@@ -1,0 +1,76 @@
+/* ════════════════════════════════════════════════════════════════════
+   KBiz360 — Global Styles
+   Tailwind directives + minimal base resets.
+   ════════════════════════════════════════════════════════════════════ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base resets (kept from original index.html) ─── */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #f3f4f8;
+}
+
+/* Prevent iOS double-tap zoom on buttons */
+button {
+  touch-action: manipulation;
+}
+
+/* ─── Component classes (use @apply for repeated patterns) ─── */
+@layer components {
+  /* Standard card — replaces inline cardStyle */
+  .kbiz-card {
+    @apply bg-white rounded-brand border border-surface-border p-4 shadow-sm;
+  }
+
+  /* Standard input — replaces inline inpStd */
+  .kbiz-input {
+    @apply w-full px-3 py-2 border border-surface-border rounded-md text-sm
+           text-navy bg-white outline-none transition-colors
+           focus:border-gold;
+  }
+
+  /* Primary CTA button (navy with gold text) */
+  .kbiz-btn-primary {
+    @apply w-full px-5 py-3.5 bg-navy text-gold border-none rounded-lg
+           text-sm font-extrabold cursor-pointer tracking-wider
+           transition-colors hover:bg-navy-light
+           disabled:bg-ink-muted disabled:cursor-wait;
+  }
+
+  /* Gold accent button */
+  .kbiz-btn-accent {
+    @apply px-4 py-2 bg-gold text-navy border-none rounded-md
+           text-xs font-bold cursor-pointer
+           transition-colors hover:bg-gold-dark hover:text-white;
+  }
+
+  /* Touch-optimized clickable region (≥44px) */
+  .kbiz-touchable {
+    @apply min-h-[44px] cursor-pointer select-none
+           [-webkit-tap-highlight-color:transparent];
+  }
+
+  /* Brand text treatment — "KBiz" gold + "360" white/navy */
+  .kbiz-brand-name {
+    @apply font-extrabold tracking-tight;
+  }
+
+  /* "THE BUSINESS ENGINE" tagline */
+  .kbiz-tagline {
+    @apply text-gold font-bold tracking-brand-tagline uppercase;
+  }
+}

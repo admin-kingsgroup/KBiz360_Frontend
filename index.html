@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/kbiz360_appicon.png" />
+    <link rel="apple-touch-icon" href="/kbiz360_appicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <meta name="theme-color" content="#0d1326" />
+    <meta name="description" content="KBiz360 — The Business Engine. Smart Travel ERP for Travkings Tours & Travels." />
+    <meta name="application-name" content="KBiz360" />
+    <meta name="apple-mobile-web-app-title" content="KBiz360" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>KBiz360 — Smart Travel ERP · The Business Engine</title>
+    <style>
+      /* Loading state — replaced once React mounts. Kept in HTML so it
+         shows before main.jsx + index.css have downloaded. */
+      #root:empty::before {
+        content: "Loading KBiz360...";
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        color: #d4a437;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        font-size: 14px;
+        background: #0d1326;
+        font-family: system-ui, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

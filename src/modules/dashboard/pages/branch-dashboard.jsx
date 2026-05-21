@@ -1,0 +1,150 @@
+import React from 'react';
+import { useMobile } from '../../../core/hooks';
+import { useBranchDashboard } from '../hooks/use-branch-dashboard';
+import { useDashboardActions } from '../hooks/use-dashboard-actions';
+import { formatCurrency } from '../utils/helpers';
+import { BranchHeader } from '../components/shared/BranchHeader';
+import { AlertStrip } from '../components/shared/AlertStrip';
+import { KpiTile } from '../components/cards/KpiTile';
+import { GpByModulePanel } from '../components/shared/GpByModulePanel';
+import { ConsultantLeaderboard } from '../components/shared/ConsultantLeaderboard';
+import { ActionItemsPanel } from '../components/shared/ActionItemsPanel';
+import { UpcomingTravelPanel } from '../components/shared/UpcomingTravelPanel';
+import { QuickStatsCard } from '../components/cards/QuickStatsCard';
+import { QuickCreateBar } from '../components/shared/QuickCreateBar';
+
+export function BranchDashboardPage({ branch, setRoute }) {
+  const mob = useMobile();
+  const { data, isLoading, branchCode, currencySymbol, isIndia } = useBranchDashboard(branch);
+  const { navigate } = useDashboardActions(setRoute);
+
+  if (isLoading || !data) {
+    return <div style={{ padding: '24px', color: '#5a6691', fontSize: 12 }}>Loading dashboard…</div>;
+  }
+
+  const { kpis, gpByModule, topConsultants, actionItems, upcomingTravel, unmatchedCount, billsYtd } = data;
+  const formatMoney = (n) => formatCurrency(currencySymbol, n);
+
+  return (
+    <div style={{ padding: '12px 10px', maxWidth: 1400, margin: '0 auto' }}>
+      <BranchHeader
+        branch={branch}
+        branchCode={branchCode}
+        isIndia={isIndia}
+        bookingsCount={kpis.bookings}
+        onNavigate={navigate}
+      />
+
+      <AlertStrip count={unmatchedCount} onClick={() => navigate('/tickets/unmatched')} />
+
+      {/* KPI Cards */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: mob ? '1fr 1fr' : 'repeat(6,1fr)',
+          gap: 10,
+          marginBottom: 16,
+        }}
+      >
+        <KpiTile
+          label="MTD Revenue"
+          value={formatMoney(kpis.revenue)}
+          growth={kpis.revenueGrowth}
+          icon="💰"
+          color="#185FA5"
+          onClick={() => navigate('/reports/sreg')}
+        />
+        <KpiTile
+          label="Gross Profit"
+          value={formatMoney(kpis.gp)}
+          growth={kpis.gpGrowth}
+          icon="📈"
+          color="#27500A"
+          sub={kpis.gpPct + '%'}
+          onClick={() => navigate('/reports/gp')}
+        />
+        <KpiTile
+          label="Net Profit"
+          value={formatMoney(kpis.netProfit)}
+          sub="after expenses"
+          icon="🏆"
+          color={kpis.netProfit > 0 ? '#1D9E75' : '#A32D2D'}
+          onClick={() => navigate('/reports/pnl')}
+        />
+        <KpiTile
+          label="Outstanding"
+          value={formatMoney(kpis.outstanding)}
+          sub="receivables"
+          icon="⏰"
+          color="#854F0B"
+          onClick={() => navigate('/reports/rec')}
+        />
+        <KpiTile
+          label="Bookings"
+          value={String(kpis.bookings)}
+          sub={`${(kpis.revenue / Math.max(1, kpis.bookings) | 0).toLocaleString()} avg`}
+          icon="✈"
+          color="#384677"
+          onClick={() => navigate('/bookings')}
+        />
+        <KpiTile
+          label="YTD Revenue"
+          value={formatMoney(kpis.ytdRevenue)}
+          sub={`GP ${formatMoney(kpis.ytdGp)}`}
+          icon="📊"
+          color="#5a6691"
+          onClick={() => navigate('/reports/pnl')}
+        />
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: mob ? '1fr' : '2fr 1fr',
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
+        {/* Left column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <GpByModulePanel
+            modGp={gpByModule}
+            totalGp={kpis.gp}
+            formatMoney={formatMoney}
+            onViewFullReport={() => navigate('/reports/gp')}
+          />
+          <ConsultantLeaderboard
+            consultants={topConsultants}
+            formatMoney={formatMoney}
+            onViewAll={() => navigate('/reports/gp')}
+          />
+        </div>
+
+        {/* Right column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <ActionItemsPanel items={actionItems} onItemClick={navigate} />
+          <UpcomingTravelPanel bookings={upcomingTravel} onViewAll={() => navigate('/bookings')} />
+          <QuickStatsCard
+            rows={[
+              { label: 'YTD Revenue', value: formatMoney(kpis.ytdRevenue), color: '#fff' },
+              { label: 'YTD Gross Profit', value: formatMoney(kpis.ytdGp), color: '#5ab84b' },
+              {
+                label: 'GP Margin',
+                value: kpis.ytdRevenue > 0 ? +((kpis.ytdGp / kpis.ytdRevenue) * 100).toFixed(1) + '%' : '—',
+                color: '#d4a437',
+              },
+              { label: 'Active Bookings', value: String(billsYtd.length), color: '#5da0e0' },
+              {
+                label: 'Avg per Booking',
+                value: billsYtd.length ? formatMoney(kpis.ytdRevenue / billsYtd.length) : '—',
+                color: '#fff',
+              },
+            ]}
+          />
+        </div>
+      </div>
+
+      <QuickCreateBar onNavigate={navigate} />
+    </div>
+  );
+}

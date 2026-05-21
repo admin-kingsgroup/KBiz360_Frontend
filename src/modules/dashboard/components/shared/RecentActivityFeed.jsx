@@ -1,0 +1,22 @@
+import React from 'react';
+import { fmtINR } from '../../../../core/format';
+
+export function RecentActivityFeed({ entries }) {
+  return (
+    <>
+      {entries.map((a, i) => (
+        <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid #f0f2f7' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <p style={{ margin: 0, fontSize: 11.5, color: '#0d1326', fontWeight: 600 }}>{a.action}</p>
+            {a.amount > 0 && (
+              <p style={{ margin: 0, fontSize: 11.5, color: '#d4a437', fontWeight: 700 }}>{fmtINR(a.amount)}</p>
+            )}
+          </div>
+          <p style={{ margin: '2px 0 0', fontSize: 10, color: '#5a6691' }}>
+            {a.vendor} · {a.ts}
+          </p>
+        </div>
+      ))}
+    </>
+  );
+}

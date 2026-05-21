@@ -1,0 +1,33 @@
+{
+  "name": "kbiz360-smart-travel-erp",
+  "version": "1.1.0",
+  "private": true,
+  "description": "KBiz360 — The Business Engine. Smart Travel ERP for Travkings Tours & Travels.",
+  "author": "Travkings Tours & Travels Pvt. Ltd.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "lint": "echo 'Linting skipped (configure eslint as needed)'"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "lucide-react": "^0.383.0",
+    "recharts": "^2.12.7",
+    "zustand": "^4.5.4",
+    "@tanstack/react-query": "^5.51.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.3.1",
+    "tailwindcss": "^3.4.4",
+    "postcss": "^8.4.38",
+    "autoprefixer": "^10.4.19"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
