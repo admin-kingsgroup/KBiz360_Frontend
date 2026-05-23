@@ -126,6 +126,17 @@ export const MIX=[
 
 export const CASH=Array.from({length:30},(_,i)=>({day:i+1,inflow:Math.round(80+Math.sin(i/4)*30+(i>20?40:0)),outflow:Math.round(65+Math.cos(i/3)*20)}));
 
+/* Salespeople — synced from CRM. Used on every sale/purchase voucher to match transactions back to a CRM owner. */
+export const SALESPEOPLE=[
+  {id:"RAHM",name:"Rahul M",   branch:"BOM"},
+  {id:"PRIS",name:"Priya S",   branch:"BOM"},
+  {id:"AMIK",name:"Amit K",    branch:"BOM"},
+  {id:"NEHP",name:"Neha P",    branch:"AMD"},
+  {id:"KEVO",name:"Kevin O",   branch:"NBO"},
+  {id:"AMIH",name:"Amina H",   branch:"DAR"},
+  {id:"SUJE",name:"Sujeet",    branch:"FBM"},
+];
+
 export const CUSTOMERS=[
   {name:"Sharma Enterprises",rev:"₹18.4 L",out:"₹2.15 L",ov:false},
   {name:"Apex Pharma",       rev:"₹12.8 L",out:"₹1.80 L",ov:false},

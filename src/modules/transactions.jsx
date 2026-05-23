@@ -11,7 +11,7 @@ import { ADM_DATA, ADM_REASON_CODES, BRANCHES, GP_BILLS, LEDGER_REGISTRY, PURCHA
 import { fmt, fmtINR } from '../core/format';
 import { ACM_DATA, ACM_REASON_CODES, LedgerSelect, RECURRING_DATA, REFUNDS_DATA, Recruitment, STATUS_FLOW, TAB_Page, TRow, TrainingRecords, VTD, VTH, _ADM_LIST, _TICKET_CTRL, cardStyle, tabPanel } from '../core/helpers';
 import { triggerSaveRefresh, useMobile, useVNo } from '../core/hooks';
-import { ARow, B, DBtn, FL, RPT_tdStyle, RPT_thStyle, VHead, VNarr, VParty, VTot, VWrap, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../core/styles';
+import { ARow, B, DBtn, FL, RPT_tdStyle, RPT_thStyle, SalespersonField, VHead, VNarr, VParty, VTot, VWrap, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../core/styles';
 import { Dashboard } from './dashboard';
 import { TDS_SECTIONS } from './finance';
 import { ChartOfAccounts, MastersLedgers, MastersSubAgents } from './masters';
@@ -296,41 +296,73 @@ export function SalesFlight({branch,setRoute}){
   const vNo=useVNo(branch,"SF");
   const [linkedPurch,setLinkedPurch]=useState(null);
   const [pax,setPax]=useState([
-    {id:1,name:"Mr. Rajiv Sharma",  ticket:"098-2156789012",airline:"Air India",sector:"BOM-DXB",date:"2026-05-16",cls:"Economy",base:18000,taxes:2500},
-    {id:2,name:"Mrs. Rohan", ticket:"098-2156789013",airline:"Air India",sector:"BOM-DXB",date:"2026-05-16",cls:"Economy",base:18000,taxes:2500},
+    {id:1,name:"Mr. Rajiv Sharma",  ticket:"098-2156789012",airline:"Air India",sector:"BOM-DXB",date:"2026-05-16",cls:"Economy",base:18000,k3:1400,otherTax:1100},
+    {id:2,name:"Mrs. Rohan", ticket:"098-2156789013",airline:"Air India",sector:"BOM-DXB",date:"2026-05-16",cls:"Economy",base:18000,k3:1400,otherTax:1100},
   ]);
   const [sc,setSc]=useState(1500);
+  const [tripType,setTripType]=useState("International"); // International | Domestic
+  const [irn,setIrn]=useState("a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456");
+  const [terms,setTerms]=useState("1. Tickets are non-refundable unless airline policy permits.\n2. Date/route changes attract airline change fee + fare difference.\n3. Cancellation charges as per airline rules apply.\n4. Passport must be valid for 6 months beyond travel date.\n5. Visa, insurance and on-board services not included unless specified.");
+  const [qrFile,setQrFile]=useState(null);
   const t=useMemo(()=>{
     const base=pax.reduce((s,p)=>s+(+p.base||0),0);
-    const taxes=pax.reduce((s,p)=>s+(+p.taxes||0),0);
+    const k3=pax.reduce((s,p)=>s+(+p.k3||0),0);
+    const otherTax=pax.reduce((s,p)=>s+(+p.otherTax||0),0);
+    const taxes=k3+otherTax;
     const cgst=+(sc*0.09).toFixed(2);
     const sgst=+(sc*0.09).toFixed(2);
-    return {base:base,taxes:taxes,sc:sc,cgst:cgst,sgst:sgst,total:base+taxes+sc+cgst+sgst};
+    return {base:base,k3:k3,otherTax:otherTax,taxes:taxes,sc:sc,cgst:cgst,sgst:sgst,total:base+taxes+sc+cgst+sgst};
   },[pax,sc]);
   const upd=(id,f,v)=>setPax(ps=>ps.map(p=>p.id===id?{...p,[f]:v}:p));
-  const add=()=>setPax(ps=>[...ps,{id:Date.now(),name:"",ticket:"",airline:"",sector:"",date:"",cls:"Economy",base:0,taxes:0}]);
+  const add=()=>setPax(ps=>[...ps,{id:Date.now(),name:"",ticket:"",airline:"",sector:"",date:"",cls:"Economy",base:0,k3:0,otherTax:0}]);
   const rm=id=>setPax(ps=>ps.filter(p=>p.id!==id));
   const cfg=bc(branch);
   const cur=cfg.cur;
+  const isIntl=tripType==="International";
   return (
     <div style={{padding:"12px 10px",maxWidth:1260,margin:"0 auto",paddingBottom:72}}>
       <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:12,overflow:"hidden"}}>
         {/* Header */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-          padding:"12px 16px",background:"#0d1326"}}>
-          <div style={{display:"flex",alignItems:"center",gap:11}}>
-            <div style={{width:38,height:38,borderRadius:9,background:"#E6F1FB",
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>✈</div>
-            <div>
-              <p style={{margin:0,fontSize:15,fontWeight:700,color:"#fff"}}>Sales — Flight Tickets</p>
-              <p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{"Voucher · "+(branch?.code||"BOM")+" · "+vNo}</p>
+        <div style={{padding:"12px 16px",background:"#0d1326"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:11}}>
+              <div style={{width:38,height:38,borderRadius:9,background:"#E6F1FB",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>✈</div>
+              <div>
+                <p style={{margin:0,fontSize:15,fontWeight:700,color:"#fff"}}>Sales — Flight Tickets</p>
+                <p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{"Voucher · "+(branch?.code||"BOM")+" · "+vNo}</p>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+              <div style={{display:"flex",gap:0,borderRadius:999,overflow:"hidden",border:"1px solid #2a3450"}}>
+                <button onClick={()=>setTripType("Domestic")}
+                  style={{padding:"5px 12px",fontSize:10,fontWeight:700,cursor:"pointer",border:"none",
+                    background:tripType==="Domestic"?"#27500A":"transparent",
+                    color:tripType==="Domestic"?"#fff":"#8b94b3"}}>
+                  🇮🇳 Domestic
+                </button>
+                <button onClick={()=>setTripType("International")}
+                  style={{padding:"5px 12px",fontSize:10,fontWeight:700,cursor:"pointer",border:"none",
+                    background:tripType==="International"?"#185FA5":"transparent",
+                    color:tripType==="International"?"#fff":"#8b94b3"}}>
+                  🌍 International
+                </button>
+              </div>
+              <span style={{fontSize:10,padding:"4px 10px",borderRadius:999,
+                background:cfg.taxType==="GST"?"#E6F1FB":"#EAF3DE",
+                color:cfg.taxType==="GST"?"#185FA5":"#27500A",fontWeight:700}}>
+                {branch?.flag} {cfg.curCode} · {cfg.taxType==="GST"?"GST 18%":"VAT "+cfg.vatRate+"%"}
+              </span>
             </div>
           </div>
-          <div style={{display:"flex",gap:8}}>
-            <span style={{fontSize:10,padding:"4px 10px",borderRadius:999,
-              background:cfg.taxType==="GST"?"#E6F1FB":"#EAF3DE",
-              color:cfg.taxType==="GST"?"#185FA5":"#27500A",fontWeight:700}}>
-              {branch?.flag} {cfg.curCode} · {cfg.taxType==="GST"?"GST 18%":"VAT "+cfg.vatRate+"%"}
+          {/* IRN row */}
+          <div style={{marginTop:10,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            <label style={{fontSize:9.5,color:"#8b94b3",fontWeight:700,letterSpacing:"0.5px",textTransform:"uppercase",whiteSpace:"nowrap"}}>IRN No.</label>
+            <input value={irn} onChange={e=>setIrn(e.target.value)}
+              style={{flex:1,minWidth:280,padding:"6px 10px",borderRadius:6,border:"1px solid #2a3450",
+                background:"#1a2238",color:"#d4a437",fontFamily:"monospace",fontSize:10.5,fontWeight:600}}/>
+            <span style={{fontSize:9,padding:"3px 9px",borderRadius:999,background:"#d4a437",color:"#0d1326",fontWeight:700,whiteSpace:"nowrap"}}>
+              e-Invoice IRN
             </span>
           </div>
         </div>
@@ -346,6 +378,7 @@ export function SalesFlight({branch,setRoute}){
             <FL label="Date"><input type="date" defaultValue="2026-05-16" style={inp}/></FL>
             <FL label="Invoice type"><select style={inp}><option>Tax Invoice</option><option>Bill of Supply</option><option>Proforma</option></select></FL>
             <FL label="Reference"><input defaultValue="REF-AI-78421" style={inp}/></FL>
+            <SalespersonField branch={branch}/>
           </div>
         </div>
 
@@ -375,10 +408,10 @@ export function SalesFlight({branch,setRoute}){
             </button>
           </div>
           <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",fontSize:11.5,borderCollapse:"collapse",minWidth:780}}>
+            <table style={{width:"100%",fontSize:11.5,borderCollapse:"collapse",minWidth:880}}>
               <thead><tr style={{background:"#f3f4f8"}}>
-                {["#","Passenger","Ticket no.","Airline","Sector","Date","Class","Base fare","Taxes",""].map((h,i)=>(
-                  <th key={i} style={{padding:"7px 8px",textAlign:i>=7?"right":"left",
+                {["#","Passenger","Ticket no.","Airline","Sector","Date","Class","Base fare","K3","Other taxes",""].map((h,i)=>(
+                  <th key={i} style={{padding:"7px 8px",textAlign:i>=7&&i<=9?"right":"left",
                     fontSize:10,color:"#5a6691",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr></thead>
@@ -392,12 +425,20 @@ export function SalesFlight({branch,setRoute}){
                   <td style={{padding:3}}><input type="date" value={p.date} onChange={e=>upd(p.id,"date",e.target.value)} style={{...inp,minWidth:120}}/></td>
                   <td style={{padding:3}}><select value={p.cls} onChange={e=>upd(p.id,"cls",e.target.value)} style={{...inp,minWidth:90}}><option>Economy</option><option>Business</option><option>First</option></select></td>
                   <td style={{padding:3}}><input type="number" value={p.base} onChange={e=>upd(p.id,"base",+e.target.value)} style={{...inp,minWidth:90,textAlign:"right"}}/></td>
-                  <td style={{padding:3}}><input type="number" value={p.taxes} onChange={e=>upd(p.id,"taxes",+e.target.value)} style={{...inp,minWidth:80,textAlign:"right"}}/></td>
+                  <td style={{padding:3}}><input type="number" value={p.k3} onChange={e=>upd(p.id,"k3",+e.target.value)} style={{...inp,minWidth:75,textAlign:"right"}} title="K3 tax (GST on airline tax — typically applicable on international tickets)"/></td>
+                  <td style={{padding:3}}><input type="number" value={p.otherTax} onChange={e=>upd(p.id,"otherTax",+e.target.value)} style={{...inp,minWidth:80,textAlign:"right"}} title="Other taxes — YQ/YR fuel, airport fees, UDF, PSF"/></td>
                   <td style={{padding:"4px 8px",textAlign:"center"}}>
                     <button onClick={()=>rm(p.id)} style={{background:"transparent",border:"none",color:"#A32D2D",cursor:"pointer",fontSize:16}}>×</button>
                   </td>
                 </tr>
               ))}</tbody>
+              <tfoot><tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+                <td colSpan={7} style={{padding:"7px 8px",fontWeight:700,fontSize:11,color:"#5a6691"}}>Totals</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#185FA5"}}>{fmt(t.base)}</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(t.k3)}</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(t.otherTax)}</td>
+                <td/>
+              </tr></tfoot>
             </table>
           </div>
         </div>
@@ -420,10 +461,44 @@ export function SalesFlight({branch,setRoute}){
         {/* Narration + summary */}
         <div style={{padding:"13px 16px",background:"#f9fafb"}}>
           <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:14}}>
-            <FL label="Narration"><textarea rows={3} defaultValue={"Being air tickets issued to Sharma Enterprises — "+pax.length+" pax"} style={{...inp,resize:"vertical"}}/></FL>
-            <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:10,padding:14}}>
+            <div style={{display:"flex",flexDirection:"column",gap:11}}>
+              <FL label="Narration"><textarea rows={2} defaultValue={"Being air tickets issued to Sharma Enterprises — "+pax.length+" pax · "+tripType} style={{...inp,resize:"vertical"}}/></FL>
+              <FL label="Terms & Conditions">
+                <textarea rows={5} value={terms} onChange={e=>setTerms(e.target.value)} style={{...inp,resize:"vertical",fontSize:10.5,lineHeight:1.45}}/>
+              </FL>
+              <div>
+                <label style={{fontSize:10,color:"#5a6691",fontWeight:600,letterSpacing:"0.4px",textTransform:"uppercase"}}>GST QR Code</label>
+                <div style={{marginTop:4,padding:"10px 12px",border:"2px dashed #c7cbe0",borderRadius:8,background:"#fff",
+                  display:"flex",alignItems:"center",gap:11,flexWrap:"wrap"}}>
+                  {qrFile
+                    ?<>
+                      <div style={{width:54,height:54,borderRadius:6,background:"#f3f4f8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,border:"1px solid #e1e3ec"}}>▦</div>
+                      <div style={{flex:1,minWidth:140}}>
+                        <p style={{margin:0,fontSize:11,fontWeight:700,color:"#0d1326"}}>{qrFile.name}</p>
+                        <p style={{margin:"2px 0 0",fontSize:10,color:"#5a6691"}}>{(qrFile.size/1024).toFixed(1)} KB · uploaded</p>
+                      </div>
+                      <button onClick={()=>setQrFile(null)} style={{...btnGh,fontSize:10,padding:"4px 10px",color:"#A32D2D",borderColor:"#A32D2D"}}>Remove</button>
+                    </>
+                    :<>
+                      <div style={{width:54,height:54,borderRadius:6,background:"#f3f4f8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#8b94b3",border:"1px solid #e1e3ec"}}>▦</div>
+                      <div style={{flex:1,minWidth:140}}>
+                        <p style={{margin:0,fontSize:11,fontWeight:600,color:"#0d1326"}}>Upload GST e-Invoice QR code</p>
+                        <p style={{margin:"2px 0 0",fontSize:9.5,color:"#5a6691"}}>PNG / JPG · signed QR from IRP portal</p>
+                      </div>
+                      <label style={{...btnGh,fontSize:10,padding:"5px 12px",cursor:"pointer",display:"inline-block"}}>
+                        Choose file
+                        <input type="file" accept="image/png,image/jpeg" style={{display:"none"}}
+                          onChange={e=>{const f=e.target.files?.[0];if(f)setQrFile(f);}}/>
+                      </label>
+                    </>
+                  }
+                </div>
+              </div>
+            </div>
+            <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:10,padding:14,alignSelf:"start"}}>
               <TRow l="Base fare" v={cur+" "+fmt(t.base)}/>
-              <TRow l="Airline taxes" v={cur+" "+fmt(t.taxes)}/>
+              <TRow l="K3 tax" v={cur+" "+fmt(t.k3)}/>
+              <TRow l="Other taxes" v={cur+" "+fmt(t.otherTax)}/>
               <TRow l="Service charge" v={cur+" "+fmt(t.sc)}/>
               <TRow l={cfg.taxType==="GST"?"CGST 9%":"VAT "+cfg.vatRate+"%"} v={cur+" "+fmt(t.cgst)}/>
               {cfg.taxType==="GST"&&<TRow l="SGST 9%" v={cur+" "+fmt(t.sgst)}/>}
@@ -434,6 +509,11 @@ export function SalesFlight({branch,setRoute}){
                   {cur+" "+fmt(t.total)}
                 </span>
               </div>
+              <p style={{margin:"10px 0 0",fontSize:9.5,color:"#5a6691",fontStyle:"italic"}}>
+                {isIntl
+                  ?"International ticket — K3 (GST on airline tax) typically applies. CGST/SGST on service charge only."
+                  :"Domestic ticket — K3 generally nil. Full GST on base fare + service charge as applicable."}
+              </p>
             </div>
           </div>
         </div>
@@ -469,77 +549,57 @@ export function SalesFlight({branch,setRoute}){
 
 export function SalesCar({branch,setRoute}){
   const vNo=useVNo(branch,"SC");
-  const [rows,setRows]=useState([
-    {id:1,vehicle:"Toyota Innova Crysta",type:"MUV",pickup:"Mumbai Airport T2",drop:"Pune Station",days:3,rate:4200,km:0,drv:0},
-    {id:2,vehicle:"Toyota Etios",type:"Sedan",pickup:"Pune Station",drop:"Pune Station",days:2,rate:2800,km:0,drv:0},
-  ]);
-  const [gstScheme,setGstScheme]=useState("5");
-  const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:Date.now(),vehicle:"",type:"Sedan",pickup:"",drop:"",days:1,rate:0,km:0,drv:0}]);
-  const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
-  const sub=rows.reduce((s,r)=>s+(+r.rate||0)*(+r.days||1)+(+r.km||0)+(+r.drv||0),0);
-  const gstPct=+gstScheme;
-  const cgst=+(sub*gstPct/200).toFixed(2);
+  const [row,setRow]=useState({pickup:"Mumbai Airport T2",drop:"Pune Station",days:3,basic:12600,otherFare:1500,svc:800});
+  const upd=(k,v)=>setRow(r=>({...r,[k]:v}));
+  const sub=(+row.basic||0)+(+row.otherFare||0)+(+row.svc||0);
+  const cgst=+(sub*0.025).toFixed(2);
   const sgst=cgst;
   const total=+(sub+cgst+sgst).toFixed(2);
   return (
     <VWrap title="Sales Voucher — Car Rentals" icon="🚗" vNo={vNo} branch={branch} type="sales" saleMod="SC" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} name="Nexus Industries" gstin="27AACNI2211J1Z1"/>
-      <ARow label="Vehicle &amp; hire details" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:860}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+        <p style={{margin:"0 0 8px",fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Vehicle &amp; hire details</p>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:820}}>
           <thead><tr>
-            {["#","Vehicle","Type","Pickup","Drop","Days","Rate/day ₹","Extra km ₹","Driver ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=9}/>)}
+            {["#","Vehicle","Pickup","Drop","Days","Basic ₹","Other fare ₹","Service charge ₹","Total ₹"].map((h,i)=><VTH key={i} c={h} r={i>=4&&i<=8}/>)}
           </tr></thead>
-          <tbody>{rows.map((r,i)=>{
-            const rowTotal=(+r.rate||0)*(+r.days||1)+(+r.km||0)+(+r.drv||0);
-            return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
-                <VTD c={i+1}/>
-                <td style={{padding:3}}><input value={r.vehicle} onChange={e=>upd(r.id,"vehicle",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}>
-                  <select value={r.type} onChange={e=>upd(r.id,"type",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}>
-                    <option>Sedan</option><option>MUV</option><option>SUV</option><option>Tempo</option><option>Bus</option>
-                  </select>
-                </td>
-                <td style={{padding:3}}><input value={r.pickup} onChange={e=>upd(r.id,"pickup",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input value={r.drop} onChange={e=>upd(r.id,"drop",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.days} onChange={e=>upd(r.id,"days",+e.target.value||1)} style={{...inp,minHeight:28,fontSize:11,width:55,textAlign:"right"}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.rate} onChange={e=>upd(r.id,"rate",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.km} onChange={e=>upd(r.id,"km",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.drv} onChange={e=>upd(r.id,"drv",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
-                <VTD c={fmt(rowTotal)} r/>
-                <DBtn fn={()=>rm(r.id)}/>
-              </tr>
-            );
-          })}</tbody>
+          <tbody>
+            <tr style={{borderBottom:"1px solid #e1e3ec"}}>
+              <VTD c={1}/>
+              <td style={{padding:3}}>
+                <input value="Car rental" readOnly style={{...inp,minHeight:28,fontSize:11,background:"#f3f4f8",color:"#5a6691",fontWeight:600,cursor:"not-allowed"}}/>
+              </td>
+              <td style={{padding:3}}><input value={row.pickup} onChange={e=>upd("pickup",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
+              <td style={{padding:3}}><input value={row.drop} onChange={e=>upd("drop",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
+              <td style={{padding:3}}><input type="number" value={row.days} onChange={e=>upd("days",+e.target.value||1)} style={{...inp,minHeight:28,fontSize:11,width:60,textAlign:"right"}}/></td>
+              <td style={{padding:3}}><input type="number" value={row.basic} onChange={e=>upd("basic",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Basic hire charges"/></td>
+              <td style={{padding:3}}><input type="number" value={row.otherFare} onChange={e=>upd("otherFare",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Toll, parking, extra km, driver allowance"/></td>
+              <td style={{padding:3}}><input type="number" value={row.svc} onChange={e=>upd("svc",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Agency service charge"/></td>
+              <VTD c={fmt(sub)} r/>
+            </tr>
+          </tbody>
         </table>
-      </ARow>
+      </div>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
-          <FL label="GST scheme">
-            <select value={gstScheme} onChange={e=>setGstScheme(e.target.value)} style={inp}>
-              <option value="5">5% — No ITC (standard hire)</option>
-              <option value="12">12% — With ITC (B2B / aggregator)</option>
-            </select>
-          </FL>
-          <FL label={"CGST "+gstPct/2+"% ₹"}><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          <FL label={"SGST "+gstPct/2+"% ₹"}><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+          <FL label="GST rate"><input value="5% (CGST 2.5% + SGST 2.5%)" readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontWeight:600,cursor:"not-allowed"}}/></FL>
+          <FL label="CGST 2.5% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+          <FL label="SGST 2.5% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
         </div>
         <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
-          {bc(branch).taxType==="GST"
-            ? (gstScheme==="5"
-              ? "5% GST — No ITC. Standard car hire (SAC 996601). Apply when hiring with operator."
-              : "12% GST — ITC available for B2B / aggregator transport.")
-            : bc(branch).taxType+" "+bc(branch).vatRate+"% on hire charges."}
+          5% GST applied on (Basic + Other fare + Service charge). SAC 996601 — Rental services of road vehicles with operator. No ITC available to buyer under the 5% scheme.
         </div>
       </div>
-      <VNarr def="Being car hire charges — Innova Crysta BOM-Pune + Etios local Pune, 28-30 May 2026, Nexus Industries.">
+      <VNarr def={`Being car rental charges — ${row.pickup} to ${row.drop}, ${row.days} day(s), Nexus Industries.`}>
         <VTot branch={branch}
           lines={[
-            {l:"Hire charges (base)",v:"₹ "+fmt(sub)},
-            {l:"CGST "+gstPct/2+"%",v:"₹ "+fmt(cgst)},
-            {l:"SGST "+gstPct/2+"%",v:"₹ "+fmt(sgst)},
+            {l:"Basic",v:"₹ "+fmt(row.basic)},
+            {l:"Other fare",v:"₹ "+fmt(row.otherFare)},
+            {l:"Service charge",v:"₹ "+fmt(row.svc)},
+            {l:"CGST 2.5%",v:"₹ "+fmt(cgst)},
+            {l:"SGST 2.5%",v:"₹ "+fmt(sgst)},
           ]}
           total={total}
         />
@@ -554,42 +614,50 @@ export function SalesCar({branch,setRoute}){
 export function SalesVisa({branch,setRoute}){
   const vNo=useVNo(branch,"SV");
   const [appl,setAppl]=useState([
-    {id:1,name:"Mr. Rajiv Sharma",pp:"Z1234567",dob:"1975-04-15",nat:"Indian",country:"UAE",vtype:"Tourist 30D",vfsRef:"VFS-DXB-112233",embFee:4800,vfsFee:1800},
-    {id:2,name:"Mrs. Rohan",pp:"Z1234568",dob:"1978-09-22",nat:"Indian",country:"UAE",vtype:"Tourist 30D",vfsRef:"VFS-DXB-112234",embFee:4800,vfsFee:1800},
+    {id:1,name:"Mr. Rajiv Sharma",pp:"Z1234567",country:"UAE",vtype:"Tourist 30D",vfsFee:1800,taxes:324,otherTax:150},
+    {id:2,name:"Mrs. Rohan",pp:"Z1234568",country:"UAE",vtype:"Tourist 30D",vfsFee:1800,taxes:324,otherTax:150},
   ]);
   const [svc,setSvc]=useState(2500);
   const upd=(id,k,v)=>setAppl(as=>as.map(a=>a.id===id?{...a,[k]:v}:a));
-  const add=()=>setAppl(as=>[...as,{id:Date.now(),name:"",pp:"",dob:"",nat:"Indian",country:"",vtype:"",vfsRef:"",embFee:0,vfsFee:0}]);
+  const add=()=>setAppl(as=>[...as,{id:Date.now(),name:"",pp:"",country:"",vtype:"",vfsFee:0,taxes:0,otherTax:0}]);
   const rm=id=>setAppl(as=>as.filter(a=>a.id!==id));
-  const embTot=appl.reduce((s,a)=>s+(+a.embFee||0),0);
   const vfsTot=appl.reduce((s,a)=>s+(+a.vfsFee||0),0);
+  const taxesTot=appl.reduce((s,a)=>s+(+a.taxes||0),0);
+  const otherTot=appl.reduce((s,a)=>s+(+a.otherTax||0),0);
   const cgst=+(svc*0.09).toFixed(2);
   const sgst=cgst;
-  const total=+(embTot+vfsTot+svc+cgst+sgst).toFixed(2);
+  const total=+(vfsTot+taxesTot+otherTot+svc+cgst+sgst).toFixed(2);
   return (
     <VWrap title="Sales Voucher — Visas" icon="🛂" vNo={vNo} branch={branch} type="sales" saleMod="SV" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} name="Sharma Enterprises Pvt. Ltd." gstin="27AABCS1234L1Z5"/>
       <ARow label="Applicant details" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
-            {["#","Applicant name","Passport no.","DOB","Nationality","Visa country","Visa type","VFS ref.","Embassy fee ₹","VFS fee ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=8&&i<=9}/>)}
+            {["#","Applicant name","Passport no.","Visa country","Visa type","VFS fee ₹","Taxes ₹","Other taxes ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=7}/>)}
           </tr></thead>
           <tbody>{appl.map((a,i)=>(
             <tr key={a.id} style={{borderBottom:"1px solid #e1e3ec"}}>
               <VTD c={i+1}/>
-              <td style={{padding:3}}><input value={a.name} onChange={e=>upd(a.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={a.pp} onChange={e=>upd(a.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:90}}/></td>
-              <td style={{padding:3}}><input type="date" value={a.dob} onChange={e=>upd(a.id,"dob",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={a.nat} onChange={e=>upd(a.id,"nat",e.target.value)} style={{...inp,minHeight:28,fontSize:11,width:80}}/></td>
-              <td style={{padding:3}}><input value={a.country} onChange={e=>upd(a.id,"country",e.target.value)} style={{...inp,minHeight:28,fontSize:11,width:80}}/></td>
+              <td style={{padding:3}}><input value={a.name} onChange={e=>upd(a.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:150}}/></td>
+              <td style={{padding:3}}><input value={a.pp} onChange={e=>upd(a.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:100}}/></td>
+              <td style={{padding:3}}><input value={a.country} onChange={e=>upd(a.id,"country",e.target.value)} style={{...inp,minHeight:28,fontSize:11,width:90}}/></td>
               <td style={{padding:3}}><input value={a.vtype} onChange={e=>upd(a.id,"vtype",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={a.vfsRef} onChange={e=>upd(a.id,"vfsRef",e.target.value)} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace"}}/></td>
-              <td style={{padding:3}}><input type="number" value={a.embFee} onChange={e=>upd(a.id,"embFee",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:80}}/></td>
-              <td style={{padding:3}}><input type="number" value={a.vfsFee} onChange={e=>upd(a.id,"vfsFee",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:80}}/></td>
+              <td style={{padding:3}}><input type="number" value={a.vfsFee} onChange={e=>upd(a.id,"vfsFee",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:90}}/></td>
+              <td style={{padding:3}}><input type="number" value={a.taxes} onChange={e=>upd(a.id,"taxes",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:80}} title="GST / VAT on VFS fee"/></td>
+              <td style={{padding:3}}><input type="number" value={a.otherTax} onChange={e=>upd(a.id,"otherTax",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:80}} title="Service tax, biometric, courier — non-creditable"/></td>
               <DBtn fn={()=>rm(a.id)}/>
             </tr>
           ))}</tbody>
+          <tfoot>
+            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+              <td colSpan={5} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(vfsTot)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(taxesTot)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(otherTot)}</td>
+              <td/>
+            </tr>
+          </tfoot>
         </table>
       </ARow>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
@@ -600,20 +668,16 @@ export function SalesVisa({branch,setRoute}){
           <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
           <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
         </div>
-        <div style={{marginTop:9,display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
-          <div style={{padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
-            Embassy fees (<b>{"₹ "+fmt(embTot)}</b>) and VFS fees (<b>{"₹ "+fmt(vfsTot)}</b>) are pure pass-through — not agency income. GST 18% applies only on service charge.
-          </div>
-          <div style={{padding:"8px 12px",background:"#f3f4f8",borderRadius:8,fontSize:11.5,color:"#5a6691"}}>
-            SAC code: <b>998212</b> — Visa and passport services. Issue tax invoice showing service charge separately from pass-through fees.
-          </div>
+        <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
+          SAC code: <b>998212</b> — Visa and passport services. VFS fee + Taxes + Other taxes are pass-through to the applicant. GST 18% applies only on agency service charge.
         </div>
       </div>
       <VNarr def="Being visa processing charges — Sharma Enterprises, 2 applicants, UAE Tourist 30D via VFS Dubai centre.">
         <VTot branch={branch}
           lines={[
-            {l:"Embassy fees (pass-through)",v:"₹ "+fmt(embTot)},
-            {l:"VFS / processing fees (pass-through)",v:"₹ "+fmt(vfsTot)},
+            {l:"VFS fee (pass-through)",v:"₹ "+fmt(vfsTot)},
+            {l:"Taxes",v:"₹ "+fmt(taxesTot)},
+            {l:"Other taxes",v:"₹ "+fmt(otherTot)},
             {l:"Agency service charge",v:"₹ "+fmt(svc)},
             {l:"CGST 9%",v:"₹ "+fmt(cgst)},
             {l:"SGST 9%",v:"₹ "+fmt(sgst)},
@@ -631,96 +695,70 @@ export function SalesVisa({branch,setRoute}){
 export function SalesHotel({branch,setRoute}){
   const vNo=useVNo(branch,"SHT");
   const [rows,setRows]=useState([
-    {id:1,hotel:"Hyatt Regency Ahmedabad",ci:"2026-06-05",co:"2026-06-08",rtype:"Deluxe King",rooms:2,nights:3,rate:9500,meal:"CP"},
+    {id:1,passenger:"Mr. Rajiv Sharma",ci:"2026-06-05",co:"2026-06-08",rtype:"Deluxe King",meal:"CP",basic:24000,taxes:2880,otherTax:600,svc:1500},
   ]);
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:Date.now(),hotel:"",ci:"",co:"",rtype:"Deluxe",rooms:1,nights:1,rate:0,meal:"EP"}]);
+  const add=()=>setRows(rs=>[...rs,{id:Date.now(),passenger:"",ci:"",co:"",rtype:"Deluxe",meal:"EP",basic:0,taxes:0,otherTax:0,svc:0}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
 
-  function gstSlab(rate){
-    if(rate<1000)return 0;
-    if(rate<=7500)return 12;
-    return 18;
-  }
-  const sub=rows.reduce((s,r)=>s+(+r.rate||0)*(+r.rooms||1)*(+r.nights||1),0);
-  const gstAmt=rows.reduce((s,r)=>{
-    const lineTotal=(+r.rate||0)*(+r.rooms||1)*(+r.nights||1);
-    return s+lineTotal*gstSlab(+r.rate||0)/100;
-  },0);
-  const cgst=+(gstAmt/2).toFixed(2);
-  const sgst=cgst;
-  const total=+(sub+cgst+sgst).toFixed(2);
-
-  const slabBg={0:"#f3f4f8",12:"#FAEEDA",18:"#FCEBEB"};
-  const slabC={0:"#5a6691",12:"#854F0B",18:"#A32D2D"};
-  const slabLabel={0:"0% — Nil GST (below ₹1,000/night)",12:"12% — Mid-range (₹1k–₹7.5k/night)",18:"18% — Luxury (above ₹7,500/night)"};
+  const totBasic=rows.reduce((s,r)=>s+(+r.basic||0),0);
+  const totTaxes=rows.reduce((s,r)=>s+(+r.taxes||0),0);
+  const totOther=rows.reduce((s,r)=>s+(+r.otherTax||0),0);
+  const totSvc=rows.reduce((s,r)=>s+(+r.svc||0),0);
+  const total=+(totBasic+totTaxes+totOther+totSvc).toFixed(2);
 
   return (
     <VWrap title="Sales Voucher — Hotels" icon="🏨" vNo={vNo} branch={branch} type="sales" saleMod="SHT" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} name="Apex Pharma Ltd." gstin="27AAPFL9876K1Z3"/>
       <ARow label="Accommodation details" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:920}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:1020}}>
           <thead><tr>
-            {["#","Hotel / property","Check-in","Check-out","Room type","Rooms","Nights","Rate/room/night ₹","Meal plan","GST slab","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=6||i===7||i===10}/>)}
+            {["#","Passenger Name","Check-in","Check-out","Room type","Meal plan","Room fare / Basic fare ₹","Taxes ₹","Other tax ₹","Service charge ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=6&&i<=10}/>)}
           </tr></thead>
           <tbody>{rows.map((r,i)=>{
-            const slab=gstSlab(+r.rate||0);
-            const lineTotal=(+r.rate||0)*(+r.rooms||1)*(+r.nights||1);
+            const lineTotal=(+r.basic||0)+(+r.taxes||0)+(+r.otherTax||0)+(+r.svc||0);
             return (
               <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
                 <VTD c={i+1}/>
-                <td style={{padding:3}}><input value={r.hotel} onChange={e=>upd(r.id,"hotel",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
+                <td style={{padding:3}}><input value={r.passenger} onChange={e=>upd(r.id,"passenger",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:160}}/></td>
                 <td style={{padding:3}}><input type="date" value={r.ci} onChange={e=>upd(r.id,"ci",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
                 <td style={{padding:3}}><input type="date" value={r.co} onChange={e=>upd(r.id,"co",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
                 <td style={{padding:3}}><input value={r.rtype} onChange={e=>upd(r.id,"rtype",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.rooms} onChange={e=>upd(r.id,"rooms",+e.target.value||1)} style={{...inp,minHeight:28,fontSize:11,width:50,textAlign:"right"}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.nights} onChange={e=>upd(r.id,"nights",+e.target.value||1)} style={{...inp,minHeight:28,fontSize:11,width:50,textAlign:"right"}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.rate} onChange={e=>upd(r.id,"rate",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
                 <td style={{padding:3}}>
                   <select value={r.meal} onChange={e=>upd(r.id,"meal",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}>
                     <option>EP</option><option>CP</option><option>MAP</option><option>AP</option>
                   </select>
                 </td>
-                <td style={{padding:"4px 7px"}}>
-                  <span style={{fontSize:10,padding:"2px 7px",borderRadius:6,background:slabBg[slab],color:slabC[slab],fontWeight:600,whiteSpace:"nowrap"}}>{slab}%</span>
-                </td>
+                <td style={{padding:3}}><input type="number" value={r.basic} onChange={e=>upd(r.id,"basic",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
+                <td style={{padding:3}}><input type="number" value={r.taxes} onChange={e=>upd(r.id,"taxes",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="GST / occupancy / luxury tax charged by the hotel"/></td>
+                <td style={{padding:3}}><input type="number" value={r.otherTax} onChange={e=>upd(r.id,"otherTax",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="City fee, resort fee, tourism levy, destination tax"/></td>
+                <td style={{padding:3}}><input type="number" value={r.svc} onChange={e=>upd(r.id,"svc",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Agency service charge"/></td>
                 <VTD c={fmt(lineTotal)} r/>
                 <DBtn fn={()=>rm(r.id)}/>
               </tr>
             );
           })}</tbody>
+          <tfoot>
+            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+              <td colSpan={6} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totTaxes)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totOther)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#27500A"}}>{fmt(totSvc)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(total)}</td>
+              <td/>
+            </tr>
+          </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
-        <p style={{margin:"0 0 9px",fontSize:10,color:"#5a6691",letterSpacing:"0.5px",textTransform:"uppercase"}}>GST summary — auto-calculated per slab</p>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
-          <FL label="CGST ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          <FL label="SGST ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          <FL label="IGST ₹"><input value={fmt(0)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-        </div>
-        <div style={{marginTop:9,display:"flex",flexDirection:"column",gap:6}}>
-          {[0,12,18].map(slab=>{
-            const slabRows=rows.filter(r=>gstSlab(+r.rate||0)===slab);
-            if(!slabRows.length)return null;
-            const slabBase=slabRows.reduce((s,r)=>s+(+r.rate||0)*(+r.rooms||1)*(+r.nights||1),0);
-            return (
-              <div key={slab} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 11px",background:slabBg[slab],borderRadius:7,fontSize:11.5,color:slabC[slab]}}>
-                <span style={{fontWeight:700,minWidth:60}}>{slab}% slab</span>
-                <span>{slabLabel[slab]}</span>
-                <span style={{marginLeft:"auto",fontWeight:600}}>{"₹ "+fmt(slabBase)} taxable</span>
-                <span style={{fontWeight:700}}>{"₹ "+fmt(+(slabBase*slab/100).toFixed(2))} GST</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <VNarr def="Being hotel accommodation — Apex Pharma Ltd., Hyatt Regency Ahmedabad, 2 Deluxe King rooms, 5-8 June 2026 (3 nights), CP meal plan.">
+      <VNarr def="Being hotel accommodation — Apex Pharma Ltd., Hyatt Regency Ahmedabad, 5-8 June 2026, CP meal plan.">
         <VTot branch={branch}
           lines={[
-            {l:"Room charges",v:"₹ "+fmt(sub)},
-            {l:"CGST",v:"₹ "+fmt(cgst)},
-            {l:"SGST",v:"₹ "+fmt(sgst)},
+            {l:"Room fare / Basic fare",v:"₹ "+fmt(totBasic)},
+            {l:"Taxes",v:"₹ "+fmt(totTaxes)},
+            {l:"Other tax",v:"₹ "+fmt(totOther)},
+            {l:"Service charge",v:"₹ "+fmt(totSvc)},
           ]}
           total={total}
         />
@@ -735,65 +773,74 @@ export function SalesHotel({branch,setRoute}){
 export function SalesInsurance({branch,setRoute}){
   const vNo=useVNo(branch,"SI");
   const [rows,setRows]=useState([
-    {id:1,insurer:"TATA AIG General Insurance",plan:"Travel Guard — Overseas",insured:"Rajiv Sharma",pp:"Z1234567",from:"2026-06-10",to:"2026-06-17",dest:"Bali, Indonesia",coverage:"USD 100,000",premium:4200,policy:""},
-    {id:2,insurer:"TATA AIG General Insurance",plan:"Travel Guard — Overseas",insured:"Rohan",pp:"Z1234568",from:"2026-06-10",to:"2026-06-17",dest:"Bali, Indonesia",coverage:"USD 100,000",premium:4200,policy:""},
+    {id:1,name:"TATA AIG General Insurance",pp:"Z1234567",dest:"Bali, Indonesia",basic:4200,otherTax:0,svc:500},
+    {id:2,name:"TATA AIG General Insurance",pp:"Z1234568",dest:"Bali, Indonesia",basic:4200,otherTax:0,svc:500},
   ]);
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:Date.now(),insurer:"",plan:"",insured:"",pp:"",from:"",to:"",dest:"",coverage:"",premium:0,policy:""}]);
+  const add=()=>setRows(rs=>[...rs,{id:Date.now(),name:"",pp:"",dest:"",basic:0,otherTax:0,svc:0}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
-  const premTot=rows.reduce((s,r)=>s+(+r.premium||0),0);
+  const totBasic=rows.reduce((s,r)=>s+(+r.basic||0),0);
+  const totOther=rows.reduce((s,r)=>s+(+r.otherTax||0),0);
+  const totSvc=rows.reduce((s,r)=>s+(+r.svc||0),0);
+  const taxable=totBasic+totOther+totSvc;
   const taxRate=bc(branch).taxType==="GST"?0.09:(bc(branch).vatRate||18)/200;
-  const cgst=+(premTot*taxRate).toFixed(2);
+  const cgst=+(taxable*taxRate).toFixed(2);
   const sgst=bc(branch).taxType==="GST"?cgst:0;
-  const vatAmt=bc(branch).taxType!=="GST"?+(premTot*(bc(branch).vatRate||18)/100).toFixed(2):0;
-  const total=+(premTot+cgst+sgst).toFixed(2);
+  const total=+(taxable+cgst+sgst).toFixed(2);
   return (
     <VWrap title="Sales Voucher — Insurance" icon="🛡" vNo={vNo} branch={branch} type="sales" saleMod="SI" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} name="Mehta &amp; Sons" gstin="24AABCM8765G1Z2"/>
       <ARow label="Policy details" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:960}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
-            {["#","Insurer","Plan / product","Insured person","Passport no.","Trip from","Trip to","Destination","Coverage","Premium ₹","Policy no.",""].map((h,i)=><VTH key={i} c={h} r={i===9}/>)}
+            {["#","Name","Passport no.","Destination","Basic ₹","Other tax ₹","Service charge ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=4&&i<=7}/>)}
           </tr></thead>
-          <tbody>{rows.map((r,i)=>(
-            <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
-              <VTD c={i+1}/>
-              <td style={{padding:3}}><input value={r.insurer} onChange={e=>upd(r.id,"insurer",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={r.plan} onChange={e=>upd(r.id,"plan",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={r.insured} onChange={e=>upd(r.id,"insured",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={r.pp} onChange={e=>upd(r.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:88}}/></td>
-              <td style={{padding:3}}><input type="date" value={r.from} onChange={e=>upd(r.id,"from",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input type="date" value={r.to} onChange={e=>upd(r.id,"to",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={r.dest} onChange={e=>upd(r.id,"dest",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={r.coverage} onChange={e=>upd(r.id,"coverage",e.target.value)} style={{...inp,minHeight:28,fontSize:11,width:110}}/></td>
-              <td style={{padding:3}}><input type="number" value={r.premium} onChange={e=>upd(r.id,"premium",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:80}}/></td>
-              <td style={{padding:3}}><input value={r.policy} onChange={e=>upd(r.id,"policy",e.target.value)} placeholder="After issuance" style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace"}}/></td>
-              <DBtn fn={()=>rm(r.id)}/>
+          <tbody>{rows.map((r,i)=>{
+            const lineTotal=(+r.basic||0)+(+r.otherTax||0)+(+r.svc||0);
+            return (
+              <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
+                <VTD c={i+1}/>
+                <td style={{padding:3}}><input value={r.name} onChange={e=>upd(r.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:180}}/></td>
+                <td style={{padding:3}}><input value={r.pp} onChange={e=>upd(r.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:100}}/></td>
+                <td style={{padding:3}}><input value={r.dest} onChange={e=>upd(r.id,"dest",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:130}}/></td>
+                <td style={{padding:3}}><input type="number" value={r.basic} onChange={e=>upd(r.id,"basic",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:85}} title="Basic / net premium amount"/></td>
+                <td style={{padding:3}}><input type="number" value={r.otherTax} onChange={e=>upd(r.id,"otherTax",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:80}} title="Stamp duty, levy or other non-creditable tax on policy"/></td>
+                <td style={{padding:3}}><input type="number" value={r.svc} onChange={e=>upd(r.id,"svc",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:85}} title="Agency service charge"/></td>
+                <VTD c={fmt(lineTotal)} r/>
+                <DBtn fn={()=>rm(r.id)}/>
+              </tr>
+            );
+          })}</tbody>
+          <tfoot>
+            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+              <td colSpan={4} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totOther)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#27500A"}}>{fmt(totSvc)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(taxable)}</td>
+              <td/>
             </tr>
-          ))}</tbody>
+          </tfoot>
         </table>
       </ARow>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
-          <FL label={bc(branch).cur+"Total premium"}><input value={fmt(premTot)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+          <FL label={bc(branch).cur+"Taxable value"}><input value={fmt(taxable)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
           <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
           <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
           <FL label="Invoice total ₹"><input value={fmt(total)} readOnly style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#185FA5"}}/></FL>
         </div>
-        <div style={{marginTop:9,display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
-          <div style={{padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
-            GST 18% on full premium value (SAC 997131 — Life &amp; non-life insurance). ITC available to registered buyer. Collect at time of premium payment.
-          </div>
-          <div style={{padding:"8px 12px",background:"#f3f4f8",borderRadius:8,fontSize:11.5,color:"#5a6691"}}>
-            Commission received from insurer is also taxable at 18% and must be invoiced separately by the agency to the insurance company (reverse flow).
-          </div>
+        <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
+          GST 18% on (Basic + Other tax + Service charge). SAC 997131 — Life &amp; non-life insurance. ITC available to registered buyer.
         </div>
       </div>
-      <VNarr def="Being travel insurance premium — TATA AIG Travel Guard Overseas, 2 pax, Bali trip 10-17 June 2026, Mehta &amp; Sons.">
+      <VNarr def="Being travel insurance premium — 2 pax, Bali destination, Mehta &amp; Sons.">
         <VTot branch={branch}
           lines={[
-            {l:"Total premium",v:"₹ "+fmt(premTot)},
+            {l:"Basic",v:"₹ "+fmt(totBasic)},
+            {l:"Other tax",v:"₹ "+fmt(totOther)},
+            {l:"Service charge",v:"₹ "+fmt(totSvc)},
             {l:"CGST 9%",v:"₹ "+fmt(cgst)},
             {l:"SGST 9%",v:"₹ "+fmt(sgst)},
           ]}
@@ -810,21 +857,21 @@ export function SalesInsurance({branch,setRoute}){
 export function SalesMisc({branch,setRoute}){
   const vNo=useVNo(branch,"SM");
   const [rows,setRows]=useState([
-    {id:1,desc:"SIM card — Airtel International Roaming",sac:"996429",qty:2,unit:"Nos",rate:999,gstPct:18},
-    {id:2,desc:"Travel documentation & attestation charges",sac:"998212",qty:1,unit:"Job",rate:1500,gstPct:18},
-    {id:3,desc:"Forex card issuance fee (Niyo Global)",sac:"996611",qty:1,unit:"Nos",rate:200,gstPct:18},
+    {id:1,gl:"SIM card — Airtel International Roaming",sac:"996429",amt:1998,gstPct:18},
+    {id:2,gl:"Travel documentation & attestation charges",sac:"998212",amt:1500,gstPct:18},
+    {id:3,gl:"Forex card issuance fee (Niyo Global)",sac:"996611",amt:200,gstPct:18},
   ]);
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:Date.now(),desc:"",sac:"",qty:1,unit:"Nos",rate:0,gstPct:18}]);
+  const add=()=>setRows(rs=>[...rs,{id:Date.now(),gl:"",sac:"",amt:0,gstPct:18}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
 
-  const sub=rows.reduce((s,r)=>s+(+r.rate||0)*(+r.qty||1),0);
-  const gstAmt=rows.reduce((s,r)=>s+((+r.rate||0)*(+r.qty||1))*(r.gstPct/100),0);
+  const sub=rows.reduce((s,r)=>s+(+r.amt||0),0);
+  const gstAmt=rows.reduce((s,r)=>s+(+r.amt||0)*(r.gstPct/100),0);
   const total=+(sub+gstAmt).toFixed(2);
 
   const gstByRate={};
   rows.forEach(r=>{
-    const amt=(+r.rate||0)*(+r.qty||1);
+    const amt=+r.amt||0;
     const g=+(amt*(r.gstPct/100)).toFixed(2);
     if(!gstByRate[r.gstPct])gstByRate[r.gstPct]={taxable:0,gst:0};
     gstByRate[r.gstPct].taxable+=amt;
@@ -839,31 +886,24 @@ export function SalesMisc({branch,setRoute}){
       <VHead vNo={vNo}/>
       <VParty branch={branch} name="Sharma Enterprises Pvt. Ltd." gstin="27AABCS1234L1Z5"/>
       <ARow label="Service / item details" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:820}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:760}}>
           <thead><tr>
-            {["#","Description","SAC code","Qty","Unit","Rate ₹","GST %","Amount ₹","GST ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=9}/>)}
+            {["#","G.L Name","SAC code","GST %","Amount ₹","GST ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=3&&i<=6}/>)}
           </tr></thead>
           <tbody>{rows.map((r,i)=>{
-            const amt=(+r.rate||0)*(+r.qty||1);
+            const amt=+r.amt||0;
             const g=+(amt*(r.gstPct/100)).toFixed(2);
             return (
               <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
                 <VTD c={i+1}/>
-                <td style={{padding:3}}><input value={r.desc} onChange={e=>upd(r.id,"desc",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input value={r.sac} onChange={e=>upd(r.id,"sac",e.target.value)} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:82}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.qty} onChange={e=>upd(r.id,"qty",+e.target.value||1)} style={{...inp,minHeight:28,fontSize:11,width:55,textAlign:"right"}}/></td>
+                <td style={{padding:3}}><input value={r.gl} onChange={e=>upd(r.id,"gl",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:220}}/></td>
+                <td style={{padding:3}}><input value={r.sac} onChange={e=>upd(r.id,"sac",e.target.value)} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:90}}/></td>
                 <td style={{padding:3}}>
-                  <select value={r.unit} onChange={e=>upd(r.id,"unit",e.target.value)} style={{...inp,minHeight:28,fontSize:11,width:70}}>
-                    <option>Nos</option><option>Job</option><option>Hrs</option><option>Days</option><option>Pax</option>
-                  </select>
-                </td>
-                <td style={{padding:3}}><input type="number" value={r.rate} onChange={e=>upd(r.id,"rate",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
-                <td style={{padding:3}}>
-                  <select value={r.gstPct} onChange={e=>upd(r.id,"gstPct",+e.target.value)} style={{...inp,minHeight:28,fontSize:11,background:rateBg[r.gstPct],color:rateC[r.gstPct],fontWeight:600}}>
+                  <select value={r.gstPct} onChange={e=>upd(r.id,"gstPct",+e.target.value)} style={{...inp,minHeight:28,fontSize:11,background:rateBg[r.gstPct],color:rateC[r.gstPct],fontWeight:600,width:75}}>
                     <option value={0}>0%</option><option value={5}>5%</option><option value={12}>12%</option><option value={18}>18%</option>
                   </select>
                 </td>
-                <VTD c={fmt(amt)} r/>
+                <td style={{padding:3}}><input type="number" value={r.amt} onChange={e=>upd(r.id,"amt",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
                 <VTD c={fmt(g)} r/>
                 <td style={{padding:"4px 7px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{fmt(amt+g)}</td>
                 <DBtn fn={()=>rm(r.id)}/>
@@ -872,7 +912,7 @@ export function SalesMisc({branch,setRoute}){
           })}</tbody>
           <tfoot>
             <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
-              <td colSpan={7} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
+              <td colSpan={4} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(sub)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#27500A"}}>{fmt(gstAmt)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(total)}</td>
@@ -1038,23 +1078,60 @@ export function SalesCreditNote({branch,setRoute}){
 export function PurchaseFlight({branch,setRoute}){
   const vNo=useVNo(branch,"PF");
   const [pax,setPax]=useState([
-    {id:1,name:"Mr. Rajiv Sharma",ticket:"098-2156789012",airline:"Air India",sector:"BOM-DXB",cls:"Economy",date:"2026-05-28",base:18500,taxes:3800},
-    {id:2,name:"Mrs. Rohan",ticket:"098-2156789013",airline:"Air India",sector:"BOM-DXB",cls:"Economy",date:"2026-05-28",base:18500,taxes:3800},
+    {id:1,name:"Mr. Rajiv Sharma",ticket:"098-2156789012",airline:"Air India",sector:"BOM-DXB",cls:"Economy",date:"2026-05-28",base:18500,k3:2200,otherTax:1600},
+    {id:2,name:"Mrs. Rohan",ticket:"098-2156789013",airline:"Air India",sector:"BOM-DXB",cls:"Economy",date:"2026-05-28",base:18500,k3:2200,otherTax:1600},
   ]);
+  const [tripType,setTripType]=useState("International"); // International | Domestic
+  const [irn,setIrn]=useState("f6e5d4c3b2a1987654321fedcba9876543210abcdef1234567890abcdef98765");
+  const [terms,setTerms]=useState("1. Supplier invoice subject to BSP weekly settlement timelines.\n2. Refunds processed only after airline credits the BSP ARC report.\n3. ADM/ACM raised by airline will be passed on without markup.\n4. Tickets governed by airline's published conditions of carriage.\n5. Disputes to be raised within 7 days of BSP report.");
+  const [qrFile,setQrFile]=useState(null);
   const upd=(id,k,v)=>setPax(ps=>ps.map(p=>p.id===id?{...p,[k]:v}:p));
-  const add=()=>setPax(ps=>[...ps,{id:Date.now(),name:"",ticket:"",airline:"",sector:"",cls:"Economy",date:"",base:0,taxes:0}]);
+  const add=()=>setPax(ps=>[...ps,{id:Date.now(),name:"",ticket:"",airline:"",sector:"",cls:"Economy",date:"",base:0,k3:0,otherTax:0}]);
   const rm=id=>setPax(ps=>ps.filter(p=>p.id!==id));
   const totalBase=pax.reduce((s,p)=>s+(+p.base||0),0);
-  const totalTax=pax.reduce((s,p)=>s+(+p.taxes||0),0);
+  const totalK3=pax.reduce((s,p)=>s+(+p.k3||0),0);
+  const totalOther=pax.reduce((s,p)=>s+(+p.otherTax||0),0);
+  const totalTax=totalK3+totalOther;
   const total=+(totalBase+totalTax).toFixed(2);
+  const isIntl=tripType==="International";
   return (
     <VWrap title="Purchase Voucher — Flight Tickets" icon="✈" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
+
+      {/* Trip type + IRN strip */}
+      <div style={{padding:"10px 16px",background:"#0d1326",borderBottom:"1px solid #e1e3ec"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+          <div style={{display:"flex",gap:0,borderRadius:999,overflow:"hidden",border:"1px solid #2a3450"}}>
+            <button onClick={()=>setTripType("Domestic")}
+              style={{padding:"5px 12px",fontSize:10,fontWeight:700,cursor:"pointer",border:"none",
+                background:tripType==="Domestic"?"#27500A":"transparent",
+                color:tripType==="Domestic"?"#fff":"#8b94b3"}}>
+              🇮🇳 Domestic
+            </button>
+            <button onClick={()=>setTripType("International")}
+              style={{padding:"5px 12px",fontSize:10,fontWeight:700,cursor:"pointer",border:"none",
+                background:tripType==="International"?"#185FA5":"transparent",
+                color:tripType==="International"?"#fff":"#8b94b3"}}>
+              🌍 International
+            </button>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:280}}>
+            <label style={{fontSize:9.5,color:"#8b94b3",fontWeight:700,letterSpacing:"0.5px",textTransform:"uppercase",whiteSpace:"nowrap"}}>IRN No.</label>
+            <input value={irn} onChange={e=>setIrn(e.target.value)}
+              style={{flex:1,minWidth:240,padding:"6px 10px",borderRadius:6,border:"1px solid #2a3450",
+                background:"#1a2238",color:"#d4a437",fontFamily:"monospace",fontSize:10.5,fontWeight:600}}/>
+            <span style={{fontSize:9,padding:"3px 9px",borderRadius:999,background:"#d4a437",color:"#0d1326",fontWeight:700,whiteSpace:"nowrap"}}>
+              e-Invoice IRN
+            </span>
+          </div>
+        </div>
+      </div>
+
       <VParty branch={branch} label="Supplier" name="BSP India (IATA)" gstin="07AABSB5678C1Z9"/>
       <ARow label="Ticket cost details" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:860}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:960}}>
           <thead><tr>
-            {["#","Passenger","Ticket no.","Airline","Sector","Class","Date","Base cost ₹","Taxes ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=7&&i<=9}/>)}
+            {["#","Passenger","Ticket no.","Airline","Sector","Class","Date","Base cost ₹","K3 ₹","Other taxes ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=7&&i<=10}/>)}
           </tr></thead>
           <tbody>{pax.map((p,i)=>(
             <tr key={p.id} style={{borderBottom:"1px solid #e1e3ec"}}>
@@ -1070,8 +1147,9 @@ export function PurchaseFlight({branch,setRoute}){
               </td>
               <td style={{padding:3}}><input type="date" value={p.date} onChange={e=>upd(p.id,"date",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
               <td style={{padding:3}}><input type="number" value={p.base} onChange={e=>upd(p.id,"base",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
-              <td style={{padding:3}}><input type="number" value={p.taxes} onChange={e=>upd(p.id,"taxes",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
-              <VTD c={fmt((+p.base||0)+(+p.taxes||0))} r/>
+              <td style={{padding:3}}><input type="number" value={p.k3} onChange={e=>upd(p.id,"k3",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="K3 tax (GST on airline tax — typically applicable on international tickets)"/></td>
+              <td style={{padding:3}}><input type="number" value={p.otherTax} onChange={e=>upd(p.id,"otherTax",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Other taxes — YQ/YR fuel, airport fees, UDF, PSF"/></td>
+              <VTD c={fmt((+p.base||0)+(+p.k3||0)+(+p.otherTax||0))} r/>
               <DBtn fn={()=>rm(p.id)}/>
             </tr>
           ))}</tbody>
@@ -1079,7 +1157,8 @@ export function PurchaseFlight({branch,setRoute}){
             <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
               <td colSpan={7} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totalBase)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totalTax)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totalK3)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totalOther)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(total)}</td>
               <td/>
             </tr>
@@ -1092,15 +1171,56 @@ export function PurchaseFlight({branch,setRoute}){
             Accounting: <b>Dr Flight Ticket Purchase</b> &nbsp;|&nbsp; <b>Cr BSP India / Airline ledger</b>. Base fare and taxes are both cost — no GST on ticket purchase side.
           </div>
           <div style={{padding:"8px 12px",background:"#f3f4f8",borderRadius:8,fontSize:11.5,color:"#5a6691"}}>
-            Input GST applicable only on GDS charges or agency service fees billed separately by the supplier — not on ticket base fare or airline taxes.
+            {isIntl
+              ?"International ticket — K3 (GST on airline tax) appears on supplier BSP invoice and is input-creditable. Other taxes (YQ/YR, UDF, PSF) are non-creditable pass-through."
+              :"Domestic ticket — K3 generally nil. Input GST applies only on GDS / agency service fees, not on base fare or airline taxes."}
           </div>
         </div>
       </div>
-      <VNarr def="Being air ticket cost purchased via BSP — Air India BOM-DXB, 2 pax Economy, departure 28 May 2026.">
+
+      {/* Terms & GST QR upload */}
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+        <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:14}}>
+          <FL label="Terms & Conditions">
+            <textarea rows={5} value={terms} onChange={e=>setTerms(e.target.value)} style={{...inp,resize:"vertical",fontSize:10.5,lineHeight:1.45}}/>
+          </FL>
+          <div>
+            <label style={{fontSize:10,color:"#5a6691",fontWeight:600,letterSpacing:"0.4px",textTransform:"uppercase"}}>GST QR Code</label>
+            <div style={{marginTop:4,padding:"10px 12px",border:"2px dashed #c7cbe0",borderRadius:8,background:"#fff",
+              display:"flex",alignItems:"center",gap:11,flexWrap:"wrap"}}>
+              {qrFile
+                ?<>
+                  <div style={{width:54,height:54,borderRadius:6,background:"#f3f4f8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,border:"1px solid #e1e3ec"}}>▦</div>
+                  <div style={{flex:1,minWidth:140}}>
+                    <p style={{margin:0,fontSize:11,fontWeight:700,color:"#0d1326"}}>{qrFile.name}</p>
+                    <p style={{margin:"2px 0 0",fontSize:10,color:"#5a6691"}}>{(qrFile.size/1024).toFixed(1)} KB · uploaded</p>
+                  </div>
+                  <button onClick={()=>setQrFile(null)} style={{...btnGh,fontSize:10,padding:"4px 10px",color:"#A32D2D",borderColor:"#A32D2D"}}>Remove</button>
+                </>
+                :<>
+                  <div style={{width:54,height:54,borderRadius:6,background:"#f3f4f8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#8b94b3",border:"1px solid #e1e3ec"}}>▦</div>
+                  <div style={{flex:1,minWidth:140}}>
+                    <p style={{margin:0,fontSize:11,fontWeight:600,color:"#0d1326"}}>Upload supplier GST QR code</p>
+                    <p style={{margin:"2px 0 0",fontSize:9.5,color:"#5a6691"}}>PNG / JPG · signed QR from BSP / airline e-invoice</p>
+                  </div>
+                  <label style={{...btnGh,fontSize:10,padding:"5px 12px",cursor:"pointer",display:"inline-block"}}>
+                    Choose file
+                    <input type="file" accept="image/png,image/jpeg" style={{display:"none"}}
+                      onChange={e=>{const f=e.target.files?.[0];if(f)setQrFile(f);}}/>
+                  </label>
+                </>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <VNarr def={`Being air ticket cost purchased via BSP — ${tripType}, 2 pax Economy, departure 28 May 2026.`}>
         <VTot branch={branch}
           lines={[
             {l:"Net ticket cost (base fare)",v:"₹ "+fmt(totalBase)},
-            {l:"Airline taxes & surcharges",v:"₹ "+fmt(totalTax)},
+            {l:"K3 tax",v:"₹ "+fmt(totalK3)},
+            {l:"Other taxes & surcharges",v:"₹ "+fmt(totalOther)},
           ]}
           total={total}
         />
@@ -1113,60 +1233,134 @@ export function PurchaseFlight({branch,setRoute}){
 
 export function PurchaseHoliday({branch,setRoute}){
   const vNo=useVNo(branch,"PH");
-  const [rows,setRows]=useState([
-    {id:1,dmc:"Bali Tours DMC",pkg:"Bali Land Package 7N/8D",dest:"Bali, Indonesia",pax:2,dept:"2026-06-10",rtrn:"2026-06-17",cost:140000,currency:"USD",forex:84.5},
-  ]);
-  const [inputGst,setInputGst]=useState(false);
-  const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:Date.now(),dmc:"",pkg:"",dest:"",pax:1,dept:"",rtrn:"",cost:0,currency:"USD",forex:84.5}]);
-  const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
-  const total=rows.reduce((s,r)=>s+(+r.cost||0),0);
+  const [dmc,setDmc]=useState("Bali Tours DMC");
+  const [pkg,setPkg]=useState("Bali Land Package 7N/8D");
+  const [dest,setDest]=useState("Bali, Indonesia");
+  const [pax,setPax]=useState(2);
+  const [dept,setDept]=useState("2026-06-10");
+  const [rtrn,setRtrn]=useState("2026-06-17");
+  const [pkgType,setPkgType]=useState("International"); // International | Domestic
+  const [basic,setBasic]=useState({desc:"Bali land package — hotel + transfers (7N/8D)",sac:"998552",amt:140000});
+  const [service,setService]=useState({desc:"DMC handling + guide + sightseeing",sac:"998555",amt:18000});
+  const updBasic=(k,v)=>setBasic(b=>({...b,[k]:v}));
+  const updService=(k,v)=>setService(s=>({...s,[k]:v}));
+
+  const basicAmt=+basic.amt||0;
+  const serviceAmt=+service.amt||0;
+  const subTotal=basicAmt+serviceAmt;
+  const gstAmt=+(subTotal*0.05).toFixed(2);
+  const isIntl=pkgType==="International";
+  const tcsAmt=isIntl?+((subTotal+gstAmt)*0.02).toFixed(2):0;
+  const grandTotal=+(subTotal+gstAmt+tcsAmt).toFixed(2);
+
   return (
     <VWrap title="Purchase Voucher — Holiday Packages" icon="🌴" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} label="DMC / Supplier" name="Bali Tours DMC" gstin=""/>
-      <ARow label="Package purchase lines" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
-          <thead><tr>
-            {["#","DMC / Supplier","Package name","Destination","Pax","Dept.","Return","Currency","Forex rate","Cost ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=8&&i<=9}/>)}
-          </tr></thead>
-          <tbody>{rows.map((r,i)=>(
-            <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
-              <VTD c={i+1}/>
-              <td style={{padding:3}}><input value={r.dmc} onChange={e=>upd(r.id,"dmc",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={r.pkg} onChange={e=>upd(r.id,"pkg",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={r.dest} onChange={e=>upd(r.id,"dest",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input type="number" value={r.pax} onChange={e=>upd(r.id,"pax",+e.target.value||1)} style={{...inp,minHeight:28,fontSize:11,width:50,textAlign:"right"}}/></td>
-              <td style={{padding:3}}><input type="date" value={r.dept} onChange={e=>upd(r.id,"dept",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input type="date" value={r.rtrn} onChange={e=>upd(r.id,"rtrn",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}>
-                <select value={r.currency} onChange={e=>upd(r.id,"currency",e.target.value)} style={{...inp,minHeight:28,fontSize:11,width:70}}>
-                  {["USD","EUR","GBP","AED","SGD","KES","TZS","INR"].map(c=><option key={c}>{c}</option>)}
-                </select>
-              </td>
-              <td style={{padding:3}}><input type="number" value={r.forex} onChange={e=>upd(r.id,"forex",+e.target.value||1)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:70}}/></td>
-              <td style={{padding:3}}><input type="number" value={r.cost} onChange={e=>upd(r.id,"cost",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
-              <DBtn fn={()=>rm(r.id)}/>
-            </tr>
-          ))}</tbody>
-        </table>
-      </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
-          <FL label="Input GST claimable">
-            <select value={inputGst?"yes":"no"} onChange={e=>setInputGst(e.target.value==="yes")} style={inp}>
-              <option value="no">No — overseas DMC (no GST)</option>
-              <option value="yes">Yes — Indian supplier with GST</option>
-            </select>
-          </FL>
-          <FL label="Input GST ₹"><input value={inputGst?fmt(+(total*0.05).toFixed(2)):"0.00"} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+      <VParty branch={branch} label="DMC / Supplier" name={dmc} gstin=""/>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:11,padding:"10px 16px 12px"}}>
+        <FL label="DMC / Supplier"><input value={dmc} onChange={e=>setDmc(e.target.value)} style={inp}/></FL>
+        <FL label="Package name"><input value={pkg} onChange={e=>setPkg(e.target.value)} style={inp}/></FL>
+        <FL label="Destination"><input value={dest} onChange={e=>setDest(e.target.value)} style={inp}/></FL>
+        <FL label="No. of pax"><input type="number" value={pax} onChange={e=>setPax(+e.target.value||1)} style={inp}/></FL>
+        <FL label="Departure date"><input type="date" value={dept} onChange={e=>setDept(e.target.value)} style={inp}/></FL>
+        <FL label="Return date"><input type="date" value={rtrn} onChange={e=>setRtrn(e.target.value)} style={inp}/></FL>
+      </div>
+
+      {/* Package Type selector */}
+      <div style={{margin:"0 16px 14px",padding:"12px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775"}}>
+        <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#854F0B"}}>Package Type</p>
+        <div style={{display:"flex",gap:8,marginBottom:8}}>
+          <button onClick={()=>setPkgType("Domestic")} style={{flex:1,padding:"8px 12px",borderRadius:8,cursor:"pointer",
+            background:pkgType==="Domestic"?"#27500A":"#fff",color:pkgType==="Domestic"?"#fff":"#27500A",
+            border:"2px solid #27500A",fontSize:11,fontWeight:600}}>
+            Domestic — GST 5% only (No TCS)
+          </button>
+          <button onClick={()=>setPkgType("International")} style={{flex:1,padding:"8px 12px",borderRadius:8,cursor:"pointer",
+            background:pkgType==="International"?"#185FA5":"#fff",color:pkgType==="International"?"#fff":"#185FA5",
+            border:"2px solid #185FA5",fontSize:11,fontWeight:600}}>
+            International — GST 5% + TCS 2%
+          </button>
         </div>
-        <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
-          Accounting: <b>Dr Tour Package Purchase</b> &nbsp;|&nbsp; <b>Cr DMC / Supplier ledger</b>. For overseas DMCs, no input GST. For domestic Indian suppliers, claim input GST if invoice provided.
+        <p style={{margin:0,fontSize:10,color:"#854F0B"}}>
+          {isIntl
+            ?"INTERNATIONAL outbound package — GST 5% on (Basic + Service) and TCS 2% on (Basic + Service + GST). Verify supplier TCS certificate."
+            :"DOMESTIC package — GST 5% on (Basic + Service). No TCS applicable."}
+        </p>
+      </div>
+
+      {/* Component breakout — fixed GL rows */}
+      <p style={{margin:"0 16px 8px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Package Component Breakout <span style={{fontSize:9.5,color:"#5a6691"}}>(Basic + Service → GST 5% → TCS 2% if international)</span></p>
+      <div style={{margin:"0 16px",...card,padding:0,overflow:"hidden",marginBottom:12}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:720}}>
+            <thead><tr style={{background:"#0d1326"}}>
+              {["S.NO","GL Name","Description","SAC Code","Cost Price"].map((h,i)=>(
+                <th key={i} style={{padding:"8px 10px",textAlign:i===4?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fff"}}>
+                <td style={{padding:"4px 10px",textAlign:"center",color:"#5a6691",fontSize:10}}>1</td>
+                <td style={{padding:"4px 10px",fontWeight:700,color:"#0d1326",fontSize:11}}>Basic</td>
+                <td style={{padding:"3px 6px"}}><input value={basic.desc} onChange={e=>updBasic("desc",e.target.value)} style={{...inp,minHeight:28,fontSize:10.5,minWidth:200}}/></td>
+                <td style={{padding:"3px 6px"}}><input value={basic.sac} onChange={e=>updBasic("sac",e.target.value)} style={{...inp,minHeight:28,fontSize:10,fontFamily:"monospace",width:90}}/></td>
+                <td style={{padding:"3px 6px"}}><input type="number" value={basic.amt} onChange={e=>updBasic("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#A32D2D"}}/></td>
+              </tr>
+              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fafafa"}}>
+                <td style={{padding:"4px 10px",textAlign:"center",color:"#5a6691",fontSize:10}}>2</td>
+                <td style={{padding:"4px 10px",fontWeight:700,color:"#0d1326",fontSize:11}}>Service</td>
+                <td style={{padding:"3px 6px"}}><input value={service.desc} onChange={e=>updService("desc",e.target.value)} style={{...inp,minHeight:28,fontSize:10.5,minWidth:200}}/></td>
+                <td style={{padding:"3px 6px"}}><input value={service.sac} onChange={e=>updService("sac",e.target.value)} style={{...inp,minHeight:28,fontSize:10,fontFamily:"monospace",width:90}}/></td>
+                <td style={{padding:"3px 6px"}}><input type="number" value={service.amt} onChange={e=>updService("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#A32D2D"}}/></td>
+              </tr>
+              <tr style={{borderBottom:"1px solid #e1e3ec",background:"#f3f4f8"}}>
+                <td style={{padding:"6px 10px",textAlign:"center",color:"#0d1326",fontSize:10,fontWeight:700}}>3</td>
+                <td style={{padding:"6px 10px",fontWeight:800,color:"#0d1326",fontSize:11.5}}>Total</td>
+                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>Basic + Service</td>
+                <td style={{padding:"6px 10px"}}></td>
+                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:800,fontSize:12,color:"#0d1326",fontVariantNumeric:"tabular-nums"}}>{fmt(subTotal)}</td>
+              </tr>
+              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fff"}}>
+                <td style={{padding:"6px 10px",textAlign:"center",color:"#854F0B",fontSize:10,fontWeight:700}}>4</td>
+                <td style={{padding:"6px 10px",fontWeight:700,color:"#854F0B",fontSize:11}}>GST (5%)</td>
+                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>5% on (Basic + Service)</td>
+                <td style={{padding:"6px 10px",fontSize:10,fontFamily:"monospace",color:"#5a6691"}}>—</td>
+                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#854F0B",fontVariantNumeric:"tabular-nums"}}>{fmt(gstAmt)}</td>
+              </tr>
+              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fafafa",opacity:isIntl?1:0.45}}>
+                <td style={{padding:"6px 10px",textAlign:"center",color:"#185FA5",fontSize:10,fontWeight:700}}>5</td>
+                <td style={{padding:"6px 10px",fontWeight:700,color:"#185FA5",fontSize:11}}>TCS (2%) {!isIntl&&<span style={{fontSize:9,color:"#5a6691",fontWeight:500}}>— N/A (Domestic)</span>}</td>
+                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>2% on (Basic + Service + GST) — international only</td>
+                <td style={{padding:"6px 10px",fontSize:10,fontFamily:"monospace",color:"#5a6691"}}>—</td>
+                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{fmt(tcsAmt)}</td>
+              </tr>
+            </tbody>
+            <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
+              <td colSpan={4} style={{padding:"8px 10px",fontWeight:800,color:"#d4a437",fontSize:11.5}}>Grand Total ({pkgType})</td>
+              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:"#d4a437",fontSize:13,fontVariantNumeric:"tabular-nums"}}>{fmt(grandTotal)}</td>
+            </tr></tfoot>
+          </table>
         </div>
       </div>
-      <VNarr def="Being Bali land package cost from Bali Tours DMC — 2 pax, 7N/8D, departure 10 June 2026.">
-        <VTot branch={branch} lines={[{l:"Package cost",v:"₹ "+fmt(total)}]} total={total}/>
+
+      <div style={{padding:"0 16px 12px"}}>
+        <div style={{padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
+          Accounting: <b>Dr Tour Package Purchase</b> &nbsp;|&nbsp; <b>Dr Input GST 5%</b> {isIntl&&<>&nbsp;|&nbsp; <b>Dr TCS Receivable</b></>} &nbsp;|&nbsp; <b>Cr {dmc||"DMC / Supplier"} ledger</b>.
+        </div>
+      </div>
+
+      <VNarr def={`Being ${pkg||"holiday package"} purchase (${pkgType}) from ${dmc} — ${pax} pax, departure ${dept}. GST 5% on Basic+Service${isIntl?", TCS 2% on Basic+Service+GST":""}.`}>
+        <VTot branch={branch}
+          lines={[
+            {l:"Basic",v:"₹ "+fmt(basicAmt)},
+            {l:"Service",v:"₹ "+fmt(serviceAmt)},
+            {l:"Total (Basic + Service)",v:"₹ "+fmt(subTotal)},
+            {l:"GST 5%",v:"₹ "+fmt(gstAmt)},
+            ...(isIntl?[{l:"TCS 2% (International)",v:"₹ "+fmt(tcsAmt)}]:[]),
+          ]}
+          total={grandTotal}
+        />
       </VNarr>
     </VWrap>
   );
@@ -1177,64 +1371,57 @@ export function PurchaseHoliday({branch,setRoute}){
 export function PurchaseHotelVoucher({branch,setRoute}){
   const vNo=useVNo(branch,"PHT");
   const [rows,setRows]=useState([
-    {id:1,hotel:"Hyatt Regency Ahmedabad",ci:"2026-06-05",co:"2026-06-08",rtype:"Deluxe King",rooms:2,nights:3,rate:8000,meal:"CP"},
+    {id:1,passenger:"Mr. Rajiv Sharma",ci:"2026-06-05",co:"2026-06-08",rtype:"Deluxe King",meal:"CP",basic:20000,taxes:2400,otherTax:500,svc:0},
   ]);
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:Date.now(),hotel:"",ci:"",co:"",rtype:"Deluxe",rooms:1,nights:1,rate:0,meal:"EP"}]);
+  const add=()=>setRows(rs=>[...rs,{id:Date.now(),passenger:"",ci:"",co:"",rtype:"Deluxe",meal:"EP",basic:0,taxes:0,otherTax:0,svc:0}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
 
-  function gstSlab(rate){ if(rate<1000)return 0; if(rate<=7500)return 12; return 18; }
-
-  const sub=rows.reduce((s,r)=>s+(+r.rate||0)*(+r.rooms||1)*(+r.nights||1),0);
-  const inputGst=rows.reduce((s,r)=>{
-    const lineTotal=(+r.rate||0)*(+r.rooms||1)*(+r.nights||1);
-    return s+lineTotal*gstSlab(+r.rate||0)/100;
-  },0);
-  const total=+(sub+inputGst).toFixed(2);
-  const slabBg={0:"#f3f4f8",12:"#FAEEDA",18:"#FCEBEB"};
-  const slabC={0:"#5a6691",12:"#854F0B",18:"#A32D2D"};
+  const totBasic=rows.reduce((s,r)=>s+(+r.basic||0),0);
+  const totTaxes=rows.reduce((s,r)=>s+(+r.taxes||0),0);
+  const totOther=rows.reduce((s,r)=>s+(+r.otherTax||0),0);
+  const totSvc=rows.reduce((s,r)=>s+(+r.svc||0),0);
+  const total=+(totBasic+totTaxes+totOther+totSvc).toFixed(2);
 
   return (
     <VWrap title="Purchase Voucher — Hotels" icon="🏨" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} label="Hotel / Supplier" name="Hyatt Regency Ahmedabad" gstin="24AABCH7890J1Z5"/>
       <ARow label="Hotel purchase lines" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:1020}}>
           <thead><tr>
-            {["#","Hotel","Check-in","Check-out","Room type","Rooms","Nights","Rate/room ₹","Meal","GST slab","Input GST ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=6||i>=10}/>)}
+            {["#","Passenger Name","Check-in","Check-out","Room type","Meal","Room fare / Basic fare ₹","Taxes ₹","Other tax ₹","Service charge ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=6&&i<=10}/>)}
           </tr></thead>
           <tbody>{rows.map((r,i)=>{
-            const slab=gstSlab(+r.rate||0);
-            const lineBase=(+r.rate||0)*(+r.rooms||1)*(+r.nights||1);
-            const lineGst=+(lineBase*slab/100).toFixed(2);
+            const lineTotal=(+r.basic||0)+(+r.taxes||0)+(+r.otherTax||0)+(+r.svc||0);
             return (
               <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
                 <VTD c={i+1}/>
-                <td style={{padding:3}}><input value={r.hotel} onChange={e=>upd(r.id,"hotel",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
+                <td style={{padding:3}}><input value={r.passenger} onChange={e=>upd(r.id,"passenger",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:160}}/></td>
                 <td style={{padding:3}}><input type="date" value={r.ci} onChange={e=>upd(r.id,"ci",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
                 <td style={{padding:3}}><input type="date" value={r.co} onChange={e=>upd(r.id,"co",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
                 <td style={{padding:3}}><input value={r.rtype} onChange={e=>upd(r.id,"rtype",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.rooms} onChange={e=>upd(r.id,"rooms",+e.target.value||1)} style={{...inp,minHeight:28,fontSize:11,width:50,textAlign:"right"}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.nights} onChange={e=>upd(r.id,"nights",+e.target.value||1)} style={{...inp,minHeight:28,fontSize:11,width:50,textAlign:"right"}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.rate} onChange={e=>upd(r.id,"rate",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
                 <td style={{padding:3}}>
                   <select value={r.meal} onChange={e=>upd(r.id,"meal",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}>
                     <option>EP</option><option>CP</option><option>MAP</option><option>AP</option>
                   </select>
                 </td>
-                <td style={{padding:"4px 7px"}}>
-                  <span style={{fontSize:10,padding:"2px 7px",borderRadius:6,background:slabBg[slab],color:slabC[slab],fontWeight:600,whiteSpace:"nowrap"}}>{slab}%</span>
-                </td>
-                <VTD c={fmt(lineGst)} r/>
-                <VTD c={fmt(lineBase+lineGst)} r/>
+                <td style={{padding:3}}><input type="number" value={r.basic} onChange={e=>upd(r.id,"basic",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
+                <td style={{padding:3}}><input type="number" value={r.taxes} onChange={e=>upd(r.id,"taxes",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="GST / occupancy / luxury tax on the supplier invoice"/></td>
+                <td style={{padding:3}}><input type="number" value={r.otherTax} onChange={e=>upd(r.id,"otherTax",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="City fee, resort fee, tourism levy, destination tax"/></td>
+                <td style={{padding:3}}><input type="number" value={r.svc} onChange={e=>upd(r.id,"svc",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Supplier service / commission charge"/></td>
+                <VTD c={fmt(lineTotal)} r/>
                 <DBtn fn={()=>rm(r.id)}/>
               </tr>
             );
           })}</tbody>
           <tfoot>
             <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
-              <td colSpan={10} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#27500A"}}>{fmt(inputGst)}</td>
+              <td colSpan={6} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totTaxes)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totOther)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#27500A"}}>{fmt(totSvc)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(total)}</td>
               <td/>
             </tr>
@@ -1243,14 +1430,16 @@ export function PurchaseHotelVoucher({branch,setRoute}){
       </ARow>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
         <div style={{padding:"8px 12px",background:"#EAF3DE",borderRadius:8,fontSize:11.5,color:"#27500A"}}>
-          Accounting: <b>Dr Hotel Purchase</b> &nbsp;|&nbsp; <b>Dr Input CGST / SGST</b> &nbsp;|&nbsp; <b>Cr Hotel / Supplier ledger</b>. ITC on hotel stays claimable only for business travel — not for personal or exempt use.
+          Accounting: <b>Dr Hotel Purchase</b> &nbsp;|&nbsp; <b>Dr Input CGST / SGST</b> (from Taxes column) &nbsp;|&nbsp; <b>Cr Hotel / Supplier ledger</b>. ITC on hotel stays claimable only for business travel — not for personal or exempt use.
         </div>
       </div>
-      <VNarr def="Being hotel room charges — Hyatt Regency Ahmedabad, 2 Deluxe King rooms, 3 nights, 5-8 June 2026, with input GST claim.">
+      <VNarr def="Being hotel room charges — Hyatt Regency Ahmedabad, 5-8 June 2026, with input GST claim.">
         <VTot branch={branch}
           lines={[
-            {l:"Room charges (taxable)",v:"₹ "+fmt(sub)},
-            {l:"Input GST (ITC claim)",v:"₹ "+fmt(inputGst)},
+            {l:"Room fare / Basic fare",v:"₹ "+fmt(totBasic)},
+            {l:"Taxes",v:"₹ "+fmt(totTaxes)},
+            {l:"Other tax",v:"₹ "+fmt(totOther)},
+            {l:"Service charge",v:"₹ "+fmt(totSvc)},
           ]}
           total={total}
         />
@@ -1264,78 +1453,67 @@ export function PurchaseHotelVoucher({branch,setRoute}){
 export function PurchaseVisa({branch,setRoute}){
   const vNo=useVNo(branch,"PV");
   const [rows,setRows]=useState([
-    {id:1,applicant:"Rajiv Sharma",pp:"Z1234567",country:"UAE",ftype:"Embassy fee",supplier:"UAE Embassy — VFS Dubai",ref:"VFS-DXB-112233",amount:4800,currency:"INR"},
-    {id:2,applicant:"Rohan",pp:"Z1234568",country:"UAE",ftype:"VFS service fee",supplier:"VFS Global Services",ref:"VFS-DXB-112234",amount:1800,currency:"INR"},
+    {id:1,applicant:"Rajiv Sharma",pp:"Z1234567",country:"UAE",vtype:"Tourist 30D",vfsFee:1500,taxes:270,otherTax:100},
+    {id:2,applicant:"Rohan",pp:"Z1234568",country:"UAE",vtype:"Tourist 30D",vfsFee:1500,taxes:270,otherTax:100},
   ]);
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:Date.now(),applicant:"",pp:"",country:"",ftype:"Embassy fee",supplier:"",ref:"",amount:0,currency:"INR"}]);
+  const add=()=>setRows(rs=>[...rs,{id:Date.now(),applicant:"",pp:"",country:"",vtype:"",vfsFee:0,taxes:0,otherTax:0}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
 
-  const embTotal=rows.filter(r=>r.ftype==="Embassy fee").reduce((s,r)=>s+(+r.amount||0),0);
-  const vfsTotal=rows.filter(r=>r.ftype!=="Embassy fee").reduce((s,r)=>s+(+r.amount||0),0);
-  const total=rows.reduce((s,r)=>s+(+r.amount||0),0);
-
-  const ftypeBg={"Embassy fee":{bg:"#E6F1FB",c:"#185FA5"},"VFS service fee":{bg:"#FAEEDA",c:"#854F0B"},"TLS fee":{bg:"#F3E8FF",c:"#5B21B6"},"Govt. processing fee":{bg:"#EAF3DE",c:"#27500A"}};
+  const vfsTotal=rows.reduce((s,r)=>s+(+r.vfsFee||0),0);
+  const taxesTotal=rows.reduce((s,r)=>s+(+r.taxes||0),0);
+  const otherTotal=rows.reduce((s,r)=>s+(+r.otherTax||0),0);
+  const total=+(vfsTotal+taxesTotal+otherTotal).toFixed(2);
 
   return (
     <VWrap title="Purchase Voucher — Visas" icon="🛂" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} label="Primary Supplier" name="VFS Global Services" gstin="27AABVV4321F1Z6"/>
       <ARow label="Visa fee payment lines" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
-            {["#","Applicant","Passport","Country","Fee type","Supplier / payee","Reference","Currency","Amount ₹",""].map((h,i)=><VTH key={i} c={h} r={i===8}/>)}
+            {["#","Applicant","Passport","Visa country","Visa type","VFS fee ₹","Taxes ₹","Other taxes ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=8}/>)}
           </tr></thead>
           <tbody>{rows.map((r,i)=>{
-            const fc=ftypeBg[r.ftype]||{bg:"#f3f4f8",c:"#5a6691"};
+            const lineTotal=(+r.vfsFee||0)+(+r.taxes||0)+(+r.otherTax||0);
             return (
               <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
                 <VTD c={i+1}/>
-                <td style={{padding:3}}><input value={r.applicant} onChange={e=>upd(r.id,"applicant",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input value={r.pp} onChange={e=>upd(r.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:88}}/></td>
-                <td style={{padding:3}}><input value={r.country} onChange={e=>upd(r.id,"country",e.target.value)} style={{...inp,minHeight:28,fontSize:11,width:70}}/></td>
-                <td style={{padding:3}}>
-                  <select value={r.ftype} onChange={e=>upd(r.id,"ftype",e.target.value)} style={{...inp,minHeight:28,fontSize:11,background:fc.bg,color:fc.c,fontWeight:600}}>
-                    <option>Embassy fee</option><option>VFS service fee</option><option>TLS fee</option><option>Govt. processing fee</option>
-                  </select>
-                </td>
-                <td style={{padding:3}}><input value={r.supplier} onChange={e=>upd(r.id,"supplier",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input value={r.ref} onChange={e=>upd(r.id,"ref",e.target.value)} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace"}}/></td>
-                <td style={{padding:3}}>
-                  <select value={r.currency} onChange={e=>upd(r.id,"currency",e.target.value)} style={{...inp,minHeight:28,fontSize:11,width:70}}>
-                    {["INR","USD","EUR","AED","GBP"].map(c=><option key={c}>{c}</option>)}
-                  </select>
-                </td>
-                <td style={{padding:3}}><input type="number" value={r.amount} onChange={e=>upd(r.id,"amount",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
+                <td style={{padding:3}}><input value={r.applicant} onChange={e=>upd(r.id,"applicant",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:150}}/></td>
+                <td style={{padding:3}}><input value={r.pp} onChange={e=>upd(r.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:100}}/></td>
+                <td style={{padding:3}}><input value={r.country} onChange={e=>upd(r.id,"country",e.target.value)} style={{...inp,minHeight:28,fontSize:11,width:90}}/></td>
+                <td style={{padding:3}}><input value={r.vtype} onChange={e=>upd(r.id,"vtype",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
+                <td style={{padding:3}}><input type="number" value={r.vfsFee} onChange={e=>upd(r.id,"vfsFee",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:90}}/></td>
+                <td style={{padding:3}}><input type="number" value={r.taxes} onChange={e=>upd(r.id,"taxes",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:80}} title="GST / VAT on VFS fee — appears on supplier invoice"/></td>
+                <td style={{padding:3}}><input type="number" value={r.otherTax} onChange={e=>upd(r.id,"otherTax",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:80}} title="Service tax, biometric, courier — non-creditable"/></td>
+                <VTD c={fmt(lineTotal)} r/>
                 <DBtn fn={()=>rm(r.id)}/>
               </tr>
             );
           })}</tbody>
+          <tfoot>
+            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+              <td colSpan={5} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(vfsTotal)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(taxesTotal)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(otherTotal)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(total)}</td>
+              <td/>
+            </tr>
+          </tfoot>
         </table>
       </ARow>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:9}}>
-          {[
-            {l:"Embassy fees",v:"₹ "+fmt(embTotal),bg:"#E6F1FB",c:"#185FA5"},
-            {l:"VFS / processing fees",v:"₹ "+fmt(vfsTotal),bg:"#FAEEDA",c:"#854F0B"},
-            {l:"Total outflow",v:"₹ "+fmt(total),bg:"#f3f4f8",c:"#384677"},
-            {l:"Input GST",v:"Nil — pass-through",bg:"#EAF3DE",c:"#27500A"},
-          ].map((s,i)=>(
-            <div key={i} style={{background:s.bg,borderRadius:9,padding:"9px 13px"}}>
-              <p style={{margin:0,fontSize:9.5,color:s.c,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.5px"}}>{s.l}</p>
-              <p style={{margin:"3px 0 0",fontSize:14,fontWeight:700,color:s.c}}>{s.v}</p>
-            </div>
-          ))}
-        </div>
         <div style={{padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
-          All visa fees are pure pass-through costs — no input GST to claim. Accounting: <b>Dr Visa Fee Expense</b> &nbsp;|&nbsp; <b>Cr Bank / Cash</b>. Record each fee separately against its payee ledger.
+          Accounting: <b>Dr Visa Fee Expense</b> &nbsp;|&nbsp; <b>Dr Input GST</b> (from Taxes column, where supplier-charged GST is creditable) &nbsp;|&nbsp; <b>Cr VFS / Supplier ledger</b>. Other taxes (biometric, courier) are non-creditable pass-through.
         </div>
       </div>
-      <VNarr def="Being visa fees paid to UAE Embassy via VFS Global — 2 applicants, UAE Tourist 30D, pass-through recovery from Sharma Enterprises.">
+      <VNarr def="Being visa fees paid to VFS Global — 2 applicants, UAE Tourist 30D, pass-through recovery from Sharma Enterprises.">
         <VTot branch={branch}
           lines={[
-            {l:"Embassy fees (Dr Visa Fee A/c)",v:"₹ "+fmt(embTotal)},
-            {l:"VFS / processing fees",v:"₹ "+fmt(vfsTotal)},
+            {l:"VFS fee",v:"₹ "+fmt(vfsTotal)},
+            {l:"Taxes",v:"₹ "+fmt(taxesTotal)},
+            {l:"Other taxes",v:"₹ "+fmt(otherTotal)},
           ]}
           total={total}
         />
@@ -1351,94 +1529,60 @@ export function PurchaseVisa({branch,setRoute}){
 
 export function PurchaseCar({branch,setRoute}){
   const vNo=useVNo(branch,"PC");
-  const [rows,setRows]=useState([
-    {id:1,vendor:"Mombasa Car Hire Kenya",vehicle:"Toyota Land Cruiser",type:"SUV",pickup:"Nairobi Airport",drop:"Nairobi Airport",days:3,rate:8500,currency:"KES",km:0,drv:0},
-    {id:2,vendor:"Riya Travels Mumbai",vehicle:"Toyota Innova Crysta",type:"MUV",pickup:"BOM T2",drop:"Pune Station",days:1,rate:4500,currency:"INR",km:0,drv:500},
-  ]);
-  const [gstScheme,setGstScheme]=useState("5");
-  const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:Date.now(),vendor:"",vehicle:"",type:"Sedan",pickup:"",drop:"",days:1,rate:0,currency:"INR",km:0,drv:0}]);
-  const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
-  const sub=rows.reduce((s,r)=>s+(+r.rate||0)*(+r.days||1)+(+r.km||0)+(+r.drv||0),0);
-  const gstPct=+gstScheme;
-  const inputCgst=+(sub*gstPct/200).toFixed(2);
+  const [row,setRow]=useState({vendor:"Riya Travels Mumbai",pickup:"BOM T2",drop:"Pune Station",days:1,basic:4500,otherFare:500,svc:0});
+  const upd=(k,v)=>setRow(r=>({...r,[k]:v}));
+  const sub=(+row.basic||0)+(+row.otherFare||0)+(+row.svc||0);
+  const inputCgst=+(sub*0.025).toFixed(2);
   const inputSgst=inputCgst;
   const total=+(sub+inputCgst+inputSgst).toFixed(2);
   return (
     <VWrap title="Purchase Voucher — Car Rentals" icon="🚗" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} label="Supplier / Transport Co." name="Mombasa Car Hire Kenya" gstin=""/>
-      <ARow label="Vehicle hire details" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:920}}>
+      <VParty branch={branch} label="Supplier / Transport Co." name={row.vendor} gstin=""/>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+        <p style={{margin:"0 0 8px",fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Vehicle hire details</p>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
-            {["#","Vendor","Vehicle","Type","Pickup","Drop","Days","Currency","Rate/day","Extra km","Driver","Total",""].map((h,i)=><VTH key={i} c={h} r={i>=8&&i<=11}/>)}
+            {["#","Vendor","Vehicle","Pickup","Drop","Days","Basic ₹","Other fare ₹","Service charge ₹","Total ₹"].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=9}/>)}
           </tr></thead>
-          <tbody>{rows.map((r,i)=>{
-            const rowTotal=(+r.rate||0)*(+r.days||1)+(+r.km||0)+(+r.drv||0);
-            return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
-                <VTD c={i+1}/>
-                <td style={{padding:3}}><input value={r.vendor} onChange={e=>upd(r.id,"vendor",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input value={r.vehicle} onChange={e=>upd(r.id,"vehicle",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}>
-                  <select value={r.type} onChange={e=>upd(r.id,"type",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}>
-                    <option>Sedan</option><option>MUV</option><option>SUV</option><option>Tempo</option><option>Bus</option>
-                  </select>
-                </td>
-                <td style={{padding:3}}><input value={r.pickup} onChange={e=>upd(r.id,"pickup",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input value={r.drop} onChange={e=>upd(r.id,"drop",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.days} onChange={e=>upd(r.id,"days",+e.target.value||1)} style={{...inp,minHeight:28,fontSize:11,width:50,textAlign:"right"}}/></td>
-                <td style={{padding:3}}>
-                  <select value={r.currency} onChange={e=>upd(r.id,"currency",e.target.value)} style={{...inp,minHeight:28,fontSize:11,width:70}}>
-                    {["INR","KES","TZS","USD","AED"].map(c=><option key={c}>{c}</option>)}
-                  </select>
-                </td>
-                <td style={{padding:3}}><input type="number" value={r.rate} onChange={e=>upd(r.id,"rate",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.km} onChange={e=>upd(r.id,"km",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:70}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.drv} onChange={e=>upd(r.id,"drv",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:70}}/></td>
-                <VTD c={fmt(rowTotal)} r/>
-                <DBtn fn={()=>rm(r.id)}/>
-              </tr>
-            );
-          })}</tbody>
-          <tfoot>
-            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
-              <td colSpan={11} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(sub)}</td>
-              <td/>
+          <tbody>
+            <tr style={{borderBottom:"1px solid #e1e3ec"}}>
+              <VTD c={1}/>
+              <td style={{padding:3}}><input value={row.vendor} onChange={e=>upd("vendor",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
+              <td style={{padding:3}}>
+                <input value="Car rental" readOnly style={{...inp,minHeight:28,fontSize:11,background:"#f3f4f8",color:"#5a6691",fontWeight:600,cursor:"not-allowed"}}/>
+              </td>
+              <td style={{padding:3}}><input value={row.pickup} onChange={e=>upd("pickup",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
+              <td style={{padding:3}}><input value={row.drop} onChange={e=>upd("drop",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
+              <td style={{padding:3}}><input type="number" value={row.days} onChange={e=>upd("days",+e.target.value||1)} style={{...inp,minHeight:28,fontSize:11,width:60,textAlign:"right"}}/></td>
+              <td style={{padding:3}}><input type="number" value={row.basic} onChange={e=>upd("basic",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Basic hire charges on supplier invoice"/></td>
+              <td style={{padding:3}}><input type="number" value={row.otherFare} onChange={e=>upd("otherFare",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Toll, parking, extra km, driver allowance"/></td>
+              <td style={{padding:3}}><input type="number" value={row.svc} onChange={e=>upd("svc",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Supplier service / handling charge"/></td>
+              <VTD c={fmt(sub)} r/>
             </tr>
-          </tfoot>
+          </tbody>
         </table>
-      </ARow>
+      </div>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
-          <FL label="Input GST scheme">
-            <select value={gstScheme} onChange={e=>setGstScheme(e.target.value)} style={inp}>
-              <option value="5">5% — No ITC (Indian vendors)</option>
-              <option value="12">12% — With ITC (B2B registered)</option>
-              <option value="0">0% — Overseas / no GST</option>
-            </select>
-          </FL>
-          <FL label={"Input CGST "+gstPct/2+"% ₹"}><input value={gstPct>0?fmt(inputCgst):"0.00"} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          <FL label={"Input SGST "+gstPct/2+"% ₹"}><input value={gstPct>0?fmt(inputSgst):"0.00"} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+          <FL label="Input GST rate"><input value="5% (CGST 2.5% + SGST 2.5%)" readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontWeight:600,cursor:"not-allowed"}}/></FL>
+          <FL label="Input CGST 2.5% ₹"><input value={fmt(inputCgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+          <FL label="Input SGST 2.5% ₹"><input value={fmt(inputSgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
         </div>
-        <div style={{marginTop:9,display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
-          <div style={{padding:"8px 12px",background:"#EAF3DE",borderRadius:8,fontSize:11.5,color:"#27500A"}}>
-            Accounting: <b>Dr Car Hire Expense</b> + <b>Dr Input CGST/SGST</b> | <b>Cr Vendor ledger</b>. TDS 194C applicable — deduct 1% (individual) or 2% (company) on payments above threshold.
-          </div>
-          <div style={{padding:"8px 12px",background:"#f3f4f8",borderRadius:8,fontSize:11.5,color:"#5a6691"}}>
-            For overseas vendors (Kenya/Tanzania/DRC), no Indian GST applies. Book cost in respective foreign currency and record forex gain/loss on settlement.
-          </div>
+        <div style={{marginTop:9,padding:"8px 12px",background:"#EAF3DE",borderRadius:8,fontSize:11.5,color:"#27500A"}}>
+          5% GST on (Basic + Other fare + Service charge). Accounting: <b>Dr Car Hire Expense</b> + <b>Dr Input CGST/SGST</b> | <b>Cr Vendor ledger</b>. TDS 194C: deduct 1% (individual) or 2% (company) above threshold.
         </div>
       </div>
-      <VNarr def="Being car hire charges — Land Cruiser Nairobi 3 days + Innova BOM-Pune 1 day, May 2026.">
+      <VNarr def={`Being car rental charges from ${row.vendor} — ${row.pickup} to ${row.drop}, ${row.days} day(s).`}>
         <VTot branch={branch}
           lines={[
-            {l:"Hire charges (base)",v:"₹ "+fmt(sub)},
-            {l:"Input CGST "+gstPct/2+"%",v:"₹ "+fmt(gstPct>0?inputCgst:0)},
-            {l:"Input SGST "+gstPct/2+"%",v:"₹ "+fmt(gstPct>0?inputSgst:0)},
+            {l:"Basic",v:"₹ "+fmt(row.basic)},
+            {l:"Other fare",v:"₹ "+fmt(row.otherFare)},
+            {l:"Service charge",v:"₹ "+fmt(row.svc)},
+            {l:"Input CGST 2.5%",v:"₹ "+fmt(inputCgst)},
+            {l:"Input SGST 2.5%",v:"₹ "+fmt(inputSgst)},
           ]}
-          total={gstPct>0?total:sub}
+          total={total}
         />
       </VNarr>
     </VWrap>
@@ -1450,75 +1594,74 @@ export function PurchaseCar({branch,setRoute}){
 export function PurchaseInsurance({branch,setRoute}){
   const vNo=useVNo(branch,"PI");
   const [rows,setRows]=useState([
-    {id:1,insurer:"TATA AIG General Insurance",plan:"Travel Guard — Overseas",insured:"Rajiv Sharma",pp:"Z1234567",from:"2026-06-10",to:"2026-06-17",coverage:"USD 100,000",premium:3500,commission:700,policy:""},
-    {id:2,insurer:"TATA AIG General Insurance",plan:"Travel Guard — Overseas",insured:"Rohan",pp:"Z1234568",from:"2026-06-10",to:"2026-06-17",coverage:"USD 100,000",premium:3500,commission:700,policy:""},
+    {id:1,name:"TATA AIG General Insurance",pp:"Z1234567",dest:"Bali, Indonesia",basic:3500,otherTax:0,svc:200},
+    {id:2,name:"TATA AIG General Insurance",pp:"Z1234568",dest:"Bali, Indonesia",basic:3500,otherTax:0,svc:200},
   ]);
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:Date.now(),insurer:"",plan:"",insured:"",pp:"",from:"",to:"",coverage:"",premium:0,commission:0,policy:""}]);
+  const add=()=>setRows(rs=>[...rs,{id:Date.now(),name:"",pp:"",dest:"",basic:0,otherTax:0,svc:0}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
-  const premTot=rows.reduce((s,r)=>s+(+r.premium||0),0);
-  const commTot=rows.reduce((s,r)=>s+(+r.commission||0),0);
-  const inputGst=+(premTot*0.18).toFixed(2);
-  const netPay=+(premTot-commTot).toFixed(2);
+  const totBasic=rows.reduce((s,r)=>s+(+r.basic||0),0);
+  const totOther=rows.reduce((s,r)=>s+(+r.otherTax||0),0);
+  const totSvc=rows.reduce((s,r)=>s+(+r.svc||0),0);
+  const taxable=totBasic+totOther+totSvc;
+  const inputGst=+(taxable*0.18).toFixed(2);
+  const total=+(taxable+inputGst).toFixed(2);
   return (
     <VWrap title="Purchase Voucher — Insurance" icon="🛡" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} label="Insurer / Supplier" name="TATA AIG General Insurance" gstin="27AABCT1234G1Z5"/>
       <ARow label="Policy purchase details" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:980}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
-            {["#","Insurer","Plan","Insured","Passport","From","To","Coverage","Net premium ₹","Commission ₹","Policy no.",""].map((h,i)=><VTH key={i} c={h} r={i>=8&&i<=9}/>)}
+            {["#","Name","Passport","Destination","Basic ₹","Other tax ₹","Service charge ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=4&&i<=7}/>)}
           </tr></thead>
-          <tbody>{rows.map((r,i)=>(
-            <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
-              <VTD c={i+1}/>
-              <td style={{padding:3}}><input value={r.insurer} onChange={e=>upd(r.id,"insurer",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={r.plan} onChange={e=>upd(r.id,"plan",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={r.insured} onChange={e=>upd(r.id,"insured",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={r.pp} onChange={e=>upd(r.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:88}}/></td>
-              <td style={{padding:3}}><input type="date" value={r.from} onChange={e=>upd(r.id,"from",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input type="date" value={r.to} onChange={e=>upd(r.id,"to",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-              <td style={{padding:3}}><input value={r.coverage} onChange={e=>upd(r.id,"coverage",e.target.value)} style={{...inp,minHeight:28,fontSize:11,width:110}}/></td>
-              <td style={{padding:3}}><input type="number" value={r.premium} onChange={e=>upd(r.id,"premium",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:80}}/></td>
-              <td style={{padding:3}}><input type="number" value={r.commission} onChange={e=>upd(r.id,"commission",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:80}}/></td>
-              <td style={{padding:3}}><input value={r.policy} onChange={e=>upd(r.id,"policy",e.target.value)} placeholder="After issuance" style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace"}}/></td>
-              <DBtn fn={()=>rm(r.id)}/>
-            </tr>
-          ))}</tbody>
+          <tbody>{rows.map((r,i)=>{
+            const lineTotal=(+r.basic||0)+(+r.otherTax||0)+(+r.svc||0);
+            return (
+              <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
+                <VTD c={i+1}/>
+                <td style={{padding:3}}><input value={r.name} onChange={e=>upd(r.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:180}}/></td>
+                <td style={{padding:3}}><input value={r.pp} onChange={e=>upd(r.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:100}}/></td>
+                <td style={{padding:3}}><input value={r.dest} onChange={e=>upd(r.id,"dest",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:130}}/></td>
+                <td style={{padding:3}}><input type="number" value={r.basic} onChange={e=>upd(r.id,"basic",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:85}} title="Basic / net premium charged by insurer"/></td>
+                <td style={{padding:3}}><input type="number" value={r.otherTax} onChange={e=>upd(r.id,"otherTax",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:80}} title="Stamp duty, levy or other non-creditable tax"/></td>
+                <td style={{padding:3}}><input type="number" value={r.svc} onChange={e=>upd(r.id,"svc",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right",width:85}} title="Supplier service / processing charge"/></td>
+                <VTD c={fmt(lineTotal)} r/>
+                <DBtn fn={()=>rm(r.id)}/>
+              </tr>
+            );
+          })}</tbody>
           <tfoot>
             <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
-              <td colSpan={8} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12}}>{fmt(premTot)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#27500A"}}>{fmt(commTot)}</td>
-              <td colSpan={2}/>
+              <td colSpan={4} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totOther)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#27500A"}}>{fmt(totSvc)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(taxable)}</td>
+              <td/>
             </tr>
           </tfoot>
         </table>
       </ARow>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11,marginBottom:9}}>
-          <FL label={bc(branch).cur+"Total premium"}><input value={fmt(premTot)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          <FL label="Commission earned ₹"><input value={fmt(commTot)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#27500A",fontWeight:600}}/></FL>
+          <FL label={bc(branch).cur+"Taxable value"}><input value={fmt(taxable)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
           <FL label="Input GST 18% ₹"><input value={fmt(inputGst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          <FL label="Net payable to insurer ₹"><input value={fmt(netPay)} readOnly style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#185FA5"}}/></FL>
+          <FL label="Total payable ₹"><input value={fmt(total)} readOnly style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#185FA5"}}/></FL>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
-          <div style={{padding:"8px 12px",background:"#EAF3DE",borderRadius:8,fontSize:11.5,color:"#27500A"}}>
-            Accounting: <b>Dr Insurance Premium Expense</b> + <b>Dr Input CGST/SGST 9%</b> | <b>Cr Insurer ledger</b>. Commission credit to <b>Commission Income A/c</b> — taxable at 18% (issue separate invoice to insurer).
-          </div>
-          <div style={{padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
-            TDS 194D applies on commission received from insurer. Deduct 5% TDS on commission income above threshold. Commission is agency income — book separately from premium pass-through.
-          </div>
+        <div style={{padding:"8px 12px",background:"#EAF3DE",borderRadius:8,fontSize:11.5,color:"#27500A"}}>
+          Accounting: <b>Dr Insurance Premium Expense</b> + <b>Dr Input CGST/SGST 9%</b> | <b>Cr Insurer ledger</b>. Input GST 18% (SAC 997131) is creditable when on-billed to the customer.
         </div>
       </div>
-      <VNarr def="Being travel insurance premium purchase — TATA AIG Travel Guard Overseas, 2 pax, Bali trip 10-17 June 2026. Commission 20% deducted.">
+      <VNarr def="Being travel insurance premium purchase — 2 pax, Bali destination.">
         <VTot branch={branch}
           lines={[
-            {l:"Gross premium",v:"₹ "+fmt(premTot)},
-            {l:"Less: Commission earned",v:"(₹ "+fmt(commTot)+")"},
+            {l:"Basic",v:"₹ "+fmt(totBasic)},
+            {l:"Other tax",v:"₹ "+fmt(totOther)},
+            {l:"Service charge",v:"₹ "+fmt(totSvc)},
             {l:"Input GST 18% (ITC claim)",v:"₹ "+fmt(inputGst)},
           ]}
-          total={+(netPay+inputGst).toFixed(2)}
+          total={total}
         />
       </VNarr>
     </VWrap>
@@ -1530,22 +1673,22 @@ export function PurchaseInsurance({branch,setRoute}){
 export function PurchaseMisc({branch,setRoute}){
   const vNo=useVNo(branch,"PM");
   const [rows,setRows]=useState([
-    {id:1,vendor:"Airtel Business",desc:"International SIM cards x10",sac:"996429",qty:10,unit:"Nos",rate:850,gstPct:18,tds:false},
-    {id:2,vendor:"Singh Stationery",desc:"Office stationery & printing",sac:"996812",qty:1,unit:"Job",rate:3200,gstPct:18,tds:false},
-    {id:3,vendor:"M/s Cleantech Services",desc:"Office housekeeping — May",sac:"998531",qty:1,unit:"Month",rate:12000,gstPct:18,tds:true},
+    {id:1,vendor:"Airtel Business",gl:"International SIM cards x10",sac:"996429",amt:8500,gstPct:18,tds:false},
+    {id:2,vendor:"Singh Stationery",gl:"Office stationery & printing",sac:"996812",amt:3200,gstPct:18,tds:false},
+    {id:3,vendor:"M/s Cleantech Services",gl:"Office housekeeping — May",sac:"998531",amt:12000,gstPct:18,tds:true},
   ]);
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:Date.now(),vendor:"",desc:"",sac:"",qty:1,unit:"Nos",rate:0,gstPct:18,tds:false}]);
+  const add=()=>setRows(rs=>[...rs,{id:Date.now(),vendor:"",gl:"",sac:"",amt:0,gstPct:18,tds:false}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
 
-  const sub=rows.reduce((s,r)=>s+(+r.rate||0)*(+r.qty||1),0);
-  const inputGst=rows.reduce((s,r)=>s+((+r.rate||0)*(+r.qty||1))*(r.gstPct/100),0);
-  const tdsAmt=rows.filter(r=>r.tds).reduce((s,r)=>s+((+r.rate||0)*(+r.qty||1))*0.02,0);
+  const sub=rows.reduce((s,r)=>s+(+r.amt||0),0);
+  const inputGst=rows.reduce((s,r)=>s+(+r.amt||0)*(r.gstPct/100),0);
+  const tdsAmt=rows.filter(r=>r.tds).reduce((s,r)=>s+(+r.amt||0)*0.02,0);
   const total=+(sub+inputGst).toFixed(2);
 
   const gstByRate={};
   rows.forEach(r=>{
-    const amt=(+r.rate||0)*(+r.qty||1);
+    const amt=+r.amt||0;
     if(!gstByRate[r.gstPct])gstByRate[r.gstPct]={taxable:0,gst:0};
     gstByRate[r.gstPct].taxable+=amt;
     gstByRate[r.gstPct].gst+=+(amt*r.gstPct/100).toFixed(2);
@@ -1558,33 +1701,26 @@ export function PurchaseMisc({branch,setRoute}){
       <VHead vNo={vNo}/>
       <VParty branch={branch} label="Primary Supplier" name="Various / Multiple" gstin=""/>
       <ARow label="Expense / purchase lines" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:840}}>
           <thead><tr>
-            {["#","Vendor","Description","SAC","Qty","Unit","Rate ₹","GST %","Amount ₹","Input GST ₹","TDS?","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=6&&i<=11}/>)}
+            {["#","Vendor","G.L Name","SAC","GST %","Amount ₹","Input GST ₹","TDS?","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=4&&i<=8}/>)}
           </tr></thead>
           <tbody>{rows.map((r,i)=>{
-            const amt=(+r.rate||0)*(+r.qty||1);
+            const amt=+r.amt||0;
             const gst=+(amt*r.gstPct/100).toFixed(2);
             const tdsLine=r.tds?+(amt*0.02).toFixed(2):0;
             return (
               <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
                 <VTD c={i+1}/>
-                <td style={{padding:3}}><input value={r.vendor} onChange={e=>upd(r.id,"vendor",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input value={r.desc} onChange={e=>upd(r.id,"desc",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input value={r.sac} onChange={e=>upd(r.id,"sac",e.target.value)} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:82}}/></td>
-                <td style={{padding:3}}><input type="number" value={r.qty} onChange={e=>upd(r.id,"qty",+e.target.value||1)} style={{...inp,minHeight:28,fontSize:11,width:55,textAlign:"right"}}/></td>
+                <td style={{padding:3}}><input value={r.vendor} onChange={e=>upd(r.id,"vendor",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:160}}/></td>
+                <td style={{padding:3}}><input value={r.gl} onChange={e=>upd(r.id,"gl",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:200}}/></td>
+                <td style={{padding:3}}><input value={r.sac} onChange={e=>upd(r.id,"sac",e.target.value)} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:90}}/></td>
                 <td style={{padding:3}}>
-                  <select value={r.unit} onChange={e=>upd(r.id,"unit",e.target.value)} style={{...inp,minHeight:28,fontSize:11,width:72}}>
-                    <option>Nos</option><option>Job</option><option>Month</option><option>Hrs</option><option>Days</option>
-                  </select>
-                </td>
-                <td style={{padding:3}}><input type="number" value={r.rate} onChange={e=>upd(r.id,"rate",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
-                <td style={{padding:3}}>
-                  <select value={r.gstPct} onChange={e=>upd(r.id,"gstPct",+e.target.value)} style={{...inp,minHeight:28,fontSize:11,background:rateBg[r.gstPct],color:rateC[r.gstPct],fontWeight:600}}>
+                  <select value={r.gstPct} onChange={e=>upd(r.id,"gstPct",+e.target.value)} style={{...inp,minHeight:28,fontSize:11,background:rateBg[r.gstPct],color:rateC[r.gstPct],fontWeight:600,width:75}}>
                     <option value={0}>0%</option><option value={5}>5%</option><option value={12}>12%</option><option value={18}>18%</option>
                   </select>
                 </td>
-                <VTD c={fmt(amt)} r/>
+                <td style={{padding:3}}><input type="number" value={r.amt} onChange={e=>upd(r.id,"amt",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
                 <VTD c={fmt(gst)} r/>
                 <td style={{padding:"4px 7px",textAlign:"center"}}>
                   <input type="checkbox" checked={r.tds} onChange={e=>upd(r.id,"tds",e.target.checked)} title="TDS 194C applicable" style={{cursor:"pointer",width:16,height:16}}/>
@@ -1599,7 +1735,7 @@ export function PurchaseMisc({branch,setRoute}){
           })}</tbody>
           <tfoot>
             <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
-              <td colSpan={8} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
+              <td colSpan={5} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(sub)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#185FA5"}}>{fmt(inputGst)}</td>
               <td style={{padding:"7px 8px",textAlign:"center",fontSize:10,color:"#854F0B"}}>{tdsAmt>0?"TDS: ("+fmt(tdsAmt)+")":""}</td>
@@ -3423,30 +3559,21 @@ export function SalesHoliday({branch,setRoute}){
   const [deptDate,setDeptDate]=useState("2026-06-10");
   const [returnDate,setReturnDate]=useState("2026-06-14");
   const [pax,setPax]=useState(2);
-  const [gstScheme,setGstScheme]=useState("A"); // A = agent 18% on fee | B = tour operator 5% on package
+  const [pkgType,setPkgType]=useState("International"); // International | Domestic — drives TCS
   const [consultant,setConsultant]=useState("Rahul M");
-  const [components,setComponents]=useState([
-    {id:1,type:"Flight",desc:"Air India BOM-DXB return × 2",cost:82000,sell:88000,gstRate:0,sacCode:"998552"},
-    {id:2,type:"Hotel",desc:"Marriott Dubai 4N × 2 pax",cost:55000,sell:62000,gstRate:12,sacCode:"996311"},
-    {id:3,type:"Transfers",desc:"Airport transfers × 2 ways",cost:3500,sell:5000,gstRate:5,sacCode:"998557"},
-    {id:4,type:"Visa",desc:"UAE Visa Service × 2",cost:4800,sell:9600,gstRate:18,sacCode:"999299"},
-    {id:5,type:"Insurance",desc:"Travel insurance × 2",cost:2400,sell:3200,gstRate:18,sacCode:"997133"},
-  ]);
-  const addComp=()=>setComponents(c=>[...c,{id:Date.now(),type:"Other",desc:"",cost:0,sell:0,gstRate:18,sacCode:""}]);
-  const updComp=(id,k,v)=>setComponents(c=>c.map(x=>x.id===id?{...x,[k]:v}:x));
-  const rmComp=id=>setComponents(c=>c.filter(x=>x.id!==id));
+  const [basic,setBasic]=useState({desc:"Air India BOM-DXB return × 2 + Marriott Dubai 4N",sac:"998552",amt:140000});
+  const [service,setService]=useState({desc:"Transfers, visa, insurance, agent service fee",sac:"998555",amt:25000});
+  const updBasic=(k,v)=>setBasic(b=>({...b,[k]:v}));
+  const updService=(k,v)=>setService(s=>({...s,[k]:v}));
 
-  const totCost=components.reduce((s,c)=>s+c.cost,0);
-  const totSell=components.reduce((s,c)=>s+c.sell,0);
-  const gp=totSell-totCost;
-  const gpPct=totSell>0?+(gp/totSell*100).toFixed(1):0;
+  const basicAmt=+basic.amt||0;
+  const serviceAmt=+service.amt||0;
+  const subTotal=basicAmt+serviceAmt;
+  const gstAmt=+(subTotal*0.05).toFixed(2);
+  const isIntl=pkgType==="International";
+  const tcsAmt=isIntl?+((subTotal+gstAmt)*0.02).toFixed(2):0;
+  const grandTotal=+(subTotal+gstAmt+tcsAmt).toFixed(2);
 
-  // GST computation based on scheme
-  const gstAmt=gstScheme==="A"
-    ? Math.round(gp*0.18) // 18% on service fee/GP only
-    : Math.round(totSell*0.05); // 5% on total package
-
-  const COMP_TYPES=["Flight","Hotel","Transfers","Guide/Sightseeing","Visa","Insurance","Meals","Cruise","Excursion","Other"];
   const f=n=>cur+Number(Math.round(n)).toLocaleString("en-IN");
   return (
     <VWrap title="Holiday Package Sale" icon="🌴" vNo={vNo} branch={branch}>
@@ -3460,92 +3587,105 @@ export function SalesHoliday({branch,setRoute}){
         <FL label="No. of pax"><input type="number" value={pax} onChange={e=>setPax(+e.target.value)} style={inp}/></FL>
       </div>
 
-      {/* GST Scheme selection */}
+      {/* Package Type selector — drives TCS applicability */}
       <div style={{marginBottom:14,padding:"12px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775"}}>
-        <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#854F0B"}}>GST Scheme (choose before invoice)</p>
+        <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#854F0B"}}>Package Type</p>
         <div style={{display:"flex",gap:8,marginBottom:8}}>
-          <button onClick={()=>setGstScheme("A")} style={{flex:1,padding:"8px 12px",borderRadius:8,cursor:"pointer",
-            background:gstScheme==="A"?"#854F0B":"#fff",color:gstScheme==="A"?"#fff":"#854F0B",
-            border:"2px solid #854F0B",fontSize:10.5,fontWeight:600}}>
-            Scheme A — 18% GST on service fee/commission only (ITC available)
+          <button onClick={()=>setPkgType("Domestic")} style={{flex:1,padding:"8px 12px",borderRadius:8,cursor:"pointer",
+            background:pkgType==="Domestic"?"#27500A":"#fff",color:pkgType==="Domestic"?"#fff":"#27500A",
+            border:"2px solid #27500A",fontSize:11,fontWeight:600}}>
+            Domestic — GST 5% only (No TCS)
           </button>
-          <button onClick={()=>setGstScheme("B")} style={{flex:1,padding:"8px 12px",borderRadius:8,cursor:"pointer",
-            background:gstScheme==="B"?"#854F0B":"#fff",color:gstScheme==="B"?"#fff":"#854F0B",
-            border:"2px solid #854F0B",fontSize:10.5,fontWeight:600}}>
-            Scheme B — 5% GST on total package value (No ITC — tour operator)
+          <button onClick={()=>setPkgType("International")} style={{flex:1,padding:"8px 12px",borderRadius:8,cursor:"pointer",
+            background:pkgType==="International"?"#185FA5":"#fff",color:pkgType==="International"?"#fff":"#185FA5",
+            border:"2px solid #185FA5",fontSize:11,fontWeight:600}}>
+            International — GST 5% + TCS 2%
           </button>
         </div>
         <p style={{margin:0,fontSize:10,color:"#854F0B"}}>
-          {gstScheme==="A"
-            ?"You are acting as a TRAVEL AGENT — GST 18% on GP ₹"+gp.toLocaleString()+" = ₹"+gstAmt.toLocaleString()+". ITC on GDS/software/office expenses ALLOWED."
-            :"You are a TOUR OPERATOR — GST 5% on package value ₹"+totSell.toLocaleString()+" = ₹"+gstAmt.toLocaleString()+". NO ITC allowed. Use for domestic/outbound holiday packages."}
+          {isIntl
+            ?"INTERNATIONAL outbound package — GST 5% on (Basic + Service) and TCS 2% u/s 206C(1G) on (Basic + Service + GST). Threshold ₹7L per FY waived in this demo."
+            :"DOMESTIC package — GST 5% on (Basic + Service). No TCS applicable."}
         </p>
       </div>
 
-      {/* Component breakout */}
-      <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Package Component Breakout <span style={{fontSize:9.5,color:"#5a6691"}}>(required for tour operator GST and GSTR-1)</span></p>
+      {/* Component breakout — fixed GL rows */}
+      <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Package Component Breakout <span style={{fontSize:9.5,color:"#5a6691"}}>(Basic + Service → GST 5% → TCS 2% if international)</span></p>
       <div style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
         <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",minWidth:750}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:720}}>
             <thead><tr style={{background:"#0d1326"}}>
-              {["#","Type","Description","SAC Code","Cost Price","Sell Price","GST Rate","GP",""].map((h,i)=>(
-                <th key={i} style={{padding:"8px 10px",textAlign:i>=4&&i<=7?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+              {["S.NO","GL Name","Description","SAC Code","Sell Price"].map((h,i)=>(
+                <th key={i} style={{padding:"8px 10px",textAlign:i===4?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
-              {components.map((c,i)=>(
-                <tr key={c.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-                  <td style={{padding:"4px 8px",textAlign:"center",color:"#5a6691",fontSize:10}}>{i+1}</td>
-                  <td style={{padding:"3px 6px"}}>
-                    <select value={c.type} onChange={e=>updComp(c.id,"type",e.target.value)} style={{...inp,minHeight:28,fontSize:10.5}}>
-                      {COMP_TYPES.map(t=><option key={t}>{t}</option>)}
-                    </select>
-                  </td>
-                  <td style={{padding:"3px 6px"}}>
-                    <input value={c.desc} onChange={e=>updComp(c.id,"desc",e.target.value)} style={{...inp,minHeight:28,fontSize:10.5,minWidth:160}}/>
-                  </td>
-                  <td style={{padding:"3px 6px"}}>
-                    <input value={c.sacCode} onChange={e=>updComp(c.id,"sacCode",e.target.value)} style={{...inp,minHeight:28,fontSize:10,fontFamily:"monospace",width:80}}/>
-                  </td>
-                  <td style={{padding:"3px 6px"}}>
-                    <input type="number" value={c.cost} onChange={e=>updComp(c.id,"cost",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#A32D2D"}}/>
-                  </td>
-                  <td style={{padding:"3px 6px"}}>
-                    <input type="number" value={c.sell} onChange={e=>updComp(c.id,"sell",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#185FA5"}}/>
-                  </td>
-                  <td style={{padding:"3px 6px"}}>
-                    <select value={c.gstRate} onChange={e=>updComp(c.id,"gstRate",+e.target.value)} style={{...inp,minHeight:28,fontSize:10.5,width:65}}>
-                      {[0,5,12,18].map(r=><option key={r} value={r}>{r}%</option>)}
-                    </select>
-                  </td>
-                  <td style={{padding:"4px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:c.sell-c.cost>0?"#27500A":"#A32D2D"}}>
-                    {f(c.sell-c.cost)}
-                  </td>
-                  <td style={{padding:"4px 8px",textAlign:"center"}}>
-                    <button onClick={()=>rmComp(c.id)} style={{background:"transparent",border:"none",cursor:"pointer",color:"#A32D2D",fontSize:16}}>✕</button>
-                  </td>
-                </tr>
-              ))}
+              {/* 1. Basic */}
+              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fff"}}>
+                <td style={{padding:"4px 10px",textAlign:"center",color:"#5a6691",fontSize:10}}>1</td>
+                <td style={{padding:"4px 10px",fontWeight:700,color:"#0d1326",fontSize:11}}>Basic</td>
+                <td style={{padding:"3px 6px"}}>
+                  <input value={basic.desc} onChange={e=>updBasic("desc",e.target.value)} style={{...inp,minHeight:28,fontSize:10.5,minWidth:200}}/>
+                </td>
+                <td style={{padding:"3px 6px"}}>
+                  <input value={basic.sac} onChange={e=>updBasic("sac",e.target.value)} style={{...inp,minHeight:28,fontSize:10,fontFamily:"monospace",width:90}}/>
+                </td>
+                <td style={{padding:"3px 6px"}}>
+                  <input type="number" value={basic.amt} onChange={e=>updBasic("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#185FA5"}}/>
+                </td>
+              </tr>
+              {/* 2. Service */}
+              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fafafa"}}>
+                <td style={{padding:"4px 10px",textAlign:"center",color:"#5a6691",fontSize:10}}>2</td>
+                <td style={{padding:"4px 10px",fontWeight:700,color:"#0d1326",fontSize:11}}>Service</td>
+                <td style={{padding:"3px 6px"}}>
+                  <input value={service.desc} onChange={e=>updService("desc",e.target.value)} style={{...inp,minHeight:28,fontSize:10.5,minWidth:200}}/>
+                </td>
+                <td style={{padding:"3px 6px"}}>
+                  <input value={service.sac} onChange={e=>updService("sac",e.target.value)} style={{...inp,minHeight:28,fontSize:10,fontFamily:"monospace",width:90}}/>
+                </td>
+                <td style={{padding:"3px 6px"}}>
+                  <input type="number" value={service.amt} onChange={e=>updService("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#185FA5"}}/>
+                </td>
+              </tr>
+              {/* 3. Total (subtotal) */}
+              <tr style={{borderBottom:"1px solid #e1e3ec",background:"#f3f4f8"}}>
+                <td style={{padding:"6px 10px",textAlign:"center",color:"#0d1326",fontSize:10,fontWeight:700}}>3</td>
+                <td style={{padding:"6px 10px",fontWeight:800,color:"#0d1326",fontSize:11.5}}>Total</td>
+                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>Basic + Service</td>
+                <td style={{padding:"6px 10px"}}></td>
+                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:800,fontSize:12,color:"#0d1326",fontVariantNumeric:"tabular-nums"}}>{f(subTotal)}</td>
+              </tr>
+              {/* 4. GST 5% */}
+              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fff"}}>
+                <td style={{padding:"6px 10px",textAlign:"center",color:"#854F0B",fontSize:10,fontWeight:700}}>4</td>
+                <td style={{padding:"6px 10px",fontWeight:700,color:"#854F0B",fontSize:11}}>GST (5%)</td>
+                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>5% on (Basic + Service)</td>
+                <td style={{padding:"6px 10px",fontSize:10,fontFamily:"monospace",color:"#5a6691"}}>—</td>
+                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#854F0B",fontVariantNumeric:"tabular-nums"}}>{f(gstAmt)}</td>
+              </tr>
+              {/* 5. TCS 2% */}
+              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fafafa",opacity:isIntl?1:0.45}}>
+                <td style={{padding:"6px 10px",textAlign:"center",color:"#185FA5",fontSize:10,fontWeight:700}}>5</td>
+                <td style={{padding:"6px 10px",fontWeight:700,color:"#185FA5",fontSize:11}}>TCS (2%) {!isIntl&&<span style={{fontSize:9,color:"#5a6691",fontWeight:500}}>— N/A (Domestic)</span>}</td>
+                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>2% on (Basic + Service + GST) — international only</td>
+                <td style={{padding:"6px 10px",fontSize:10,fontFamily:"monospace",color:"#5a6691"}}>—</td>
+                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(tcsAmt)}</td>
+              </tr>
             </tbody>
             <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
-              <td colSpan={4} style={{padding:"8px 10px",fontWeight:700,color:"#d4a437",fontSize:11}}>
-                <button onClick={addComp} style={{...btnGh,fontSize:10,padding:"3px 10px",color:"#d4a437",borderColor:"#d4a437"}}><Plus size={11}/> Add Component</button>
-              </td>
-              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:"#F7C1C1",fontVariantNumeric:"tabular-nums"}}>{f(totCost)}</td>
-              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(totSell)}</td>
-              <td style={{padding:"8px 10px",textAlign:"right",color:"#d4a437",fontSize:10.5,fontWeight:700}}>{gstScheme==="A"?"18% on GP":"5% on pkg"}</td>
-              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(gp)} ({gpPct}%)</td>
-              <td/>
+              <td colSpan={4} style={{padding:"8px 10px",fontWeight:800,color:"#d4a437",fontSize:11.5}}>Grand Total ({pkgType})</td>
+              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:"#d4a437",fontSize:13,fontVariantNumeric:"tabular-nums"}}>{f(grandTotal)}</td>
             </tr></tfoot>
           </table>
         </div>
       </div>
 
-      {/* GST + Total summary */}
+      {/* Summary tiles */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr",gap:10,marginBottom:12}}>
-        {[{l:"Package Cost",v:f(totCost),c:"#A32D2D"},{l:"Sell Price (net)",v:f(totSell),c:"#185FA5"},
-          {l:"GST on Invoice",v:f(gstAmt),c:"#854F0B"},{l:"Total Billed",v:f(totSell+gstAmt),c:"#0d1326"},
-          {l:"GP ("+gpPct+"%)",v:f(gp),c:gpPct>=12?"#27500A":gpPct>=8?"#854F0B":"#A32D2D"},
+        {[{l:"Basic",v:f(basicAmt),c:"#185FA5"},{l:"Service",v:f(serviceAmt),c:"#185FA5"},
+          {l:"GST 5%",v:f(gstAmt),c:"#854F0B"},{l:"TCS 2%",v:isIntl?f(tcsAmt):"N/A",c:isIntl?"#185FA5":"#8b94b3"},
+          {l:"Grand Total",v:f(grandTotal),c:"#0d1326"},
         ].map((k,i)=>(
           <div key={i} style={{padding:"9px 12px",borderRadius:8,background:"#f3f4f8",textAlign:"center"}}>
             <p style={{margin:0,fontSize:9,color:"#5a6691",textTransform:"uppercase"}}>{k.l}</p>
@@ -3555,8 +3695,8 @@ export function SalesHoliday({branch,setRoute}){
       </div>
 
       <VParty branch={branch} label="Client" name={client} gstin="27AABCX****1Z5"/>
-      <VNarr def={`Being holiday package sale — ${dest}, ${pax} pax, ${deptDate} to ${returnDate}${tourCode?" tour code "+tourCode:""}. GST Scheme ${gstScheme} applicable.`}/>
-      <VTot label="Total Invoice" val={totSell+gstAmt} cur={cur}/>
+      <VNarr def={`Being holiday package sale (${pkgType}) — ${dest}, ${pax} pax, ${deptDate} to ${returnDate}${tourCode?" tour code "+tourCode:""}. GST 5% on Basic+Service${isIntl?", TCS 2% u/s 206C(1G) on Basic+Service+GST":""}.`}/>
+      <VTot label="Total Invoice" val={grandTotal} cur={cur}/>
     </VWrap>
   );
 }

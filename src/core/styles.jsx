@@ -7,7 +7,7 @@ import React, { useRef, useState } from 'react';
 import { Calendar, ChevronRight, Download, Plus, Save, Search, Trash2, TrendingDown, TrendingUp, User } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from './business-logic';
-import { HR_STATS_DATA, INTERBRANCH_ELIMINATIONS, LEAVE_UTILIZATION, PURCHASE_REGISTRY, TAX_FILING_BOARD, YIELD_BY_CONSULTANT, YIELD_BY_DESTINATION, YIELD_BY_SUPPLIER, YOY_PL } from './data';
+import { HR_STATS_DATA, INTERBRANCH_ELIMINATIONS, LEAVE_UTILIZATION, PURCHASE_REGISTRY, SALESPEOPLE, TAX_FILING_BOARD, YIELD_BY_CONSULTANT, YIELD_BY_DESTINATION, YIELD_BY_SUPPLIER, YOY_PL } from './data';
 import { fmt, fmtINR } from './format';
 import { ATTRITION_DATA, AUDIT_TRAIL_DATA, BANK_ACCOUNTS_DATA, CUSTOMER_LTV_DATA, FS_NOTES, FX_EXPOSURE, STATUTORY_DUES, TOP_SUPPLIERS_DATA, abcOf, cardStyle } from './helpers';
 import { triggerSaveRefresh, useMobile } from './hooks';
@@ -320,6 +320,20 @@ export function FL({label,children}){
   );
 }
 
+/* Salesperson — read-only, comes from CRM (SALESPEOPLE in data.js).
+   Shown on every sale/purchase voucher so the booking can be matched
+   back to a CRM owner. Not editable: CRM is the source of truth. */
+export function SalespersonField({branch,label="Salesperson (CRM)",name}){
+  const branchCode=branch?.code;
+  const resolved=name||SALESPEOPLE.find(p=>p.branch===branchCode)?.name||SALESPEOPLE[0].name;
+  return (
+    <FL label={label}>
+      <input value={resolved} readOnly title="Synced from CRM"
+        style={{...inp,background:"#f3f4f8",color:"#5a6691",fontWeight:600,cursor:"not-allowed"}}/>
+    </FL>
+  );
+}
+
 
 /* Keep getUnmatchedTickets for backwards compat (flights only) */
 
@@ -509,7 +523,7 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
 
 
 
-export function VHead({vNo,branch}){
+export function VHead({vNo,branch,salesperson=true}){
   const cfg=bc(branch);
   const isIndia=cfg.taxType==="GST";
   return (
@@ -535,6 +549,7 @@ export function VHead({vNo,branch}){
           <FL label="Reference">
             <input placeholder="Optional ref." style={inp}/>
           </FL>
+          {salesperson&&<SalespersonField branch={branch}/>}
         </div>
     </div>
   );
