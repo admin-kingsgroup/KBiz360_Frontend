@@ -8,7 +8,7 @@ import { AlertTriangle, Check, Download, Plus, Save, Search, Settings } from 'lu
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ADM_DATA, CASH, CUSTOMERS, FOREX_RATES_DATA, GP_BILLS, NUMBERING_SERIES_DATA } from '../core/data';
 import { fmt, fmtINR } from '../core/format';
-import { ACM_DATA, APPROVAL_LIMITS_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, CURRENCY_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, MstrModal, MstrShell, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, cardStyle, tabPanel } from '../core/helpers';
+import { ACM_DATA, APPROVAL_LIMITS_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, CURRENCY_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, MstrModal, MstrShell, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, _PASSPORTS, cardStyle, tabPanel } from '../core/helpers';
 import { useMobile } from '../core/hooks';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../core/styles';
 import { PHASE2_Page } from '../shell/PHASE2_Page';
@@ -2918,6 +2918,129 @@ export function MasterChangeQueue(){
   );
 }
 
+
+export function PassportManager({branch}){
+  const mob=useMobile();
+  const brCode=branch==="ALL"?null:branch?.code;
+  const [search,setSearch]=useState("");
+  const [modal,setModal]=useState(false);
+  const [form,setForm]=useState({client:"",person:"",passport:"",nationality:"Indian",issued:"",expiry:"",branch:"BOM"});
+  const [passports,setPassports]=useState(_PASSPORTS);
+  const TODAY="2026-05-19";
+
+  const filtered=passports.filter(p=>(
+    (!brCode||p.branch===brCode)&&
+    (!search||p.person.toLowerCase().includes(search.toLowerCase())||p.client.toLowerCase().includes(search.toLowerCase())||p.passport.includes(search))
+  ));
+
+  const daysToExpiry=d=>Math.ceil((new Date(d)-new Date(TODAY))/(1000*60*60*24));
+  const expStatus=d=>{const dl=daysToExpiry(d);return dl<0?"Expired":dl<90?"Expiring Soon":dl<180?"Expiring in 6mo":"Valid";};
+  const STATUS_CLR={"Valid":"#27500A","Expiring in 6mo":"#1D9E75","Expiring Soon":"#854F0B","Expired":"#A32D2D","Visa Expiring":"#854F0B"};
+  const STATUS_BG={"Valid":"#EAF3DE","Expiring in 6mo":"#EAF3DE","Expiring Soon":"#FAEEDA","Expired":"#FCEBEB","Visa Expiring":"#FAEEDA"};
+
+  const expiringSoon=filtered.filter(p=>daysToExpiry(p.expiry)<180&&daysToExpiry(p.expiry)>0);
+
+  return (
+    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🛂</div>
+          <div>
+            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Passport & Document Manager</h2>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Client passports · Visa stamps · Expiry alerts</p>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Name / passport / client..." style={{...inp,width:220,minHeight:32,fontSize:11}}/>
+          <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Add Passport</button>
+        </div>
+      </div>
+
+      {expiringSoon.length>0&&(
+        <div style={{marginBottom:12,padding:"10px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775",fontSize:10.5,color:"#854F0B",fontWeight:600,display:"flex",gap:8,alignItems:"center"}}>
+          <AlertTriangle size={15}/>
+          {expiringSoon.length} passport{expiringSoon.length>1?"s":""} expiring within 6 months:
+          {expiringSoon.map(p=><span key={p.id} style={{marginLeft:6,padding:"1px 7px",borderRadius:999,background:"#854F0B",color:"#fff",fontSize:9.5}}>{p.person} ({daysToExpiry(p.expiry)}d)</span>)}
+        </div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
+        {[{l:"Total Passports",v:String(filtered.length),c:"#384677",bg:"#f3f4f8"},
+          {l:"Valid",v:String(filtered.filter(p=>daysToExpiry(p.expiry)>=180).length),c:"#27500A",bg:"#EAF3DE"},
+          {l:"Expiring <6mo",v:String(filtered.filter(p=>daysToExpiry(p.expiry)<180&&daysToExpiry(p.expiry)>0).length),c:"#854F0B",bg:"#FAEEDA"},
+          {l:"Expired",v:String(filtered.filter(p=>daysToExpiry(p.expiry)<=0).length),c:"#A32D2D",bg:"#FCEBEB"},
+        ].map((k,i)=>(
+          <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"11px 13px",background:k.bg}}>
+            <p style={{margin:0,fontSize:9,fontWeight:700,color:k.c,textTransform:"uppercase"}}>{k.l}</p>
+            <p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:"#0d1326"}}>{k.v}</p>
+          </div>
+        ))}
+      </div>
+
+      <div style={{...card,padding:0,overflow:"hidden"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
+          <thead><tr style={{background:"#0d1326"}}>
+            {["Person","Client","Passport No.","Nationality","Issued","Expiry","Days Left","Visas in Passport","Branch","Status"].map((h,i)=>(
+              <th key={i} style={{padding:"9px 11px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>{filtered.map((p,i)=>{
+            const dl=daysToExpiry(p.expiry);
+            const st=expStatus(p.expiry);
+            return (
+              <tr key={p.id} style={{borderBottom:"1px solid #f3f4f8",background:dl<0?"#fff5f5":dl<90?"#fffaf0":i%2===0?"#fff":"#fafafa"}}>
+                <td style={{padding:"8px 11px",fontWeight:600,color:"#0d1326"}}>{p.person}</td>
+                <td style={{padding:"8px 11px",color:"#384677"}}>{p.client}</td>
+                <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:10,color:"#185FA5",fontWeight:700}}>{p.passport}</td>
+                <td style={{padding:"8px 11px",color:"#5a6691"}}>{p.nationality}</td>
+                <td style={{padding:"8px 11px",color:"#5a6691",whiteSpace:"nowrap"}}>{p.issued}</td>
+                <td style={{padding:"8px 11px",color:dl<90?"#A32D2D":dl<180?"#854F0B":"#5a6691",fontWeight:dl<180?700:400,whiteSpace:"nowrap"}}>{p.expiry}</td>
+                <td style={{padding:"8px 11px",fontWeight:700,color:dl<0?"#A32D2D":dl<90?"#854F0B":"#27500A"}}>{dl<0?`${Math.abs(dl)}d EXPIRED`:`${dl}d`}</td>
+                <td style={{padding:"8px 11px",fontSize:10,color:"#5a6691",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis"}}>{p.visas.length>0?p.visas.join(" · "):"None"}</td>
+                <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 6px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{p.branch}</span></td>
+                <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:STATUS_BG[st]||"#f3f4f8",color:STATUS_CLR[st]||"#5a6691"}}>{st}</span></td>
+              </tr>
+            );
+          })}</tbody>
+        </table>
+      </div>
+      {modal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:480,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Add Passport Record</p>
+              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
+            </div>
+            <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FL label="Person name"><input value={form.person} onChange={e=>setForm(f=>({...f,person:e.target.value}))} style={inp}/></FL>
+                <FL label="Client account"><input value={form.client} onChange={e=>setForm(f=>({...f,client:e.target.value}))} style={inp}/></FL>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FL label="Passport number"><input value={form.passport} onChange={e=>setForm(f=>({...f,passport:e.target.value}))} style={{...inp,fontFamily:"monospace",textTransform:"uppercase"}}/></FL>
+                <FL label="Nationality"><input value={form.nationality} onChange={e=>setForm(f=>({...f,nationality:e.target.value}))} style={inp}/></FL>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FL label="Issue date"><input type="date" value={form.issued} onChange={e=>setForm(f=>({...f,issued:e.target.value}))} style={inp}/></FL>
+                <FL label="Expiry date"><input type="date" value={form.expiry} onChange={e=>setForm(f=>({...f,expiry:e.target.value}))} style={inp}/></FL>
+              </div>
+              <FL label="Branch"><select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))} style={inp}>{["TKHO","BOM","AMD","NBO","DAR","FBM"].map(b=><option key={b}>{b}</option>)}</select></FL>
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+              <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
+              <button onClick={()=>{
+                const id=`PP${String(passports.length+1).padStart(3,"0")}`;
+                const st=expStatus(form.expiry);
+                setPassports(p=>[{...form,id,visas:[],type:"B2C",dob:"",status:st},...p]);
+                setModal(false);
+              }} style={btnG}>💾 Save Passport</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ════════════════════════════════════════════════════════════════════
    USER MENU + SIGN-OUT  (in TopBar, next to notification bell)

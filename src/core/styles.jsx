@@ -559,9 +559,10 @@ export function VHead({vNo,branch,salesperson=true}){
 
 
 
-export function VParty({label,name,gstin,branch:branchProp}){
+export function VParty({label,name,gstin,branch:branchProp,onGstinChange}){
   const cfg=bc(branchProp);
   const isIndia=cfg.taxType==="GST";
+  const controlled=typeof onGstinChange==="function";
   return (
     <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
       <p style={{margin:"0 0 9px",fontSize:10,color:"#5a6691",letterSpacing:"0.5px",textTransform:"uppercase"}}>{label||"Customer"} details</p>
@@ -570,7 +571,9 @@ export function VParty({label,name,gstin,branch:branchProp}){
           <input defaultValue={name||""} style={inp}/>
         </FL>
         <FL label={isIndia?"GSTIN":"Tax ID / VAT no."}>
-          <input defaultValue={gstin||""} style={{...inp,fontFamily:"monospace"}} placeholder={isIndia?"27AABCS1234L1Z5":"VAT-123456"}/>
+          {controlled
+            ?<input value={gstin||""} onChange={e=>onGstinChange(e.target.value.toUpperCase())} style={{...inp,fontFamily:"monospace"}} placeholder={isIndia?"27AABCS1234L1Z5":"VAT-123456"}/>
+            :<input defaultValue={gstin||""} style={{...inp,fontFamily:"monospace"}} placeholder={isIndia?"27AABCS1234L1Z5":"VAT-123456"}/>}
         </FL>
         <FL label={isIndia?"Place of supply":"Country / region"}>
           <select style={inp}>

@@ -3,7 +3,7 @@
    Auto-generated from KBiz360_v2.jsx · 361 lines · 11 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import { BarChart2, BookOpen, Calendar, Database, Download, LayoutDashboard, Lock, Settings, ShoppingCart, User, Users, Wallet, Wrench } from 'lucide-react';
+import { BarChart2, Calendar, Database, Download, LayoutDashboard, Lock, Settings, ShoppingCart, User, Users, Wallet, Wrench } from 'lucide-react';
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { Recruitment } from './helpers';
 import { PERM_MODULES, ROLE_TEMPLATES } from './permissions';
@@ -44,16 +44,6 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
     {label:"Bulk Import Master Data", href:"/masters/bulk-import"},
     {label:"Merge Duplicate Records", href:"/masters/merge"},
   ]},
-]};
-
-/* ── OPERATIONS ──────────────────────────────────────────────── */
-
-export const MENU_OPERATIONS = {label:"Operations", icon:BookOpen, children:[
-  {label:"Booking Files",           href:"/bookings"},
-  {label:"Group Bookings", href:"/operations/groups", icon:"👨‍👩‍👧‍👦"},
-          {label:"Refund Tracker", href:"/operations/refunds", icon:"↩"},
-          {label:"Advance & Deposits", href:"/bookings/advances"},
-  {label:"Unmatched Tickets ⚠",     href:"/tickets/unmatched"},
 ]};
 
 /* ── SALES ───────────────────────────────────────────────────── */
@@ -333,7 +323,6 @@ export const MENU_HO_CONTROL = {label:"HO Control", icon:Settings, children:[
 export const MENU_COMMON_TOP = [
   {label:"Dashboard",   icon:LayoutDashboard, href:"/dashboard"},
   MENU_TRANSACTIONS,
-  MENU_OPERATIONS,
   MENU_FINANCE,
 ];
 
@@ -347,7 +336,6 @@ export function getMenu(branch, currentUser){
     "Dashboard":        null,            // always visible
     "Masters":          "Masters",
     "Transactions":     "_TXN",          // special: passes if Sales OR Purchase accessible
-    "Operations":       "Operations",
     "Finance":          "Finance",
     "Assets":           "Finance",
     "Taxation":         "Taxation",

@@ -36,7 +36,6 @@ export const QUICK_CREATE_ACTIONS = [
   { label: '💰 Receipt',      route: '/receipts',      color: '#384677' },
   { label: '💸 Payment',      route: '/payments',      color: '#A32D2D' },
   { label: '📒 Journal',      route: '/journal',       color: '#5a6691' },
-  { label: '📁 Booking File', route: '/bookings',      color: '#384677' },
 ];
 
 export const POST_SHORTCUTS = [

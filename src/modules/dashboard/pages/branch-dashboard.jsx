@@ -4,7 +4,6 @@ import { useBranchDashboard } from '../hooks/use-branch-dashboard';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
 import { formatCurrency } from '../utils/helpers';
 import { BranchHeader } from '../components/shared/BranchHeader';
-import { AlertStrip } from '../components/shared/AlertStrip';
 import { KpiTile } from '../components/cards/KpiTile';
 import { GpByModulePanel } from '../components/shared/GpByModulePanel';
 import { ConsultantLeaderboard } from '../components/shared/ConsultantLeaderboard';
@@ -22,7 +21,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
     return <div style={{ padding: '24px', color: '#5a6691', fontSize: 12 }}>Loading dashboard…</div>;
   }
 
-  const { kpis, gpByModule, topConsultants, actionItems, upcomingTravel, unmatchedCount, billsYtd } = data;
+  const { kpis, gpByModule, topConsultants, actionItems, upcomingTravel, billsYtd } = data;
   const formatMoney = (n) => formatCurrency(currencySymbol, n);
 
   return (
@@ -34,8 +33,6 @@ export function BranchDashboardPage({ branch, setRoute }) {
         bookingsCount={kpis.bookings}
         onNavigate={navigate}
       />
-
-      <AlertStrip count={unmatchedCount} onClick={() => navigate('/tickets/unmatched')} />
 
       {/* KPI Cards */}
       <div
@@ -85,7 +82,6 @@ export function BranchDashboardPage({ branch, setRoute }) {
           sub={`${(kpis.revenue / Math.max(1, kpis.bookings) | 0).toLocaleString()} avg`}
           icon="✈"
           color="#384677"
-          onClick={() => navigate('/bookings')}
         />
         <KpiTile
           label="YTD Revenue"
@@ -123,7 +119,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
         {/* Right column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <ActionItemsPanel items={actionItems} onItemClick={navigate} />
-          <UpcomingTravelPanel bookings={upcomingTravel} onViewAll={() => navigate('/bookings')} />
+          <UpcomingTravelPanel bookings={upcomingTravel} />
           <QuickStatsCard
             rows={[
               { label: 'YTD Revenue', value: formatMoney(kpis.ytdRevenue), color: '#fff' },

@@ -15,7 +15,6 @@ import { ARow, B, DBtn, FL, RPT_tdStyle, RPT_thStyle, SalespersonField, VHead, V
 import { Dashboard } from './dashboard';
 import { TDS_SECTIONS } from './finance';
 import { ChartOfAccounts, MastersLedgers, MastersSubAgents } from './masters';
-import { DocumentManager } from './operations';
 import { ApiKeySettings } from './settings';
 import { Form26AS } from './taxation';
 import { NotificationCentre } from '../shell/NotifPanel';
@@ -304,15 +303,19 @@ export function SalesFlight({branch,setRoute}){
   const [irn,setIrn]=useState("a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456");
   const [terms,setTerms]=useState("1. Tickets are non-refundable unless airline policy permits.\n2. Date/route changes attract airline change fee + fare difference.\n3. Cancellation charges as per airline rules apply.\n4. Passport must be valid for 6 months beyond travel date.\n5. Visa, insurance and on-board services not included unless specified.");
   const [qrFile,setQrFile]=useState(null);
+  const [partyGstin,setPartyGstin]=useState("27AABCS1234L1Z5");
+  const intra=(partyGstin||"").trim().slice(0,2)==="27"; // office is in Mumbai (27)
   const t=useMemo(()=>{
     const base=pax.reduce((s,p)=>s+(+p.base||0),0);
     const k3=pax.reduce((s,p)=>s+(+p.k3||0),0);
     const otherTax=pax.reduce((s,p)=>s+(+p.otherTax||0),0);
     const taxes=k3+otherTax;
-    const cgst=+(sc*0.09).toFixed(2);
-    const sgst=+(sc*0.09).toFixed(2);
-    return {base:base,k3:k3,otherTax:otherTax,taxes:taxes,sc:sc,cgst:cgst,sgst:sgst,total:base+taxes+sc+cgst+sgst};
-  },[pax,sc]);
+    const gstFull=+(sc*0.18).toFixed(2);
+    const cgst=intra?+(sc*0.09).toFixed(2):0;
+    const sgst=intra?+(sc*0.09).toFixed(2):0;
+    const igst=intra?0:gstFull;
+    return {base:base,k3:k3,otherTax:otherTax,taxes:taxes,sc:sc,cgst:cgst,sgst:sgst,igst:igst,gstFull:gstFull,total:base+taxes+sc+gstFull};
+  },[pax,sc,intra]);
   const upd=(id,f,v)=>setPax(ps=>ps.map(p=>p.id===id?{...p,[f]:v}:p));
   const add=()=>setPax(ps=>[...ps,{id:Date.now(),name:"",ticket:"",airline:"",sector:"",date:"",cls:"Economy",base:0,k3:0,otherTax:0}]);
   const rm=id=>setPax(ps=>ps.filter(p=>p.id!==id));
@@ -387,7 +390,7 @@ export function SalesFlight({branch,setRoute}){
           <p style={{margin:"0 0 8px",fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Customer</p>
           <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:11}}>
             <FL label="Customer / Party A/c"><input defaultValue="Sharma Enterprises Pvt. Ltd." style={inp}/></FL>
-            <FL label={cfg.taxType==="GST"?"GSTIN":"Tax ID"}><input defaultValue="27AABCS1234L1Z5" style={inp}/></FL>
+            <FL label={cfg.taxType==="GST"?"GSTIN":"Tax ID"}><input value={partyGstin} onChange={e=>setPartyGstin(e.target.value.toUpperCase())} style={{...inp,fontFamily:"monospace"}}/></FL>
             <FL label={cfg.taxType==="GST"?"Place of supply":"Country"}>
               <select style={inp}>
                 {cfg.taxType==="GST"
@@ -451,11 +454,18 @@ export function SalesFlight({branch,setRoute}){
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
             <FL label={"Service charge "+cur}><input type="number" value={sc} onChange={e=>setSc(+e.target.value)} style={inp}/></FL>
             {cfg.taxType==="GST"
-              ?<><FL label="CGST 9%"><input value={fmt(t.cgst)} readOnly style={{...inp,background:"#f3f4f8"}}/></FL>
-                <FL label="SGST 9%"><input value={fmt(t.sgst)} readOnly style={{...inp,background:"#f3f4f8"}}/></FL></>
+              ?(intra
+                  ?<><FL label="CGST 9%"><input value={fmt(t.cgst)} readOnly style={{...inp,background:"#f3f4f8"}}/></FL>
+                     <FL label="SGST 9%"><input value={fmt(t.sgst)} readOnly style={{...inp,background:"#f3f4f8"}}/></FL></>
+                  :<FL label="IGST 18%"><input value={fmt(t.igst)} readOnly style={{...inp,background:"#f3f4f8"}}/></FL>)
               :<FL label={"VAT "+cfg.vatRate+"%"}><input value={fmt(+(sc*cfg.vatRate/100).toFixed(2))} readOnly style={{...inp,background:"#f3f4f8"}}/></FL>
             }
           </div>
+          <p style={{margin:"6px 0 0",fontSize:10,color:intra?"#27500A":"#185FA5",fontWeight:600}}>
+            {cfg.taxType==="GST"&&(intra
+              ?"Intra-state supply (GSTIN starts with 27 — Maharashtra). CGST 9% + SGST 9% applied."
+              :"Inter-state supply (GSTIN state code ≠ 27). IGST 18% applied; CGST/SGST suppressed.")}
+          </p>
         </div>
 
         {/* Narration + summary */}
@@ -500,8 +510,11 @@ export function SalesFlight({branch,setRoute}){
               <TRow l="K3 tax" v={cur+" "+fmt(t.k3)}/>
               <TRow l="Other taxes" v={cur+" "+fmt(t.otherTax)}/>
               <TRow l="Service charge" v={cur+" "+fmt(t.sc)}/>
-              <TRow l={cfg.taxType==="GST"?"CGST 9%":"VAT "+cfg.vatRate+"%"} v={cur+" "+fmt(t.cgst)}/>
-              {cfg.taxType==="GST"&&<TRow l="SGST 9%" v={cur+" "+fmt(t.sgst)}/>}
+              {cfg.taxType==="GST"
+                ?(intra
+                    ?<><TRow l="CGST 9%" v={cur+" "+fmt(t.cgst)}/><TRow l="SGST 9%" v={cur+" "+fmt(t.sgst)}/></>
+                    :<TRow l="IGST 18%" v={cur+" "+fmt(t.igst)}/>)
+                :<TRow l={"VAT "+cfg.vatRate+"%"} v={cur+" "+fmt(+(sc*cfg.vatRate/100).toFixed(2))}/>}
               <div style={{borderTop:"2px solid #0d1326",margin:"8px 0",paddingTop:8,
                 display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span style={{fontSize:13,fontWeight:700}}>Invoice total</span>
@@ -550,15 +563,19 @@ export function SalesFlight({branch,setRoute}){
 export function SalesCar({branch,setRoute}){
   const vNo=useVNo(branch,"SC");
   const [row,setRow]=useState({pickup:"Mumbai Airport T2",drop:"Pune Station",days:3,basic:12600,otherFare:1500,svc:800});
+  const [partyGstin,setPartyGstin]=useState("27AACNI2211J1Z1");
+  const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(k,v)=>setRow(r=>({...r,[k]:v}));
   const sub=(+row.basic||0)+(+row.otherFare||0)+(+row.svc||0);
-  const cgst=+(sub*0.025).toFixed(2);
-  const sgst=cgst;
-  const total=+(sub+cgst+sgst).toFixed(2);
+  const gstFull=+(sub*0.05).toFixed(2);
+  const cgst=intra?+(sub*0.025).toFixed(2):0;
+  const sgst=intra?+(sub*0.025).toFixed(2):0;
+  const igst=intra?0:gstFull;
+  const total=+(sub+gstFull).toFixed(2);
   return (
     <VWrap title="Sales Voucher — Car Rentals" icon="🚗" vNo={vNo} branch={branch} type="sales" saleMod="SC" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} name="Nexus Industries" gstin="27AACNI2211J1Z1"/>
+      <VParty branch={branch} name="Nexus Industries" gstin={partyGstin} onGstinChange={setPartyGstin}/>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
         <p style={{margin:"0 0 8px",fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Vehicle &amp; hire details</p>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:820}}>
@@ -584,12 +601,16 @@ export function SalesCar({branch,setRoute}){
       </div>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
-          <FL label="GST rate"><input value="5% (CGST 2.5% + SGST 2.5%)" readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontWeight:600,cursor:"not-allowed"}}/></FL>
-          <FL label="CGST 2.5% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          <FL label="SGST 2.5% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+          <FL label="GST rate"><input value={intra?"5% (CGST 2.5% + SGST 2.5%)":"5% (IGST)"} readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontWeight:600,cursor:"not-allowed"}}/></FL>
+          {intra
+            ?<>
+              <FL label="CGST 2.5% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="SGST 2.5% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+            </>
+            :<FL label="IGST 5% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
         </div>
         <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
-          5% GST applied on (Basic + Other fare + Service charge). SAC 996601 — Rental services of road vehicles with operator. No ITC available to buyer under the 5% scheme.
+          5% GST applied on (Basic + Other fare + Service charge). SAC 996601 — Rental services of road vehicles with operator. {intra?"Intra-state (27): CGST 2.5% + SGST 2.5%.":"Inter-state (state ≠ 27): IGST 5%."} No ITC available to buyer under the 5% scheme.
         </div>
       </div>
       <VNarr def={`Being car rental charges — ${row.pickup} to ${row.drop}, ${row.days} day(s), Nexus Industries.`}>
@@ -598,8 +619,9 @@ export function SalesCar({branch,setRoute}){
             {l:"Basic",v:"₹ "+fmt(row.basic)},
             {l:"Other fare",v:"₹ "+fmt(row.otherFare)},
             {l:"Service charge",v:"₹ "+fmt(row.svc)},
-            {l:"CGST 2.5%",v:"₹ "+fmt(cgst)},
-            {l:"SGST 2.5%",v:"₹ "+fmt(sgst)},
+            ...(intra
+              ?[{l:"CGST 2.5%",v:"₹ "+fmt(cgst)},{l:"SGST 2.5%",v:"₹ "+fmt(sgst)}]
+              :[{l:"IGST 5%",v:"₹ "+fmt(igst)}]),
           ]}
           total={total}
         />
@@ -618,19 +640,37 @@ export function SalesVisa({branch,setRoute}){
     {id:2,name:"Mrs. Rohan",pp:"Z1234568",country:"UAE",vtype:"Tourist 30D",vfsFee:1800,taxes:324,otherTax:150},
   ]);
   const [svc,setSvc]=useState(2500);
+  const [partyGstin,setPartyGstin]=useState("27AABCS1234L1Z5");
+  const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(id,k,v)=>setAppl(as=>as.map(a=>a.id===id?{...a,[k]:v}:a));
   const add=()=>setAppl(as=>[...as,{id:Date.now(),name:"",pp:"",country:"",vtype:"",vfsFee:0,taxes:0,otherTax:0}]);
   const rm=id=>setAppl(as=>as.filter(a=>a.id!==id));
   const vfsTot=appl.reduce((s,a)=>s+(+a.vfsFee||0),0);
   const taxesTot=appl.reduce((s,a)=>s+(+a.taxes||0),0);
   const otherTot=appl.reduce((s,a)=>s+(+a.otherTax||0),0);
-  const cgst=+(svc*0.09).toFixed(2);
-  const sgst=cgst;
-  const total=+(vfsTot+taxesTot+otherTot+svc+cgst+sgst).toFixed(2);
+  const gstFull=+(svc*0.18).toFixed(2);
+  const cgst=intra?+(svc*0.09).toFixed(2):0;
+  const sgst=intra?+(svc*0.09).toFixed(2):0;
+  const igst=intra?0:gstFull;
+  const total=+(vfsTot+taxesTot+otherTot+svc+gstFull).toFixed(2);
   return (
     <VWrap title="Sales Voucher — Visas" icon="🛂" vNo={vNo} branch={branch} type="sales" saleMod="SV" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} name="Sharma Enterprises Pvt. Ltd." gstin="27AABCS1234L1Z5"/>
+      <VParty branch={branch} name="Sharma Enterprises Pvt. Ltd." gstin={partyGstin} onGstinChange={setPartyGstin}/>
+      <div style={{padding:"8px 16px",borderBottom:"1px solid #e1e3ec",background:"#f9fafb",display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
+        <span style={{fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px"}}>Demo presets</span>
+        <button onClick={()=>setPartyGstin("27AABCS1234L1Z5")}
+          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(intra?"#27500A":"#c7cbe0"),
+            background:intra?"#27500A":"#fff",color:intra?"#fff":"#27500A",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
+          Intra-state · Mumbai (27)
+        </button>
+        <button onClick={()=>setPartyGstin("24AAGCG7456L1Z9")}
+          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(!intra?"#185FA5":"#c7cbe0"),
+            background:!intra?"#185FA5":"#fff",color:!intra?"#fff":"#185FA5",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
+          Inter-state · Gujarat (24)
+        </button>
+        <span style={{fontSize:10,color:"#5a6691",marginLeft:"auto"}}>Click a preset to load a demo customer and watch CGST/SGST flip to IGST.</span>
+      </div>
       <ARow label="Applicant details" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
@@ -665,11 +705,15 @@ export function SalesVisa({branch,setRoute}){
           <FL label={bc(branch).cur+"Service charge"}>
             <input type="number" value={svc} onChange={e=>setSvc(+e.target.value||0)} style={{...inp,textAlign:"right"}}/>
           </FL>
-          <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+          {intra
+            ?<>
+              <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+            </>
+            :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
         </div>
         <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
-          SAC code: <b>998212</b> — Visa and passport services. VFS fee + Taxes + Other taxes are pass-through to the applicant. GST 18% applies only on agency service charge.
+          SAC code: <b>998212</b> — Visa and passport services. {intra?"Intra-state (27): CGST 9% + SGST 9% on service charge.":"Inter-state (state ≠ 27): IGST 18% on service charge."}
         </div>
       </div>
       <VNarr def="Being visa processing charges — Sharma Enterprises, 2 applicants, UAE Tourist 30D via VFS Dubai centre.">
@@ -679,8 +723,9 @@ export function SalesVisa({branch,setRoute}){
             {l:"Taxes",v:"₹ "+fmt(taxesTot)},
             {l:"Other taxes",v:"₹ "+fmt(otherTot)},
             {l:"Agency service charge",v:"₹ "+fmt(svc)},
-            {l:"CGST 9%",v:"₹ "+fmt(cgst)},
-            {l:"SGST 9%",v:"₹ "+fmt(sgst)},
+            ...(intra
+              ?[{l:"CGST 9%",v:"₹ "+fmt(cgst)},{l:"SGST 9%",v:"₹ "+fmt(sgst)}]
+              :[{l:"IGST 18%",v:"₹ "+fmt(igst)}]),
           ]}
           total={total}
         />
@@ -695,29 +740,50 @@ export function SalesVisa({branch,setRoute}){
 export function SalesHotel({branch,setRoute}){
   const vNo=useVNo(branch,"SHT");
   const [rows,setRows]=useState([
-    {id:1,passenger:"Mr. Rajiv Sharma",ci:"2026-06-05",co:"2026-06-08",rtype:"Deluxe King",meal:"CP",basic:24000,taxes:2880,otherTax:600,svc:1500},
+    {id:1,passenger:"Mr. Rajiv Sharma",ci:"2026-06-05",co:"2026-06-08",rtype:"Deluxe King",meal:"CP",basic:24000,taxes:2880,otherTax:600},
   ]);
+  const [svc,setSvc]=useState(1500);
+  const [partyGstin,setPartyGstin]=useState("27AAPFL9876K1Z3");
+  const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:Date.now(),passenger:"",ci:"",co:"",rtype:"Deluxe",meal:"EP",basic:0,taxes:0,otherTax:0,svc:0}]);
+  const add=()=>setRows(rs=>[...rs,{id:Date.now(),passenger:"",ci:"",co:"",rtype:"Deluxe",meal:"EP",basic:0,taxes:0,otherTax:0}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
 
   const totBasic=rows.reduce((s,r)=>s+(+r.basic||0),0);
   const totTaxes=rows.reduce((s,r)=>s+(+r.taxes||0),0);
   const totOther=rows.reduce((s,r)=>s+(+r.otherTax||0),0);
-  const totSvc=rows.reduce((s,r)=>s+(+r.svc||0),0);
-  const total=+(totBasic+totTaxes+totOther+totSvc).toFixed(2);
+  const subTable=totBasic+totTaxes+totOther;
+  const gstFull=+(svc*0.18).toFixed(2);
+  const cgst=intra?+(svc*0.09).toFixed(2):0;
+  const sgst=intra?+(svc*0.09).toFixed(2):0;
+  const igst=intra?0:gstFull;
+  const total=+(subTable+svc+gstFull).toFixed(2);
 
   return (
     <VWrap title="Sales Voucher — Hotels" icon="🏨" vNo={vNo} branch={branch} type="sales" saleMod="SHT" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} name="Apex Pharma Ltd." gstin="27AAPFL9876K1Z3"/>
+      <VParty branch={branch} name="Apex Pharma Ltd." gstin={partyGstin} onGstinChange={setPartyGstin}/>
+      <div style={{padding:"8px 16px",borderBottom:"1px solid #e1e3ec",background:"#f9fafb",display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
+        <span style={{fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px"}}>Demo presets</span>
+        <button onClick={()=>setPartyGstin("27AAPFL9876K1Z3")}
+          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(intra?"#27500A":"#c7cbe0"),
+            background:intra?"#27500A":"#fff",color:intra?"#fff":"#27500A",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
+          Intra-state · Mumbai (27)
+        </button>
+        <button onClick={()=>setPartyGstin("24AAGCG7456L1Z9")}
+          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(!intra?"#185FA5":"#c7cbe0"),
+            background:!intra?"#185FA5":"#fff",color:!intra?"#fff":"#185FA5",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
+          Inter-state · Gujarat (24)
+        </button>
+        <span style={{fontSize:10,color:"#5a6691",marginLeft:"auto"}}>Click a preset to load a demo customer and watch CGST/SGST flip to IGST.</span>
+      </div>
       <ARow label="Accommodation details" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:1020}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:960}}>
           <thead><tr>
-            {["#","Passenger Name","Check-in","Check-out","Room type","Meal plan","Room fare / Basic fare ₹","Taxes ₹","Other tax ₹","Service charge ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=6&&i<=10}/>)}
+            {["#","Passenger Name","Check-in","Check-out","Room type","Meal plan","Room fare / Basic fare ₹","Taxes ₹","Other tax ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=6&&i<=9}/>)}
           </tr></thead>
           <tbody>{rows.map((r,i)=>{
-            const lineTotal=(+r.basic||0)+(+r.taxes||0)+(+r.otherTax||0)+(+r.svc||0);
+            const lineTotal=(+r.basic||0)+(+r.taxes||0)+(+r.otherTax||0);
             return (
               <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
                 <VTD c={i+1}/>
@@ -733,7 +799,6 @@ export function SalesHotel({branch,setRoute}){
                 <td style={{padding:3}}><input type="number" value={r.basic} onChange={e=>upd(r.id,"basic",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
                 <td style={{padding:3}}><input type="number" value={r.taxes} onChange={e=>upd(r.id,"taxes",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="GST / occupancy / luxury tax charged by the hotel"/></td>
                 <td style={{padding:3}}><input type="number" value={r.otherTax} onChange={e=>upd(r.id,"otherTax",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="City fee, resort fee, tourism levy, destination tax"/></td>
-                <td style={{padding:3}}><input type="number" value={r.svc} onChange={e=>upd(r.id,"svc",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Agency service charge"/></td>
                 <VTD c={fmt(lineTotal)} r/>
                 <DBtn fn={()=>rm(r.id)}/>
               </tr>
@@ -745,20 +810,38 @@ export function SalesHotel({branch,setRoute}){
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totTaxes)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totOther)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#27500A"}}>{fmt(totSvc)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(total)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(subTable)}</td>
               <td/>
             </tr>
           </tfoot>
         </table>
       </ARow>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
+          <FL label={bc(branch).cur+"Service charge"}>
+            <input type="number" value={svc} onChange={e=>setSvc(+e.target.value||0)} style={{...inp,textAlign:"right"}}/>
+          </FL>
+          {intra
+            ?<>
+              <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+            </>
+            :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
+        </div>
+        <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
+          SAC code: <b>998552</b> — Tour operator / accommodation reservation. Room fare + Taxes + Other tax are pass-through to the customer. {intra?"Intra-state (27): CGST 9% + SGST 9% on agency service charge.":"Inter-state (state ≠ 27): IGST 18% on agency service charge."}
+        </div>
+      </div>
       <VNarr def="Being hotel accommodation — Apex Pharma Ltd., Hyatt Regency Ahmedabad, 5-8 June 2026, CP meal plan.">
         <VTot branch={branch}
           lines={[
             {l:"Room fare / Basic fare",v:"₹ "+fmt(totBasic)},
             {l:"Taxes",v:"₹ "+fmt(totTaxes)},
             {l:"Other tax",v:"₹ "+fmt(totOther)},
-            {l:"Service charge",v:"₹ "+fmt(totSvc)},
+            {l:"Agency service charge",v:"₹ "+fmt(svc)},
+            ...(intra
+              ?[{l:"CGST 9%",v:"₹ "+fmt(cgst)},{l:"SGST 9%",v:"₹ "+fmt(sgst)}]
+              :[{l:"IGST 18%",v:"₹ "+fmt(igst)}]),
           ]}
           total={total}
         />
@@ -776,6 +859,8 @@ export function SalesInsurance({branch,setRoute}){
     {id:1,name:"TATA AIG General Insurance",pp:"Z1234567",dest:"Bali, Indonesia",basic:4200,otherTax:0,svc:500},
     {id:2,name:"TATA AIG General Insurance",pp:"Z1234568",dest:"Bali, Indonesia",basic:4200,otherTax:0,svc:500},
   ]);
+  const [partyGstin,setPartyGstin]=useState("24AABCM8765G1Z2");
+  const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
   const add=()=>setRows(rs=>[...rs,{id:Date.now(),name:"",pp:"",dest:"",basic:0,otherTax:0,svc:0}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
@@ -783,14 +868,16 @@ export function SalesInsurance({branch,setRoute}){
   const totOther=rows.reduce((s,r)=>s+(+r.otherTax||0),0);
   const totSvc=rows.reduce((s,r)=>s+(+r.svc||0),0);
   const taxable=totBasic+totOther+totSvc;
-  const taxRate=bc(branch).taxType==="GST"?0.09:(bc(branch).vatRate||18)/200;
-  const cgst=+(taxable*taxRate).toFixed(2);
-  const sgst=bc(branch).taxType==="GST"?cgst:0;
-  const total=+(taxable+cgst+sgst).toFixed(2);
+  const isGST=bc(branch).taxType==="GST";
+  const gstFull=isGST?+(taxable*0.18).toFixed(2):+(taxable*(bc(branch).vatRate||18)/100).toFixed(2);
+  const cgst=isGST&&intra?+(taxable*0.09).toFixed(2):0;
+  const sgst=isGST&&intra?+(taxable*0.09).toFixed(2):0;
+  const igst=isGST&&!intra?gstFull:0;
+  const total=+(taxable+gstFull).toFixed(2);
   return (
     <VWrap title="Sales Voucher — Insurance" icon="🛡" vNo={vNo} branch={branch} type="sales" saleMod="SI" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} name="Mehta &amp; Sons" gstin="24AABCM8765G1Z2"/>
+      <VParty branch={branch} name="Mehta &amp; Sons" gstin={partyGstin} onGstinChange={setPartyGstin}/>
       <ARow label="Policy details" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
@@ -827,12 +914,16 @@ export function SalesInsurance({branch,setRoute}){
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
           <FL label={bc(branch).cur+"Taxable value"}><input value={fmt(taxable)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+          {intra
+            ?<>
+              <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+            </>
+            :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
           <FL label="Invoice total ₹"><input value={fmt(total)} readOnly style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#185FA5"}}/></FL>
         </div>
         <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
-          GST 18% on (Basic + Other tax + Service charge). SAC 997131 — Life &amp; non-life insurance. ITC available to registered buyer.
+          GST 18% on (Basic + Other tax + Service charge). SAC 997131 — Life &amp; non-life insurance. {intra?"Intra-state (27): split as CGST 9% + SGST 9%.":"Inter-state (state ≠ 27): IGST 18%."}
         </div>
       </div>
       <VNarr def="Being travel insurance premium — 2 pax, Bali destination, Mehta &amp; Sons.">
@@ -841,8 +932,9 @@ export function SalesInsurance({branch,setRoute}){
             {l:"Basic",v:"₹ "+fmt(totBasic)},
             {l:"Other tax",v:"₹ "+fmt(totOther)},
             {l:"Service charge",v:"₹ "+fmt(totSvc)},
-            {l:"CGST 9%",v:"₹ "+fmt(cgst)},
-            {l:"SGST 9%",v:"₹ "+fmt(sgst)},
+            ...(intra
+              ?[{l:"CGST 9%",v:"₹ "+fmt(cgst)},{l:"SGST 9%",v:"₹ "+fmt(sgst)}]
+              :[{l:"IGST 18%",v:"₹ "+fmt(igst)}]),
           ]}
           total={total}
         />
@@ -1371,29 +1463,50 @@ export function PurchaseHoliday({branch,setRoute}){
 export function PurchaseHotelVoucher({branch,setRoute}){
   const vNo=useVNo(branch,"PHT");
   const [rows,setRows]=useState([
-    {id:1,passenger:"Mr. Rajiv Sharma",ci:"2026-06-05",co:"2026-06-08",rtype:"Deluxe King",meal:"CP",basic:20000,taxes:2400,otherTax:500,svc:0},
+    {id:1,passenger:"Mr. Rajiv Sharma",ci:"2026-06-05",co:"2026-06-08",rtype:"Deluxe King",meal:"CP",basic:20000,taxes:2400,otherTax:500},
   ]);
+  const [svc,setSvc]=useState(0);
+  const [partyGstin,setPartyGstin]=useState("24AABCH7890J1Z5");
+  const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:Date.now(),passenger:"",ci:"",co:"",rtype:"Deluxe",meal:"EP",basic:0,taxes:0,otherTax:0,svc:0}]);
+  const add=()=>setRows(rs=>[...rs,{id:Date.now(),passenger:"",ci:"",co:"",rtype:"Deluxe",meal:"EP",basic:0,taxes:0,otherTax:0}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
 
   const totBasic=rows.reduce((s,r)=>s+(+r.basic||0),0);
   const totTaxes=rows.reduce((s,r)=>s+(+r.taxes||0),0);
   const totOther=rows.reduce((s,r)=>s+(+r.otherTax||0),0);
-  const totSvc=rows.reduce((s,r)=>s+(+r.svc||0),0);
-  const total=+(totBasic+totTaxes+totOther+totSvc).toFixed(2);
+  const subTable=totBasic+totTaxes+totOther;
+  const gstFull=+(svc*0.18).toFixed(2);
+  const cgst=intra?+(svc*0.09).toFixed(2):0;
+  const sgst=intra?+(svc*0.09).toFixed(2):0;
+  const igst=intra?0:gstFull;
+  const total=+(subTable+svc+gstFull).toFixed(2);
 
   return (
     <VWrap title="Purchase Voucher — Hotels" icon="🏨" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} label="Hotel / Supplier" name="Hyatt Regency Ahmedabad" gstin="24AABCH7890J1Z5"/>
+      <VParty branch={branch} label="Hotel / Supplier" name="Hyatt Regency Ahmedabad" gstin={partyGstin} onGstinChange={setPartyGstin}/>
+      <div style={{padding:"8px 16px",borderBottom:"1px solid #e1e3ec",background:"#f9fafb",display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
+        <span style={{fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px"}}>Demo presets</span>
+        <button onClick={()=>setPartyGstin("27AABCH1234M1Z2")}
+          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(intra?"#27500A":"#c7cbe0"),
+            background:intra?"#27500A":"#fff",color:intra?"#fff":"#27500A",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
+          Intra-state · Mumbai supplier (27)
+        </button>
+        <button onClick={()=>setPartyGstin("24AABCH7890J1Z5")}
+          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(!intra?"#185FA5":"#c7cbe0"),
+            background:!intra?"#185FA5":"#fff",color:!intra?"#fff":"#185FA5",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
+          Inter-state · Gujarat supplier (24)
+        </button>
+        <span style={{fontSize:10,color:"#5a6691",marginLeft:"auto"}}>Click a preset to flip supplier GSTIN and watch Input CGST/SGST become Input IGST.</span>
+      </div>
       <ARow label="Hotel purchase lines" onAdd={add}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:1020}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:960}}>
           <thead><tr>
-            {["#","Passenger Name","Check-in","Check-out","Room type","Meal","Room fare / Basic fare ₹","Taxes ₹","Other tax ₹","Service charge ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=6&&i<=10}/>)}
+            {["#","Passenger Name","Check-in","Check-out","Room type","Meal","Room fare / Basic fare ₹","Taxes ₹","Other tax ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=6&&i<=9}/>)}
           </tr></thead>
           <tbody>{rows.map((r,i)=>{
-            const lineTotal=(+r.basic||0)+(+r.taxes||0)+(+r.otherTax||0)+(+r.svc||0);
+            const lineTotal=(+r.basic||0)+(+r.taxes||0)+(+r.otherTax||0);
             return (
               <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
                 <VTD c={i+1}/>
@@ -1409,7 +1522,6 @@ export function PurchaseHotelVoucher({branch,setRoute}){
                 <td style={{padding:3}}><input type="number" value={r.basic} onChange={e=>upd(r.id,"basic",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
                 <td style={{padding:3}}><input type="number" value={r.taxes} onChange={e=>upd(r.id,"taxes",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="GST / occupancy / luxury tax on the supplier invoice"/></td>
                 <td style={{padding:3}}><input type="number" value={r.otherTax} onChange={e=>upd(r.id,"otherTax",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="City fee, resort fee, tourism levy, destination tax"/></td>
-                <td style={{padding:3}}><input type="number" value={r.svc} onChange={e=>upd(r.id,"svc",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Supplier service / commission charge"/></td>
                 <VTD c={fmt(lineTotal)} r/>
                 <DBtn fn={()=>rm(r.id)}/>
               </tr>
@@ -1421,16 +1533,26 @@ export function PurchaseHotelVoucher({branch,setRoute}){
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totTaxes)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totOther)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#27500A"}}>{fmt(totSvc)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(total)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(subTable)}</td>
               <td/>
             </tr>
           </tfoot>
         </table>
       </ARow>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
-        <div style={{padding:"8px 12px",background:"#EAF3DE",borderRadius:8,fontSize:11.5,color:"#27500A"}}>
-          Accounting: <b>Dr Hotel Purchase</b> &nbsp;|&nbsp; <b>Dr Input CGST / SGST</b> (from Taxes column) &nbsp;|&nbsp; <b>Cr Hotel / Supplier ledger</b>. ITC on hotel stays claimable only for business travel — not for personal or exempt use.
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
+          <FL label={bc(branch).cur+"Service charge"}>
+            <input type="number" value={svc} onChange={e=>setSvc(+e.target.value||0)} style={{...inp,textAlign:"right"}}/>
+          </FL>
+          {intra
+            ?<>
+              <FL label="Input CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="Input SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+            </>
+            :<FL label="Input IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
+        </div>
+        <div style={{marginTop:9,padding:"8px 12px",background:"#EAF3DE",borderRadius:8,fontSize:11.5,color:"#27500A"}}>
+          Accounting: <b>Dr Hotel Purchase</b> &nbsp;|&nbsp; <b>Dr Input GST</b> (from Taxes column + 18% on service charge) &nbsp;|&nbsp; <b>Cr Hotel / Supplier ledger</b>. {intra?"Intra-state (27): CGST 9% + SGST 9% on service charge.":"Inter-state (state ≠ 27): IGST 18% on service charge."} ITC on hotel stays claimable only for business travel.
         </div>
       </div>
       <VNarr def="Being hotel room charges — Hyatt Regency Ahmedabad, 5-8 June 2026, with input GST claim.">
@@ -1439,7 +1561,10 @@ export function PurchaseHotelVoucher({branch,setRoute}){
             {l:"Room fare / Basic fare",v:"₹ "+fmt(totBasic)},
             {l:"Taxes",v:"₹ "+fmt(totTaxes)},
             {l:"Other tax",v:"₹ "+fmt(totOther)},
-            {l:"Service charge",v:"₹ "+fmt(totSvc)},
+            {l:"Service charge",v:"₹ "+fmt(svc)},
+            ...(intra
+              ?[{l:"Input CGST 9%",v:"₹ "+fmt(cgst)},{l:"Input SGST 9%",v:"₹ "+fmt(sgst)}]
+              :[{l:"Input IGST 18%",v:"₹ "+fmt(igst)}]),
           ]}
           total={total}
         />
@@ -1456,6 +1581,9 @@ export function PurchaseVisa({branch,setRoute}){
     {id:1,applicant:"Rajiv Sharma",pp:"Z1234567",country:"UAE",vtype:"Tourist 30D",vfsFee:1500,taxes:270,otherTax:100},
     {id:2,applicant:"Rohan",pp:"Z1234568",country:"UAE",vtype:"Tourist 30D",vfsFee:1500,taxes:270,otherTax:100},
   ]);
+  const [svc,setSvc]=useState(1500);
+  const [partyGstin,setPartyGstin]=useState("27AABVV4321F1Z6");
+  const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
   const add=()=>setRows(rs=>[...rs,{id:Date.now(),applicant:"",pp:"",country:"",vtype:"",vfsFee:0,taxes:0,otherTax:0}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
@@ -1463,12 +1591,30 @@ export function PurchaseVisa({branch,setRoute}){
   const vfsTotal=rows.reduce((s,r)=>s+(+r.vfsFee||0),0);
   const taxesTotal=rows.reduce((s,r)=>s+(+r.taxes||0),0);
   const otherTotal=rows.reduce((s,r)=>s+(+r.otherTax||0),0);
-  const total=+(vfsTotal+taxesTotal+otherTotal).toFixed(2);
+  const gstFull=+(svc*0.18).toFixed(2);
+  const cgst=intra?+(svc*0.09).toFixed(2):0;
+  const sgst=intra?+(svc*0.09).toFixed(2):0;
+  const igst=intra?0:gstFull;
+  const total=+(vfsTotal+taxesTotal+otherTotal+svc+gstFull).toFixed(2);
 
   return (
     <VWrap title="Purchase Voucher — Visas" icon="🛂" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} label="Primary Supplier" name="VFS Global Services" gstin="27AABVV4321F1Z6"/>
+      <VParty branch={branch} label="Primary Supplier" name="VFS Global Services" gstin={partyGstin} onGstinChange={setPartyGstin}/>
+      <div style={{padding:"8px 16px",borderBottom:"1px solid #e1e3ec",background:"#f9fafb",display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
+        <span style={{fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px"}}>Demo presets</span>
+        <button onClick={()=>setPartyGstin("27AABVV4321F1Z6")}
+          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(intra?"#27500A":"#c7cbe0"),
+            background:intra?"#27500A":"#fff",color:intra?"#fff":"#27500A",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
+          Intra-state · Mumbai supplier (27)
+        </button>
+        <button onClick={()=>setPartyGstin("07AABVV9988N1Z4")}
+          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(!intra?"#185FA5":"#c7cbe0"),
+            background:!intra?"#185FA5":"#fff",color:!intra?"#fff":"#185FA5",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
+          Inter-state · Delhi supplier (07)
+        </button>
+        <span style={{fontSize:10,color:"#5a6691",marginLeft:"auto"}}>Click a preset to flip supplier GSTIN and watch Input CGST/SGST become Input IGST.</span>
+      </div>
       <ARow label="Visa fee payment lines" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
@@ -1504,8 +1650,19 @@ export function PurchaseVisa({branch,setRoute}){
         </table>
       </ARow>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
-        <div style={{padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
-          Accounting: <b>Dr Visa Fee Expense</b> &nbsp;|&nbsp; <b>Dr Input GST</b> (from Taxes column, where supplier-charged GST is creditable) &nbsp;|&nbsp; <b>Cr VFS / Supplier ledger</b>. Other taxes (biometric, courier) are non-creditable pass-through.
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
+          <FL label={bc(branch).cur+"Service charge"}>
+            <input type="number" value={svc} onChange={e=>setSvc(+e.target.value||0)} style={{...inp,textAlign:"right"}}/>
+          </FL>
+          {intra
+            ?<>
+              <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+            </>
+            :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
+        </div>
+        <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
+          Accounting: <b>Dr Visa Fee Expense</b> &nbsp;|&nbsp; <b>Dr Input GST</b> (from Taxes column + 18% on service charge) &nbsp;|&nbsp; <b>Cr VFS / Supplier ledger</b>. {intra?"Intra-state (27): CGST 9% + SGST 9% on service charge.":"Inter-state (state ≠ 27): IGST 18% on service charge."} Other taxes (biometric, courier) are non-creditable pass-through.
         </div>
       </div>
       <VNarr def="Being visa fees paid to VFS Global — 2 applicants, UAE Tourist 30D, pass-through recovery from Sharma Enterprises.">
@@ -1514,6 +1671,10 @@ export function PurchaseVisa({branch,setRoute}){
             {l:"VFS fee",v:"₹ "+fmt(vfsTotal)},
             {l:"Taxes",v:"₹ "+fmt(taxesTotal)},
             {l:"Other taxes",v:"₹ "+fmt(otherTotal)},
+            {l:"Service charge",v:"₹ "+fmt(svc)},
+            ...(intra
+              ?[{l:"CGST 9%",v:"₹ "+fmt(cgst)},{l:"SGST 9%",v:"₹ "+fmt(sgst)}]
+              :[{l:"IGST 18%",v:"₹ "+fmt(igst)}]),
           ]}
           total={total}
         />
@@ -1530,15 +1691,19 @@ export function PurchaseVisa({branch,setRoute}){
 export function PurchaseCar({branch,setRoute}){
   const vNo=useVNo(branch,"PC");
   const [row,setRow]=useState({vendor:"Riya Travels Mumbai",pickup:"BOM T2",drop:"Pune Station",days:1,basic:4500,otherFare:500,svc:0});
+  const [partyGstin,setPartyGstin]=useState("27AAACR1234R1Z0");
+  const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(k,v)=>setRow(r=>({...r,[k]:v}));
   const sub=(+row.basic||0)+(+row.otherFare||0)+(+row.svc||0);
-  const inputCgst=+(sub*0.025).toFixed(2);
-  const inputSgst=inputCgst;
-  const total=+(sub+inputCgst+inputSgst).toFixed(2);
+  const gstFull=+(sub*0.05).toFixed(2);
+  const inputCgst=intra?+(sub*0.025).toFixed(2):0;
+  const inputSgst=intra?+(sub*0.025).toFixed(2):0;
+  const inputIgst=intra?0:gstFull;
+  const total=+(sub+gstFull).toFixed(2);
   return (
     <VWrap title="Purchase Voucher — Car Rentals" icon="🚗" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} label="Supplier / Transport Co." name={row.vendor} gstin=""/>
+      <VParty branch={branch} label="Supplier / Transport Co." name={row.vendor} gstin={partyGstin} onGstinChange={setPartyGstin}/>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
         <p style={{margin:"0 0 8px",fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Vehicle hire details</p>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
@@ -1565,12 +1730,16 @@ export function PurchaseCar({branch,setRoute}){
       </div>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
-          <FL label="Input GST rate"><input value="5% (CGST 2.5% + SGST 2.5%)" readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontWeight:600,cursor:"not-allowed"}}/></FL>
-          <FL label="Input CGST 2.5% ₹"><input value={fmt(inputCgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          <FL label="Input SGST 2.5% ₹"><input value={fmt(inputSgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+          <FL label="Input GST rate"><input value={intra?"5% (CGST 2.5% + SGST 2.5%)":"5% (IGST)"} readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontWeight:600,cursor:"not-allowed"}}/></FL>
+          {intra
+            ?<>
+              <FL label="Input CGST 2.5% ₹"><input value={fmt(inputCgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="Input SGST 2.5% ₹"><input value={fmt(inputSgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+            </>
+            :<FL label="Input IGST 5% ₹"><input value={fmt(inputIgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
         </div>
         <div style={{marginTop:9,padding:"8px 12px",background:"#EAF3DE",borderRadius:8,fontSize:11.5,color:"#27500A"}}>
-          5% GST on (Basic + Other fare + Service charge). Accounting: <b>Dr Car Hire Expense</b> + <b>Dr Input CGST/SGST</b> | <b>Cr Vendor ledger</b>. TDS 194C: deduct 1% (individual) or 2% (company) above threshold.
+          5% GST on (Basic + Other fare + Service charge). {intra?"Intra-state (27): CGST 2.5% + SGST 2.5%.":"Inter-state (state ≠ 27): IGST 5%."} Accounting: <b>Dr Car Hire Expense</b> + <b>Dr Input {intra?"CGST/SGST":"IGST"}</b> | <b>Cr Vendor ledger</b>. TDS 194C: deduct 1% (individual) or 2% (company) above threshold.
         </div>
       </div>
       <VNarr def={`Being car rental charges from ${row.vendor} — ${row.pickup} to ${row.drop}, ${row.days} day(s).`}>
@@ -1579,8 +1748,9 @@ export function PurchaseCar({branch,setRoute}){
             {l:"Basic",v:"₹ "+fmt(row.basic)},
             {l:"Other fare",v:"₹ "+fmt(row.otherFare)},
             {l:"Service charge",v:"₹ "+fmt(row.svc)},
-            {l:"Input CGST 2.5%",v:"₹ "+fmt(inputCgst)},
-            {l:"Input SGST 2.5%",v:"₹ "+fmt(inputSgst)},
+            ...(intra
+              ?[{l:"Input CGST 2.5%",v:"₹ "+fmt(inputCgst)},{l:"Input SGST 2.5%",v:"₹ "+fmt(inputSgst)}]
+              :[{l:"Input IGST 5%",v:"₹ "+fmt(inputIgst)}]),
           ]}
           total={total}
         />
@@ -2760,7 +2930,6 @@ export function QuickCreate({setRoute}){
   const SHORTCUTS=[
     {icon:"✈",label:"New Flight Sale",route:"/sales/flight"},
     {icon:"🌴",label:"New Holiday Sale",route:"/sales/holiday"},
-    {icon:"📁",label:"New Booking File",route:"/bookings"},
     {icon:"💰",label:"New Receipt",route:"/receipts"},
     {icon:"💸",label:"New Payment",route:"/payments"},
     {icon:"📓",label:"Journal Entry",route:"/journal"},

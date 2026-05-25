@@ -33,11 +33,6 @@ export const PERM_MODULES=[
     {id:"vendorterms",  label:"Vendor Terms"},
     {id:"taxcodes",     label:"Tax / SAC Codes"},
   ]},
-  {group:"Operations",   icon:"📁",  mods:[
-    {id:"bookingfiles", label:"Booking Files"},
-    {id:"advances",     label:"Advance & Deposits"},
-    {id:"itinerary",    label:"Itinerary Builder"},
-  ]},
   {group:"Sales",        icon:"🛒",  mods:[
     {id:"s_flight",     label:"Sales — Flight"},
     {id:"s_holiday",    label:"Sales — Holiday"},
@@ -170,7 +165,6 @@ export const ROLE_TEMPLATES={
     branches:"ALL",
     perms:buildPerms({
       "Masters":     ["view","create","edit","delete","print","export"],
-      "Operations":  ["view","create","edit","delete","print","export"],
       "Sales":       ["view","create","edit","delete","approve","print","export"],
       "Purchase":    ["view","create","edit","delete","approve","print","export"],
       "Finance":     ["view","create","edit","delete","approve","print","export"],
@@ -189,7 +183,6 @@ export const ROLE_TEMPLATES={
     branches:"ALL",
     perms:buildPerms({
       "Masters":     ["view","create","edit","print","export"],
-      "Operations":  ["view","create","edit","print","export"],
       "Sales":       ["view","create","edit","approve","print","export"],
       "Purchase":    ["view","create","edit","approve","print","export"],
       "Finance":     ["view","create","edit","approve","print","export"],
@@ -208,7 +201,6 @@ export const ROLE_TEMPLATES={
     branches:"ASSIGNED",
     perms:buildPerms({
       "Masters":     ["view"],
-      "Operations":  ["view","create","edit","print","export"],
       "Sales":       ["view","create","edit","print","export"],
       "Purchase":    ["view","create","edit","print","export"],
       "Finance":     ["view","create","edit","print","export"],
@@ -227,7 +219,6 @@ export const ROLE_TEMPLATES={
     branches:"ASSIGNED",
     perms:buildPerms({
       "Masters":     ["view"],
-      "Operations":  [],
       "Sales":       [],
       "Purchase":    [],
       "Finance":     ["view"],
@@ -245,4 +236,4 @@ export const ROLE_TEMPLATES={
 
 /* ── USERS DATA ───────────────────────────────────────────────── */
 
-export const PERM_MODULES_P2 = ["Dashboard","Masters","Transactions","Finance","Reports","Taxation","HR & Payroll","Settings","Assets","Operations"];
+export const PERM_MODULES_P2 = ["Dashboard","Masters","Transactions","Finance","Reports","Taxation","HR & Payroll","Settings","Assets"];

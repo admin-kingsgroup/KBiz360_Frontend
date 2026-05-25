@@ -14,15 +14,14 @@ import { PERM_MODULES, ROLE_TEMPLATES } from './core/permissions';
 import { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RPT_CashPosition, RPT_CurrencyExposure, RPT_CustomerLTV, RPT_FSNotes, RPT_InterbranchElim, RPT_LeaveUtilization, RPT_StatutoryDues, RPT_TaxFilingBoard, RPT_YieldConsultant, RPT_YieldDestination, RPT_YieldSupplier, RPT_YoY } from './core/styles';
 import { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } from './modules/assets';
 import { Dashboard } from './modules/dashboard';
-import { AdvanceDepositLedger, BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose } from './modules/finance';
-import { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupBookings, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } from './modules/ho-control';
+import { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose } from './modules/finance';
+import { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } from './modules/ho-control';
 import { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrExpenses, HrLeave, HrPayroll, HrPayslips, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } from './modules/hr';
-import { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CostCenterMaster, CurrencyMaster, CustomerMasterDetail, CustomerMasterTabbed, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, ProjectMaster, Supplier360, SupplierMasterTabbed, TourCodeMaster, VendorAdvances, VendorTermsMaster } from './modules/masters';
-import { BookingFiles, PassportManager } from './modules/operations';
+import { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CostCenterMaster, CurrencyMaster, CustomerMasterDetail, CustomerMasterTabbed, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, SupplierMasterTabbed, TourCodeMaster, VendorAdvances, VendorTermsMaster } from './modules/masters';
 import { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBS, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportPayables, ReportPnL, ReportReceivables, ReportSalesReg, ReportViewerTabbed, ReportsMetaDemo, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } from './modules/reports';
 import { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } from './modules/settings';
 import { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } from './modules/taxation';
-import { AdmRegister, AutoLinkedVouchers, BspCsvImport, BspSummary, BulkVoucherImport, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundTracker, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, UnmatchedTickets, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
+import { AdmRegister, AutoLinkedVouchers, BspCsvImport, BspSummary, BulkVoucherImport, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
 import { GlobalSearch } from './shell/GlobalSearch';
 import { Placeholder } from './shell/Placeholder';
 import { SideNav } from './shell/SideNav';
@@ -76,7 +75,6 @@ export default function KB360App(){
       if(route.startsWith("/assets"))   return "Finance";
       if(route.startsWith("/purchase")) return "Purchase";
       if(route.startsWith("/sales"))    return "Sales";
-      if(route.startsWith("/ops"))      return "Operations";
       if(route.startsWith("/masters"))  return "Masters";
       if(route.startsWith("/approvals"))return "Finance";
       if(route.startsWith("/group"))    return "Reports"; // group dashboard
@@ -236,7 +234,6 @@ export default function KB360App(){
     if(route==="/reports/sreg")       return <ReportSalesReg/>;
     if(route==="/reports/branch")     return <ReportBranch/>;
     if(route==="/reports/pkg")        return <ReportPackagePnL/>;
-    if(route==="/tickets/unmatched")  return <UnmatchedTickets branch={branch} setRoute={navigate}/>;
     if(route==="/sales/debit-note")     return <SalesDebitNote branch={branch} setRoute={navigate}/>;
     if(route==="/sales/cancellation")   return <SalesCancellation branch={branch} setRoute={navigate}/>;
     if(route==="/purchase/refunds")     return <PurchaseRefunds branch={branch} setRoute={navigate}/>;
@@ -247,7 +244,6 @@ export default function KB360App(){
     if(route==="/masters/forex")        return <MastersForex/>;
     if(route==="/reports/commission")   return <ReportCommission branch={branch} setRoute={navigate}/>;
     if(route==="/search")               return <GlobalSearch setRoute={navigate}/>;
-    if(route==="/bookings")              return <BookingFiles branch={branch} setRoute={navigate}/>;
     if(route==="/group-dashboard")       return <GroupDashboard/>;
     if(route==="/tax/calendar")          return <TaxCalendar/>;
     if(route==="/hr/leave")              return <HrLeave branch={branch}/>;
@@ -259,7 +255,6 @@ export default function KB360App(){
     if(route==="/reports/cashflow-forecast")return <CashFlowForecast branch={branch}/>;
     if(route==="/reports/supplier-360")   return <Supplier360 branch={branch}/>;
     if(route==="/reports/tally-export")   return <TallyExport branch={branch}/>;
-    if(route==="/bookings/advances")      return <AdvanceDepositLedger branch={branch}/>;
     if(route==="/masters/passports")      return <PassportManager branch={branch}/>;
     if(route==="/masters/markup")         return <MarkupRateSheet branch={branch}/>;
     if(route==="/masters/vendor-terms")   return <VendorTermsMaster branch={branch}/>;
@@ -286,7 +281,6 @@ export default function KB360App(){
     if(route==="/masters/airlines")   return <MastersAirlines/>;
     if(route==="/masters/hotels")     return <MastersHotels/>;
     if(route==="/masters/tax")        return <MastersTaxRates/>;
-    if(route==="/operations/groups")    return <GroupBookings branch={branch} setRoute={navigate}/>;
     if(route==="/hr/pf-esi")            return <PfEsiChallan branch={branch}/>;
     if(route==="/accounting/recurring") return <RecurringVouchers branch={branch}/>;
     if(route==="/masters/tour-codes")   return <TourCodeMaster branch={branch} setRoute={navigate}/>;
@@ -300,7 +294,6 @@ export default function KB360App(){
     if(route==="/reports/destination")      return <DestinationIntelligence branch={branch}/>;
     if(route==="/reports/package-pl")       return <PackagePnL branch={branch}/>;
     if(route==="/reports/sa-statement")     return <SubAgentStatement branch={branch}/>;
-    if(route==="/operations/refunds")       return <RefundTracker branch={branch} setRoute={navigate}/>;
     if(route==="/hr/recruitment")           return <Recruitment branch={branch}/>;
     if(route==="/hr/training")              return <TrainingRecords branch={branch}/>;
     if(route==="/reports/budget")           return <BudgetPlanning branch={branch}/>;
