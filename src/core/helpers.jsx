@@ -808,7 +808,7 @@ export function PinnedRecentSection({setRoute}){
    ITEM 21: BSP CSV IMPORT  /purchase/bsp-import
    ════════════════════════════════════════════════════════════════ */
 
-export function LedgerSelect({value,onChange,filter,placeholder,style:{}}){
+export function LedgerSelect({value,onChange,filter,placeholder,style={}}){
   const [q,setQ]=useState("");
   const [open,setOpen]=useState(false);
   const ref=useRef(null);

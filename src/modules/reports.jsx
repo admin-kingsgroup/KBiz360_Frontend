@@ -722,6 +722,14 @@ export function ReportSalesReg({branch}){
   );
 }
 
+const BR_D=[
+  {branch:"BOM", rev:38500000,gp:6850000,gpPct:17.8,color:"#185FA5"},
+  {branch:"AMD", rev:14200000,gp:2480000,gpPct:17.5,color:"#854F0B"},
+  {branch:"NBO", rev:18500000,gp:4200000,gpPct:22.7,color:"#27500A"},
+  {branch:"DAR", rev: 9800000,gp:2680000,gpPct:27.3,color:"#1D9E75"},
+  {branch:"FBM", rev: 6400000,gp:1850000,gpPct:28.9,color:"#A32D2D"},
+];
+
 export function ReportBranch(){
   const maxR=Math.max(...BR_D.map(b=>b.rev));
   const totR=BR_D.reduce((s,b)=>s+b.rev,0);

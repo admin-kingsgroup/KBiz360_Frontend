@@ -3391,7 +3391,7 @@ export function PaymentVoucher({branch}){
           {/* Payment type - BSP has special treatment */}
           <FL label="Payment type">
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              <button onClick={()=>setBsp(false)} style={{flex:1,padding:"7px",border:"none",cursor:"pointer",fontWeight:!bsp?700:500,background:!bsp?"#fff":"transparent",borderRadius:6}}>Regular Payment</button><button onClick={()=>setBsp(true)} style={{flex:1,padding:"7px",border:"none",cursor:"pointer",fontWeight:bsp?700:500,background:bsp?"#fff":"transparent",borderRadius:6}}>BSP Settlement</button>
+              <button onClick={()=>setIsBsp(false)} style={{flex:1,padding:"7px",border:"none",cursor:"pointer",fontWeight:!isBsp?700:500,background:!isBsp?"#fff":"transparent",borderRadius:6}}>Regular Payment</button><button onClick={()=>setIsBsp(true)} style={{flex:1,padding:"7px",border:"none",cursor:"pointer",fontWeight:isBsp?700:500,background:isBsp?"#fff":"transparent",borderRadius:6}}>BSP Settlement</button>
             </div>
           </FL>
           {isBsp&&<div style={{padding:"8px 12px",borderRadius:8,background:"#E6F1FB",fontSize:10,color:"#185FA5"}}>
