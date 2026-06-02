@@ -18,7 +18,7 @@ import { card, inp, bc } from '../core/styles';
 import {
   useTrialBalance, useProfitAndLoss, useBalanceSheet, useDayBook,
   useLedgerStatement, useLedgerGroups, useChartOfAccounts,
-  useSalesRegister, usePurchaseRegister,
+  useSalesRegister, usePurchaseRegister, useInvoiceGP,
 } from '../core/useAccounting';
 
 const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691', BLUE = '#185FA5', RED = '#A32D2D', GREEN = '#27500A';
@@ -324,11 +324,65 @@ export function ReportBSLive({ branch }) {
 }
 
 /* ════════════════════ SALES / PURCHASE REGISTER ════════════════════ */
+/* Read-only voucher detail — shows every imported field (PNR, ticket, fare
+   breakup, etc.) captured on the line `meta`, plus the header + Link No. */
+function VoucherDetail({ voucher, cur, onClose }) {
+  if (!voucher) return null;
+  const v = voucher;
+  const F = ({ label, val }) => (
+    <div style={{ minWidth: 110 }}>
+      <div style={{ fontSize: 9, color: DIM, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{label}</div>
+      <div style={{ fontSize: 12, color: DARK, fontWeight: 600 }}>{val || '—'}</div>
+    </div>
+  );
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', zIndex: 700, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '6vh' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 660, maxWidth: '94vw', maxHeight: '84vh', overflowY: 'auto', padding: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff' }}>
+          <div style={{ fontSize: 14.5, fontWeight: 800, color: DARK }}>{v.vno} <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>{v.type} · {v.category}</span></div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 16 }}>✕</button>
+        </div>
+        <div style={{ padding: 16 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 14 }}>
+            <F label="Date" val={v.date} /><F label="Branch" val={v.branch} />
+            <F label={v.category === 'purchase' ? 'Supplier' : 'Customer'} val={v.party} />
+            <F label="Link No" val={v.linkNo} /><F label="Taxable" val={money(cur, v.subtotal)} />
+            <F label="GST" val={money(cur, v.taxAmt)} /><F label="Total" val={money(cur, v.total)} />
+          </div>
+          {(v.lines || []).map((ln, i) => {
+            const meta = ln.meta && typeof ln.meta === 'object' ? ln.meta : {};
+            const entries = Object.entries(meta).filter(([, val]) => val !== '' && val != null);
+            return (
+              <div key={i} style={{ ...card, padding: 12, marginBottom: 10, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: entries.length ? 8 : 0 }}>
+                  <span style={{ fontWeight: 700, color: DARK, fontSize: 12.5 }}>{ln.ledger || `Line ${i + 1}`}</span>
+                  <span style={{ fontWeight: 700, color: BLUE, fontVariantNumeric: 'tabular-nums' }}>{money(cur, ln.amt)}</span>
+                </div>
+                {entries.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '4px 14px' }}>
+                    {entries.map(([k, val]) => (
+                      <div key={k} style={{ fontSize: 11 }}>
+                        <span style={{ color: DIM }}>{k}: </span><span style={{ color: DARK, fontWeight: 600 }}>{String(val)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {v.remarks && <div style={{ fontSize: 11, color: DIM }}>Remarks: {v.remarks}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function RegisterLive({ branch, initial = 'sales' }) {
   const cur = curOf(branch);
   const [tab, setTab] = useState(initial === 'purchase' ? 'purchase' : 'sales'); // sales | purchase
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [detail, setDetail] = useState(null);
   const sales = useSalesRegister(branch, { from, to });
   const purch = usePurchaseRegister(branch, { from, to });
   const q = tab === 'sales' ? sales : purch;
@@ -340,7 +394,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   return (
     <Page
       title={tab === 'sales' ? 'Sales Register' : 'Purchase Register'}
-      sub={`${branchLabel(branch)} · ${rows.length} vouchers · Total ${money(cur, sum('total'))}`}
+      sub={`${branchLabel(branch)} · ${rows.length} vouchers · Total ${money(cur, sum('total'))} · click a row for full detail`}
       right={<>
         <Tab id="sales" label="Sales" /><Tab id="purchase" label="Purchase" />
         <DateInput value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -351,16 +405,19 @@ export function RegisterLive({ branch, initial = 'sales' }) {
       <State q={q} empty={rows.length === 0}>
         <Table>
           <thead><tr style={headRow}>
-            <Th>Date</Th><Th>Voucher</Th><Th>Type</Th><Th>{tab === 'sales' ? 'Customer' : 'Supplier'}</Th>
+            <Th>Date</Th><Th>Voucher</Th><Th>Type</Th><Th>{tab === 'sales' ? 'Customer' : 'Supplier'}</Th><Th>Link No</Th>
             <Th right>Taxable</Th><Th right>GST</Th><Th right>Total</Th>
           </tr></thead>
           <tbody>
             {rows.map((v, i) => (
-              <tr key={v.id || v.vno} style={rowBg(i)}>
+              <tr key={v.id || v.vno} style={{ ...rowBg(i), cursor: 'pointer' }} onClick={() => setDetail(v)}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
                 <td style={{ padding: '8px 12px', color: DIM, whiteSpace: 'nowrap' }}>{v.date}</td>
                 <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{v.vno}</td>
                 <td style={{ padding: '8px 12px', color: '#384677' }}>{v.type}</td>
                 <td style={{ padding: '8px 12px', fontWeight: 600, color: DARK }}>{v.party || '—'}</td>
+                <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, color: '#6b21a8' }}>{v.linkNo || '—'}</td>
                 <td style={{ padding: '8px 12px', ...num }}>{money(cur, v.subtotal)}</td>
                 <td style={{ padding: '8px 12px', ...num, color: '#854F0B' }}>{money(cur, v.taxAmt)}</td>
                 <td style={{ padding: '8px 12px', ...num, fontWeight: 700 }}>{money(cur, v.total)}</td>
@@ -368,10 +425,69 @@ export function RegisterLive({ branch, initial = 'sales' }) {
             ))}
           </tbody>
           <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
-            <td colSpan={4} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD }}>TOTAL — {rows.length}</td>
+            <td colSpan={5} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD }}>TOTAL — {rows.length}</td>
             <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, sum('subtotal'))}</td>
             <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, sum('taxAmt'))}</td>
             <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, sum('total'))}</td>
+          </tr></tfoot>
+        </Table>
+      </State>
+      <VoucherDetail voucher={detail} cur={cur} onClose={() => setDetail(null)} />
+    </Page>
+  );
+}
+
+/* ════════════════════ INVOICE-WISE GP (by Link No) ═════════════════ */
+export function InvoiceGPLive({ branch }) {
+  const cur = curOf(branch);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const q = useInvoiceGP(branch, { from, to });
+  const d = q.data;
+  const rows = d?.rows || [];
+  const STATUS = { matched: { c: GREEN, t: 'matched' }, 'no-cost': { c: '#854F0B', t: 'no cost' }, 'no-sale': { c: RED, t: 'no sale' } };
+  return (
+    <Page
+      title="Invoice-wise Gross Profit"
+      sub={`${branchLabel(branch)} · grouped by Link No · ${rows.length} files`}
+      right={<>
+        <DateInput value={from} onChange={(e) => setFrom(e.target.value)} />
+        <span style={{ lineHeight: '32px', color: DIM, fontSize: 11 }}>to</span>
+        <DateInput value={to} onChange={(e) => setTo(e.target.value)} />
+      </>}
+    >
+      {d && (d.unlinked.sales > 0 || d.unlinked.purchases > 0) && (
+        <Banner tone="info">{d.unlinked.sales} sale(s) and {d.unlinked.purchases} purchase(s) have no Link No — add one on import to include them here.</Banner>
+      )}
+      <State q={q} empty={rows.length === 0}>
+        <Table>
+          <thead><tr style={headRow}>
+            <Th>Link No</Th><Th>Customer</Th><Th>Supplier</Th><Th right>Sale</Th><Th right>Cost</Th><Th right>GP</Th><Th right>GP %</Th><Th>Status</Th>
+          </tr></thead>
+          <tbody>
+            {rows.map((r, i) => {
+              const s = STATUS[r.status] || { c: DIM, t: r.status };
+              return (
+                <tr key={r.linkNo} style={rowBg(i)}>
+                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10.5, color: '#6b21a8', fontWeight: 700 }}>{r.linkNo}</td>
+                  <td style={{ padding: '8px 12px', color: DARK }}>{r.customer || '—'}</td>
+                  <td style={{ padding: '8px 12px', color: DARK }}>{r.supplier || '—'}</td>
+                  <td style={{ padding: '8px 12px', ...num }}>{money(cur, r.sale)}</td>
+                  <td style={{ padding: '8px 12px', ...num, color: '#854F0B' }}>{money(cur, r.cost)}</td>
+                  <td style={{ padding: '8px 12px', ...num, fontWeight: 700, color: r.gp >= 0 ? GREEN : RED }}>{money(cur, r.gp)}</td>
+                  <td style={{ padding: '8px 12px', ...num, fontWeight: 700, color: r.gp >= 0 ? GREEN : RED }}>{r.gpPct}%</td>
+                  <td style={{ padding: '8px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: s.c + '22', color: s.c }}>{s.t}</span></td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
+            <td colSpan={3} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD }}>TOTAL — {rows.length} files</td>
+            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, d?.totals.sale)}</td>
+            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, d?.totals.cost)}</td>
+            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, d?.totals.gp)}</td>
+            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{d?.totals.gpPct}%</td>
+            <td />
           </tr></tfoot>
         </Table>
       </State>

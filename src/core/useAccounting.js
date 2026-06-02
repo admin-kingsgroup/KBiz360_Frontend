@@ -85,6 +85,16 @@ export function useLedgerGroups() {
   });
 }
 
+export function useInvoiceGP(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'invoice-gp', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/invoice-gp', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 export function useChartOfAccounts(branch) {
   const code = branchCode(branch);
   return useQuery({

@@ -208,3 +208,33 @@ export const ScenariosMaster = () => (
       { key: 'active', label: 'Active', type: 'bool', default: true },
     ]} />
 );
+
+/* ── Parties (live, backend-connected) ──────────────────────────────────── */
+export const CustomersMaster = () => (
+  <MasterCrud title="Customers" subtitle="Clients (Sundry Debtors) — live from the backend" resource="customers"
+    fields={[
+      { key: 'name', label: 'Name', type: 'text', required: true },
+      { key: 'branch', label: 'Branch', type: 'text' },
+      { key: 'phone', label: 'Phone', type: 'text' },
+      { key: 'email', label: 'Email', type: 'text' },
+    ]} />
+);
+
+export const SuppliersMaster = () => (
+  <MasterCrud title="Suppliers" subtitle="Vendors (Sundry Creditors) — live from the backend" resource="suppliers"
+    fields={[
+      { key: 'name', label: 'Name', type: 'text', required: true },
+      { key: 'category', label: 'Category', type: 'text' },
+      { key: 'type', label: 'Type', type: 'text' },
+      { key: 'branch', label: 'Branch', type: 'text' },
+      { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
+      { key: 'pan', label: 'PAN', type: 'text', table: false },
+      { key: 'contact', label: 'Contact', type: 'text', table: false },
+      { key: 'phone', label: 'Phone', type: 'text' },
+      { key: 'email', label: 'Email', type: 'text', table: false },
+      { key: 'city', label: 'City', type: 'text', table: false },
+      { key: 'country', label: 'Country', type: 'text', table: false },
+      { key: 'creditDays', label: 'Credit Days', type: 'number' },
+      { key: 'active', label: 'Active', type: 'bool', default: true },
+    ]} />
+);

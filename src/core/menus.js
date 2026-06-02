@@ -123,6 +123,7 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
     {label:"Cash Book", href:"/reports/cashbook"},
   ]},
   {label:"Profitability", children:[
+    {label:"Invoice-wise GP (by Link No)", href:"/reports/invoice-gp"},
     {label:"GP Reports (Multi-view)", href:"/reports/gp"},
     {label:"Yield by Destination", href:"/reports/yield-destination"},
     {label:"Yield by Consultant", href:"/reports/yield-consultant"},

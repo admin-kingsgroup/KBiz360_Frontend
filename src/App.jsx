@@ -22,9 +22,9 @@ import { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport,
 import { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } from './modules/settings';
 import { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } from './modules/taxation';
 import { AdmRegister, AutoLinkedVouchers, BspCsvImport, BspSummary, BulkVoucherImport, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
-import { TrialBalanceLive, DayBookLive, LedgerAcLive, ReportPnLLive, ReportBSLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive } from './modules/accountingLive';
+import { TrialBalanceLive, DayBookLive, LedgerAcLive, ReportPnLLive, ReportBSLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, InvoiceGPLive } from './modules/accountingLive';
 import { PaymentVerificationLive } from './modules/paymentVerification';
-import { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster } from './modules/mastersLive';
+import { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster } from './modules/mastersLive';
 import { DataImportPage } from './modules/dataImport';
 import { GlobalSearch } from './shell/GlobalSearch';
 import { Placeholder } from './shell/Placeholder';
@@ -240,6 +240,7 @@ export default function KB360App(){
     if(route==="/reports/pay")        return <ReportPayables/>;
     if(route==="/reports/sreg")       return <RegisterLive branch={branch} initial="sales"/>;
     if(route==="/reports/preg")       return <RegisterLive branch={branch} initial="purchase"/>;
+    if(route==="/reports/invoice-gp") return <InvoiceGPLive branch={branch}/>;
     if(route==="/reports/branch")     return <ReportBranch/>;
     if(route==="/reports/pkg")        return <ReportPackagePnL/>;
     if(route==="/sales/debit-note")     return <SalesDebitNote branch={branch} setRoute={navigate}/>;
@@ -288,8 +289,8 @@ export default function KB360App(){
     if(route==="/masters/cost-categories") return <CostCategoriesMaster/>;
     if(route==="/masters/budgets")         return <BudgetsMaster/>;
     if(route==="/masters/scenarios")       return <ScenariosMaster/>;
-    if(route==="/masters/customers")  return <MastersCustomers/>;
-    if(route==="/masters/suppliers")  return <MastersSuppliers/>;
+    if(route==="/masters/customers")  return <CustomersMaster/>;
+    if(route==="/masters/suppliers")  return <SuppliersMaster/>;
     if(route==="/masters/airlines")   return <MastersAirlines/>;
     if(route==="/masters/hotels")     return <MastersHotels/>;
     if(route==="/masters/tax")        return <MastersTaxRates/>;
