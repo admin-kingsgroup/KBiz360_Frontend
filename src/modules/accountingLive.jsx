@@ -13,12 +13,13 @@
    #d4a437 accents). No demo data — empty in, empty out.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { card, inp, bc } from '../core/styles';
 import {
   useTrialBalance, useProfitAndLoss, useBalanceSheet, useDayBook,
   useLedgerStatement, useLedgerGroups, useChartOfAccounts,
   useSalesRegister, usePurchaseRegister, useInvoiceGP,
+  useVoucher, useUpdateVoucher,
 } from '../core/useAccounting';
 
 const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691', BLUE = '#185FA5', RED = '#A32D2D', GREEN = '#27500A';
@@ -232,17 +233,165 @@ export function LedgerAcLive({ branch }) {
   );
 }
 
+/* ════════════════════ DRILL-DOWN: group → ledger → voucher (editable) ═══ */
+const tapRow = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 14px', minHeight: 44, cursor: 'pointer', borderBottom: '1px solid #f1f3f8', WebkitTapHighlightColor: 'transparent' };
+
+function Crumb({ items }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, fontSize: 12, minWidth: 0 }}>
+      {items.map((it, i) => (
+        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          {i > 0 && <span style={{ color: '#b9bed4' }}>▸</span>}
+          {it.onClick
+            ? <button onClick={it.onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', color: BLUE, fontWeight: 600, padding: 0, fontSize: 12 }}>{it.label}</button>
+            : <span style={{ color: DARK, fontWeight: 700 }}>{it.label}</span>}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// Editable voucher view (the last drill step). Saving re-posts the journal.
+function VoucherEditor({ voucherId, cur, onBack }) {
+  const vq = useVoucher(voucherId);
+  const upd = useUpdateVoucher();
+  const v = vq.data;
+  const [form, setForm] = useState(null);
+  const [msg, setMsg] = useState('');
+  useEffect(() => {
+    if (v) { setForm({ date: v.date || '', branch: v.branch || '', party: v.party || '', subtotal: v.subtotal ?? 0, taxAmt: v.taxAmt ?? 0, linkNo: v.linkNo || '', remarks: v.remarks || '' }); setMsg(''); }
+  }, [v]);
+  if (vq.isLoading || !form) return <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading voucher…</div>;
+  if (vq.isError) return <div style={{ padding: 16, color: RED }}>⚠ {vq.error?.message}</div>;
+  const set = (k, val) => setForm((f) => ({ ...f, [k]: val }));
+  const total = r2((Number(form.subtotal) || 0) + (Number(form.taxAmt) || 0));
+  const save = () => {
+    setMsg('');
+    const lines = (v.lines && v.lines.length === 1) ? [{ ...v.lines[0], amt: Number(form.subtotal) || 0 }] : v.lines;
+    const body = { ...v, ...form, subtotal: Number(form.subtotal) || 0, taxAmt: Number(form.taxAmt) || 0, total, lines, status: v.status || 'saved' };
+    delete body.id; delete body.createdAt; delete body.updatedAt;
+    upd.mutate({ id: voucherId, body }, { onSuccess: () => setMsg('saved'), onError: (e) => setMsg('err:' + e.message) });
+  };
+  const Field = ({ label, k, type = 'text' }) => (
+    <div>
+      <div style={{ fontSize: 10, color: DIM, fontWeight: 700, marginBottom: 3 }}>{label}</div>
+      <input type={type} value={form[k]} onChange={(e) => set(k, e.target.value)} style={{ ...inp, fontSize: 12.5 }} />
+    </div>
+  );
+  return (
+    <div style={{ padding: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <div style={{ fontWeight: 800, color: DARK, fontSize: 14 }}>{v.vno} <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>{v.type} · {v.category}</span></div>
+        <button onClick={onBack} style={{ ...inp, width: 'auto', minHeight: 34, fontSize: 11.5, cursor: 'pointer' }}>← Back</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: 10 }}>
+        <Field label="Date" k="date" /><Field label="Branch" k="branch" />
+        <Field label={v.category === 'purchase' ? 'Supplier' : 'Customer'} k="party" />
+        <Field label="Link No" k="linkNo" />
+        <Field label="Taxable" k="subtotal" type="number" /><Field label="GST" k="taxAmt" type="number" />
+        <div><div style={{ fontSize: 10, color: DIM, fontWeight: 700, marginBottom: 3 }}>Total (auto)</div><div style={{ ...inp, fontSize: 12.5, background: '#f3f5f9', color: DARK, fontWeight: 700 }}>{money(cur, total)}</div></div>
+        <Field label="Remarks" k="remarks" />
+      </div>
+      {(v.lines || []).map((ln, i) => {
+        const meta = ln.meta && typeof ln.meta === 'object' ? ln.meta : {};
+        const ent = Object.entries(meta).filter(([, x]) => x !== '' && x != null);
+        return (
+          <div key={i} style={{ ...card, padding: 10, marginTop: 10, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+            <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>{ln.ledger} · {money(cur, ln.amt)}</div>
+            {ent.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: '3px 12px', marginTop: 6 }}>{ent.map(([k, x]) => <div key={k} style={{ fontSize: 10.5 }}><span style={{ color: DIM }}>{k}: </span><span style={{ color: DARK }}>{String(x)}</span></div>)}</div>}
+          </div>
+        );
+      })}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
+        <button disabled={upd.isPending} onClick={save} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: GREEN, color: '#fff' }}>{upd.isPending ? 'Saving…' : 'Save'}</button>
+        {msg === 'saved' && <span style={{ color: GREEN, fontSize: 12, fontWeight: 700 }}>✓ Saved &amp; re-posted</span>}
+        {msg.startsWith('err:') && <span style={{ color: RED, fontSize: 11.5 }}>⚠ {msg.slice(4)}</span>}
+      </div>
+    </div>
+  );
+}
+
+function DrillDown({ branch, group, onClose }) {
+  const cur = curOf(branch);
+  const [ledger, setLedger] = useState(null);
+  const [voucher, setVoucher] = useState(null); // { id, vno }
+  const tb = useTrialBalance(branch);
+  const stmt = useLedgerStatement(ledger, branch);
+  const groupLedgers = (tb.data?.rows || []).filter((r) => r.group === group);
+
+  const crumbs = [
+    { label: group, onClick: (ledger || voucher) ? () => { setLedger(null); setVoucher(null); } : null },
+    ...(ledger ? [{ label: ledger, onClick: voucher ? () => setVoucher(null) : null }] : []),
+    ...(voucher ? [{ label: voucher.vno }] : []),
+  ];
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(780px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+          <Crumb items={crumbs} />
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
+        </div>
+
+        {voucher && <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} />}
+
+        {!voucher && ledger && (
+          <div>
+            {stmt.isLoading && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading…</div>}
+            {stmt.data && <>
+              <div style={{ padding: '8px 14px', background: '#f3f5f9', fontSize: 11, color: DIM, display: 'flex', justifyContent: 'space-between' }}>
+                <span>Opening {money(cur, stmt.data.openingBalance)} {stmt.data.openingSide}</span>
+                <span style={{ fontWeight: 700, color: DARK }}>Closing {money(cur, stmt.data.closingBalance)} {stmt.data.closingSide}</span>
+              </div>
+              {(stmt.data.lines || []).length === 0 && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>No entries.</div>}
+              {(stmt.data.lines || []).map((ln, i) => (
+                <div key={i} style={tapRow} onClick={() => ln.voucherId && setVoucher({ id: ln.voucherId, vno: ln.vno })}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12, color: BLUE, fontWeight: 600 }}>{ln.vno} <span style={{ color: DIM, fontWeight: 400 }}>· {ln.date}</span></div>
+                    <div style={{ fontSize: 10.5, color: DIM, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ln.narration || ln.party || ln.category}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: ln.debit ? BLUE : RED }}>{ln.debit ? `Dr ${money(cur, ln.debit)}` : `Cr ${money(cur, ln.credit)}`}</div>
+                    <div style={{ fontSize: 10, color: DIM }}>bal {money(cur, Math.abs(ln.balance))} {ln.balanceSide}</div>
+                  </div>
+                </div>
+              ))}
+            </>}
+          </div>
+        )}
+
+        {!voucher && !ledger && (
+          <div>
+            <div style={{ padding: '8px 14px', fontSize: 11, color: DIM, background: '#f3f5f9' }}>{groupLedgers.length} ledger(s) in {group} — tap to open</div>
+            {tb.isLoading && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading…</div>}
+            {!tb.isLoading && groupLedgers.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>No ledgers in this group.</div>}
+            {groupLedgers.map((r, i) => (
+              <div key={i} style={tapRow} onClick={() => setLedger(r.ledger)}>
+                <span style={{ fontSize: 12.5, color: DARK, fontWeight: 600 }}>{r.ledger}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: r.debit ? BLUE : RED, whiteSpace: 'nowrap' }}>{money(cur, r.debit || r.credit)} {r.debit ? 'Dr' : 'Cr'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ════════════════════ Tally two-column (Dr | Cr) T-account ═════════ */
 const r2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
-function TAccount({ leftHead = 'Particulars', rightHead = 'Particulars', left, right, leftTotal, rightTotal, cur }) {
+function TAccount({ leftHead = 'Particulars', rightHead = 'Particulars', left, right, leftTotal, rightTotal, cur, onPick }) {
   const n = Math.max(left.length, right.length, 1);
+  const Label = ({ row }) => (row.group && onPick)
+    ? <button onClick={() => onPick(row.group)} title="Drill into group" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: BLUE, fontWeight: row.bold ? 700 : 600, fontSize: 11.5, textAlign: 'left' }}>{row.label} ›</button>
+    : <span style={{ color: '#384677', fontWeight: row.bold ? 700 : 400 }}>{row.label}</span>;
   const Cell = ({ row }) => row
-    ? (<><td style={{ padding: '7px 14px', color: '#384677', fontWeight: row.bold ? 700 : 400 }}>{row.label}</td>
-          <td style={{ padding: '7px 14px', ...num, color: DARK, fontWeight: row.bold ? 700 : 400 }}>{row.amount != null ? money(cur, row.amount) : ''}</td></>)
-    : (<><td style={{ padding: '7px 14px' }} /><td style={{ padding: '7px 14px' }} /></>);
+    ? (<><td style={{ padding: '9px 14px' }}><Label row={row} /></td>
+          <td style={{ padding: '9px 14px', ...num, color: DARK, fontWeight: row.bold ? 700 : 400 }}>{row.amount != null ? money(cur, row.amount) : ''}</td></>)
+    : (<><td style={{ padding: '9px 14px' }} /><td style={{ padding: '9px 14px' }} /></>);
   return (
-    <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, tableLayout: 'fixed' }}>
+    <div style={{ ...card, padding: 0, overflow: 'hidden', overflowX: 'auto' }}>
+      <table style={{ width: '100%', minWidth: 520, borderCollapse: 'collapse', fontSize: 11.5, tableLayout: 'fixed' }}>
         <thead><tr style={headRow}>
           <Th>{leftHead}</Th><Th right>Amount</Th><Th>{rightHead}</Th><Th right>Amount</Th>
         </tr></thead>
@@ -269,9 +418,10 @@ export function ReportPnLLive({ branch }) {
   const cur = curOf(branch);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [drill, setDrill] = useState(null);
   const q = useProfitAndLoss(branch, { from, to });
   const d = q.data;
-  const G = (g) => ({ label: g.group, amount: g.amount });
+  const G = (g) => ({ label: g.group, amount: g.amount, group: g.group });
 
   let trade = null, pl = null;
   if (d) {
@@ -309,11 +459,12 @@ export function ReportPnLLive({ branch }) {
         )}
         {trade && <>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.5px', textTransform: 'uppercase', color: BLUE, margin: '4px 0 6px' }}>Trading Account</div>
-          <div style={{ marginBottom: 14 }}><TAccount left={trade.left} right={trade.right} leftTotal={trade.lt} rightTotal={trade.rt} cur={cur} /></div>
+          <div style={{ marginBottom: 14 }}><TAccount left={trade.left} right={trade.right} leftTotal={trade.lt} rightTotal={trade.rt} cur={cur} onPick={setDrill} /></div>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.5px', textTransform: 'uppercase', color: BLUE, margin: '4px 0 6px' }}>Profit &amp; Loss Account</div>
-          <TAccount left={pl.left} right={pl.right} leftTotal={pl.lt} rightTotal={pl.rt} cur={cur} />
+          <TAccount left={pl.left} right={pl.right} leftTotal={pl.lt} rightTotal={pl.rt} cur={cur} onPick={setDrill} />
         </>}
       </State>
+      {drill && <DrillDown branch={branch} group={drill} onClose={() => setDrill(null)} />}
     </Page>
   );
 }
@@ -322,9 +473,11 @@ export function ReportPnLLive({ branch }) {
 export function ReportBSLive({ branch }) {
   const cur = curOf(branch);
   const [to, setTo] = useState('');
+  const [drill, setDrill] = useState(null);
   const q = useBalanceSheet(branch, { to });
   const d = q.data;
-  const G = (g) => ({ label: g.group, amount: g.amount, bold: g.isResult });
+  // Synthetic rows (P&L A/c, difference) aren't real groups → not drillable.
+  const G = (g) => ({ label: g.group, amount: g.amount, bold: g.isResult, group: (g.isResult || g.group === 'Difference in Opening Balances') ? null : g.group });
   return (
     <Page
       title="Balance Sheet"
@@ -333,8 +486,9 @@ export function ReportBSLive({ branch }) {
     >
       <State q={q} empty={!d}>
         {d && <Banner tone={d.balanced ? 'ok' : 'err'}>{d.balanced ? '✔ Balanced' : '⚠ Out of balance'} — Liabilities {money(cur, d.totalLiabilities)} {d.balanced ? '=' : '≠'} Assets {money(cur, d.totalAssets)}</Banner>}
-        {d && <TAccount leftHead="Liabilities" rightHead="Assets" left={d.liabilities.map(G)} right={d.assets.map(G)} leftTotal={d.totalLiabilities} rightTotal={d.totalAssets} cur={cur} />}
+        {d && <TAccount leftHead="Liabilities" rightHead="Assets" left={d.liabilities.map(G)} right={d.assets.map(G)} leftTotal={d.totalLiabilities} rightTotal={d.totalAssets} cur={cur} onPick={setDrill} />}
       </State>
+      {drill && <DrillDown branch={branch} group={drill} onClose={() => setDrill(null)} />}
     </Page>
   );
 }

@@ -14,8 +14,8 @@
 //
 // No demo-data fallback — empty in, empty out (same contract as useVouchers).
 
-import { useQuery } from '@tanstack/react-query';
-import { apiGet, getAuthToken } from './api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiPut, getAuthToken } from './api';
 
 // The shell passes `branch` as either the string "ALL" or a branch object.
 // The backend treats a missing/ALL branch as "all branches".
@@ -112,6 +112,30 @@ export function useSalesRegister(branch, { from, to } = {}) {
     queryFn: () => apiGet('/api/vouchers', { branch: code, category: 'sale', from, to }),
     enabled: enabled(),
     staleTime: 30_000,
+  });
+}
+
+// Single voucher (drill-down target) — view + edit.
+export function useVoucher(id) {
+  return useQuery({
+    queryKey: ['voucher', id],
+    queryFn: () => apiGet(`/api/vouchers/${id}`),
+    enabled: enabled() && !!id,
+    staleTime: 10_000,
+  });
+}
+
+// Save an edited voucher; re-posts the journal server-side. Invalidates the
+// reports/registers so the change shows everywhere immediately.
+export function useUpdateVoucher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }) => apiPut(`/api/vouchers/${id}`, body),
+    onSuccess: (_d, { id }) => {
+      qc.invalidateQueries({ queryKey: ['accounting'] });
+      qc.invalidateQueries({ queryKey: ['vouchers'] });
+      qc.invalidateQueries({ queryKey: ['voucher', id] });
+    },
   });
 }
 
