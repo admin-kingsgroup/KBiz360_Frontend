@@ -13,13 +13,14 @@ const BASE = import.meta.env.VITE_KBIZ_API_BASE || 'http://localhost:9090';
 const TOKEN_KEY = import.meta.env.VITE_AUTH_TOKEN_KEY || 'kb360-token';
 
 export function getAuthToken() {
+  // Order: real SSO token (localStorage) → dev token → 'open' placeholder.
+  // The 'open' placeholder is non-empty so the data hooks (enabled: !!token) still
+  // fire; when the backend runs with AUTH_OPTIONAL=true it ignores the token. A
+  // real login token always takes precedence and is used as-is.
   try {
-    // VITE_KBIZ_DEV_TOKEN lets you exercise the live backend locally without a
-    // full CRM session — drop a JWT signed with the shared secret into a
-    // .env.local file. localStorage (real SSO) always takes precedence.
-    return localStorage.getItem(TOKEN_KEY) || import.meta.env.VITE_KBIZ_DEV_TOKEN || '';
+    return localStorage.getItem(TOKEN_KEY) || import.meta.env.VITE_KBIZ_DEV_TOKEN || 'open';
   } catch {
-    return import.meta.env.VITE_KBIZ_DEV_TOKEN || '';
+    return import.meta.env.VITE_KBIZ_DEV_TOKEN || 'open';
   }
 }
 
