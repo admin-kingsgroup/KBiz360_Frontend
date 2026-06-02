@@ -3,44 +3,52 @@
    Auto-generated from KBiz360_v2.jsx · 361 lines · 11 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import { BarChart2, Calendar, Database, Download, LayoutDashboard, Lock, Settings, ShoppingCart, User, Users, Wallet, Wrench } from 'lucide-react';
+import { BarChart2, Calendar, Database, Download, LayoutDashboard, Lock, Settings, ShoppingCart, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { Recruitment } from './helpers';
 import { PERM_MODULES, ROLE_TEMPLATES } from './permissions';
 import { Dashboard } from '../modules/dashboard';
 
+// Organised on Tally's master taxonomy: Accounts Info · Statutory Info ·
+// Parties (which in Tally are just ledgers) · Inventory & Catalog · Utilities.
 export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
-  {label:"Accounting", children:[
-    {label:"Ledger Groups", href:"/masters/groups"},
-    {label:"Chart of Accounts", href:"/masters/ledgers"},
-    {label:"Bank Account Master", href:"/masters/bank-accounts"},
-    {label:"Cost Center Master", href:"/masters/cost-centers"},
-    {label:"Project / Tour Code Master", href:"/masters/projects"},
+  {label:"Accounts Info", children:[
+    {label:"Groups (Ledger Groups)", href:"/masters/groups"},
+    {label:"Ledgers (Chart of Accounts)", href:"/masters/ledgers"},
+    {label:"Voucher Types", href:"/masters/voucher-types"},
+    {label:"Currencies", href:"/masters/currency"},
+    {label:"Cost Categories", href:"/masters/cost-categories"},
+    {label:"Cost Centres", href:"/masters/cost-centers"},
+    {label:"Budgets", href:"/masters/budgets"},
+    {label:"Scenarios", href:"/masters/scenarios"},
+    {label:"Bank Accounts", href:"/masters/bank-accounts"},
+    {label:"Forex Rates", href:"/masters/forex"},
+    {label:"Numbering Series", href:"/masters/numbering"},
   ]},
-  {label:"Parties", children:[
-    {label:"Clients", href:"/masters/customers"},
+  {label:"Statutory Info", children:[
+    {label:"Tax / HSN-SAC Codes", href:"/masters/tax"},
+  ]},
+  {label:"Parties (Ledgers)", children:[
+    {label:"Clients (Sundry Debtors)", href:"/masters/customers"},
     {label:"Customer (12-Tab View)", href:"/masters/customer-tabs"},
-    {label:"Suppliers", href:"/masters/suppliers"},
+    {label:"Suppliers (Sundry Creditors)", href:"/masters/suppliers"},
     {label:"Supplier (12-Tab View)", href:"/masters/supplier-tabs"},
     {label:"Sub-Agents", href:"/masters/sub-agents"},
+    {label:"Project / Tour Code Master", href:"/masters/projects"},
   ]},
-  {label:"Catalog", children:[
+  {label:"Inventory & Catalog", children:[
     {label:"Airlines & GDSs", href:"/masters/airlines"},
     {label:"Hotels & DMCs", href:"/masters/hotels"},
     {label:"Tour Codes", href:"/masters/tour-codes"},
     {label:"Seat Inventory", href:"/masters/seats"},
-  ]},
-  {label:"Codes & Rates", children:[
-    {label:"Tax / SAC Codes", href:"/masters/tax"},
-    {label:"Currency Master", href:"/masters/currency"},
-    {label:"Forex Rates", href:"/masters/forex"},
     {label:"Markup Rates", href:"/masters/markup"},
     {label:"Vendor Credit Terms", href:"/masters/vendor-terms"},
+  ]},
+  {label:"Utilities", children:[
     {label:"Passport Register", href:"/masters/passports"},
     {label:"Document Type Master", href:"/masters/doc-types"},
     {label:"Approval Limits Master", href:"/masters/approval-limits"},
-    {label:"Numbering Series Master", href:"/masters/numbering"},
-    {label:"Customer Detail (10-Tab Pattern Demo)", href:"/masters/customer-detail-demo"},
+    {label:"Customer Detail (10-Tab Demo)", href:"/masters/customer-detail-demo"},
     {label:"Bulk Import Master Data", href:"/masters/bulk-import"},
     {label:"Merge Duplicate Records", href:"/masters/merge"},
   ]},
@@ -74,6 +82,9 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Trial Balance", href:"/trial-balance"},
     {label:"Bank Reconciliation", href:"/bank-reco"},
   ]},
+  {label:"Verification", children:[
+    {label:"Payment Verification", href:"/finance/verification"},
+  ]},
   {label:"Period & Year-End", children:[
     {label:"Year-End Close", href:"/accounting/year-close"},
     {label:"Recurring Vouchers", href:"/accounting/recurring"},
@@ -85,7 +96,6 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"FX Revaluation", href:"/accounting/fx-revaluation"},
     {label:"Expense Budget", href:"/expense/budget"},
   ]},
-,
   {label:"Finance Tools", children:[
     {label:"Bank Balance Dashboard", href:"/finance/bank-balance"},
     {label:"TDS Auto-Calculator", href:"/finance/tds-calculator"},
@@ -127,6 +137,7 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
   ]},
   {label:"Operational", children:[
     {label:"Sales Register", href:"/reports/sreg"},
+    {label:"Purchase Register", href:"/reports/preg"},
     {label:"Consultant Report", href:"/reports/consultant"},
     {label:"Sub-Agent Statement", href:"/reports/sa-statement"},
     {label:"Supplier 360 View", href:"/reports/supplier-360"},
@@ -152,7 +163,6 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
     {label:"Tally XML Export", href:"/reports/tally-export"},
     {label:"Client Concentration Risk", href:"/reports/concentration"},
   ]},
-,
   {label:"Report Tools", children:[
     {label:"Custom Report Builder", href:"/reports/builder"},
     {label:"Saved Report Views", href:"/reports/saved-views"},
@@ -225,7 +235,6 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
     {label:"Audit Log", href:"/settings/audit"},
     {label:"Display Preferences", href:"/settings/preferences"},
   ]},
-,
   {label:"Admin Power", children:[
     {label:"Document Template Editor", href:"/settings/doc-templates"},
     {label:"Email / SMS Templates", href:"/settings/email-templates"},
@@ -290,7 +299,6 @@ export const MENU_TRANSACTIONS = {label:"Transactions", icon:ShoppingCart, child
     {label:"Ticket Control Register", href:"/purchase/ticket-control"},
     {label:"GDS / PNR Import", href:"/purchase/gds-import"},
   ]},
-,
   {label:"Voucher Tools", children:[
     {label:"Bulk Voucher Import (Excel)", href:"/transactions/bulk-import"},
     {label:"Multi-Currency Voucher", href:"/transactions/multi-currency"},
@@ -327,6 +335,9 @@ export const MENU_COMMON_TOP = [
 ];
 
 
+// Tally → Books data migration. Top-level tab, super-admin only (added in getMenu).
+export const MENU_IMPORT = {label:"Data Import", icon:Upload, href:"/import"};
+
 export function getMenu(branch, currentUser){
   const isAll   = branch==="ALL";
   const isIndia = !isAll && branch?.code && ["BOM","AMD"].includes(branch.code);
@@ -347,6 +358,8 @@ export function getMenu(branch, currentUser){
     "HO Control":       "Settings",
   };
   let menus = [...MENU_COMMON_TOP, MENU_REPORTS, taxSection, MENU_HR, MENU_HO_CONTROL, MENU_MASTERS, MENU_ASSETS, MENU_SETTINGS];
+  // Super-admin-only Tally migration tab
+  if(currentUser?.role === "Super Admin") menus = [...menus, MENU_IMPORT];
   if(!currentUser) return menus;
   const tmpl = ROLE_TEMPLATES[currentUser.role];
   if(!tmpl) return menus;

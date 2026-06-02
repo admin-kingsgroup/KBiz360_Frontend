@@ -55,13 +55,13 @@ export function ReportPnL({branch}){
   const gp     =revenue-cost;
   const gpPct  =revenue>0?+(gp/revenue*100).toFixed(1):0;
   const SAL=acts.filter(a=>a.id==="SAL").reduce((s,a)=>s+a.a,0)||hr.reduce((s,e)=>s+e.basic+e.hra,0);
-  const RNT=acts.filter(a=>a.id==="RNT").reduce((s,a)=>s+a.a,0)||60000;
-  const GDS=acts.filter(a=>a.id==="GDS").reduce((s,a)=>s+a.a,0)||45000;
-  const TEL=acts.filter(a=>a.id==="TEL").reduce((s,a)=>s+a.a,0)||18000;
-  const ADV=acts.filter(a=>a.id==="ADV").reduce((s,a)=>s+a.a,0)||32000;
-  const SOFT=acts.filter(a=>a.id==="SFT").reduce((s,a)=>s+a.a,0)||28000;
-  const BNK=acts.filter(a=>a.id==="BNK").reduce((s,a)=>s+a.a,0)||8500;
-  const DEPN=5000;
+  const RNT=acts.filter(a=>a.id==="RNT").reduce((s,a)=>s+a.a,0);
+  const GDS=acts.filter(a=>a.id==="GDS").reduce((s,a)=>s+a.a,0);
+  const TEL=acts.filter(a=>a.id==="TEL").reduce((s,a)=>s+a.a,0);
+  const ADV=acts.filter(a=>a.id==="ADV").reduce((s,a)=>s+a.a,0);
+  const SOFT=acts.filter(a=>a.id==="SFT").reduce((s,a)=>s+a.a,0);
+  const BNK=acts.filter(a=>a.id==="BNK").reduce((s,a)=>s+a.a,0);
+  const DEPN=0;
   const totalExp=SAL+RNT+GDS+TEL+ADV+SOFT+BNK+DEPN;
   const netPft=gp-totalExp;
   const netPct=revenue>0?+(netPft/revenue*100).toFixed(1):0;
@@ -247,10 +247,10 @@ export function ReportBS({branch}){
   const cash=expenses*0.08;
   const gstPayable=revenue*0.04-cogs*0.02;
   const advanceFromClients=revenue*0.04;
-  const capital=250000;
+  const capital=0;
   const retained=netProfit;
-  const fixedAssets=120000;
-  const deposits=30000;
+  const fixedAssets=0;
+  const deposits=0;
   const tdsPayable=expenses*0.02;
 
   const ASSETS=[

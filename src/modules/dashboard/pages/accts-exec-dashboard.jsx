@@ -44,9 +44,9 @@ export function AcctsExecDashboardPage({ currentUser, setRoute /*, branch */ }) 
         }}
       >
         <KPICard label="Today's Vouchers" value={branchData.total} delta={fmtINR(branchData.value) + ' total'} color="#22c55e" />
-        <KPICard label="Errors to Fix" value="2" delta="returned by Sr.AE" color="#A32D2D" />
-        <KPICard label="Receipts This Week" value="14" delta="₹8.45L expected" color="#d4a437" />
-        <KPICard label="Payments Due" value="8" delta="₹5.20L this week" color="#f97316" />
+        <KPICard label="Errors to Fix" value="0" delta="" color="#A32D2D" />
+        <KPICard label="Receipts This Week" value="0" delta="" color="#d4a437" />
+        <KPICard label="Payments Due" value="0" delta="" color="#f97316" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14 }}>

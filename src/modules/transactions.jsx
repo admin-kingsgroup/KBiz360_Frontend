@@ -6,8 +6,9 @@
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, Calendar, Check, Clock, Download, Plus, Printer, Save, Search } from 'lucide-react';
 import { Area, Line } from 'recharts';
-import { getAllPurchases, getAvailablePurchases, getUnmatchedTickets, settlePurchaseEntry } from '../core/business-logic';
+import { getUnmatchedTickets, settlePurchaseEntry } from '../core/business-logic';
 import { ADM_DATA, ADM_REASON_CODES, BRANCHES, GP_BILLS, LEDGER_REGISTRY, PURCHASE_REGISTRY, SALE_TO_PURCH_MOD } from '../core/data';
+import { useLivePurchaseRegistry } from '../core/useVouchers';
 import { fmt, fmtINR } from '../core/format';
 import { ACM_DATA, ACM_REASON_CODES, LedgerSelect, RECURRING_DATA, REFUNDS_DATA, Recruitment, STATUS_FLOW, TAB_Page, TRow, TrainingRecords, VTD, VTH, _ADM_LIST, _TICKET_CTRL, cardStyle, tabPanel } from '../core/helpers';
 import { triggerSaveRefresh, useMobile, useVNo } from '../core/hooks';
@@ -27,8 +28,11 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const purchMod=SALE_TO_PURCH_MOD[saleMod]||"PF";
-  const available=getAvailablePurchases(purchMod,branch);
-  const allPurch  =getAllPurchases(purchMod,branch);
+  // Live registry from KBiz Books backend (falls back to demo data when API
+  // is unreachable or returns empty). Replaces direct static-array reads.
+  const liveRegistry=useLivePurchaseRegistry(purchMod, branch?.code);
+  const available=liveRegistry.filter(p=>!p.settled);
+  const allPurch  =liveRegistry;
   const filtered  =search
     ?available.filter(p=>
         p.vno.toLowerCase().includes(search.toLowerCase())||
@@ -295,8 +299,8 @@ export function SalesFlight({branch,setRoute}){
   const vNo=useVNo(branch,"SF");
   const [linkedPurch,setLinkedPurch]=useState(null);
   const [pax,setPax]=useState([
-    {id:1,name:"Mr. Rajiv Sharma",  ticket:"098-2156789012",airline:"Air India",sector:"BOM-DXB",date:"2026-05-16",cls:"Economy",base:18000,k3:1400,otherTax:1100},
-    {id:2,name:"Mrs. Rohan", ticket:"098-2156789013",airline:"Air India",sector:"BOM-DXB",date:"2026-05-16",cls:"Economy",base:18000,k3:1400,otherTax:1100},
+    {id:1,name:"Mr. Rajiv Sharma",  ticket:"098-2156789012",airline:"Air India",sector:"BOM-DXB",date:"2026-05-16",cls:"Economy",base:18000,k3:1400,tax:0,otherTax:1100},
+    {id:2,name:"Mrs. Rohan", ticket:"098-2156789013",airline:"Air India",sector:"BOM-DXB",date:"2026-05-16",cls:"Economy",base:18000,k3:1400,tax:0,otherTax:1100},
   ]);
   const [sc,setSc]=useState(1500);
   const [tripType,setTripType]=useState("International"); // International | Domestic
@@ -308,16 +312,17 @@ export function SalesFlight({branch,setRoute}){
   const t=useMemo(()=>{
     const base=pax.reduce((s,p)=>s+(+p.base||0),0);
     const k3=pax.reduce((s,p)=>s+(+p.k3||0),0);
+    const tax=pax.reduce((s,p)=>s+(+p.tax||0),0);
     const otherTax=pax.reduce((s,p)=>s+(+p.otherTax||0),0);
-    const taxes=k3+otherTax;
+    const taxes=k3+tax+otherTax;
     const gstFull=+(sc*0.18).toFixed(2);
     const cgst=intra?+(sc*0.09).toFixed(2):0;
     const sgst=intra?+(sc*0.09).toFixed(2):0;
     const igst=intra?0:gstFull;
-    return {base:base,k3:k3,otherTax:otherTax,taxes:taxes,sc:sc,cgst:cgst,sgst:sgst,igst:igst,gstFull:gstFull,total:base+taxes+sc+gstFull};
+    return {base:base,k3:k3,tax:tax,otherTax:otherTax,taxes:taxes,sc:sc,cgst:cgst,sgst:sgst,igst:igst,gstFull:gstFull,total:base+taxes+sc+gstFull};
   },[pax,sc,intra]);
   const upd=(id,f,v)=>setPax(ps=>ps.map(p=>p.id===id?{...p,[f]:v}:p));
-  const add=()=>setPax(ps=>[...ps,{id:Date.now(),name:"",ticket:"",airline:"",sector:"",date:"",cls:"Economy",base:0,k3:0,otherTax:0}]);
+  const add=()=>setPax(ps=>[...ps,{id:Date.now(),name:"",ticket:"",airline:"",sector:"",date:"",cls:"Economy",base:0,k3:0,tax:0,otherTax:0}]);
   const rm=id=>setPax(ps=>ps.filter(p=>p.id!==id));
   const cfg=bc(branch);
   const cur=cfg.cur;
@@ -413,8 +418,8 @@ export function SalesFlight({branch,setRoute}){
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",fontSize:11.5,borderCollapse:"collapse",minWidth:880}}>
               <thead><tr style={{background:"#f3f4f8"}}>
-                {["#","Passenger","Ticket no.","Airline","Sector","Date","Class","Base fare","K3","Other taxes",""].map((h,i)=>(
-                  <th key={i} style={{padding:"7px 8px",textAlign:i>=7&&i<=9?"right":"left",
+                {["#","Passenger","Ticket no.","Airline","Sector","Date","Class","Base fare","K3","Taxes","Other taxes",""].map((h,i)=>(
+                  <th key={i} style={{padding:"7px 8px",textAlign:i>=7&&i<=10?"right":"left",
                     fontSize:10,color:"#5a6691",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr></thead>
@@ -429,6 +434,7 @@ export function SalesFlight({branch,setRoute}){
                   <td style={{padding:3}}><select value={p.cls} onChange={e=>upd(p.id,"cls",e.target.value)} style={{...inp,minWidth:90}}><option>Economy</option><option>Business</option><option>First</option></select></td>
                   <td style={{padding:3}}><input type="number" value={p.base} onChange={e=>upd(p.id,"base",+e.target.value)} style={{...inp,minWidth:90,textAlign:"right"}}/></td>
                   <td style={{padding:3}}><input type="number" value={p.k3} onChange={e=>upd(p.id,"k3",+e.target.value)} style={{...inp,minWidth:75,textAlign:"right"}} title="K3 tax (GST on airline tax — typically applicable on international tickets)"/></td>
+                  <td style={{padding:3}}><input type="number" value={p.tax} onChange={e=>upd(p.id,"tax",+e.target.value)} style={{...inp,minWidth:80,textAlign:"right"}} title="Taxes / levies on this ticket"/></td>
                   <td style={{padding:3}}><input type="number" value={p.otherTax} onChange={e=>upd(p.id,"otherTax",+e.target.value)} style={{...inp,minWidth:80,textAlign:"right"}} title="Other taxes — YQ/YR fuel, airport fees, UDF, PSF"/></td>
                   <td style={{padding:"4px 8px",textAlign:"center"}}>
                     <button onClick={()=>rm(p.id)} style={{background:"transparent",border:"none",color:"#A32D2D",cursor:"pointer",fontSize:16}}>×</button>
@@ -439,6 +445,7 @@ export function SalesFlight({branch,setRoute}){
                 <td colSpan={7} style={{padding:"7px 8px",fontWeight:700,fontSize:11,color:"#5a6691"}}>Totals</td>
                 <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#185FA5"}}>{fmt(t.base)}</td>
                 <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(t.k3)}</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(t.tax)}</td>
                 <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(t.otherTax)}</td>
                 <td/>
               </tr></tfoot>
@@ -508,6 +515,7 @@ export function SalesFlight({branch,setRoute}){
             <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:10,padding:14,alignSelf:"start"}}>
               <TRow l="Base fare" v={cur+" "+fmt(t.base)}/>
               <TRow l="K3 tax" v={cur+" "+fmt(t.k3)}/>
+              <TRow l="Taxes" v={cur+" "+fmt(t.tax)}/>
               <TRow l="Other taxes" v={cur+" "+fmt(t.otherTax)}/>
               <TRow l="Service charge" v={cur+" "+fmt(t.sc)}/>
               {cfg.taxType==="GST"
@@ -1223,7 +1231,7 @@ export function PurchaseFlight({branch,setRoute}){
       <ARow label="Ticket cost details" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:960}}>
           <thead><tr>
-            {["#","Passenger","Ticket no.","Airline","Sector","Class","Date","Base cost ₹","K3 ₹","Other taxes ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=7&&i<=10}/>)}
+            {["#","Passenger","Ticket no.","Airline","Sector","Class","Date","Base cost ₹","K3 ₹","Taxes ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=7&&i<=10}/>)}
           </tr></thead>
           <tbody>{pax.map((p,i)=>(
             <tr key={p.id} style={{borderBottom:"1px solid #e1e3ec"}}>
@@ -1240,7 +1248,7 @@ export function PurchaseFlight({branch,setRoute}){
               <td style={{padding:3}}><input type="date" value={p.date} onChange={e=>upd(p.id,"date",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
               <td style={{padding:3}}><input type="number" value={p.base} onChange={e=>upd(p.id,"base",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
               <td style={{padding:3}}><input type="number" value={p.k3} onChange={e=>upd(p.id,"k3",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="K3 tax (GST on airline tax — typically applicable on international tickets)"/></td>
-              <td style={{padding:3}}><input type="number" value={p.otherTax} onChange={e=>upd(p.id,"otherTax",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Other taxes — YQ/YR fuel, airport fees, UDF, PSF"/></td>
+              <td style={{padding:3}}><input type="number" value={p.otherTax} onChange={e=>upd(p.id,"otherTax",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Taxes — YQ/YR fuel, airport fees, UDF, PSF"/></td>
               <VTD c={fmt((+p.base||0)+(+p.k3||0)+(+p.otherTax||0))} r/>
               <DBtn fn={()=>rm(p.id)}/>
             </tr>

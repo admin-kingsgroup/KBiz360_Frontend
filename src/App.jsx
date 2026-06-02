@@ -22,9 +22,14 @@ import { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport,
 import { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } from './modules/settings';
 import { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } from './modules/taxation';
 import { AdmRegister, AutoLinkedVouchers, BspCsvImport, BspSummary, BulkVoucherImport, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
+import { TrialBalanceLive, DayBookLive, LedgerAcLive, ReportPnLLive, ReportBSLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive } from './modules/accountingLive';
+import { PaymentVerificationLive } from './modules/paymentVerification';
+import { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster } from './modules/mastersLive';
+import { DataImportPage } from './modules/dataImport';
 import { GlobalSearch } from './shell/GlobalSearch';
 import { Placeholder } from './shell/Placeholder';
 import { SideNav } from './shell/SideNav';
+import { TopNav } from './shell/TopNav';
 import { TopBar } from './shell/TopBar';
 
 export default function KB360App(){
@@ -216,9 +221,11 @@ export default function KB360App(){
     if(route==="/contra")             return <ContraVoucher branch={branch}/>;
     if(route==="/bank-reco")          return <BankReco/>;
     if(route==="/journal")            return <JournalEntry branch={branch}/>;
-    if(route==="/day-book")           return <DayBook branch={branch}/>;
-    if(route==="/ledger")             return <LedgerAc branch={branch}/>;
-    if(route==="/trial-balance")      return <TrialBalance/>;
+    if(route==="/finance/verification") return <PaymentVerificationLive/>;
+    if(route==="/import")               return <DataImportPage currentUser={currentUser}/>;
+    if(route==="/day-book")           return <DayBookLive branch={branch}/>;
+    if(route==="/ledger")             return <LedgerAcLive branch={branch}/>;
+    if(route==="/trial-balance")      return <TrialBalanceLive branch={branch}/>;
     if(route==="/tax/gstr1")          return <TaxGstr1/>;
     if(route==="/tax/gstr3b")         return <TaxGstr3b/>;
     if(route==="/tax/tds")            return <TaxTdsTcs/>;
@@ -226,12 +233,13 @@ export default function KB360App(){
     if(route==="/tax/vat")            return <TaxVat/>;
     if(route==="/tax/einvoice")       return <TaxEInvoice/>;
     if(route==="/reports/gp")        return <ReportGP branch={branch} setRoute={navigate}/>;
-    if(route==="/reports/pnl")        return <ReportPnL branch={branch}/>;
-    if(route==="/reports/bs")         return <ReportBS/>;
+    if(route==="/reports/pnl")        return <ReportPnLLive branch={branch}/>;
+    if(route==="/reports/bs")         return <ReportBSLive branch={branch}/>;
     if(route==="/reports/cf")         return <ReportCF/>;
     if(route==="/reports/rec")        return <ReportReceivables/>;
     if(route==="/reports/pay")        return <ReportPayables/>;
-    if(route==="/reports/sreg")       return <ReportSalesReg/>;
+    if(route==="/reports/sreg")       return <RegisterLive branch={branch} initial="sales"/>;
+    if(route==="/reports/preg")       return <RegisterLive branch={branch} initial="purchase"/>;
     if(route==="/reports/branch")     return <ReportBranch/>;
     if(route==="/reports/pkg")        return <ReportPackagePnL/>;
     if(route==="/sales/debit-note")     return <SalesDebitNote branch={branch} setRoute={navigate}/>;
@@ -274,8 +282,12 @@ export default function KB360App(){
     if(route==="/settings/branches")     return <SettingsBranches/>;
     if(route==="/settings/users")        return <SettingsUsers/>;
     if(route==="/settings/audit")        return <SettingsAudit/>;
-    if(route==="/masters/groups")        return <ChartOfAccounts/>;
-    if(route==="/masters/ledgers")    return <MastersLedgers/>;
+    if(route==="/masters/groups")        return <LedgerGroupsLive/>;
+    if(route==="/masters/ledgers")    return <ChartOfAccountsLive branch={branch}/>;
+    if(route==="/masters/voucher-types")   return <VoucherTypesMaster/>;
+    if(route==="/masters/cost-categories") return <CostCategoriesMaster/>;
+    if(route==="/masters/budgets")         return <BudgetsMaster/>;
+    if(route==="/masters/scenarios")       return <ScenariosMaster/>;
     if(route==="/masters/customers")  return <MastersCustomers/>;
     if(route==="/masters/suppliers")  return <MastersSuppliers/>;
     if(route==="/masters/airlines")   return <MastersAirlines/>;
@@ -338,32 +350,27 @@ export default function KB360App(){
       {/* Top bar */}
       <TopBar onToggle={()=>setSideOpen(o=>!o)} setRoute={navigate} currentUser={currentUser} setCurrentUser={setCurrentUser}/>
 
+      {/* Desktop — SAP Fiori-style horizontal navigation (replaces the sidebar) */}
+      {!mob&&(
+        <TopNav branch={branch} setBranch={setBranch} currentUser={currentUser} switchUser={switchUser}
+          route={route} setRoute={navigate}/>
+      )}
+
       {/* Body */}
       <div style={{display:"flex",flex:1,overflow:"hidden",minHeight:0}}>
 
-        {mob?(
-          /* Mobile — overlay drawer */
-          sideOpen&&(
-            <>
-              <div onClick={()=>setSideOpen(false)}
-                style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200}}/>
-              <div style={{position:"fixed",top:52,left:0,bottom:0,
-                width:260,zIndex:201,overflowY:"hidden"}}>
-                <SideNav branch={branch} setBranch={setBranch} currentUser={currentUser} switchUser={switchUser}
-                  route={route} setRoute={navigate}
-                  onClose={()=>setSideOpen(false)}/>
-              </div>
-            </>
-          )
-        ):(
-          /* Desktop — inline sidebar, collapsible */
-          sideOpen&&(
-            <div style={{width:240,flexShrink:0,
-              borderRight:"1px solid #1a2340",overflow:"hidden"}}>
+        {mob&&sideOpen&&(
+          /* Mobile — overlay drawer (the header nav is desktop-only) */
+          <>
+            <div onClick={()=>setSideOpen(false)}
+              style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200}}/>
+            <div style={{position:"fixed",top:52,left:0,bottom:0,
+              width:260,zIndex:201,overflowY:"hidden"}}>
               <SideNav branch={branch} setBranch={setBranch} currentUser={currentUser} switchUser={switchUser}
-                route={route} setRoute={navigate}/>
+                route={route} setRoute={navigate}
+                onClose={()=>setSideOpen(false)}/>
             </div>
-          )
+          </>
         )}
 
         {/* Main */}

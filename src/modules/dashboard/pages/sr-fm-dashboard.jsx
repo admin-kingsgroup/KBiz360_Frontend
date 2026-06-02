@@ -46,26 +46,26 @@ export function SrFmDashboardPage({ currentUser, setRoute }) {
           marginBottom: 14,
         }}
       >
-        <KPICard label="Pending My Approval" value="4" delta="₹8.85L total" color="#f97316" onClick={() => navigate('/approvals')} />
+        <KPICard label="Pending My Approval" value="0" delta="" color="#f97316" onClick={() => navigate('/approvals')} />
         <KPICard
           label="Banks Balance Total"
-          value={fmtINR(7945000)}
-          delta="across 9 accounts"
+          value={fmtINR(0)}
+          delta=""
           color="#22c55e"
           onClick={() => navigate('/masters/bank-accounts')}
         />
-        <KPICard label="Period Close" value="2/6" delta="branches closed" color="#d4a437" />
+        <KPICard label="Period Close" value="0/6" delta="" color="#d4a437" />
         <KPICard
           label="GSTR-3B Filed"
-          value="1/3"
-          delta="2 pending today"
+          value="0/3"
+          delta=""
           color="#A32D2D"
           onClick={() => navigate('/tax/gstr-3b')}
         />
         <KPICard
           label="Total AR Outstanding"
-          value={fmtINR(15010000)}
-          delta="DSO 42 days"
+          value={fmtINR(0)}
+          delta=""
           color="#5a6691"
           onClick={() => navigate('/reports/rec')}
         />

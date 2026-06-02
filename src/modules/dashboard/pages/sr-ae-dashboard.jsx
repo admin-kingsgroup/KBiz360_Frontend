@@ -41,13 +41,13 @@ export function SrAeDashboardPage({ currentUser, setRoute }) {
           marginBottom: 14,
         }}
       >
-        <KPICard label="Pending My Approval" value="6" delta="₹4.65L total" color="#f97316" onClick={() => navigate('/approvals')} />
+        <KPICard label="Pending My Approval" value="0" delta="" color="#f97316" onClick={() => navigate('/approvals')} />
         <KPICard label="Posted Today" value={todayTotal} delta={fmtINR(todayValue) + ' value'} color="#22c55e" />
-        <KPICard label="Rejected to Branches" value="2" delta="awaiting re-submission" color="#A32D2D" />
+        <KPICard label="Rejected to Branches" value="0" delta="" color="#A32D2D" />
         <KPICard
           label="Bank Reco Issues"
-          value="32"
-          delta="unmatched txns"
+          value="0"
+          delta=""
           color="#d4a437"
           onClick={() => navigate('/bank-reco')}
         />

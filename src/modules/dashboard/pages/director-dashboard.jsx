@@ -26,8 +26,8 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
   }
 
   const { revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers } = data;
-  const topCust = topCustomers[0];
-  const highValueApprovals = 2;
+  const topCust = topCustomers[0] || { share: 0, name: '—' };
+  const highValueApprovals = 0;
 
   return (
     <div style={{ padding: 18, maxWidth: 1400, margin: '0 auto' }}>
@@ -51,12 +51,12 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
         <KPICard
           label="Cash Position (INR equiv)"
           value={fmtINR(totalCashInr)}
-          delta="+12.4% vs last month"
+          delta=""
           color="#22c55e"
           onClick={() => navigate('/reports/cashbook')}
         />
-        <KPICard label="MTD Revenue" value={fmtINR(26800000)} delta="+19.1% YoY" color="#d4a437" onClick={() => navigate('/reports/pnl')} />
-        <KPICard label="MTD GP" value={fmtINR(4250000)} delta="+8.5% YoY" color="#22c55e" onClick={() => navigate('/reports/gp')} />
+        <KPICard label="MTD Revenue" value={fmtINR(0)} delta="" color="#d4a437" onClick={() => navigate('/reports/pnl')} />
+        <KPICard label="MTD GP" value={fmtINR(0)} delta="" color="#22c55e" onClick={() => navigate('/reports/gp')} />
         <KPICard
           label="Concentration Risk"
           value={topCust.share + '%'}
