@@ -232,33 +232,65 @@ export function LedgerAcLive({ branch }) {
   );
 }
 
-/* ════════════════════ PROFIT & LOSS ════════════════════════════════ */
+/* ════════════════════ Tally two-column (Dr | Cr) T-account ═════════ */
+const r2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
+function TAccount({ leftHead = 'Particulars', rightHead = 'Particulars', left, right, leftTotal, rightTotal, cur }) {
+  const n = Math.max(left.length, right.length, 1);
+  const Cell = ({ row }) => row
+    ? (<><td style={{ padding: '7px 14px', color: '#384677', fontWeight: row.bold ? 700 : 400 }}>{row.label}</td>
+          <td style={{ padding: '7px 14px', ...num, color: DARK, fontWeight: row.bold ? 700 : 400 }}>{row.amount != null ? money(cur, row.amount) : ''}</td></>)
+    : (<><td style={{ padding: '7px 14px' }} /><td style={{ padding: '7px 14px' }} /></>);
+  return (
+    <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, tableLayout: 'fixed' }}>
+        <thead><tr style={headRow}>
+          <Th>{leftHead}</Th><Th right>Amount</Th><Th>{rightHead}</Th><Th right>Amount</Th>
+        </tr></thead>
+        <tbody>
+          {Array.from({ length: n }).map((_, i) => (
+            <tr key={i} style={{ borderBottom: '1px solid #f3f4f8', borderLeft: i === 0 ? 'none' : 'none' }}>
+              <Cell row={left[i]} /><Cell row={right[i]} />
+            </tr>
+          ))}
+        </tbody>
+        <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
+          <td style={{ padding: '9px 14px', fontWeight: 700, color: GOLD }}>Total</td>
+          <td style={{ padding: '9px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, leftTotal)}</td>
+          <td style={{ padding: '9px 14px', fontWeight: 700, color: GOLD }}>Total</td>
+          <td style={{ padding: '9px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, rightTotal)}</td>
+        </tr></tfoot>
+      </table>
+    </div>
+  );
+}
+
+/* ════════════════════ PROFIT & LOSS (Tally horizontal) ═════════════ */
 export function ReportPnLLive({ branch }) {
   const cur = curOf(branch);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const q = useProfitAndLoss(branch, { from, to });
   const d = q.data;
-  const Side = ({ title, rows, total, accent }) => (
-    <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-      <div style={{ padding: '9px 14px', background: DARK, color: GOLD, fontWeight: 700, fontSize: 12 }}>{title}</div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-        <tbody>
-          {rows.length === 0 && <tr><td colSpan={2} style={{ padding: 18, textAlign: 'center', color: DIM }}>—</td></tr>}
-          {rows.map((r, i) => (
-            <tr key={i} style={rowBg(i)}>
-              <td style={{ padding: '8px 14px', color: '#384677' }}>{r.ledger}<span style={{ color: '#b9bed4', fontSize: 9.5, marginLeft: 6 }}>{r.group}</span></td>
-              <td style={{ padding: '8px 14px', ...num, color: DARK }}>{money(cur, r.amount)}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot><tr style={{ background: '#f3f4f8', borderTop: `2px solid ${accent}` }}>
-          <td style={{ padding: '9px 14px', fontWeight: 700, color: DARK }}>Total {title}</td>
-          <td style={{ padding: '9px 14px', ...num, fontWeight: 800, color: accent }}>{money(cur, total)}</td>
-        </tr></tfoot>
-      </table>
-    </div>
-  );
+  const G = (g) => ({ label: g.group, amount: g.amount });
+
+  let trade = null, pl = null;
+  if (d) {
+    const gp = d.grossProfit, np = d.netProfit;
+    // Trading account → Gross Profit
+    const tL = d.trading.debit.map(G), tR = d.trading.credit.map(G);
+    if (gp >= 0) tL.push({ label: 'Gross Profit c/d', amount: gp, bold: true });
+    else tR.push({ label: 'Gross Loss c/d', amount: -gp, bold: true });
+    trade = { left: tL, right: tR, lt: r2(d.trading.debitTotal + Math.max(gp, 0)), rt: r2(d.trading.creditTotal + Math.max(-gp, 0)) };
+    // Profit & Loss account → Net Profit
+    const pL = d.indirect.debit.map(G); let pR = [];
+    if (gp >= 0) pR.push({ label: 'Gross Profit b/d', amount: gp, bold: true });
+    else pL.push({ label: 'Gross Loss b/d', amount: -gp, bold: true });
+    pR = [...pR, ...d.indirect.credit.map(G)];
+    if (np >= 0) pL.push({ label: 'Net Profit', amount: np, bold: true });
+    else pR.push({ label: 'Net Loss', amount: -np, bold: true });
+    pl = { left: pL, right: pR, lt: r2(d.indirect.debitTotal + Math.max(-gp, 0) + Math.max(np, 0)), rt: r2(Math.max(gp, 0) + d.indirect.creditTotal + Math.max(-np, 0)) };
+  }
+
   return (
     <Page
       title="Profit & Loss Account"
@@ -270,42 +302,29 @@ export function ReportPnLLive({ branch }) {
       </>}
     >
       <State q={q} empty={!d}>
-        {d && <Banner tone={d.netProfit >= 0 ? 'ok' : 'err'}>{d.result}: {money(cur, Math.abs(d.netProfit))} (Income {money(cur, d.totalIncome)} − Expenses {money(cur, d.totalExpense)})</Banner>}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Side title="Expenses" rows={d?.expense || []} total={d?.totalExpense || 0} accent={RED} />
-          <Side title="Income" rows={d?.income || []} total={d?.totalIncome || 0} accent={GREEN} />
-        </div>
+        {d && (
+          <Banner tone={d.netProfit >= 0 ? 'ok' : 'err'}>
+            {d.grossResult}: {money(cur, Math.abs(d.grossProfit))} · {d.result}: {money(cur, Math.abs(d.netProfit))}
+          </Banner>
+        )}
+        {trade && <>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.5px', textTransform: 'uppercase', color: BLUE, margin: '4px 0 6px' }}>Trading Account</div>
+          <div style={{ marginBottom: 14 }}><TAccount left={trade.left} right={trade.right} leftTotal={trade.lt} rightTotal={trade.rt} cur={cur} /></div>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.5px', textTransform: 'uppercase', color: BLUE, margin: '4px 0 6px' }}>Profit &amp; Loss Account</div>
+          <TAccount left={pl.left} right={pl.right} leftTotal={pl.lt} rightTotal={pl.rt} cur={cur} />
+        </>}
       </State>
     </Page>
   );
 }
 
-/* ════════════════════ BALANCE SHEET ════════════════════════════════ */
+/* ════════════════════ BALANCE SHEET (Tally horizontal) ═════════════ */
 export function ReportBSLive({ branch }) {
   const cur = curOf(branch);
   const [to, setTo] = useState('');
   const q = useBalanceSheet(branch, { to });
   const d = q.data;
-  const Side = ({ title, rows, total, accent }) => (
-    <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-      <div style={{ padding: '9px 14px', background: DARK, color: GOLD, fontWeight: 700, fontSize: 12 }}>{title}</div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-        <tbody>
-          {rows.length === 0 && <tr><td colSpan={2} style={{ padding: 18, textAlign: 'center', color: DIM }}>—</td></tr>}
-          {rows.map((r, i) => (
-            <tr key={i} style={rowBg(i)}>
-              <td style={{ padding: '8px 14px', color: '#384677' }}>{r.ledger}<span style={{ color: '#b9bed4', fontSize: 9.5, marginLeft: 6 }}>{r.group}</span></td>
-              <td style={{ padding: '8px 14px', ...num, color: DARK }}>{money(cur, r.amount)}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot><tr style={{ background: '#f3f4f8', borderTop: `2px solid ${accent}` }}>
-          <td style={{ padding: '9px 14px', fontWeight: 700, color: DARK }}>Total {title}</td>
-          <td style={{ padding: '9px 14px', ...num, fontWeight: 800, color: accent }}>{money(cur, total)}</td>
-        </tr></tfoot>
-      </table>
-    </div>
-  );
+  const G = (g) => ({ label: g.group, amount: g.amount, bold: g.isResult });
   return (
     <Page
       title="Balance Sheet"
@@ -313,11 +332,8 @@ export function ReportBSLive({ branch }) {
       right={<><span style={{ lineHeight: '32px', color: DIM, fontSize: 11 }}>As on</span><DateInput value={to} onChange={(e) => setTo(e.target.value)} /></>}
     >
       <State q={q} empty={!d}>
-        {d && <Banner tone={d.balanced ? 'ok' : 'err'}>{d.balanced ? '✔' : '⚠'} Assets {money(cur, d.totalAssets)} {d.balanced ? '=' : '≠'} Liabilities {money(cur, d.totalLiabilities)}</Banner>}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Side title="Liabilities" rows={d?.liabilities || []} total={d?.totalLiabilities || 0} accent={RED} />
-          <Side title="Assets" rows={d?.assets || []} total={d?.totalAssets || 0} accent={BLUE} />
-        </div>
+        {d && <Banner tone={d.balanced ? 'ok' : 'err'}>{d.balanced ? '✔ Balanced' : '⚠ Out of balance'} — Liabilities {money(cur, d.totalLiabilities)} {d.balanced ? '=' : '≠'} Assets {money(cur, d.totalAssets)}</Banner>}
+        {d && <TAccount leftHead="Liabilities" rightHead="Assets" left={d.liabilities.map(G)} right={d.assets.map(G)} leftTotal={d.totalLiabilities} rightTotal={d.totalAssets} cur={cur} />}
       </State>
     </Page>
   );
