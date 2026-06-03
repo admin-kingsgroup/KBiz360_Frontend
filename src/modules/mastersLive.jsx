@@ -125,7 +125,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params }) {
       {list.isError && <div style={{ ...card, padding: 16, color: RED, fontSize: 12, fontWeight: 600 }}>⚠ {list.error?.message || 'Failed to load'} — is the ERP backend running and are you logged in?</div>}
 
       {!list.isLoading && !list.isError && (
-        <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+        <div className="kb-sticky" style={{ ...card, padding: 0, '--stick-head': '#f3f5f9', maxHeight: 'calc(100vh - 220px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead><tr style={{ background: '#f3f5f9' }}>
               {cols.map((f) => <th key={f.key} style={{ textAlign: f.type === 'number' ? 'right' : 'left', padding: '10px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #e5e9f0' }}>{f.label}</th>)}

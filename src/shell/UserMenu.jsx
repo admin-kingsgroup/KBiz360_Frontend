@@ -10,7 +10,7 @@ import { Icon } from '../core/styles';
 export function UserMenu({currentUser, setCurrentUser, setRoute}){
   const [open, setOpen] = useState(false);
   if(!currentUser) return null;
-  const initials = currentUser.name
+  const initials = String(currentUser.name || currentUser.email || "U")
     .split(" ")
     .map(s => s[0])
     .slice(0,2)

@@ -15,7 +15,7 @@
 // No demo-data fallback — empty in, empty out (same contract as useVouchers).
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPut, getAuthToken } from './api';
+import { apiGet, apiPut, apiPost, getAuthToken } from './api';
 
 // The shell passes `branch` as either the string "ALL" or a branch object.
 // The backend treats a missing/ALL branch as "all branches".
@@ -92,6 +92,51 @@ export function useInvoiceGP(branch, { from, to } = {}) {
     queryFn: () => apiGet('/api/accounting/invoice-gp', { branch: code, from, to }),
     enabled: enabled(),
     staleTime: 30_000,
+  });
+}
+
+// Module-wise P&L: Sales/COGS/Gross Profit per product module (Flights, Holiday,
+// Hotels, Visa…) + indirect overheads + a Gross→Net profit bridge. Live from the
+// double-entry engine (GET /api/accounting/module-pl).
+export function useModulePL(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'module-pl', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/module-pl', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
+// AR / AP ageing (receivables & payables, FIFO, as-of today). GET /api/accounting/ageing.
+export function useAgeing(branch) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'ageing', code || 'all'],
+    queryFn: () => apiGet('/api/accounting/ageing', { branch: code }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
+// One-time: re-tag already-imported sale/purchase vouchers with their cost centre
+// (derived from the saved line.meta Ticket Type / Service Type / Country).
+export function useBackfillCostCenters() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost('/api/accounting/backfill-cost-centers'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['accounting'] }); },
+  });
+}
+
+// Seeded, read-only cost-centre catalogue (7 modules + Int'l/Domestic sub-centres
+// for Flights & Holiday). GET /api/cost-centers → { costCenters, modules }.
+export function useCostCenters() {
+  return useQuery({
+    queryKey: ['cost-centers'],
+    queryFn: () => apiGet('/api/cost-centers'),
+    enabled: enabled(),
+    staleTime: 5 * 60_000, // seeded & immutable
   });
 }
 

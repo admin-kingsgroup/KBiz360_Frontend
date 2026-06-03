@@ -4,9 +4,10 @@
    See PROJECT_CONTEXT.md for full architecture.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
+import { ErrorBoundary } from './shell/ErrorBoundary';
 import { BRANCHES } from './core/data';
 import { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, GratuityRegister, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, SubAgentStatement, TdsCertRegister, TrainingRecords, UxPreferences } from './core/helpers';
 import { useMobile } from './core/hooks';
@@ -17,12 +18,14 @@ import { Dashboard } from './modules/dashboard';
 import { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose } from './modules/finance';
 import { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } from './modules/ho-control';
 import { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrExpenses, HrLeave, HrPayroll, HrPayslips, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } from './modules/hr';
-import { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CostCenterMaster, CurrencyMaster, CustomerMasterDetail, CustomerMasterTabbed, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, SupplierMasterTabbed, TourCodeMaster, VendorAdvances, VendorTermsMaster } from './modules/masters';
+import { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CurrencyMaster, CustomerMasterDetail, CustomerMasterTabbed, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, SupplierMasterTabbed, TourCodeMaster, VendorAdvances, VendorTermsMaster } from './modules/masters';
 import { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBS, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportPayables, ReportPnL, ReportReceivables, ReportSalesReg, ReportViewerTabbed, ReportsMetaDemo, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } from './modules/reports';
 import { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } from './modules/settings';
 import { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } from './modules/taxation';
 import { AdmRegister, AutoLinkedVouchers, BspCsvImport, BspSummary, BulkVoucherImport, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
-import { TrialBalanceLive, DayBookLive, LedgerAcLive, ReportPnLLive, ReportBSLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, InvoiceGPLive } from './modules/accountingLive';
+import { TrialBalanceLive, DayBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, InvoiceGPLive } from './modules/accountingLive';
+import { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } from './modules/reportsFinancial';
+import { CostCenterMasterLive } from './modules/costCentersLive';
 import { PaymentVerificationLive } from './modules/paymentVerification';
 import { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster } from './modules/mastersLive';
 import { DataImportPage } from './modules/dataImport';
@@ -33,13 +36,36 @@ import { TopNav } from './shell/TopNav';
 import { TopBar } from './shell/TopBar';
 
 export default function KB360App(){
-  /* ── Multi-branch starts at TKHO; viewer defaults to Super Admin ── */
-  const [branch,setBranch]=useState(BRANCHES[0]);  // TKHO is first in BRANCHES
-  const [route,setRoute]=useState("/dashboard");
-  const [sideOpen,setSideOpen]=useState(true);
-  const [currentUser,setCurrentUser]=useState(null);  // null → LoginScreen shows on app load
+  /* ── Restore the session from localStorage so a refresh keeps the user
+     signed in (the JWT lives under 'kb360-token', the user under 'kb360-user'). */
+  const restoredUser = (() => {
+    try { if(localStorage.getItem("kb360-token")) return JSON.parse(localStorage.getItem("kb360-user")||"null"); }
+    catch { /* ignore */ }
+    return null;
+  })();
+
+  /* ── Branch: restore the user's first allowed branch, else default to TKHO ── */
+  const [branch,setBranch]=useState(()=>{
+    const codes = restoredUser?.branches;
+    if(Array.isArray(codes) && codes.length){
+      const b = BRANCHES.find(x => codes.includes(x.code));
+      if(b) return b;
+    }
+    return BRANCHES[0];
+  });
+  /* ── Route: restore the last visited page so a refresh keeps you where you
+     were (only when signed in; logged-out always lands on the login screen). */
+  const [route,setRoute]=useState(()=>{
+    try { if(localStorage.getItem("kb360-token")) return localStorage.getItem("kb360-route")||"/dashboard"; }
+    catch { /* ignore */ }
+    return "/dashboard";
+  });
+  const [currentUser,setCurrentUser]=useState(restoredUser);  // null → LoginScreen shows on app load
   const mob=useMobile();
-  const navigate=r=>{setRoute(r);if(mob)setSideOpen(false);};
+  const navigate=r=>{setRoute(r);};
+
+  /* Persist the current route so it survives a page refresh. */
+  useEffect(()=>{ try{ localStorage.setItem("kb360-route", route); }catch{ /* ignore */ } },[route]);
 
   /* ── Permission helpers ──────────────────────────────────────── */
   const FULL_SCOPE_ROLES = ["Super Admin","Director","Senior Finance Manager","Sr. Accounts Executive"];
@@ -66,6 +92,12 @@ export default function KB360App(){
     }
     // Redirect to dashboard on user switch (since current route may be forbidden)
     setRoute("/dashboard");
+  };
+
+  /* ── Sign out: clear the stored JWT + user so the next session must log in ── */
+  const setUser = (u) => {
+    if(!u){ try{ localStorage.removeItem("kb360-token"); localStorage.removeItem("kb360-user"); }catch{} }
+    setCurrentUser(u);
   };
 
   function Page(){
@@ -195,7 +227,7 @@ export default function KB360App(){
     if(route==="/masters/merge")                return <MergeRecordsUtility/>;
     if(route==="/masters/bank-accounts")  return <BankAccountMaster branch={branch}/>;
     if(route==="/masters/currency")       return <CurrencyMaster/>;
-    if(route==="/masters/cost-centers")   return <CostCenterMaster/>;
+    if(route==="/masters/cost-centers")   return <CostCenterMasterLive currentUser={currentUser}/>;
     if(route==="/masters/projects")       return <ProjectMaster/>;
     if(route==="/masters/doc-types")      return <DocumentTypeMaster/>;
     if(route==="/masters/approval-limits")return <ApprovalLimitsMaster/>;
@@ -236,8 +268,8 @@ export default function KB360App(){
     if(route==="/reports/pnl")        return <ReportPnLLive branch={branch}/>;
     if(route==="/reports/bs")         return <ReportBSLive branch={branch}/>;
     if(route==="/reports/cf")         return <ReportCF/>;
-    if(route==="/reports/rec")        return <ReportReceivables/>;
-    if(route==="/reports/pay")        return <ReportPayables/>;
+    if(route==="/reports/rec")        return <ReceivablesLive branch={branch}/>;
+    if(route==="/reports/pay")        return <PayablesLive branch={branch}/>;
     if(route==="/reports/sreg")       return <RegisterLive branch={branch} initial="sales"/>;
     if(route==="/reports/preg")       return <RegisterLive branch={branch} initial="purchase"/>;
     if(route==="/reports/invoice-gp") return <InvoiceGPLive branch={branch}/>;
@@ -341,7 +373,8 @@ export default function KB360App(){
 
   /* If signed out, show the sign-out screen */
   if(!currentUser){
-    return <LoginScreen onSignIn={(user)=>setCurrentUser(user)}/>;
+    // switchUser sets the user + auto-corrects the branch to one they can access.
+    return <LoginScreen onSignIn={switchUser}/>;
   }
 
   return (
@@ -349,34 +382,20 @@ export default function KB360App(){
       overflow:"hidden",fontFamily:"system-ui,sans-serif",background:"#f3f4f8"}}>
 
       {/* Top bar */}
-      <TopBar onToggle={()=>setSideOpen(o=>!o)} setRoute={navigate} currentUser={currentUser} setCurrentUser={setCurrentUser}/>
+      <TopBar setRoute={navigate} currentUser={currentUser} setCurrentUser={setUser} branch={branch}/>
 
-      {/* Desktop — SAP Fiori-style horizontal navigation (replaces the sidebar) */}
-      {!mob&&(
-        <TopNav branch={branch} setBranch={setBranch} currentUser={currentUser} switchUser={switchUser}
-          route={route} setRoute={navigate}/>
-      )}
+      {/* SAP Fiori-style horizontal navigation */}
+      <TopNav branch={branch} setBranch={setBranch} currentUser={currentUser} switchUser={switchUser}
+        route={route} setRoute={navigate}/>
 
       {/* Body */}
       <div style={{display:"flex",flex:1,overflow:"hidden",minHeight:0}}>
 
-        {mob&&sideOpen&&(
-          /* Mobile — overlay drawer (the header nav is desktop-only) */
-          <>
-            <div onClick={()=>setSideOpen(false)}
-              style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200}}/>
-            <div style={{position:"fixed",top:52,left:0,bottom:0,
-              width:260,zIndex:201,overflowY:"hidden"}}>
-              <SideNav branch={branch} setBranch={setBranch} currentUser={currentUser} switchUser={switchUser}
-                route={route} setRoute={navigate}
-                onClose={()=>setSideOpen(false)}/>
-            </div>
-          </>
-        )}
-
         {/* Main */}
         <main style={{flex:1,overflowY:"auto",minWidth:0,background:"#f3f4f8"}}>
-          <Page/>
+          <ErrorBoundary resetKey={route}>
+            <Page/>
+          </ErrorBoundary>
         </main>
       </div>
     </div>

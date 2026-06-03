@@ -4,14 +4,15 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
-import { Bell, Menu, Search } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { KBIZ_LOGO } from '../core/brand';
 import { getUnreadCount } from '../core/business-logic';
 import { useMobile, useNotifRefresh } from '../core/hooks';
 import { NotifPanel } from './NotifPanel';
 import { UserMenu } from './UserMenu';
+import { ModuleSearch } from './ModuleSearch';
 
-export function TopBar({onToggle,setRoute,currentUser,setCurrentUser}){
+export function TopBar({setRoute,currentUser,setCurrentUser,branch}){
   const [showNotif,setShowNotif]=useState(false);
   const mob=useMobile();
   useNotifRefresh();
@@ -25,17 +26,6 @@ export function TopBar({onToggle,setRoute,currentUser,setCurrentUser}){
         boxShadow:"0 2px 8px rgba(0,0,0,0.04)",flexShrink:0,
       }}>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          {/* Hamburger toggles the drawer on mobile only — desktop uses the TopNav header */}
-          {mob&&(
-            <button onClick={onToggle}
-              style={{background:"transparent",border:"none",color:"#5a6691",
-                cursor:"pointer",padding:6,lineHeight:1,display:"flex",alignItems:"center",
-                borderRadius:4,transition:"all 0.15s ease-in-out"}}
-              onMouseEnter={e=>{e.currentTarget.style.color="#0070f2";e.currentTarget.style.background="rgba(0,112,242,0.05)"}}
-              onMouseLeave={e=>{e.currentTarget.style.color="#5a6691";e.currentTarget.style.background="transparent"}}>
-              <Menu size={20}/>
-            </button>
-          )}
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <img src={KBIZ_LOGO} alt="KBiz360" style={{width:34,height:34,borderRadius:7,
               display:"block",objectFit:"contain",flexShrink:0}}/>
@@ -50,17 +40,11 @@ export function TopBar({onToggle,setRoute,currentUser,setCurrentUser}){
             </div>
           </div>
         </div>
+
+        {/* Module / page search — type any module or sub-module to jump there */}
+        <ModuleSearch branch={branch} currentUser={currentUser} setRoute={setRoute}/>
+
         <div style={{display:"flex",alignItems:"center",gap:4}}>
-          {/* Search button */}
-          <button onClick={()=>setRoute&&setRoute("/search")}
-            style={{background:"transparent",border:"none",color:"#5a6691",
-              cursor:"pointer",padding:6,display:"flex",alignItems:"center",
-              borderRadius:4,transition:"all 0.15s ease-in-out"}}
-            onMouseEnter={e=>{e.currentTarget.style.color="#0070f2";e.currentTarget.style.background="rgba(0,112,242,0.05)"}}
-            onMouseLeave={e=>{e.currentTarget.style.color="#5a6691";e.currentTarget.style.background="transparent"}}
-            title="Global Search">
-            <Search size={17}/>
-          </button>
           {/* Notification bell */}
           <div style={{position:"relative"}}>
             <button onClick={()=>setShowNotif(s=>!s)}

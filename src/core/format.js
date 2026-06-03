@@ -16,7 +16,10 @@ export function fmt(n){
 
 /* Responsive hook */
 
-export const fmtINR = n => "₹"+(n>=10000000?(n/10000000).toFixed(2)+"Cr":n>=100000?(n/100000).toFixed(2)+"L":n.toLocaleString("en-IN"));
+export const fmtINR = n => {
+  const v = Number(n) || 0;  // tolerate undefined/null/NaN → ₹0
+  return "₹"+(v>=10000000?(v/10000000).toFixed(2)+"Cr":v>=100000?(v/100000).toFixed(2)+"L":v.toLocaleString("en-IN"));
+};
 
 /* ════════════════════════════════════════════════════════════════════
    A. DIRECTOR DASHBOARD

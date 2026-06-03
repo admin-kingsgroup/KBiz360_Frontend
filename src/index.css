@@ -74,3 +74,26 @@ button {
     @apply text-gold font-bold tracking-brand-tagline uppercase;
   }
 }
+
+/* ─── Sticky-header / sticky-footer scroll tables ───
+   Wrap a <table> in <div class="kb-sticky">. The thead pins to the top and the
+   tfoot pins to the bottom while the table body scrolls inside the bounded
+   height — header & footer never scroll off the page. Per-table colors come
+   from the --stick-head / --stick-foot CSS variables set on the wrapper
+   (default white); override max-height inline when a screen needs it. */
+.kb-sticky {
+  overflow: auto;
+  max-height: calc(100vh - 200px);
+}
+.kb-sticky thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--stick-head, #ffffff);
+}
+.kb-sticky tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--stick-foot, #ffffff);
+}

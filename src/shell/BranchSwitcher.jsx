@@ -48,9 +48,11 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
           zIndex:400,overflow:"hidden",boxShadow:panelShadow}}>
           {(()=>{
             const FULL_SCOPE=["Super Admin","Director","Senior Finance Manager","Sr. Accounts Executive"];
+            const userBranches = Array.isArray(currentUser?.branches) ? currentUser.branches : null;
             const isFull = !currentUser || FULL_SCOPE.includes(currentUser.role);
-            const allowed = currentUser ? BRANCHES.filter(b=>currentUser.branches.includes(b.code)) : BRANCHES;
-            const includeAll = isFull && currentUser?.branches?.length>1;
+            // No branch list on the user → show all branches (don't crash / blank).
+            const allowed = userBranches ? BRANCHES.filter(b=>userBranches.includes(b.code)) : BRANCHES;
+            const includeAll = isFull && (userBranches ? userBranches.length>1 : true);
             const list = includeAll ? [...allowed,{code:"ALL",city:"Travkings Group",country:"Consolidated",flag:"🌐",currency:"INR",tax:"MULTI"}] : allowed;
             return list;
           })().map(b=>{

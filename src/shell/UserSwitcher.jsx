@@ -9,12 +9,14 @@ import { BranchSwitcher } from './BranchSwitcher';
 
 export function UserSwitcher({currentUser, switchUser, light}){
   const [open,setOpen]=useState(false);
+  if(!currentUser) return null;
   const roleColor = {
     "Super Admin":"#A32D2D","Director":"#3C1B14",
     "Senior Finance Manager":"#0d1326","Sr. Accounts Executive":"#6B4C8B",
     "Accounts Executive":"#2F7A8E","HR Manager":"#384677",
   };
   const col = roleColor[currentUser.role] || "#5a6691";
+  const initials2 = (name) => String(name || "U").substring(0,2).toUpperCase();
 
   // Fiori Light vs Dark colors
   const bgColor = light ? "#eff4f9" : "rgba(212,164,55,0.08)";
@@ -38,7 +40,7 @@ export function UserSwitcher({currentUser, switchUser, light}){
         <div style={{width:24,height:24,borderRadius:"50%",background:col,
           display:"flex",alignItems:"center",justifyContent:"center",
           color:"#fff",fontSize:10,fontWeight:700}}>
-          {currentUser.name.substring(0,2).toUpperCase()}
+          {initials2(currentUser.name || currentUser.email)}
         </div>
         <div style={{flex:1,minWidth:0}}>
           <p style={{margin:0,fontSize:9,color:labelColor,fontWeight:700,
@@ -71,7 +73,7 @@ export function UserSwitcher({currentUser, switchUser, light}){
                 <div style={{width:22,height:22,borderRadius:"50%",background:ucol,
                   display:"flex",alignItems:"center",justifyContent:"center",
                   color:"#fff",fontSize:9.5,fontWeight:700,flexShrink:0}}>
-                  {u.name.substring(0,2).toUpperCase()}
+                  {initials2(u.name)}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <p style={{margin:0,fontSize:11,fontWeight:sel?700:500,
