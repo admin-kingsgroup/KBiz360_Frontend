@@ -360,28 +360,9 @@ export function getMenu(branch, currentUser){
     "Settings":         "Settings",
     "HO Control":       "Settings",
   };
-  let menus = [...MENU_COMMON_TOP, MENU_REPORTS, taxSection, MENU_HR, MENU_HO_CONTROL, MENU_MASTERS, MENU_ASSETS, MENU_SETTINGS];
-  // Super-admin-only Tally migration tab
-  if(currentUser?.role === "Super Admin") menus = [...menus, MENU_IMPORT];
-  if(!currentUser) return menus;
-  const tmpl = getRole(currentUser.role);   // DB-backed role (Settings → Roles)
-  if(!tmpl) return menus;
-  // A group is accessible if ANY sub-module within it has view=true
-  const hasGroupAccess = (groupName) => {
-    if(!groupName) return true;
-    if(tmpl._fullAccess) return true;       // bootstrap Super-Admin fallback
-    if(groupName === "_TXN"){
-      // Transactions menu requires Sales OR Purchase access
-      return ["Sales","Purchase"].some(g=>{
-        const grp = PERM_MODULES.find(x=>x.group===g);
-        return grp && grp.mods.some(mod => tmpl.perms?.[mod.id]?.view === true);
-      });
-    }
-    const grp = PERM_MODULES.find(g => g.group === groupName);
-    if(!grp) return true;
-    return grp.mods.some(mod => tmpl.perms?.[mod.id]?.view === true);
-  };
-  return menus.filter(m => hasGroupAccess(MENU_TO_GROUP[m.label]));
+  // OPEN ACCESS: every ERP user sees every menu (no role-based filtering).
+  const menus = [...MENU_COMMON_TOP, MENU_REPORTS, taxSection, MENU_HR, MENU_HO_CONTROL, MENU_MASTERS, MENU_ASSETS, MENU_SETTINGS, MENU_IMPORT];
+  return menus;
 }
 
 

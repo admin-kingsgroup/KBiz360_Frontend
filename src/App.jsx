@@ -68,19 +68,11 @@ export default function KB360App(){
   /* Persist the current route so it survives a page refresh. */
   useEffect(()=>{ try{ localStorage.setItem("kb360-route", route); }catch{ /* ignore */ } },[route]);
 
-  /* ── Permission helpers ──────────────────────────────────────── */
-  const FULL_SCOPE_ROLES = ["Super Admin","Director","Senior Finance Manager","Sr. Accounts Executive"];
-  const canSeeAllBranches = u => FULL_SCOPE_ROLES.includes(u.role);
-  const canAccessModule = (u, moduleName) => {
-    if(!moduleName) return true;  // unrestricted (e.g. Dashboard)
-    const tmpl = getRole(u.role);            // role + perms from the DB-backed cache
-    if(!tmpl) return false;
-    if(tmpl._fullAccess) return true;        // bootstrap Super-Admin fallback
-    // perms is keyed by sub-module ID; check if any sub-mod in the group has view
-    const grp = getPermModules().find(g => g.group === moduleName);
-    if(!grp) return true;
-    return grp.mods.some(mod => tmpl.perms?.[mod.id]?.view === true);
-  };
+  /* ── Permission helpers ──────────────────────────────────────────
+     OPEN ACCESS: every ERP user can see all branches and all modules.
+     (Module-level access gating is intentionally disabled.) */
+  const canSeeAllBranches = () => true;
+  const canAccessModule = () => true;
 
   /* ── Switch user (demo simulator) — auto-corrects branch ───── */
   const switchUser = (newUser) => {
