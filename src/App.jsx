@@ -27,7 +27,7 @@ import { TrialBalanceLive, DayBookLive, LedgerAcLive, RegisterLive, LedgerGroups
 import { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } from './modules/reportsFinancial';
 import { CostCenterMasterLive } from './modules/costCentersLive';
 import { PaymentVerificationLive } from './modules/paymentVerification';
-import { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster } from './modules/mastersLive';
+import { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, GroupsMaster, LedgersMaster } from './modules/mastersLive';
 import { DataImportPage } from './modules/dataImport';
 import { GlobalSearch } from './shell/GlobalSearch';
 import { Placeholder } from './shell/Placeholder';
@@ -225,7 +225,7 @@ export default function KB360App(){
     if(route==="/masters/customer-detail-demo") return <CustomerMasterDetail/>;
     if(route==="/masters/bulk-import")          return <BulkImportMaster/>;
     if(route==="/masters/merge")                return <MergeRecordsUtility/>;
-    if(route==="/masters/bank-accounts")  return <BankAccountMaster branch={branch}/>;
+    if(route==="/masters/bank-accounts")  return <BankAccountMaster branch={branch} setRoute={navigate}/>;
     if(route==="/masters/currency")       return <CurrencyMaster/>;
     if(route==="/masters/cost-centers")   return <CostCenterMasterLive currentUser={currentUser}/>;
     if(route==="/masters/projects")       return <ProjectMaster/>;
@@ -315,8 +315,10 @@ export default function KB360App(){
     if(route==="/settings/branches")     return <SettingsBranches/>;
     if(route==="/settings/users")        return <SettingsUsers/>;
     if(route==="/settings/audit")        return <SettingsAudit/>;
-    if(route==="/masters/groups")        return <LedgerGroupsLive/>;
-    if(route==="/masters/ledgers")    return <ChartOfAccountsLive branch={branch}/>;
+    if(route==="/masters/groups")        return <GroupsMaster/>;                 // editable: 28 Tally (locked) + custom
+    if(route==="/masters/ledgers")    return <LedgersMaster/>;                    // editable ledger master (live CRUD)
+    if(route==="/masters/groups-view")   return <LedgerGroupsLive/>;              // read-only 28-group reference
+    if(route==="/masters/ledgers-view")  return <ChartOfAccountsLive branch={branch}/>; // read-only chart of accounts
     if(route==="/masters/voucher-types")   return <VoucherTypesMaster/>;
     if(route==="/masters/cost-categories") return <CostCategoriesMaster/>;
     if(route==="/masters/budgets")         return <BudgetsMaster/>;
@@ -394,6 +396,16 @@ export default function KB360App(){
         {/* Main */}
         <main style={{flex:1,overflowY:"auto",minWidth:0,background:"#f3f4f8"}}>
           <ErrorBoundary resetKey={route}>
+            {/* Sales & Purchase are edit-only: new entries come via bulk Data Import (old-data upload).
+                The 14 product entry forms stay reachable for reviewing/editing existing vouchers. */}
+            {/^\/(sales|purchase)\/(flight|holiday|hotel|visa|car|insurance|misc)$/.test(route) && (
+              <div style={{margin:"10px 10px 0",padding:"10px 14px",borderRadius:8,background:"#FFF7E6",
+                border:"1px solid #F0C36D",color:"#7a5b12",fontSize:12,fontWeight:600,lineHeight:1.5}}>
+                🔒 <b>Edit-only.</b> New Sales / Purchase entries are added in bulk via{" "}
+                <a onClick={()=>navigate("/import")} style={{color:"#0070f2",cursor:"pointer",textDecoration:"underline"}}>Data Import</a>{" "}
+                (upload old data with the template). Use this form to review or edit existing entries only.
+              </div>
+            )}
             <Page/>
           </ErrorBoundary>
         </main>

@@ -54,7 +54,8 @@ function FieldInput({ field, value, onChange }) {
 function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   const [form, setForm] = useState(record);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const missing = fields.filter((f) => f.required && (form[f.key] === '' || form[f.key] == null));
+  const editable = fields.filter((f) => f.input !== false); // table-only fields (e.g. derived) aren't edited
+  const missing = editable.filter((f) => f.required && (form[f.key] === '' || form[f.key] == null));
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', zIndex: 700, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '7vh' }} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 460, maxWidth: '94vw', maxHeight: '82vh', overflowY: 'auto', padding: 0 }}>
@@ -63,7 +64,7 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM }}><X size={18} /></button>
         </div>
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {fields.map((f) => (
+          {editable.map((f) => (
             <div key={f.key}>
               {f.type !== 'bool' && <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: DIM, marginBottom: 4 }}>{f.label}{f.required && <span style={{ color: RED }}> *</span>}</label>}
               <FieldInput field={f} value={form[f.key]} onChange={(v) => set(f.key, v)} />
@@ -82,7 +83,7 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   );
 }
 
-export function MasterCrud({ title, subtitle, resource, fields, params }) {
+export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note }) {
   const list = useMasterList(resource, params);
   const { create, update, remove } = useMasterMutations(resource);
   const [editing, setEditing] = useState(null); // record being edited, or {} for new
@@ -118,8 +119,9 @@ export function MasterCrud({ title, subtitle, resource, fields, params }) {
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>{title}</h2>
           <p style={{ margin: '2px 0 0', fontSize: 10.5, color: DIM }}>{subtitle} · {rows.length} record{rows.length === 1 ? '' : 's'}</p>
         </div>
-        <button onClick={openNew} style={btn(BLUE, '#fff')}><Plus size={14} /> New</button>
+        {!readOnly && <button onClick={openNew} style={btn(BLUE, '#fff')}><Plus size={14} /> New</button>}
       </div>
+      {note && <div style={{ ...card, padding: '9px 13px', marginBottom: 12, fontSize: 11, color: DIM }}>{note}</div>}
 
       {list.isLoading && <div style={{ ...card, padding: 28, textAlign: 'center', color: DIM, fontSize: 12 }}>Loading…</div>}
       {list.isError && <div style={{ ...card, padding: 16, color: RED, fontSize: 12, fontWeight: 600 }}>⚠ {list.error?.message || 'Failed to load'} — is the ERP backend running and are you logged in?</div>}
@@ -137,8 +139,12 @@ export function MasterCrud({ title, subtitle, resource, fields, params }) {
                 <tr key={r.id} style={{ borderBottom: '1px solid #f1f3f8' }}>
                   {cols.map((f) => <td key={f.key} style={{ padding: '9px 13px', textAlign: f.type === 'number' ? 'right' : 'left', color: '#334155', fontWeight: f.key === 'name' ? 700 : 400 }}>{cell(r, f)}</td>)}
                   <td style={{ padding: '9px 13px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <button onClick={() => openEdit(r)} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: BLUE, padding: 4 }}><Pencil size={14} /></button>
-                    <button onClick={() => del(r)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: RED, padding: 4 }}><Trash2 size={14} /></button>
+                    {readOnly || (lockedRow && lockedRow(r))
+                      ? <span title="Locked" style={{ color: '#c2c8d6', fontSize: 13 }}>🔒</span>
+                      : (<>
+                          <button onClick={() => openEdit(r)} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: BLUE, padding: 4 }}><Pencil size={14} /></button>
+                          <button onClick={() => del(r)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: RED, padding: 4 }}><Trash2 size={14} /></button>
+                        </>)}
                   </td>
                 </tr>
               ))}
@@ -238,3 +244,51 @@ export const SuppliersMaster = () => (
       { key: 'active', label: 'Active', type: 'bool', default: true },
     ]} />
 );
+
+/* ── Chart of Accounts: Groups & Ledgers (live, backend-connected) ───────── */
+// The 28 seeded Tally groups (parent options for custom groups/sub-groups).
+const TALLY_GROUP_NAMES = [
+  'Capital Account', 'Loans (Liability)', 'Bank OD Accounts', 'Secured Loans', 'Unsecured Loans',
+  'Current Liabilities', 'Duties & Taxes', 'Provisions', 'Sundry Creditors',
+  'Fixed Assets', 'Investments', 'Current Assets', 'Bank Accounts', 'Cash-in-Hand',
+  'Deposits (Asset)', 'Loans & Advances (Asset)', 'Stock-in-Hand', 'Sundry Debtors',
+  'Sales Accounts', 'Direct Income', 'Purchase Accounts', 'Direct Expenses',
+  'Indirect Expenses', 'Indirect Income', 'Opening Stock', 'Closing Stock',
+  'Misc. Expenses (Asset)', 'Suspense Account',
+];
+
+export const GroupsMaster = () => (
+  <MasterCrud title="Account Groups" subtitle="Chart of Accounts — Tally groups + custom groups/sub-groups"
+    resource="groups" lockedRow={(r) => r.system}
+    note="🔒 The 28 Tally groups are seeded and locked. Add custom groups / sub-groups under a parent — Nature & Statement (BS/PL) are inherited automatically."
+    fields={[
+      { key: 'name', label: 'Group Name', type: 'text', required: true },
+      { key: 'parent', label: 'Parent Group', type: 'select', options: TALLY_GROUP_NAMES },
+      { key: 'nature', label: 'Nature', type: 'text', input: false },
+      { key: 'statement', label: 'Statement', type: 'text', input: false },
+      { key: 'active', label: 'Active', type: 'bool', default: true },
+    ]} />
+);
+
+export const LedgersMaster = () => {
+  // Suggest group names in a dropdown — live from /api/groups (28 Tally + custom),
+  // falling back to the 28 Tally names until the list loads.
+  const groupsQ = useMasterList('groups');
+  const groupOptions = (groupsQ.data || []).map((g) => g.name);
+  return (
+    <MasterCrud title="Ledgers" subtitle="Chart of Accounts — ledger accounts (live)"
+      resource="ledgers"
+      note="Pick the account Group from the dropdown — the 28 Tally groups plus any custom groups you created."
+      fields={[
+        { key: 'code', label: 'Code', type: 'text', required: true },
+        { key: 'name', label: 'Ledger Name', type: 'text', required: true },
+        { key: 'group', label: 'Group', type: 'select', options: groupOptions.length ? groupOptions : TALLY_GROUP_NAMES, required: true },
+        { key: 'subGroup', label: 'Sub-Group', type: 'text', table: false },
+        { key: 'branch', label: 'Branch', type: 'text', default: 'ALL' },
+        { key: 'currency', label: 'Currency', type: 'text', default: 'INR' },
+        { key: 'openingBalance', label: 'Opening Balance', type: 'number', default: 0 },
+        { key: 'drCr', label: 'Dr/Cr', type: 'select', options: ['Dr', 'Cr'], default: 'Dr' },
+        { key: 'active', label: 'Active', type: 'bool', default: true },
+      ]} />
+  );
+};

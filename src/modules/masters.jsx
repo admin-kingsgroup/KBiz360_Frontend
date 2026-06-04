@@ -8,6 +8,7 @@ import { AlertTriangle, Check, Download, Plus, Save, Search, Settings } from 'lu
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ADM_DATA, CASH, CUSTOMERS, FOREX_RATES_DATA, GP_BILLS, NUMBERING_SERIES_DATA } from '../core/data';
 import { fmt, fmtINR } from '../core/format';
+import { exportToExcel } from '../core/exportExcel';
 import { ACM_DATA, APPROVAL_LIMITS_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, CURRENCY_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, MstrModal, MstrShell, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, _PASSPORTS, cardStyle, tabPanel } from '../core/helpers';
 import { useMobile } from '../core/hooks';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../core/styles';
@@ -1724,7 +1725,7 @@ export function VendorAdvances({branch,setRoute}){
 }
 
 
-export function BankAccountMaster({branch}){
+export function BankAccountMaster({branch,setRoute}){
   const [search,setSearch]=useState("");
   const [filterBranch,setFilterBranch]=useState(branch==="ALL"?"ALL":branch?.code||"ALL");
   const filtered=BANK_ACCOUNTS_DATA.filter(b=>{
@@ -1757,9 +1758,10 @@ export function BankAccountMaster({branch}){
           <option value="ALL">All branches</option>
           {["TKHO","BOM","AMD","NBO","DAR","FBM"].map(b=><option key={b} value={b}>{b}</option>)}
         </select>
-        <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
-        <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📤 Export</button>
-        <button style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Bank Account</button>
+        <button onClick={()=>setRoute&&setRoute("/import")} style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
+        <button onClick={()=>exportToExcel("bank-accounts",[{key:"branch",label:"Branch"},{key:"bank",label:"Bank"},{key:"accountNo",label:"Account No"},{key:"ifsc",label:"IFSC/SWIFT"},{key:"type",label:"Type"},{key:"currency",label:"Currency"},{key:"openingBal",label:"Opening Bal"}],filtered)} style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📤 Export</button>
+        <button onClick={()=>setRoute&&setRoute("/masters/ledgers")} title="Bank accounts are ledgers under the “Bank Accounts” group — opens the Ledger master to add one"
+          style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Bank Account</button>
       </div>
       {/* Table */}
       <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>

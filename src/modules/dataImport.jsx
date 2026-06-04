@@ -18,8 +18,12 @@ const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREE
 // entity = the backend /api/import/:entity bucket. columns = template headers.
 const SPECS = [
   // ── Masters ──────────────────────────────────────────────────────────────
+  { group: 'Masters', entity: 'groups', label: 'Account Groups / Sub-Groups',
+    desc: 'Custom groups under a parent. The 28 Tally groups are seeded & locked — only add your own.',
+    columns: ['name', 'parent', 'active'],
+    example: ['Reserves & Surplus', 'Capital Account', 'true'] },
   { group: 'Masters', entity: 'ledgers', label: 'Ledgers (Chart of Accounts)',
-    desc: 'Opening balances + groups. Import these first.',
+    desc: 'Opening balances + groups. Import groups first, then these.',
     columns: ['code', 'name', 'group', 'subGroup', 'branch', 'currency', 'openingBalance', 'drCr', 'active'],
     example: ['1001', 'Cash in Hand — BOM', 'Cash-in-Hand', '', 'BOM', 'INR', '50000', 'Dr', 'true'] },
   { group: 'Masters', entity: 'voucher-types', label: 'Voucher Types',
