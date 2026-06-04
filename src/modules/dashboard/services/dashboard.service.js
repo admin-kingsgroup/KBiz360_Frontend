@@ -1,8 +1,9 @@
 import * as api from '../api';
 import {
-  computeBranchKpis,
-  computeGpByModule,
-  computeConsultantLeaderboard,
+  countFiles,
+  filesOf,
+  gpByModuleFromMpl,
+  consultantsFromSales,
 } from '../utils/transformers';
 import { growthPct } from '../utils/helpers';
 
@@ -10,68 +11,78 @@ import { growthPct } from '../utils/helpers';
  * Dashboard service — the only place that orchestrates `api/*` accessors and
  * domain transformers. Hooks should call into the service, not the api layer
  * directly, so business logic stays out of React.
+ *
+ * Figures are sourced LIVE from the double-entry engine (module-wise P&L +
+ * ageing), the same source as Reports → P&L / Balance Sheet — replacing the old
+ * empty seed arrays that made every KPI render as zero.
  */
 
-export const loadBranchDashboard = async ({ branchCode, branch }) => {
-  const [
-    bills,
-    billsPrev,
-    billsYtd,
-    expenses,
-    actionItems,
-    upcomingTravel,
-    unmatched,
-  ] = await Promise.all([
-    api.getBillsForBranchMonth(branchCode),
-    api.getBillsForPreviousMonth(branchCode),
-    api.getBillsYearToDate(branchCode),
-    api.getExpensesForBranchMonth(branchCode),
+export const loadBranchDashboard = async ({ branchCode }) => {
+  const p = api.periods();
+  const [cur, prev, ytd, outstanding, saleVouchers, actionItems, upcomingTravel] = await Promise.all([
+    api.getModulePL({ branchCode, ...p.month }),
+    api.getModulePL({ branchCode, ...p.prevMonth }),
+    api.getModulePL({ branchCode, ...p.ytd }),
+    api.getReceivablesOutstanding(branchCode),
+    api.getSaleVouchers({ branchCode, ...p.month }),
     api.getActionItems(),
     api.getUpcomingTravel({ limit: 5 }),
-    api.getUnmatchedTickets(branch),
   ]);
 
-  const currentKpis = computeBranchKpis(bills);
-  const prevKpis = computeBranchKpis(billsPrev);
-  const ytdKpis = computeBranchKpis(billsYtd);
-  const totalExpenses = expenses.reduce((s, a) => s + a.a, 0);
-
   return {
-    bills,
-    billsYtd,
-    expenses,
+    billsYtd: filesOf(ytd),
     actionItems,
     upcomingTravel,
-    unmatchedCount: unmatched.totalCount,
     kpis: {
-      ...currentKpis,
-      netProfit: currentKpis.gp - totalExpenses,
-      expenses: totalExpenses,
-      revenueGrowth: growthPct(currentKpis.revenue, prevKpis.revenue),
-      gpGrowth: growthPct(currentKpis.gp, prevKpis.gp),
-      outstanding: Math.round(currentKpis.revenue * 0.27),
-      ytdRevenue: ytdKpis.revenue,
-      ytdGp: ytdKpis.gp,
-      ytdBookings: ytdKpis.bookings,
+      revenue: cur.totals.sales,
+      cost: cur.totals.cogs,
+      gp: cur.totals.gp,
+      gpPct: cur.totals.gpPct,
+      bookings: countFiles(cur),
+      netProfit: cur.bridge.netProfit,
+      expenses: cur.indirect.expense,
+      revenueGrowth: growthPct(cur.totals.sales, prev.totals.sales),
+      gpGrowth: growthPct(cur.totals.gp, prev.totals.gp),
+      outstanding,
+      ytdRevenue: ytd.totals.sales,
+      ytdGp: ytd.totals.gp,
+      ytdBookings: countFiles(ytd),
     },
-    gpByModule: computeGpByModule(bills, currentKpis.gp),
-    topConsultants: computeConsultantLeaderboard(bills),
+    gpByModule: gpByModuleFromMpl(cur),
+    topConsultants: consultantsFromSales(saleVouchers, cur.totals.gpPct),
   };
 };
 
-export const loadDirectorDashboard = async () => {
-  const [revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers, bankAccounts] =
+export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}) => {
+  const dates = api.rangeToDates(range); // 'month' | 'ytd' | 'all' → ISO range + label
+  const [revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers, bankAccounts, mpl, outstanding, cash] =
     await Promise.all([
-      api.getRevenueTrend(),
+      api.getRevenueTrend(branchCode),
       api.getFyTargets(),
       api.getBranchHeatmap(),
       api.getKeyAlerts(),
-      api.getTopCustomers(),
-      api.getTopSuppliers(),
+      api.getTopCustomers(branchCode),
+      api.getTopSuppliers(branchCode),
       api.getBankAccounts(),
+      api.getModulePL({ branchCode, from: dates.from, to: dates.to }), // live, period + scope driven
+      api.getReceivablesOutstanding(branchCode),
+      api.getCashPosition(branchCode),
     ]);
 
-  return { revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers, bankAccounts };
+  return {
+    revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers, bankAccounts,
+    rangeLabel: dates.label,
+    figures: {
+      revenue: mpl.totals.sales,
+      gp: mpl.totals.gp,
+      gpPct: mpl.totals.gpPct,
+      netProfit: mpl.bridge.netProfit,
+      outstanding,
+      cash,
+    },
+    // back-compat: anything still reading data.mtd gets the selected-period figures
+    mtd: { revenue: mpl.totals.sales, gp: mpl.totals.gp },
+  };
 };
 
 export const loadSrFmDashboard = async () => {

@@ -194,6 +194,51 @@ function FileVoucherDrill({ file, cur, mobile, onClose }) {
   );
 }
 
+// Classic-view module drill: a module row aggregates many booking files, so we
+// step module → booking file → its sale/purchase vouchers → edit (re-posts the
+// journal). The Fiori view drills file-first; this enters from an aggregate row.
+function ModuleVoucherDrill({ module, cur, mobile, onClose }) {
+  const allFiles = module.hasSubs ? (module.subs || []).flatMap((s) => s.files || []) : (module.files || []);
+  const files = allFiles.filter((f) => !f.aggregate && (f.vouchers || []).length > 0);
+  const [file, setFile] = useState(null);
+  const [vid, setVid] = useState(null);
+  const title = vid ? 'Edit Voucher'
+    : file ? `${file.ref} — ${(file.vouchers || []).length} voucher(s)`
+      : `${module.name} — ${files.length} booking file(s)`;
+  return (
+    <Modal title={title} onClose={onClose} mobile={mobile}>
+      {vid ? (
+        <VoucherEditor voucherId={vid} cur={cur} onBack={() => setVid(null)} />
+      ) : file ? (
+        (file.vouchers || []).map((vh) => (
+          <div key={vh.id} onClick={() => setVid(vh.id)} style={tapRow}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: SAP.blue, fontWeight: 600, fontSize: 12.5 }}>{vh.vno} <span style={{ color: SAP.label, fontWeight: 400 }}>· {vh.category} · {vh.date}</span></div>
+              <div style={{ fontSize: 11, color: SAP.sec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vh.party || '—'}</div>
+            </div>
+            <div style={{ fontWeight: 700, color: SAP.text, whiteSpace: 'nowrap' }}>{cur}{inr(vh.total)} ›</div>
+          </div>
+        ))
+      ) : files.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', color: SAP.sec, fontSize: 12 }}>No editable vouchers under this module for the selected period.</div>
+      ) : (
+        files.map((f, i) => (
+          <div key={(f.ref || '') + i} onClick={() => setFile(f)} style={tapRow}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: SAP.blue, fontWeight: 600, fontSize: 12.5 }}>{f.ref} <span style={{ color: SAP.label, fontWeight: 400 }}>· {(f.vouchers || []).length} vch</span></div>
+              <div style={{ fontSize: 11, color: SAP.sec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.customer || f.supplier || '—'}</div>
+            </div>
+            <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+              <div style={{ fontWeight: 700, color: SAP.text }}>{cur}{inr(f.sale)} ›</div>
+              <div style={{ fontSize: 10, color: f.gp >= 0 ? SAP.greenDk : SAP.red }}>GP {inr(f.gp)}</div>
+            </div>
+          </div>
+        ))
+      )}
+    </Modal>
+  );
+}
+
 // Balance-sheet ledger → its postings → the voucher → edit.
 function LedgerVoucherDrill({ ledger, branch, to, cur, mobile, onClose }) {
   const [vid, setVid] = useState(null);
@@ -227,11 +272,12 @@ function LedgerVoucherDrill({ ledger, branch, to, cur, mobile, onClose }) {
 }
 const Th = ({ children, right, w }) => <th style={{ background: '#f7f8f9', color: SAP.sec, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: right ? '9px 20px 9px 16px' : '9px 16px', borderBottom: `2px solid ${SAP.border}`, textAlign: right ? 'right' : 'left', width: w }}>{children}</th>;
 
-/* ════════════════════════ PROFIT & LOSS (Fiori) ════════════════════════ */
+/* ═══════════════════ PROFIT & LOSS (Fiori ⇄ Tally Classic) ══════════════ */
 export function ReportPnLLive({ branch }) {
   const cur = curOf(branch);
   const [fy, setFy] = useState('ALL');
   const [compare, setCompare] = useState(true);
+  const [view, setView] = useState('fiori'); // 'fiori' | 'classic'
   const period = fy === 'ALL' ? { from: '', to: '' } : fyRange(fy);
   const showPY = fy !== 'ALL' && compare;
   const prior = showPY ? fyPrior(fy) : { from: '', to: '' };
@@ -269,6 +315,7 @@ export function ReportPnLLive({ branch }) {
     ];
   }, [d, pat, cur]);
   const periodTxt = fy === 'ALL' ? 'all periods' : `FY ${fy} (Apr–Mar)`;
+  const classicPeriod = fy === 'ALL' ? 'All periods' : `${asOn(period.from)} to ${asOn(period.to)}`;
 
   return (
     <Wrap>
@@ -276,11 +323,11 @@ export function ReportPnLLive({ branch }) {
         system="KBiz360 · Finance"
         title="Profit & Loss — Module-wise Gross Profit"
         sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} INR (excl. GST) &nbsp;|&nbsp; {periodTxt} &nbsp;|&nbsp; Tally double-entry · live</>}
-        right={<FyPicker fy={fy} setFy={setFy} compare={compare} setCompare={setCompare} />}
+        right={<><PnlViewSwitcher view={view} setView={setView} /><FyPicker fy={fy} setFy={setFy} compare={compare} setCompare={setCompare} /></>}
       />
-      <div style={{ background: SAP.pageBg, padding: 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+      <div style={{ background: SAP.pageBg, padding: view === 'classic' ? 0 : 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
         <StateBox q={q} empty={!d || !(d.modules || []).length}>
-          {d && <>
+          {d && view === 'fiori' && <>
             {/* KPIs */}
             <KpiGrid>
               <Kpi tone="blue" label="Total Sales" value={compact(cur, d.totals.sales)}
@@ -462,10 +509,147 @@ export function ReportPnLLive({ branch }) {
               </FCard>
             </div>
           </>}
+          {d && view === 'classic' && (
+            <ClassicPnL d={d} cur={cur} mobile={mobile} branch={branch} to={period.to} tax={tax} pat={pat} periodTxt={classicPeriod} />
+          )}
         </StateBox>
       </div>
       {drillFile && <FileVoucherDrill file={drillFile} cur={cur} mobile={mobile} onClose={() => setDrillFile(null)} />}
     </Wrap>
+  );
+}
+
+/* ── view switcher (Fiori ⇄ Tally Classic) ───────────────────────────── */
+function PnlViewSwitcher({ view, setView }) {
+  return (
+    <div style={{ display: 'inline-flex', background: '#fff', border: `1px solid ${SAP.border}`, borderRadius: 6, overflow: 'hidden' }}>
+      {[['fiori', '▪ SAP Fiori'], ['classic', '▭ Tally Classic']].map(([id, label]) => (
+        <button key={id} onClick={() => setView(id)} style={{ padding: '7px 14px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: view === id ? SAP.blue : '#fff', color: view === id ? '#fff' : SAP.sec }}>{label}</button>
+      ))}
+    </div>
+  );
+}
+
+/* ── Tally Classic (white) P&L view — Dr/Cr two-column, touch-drillable ── */
+// Trading A/c (COGS vs Sales, balancing with Gross Profit c/d) stacked over the
+// P&L A/c (indirect expenses + tax + net profit vs GP b/d). Tap any module to
+// reach its booking files → vouchers → edit; tap any expense ledger to drill
+// its postings → voucher → edit. Same live data & editor as the Fiori view.
+function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
+  const [drillModule, setDrillModule] = useState(null);
+  const [drillLedger, setDrillLedger] = useState(null);
+  const mono = { fontFamily: "'Courier New', Courier, monospace" };
+  const company = (branch && branch !== 'ALL') ? (branch.code || branch) : 'All Branches — Consolidated';
+  const modules = d.modules || [];
+  const groups = d.indirect?.groups || [];
+  const indIncome = d.bridge?.indirectIncome || 0;
+  const grossProfit = d.bridge?.grossProfit ?? d.totals.gp;
+
+  // Trading account — Purchases/COGS (Dr) vs Sales (Cr); both sides total Nett Sales.
+  const tradeLeft = [
+    { label: 'Purchase Accounts (COGS)', amount: d.totals.cogs, group: true },
+    ...modules.map((m) => ({ label: m.name, amount: m.cogs, sub: true, module: m, icon: m.icon })),
+    { label: 'Gross Profit c/d', amount: grossProfit, result: true },
+  ];
+  // Supplier incentive is direct income → credited in the Trading A/c so COGS +
+  // Gross Profit c/d (Dr) balances against Sales + Incentive (Cr): gp = sales + incentive − cogs.
+  const incentive = d.totals.incentive || 0;
+  const tradeRight = [
+    { label: 'Sales Accounts', amount: d.totals.sales, group: true },
+    ...modules.map((m) => ({ label: m.name, amount: m.sales, sub: true, module: m, icon: m.icon })),
+    ...(incentive > 0 ? [{ label: 'Supplier Incentive (Direct Income)', amount: incentive }] : []),
+  ];
+  const tradeTotal = d.totals.sales + incentive;
+
+  // Profit & Loss account — Indirect Exp + Tax + Net Profit (Dr) vs GP b/d + Indirect Income (Cr).
+  const plLeft = [
+    { label: 'Indirect Expenses', amount: d.indirect.expense, group: true },
+    ...groups.flatMap((g) => [
+      { label: g.name, amount: g.amount, sub: true },
+      ...(g.ledgers || []).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true })),
+    ]),
+    ...(tax > 0 ? [{ label: 'Provision for Tax @ 25.17% (est.)', amount: tax }] : []),
+    { label: 'Net Profit (to Capital A/c)', amount: pat, result: true },
+  ];
+  const plRight = [
+    { label: 'Gross Profit b/d', amount: grossProfit, result: true },
+    ...(indIncome > 0 ? [{ label: 'Indirect Income', amount: indIncome }] : []),
+  ];
+  const plTotal = grossProfit + indIncome;
+
+  const nett = d.totals.sales;
+  const onRowClick = (r) => { if (r.module) setDrillModule(r.module); else if (r.ledger) setDrillLedger(r.ledger); };
+
+  const Cell = ({ r, side }) => {
+    const sep = side === 'cr' ? { borderLeft: '1px solid #d6d6d6' } : {};
+    if (!r) return (<><td style={{ ...mono, ...sep }} /><td style={{ ...mono }} /></>);
+    const clickable = !!(r.module || r.ledger);
+    const color = r.result ? TALLY.green : r.group ? TALLY.head : '#1a1a1a';
+    const pad = r.leaf ? 40 : r.sub ? 26 : 12;
+    return (
+      <>
+        <td onClick={clickable ? () => onRowClick(r) : undefined}
+          className={clickable ? 'cl-drill' : undefined}
+          style={{ padding: '2px 12px', paddingLeft: pad, color, fontWeight: (r.group || r.result) ? 700 : 400, cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...sep, ...mono }}>
+          {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{clickable ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
+        </td>
+        <td onClick={clickable ? () => onRowClick(r) : undefined}
+          style={{ padding: '2px 12px', textAlign: 'right', color, fontWeight: r.result ? 700 : 400, cursor: clickable ? 'pointer' : 'default', ...mono }}>{inr(r.amount)}</td>
+      </>
+    );
+  };
+
+  const Section = ({ left, right, total }) => {
+    const n = Math.max(left.length, right.length);
+    return (
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, ...mono }}>
+        <colgroup><col style={{ width: '34%' }} /><col style={{ width: '16%' }} /><col style={{ width: '34%' }} /><col style={{ width: '16%' }} /></colgroup>
+        <tbody>
+          <tr style={{ color: TALLY.head, fontWeight: 700, background: '#f0f4fa', borderBottom: `2px solid ${TALLY.head}` }}>
+            <td style={{ padding: '5px 12px', ...mono }}>Particulars (Dr)</td><td style={{ padding: '5px 12px', textAlign: 'right', ...mono }}>Amount</td>
+            <td style={{ padding: '5px 12px', borderLeft: '1px solid #a9c2e0', ...mono }}>Particulars (Cr)</td><td style={{ padding: '5px 12px', textAlign: 'right', ...mono }}>Amount</td>
+          </tr>
+          {Array.from({ length: n }).map((_, i) => (
+            <tr key={i} style={{ borderBottom: '1px solid #f4f4f4' }}><Cell r={left[i]} /><Cell r={right[i]} side="cr" /></tr>
+          ))}
+          <tr style={{ color: TALLY.head, fontWeight: 700, borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}>
+            <td style={{ padding: '6px 12px', ...mono }}>Total</td><td style={{ padding: '6px 12px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(total)}</td>
+            <td style={{ padding: '6px 12px', borderLeft: '1px solid #a9c2e0', ...mono }}>Total</td><td style={{ padding: '6px 12px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(total)}</td>
+          </tr>
+        </tbody>
+      </table>
+    );
+  };
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #b0b0b0', borderRadius: 4, overflow: 'hidden', margin: 12, ...mono }}>
+      <style>{'.cl-drill:hover{background:#eef4fb;text-decoration:underline}'}</style>
+      <div style={{ background: TALLY.titlebar, color: TALLY.head, padding: '5px 12px', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #a9c2e0' }}>
+        <span>KBiz360 Books — {company}</span><span style={{ color: TALLY.gold }}>Profit &amp; Loss A/c</span>
+      </div>
+      <div style={{ textAlign: 'center', padding: '10px 8px 8px', borderBottom: `2px solid ${TALLY.head}` }}>
+        <div style={{ color: TALLY.head, fontSize: 16, fontWeight: 700 }}>{company}</div>
+        <div style={{ fontSize: 13 }}>Profit &amp; Loss A/c</div>
+        <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{periodTxt}</div>
+      </div>
+      <div style={{ padding: '4px 0' }}>
+        <Section left={tradeLeft} right={tradeRight} total={tradeTotal} />
+      </div>
+      <div style={{ borderTop: '1px dashed #c8c8c8', padding: '4px 0' }}>
+        <Section left={plLeft} right={plRight} total={plTotal} />
+      </div>
+      <div style={{ background: TALLY.titlebar, color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: `2px solid ${TALLY.head}`, ...mono }}>
+        <span>Gross Profit : <span style={{ color: TALLY.green }}>{inr(grossProfit)} ({pctTxt(d.totals.gpPct)})</span></span>
+        <span>Net Profit : <span style={{ color: TALLY.green }}>{inr(pat)} ({pctTxt(nett ? (pat / nett) * 100 : 0)})</span></span>
+        <span>Nett Sales : {inr(nett)}</span>
+      </div>
+      <div style={{ background: '#d4d4d4', color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: '1px solid #b0b0b0', ...mono }}>
+        <span>Enter / Tap: Drill a module or expense ledger → voucher → edit (re-posts the journal)</span>
+        <span>KBiz360 · live double-entry</span>
+      </div>
+      {drillModule && <ModuleVoucherDrill module={drillModule} cur={cur} mobile={mobile} onClose={() => setDrillModule(null)} />}
+      {drillLedger && <LedgerVoucherDrill ledger={drillLedger} branch={branch} to={to} cur={cur} mobile={mobile} onClose={() => setDrillLedger(null)} />}
+    </div>
   );
 }
 
@@ -556,36 +740,77 @@ function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, t
     </>
   );
 }
+// Split a group's ledgers into named Tally sub-groups (carried on each ledger's
+// `subGroup`) and the ledgers that hang directly under the 28-group head.
+function splitSubGroups(ledgers) {
+  const direct = [];
+  const map = new Map(); // subGroup name → { name, amount, ledgers }
+  for (const l of (ledgers || [])) {
+    const s = (l.subGroup || '').trim();
+    if (!s) { direct.push(l); continue; }
+    if (!map.has(s)) map.set(s, { name: s, amount: 0, ledgers: [] });
+    const sg = map.get(s);
+    sg.amount += l.amount || 0;
+    sg.ledgers.push(l);
+  }
+  const subs = [...map.values()].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+  return { subs, direct };
+}
+
+// A single leaf-ledger row (tap → drill into its postings → voucher → edit).
+function bsLedgerRow(l, i, indent, onPickLedger, showPY) {
+  return (
+    <tr key={`${indent}-${i}-${l.name}`} onClick={() => onPickLedger && onPickLedger(l.name)}
+      style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: onPickLedger ? 'pointer' : 'default' }}>
+      <td style={{ padding: `5px 16px 5px ${indent}px`, color: SAP.text }}>{l.name}{onPickLedger ? <span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span> : null}</td>
+      <td style={num}>{inr(l.amount)}</td>
+      {showPY && <td style={{ ...num, color: SAP.sec }}>—</td>}
+    </tr>
+  );
+}
+
 function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, showPY, curLabel, prevLabel, onPickLedger }) {
   const [open, setOpen] = useState({});
+  const [openSub, setOpenSub] = useState({});
   return (
-    <FCard title={title} sub="Click a group to expand into its ledgers" badge={<Badge bg="#fef0e0" c={SAP.orange} bd="#ffcf9e">Tally Logic</Badge>}>
+    <FCard title={title} sub="Click a group → sub-group (if any) → ledger → voucher" badge={<Badge bg="#fef0e0" c={SAP.orange} bd="#ffcf9e">Tally Logic</Badge>}>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-          <thead><tr><Th w={showPY ? '50%' : '64%'}>Group / Ledger</Th><Th right>{curLabel} ({cur})</Th>{showPY && <Th right>{prevLabel} ({cur})</Th>}</tr></thead>
+          <thead><tr><Th w={showPY ? '50%' : '64%'}>Group / Sub-group / Ledger</Th><Th right>{curLabel} ({cur})</Th>{showPY && <Th right>{prevLabel} ({cur})</Th>}</tr></thead>
           <tbody>
             {rows.map((g, gi) => {
-              const hasLedgers = (g.ledgers || []).length > 0;
+              const { subs, direct } = splitSubGroups(g.ledgers);
+              const hasChildren = subs.length > 0 || direct.length > 0;
               const isOpen = !!open[g.group];
               const pv = prevMap[g.group];
               const rowBg = g.isResult ? SAP.greenBg : SAP.grpBg;
               const rowColor = g.isResult ? SAP.greenDk : SAP.grpText;
               return (
                 <React.Fragment key={g.group + gi}>
-                  <tr onClick={() => hasLedgers && setOpen((s) => ({ ...s, [g.group]: !s[g.group] }))}
-                    style={{ background: rowBg, color: rowColor, cursor: hasLedgers ? 'pointer' : 'default', borderTop: '2px solid #b3ccf5', fontWeight: 700 }}>
-                    <td style={{ padding: '9px 16px' }}>{hasLedgers ? <Toggle open={isOpen} /> : <span style={{ marginRight: 7 }}>{g.isResult ? '●' : '•'}</span>}{g.group}</td>
+                  <tr onClick={() => hasChildren && setOpen((s) => ({ ...s, [g.group]: !s[g.group] }))}
+                    style={{ background: rowBg, color: rowColor, cursor: hasChildren ? 'pointer' : 'default', borderTop: '2px solid #b3ccf5', fontWeight: 700 }}>
+                    <td style={{ padding: '9px 16px' }}>{hasChildren ? <Toggle open={isOpen} /> : <span style={{ marginRight: 7 }}>{g.isResult ? '●' : '•'}</span>}{g.group}</td>
                     <td style={num}>{inr(g.amount)}</td>
                     {showPY && <td style={{ ...num, color: SAP.sec }}>{pv == null ? '—' : inr(pv)}</td>}
                   </tr>
-                  {hasLedgers && isOpen && g.ledgers.map((l, i) => (
-                    <tr key={i} onClick={() => onPickLedger && onPickLedger(l.name)}
-                      style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: onPickLedger ? 'pointer' : 'default' }}>
-                      <td style={{ padding: '5px 16px 5px 48px', color: SAP.text }}>{l.name}{onPickLedger ? <span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span> : null}</td>
-                      <td style={num}>{inr(l.amount)}</td>
-                      {showPY && <td style={{ ...num, color: SAP.sec }}>—</td>}
-                    </tr>
-                  ))}
+                  {/* Sub-groups (if the ledgers carry one) → expand to their ledgers */}
+                  {isOpen && subs.map((sg) => {
+                    const sk = `${g.group}|${sg.name}`;
+                    const so = !!openSub[sk];
+                    return (
+                      <React.Fragment key={sk}>
+                        <tr onClick={() => setOpenSub((s) => ({ ...s, [sk]: !s[sk] }))}
+                          style={{ background: SAP.subBg, color: SAP.subText, cursor: 'pointer', borderBottom: `1px solid ${SAP.borderLt}`, fontWeight: 600 }}>
+                          <td style={{ padding: '6px 16px 6px 38px' }}><Toggle open={so} />{sg.name}<span style={{ fontSize: 9, color: SAP.label, marginLeft: 6 }}>· {sg.ledgers.length} ledger{sg.ledgers.length > 1 ? 's' : ''}</span></td>
+                          <td style={{ ...num, fontWeight: 600 }}>{inr(sg.amount)}</td>
+                          {showPY && <td style={{ ...num, color: SAP.sec }}>—</td>}
+                        </tr>
+                        {so && sg.ledgers.map((l, i) => bsLedgerRow(l, i, 62, onPickLedger, showPY))}
+                      </React.Fragment>
+                    );
+                  })}
+                  {/* Ledgers with no sub-group hang directly under the 28-group head */}
+                  {isOpen && direct.map((l, i) => bsLedgerRow(l, i, 48, onPickLedger, showPY))}
                 </React.Fragment>
               );
             })}
@@ -602,18 +827,25 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
 }
 
 /* ── Tally Classic (white) view ──────────────────────────────────────── */
-const sideRows = (groups) => (groups || []).flatMap((g) => [
-  { label: g.group, amount: g.amount, group: true, result: g.isResult },
-  ...((g.ledgers || []).map((l) => ({ label: l.name, amount: l.amount }))),
-]);
+const sideRows = (groups) => (groups || []).flatMap((g) => {
+  const { subs, direct } = splitSubGroups(g.ledgers);
+  return [
+    { label: g.group, amount: g.amount, group: true, result: g.isResult },
+    ...subs.flatMap((s) => [
+      { label: s.name, amount: s.amount, sub: true },
+      ...s.ledgers.map((l) => ({ label: l.name, amount: l.amount })),
+    ]),
+    ...direct.map((l) => ({ label: l.name, amount: l.amount })),
+  ];
+});
 function ClassicBS({ d, cur, curLabel }) {
   const left = sideRows(d.liabilities), right = sideRows(d.assets);
   const n = Math.max(left.length, right.length);
   const mono = { fontFamily: "'Courier New', Courier, monospace" };
   const Cell = ({ r }) => r ? (
     <>
-      <td style={{ padding: '2px 12px', color: r.group ? TALLY.head : '#444', fontWeight: r.group ? 700 : 400, paddingLeft: r.group ? 12 : 26, ...mono }}>{r.label}</td>
-      <td style={{ padding: '2px 12px', textAlign: 'right', color: r.result ? TALLY.green : '#1a1a1a', fontWeight: r.result ? 700 : 400, ...mono }}>{inr(r.amount)}</td>
+      <td style={{ padding: '2px 12px', color: r.group || r.sub ? TALLY.head : '#444', fontWeight: r.group ? 700 : r.sub ? 600 : 400, paddingLeft: r.group ? 12 : r.sub ? 28 : 44, ...mono }}>{r.label}</td>
+      <td style={{ padding: '2px 12px', textAlign: 'right', color: r.result ? TALLY.green : '#1a1a1a', fontWeight: r.result || r.sub ? 600 : 400, ...mono }}>{inr(r.amount)}</td>
     </>
   ) : (<><td /><td /></>);
   const ca = sumGroups(d.assets, CURRENT_ASSETS), cl = sumGroups(d.liabilities, CURRENT_LIABS);

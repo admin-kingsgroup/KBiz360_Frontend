@@ -37,9 +37,9 @@ function ym(dateStr) {
 const monthLabel = (k) => { const [y, m] = k.split('-'); return `${MON[+m - 1]} ${String(y).slice(2)}`; };
 
 // Revenue trend → last 12 months of sales (taxable value), with same-month-last-year.
-export const getRevenueTrend = async () => {
+export const getRevenueTrend = async (branchCode) => {
   try {
-    const sales = await apiGet('/api/vouchers', { category: 'sale' });
+    const sales = await apiGet('/api/vouchers', { category: 'sale', branch: branchCode });
     const byMonth = {};
     for (const v of sales || []) { const k = ym(v.date); if (k) byMonth[k] = (byMonth[k] || 0) + (v.subtotal || 0); }
     const months = Object.keys(byMonth).sort();
@@ -52,9 +52,9 @@ export const getRevenueTrend = async () => {
 
 // Ranked parties by taxable value — superset shape so the table resolves whatever
 // valueKey/countKey it's configured with (customer or supplier).
-const topEntities = async (category) => {
+const topEntities = async (category, branchCode) => {
   try {
-    const rows = await apiGet('/api/vouchers', { category });
+    const rows = await apiGet('/api/vouchers', { category, branch: branchCode });
     const map = {};
     for (const v of rows || []) {
       const name = v.party || '—';
@@ -72,8 +72,8 @@ const topEntities = async (category) => {
     }));
   } catch { return []; }
 };
-export const getTopCustomers = async () => topEntities('sale');
-export const getTopSuppliers = async () => topEntities('purchase');
+export const getTopCustomers = async (branchCode) => topEntities('sale', branchCode);
+export const getTopSuppliers = async (branchCode) => topEntities('purchase', branchCode);
 
 // AR / AP ageing buckets (live, FIFO) → the shape AgeingBuckets renders.
 const BUCKET_META = [

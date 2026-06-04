@@ -3,10 +3,11 @@ import { useMemo } from 'react';
 import { loadDirectorDashboard } from '../services/dashboard.service';
 import { computeTotalBankBalanceInr } from '../utils/transformers';
 
-export function useDirectorDashboard() {
+export function useDirectorDashboard({ range = 'month', scope = 'ALL' } = {}) {
+  const branchCode = scope && scope !== 'ALL' ? scope : undefined;
   const query = useQuery({
-    queryKey: ['dashboard', 'director'],
-    queryFn: loadDirectorDashboard,
+    queryKey: ['dashboard', 'director', range, scope],
+    queryFn: () => loadDirectorDashboard({ range, branchCode }),
   });
 
   const totalCashInr = useMemo(

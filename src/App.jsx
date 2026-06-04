@@ -11,7 +11,8 @@ import { ErrorBoundary } from './shell/ErrorBoundary';
 import { BRANCHES } from './core/data';
 import { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, GratuityRegister, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, SubAgentStatement, TdsCertRegister, TrainingRecords, UxPreferences } from './core/helpers';
 import { useMobile } from './core/hooks';
-import { PERM_MODULES, ROLE_TEMPLATES } from './core/permissions';
+import { ReferenceProvider } from './core/ReferenceProvider';
+import { getRole, getPermModules } from './core/referenceCache';
 import { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RPT_CashPosition, RPT_CurrencyExposure, RPT_CustomerLTV, RPT_FSNotes, RPT_InterbranchElim, RPT_LeaveUtilization, RPT_StatutoryDues, RPT_TaxFilingBoard, RPT_YieldConsultant, RPT_YieldDestination, RPT_YieldSupplier, RPT_YoY } from './core/styles';
 import { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } from './modules/assets';
 import { Dashboard } from './modules/dashboard';
@@ -27,7 +28,7 @@ import { TrialBalanceLive, DayBookLive, LedgerAcLive, RegisterLive, LedgerGroups
 import { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } from './modules/reportsFinancial';
 import { CostCenterMasterLive } from './modules/costCentersLive';
 import { PaymentVerificationLive } from './modules/paymentVerification';
-import { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, GroupsMaster, LedgersMaster } from './modules/mastersLive';
+import { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, GroupsMaster, SubGroupsMaster, LedgersMaster } from './modules/mastersLive';
 import { DataImportPage } from './modules/dataImport';
 import { GlobalSearch } from './shell/GlobalSearch';
 import { Placeholder } from './shell/Placeholder';
@@ -44,7 +45,7 @@ export default function KB360App(){
     return null;
   })();
 
-  /* ── Branch: restore the user's first allowed branch, else default to TKHO ── */
+  /* ── Branch: restore the user's first allowed branch, else default to TKHO (Head Office) ── */
   const [branch,setBranch]=useState(()=>{
     const codes = restoredUser?.branches;
     if(Array.isArray(codes) && codes.length){
@@ -72,10 +73,11 @@ export default function KB360App(){
   const canSeeAllBranches = u => FULL_SCOPE_ROLES.includes(u.role);
   const canAccessModule = (u, moduleName) => {
     if(!moduleName) return true;  // unrestricted (e.g. Dashboard)
-    const tmpl = ROLE_TEMPLATES[u.role];
+    const tmpl = getRole(u.role);            // role + perms from the DB-backed cache
     if(!tmpl) return false;
+    if(tmpl._fullAccess) return true;        // bootstrap Super-Admin fallback
     // perms is keyed by sub-module ID; check if any sub-mod in the group has view
-    const grp = PERM_MODULES.find(g => g.group === moduleName);
+    const grp = getPermModules().find(g => g.group === moduleName);
     if(!grp) return true;
     return grp.mods.some(mod => tmpl.perms?.[mod.id]?.view === true);
   };
@@ -315,7 +317,8 @@ export default function KB360App(){
     if(route==="/settings/branches")     return <SettingsBranches/>;
     if(route==="/settings/users")        return <SettingsUsers/>;
     if(route==="/settings/audit")        return <SettingsAudit/>;
-    if(route==="/masters/groups")        return <GroupsMaster/>;                 // editable: 28 Tally (locked) + custom
+    if(route==="/masters/groups")        return <GroupsMaster/>;                 // read-only: the 28 fixed Tally groups
+    if(route==="/masters/subgroups")     return <SubGroupsMaster/>;              // CRUD: custom sub-groups (any depth)
     if(route==="/masters/ledgers")    return <LedgersMaster/>;                    // editable ledger master (live CRUD)
     if(route==="/masters/groups-view")   return <LedgerGroupsLive/>;              // read-only 28-group reference
     if(route==="/masters/ledgers-view")  return <ChartOfAccountsLive branch={branch}/>; // read-only chart of accounts
@@ -380,6 +383,7 @@ export default function KB360App(){
   }
 
   return (
+    <ReferenceProvider>
     <div style={{display:"flex",flexDirection:"column",height:"100vh",
       overflow:"hidden",fontFamily:"system-ui,sans-serif",background:"#f3f4f8"}}>
 
@@ -411,6 +415,7 @@ export default function KB360App(){
         </main>
       </div>
     </div>
+    </ReferenceProvider>
   );
 }
 

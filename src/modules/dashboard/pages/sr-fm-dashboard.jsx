@@ -2,6 +2,7 @@ import React from 'react';
 import { DashboardHeader } from '../../../core/helpers';
 import { KPICard, WidgetCard } from '../../../core/styles';
 import { fmtINR } from '../../../core/format';
+import { CUR_MONTH_LABEL } from '../../../core/dates';
 import { useSrFmDashboard } from '../hooks/use-sr-fm-dashboard';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
 import { useDashboardStore } from '../store/dashboard.store';
@@ -27,6 +28,13 @@ export function SrFmDashboardPage({ currentUser, setRoute }) {
 
   const { cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags } = data;
 
+  // Derive KPIs from the loaded data instead of hard-coded zeros, so figures
+  // reflect reality (and populate automatically once the data sources fill in).
+  const banksTotal = (bankAccounts || []).reduce((s, b) => s + (b.openingBal ?? b.balance ?? 0), 0);
+  const arOutstanding = (arAgeing || []).reduce((s, b) => s + (b.amount || 0), 0);
+  const periodClosed = (periodClose || []).filter((p) => p.status === 'Closed').length;
+  const gstr3bFiled = (GSTR_FILING_STATUS || []).filter((g) => g.gstr3b === 'Filed').length;
+
   return (
     <div style={{ padding: 18, maxWidth: 1400, margin: '0 auto' }}>
       <DashboardHeader
@@ -46,25 +54,25 @@ export function SrFmDashboardPage({ currentUser, setRoute }) {
           marginBottom: 14,
         }}
       >
-        <KPICard label="Pending My Approval" value="0" delta="" color="#f97316" onClick={() => navigate('/approvals')} />
+        <KPICard label="Pending My Approval" value={String(varianceFlags.length)} delta="" color="#f97316" onClick={() => navigate('/approvals')} />
         <KPICard
           label="Banks Balance Total"
-          value={fmtINR(0)}
+          value={fmtINR(banksTotal)}
           delta=""
           color="#22c55e"
           onClick={() => navigate('/masters/bank-accounts')}
         />
-        <KPICard label="Period Close" value="0/6" delta="" color="#d4a437" />
+        <KPICard label="Period Close" value={`${periodClosed}/${periodClose.length || 0}`} delta="" color="#d4a437" />
         <KPICard
           label="GSTR-3B Filed"
-          value="0/3"
+          value={`${gstr3bFiled}/${GSTR_FILING_STATUS.length}`}
           delta=""
           color="#A32D2D"
           onClick={() => navigate('/tax/gstr-3b')}
         />
         <KPICard
           label="Total AR Outstanding"
-          value={fmtINR(0)}
+          value={fmtINR(arOutstanding)}
           delta=""
           color="#5a6691"
           onClick={() => navigate('/reports/rec')}
@@ -86,7 +94,7 @@ export function SrFmDashboardPage({ currentUser, setRoute }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-        <WidgetCard title="Period Close Progress" subtitle="Branch-by-branch May 2026 close status">
+        <WidgetCard title="Period Close Progress" subtitle={`Branch-by-branch ${CUR_MONTH_LABEL} close status`}>
           <PeriodCloseTable rows={periodClose} />
         </WidgetCard>
 

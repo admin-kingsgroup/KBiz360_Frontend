@@ -2,6 +2,7 @@ import React from 'react';
 import { DashboardHeader } from '../../../core/helpers';
 import { KPICard, WidgetCard } from '../../../core/styles';
 import { fmtINR } from '../../../core/format';
+import { CUR_MONTH_LABEL } from '../../../core/dates';
 import { useSrAeDashboard } from '../hooks/use-sr-ae-dashboard';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
 import { useDashboardStore } from '../store/dashboard.store';
@@ -64,7 +65,7 @@ export function SrAeDashboardPage({ currentUser, setRoute }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        <WidgetCard title="Monthly Close Checklist" subtitle="May 2026">
+        <WidgetCard title="Monthly Close Checklist" subtitle={CUR_MONTH_LABEL}>
           <CloseChecklist />
         </WidgetCard>
 

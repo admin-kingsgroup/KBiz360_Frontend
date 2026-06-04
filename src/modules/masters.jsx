@@ -6,7 +6,8 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Check, Download, Plus, Save, Search, Settings } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { ADM_DATA, CASH, CUSTOMERS, FOREX_RATES_DATA, GP_BILLS, NUMBERING_SERIES_DATA } from '../core/data';
+import { ACTIVE_CURRENCIES, ADM_DATA, BRANCH_CODES, CASH, CUSTOMERS, FOREX_RATES_DATA, GP_BILLS } from '../core/data';
+import { useNumberingSeries } from '../core/useReference';
 import { fmt, fmtINR } from '../core/format';
 import { exportToExcel } from '../core/exportExcel';
 import { ACM_DATA, APPROVAL_LIMITS_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, CURRENCY_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, MstrModal, MstrShell, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, _PASSPORTS, cardStyle, tabPanel } from '../core/helpers';
@@ -18,8 +19,8 @@ import { TopBar } from '../shell/TopBar';
 export function MastersForex(){
   const [rates,setRates]=useState(FOREX_RATES_DATA);
   const [modal,setModal]=useState(false);
-  const [form,setForm]=useState({from:"USD",to:"INR",rate:0,source:"Manual"});
-  const CURRENCIES=["USD","AED","GBP","EUR","SGD","KES","TZS","THB","AUD","CAD"];
+  const [form,setForm]=useState({from:"INR",to:"INR",rate:0,source:"Manual"});
+  const CURRENCIES=ACTIVE_CURRENCIES;
 
   const save=()=>{
     const rec={...form,date:new Date().toISOString().slice(0,10)};
@@ -72,7 +73,7 @@ export function MastersForex(){
             <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <FL label="From currency"><select value={form.from} onChange={e=>setForm(f=>({...f,from:e.target.value}))} style={inp}>{CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></FL>
-                <FL label="To currency"><select value={form.to} onChange={e=>setForm(f=>({...f,to:e.target.value}))} style={inp}>{["INR","KES","TZS","USD",...CURRENCIES].map(c=><option key={c}>{c}</option>)}</select></FL>
+                <FL label="To currency"><select value={form.to} onChange={e=>setForm(f=>({...f,to:e.target.value}))} style={inp}>{CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></FL>
               </div>
               <FL label="Exchange rate"><input type="number" step="0.01" value={form.rate} onChange={e=>setForm(f=>({...f,rate:+e.target.value}))} style={inp} placeholder="e.g. 83.42"/></FL>
               <FL label="Source"><select value={form.source} onChange={e=>setForm(f=>({...f,source:e.target.value}))} style={inp}><option>RBI</option><option>CBK</option><option>BOT</option><option>DGI</option><option>Manual</option><option>Bank Rate</option></select></FL>
@@ -228,7 +229,6 @@ export function MastersSubAgents(){
     {id:"SA001",name:"Skyline Travels",        iata:"14-3 88888 1",email:"info@skyline.in",   phone:"+91 22 1234 5678",type:"Retail",   city:"Mumbai",  currency:"INR",commType:"% of GP",  commRate:15,creditLimit:500000,creditDays:30,paymentCycle:"Monthly",revYTD:840000,gpYTD:126000,books:24,active:true,joined:"2021-06-01",territory:"Mumbai, Thane"},
     {id:"SA002",name:"Global Wings",            iata:"",            email:"gw@global.in",     phone:"+91 79 2345 6789",type:"Corporate",city:"Ahmedabad",currency:"INR",commType:"Fixed ₹",  commRate:1200,creditLimit:300000,creditDays:45,paymentCycle:"Monthly",revYTD:560000,gpYTD:67200,books:18,active:true,joined:"2022-03-15",territory:"Gujarat"},
     {id:"SA003",name:"Paradise Holidays",       iata:"14-3 77777 2",email:"paradise@ph.in",   phone:"+91 11 3456 7890",type:"Retail",   city:"Delhi",   currency:"INR",commType:"% of sell",commRate:8, creditLimit:400000,creditDays:30,paymentCycle:"Bi-weekly",revYTD:1120000,gpYTD:89600,books:31,active:true,joined:"2020-11-01",territory:"Delhi NCR"},
-    {id:"SA004",name:"Nairobi Getaways Ltd.",   iata:"",            email:"nbo@nget.co.ke",   phone:"+254 722 345678",type:"Local",    city:"Nairobi",currency:"KES",commType:"% of GP",  commRate:20,creditLimit:1500000,creditDays:30,paymentCycle:"Monthly",revYTD:3200000,gpYTD:640000,books:15,active:true,joined:"2023-01-10",territory:"Nairobi CBD"},
     {id:"SA005",name:"Online Deals (OTA)",      iata:"",            email:"ops@onlinedeals.in",phone:"+91 80 4567 8901",type:"Online",  city:"Bangalore",currency:"INR",commType:"% of sell",commRate:6, creditLimit:1000000,creditDays:15,paymentCycle:"Weekly",revYTD:2340000,gpYTD:140400,books:67,active:true,joined:"2022-08-01",territory:"Pan India Online"},
   ];
 
@@ -340,7 +340,7 @@ export function MastersSubAgents(){
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginTop:8}}>
                   <FL label="Credit limit (₹)"><input type="number" value={form.creditLimit} onChange={e=>setForm(f=>({...f,creditLimit:+e.target.value}))} style={inp}/></FL>
                   <FL label="Credit days"><input type="number" value={form.creditDays} onChange={e=>setForm(f=>({...f,creditDays:+e.target.value}))} style={inp}/></FL>
-                  <FL label="Currency"><select value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))} style={inp}><option>INR</option><option>KES</option><option>TZS</option><option>USD</option></select></FL>
+                  <FL label="Currency"><select value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))} style={inp}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></FL>
                 </div>
               </div>
             </div>
@@ -456,8 +456,6 @@ export function ChartOfAccounts(){
           "Prepaid Rent","Prepaid Insurance","Prepaid Subscriptions",
           "Security Deposit — Office Lease","Security Deposit — Others",
           "HDFC Bank CA — BOM","ICICI Bank CA — BOM","ICICI Bank CA — AMD",
-          "KCB Bank CA — NBO","Equity Bank CA — NBO",
-          "CRDB Bank — DAR","Rawbank — FBM",
           "Cash in Hand — BOM","Cash in Hand — AMD","Petty Cash — Travkings Group"]},
     {id:7, name:"Sundry Debtors",           type:"Asset",     parent:"Current Assets",
      sub:["Auto-created per client from Clients master"]},
@@ -472,8 +470,6 @@ export function ChartOfAccounts(){
           "TDS Payable — 194C (Contractors)","TDS Payable — 194H (Commission)",
           "TDS Payable — 194J (Professional)","TDS Payable — 194D (Insurance)",
           "TCS Payable — 206C(1G) LRS / Foreign Travel",
-          "VAT Payable — Kenya (16%)","VAT Payable — Tanzania (18%)","VAT Payable — DRC (16%)",
-          "WHT Payable — Kenya","WHT Payable — Tanzania",
           "Service Tax Old Regime (pre-GST balance if any)"]},
     {id:11,name:"Sales Accounts",           type:"Income",    parent:"Primary",
      sub:["Flight Ticket Sales — Domestic","Flight Ticket Sales — International",
@@ -583,28 +579,8 @@ export function MastersLedgers(){
   const [modal,setModal]=useState(false);
   const [search,setSearch]=useState("");
   const [filter,setFilter]=useState("All");
-  const ledgers=[
-    {id:1, name:"HDFC Bank CA — Nariman Point",group:"Current Assets",nature:"Dr",ob:2480000,currency:"INR",active:true},
-    {id:2, name:"ICICI Bank CA — Fort",         group:"Current Assets",nature:"Dr",ob:680000, currency:"INR",active:true},
-    {id:3, name:"Cash in Hand",                  group:"Current Assets",nature:"Dr",ob:45000,  currency:"INR",active:true},
-    {id:4, name:"Flight Ticket Sales",            group:"Sales Accounts",nature:"Cr",ob:0,      currency:"INR",active:true},
-    {id:5, name:"Holiday Package Sales",          group:"Sales Accounts",nature:"Cr",ob:0,      currency:"INR",active:true},
-    {id:6, name:"Hotel Sales",                    group:"Sales Accounts",nature:"Cr",ob:0,      currency:"INR",active:true},
-    {id:7, name:"Flight Ticket Purchase",         group:"Purchase Accounts",nature:"Dr",ob:0,   currency:"INR",active:true},
-    {id:8, name:"BSP India Payable",              group:"Current Liabilities",nature:"Cr",ob:320000,currency:"INR",active:true},
-    {id:9, name:"Output CGST",                    group:"Duties & Taxes",nature:"Cr",ob:0,      currency:"INR",active:true},
-    {id:10,name:"Output SGST",                    group:"Duties & Taxes",nature:"Cr",ob:0,      currency:"INR",active:true},
-    {id:11,name:"Output IGST",                    group:"Duties & Taxes",nature:"Cr",ob:0,      currency:"INR",active:true},
-    {id:12,name:"Input CGST",                     group:"Current Assets",nature:"Dr",ob:0,      currency:"INR",active:true},
-    {id:13,name:"Input SGST",                     group:"Current Assets",nature:"Dr",ob:0,      currency:"INR",active:true},
-    {id:14,name:"TCS Payable",                    group:"Duties & Taxes",nature:"Cr",ob:0,      currency:"INR",active:true},
-    {id:15,name:"Sharma Enterprises Pvt. Ltd.",   group:"Sundry Debtors",nature:"Dr",ob:215000, currency:"INR",active:true},
-    {id:16,name:"Mehta & Sons",                   group:"Sundry Debtors",nature:"Dr",ob:180000, currency:"INR",active:true},
-    {id:17,name:"Proprietor Capital",             group:"Capital Account",nature:"Cr",ob:5000000,currency:"INR",active:true},
-    {id:18,name:"Salaries & Wages",               group:"Indirect Expenses",nature:"Dr",ob:0,   currency:"INR",active:true},
-    {id:19,name:"KCB Bank — Nairobi",             group:"Current Assets",nature:"Dr",ob:2240000,currency:"KES",active:true},
-    {id:20,name:"Rawbank USD — Lubumbashi",        group:"Current Assets",nature:"Dr",ob:58000,  currency:"USD",active:true},
-  ];
+  // Superseded by the live LedgersMaster (/api/ledgers). No bundled demo ledgers.
+  const ledgers=[];
   const groups=["All",...new Set(ledgers.map(l=>l.group))];
   const filtered=ledgers.filter(l=>
     (filter==="All"||l.group===filter)&&
@@ -665,7 +641,7 @@ export function MastersLedgers(){
           <FL label="Group"><select style={inp}><option>Current Assets</option><option>Sales Accounts</option><option>Purchase Accounts</option><option>Sundry Debtors</option><option>Sundry Creditors</option><option>Duties & Taxes</option></select></FL>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             <FL label="Nature"><select style={inp}><option>Dr</option><option>Cr</option></select></FL>
-            <FL label="Currency"><select style={inp}><option>INR</option><option>KES</option><option>TZS</option><option>USD</option></select></FL>
+            <FL label="Currency"><select style={inp}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></FL>
           </div>
           <FL label="Opening balance"><input type="number" style={inp} placeholder="0.00"/></FL>
           <FL label="GSTIN (if party ledger)"><input style={inp} placeholder="15-digit GSTIN"/></FL>
@@ -692,35 +668,12 @@ export function MastersCustomers(){
      B2E : Corporate employee travel accounts
      ═══════════════════════════════════════════════════════════════ */
 
-  const [b2bData,setB2bData]=useState([
-    {id:1,name:"Sharma Enterprises Pvt. Ltd.",gstin:"27AABCS1234L1Z5",state:"Maharashtra",city:"Mumbai",    credit:500000,out:215000,contact:"Rajiv Sharma",   mobile:"+91 98201 11111",email:"rajiv@sharma.co",   pan:"AABCS1234L",active:true},
-    {id:2,name:"Mehta & Sons",                gstin:"27AABCM5678K1Z2",state:"Maharashtra",city:"Mumbai",    credit:300000,out:180000,contact:"Anil Mehta",     mobile:"+91 98201 22222",email:"anil@mehta.in",     pan:"AABCM5678K",active:true},
-    {id:3,name:"Apex Pharma Ltd.",             gstin:"27AABCA9012J1Z3",state:"Maharashtra",city:"Mumbai",    credit:400000,out:98000, contact:"HR Manager",     mobile:"+91 98201 33333",email:"travel@apex.com",   pan:"AABCA9012J",active:true},
-    {id:4,name:"Globex Consulting",            gstin:"27AABCG3456H1Z4",state:"Maharashtra",city:"Mumbai",    credit:200000,out:340000,contact:"Rohan",     mobile:"+91 98201 44444",email:"priya@globex.in",   pan:"AABCG3456H",active:true},
-    {id:5,name:"Nexus Industries",             gstin:"27AABCN7890F1Z5",state:"Maharashtra",city:"Pune",      credit:250000,out:85000, contact:"Vikram Nair",    mobile:"+91 98201 55555",email:"vikram@nexus.in",   pan:"AABCN7890F",active:true},
-    {id:6,name:"TechCorp Solutions Pvt. Ltd.", gstin:"27AABCT2345E1Z6",state:"Karnataka",  city:"Bangalore", credit:600000,out:185000,contact:"Travel Admin",   mobile:"+91 80 4000 1234",email:"admin@techcorp.in",pan:"AABCT2345E",active:true},
-    {id:7,name:"Patel Exports Ltd.",           gstin:"24AABCP6789D1Z7",state:"Gujarat",    city:"Ahmedabad", credit:350000,out:72000, contact:"Jayesh Patel",   mobile:"+91 98254 11111",email:"jayesh@patelx.in",  pan:"AABCP6789D",active:true},
-    {id:8,name:"Gujarat Ceramics Ltd.",        gstin:"24AABCG1357H1Z8",state:"Gujarat",    city:"Ahmedabad", credit:280000,out:0,     contact:"Nilesh Modi",    mobile:"+91 98254 22222",email:"nilesh@gujceram.in",pan:"AABCG1357H",active:true},
-  ]);
+  // Superseded by the live CustomersMaster (/api/customers). No bundled demo data.
+  const [b2bData,setB2bData]=useState([]);
 
-  const [b2cData,setB2cData]=useState([
-    {id:1,name:"Rohan",         country:"India",   city:"Mumbai",    passport:"Z1234567",mobile:"+91 98201 66666",email:"kavita@gmail.com",  dob:"1985-03-12",credit:50000, out:8420, active:true},
-    {id:2,name:"Rajiv Sharma",        country:"India",   city:"Mumbai",    passport:"Z1234568",mobile:"+91 98201 77777",email:"rajiv.p@gmail.com",  dob:"1978-07-22",credit:25000, out:0,    active:true},
-    {id:3,name:"Suresh Iyer",         country:"India",   city:"Mumbai",    passport:"K3456790",mobile:"+91 98201 88888",email:"suresh@gmail.com",   dob:"1980-11-05",credit:30000, out:0,    active:true},
-    {id:4,name:"Priya Mehta",         country:"India",   city:"Ahmedabad", passport:"M2345678",mobile:"+91 98254 33333",email:"priya.m@gmail.com",  dob:"1990-06-15",credit:20000, out:0,    active:true},
-    {id:5,name:"James Kamau",         country:"Kenya",   city:"Nairobi",   passport:"KE123456",mobile:"+254 72 400 1234",email:"james@gmail.com",   dob:"1982-04-18",credit:200000,out:0,    active:true},
-    {id:6,name:"Fatuma Said",         country:"Tanzania",city:"Dar es Salaam",passport:"TZ234567",mobile:"+255 75 400 1234",email:"fatuma@gmail.com",dob:"1988-09-25",credit:300000,out:0, active:true},
-    {id:7,name:"Mujeet",       country:"Kenya",   city:"Nairobi",   passport:"KE234567",mobile:"+254 73 400 5678",email:"grace@gmail.com",   dob:"1992-01-30",credit:150000,out:0,    active:true},
-    {id:8,name:"Pierre Kabila",       country:"DRC",     city:"Lubumbashi",passport:"CD123456",mobile:"+243 99 400 1234",email:"pierre@gmail.com",  dob:"1975-12-10",credit:500,  out:0,    active:true},
-  ]);
+  const [b2cData,setB2cData]=useState([]);
 
-  const [b2eData,setB2eData]=useState([
-    {id:1,empAcct:"TechCorp — Employee Travel A/c", company:"TechCorp Solutions Pvt. Ltd.",compGstin:"27AABCT2345E1Z6",dept:"All Departments",  city:"Bangalore",credit:1000000,out:42000, adminContact:"HR Dept",mobile:"+91 80 4000 5678",email:"travel.hr@techcorp.in",  active:true},
-    {id:2,empAcct:"Nexus Industries — Staff Travel", company:"Nexus Industries",            compGstin:"27AABCN7890F1Z5",dept:"Operations & Sales",city:"Pune",     credit:500000, out:18000, adminContact:"Admin",   mobile:"+91 98201 99999",email:"admin.travel@nexus.in",    active:true},
-    {id:3,empAcct:"Apex Pharma — Field Force Travel",company:"Apex Pharma Ltd.",            compGstin:"27AABCA9012J1Z3",dept:"Medical Sales",    city:"Mumbai",   credit:300000, out:0,     adminContact:"HR Manager",mobile:"+91 98201 33333",email:"fieldstaff@apex.com",       active:true},
-    {id:4,empAcct:"Globex — Consultant Travel",      company:"Globex Consulting",           compGstin:"27AABCG3456H1Z4",dept:"Consulting",       city:"Mumbai",   credit:200000, out:28000, adminContact:"Rohan",mobile:"+91 98201 44444",email:"priya@globex.in",            active:true},
-    {id:5,empAcct:"Patel Exports — Trade Visits",    company:"Patel Exports Ltd.",          compGstin:"24AABCP6789D1Z7",dept:"Export / Sourcing", city:"Ahmedabad",credit:150000, out:0,     adminContact:"Jayesh Patel",mobile:"+91 98254 11111",email:"export.travel@patelx.in",active:true},
-  ]);
+  const [b2eData,setB2eData]=useState([]);
 
   /* ══ Tab config ════════════════════════════════════════════════ */
   const TABS={
@@ -1082,15 +1035,15 @@ export function MastersSuppliers(){
     {id:1, name:"BSP India (IATA Clearing)",  type:"Airline/BSP",   gstin:"27AABCB1234A1Z1",currency:"INR",tds:"194C",commPct:0,active:true},
     {id:2, name:"Emirates GSA India",          type:"Airline/BSP",   gstin:"27AABCE5678B1Z2",currency:"INR",tds:"",    commPct:5,active:true},
     {id:3, name:"Air India Ltd.",              type:"Airline/BSP",   gstin:"07AABCA9012C1Z3",currency:"INR",tds:"",    commPct:3,active:true},
-    {id:4, name:"Bali Tours DMC Co.",          type:"DMC/Operator",  gstin:"",               currency:"USD",tds:"",    commPct:10,active:true},
-    {id:5, name:"Singapore MICE & Events DMC", type:"DMC/Operator",  gstin:"",               currency:"SGD",tds:"",    commPct:8, active:true},
-    {id:6, name:"Island Escapes Maldives DMC", type:"DMC/Operator",  gstin:"",               currency:"USD",tds:"",    commPct:12,active:true},
+    {id:4, name:"Bali Tours DMC Co.",          type:"DMC/Operator",  gstin:"",               currency:"INR",tds:"",    commPct:10,active:true},
+    {id:5, name:"Singapore MICE & Events DMC", type:"DMC/Operator",  gstin:"",               currency:"INR",tds:"",    commPct:8, active:true},
+    {id:6, name:"Island Escapes Maldives DMC", type:"DMC/Operator",  gstin:"",               currency:"INR",tds:"",    commPct:12,active:true},
     {id:7, name:"Hyatt Hotels & Resorts",      type:"Hotel",         gstin:"27AABCH3456D1Z4",currency:"INR",tds:"194C",commPct:10,active:true},
     {id:8, name:"ITC Hotels Ltd.",             type:"Hotel",         gstin:"27AABCI7890E1Z5",currency:"INR",tds:"194C",commPct:12,active:true},
     {id:9, name:"Riya Travels & Tours",        type:"Car/Transport", gstin:"27AABCR2345F1Z6",currency:"INR",tds:"194C",commPct:0, active:true},
     {id:10,name:"VFS Global India",            type:"Visa Agency",   gstin:"27AABCV6789G1Z7",currency:"INR",tds:"",    commPct:0, active:true},
     {id:11,name:"TATA AIG General Insurance",  type:"Insurance",     gstin:"27AABCT0123H1Z8",currency:"INR",tds:"194D",commPct:15,active:true},
-    {id:12,name:"Jubilee Insurance (Kenya)",   type:"Insurance",     gstin:"",               currency:"KES",tds:"",    commPct:12,active:true},
+    {id:12,name:"Jubilee Insurance (Kenya)",   type:"Insurance",     gstin:"",               currency:"INR",tds:"",    commPct:12,active:true},
   ];
   const types=["All",...new Set(supps.map(s=>s.type))];
   const filtered=supps.filter(s=>
@@ -1149,7 +1102,7 @@ export function MastersSuppliers(){
           <FL label="Type"><select style={inp}><option>Airline/BSP</option><option>DMC/Operator</option><option>Hotel</option><option>Car/Transport</option><option>Visa Agency</option><option>Insurance</option><option>Other</option></select></FL>
           <FL label="GSTIN (leave blank for overseas)"><input style={inp}/></FL>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <FL label="Settlement currency"><select style={inp}><option>INR</option><option>USD</option><option>EUR</option><option>AED</option><option>KES</option><option>TZS</option></select></FL>
+            <FL label="Settlement currency"><select style={inp}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></FL>
             <FL label="TDS section"><select style={inp}><option>None</option><option>194C</option><option>194H</option><option>194D</option><option>194J</option></select></FL>
           </div>
           <FL label="Commission % (if applicable)"><input type="number" style={inp} placeholder="0"/></FL>
@@ -1174,7 +1127,6 @@ export function MastersAirlines(){
     {id:5, iata:"QR",  name:"Qatar Airways",        country:"Qatar",       type:"Full Service",hub:"DOH",bsp:true, alliance:"One",    gds:"1A/1G/1B",commPct:5},
     {id:6, iata:"EY",  name:"Etihad Airways",       country:"UAE",         type:"Full Service",hub:"AUH",bsp:true, alliance:"None",   gds:"1A/1G",   commPct:4},
     {id:7, iata:"G9",  name:"Air Arabia",           country:"UAE",         type:"Low Cost",    hub:"SHJ",bsp:false,alliance:"None",   gds:"Direct",  commPct:0},
-    {id:8, iata:"KQ",  name:"Kenya Airways",        country:"Kenya",       type:"Full Service",hub:"NBO",bsp:true, alliance:"Sky",    gds:"1A/1G",   commPct:5},
     {id:9, iata:"ET",  name:"Ethiopian Airlines",   country:"Ethiopia",    type:"Full Service",hub:"ADD",bsp:true, alliance:"Star",   gds:"1A/1G/1B",commPct:5},
     {id:10,iata:"LH",  name:"Lufthansa",            country:"Germany",     type:"Full Service",hub:"FRA",bsp:true, alliance:"Star",   gds:"1A/1G/1B",commPct:5},
     {id:11,iata:"BA",  name:"British Airways",      country:"UK",          type:"Full Service",hub:"LHR",bsp:true, alliance:"One",    gds:"1A/1B",   commPct:5},
@@ -1274,14 +1226,14 @@ export function MastersHotels(){
     {id:10,name:"Karavia Hotel Lubumbashi",city:"Lubumbashi",stars:4,gstSlab:16,tariff:180,  chain:"Karavia",contract:true},
   ];
   const dmcs=[
-    {id:1, name:"Bali Tours DMC Co.",        country:"Indonesia",speciality:"Beach/Adventure",currency:"USD",commPct:10,contract:true},
-    {id:2, name:"Singapore MICE & Events",   country:"Singapore", speciality:"MICE/Corporate", currency:"SGD",commPct:8, contract:true},
-    {id:3, name:"Island Escapes Maldives",   country:"Maldives",  speciality:"Luxury Beach",   currency:"USD",commPct:12,contract:true},
-    {id:4, name:"Thailand Discovery DMC",    country:"Thailand",  speciality:"Cultural/Beach",  currency:"THB",commPct:10,contract:false},
-    {id:5, name:"Dubai Wonders DMC",         country:"UAE",       speciality:"City/Shopping",   currency:"AED",commPct:8, contract:true},
-    {id:6, name:"Maasai Mara Safaris",       country:"Kenya",     speciality:"Safari/Wildlife", currency:"KES",commPct:10,contract:true},
-    {id:7, name:"Zanzibar Beach DMC",        country:"Tanzania",  speciality:"Beach/Spice",     currency:"TZS",commPct:12,contract:true},
-    {id:8, name:"DRC Safari Operator",       country:"DRC",       speciality:"Gorilla/Nature",  currency:"USD",commPct:15,contract:false},
+    {id:1, name:"Bali Tours DMC Co.",        country:"Indonesia",speciality:"Beach/Adventure",currency:"INR",commPct:10,contract:true},
+    {id:2, name:"Singapore MICE & Events",   country:"Singapore", speciality:"MICE/Corporate", currency:"INR",commPct:8, contract:true},
+    {id:3, name:"Island Escapes Maldives",   country:"Maldives",  speciality:"Luxury Beach",   currency:"INR",commPct:12,contract:true},
+    {id:4, name:"Thailand Discovery DMC",    country:"Thailand",  speciality:"Cultural/Beach",  currency:"INR",commPct:10,contract:false},
+    {id:5, name:"Dubai Wonders DMC",         country:"UAE",       speciality:"City/Shopping",   currency:"INR",commPct:8, contract:true},
+    {id:6, name:"Maasai Mara Safaris",       country:"Kenya",     speciality:"Safari/Wildlife", currency:"INR",commPct:10,contract:true},
+    {id:7, name:"Zanzibar Beach DMC",        country:"Tanzania",  speciality:"Beach/Spice",     currency:"INR",commPct:12,contract:true},
+    {id:8, name:"DRC Safari Operator",       country:"DRC",       speciality:"Gorilla/Nature",  currency:"INR",commPct:15,contract:false},
   ];
   const filt_h=hotels.filter(h=>!search||h.name.toLowerCase().includes(search.toLowerCase())||h.city.toLowerCase().includes(search.toLowerCase()));
   const filt_d=dmcs.filter(d=>!search||d.name.toLowerCase().includes(search.toLowerCase())||d.country.toLowerCase().includes(search.toLowerCase()));
@@ -1396,7 +1348,7 @@ export function MastersHotels(){
               <FL label="Speciality"><input style={inp}/></FL>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              <FL label="Settlement currency"><select style={inp}><option>USD</option><option>EUR</option><option>AED</option><option>SGD</option><option>THB</option><option>KES</option><option>TZS</option></select></FL>
+              <FL label="Settlement currency"><select style={inp}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></FL>
               <FL label="Commission %"><input type="number" style={inp} placeholder="10"/></FL>
             </div>
           </div>
@@ -1436,9 +1388,6 @@ export function MastersTaxRates(){
     {section:"194I",    nature:"TDS",rate:"10%", threshold:"Rs.2.4L/year",applicability:"Office/premises rent payments"},
   ];
   const afVat=[
-    {branch:"NBO — Kenya", rate:"16%",authority:"KRA",tin:"PIN",deadline:"20th of month",input:"Full credit",wht:"5% services"},
-    {branch:"DAR — Tanzania",rate:"18%",authority:"TRA",tin:"TPIN",deadline:"20th of month",input:"Full credit",wht:"5% services"},
-    {branch:"FBM — DRC",   rate:"16%",authority:"DGI",tin:"NIF", deadline:"20th of month",input:"Full credit",wht:"14% services"},
   ];
   const filt_g=gstRates.filter(r=>!search||
     r.service.toLowerCase().includes(search.toLowerCase())||
@@ -1756,7 +1705,7 @@ export function BankAccountMaster({branch,setRoute}){
         <select value={filterBranch} onChange={e=>setFilterBranch(e.target.value)}
           style={{padding:"8px 11px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12.5,background:"#fff"}}>
           <option value="ALL">All branches</option>
-          {["TKHO","BOM","AMD","NBO","DAR","FBM"].map(b=><option key={b} value={b}>{b}</option>)}
+          {BRANCH_CODES.map(b=><option key={b} value={b}>{b}</option>)}
         </select>
         <button onClick={()=>setRoute&&setRoute("/import")} style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
         <button onClick={()=>exportToExcel("bank-accounts",[{key:"branch",label:"Branch"},{key:"bank",label:"Bank"},{key:"accountNo",label:"Account No"},{key:"ifsc",label:"IFSC/SWIFT"},{key:"type",label:"Type"},{key:"currency",label:"Currency"},{key:"openingBal",label:"Opening Bal"}],filtered)} style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📤 Export</button>
@@ -2077,6 +2026,7 @@ export function ApprovalLimitsMaster(){
 export function NumberingSeriesMaster({branch}){
   const [filterBranch,setFilterBranch]=useState(branch==="ALL"?"ALL":branch?.code||"ALL");
   const [search,setSearch]=useState("");
+  const NUMBERING_SERIES_DATA=useNumberingSeries().data||[];   // DB-backed (/api/numbering-series)
   const filtered=NUMBERING_SERIES_DATA.filter(n=>{
     if(filterBranch!=="ALL"&&n.branch!==filterBranch) return false;
     if(!search) return true;
@@ -2091,7 +2041,7 @@ export function NumberingSeriesMaster({branch}){
         <select value={filterBranch} onChange={e=>setFilterBranch(e.target.value)}
           style={{padding:"8px 11px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12.5,background:"#fff"}}>
           <option value="ALL">All branches</option>
-          {["TKHO","BOM","AMD","NBO","DAR","FBM"].map(b=><option key={b} value={b}>{b}</option>)}
+          {BRANCH_CODES.map(b=><option key={b} value={b}>{b}</option>)}
         </select>
         <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
         <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📤 Export</button>
@@ -2168,7 +2118,7 @@ export function CustomerMasterTabbed(){
           <FL label="Customer Type"><select style={inpStd}><option>Corporate · Premium</option><option>Corporate · Standard</option><option>Individual</option><option>Travel Agent</option></select></FL>
           <FL label="Country"><select style={inpStd}><option>India</option><option>UAE</option><option>Kenya</option><option>Singapore</option></select></FL>
           <FL label="Industry"><input defaultValue="Engineering & Construction" style={inpStd}/></FL>
-          <FL label="Branch"><select style={inpStd}><option>BOM (Mumbai)</option><option>AMD</option><option>TKHO</option></select></FL>
+          <FL label="Branch"><select style={inpStd}><option>BOM (Mumbai)</option><option>AMD</option></select></FL>
           <FL label="Account Manager"><select style={inpStd}><option>Rohan</option><option>Mohan</option></select></FL>
           <FL label="Status"><div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
             <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}><input type="radio" checked={active} onChange={()=>setActive(true)}/><span style={{fontSize:12}}>Active</span></label>
@@ -2214,7 +2164,7 @@ export function CustomerMasterTabbed(){
             <th style={{padding:"9px 12px",textAlign:"center",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Primary</th>
             <th style={{padding:"9px 12px",textAlign:"center",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Action</th>
           </tr></thead>
-          <tbody>{[{b:"State Bank of India",a:"XXXX 7892",i:"SBIN0001234",c:"INR",p:true},{b:"HDFC Bank",a:"XXXX 1245",i:"HDFC0000045",c:"USD",p:false},{b:"ICICI Bank",a:"XXXX 5566",i:"ICIC0000004",c:"EUR",p:false}].map((b,i)=>(
+          <tbody>{[{b:"State Bank of India",a:"XXXX 7892",i:"SBIN0001234",c:"INR",p:true},{b:"HDFC Bank",a:"XXXX 1245",i:"HDFC0000045",c:"INR",p:false},{b:"ICICI Bank",a:"XXXX 5566",i:"ICIC0000004",c:"INR",p:false}].map((b,i)=>(
             <tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}>
               <td style={{padding:"10px 12px",fontWeight:600}}>{b.b}</td><td style={{padding:"10px 12px",fontFamily:"monospace"}}>{b.a}</td>
               <td style={{padding:"10px 12px",fontFamily:"monospace"}}>{b.i}</td><td style={{padding:"10px 12px"}}>{b.c}</td>
@@ -2529,11 +2479,11 @@ export function CustomerMasterDetail(){
               <CMDLabel label="Customer Code"><input style={{...inp,fontFamily:"monospace"}} defaultValue="CUST-BOM-00142"/></CMDLabel>
               <CMDLabel label="Customer Name"><input style={inp} defaultValue="L&T Limited"/></CMDLabel>
               <CMDLabel label="Type"><select style={inp}><option>Corporate</option><option>Individual</option><option>Sub-Agent</option><option>Govt / PSU</option></select></CMDLabel>
-              <CMDLabel label="Branch"><select style={inp}><option>BOM</option><option>AMD</option><option>TKHO</option><option>NBO</option><option>DAR</option><option>FBM</option></select></CMDLabel>
+              <CMDLabel label="Branch"><select style={inp}><option>BOM</option><option>AMD</option></select></CMDLabel>
               <CMDLabel label="Industry"><select style={inp}><option>Engineering & Construction</option><option>IT/ITES</option><option>Manufacturing</option><option>BFSI</option></select></CMDLabel>
               <CMDLabel label="Credit Limit"><input type="number" style={inp} defaultValue="5000000"/></CMDLabel>
               <CMDLabel label="Credit Days"><input type="number" style={inp} defaultValue="45"/></CMDLabel>
-              <CMDLabel label="Default Currency"><select style={inp}><option>INR</option><option>USD</option><option>EUR</option></select></CMDLabel>
+              <CMDLabel label="Default Currency"><select style={inp}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></CMDLabel>
             </div>
           )}
           {tab==="address" && (
@@ -2724,7 +2674,7 @@ export function BulkImportMaster(){
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
               <thead style={{background:"#f7f8fb",position:"sticky",top:0}}><tr><th style={RPT_thStyle}>Row</th><th style={RPT_thStyle}>Code</th><th style={RPT_thStyle}>Name</th><th style={RPT_thStyle}>GSTIN</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
               <tbody>
-                {[{r:1,code:"CUST-BOM-00200",name:"Adani Group",gst:"24AAACA0123F1ZK",status:"valid"},{r:2,code:"CUST-BOM-00201",name:"Bajaj Auto Ltd.",gst:"27AAACB1234D1ZS",status:"valid"},{r:3,code:"CUST-BOM-00202",name:"Wipro Limited",gst:"29AAACW0987A1ZP",status:"warning",msg:"Possible duplicate of CUST-BOM-00098"},{r:4,code:"CUST-BOM-00203",name:"HCL Technologies",gst:"INVALID-GSTIN",status:"error",msg:"GSTIN format invalid"},{r:5,code:"CUST-BOM-00204",name:"Mahindra Group",gst:"27AAACM0001H1ZE",status:"valid"},{r:6,code:"CUST-BOM-00205",name:"",gst:"27AAACN0078J1ZA",status:"error",msg:"Customer Name is required"},{r:7,code:"CUST-BOM-00206",name:"Maruti Suzuki",gst:"06AAACM5678K1ZG",status:"valid"}].map(row=>(
+                {[].map(row=>(
                   <tr key={row.r} style={{background:row.status==="error"?"#fff5f5":row.status==="warning"?"#fffbed":"#fff",borderBottom:"1px solid #f0f2f7"}}>
                     <td style={{...RPT_tdStyle,color:"#5a6691"}}>{row.r}</td>
                     <td style={{...RPT_tdStyle,fontFamily:"monospace"}}>{row.code}</td>
@@ -2792,16 +2742,13 @@ export function MergeRecordsUtility(){
           <div>
             <label style={{fontSize:11,color:"#A32D2D",fontWeight:700,textTransform:"uppercase",marginBottom:4,display:"block"}}>Source (will be merged out)</label>
             <select value={source} onChange={e=>setSource(e.target.value)} style={{...inp,borderColor:"#A32D2D"}}>
-              <option>L T Group (CUST-AMD-00012)</option>
-              <option>L &amp; T Limited (CUST-BOM-00098)</option>
-              <option>L&amp;T Ltd (CUST-BOM-00103)</option>
+              <option value="">Select customer…</option>
             </select>
           </div>
           <div>
             <label style={{fontSize:11,color:"#22c55e",fontWeight:700,textTransform:"uppercase",marginBottom:4,display:"block"}}>Target (will keep)</label>
             <select value={target} onChange={e=>setTarget(e.target.value)} style={{...inp,borderColor:"#22c55e"}}>
-              <option>L&amp;T Limited (CUST-BOM-00142)</option>
-              <option>Reliance Industries (CUST-BOM-00021)</option>
+              <option value="">Select customer…</option>
             </select>
           </div>
         </div>
@@ -2851,7 +2798,7 @@ export function MergeRecordsUtility(){
         <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Recent merges (audit history)</p>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Date</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>Source → Target</th><th style={RPT_thStyle}>By</th><th style={{...RPT_thStyle,textAlign:"right"}}>Txns Moved</th></tr></thead>
-          <tbody>{[{date:"2026-04-15",type:"Suppliers",merge:"Emirates GS (BOM) → Emirates Airlines",user:"Faiz Patel",txns:48},{date:"2026-03-08",type:"Customers",merge:"Sharma & Co → Sharma Enterprises",user:"Afshin Dhanani",txns:124}].map((m,i)=>(<tr key={i}><td style={RPT_tdStyle}>{m.date}</td><td style={RPT_tdStyle}>{m.type}</td><td style={RPT_tdStyle}>{m.merge}</td><td style={RPT_tdStyle}>{m.user}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{m.txns}</td></tr>))}</tbody>
+          <tbody>{[].map((m,i)=>(<tr key={i}><td style={RPT_tdStyle}>{m.date}</td><td style={RPT_tdStyle}>{m.type}</td><td style={RPT_tdStyle}>{m.merge}</td><td style={RPT_tdStyle}>{m.user}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{m.txns}</td></tr>))}</tbody>
         </table>
       </div>
     </PHASE2_Page>
@@ -3026,7 +2973,7 @@ export function PassportManager({branch}){
                 <FL label="Issue date"><input type="date" value={form.issued} onChange={e=>setForm(f=>({...f,issued:e.target.value}))} style={inp}/></FL>
                 <FL label="Expiry date"><input type="date" value={form.expiry} onChange={e=>setForm(f=>({...f,expiry:e.target.value}))} style={inp}/></FL>
               </div>
-              <FL label="Branch"><select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))} style={inp}>{["TKHO","BOM","AMD","NBO","DAR","FBM"].map(b=><option key={b}>{b}</option>)}</select></FL>
+              <FL label="Branch"><select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))} style={inp}>{BRANCH_CODES.map(b=><option key={b}>{b}</option>)}</select></FL>
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>

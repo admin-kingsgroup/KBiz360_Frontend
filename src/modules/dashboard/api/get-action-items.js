@@ -1,11 +1,12 @@
 import { ADM_DATA } from '../../../core/data';
 import { _PASSPORTS } from '../../../core/helpers';
-
-const DISPUTE_DEADLINE = '2026-05-12';
-const PASSPORT_EXPIRY_THRESHOLD = '2026-11-19';
+import { isoDate } from '../../../core/dates';
 
 export const getActionItems = async () => {
   const items = [];
+  const now = new Date();
+  const DISPUTE_DEADLINE = isoDate(now);                                                  // anything dated before today is overdue
+  const PASSPORT_EXPIRY_THRESHOLD = isoDate(new Date(now.getFullYear(), now.getMonth() + 6, now.getDate())); // expiring within 6 months
 
   const overdueAdm = (ADM_DATA || []).filter(
     (a) => a.status === 'Disputed' && a.date < DISPUTE_DEADLINE,

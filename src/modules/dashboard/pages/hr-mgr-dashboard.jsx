@@ -1,6 +1,7 @@
 import React from 'react';
 import { DashboardHeader } from '../../../core/helpers';
 import { KPICard, WidgetCard } from '../../../core/styles';
+import { CUR_MONTH_LABEL } from '../../../core/dates';
 import { useHrMgrDashboard } from '../hooks/use-hr-mgr-dashboard';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
 import { useDashboardStore } from '../store/dashboard.store';
@@ -48,7 +49,7 @@ export function HrMgrDashboardPage({ currentUser, setRoute }) {
         <KPICard
           label="Attendance %"
           value={stats.attendancePct + '%'}
-          delta="May current"
+          delta={`${CUR_MONTH_LABEL} current`}
           color="#d4a437"
           onClick={() => navigate('/hr/attendance')}
         />

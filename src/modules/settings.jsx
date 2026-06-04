@@ -3,102 +3,52 @@
    Auto-generated from KBiz360_v2.jsx · 1738 lines · 15 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Download, Lock, Plus, Save, Search, Settings, User, Users } from 'lucide-react';
 import { Line } from 'recharts';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { exportToCSV } from '../core/business-logic';
-import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_FULL_DATA, _USERS_DATA } from '../core/data';
+import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES } from '../core/data';
+import { apiPost, apiPut, apiDelete } from '../core/api';
+import { useUsersAdmin, useRoles, useCompanyProfiles, useApprovalRules } from '../core/useReference';
 import { fmt } from '../core/format';
-import { APPROVAL_LIMITS_DATA, APPROVAL_RULES, CUSTOM_FIELDS_DATA, EMAIL_TEMPLATES_DATA, FIELD_ACCESS_DATA, PERM_ACTIONS, PERM_ROLES, cardStyle } from '../core/helpers';
+import { APPROVAL_LIMITS_DATA, CUSTOM_FIELDS_DATA, EMAIL_TEMPLATES_DATA, FIELD_ACCESS_DATA, PERM_ACTIONS, cardStyle } from '../core/helpers';
 import { useIsMob, useMobile } from '../core/hooks';
-import { ACTIONS, PERM_MODULES, PERM_MODULES_P2, ROLE_TEMPLATES, SPECIAL_TOGGLES } from '../core/permissions';
+// Permission CATALOGUE (which modules/actions/toggles exist) stays in code as
+// app structure; the per-role GRANTS, users, company profiles and approval rules
+// are DB-backed (see the useReference hooks above).
+import { ACTIONS, PERM_MODULES, PERM_MODULES_P2, SPECIAL_TOGGLES } from '../core/permissions';
 import { FL, RPT_tdStyle, RPT_thStyle, btnG, btnGh, card, inp } from '../core/styles';
 import { PHASE2_Page } from '../shell/PHASE2_Page';
 
 export function SettingsCompany(){
   const [tab,setTab]=useState("india");
   const [saved,setSaved]=useState(false);
+  const profiles=useCompanyProfiles().data||[];                 // DB-backed (/api/company-profile)
 
+  // Build the India entity view from the live BOM (primary) + AMD profiles.
+  const bom=profiles.find(p=>p.code==="BOM")||{};
+  const amd=profiles.find(p=>p.code==="AMD")||{};
   const companies=[
     {
       key:"india", flag:"🇮🇳", label:"India Entity",
-      name:"Travkings Tours & Travels",
+      name:bom.entity||"Travkings Tours & Travels",
       type:"Partnership Firm",
-      pan:"AABCT1234H",
-      gstin1:"27AABCT1234H1Z5", gstState1:"Maharashtra (27)",
-      gstin2:"24AABCT1234H1Z2", gstState2:"Gujarat (24)",
-      tan:"MUMT12345A",
-      addr1:"401, Maker Chamber V, Nariman Point",
-      addr2:"Mumbai – 400 021, Maharashtra, India",
-      phone:"+91 22 4000 1234",
-      email:"accounts@travkings.com",
-      web:"www.travkings.com",
-      iata:"14-3-1234",
-      bsp:"BSP India — IATA Participant",
+      pan:bom.pan,
+      gstin1:bom.gstin, gstState1:bom.state?`${bom.state} (${bom.stateCode||""})`.trim():"",
+      gstin2:amd.gstin, gstState2:amd.state?`${amd.state} (${amd.stateCode||""})`.trim():"",
+      tan:bom.tan,
+      addr1:bom.operAddr,
+      addr2:[bom.city&&`${bom.city} – ${bom.pin||""}`.trim(),bom.state,bom.country].filter(Boolean).join(", "),
+      phone:bom.phone,
+      email:bom.email,
+      web:bom.website,
+      iata:bom.iataNo,
+      bsp:bom.bspParticipant,
       logo:"TK",
-      fy:"April – March",
-      currency:"INR ₹",
-      gst:"GST 5% / 18%",
-    },
-    {
-      key:"kenya", flag:"🇰🇪", label:"Kenya Entity",
-      name:"Travkings Tours & Travels Ltd.",
-      type:"Private Limited Company",
-      pan:"",
-      gstin1:"P051234567X", gstState1:"VAT PIN — KRA",
-      gstin2:"", gstState2:"",
-      tan:"",
-      addr1:"ICEA Building, Kenyatta Avenue",
-      addr2:"Nairobi, Kenya",
-      phone:"+254 20 400 1234",
-      email:"accounts@travkings.co.ke",
-      web:"www.travkings.co.ke",
-      iata:"14-3-5678",
-      bsp:"BSP Kenya — IATA Participant",
-      logo:"TK",
-      fy:"January – December",
-      currency:"KES",
-      gst:"VAT 16%",
-    },
-    {
-      key:"tanzania", flag:"🇹🇿", label:"Tanzania Entity",
-      name:"Travkings Tours & Travels Ltd.",
-      type:"Private Limited Company",
-      pan:"",
-      gstin1:"123-456-789", gstState1:"TPIN — TRA",
-      gstin2:"", gstState2:"",
-      tan:"",
-      addr1:"Plot 45, Ohio Street",
-      addr2:"Dar es Salaam, Tanzania",
-      phone:"+255 22 400 5678",
-      email:"accounts@travkings.co.tz",
-      web:"www.travkings.co.tz",
-      iata:"",
-      bsp:"",
-      logo:"TK",
-      fy:"January – December",
-      currency:"TZS",
-      gst:"VAT 18%",
-    },
-    {
-      key:"drc", flag:"🇨🇩", label:"DRC Entity",
-      name:"Travkings Tours & Travels SPRL",
-      type:"SPRL (Société Privée à Responsabilité Limitée)",
-      pan:"",
-      gstin1:"CD-FBM-456789", gstState1:"NIF — DGI",
-      gstin2:"", gstState2:"",
-      tan:"",
-      addr1:"Avenue Lumumba 12",
-      addr2:"Lubumbashi, Haut-Katanga, DRC",
-      phone:"+243 99 400 1234",
-      email:"accounts@travkings.cd",
-      web:"",
-      iata:"",
-      bsp:"",
-      logo:"TK",
-      fy:"January – December",
-      currency:"USD",
-      gst:"TVA 16%",
+      fy:bom.fyStart?`${bom.fyStart} – March`:"April – March",
+      currency:[bom.currency,bom.cur_sym].filter(Boolean).join(" "),
+      gst:bom.taxRate?`GST ${bom.taxRate}`:"GST",
     },
   ];
 
@@ -206,7 +156,9 @@ export function SettingsBranches(){
   const [sel,setSel]=useState(null);
   const [tab,setTab]=useState("overview"); // overview | identity | compliance | banking | vouchers
   const [editBank,setEditBank]=useState(false);
-  const [branches,setBranches]=useState(BRANCH_FULL_DATA);
+  const profilesLive=useCompanyProfiles().data;                 // DB-backed (/api/company-profile)
+  const [branches,setBranches]=useState([]);
+  useEffect(()=>{ if(profilesLive) setBranches(profilesLive); },[profilesLive]);
   const TODAY="2026-05-19";
   const daysLeft=d=>d?Math.ceil((new Date(d)-new Date(TODAY))/(1000*60*60*24)):null;
 
@@ -270,7 +222,7 @@ export function SettingsBranches(){
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Branch Configuration</h2>
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>
-              1 HO + 5 branches · 3 countries · 3 currencies · IATA · Banking · Compliance
+              1 HO + 5 branches · 4 countries · 5 currencies · IATA · Banking · Compliance
             </p>
           </div>
         </div>
@@ -534,7 +486,9 @@ export function SettingsBranches(){
 /* ── PERMISSION SCHEMA ────────────────────────────────────────── */
 
 export function SettingsUsers(){
-  const [users,setUsers]=useState(_USERS_DATA);
+  const usersLive=useUsersAdmin().data;                          // DB-backed (/api/auth/users)
+  const [users,setUsers]=useState([]);
+  useEffect(()=>{ if(usersLive) setUsers(usersLive); },[usersLive]);
   const [tab,setTab]=useState("users"); // users | roles | matrix
   const [selUser,setSelUser]=useState(null);
   const [selRole,setSelRole]=useState(null);
@@ -543,8 +497,14 @@ export function SettingsUsers(){
   const [newUserForm,setNewUserForm]=useState({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"]});
   const [search,setSearch]=useState("");
   const mob=useMobile();
+  const qc=useQueryClient();
+  // Role grants come from the DB (Settings → Roles); built into the legacy map shape.
+  const ROLE_TEMPLATES=Object.fromEntries((useRoles().data||[]).map(r=>[r.name,r]));
+  const createUserMut=useMutation({mutationFn:(b)=>apiPost('/api/auth/users',b),onSuccess:()=>qc.invalidateQueries({queryKey:['ref','users']})});
+  const updateUserMut=useMutation({mutationFn:({id,body})=>apiPut(`/api/auth/users/${id}`,body),onSuccess:()=>qc.invalidateQueries({queryKey:['ref','users']})});
+  const deleteUserMut=useMutation({mutationFn:(id)=>apiDelete(`/api/auth/users/${id}`),onSuccess:()=>qc.invalidateQueries({queryKey:['ref','users']})});
 
-  const ALL_BRANCHES=["TKHO","BOM","AMD","NBO","DAR","FBM"];
+  const ALL_BRANCHES=BRANCH_CODES;
   const ROLE_NAMES=Object.keys(ROLE_TEMPLATES);
   const ROLE_CLR=Object.fromEntries(Object.entries(ROLE_TEMPLATES).map(([k,v])=>[k,v.color]));
   const ROLE_BG =Object.fromEntries(Object.entries(ROLE_TEMPLATES).map(([k,v])=>[k,v.bg]));
@@ -652,7 +612,7 @@ export function SettingsUsers(){
               <td style={{padding:"8px 12px"}}>
                 <div style={{display:"flex",gap:4}}>
                   <button onClick={()=>startEdit(u)} style={{...btnG,padding:"3px 9px",fontSize:9.5,background:"#185FA5"}}>Permissions</button>
-                  <button onClick={()=>setUsers(us=>us.map(x=>x.id===u.id?{...x,active:!x.active}:x))}
+                  <button onClick={()=>updateUserMut.mutate({id:u.id,body:{active:!u.active}})}
                     style={{...btnGh,padding:"3px 9px",fontSize:9.5,color:u.active?"#A32D2D":"#27500A"}}>
                     {u.active?"Deactivate":"Activate"}
                   </button>
@@ -975,8 +935,7 @@ export function SettingsUsers(){
             <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setNewUserModal(false)} style={btnGh}>Cancel</button>
               <button onClick={()=>{
-                const id=Math.max(...users.map(u=>u.id))+1;
-                setUsers(u=>[...u,{...newUserForm,id,last:"Never",active:true}]);
+                createUserMut.mutate({...newUserForm,active:true});  // persists to /api/auth/users
                 setNewUserModal(false);
                 setNewUserForm({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"]});
               }} style={btnG}>Add User</button>
@@ -999,15 +958,12 @@ export function SettingsAudit(){
     {id:3,ts:"2026-05-17 11:42",user:"Rohan",    branch:"BOM",action:"CREATE",module:"Journal",     desc:"Created JV BOM/1726/JV00012 — Salary provision",ip:"10.0.1.18"},
     {id:4,ts:"2026-05-17 11:30",user:"Rohan",    branch:"BOM",action:"LOGIN", module:"Auth",        desc:"User login from Mumbai office network",ip:"10.0.1.12"},
     {id:5,ts:"2026-05-17 11:15",user:"Mohan",    branch:"AMD",action:"CREATE",module:"Sales/Visa",  desc:"Created voucher AMD/1726/SV00006",ip:"10.0.2.20"},
-    {id:6,ts:"2026-05-17 10:55",user:"Mujeet", branch:"NBO",action:"CREATE",module:"Sales/Holiday",desc:"Created voucher NBO/1726/SH00011",ip:"196.1.2.34"},
     {id:7,ts:"2026-05-17 10:44",user:"Rohan",    branch:"BOM",action:"EDIT",  module:"Masters",     desc:"Updated supplier: Emirates GSA India — commission updated to 5%",ip:"10.0.1.18"},
-    {id:8,ts:"2026-05-17 10:30",user:"AD",            branch:"TKHO",action:"LOGIN", module:"Auth",        desc:"Admin login — settings access",ip:"10.0.1.5"},
-    {id:9,ts:"2026-05-17 10:12",user:"Rujeet",  branch:"DAR",action:"CREATE",module:"Purchase/Flight",desc:"Created voucher DAR/1726/PF00020",ip:"41.75.3.21"},
+    {id:8,ts:"2026-05-17 10:30",user:"AD",            branch:"BOM",action:"LOGIN", module:"Auth",        desc:"Admin login — settings access",ip:"10.0.1.5"},
     {id:10,ts:"2026-05-17 09:55",user:"Rohan",  branch:"BOM",action:"PRINT", module:"Sales/Flight",desc:"Downloaded PDF for BOM/1726/SF00045",ip:"10.0.1.15"},
     {id:11,ts:"2026-05-17 09:40",user:"Mohan",  branch:"AMD",action:"EDIT",  module:"Payroll",     desc:"Processed payroll run — AMD May 2026",ip:"10.0.2.22"},
     {id:12,ts:"2026-05-17 09:14",user:"Rohan",  branch:"BOM",action:"LOGIN", module:"Auth",        desc:"User login",ip:"10.0.1.15"},
     {id:13,ts:"2026-05-16 18:22",user:"Mohan",   branch:"AMD",action:"LOGOUT",module:"Auth",        desc:"User logout",ip:"10.0.2.20"},
-    {id:14,ts:"2026-05-16 17:45",user:"Mujeet",branch:"NBO",action:"CREATE",module:"Purchase/Visa",desc:"Created voucher NBO/1726/PV00006",ip:"196.1.2.34"},
     {id:15,ts:"2026-05-16 16:30",user:"Rohan",   branch:"BOM",action:"DELETE",module:"Draft",       desc:"Deleted draft voucher BOM/1726/SF00040-D (unsaved draft)",ip:"10.0.1.12"},
   ];
 
@@ -1042,7 +998,7 @@ export function SettingsAudit(){
           </select>
           <select value={brFilter} onChange={e=>setBrFilter(e.target.value)}
             style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-            {["All","BOM","AMD","NBO","DAR","FBM"].map(b=><option key={b}>{b}</option>)}
+            {["All",...BRANCH_CODES].map(b=><option key={b}>{b}</option>)}
           </select>
           <input value={search} onChange={e=>setSearch(e.target.value)}
             placeholder="Search user, module, action..."
@@ -1165,6 +1121,7 @@ export function ApiKeySettings(){
 
 export function ApprovalWorkflow({branch,setRoute}){
   const mob=useMobile();
+  const APPROVAL_RULES=useApprovalRules().data||[];   // DB-backed (/api/approval-rules)
   const active=APPROVAL_RULES.filter(r=>r.active).length;
   const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
 
@@ -1538,6 +1495,7 @@ export function CustomFieldsManager(){
 
 export function FieldAccessControl(){
   const accessColor={"View+Edit":"#22c55e","View Only":"#d4a437","Hidden":"#A32D2D"};
+  const PERM_ROLES=(useRoles().data||[]).map(r=>r.name);   // DB-backed role names
   return(
     <PHASE2_Page title="Field-Level Access Control" subtitle="Control which fields each role can view or edit · per module · per field">
       <div style={cardStyle}>
@@ -1584,6 +1542,7 @@ export function FieldAccessControl(){
 
 export function BulkUserOperations(){
   const [selected,setSelected]=useState({});
+  const _USERS_DATA=useUsersAdmin().data||[];   // DB-backed (/api/auth/users)
   const toggle=id=>setSelected(s=>({...s,[id]:!s[id]}));
   const allSelected=_USERS_DATA.every(u=>selected[u.id]);
   const toggleAll=()=>{if(allSelected)setSelected({});else setSelected(Object.fromEntries(_USERS_DATA.map(u=>[u.id,true])));};
@@ -1627,6 +1586,7 @@ export function BulkUserOperations(){
 
 export function PermissionsMatrix(){
   const [selRole,setSelRole]=useState("Accounts Executive");
+  const PERM_ROLES=(useRoles().data||[]).map(r=>r.name);   // DB-backed role names
   const fullAccess=["Super Admin","Director"];
   const noSettings=["Accounts Executive","Sr. Accounts Executive"];
   const hrOnly=["HR Manager"];

@@ -6,21 +6,22 @@
 import React, { useState } from 'react';
 import { Check, Download, Lock, Plus, Save, Settings } from 'lucide-react';
 import { Legend, Line } from 'recharts';
-import { BRANCHES, EXP_ACTUALS, GP_BILLS } from '../core/data';
+import { BRANCHES, EXP_ACTUALS, FX_RATES, GP_BILLS } from '../core/data';
 import { fmt, fmtINR } from '../core/format';
 import { ACTIVE_DELEGATIONS, AUDIT_QUEUE_DATA, AUTH_INITIAL_MASTER, AUTH_INITIAL_TXN, GROUP_BOOKINGS, GROUP_DASH_DATA, PERIOD_LOCK_DATA, PERIOD_LOCK_STATE, STATUTORY_FILINGS, cardStyle } from '../core/helpers';
 import { useMobile } from '../core/hooks';
 import { B, FL, RPT_tdStyle, RPT_thStyle, btnG, btnGh, card, inp, tabBtnStyle } from '../core/styles';
+import { CUR_MONTH, MONTH_OPTIONS, monthLabel, rangeNote } from '../core/dates';
 import { Dashboard } from './dashboard';
 import { PHASE2_Page } from '../shell/PHASE2_Page';
 
 export function GroupDashboard(){
   const mob=useMobile();
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
 
   /* INR conversion rates */
-  const FX={KES:0.65,TZS:0.03,USD:83.42,INR:1};
+  const FX=FX_RATES;
 
   const getBranch=(code)=>{
     const bills=GP_BILLS.filter(b=>b.branch===code&&b.date.startsWith(period));
@@ -37,7 +38,7 @@ export function GroupDashboard(){
       flag:br.flag,city:br.city,cur:br.cur,rate};
   };
 
-  const branchData=["BOM","AMD","NBO","DAR","FBM"].map(getBranch);
+  const branchData=["BOM","AMD"].map(getBranch);
   const groupRevINR=branchData.reduce((s,b)=>s+b.revINR,0);
   const groupGPINR =branchData.reduce((s,b)=>s+b.gpINR,0);
   const groupNPINR =branchData.reduce((s,b)=>s+b.npINR,0);
@@ -60,7 +61,8 @@ export function GroupDashboard(){
           <div style={{width:40,height:40,borderRadius:10,background:"linear-gradient(135deg,#0d1326,#185FA5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🌍</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Group Executive Dashboard</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>All branches · INR-normalised · {PERIODS.find(p=>p.v===period)?.l}</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>All branches · INR-normalised · {monthLabel(period)}</p>
+            <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {rangeNote('month',{month:period})} · use the period selector to change</p>
           </div>
         </div>
         <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
@@ -143,7 +145,7 @@ export function GroupDashboard(){
             <tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
               <td style={{padding:"11px 14px",fontWeight:700,color:"#d4a437",fontSize:12}}>GROUP TOTAL</td>
               {METRICS.map(m=><td key={m.k} style={{padding:"11px 14px",textAlign:"center",color:"#8b94b3"}}>—</td>)}
-              <td style={{padding:"11px 14px",textAlign:"right",color:"#8b94b3"}}>Multi-currency</td>
+              <td style={{padding:"11px 14px",textAlign:"right",color:"#8b94b3"}}>INR</td>
               <td style={{padding:"11px 14px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>
                 ₹{Number(Math.round(groupRevINR/1000)).toLocaleString()}K
               </td>
@@ -357,7 +359,7 @@ export function PeriodLocking({branch,setRoute}){
         <div style={{...card,borderTop:"3px solid #27500A"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Locked Periods</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#27500A"}}>{locked}</p></div>
         <div style={{...card,borderTop:"3px solid #854F0B"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Soft Locks</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#854F0B"}}>{soft}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>Warning only</p></div>
         <div style={{...card,borderTop:"3px solid #A32D2D"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Open Periods</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#A32D2D"}}>{open}</p></div>
-        <div style={{...card,borderTop:"3px solid #185FA5"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Branches</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#185FA5"}}>5</p></div>
+        <div style={{...card,borderTop:"3px solid #185FA5"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Branches</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#185FA5"}}>2</p></div>
       </div>
 
       <div style={{...card,padding:0,overflow:"hidden"}}>
@@ -409,10 +411,6 @@ export function BankingApiSettings({branch,setRoute}){
     {bank:"HDFC Bank — Connect API",branch:"BOM",account:"50100012345678",status:"Connected",lastSync:"2026-05-19 11:42",balance:1845000,features:["Balance · Transactions · Bulk NEFT"]},
     {bank:"ICICI Bank — Corporate Banking",branch:"BOM",account:"007205012345",status:"Connected",lastSync:"2026-05-19 11:45",balance:892000,features:["Balance · Transactions · Auto-Recon"]},
     {bank:"ICICI Bank — Corporate Banking",branch:"AMD",account:"077301098765",status:"Connected",lastSync:"2026-05-19 10:15",balance:485000,features:["Balance · Transactions"]},
-    {bank:"KCB Bank Kenya — Vooma API",branch:"NBO",account:"1191234567",status:"Pending",lastSync:"—",balance:0,features:["Awaiting M-Pesa till integration"]},
-    {bank:"Equity Bank Kenya",branch:"NBO",account:"0090298765432",status:"Connected",lastSync:"2026-05-19 10:30",balance:8500000,features:["Balance · Transactions · Bulk RTGS"]},
-    {bank:"CRDB Bank Tanzania",branch:"DAR",account:"01J1098765400",status:"Manual",lastSync:"—",balance:0,features:["No API · Manual statement upload"]},
-    {bank:"Rawbank DRC",branch:"FBM",account:"05101-100123",status:"Manual",lastSync:"—",balance:0,features:["No API · Manual reconciliation"]},
   ];
   const connected=BANK_INTEGRATIONS.filter(b=>b.status==="Connected").length;
   const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
@@ -465,11 +463,8 @@ export function BankingApiSettings({branch,setRoute}){
 export const HO_ASSET_REQUESTS = [
   {id:"AR-001",branch:"BOM",requestedBy:"Rohan",date:"2026-05-15",item:"Dell Laptops × 5",category:"IT Equipment",amount:425000,gst:76500,supplier:"Dell India Pvt Ltd",stage:"Approved",approvedBy:"Faiz Patel",approvedDate:"2026-05-17",priority:"Normal"},
   {id:"AR-002",branch:"AMD",requestedBy:"Mohan",date:"2026-05-18",item:"Office furniture set",category:"Furniture",amount:185000,gst:33300,supplier:"Featherlite",stage:"Sughra Review",approvedBy:"—",approvedDate:"—",priority:"Normal"},
-  {id:"AR-003",branch:"NBO",requestedBy:"Mujeet",date:"2026-05-19",item:"Server upgrade — UPS",category:"IT Equipment",amount:680000,gst:122400,supplier:"APC by Schneider",stage:"Faiz Review",approvedBy:"—",approvedDate:"—",priority:"High"},
   {id:"AR-004",branch:"BOM",requestedBy:"Sughra Sayed",date:"2026-05-20",item:"Software licenses — MS 365 (50 seats)",category:"Software",amount:520000,gst:93600,supplier:"Microsoft India",stage:"Pending Director",approvedBy:"—",approvedDate:"—",priority:"Normal"},
-  {id:"AR-005",branch:"DAR",requestedBy:"Rujeet",date:"2026-05-12",item:"Vehicle — Toyota Hilux",category:"Vehicle",amount:3850000,gst:0,supplier:"Toyota Tanzania",stage:"Pending Director",approvedBy:"—",approvedDate:"—",priority:"High"},
   {id:"AR-006",branch:"BOM",requestedBy:"Rohan",date:"2026-04-28",item:"Conference room AV setup",category:"Equipment",amount:240000,gst:43200,supplier:"Sennheiser India",stage:"Delivered",approvedBy:"Faiz Patel",approvedDate:"2026-04-30",priority:"Normal"},
-  {id:"AR-007",branch:"FBM",requestedBy:"Sujeet",date:"2026-05-08",item:"Office renovation — Phase 1",category:"Capex",amount:1250000,gst:0,supplier:"Local contractor",stage:"Ordered",approvedBy:"Afshin Dhanani",approvedDate:"2026-05-10",priority:"Normal"},
 ];
 
 
@@ -485,15 +480,10 @@ export const HO_LOCKED_VENDORS = [
 
 
 export const HO_BANK_CONTROL = [
-  {bank:"HDFC Bank — TKHO Treasury",   acct:"...9988",branch:"TKHO",currency:"INR",controlLevel:"HO-Locked",     signatory:"Afshin + Faiz (joint)",purpose:"Treasury / Investments",balance:18500000},
-  {bank:"HDFC Bank — TKHO Operations", acct:"...4321",branch:"TKHO",currency:"INR",controlLevel:"HO-Locked",     signatory:"Faiz (single)",       purpose:"HO Expenses / Asset Purchases",balance:4800000},
   {bank:"HDFC Bank — BOM Current",     acct:"...4321",branch:"BOM", currency:"INR",controlLevel:"Branch-Op",     signatory:"Faiz + Rohan",         purpose:"Branch operations",balance:12400000},
   {bank:"ICICI Bank — BOM Current",    acct:"...7766",branch:"BOM", currency:"INR",controlLevel:"Branch-Op",     signatory:"Faiz + Rohan",         purpose:"Branch operations",balance:6800000},
   {bank:"HDFC Bank — AMD Current",     acct:"...5544",branch:"AMD", currency:"INR",controlLevel:"Branch-Op",     signatory:"Faiz + Mohan",         purpose:"Branch operations",balance:5200000},
-  {bank:"HDFC Bank — Forex (BOM)",     acct:"...5512",branch:"BOM", currency:"USD",controlLevel:"HO-Locked",     signatory:"Faiz + Afshin",        purpose:"International payments",balance:84500},
-  {bank:"KCB Bank — Nairobi Current",  acct:"...2231",branch:"NBO", currency:"KES",controlLevel:"Branch-Op",     signatory:"Faiz + Mujeet",        purpose:"Branch operations",balance:4250000},
-  {bank:"CRDB Bank — Dar Current",     acct:"...8854",branch:"DAR", currency:"TZS",controlLevel:"Branch-Op",     signatory:"Faiz + Rujeet",        purpose:"Branch operations",balance:185000000},
-  {bank:"BCDC Bank — Lubumbashi USD",  acct:"...3398",branch:"FBM", currency:"USD",controlLevel:"Branch-Op",     signatory:"Faiz + Sujeet",        purpose:"Branch operations",balance:142000},
+  {bank:"HDFC Bank — Forex (BOM)",     acct:"...5512",branch:"BOM", currency:"INR",controlLevel:"HO-Locked",     signatory:"Faiz + Afshin",        purpose:"International payments",balance:84500},
 ];
 
 
@@ -509,7 +499,7 @@ export function HOAssetProcurement(){
 
   return(
     <PHASE2_Page title="HO Asset Procurement — Central Workflow"
-      subtitle="All high-value assets routed through TKHO · consolidated GST input credit · vendor discount leverage"
+      subtitle="All high-value assets routed through HO · consolidated GST input credit · vendor discount leverage"
       toolbar={<>
         <select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>
           <option value="ALL">All stages</option>{stages.map(s=><option key={s}>{s}</option>)}
@@ -529,7 +519,7 @@ export function HOAssetProcurement(){
         <div style={{...cardStyle,marginBottom:14,borderTop:"3px solid #d4a437"}}>
           <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>New Asset Procurement Request</p>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:10}}>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Requesting Branch</label><select style={inp}><option>BOM</option><option>AMD</option><option>NBO</option><option>DAR</option><option>FBM</option><option>TKHO</option></select></div>
+            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Requesting Branch</label><select style={inp}><option>BOM</option><option>AMD</option></select></div>
             <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Category</label><select style={inp}><option>IT Equipment</option><option>Furniture</option><option>Software</option><option>Vehicle</option><option>Capex / Renovation</option><option>Equipment</option></select></div>
             <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Estimated Amount (₹)</label><input type="number" placeholder="0" style={{...inp,fontFamily:"monospace",fontWeight:700}}/></div>
             <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Priority</label><select style={inp}><option>Normal</option><option>High</option><option>Urgent</option></select></div>
@@ -587,8 +577,8 @@ export function HOAssetProcurement(){
 
       {/* GST input optimization callout */}
       <div style={{marginTop:14,padding:14,background:"#fff8e8",border:"1px solid #fde68a",borderRadius:8,fontSize:11.5,color:"#856404"}}>
-        <p style={{margin:"0 0 4px",fontWeight:700,fontSize:12,color:"#0d1326"}}>💡 Why route everything through TKHO?</p>
-        <p style={{margin:0,lineHeight:1.5}}>(i) Consolidated GST input credit at TKHO (₹{(totalGSTRecoverable/100000).toFixed(1)}L YTD recoverable) — easier to track and claim. (ii) Volume discounts from vendors when negotiating across all branches. (iii) Cleaner asset register — assets "leased" to branches via monthly recharge. (iv) Single point of warranty/service contract management.</p>
+        <p style={{margin:"0 0 4px",fontWeight:700,fontSize:12,color:"#0d1326"}}>💡 Why route everything through HO?</p>
+        <p style={{margin:0,lineHeight:1.5}}>(i) Consolidated GST input credit at HO (₹{(totalGSTRecoverable/100000).toFixed(1)}L YTD recoverable) — easier to track and claim. (ii) Volume discounts from vendors when negotiating across all branches. (iii) Cleaner asset register — assets "leased" to branches via monthly recharge. (iv) Single point of warranty/service contract management.</p>
       </div>
     </PHASE2_Page>
   );
@@ -601,12 +591,12 @@ export function HOAssetProcurement(){
 export function HOVendorMasterLock(){
   return(
     <PHASE2_Page title="Centralized Vendor Master — HO Lock Control"
-      subtitle="Critical vendor master data locked at TKHO · branches read-only on PAN, Bank A/c & Credit Terms"
+      subtitle="Critical vendor master data locked at HO · branches read-only on PAN, Bank A/c & Credit Terms"
       toolbar={<><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Lock New Vendor</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Locked List</button></>}>
 
       <div style={{padding:14,background:"#fff5f5",border:"1px solid #fecaca",borderLeft:"3px solid #A32D2D",borderRadius:6,marginBottom:14,fontSize:11.5,color:"#721c24"}}>
-        <p style={{margin:"0 0 4px",fontWeight:700,fontSize:12.5,color:"#A32D2D"}}>🔒 Why these vendors are locked at TKHO</p>
-        <p style={{margin:0,lineHeight:1.5}}>The single biggest fraud vector in multi-branch ERP is a rogue branch staffer changing a supplier's bank account number to divert payments. Locking PAN, Bank A/c and Credit Terms at TKHO eliminates this risk. Branches use these vendors freely for transactions but cannot modify the locked fields. Every change attempt is logged.</p>
+        <p style={{margin:"0 0 4px",fontWeight:700,fontSize:12.5,color:"#A32D2D"}}>🔒 Why these vendors are locked at HO</p>
+        <p style={{margin:0,lineHeight:1.5}}>The single biggest fraud vector in multi-branch ERP is a rogue branch staffer changing a supplier's bank account number to divert payments. Locking PAN, Bank A/c and Credit Terms at HO eliminates this risk. Branches use these vendors freely for transactions but cannot modify the locked fields. Every change attempt is logged.</p>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
@@ -674,17 +664,17 @@ export function HOBankingControl(){
   const totalHO=HO_BANK_CONTROL.filter(b=>b.controlLevel==="HO-Locked").reduce((s,b)=>s+b.balance,0);
   const totalOps=HO_BANK_CONTROL.filter(b=>b.controlLevel==="Branch-Op").reduce((s,b)=>s+b.balance,0);
   return(
-    <PHASE2_Page title="Banking Relationship Control — TKHO Ownership"
-      subtitle="TKHO finance team owns all banking relationships · branches transact only · cannot open/close accounts">
+    <PHASE2_Page title="Banking Relationship Control — HO Ownership"
+      subtitle="HO finance team owns all banking relationships · branches transact only · cannot open/close accounts">
       <div style={{padding:14,background:"#e8f0fe",border:"1px solid #b8d0f8",borderLeft:"3px solid #3b82f6",borderRadius:6,marginBottom:14,fontSize:11.5,color:"#1e3a5f"}}>
         <p style={{margin:"0 0 4px",fontWeight:700,fontSize:12.5}}>🏦 Banking Control Model</p>
-        <p style={{margin:0,lineHeight:1.5}}><b>HO-Locked accounts</b> (Treasury, Forex, Asset Procurement) — only TKHO finance (Faiz/Sughra) can transact. <b>Branch-Operational accounts</b> — branch AE can post day-to-day transactions but cannot change signatories, open new accounts, or close accounts. All bank relationship management (KYC updates, signatory changes, account opening) sits with Faiz Patel.</p>
+        <p style={{margin:0,lineHeight:1.5}}><b>HO-Locked accounts</b> (Treasury, Forex, Asset Procurement) — only HO finance (Faiz/Sughra) can transact. <b>Branch-Operational accounts</b> — branch AE can post day-to-day transactions but cannot change signatories, open new accounts, or close accounts. All bank relationship management (KYC updates, signatory changes, account opening) sits with Faiz Patel.</p>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
-        <div style={{...cardStyle,borderTop:"3px solid #A32D2D"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>HO-Locked Accounts</p><p style={{margin:"4px 0 0",fontSize:18,fontWeight:700,color:"#0d1326"}}>3</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{fmtINR(totalHO)} balance</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #22c55e"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Branch-Operational</p><p style={{margin:"4px 0 0",fontSize:18,fontWeight:700,color:"#0d1326"}}>6</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{fmtINR(totalOps)} balance</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #d4a437"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Joint Signatories</p><p style={{margin:"4px 0 0",fontSize:18,fontWeight:700,color:"#0d1326"}}>9 of 9</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>100% dual-control</p></div>
+        <div style={{...cardStyle,borderTop:"3px solid #A32D2D"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>HO-Locked Accounts</p><p style={{margin:"4px 0 0",fontSize:18,fontWeight:700,color:"#0d1326"}}>{HO_BANK_CONTROL.filter(b=>b.controlLevel==="HO-Locked").length}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{fmtINR(totalHO)} balance</p></div>
+        <div style={{...cardStyle,borderTop:"3px solid #22c55e"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Branch-Operational</p><p style={{margin:"4px 0 0",fontSize:18,fontWeight:700,color:"#0d1326"}}>{HO_BANK_CONTROL.filter(b=>b.controlLevel==="Branch-Op").length}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{fmtINR(totalOps)} balance</p></div>
+        <div style={{...cardStyle,borderTop:"3px solid #d4a437"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Joint Signatories</p><p style={{margin:"4px 0 0",fontSize:18,fontWeight:700,color:"#0d1326"}}>{HO_BANK_CONTROL.length} of {HO_BANK_CONTROL.length}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>100% dual-control</p></div>
       </div>
 
       <div style={cardStyle}>
@@ -740,7 +730,7 @@ export function GroupMonthlyDashboard(){
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
         <div style={{...cardStyle,borderTop:"3px solid #22c55e"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Group Revenue</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:700,color:"#0d1326"}}>{fmtINR(totalRev)}</p></div>
         <div style={{...cardStyle,borderTop:"3px solid #d4a437"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Gross Profit</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:700,color:"#22c55e"}}>{fmtINR(totalGP)}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{gpPct}% margin</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #3b82f6"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Group Cash</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:700,color:"#0d1326"}}>{fmtINR(d.cash.total)}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>Multi-currency INR equiv</p></div>
+        <div style={{...cardStyle,borderTop:"3px solid #3b82f6"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Group Cash</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:700,color:"#0d1326"}}>{fmtINR(d.cash.total)}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>INR</p></div>
         <div style={{...cardStyle,borderTop:"3px solid #A32D2D"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Overdue Receivables</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:700,color:"#A32D2D"}}>{fmtINR(d.overdue.amount)}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{d.overdue.count} invoices, {d.overdue.over90} over 90d</p></div>
       </div>
 
@@ -750,8 +740,8 @@ export function GroupMonthlyDashboard(){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"right"}}>Revenue</th><th style={{...RPT_thStyle,textAlign:"right"}}>Cost</th><th style={{...RPT_thStyle,textAlign:"right"}}>GP</th><th style={{...RPT_thStyle,textAlign:"right"}}>GP %</th><th style={{...RPT_thStyle,textAlign:"right"}}>Bookings</th></tr></thead>
           <tbody>{d.pnlByBranch.map(b=>(
-            <tr key={b.branch} style={{borderBottom:"1px solid #f0f2f7",background:b.branch==="TKHO"?"#fafbfd":"#fff"}}>
-              <td style={{...RPT_tdStyle,fontWeight:700}}><span style={{padding:"2px 7px",background:"#0d1326",color:"#d4a437",borderRadius:3,fontSize:10.5,fontWeight:700}}>{b.branch}</span>{b.branch==="TKHO"&&<span style={{marginLeft:8,fontSize:10,color:"#5a6691",fontStyle:"italic"}}>HO (non-revenue)</span>}</td>
+            <tr key={b.branch} style={{borderBottom:"1px solid #f0f2f7",background:"#fff"}}>
+              <td style={{...RPT_tdStyle,fontWeight:700}}><span style={{padding:"2px 7px",background:"#0d1326",color:"#d4a437",borderRadius:3,fontSize:10.5,fontWeight:700}}>{b.branch}</span></td>
               <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(b.revenue)}</td>
               <td style={{...RPT_tdStyle,textAlign:"right",color:"#5a6691"}}>{fmtINR(b.cost)}</td>
               <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:b.gp>=0?"#22c55e":"#A32D2D"}}>{fmtINR(b.gp)}</td>
@@ -797,7 +787,7 @@ export function GroupMonthlyDashboard(){
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
         <div style={cardStyle}>
           <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>4️⃣ Group Cash Position</p>
-          {[{cur:"INR",amt:d.cash.inr,sym:"₹"},{cur:"USD",amt:d.cash.usd,sym:"$"},{cur:"KES",amt:d.cash.kes,sym:"KSh"},{cur:"TZS",amt:d.cash.tzs,sym:"TSh"}].map(c=>(
+          {[{cur:"INR",amt:d.cash.inr,sym:"₹"}].map(c=>(
             <div key={c.cur} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f0f2f7"}}>
               <span style={{fontSize:12,color:"#0d1326",fontWeight:600}}>{c.cur}</span>
               <span style={{fontSize:12,fontWeight:700,color:"#0d1326",fontFamily:"monospace"}}>{c.sym} {c.amt.toLocaleString("en-IN")}</span>
@@ -809,7 +799,6 @@ export function GroupMonthlyDashboard(){
           {[
             {label:"GSTR-3B (Apr)",   due:"2026-05-20",amt:1579300},
             {label:"PF/ESI Challan",  due:"2026-05-31",amt:60700},
-            {label:"VAT-FBM (Apr)",   due:"2026-05-25",amt:184000},
             {label:"TDS Q4 Returns",  due:"2026-05-31",amt:0},
             {label:"Adv Tax Q1",      due:"2026-06-15",amt:1850000},
           ].map((s,i)=>(
@@ -829,7 +818,7 @@ export function GroupMonthlyDashboard(){
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   5. STATUTORY FILING REGISTER  (Point E — TKHO owns all filings)
+   5. STATUTORY FILING REGISTER  (Point E — HO owns all filings)
    ════════════════════════════════════════════════════════════════════ */
 
 export function StatutoryFilingRegister(){
@@ -841,8 +830,8 @@ export function StatutoryFilingRegister(){
   const dueToday=STATUTORY_FILINGS.filter(f=>f.status==="Due Today").length;
   const statusStyle={Filed:{bg:"#d4edda",color:"#155724"},"In Progress":{bg:"#cfe2ff",color:"#004085"},"Due Today":{bg:"#f8d7da",color:"#721c24"},Pending:{bg:"#fff3cd",color:"#856404"},Overdue:{bg:"#f8d7da",color:"#721c24"}};
   return(
-    <PHASE2_Page title="Statutory Filing Register — TKHO Ownership"
-      subtitle="All statutory filings owned & filed by TKHO finance · branches contribute data, TKHO files · single source of truth"
+    <PHASE2_Page title="Statutory Filing Register — HO Ownership"
+      subtitle="All statutory filings owned & filed by HO finance · branches contribute data, HO files · single source of truth"
       toolbar={<><select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All statuses</option>{statuses.map(s=><option key={s}>{s}</option>)}</select><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Register</button></>}>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
@@ -894,7 +883,7 @@ export function StatutoryFilingRegister(){
 export function PeriodLockControl(){
   const [periods,setPeriods]=useState(PERIOD_LOCK_STATE);
   const months=["2026-01","2026-02","2026-03","2026-04","2026-05"];
-  const branches=["TKHO","BOM","AMD","NBO","DAR","FBM"];
+  const branches=["BOM","AMD"];
   const cycle=(branch,month)=>{
     const cur=periods[branch][month];
     const next={open:"soft",soft:"hard",hard:"open"}[cur];
@@ -903,7 +892,7 @@ export function PeriodLockControl(){
   const counts={open:0,soft:0,hard:0};
   branches.forEach(b=>months.forEach(m=>counts[periods[b][m]]++));
   return(
-    <PHASE2_Page title="Period Lock Control — TKHO Authority"
+    <PHASE2_Page title="Period Lock Control — HO Authority"
       subtitle="Only Faiz Patel & Sughra Sayed can lock/unlock periods · branches frozen after 7th of following month">
       <div style={{padding:14,background:"#fff5f5",border:"1px solid #fecaca",borderLeft:"3px solid #A32D2D",borderRadius:6,marginBottom:14,fontSize:11.5,color:"#721c24"}}>
         <p style={{margin:"0 0 4px",fontWeight:700,fontSize:12.5,color:"#A32D2D"}}>🔒 Period Lock Discipline</p>
@@ -946,7 +935,6 @@ export function PeriodLockControl(){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Override Date</th><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Period</th><th style={RPT_thStyle}>Requested By</th><th style={RPT_thStyle}>Reason</th><th style={RPT_thStyle}>Approved By</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
           <tbody>{[
-            {date:"2026-05-12",branch:"NBO",period:"2026-04",requestedBy:"Mujeet",reason:"Missing receipt voucher RV-NBO/2026/1531 — original receipt found on 12-May",approvedBy:"Faiz Patel",status:"Approved"},
             {date:"2026-05-08",branch:"AMD",period:"2026-04",requestedBy:"Mohan",reason:"Vendor credit note received post-cutoff for adjustment",approvedBy:"Sughra Sayed",status:"Approved"},
             {date:"2026-05-02",branch:"BOM",period:"2026-03",requestedBy:"Rohan",reason:"Late expense reimbursement claim from team",approvedBy:"Sughra Sayed",status:"Approved"},
           ].map((o,i)=>(
@@ -983,7 +971,7 @@ export function CentralAuditQueue(){
   const riskStyle={Low:{bg:"#d4edda",color:"#155724"},Medium:{bg:"#fff3cd",color:"#856404"},High:{bg:"#f8d7da",color:"#721c24"}};
   return(
     <PHASE2_Page title="Central Audit Review Queue — 100% Voucher Audit"
-      subtitle="TKHO finance reviews 100% of branch vouchers · risk-based prioritization · findings discussed in monthly branch-leads call"
+      subtitle="HO finance reviews 100% of branch vouchers · risk-based prioritization · findings discussed in monthly branch-leads call"
       toolbar={<><select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All statuses</option>{statuses.map(s=><option key={s}>{s}</option>)}</select><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Findings</button></>}>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
@@ -1155,7 +1143,7 @@ export function AuthorityConfigCenter(){
       {tab==="txn"&&(
         <div style={cardStyle}>
           <p style={{margin:"0 0 4px",fontSize:13,fontWeight:700,color:"#0d1326"}}>A · Transactional Approval Ladder — Per Voucher Type</p>
-          <p style={{margin:"0 0 14px",fontSize:11,color:"#5a6691"}}>All amounts in ₹ (forex shown as USD equivalent). "Above" = mandatory Director approval. "Any" = no upper limit. Edit any cell to update.</p>
+          <p style={{margin:"0 0 14px",fontSize:11,color:"#5a6691"}}>All amounts in ₹. "Above" = mandatory Director approval. "Any" = no upper limit. Edit any cell to update.</p>
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5,minWidth:760}}>
               <thead>

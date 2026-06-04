@@ -6,14 +6,16 @@
 import { BarChart2, Calendar, Database, Download, LayoutDashboard, Lock, Settings, ShoppingCart, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { Recruitment } from './helpers';
-import { PERM_MODULES, ROLE_TEMPLATES } from './permissions';
+import { PERM_MODULES } from './permissions';
+import { getRole } from './referenceCache';
 import { Dashboard } from '../modules/dashboard';
 
 // Organised on Tally's master taxonomy: Accounts Info · Statutory Info ·
 // Parties (which in Tally are just ledgers) · Inventory & Catalog · Utilities.
 export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
   {label:"Accounts Info", children:[
-    {label:"Groups (Ledger Groups)", href:"/masters/groups"},
+    {label:"Groups (Fixed · 28 Tally)", href:"/masters/groups"},
+    {label:"Sub-Groups (Custom)", href:"/masters/subgroups"},
     {label:"Ledgers (Chart of Accounts)", href:"/masters/ledgers"},
     {label:"Voucher Types", href:"/masters/voucher-types"},
     {label:"Currencies", href:"/masters/currency"},
@@ -362,11 +364,12 @@ export function getMenu(branch, currentUser){
   // Super-admin-only Tally migration tab
   if(currentUser?.role === "Super Admin") menus = [...menus, MENU_IMPORT];
   if(!currentUser) return menus;
-  const tmpl = ROLE_TEMPLATES[currentUser.role];
+  const tmpl = getRole(currentUser.role);   // DB-backed role (Settings → Roles)
   if(!tmpl) return menus;
   // A group is accessible if ANY sub-module within it has view=true
   const hasGroupAccess = (groupName) => {
     if(!groupName) return true;
+    if(tmpl._fullAccess) return true;       // bootstrap Super-Admin fallback
     if(groupName === "_TXN"){
       // Transactions menu requires Sales OR Purchase access
       return ["Sales","Purchase"].some(g=>{

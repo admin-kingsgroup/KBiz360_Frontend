@@ -301,7 +301,7 @@ export function TrialBalanceLive({ branch }) {
 /* ════════════════════ DAY BOOK ═════════════════════════════════════ */
 export function DayBookLive({ branch }) {
   const cur = curOf(branch);
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(todayISO);
   const range = date ? { from: date, to: date } : {};
   const q = useDayBook(branch, range);
   const journals = q.data || [];

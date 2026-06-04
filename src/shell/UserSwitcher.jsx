@@ -4,11 +4,12 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
-import { _USERS_DATA } from '../core/data';
+import { useUsersAdmin } from '../core/useReference';
 import { BranchSwitcher } from './BranchSwitcher';
 
 export function UserSwitcher({currentUser, switchUser, light}){
   const [open,setOpen]=useState(false);
+  const _USERS_DATA=useUsersAdmin().data||[];   // DB-backed (/api/auth/users)
   if(!currentUser) return null;
   const roleColor = {
     "Super Admin":"#A32D2D","Director":"#3C1B14",

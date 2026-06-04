@@ -7,8 +7,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronRight, Download, Lock, Plus, Printer, Save, Search, Settings, User } from 'lucide-react';
 import { Cell } from 'recharts';
 import { exportToCSV } from './business-logic';
-import { ADM_DATA, CASH, FY_TARGETS_DATA, GP_BILLS, HR_EMPLOYEES_DATA, LEDGER_REGISTRY, NOTIFICATIONS_DATA, _EXP_BGT_LISTENERS, _EXP_BUDGETS } from './data';
+import { ADM_DATA, CASH, FY_TARGETS_DATA, GP_BILLS, HR_EMPLOYEES_DATA, NOTIFICATIONS_DATA, _EXP_BGT_LISTENERS, _EXP_BUDGETS } from './data';
+import { useLedgerRegistry } from './useReference';
 import { fmt, fmtINR } from './format';
+import { todayISO, CUR_MONTH, MONTH_OPTIONS, PERIOD_OPTIONS as MONTH_PERIOD_OPTIONS, FY_YTD_MONTHS } from './dates';
 import { useMobile } from './hooks';
 import { B, FL, KpiCard, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, vDate } from './styles';
 import { AcctsExecDashboard, Dashboard, DirectorDashboard, HrMgrDashboard, SrAeDashboard, SrFmDashboard } from '../modules/dashboard';
@@ -23,7 +25,6 @@ export const VTD=({c,r})=><td style={{padding:"4px 7px",textAlign:r?"right":"lef
 
 export const BANK_LIST_V=[
   "HDFC Bank CA — Nariman Point","HDFC Bank CA — Ahmedabad","ICICI Bank CA — Fort",
-  "KCB Bank — Nairobi","CRDB Bank — Dar es Salaam","Rawbank USD — Lubumbashi",
   "Cash in Hand","Petty Cash",
 ];
 
@@ -38,46 +39,23 @@ export const PMT_MODES_V=[
 /* ContraVoucher — see rebuilt version below */
 /* ════ FIX 5: BANK RECONCILIATION — PDC Register + Cheque Bounce ═ */
 
-export function getDbRows(branch){
-  const p=branch==="ALL"?"BOM":branch?.code||"BOM";
-  const fy=vDate();
-  return [
-    {time:"09:15",vno:`${p}/${fy}/SF00043`,type:"Sales",   party:"Apex Pharma",        dr:0,    cr:52170, narr:"Air ticket — DEL"},
-    {time:"10:30",vno:`${p}/${fy}/RV00032`,type:"Receipt", party:"Sharma Enterprises", dr:52170,cr:0,     narr:"NEFT receipt"},
-    {time:"11:00",vno:`${p}/${fy}/SC00012`,type:"Sales",   party:"Nexus Industries",   dr:0,    cr:14490, narr:"Car hire"},
-    {time:"12:45",vno:`${p}/${fy}/SV00009`,type:"Sales",   party:"Rohan",        dr:0,    cr:21950, narr:"UAE visa"},
-    {time:"14:00",vno:`${p}/${fy}/PF00043`,type:"Purchase",party:"IndiGo Airlines",    dr:31200,cr:0,     narr:"Ticket cost"},
-    {time:"15:30",vno:`${p}/${fy}/JV00022`,type:"Journal", party:"GST/VAT transfer",   dr:14850,cr:14850, narr:"Tax adj."},
-    {time:"16:00",vno:`${p}/${fy}/PMT0028`,type:"Payment", party:"Airline",            dr:37000,cr:0,     narr:"BSP payment"},
-  ];
-}
+/* Day Book and Ledger statements are read live from the accounting engine
+   (useDayBook / useLedgerStatement). The former hardcoded demo rows
+   (getDbRows / getLtx) have been removed — no bundled fake transactions. */
 
 export const DB_CLR={Sales:{bg:"#E6F1FB",c:"#185FA5"},Receipt:{bg:"#EAF3DE",c:"#27500A"},Purchase:{bg:"#FAEEDA",c:"#854F0B"},Payment:{bg:"#FCEBEB",c:"#A32D2D"},Journal:{bg:"#f3f4f8",c:"#5a6691"},Contra:{bg:"#F3E8FF",c:"#5B21B6"}};
-
-export function getLtx(branch){
-  const p=branch==="ALL"?"BOM":branch?.code||"BOM";
-  const fy=vDate();
-  return [
-    {date:"2026-04-01",vno:"OB",                 type:"Opening",narr:"Opening balance",       dr:0,     cr:0,      bal:215000, bt:"Dr"},
-    {date:"2026-04-15",vno:`${p}/${fy}/SF00031`, type:"Sales",  narr:"Flight ticket",          dr:0,     cr:48500,  bal:263500, bt:"Dr"},
-    {date:"2026-04-22",vno:`${p}/${fy}/RV00021`, type:"Receipt",narr:"NEFT receipt",           dr:263500,cr:0,      bal:0,      bt:"Nil"},
-    {date:"2026-05-05",vno:`${p}/${fy}/SF00042`, type:"Sales",  narr:"Flight ticket",          dr:0,     cr:52170,  bal:52170,  bt:"Dr"},
-    {date:"2026-05-10",vno:`${p}/${fy}/SH00018`, type:"Sales",  narr:"Holiday package",        dr:0,     cr:272800, bal:324970, bt:"Dr"},
-    {date:"2026-05-15",vno:`${p}/${fy}/RV00031`, type:"Receipt",narr:"Part payment NEFT",      dr:52170, cr:0,      bal:272800, bt:"Dr"},
-  ];
-}
 
 export const B2B_D=[];
 
 export const PNL_D=[];
 /* ── MODULE-WISE GP DATA (branch-aware) ──────────────────────── */
 
-export const MODULE_GP={ BOM:[], AMD:[], NBO:[], DAR:[], FBM:[] };
+export const MODULE_GP={ BOM:[], AMD:[] };
 /* Consolidated — sum all branches */
 MODULE_GP.ALL=(()=>{
   const mods=["Flight","Holiday","Hotel","Car","Visa","Insurance","Misc"];
   return mods.map((mod,mi)=>{
-    const branches=["BOM","AMD","NBO","DAR","FBM"];
+    const branches=["BOM","AMD"];
     const rev=branches.reduce((s,b)=>s+(MODULE_GP[b].find(m=>m.mod===mod)?.rev||0),0);
     const cost=branches.reduce((s,b)=>s+(MODULE_GP[b].find(m=>m.mod===mod)?.cost||0),0);
     const gp=rev-cost;
@@ -155,7 +133,7 @@ export const _ACM_LIST=[...ACM_DATA];
    ════════════════════════════════════════════════════════════════ */
 
 export const _BOOKING_FILES={};
-let _bfSeq={BOM:12,AMD:6,NBO:8,DAR:5,FBM:3};
+let _bfSeq={BOM:12,AMD:6};
 
 export const BOOKING_FILES_SEED=[];
 BOOKING_FILES_SEED.forEach(f=>{_BOOKING_FILES[f.id]=f;});
@@ -386,7 +364,7 @@ export function TdsCertRegister({branch}){
   const QUARTERS=["All","Q4 FY25-26","Q3 FY25-26","Q2 FY25-26","Q1 FY25-26"];
   const STATUS_CLR={Pending:"#A32D2D",Issued:"#185FA5",Acknowledged:"#27500A"};
   const STATUS_BG={Pending:"#FCEBEB",Issued:"#E6F1FB",Acknowledged:"#EAF3DE"};
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
   const daysLeft=d=>d?Math.ceil((new Date(d)-new Date(TODAY))/(1000*60*60*24)):null;
 
   const filtered=certs.filter(c=>quarter==="All"||c.quarter===quarter);
@@ -605,6 +583,7 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={}}){
   const [q,setQ]=useState("");
   const [open,setOpen]=useState(false);
   const ref=useRef(null);
+  const LEDGER_REGISTRY=useLedgerRegistry().data||[];   // live chart of accounts (/api/ledgers)
   const filtered=LEDGER_REGISTRY.filter(l=>{
     const matchQ=!q||l.name.toLowerCase().includes(q.toLowerCase())||l.group.toLowerCase().includes(q.toLowerCase());
     const matchFilter=!filter||filter(l);
@@ -750,8 +729,8 @@ export function PackagePnL({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?null:branch?.code;
   const [period,setPeriod]=useState("YTD");
-  const PERIODS=[{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"},{v:"YTD",l:"YTD 2026"}];
-  const FY_MONTHS=["2026-04","2026-05"];
+  const PERIODS=MONTH_PERIOD_OPTIONS;
+  const FY_MONTHS=FY_YTD_MONTHS;
   const bills=useMemo(()=>GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&(b.mod==="Holiday"||b.mod==="MICE")&&(period==="YTD"?FY_MONTHS.includes(b.date.slice(0,7)):b.date.startsWith(period))),[brCode,period]);
 
   // Group by tour code (simulate from dest)
@@ -824,8 +803,8 @@ export function SubAgentStatement({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?null:branch?.code;
   const [agent,setAgent]=useState("SA001");
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
   const selAgent=SUBAGENTS?.find(s=>s.id===agent)||{name:"Skyline Travels",commType:"% of GP",commRate:15,creditDays:30};
   const bills=useMemo(()=>GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period)).slice(0,12),[brCode,period]);
   const commAmt=b=>selAgent.commType?.includes("%")?Math.round((b.sell-b.cost)*(selAgent.commRate||10)/100):(selAgent.commRate||500);
@@ -907,7 +886,6 @@ export function Recruitment({branch}){
   const [jobs,setJobs]=useState([
     {id:"JOB001",title:"Senior Travel Consultant",dept:"Operations",location:"Mumbai",type:"Full-time",salary:"₹35K–50K/mo",status:"Open",applicants:12,posted:"2026-05-01",skills:"GDS, Flight ticketing, holiday packages"},
     {id:"JOB002",title:"Accountant",dept:"Finance",location:"Ahmedabad",type:"Full-time",salary:"₹25K–35K/mo",status:"Open",applicants:8,posted:"2026-05-10",skills:"Tally, GST, bank reconciliation"},
-    {id:"JOB003",title:"Accounts Executive — Nairobi",dept:"Management",location:"Nairobi",type:"Full-time",salary:"KES 150K–200K/mo",status:"Interviewing",applicants:5,posted:"2026-04-20",skills:"Travel industry experience, team management"},
   ]);
   const [modal,setModal]=useState(false);
   const STATUS_CLR={Open:"#185FA5",Interviewing:"#854F0B",Hired:"#27500A",Closed:"#5a6691"};
@@ -1268,15 +1246,7 @@ export function GratuityRegister({branch}){
 
 /* ── E-WAY BILL ──────────────────────────────────────────────── */
 
-export const ASSET_CATEGORIES = [
-  {code:"COMP",  name:"Computers & Peripherals",   itRate:40, coRate:31.67, life:3,  block:"Block IV — Computer"},
-  {code:"FURN",  name:"Furniture & Fixtures",      itRate:10, coRate:9.50,  life:10, block:"Block VII — Furniture"},
-  {code:"VEHI",  name:"Motor Vehicles",            itRate:15, coRate:11.88, life:8,  block:"Block III — Vehicle"},
-  {code:"OFEQ",  name:"Office Equipment",          itRate:15, coRate:13.91, life:5,  block:"Block VI — Plant"},
-  {code:"BUIL",  name:"Building (Office)",         itRate:10, coRate:1.63,  life:60, block:"Block I — Building"},
-  {code:"INTA",  name:"Software & Intangibles",    itRate:25, coRate:31.67, life:3,  block:"Block V — Intangible"},
-  {code:"AC",    name:"Air Conditioners",          itRate:15, coRate:9.50,  life:10, block:"Block VI — Plant"},
-];
+export const ASSET_CATEGORIES = []; /* moved to DB — fetch via API/hook */
 
 
 export const FIXED_ASSETS_DATA = [];
@@ -1293,7 +1263,7 @@ export function FxRevaluation({branch,setRoute}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState("2026-05");
+  const [period,setPeriod]=useState(CUR_MONTH);
 
   const rows=FX_REVAL_DATA.filter(r=>!brCode||r.branch===brCode);
   const totGain=rows.reduce((s,r)=>s+(r.fxGain>0?r.fxGain:0),0);
@@ -1311,7 +1281,7 @@ export function FxRevaluation({branch,setRoute}){
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:7,fontSize:11.5}}>
-            <option value="2026-05">May 2026</option><option value="2026-04">Apr 2026</option><option value="2026-03">Mar 2026</option>
+            {MONTH_OPTIONS.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
           <button style={{padding:"7px 14px",border:"none",background:"#d4a437",color:"#0d1326",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer"}}>📒 Post Revaluation JV</button>
         </div>
@@ -1445,22 +1415,7 @@ export function MsmeTracker({branch,setRoute}){
 export const PERIOD_LOCK_DATA = [];
 
 
-export const APPROVAL_RULES = [
-  {id:"AR-001",voucherType:"Payment Voucher",condition:"Amount > ₹50,000",            approver:"Sughra Sayed (Sr. AE — TKHO)",backup:"Faiz Patel (Sr. FM — TKHO)",sla:"4 hours", active:true},
-  {id:"AR-002",voucherType:"Payment Voucher",condition:"Amount > ₹2,00,000",           approver:"Faiz Patel (Sr. FM — TKHO)", backup:"—",                          sla:"24 hours",active:true},
-  {id:"AR-003",voucherType:"Journal Voucher",condition:"All journals (any amount)",    approver:"Sughra Sayed (Sr. AE — TKHO)",backup:"Faiz Patel (Sr. FM — TKHO)",sla:"4 hours", active:true},
-  {id:"AR-004",voucherType:"Credit Note",    condition:"Amount > ₹25,000",            approver:"Sughra Sayed (Sr. AE — TKHO)",backup:"Faiz Patel (Sr. FM — TKHO)",sla:"4 hours", active:true},
-  {id:"AR-005",voucherType:"Vendor Master",  condition:"New vendor creation",         approver:"Sughra Sayed (Sr. AE — TKHO)",backup:"Faiz Patel (Sr. FM — TKHO)",sla:"24 hours",active:true},
-  {id:"AR-006",voucherType:"Vendor Master",  condition:"Bank A/c change",             approver:"Faiz Patel (Sr. FM — TKHO)", backup:"—",                          sla:"48 hours",active:true},
-  {id:"AR-007",voucherType:"Cash Refund",    condition:"Amount > ₹10,000",            approver:"Sughra Sayed (Sr. AE — TKHO)",backup:"Faiz Patel (Sr. FM — TKHO)",sla:"4 hours", active:true},
-  {id:"AR-008",voucherType:"Forex Trade",    condition:"All forex purchases",         approver:"Faiz Patel (Sr. FM — TKHO)", backup:"—",                          sla:"24 hours",active:true},
-  {id:"AR-009",voucherType:"Period Lock",    condition:"Lock/unlock monthly periods",            approver:"Faiz Patel (Sr. FM — TKHO)",        backup:"Afshin Dhanani (Founder & Director)",sla:"Immediate",active:true},
-  {id:"AR-010",voucherType:"Payment Voucher",condition:"Amount > ₹5,00,000 (above Sr. FM ceiling)",approver:"Faiz Patel (Sr. FM — TKHO)",         backup:"Afshin Dhanani (Founder & Director)",sla:"24 hours",active:true},
-  {id:"AR-011",voucherType:"Payment Voucher",condition:"Amount > ₹25,00,000 (strategic)",       approver:"Afshin Dhanani (Founder & Director)",          backup:"—",                       sla:"48 hours",active:true},
-  {id:"AR-012",voucherType:"Annual Filing",  condition:"GSTR-9, Income Tax Return sign-off",     approver:"Faiz Patel (Sr. FM — TKHO)",         backup:"Afshin Dhanani (Founder & Director)",sla:"7 days",  active:true},
-  {id:"AR-013",voucherType:"Capex",          condition:"Fixed asset purchase > ₹2,00,000",       approver:"Faiz Patel (Sr. FM — TKHO)",         backup:"Afshin Dhanani (Founder & Director)",sla:"48 hours",active:true},
-  {id:"AR-014",voucherType:"Bank Facility",  condition:"New loan / credit limit / OD increase",  approver:"Afshin Dhanani (Founder & Director)",          backup:"—",                       sla:"7 days",  active:true},
-];
+export const APPROVAL_RULES = []; /* moved to DB — fetch via API/hook */
 
 
 export const PENDING_APPROVALS_DATA = [];
@@ -1542,12 +1497,8 @@ export const BANK_ACCOUNTS_DATA = [];
 
 export const CURRENCY_DATA = [
   {code:"INR",name:"Indian Rupee",      symbol:"₹",  dailyRate:1.0000,    lastUpdated:"2026-05-20 09:00",isBase:true, active:true},
-  {code:"USD",name:"US Dollar",         symbol:"$",  dailyRate:84.5200,   lastUpdated:"2026-05-20 09:00",isBase:false,active:true},
-  {code:"EUR",name:"Euro",              symbol:"€",  dailyRate:91.2400,   lastUpdated:"2026-05-20 09:00",isBase:false,active:true},
-  {code:"GBP",name:"British Pound",     symbol:"£",  dailyRate:107.1500,  lastUpdated:"2026-05-20 09:00",isBase:false,active:true},
-  {code:"AED",name:"UAE Dirham",        symbol:"د.إ", dailyRate:23.0200,   lastUpdated:"2026-05-20 09:00",isBase:false,active:true},
-  {code:"SGD",name:"Singapore Dollar",  symbol:"S$", dailyRate:63.1800,   lastUpdated:"2026-05-20 09:00",isBase:false,active:true},
-  {code:"KES",name:"Kenyan Shilling",   symbol:"KSh",dailyRate:0.6520,    lastUpdated:"2026-05-20 09:00",isBase:false,active:true},
+  {code:"USD",name:"US Dollar",         symbol:"$",  dailyRate:84.5000,   lastUpdated:"2026-05-20 09:00",isBase:false,active:true},
+  {code:"KES",name:"Kenyan Shilling",   symbol:"KSh",dailyRate:0.6500,    lastUpdated:"2026-05-20 09:00",isBase:false,active:true},
   {code:"TZS",name:"Tanzanian Shilling",symbol:"TSh",dailyRate:0.0340,    lastUpdated:"2026-05-20 09:00",isBase:false,active:true},
   {code:"CDF",name:"Congolese Franc",   symbol:"FC", dailyRate:0.0300,    lastUpdated:"2026-05-20 09:00",isBase:false,active:true},
 ];
@@ -1676,12 +1627,9 @@ export const RECON_STATUS_DATA = [];
 
 
 export const TODAY_VOUCHERS_BY_BR = {
-  TKHO:[],
+  TKHO: [],
   BOM: [],
   AMD: [],
-  NBO: [],
-  DAR: [],
-  FBM: [],
 };
 
 
@@ -1717,7 +1665,7 @@ export function DashboardHeader({title,subtitle,user,period,setPeriod,onExport})
         <p style={{margin:"3px 0 0",fontSize:12.5,color:"#5a6691"}}>{subtitle} · <span style={{color:"#d4a437",fontWeight:600}}>{user.name}</span></p>
       </div>
       <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-        <PeriodSelector period={period} setPeriod={setPeriod}/>
+        {period && setPeriod && <PeriodSelector period={period} setPeriod={setPeriod}/>}
         <button onClick={onExport} style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📄 Export PDF</button>
       </div>
     </div>
@@ -1852,13 +1800,7 @@ export function Sparkline({values,color="#d4a437",w=80,h=28}){
 /* ── Drill-down modal ────────────────────────────────────────────── */
 
 export function DrillModal({branch,metric,value,onClose}){
-  const rows=[
-    {vno:"INV-"+branch+"/2026/8740",date:"2026-05-18",party:"L&T Limited",   amount:Math.round(value*0.28)},
-    {vno:"INV-"+branch+"/2026/8728",date:"2026-05-12",party:"Reliance Ind.", amount:Math.round(value*0.22)},
-    {vno:"INV-"+branch+"/2026/8715",date:"2026-05-08",party:"TechCorp Sol.", amount:Math.round(value*0.18)},
-    {vno:"INV-"+branch+"/2026/8701",date:"2026-05-04",party:"Infosys Ltd.",  amount:Math.round(value*0.14)},
-    {vno:"INV-"+branch+"/2026/8695",date:"2026-05-02",party:"Others (48)",   amount:Math.round(value*0.18)},
-  ];
+  const rows=[]; // drill-down rows come from the live ledger/voucher data (no demo)
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(13,19,38,0.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
       <div style={{background:"#fff",borderRadius:10,padding:22,width:580,maxHeight:"80vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
@@ -2002,12 +1944,9 @@ export const STATUTORY_FILINGS = [];
 
 
 export const PERIOD_LOCK_STATE = {
+  "TKHO": {},
   "BOM": {},
   "AMD": {},
-  "NBO": {},
-  "DAR": {},
-  "FBM": {},
-  "TKHO":{},
 };
 
 
@@ -2021,7 +1960,7 @@ export const GROUP_DASH_DATA = {
   pnlByBranch:[],
   topConsultants:[],
   topCustomers:[],
-  cash:{total:0,inr:0,usd:0,kes:0,tzs:0},
+  cash:{total:0,inr:0},
   overdue:{count:0,amount:0,over90:0,over90amt:0},
 };
 

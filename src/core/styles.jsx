@@ -3,245 +3,31 @@
    Auto-generated from KBiz360_v2.jsx · 1176 lines · 44 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useRef, useState } from 'react';
-import { Calendar, ChevronRight, Download, Plus, Save, Search, Trash2, TrendingDown, TrendingUp, User } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { Calendar, ChevronRight, Clock, Download, Plus, Save, Search, Trash2, TrendingDown, TrendingUp, User } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from './business-logic';
-import { HR_STATS_DATA, INTERBRANCH_ELIMINATIONS, LEAVE_UTILIZATION, PURCHASE_REGISTRY, SALESPEOPLE, TAX_FILING_BOARD, YIELD_BY_CONSULTANT, YIELD_BY_DESTINATION, YIELD_BY_SUPPLIER, YOY_PL } from './data';
+import { FX_RATES, HR_STATS_DATA, INTERBRANCH_ELIMINATIONS, LEAVE_UTILIZATION, PURCHASE_REGISTRY, TAX_FILING_BOARD, YIELD_BY_CONSULTANT, YIELD_BY_DESTINATION, YIELD_BY_SUPPLIER, YOY_PL } from './data';
+import { branchCfg } from './referenceCache';
+import { useSalespeople } from './useReference';
 import { fmt, fmtINR } from './format';
+import { todayISO, nowLabel } from './dates';
 import { ATTRITION_DATA, AUDIT_TRAIL_DATA, BANK_ACCOUNTS_DATA, CUSTOMER_LTV_DATA, FS_NOTES, FX_EXPOSURE, STATUTORY_DUES, TOP_SUPPLIERS_DATA, abcOf, cardStyle } from './helpers';
 import { triggerSaveRefresh, useMobile } from './hooks';
 import { openPrintWindow } from './voucher-print';
 import { PurchaseLinkField } from '../modules/transactions';
 import { UserSwitcher } from '../shell/UserSwitcher';
 
-export const B = {
-  /* ── HO – Head Office (India, INR base) ────────────── */
-  TKHO:{
-    cur:"₹", curCode:"INR", taxType:"GST", vatRate:null,
-    gstRates:[5,12,18], hasIGST:true,
-    psOptions:["Maharashtra (27)","Gujarat (24)","Karnataka (29)","Delhi (07)","Tamil Nadu (33)","Overseas"],
-    voucherPrefix:"TKHO", isHO:true,
-    kpi:{
-      revenue:"₹2.42 Cr", margin:"₹68.0 L", marginPct:"28.1%",
-      bookings:684, receivables:"₹52.4 L", payables:"₹24.8 L",
-      bank:"₹38.5 L", overdueCount:6,
-    },
-    bookings:[
-      {id:"TKHO-SF/0001",cust:"Reliance Group",        type:"Flight",  amt:"4,82,500", st:"Paid"},
-      {id:"TKHO-SH/0001",cust:"Tata Consultancy",      type:"Holiday", amt:"12,85,000",st:"Partial"},
-      {id:"TKHO-SHT/001",cust:"Adani Ports",           type:"Hotel",   amt:"1,98,400", st:"Paid"},
-      {id:"TKHO-SV/0001",cust:"L&T Limited",           type:"Visa",    amt:"42,500",   st:"Pending"},
-      {id:"TKHO-SC/0001",cust:"Wipro Technologies",    type:"Car",     amt:"58,900",   st:"Paid"},
-    ],
-    customers:[
-      {name:"Reliance Group",        rev:"42,80,000", out:"5,40,000", ov:false},
-      {name:"Tata Consultancy",      rev:"38,50,000", out:"0",        ov:false},
-      {name:"Adani Ports",           rev:"28,90,000", out:"2,15,000", ov:false},
-      {name:"L&T Limited",           rev:"24,60,000", out:"3,80,000", ov:true },
-      {name:"Wipro Technologies",    rev:"18,40,000", out:"0",        ov:false},
-      {name:"Mahindra Holidays",     rev:"15,20,000", out:"1,25,000", ov:false},
-    ],
-    alerts:[
-      {type:"Visa",  msg:"3 corporate visa files pending — L&T Limited",        priority:"High"},
-      {type:"BSP",   msg:"BSP settlement cycle 2 due in 2 days",                priority:"High"},
-      {type:"Audit", msg:"Period lock pending for May — close pre-filing",      priority:"Medium"},
-    ],
-  },
-  /* ── India – Mumbai ──────────────────────────────── */
-  BOM:{
-    cur:"₹", curCode:"INR", taxType:"GST", vatRate:null,
-    gstRates:[5,12,18], hasIGST:true,
-    psOptions:["Maharashtra (27)","Gujarat (24)","Karnataka (29)","Delhi (07)","Tamil Nadu (33)","Overseas"],
-    voucherPrefix:"BOM",
-    kpi:{
-      revenue:"₹1.51 Cr", margin:"₹35.0 L", marginPct:"23.2%",
-      bookings:524, receivables:"₹38.6 L", payables:"₹18.2 L",
-      bank:"₹24.8 L", overdueCount:8,
-    },
-    bookings:[
-      {id:"BOM-SF/0042",cust:"Sharma Enterprises",type:"Flight",  amt:"52,170",  st:"Paid"},
-      {id:"BOM-SH/0018",cust:"Mehta & Sons",       type:"Holiday", amt:"2,72,800", st:"Partial"},
-      {id:"BOM-SHT/021",cust:"Apex Pharma",        type:"Hotel",   amt:"49,560",  st:"Paid"},
-      {id:"BOM-SV/0008",cust:"Rohan",         type:"Visa",    amt:"21,950",  st:"Pending"},
-      {id:"BOM-SC/0012",cust:"Nexus Industries",   type:"Car",     amt:"14,490",  st:"Paid"},
-    ],
-    customers:[
-      {name:"Sharma Enterprises", rev:"18,40,000", out:"2,15,000", ov:false},
-      {name:"Apex Pharma Ltd.",   rev:"12,75,000", out:"1,80,000", ov:false},
-      {name:"Mehta & Sons",       rev:"9,60,000",  out:"3,40,000", ov:true},
-      {name:"Nexus Industries",   rev:"7,20,000",  out:"85,000",   ov:false},
-      {name:"Rohan",        rev:"4,10,000",  out:"0",        ov:false},
-    ],
-    alerts:[
-      {type:"warning", label:"Overdue receivables", val:"8 invoices",    sub:"₹3.4 L · 30+ days"},
-      {type:"info",    label:"GSTR-1 due",           val:"in 4 days",    sub:"214 B2B invoices"},
-            {type:"success", label:"HDFC CA balance",      val:"₹24.8 L",     sub:"As of today"},
-    ],
-  },
-
-  /* ── India – Ahmedabad ───────────────────────────── */
-  AMD:{
-    cur:"₹", curCode:"INR", taxType:"GST", vatRate:null,
-    gstRates:[5,12,18], hasIGST:true,
-    psOptions:["Gujarat (24)","Maharashtra (27)","Rajasthan (08)","Delhi (07)","Overseas"],
-    voucherPrefix:"AMD",
-    kpi:{
-      revenue:"₹86.0 L", margin:"₹20.2 L", marginPct:"23.5%",
-      bookings:312, receivables:"₹12.4 L", payables:"₹9.1 L",
-      bank:"₹10.2 L", overdueCount:3,
-    },
-    bookings:[
-      {id:"AMD-SF/0031",cust:"Patel Exports",      type:"Flight",  amt:"38,400",  st:"Paid"},
-      {id:"AMD-SH/0014",cust:"Gujarat Ceramics",   type:"Holiday", amt:"1,85,000", st:"Paid"},
-      {id:"AMD-SHT/009",cust:"Adani Enterprises",  type:"Hotel",   amt:"42,000",  st:"Pending"},
-      {id:"AMD-SV/0005",cust:"Rajesh Shah",         type:"Visa",    amt:"18,500",  st:"Paid"},
-      {id:"AMD-SC/0008",cust:"Torrent Group",      type:"Car",     amt:"12,600",  st:"Partial"},
-    ],
-    customers:[
-      {name:"Patel Exports Ltd.",  rev:"14,20,000", out:"0",        ov:false},
-      {name:"Gujarat Ceramics",    rev:"9,80,000",  out:"1,20,000", ov:false},
-      {name:"Adani Enterprises",   rev:"7,40,000",  out:"2,10,000", ov:true},
-      {name:"Torrent Group",       rev:"5,60,000",  out:"0",        ov:false},
-      {name:"Rajesh Shah & Co.",   rev:"3,20,000",  out:"0",        ov:false},
-    ],
-    alerts:[
-      {type:"warning", label:"Overdue receivables", val:"3 invoices",    sub:"₹2.1 L · 45+ days"},
-      {type:"info",    label:"GSTR-1 due",           val:"in 4 days",    sub:"128 B2B invoices"},
-      {type:"danger",  label:"TDS pending",          val:"₹14,200",     sub:"194C — due 7 June"},
-      {type:"success", label:"ICICI CA balance",     val:"₹10.2 L",     sub:"As of today"},
-    ],
-  },
-
-  /* ── Tanzania – Dar es Salaam ────────────────────── */
-  DAR:{
-    cur:"TZS ", curCode:"TZS", taxType:"VAT", vatRate:18,
-    gstRates:[], hasIGST:false,
-    psOptions:["Tanzania — mainland","Zanzibar","Overseas"],
-    voucherPrefix:"DAR",
-    kpi:{
-      revenue:"TZS 47.5 M", margin:"TZS 11.0 M", marginPct:"23.2%",
-      bookings:178, receivables:"TZS 9.8 M", payables:"TZS 5.2 M",
-      bank:"TZS 14.6 M", overdueCount:5,
-    },
-    bookings:[
-      {id:"DAR-SF/0021",cust:"Serengeti Safaris",  type:"Flight",  amt:"4,200,000",  st:"Paid"},
-      {id:"DAR-SH/0009",cust:"Tanzania Tours Co.", type:"Holiday", amt:"12,500,000", st:"Partial"},
-      {id:"DAR-SHT/004",cust:"Kilimanjaro Hotels", type:"Hotel",   amt:"3,800,000",  st:"Paid"},
-      {id:"DAR-SV/0003",cust:"Zanzibar Exports",   type:"Visa",    amt:"960,000",    st:"Pending"},
-      {id:"DAR-SC/0005",cust:"Dar Car Hire Co.",   type:"Car",     amt:"2,100,000",  st:"Paid"},
-    ],
-    customers:[
-      {name:"Serengeti Safaris",  rev:"12,40,00,000", out:"1,80,00,000", ov:false},
-      {name:"Tanzania Tours Co.", rev:"8,90,00,000",  out:"3,20,00,000", ov:true},
-      {name:"Kilimanjaro Hotels", rev:"6,20,00,000",  out:"0",           ov:false},
-      {name:"Zanzibar Exports",   rev:"4,10,00,000",  out:"90,00,000",   ov:false},
-      {name:"Dar Car Hire Co.",   rev:"2,80,00,000",  out:"0",           ov:false},
-    ],
-    alerts:[
-      {type:"warning", label:"VAT return due",        val:"20 June",       sub:"VAT 18% · TZS 8.55 M"},
-      {type:"info",    label:"Overdue receivables",   val:"5 invoices",    sub:"TZS 3.2 M · 30+ days"},
-      {type:"danger",  label:"Withholding tax",       val:"TZS 420,000",   sub:"Due 7 June 2026"},
-      {type:"success", label:"CRDB bank balance",     val:"TZS 14.6 M",   sub:"As of today"},
-    ],
-  },
-
-  /* ── Kenya – Nairobi ─────────────────────────────── */
-  NBO:{
-    cur:"KES ", curCode:"KES", taxType:"VAT", vatRate:16,
-    gstRates:[], hasIGST:false,
-    psOptions:["Kenya — Nairobi","Kenya — Mombasa","Kenya — Kisumu","Overseas"],
-    voucherPrefix:"NBO",
-    kpi:{
-      revenue:"KES 60.5 M", margin:"KES 14.5 M", marginPct:"24.0%",
-      bookings:214, receivables:"KES 18.2 M", payables:"KES 7.8 M",
-      bank:"KES 22.4 M", overdueCount:6,
-    },
-    bookings:[
-      {id:"NBO-SF/0031",cust:"Kenya Airways Corp.", type:"Flight",  amt:"580,000",   st:"Paid"},
-      {id:"NBO-SH/0012",cust:"Maasai Mara Tours",  type:"Holiday", amt:"3,200,000", st:"Paid"},
-      {id:"NBO-SHT/007",cust:"Nairobi Serena",      type:"Hotel",   amt:"1,100,000", st:"Partial"},
-      {id:"NBO-SV/0004",cust:"East Africa Travels", type:"Visa",    amt:"240,000",   st:"Pending"},
-      {id:"NBO-SC/0009",cust:"Mombasa Car Hire",    type:"Car",     amt:"850,000",   st:"Paid"},
-    ],
-    customers:[
-      {name:"Kenya Airways Corp.", rev:"18,200,000", out:"0",         ov:false},
-      {name:"Maasai Mara Tours",   rev:"12,400,000", out:"2,800,000", ov:false},
-      {name:"Nairobi Serena",      rev:"9,100,000",  out:"1,600,000", ov:true},
-      {name:"East Africa Travels", rev:"6,800,000",  out:"800,000",   ov:false},
-      {name:"Mombasa Car Hire",    rev:"4,200,000",  out:"0",         ov:false},
-    ],
-    alerts:[
-      {type:"warning", label:"VAT return due",        val:"20 June",       sub:"VAT 16% · KES 9.68 M"},
-      {type:"info",    label:"Overdue receivables",   val:"6 invoices",    sub:"KES 4.4 M · 30+ days"},
-      {type:"danger",  label:"WHT pending",           val:"KES 180,000",   sub:"Due 7 June 2026"},
-      {type:"success", label:"KCB bank balance",      val:"KES 22.4 M",   sub:"As of today"},
-    ],
-  },
-
-  /* ── DRC – Lubumbashi ────────────────────────────── */
-  FBM:{
-    cur:"USD ", curCode:"USD", taxType:"VAT", vatRate:16,
-    gstRates:[], hasIGST:false,
-    psOptions:["DRC — Lubumbashi","DRC — Kinshasa","Overseas"],
-    voucherPrefix:"FBM",
-    kpi:{
-      revenue:"USD 325,000", margin:"USD 70,000", marginPct:"21.5%",
-      bookings:134, receivables:"USD 81,000", payables:"USD 42,000",
-      bank:"USD 58,000", overdueCount:4,
-    },
-    bookings:[
-      {id:"FBM-SF/0018",cust:"Katanga Mining Ltd.", type:"Flight",  amt:"28,400",  st:"Paid"},
-      {id:"FBM-SH/0006",cust:"DRC Safari Club",     type:"Holiday", amt:"85,000",  st:"Partial"},
-      {id:"FBM-SHT/003",cust:"Lubumbashi Hotel",    type:"Hotel",   amt:"18,600",  st:"Paid"},
-      {id:"FBM-SV/0002",cust:"Congo Minerals Co.",  type:"Visa",    amt:"4,200",   st:"Pending"},
-      {id:"FBM-SC/0004",cust:"FBM Car Rentals",     type:"Car",     amt:"9,800",   st:"Paid"},
-    ],
-    customers:[
-      {name:"Katanga Mining Ltd.", rev:"98,000",  out:"0",      ov:false},
-      {name:"DRC Safari Club",     rev:"72,000",  out:"18,000", ov:false},
-      {name:"Lubumbashi Hotel",    rev:"54,000",  out:"22,000", ov:true},
-      {name:"Congo Minerals Co.",  rev:"38,000",  out:"8,000",  ov:false},
-      {name:"FBM Car Rentals",     rev:"28,000",  out:"0",      ov:false},
-    ],
-    alerts:[
-      {type:"warning", label:"VAT return due",        val:"20 June",       sub:"VAT 16% · USD 52,000"},
-      {type:"info",    label:"Overdue receivables",   val:"4 invoices",    sub:"USD 48,000 · 30+ days"},
-      {type:"danger",  label:"Forex reconciliation",  val:"3 pending",     sub:"USD / CDF rate gap"},
-      {type:"success", label:"Rawbank USD balance",   val:"USD 58,000",   sub:"As of today"},
-    ],
-  },
-
-  /* ── Consolidated (All branches) ────────────────── */
-  ALL:{
-    cur:"₹", curCode:"INR", taxType:"MULTI", vatRate:null,
-    kpi:{
-      revenue:"₹7.72 Cr", margin:"₹3.00 Cr", marginPct:"38.9%",
-      bookings:1362, receivables:"₹72.5 L", payables:"₹38.4 L",
-      bank:"₹54.2 L", overdueCount:26,
-    },
-    bookings:[
-      {id:"BOM-SH/0018",cust:"Mehta & Sons (BOM)",       type:"Holiday", amt:"2,72,800", st:"Partial"},
-      {id:"NBO-SH/0012",cust:"Maasai Mara Tours (NBO)",  type:"Holiday", amt:"KES 3.2M", st:"Paid"},
-      {id:"AMD-SH/0014",cust:"Gujarat Ceramics (AMD)",   type:"Holiday", amt:"1,85,000", st:"Paid"},
-      {id:"DAR-SF/0021",cust:"Serengeti Safaris (DAR)",  type:"Flight",  amt:"TZS 4.2M", st:"Paid"},
-      {id:"FBM-SH/0006",cust:"DRC Safari Club (FBM)",    type:"Holiday", amt:"USD 85K",  st:"Partial"},
-    ],
-    customers:[
-      {name:"Sharma Enterprises (BOM)", rev:"18,40,000", out:"2,15,000", ov:false},
-      {name:"Kenya Airways (NBO)",      rev:"KES 18.2M", out:"Nil",       ov:false},
-      {name:"Patel Exports (AMD)",      rev:"14,20,000", out:"0",         ov:false},
-      {name:"Tanzania Tours (DAR)",     rev:"TZS 8.9M",  out:"TZS 3.2M", ov:true},
-      {name:"Katanga Mining (FBM)",     rev:"USD 98K",   out:"Nil",       ov:false},
-    ],
-    alerts:[
-      {type:"warning", label:"Overdue across branches", val:"26 invoices",  sub:"Mixed currencies"},
-      {type:"info",    label:"Tax filings due",          val:"5 returns",    sub:"GST + VAT · June 2026"},
-      {type:"danger",  label:"Forex gap",                val:"3 items",      sub:"USD/KES/TZS variance"},
-      {type:"success", label:"Total bank balance",       val:"₹54.2 L",     sub:"All branches combined"},
-    ],
-  },
-};
+/* ── Per-branch config — now DB-backed ──────────────────────────────
+   The per-branch config (currency symbol, tax type, GST rates, place-of-supply
+   options, voucher prefix) used to be hardcoded here together with demo KPIs /
+   bookings / customers / alerts. The demo data is gone (screens read live data);
+   the config now comes from /api/company-profile via the synchronous reference
+   cache. `B` is a Proxy so legacy `B[code].cur` / `bc(branch)` keep working. */
+export const B = new Proxy({}, {
+  get: (_t, code) => branchCfg(code === "ALL" ? "ALL" : String(code)),
+  has: () => true,
+});
 
 /* Helper — get branch config */
 
@@ -252,13 +38,13 @@ export function bcfmt(branch,n){const b=bc(branch);return b.cur+Number(n).toLoca
 
 /* ── Voucher number generator ───────────────────────────────────────
    Pattern: BRANCH/DDYY/MODULE + SEQ
-   e.g.  AMD/1726/SF00042   NBO/1726/SH00019   FBM/1726/PF00008
+   e.g.  AMD/1726/SF00042   BOM/1726/SH00019   AMD/1726/PF00008
    DDYY = day (DD) + year last 2 digits (YY) on date of entry
    17 May 2026 → "1726"
    ─────────────────────────────────────────────────────────────────*/
 /* ── Voucher numbering system ───────────────────────────────────────
    Format: BRANCH / DDYY / MODULE + 5-digit running sequence
-   e.g.  AMD/1726/SF00001   BOM/1726/SH00019   NBO/1726/PF00042
+   e.g.  AMD/1726/SF00001   BOM/1726/SH00019   AMD/1726/PF00042
    Each branch maintains its OWN independent counter per module.
    Branch prefix guarantees zero duplicacy across all branches.
    ─────────────────────────────────────────────────────────────── */
@@ -324,8 +110,9 @@ export function FL({label,children}){
    Shown on every sale/purchase voucher so the booking can be matched
    back to a CRM owner. Not editable: CRM is the source of truth. */
 export function SalespersonField({branch,label="Salesperson (CRM)",name}){
+  const SALESPEOPLE=useSalespeople().data||[];   // DB-backed (/api/salespeople)
   const branchCode=branch?.code;
-  const resolved=name||SALESPEOPLE.find(p=>p.branch===branchCode)?.name||SALESPEOPLE[0].name;
+  const resolved=name||SALESPEOPLE.find(p=>p.branch===branchCode)?.name||SALESPEOPLE[0]?.name||"—";
   return (
     <FL label={label}>
       <input value={resolved} readOnly title="Synced from CRM"
@@ -441,6 +228,21 @@ export function VLinked({branch,type,vNo,setRoute}){
 }
 
 
+/* Live "current date & time" stamp — shown on every voucher as it is opened,
+   so the entry always reflects the moment of data entry. Ticks each minute. */
+export function LiveDateTime({compact=false}){
+  const [now,setNow]=useState(()=>nowLabel());
+  useEffect(()=>{
+    const id=setInterval(()=>setNow(nowLabel()),30000);
+    return ()=>clearInterval(id);
+  },[]);
+  return (
+    <span title="Current date & time" style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:"#5a6691",fontWeight:600,background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:compact?"3px 8px":"5px 10px"}}>
+      <Clock size={13}/> {now}
+    </span>
+  );
+}
+
 export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,saleAmt}){
   const printRef=useRef(null);
   const [linkedPurch,setLinkedPurch]=useState(null);  /* selected purchase entry */
@@ -467,6 +269,7 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
             </div>
           </div>
           <div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
+            <LiveDateTime/>
             {/* Branch tax badge */}
             <span style={{fontSize:10,padding:"3px 9px",borderRadius:999,background:taxBg,color:taxC,fontWeight:700,border:"1px solid "+taxBg,letterSpacing:"0.04em"}}>
               {brFlag} {cfg.curCode} · {taxBadge}
@@ -533,7 +336,7 @@ export function VHead({vNo,branch,salesperson=true}){
             <input value={vNo} readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontFamily:"monospace",fontWeight:700}}/>
           </FL>
           <FL label="Date">
-            <input type="date" defaultValue="2026-05-17" style={inp}/>
+            <input type="date" defaultValue={todayISO()} style={inp}/>
           </FL>
           <FL label={isIndia?"Invoice type":"Document type"}>
             <select style={inp}>
@@ -818,7 +621,7 @@ export function RPT_CashPosition({branch}){
   const groupByCurrency={};
   BANK_ACCOUNTS_DATA.forEach(b=>{
     if(!groupByCurrency[b.currency]) groupByCurrency[b.currency]={total:0,count:0,inINR:0};
-    const rate=b.currency==="INR"?1:b.currency==="USD"?84.5:b.currency==="KES"?0.65:b.currency==="TZS"?0.034:1;
+    const rate=FX_RATES[b.currency]||1;
     groupByCurrency[b.currency].total+=b.openingBal;
     groupByCurrency[b.currency].count+=1;
     groupByCurrency[b.currency].inINR+=b.openingBal*rate;
@@ -844,7 +647,7 @@ export function RPT_CashPosition({branch}){
           <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>By Branch</p>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"center"}}>A/cs</th><th style={{...RPT_thStyle,textAlign:"right"}}>Total INR Equiv</th></tr></thead>
-            <tbody>{Object.entries(groupByBranch).map(([br,accts])=>{const total=accts.reduce((s,a)=>{const rate=a.currency==="INR"?1:a.currency==="USD"?84.5:a.currency==="KES"?0.65:a.currency==="TZS"?0.034:1;return s+a.openingBal*rate;},0);return (<tr key={br}><td style={{...RPT_tdStyle,fontWeight:700}}>{br}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{accts.length}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(total)}</td></tr>);})}</tbody>
+            <tbody>{Object.entries(groupByBranch).map(([br,accts])=>{const total=accts.reduce((s,a)=>{const rate=1;return s+a.openingBal*rate;},0);return (<tr key={br}><td style={{...RPT_tdStyle,fontWeight:700}}>{br}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{accts.length}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(total)}</td></tr>);})}</tbody>
           </table>
         </div>
       </div>
@@ -852,7 +655,7 @@ export function RPT_CashPosition({branch}){
         <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>Detail — All Accounts</p>
         <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Bank · Account</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>Currency</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th><th style={{...RPT_thStyle,textAlign:"right"}}>INR Equiv</th><th style={{...RPT_thStyle,textAlign:"right"}}>% of Limit</th></tr></thead>
-          <tbody>{BANK_ACCOUNTS_DATA.map(b=>{const rate=b.currency==="INR"?1:b.currency==="USD"?84.5:b.currency==="KES"?0.65:b.currency==="TZS"?0.034:1;const pct=Math.round(b.openingBal/b.limit*100);return (<tr key={b.id}><td style={RPT_tdStyle}>{b.branch}</td><td style={RPT_tdStyle}>{b.bank} · <span style={{fontFamily:"monospace",color:"#5a6691"}}>...{b.accountNo.slice(-6)}</span></td><td style={RPT_tdStyle}>{b.type}</td><td style={{...RPT_tdStyle,fontFamily:"monospace"}}>{b.currency}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{b.openingBal.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(b.openingBal*rate)}</td><td style={{...RPT_tdStyle,textAlign:"right",color:pct>80?"#A32D2D":"#0d1326",fontWeight:600}}>{pct}%</td></tr>);})}</tbody>
+          <tbody>{BANK_ACCOUNTS_DATA.map(b=>{const rate=FX_RATES[b.currency]||1;const pct=Math.round(b.openingBal/b.limit*100);return (<tr key={b.id}><td style={RPT_tdStyle}>{b.branch}</td><td style={RPT_tdStyle}>{b.bank} · <span style={{fontFamily:"monospace",color:"#5a6691"}}>...{b.accountNo.slice(-6)}</span></td><td style={RPT_tdStyle}>{b.type}</td><td style={{...RPT_tdStyle,fontFamily:"monospace"}}>{b.currency}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{b.openingBal.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(b.openingBal*rate)}</td><td style={{...RPT_tdStyle,textAlign:"right",color:pct>80?"#A32D2D":"#0d1326",fontWeight:600}}>{pct}%</td></tr>);})}</tbody>
         </table></div>
       </div>
     </RPT_Page>

@@ -12,8 +12,8 @@
 
 1. [Project Identity](#1-project-identity)
 2. [Business Context](#2-business-context)
-3. [People & Roles (9 Users · 4 Tiers)](#3-people--roles)
-4. [Entities & Branches (6 Companies)](#4-entities--branches)
+3. [People & Roles (6 Users · 4 Tiers)](#3-people--roles)
+4. [Entities & Branches (2 Branches)](#4-entities--branches)
 5. [Tech Stack](#5-tech-stack)
 6. [Modular File Structure (NEW)](#6-modular-file-structure)
 7. [How to Find What — LLM Context Map](#7-how-to-find-what)
@@ -46,24 +46,20 @@ The brand evolved from "KB360" → "KBiz360" in May 2026. Every user-facing inst
 
 ## 2. Business Context
 
-**Travkings Tours & Travels** is a multi-branch international travel agency:
+**Travkings Tours & Travels** is a two-branch India travel agency:
 
 - **Established:** 2008 · **IATA Accredited** · **GST 27AAACT1234A1ZF** · **Mumbai HQ**
-- **Operations:** 6 entities across 4 countries (India, Kenya, Tanzania, DR Congo)
-- **Scale:** ~500 bookings/month, ~₹8-9 Cr monthly revenue, 9 active employees
+- **Operations:** 2 branches in India (Mumbai, Ahmedabad) — INR only, GST only
+- **Scale:** ~500 bookings/month, ~₹8-9 Cr monthly revenue, active employees across both branches
 - **Services:** Inbound/outbound tour packages, IATA airline ticketing, visa services, MICE, DMC operations
 
 ### Why KBiz360 exists
 
-Before KBiz360, each branch ran its own spreadsheets — no consolidated view, manual compliance for 6 entities, no audit trail on approvals, vendor bank-account changes were a fraud vector, month-end close took 12+ days. KBiz360 unifies all 6 entities into a single role-controlled platform.
+Before KBiz360, each branch ran its own spreadsheets — no consolidated view, manual GST compliance for both branches, no audit trail on approvals, vendor bank-account changes were a fraud vector, month-end close took 12+ days. KBiz360 unifies both branches into a single role-controlled platform.
 
-### The HO (TKHO) is special
+### Two-branch structure
 
-**TKHO is a non-revenue entity** — it does NOT do sales or purchases for travel services. Its sole transactional activity is:
-- Asset purchases (laptops, vehicles, software licenses, office furniture) — consolidates GST input credit
-- HO running expenses (rent, utilities, professional fees)
-
-TKHO is the **control & shared-services hub** — owns vendor masters, banking relationships, statutory filings, and approval authority for the whole group.
+The business operates **two India branches — BOM (Mumbai) and AMD (Ahmedabad)** — with no separate Head Office entity. Both branches are INR-only and GST-only. Shared-services activity (asset purchases, running expenses, vendor masters, banking relationships, statutory filings, and group approval authority) is administered centrally out of the Mumbai (BOM) branch, which also consolidates GST input credit.
 
 ---
 
@@ -73,30 +69,24 @@ TKHO is the **control & shared-services hub** — owns vendor masters, banking r
 
 ```
 Tier 0 — System          AD (Super Admin)                   [TK-SYS-001]
-Tier 1 — Leadership      Afshin Dhanani (Director/Founder)  [TK-TKHO-000]
-Tier 2 — Finance Mgmt    Faiz Patel (Sr. Finance Mgr/CFO)   [TK-TKHO-001]
-Tier 3 — Checker         Sughra Sayed (Sr. Accounts Exec)   [TK-TKHO-002]
-Tier 4 — Maker           5× Branch Accounts Executives      [TK-{BRANCH}-00X]
+Tier 1 — Leadership      Afshin Dhanani (Director/Founder)  [TK-HO-000]
+Tier 2 — Finance Mgmt    Faiz Patel (Sr. Finance Mgr/CFO)   [TK-HO-001]
+Tier 3 — Checker         Sughra Sayed (Sr. Accounts Exec)   [TK-HO-002]
+Tier 4 — Maker           2× Branch Accounts Executives      [TK-{BRANCH}-00X]
                          ├── Rohan   (BOM)
-                         ├── Mohan   (AMD)
-                         ├── Mujeet  (NBO)
-                         ├── Rujeet  (DAR)
-                         └── Sujeet  (FBM)
+                         └── Mohan   (AMD)
 ```
 
 ### Complete user table
 
 | Tier | Name | Employee ID | Role | Branches | Email |
 |---|---|---|---|---|---|
-| 0 | AD | TK-SYS-001 | Super Admin | ALL 6 | ad@travkings.com |
-| 1 | Afshin Dhanani | TK-TKHO-000 | Director | ALL 6 | afshin@travkings.com |
-| 2 | Faiz Patel | TK-TKHO-001 | Senior Finance Manager | ALL 6 | faiz.fm@travkings.com |
-| 3 | Sughra Sayed | TK-TKHO-002 | Sr. Accounts Executive | ALL 6 | sughra.sae@travkings.com |
+| 0 | AD | TK-SYS-001 | Super Admin | BOM, AMD | ad@travkings.com |
+| 1 | Afshin Dhanani | TK-HO-000 | Director | BOM, AMD | afshin@travkings.com |
+| 2 | Faiz Patel | TK-HO-001 | Senior Finance Manager | BOM, AMD | faiz.fm@travkings.com |
+| 3 | Sughra Sayed | TK-HO-002 | Sr. Accounts Executive | BOM, AMD | sughra.sae@travkings.com |
 | 4 | Rohan | TK-BOM-003 | Accounts Executive | BOM only | rohan@travkings.com |
 | 4 | Mohan | TK-AMD-002 | Accounts Executive | AMD only | mohan@travkings.com |
-| 4 | Mujeet | TK-NBO-003 | Accounts Executive | NBO only | mujeet@travkings.com |
-| 4 | Rujeet | TK-DAR-002 | Accounts Executive | DAR only | rujeet@travkings.com |
-| 4 | Sujeet | TK-FBM-002 | Accounts Executive | FBM only | sujeet@travkings.com |
 
 ### Role colors (use exact hex values)
 
@@ -115,14 +105,10 @@ Tier 4 — Maker           5× Branch Accounts Executives      [TK-{BRANCH}-00X]
 
 | Code | City | Country | Role | Currency | Tax Regime |
 |---|---|---|---|---|---|
-| **TKHO** | Head Office (Mumbai) | 🇮🇳 India | HO / Main Branch — non-revenue, control hub | INR | GST 5%/18% |
-| **BOM** | Mumbai | 🇮🇳 India | Operating branch (largest) | INR | GST 5%/18% |
+| **BOM** | Mumbai | 🇮🇳 India | Operating branch (largest) · shared-services hub | INR | GST 5%/18% |
 | **AMD** | Ahmedabad | 🇮🇳 India | Operating branch | INR | GST 5%/18% |
-| **NBO** | Nairobi | 🇰🇪 Kenya | Operating branch | KES | VAT 16% |
-| **DAR** | Dar es Salaam | 🇹🇿 Tanzania | Operating branch | TZS | VAT 18% |
-| **FBM** | Lubumbashi | 🇨🇩 DR Congo | Operating branch | USD | VAT 16% |
 
-**"Travkings Group"** = the consolidation label used when aggregating all 6 entities.
+**"Travkings Group"** = the consolidation label used when aggregating both branches.
 
 ---
 
@@ -245,7 +231,7 @@ src/
     ├── operations.jsx               Booking files, Itinerary, Passports (413 lines · 3 components)
     ├── finance.jsx                  Bank, TDS, Treasury, Reconciliation (1,932 lines · 20 components)
     ├── reports.jsx                  P&L, GP, Yield, Custom builder (3,483 lines · 29 components)
-    ├── taxation.jsx                 GSTR, VAT, Form 16, TDS, Tax calendar (1,665 lines · 24 components)
+    ├── taxation.jsx                 GSTR, Form 16, TDS, Tax calendar (1,665 lines · 24 components)
     ├── hr.jsx                       Employee master, payroll, self-service (2,236 lines · 18 components)
     ├── masters.jsx                  Customer, Supplier, CoA, Currency masters (2,924 lines · 25 components)
     ├── ho-control.jsx               Group dashboard, vendor lock, audit, authority config (1,459 lines · 16 components)
@@ -314,7 +300,7 @@ kbiz360-app/
 | Edit booking files / operations | `modules/operations.jsx` |
 | Edit finance screens (bank, TDS, treasury, reco) | `modules/finance.jsx` |
 | Edit reports | `modules/reports.jsx` |
-| Edit GSTR/VAT/TDS prep | `modules/taxation.jsx` |
+| Edit GSTR/TDS prep | `modules/taxation.jsx` |
 | Edit HR / payroll / self-service | `modules/hr.jsx` |
 | Edit master data screens | `modules/masters.jsx` |
 | Edit HO Control (group dashboard, vendor lock, audit, authority) | `modules/ho-control.jsx` |
@@ -357,7 +343,7 @@ If an LLM needs to add a new HR self-service screen:
 | 3 | **Operations** | Bookings, ticketing, itineraries | `modules/operations.jsx` |
 | 4 | **Finance** | Reconciliation, TDS, treasury | `modules/finance.jsx` |
 | 5 | **Reports** | P&L, GP analysis, yield reports | `modules/reports.jsx` |
-| 6 | **Taxation** | GSTR auto-prep, VAT, TDS, tax calendar | `modules/taxation.jsx` |
+| 6 | **Taxation** | GSTR auto-prep, TDS, tax calendar | `modules/taxation.jsx` |
 | 7 | **HR & Payroll** | Employee master, payroll, self-service | `modules/hr.jsx` |
 | 8 | **HO Control** | Group dashboard, vendor lock, audit, authority | `modules/ho-control.jsx` |
 | 9 | **Masters** | Customers, suppliers, CoA, banks, currencies | `modules/masters.jsx` |
@@ -374,7 +360,6 @@ If an LLM needs to add a new HR self-service screen:
 |---|---|---|---|---|
 | NEFT/RTGS Payment | ₹0 | ₹2,00,000 | ₹10,00,000 | Above ₹10L |
 | Cash Payment | ₹5,000 | ₹25,000 | ₹1,00,000 | Above ₹1L |
-| Forex (USD eq.) | $0 | $5,000 | $50,000 | Above $50K |
 | Journal Voucher | ₹0 | ₹50,000 | ₹5,00,000 | Above ₹5L |
 | Credit Note / Refund | ₹0 | ₹25,000 | ₹5,00,000 | Above ₹5L |
 | Receipt Voucher | ₹10,000 | ₹2,00,000 | ₹10,00,000 | Any |
@@ -772,20 +757,16 @@ All should report 0 diagnostics.
 | **BOM** | Mumbai branch (India) — largest operating branch |
 | **BSP** | Billing & Settlement Plan (IATA airline ticket settlement) |
 | **CGST/SGST/IGST** | Central/State/Integrated Goods & Services Tax (India) |
-| **DAR** | Dar es Salaam branch (Tanzania) |
 | **DMC** | Destination Management Company (local tour operator partner) |
-| **FBM** | Lubumbashi branch (DR Congo) |
 | **GP** | Gross Profit |
 | **GSTIN** | GST Identification Number (15-char alphanumeric) |
 | **GSTR-1/GSTR-3B** | Monthly GST returns (outward supply / summary) |
-| **HO** | Head Office (= TKHO entity in Mumbai) |
+| **HO** | Head Office function — shared services run out of the Mumbai (BOM) branch (no separate entity) |
 | **IATA** | International Air Transport Association |
 | **IRN** | Invoice Reference Number (e-invoice) |
 | **ITC** | Input Tax Credit (GST) |
 | **JV** | Journal Voucher |
-| **KES** | Kenyan Shilling |
 | **MICE** | Meetings, Incentives, Conferences, Exhibitions |
-| **NBO** | Nairobi branch (Kenya) |
 | **PAN** | Permanent Account Number (10-char Indian tax ID) |
 | **PNR** | Passenger Name Record (airline reservation) |
 | **PT** | Professional Tax (state-level India) |
@@ -795,9 +776,6 @@ All should report 0 diagnostics.
 | **Sr. AE** | Senior Accounts Executive = Sughra (Tier 3 checker) |
 | **Sr. FM** | Senior Finance Manager = Faiz (Tier 2 approver, CFO-equiv) |
 | **TDS** | Tax Deducted at Source (India) |
-| **TKHO** | Travkings Head Office (the non-revenue control entity) |
-| **TZS** | Tanzanian Shilling |
-| **VAT** | Value Added Tax (used in NBO/DAR/FBM) |
 
 ---
 

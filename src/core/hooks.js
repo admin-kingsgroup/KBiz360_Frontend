@@ -16,9 +16,8 @@ export function useVNo(branch,pfx){
 
 
 /* ── Branch-aware navigation menu ──────────────────────────────────
-   Taxation section differs per regime:
-   India  (BOM/AMD)      → GST modules (GSTR-1, GSTR-3B, TDS, RCM, E-Invoice)
-   Africa (NBO/DAR/FBM)  → VAT modules (VAT Return, Withholding Tax)
+   Taxation section (India / GST):
+   India  (TKHO/BOM/AMD) → GST modules (GSTR-1, GSTR-3B, TDS, RCM, E-Invoice)
    Travkings Group          → Full list (consolidated view)
    ─────────────────────────────────────────────────────────────── */
 

@@ -7,9 +7,11 @@ import React, { useMemo, useState } from 'react';
 import { Download, Printer, Save, Search } from 'lucide-react';
 import { Bar, Legend, Line } from 'recharts';
 import { exportToCSV } from '../core/business-logic';
-import { BRANCHES, CASH, EXP_ACTUALS, EXP_LEDGERS, FY_LIST, GP_BILLS, HR_EMPLOYEES_DATA, MODULE_ICONS } from '../core/data';
+import { ACTIVE_CURRENCIES, BRANCHES, BRANCH_CODES, CASH, CURRENCY_META, EXP_ACTUALS, FX_RATES, GP_BILLS, HR_EMPLOYEES_DATA, MODULE_ICONS } from '../core/data';
+import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../core/useReference';
 import { fmt, fmtINR } from '../core/format';
-import { BUILDER_FIELD_CATALOG, DEMO_REPORT_DATA, DrillModal, ExportDropdown, GRP_COLORS, PKG_D, PKG_SC, PackagePnL, SAVED_VIEWS_DATA, SCHEDULED_REPORTS_DATA, Sparkline, SubAgentStatement, TAB_Page, cardStyle, getExpenseBudget, tabPanel } from '../core/helpers';
+import { CUR_MONTH, CUR_FY, MONTH_OPTIONS, PERIOD_OPTIONS, FY_MONTHS, FY_YTD_MONTHS, ALL_TIME_FROM, todayISO, fmtDate, rangeNote, monthLabel, prevMonthKey } from '../core/dates';
+import { BUILDER_FIELD_CATALOG, DEMO_REPORT_DATA, DrillModal, ExportDropdown, GRP_COLORS, PKG_D, PKG_SC, PackagePnL, SAVED_VIEWS_DATA, SCHEDULED_REPORTS_DATA, Sparkline, SubAgentStatement, TAB_Page, cardStyle, tabPanel } from '../core/helpers';
 import { useBgtRefresh, useMobile } from '../core/hooks';
 import { B, FL, KpiCard, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../core/styles';
 import { Dashboard } from './dashboard';
@@ -40,14 +42,14 @@ export function ReportPnL({branch}){
   const mob=useMobile();
   const cur=bc(branch).cur;
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState("2026-05");
+  const [period,setPeriod]=useState(CUR_MONTH);
   const [view,setView]=useState("pnl");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"},{v:"YTD",l:"YTD 2026"}];
-  const FY=["2026-04","2026-05"];
+  const PERIODS=PERIOD_OPTIONS;
+  const FY=FY_YTD_MONTHS;
   const filt=p=>GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&(p==="YTD"?FY.includes(b.date.slice(0,7)):b.date.startsWith(p)));
   const filtA=p=>EXP_ACTUALS.filter(a=>(!brCode||a.br===brCode)&&(p==="YTD"?FY.includes(a.m):a.m===p));
   const bills=filt(period);
-  const billsPrev=filt(period==="2026-05"?"2026-04":period==="2026-04"?"2026-03":"2026-02");
+  const billsPrev=filt(prevMonthKey(period));
   const acts=filtA(period);
   const hr=HR_EMPLOYEES_DATA.filter(e=>!brCode||e.branch===brCode);
   const revenue=bills.reduce((s,b)=>s+b.sell,0);
@@ -106,6 +108,7 @@ export function ReportPnL({branch}){
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Profit and Loss Statement</h2>
           <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{(brCode||"Travkings Group")+" · "+periodLabel+" · Live from voucher data"}</p>
+          <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {period==="YTD"?rangeNote('ytd'):rangeNote('month',{month:period})} · use the period selector to change</p>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
@@ -226,12 +229,10 @@ export function ReportBS({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2025-12",l:"Dec 2025"},{v:"2026-01",l:"Jan 2026"},{v:"2026-02",l:"Feb 2026"},
-    {v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
 
-  const FY_MONTHS=["2025-04","2025-05","2025-06","2025-07","2025-08","2025-09",
-    "2025-10","2025-11","2025-12","2026-01","2026-02","2026-03"];
+  // FY_MONTHS imported from core/dates = current financial year (Apr–Mar)
   const ytdMonths=FY_MONTHS.filter(m=>m<=period);
   const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&ytdMonths.includes(b.date.slice(0,7)));
   const actuals=EXP_ACTUALS.filter(a=>(!brCode||a.br===brCode)&&ytdMonths.includes(a.m));
@@ -321,8 +322,9 @@ export function ReportBS({branch}){
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Balance Sheet</h2>
           <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>
-            Financial position as at end of {PERIODS.find(p=>p.v===period)?.l} · {brCode||"Travkings Group"}
+            Financial position as at end of {monthLabel(period)} · {brCode||"Travkings Group"}
           </p>
+          <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 Cumulative {CUR_FY.label} year-to-date · as at end of {monthLabel(period)} · use selector to change</p>
         </div>
         <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
           {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
@@ -345,8 +347,8 @@ export function ReportCF({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
 
   const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period));
   const actuals=EXP_ACTUALS.filter(a=>(!brCode||a.br===brCode)&&a.m===period);
@@ -396,7 +398,8 @@ export function ReportCF({branch}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Cash Flow Statement</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Indirect method · {PERIODS.find(p=>p.v===period)?.l} · {brCode||"Travkings Group"}</p>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Indirect method · {monthLabel(period)} · {brCode||"Travkings Group"}</p>
+          <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {rangeNote('month',{month:period})} · use selector to change</p>
         </div>
         <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
           {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
@@ -452,7 +455,7 @@ export function ReportReceivables({branch}){
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
   const [search,setSearch]=useState("");
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
 
   /* Aggregate by client from GP_BILLS — simulate 75% collected, 25% outstanding */
   const clientMap={};
@@ -542,7 +545,7 @@ export function ReportPayables({branch}){
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
   const [search,setSearch]=useState("");
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
 
   const suppMap={};
   GP_BILLS.filter(b=>!brCode||b.branch===brCode).forEach(b=>{
@@ -628,8 +631,8 @@ export function ReportSalesReg({branch}){
   const brCode=branch==="ALL"?null:branch?.code;
   const [modFilter,setModFilter]=useState("All");
   const [search,setSearch]=useState("");
-  const [dateFrom,setDateFrom]=useState("2025-12-01");
-  const [dateTo,setDateTo]=useState("2026-05-31");
+  const [dateFrom,setDateFrom]=useState(ALL_TIME_FROM);
+  const [dateTo,setDateTo]=useState(todayISO());
   const [sortKey,setSortKey]=useState("date");
   const [sortDir,setSortDir]=useState("desc");
 
@@ -668,6 +671,7 @@ export function ReportSalesReg({branch}){
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Sales Register</h2>
           <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{rows.length} bookings · {f(totSell)} revenue · {totGPPct}% GP</p>
+          <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {(dateFrom<=ALL_TIME_FROM?"Showing all entries since inception":"Showing "+fmtDate(dateFrom))+" → "+fmtDate(dateTo)+" · change dates to filter"}</p>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
           <select value={modFilter} onChange={e=>setModFilter(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>{MODS.map(m=><option key={m}>{m}</option>)}</select>
@@ -725,9 +729,6 @@ export function ReportSalesReg({branch}){
 const BR_D=[
   {branch:"BOM", rev:38500000,gp:6850000,gpPct:17.8,color:"#185FA5"},
   {branch:"AMD", rev:14200000,gp:2480000,gpPct:17.5,color:"#854F0B"},
-  {branch:"NBO", rev:18500000,gp:4200000,gpPct:22.7,color:"#27500A"},
-  {branch:"DAR", rev: 9800000,gp:2680000,gpPct:27.3,color:"#1D9E75"},
-  {branch:"FBM", rev: 6400000,gp:1850000,gpPct:28.9,color:"#A32D2D"},
 ];
 
 export function ReportBranch(){
@@ -852,8 +853,8 @@ export function ReportGP({branch,setRoute}){
   const cur=cfg.cur;
   const [tab,setTab]=useState("summary");
   const [search,setSearch]=useState("");
-  const [dateFrom,setDateFrom]=useState("2025-12-01");
-  const [dateTo,setDateTo]=useState("2026-05-31");
+  const [dateFrom,setDateFrom]=useState(ALL_TIME_FROM);
+  const [dateTo,setDateTo]=useState(todayISO());
   const [modFilter,setModFilter]=useState("All");
   const [sortCol,setSortCol]=useState("gp");
   const [sortDir,setSortDir]=useState("desc");
@@ -1273,8 +1274,12 @@ export function ReportGP({branch,setRoute}){
 export function ReportExpenseBgt({branch,setRoute}){
   const mob=useMobile();
   useBgtRefresh();
-  const [fy,setFy]=useState("2025-26");
-  const [selMonth,setSelMonth]=useState("2026-05");
+  const EXP_LEDGERS=useExpenseLedgers().data||[];          // DB-backed (/api/expense-ledgers)
+  const FY_LIST=useFiscalYears().data||[];                 // DB-backed (/api/fiscal-years)
+  const budgetRows=useExpenseBudgets().data;               // DB-backed (/api/expense-budgets)
+  const bgtFor=(brc,fyv)=>Object.fromEntries((budgetRows||[]).filter(r=>r.branch===brc&&r.fy===fyv).map(r=>[r.ledgerCode,{monthly:r.monthly,yearly:r.yearly}]));
+  const [fy,setFy]=useState(CUR_FY.label);
+  const [selMonth,setSelMonth]=useState(CUR_MONTH);
   const [view,setView]=useState("mtd");   /* mtd | ytd | annual */
   const [groupFilter,setGroupFilter]=useState("All");
   const [activeBr,setActiveBr]=useState(null);
@@ -1284,9 +1289,9 @@ export function ReportExpenseBgt({branch,setRoute}){
   const brCode=brObj?.code||"BOM";
   const cfg=bc(brObj);
   const cur=cfg.cur;
-  const fyObj=FY_LIST.find(f=>f.v===fy)||FY_LIST[1];
-  const budget=getExpenseBudget(brObj,fy);
-  const ytdMonths=fyObj.keys.filter(k=>k<=selMonth);
+  const fyObj=FY_LIST.find(f=>f.v===fy||f.l===fy)||FY_LIST[1]||{l:fy,v:fy,keys:[],months:[]};
+  const budget=bgtFor(brCode,fyObj.v);
+  const ytdMonths=(fyObj.keys||[]).filter(k=>k<=selMonth);
 
   /* Actuals helper */
   const getAct=(id,months)=>EXP_ACTUALS.filter(a=>a.id===id&&a.br===brCode&&months.includes(a.m)).reduce((s,a)=>s+a.a,0);
@@ -1323,7 +1328,7 @@ export function ReportExpenseBgt({branch,setRoute}){
 
   /* All-branches summary */
   const allBranchSummary=isAll?BRANCHES.map(b=>{
-    const bBgt=getExpenseBudget(b,fy);
+    const bBgt=bgtFor(b.code,fyObj.v);
     const bCur=bc(b).cur;
     const months=view==="mtd"?[selMonth]:view==="ytd"?ytdMonths:fyObj.keys;
     const totB=EXP_LEDGERS.reduce((s,l)=>s+(view==="annual"?bBgt[l.id]?.yearly||0:(bBgt[l.id]?.monthly||0)*(view==="ytd"?ytdMonths.length:1)),0);
@@ -1357,7 +1362,7 @@ export function ReportExpenseBgt({branch,setRoute}){
 
       {/* View toggle */}
       <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-        <button onClick={()=>setPeriod("mtd")} style={{padding:"6px 12px",border:"none",cursor:"pointer",fontSize:11,fontWeight:period==="mtd"?700:500,background:period==="mtd"?"#0d1326":"transparent",color:period==="mtd"?"#d4a437":"#5a6691",borderRadius:6}}>MTD</button><button onClick={()=>setPeriod("ytd")} style={{padding:"6px 12px",border:"none",cursor:"pointer",fontSize:11,fontWeight:period==="ytd"?700:500,background:period==="ytd"?"#0d1326":"transparent",color:period==="ytd"?"#d4a437":"#5a6691",borderRadius:6}}>YTD</button><button onClick={()=>setPeriod("custom")} style={{padding:"6px 12px",border:"none",cursor:"pointer",fontSize:11,fontWeight:period==="custom"?700:500,background:period==="custom"?"#0d1326":"transparent",color:period==="custom"?"#d4a437":"#5a6691",borderRadius:6}}>Custom Range</button>
+        <button onClick={()=>setView("mtd")} style={{padding:"6px 12px",border:"none",cursor:"pointer",fontSize:11,fontWeight:view==="mtd"?700:500,background:view==="mtd"?"#0d1326":"transparent",color:view==="mtd"?"#d4a437":"#5a6691",borderRadius:6}}>MTD</button><button onClick={()=>setView("ytd")} style={{padding:"6px 12px",border:"none",cursor:"pointer",fontSize:11,fontWeight:view==="ytd"?700:500,background:view==="ytd"?"#0d1326":"transparent",color:view==="ytd"?"#d4a437":"#5a6691",borderRadius:6}}>YTD</button><button onClick={()=>setView("annual")} style={{padding:"6px 12px",border:"none",cursor:"pointer",fontSize:11,fontWeight:view==="annual"?700:500,background:view==="annual"?"#0d1326":"transparent",color:view==="annual"?"#d4a437":"#5a6691",borderRadius:6}}>Annual</button>
       </div>
 
       {/* Travkings Group Overview */}
@@ -1495,8 +1500,8 @@ export function ReportCommission({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
 
   const rows=useMemo(()=>{
     const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period));
@@ -1585,15 +1590,15 @@ export function ReportCommission({branch}){
 
 export function MisReport({branch}){
   const mob=useMobile();
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
   const brCode=branch==="ALL"?null:branch?.code;
   const cfg=bc(branch);
   const cur=cfg.cur;
 
   /* Current period */
   const bills  =GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period));
-  const prev   =GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period==="2026-05"?"2026-04":period==="2026-04"?"2026-03":"2026-02"));
+  const prev   =GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(prevMonthKey(period)));
   const acts   =EXP_ACTUALS.filter(a=>(!brCode||a.br===brCode)&&a.m===period);
   const tgt    =null; /* sales targets module removed — CRM app now owns this */
 
@@ -1790,8 +1795,8 @@ export function ClientConcentration({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"},{v:"ALL",l:"All Time"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=[...MONTH_OPTIONS,{v:"ALL",l:"All Time"}];
 
   const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&(period==="ALL"||b.date.startsWith(period)));
   const totalRev=bills.reduce((s,b)=>s+b.sell,0);
@@ -1943,16 +1948,16 @@ export function CashRunwayCard({branch}){
 
 export function ConsolidatedBS(){
   const mob=useMobile();
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
-  const FX={KES:0.65,TZS:0.03,USD:83.42,INR:1};
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
+  const FX=FX_RATES;
 
   const getBranchBS=(code)=>{
     const br=BRANCHES.find(b=>b.code===code)||{currency:"INR"};
     const rate=FX[br.currency]||1;
-    const FY_MONTHS=["2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03"].filter(m=>m<=period);
-    const bills=GP_BILLS.filter(b=>b.branch===code&&FY_MONTHS.includes(b.date.slice(0,7)));
-    const acts=EXP_ACTUALS.filter(a=>a.br===code&&FY_MONTHS.includes(a.m));
+    const fyM=FY_MONTHS.filter(m=>m<=period);
+    const bills=GP_BILLS.filter(b=>b.branch===code&&fyM.includes(b.date.slice(0,7)));
+    const acts=EXP_ACTUALS.filter(a=>a.br===code&&fyM.includes(a.m));
     const rev=bills.reduce((s,b)=>s+b.sell,0)*rate;
     const cost=bills.reduce((s,b)=>s+b.cost,0)*rate;
     const exp=acts.reduce((s,a)=>s+a.a,0)*rate;
@@ -1963,7 +1968,7 @@ export function ConsolidatedBS(){
       fixedAssets:120000*rate,gstPayable:Math.max(rev*0.04-cost*0.02,0),advance:rev*0.04};
   };
 
-  const branches=["TKHO","BOM","AMD","NBO","DAR","FBM"].map(getBranchBS);
+  const branches=["BOM","AMD"].map(getBranchBS);
 
   /* Group sums (eliminating intercompany - simplified: 5% of creditors are intercompany) */
   const sumKey=(key)=>branches.reduce((s,b)=>s+b[key],0);
@@ -2009,7 +2014,7 @@ export function ConsolidatedBS(){
 
       {/* Branch forex legend */}
       <div style={{...card,padding:"10px 14px",marginBottom:12,background:"#f3f4f8",fontSize:10,color:"#5a6691"}}>
-        <b>FX Rates applied:</b> KES 0.65 → INR · TZS 0.03 → INR · USD 83.42 → INR · BOM/AMD native INR
+        <b>Reporting currency:</b> INR · BOM/AMD native INR
       </div>
 
       {Math.abs(totalAssets-totalLiab)<totalAssets*0.05
@@ -2075,10 +2080,10 @@ export function ConsolidatedBS(){
 export function ConsultantReport({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState("2026-05");
+  const [period,setPeriod]=useState(CUR_MONTH);
   const [view,setView]=useState("table"); // table | trend
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"},{v:"YTD",l:"YTD 2026"}];
-  const FY_MONTHS=["2026-04","2026-05"];
+  const PERIODS=PERIOD_OPTIONS;
+  const FY_MONTHS=FY_YTD_MONTHS;
 
   const bills=useMemo(()=>GP_BILLS.filter(b=>
     (!brCode||b.branch===brCode)&&
@@ -2257,10 +2262,10 @@ export function ClientStatement({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
-  const [client,setClient]=useState("Sharma Enterprises");
-  const [period,setPeriod]=useState("2026-05");
+  const [client,setClient]=useState("");
+  const [period,setPeriod]=useState(CUR_MONTH);
   const [showModal,setShowModal]=useState(false);
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"},{v:"ALL",l:"All Time"}];
+  const PERIODS=[...MONTH_OPTIONS,{v:"ALL",l:"All Time"}];
   const clients=[...new Set(GP_BILLS.filter(b=>!brCode||b.branch===brCode).map(b=>b.client))].sort();
 
   const txns=useMemo(()=>{
@@ -2372,21 +2377,16 @@ export function ClientStatement({branch}){
 export function ForexReport({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"},{v:"YTD",l:"YTD 2026"}];
-  const FOREX_DATA=[
-    {date:"2026-05-07",ccy:"USD",type:"Payment",party:"Bali Tours DMC",fcAmt:1200,rate:83.40,inrAmt:100080,settleRate:83.60,settleInr:100320,gain:240,status:"Settled"},
-    {date:"2026-05-10",ccy:"USD",type:"Payment",party:"Island Escapes",fcAmt:950,rate:83.45,inrAmt:79278,settleRate:83.52,settleInr:79344,gain:66,status:"Settled"},
-    {date:"2026-05-12",ccy:"KES",type:"Receipt",party:"Mujeet",fcAmt:85000,rate:0.6185,inrAmt:52573,settleRate:0.6210,settleInr:52785,gain:212,status:"Settled"},
-    {date:"2026-05-15",ccy:"USD",type:"Payment",party:"Euro DMC Spain",fcAmt:2400,rate:83.40,inrAmt:200160,settleRate:0,settleInr:0,gain:0,status:"Unsettled"},
-    {date:"2026-05-17",ccy:"TZS",type:"Payment",party:"CRDB Bank — DAR",fcAmt:2400000,rate:0.032,inrAmt:76800,settleRate:0.0318,settleInr:76320,gain:-480,status:"Settled"},
-  ];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=PERIOD_OPTIONS;
+  /* India-only / INR base — no foreign-currency settlements. */
+  const FOREX_DATA=[];
   const filtered=FOREX_DATA.filter(r=>r.date.startsWith(period)||period==="YTD");
   const realized=filtered.filter(r=>r.status==="Settled");
   const totalGain=realized.reduce((s,r)=>s+r.gain,0);
   const totalUnreal=filtered.filter(r=>r.status==="Unsettled").length;
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
-  const CCY_CLR={USD:"#185FA5",KES:"#27500A",TZS:"#854F0B",EUR:"#1D9E75"};
+  const CCY_CLR={};
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
@@ -2395,7 +2395,7 @@ export function ForexReport({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>💱</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Forex Gain / Loss Report</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Currency: USD · KES · TZS · Realized + Unrealized</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Foreign currency settlements · Realized + Unrealized</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -2412,7 +2412,7 @@ export function ForexReport({branch}){
           {l:"Gain Transactions",v:String(realized.filter(r=>r.gain>0).length),c:"#27500A",bg:"#EAF3DE"},
           {l:"Loss Transactions",v:String(realized.filter(r=>r.gain<0).length),c:"#A32D2D",bg:"#FCEBEB"},
           {l:"Unsettled (Unrealized)",v:String(totalUnreal),c:"#854F0B",bg:"#FAEEDA"},
-          {l:"Total FCY Volume",v:`${filtered.filter(r=>r.ccy==="USD").reduce((s,r)=>s+r.fcAmt,0).toLocaleString()} USD`,c:"#185FA5",bg:"#E6F1FB"},
+          {l:"Total FCY Volume",v:`${filtered.reduce((s,r)=>s+r.fcAmt,0).toLocaleString()} FCY`,c:"#185FA5",bg:"#E6F1FB"},
         ].map((k,i)=>(
           <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"10px 12px",background:k.bg}}>
             <p style={{margin:0,fontSize:8.5,fontWeight:700,color:k.c,textTransform:"uppercase"}}>{k.l}</p>
@@ -2451,7 +2451,7 @@ export function ForexReport({branch}){
         </table>
       </div>
       <div style={{marginTop:10,...card,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:10,color:"#185FA5"}}>
-        Forex Gain/Loss is posted to GL via Journal Entry. Rate booked = rate at time of invoice. Rate settled = rate at time of payment. Unrealized: open positions at period-end rated at closing rate. Affects Africa branches NBO (KES), DAR (TZS), FBM (USD) significantly.
+        Forex Gain/Loss is posted to GL via Journal Entry. Rate booked = rate at time of invoice. Rate settled = rate at time of payment. Unrealized: open positions at period-end rated at closing rate.
       </div>
     </div>
   );
@@ -2470,8 +2470,8 @@ export function DestinationIntelligence({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?null:branch?.code;
   const [period,setPeriod]=useState("YTD");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"},{v:"YTD",l:"YTD 2026"}];
-  const FY_MONTHS=["2026-04","2026-05"];
+  const PERIODS=PERIOD_OPTIONS;
+  const FY_MONTHS=FY_YTD_MONTHS;
 
   const bills=useMemo(()=>GP_BILLS.filter(b=>
     (!brCode||b.branch===brCode)&&
@@ -2585,14 +2585,12 @@ export function IntercompanyBilling({branch}){
   const [tab,setTab]=useState("list"); // list | new
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
   const IC_ENTRIES=[
-    {id:"IC/BOM-NBO/001",from:"BOM",to:"NBO",desc:"BOM processed Kenya safari booking on behalf of NBO",amount:85000,currency:"INR",markup:5,date:"2026-05-08",status:"Invoiced",ref:"BOM/1726/SH00015"},
-    {id:"IC/BOM-DAR/001",from:"BOM",to:"DAR",desc:"BOM managed Zanzibar holiday — DAR client",amount:142000,currency:"INR",markup:5,date:"2026-05-12",status:"Invoiced",ref:"BOM/1726/SH00018"},
-    {id:"IC/NBO-BOM/001",from:"NBO",to:"BOM",desc:"NBO arranged India pilgrimage — BOM client forwarded",amount:6200,currency:"USD",markup:3,date:"2026-04-28",status:"Settled",ref:"NBO/1726/SH00011"},
+    {id:"IC/BOM-AMD/001",from:"BOM",to:"AMD",desc:"BOM issued tickets for AMD client group",amount:142000,currency:"INR",markup:5,date:"2026-05-12",status:"Invoiced",ref:"BOM/1726/SH00018"},
     {id:"IC/AMD-BOM/001",from:"AMD",to:"BOM",desc:"AMD client group — BOM issued tickets",amount:220000,currency:"INR",markup:4,date:"2026-05-15",status:"Pending",ref:"AMD/1726/SF00022"},
   ];
   const STATUS_CLR={Invoiced:"#185FA5",Settled:"#27500A",Pending:"#854F0B"};
   const STATUS_BG ={Invoiced:"#E6F1FB",Settled:"#EAF3DE",Pending:"#FAEEDA"};
-  const BRANCH_CLR={BOM:"#185FA5",AMD:"#854F0B",NBO:"#27500A",DAR:"#1D9E75",FBM:"#A32D2D"};
+  const BRANCH_CLR={BOM:"#185FA5",AMD:"#854F0B"};
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
@@ -2601,7 +2599,7 @@ export function IntercompanyBilling({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔄</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Intercompany Billing</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Cross-branch transactions · BOM ↔ NBO ↔ DAR ↔ AMD ↔ FBM · Auto markup {IC_ENTRIES[0].markup}%</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Cross-branch transactions · BOM ↔ AMD · Auto markup {IC_ENTRIES[0].markup}%</p>
           </div>
         </div>
         <button onClick={()=>setTab(t=>t==="list"?"new":"list")} style={{...btnG,fontSize:11}}>{tab==="list"?"+ New IC Entry":"← Back to List"}</button>
@@ -2651,16 +2649,16 @@ export function IntercompanyBilling({branch}){
         <div style={{...card}}>
           <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#0d1326"}}>New Intercompany Entry</p>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
-            <FL label="From branch"><select style={inp}>{["TKHO","BOM","AMD","NBO","DAR","FBM"].map(b=><option key={b}>{b}</option>)}</select></FL>
-            <FL label="To branch"><select style={inp}>{["TKHO","BOM","AMD","NBO","DAR","FBM"].map(b=><option key={b}>{b}</option>)}</select></FL>
+            <FL label="From branch"><select style={inp}>{BRANCH_CODES.map(b=><option key={b}>{b}</option>)}</select></FL>
+            <FL label="To branch"><select style={inp}>{BRANCH_CODES.map(b=><option key={b}>{b}</option>)}</select></FL>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:12}}>
             <FL label="Amount"><input type="number" style={inp} placeholder="0"/></FL>
-            <FL label="Currency"><select style={inp}><option>INR</option><option>USD</option><option>KES</option><option>TZS</option></select></FL>
+            <FL label="Currency"><select style={inp}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></FL>
             <FL label="Intercompany Markup %"><input type="number" defaultValue={5} style={inp}/></FL>
           </div>
-          <FL label="Description"><input style={inp} placeholder="e.g. BOM processed Kenya safari for NBO client"/></FL>
-          <FL label="Linked booking ref"><input style={{...inp,marginTop:10,fontFamily:"monospace"}} placeholder="NBO/1726/SH00001"/></FL>
+          <FL label="Description"><input style={inp} placeholder="e.g. BOM issued tickets for AMD client"/></FL>
+          <FL label="Linked booking ref"><input style={{...inp,marginTop:10,fontFamily:"monospace"}} placeholder="BOM/1726/SH00001"/></FL>
           <div style={{display:"flex",gap:8,marginTop:14,justifyContent:"flex-end"}}>
             <button onClick={()=>setTab("list")} style={btnGh}>Cancel</button>
             <button onClick={()=>setTab("list")} style={btnG}>Post IC Entry</button>
@@ -2677,7 +2675,7 @@ export function RatioAnalysis({branch,setRoute}){
   const mob=useMobile();
   const cfg=bc(branch);
   const cur=cfg.cur;
-  const [period,setPeriod]=useState("2026-05");
+  const [period,setPeriod]=useState(CUR_MONTH);
 
   // Sample ratios with trend (last 6 months)
   const RATIOS=[
@@ -2714,7 +2712,7 @@ export function RatioAnalysis({branch,setRoute}){
           <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Liquidity · Activity · Leverage · Profitability ratios with 6-month trend</p>
         </div>
         <select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:7,fontSize:11.5}}>
-          <option value="2026-05">May 2026</option><option value="2026-04">Apr 2026</option><option value="2026-03">Mar 2026</option>
+          {MONTH_OPTIONS.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
         </select>
       </div>
 
@@ -2879,7 +2877,7 @@ export function VarianceAnalysis({branch,setRoute}){
   const mob=useMobile();
   const cfg=bc(branch);
   const cur=cfg.cur;
-  const [period,setPeriod]=useState("2026-05");
+  const [period,setPeriod]=useState(CUR_MONTH);
 
   const VARIANCES=[
     {head:"Revenue",actual:9850000,budget:9500000,forecast:9650000,priorYear:8500000},
@@ -2911,7 +2909,7 @@ export function VarianceAnalysis({branch,setRoute}){
           <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Actual vs Budget vs Forecast vs Prior Year · Ranked by largest swing</p>
         </div>
         <select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:7,fontSize:11.5}}>
-          <option value="2026-05">May 2026</option><option value="2026-04">Apr 2026</option>
+          {MONTH_OPTIONS.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
         </select>
       </div>
 
@@ -2982,11 +2980,11 @@ export function ReportViewerTabbed(){
           <FL label="Period"><select style={inpStd}><option>Today</option><option>This Week</option><option selected>This Month</option><option>This Quarter</option><option>YTD</option><option>Custom...</option></select></FL>
           <FL label="Date From"><input type="date" defaultValue="2026-05-01" style={inpStd}/></FL>
           <FL label="Date To"><input type="date" defaultValue="2026-05-31" style={inpStd}/></FL>
-          <FL label="Branch"><select multiple size={4} style={{...inpStd,height:90}}><option>All Branches</option><option>TKHO</option><option>BOM</option><option>AMD</option><option>NBO</option><option>DAR</option><option>FBM</option></select></FL>
+          <FL label="Branch"><select multiple size={4} style={{...inpStd,height:90}}><option>All Branches</option><option>BOM</option><option>AMD</option></select></FL>
           <FL label="Customer Type"><select style={inpStd}><option>All</option><option>Corporate Premium</option><option>Corporate Standard</option><option>Individual</option><option>Travel Agent</option></select></FL>
           <FL label="Product Line"><select style={inpStd}><option>All</option><option>Flight</option><option>Holiday</option><option>Hotel</option><option>Visa</option><option>Insurance</option></select></FL>
           <FL label="Cost Center"><select style={inpStd}><option>All</option><option>TK-OPS</option><option>TK-MKT</option></select></FL>
-          <FL label="Currency"><select style={inpStd}><option>All — show in INR equivalent</option><option>INR only</option><option>USD only</option></select></FL>
+          <FL label="Currency"><select style={inpStd}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></FL>
           <FL label="Min Amount"><input type="number" placeholder="0" style={inpStd}/></FL>
         </div>
       )}
@@ -3041,7 +3039,7 @@ export function ReportViewerTabbed(){
             <div style={{marginTop:10,display:"grid",gap:10}}>
               <FL label="Display Unit"><select style={inpStd}><option>Lakhs (L)</option><option>Crores (Cr)</option><option>Actual</option><option>Thousands (K)</option></select></FL>
               <FL label="Decimals"><select style={inpStd}><option>0</option><option>1</option><option>2</option></select></FL>
-              <FL label="Currency Symbol"><select style={inpStd}><option>₹ (Rupee)</option><option>INR</option><option>None</option></select></FL>
+              <FL label="Currency Symbol"><select style={inpStd}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{`${CURRENCY_META[c].symbol} (${c})`}</option>)}<option>None</option></select></FL>
               <FL label="Negative Display"><select style={inpStd}><option>(brackets)</option><option>-prefix</option><option>red color</option></select></FL>
             </div>
           </div>
@@ -3097,7 +3095,7 @@ export function CustomReportBuilder(){
   const [selected,setSelected]=useState(["Branch","Revenue","GP","GP %","Bookings"]);
   const [filters,setFilters]=useState([
     {id:1,field:"Period (Month)",op:"=",val:"May 2026"},
-    {id:2,field:"Branch",op:"≠",val:"TKHO"},
+    {id:2,field:"Branch",op:"=",val:"BOM"},
   ]);
   const [viewName,setViewName]=useState("My Custom Report");
   const [saved,setSaved]=useState(false);
@@ -3115,10 +3113,7 @@ export function CustomReportBuilder(){
 
   const previewData=[
     {Branch:"BOM",Revenue:"₹3.85Cr",GP:"₹68.5L","GP %":"17.8%",Bookings:182},
-    {Branch:"NBO",Revenue:"₹1.85Cr",GP:"₹42.0L","GP %":"22.7%",Bookings:62},
     {Branch:"AMD",Revenue:"₹1.42Cr",GP:"₹24.8L","GP %":"17.5%",Bookings:84},
-    {Branch:"DAR",Revenue:"₹98.0L", GP:"₹26.8L","GP %":"27.3%",Bookings:38},
-    {Branch:"FBM",Revenue:"₹64.0L", GP:"₹18.5L","GP %":"28.9%",Bookings:28},
   ];
 
   return(

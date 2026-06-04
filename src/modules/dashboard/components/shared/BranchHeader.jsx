@@ -2,6 +2,7 @@ import React from 'react';
 import { Plus } from 'lucide-react';
 import { btnG, btnGh } from '../../../../core/styles';
 import { useMobile } from '../../../../core/hooks';
+import { CUR_MONTH_LABEL } from '../../../../core/dates';
 
 export function BranchHeader({ branch, branchCode, isIndia, bookingsCount, onNavigate }) {
   const mob = useMobile();
@@ -21,7 +22,7 @@ export function BranchHeader({ branch, branchCode, isIndia, bookingsCount, onNav
           {branch === 'ALL' ? 'Group Dashboard' : 'Branch Dashboard'} — {branchCode || 'Travkings Group'}
         </h2>
         <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#5a6691' }}>
-          May 2026 · Live data from {bookingsCount} bookings · {isIndia ? 'GST Regime' : 'VAT Regime'}
+          {CUR_MONTH_LABEL} · Live data from {bookingsCount} bookings · {isIndia ? 'GST Regime' : 'VAT Regime'}
         </p>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>

@@ -5,7 +5,9 @@
 
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, Calendar, Download, Plus, Settings, Users } from 'lucide-react';
-import { GP_BILLS, TAX_CALENDAR_EVENTS } from '../core/data';
+import { GP_BILLS } from '../core/data';
+import { useTaxCalendar } from '../core/useReference';
+import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY, fyOptions, rangeNote } from '../core/dates';
 import { fmt, fmtINR } from '../core/format';
 import { FORM16A_DATA, _TCS_ENTRIES, _TDS_ENTRIES, cardStyle } from '../core/helpers';
 import { useMobile } from '../core/hooks';
@@ -34,11 +36,11 @@ export function TaxShell({title,subtitle,children,action}){
 export function TaxGstr1({branch}){
   const mob=useMobile();
   const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
 
   const bills=GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period));
-  const B2B_CLIENTS=["Sharma Enterprises","Mehta & Sons","TechCorp MICE","Globex Consulting","Nexus Industries","Apex Pharma","Patel Exports","Gujarat Ceramics"];
+  const B2B_CLIENTS=[]; // TODO: derive B2B/B2C split from the customer master's GST-registration flag
 
   const b2b=bills.filter(b=>B2B_CLIENTS.includes(b.client));
   const b2c=bills.filter(b=>!B2B_CLIENTS.includes(b.client));
@@ -61,7 +63,8 @@ export function TaxGstr1({branch}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>GSTR-1 — Outward Supplies</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {PERIODS.find(p=>p.v===period)?.l} · Due: 11th of following month</p>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {monthLabel(period)} · Due: 11th of following month</p>
+          <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {rangeNote('month',{month:period})} · use the period selector to change</p>
         </div>
         <div style={{display:"flex",gap:8}}>
           <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
@@ -122,8 +125,8 @@ export function TaxGstr1({branch}){
 export function TaxGstr3b({branch}){
   const mob=useMobile();
   const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
 
   const sales=GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period));
   const purch=GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period));
@@ -161,7 +164,8 @@ export function TaxGstr3b({branch}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>GSTR-3B — Monthly Summary</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {PERIODS.find(p=>p.v===period)?.l} · Due: 20th of following month</p>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {monthLabel(period)} · Due: 20th of following month</p>
+          <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {rangeNote('month',{month:period})} · use the period selector to change</p>
         </div>
         <div style={{display:"flex",gap:8}}>
           <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
@@ -207,12 +211,12 @@ export function TaxGstr3b({branch}){
 export function TaxRcm({branch}){
   const mob=useMobile();
   const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
 
   /* Identify RCM entries: overseas DMC purchases + GDS charges */
   const rcmEntries=useMemo(()=>{
-    const OVERSEAS_SUPPLIERS=["Bali Tours DMC","Thailand DMC","Singapore MICE","Dubai Wonders","Island Escapes","Maasai Safaris","Zanzibar DMC","ET GSA Dar","ET GSA FBM","KQ Direct","BSP Nairobi"];
+    const OVERSEAS_SUPPLIERS=[]; // TODO: flag overseas suppliers in the supplier master
     return GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&
       OVERSEAS_SUPPLIERS.some(s=>b.supplier.includes(s.split(" ")[0]))).map(b=>{
       const igst=Math.round(b.cost/(1+0.18)*0.18);
@@ -273,14 +277,10 @@ export function TaxRcm({branch}){
 
 export function TaxVat({branch}){
   const mob=useMobile();
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
 
-  const AFRICA_BRANCHES=[
-    {code:"NBO",name:"Nairobi — Kenya",flag:"🇰🇪",cur:"KES",rate:16,auth:"KRA",portal:"iTax",due:"20th"},
-    {code:"DAR",name:"Dar es Salaam — Tanzania",flag:"🇹🇿",cur:"TZS",rate:18,auth:"TRA",portal:"e-VAT",due:"20th"},
-    {code:"FBM",name:"Lubumbashi — DRC",flag:"🇨🇩",cur:"USD",rate:16,auth:"DGI",portal:"e-DGI",due:"20th"},
-  ];
+  const AFRICA_BRANCHES=[];
 
   const getBranchData=(brCode,rate)=>{
     const bills=GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period));
@@ -296,13 +296,14 @@ export function TaxVat({branch}){
     <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>VAT Returns — Africa Branches</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Kenya · Tanzania · DRC · {PERIODS.find(p=>p.v===period)?.l} · Due 20th of following month</p>
+          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>VAT Returns</h2>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>India is GST-only — no VAT jurisdictions configured · {PERIODS.find(p=>p.v===period)?.l}</p>
         </div>
         <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
           {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
         </select>
       </div>
+      {AFRICA_BRANCHES.length===0&&<div style={{...card,padding:"24px",textAlign:"center",color:"#5a6691",fontSize:11.5}}>No VAT jurisdictions — this entity operates under India GST only.</div>}
       {AFRICA_BRANCHES.map(ab=>{
         const d=getBranchData(ab.code,ab.rate);
         const f=n=>ab.cur+" "+Number(Math.round(n)).toLocaleString("en-IN");
@@ -379,17 +380,14 @@ export function TaxEInvoice(){
 
 export function TaxCalendar(){
   const mob=useMobile();
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
 
   const deadlines=[
     {date:"2026-05-20",title:"GSTR-3B — Apr 2026",auth:"GSTIN BOM+AMD",type:"GST",branch:"BOM+AMD",desc:"Pay CGST+SGST for April. Interest 18% p.a. if late."},
-    {date:"2026-05-20",title:"VAT Return — Apr 2026",auth:"KRA / TRA / DGI",type:"VAT",branch:"NBO+DAR+FBM",desc:"Output minus input VAT payable to KRA, TRA, DGI"},
-    {date:"2026-05-20",title:"WHT Deposit — Apr 2026",auth:"KRA / TRA / DGI",type:"WHT",branch:"NBO+DAR+FBM",desc:"Withholding tax on service payments April"},
     {date:"2026-06-07",title:"TDS Deposit — May 2026",auth:"Income Tax Dept",type:"TDS",branch:"BOM+AMD",desc:"TDS u/s 194C, 194H, 194J for May. 7th or 30th Apr for March."},
     {date:"2026-06-11",title:"GSTR-1 — May 2026",auth:"GSTIN BOM+AMD",type:"GST",branch:"BOM+AMD",desc:"All outward supplies. File before GSTR-3B for ITC flow to buyers."},
     {date:"2026-06-15",title:"Advance Tax — Q1 FY27",auth:"Income Tax Dept",type:"IT",branch:"All",desc:"15% of annual advance tax estimate due by 15 June."},
     {date:"2026-06-20",title:"GSTR-3B — May 2026",auth:"GSTIN BOM+AMD",type:"GST",branch:"BOM+AMD",desc:"Pay net GST (Output – ITC) for May 2026."},
-    {date:"2026-06-20",title:"VAT Return — May 2026",auth:"KRA / TRA / DGI",type:"VAT",branch:"NBO+DAR+FBM",desc:"Africa VAT for May"},
     {date:"2026-06-30",title:"TDS Form 16A — Q4 FY26",auth:"Income Tax Dept",type:"TDS",branch:"BOM+AMD",desc:"Issue TDS certificates (Form 16A) to all vendors for Q4 FY 2025-26"},
     {date:"2026-07-07",title:"TDS Deposit — Jun 2026",auth:"Income Tax Dept",type:"TDS",branch:"BOM+AMD",desc:"TDS for June 2026"},
     {date:"2026-07-15",title:"TCS Return Q1 — 27EQ",auth:"Income Tax Dept",type:"TCS",branch:"BOM+AMD",desc:"TCS collected on overseas packages u/s 206C(1G) for Q1 FY27"},
@@ -438,7 +436,7 @@ export function TaxCalendar(){
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📅</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Tax Compliance Calendar</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>All compliance deadlines — India GST · Africa VAT · TDS/TCS · Advance Tax</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>All compliance deadlines — India GST · TDS/TCS · Advance Tax</p>
           </div>
         </div>
       </div>
@@ -480,8 +478,8 @@ export function TaxCalendar(){
 
 export function GstrRecon({branch}){
   const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
 
   /* Simulate GSTR-2B data vs books */
   const bills=GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&["BSP India","Emirates GSA","Bali Tours DMC"].includes(b.supplier));
@@ -573,9 +571,9 @@ export function GstrRecon({branch}){
 export function TallyExport({branch}){
   const cfg=bc(branch);
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState("2026-05");
+  const [period,setPeriod]=useState(CUR_MONTH);
   const [exportType,setExportType]=useState("trial-balance");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const PERIODS=MONTH_OPTIONS;
 
   const generateXML=()=>{
     const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period));
@@ -682,8 +680,8 @@ export function TaxTdsTcs({branch}){
   const mob=useMobile();
   const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
   const [tab,setTab]=useState("tds"); // tds | tcs | challan
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
   const [tdsEntries,setTdsEntries]=useState(_TDS_ENTRIES);
   const [modal,setModal]=useState(false);
   const [form,setForm]=useState({payee:"",pan:"",section:"194C",nature:"",gross:0,date:""});
@@ -882,15 +880,10 @@ export function TaxTdsTcs({branch}){
 
 export function Form26AS({branch}){
   const mob=useMobile();
-  const [fy,setFy]=useState("2025-26");
+  const [fy,setFy]=useState(CUR_FY.label);
   const [quarter,setQuarter]=useState("Q4");
-  const TWENTYSIX_DATA=[
-    {party:"Bali Tours DMC",pan:"AABCB1234D",section:"194C",quarter:"Q4",asTDS:1920,bookTDS:1920,diff:0,status:"Matched"},
-    {party:"VFS Global India",pan:"AABCV9012K",section:"194J",quarter:"Q4",asTDS:8400,bookTDS:8400,diff:0,status:"Matched"},
-    {party:"TATA AIG Insurance",pan:"AABCT5678M",section:"194D",quarter:"Q4",asTDS:1725,bookTDS:1500,diff:-225,status:"Mismatch"},
-    {party:"Riya Travels",pan:"AABCR1234J",section:"194H",quarter:"Q4",asTDS:2400,bookTDS:0,diff:-2400,status:"Missing in Books"},
-    {party:"GDS Provider (Amadeus)",pan:"AABCA4567N",section:"194C",quarter:"Q4",asTDS:0,bookTDS:1200,diff:1200,status:"Not in 26AS"},
-  ];
+  // Form 26AS reconciliation — no bundled demo data (fed from TDS data later).
+  const TWENTYSIX_DATA=[];
   const filtered=TWENTYSIX_DATA.filter(r=>r.quarter===quarter);
   const mismatches=filtered.filter(r=>r.status!=="Matched");
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
@@ -1047,7 +1040,7 @@ export function Gstr9c({branch,setRoute}){
   const mob=useMobile();
   const cfg=bc(branch);
   const cur=cfg.cur;
-  const [fy,setFy]=useState("2025-26");
+  const [fy,setFy]=useState(CUR_FY.label);
 
   const RECON_TABLE=[
     {sn:"5A",label:"Turnover (incl. exports) as per audited annual financial statement",booksValue:124850000,returnValue:124850000,diff:0,note:"Tied"},
@@ -1083,7 +1076,7 @@ export function Gstr9c({branch,setRoute}){
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <select value={fy} onChange={e=>setFy(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:7,fontSize:11.5}}>
-            <option value="2024-25">FY 2024-25</option><option value="2025-26">FY 2025-26</option>
+            {fyOptions().map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
           <button style={{padding:"7px 14px",border:"none",background:"#d4a437",color:"#0d1326",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer"}}>📤 Generate JSON</button>
         </div>
@@ -1262,7 +1255,7 @@ export function Gstr2aReco({branch,setRoute}){
   const mob=useMobile();
   const cfg=bc(branch);
   const cur=cfg.cur;
-  const [period,setPeriod]=useState("2026-05");
+  const [period,setPeriod]=useState(CUR_MONTH);
 
   const SUPPLIER_2A=[
     {gstin:"27AAACA1681K1Z3",supplier:"Air India Ltd.",books:128500,gstr2a:128500,match:128500,diff:0,status:"Matched",invCount:8},
@@ -1289,7 +1282,7 @@ export function Gstr2aReco({branch,setRoute}){
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:7,fontSize:11.5}}>
-            <option value="2026-05">May 2026</option><option value="2026-04">Apr 2026</option>
+            {MONTH_OPTIONS.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
           <button style={{padding:"7px 14px",border:"1px solid #185FA5",background:"#fff",color:"#185FA5",borderRadius:7,fontSize:11,fontWeight:600,cursor:"pointer"}}>⬇ Import 2A</button>
         </div>
@@ -1347,7 +1340,7 @@ export function Gstr2aReco({branch,setRoute}){
 
 
 export const GSTR_FILING_STATUS = [
-  {entity:"Travkings — TKHO",       gstin:"27AAACT1234A1ZF",gstr1:"Filed",   gstr3b:"Filed",  due:"2026-05-20"},
+  {entity:"Travkings — Head Office", gstin:"27AAACT1234A1ZF",gstr1:"Filed",   gstr3b:"Filed",  due:"2026-05-20"},
   {entity:"Travkings — BOM",        gstin:"27AAACT5678B1ZG",gstr1:"Filed",   gstr3b:"Pending",due:"2026-05-20"},
   {entity:"Travkings — AMD",        gstin:"24AAACT9012C1ZH",gstr1:"Pending", gstr3b:"Pending",due:"2026-05-20"},
 ];
@@ -1355,10 +1348,10 @@ export const GSTR_FILING_STATUS = [
 
 export function Form16Generator(){
   const [selEmp,setSelEmp]=useState("Rohan (TK-BOM-003)");
-  const [fy,setFy]=useState("2025-26");
+  const [fy,setFy]=useState(CUR_FY.label);
   return(
     <PHASE2_Page title="Form 16 Generator — India" subtitle="Annual salary certificate for income tax filing · generated from payroll data"
-      toolbar={<><select value={selEmp} onChange={e=>setSelEmp(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{["Afshin Dhanani (TK-TKHO-000)","Faiz Patel (TK-TKHO-001)","Sughra Sayed (TK-TKHO-002)","Rohan (TK-BOM-003)","Mohan (TK-AMD-002)","Mujeet (TK-NBO-003)","Rujeet (TK-DAR-002)","Sujeet (TK-FBM-002)"].map(e=><option key={e}>{e}</option>)}</select><select value={fy} onChange={e=>setFy(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}><option>2025-26</option><option>2024-25</option></select><button onClick={()=>window.print()} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download Form 16</button></>}>
+      toolbar={<><select value={selEmp} onChange={e=>setSelEmp(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{["Afshin Dhanani (TK-HO-000)","Faiz Patel (TK-HO-001)","Sughra Sayed (TK-HO-002)","Rohan (TK-BOM-003)","Mohan (TK-AMD-002)"].map(e=><option key={e}>{e}</option>)}</select><select value={fy} onChange={e=>setFy(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{fyOptions().map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select><button onClick={()=>window.print()} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download Form 16</button></>}>
       <div style={{maxWidth:760,margin:"0 auto",background:"#fff",border:"2px solid #0d1326",borderRadius:6,overflow:"hidden",fontSize:12}}>
         {/* Header */}
         <div style={{padding:"12px 20px",background:"#0d1326",color:"#fff",textAlign:"center"}}>
@@ -1414,14 +1407,8 @@ export function Form16Generator(){
    7. PERFORMANCE REVIEW MODULE
    ════════════════════════════════════════════════════════════════════ */
 
-export const GSTR1_B2B = [
-  {gstin:"27AAACL0140P1ZW",name:"L&T Limited",         invoices:8,taxable:3850000,igst:0,cgst:346500,sgst:346500,total:4543000,place:"Maharashtra"},
-  {gstin:"27AAACR0987H1ZK",name:"Reliance Industries",  invoices:6,taxable:2850000,igst:0,cgst:256500,sgst:256500,total:3363000,place:"Maharashtra"},
-  {gstin:"29AAACT5678A1ZP",name:"Infosys Limited",       invoices:5,taxable:1950000,igst:351000,cgst:0,sgst:0,   total:2301000,place:"Karnataka"},
-  {gstin:"24AAACB4321D1ZQ",name:"Bajaj Auto Ltd.",       invoices:3,taxable:1200000,igst:0,cgst:108000,sgst:108000,total:1416000,place:"Maharashtra"},
-  {gstin:"27AAACT9012K1ZR",name:"TCS (Mumbai)",          invoices:4,taxable:980000, igst:0,cgst:88200, sgst:88200, total:1156400,place:"Maharashtra"},
-  {gstin:"36AAACA1234B1ZS",name:"Adani Group",           invoices:2,taxable:750000, igst:135000,cgst:0,sgst:0,   total:885000, place:"Telangana"},
-];
+// GSTR-1 B2B is generated from real sale vouchers — no bundled demo invoices.
+export const GSTR1_B2B = [];
 
 
 export const GSTR1_B2C = [
@@ -1447,15 +1434,15 @@ export const GSTR3B_SUMMARY = {
 
 
 export function GSTR1Prep(){
-  const [period,setPeriod]=useState("April 2026");
-  const [entity,setEntity]=useState("TKHO — 27AAACT1234A1ZF");
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const [entity,setEntity]=useState("Head Office — 27AAACT1234A1ZF");
   const [tab,setTab]=useState("b2b");
   const totalB2BTaxable=GSTR1_B2B.reduce((s,r)=>s+r.taxable,0);
   const totalB2BTax=GSTR1_B2B.reduce((s,r)=>s+r.igst+r.cgst+r.sgst,0);
   const totalB2CTaxable=GSTR1_B2C.reduce((s,r)=>s+r.taxable,0);
   return(
     <PHASE2_Page title="GSTR-1 Auto-Prep" subtitle="Outward supplies auto-aggregated from sales vouchers · ready for JSON download"
-      toolbar={<><select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}><option>April 2026</option><option>March 2026</option><option>February 2026</option></select><select value={entity} onChange={e=>setEntity(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}><option>TKHO — 27AAACT1234A1ZF</option><option>BOM — 27AAACT5678B1ZG</option><option>AMD — 24AAACT9012C1ZH</option></select><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download JSON</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 File on GST Portal</button></>}>
+      toolbar={<><select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{MONTH_OPTIONS.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select><select value={entity} onChange={e=>setEntity(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}><option>Head Office — 27AAACT1234A1ZF</option><option>BOM — 27AAACT5678B1ZG</option><option>AMD — 24AAACT9012C1ZH</option></select><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download JSON</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 File on GST Portal</button></>}>
       {/* Summary tiles */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:14}}>
         {[{l:"Total Invoices",v:GSTR1_B2B.reduce((s,r)=>s+r.invoices,0)+GSTR1_B2C.length,c:"#0d1326"},{l:"B2B Taxable",v:fmtINR(totalB2BTaxable),c:"#3b82f6"},{l:"B2C Taxable",v:fmtINR(totalB2CTaxable),c:"#22c55e"},{l:"Total Tax",v:fmtINR(totalB2BTax),c:"#d4a437"},{l:"GSTR-1 Status",v:"Draft",c:"#f97316"}].map(k=>(
@@ -1514,7 +1501,7 @@ export function GSTR3BPrep(){
     </div>
   );
   return(
-    <PHASE2_Page title="GSTR-3B Auto-Prep" subtitle="Summary return auto-built from vouchers · April 2026 · 27AAACT1234A1ZF (TKHO)"
+    <PHASE2_Page title="GSTR-3B Auto-Prep" subtitle="Summary return auto-built from vouchers · April 2026 · 27AAACT1234A1ZF (Head Office)"
       toolbar={<><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download JSON</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 File on GST Portal</button></>}>
       {/* Liability summary */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
@@ -1613,6 +1600,7 @@ export function Form16AGenerator(){
 
 export function TaxCalendarV2(){
   const [filter,setFilter]=useState("ALL");
+  const TAX_CALENDAR_EVENTS=useTaxCalendar().data||[];   // DB-backed (/api/tax-calendar)
   const types=[...new Set(TAX_CALENDAR_EVENTS.map(e=>e.type))];
   const filtered=filter==="ALL"?TAX_CALENDAR_EVENTS:TAX_CALENDAR_EVENTS.filter(e=>e.type===filter);
   const overdue=TAX_CALENDAR_EVENTS.filter(e=>e.status==="Overdue").length;

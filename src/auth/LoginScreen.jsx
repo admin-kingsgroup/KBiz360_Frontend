@@ -9,7 +9,6 @@ import React, { useState } from 'react';
 import { Lock, Plane, Users } from 'lucide-react';
 import { KBIZ_LOGO } from '../core/brand';
 import { useMobile } from '../core/hooks';
-import { _USERS_DATA } from '../core/data';
 
 const API_BASE = import.meta.env.VITE_KBIZ_API_BASE || 'http://localhost:9090';
 
@@ -38,11 +37,8 @@ export function LoginScreen({ onSignIn }) {
       if (!resp.ok) throw new Error((json && json.message) || `Sign in failed (${resp.status})`);
       const data = json && 'data' in json ? json.data : json;
       if (!data?.user) throw new Error('Unexpected response from server.');
-      // Find whitelisted details by email to ensure accurate branches and authorization
-      const whitelisted = _USERS_DATA.find(u => u.email.toLowerCase() === data.user.email.toLowerCase());
-      const mergedUser = whitelisted 
-        ? { ...whitelisted, ...data.user, branches: whitelisted.branches } // whitelist branches override
-        : data.user;
+      // Role + branches come straight from the DB user record (returned by the API).
+      const mergedUser = data.user;
 
       // Persist token + user so a page refresh keeps the session (see App.jsx restore).
       try {
@@ -87,8 +83,7 @@ export function LoginScreen({ onSignIn }) {
           <p style={{ margin: '0 0 10px', fontSize: 9, fontWeight: 700, color: '#8b94b3', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Our Branches</p>
           <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr 1fr' : '1fr 1fr 1fr', gap: 8 }}>
             {[
-              { flag: '🇮🇳', code: 'TKHO', city: 'Mumbai (HO)' }, { flag: '🇮🇳', code: 'BOM', city: 'Mumbai' }, { flag: '🇮🇳', code: 'AMD', city: 'Ahmedabad' },
-              { flag: '🇰🇪', code: 'NBO', city: 'Nairobi' }, { flag: '🇹🇿', code: 'DAR', city: 'Dar es Salaam' }, { flag: '🇨🇩', code: 'FBM', city: 'Lubumbashi' },
+              { flag: '🇮🇳', code: 'TKHO', city: 'Head Office' }, { flag: '🇮🇳', code: 'BOM', city: 'Mumbai' }, { flag: '🇮🇳', code: 'AMD', city: 'Ahmedabad' },
             ].map((b) => (
               <div key={b.code} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.05)', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)' }}>
                 <span style={{ fontSize: 18, lineHeight: 1 }}>{b.flag}</span>

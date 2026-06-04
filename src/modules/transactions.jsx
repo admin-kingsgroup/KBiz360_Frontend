@@ -7,9 +7,11 @@ import React, { useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, Calendar, Check, Clock, Download, Plus, Printer, Save, Search } from 'lucide-react';
 import { Area, Line } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from '../core/business-logic';
-import { ADM_DATA, ADM_REASON_CODES, BRANCHES, GP_BILLS, LEDGER_REGISTRY, PURCHASE_REGISTRY, SALE_TO_PURCH_MOD } from '../core/data';
+import { ACTIVE_CURRENCIES, ADM_DATA, BRANCHES, BRANCH_CODES, GP_BILLS, PURCHASE_REGISTRY, SALE_TO_PURCH_MOD, branchCurrencies, branchMainCurrency } from '../core/data';
+import { useAdmReasonCodes, useLedgerRegistry } from '../core/useReference';
 import { useLivePurchaseRegistry } from '../core/useVouchers';
 import { fmt, fmtINR } from '../core/format';
+import { todayISO, CUR_MONTH, MONTH_OPTIONS } from '../core/dates';
 import { ACM_DATA, ACM_REASON_CODES, LedgerSelect, RECURRING_DATA, REFUNDS_DATA, Recruitment, STATUS_FLOW, TAB_Page, TRow, TrainingRecords, VTD, VTH, _ADM_LIST, _TICKET_CTRL, cardStyle, tabPanel } from '../core/helpers';
 import { triggerSaveRefresh, useMobile, useVNo } from '../core/hooks';
 import { ARow, B, DBtn, FL, RPT_tdStyle, RPT_thStyle, SalespersonField, VHead, VNarr, VParty, VTot, VWrap, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../core/styles';
@@ -383,7 +385,7 @@ export function SalesFlight({branch,setRoute}){
         <div style={{padding:"13px 16px",borderBottom:"1px solid #e1e3ec"}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
             <FL label="Voucher no."><input value={vNo} readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691"}}/></FL>
-            <FL label="Date"><input type="date" defaultValue="2026-05-16" style={inp}/></FL>
+            <FL label="Date"><input type="date" defaultValue={todayISO()} style={inp}/></FL>
             <FL label="Invoice type"><select style={inp}><option>Tax Invoice</option><option>Bill of Supply</option><option>Proforma</option></select></FL>
             <FL label="Reference"><input defaultValue="REF-AI-78421" style={inp}/></FL>
             <SalespersonField branch={branch}/>
@@ -394,7 +396,7 @@ export function SalesFlight({branch,setRoute}){
         <div style={{padding:"13px 16px",borderBottom:"1px solid #e1e3ec"}}>
           <p style={{margin:"0 0 8px",fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Customer</p>
           <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:11}}>
-            <FL label="Customer / Party A/c"><input defaultValue="Sharma Enterprises Pvt. Ltd." style={inp}/></FL>
+            <FL label="Customer / Party A/c"><input placeholder="Select customer…" style={inp}/></FL>
             <FL label={cfg.taxType==="GST"?"GSTIN":"Tax ID"}><input value={partyGstin} onChange={e=>setPartyGstin(e.target.value.toUpperCase())} style={{...inp,fontFamily:"monospace"}}/></FL>
             <FL label={cfg.taxType==="GST"?"Place of supply":"Country"}>
               <select style={inp}>
@@ -479,7 +481,7 @@ export function SalesFlight({branch,setRoute}){
         <div style={{padding:"13px 16px",background:"#f9fafb"}}>
           <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:14}}>
             <div style={{display:"flex",flexDirection:"column",gap:11}}>
-              <FL label="Narration"><textarea rows={2} defaultValue={"Being air tickets issued to Sharma Enterprises — "+pax.length+" pax · "+tripType} style={{...inp,resize:"vertical"}}/></FL>
+              <FL label="Narration"><textarea rows={2} defaultValue={"Being air tickets issued — "+pax.length+" pax · "+tripType} style={{...inp,resize:"vertical"}}/></FL>
               <FL label="Terms & Conditions">
                 <textarea rows={5} value={terms} onChange={e=>setTerms(e.target.value)} style={{...inp,resize:"vertical",fontSize:10.5,lineHeight:1.45}}/>
               </FL>
@@ -583,7 +585,7 @@ export function SalesCar({branch,setRoute}){
   return (
     <VWrap title="Sales Voucher — Car Rentals" icon="🚗" vNo={vNo} branch={branch} type="sales" saleMod="SC" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} name="Nexus Industries" gstin={partyGstin} onGstinChange={setPartyGstin}/>
+      <VParty branch={branch} name="" gstin={partyGstin} onGstinChange={setPartyGstin}/>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
         <p style={{margin:"0 0 8px",fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Vehicle &amp; hire details</p>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:820}}>
@@ -621,7 +623,7 @@ export function SalesCar({branch,setRoute}){
           5% GST applied on (Basic + Other fare + Service charge). SAC 996601 — Rental services of road vehicles with operator. {intra?"Intra-state (27): CGST 2.5% + SGST 2.5%.":"Inter-state (state ≠ 27): IGST 5%."} No ITC available to buyer under the 5% scheme.
         </div>
       </div>
-      <VNarr def={`Being car rental charges — ${row.pickup} to ${row.drop}, ${row.days} day(s), Nexus Industries.`}>
+      <VNarr def={`Being car rental charges — ${row.pickup} to ${row.drop}, ${row.days} day(s).`}>
         <VTot branch={branch}
           lines={[
             {l:"Basic",v:"₹ "+fmt(row.basic)},
@@ -664,7 +666,7 @@ export function SalesVisa({branch,setRoute}){
   return (
     <VWrap title="Sales Voucher — Visas" icon="🛂" vNo={vNo} branch={branch} type="sales" saleMod="SV" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} name="Sharma Enterprises Pvt. Ltd." gstin={partyGstin} onGstinChange={setPartyGstin}/>
+      <VParty branch={branch} name="" gstin={partyGstin} onGstinChange={setPartyGstin}/>
       <div style={{padding:"8px 16px",borderBottom:"1px solid #e1e3ec",background:"#f9fafb",display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
         <span style={{fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px"}}>Demo presets</span>
         <button onClick={()=>setPartyGstin("27AABCS1234L1Z5")}
@@ -724,7 +726,7 @@ export function SalesVisa({branch,setRoute}){
           SAC code: <b>998212</b> — Visa and passport services. {intra?"Intra-state (27): CGST 9% + SGST 9% on service charge.":"Inter-state (state ≠ 27): IGST 18% on service charge."}
         </div>
       </div>
-      <VNarr def="Being visa processing charges — Sharma Enterprises, 2 applicants, UAE Tourist 30D via VFS Dubai centre.">
+      <VNarr def="Being visa processing charges — 2 applicants, UAE Tourist 30D via VFS Dubai centre.">
         <VTot branch={branch}
           lines={[
             {l:"VFS fee (pass-through)",v:"₹ "+fmt(vfsTot)},
@@ -770,7 +772,7 @@ export function SalesHotel({branch,setRoute}){
   return (
     <VWrap title="Sales Voucher — Hotels" icon="🏨" vNo={vNo} branch={branch} type="sales" saleMod="SHT" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} name="Apex Pharma Ltd." gstin={partyGstin} onGstinChange={setPartyGstin}/>
+      <VParty branch={branch} name="" gstin={partyGstin} onGstinChange={setPartyGstin}/>
       <div style={{padding:"8px 16px",borderBottom:"1px solid #e1e3ec",background:"#f9fafb",display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
         <span style={{fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px"}}>Demo presets</span>
         <button onClick={()=>setPartyGstin("27AAPFL9876K1Z3")}
@@ -840,7 +842,7 @@ export function SalesHotel({branch,setRoute}){
           SAC code: <b>998552</b> — Tour operator / accommodation reservation. Room fare + Taxes + Other tax are pass-through to the customer. {intra?"Intra-state (27): CGST 9% + SGST 9% on agency service charge.":"Inter-state (state ≠ 27): IGST 18% on agency service charge."}
         </div>
       </div>
-      <VNarr def="Being hotel accommodation — Apex Pharma Ltd., Hyatt Regency Ahmedabad, 5-8 June 2026, CP meal plan.">
+      <VNarr def="Being hotel accommodation — Hyatt Regency Ahmedabad, 5-8 June 2026, CP meal plan.">
         <VTot branch={branch}
           lines={[
             {l:"Room fare / Basic fare",v:"₹ "+fmt(totBasic)},
@@ -885,7 +887,7 @@ export function SalesInsurance({branch,setRoute}){
   return (
     <VWrap title="Sales Voucher — Insurance" icon="🛡" vNo={vNo} branch={branch} type="sales" saleMod="SI" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} name="Mehta &amp; Sons" gstin={partyGstin} onGstinChange={setPartyGstin}/>
+      <VParty branch={branch} name="" gstin={partyGstin} onGstinChange={setPartyGstin}/>
       <ARow label="Policy details" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
@@ -934,7 +936,7 @@ export function SalesInsurance({branch,setRoute}){
           GST 18% on (Basic + Other tax + Service charge). SAC 997131 — Life &amp; non-life insurance. {intra?"Intra-state (27): split as CGST 9% + SGST 9%.":"Inter-state (state ≠ 27): IGST 18%."}
         </div>
       </div>
-      <VNarr def="Being travel insurance premium — 2 pax, Bali destination, Mehta &amp; Sons.">
+      <VNarr def="Being travel insurance premium — 2 pax, Bali destination.">
         <VTot branch={branch}
           lines={[
             {l:"Basic",v:"₹ "+fmt(totBasic)},
@@ -984,7 +986,7 @@ export function SalesMisc({branch,setRoute}){
   return (
     <VWrap title="Sales Voucher — Miscellaneous" icon="📦" vNo={vNo} branch={branch} type="sales" saleMod="SM" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} name="Sharma Enterprises Pvt. Ltd." gstin="27AABCS1234L1Z5"/>
+      <VParty branch={branch} name="" gstin=""/>
       <ARow label="Service / item details" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:760}}>
           <thead><tr>
@@ -1040,7 +1042,7 @@ export function SalesMisc({branch,setRoute}){
           {Object.keys(gstByRate).length===0&&<p style={{fontSize:11.5,color:"#8b94b3",margin:0}}>Add line items above to see GST breakup.</p>}
         </div>
       </div>
-      <VNarr def="Being miscellaneous travel services — SIM cards, documentation charges, forex card issuance for Sharma Enterprises Pvt. Ltd.">
+      <VNarr def="Being miscellaneous travel services — SIM cards, documentation charges, forex card issuance.">
         <VTot branch={branch}
           lines={[
             {l:"Sub-total (taxable)",v:"₹ "+fmt(sub)},
@@ -1058,9 +1060,7 @@ export function SalesMisc({branch,setRoute}){
 
 export function SalesCreditNote({branch,setRoute}){
   const vNo=useVNo(branch,"SCN");
-  const [rows,setRows]=useState([
-    {id:1,origVno:"SH/2026/0018",origDate:"2026-05-01",party:"Mehta & Sons",gstin:"24AABCM8765G1Z2",reason:"Cancellation — Bali holiday package",module:"Holiday",taxable:242800,gstPct:5,gstAmt:12140,tcsAmt:12140},
-  ]);
+  const [rows,setRows]=useState([]);
   const [cnType,setCnType]=useState("full");
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
   const add=()=>setRows(rs=>[...rs,{id:Date.now(),origVno:"",origDate:"",party:"",gstin:"",reason:"",module:"Flight",taxable:0,gstPct:18,gstAmt:0,tcsAmt:0}]);
@@ -1157,7 +1157,7 @@ export function SalesCreditNote({branch,setRoute}){
           </div>
         </div>
       </div>
-      <VNarr def="Being credit note issued against SH/2026/0018 — full cancellation of Bali holiday package, Mehta & Sons, with GST and TCS reversal.">
+      <VNarr def="Being credit note issued against the original invoice — full cancellation of the holiday package, with GST and TCS reversal.">
         <div style={{background:"#FCEBEB",border:"1px solid #F7C1C1",borderRadius:10,padding:14}}>
           <p style={{margin:"0 0 6px",fontSize:12,fontWeight:600,color:"#A32D2D"}}>Total credit note value</p>
           <p style={{margin:"0 0 8px",fontSize:26,fontWeight:800,color:"#A32D2D",fontVariantNumeric:"tabular-nums",letterSpacing:"-0.02em"}}>({bc(branch).cur+fmt(totCredit)})</p>
@@ -1673,7 +1673,7 @@ export function PurchaseVisa({branch,setRoute}){
           Accounting: <b>Dr Visa Fee Expense</b> &nbsp;|&nbsp; <b>Dr Input GST</b> (from Taxes column + 18% on service charge) &nbsp;|&nbsp; <b>Cr VFS / Supplier ledger</b>. {intra?"Intra-state (27): CGST 9% + SGST 9% on service charge.":"Inter-state (state ≠ 27): IGST 18% on service charge."} Other taxes (biometric, courier) are non-creditable pass-through.
         </div>
       </div>
-      <VNarr def="Being visa fees paid to VFS Global — 2 applicants, UAE Tourist 30D, pass-through recovery from Sharma Enterprises.">
+      <VNarr def="Being visa fees paid to VFS Global — 2 applicants, UAE Tourist 30D, pass-through recovery from the customer.">
         <VTot branch={branch}
           lines={[
             {l:"VFS fee",v:"₹ "+fmt(vfsTotal)},
@@ -2207,10 +2207,7 @@ export function SalesDebitNote({branch,setRoute}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?"BOM":branch?.code||"BOM";
-  const [notes]=useState([
-    {id:`${brCode}/1726/SDN00001`,date:"2026-05-12",origVno:"BOM/1726/SH00018",client:"Mehta & Sons",reason:"Date change fee",amount:5000,gst:900,total:5900,status:"Raised"},
-    {id:`${brCode}/1726/SDN00002`,date:"2026-05-15",origVno:"BOM/1726/SF00043",client:"Sharma Enterprises",reason:"Excess baggage surcharge",amount:3500,gst:630,total:4130,status:"Collected"},
-  ]);
+  const [notes]=useState([]);
   const REASONS=["Date change fee","Cancellation charge","Excess baggage surcharge","Amendment fee","Upgrade difference","Additional service charge","Other"];
   const [modal,setModal]=useState(false);
   const [form,setForm]=useState({client:"",origVno:"",reason:"Date change fee",amount:0});
@@ -2281,11 +2278,7 @@ export function SalesDebitNote({branch,setRoute}){
 export function SalesCancellation({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
-  const [cancellations]=useState([
-    {id:"CXL-BOM-001",date:"2026-05-14",origVno:"BOM/0826/SH00014",client:"Globex Consulting",module:"Holiday",dest:"Dubai",origAmt:98000,cancCharge:15000,refundToClient:83000,supplierRefund:68000,netLoss:0,status:"Refund Pending"},
-    {id:"CXL-BOM-002",date:"2026-05-10",origVno:"BOM/0826/SF00041",client:"TechCorp MICE",module:"Flight",dest:"Doha",origAmt:62000,cancCharge:8000,refundToClient:54000,supplierRefund:54000,netLoss:0,status:"Completed"},
-    {id:"CXL-AMD-001",date:"2026-05-08",origVno:"AMD/0826/SH00008",client:"Patel Exports",module:"Holiday",dest:"Thailand",origAmt:168000,cancCharge:35000,refundToClient:133000,supplierRefund:140000,netLoss:7000,status:"Refund Paid"},
-  ]);
+  const [cancellations]=useState([]);
   const [modal,setModal]=useState(false);
 
   const totCancCharge=cancellations.reduce((s,c)=>s+c.cancCharge,0);
@@ -2355,7 +2348,6 @@ export function PurchaseRefunds({branch}){
     {id:"REF-BOM-001",date:"2026-05-13",supplier:"BSP India",module:"Flight",origVno:"BOM/0826/PF00041",tickets:2,refundReq:51000,refundRec:48500,tds:0,status:"Received",notes:"Partial — airline penalty deducted"},
     {id:"REF-BOM-002",date:"2026-05-10",supplier:"Bali Tours DMC",module:"Holiday",origVno:"BOM/0826/PH00016",tickets:1,refundReq:128000,refundRec:0,tds:0,status:"Applied",notes:"Awaiting DMC confirmation"},
     {id:"REF-AMD-001",date:"2026-05-08",supplier:"VFS Global",module:"Visa",origVno:"AMD/0826/PV00003",tickets:2,refundReq:17800,refundRec:17800,tds:0,status:"Received",notes:"Full refund — visa rejected"},
-    {id:"REF-NBO-001",date:"2026-04-30",supplier:"KQ Direct",module:"Flight",origVno:"NBO/0826/SF00015",tickets:3,refundReq:560000,refundRec:504000,tds:0,status:"Received",notes:"10% cancellation charge by Kenya Airways"},
   ]);
   const totReq=refunds.reduce((s,r)=>s+r.refundReq,0);
   const totRec=refunds.reduce((s,r)=>s+r.refundRec,0);
@@ -2417,6 +2409,7 @@ export function PurchaseRefunds({branch}){
 
 export function AdmRegister({branch}){
   const mob=useMobile();
+  const ADM_REASON_CODES=useAdmReasonCodes().data||{};   // DB-backed (/api/adm-reason-codes)
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
@@ -2429,7 +2422,7 @@ export function AdmRegister({branch}){
   const [form,setForm]=useState({airline:"Air India",airlineCode:"AI",ticketNo:"",passenger:"",
     sector:"",reasonCode:"FD",amount:0,currency:"INR",branch:"BOM",consultant:"",remarks:""});
 
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
   const daysLeft=(deadline)=>Math.ceil((new Date(deadline)-new Date(TODAY))/(1000*60*60*24));
 
   const filtered=adms.filter(a=>(
@@ -2636,8 +2629,8 @@ export function AdmRegister({branch}){
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
                 <FL label="ADM amount"><input type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:+e.target.value}))} style={inp}/></FL>
-                <FL label="Currency"><select value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))} style={inp}><option>INR</option><option>KES</option><option>TZS</option><option>USD</option></select></FL>
-                <FL label="Branch"><select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))} style={inp}>{["TKHO","BOM","AMD","NBO","DAR","FBM"].map(b=><option key={b}>{b}</option>)}</select></FL>
+                <FL label="Currency"><select value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))} style={inp}>{branchCurrencies(form.branch).map(c=><option key={c}>{c}</option>)}</select></FL>
+                <FL label="Branch"><select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value,currency:branchMainCurrency(e.target.value)}))} style={inp}>{BRANCH_CODES.map(b=><option key={b}>{b}</option>)}</select></FL>
               </div>
               <FL label="Remarks / Airline explanation"><textarea value={form.remarks} onChange={e=>setForm(f=>({...f,remarks:e.target.value}))} rows={2} style={{...inp,resize:"vertical"}}/></FL>
               <div style={{padding:"9px 12px",borderRadius:8,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:9.5,color:"#A32D2D",fontWeight:600}}>
@@ -2699,8 +2692,8 @@ export function AdmRegister({branch}){
 
 export function BspSummary({branch}){
   const mob=useMobile();
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
   const brCode=branch==="ALL"?null:branch?.code;
 
   /* Compute from real data */
@@ -2909,7 +2902,7 @@ export function TicketControlRegister({branch}){
                 <td style={{padding:"8px 10px",color:"#5a6691",whiteSpace:"nowrap"}}>{t.issueDate}</td>
                 <td style={{padding:"8px 10px",color:"#5a6691",whiteSpace:"nowrap"}}>{t.travelDate}</td>
                 <td style={{padding:"8px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",fontWeight:600}}>
-                  {t.branch==="NBO"?"KES":"₹"}{Number(t.fare).toLocaleString()}
+                  {"₹"}{Number(t.fare).toLocaleString()}
                 </td>
                 <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:STATUS_BG[t.bspStatus]||"#f3f4f8",color:STATUS_CLR[t.bspStatus]||"#5a6691"}}>{t.bspStatus}</span></td>
                 <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:STATUS_BG[t.status]||"#f3f4f8",color:STATUS_CLR[t.status]||"#5a6691"}}>{t.status}</span></td>
@@ -3163,13 +3156,14 @@ export function GdsPnrImport({branch,setRoute}){
 
 export function ReceiptVoucher({branch}){
   const mob=useMobile();
+  const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];   // live chart of accounts
   const vNo=useVNo(branch,"RV");
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch?.code||"BOM";
 
   const bankLedgers=LEDGER_REGISTRY.filter(l=>l.type==="Bank"||l.type==="Cash");
-  const [date,setDate]=useState("2026-05-19");
+  const [date,setDate]=useState(todayISO());
   const [bankLedger,setBankLedger]=useState("hdfc_bom");
   const [party,setParty]=useState("sharma");
   const [payMode,setPayMode]=useState("NEFT");
@@ -3347,11 +3341,12 @@ export function ReceiptVoucher({branch}){
 
 export function PaymentVoucher({branch}){
   const mob=useMobile();
+  const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];   // live chart of accounts
   const vNo=useVNo(branch,"PMT");
   const cfg=bc(branch);
   const cur=cfg.cur;
 
-  const [date,setDate]=useState("2026-05-19");
+  const [date,setDate]=useState(todayISO());
   const [party,setParty]=useState("bsp_india");
   const [bankLedger,setBankLedger]=useState("hdfc_bom");
   const [payMode,setPayMode]=useState("NEFT");
@@ -3500,10 +3495,11 @@ export function PaymentVoucher({branch}){
 
 export function ContraVoucher({branch}){
   const mob=useMobile();
+  const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];   // live chart of accounts
   const vNo=useVNo(branch,"CV");
   const cfg=bc(branch);
   const cur=cfg.cur;
-  const [date,setDate]=useState("2026-05-19");
+  const [date,setDate]=useState(todayISO());
   const [fromLedger,setFromLedger]=useState("cash_bom");
   const [toLedger,setToLedger]=useState("hdfc_bom");
   const [amount,setAmount]=useState(10000);
@@ -3563,6 +3559,7 @@ export function ContraVoucher({branch}){
 
 export function JournalEntry({branch}){
   const mob=useMobile();
+  const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];   // live chart of accounts
   const vNo=useVNo(branch,"JV");
   const cfg=bc(branch);
   const cur=cfg.cur;
@@ -3603,7 +3600,7 @@ export function JournalEntry({branch}){
     {id:4,ledger:"sgst_in",dr:8500,cr:0,narr:"Input SGST setoff"},
     {id:5,ledger:"hdfc_bom",dr:0,cr:12700,narr:"Net GST payment"},
   ]);
-  const [date,setDate]=useState("2026-05-19");
+  const [date,setDate]=useState(todayISO());
   const [masterNarr,setMasterNarr]=useState("Being GST payment for April 2026");
   const [saved,setSaved]=useState(false);
 
@@ -3730,7 +3727,7 @@ export function SalesHoliday({branch,setRoute}){
   const vNo=useVNo(branch,"SH");
   const cfg=bc(branch);
   const cur=cfg.cur;
-  const [client,setClient]=useState("Sharma Enterprises");
+  const [client,setClient]=useState("");
   const [tourCode,setTourCode]=useState("");
   const [dest,setDest]=useState("Dubai");
   const [deptDate,setDeptDate]=useState("2026-06-10");
@@ -3887,7 +3884,7 @@ export function RecurringVouchers({branch}){
   const [templates,setTemplates]=useState(RECURRING_DATA);
   const [modal,setModal]=useState(false);
   const [form,setForm]=useState({name:"",type:"Journal",freq:"Monthly",day:1,dr:"",cr:"",amt:0});
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
   const due=templates.filter(t=>t.active&&t.nextRun<=TODAY);
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
   const run=id=>setTemplates(ts=>ts.map(t=>t.id===id?{...t,lastRun:TODAY,nextRun:TODAY.replace(/-\d\d$/,"-01").replace(/\d{4}/,(y)=>t.freq==="Monthly"?y:String(parseInt(y)+1))}:t));
@@ -4211,7 +4208,7 @@ export function VoucherEntryTabbed(){
       {tab==="entry"&&tabPanel(
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}>
           <FL label="Voucher No."><input defaultValue="RV-BOM/2026/4521" readOnly style={{...inpStd,fontFamily:"monospace",background:"#fafbfd"}}/></FL>
-          <FL label="Voucher Date"><input type="date" defaultValue="2026-05-19" style={inpStd}/></FL>
+          <FL label="Voucher Date"><input type="date" defaultValue={todayISO()} style={inpStd}/></FL>
           <FL label="Branch"><select style={inpStd}><option>BOM (Mumbai)</option></select></FL>
           <FL label="Customer"><select style={inpStd}><option>L&T Limited (CUST-BOM-00128)</option></select></FL>
           <FL label="Bank/Cash A/c"><select style={inpStd}><option>HDFC BOM Operational — XXXX4321</option><option>SBI BOM — XXXX2255</option></select></FL>
@@ -4306,7 +4303,6 @@ export function BulkVoucherImport(){
   const PREVIEW_ROWS=[
     {r:1,date:"2026-05-01",party:"Air India Ltd. (BSP)",ledger:"Air India BSP Payable",amount:4250000,branch:"BOM",status:"valid"},
     {r:2,date:"2026-05-01",party:"Dubai Wonders DMC",ledger:"DMC Payable",amount:1240000,branch:"BOM",status:"valid"},
-    {r:3,date:"2026-05-02",party:"Kenya Safari Lodge",ledger:"KSL Payable",amount:980000,branch:"NBO",status:"valid"},
     {r:4,date:"2026-05-02",party:"",ledger:"Marriott Group",amount:680000,branch:"BOM",status:"error",msg:"Party name missing"},
     {r:5,date:"2026-05-03",party:"VFS Global",ledger:"VFS Payable",amount:0,branch:"BOM",status:"error",msg:"Amount cannot be 0"},
     {r:6,date:"2026-05-03",party:"Hertz Car Rental",ledger:"Hertz Payable",amount:450000,branch:"AMD",status:"warning",msg:"Possible duplicate of PV-AMD/2026/1015"},
@@ -4340,7 +4336,7 @@ export function BulkVoucherImport(){
           </div>
           <div style={{marginTop:18,display:"flex",gap:10,alignItems:"center"}}>
             <label style={{fontSize:11.5,color:"#5a6691"}}>Branch:</label>
-            <select style={{...inp,width:160}} defaultValue="BOM"><option>All branches</option><option>BOM</option><option>AMD</option><option>NBO</option><option>DAR</option><option>FBM</option><option>TKHO</option></select>
+            <select style={{...inp,width:160}} defaultValue="BOM"><option>All branches</option><option>BOM</option><option>AMD</option></select>
             <label style={{fontSize:11.5,color:"#5a6691",marginLeft:8}}>Period:</label>
             <select style={{...inp,width:180}}><option>May 2026</option><option>Apr 2026</option><option>Mar 2026</option></select>
           </div>
@@ -4423,7 +4419,7 @@ export function BulkVoucherImport(){
         <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Recent batch imports</p>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Date</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>By</th><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"right"}}>Rows</th><th style={{...RPT_thStyle,textAlign:"right"}}>Posted</th><th style={{...RPT_thStyle,textAlign:"right"}}>Total Value</th></tr></thead>
-          <tbody>{[{date:"2026-05-15",type:"Payment Voucher",user:"Rohan",branch:"BOM",rows:18,posted:16,value:12450000},{date:"2026-05-08",type:"Tax Invoice",user:"Mujeet",branch:"NBO",rows:24,posted:24,value:8500000},{date:"2026-04-30",type:"Receipt Voucher",user:"Mohan",branch:"AMD",rows:12,posted:11,value:4200000}].map((r,i)=>(<tr key={i}><td style={RPT_tdStyle}>{r.date}</td><td style={RPT_tdStyle}>{r.type}</td><td style={RPT_tdStyle}>{r.user}</td><td style={RPT_tdStyle}><span style={{padding:"1px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{r.branch}</span></td><td style={{...RPT_tdStyle,textAlign:"right"}}>{r.rows}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#22c55e"}}>{r.posted}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(r.value)}</td></tr>))}</tbody>
+          <tbody>{[{date:"2026-05-15",type:"Payment Voucher",user:"Rohan",branch:"BOM",rows:18,posted:16,value:12450000},{date:"2026-04-30",type:"Receipt Voucher",user:"Mohan",branch:"AMD",rows:12,posted:11,value:4200000}].map((r,i)=>(<tr key={i}><td style={RPT_tdStyle}>{r.date}</td><td style={RPT_tdStyle}>{r.type}</td><td style={RPT_tdStyle}>{r.user}</td><td style={RPT_tdStyle}><span style={{padding:"1px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{r.branch}</span></td><td style={{...RPT_tdStyle,textAlign:"right"}}>{r.rows}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#22c55e"}}>{r.posted}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(r.value)}</td></tr>))}</tbody>
         </table>
       </div>
     </PHASE2_Page>
@@ -4435,60 +4431,57 @@ export function BulkVoucherImport(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function MultiCurrencyVoucher(){
-  const INR_PER_USD=84.52, INR_PER_EUR=91.24;
-  const [saleAmt,setSaleAmt]=useState(8500);
-  const [costAmt,setCostAmt]=useState(6200);
-  const saleCur="USD", costCur="EUR";
-  const saleINR=Math.round(saleAmt*INR_PER_USD);
-  const costINR=Math.round(costAmt*INR_PER_EUR);
+  const [saleAmt,setSaleAmt]=useState(850000);
+  const [costAmt,setCostAmt]=useState(620000);
+  const saleCur="INR", costCur="INR";
+  const saleINR=Math.round(saleAmt);
+  const costINR=Math.round(costAmt);
   const gpINR=saleINR-costINR;
   const gpPct=(gpINR/saleINR*100).toFixed(1);
   const inp={padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12};
 
   return (
-    <PHASE2_Page title="Multi-Currency Voucher" subtitle="Single voucher · sale in one currency · cost in another · auto GP calculation in INR">
+    <PHASE2_Page title="Gross Profit Voucher" subtitle="Single voucher · sale and cost in INR · auto GP calculation">
       <div style={{padding:12,background:"#e8f0fe",border:"1px solid #b8d0f8",borderLeft:"3px solid #3b82f6",borderRadius:6,marginBottom:14,fontSize:11.5,color:"#1e3a5f"}}>
-        <b>How it works:</b> Enter the sale amount in the billing currency (e.g. USD) and cost in the supplier currency (e.g. EUR). KBiz360 converts both to the base currency (INR) using daily forex rates and calculates GP automatically.
+        <b>How it works:</b> Enter the sale amount billed to the customer and the cost paid to the supplier — both in INR. KBiz360 calculates gross profit and GP% automatically.
       </div>
       <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:20}}>
         {/* Header */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,marginBottom:18,paddingBottom:14,borderBottom:"1px solid #f0f2f7"}}>
           <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Voucher Type</label><select style={{...inp,width:"100%"}}><option>Sales Voucher</option><option>Mixed Purchase-Sale</option></select></div>
-          <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Date</label><input type="date" defaultValue="2026-05-20" style={{...inp,width:"100%"}}/></div>
-          <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Branch</label><select style={{...inp,width:"100%"}}><option>BOM</option></select></div>
+          <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Date</label><input type="date" defaultValue={todayISO()} style={{...inp,width:"100%"}}/></div>
+          <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Branch</label><select style={{...inp,width:"100%"}}><option>BOM</option><option>AMD</option></select></div>
         </div>
 
         {/* Revenue side */}
         <div style={{padding:14,background:"#f0fff4",border:"1px solid #bbf7d0",borderRadius:6,marginBottom:10}}>
           <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#155724"}}>📄 Revenue side (Sale)</p>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr",gap:10,alignItems:"flex-end"}}>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Customer</label><input defaultValue="TechCorp Solutions" style={{...inp,width:"100%"}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Currency</label><select style={{...inp,width:"100%"}}><option>USD</option><option>EUR</option><option>INR</option></select></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Rate (₹/USD)</label><input readOnly value={INR_PER_USD} style={{...inp,width:"100%",background:"#f7f8fb",fontFamily:"monospace"}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Amount (USD)</label><input type="number" value={saleAmt} onChange={e=>setSaleAmt(+e.target.value)} style={{...inp,width:"100%",fontFamily:"monospace",fontWeight:700}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>INR Equivalent</label><input readOnly value={"₹"+saleINR.toLocaleString("en-IN")} style={{...inp,width:"100%",background:"#d4edda",fontFamily:"monospace",fontWeight:700,color:"#155724"}}/></div>
+          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:10,alignItems:"flex-end"}}>
+            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Customer</label><input placeholder="Customer" style={{...inp,width:"100%"}}/></div>
+            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Currency</label><select style={{...inp,width:"100%"}}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div>
+            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Amount (₹)</label><input type="number" value={saleAmt} onChange={e=>setSaleAmt(+e.target.value)} style={{...inp,width:"100%",fontFamily:"monospace",fontWeight:700}}/></div>
+            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>INR Value</label><input readOnly value={"₹"+saleINR.toLocaleString("en-IN")} style={{...inp,width:"100%",background:"#d4edda",fontFamily:"monospace",fontWeight:700,color:"#155724"}}/></div>
           </div>
         </div>
 
         {/* Cost side */}
         <div style={{padding:14,background:"#fff5f5",border:"1px solid #fecaca",borderRadius:6,marginBottom:10}}>
           <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#721c24"}}>📥 Cost side (Purchase)</p>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr",gap:10,alignItems:"flex-end"}}>
+          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:10,alignItems:"flex-end"}}>
             <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Supplier</label><input defaultValue="Marriott Group (Bali)" style={{...inp,width:"100%"}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Currency</label><select style={{...inp,width:"100%"}}><option>EUR</option><option>USD</option><option>INR</option></select></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Rate (₹/EUR)</label><input readOnly value={INR_PER_EUR} style={{...inp,width:"100%",background:"#f7f8fb",fontFamily:"monospace"}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Amount (EUR)</label><input type="number" value={costAmt} onChange={e=>setCostAmt(+e.target.value)} style={{...inp,width:"100%",fontFamily:"monospace",fontWeight:700}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>INR Equivalent</label><input readOnly value={"₹"+costINR.toLocaleString("en-IN")} style={{...inp,width:"100%",background:"#f8d7da",fontFamily:"monospace",fontWeight:700,color:"#721c24"}}/></div>
+            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Currency</label><select style={{...inp,width:"100%"}}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div>
+            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Amount (₹)</label><input type="number" value={costAmt} onChange={e=>setCostAmt(+e.target.value)} style={{...inp,width:"100%",fontFamily:"monospace",fontWeight:700}}/></div>
+            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>INR Value</label><input readOnly value={"₹"+costINR.toLocaleString("en-IN")} style={{...inp,width:"100%",background:"#f8d7da",fontFamily:"monospace",fontWeight:700,color:"#721c24"}}/></div>
           </div>
         </div>
 
         {/* Auto-calculated GP summary */}
         <div style={{padding:14,background:"#fff8e8",border:"1px solid #fde68a",borderRadius:6,marginBottom:14}}>
-          <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Auto-calculated in INR (base currency)</p>
+          <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Auto-calculated (INR)</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
-            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700}}>SALE</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:"#155724"}}>{fmtINR(saleINR)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>${saleAmt.toLocaleString()} × ₹{INR_PER_USD}</p></div>
-            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700}}>COST</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:"#721c24"}}>{fmtINR(costINR)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>€{costAmt.toLocaleString()} × ₹{INR_PER_EUR}</p></div>
-            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700}}>GROSS PROFIT</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:gpINR>0?"#22c55e":"#A32D2D"}}>{fmtINR(gpINR)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>after forex conversion</p></div>
+            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700}}>SALE</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:"#155724"}}>{fmtINR(saleINR)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>billed to customer</p></div>
+            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700}}>COST</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:"#721c24"}}>{fmtINR(costINR)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>paid to supplier</p></div>
+            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700}}>GROSS PROFIT</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:gpINR>0?"#22c55e":"#A32D2D"}}>{fmtINR(gpINR)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>sale − cost</p></div>
             <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700}}>GP %</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:+gpPct>=20?"#22c55e":+gpPct>=12?"#d4a437":"#A32D2D"}}>{gpPct}%</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>on sale value</p></div>
           </div>
         </div>
@@ -4498,9 +4491,9 @@ export function MultiCurrencyVoucher(){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5,marginBottom:14}}>
           <thead style={{background:"#f7f8fb"}}><tr><th style={RPT_thStyle}>Ledger</th><th style={RPT_thStyle}>Narration</th><th style={{...RPT_thStyle,textAlign:"right"}}>Debit (₹)</th><th style={{...RPT_thStyle,textAlign:"right"}}>Credit (₹)</th></tr></thead>
           <tbody>
-            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>TechCorp Solutions (Receivable)</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>Bali Package — May 2026</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
-            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Sales — Bali Holidays</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>${saleAmt} @ ₹{INR_PER_USD}</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td></tr>
-            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Tour Cost — Hotels</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>€{costAmt} @ ₹{INR_PER_EUR}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
+            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Customer (Receivable)</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>Sample package</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
+            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Sales — Bali Holidays</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>Package sale</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td></tr>
+            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Tour Cost — Hotels</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>Supplier cost</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
             <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Marriott Group (Payable)</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>Marriott Bali, 3 nights</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td></tr>
           </tbody>
           <tfoot style={{background:"#fafbfd",fontWeight:700}}><tr><td style={{...RPT_tdStyle,fontWeight:700}}>TOTAL</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,borderTop:"2px solid #e1e3ec"}}>{(saleINR+costINR).toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,borderTop:"2px solid #e1e3ec"}}>{(saleINR+costINR).toLocaleString("en-IN")}</td></tr></tfoot>
@@ -4699,13 +4692,7 @@ export function AutoLinkedVouchers(){
     {step:3,voucher:"PUR-BOM/2026/3214",type:"Purchase Invoice (auto-updated)",party:"Air India BSP",amount:285000,date:"2026-05-12",status:"PAID ✓",color:"#22c55e"},
   ];
   const steps=cycle==="sale"?SALE_CYCLE:PUR_CYCLE;
-  const LINK_TABLE=[
-    {sale:"INV-BOM/2026/8742",receipt:"RV-BOM/2026/4521",amount:485000,party:"L&T Limited",date:"2026-05-15"},
-    {sale:"INV-BOM/2026/8728",receipt:"RV-BOM/2026/4519",amount:142500,party:"L&T Limited",date:"2026-05-08"},
-    {sale:"INV-BOM/2026/9001",receipt:"—",amount:285000,party:"TechCorp Solutions",date:"—"},
-    {sale:"PUR-BOM/2026/3214",receipt:"PV-BOM/2026/0892",amount:285000,party:"Air India BSP",date:"2026-05-17"},
-    {sale:"PUR-BOM/2026/3208",receipt:"PV-BOM/2026/0888",amount:124000,party:"Dubai Wonders DMC",date:"2026-05-12"},
-  ];
+  const LINK_TABLE=[]; // populated from live linked sale/receipt vouchers
 
   return (
     <PHASE2_Page title="Auto-link Related Vouchers" subtitle="Sale Invoice ↔ Receipt · Purchase Invoice ↔ Payment — auto-matched on party + amount + date proximity">

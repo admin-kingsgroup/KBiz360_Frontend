@@ -16,16 +16,20 @@ export const ACTION_BACKGROUNDS = {
   success: '#EAF3DE',
 };
 
-export const TODAY_ISO = '2026-05-19';
-export const CURRENT_MONTH = '2026-05';
-export const PREV_MONTH = '2026-04';
-export const FY_START = '2026-04-01';
+// Live, derived from the real system clock (single source of truth: core/dates).
+import { todayISO, CUR_MONTH, CUR_FY, monthKey } from '../../../core/dates';
+
+export const TODAY_ISO = todayISO();
+export const CURRENT_MONTH = CUR_MONTH;
+export const PREV_MONTH = monthKey(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1));
+export const FY_START = CUR_FY.startISO;
 
 export const FX_TO_INR = {
   INR: 1,
   USD: 84.5,
   KES: 0.65,
   TZS: 0.034,
+  CDF: 0.03,
 };
 
 export const QUICK_CREATE_ACTIONS = [

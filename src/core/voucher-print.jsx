@@ -5,19 +5,17 @@
 
 import { Save } from 'lucide-react';
 import { bc } from './styles';
+import { companyProfile } from './referenceCache';
 
 export function openPrintWindow(branch,vNo,title,el){
   const cfg=bc(branch);
   const isIndia=cfg.taxType==="GST";
 
-  const BRANCH_ADDR={
-    BOM:"401, Maker Chamber V, Nariman Point, Mumbai 400 021<br/>GSTIN: 27AABCT1234H1Z5 | Phone: +91 22 4000 1234",
-    AMD:"202, Shapath IV, SG Highway, Ahmedabad 380 054<br/>GSTIN: 24AABCT1234H1Z2 | Phone: +91 79 4000 5678",
-    NBO:"ICEA Building, Kenyatta Avenue, Nairobi<br/>VAT PIN: P051234567X | Phone: +254 20 400 1234",
-    DAR:"Plot 45, Ohio Street, Dar es Salaam<br/>VAT TIN: 123-456-789 | Phone: +255 22 400 5678",
-    FBM:"Avenue Lumumba 12, Lubumbashi, DRC<br/>VAT No: CD-FBM-456789 | Phone: +243 99 400 1234",
-  };
-  const addr=BRANCH_ADDR[branch?.code||"BOM"]||"";
+  // Company letterhead pulled from the live company-profile master (DB-backed).
+  const prof=companyProfile(branch?.code||"BOM")||{};
+  const taxId=prof.gstin?`${cfg.taxType||"GSTIN"}: ${prof.gstin}`:"";
+  const addr=[prof.operAddr, [taxId, prof.phone?`Phone: ${prof.phone}`:""].filter(Boolean).join(" | ")].filter(Boolean).join("<br/>");
+  const companyName=(prof.entity||"Travkings Tours & Travels");
   const bodyHTML=el?el.innerHTML:"<p style='color:#999'>Voucher content not available for preview.</p>";
   const safeName=(vNo||"voucher").replace(/\//g,"-");
 
@@ -72,8 +70,8 @@ export function openPrintWindow(branch,vNo,title,el){
 
 <div class="letterhead">
   <div>
-    <div class="company">TRAVKINGS</div>
-    <div class="company-sub">Tours &amp; Travels &nbsp;·&nbsp; ${cfg.curCode} &nbsp;·&nbsp; ${isIndia?"GST Regime":"VAT Regime"}</div>
+    <div class="company">${companyName}</div>
+    <div class="company-sub">${cfg.curCode} &nbsp;·&nbsp; ${isIndia?"GST Regime":"VAT Regime"}</div>
   </div>
   <div class="addr">${addr}</div>
 </div>

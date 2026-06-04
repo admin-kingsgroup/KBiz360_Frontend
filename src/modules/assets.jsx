@@ -7,7 +7,9 @@ import React, { useState } from 'react';
 import { Plus, Printer } from 'lucide-react';
 import { Line } from 'recharts';
 import { fmt } from '../core/format';
-import { ACM_REASON_CODES, ASSET_CATEGORIES, FIXED_ASSETS_DATA, _ACM_LIST } from '../core/helpers';
+import { ACM_REASON_CODES, FIXED_ASSETS_DATA, _ACM_LIST } from '../core/helpers';
+import { useAssetCategories } from '../core/useReference';
+import { BRANCH_CODES, branchCurrencies, branchMainCurrency } from '../core/data';
 import { useMobile } from '../core/hooks';
 import { FL, bc, btnG, btnGh, card, inp } from '../core/styles';
 
@@ -192,8 +194,8 @@ export function AcmRegister({branch}){
               <div style={{padding:"7px 10px",borderRadius:7,background:"#EAF3DE",fontSize:9.5,color:"#27500A"}}>{ACM_REASON_CODES[form.reasonCode]?.desc}</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
                 <FL label="Credit amount"><input type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:+e.target.value}))} style={inp}/></FL>
-                <FL label="Currency"><select value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))} style={inp}><option>INR</option><option>KES</option><option>TZS</option><option>USD</option></select></FL>
-                <FL label="Branch"><select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))} style={inp}>{["TKHO","BOM","AMD","NBO","DAR","FBM"].map(b=><option key={b}>{b}</option>)}</select></FL>
+                <FL label="Currency"><select value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))} style={inp}>{branchCurrencies(form.branch).map(c=><option key={c}>{c}</option>)}</select></FL>
+                <FL label="Branch"><select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value,currency:branchMainCurrency(e.target.value)}))} style={inp}>{BRANCH_CODES.map(b=><option key={b}>{b}</option>)}</select></FL>
               </div>
               <FL label="Remarks"><textarea value={form.remarks} onChange={e=>setForm(f=>({...f,remarks:e.target.value}))} rows={2} style={{...inp,resize:"vertical"}}/></FL>
             </div>
@@ -215,6 +217,7 @@ export function AcmRegister({branch}){
 
 export function FixedAssetRegister({branch,setRoute}){
   const mob=useMobile();
+  const ASSET_CATEGORIES=useAssetCategories().data||[];   // DB-backed (/api/asset-categories)
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
@@ -330,6 +333,7 @@ export function FixedAssetRegister({branch,setRoute}){
 
 export function AssetDepreciation({branch,setRoute}){
   const mob=useMobile();
+  const ASSET_CATEGORIES=useAssetCategories().data||[];   // DB-backed (/api/asset-categories)
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
@@ -437,8 +441,7 @@ export function AssetDisposal({branch,setRoute}){
   const DISPOSALS=[
     {id:"DSP-001",assetId:"FA-BOM-0099",name:"Old HP Printer",disposalDate:"2026-03-15",reason:"Sale",bookValue:8500,saleValue:12000,gain:3500,buyer:"Office Solutions Pvt Ltd",method:"Sold"},
     {id:"DSP-002",assetId:"FA-AMD-0045",name:"Dell Workstation (4 yrs)",disposalDate:"2026-02-20",reason:"Sale",bookValue:15000,saleValue:8000,gain:-7000,buyer:"Cash buyer",method:"Sold"},
-    {id:"DSP-003",assetId:"FA-NBO-0012",name:"Office Furniture (Old)",disposalDate:"2026-01-10",reason:"Scrap",bookValue:25000,saleValue:5000,gain:-20000,buyer:"Local scrap dealer",method:"Scrapped"},
-    {id:"DSP-004",assetId:"FA-BOM-0067",name:"Conference Room Projector",disposalDate:"2025-12-05",reason:"Transfer",bookValue:18000,saleValue:18000,gain:0,buyer:"Internal — to NBO branch",method:"Transferred"},
+    {id:"DSP-004",assetId:"FA-BOM-0067",name:"Conference Room Projector",disposalDate:"2025-12-05",reason:"Transfer",bookValue:18000,saleValue:18000,gain:0,buyer:"Internal transfer",method:"Transferred"},
   ];
 
   const totGain=DISPOSALS.reduce((s,d)=>s+(d.gain>0?d.gain:0),0);
@@ -490,6 +493,7 @@ export function AssetDisposal({branch,setRoute}){
 
 export function BlockOfAssets({branch,setRoute}){
   const mob=useMobile();
+  const ASSET_CATEGORIES=useAssetCategories().data||[];   // DB-backed (/api/asset-categories)
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;

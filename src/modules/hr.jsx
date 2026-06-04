@@ -6,15 +6,23 @@
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, BarChart2, Calendar, Check, Download, Lock, Plus, Save, Search, Settings, Users } from 'lucide-react';
 import { Legend, Line } from 'recharts';
-import { BRANCHES, EMP_LOANS_DATA, EXP_LEDGERS, FY_LIST, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../core/data';
+import { BRANCHES, EMP_LOANS_DATA, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../core/data';
 import { fmt, fmtINR } from '../core/format';
-import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, _LEAVES, _LEAVE_BALANCES, _REVISION_DUE, _SALARY_HISTORY, cardStyle, getExpenseBudget, saveExpenseBudget, tabPanel } from '../core/helpers';
+import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, _LEAVES, _LEAVE_BALANCES, _REVISION_DUE, _SALARY_HISTORY, cardStyle, tabPanel } from '../core/helpers';
 import { useMobile } from '../core/hooks';
+import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../core/useReference';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiPut } from '../core/api';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../core/styles';
 import { PHASE2_Page } from '../shell/PHASE2_Page';
 
 export function ExpenseBudget({branch,setRoute}){
   const mob=useMobile();
+  const EXP_LEDGERS=useExpenseLedgers().data||[];          // DB-backed (/api/expense-ledgers)
+  const FY_LIST=useFiscalYears().data||[];                 // DB-backed (/api/fiscal-years)
+  const budgetRows=useExpenseBudgets().data;               // DB-backed (/api/expense-budgets)
+  const qc=useQueryClient();
+  const saveMut=useMutation({mutationFn:(payload)=>apiPut('/api/expense-budgets/bulk',payload),onSuccess:()=>qc.invalidateQueries({queryKey:['ref','expense-budgets']})});
   const [fy,setFy]=useState("2025-26");
   const [tab,setTab]=useState("monthly");
   const [editing,setEditing]=useState(false);
@@ -27,17 +35,24 @@ export function ExpenseBudget({branch,setRoute}){
   const brCode=brObj?.code||"BOM";
   const cfg=bc(brObj);
   const cur=cfg.cur;
-  const fyObj=FY_LIST.find(f=>f.v===fy)||FY_LIST[1];
+  const fyObj=FY_LIST.find(f=>f.v===fy)||FY_LIST[1]||{l:fy,v:fy};
   const groups=["All",...new Set(EXP_LEDGERS.map(l=>l.group))];
   const visLedgers=EXP_LEDGERS.filter(l=>groupFilter==="All"||l.group===groupFilter);
-  const saved=getExpenseBudget(brObj,fy);
+  const saved=useMemo(()=>{
+    const rows=(budgetRows||[]).filter(r=>r.branch===brCode&&r.fy===fy);
+    return Object.fromEntries(rows.map(r=>[r.ledgerCode,{monthly:r.monthly,yearly:r.yearly}]));
+  },[budgetRows,brCode,fy]);
   const tgts=draft||saved;
   const totM=EXP_LEDGERS.reduce((s,l)=>s+(tgts[l.id]?.monthly||0),0);
   const totY=EXP_LEDGERS.reduce((s,l)=>s+(tgts[l.id]?.yearly||0),0);
 
   const startEdit=()=>{const base={};EXP_LEDGERS.forEach(l=>{const s=saved[l.id]||{monthly:0,yearly:0};base[l.id]={monthly:s.monthly,yearly:s.yearly||s.monthly*12};});setDraft(base);setEditing(true);};
   const cancelEdit=()=>{setDraft(null);setEditing(false);};
-  const saveEdit=()=>{saveExpenseBudget(brObj,fy,draft);setDraft(null);setEditing(false);};
+  const saveEdit=()=>{
+    const rows=Object.entries(draft||{}).map(([ledgerCode,v])=>({ledgerCode,monthly:v.monthly,yearly:v.yearly}));
+    saveMut.mutate({branch:brCode,fy,rows});
+    setDraft(null);setEditing(false);
+  };
   const updM=(id,v)=>setDraft(d=>({...d,[id]:{...d[id],monthly:+v,yearly:Math.round(+v*12)}}));
   const updY=(id,v)=>setDraft(d=>({...d,[id]:{...d[id],yearly:+v,monthly:Math.round(+v/12)}}));
   const f=n=>n>=1000000?(n/100000).toFixed(1)+"L":n>=1000?(n/1000).toFixed(0)+"K":n>0?String(n):"—";
@@ -442,7 +457,6 @@ export function HrAttendance({branch}){
     if(dow===0) return "WO";
     if(dow===6) return "WO";
     const seed=(empId.charCodeAt(empId.length-1)+day)%10;
-    if(day<=3&&empId.includes("NBO")&&day===2) return "H"; /* public holiday */
     if(seed===0) return "A";
     if(seed===1) return "L";
     return "P";
@@ -1639,18 +1653,18 @@ export function EmployeeAdvances({branch,setRoute}){
 export function EmployeeMasterTabbed(){
   const [tab,setTab]=useState("basic");
   const tabs=[{id:"basic",label:"1. Basic Info"},{id:"address",label:"2. Address"},{id:"bank",label:"3. Bank Details"},{id:"tax",label:"4. Tax Info"},{id:"salary",label:"5. Salary Components"},{id:"leave",label:"6. Leave Balance"},{id:"attend",label:"7. Attendance"},{id:"perf",label:"8. Performance"},{id:"docs",label:"9. Documents"},{id:"notes",label:"10. Notes"}];
-  return TAB_Page("Faiz Patel", "Employee Master · TK-TKHO-001 · Senior Finance Manager · TKHO · 10-tab structure",
+  return TAB_Page("Faiz Patel", "Employee Master · TK-HO-001 · Senior Finance Manager · Head Office · 10-tab structure",
     {user:"AD",date:"2026-05-19 11:30",created:"2017-06-01 09:00"},
     <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
       <div style={{display:"flex",borderBottom:"1px solid #e1e3ec",overflowX:"auto",background:"#fafbfd"}}>{tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}</div>
       {tab==="basic"&&tabPanel(
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}>
           <FL label="Full Name"><input defaultValue="Faiz Patel" style={inpStd}/></FL>
-          <FL label="Employee ID"><input defaultValue="TK-TKHO-001" readOnly style={{...inpStd,fontFamily:"monospace",background:"#fafbfd"}}/></FL>
+          <FL label="Employee ID"><input defaultValue="TK-HO-001" readOnly style={{...inpStd,fontFamily:"monospace",background:"#fafbfd"}}/></FL>
           <FL label="Date of Birth"><input type="date" defaultValue="1985-03-22" style={inpStd}/></FL>
           <FL label="Designation"><input defaultValue="Senior Finance Manager (CFO-equivalent)" style={inpStd}/></FL>
           <FL label="Department"><select style={inpStd}><option>Finance</option><option>Operations</option><option>HR</option><option>IT</option></select></FL>
-          <FL label="Branch"><select style={inpStd}><option>TKHO (Head Office)</option><option>BOM</option></select></FL>
+          <FL label="Branch"><select style={inpStd}><option>BOM</option><option>AMD</option></select></FL>
           <FL label="Date of Joining"><input type="date" defaultValue="2017-06-01" style={inpStd}/></FL>
           <FL label="Years of Service"><input defaultValue="9 years" readOnly style={{...inpStd,background:"#fafbfd"}}/></FL>
           <FL label="Reporting To"><select style={inpStd}><option>Afshin Dhanani (Director)</option></select></FL>
@@ -1736,7 +1750,7 @@ export function EmployeeMasterTabbed(){
           </div>
           <div style={cardStyle}>
             <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>Performance History</p>
-            {[{p:"FY 2025-26",r:4.5,k:"Exceeded all targets · Led GST automation project · Clean audit"},{p:"FY 2024-25",r:4.2,k:"Met all targets · Successfully managed branch expansion to FBM"},{p:"FY 2023-24",r:4.0,k:"Met all targets · Process improvements in receivables management"}].map(p=>(<div key={p.p} style={{padding:"10px 12px",background:"#fafbfd",borderRadius:6,marginBottom:6,border:"1px solid #e1e3ec"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{p.p}</p><span style={{padding:"2px 8px",background:p.r>=4.5?"#d4edda":p.r>=4?"#fff3cd":"#f8d7da",color:p.r>=4.5?"#155724":p.r>=4?"#856404":"#721c24",borderRadius:3,fontSize:11,fontWeight:700}}>⭐ {p.r}</span></div><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{p.k}</p></div>))}
+            {[{p:"FY 2025-26",r:4.5,k:"Exceeded all targets · Led GST automation project · Clean audit"},{p:"FY 2024-25",r:4.2,k:"Met all targets · Successfully managed branch expansion"},{p:"FY 2023-24",r:4.0,k:"Met all targets · Process improvements in receivables management"}].map(p=>(<div key={p.p} style={{padding:"10px 12px",background:"#fafbfd",borderRadius:6,marginBottom:6,border:"1px solid #e1e3ec"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{p.p}</p><span style={{padding:"2px 8px",background:p.r>=4.5?"#d4edda":p.r>=4?"#fff3cd":"#f8d7da",color:p.r>=4.5?"#155724":p.r>=4?"#856404":"#721c24",borderRadius:3,fontSize:11,fontWeight:700}}>⭐ {p.r}</span></div><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{p.k}</p></div>))}
           </div>
         </>
       )}

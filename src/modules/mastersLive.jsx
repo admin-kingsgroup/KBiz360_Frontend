@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { Plus, Pencil, Trash2, X } from 'lucide-react';
 import { card, inp } from '../core/styles';
+import { ACTIVE_CURRENCIES } from '../core/data';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
 
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
@@ -20,7 +21,7 @@ const blankFromFields = (fields) => fields.reduce((o, f) => {
   return o;
 }, {});
 
-function FieldInput({ field, value, onChange }) {
+function FieldInput({ field, value, onChange, form }) {
   if (field.type === 'bool') {
     return (
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#334155', cursor: 'pointer' }}>
@@ -30,10 +31,13 @@ function FieldInput({ field, value, onChange }) {
     );
   }
   if (field.type === 'select') {
+    // options may be a static array or a fn(form) → array (e.g. Sub-Group depends
+    // on the chosen Group). An empty list renders just the placeholder.
+    const options = typeof field.options === 'function' ? (field.options(form) || []) : (field.options || []);
     return (
       <select value={value} onChange={(e) => onChange(e.target.value)} style={{ ...inp, fontSize: 12.5 }}>
-        <option value="">Select…</option>
-        {field.options.map((o) => <option key={o} value={o}>{o}</option>)}
+        <option value="">{field.emptyLabel || 'Select…'}</option>
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
     );
   }
@@ -67,7 +71,7 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
           {editable.map((f) => (
             <div key={f.key}>
               {f.type !== 'bool' && <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: DIM, marginBottom: 4 }}>{f.label}{f.required && <span style={{ color: RED }}> *</span>}</label>}
-              <FieldInput field={f} value={form[f.key]} onChange={(v) => set(f.key, v)} />
+              <FieldInput field={f} value={form[f.key]} onChange={(v) => set(f.key, v)} form={form} />
             </div>
           ))}
           {error && <div style={{ fontSize: 11.5, color: RED, fontWeight: 600 }}>⚠ {error}</div>}
@@ -257,35 +261,72 @@ const TALLY_GROUP_NAMES = [
   'Misc. Expenses (Asset)', 'Suspense Account',
 ];
 
+// Groups are the 28 FIXED Tally groups — READ-ONLY (no create / edit / delete).
 export const GroupsMaster = () => (
-  <MasterCrud title="Account Groups" subtitle="Chart of Accounts — Tally groups + custom groups/sub-groups"
-    resource="groups" lockedRow={(r) => r.system}
-    note="🔒 The 28 Tally groups are seeded and locked. Add custom groups / sub-groups under a parent — Nature & Statement (BS/PL) are inherited automatically."
+  <MasterCrud title="Account Groups (Fixed · Read-only)" subtitle="The 28 Tally groups — the fixed primary chart of accounts"
+    resource="groups" readOnly
+    note="🔒 The 28 Tally groups are fixed and cannot be created, edited or deleted. To extend the chart, add Sub-Groups under a group (Masters → Sub-Groups)."
     fields={[
-      { key: 'name', label: 'Group Name', type: 'text', required: true },
-      { key: 'parent', label: 'Parent Group', type: 'select', options: TALLY_GROUP_NAMES },
-      { key: 'nature', label: 'Nature', type: 'text', input: false },
-      { key: 'statement', label: 'Statement', type: 'text', input: false },
-      { key: 'active', label: 'Active', type: 'bool', default: true },
+      { key: 'name', label: 'Group Name', type: 'text' },
+      { key: 'parent', label: 'Parent Group', type: 'text' },
+      { key: 'nature', label: 'Nature', type: 'text' },
+      { key: 'statement', label: 'Statement', type: 'text' },
     ]} />
 );
+
+// Sub-Groups are the user-managed custom nodes. They nest under any group (or
+// another sub-group) to any depth and inherit Nature / Statement from the parent.
+export const SubGroupsMaster = () => {
+  // Parent options = every group + existing sub-group, live from /api/groups.
+  const groupsQ = useMasterList('groups');
+  const parentOptions = (groupsQ.data || []).map((g) => g.name);
+  return (
+    <MasterCrud title="Sub-Groups" subtitle="Custom Chart-of-Accounts sub-groups — nest under any group, to any depth"
+      resource="subgroups"
+      note="Create a sub-group under one of the 28 fixed groups (or under another sub-group). Nature & Statement (BS/PL) are inherited from the parent automatically."
+      fields={[
+        { key: 'name', label: 'Sub-Group Name', type: 'text', required: true },
+        { key: 'parent', label: 'Parent Group', type: 'select', options: parentOptions.length ? parentOptions : TALLY_GROUP_NAMES, required: true },
+        { key: 'nature', label: 'Nature', type: 'text', input: false },
+        { key: 'statement', label: 'Statement', type: 'text', input: false },
+        { key: 'active', label: 'Active', type: 'bool', default: true },
+      ]} />
+  );
+};
 
 export const LedgersMaster = () => {
   // Suggest group names in a dropdown — live from /api/groups (28 Tally + custom),
   // falling back to the 28 Tally names until the list loads.
   const groupsQ = useMasterList('groups');
-  const groupOptions = (groupsQ.data || []).map((g) => g.name);
+  const groups = groupsQ.data || [];
+  const groupOptions = groups.map((g) => g.name);
+  // Custom sub-groups whose parent chain reaches `groupName` — used to offer a
+  // Sub-Group dropdown scoped to the chosen Group (e.g. picking "Sundry Debtors"
+  // lists only the sub-groups created under it). Keep Group = the parent Tally
+  // group + a Sub-Group so the ledger nests correctly on the Balance Sheet.
+  const parentOf = new Map(groups.map((g) => [g.name, g.parent || '']));
+  const subGroupsUnder = (groupName) => {
+    if (!groupName) return [];
+    const out = [];
+    for (const g of groups) {
+      if (g.system) continue;                 // only user-created sub-groups
+      let p = g.parent, guard = 0;
+      while (p && guard++ < 20) { if (p === groupName) { out.push(g.name); break; } p = parentOf.get(p) || ''; }
+    }
+    return out.sort();
+  };
   return (
     <MasterCrud title="Ledgers" subtitle="Chart of Accounts — ledger accounts (live)"
       resource="ledgers"
-      note="Pick the account Group from the dropdown — the 28 Tally groups plus any custom groups you created."
+      note="Set Group to the parent Tally group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups."
       fields={[
         { key: 'code', label: 'Code', type: 'text', required: true },
         { key: 'name', label: 'Ledger Name', type: 'text', required: true },
         { key: 'group', label: 'Group', type: 'select', options: groupOptions.length ? groupOptions : TALLY_GROUP_NAMES, required: true },
-        { key: 'subGroup', label: 'Sub-Group', type: 'text', table: false },
+        { key: 'subGroup', label: 'Sub-Group', type: 'select', table: false, emptyLabel: '— None —',
+          options: (form) => { const subs = subGroupsUnder(form.group); return form.subGroup && !subs.includes(form.subGroup) ? [form.subGroup, ...subs] : subs; } },
         { key: 'branch', label: 'Branch', type: 'text', default: 'ALL' },
-        { key: 'currency', label: 'Currency', type: 'text', default: 'INR' },
+        { key: 'currency', label: 'Currency', type: 'select', options: ACTIVE_CURRENCIES, default: 'INR' },
         { key: 'openingBalance', label: 'Opening Balance', type: 'number', default: 0 },
         { key: 'drCr', label: 'Dr/Cr', type: 'select', options: ['Dr', 'Cr'], default: 'Dr' },
         { key: 'active', label: 'Active', type: 'bool', default: true },

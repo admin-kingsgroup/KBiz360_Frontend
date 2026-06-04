@@ -7,7 +7,7 @@ export function ConsultantLeaderboard({ consultants, formatMoney, onViewAll }) {
   return (
     <div style={{ ...card }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0d1326' }}>🏆 Consultant Leaderboard — May</p>
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0d1326' }}>🏆 Consultant Leaderboard — This Month</p>
         <button onClick={onViewAll} style={{ ...btnGh, fontSize: 10, padding: '3px 10px' }}>
           Full →
         </button>

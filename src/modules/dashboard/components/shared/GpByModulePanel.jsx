@@ -7,7 +7,7 @@ export function GpByModulePanel({ modGp, totalGp, formatMoney, onViewFullReport 
   return (
     <div style={{ ...card }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0d1326' }}>📊 GP by Product — May 2026</p>
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0d1326' }}>📊 GP by Product — This Month</p>
         <button onClick={onViewFullReport} style={{ ...btnGh, fontSize: 10, padding: '3px 10px' }}>
           Full Report →
         </button>

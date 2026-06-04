@@ -6,10 +6,12 @@
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, Download, Lock, Plus, Printer, Save } from 'lucide-react';
 import { exportToCSV } from '../core/business-logic';
-import { CASH, EXP_ACTUALS, GP_BILLS, LOAN_REGISTER } from '../core/data';
+import { BRANCH_CODES, CASH, EXP_ACTUALS, FX_RATES, GP_BILLS, LOAN_REGISTER } from '../core/data';
 import { fmt, fmtINR } from '../core/format';
+import { CUR_MONTH, MONTH_OPTIONS, FY_MONTHS, monthLabel, todayISO, fmtDate, CUR_FY, rangeNote } from '../core/dates';
 import { BANK_ACCOUNTS_DATA, GratuityRegister, INVESTMENT_DATA, INVESTMENT_SECTIONS, RECO_QUEUE_DATA, _ADVANCES, cardStyle } from '../core/helpers';
 import { useMobile } from '../core/hooks';
+import { useChartOfAccounts } from '../core/useAccounting';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp } from '../core/styles';
 import { Dashboard } from './dashboard';
 import { PfEsiChallan } from './hr';
@@ -23,19 +25,14 @@ export function BankReco({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
-  const [period,setPeriod]=useState("2026-05");
+  const [period,setPeriod]=useState(CUR_MONTH);
   const [tab,setTab]=useState("reco"); // reco | pdc | bounce
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const PERIODS=MONTH_OPTIONS;
   const [matchedIds,setMatchedIds]=useState(new Set([0,1,2,3,4]));
   const toggleMatch=id=>setMatchedIds(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
 
-  /* PDC Register */
-  const [pdcs,setPdcs]=useState([
-    {id:"PDC001",client:"Sharma Enterprises",chqNo:"001234",bank:"HDFC",date:"2026-05-28",amount:58500,status:"Pending",depositDate:""},
-    {id:"PDC002",client:"Mehta & Sons",chqNo:"567890",bank:"ICICI",date:"2026-06-05",amount:136400,status:"Pending",depositDate:""},
-    {id:"PDC003",client:"TechCorp MICE",chqNo:"112233",bank:"SBI",date:"2026-05-25",amount:500000,status:"Deposited",depositDate:"2026-05-25"},
-    {id:"PDC004",client:"Patel Exports",chqNo:"445566",bank:"HDFC",date:"2026-05-10",amount:48000,status:"Bounced",depositDate:"2026-05-10"},
-  ]);
+  /* PDC Register — no bundled demo cheques (empty until a PDC backend is added) */
+  const [pdcs,setPdcs]=useState([]);
   const depositPDC=id=>setPdcs(ps=>ps.map(p=>p.id===id?{...p,status:"Deposited",depositDate:"2026-05-19"}:p));
   const bouncePDC=id=>setPdcs(ps=>ps.map(p=>p.id===id?{...p,status:"Bounced"}:p));
 
@@ -213,7 +210,7 @@ export function DayBook({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
-  const [date,setDate]=useState("2026-05-17");
+  const [date,setDate]=useState(todayISO());
   const [typeFilter,setTypeFilter]=useState("All");
 
   /* Build entries from GP_BILLS, EXP_ACTUALS, ADMs, ACMs */
@@ -292,19 +289,16 @@ export function LedgerAc({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
-  const [ledger,setLedger]=useState("Sharma Enterprises");
-  const [dateFrom,setDateFrom]=useState("2025-12-01");
-  const [dateTo,setDateTo]=useState("2026-05-31");
+  const [ledger,setLedger]=useState("");
+  const [dateFrom,setDateFrom]=useState(CUR_FY.startISO);
+  const [dateTo,setDateTo]=useState(todayISO());
 
-  const LEDGERS=["Sharma Enterprises","Mehta & Sons","Rohan","TechCorp MICE",
-    "BSP India","Emirates GSA","Bali Tours DMC","Island Escapes",
-    "HDFC Bank CA","Cash in Hand","Salaries & Wages","Office Rent","Advertising"];
+  // Account list from the live chart of accounts (this legacy view is superseded
+  // by LedgerAcLive; no bundled demo names).
+  const LEDGERS=(useChartOfAccounts(branch).data||[]).map(l=>l.name);
 
   const entries=useMemo(()=>{
-    const isClient=["Sharma Enterprises","Mehta & Sons","Rohan","TechCorp MICE","Patel Exports","Gujarat Ceramics","Globex Consulting","Nexus Industries","Apex Pharma"].includes(ledger);
-    const isSupplier=["BSP India","Emirates GSA","Bali Tours DMC","Island Escapes","VFS Global"].includes(ledger);
-    const isBank=["HDFC Bank CA","Cash in Hand"].includes(ledger);
-    const isExpense=["Salaries & Wages","Office Rent","Advertising"].includes(ledger);
+    const isClient=false, isSupplier=false, isBank=false, isExpense=false;
 
     const rows=[];
     if(isClient){
@@ -392,13 +386,10 @@ export function TrialBalance({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState("2026-05");
-  const PERIODS=[{v:"2025-12",l:"Dec 2025"},{v:"2026-01",l:"Jan 2026"},{v:"2026-02",l:"Feb 2026"},
-    {v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const PERIODS=MONTH_OPTIONS;
 
   /* ── Compute from real data ── */
-  const FY_MONTHS=["2025-04","2025-05","2025-06","2025-07","2025-08","2025-09",
-    "2025-10","2025-11","2025-12","2026-01","2026-02","2026-03"];
   const ytdMonths=FY_MONTHS.filter(m=>m<=period);
 
   const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.slice(0,7)<=period);
@@ -465,8 +456,9 @@ export function TrialBalance({branch}){
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Trial Balance</h2>
           <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>
-            {brCode||"Travkings Group"} · YTD to {PERIODS.find(p=>p.v===period)?.l} · Dr = Cr = {cur}{Number(Math.round(totDr)).toLocaleString()}
+            {brCode||"Travkings Group"} · YTD to {monthLabel(period)} · Dr = Cr = {cur}{Number(Math.round(totDr)).toLocaleString()}
           </p>
+          <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 FY {CUR_FY.label} year-to-date · {fmtDate(CUR_FY.startISO)} → end of {monthLabel(period)} · use selector to change</p>
         </div>
         <div style={{display:"flex",gap:8}}>
           <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
@@ -631,7 +623,7 @@ export function CashFlowForecast({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
 
   /* Build 90-day forecast */
   const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date>="2026-04-01");
@@ -642,31 +634,11 @@ export function CashFlowForecast({branch}){
   const openingBank=monthlyRev*0.35;
 
   /* Inflows: receivables collection schedule */
-  const inflows=[
-    {date:"2026-05-22",desc:"Expected: Sharma Enterprises collection",amt:Math.round(monthlyRev*0.08),type:"Receipt"},
-    {date:"2026-05-25",desc:"Expected: TechCorp MICE advance",amt:300000,type:"Receipt"},
-    {date:"2026-05-28",desc:"Expected: Mujeet balance",amt:Math.round(monthlyRev*0.12),type:"Receipt"},
-    {date:"2026-06-05",desc:"Expected: Mehta & Sons payment",amt:Math.round(monthlyRev*0.06),type:"Receipt"},
-    {date:"2026-06-10",desc:"Expected: Nexus Industries",amt:Math.round(monthlyRev*0.04),type:"Receipt"},
-    {date:"2026-06-15",desc:"Expected: General collections",amt:Math.round(monthlyRev*0.15),type:"Receipt"},
-    {date:"2026-07-01",desc:"Expected: July advance payments",amt:Math.round(monthlyRev*0.20),type:"Receipt"},
-  ];
+  // No bundled demo forecast — a real 13-week cash-flow engine feeds this later.
+  const inflows=[];
 
-  /* Outflows: scheduled payments */
-  const outflows=[
-    {date:"2026-05-20",desc:"BSP India weekly settlement",amt:214000,type:"BSP"},
-    {date:"2026-05-22",desc:"Office rent — May",amt:Math.round(monthlyBurn*0.18),type:"Fixed"},
-    {date:"2026-05-25",desc:"Salaries — May payroll",amt:Math.round(monthlyBurn*0.40),type:"Salary"},
-    {date:"2026-06-07",desc:"TDS deposit — May",amt:Math.round(monthlyBurn*0.03),type:"Tax"},
-    {date:"2026-06-10",desc:"Bali Tours DMC — balance payment",amt:96000,type:"Supplier"},
-    {date:"2026-06-20",desc:"GSTR-3B payment — May",amt:Math.round(monthlyRev*0.04),type:"Tax"},
-    {date:"2026-06-22",desc:"Office rent — June",amt:Math.round(monthlyBurn*0.18),type:"Fixed"},
-    {date:"2026-06-25",desc:"Salaries — June payroll",amt:Math.round(monthlyBurn*0.40),type:"Salary"},
-    {date:"2026-06-27",desc:"BSP India weekly settlement",amt:228000,type:"BSP"},
-    {date:"2026-07-07",desc:"TDS deposit — June",amt:Math.round(monthlyBurn*0.03),type:"Tax"},
-    {date:"2026-07-22",desc:"Office rent — July",amt:Math.round(monthlyBurn*0.18),type:"Fixed"},
-    {date:"2026-07-25",desc:"Salaries — July payroll",amt:Math.round(monthlyBurn*0.40),type:"Salary"},
-  ];
+  /* Outflows: scheduled payments — no bundled demo data */
+  const outflows=[];
 
   /* Build running balance */
   const allEvents=[
@@ -765,7 +737,7 @@ export function CashBookReport({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?"BOM":branch?.code||"BOM";
-  const [date,setDate]=useState("2026-05-19");
+  const [date,setDate]=useState(todayISO());
   const [cashAccount,setCashAccount]=useState("Cash in Hand — BOM");
 
   const entries=useMemo(()=>{
@@ -877,9 +849,9 @@ export function YearEndClose({branch}){
   const mob=useMobile();
   const [step,setStep]=useState(0);
   const [confirmed,setConfirmed]=useState({});
-  const FY="2025-26";
-  const NEW_FY="2026-27";
-  const CLOSE_DATE="2026-03-31";
+  const FY=`${CUR_FY.startYear-1}-${String(CUR_FY.startYear).slice(2)}`;
+  const NEW_FY=CUR_FY.label;
+  const CLOSE_DATE=`${CUR_FY.startYear}-03-31`;
 
   const steps=[
     {title:"Pre-closing checklist",icon:"📋",items:[
@@ -1262,14 +1234,14 @@ export const TDS_SECTIONS_TABLE = [
 
 export function BankBalanceDashboard(){
   const [filterBranch,setFilterBranch]=useState("ALL");
-  const FX={INR:1,USD:84.52,EUR:91.24,KES:0.652,TZS:0.034,CDF:0.030};
+  const FX=FX_RATES;
   const toINR=(amt,cur)=>amt*(FX[cur]||1);
 
   const filtered=BANK_ACCOUNTS_DATA.filter(b=>filterBranch==="ALL"||b.branch===filterBranch);
   const totalINR=filtered.reduce((s,b)=>s+toINR(b.openingBal,b.currency),0);
   const totalLimit=filtered.reduce((s,b)=>s+toINR(b.limit,b.currency),0);
 
-  const byBranch=["TKHO","BOM","AMD","NBO","DAR","FBM"].map(br=>{
+  const byBranch=["BOM","AMD"].map(br=>{
     const accts=BANK_ACCOUNTS_DATA.filter(b=>b.branch===br);
     const balINR=accts.reduce((s,b)=>s+toINR(b.openingBal,b.currency),0);
     return {branch:br,balINR,accts:accts.length};
@@ -1286,7 +1258,7 @@ export function BankBalanceDashboard(){
       toolbar={<>
         <select value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>
           <option value="ALL">All branches</option>
-          {["TKHO","BOM","AMD","NBO","DAR","FBM"].map(b=><option key={b}>{b}</option>)}
+          {BRANCH_CODES.map(b=><option key={b}>{b}</option>)}
         </select>
         <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #d4a437",color:"#d4a437",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>↻ Refresh</button>
         <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 Export</button>
@@ -1493,7 +1465,7 @@ export function InterestCalculator(){
   const [principal,setPrincipal]=useState(500000);
   const [rate,setRate]=useState(18);
   const [dueDate,setDueDate]=useState("2026-04-01");
-  const [calcDate,setCalcDate]=useState("2026-05-20");
+  const [calcDate,setCalcDate]=useState(todayISO());
   const [mode,setMode]=useState("simple");
   const inp={padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12.5,width:"100%"};
 

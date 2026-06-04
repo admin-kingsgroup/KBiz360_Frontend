@@ -138,6 +138,28 @@ const SPECS = [
     example: ['DB/26/0001', '2025-06-05', 'BOM', 'Emirates GSA', 'Purchase — Air Tickets', '1000', '180', '1180', 'TKB-0001', 'Ticket void'] },
 ];
 
+// Inject the optional "Reference Ledger" column into every Sales & Purchase
+// template, right after the party column. On a SALE it's the debtor the invoice
+// posts to — a B2C/B2B/B2E sub-group ledger under Sundry Debtors (e.g. "B2C Ref
+// Harshit Jha", "B2C Meta Sayli Naik"). On a PURCHASE it's the creditor — a
+// supplier sub-group ledger under Sundry Creditors (e.g. "Supplier Air Lines"
+// member). Leave blank to fall back to the Client/Supplier name. The importer
+// guards the side so debtor and creditor sub-groups never mix.
+for (const s of SPECS) {
+  if (s.group !== 'Sales & Purchase') continue;
+  const pIdx = s.columns.findIndex((c) => /client name|supplier name|party ledger name/i.test(c));
+  const at = pIdx >= 0 ? pIdx + 1 : s.columns.length;
+  const isSale = /-sale$/.test(s.entity);
+  s.columns.splice(at, 0, 'Reference Ledger');
+  s.example.splice(at, 0, isSale ? 'B2C Ref Harshit Jha' : '');
+  // PURCHASE only: file a NEW supplier ledger under the chosen creditor sub-group
+  // (Supplier Air Lines / Supplier B2B / Supplier Others). Blank → Sundry Creditors.
+  if (!isSale) {
+    s.columns.splice(at + 1, 0, 'Supplier Group');
+    s.example.splice(at + 1, 0, 'Supplier Air Lines');
+  }
+}
+
 const GROUPS = ['Masters', 'Parties', 'Sales & Purchase', 'Vouchers'];
 
 /* ── CSV helpers ─────────────────────────────────────────────────────────── */
