@@ -1466,12 +1466,52 @@ function invBaseFare(inv){
   if(inv&&inv.baseFare!=null) return _r2(inv.baseFare);
   return _r2(Math.max(0,(inv?.subtotal||0)-invServiceCharge(inv)));
 }
-// Passenger / booking rows for the pax-detail panel + searchable option text.
+// Per-pax base fare for one line — the line amount net of THAT line's own service
+// charge/markup (so summed across pax it reconciles to invBaseFare).
+function lineBaseFare(ln){
+  const amt=_meta2num(ln&&ln.amt);
+  if(amt<=0) return 0;
+  let svc=0; const meta=(ln&&ln.meta)||{};
+  for(const k of Object.keys(meta)){ if(SVC_META_RE.test(k)&&!TAX_META_RE.test(k)) svc+=_meta2num(meta[k]); }
+  return _r2(Math.max(0,amt-svc));
+}
+// Passenger / booking rows (+ per-pax base fare) for the pax-detail panel, the
+// searchable option text and per-passenger partial refund/reissue.
 function invPax(inv){
-  if(inv&&Array.isArray(inv.pax)&&inv.pax.length) return inv.pax;
-  return (inv?.lines||[])
+  const rows=(inv?.lines||[])
     .filter(ln=>ln&&(ln.passenger||ln.ticket||ln.pnr||ln.sector))
-    .map(ln=>({name:ln.passenger||"",ticket:ln.ticket||"",pnr:ln.pnr||"",sector:ln.sector||"",airline:ln.airline||"",cls:ln.cls||"",ticketType:ln.ticketType||"",travelDate:ln.travelDate||""}));
+    .map(ln=>({name:ln.passenger||"",ticket:ln.ticket||"",pnr:ln.pnr||"",sector:ln.sector||"",airline:ln.airline||"",cls:ln.cls||"",ticketType:ln.ticketType||"",travelDate:ln.travelDate||"",baseFare:lineBaseFare(ln)}));
+  if(rows.length){
+    // If no line carried an amount, split the invoice base equally across pax.
+    if(!rows.some(p=>p.baseFare>0)){ const each=_r2(invBaseFare(inv)/rows.length); rows.forEach(p=>{p.baseFare=each;}); }
+    return rows;
+  }
+  // Fallback: backend identity-only pax (no line amounts) → equal base split.
+  if(inv&&Array.isArray(inv.pax)&&inv.pax.length){ const each=_r2(invBaseFare(inv)/inv.pax.length); return inv.pax.map(p=>({...p,baseFare:p.baseFare!=null?p.baseFare:each})); }
+  return [];
+}
+// Stable key for a pax row (drives the per-passenger selection sets).
+const paxKey=(p,i)=>`${p.ticket||""}|${p.pnr||""}|${p.name||""}|${i}`;
+const _r2DateP=n=>String(n).padStart(2,"0");
+// Backspace-friendly date entry. The native <input type="date"> won't let Backspace
+// move from the year segment back to the month; this is a plain text field (DD-MM-YYYY)
+// where Backspace edits the whole string, parsing to ISO (YYYY-MM-DD) for the model.
+function DateField({value,onChange,style}){
+  const toDisplay=iso=>{ const m=String(iso||"").match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?`${m[3]}-${m[2]}-${m[1]}`:(iso||""); };
+  const [txt,setTxt]=useState(toDisplay(value));
+  useEffect(()=>{ setTxt(toDisplay(value)); },[value]);
+  const commit=s=>{
+    setTxt(s);
+    const m=s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+    if(!m) return;
+    let [,d,mo,y]=m; if(y.length===2) y="20"+y;
+    const dd=+d, mm=+mo, yy=+y;
+    if(mm<1||mm>12||dd<1||dd>31) return;
+    const iso=`${String(yy).padStart(4,"0")}-${_r2DateP(mm)}-${_r2DateP(dd)}`;
+    const dt=new Date(iso+"T00:00:00");
+    if(!isNaN(dt.getTime())) onChange(iso);
+  };
+  return <input type="text" inputMode="numeric" value={txt} onChange={e=>commit(e.target.value)} placeholder="DD-MM-YYYY" style={style}/>;
 }
 
 /* Searchable sales-invoice picker — the only document a Refund/Reissue acts on.
@@ -1560,11 +1600,17 @@ function InvoiceSelect({invoices,value,onChange,cur,loading,placeholder,noun="sa
 }
 
 /* Pax + fare breakup of the picked invoice — confirms WHO travelled and shows the
-   original fare net of service charge + GST that the refund/reissue acts on. */
-function InvoicePaxPanel({inv,cur,label="Invoice"}){
+   original fare net of service charge + GST that the refund/reissue acts on. When
+   `selectable`, each passenger gets a checkbox so only the cancelled/amended pax are
+   refunded/reissued (for a ticket with multiple issuances). */
+function InvoicePaxPanel({inv,cur,label="Invoice",selectable=false,selected,onToggle,onToggleAll}){
   if(!inv) return null;
   const pax=invPax(inv);
-  const base=invBaseFare(inv), svc=invServiceCharge(inv);
+  const isSel=(p,i)=> !selectable || !selected || selected.has(paxKey(p,i));
+  const selPax=pax.filter((p,i)=>isSel(p,i));
+  const allSel=pax.length>0 && selPax.length===pax.length;
+  const selBase=selectable ? _r2(selPax.reduce((s,p)=>s+(+p.baseFare||0),0)) : invBaseFare(inv);
+  const svc=invServiceCharge(inv);
   const gst=_r2(inv.taxAmt||inv.gstAmt||0), tcs=_r2(inv.tcsAmt||0);
   const chip=(l,v,c)=>(
     <div style={{flex:1,minWidth:118,padding:"7px 11px",borderRadius:7,background:"#f3f4f8",border:"1px solid #e1e3ec"}}>
@@ -1575,32 +1621,37 @@ function InvoicePaxPanel({inv,cur,label="Invoice"}){
   return (
     <div style={{...card,padding:"11px 13px",marginBottom:14,background:"#FBFCFE"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6,marginBottom:8}}>
-        <span style={{fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#A07828",textTransform:"uppercase"}}>{label} {inv.vno} · Pax Detail</span>
-        <span style={{fontSize:9.5,color:"#5a6691"}}>{inv.date} · {inv.party||"—"}{inv.gstMode?` · ${inv.gstMode==="inter"?"Inter-state (IGST)":"Intra-state (CGST+SGST)"}`:""}</span>
+        <span style={{fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#A07828",textTransform:"uppercase"}}>{label} {inv.vno} · Pax Detail{selectable&&pax.length>1?<span style={{color:"#185FA5"}}> · select who to {label.toLowerCase().includes("purchase")?"settle":"refund/reissue"}</span>:null}</span>
+        <span style={{fontSize:9.5,color:"#5a6691"}}>{selectable&&pax.length>0?`${selPax.length}/${pax.length} pax · `:""}{inv.date} · {inv.party||"—"}{inv.gstMode?` · ${inv.gstMode==="inter"?"Inter-state (IGST)":"Intra-state (CGST+SGST)"}`:""}</span>
       </div>
       {pax.length>0?(
         <div style={{overflowX:"auto",marginBottom:9}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:10.5}}>
             <thead><tr style={{borderBottom:"1px solid #e1e3ec"}}>
-              {["#","Passenger","Ticket / Ref","Sector","Airline / Operator","Class"].map((h,i)=>(
-                <th key={i} style={{textAlign:i===0?"center":"left",padding:"4px 8px",fontSize:8.5,fontWeight:700,color:"#5a6691",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
+              {selectable&&<th style={{padding:"4px 8px",textAlign:"center"}}><input type="checkbox" checked={allSel} onChange={()=>onToggleAll&&onToggleAll(pax,!allSel)} title="Select all"/></th>}
+              {["#","Passenger","Ticket / Ref","Sector","Airline / Operator","Class","Base Fare"].map((h,i)=>(
+                <th key={i} style={{textAlign:i===0?"center":i===6?"right":"left",padding:"4px 8px",fontSize:8.5,fontWeight:700,color:"#5a6691",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{pax.map((p,i)=>(
-              <tr key={i} style={{borderBottom:".5px solid #f3f4f8"}}>
+            <tbody>{pax.map((p,i)=>{
+              const sel=isSel(p,i);
+              return (
+              <tr key={i} style={{borderBottom:".5px solid #f3f4f8",opacity:selectable&&!sel?0.4:1}}>
+                {selectable&&<td style={{padding:"4px 8px",textAlign:"center"}}><input type="checkbox" checked={sel} onChange={()=>onToggle&&onToggle(paxKey(p,i))}/></td>}
                 <td style={{padding:"4px 8px",textAlign:"center",color:"#9A9A9A"}}>{i+1}</td>
                 <td style={{padding:"4px 8px",fontWeight:600,color:"#0d1326",whiteSpace:"nowrap"}}>{p.name||"—"}</td>
                 <td style={{padding:"4px 8px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5",whiteSpace:"nowrap"}}>{p.ticket||p.pnr||"—"}</td>
                 <td style={{padding:"4px 8px",color:"#5a6691",whiteSpace:"nowrap"}}>{p.sector||"—"}</td>
                 <td style={{padding:"4px 8px",color:"#5a6691",whiteSpace:"nowrap"}}>{p.airline||"—"}</td>
                 <td style={{padding:"4px 8px",color:"#5a6691",whiteSpace:"nowrap"}}>{p.cls||"—"}</td>
+                <td style={{padding:"4px 8px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#1B6B4C",fontWeight:600,whiteSpace:"nowrap"}}>{vf2(cur,p.baseFare||0)}</td>
               </tr>
-            ))}</tbody>
+            );})}</tbody>
           </table>
         </div>
       ):<div style={{fontSize:10,color:"#9A9A9A",marginBottom:9}}>No passenger detail recorded on this invoice.</div>}
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-        {chip("Original Fare (excl. svc + GST)",base,"#1B6B4C")}
+        {chip(selectable?"Selected Fare (excl. svc + GST)":"Original Fare (excl. svc + GST)",selBase,"#1B6B4C")}
         {chip("Service Charge + Markup",svc,"#A07828")}
         {chip("GST collected",gst,"#185FA5")}
         {tcs>0&&chip("TCS collected",tcs,"#854F0B")}
@@ -1618,22 +1669,23 @@ function RefundReissueVoucher({branch,kind}){
   const mob=useMobile();
   const vNo=useVNo(branch,isRefund?"RF":"RI");
   const cfg=bc(branch); const cur=cfg.cur;
-  const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];
 
   const [date,setDate]=useState(todayISO());
   const [module,setModule]=useState("Flight");
   const [invId,setInvId]=useState("");            // selected sale voucher id (mandatory → customer leg)
   const [ref1,setRef1]=useState(""); const [ref2,setRef2]=useState("");
   const [gstMode,setGstMode]=useState("intra");
-  const [supplier,setSupplier]=useState("");      // creditor ledger id (optional override)
-  const [customer,setCustomer]=useState("");      // debtor ledger id (optional override)
   // Refund-only inputs
   const [origFare,setOrigFare]=useState(0);
   const [supCancel,setSupCancel]=useState(0);
   // Reissue-only inputs
   const [changeFee,setChangeFee]=useState(0);
   const [fareDiff,setFareDiff]=useState(0);
-  // Shared income inputs (our earnings)
+  // Charges levied BY THE SUPPLIER on the cancellation/amendment — reduce the refund /
+  // add to the payable. GST on them is folded into the supplier net (a direct cost).
+  const [supSvc,setSupSvc]=useState(0);
+  const [supGstRate,setSupGstRate]=useState(18);
+  // Our retained income.
   const [svc,setSvc]=useState(0);
   const [gstRateSvc,setGstRateSvc]=useState(18);
   const [markup,setMarkup]=useState(0);
@@ -1641,8 +1693,8 @@ function RefundReissueVoucher({branch,kind}){
   const [narration,setNarration]=useState("");
 
   // Live sale + purchase invoices for this branch. A refund/reissue settles BOTH in
-  // one voucher: the SALE drives the customer (debtor) leg, the related PURCHASE drives
-  // the supplier (creditor) leg / original cost.
+  // one voucher: the SALE drives the customer (debtor) leg, the auto-linked PURCHASE
+  // drives the supplier (creditor) leg / original cost.
   const salesQ=useSalesRegister(branch);
   const invoices=salesQ.data||[];
   const selInv=invoices.find(v=>v.id===invId);
@@ -1662,14 +1714,24 @@ function RefundReissueVoucher({branch,kind}){
   },[selInv,purchases]);
 
   const cfgM=RR_MODULES[module]||RR_MODULES.Misc;
-  const supLed=LEDGER_REGISTRY.find(l=>l.id===supplier);
-  // Supplier (creditor) leg defaults to the picked PURCHASE invoice's party, so the
-  // refund/reissue posts against the same supplier the cost was bought from.
-  const supplierName=supLed?.name || selPur?.party || cfgM.supplier;
-  const supplierGroup=supLed?.group || selPur?.partyGroup || "";
-  const cusLed=LEDGER_REGISTRY.find(l=>l.id===customer);
-  const customerName=cusLed?.name || selInv?.party || "";
-  const customerGroup=cusLed?.group || selInv?.partyGroup || "";
+  // Supplier (creditor) = the auto-linked purchase's party; customer (debtor) = the
+  // sale's party. Both are LOCKED on a refund/reissue — not editable.
+  const supplierName=selPur?.party || cfgM.supplier;
+  const supplierGroup=selPur?.partyGroup || "";
+  const customerName=selInv?.party || "";
+  const customerGroup=selInv?.partyGroup || "";
+
+  // ── Per-passenger selection (a ticket / Link No can carry multiple issuances) ──
+  const salePax=invPax(selInv);
+  const purPax=invPax(selPur);
+  const [salePaxSel,setSalePaxSel]=useState(()=>new Set());
+  const [purPaxSel,setPurPaxSel]=useState(()=>new Set());
+  useEffect(()=>{ setSalePaxSel(new Set(salePax.map((p,i)=>paxKey(p,i)))); },[selInv?.id]); // default: all
+  useEffect(()=>{ setPurPaxSel(new Set(purPax.map((p,i)=>paxKey(p,i)))); },[selPur?.id]);    // default: all
+  const togglePax=setSel=>k=>setSel(s=>{ const n=new Set(s); n.has(k)?n.delete(k):n.add(k); return n; });
+  const toggleAllPax=setSel=>(list,on)=>setSel(on?new Set(list.map((p,i)=>paxKey(p,i))):new Set());
+  const selPurBase=_r2(purPax.filter((p,i)=>purPaxSel.has(paxKey(p,i))).reduce((s,p)=>s+(+p.baseFare||0),0));
+  const selSaleNames=salePax.filter((p,i)=>salePaxSel.has(paxKey(p,i))).map(p=>p.name).filter(Boolean);
 
   // Picking a sales invoice prefills module, references and GST mode (customer side).
   const pickInvoice=(id)=>{
@@ -1677,33 +1739,31 @@ function RefundReissueVoucher({branch,kind}){
     const inv=invoices.find(v=>v.id===id); if(!inv)return;
     setModule(SALE_TYPE_MODULE[inv.type]||"Misc");
     setGstMode(inv.gstMode==="inter"?"inter":"intra");
-    // Original Fare is prefilled from the AUTO-LINKED purchase invoice (net of its
-    // service charge/markup and CGST/SGST/IGST & TCS) by the effect below — not here.
-    // TODO: support per-pax partial cancellation — prefill only the selected
-    // passengers' base fare instead of the whole invoice (invPax(inv) carries each).
     const l0=(inv.lines&&inv.lines[0])||{};
     setRef1(l0.pnr||inv.vno||"");
     setRef2(l0.ticket||"");
-    setCustomer(""); // fall back to the invoice's own party unless overridden
   };
 
-  // Prefill the Refund "Original Fare" from the auto-linked PURCHASE invoice's cost —
-  // net of its service charge/markup and the CGST/SGST/IGST (& TCS) already charged on
-  // it (invBaseFare) — falling back to the sale's base until the purchase resolves.
-  // Keyed on the resolved invoice ids so a background refetch can't clobber edits.
+  // Prefill the Refund "Original Fare" from the SELECTED purchase passengers (net of
+  // service charge & the CGST/SGST/IGST already on the purchase). Falls back to the whole
+  // purchase, then the sale, until the link resolves. Keyed on ids + selection so a
+  // background refetch can't clobber it.
+  const purSelKey=[...purPaxSel].sort().join(",");
   useEffect(()=>{
     if(!isRefund) return;
-    if(selPur) setOrigFare(invBaseFare(selPur));
+    if(selPur&&purPax.length) setOrigFare(selPurBase);
+    else if(selPur) setOrigFare(invBaseFare(selPur));
     else if(selInv) setOrigFare(invBaseFare(selInv));
-  },[selPur?.id,selInv?.id,isRefund]);
+  },[selPur?.id,selInv?.id,purSelKey,isRefund]);
 
-  // ── Calc (mirrors the mockup formulae exactly) ──
+  // ── Calc (mirrors the mockup formulae) ──
   const gstSvc=Math.round(svc*gstRateSvc)/100;
   const gstMk =Math.round(markup*gstRateMk)/100;
+  const supGst=_r2(Math.round(supSvc*supGstRate)/100);   // GST charged BY the supplier on its service
   const taxAmt=_r2(gstSvc+gstMk);
   const ourCharges=_r2(svc+gstSvc+markup+gstMk);
-  const supRefund=_r2(Math.max(0,origFare-supCancel));   // refund: amount supplier returns us
-  const supPayable=_r2(changeFee+fareDiff);              // reissue: amount we owe supplier
+  const supRefund=_r2(Math.max(0,origFare-supCancel-supSvc-supGst));  // refund: net the supplier returns us
+  const supPayable=_r2(changeFee+fareDiff+supSvc+supGst);             // reissue: net we owe the supplier
   const custRefund=_r2(supRefund-ourCharges);            // refund: balance to customer (may be <0 → invalid)
   const custBill=_r2(supPayable+ourCharges);             // reissue: total billed to customer
   const supplierAmt=isRefund?supRefund:supPayable;
@@ -1740,13 +1800,14 @@ function RefundReissueVoucher({branch,kind}){
   const amountsOk=isRefund?(supRefund>0&&custRefund>=0):(supPayable>0&&custBill>0);
   const canPost=!!brPost&&!!selInv&&!!selPur&&!!supplierName&&!!customerName&&amountsOk&&!post.isPending;
 
-  const reset=()=>{ setSupCancel(0);setChangeFee(0);setFareDiff(0);setSvc(0);setMarkup(0);setNarration(""); };
+  const reset=()=>{ setSupCancel(0);setChangeFee(0);setFareDiff(0);setSupSvc(0);setSvc(0);setMarkup(0);setNarration(""); };
+  const paxNote=selSaleNames.length&&selSaleNames.length<salePax.length?` · pax: ${selSaleNames.join(", ")}`:"";
   const doSave=()=>{
     if(!canPost)return;
     post.mutate({
       vno:vNo, type:isRefund?"RF":"RI", category:isRefund?"refund":"reissue", branch:brPost, date,
       party:customerName, partyType:"customer", partyGroup:customerGroup,
-      counterParty:supplierName, counterPartyGroup:supplierGroup, supplierAmt,
+      counterParty:supplierName, counterPartyGroup:supplierGroup, supplierAmt, supplierSvc:supSvc, supplierGst:supGst,
       lines:[
         {ledger:"Service Charge Income", amt:svc, desc:"Retained service charge", drCr:"Cr"},
         {ledger:"Markup Income", amt:markup, desc:"Retained markup", drCr:"Cr"},
@@ -1754,7 +1815,7 @@ function RefundReissueVoucher({branch,kind}){
       subtotal:_r2(svc+markup), taxAmt, gstMode, total,
       againstInvoice:selInv.vno, againstPurchase:selPur?.vno||"",
       linkNo:selInv.linkNo||selPur?.linkNo||selInv.vno, costCenter:selInv.costCenter||selPur?.costCenter||"",
-      remarks:narration||`Being ${kind} of ${module.toLowerCase()} booking ${ref1||selInv.vno} against ${selInv.vno}${selPur?` / ${selPur.vno}`:""}`,
+      remarks:narration||`Being ${kind} of ${module.toLowerCase()} booking ${ref1||selInv.vno} against ${selInv.vno}${selPur?` / ${selPur.vno}`:""}${paxNote}`,
       status:"saved",
     });
   };
@@ -1783,7 +1844,7 @@ function RefundReissueVoucher({branch,kind}){
 
         {/* Voucher date + place of supply */}
         <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:12,marginBottom:14}}>
-          <FL label="Date"><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inp}/></FL>
+          <FL label="Date (DD-MM-YYYY)"><DateField value={date} onChange={setDate} style={inp}/></FL>
           <VPlaceOfSupply mode={gstMode} onChange={setGstMode}/>
         </div>
 
@@ -1794,12 +1855,12 @@ function RefundReissueVoucher({branch,kind}){
             <InvoiceSelect invoices={invoices} value={invId} onChange={pickInvoice} cur={cur} loading={salesQ.isLoading} noun="sales invoice"/>
           </FL>
         </div>
-        <InvoicePaxPanel inv={selInv} cur={cur} label="Sales Invoice"/>
+        <InvoicePaxPanel inv={selInv} cur={cur} label="Sales Invoice" selectable selected={salePaxSel} onToggle={togglePax(setSalePaxSel)} onToggleAll={toggleAllPax(setSalePaxSel)}/>
 
         {/* ② Purchase side — AUTO-LINKED from the sale by Link No (no manual pick) */}
         <p style={{margin:"0 0 8px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#27500A",textTransform:"uppercase"}}>② Purchase Invoice — supplier side (auto-linked by Link No · sets the original cost)</p>
         {selPur
-          ? <InvoicePaxPanel inv={selPur} cur={cur} label="Purchase Invoice · auto-linked"/>
+          ? <InvoicePaxPanel inv={selPur} cur={cur} label="Purchase Invoice · auto-linked" selectable selected={purPaxSel} onToggle={togglePax(setPurPaxSel)} onToggleAll={toggleAllPax(setPurPaxSel)}/>
           : selInv
             ? <div style={{padding:"10px 13px",borderRadius:8,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:10.5,color:"#A32D2D",fontWeight:600,marginBottom:14}}>⚠ No purchase invoice is linked to {selInv.vno}{selInv.linkNo?` (Link No ${selInv.linkNo})`:" — the sale has no Link No"}{purchQ.isLoading?" · loading purchases…":""}. A refund/reissue must settle the linked purchase — check the purchase exists with the same Link No.</div>
             : <div style={{padding:"10px 13px",borderRadius:8,background:"#f3f4f8",border:"1px solid #e1e3ec",fontSize:10.5,color:"#5a6691",marginBottom:14}}>Pick a sales invoice above — its linked purchase invoice loads automatically.</div>}
@@ -1807,8 +1868,8 @@ function RefundReissueVoucher({branch,kind}){
         <div style={{display:"grid",gridTemplateColumns:mob?"1fr 1fr":"repeat(4,1fr)",gap:12,marginBottom:14}}>
           <FL label={cfgM.ref1}><input value={ref1} onChange={e=>setRef1(e.target.value)} style={inp} placeholder={cfgM.ref1}/></FL>
           <FL label={cfgM.ref2}><input value={ref2} onChange={e=>setRef2(e.target.value)} style={inp} placeholder={cfgM.ref2}/></FL>
-          <FL label="Supplier (Creditor)"><LedgerSelect branch={branch} value={supplier} onChange={setSupplier} filter={l=>l.type==="Creditor"} placeholder={selPur?.party||cfgM.supplier}/></FL>
-          <FL label="Customer (Debtor)"><LedgerSelect branch={branch} value={customer} onChange={setCustomer} filter={l=>l.type==="Debtor"} placeholder={selInv?.party||"From invoice"}/></FL>
+          <FL label="Supplier (Creditor) · locked"><div title={supplierName} style={{...inp,background:"#f3f4f8",color:"#3A3A3A",display:"flex",alignItems:"center",minHeight:32,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{supplierName||"— from purchase —"}</div></FL>
+          <FL label="Customer (Debtor) · locked"><div title={customerName} style={{...inp,background:"#f3f4f8",color:"#3A3A3A",display:"flex",alignItems:"center",minHeight:32,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{customerName||"— from sale —"}</div></FL>
         </div>
 
         {/* Calc grid — mirrors the mockup calc-grid */}
@@ -1818,12 +1879,16 @@ function RefundReissueVoucher({branch,kind}){
             {isRefund?<>
               <RRLine label="Original Fare" sub={selPur?`from purchase ${selPur.vno} (excl. svc + GST)`:`paid to ${cfgM.sup}`}>{num(origFare,setOrigFare)}</RRLine>
               <RRLine label={cfgM.rfCancel} sub={`${cfgM.sup} retains`}>{num(supCancel,setSupCancel)}</RRLine>
-              <RRLine label="Supplier Refund to Us" sub="fare − cancellation" derived><input type="number" value={supRefund} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
+              <RRLine label="Supplier Service Charge" sub={`charged by ${cfgM.sup}`}>{num(supSvc,setSupSvc)}</RRLine>
+              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="CGST/SGST/IGST by supplier" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
+              <RRLine label="Supplier Refund to Us" sub="fare − cancellation − supplier charges" derived><input type="number" value={supRefund} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
               <div/>
             </>:<>
               <RRLine label={cfgM.riFee} sub={`charged by ${cfgM.sup}`}>{num(changeFee,setChangeFee)}</RRLine>
               <RRLine label={cfgM.diff} sub="new − old">{num(fareDiff,setFareDiff)}</RRLine>
-              <RRLine label="Payable to Supplier" sub="fee + difference" derived><input type="number" value={supPayable} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
+              <RRLine label="Supplier Service Charge" sub={`charged by ${cfgM.sup}`}>{num(supSvc,setSupSvc)}</RRLine>
+              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="CGST/SGST/IGST by supplier" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
+              <RRLine label="Payable to Supplier" sub="fee + difference + supplier charges" derived><input type="number" value={supPayable} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
               <div/>
             </>}
             <RRLine label="Our Service Charge" sub="our income, retained">{num(svc,setSvc)}</RRLine>
