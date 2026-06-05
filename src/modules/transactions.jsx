@@ -4,12 +4,13 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { AlertTriangle, ArrowLeft, Calendar, Check, Clock, Download, Plus, Printer, Save, Search } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { AlertTriangle, ArrowLeft, Calendar, Check, ChevronDown, Clock, Download, Plus, Printer, Save, Search } from 'lucide-react';
 import { Area, Line } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from '../core/business-logic';
 import { ACTIVE_CURRENCIES, ADM_DATA, BRANCHES, BRANCH_CODES, GP_BILLS, PURCHASE_REGISTRY, SALE_TO_PURCH_MOD, branchCurrencies, branchMainCurrency, genVNo } from '../core/data';
 import { useAdmReasonCodes, useLedgerRegistry } from '../core/useReference';
-import { useLedgerStatement, useCreateVoucher, useOpenBills, useSalesRegister } from '../core/useAccounting';
+import { useLedgerStatement, useCreateVoucher, useOpenBills, useSalesRegister, usePurchaseRegister } from '../core/useAccounting';
 import { useLivePurchaseRegistry, useLiveSalesTickets } from '../core/useVouchers';
 import { fmt, fmtINR } from '../core/format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS } from '../core/dates';
@@ -1379,7 +1380,7 @@ function NoteVoucher({branch,kind}){
 
         <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:12,marginBottom:14}}>
           <FL label={isCredit?"Credit To (Customer / Debtor)":"Debit To (Supplier / Creditor)"}>
-            <LedgerSelect value={party} onChange={setParty} filter={l=>l.type===(isCredit?"Debtor":"Creditor")} placeholder={isCredit?"Select customer / debtor...":"Select supplier / creditor..."}/>
+            <LedgerSelect branch={branch} value={party} onChange={setParty} filter={l=>l.type===(isCredit?"Debtor":"Creditor")} placeholder={isCredit?"Select customer / debtor...":"Select supplier / creditor..."}/>
           </FL>
           <FL label="Reason"><select value={reason} onChange={e=>setReason(e.target.value)} style={inp}>{REASONS.map(r=><option key={r}>{r}</option>)}</select></FL>
         </div>
@@ -1439,6 +1440,165 @@ const RR_MODULES = {
 };
 const RR_ORDER = ["Flight","Holiday","Hotel","Car","Insurance","Visa","Misc"];
 
+/* ── Sale-invoice fare breakup (client mirror of backend vouchers.dto) ──────────
+   The Books frontend points at PROD by default, so a Refund/Reissue must stay
+   correct even before the enriched API is deployed. Each helper prefers the
+   backend-derived field (inv.baseFare / inv.serviceCharge / inv.pax) and falls
+   back to computing it from the sale's line.meta breakup. */
+const SVC_META_RE=/service\s*charge|service\s*fee|agency\s*fee|handling\s*fee|\bmark[\s-]?up\b/i;
+const TAX_META_RE=/\b(cgst|sgst|igst|gst|vat|tcs|tds)\b/i;
+const _meta2num=v=>{ const n=Number(String(v==null?"":v).replace(/[, ]/g,"")); return Number.isFinite(n)?n:0; };
+
+// Agency service charge + markup retained at the time of sale (our income, NOT the
+// fare paid to the supplier). GST/TCS keys are excluded so they never count here.
+function invServiceCharge(inv){
+  if(inv&&inv.serviceCharge!=null) return _r2(inv.serviceCharge);
+  let svc=0;
+  for(const ln of (inv?.lines||[])){
+    const meta=(ln&&ln.meta)||{};
+    for(const k of Object.keys(meta)){ if(SVC_META_RE.test(k)&&!TAX_META_RE.test(k)) svc+=_meta2num(meta[k]); }
+  }
+  return _r2(svc);
+}
+// Original fare paid to the supplier — the taxable base EXCLUDING service charge /
+// markup, CGST/SGST/IGST and TCS (GST & TCS are never folded into `subtotal`).
+function invBaseFare(inv){
+  if(inv&&inv.baseFare!=null) return _r2(inv.baseFare);
+  return _r2(Math.max(0,(inv?.subtotal||0)-invServiceCharge(inv)));
+}
+// Passenger / booking rows for the pax-detail panel + searchable option text.
+function invPax(inv){
+  if(inv&&Array.isArray(inv.pax)&&inv.pax.length) return inv.pax;
+  return (inv?.lines||[])
+    .filter(ln=>ln&&(ln.passenger||ln.ticket||ln.pnr||ln.sector))
+    .map(ln=>({name:ln.passenger||"",ticket:ln.ticket||"",pnr:ln.pnr||"",sector:ln.sector||"",airline:ln.airline||"",cls:ln.cls||"",ticketType:ln.ticketType||"",travelDate:ln.travelDate||""}));
+}
+
+/* Searchable sales-invoice picker — the only document a Refund/Reissue acts on.
+   Mirrors LedgerSelect's portal dropdown (so a parent's overflow can't clip it) and
+   filters by voucher no, customer, date, and every pax name / ticket / PNR / sector. */
+function InvoiceSelect({invoices,value,onChange,cur,loading,placeholder,noun="sales invoice"}){
+  const nounPlural=noun+"s";
+  const [q,setQ]=useState("");
+  const [open,setOpen]=useState(false);
+  const [rect,setRect]=useState(null);
+  const ref=useRef(null), menuRef=useRef(null);
+  const selected=invoices.find(v=>v.id===value);
+  const norm=s=>String(s||"").toLowerCase();
+  const paxText=inv=>invPax(inv).map(p=>`${p.name} ${p.ticket} ${p.pnr} ${p.sector} ${p.airline}`).join(" ");
+  const filtered=invoices.filter(inv=>{
+    if(!q) return true; const t=norm(q);
+    return norm(inv.vno).includes(t)||norm(inv.party).includes(t)||norm(inv.date).includes(t)||norm(paxText(inv)).includes(t);
+  }).slice(0,20);
+  const paxLabel=inv=>{ const px=invPax(inv); if(!px.length) return ""; const head=(px.map(p=>p.name).filter(Boolean)[0])||px[0].ticket||px[0].pnr||""; return px.length>1?`${head} +${px.length-1} more`:head; };
+  const place=()=>{ if(ref.current) setRect(ref.current.getBoundingClientRect()); };
+  const openMenu=()=>{ place(); setQ(""); setOpen(true); };
+  useEffect(()=>{
+    if(!open)return;
+    const onDoc=e=>{ if(ref.current?.contains(e.target)||menuRef.current?.contains(e.target))return; setOpen(false); };
+    const reposition=()=>place();
+    document.addEventListener("mousedown",onDoc);
+    window.addEventListener("scroll",reposition,true);
+    window.addEventListener("resize",reposition);
+    return()=>{ document.removeEventListener("mousedown",onDoc); window.removeEventListener("scroll",reposition,true); window.removeEventListener("resize",reposition); };
+  },[open]);
+  const menu=open&&rect&&createPortal(
+    <div ref={menuRef} style={{position:"fixed",top:rect.bottom+4,left:rect.left,width:Math.max(rect.width,330),zIndex:4000,background:"#fff",
+      border:"1px solid #e1e3ec",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.18)",overflow:"hidden"}}>
+      <div style={{position:"relative"}}>
+        <Search size={13} style={{position:"absolute",left:10,top:9,color:"#8b94b3"}}/>
+        <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Search by invoice no, party, pax, ticket, PNR or sector…"
+          style={{width:"100%",border:"none",borderBottom:"1px solid #e1e3ec",padding:"8px 12px 8px 30px",fontSize:11,outline:"none",boxSizing:"border-box"}}/>
+      </div>
+      <div style={{maxHeight:300,overflowY:"auto"}}>
+        {filtered.map(inv=>{
+          const pl=paxLabel(inv);
+          return (
+            <div key={inv.id} onClick={()=>{onChange(inv.id);setOpen(false);}}
+              style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #f3f4f8"}}
+              onMouseEnter={e=>e.currentTarget.style.background="#f0f4ff"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"baseline"}}>
+                <span style={{fontFamily:"monospace",fontSize:10.5,fontWeight:700,color:"#185FA5"}}>{inv.vno}</span>
+                <span style={{fontSize:11,fontWeight:700,color:"#0d1326",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,inv.total)}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",gap:10,marginTop:2}}>
+                <span style={{fontSize:10.5,color:"#0d1326",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{inv.party||"—"}</span>
+                <span style={{fontSize:9.5,color:"#5a6691",flexShrink:0}}>{inv.date}</span>
+              </div>
+              {pl&&<div style={{fontSize:9.5,color:"#5a6691",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                <span style={{color:"#A07828",fontWeight:700}}>{invPax(inv).length} pax</span> · {pl}</div>}
+            </div>
+          );
+        })}
+        {filtered.length===0&&<div style={{padding:"12px",fontSize:11,color:"#5a6691"}}>{loading?`Loading ${nounPlural}…`:`No matching ${noun}`}</div>}
+      </div>
+      <div style={{padding:"6px 10px",borderTop:"1px solid #f3f4f8",fontSize:9.5,color:"#5a6691"}}>{invoices.length} {nounPlural} · type to filter</div>
+    </div>, document.body);
+  return (
+    <div ref={ref} style={{position:"relative"}}>
+      <div onClick={()=>open?setOpen(false):openMenu()} style={{...inp,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:32,
+        borderColor:selected?"#C0DD97":"#F7C1C1",background:selected?"#f8fff8":"#fffafa"}}>
+        {selected
+          ?<span style={{fontSize:11,color:"#0d1326",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><b style={{fontFamily:"monospace",color:"#185FA5"}}>{selected.vno}</b> · {selected.party||"—"} · {vf2(cur,selected.total)}</span>
+          :<span style={{fontSize:11,color:"#bf7d7d"}}>{loading?`Loading ${nounPlural}…`:(invoices.length?(placeholder||`Search & select a ${noun}…`):`No ${nounPlural} in this branch`)}</span>}
+        <ChevronDown size={12} style={{color:"#5a6691",flexShrink:0}}/>
+      </div>
+      {menu}
+    </div>
+  );
+}
+
+/* Pax + fare breakup of the picked invoice — confirms WHO travelled and shows the
+   original fare net of service charge + GST that the refund/reissue acts on. */
+function InvoicePaxPanel({inv,cur,label="Invoice"}){
+  if(!inv) return null;
+  const pax=invPax(inv);
+  const base=invBaseFare(inv), svc=invServiceCharge(inv);
+  const gst=_r2(inv.taxAmt||inv.gstAmt||0), tcs=_r2(inv.tcsAmt||0);
+  const chip=(l,v,c)=>(
+    <div style={{flex:1,minWidth:118,padding:"7px 11px",borderRadius:7,background:"#f3f4f8",border:"1px solid #e1e3ec"}}>
+      <div style={{fontSize:8.5,fontWeight:700,letterSpacing:".5px",color:"#5a6691",textTransform:"uppercase"}}>{l}</div>
+      <div style={{fontSize:13,fontWeight:800,marginTop:2,color:c||"#0d1326",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,v)}</div>
+    </div>
+  );
+  return (
+    <div style={{...card,padding:"11px 13px",marginBottom:14,background:"#FBFCFE"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6,marginBottom:8}}>
+        <span style={{fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#A07828",textTransform:"uppercase"}}>{label} {inv.vno} · Pax Detail</span>
+        <span style={{fontSize:9.5,color:"#5a6691"}}>{inv.date} · {inv.party||"—"}{inv.gstMode?` · ${inv.gstMode==="inter"?"Inter-state (IGST)":"Intra-state (CGST+SGST)"}`:""}</span>
+      </div>
+      {pax.length>0?(
+        <div style={{overflowX:"auto",marginBottom:9}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:10.5}}>
+            <thead><tr style={{borderBottom:"1px solid #e1e3ec"}}>
+              {["#","Passenger","Ticket / Ref","Sector","Airline / Operator","Class"].map((h,i)=>(
+                <th key={i} style={{textAlign:i===0?"center":"left",padding:"4px 8px",fontSize:8.5,fontWeight:700,color:"#5a6691",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>{pax.map((p,i)=>(
+              <tr key={i} style={{borderBottom:".5px solid #f3f4f8"}}>
+                <td style={{padding:"4px 8px",textAlign:"center",color:"#9A9A9A"}}>{i+1}</td>
+                <td style={{padding:"4px 8px",fontWeight:600,color:"#0d1326",whiteSpace:"nowrap"}}>{p.name||"—"}</td>
+                <td style={{padding:"4px 8px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5",whiteSpace:"nowrap"}}>{p.ticket||p.pnr||"—"}</td>
+                <td style={{padding:"4px 8px",color:"#5a6691",whiteSpace:"nowrap"}}>{p.sector||"—"}</td>
+                <td style={{padding:"4px 8px",color:"#5a6691",whiteSpace:"nowrap"}}>{p.airline||"—"}</td>
+                <td style={{padding:"4px 8px",color:"#5a6691",whiteSpace:"nowrap"}}>{p.cls||"—"}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      ):<div style={{fontSize:10,color:"#9A9A9A",marginBottom:9}}>No passenger detail recorded on this invoice.</div>}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        {chip("Original Fare (excl. svc + GST)",base,"#1B6B4C")}
+        {chip("Service Charge + Markup",svc,"#A07828")}
+        {chip("GST collected",gst,"#185FA5")}
+        {tcs>0&&chip("TCS collected",tcs,"#854F0B")}
+        {chip("Invoice Total",inv.total,"#0d1326")}
+      </div>
+    </div>
+  );
+}
+
 export function RefundVoucher({branch}){ return <RefundReissueVoucher branch={branch} kind="refund"/>; }
 export function ReissueVoucher({branch}){ return <RefundReissueVoucher branch={branch} kind="reissue"/>; }
 
@@ -1451,7 +1611,8 @@ function RefundReissueVoucher({branch,kind}){
 
   const [date,setDate]=useState(todayISO());
   const [module,setModule]=useState("Flight");
-  const [invId,setInvId]=useState("");            // selected sale voucher id (mandatory)
+  const [invId,setInvId]=useState("");            // selected sale voucher id (mandatory → customer leg)
+  const [purId,setPurId]=useState("");            // related purchase voucher id (optional → supplier leg/cost)
   const [ref1,setRef1]=useState(""); const [ref2,setRef2]=useState("");
   const [gstMode,setGstMode]=useState("intra");
   const [supplier,setSupplier]=useState("");      // creditor ledger id (optional override)
@@ -1469,30 +1630,53 @@ function RefundReissueVoucher({branch,kind}){
   const [gstRateMk,setGstRateMk]=useState(18);
   const [narration,setNarration]=useState("");
 
-  // Live sales invoices for this branch — the ONLY documents a refund/reissue can act on.
+  // Live sale + purchase invoices for this branch. A refund/reissue settles BOTH in
+  // one voucher: the SALE drives the customer (debtor) leg, the related PURCHASE drives
+  // the supplier (creditor) leg / original cost.
   const salesQ=useSalesRegister(branch);
   const invoices=salesQ.data||[];
   const selInv=invoices.find(v=>v.id===invId);
+  const purchQ=usePurchaseRegister(branch);
+  const purchases=purchQ.data||[];
+  const selPur=purchases.find(v=>v.id===purId);
 
   const cfgM=RR_MODULES[module]||RR_MODULES.Misc;
   const supLed=LEDGER_REGISTRY.find(l=>l.id===supplier);
-  const supplierName=supLed?.name || cfgM.supplier;
-  const supplierGroup=supLed?.group || "";
+  // Supplier (creditor) leg defaults to the picked PURCHASE invoice's party, so the
+  // refund/reissue posts against the same supplier the cost was bought from.
+  const supplierName=supLed?.name || selPur?.party || cfgM.supplier;
+  const supplierGroup=supLed?.group || selPur?.partyGroup || "";
   const cusLed=LEDGER_REGISTRY.find(l=>l.id===customer);
   const customerName=cusLed?.name || selInv?.party || "";
   const customerGroup=cusLed?.group || selInv?.partyGroup || "";
 
-  // Picking a sales invoice prefills module, references, original fare and GST mode.
+  // Picking a sales invoice prefills module, references and GST mode (customer side).
   const pickInvoice=(id)=>{
     setInvId(id);
     const inv=invoices.find(v=>v.id===id); if(!inv)return;
     setModule(SALE_TYPE_MODULE[inv.type]||"Misc");
     setGstMode(inv.gstMode==="inter"?"inter":"intra");
-    if(isRefund) setOrigFare(_r2(inv.total||0));
+    // Original Fare = fare PAID TO THE SUPPLIER. Prefer the related PURCHASE invoice
+    // (picked below); until one is chosen, seed it from the sale's base (net of our
+    // service charge/markup and CGST/SGST/IGST & TCS) as a starting estimate.
+    // TODO: support per-pax partial cancellation — prefill only the selected
+    // passengers' base fare instead of the whole invoice (invPax(inv) carries each).
+    if(isRefund&&!purId) setOrigFare(invBaseFare(inv));
     const l0=(inv.lines&&inv.lines[0])||{};
     setRef1(l0.pnr||inv.vno||"");
     setRef2(l0.ticket||"");
     setCustomer(""); // fall back to the invoice's own party unless overridden
+  };
+
+  // Picking the related PURCHASE invoice settles the supplier side: it sets the
+  // Original Fare to the COST paid to the supplier — net of any service charge/markup
+  // and the CGST/SGST/IGST (& TCS) already charged ON THE PURCHASE invoice (invBaseFare)
+  // — and defaults the supplier (creditor) leg to that purchase's party.
+  const pickPurchase=(id)=>{
+    setPurId(id);
+    const pur=purchases.find(v=>v.id===id); if(!pur)return;
+    if(isRefund) setOrigFare(invBaseFare(pur));
+    if(!supplier) setSupplier(""); // keep auto-default to the purchase party unless overridden
   };
 
   // ── Calc (mirrors the mockup formulae exactly) ──
@@ -1536,7 +1720,7 @@ function RefundReissueVoucher({branch,kind}){
   const brPost=brCodeOf(branch);
   const chargesExceed=isRefund&&custRefund<0;
   const amountsOk=isRefund?(supRefund>0&&custRefund>=0):(supPayable>0&&custBill>0);
-  const canPost=!!brPost&&!!selInv&&!!supplierName&&!!customerName&&amountsOk&&!post.isPending;
+  const canPost=!!brPost&&!!selInv&&!!selPur&&!!supplierName&&!!customerName&&amountsOk&&!post.isPending;
 
   const reset=()=>{ setSupCancel(0);setChangeFee(0);setFareDiff(0);setSvc(0);setMarkup(0);setNarration(""); };
   const doSave=()=>{
@@ -1550,8 +1734,9 @@ function RefundReissueVoucher({branch,kind}){
         {ledger:"Markup Income", amt:markup, desc:"Retained markup", drCr:"Cr"},
       ].filter(l=>(+l.amt||0)>0),
       subtotal:_r2(svc+markup), taxAmt, gstMode, total,
-      againstInvoice:selInv.vno, linkNo:selInv.linkNo||selInv.vno, costCenter:selInv.costCenter||"",
-      remarks:narration||`Being ${kind} of ${module.toLowerCase()} booking ${ref1||selInv.vno} against ${selInv.vno}`,
+      againstInvoice:selInv.vno, againstPurchase:selPur?.vno||"",
+      linkNo:selInv.linkNo||selPur?.linkNo||selInv.vno, costCenter:selInv.costCenter||selPur?.costCenter||"",
+      remarks:narration||`Being ${kind} of ${module.toLowerCase()} booking ${ref1||selInv.vno} against ${selInv.vno}${selPur?` / ${selPur.vno}`:""}`,
       status:"saved",
     });
   };
@@ -1566,8 +1751,8 @@ function RefundReissueVoucher({branch,kind}){
       <div style={{padding:"14px 16px"}}>
         <VExplain>
           {isRefund
-            ?<><b style={{color:"#A07828"}}>Refund:</b> a customer cancels a {module.toLowerCase()} booking. The {cfgM.sup} refunds the fare minus its cancellation charge; you retain a service charge + markup (+GST) and refund the balance to the customer. The supplier is <b>Debited</b> (receivable); the customer, your income & GST are <b>Credited</b>. <b>Pick the sales invoice</b> being cancelled below.</>
-            :<><b style={{color:"#A07828"}}>Reissue:</b> a customer changes a {module.toLowerCase()} booking. The {cfgM.sup} charges a change fee plus any fare difference; you add a service charge + markup (+GST) and bill the total to the customer. The customer is <b>Debited</b>; the supplier, your income & GST are <b>Credited</b>. <b>Pick the sales invoice</b> being amended below.</>}
+            ?<><b style={{color:"#A07828"}}>Refund:</b> a customer cancels a {module.toLowerCase()} booking. The {cfgM.sup} refunds the fare minus its cancellation charge; you retain a service charge + markup (+GST) and refund the balance to the customer. The supplier is <b>Debited</b> (receivable); the customer, your income & GST are <b>Credited</b>. <b>Pick both the sales invoice</b> being cancelled <b>and its purchase invoice</b> below.</>
+            :<><b style={{color:"#A07828"}}>Reissue:</b> a customer changes a {module.toLowerCase()} booking. The {cfgM.sup} charges a change fee plus any fare difference; you add a service charge + markup (+GST) and bill the total to the customer. The customer is <b>Debited</b>; the supplier, your income & GST are <b>Credited</b>. <b>Pick both the sales invoice</b> being amended <b>and its purchase invoice</b> below.</>}
         </VExplain>
 
         {/* Module strip — mirrors the mockup tabs */}
@@ -1578,25 +1763,35 @@ function RefundReissueVoucher({branch,kind}){
           ))}
         </div>
 
-        {/* Mandatory: pick the sales invoice */}
-        <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"2fr 1fr 1fr",gap:12,marginBottom:14}}>
-          <FL label={`Against Sales Invoice — ${isRefund?"cancel":"amend"} (required)`}>
-            <select value={invId} onChange={e=>pickInvoice(e.target.value)} style={{...inp,borderColor:selInv?"#C0DD97":"#F7C1C1",background:selInv?"#f8fff8":"#fffafa"}}>
-              <option value="">{salesQ.isLoading?"Loading sales invoices…":invoices.length?"Select a sales invoice…":"No sales invoices in this branch"}</option>
-              {invoices.map(v=>(
-                <option key={v.id} value={v.id}>{v.vno} · {v.date} · {v.party||"—"} · {vf2(cur,v.total)}</option>
-              ))}
-            </select>
-          </FL>
+        {/* Voucher date + place of supply */}
+        <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:12,marginBottom:14}}>
           <FL label="Date"><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inp}/></FL>
           <VPlaceOfSupply mode={gstMode} onChange={setGstMode}/>
         </div>
 
+        {/* ① Sales side — settles the customer (debtor) leg (required) */}
+        <p style={{margin:"0 0 8px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#185FA5",textTransform:"uppercase"}}>① Sales Invoice — customer side (required)</p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr",gap:12,marginBottom:10}}>
+          <FL label={`Against Sales Invoice — ${isRefund?"cancel":"amend"} (required)`}>
+            <InvoiceSelect invoices={invoices} value={invId} onChange={pickInvoice} cur={cur} loading={salesQ.isLoading} noun="sales invoice"/>
+          </FL>
+        </div>
+        <InvoicePaxPanel inv={selInv} cur={cur} label="Sales Invoice"/>
+
+        {/* ② Purchase side — settles the supplier (creditor) leg / original cost (optional) */}
+        <p style={{margin:"0 0 8px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#27500A",textTransform:"uppercase"}}>② Purchase Invoice — supplier side (required · sets the original cost)</p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr",gap:12,marginBottom:10}}>
+          <FL label="Against Purchase Invoice — supplier cost (excl. service charge & GST) (required)">
+            <InvoiceSelect invoices={purchases} value={purId} onChange={pickPurchase} cur={cur} loading={purchQ.isLoading} noun="purchase invoice"/>
+          </FL>
+        </div>
+        <InvoicePaxPanel inv={selPur} cur={cur} label="Purchase Invoice"/>
+
         <div style={{display:"grid",gridTemplateColumns:mob?"1fr 1fr":"repeat(4,1fr)",gap:12,marginBottom:14}}>
           <FL label={cfgM.ref1}><input value={ref1} onChange={e=>setRef1(e.target.value)} style={inp} placeholder={cfgM.ref1}/></FL>
           <FL label={cfgM.ref2}><input value={ref2} onChange={e=>setRef2(e.target.value)} style={inp} placeholder={cfgM.ref2}/></FL>
-          <FL label="Supplier (Creditor)"><LedgerSelect value={supplier} onChange={setSupplier} filter={l=>l.type==="Creditor"} placeholder={cfgM.supplier}/></FL>
-          <FL label="Customer (Debtor)"><LedgerSelect value={customer} onChange={setCustomer} filter={l=>l.type==="Debtor"} placeholder={selInv?.party||"From invoice"}/></FL>
+          <FL label="Supplier (Creditor)"><LedgerSelect branch={branch} value={supplier} onChange={setSupplier} filter={l=>l.type==="Creditor"} placeholder={selPur?.party||cfgM.supplier}/></FL>
+          <FL label="Customer (Debtor)"><LedgerSelect branch={branch} value={customer} onChange={setCustomer} filter={l=>l.type==="Debtor"} placeholder={selInv?.party||"From invoice"}/></FL>
         </div>
 
         {/* Calc grid — mirrors the mockup calc-grid */}
@@ -1604,7 +1799,7 @@ function RefundReissueVoucher({branch,kind}){
         <div style={{...card,padding:"14px 16px",marginBottom:14}}>
           <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:"10px 26px"}}>
             {isRefund?<>
-              <RRLine label="Original Fare" sub={`paid to ${cfgM.sup}`}>{num(origFare,setOrigFare)}</RRLine>
+              <RRLine label="Original Fare" sub={selPur?`from purchase ${selPur.vno} (excl. svc + GST)`:`paid to ${cfgM.sup}`}>{num(origFare,setOrigFare)}</RRLine>
               <RRLine label={cfgM.rfCancel} sub={`${cfgM.sup} retains`}>{num(supCancel,setSupCancel)}</RRLine>
               <RRLine label="Supplier Refund to Us" sub="fare − cancellation" derived><input type="number" value={supRefund} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
               <div/>
@@ -1628,7 +1823,7 @@ function RefundReissueVoucher({branch,kind}){
 
         <p style={{margin:"0 0 6px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#A07828",textTransform:"uppercase"}}>Account Entries</p>
         <VJournalPreview rows={jrows} cur={cur}/>
-        <VBalanceBar dr={tDr} cr={tCr} cur={cur} emptyText="Pick a sales invoice and enter the figures"/>
+        <VBalanceBar dr={tDr} cr={tCr} cur={cur} emptyText="Pick the sales + purchase invoices and enter the figures"/>
 
         {/* Gross Profit cards */}
         <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:14}}>
@@ -1650,7 +1845,7 @@ function RefundReissueVoucher({branch,kind}){
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={reset} style={btnGh}>Reset</button>
           <button onClick={doSave} disabled={!canPost} style={{...btnG,background:canPost?accent:"#bfc3d6",opacity:canPost?1:0.55}}>
-            {isRefund?"💳":"🔄"} Save {title} {post.isPending?"…":!selInv?"(Pick Invoice)":chargesExceed?"(Charges Exceed Refund)":!amountsOk?"(Enter Amounts)":""}
+            {isRefund?"💳":"🔄"} Save {title} {post.isPending?"…":!selInv?"(Pick Sales Invoice)":!selPur?"(Pick Purchase Invoice)":chargesExceed?"(Charges Exceed Refund)":!amountsOk?"(Enter Amounts)":""}
           </button>
         </div>
       </div>
@@ -3770,10 +3965,10 @@ function RcptPmtVoucher({branch,side}){
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             <FL label="Date"><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inp}/></FL>
             <FL label={isReceipt?"Received from (Customer / Debtor — Cr)":"Pay to (Supplier / Creditor — Dr)"}>
-              <LedgerSelect value={party} onChange={setParty} filter={l=>l.type===(isReceipt?"Debtor":"Creditor")} placeholder={isReceipt?"Select customer / debtor...":"Select supplier / creditor..."}/>
+              <LedgerSelect branch={branch} value={party} onChange={setParty} filter={l=>l.type===(isReceipt?"Debtor":"Creditor")} placeholder={isReceipt?"Select customer / debtor...":"Select supplier / creditor..."}/>
             </FL>
             <FL label={isReceipt?"Received in (Bank / Cash — Dr)":"Paid from (Bank / Cash — Cr)"}>
-              <LedgerSelect value={bankLedger} onChange={setBankLedger} filter={l=>l.type==="Bank"||l.type==="Cash"} placeholder="Select bank / cash account..."/>
+              <LedgerSelect branch={branch} value={bankLedger} onChange={setBankLedger} filter={l=>l.type==="Bank"||l.type==="Cash"} placeholder="Select bank / cash account..."/>
             </FL>
           </div>
           {/* Right */}
@@ -3903,7 +4098,7 @@ export function ContraVoucher({branch}){
             <span style={{fontSize:11,fontWeight:700,color:"#5a6691"}}>Transferred To (Cash / Bank)</span>
           </div>
           <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 180px",gap:12}}>
-            <LedgerSelect value={drLedger} onChange={setDrLedger} filter={l=>l.type==="Bank"||l.type==="Cash"} placeholder="Select bank / cash account..."/>
+            <LedgerSelect branch={branch} value={drLedger} onChange={setDrLedger} filter={l=>l.type==="Bank"||l.type==="Cash"} placeholder="Select bank / cash account..."/>
             <input type="number" value={amount||""} onChange={e=>setAmount(+e.target.value||0)} placeholder="0.00" style={{...inp,textAlign:"right",fontSize:15,fontWeight:700,borderLeft:`3px solid ${V_DR}`}}/>
           </div>
         </div>
@@ -3915,7 +4110,7 @@ export function ContraVoucher({branch}){
             <span style={{fontSize:11,fontWeight:700,color:"#5a6691"}}>Transferred From (Cash / Bank)</span>
           </div>
           <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 180px",gap:12}}>
-            <LedgerSelect value={crLedger} onChange={setCrLedger} filter={l=>(l.type==="Bank"||l.type==="Cash")&&l.id!==drLedger} placeholder="Select bank / cash account..."/>
+            <LedgerSelect branch={branch} value={crLedger} onChange={setCrLedger} filter={l=>(l.type==="Bank"||l.type==="Cash")&&l.id!==drLedger} placeholder="Select bank / cash account..."/>
             <input type="number" value={amount||""} onChange={e=>setAmount(+e.target.value||0)} placeholder="0.00" style={{...inp,textAlign:"right",fontSize:15,fontWeight:700,borderLeft:`3px solid ${V_CR}`}}/>
           </div>
         </div>
@@ -4002,7 +4197,7 @@ export function JournalEntry({branch}){
                 {rows.map(r=>(
                   <tr key={r.id} style={{borderBottom:"1px solid #f3f4f8",background:r.type==="DR"?"#f0fbf5":"#fdf3f3"}}>
                     <td style={{padding:"4px 8px",minWidth:240}}>
-                      <LedgerSelect value={r.ledger} onChange={v=>upd(r.id,"ledger",v)} placeholder="Select ledger..." style={{minHeight:30,fontSize:11}}/>
+                      <LedgerSelect branch={branch} value={r.ledger} onChange={v=>upd(r.id,"ledger",v)} placeholder="Select ledger..." style={{minHeight:30,fontSize:11}}/>
                     </td>
                     <td style={{padding:"4px 8px"}}>
                       <div style={{display:"flex",border:"1px solid #e1e3ec",borderRadius:5,overflow:"hidden",width:64,margin:"0 auto"}}>
@@ -4141,7 +4336,7 @@ export function PurchaseExpenseVoucher({branch}){
           {gstApplicable?<VPlaceOfSupply mode={gstMode} onChange={setGstMode}/>:<div/>}
         </div>
 
-        <FL label="Supplier / Vendor (party ledger — Cr)"><LedgerSelect value={party} onChange={setParty} filter={l=>l.type==="Creditor"} placeholder="Sundry Creditors / Supplier Others..."/></FL>
+        <FL label="Supplier / Vendor (party ledger — Cr)"><LedgerSelect branch={branch} value={party} onChange={setParty} filter={l=>l.type==="Creditor"} placeholder="Sundry Creditors / Supplier Others..."/></FL>
 
         {/* Debit side — expense & asset ledgers */}
         <p style={{margin:"14px 0 6px",fontSize:9,fontWeight:700,color:"#A07828",textTransform:"uppercase",letterSpacing:"1px"}}>Debit — Asset / Expense Ledgers</p>
@@ -4160,7 +4355,7 @@ export function PurchaseExpenseVoucher({branch}){
                   <tr key={l.id} style={{borderBottom:"1px solid #f3f4f8",background:(+l.amt||0)>0?"#f0fbf5":"#fff"}}>
                     <td style={{padding:"4px 8px",textAlign:"center",fontSize:10.5,color:"#5a6691"}}>{i+1}</td>
                     <td style={{padding:"3px 6px",minWidth:240}}>
-                      <LedgerSelect value={l.ledger} onChange={v=>updLine(l.id,"ledger",v)} filter={x=>x.type==="Expense"||x.type==="Asset"} placeholder="Office Rent / Computer Asset..." style={{minHeight:30,fontSize:10.5}}/>
+                      <LedgerSelect branch={branch} value={l.ledger} onChange={v=>updLine(l.id,"ledger",v)} filter={x=>x.type==="Expense"||x.type==="Asset"} placeholder="Office Rent / Computer Asset..." style={{minHeight:30,fontSize:10.5}}/>
                     </td>
                     <td style={{padding:"3px 6px"}}>
                       <input value={l.desc} onChange={e=>updLine(l.id,"desc",e.target.value)} style={{...inp,minHeight:30,fontSize:10.5}} placeholder="e.g. June office rent / 5× laptops"/>

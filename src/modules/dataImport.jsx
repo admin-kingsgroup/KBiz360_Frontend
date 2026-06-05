@@ -124,6 +124,10 @@ const SPECS = [
     desc: 'Dr one ledger · Cr another, same amount.',
     columns: ['vno', 'date', 'branch', 'debitLedger', 'creditLedger', 'amount', 'remarks'],
     example: ['JV/26/0001', '2025-06-30', 'BOM', 'Rent & Utilities', 'Accounts Payable', '25000', 'June rent'] },
+  { group: 'Vouchers', entity: 'purchase-expense', label: 'Purchase Voucher (Expense / Asset)',
+    desc: 'Supplier expense / asset bought on credit. Dr ledger + input GST · Cr supplier (net of TDS). subtotal = taxable, total = invoice value.',
+    columns: ['vno', 'date', 'branch', 'party', 'partyGroup', 'ledger', 'description', 'subtotal', 'gstMode', 'taxAmt', 'tdsAmt', 'total', 'billNo', 'remarks'],
+    example: ['PXP/26/0001', '2025-06-30', 'BOM', 'ABC Realtors', 'Sundry Creditors', 'Office Rent', 'June 2026 office rent', '25000', 'intra', '4500', '500', '29500', 'VEND-4471', 'Being office rent for June payable to ABC Realtors'] },
   { group: 'Vouchers', entity: 'contra', label: 'Contra',
     desc: 'Bank ↔ cash transfer (from → to).',
     columns: ['vno', 'date', 'branch', 'fromAccount', 'toAccount', 'total', 'remarks'],
@@ -136,6 +140,18 @@ const SPECS = [
     desc: 'Dr supplier · Cr purchase + GST. Link No ties it to the original file.',
     columns: ['vno', 'date', 'branch', 'party', 'ledger', 'subtotal', 'taxAmt', 'total', 'linkNo', 'remarks'],
     example: ['DB/26/0001', '2025-06-05', 'BOM', 'Emirates GSA', 'Purchase — Air Tickets', '1000', '180', '1180', 'TKB-0001', 'Ticket void'] },
+  // Refund / Reissue raised against a sale. The customer figure is DERIVED so the
+  // entry always balances — Original Fare/Cancellation (refund) or Change Fee/Fare
+  // Difference (reissue) drive the supplier leg; Service Charge + Markup + GST are
+  // our retained income. Put the original sale's Link No to tie it for invoice GP.
+  { group: 'Vouchers', entity: 'refund', label: 'Refund Voucher (against Sale)',
+    desc: 'Cancellation of a sale. Dr supplier · Cr customer + service charge/markup + Output GST. Customer refund = (Original Fare − Cancellation) − Service Charge − Markup − GST, computed automatically. Against Invoice (sale) AND Against Purchase are both required — one voucher settles both sides.',
+    columns: ['Vch No', 'Vch Date', 'Branch', 'Against Invoice', 'Against Purchase', 'Link No', 'Module', 'Place Of Supply', 'Customer Name', 'Customer Group', 'Supplier Name', 'Supplier Group', 'PNR / Ref', 'Ticket No / Ref', 'Original Fare', 'Cancellation Charge', 'Service Charge', 'Markup', 'CGST', 'SGST', 'IGST', 'Narration'],
+    example: ['RF/26/0001', '2025-06-10', 'BOM', 'SF/26/0001', 'PF/26/0001', 'TKB-0001', 'Flight', 'Maharashtra', 'Acme Travels', 'Sundry Debtors', 'Emirates GSA', 'Sundry Creditors', 'ABCDEF', '0987654321098', '11000', '1000', '500', '300', '72', '72', '0', 'Refund of ticket PNR ABCDEF against SF/26/0001'] },
+  { group: 'Vouchers', entity: 'reissue', label: 'Reissue Voucher (against Sale)',
+    desc: 'Amendment of a sale. Dr customer · Cr supplier + service charge/markup + Output GST. Customer bill = (Change Fee + Fare Difference) + Service Charge + Markup + GST, computed automatically. Against Invoice (sale) AND Against Purchase are both required — one voucher settles both sides.',
+    columns: ['Vch No', 'Vch Date', 'Branch', 'Against Invoice', 'Against Purchase', 'Link No', 'Module', 'Place Of Supply', 'Customer Name', 'Customer Group', 'Supplier Name', 'Supplier Group', 'PNR / Ref', 'Ticket No / Ref', 'Change Fee', 'Fare Difference', 'Service Charge', 'Markup', 'CGST', 'SGST', 'IGST', 'Narration'],
+    example: ['RI/26/0001', '2025-06-12', 'BOM', 'SF/26/0001', 'PF/26/0001', 'TKB-0001', 'Flight', 'Maharashtra', 'Acme Travels', 'Sundry Debtors', 'Emirates GSA', 'Sundry Creditors', 'ABCDEF', '0987654321098', '2000', '1500', '500', '300', '72', '72', '0', 'Reissue of ticket PNR ABCDEF against SF/26/0001'] },
 ];
 
 // Inject the optional "Reference Ledger" column into every Sales & Purchase

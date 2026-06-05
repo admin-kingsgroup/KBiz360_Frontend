@@ -4,6 +4,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, ChevronDown, ChevronRight, Download, Lock, Plus, Printer, Save, Search, Settings, User } from 'lucide-react';
 import { Cell } from 'recharts';
 import { exportToCSV } from './business-logic';
@@ -592,53 +593,69 @@ export function PinnedRecentSection({setRoute}){
    ITEM 21: BSP CSV IMPORT  /purchase/bsp-import
    ════════════════════════════════════════════════════════════════ */
 
-export function LedgerSelect({value,onChange,filter,placeholder,style={}}){
+// Ledger picker. `branch` MUST be passed by branch-scoped vouchers so the dropdown
+// lists the SAME chart the voucher resolves names from — otherwise a ledger picked
+// from the global (all-branch) list isn't found by the voucher's branch-scoped
+// getLedgerName and the raw id leaks into the journal/preview. The menu renders in
+// a portal so a table's overflow:auto/hidden can't clip it (it used to open behind
+// the scroll container and look like it "wasn't opening").
+export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}){
   const [q,setQ]=useState("");
   const [open,setOpen]=useState(false);
+  const [rect,setRect]=useState(null);
   const ref=useRef(null);
-  const LEDGER_REGISTRY=useLedgerRegistry().data||[];   // live chart of accounts (/api/ledgers)
+  const menuRef=useRef(null);
+  const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];   // live chart of accounts (/api/ledgers), branch-scoped
   const filtered=LEDGER_REGISTRY.filter(l=>{
     const matchQ=!q||l.name.toLowerCase().includes(q.toLowerCase())||l.group.toLowerCase().includes(q.toLowerCase());
     const matchFilter=!filter||filter(l);
     return matchQ&&matchFilter;
   }).slice(0,12);
   const selected=LEDGER_REGISTRY.find(l=>l.id===value);
+  const place=()=>{ if(ref.current) setRect(ref.current.getBoundingClientRect()); };
+  const openMenu=()=>{ place(); setQ(""); setOpen(true); };
   useEffect(()=>{
-    const fn=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
-    document.addEventListener("mousedown",fn);return()=>document.removeEventListener("mousedown",fn);
-  },[]);
+    if(!open)return;
+    // Treat clicks inside the trigger OR the portalled menu as "inside".
+    const onDoc=e=>{ if(ref.current?.contains(e.target)||menuRef.current?.contains(e.target))return; setOpen(false); };
+    const reposition=()=>place();   // keep the menu pinned to the field on scroll/resize
+    document.addEventListener("mousedown",onDoc);
+    window.addEventListener("scroll",reposition,true);
+    window.addEventListener("resize",reposition);
+    return()=>{ document.removeEventListener("mousedown",onDoc); window.removeEventListener("scroll",reposition,true); window.removeEventListener("resize",reposition); };
+  },[open]);
+  const menu = open && rect && createPortal(
+    <div ref={menuRef} style={{position:"fixed",top:rect.bottom+4,left:rect.left,width:rect.width,zIndex:4000,background:"#fff",
+      border:"1px solid #e1e3ec",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.18)",overflow:"hidden"}}>
+      <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Type to search..."
+        style={{width:"100%",border:"none",borderBottom:"1px solid #e1e3ec",padding:"8px 12px",
+          fontSize:11,outline:"none",boxSizing:"border-box"}}/>
+      <div style={{maxHeight:220,overflowY:"auto"}}>
+        {filtered.map(l=>(
+          <div key={l.id} onClick={()=>{onChange(l.id);setOpen(false);}}
+            style={{padding:"7px 12px",cursor:"pointer",display:"flex",justifyContent:"space-between",fontSize:11}}
+            onMouseEnter={e=>e.currentTarget.style.background="#f0f4ff"}
+            onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            <span style={{color:"#0d1326",fontWeight:500}}>{l.name}</span>
+            <span style={{fontSize:9.5,color:"#5a6691",marginLeft:8,flexShrink:0}}>{l.group}</span>
+          </div>
+        ))}
+        {filtered.length===0&&<div style={{padding:"10px 12px",fontSize:11,color:"#5a6691"}}>No ledger found</div>}
+      </div>
+      <div style={{padding:"6px 10px",borderTop:"1px solid #f3f4f8",fontSize:9.5,color:"#5a6691"}}>
+        {LEDGER_REGISTRY.length} ledgers · Type to filter
+      </div>
+    </div>, document.body);
   return (
     <div ref={ref} style={{position:"relative"}}>
-      <div onClick={()=>{setOpen(o=>!o);setQ("");}} style={{...inp,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:32,...style}}>
+      <div onClick={()=>open?setOpen(false):openMenu()} style={{...inp,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:32,...style}}>
         {selected
           ?<span style={{fontSize:11,color:"#0d1326",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected.name}</span>
           :<span style={{fontSize:11,color:"#bfc3d6"}}>{placeholder||"Select ledger..."}</span>
         }
         <ChevronDown size={12} style={{color:"#5a6691",flexShrink:0}}/>
       </div>
-      {open&&(
-        <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:300,background:"#fff",
-          border:"1px solid #e1e3ec",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.12)",overflow:"hidden"}}>
-          <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Type to search..."
-            style={{width:"100%",border:"none",borderBottom:"1px solid #e1e3ec",padding:"8px 12px",
-              fontSize:11,outline:"none",boxSizing:"border-box"}}/>
-          <div style={{maxHeight:200,overflowY:"auto"}}>
-            {filtered.map(l=>(
-              <div key={l.id} onClick={()=>{onChange(l.id);setOpen(false);}}
-                style={{padding:"7px 12px",cursor:"pointer",display:"flex",justifyContent:"space-between",fontSize:11}}
-                onMouseEnter={e=>e.currentTarget.style.background="#f0f4ff"}
-                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                <span style={{color:"#0d1326",fontWeight:500}}>{l.name}</span>
-                <span style={{fontSize:9.5,color:"#5a6691",marginLeft:8,flexShrink:0}}>{l.group}</span>
-              </div>
-            ))}
-            {filtered.length===0&&<div style={{padding:"10px 12px",fontSize:11,color:"#5a6691"}}>No ledger found</div>}
-          </div>
-          <div style={{padding:"6px 10px",borderTop:"1px solid #f3f4f8",fontSize:9.5,color:"#5a6691"}}>
-            {LEDGER_REGISTRY.length} ledgers · Type to filter
-          </div>
-        </div>
-      )}
+      {menu}
     </div>
   );
 }
