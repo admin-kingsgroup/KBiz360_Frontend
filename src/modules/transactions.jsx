@@ -1482,6 +1482,7 @@ function InvoiceSelect({invoices,value,onChange,cur,loading,placeholder,noun="sa
   const [q,setQ]=useState("");
   const [open,setOpen]=useState(false);
   const [rect,setRect]=useState(null);
+  const [activeIdx,setActiveIdx]=useState(0);   // keyboard-highlighted option
   const ref=useRef(null), menuRef=useRef(null);
   const selected=invoices.find(v=>v.id===value);
   const norm=s=>String(s||"").toLowerCase();
@@ -1502,21 +1503,31 @@ function InvoiceSelect({invoices,value,onChange,cur,loading,placeholder,noun="sa
     window.addEventListener("resize",reposition);
     return()=>{ document.removeEventListener("mousedown",onDoc); window.removeEventListener("scroll",reposition,true); window.removeEventListener("resize",reposition); };
   },[open]);
+  // Reset the keyboard highlight to the top whenever the query (result set) or open state changes.
+  useEffect(()=>{ setActiveIdx(0); },[q,open]);
+  // Arrow Up/Down to move, Enter to pick, Esc to close — from the search box.
+  const onKeyNav=e=>{
+    if(e.key==="ArrowDown"){ e.preventDefault(); setActiveIdx(i=>Math.min(i+1,filtered.length-1)); }
+    else if(e.key==="ArrowUp"){ e.preventDefault(); setActiveIdx(i=>Math.max(i-1,0)); }
+    else if(e.key==="Enter"){ e.preventDefault(); const pick=filtered[activeIdx]; if(pick){ onChange(pick.id); setOpen(false); } }
+    else if(e.key==="Escape"){ e.preventDefault(); setOpen(false); }
+  };
   const menu=open&&rect&&createPortal(
     <div ref={menuRef} style={{position:"fixed",top:rect.bottom+4,left:rect.left,width:Math.max(rect.width,330),zIndex:4000,background:"#fff",
       border:"1px solid #e1e3ec",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.18)",overflow:"hidden"}}>
       <div style={{position:"relative"}}>
         <Search size={13} style={{position:"absolute",left:10,top:9,color:"#8b94b3"}}/>
-        <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Search by invoice no, party, pax, ticket, PNR or sector…"
+        <input autoFocus value={q} onChange={e=>setQ(e.target.value)} onKeyDown={onKeyNav} placeholder="Search by invoice no, party, pax, ticket, PNR or sector…  (↑ ↓ to move · Enter to select)"
           style={{width:"100%",border:"none",borderBottom:"1px solid #e1e3ec",padding:"8px 12px 8px 30px",fontSize:11,outline:"none",boxSizing:"border-box"}}/>
       </div>
       <div style={{maxHeight:300,overflowY:"auto"}}>
-        {filtered.map(inv=>{
+        {filtered.map((inv,idx)=>{
           const pl=paxLabel(inv);
+          const active=idx===activeIdx;
           return (
-            <div key={inv.id} onClick={()=>{onChange(inv.id);setOpen(false);}}
-              style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #f3f4f8"}}
-              onMouseEnter={e=>e.currentTarget.style.background="#f0f4ff"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            <div key={inv.id} ref={el=>{ if(active&&el) el.scrollIntoView({block:"nearest"}); }}
+              onClick={()=>{onChange(inv.id);setOpen(false);}} onMouseEnter={()=>setActiveIdx(idx)}
+              style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #f3f4f8",background:active?"#eaf0ff":"transparent"}}>
               <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"baseline"}}>
                 <span style={{fontFamily:"monospace",fontSize:10.5,fontWeight:700,color:"#185FA5"}}>{inv.vno}</span>
                 <span style={{fontSize:11,fontWeight:700,color:"#0d1326",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,inv.total)}</span>
@@ -1612,7 +1623,6 @@ function RefundReissueVoucher({branch,kind}){
   const [date,setDate]=useState(todayISO());
   const [module,setModule]=useState("Flight");
   const [invId,setInvId]=useState("");            // selected sale voucher id (mandatory → customer leg)
-  const [purId,setPurId]=useState("");            // related purchase voucher id (optional → supplier leg/cost)
   const [ref1,setRef1]=useState(""); const [ref2,setRef2]=useState("");
   const [gstMode,setGstMode]=useState("intra");
   const [supplier,setSupplier]=useState("");      // creditor ledger id (optional override)
@@ -1638,7 +1648,18 @@ function RefundReissueVoucher({branch,kind}){
   const selInv=invoices.find(v=>v.id===invId);
   const purchQ=usePurchaseRegister(branch);
   const purchases=purchQ.data||[];
-  const selPur=purchases.find(v=>v.id===purId);
+  // The related PURCHASE invoice is AUTO-LINKED from the picked sale (every sale shares
+  // a Link No with its purchase) — there is NO manual purchase picker. Falls back to a
+  // shared ticket-no / PNR match for live CRM data that leaves Link No blank.
+  const selPur=useMemo(()=>{
+    if(!selInv) return null;
+    const key=(selInv.linkNo||"").trim();
+    if(key){ const m=purchases.find(p=>(p.linkNo||"").trim()===key); if(m) return m; }
+    const tickets=new Set(invPax(selInv).map(p=>(p.ticket||"").trim()).filter(Boolean));
+    const pnrs=new Set(invPax(selInv).map(p=>(p.pnr||"").trim()).filter(Boolean));
+    if(tickets.size||pnrs.size) return purchases.find(p=>invPax(p).some(x=>(x.ticket&&tickets.has(x.ticket.trim()))||(x.pnr&&pnrs.has(x.pnr.trim()))))||null;
+    return null;
+  },[selInv,purchases]);
 
   const cfgM=RR_MODULES[module]||RR_MODULES.Misc;
   const supLed=LEDGER_REGISTRY.find(l=>l.id===supplier);
@@ -1656,28 +1677,25 @@ function RefundReissueVoucher({branch,kind}){
     const inv=invoices.find(v=>v.id===id); if(!inv)return;
     setModule(SALE_TYPE_MODULE[inv.type]||"Misc");
     setGstMode(inv.gstMode==="inter"?"inter":"intra");
-    // Original Fare = fare PAID TO THE SUPPLIER. Prefer the related PURCHASE invoice
-    // (picked below); until one is chosen, seed it from the sale's base (net of our
-    // service charge/markup and CGST/SGST/IGST & TCS) as a starting estimate.
+    // Original Fare is prefilled from the AUTO-LINKED purchase invoice (net of its
+    // service charge/markup and CGST/SGST/IGST & TCS) by the effect below — not here.
     // TODO: support per-pax partial cancellation — prefill only the selected
     // passengers' base fare instead of the whole invoice (invPax(inv) carries each).
-    if(isRefund&&!purId) setOrigFare(invBaseFare(inv));
     const l0=(inv.lines&&inv.lines[0])||{};
     setRef1(l0.pnr||inv.vno||"");
     setRef2(l0.ticket||"");
     setCustomer(""); // fall back to the invoice's own party unless overridden
   };
 
-  // Picking the related PURCHASE invoice settles the supplier side: it sets the
-  // Original Fare to the COST paid to the supplier — net of any service charge/markup
-  // and the CGST/SGST/IGST (& TCS) already charged ON THE PURCHASE invoice (invBaseFare)
-  // — and defaults the supplier (creditor) leg to that purchase's party.
-  const pickPurchase=(id)=>{
-    setPurId(id);
-    const pur=purchases.find(v=>v.id===id); if(!pur)return;
-    if(isRefund) setOrigFare(invBaseFare(pur));
-    if(!supplier) setSupplier(""); // keep auto-default to the purchase party unless overridden
-  };
+  // Prefill the Refund "Original Fare" from the auto-linked PURCHASE invoice's cost —
+  // net of its service charge/markup and the CGST/SGST/IGST (& TCS) already charged on
+  // it (invBaseFare) — falling back to the sale's base until the purchase resolves.
+  // Keyed on the resolved invoice ids so a background refetch can't clobber edits.
+  useEffect(()=>{
+    if(!isRefund) return;
+    if(selPur) setOrigFare(invBaseFare(selPur));
+    else if(selInv) setOrigFare(invBaseFare(selInv));
+  },[selPur?.id,selInv?.id,isRefund]);
 
   // ── Calc (mirrors the mockup formulae exactly) ──
   const gstSvc=Math.round(svc*gstRateSvc)/100;
@@ -1778,14 +1796,13 @@ function RefundReissueVoucher({branch,kind}){
         </div>
         <InvoicePaxPanel inv={selInv} cur={cur} label="Sales Invoice"/>
 
-        {/* ② Purchase side — settles the supplier (creditor) leg / original cost (optional) */}
-        <p style={{margin:"0 0 8px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#27500A",textTransform:"uppercase"}}>② Purchase Invoice — supplier side (required · sets the original cost)</p>
-        <div style={{display:"grid",gridTemplateColumns:"1fr",gap:12,marginBottom:10}}>
-          <FL label="Against Purchase Invoice — supplier cost (excl. service charge & GST) (required)">
-            <InvoiceSelect invoices={purchases} value={purId} onChange={pickPurchase} cur={cur} loading={purchQ.isLoading} noun="purchase invoice"/>
-          </FL>
-        </div>
-        <InvoicePaxPanel inv={selPur} cur={cur} label="Purchase Invoice"/>
+        {/* ② Purchase side — AUTO-LINKED from the sale by Link No (no manual pick) */}
+        <p style={{margin:"0 0 8px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#27500A",textTransform:"uppercase"}}>② Purchase Invoice — supplier side (auto-linked by Link No · sets the original cost)</p>
+        {selPur
+          ? <InvoicePaxPanel inv={selPur} cur={cur} label="Purchase Invoice · auto-linked"/>
+          : selInv
+            ? <div style={{padding:"10px 13px",borderRadius:8,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:10.5,color:"#A32D2D",fontWeight:600,marginBottom:14}}>⚠ No purchase invoice is linked to {selInv.vno}{selInv.linkNo?` (Link No ${selInv.linkNo})`:" — the sale has no Link No"}{purchQ.isLoading?" · loading purchases…":""}. A refund/reissue must settle the linked purchase — check the purchase exists with the same Link No.</div>
+            : <div style={{padding:"10px 13px",borderRadius:8,background:"#f3f4f8",border:"1px solid #e1e3ec",fontSize:10.5,color:"#5a6691",marginBottom:14}}>Pick a sales invoice above — its linked purchase invoice loads automatically.</div>}
 
         <div style={{display:"grid",gridTemplateColumns:mob?"1fr 1fr":"repeat(4,1fr)",gap:12,marginBottom:14}}>
           <FL label={cfgM.ref1}><input value={ref1} onChange={e=>setRef1(e.target.value)} style={inp} placeholder={cfgM.ref1}/></FL>
