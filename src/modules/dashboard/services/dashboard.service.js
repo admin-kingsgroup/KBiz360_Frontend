@@ -20,11 +20,11 @@ import { growthPct } from '../utils/helpers';
 
 export const loadBranchDashboard = async ({ branchCode }) => {
   const p = api.periods();
-  const [cur, prev, ytd, outstanding, saleVouchers, actionItems, upcomingTravel] = await Promise.all([
+  const [cur, prev, ytd, unsettled, saleVouchers, actionItems, upcomingTravel] = await Promise.all([
     api.getModulePL({ branchCode, ...p.month }),
     api.getModulePL({ branchCode, ...p.prevMonth }),
     api.getModulePL({ branchCode, ...p.ytd }),
-    api.getReceivablesOutstanding(branchCode),
+    api.getAgeingTotals(branchCode),
     api.getSaleVouchers({ branchCode, ...p.month }),
     api.getActionItems(),
     api.getUpcomingTravel({ limit: 5 }),
@@ -44,7 +44,8 @@ export const loadBranchDashboard = async ({ branchCode }) => {
       expenses: cur.indirect.expense,
       revenueGrowth: growthPct(cur.totals.sales, prev.totals.sales),
       gpGrowth: growthPct(cur.totals.gp, prev.totals.gp),
-      outstanding,
+      outstanding: unsettled.receivable,  // unsettled receivable (pending to collect)
+      payable: unsettled.payable,         // unsettled payable (pending to pay)
       ytdRevenue: ytd.totals.sales,
       ytdGp: ytd.totals.gp,
       ytdBookings: countFiles(ytd),
@@ -56,7 +57,7 @@ export const loadBranchDashboard = async ({ branchCode }) => {
 
 export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}) => {
   const dates = api.rangeToDates(range); // 'month' | 'ytd' | 'all' → ISO range + label
-  const [revenueTrend, fyTargets, branchHeatmap, topCustomers, topSuppliers, bankAccounts, mpl, outstanding, cash, arAgeing, apAgeing] =
+  const [revenueTrend, fyTargets, branchHeatmap, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing] =
     await Promise.all([
       api.getRevenueTrend(branchCode),
       api.getFyTargets(),
@@ -65,7 +66,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}
       api.getTopSuppliers(branchCode),
       api.getBankAccounts(),
       api.getModulePL({ branchCode, from: dates.from, to: dates.to }), // live, period + scope driven
-      api.getReceivablesOutstanding(branchCode),
+      api.getAgeingTotals(branchCode),
       api.getCashPosition(branchCode),
       api.getArAgeingSummary(),
       api.getApAgeingSummary(),
@@ -85,7 +86,8 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}
       gp: mpl.totals.gp,
       gpPct: mpl.totals.gpPct,
       netProfit: mpl.bridge.netProfit,
-      outstanding,
+      outstanding: unsettled.receivable,  // unsettled receivable (pending to collect)
+      payable: unsettled.payable,         // unsettled payable (pending to pay)
       cash,
     },
     // back-compat: anything still reading data.mtd gets the selected-period figures

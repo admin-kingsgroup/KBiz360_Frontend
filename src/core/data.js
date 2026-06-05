@@ -4,7 +4,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import { FileText } from 'lucide-react';
-import { BRANCHES, BRANCH_CODES, CURRENCY_META, FX_RATES, ACTIVE_CURRENCIES } from './referenceCache';
+import { BRANCHES, BRANCH_CODES, CURRENCY_META, FX_RATES, ACTIVE_CURRENCIES, VAT_RATE } from './referenceCache';
 
 function vDate(){
   const d=new Date();
@@ -24,7 +24,7 @@ function vDate(){
      DR Congo (FBM):   USD (main) + CDF
    `toINR` is the rate used for consolidated (Group) reporting only.
    ─────────────────────────────────────────────────────────────────── */
-export { BRANCHES, BRANCH_CODES, CURRENCY_META, FX_RATES, ACTIVE_CURRENCIES };
+export { BRANCHES, BRANCH_CODES, CURRENCY_META, FX_RATES, ACTIVE_CURRENCIES, VAT_RATE };
 
 const _branchObj=(b)=> (b && typeof b==="object") ? b
   : BRANCHES.find(x=>x.code===b) || null;
@@ -56,8 +56,8 @@ export const _VNO_COUNTERS={};
 /* Seed: each branch starts its own sequence independently */
 
 export const _VNO_SEED={
-  BOM:{SF:1,SH:1,SC:1,SV:1,SHT:1,SI:1,SM:1,SCN:1,PF:1,PH:1,PHT:1,PV:1,PC:1,PI:1,PM:1,RV:1,PMT:1,CV:1,JV:1,DB:1,BR:1},
-  AMD:{SF:1,SH:1,SC:1,SV:1,SHT:1,SI:1,SM:1,SCN:1,PF:1,PH:1,PHT:1,PV:1,PC:1,PI:1,PM:1,RV:1,PMT:1,CV:1,JV:1,DB:1,BR:1},
+  BOM:{SF:1,SH:1,SC:1,SV:1,SHT:1,SI:1,SM:1,SCN:1,PF:1,PH:1,PHT:1,PV:1,PC:1,PI:1,PM:1,RV:1,PMT:1,CV:1,JV:1,DB:1,BR:1,RF:1,RI:1},
+  AMD:{SF:1,SH:1,SC:1,SV:1,SHT:1,SI:1,SM:1,SCN:1,PF:1,PH:1,PHT:1,PV:1,PC:1,PI:1,PM:1,RV:1,PMT:1,CV:1,JV:1,DB:1,BR:1,RF:1,RI:1},
 };
 
 

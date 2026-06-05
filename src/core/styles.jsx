@@ -13,7 +13,7 @@ import { useSalespeople } from './useReference';
 import { fmt, fmtINR } from './format';
 import { todayISO, nowLabel, CUR_FY } from './dates';
 import { ATTRITION_DATA, AUDIT_TRAIL_DATA, BANK_ACCOUNTS_DATA, CUSTOMER_LTV_DATA, FS_NOTES, FX_EXPOSURE, STATUTORY_DUES, TOP_SUPPLIERS_DATA, abcOf, cardStyle } from './helpers';
-import { useGpBills, useProfitAndLoss } from './useAccounting';
+import { useGpBills, useProfitAndLoss, useYieldByDestination, useCustomerLtv, useAbcAnalysis, useYearOverYear } from './useAccounting';
 import { ReportDateBar, resolveReportRange } from './reportDateBar';
 import { triggerSaveRefresh, useMobile } from './hooks';
 import { openPrintWindow } from './voucher-print';
@@ -774,8 +774,8 @@ function RptState({ q, empty, label = 'data', children }) {
 
 export function RPT_YieldDestination({ branch }){
   const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
-  const q=useGpBills(branch,{from:range.from||undefined,to:range.to||undefined});
-  const sorted=aggBills(q.data,b=>b.dest).map(g=>({destination:g.key,bookings:g.bookings,revenue:g.revenue,cost:g.cost,gp:g.gp,gpPct:g.gpPct})).sort((a,b)=>b.revenue-a.revenue);
+  const q=useYieldByDestination(branch,{from:range.from||undefined,to:range.to||undefined});
+  const sorted=q.data?.rows||[];   // server already groups by destination, GP-desc
   const totalRev=sorted.reduce((s,d)=>s+d.revenue,0);
   const totalGP=sorted.reduce((s,d)=>s+d.gp,0);
   const avgGpPct=totalRev>0?(totalGP/totalRev*100).toFixed(1):"0.0";
@@ -887,28 +887,16 @@ export function RPT_YoY({ branch }){
   // (two P&L runs against the live double-entry engine). Default YTD so there's
   // a bounded period to shift; "All" falls back to current FY vs prior FY.
   const [range,setRange]=useState(()=>({mode:'ytd',...resolveReportRange('ytd')}));
-  const cyFrom=range.from||CUR_FY.startISO, cyTo=range.to||todayISO();
-  const shiftYear=(iso)=>{ if(!iso) return ''; const [y,m,d]=String(iso).split('-'); return `${(+y)-1}-${m}-${d}`; };
-  const lyFrom=shiftYear(cyFrom), lyTo=shiftYear(cyTo);
-  const cyQ=useProfitAndLoss(branch,{from:cyFrom,to:cyTo});
-  const lyQ=useProfitAndLoss(branch,{from:lyFrom,to:lyTo});
-  const cy=cyQ.data, ly=lyQ.data;
-  const lines=cy&&ly?[
-    {line:"Revenue (Sales)",group:"Income",cy:cy.trading?.creditTotal||0,ly:ly.trading?.creditTotal||0},
-    {line:"Direct Costs (COGS)",group:"Costs",cy:cy.trading?.debitTotal||0,ly:ly.trading?.debitTotal||0},
-    {line:"Gross Profit",group:"Income",cy:cy.grossProfit||0,ly:ly.grossProfit||0,bold:true},
-    {line:"Indirect Income",group:"Income",cy:cy.indirect?.creditTotal||0,ly:ly.indirect?.creditTotal||0},
-    {line:"Indirect Expenses",group:"Costs",cy:cy.indirect?.debitTotal||0,ly:ly.indirect?.debitTotal||0},
-    {line:"Net Profit",group:"Income",cy:cy.netProfit||0,ly:ly.netProfit||0,bold:true},
-  ]:[];
-  const q={isError:cyQ.isError||lyQ.isError,isLoading:cyQ.isLoading||lyQ.isLoading,error:cyQ.error||lyQ.error};
+  const q=useYearOverYear(branch,{from:range.from||undefined,to:range.to||undefined});
+  const lines=q.data?.rows||[];                      // [{line,group,cy,ly,bold}] from /yoy (two module-PL runs)
+  const curLabel=q.data?.current?.label||'Current', priorLabel=q.data?.prior?.label||'Prior Year';
   return (
-    <RPT_Page title="Year-over-Year Comparison" subtitle={`${cyFrom} → ${cyTo}  vs  ${lyFrom} → ${lyTo} (prior year)`}
+    <RPT_Page title="Year-over-Year Comparison" subtitle={`${curLabel}  vs  ${priorLabel} · same window, prior year`}
       toolbar={<ReportDateBar value={range} onChange={setRange}/>}>
       <RptState q={q} empty={lines.length===0} label="P&L data">
       <div style={cardStyle}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-          <thead><tr><th style={RPT_thStyle}>Particulars</th><th style={{...RPT_thStyle,textAlign:"right"}}>Current</th><th style={{...RPT_thStyle,textAlign:"right"}}>Prior Year</th><th style={{...RPT_thStyle,textAlign:"right"}}>Variance</th><th style={{...RPT_thStyle,textAlign:"right"}}>%Δ</th></tr></thead>
+          <thead><tr><th style={RPT_thStyle}>Particulars</th><th style={{...RPT_thStyle,textAlign:"right"}}>{curLabel}</th><th style={{...RPT_thStyle,textAlign:"right"}}>{priorLabel}</th><th style={{...RPT_thStyle,textAlign:"right"}}>Variance</th><th style={{...RPT_thStyle,textAlign:"right"}}>%Δ</th></tr></thead>
           <tbody>{lines.map((l,i)=>{const variance=l.cy-l.ly;const pct=l.ly!==0?variance/Math.abs(l.ly)*100:0;return (<tr key={i} style={l.bold?{background:"#fafbfd",fontWeight:700}:{}}><td style={{...RPT_tdStyle,fontWeight:l.bold?700:400,fontSize:l.bold?12.5:12}}>{l.line}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:l.bold?700:500}}>{fmtINR(l.cy)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:"#5a6691"}}>{fmtINR(l.ly)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:variance>=0?(l.group==="Costs"?"#A32D2D":"#22c55e"):(l.group==="Costs"?"#22c55e":"#A32D2D"),fontWeight:700}}>{variance>=0?"+":""}{fmtINR(Math.abs(variance))}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:pct>=0?(l.group==="Costs"?"#A32D2D":"#22c55e"):(l.group==="Costs"?"#22c55e":"#A32D2D")}}>{pct>=0?"+":""}{pct.toFixed(1)}%</td></tr>);})}</tbody>
         </table>
       </div>
@@ -921,11 +909,8 @@ export function RPT_YoY({ branch }){
 
 export function RPT_CustomerLTV({ branch }){
   const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
-  const q=useGpBills(branch,{from:range.from||undefined,to:range.to||undefined});
-  const today=new Date();
-  const daysSince=(iso)=>{const d=iso?new Date(iso):null;return d&&!isNaN(d)?Math.max(0,Math.floor((today-d)/86400000)):0;};
-  const monthsBetween=(a,b)=>{const x=a?new Date(a):null,y=b?new Date(b):null;if(!x||!y||isNaN(x)||isNaN(y))return 1;return Math.max(1,Math.round((y-x)/2629800000)+1);};
-  const sorted=aggBills(q.data,b=>b.client,'Walk-in / Unknown').map(g=>({name:g.key,firstBooking:g.firstDate||'—',lastBooking:g.lastDate||'—',totalBookings:g.bookings,ltv:g.revenue,avgBasket:g.bookings>0?Math.round(g.revenue/g.bookings):0,monthsActive:monthsBetween(g.firstDate,g.lastDate),recencyDays:daysSince(g.lastDate)})).sort((a,b)=>b.ltv-a.ltv);
+  const q=useCustomerLtv(branch,{from:range.from||undefined,to:range.to||undefined});
+  const sorted=q.data?.rows||[];   // server computes LTV, basket, active span & recency
   return (
     <RPT_Page title="Customer Lifetime Value (LTV)" subtitle="Cumulative value per customer — live from posted sales"
       toolbar={<ReportDateBar value={range} onChange={setRange}/>}>
@@ -945,29 +930,25 @@ export function RPT_CustomerLTV({ branch }){
 
 export function RPT_ABCAnalysis({ branch }){
   const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
-  const q=useGpBills(branch,{from:range.from||undefined,to:range.to||undefined});
   const [dim,setDim]=useState("customers");
-  const customers=aggBills(q.data,b=>b.client,'Walk-in / Unknown').map(g=>({name:g.key,ltv:g.revenue}));
-  const suppliers=aggBills(q.data,b=>b.supplier,'No supplier').map(g=>({name:g.key,spend:g.cost}));
-  const destinations=aggBills(q.data,b=>b.dest).map(g=>({destination:g.key,revenue:g.revenue}));
-  const valueKey=dim==="customers"?"ltv":dim==="suppliers"?"spend":"revenue";
-  const source=(dim==="customers"?customers:dim==="suppliers"?suppliers:destinations).filter(x=>x[valueKey]>0);
-  const data=abcOf(source,valueKey);
-  const grp={A:data.filter(d=>d.class==="A"),B:data.filter(d=>d.class==="B"),C:data.filter(d=>d.class==="C")};
+  const by=dim==="customers"?"customer":dim==="suppliers"?"supplier":"destination";
+  const q=useAbcAnalysis(branch,{from:range.from||undefined,to:range.to||undefined,by});
+  const data=q.data?.rows||[];                       // [{name,value,bookings,gp,share,cumPct,class}], ranked
+  const EMPTY_CLS={count:0,value:0,share:0};
+  const classes=q.data?.classes||{A:EMPTY_CLS,B:EMPTY_CLS,C:EMPTY_CLS};
   const grpStyle=cls=>({background:cls==="A"?"#fae7ad":cls==="B"?"#cfe2ff":"#e2e3e5",color:cls==="A"?"#664700":cls==="B"?"#004085":"#383d41"});
-  const valOf=x=>x.ltv||x.spend||x.revenue||0;
   return (
     <RPT_Page title="ABC Analysis (Pareto)"
       subtitle="80/15/5 split based on contribution to value — live from posted bills"
       toolbar={<div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><ReportDateBar value={range} onChange={setRange}/><select value={dim} onChange={e=>setDim(e.target.value)} style={{padding:"7px 11px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,background:"#fff"}}><option value="customers">By Customer (LTV)</option><option value="suppliers">By Supplier (Spend)</option><option value="destinations">By Destination (Revenue)</option></select></div>}>
       <RptState q={q} empty={data.length===0} label="contribution data">
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
-        {["A","B","C"].map(c=>{const total=grp[c].reduce((s,x)=>s+valOf(x),0);const grandTotal=data.reduce((s,x)=>s+valOf(x),0);const sharePct=grandTotal>0?(total/grandTotal*100).toFixed(1):"0.0";return (<div key={c} style={{...cardStyle,borderTop:"4px solid "+(c==="A"?"#d4a437":c==="B"?"#3b82f6":"#5a6691")}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><span style={{padding:"4px 10px",borderRadius:4,fontSize:13,fontWeight:700,letterSpacing:"0.5px",...grpStyle(c)}}>CLASS {c}</span><span style={{fontSize:11,color:"#5a6691"}}>{grp[c].length} items · {sharePct}% of total</span></div><p style={{margin:0,fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(total)}</p><p style={{margin:"3px 0 0",fontSize:10.5,color:"#5a6691"}}>{c==="A"?"Top contributors — focus & nurture":c==="B"?"Mid-tier — opportunity to grow":"Long tail — automate / rationalise"}</p></div>);})}
+        {["A","B","C"].map(c=>{const cl=classes[c]||{count:0,value:0,share:0};return (<div key={c} style={{...cardStyle,borderTop:"4px solid "+(c==="A"?"#d4a437":c==="B"?"#3b82f6":"#5a6691")}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><span style={{padding:"4px 10px",borderRadius:4,fontSize:13,fontWeight:700,letterSpacing:"0.5px",...grpStyle(c)}}>CLASS {c}</span><span style={{fontSize:11,color:"#5a6691"}}>{cl.count} items · {cl.share}% of total</span></div><p style={{margin:0,fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(cl.value)}</p><p style={{margin:"3px 0 0",fontSize:10.5,color:"#5a6691"}}>{c==="A"?"Top contributors — focus & nurture":c==="B"?"Mid-tier — opportunity to grow":"Long tail — automate / rationalise"}</p></div>);})}
       </div>
       <div style={cardStyle}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Rank</th><th style={RPT_thStyle}>Name</th><th style={{...RPT_thStyle,textAlign:"right"}}>Value</th><th style={{...RPT_thStyle,textAlign:"right"}}>Share</th><th style={{...RPT_thStyle,textAlign:"right"}}>Cumulative</th><th style={{...RPT_thStyle,textAlign:"center"}}>Class</th></tr></thead>
-          <tbody>{data.map((d,i)=>{const val=valOf(d);return (<tr key={(d.name||d.destination)+i}><td style={{...RPT_tdStyle,color:"#5a6691"}}>{i+1}</td><td style={{...RPT_tdStyle,fontWeight:600}}>{d.name||d.destination}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(val)}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{d.share}%</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{d.cumPct}%</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 9px",borderRadius:3,fontSize:10.5,fontWeight:700,letterSpacing:"0.3px",...grpStyle(d.class)}}>{d.class}</span></td></tr>);})}</tbody>
+          <tbody>{data.map((d,i)=>{const val=d.value;return (<tr key={(d.name||d.destination)+i}><td style={{...RPT_tdStyle,color:"#5a6691"}}>{i+1}</td><td style={{...RPT_tdStyle,fontWeight:600}}>{d.name||d.destination}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(val)}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{d.share}%</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{d.cumPct}%</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 9px",borderRadius:3,fontSize:10.5,fontWeight:700,letterSpacing:"0.3px",...grpStyle(d.class)}}>{d.class}</span></td></tr>);})}</tbody>
         </table>
       </div>
       </RptState>

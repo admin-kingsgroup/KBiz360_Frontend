@@ -46,6 +46,18 @@ export function useProfitAndLoss(branch, { from, to } = {}) {
   });
 }
 
+// GST/VAT return view — Output−Input tax + withholding (WHT/TDS) + TCS for a
+// branch + period. Regime-aware (VAT branches return VAT, India CGST/SGST/IGST).
+export function useTaxSummary(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'tax-summary', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/tax-summary', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 export function useBalanceSheet(branch, { to } = {}) {
   const code = branchCode(branch);
   return useQuery({
@@ -215,6 +227,21 @@ export function useSalesRegister(branch, { from, to } = {}) {
     queryFn: () => apiGet('/api/vouchers', { branch: code, category: 'sale', from, to }),
     enabled: enabled(),
     staleTime: 30_000,
+  });
+}
+
+// Open (unsettled) bills for a party, for the bill-wise allocation panel on the
+// Receipt / Payment vouchers. side 'customer' → debtor's open sale bills (Receipt);
+// side 'supplier' → creditor's open purchase bills (Payment). Returns
+// { party, side, bills:[{billVno,date,total,allocated,outstanding,status,ageDays}], advances }.
+// Needs a real party name + a specific branch (a voucher belongs to one branch).
+export function useOpenBills(party, branch, side = 'customer') {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || ''],
+    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side }),
+    enabled: enabled() && !!party && !!code,
+    staleTime: 15_000,
   });
 }
 

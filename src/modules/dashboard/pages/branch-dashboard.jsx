@@ -38,7 +38,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: mob ? '1fr 1fr' : 'repeat(6,1fr)',
+          gridTemplateColumns: mob ? '1fr 1fr' : 'repeat(auto-fit,minmax(150px,1fr))',
           gap: 10,
           marginBottom: 16,
         }}
@@ -69,12 +69,20 @@ export function BranchDashboardPage({ branch, setRoute }) {
           onClick={() => navigate('/reports/pnl')}
         />
         <KpiTile
-          label="Outstanding"
+          label="Unsettled Receivable"
           value={formatMoney(kpis.outstanding)}
-          sub="receivables"
+          sub="pending to collect"
           icon="⏰"
           color="#854F0B"
           onClick={() => navigate('/reports/rec')}
+        />
+        <KpiTile
+          label="Unsettled Payable"
+          value={formatMoney(kpis.payable)}
+          sub="pending to pay"
+          icon="📤"
+          color="#A32D2D"
+          onClick={() => navigate('/reports/pay')}
         />
         <KpiTile
           label="Bookings"

@@ -8,9 +8,9 @@ import { Download, Printer, Save, Search } from 'lucide-react';
 import { Bar, Legend, Line } from 'recharts';
 import { exportToCSV } from '../core/business-logic';
 import { exportToExcel } from '../core/exportExcel';
-import { ACTIVE_CURRENCIES, BRANCHES, BRANCH_CODES, CASH, CURRENCY_META, EXP_ACTUALS, FX_RATES, GP_BILLS, HR_EMPLOYEES_DATA, MODULE_ICONS } from '../core/data';
+import { ACTIVE_CURRENCIES, BRANCHES, BRANCH_CODES, CURRENCY_META, EXP_ACTUALS, MODULE_ICONS } from '../core/data';
 import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../core/useReference';
-import { useBalanceSheet, useGpBills, useModulePL, useAgeing } from '../core/useAccounting';
+import { useBalanceSheet, useGpBills, useModulePL, useAgeing, useTaxSummary } from '../core/useAccounting';
 import { fmt, fmtINR } from '../core/format';
 import { CUR_MONTH, CUR_FY, MONTH_OPTIONS, PERIOD_OPTIONS, FY_MONTHS, FY_YTD_MONTHS, ALL_TIME_FROM, todayISO, fmtDate, rangeNote, monthLabel, prevMonthKey, presetRange, fyQuarterKey } from '../core/dates';
 import { ReportDateBar, resolveReportRange, priorYearRange } from '../core/reportDateBar';
@@ -36,311 +36,6 @@ export function RptShell({title,subtitle,children,filters}){
         </div>
       </div>
       {children}
-    </div>
-  );
-}
-
-
-export function ReportPnL({branch}){
-  const mob=useMobile();
-  const cur=bc(branch).cur;
-  const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState(CUR_MONTH);
-  const [view,setView]=useState("pnl");
-  const PERIODS=PERIOD_OPTIONS;
-  const FY=FY_YTD_MONTHS;
-  const filt=p=>GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&(p==="YTD"?FY.includes(b.date.slice(0,7)):b.date.startsWith(p)));
-  const filtA=p=>EXP_ACTUALS.filter(a=>(!brCode||a.br===brCode)&&(p==="YTD"?FY.includes(a.m):a.m===p));
-  const bills=filt(period);
-  const billsPrev=filt(prevMonthKey(period));
-  const acts=filtA(period);
-  const hr=HR_EMPLOYEES_DATA.filter(e=>!brCode||e.branch===brCode);
-  const revenue=bills.reduce((s,b)=>s+b.sell,0);
-  const cost   =bills.reduce((s,b)=>s+b.cost,0);
-  const gp     =revenue-cost;
-  const gpPct  =revenue>0?+(gp/revenue*100).toFixed(1):0;
-  const SAL=acts.filter(a=>a.id==="SAL").reduce((s,a)=>s+a.a,0)||hr.reduce((s,e)=>s+e.basic+e.hra,0);
-  const RNT=acts.filter(a=>a.id==="RNT").reduce((s,a)=>s+a.a,0);
-  const GDS=acts.filter(a=>a.id==="GDS").reduce((s,a)=>s+a.a,0);
-  const TEL=acts.filter(a=>a.id==="TEL").reduce((s,a)=>s+a.a,0);
-  const ADV=acts.filter(a=>a.id==="ADV").reduce((s,a)=>s+a.a,0);
-  const SOFT=acts.filter(a=>a.id==="SFT").reduce((s,a)=>s+a.a,0);
-  const BNK=acts.filter(a=>a.id==="BNK").reduce((s,a)=>s+a.a,0);
-  const DEPN=0;
-  const totalExp=SAL+RNT+GDS+TEL+ADV+SOFT+BNK+DEPN;
-  const netPft=gp-totalExp;
-  const netPct=revenue>0?+(netPft/revenue*100).toFixed(1):0;
-  const prevRev=billsPrev.reduce((s,b)=>s+b.sell,0);
-  const prevGP=billsPrev.reduce((s,b)=>s+b.sell-b.cost,0);
-  const modMap={};
-  bills.forEach(b=>{
-    if(!modMap[b.mod])modMap[b.mod]={rev:0,cost:0};
-    modMap[b.mod].rev+=b.sell;
-    modMap[b.mod].cost+=b.cost;
-  });
-  const modRows=Object.entries(modMap).map(([mod,d])=>({
-    mod,rev:d.rev,cost:d.cost,gp:d.rev-d.cost,
-    gpPct:d.rev>0?+((d.rev-d.cost)/d.rev*100).toFixed(1):0
-  })).sort((a,b)=>b.gp-a.gp);
-  const f=n=>{
-    const abs=Math.abs(n);
-    const s=abs>=10000000?cur+(abs/10000000).toFixed(1)+"Cr":abs>=100000?cur+(abs/100000).toFixed(1)+"L":cur+Math.round(abs).toLocaleString("en-IN");
-    return n<0?"("+s+")":s;
-  };
-  const periodLabel=(PERIODS.find(p=>p.v===period)||{l:period}).l;
-  const Kpi=({label,value,sub,color,bg})=>(
-    <div style={{background:bg,borderTop:"3px solid "+color,borderRadius:10,padding:"11px 13px",boxShadow:"0 1px 6px rgba(0,0,0,0.06)"}}>
-      <p style={{margin:0,fontSize:9,fontWeight:700,color:color,textTransform:"uppercase"}}>{label}</p>
-      <p style={{margin:"4px 0 2px",fontSize:mob?17:21,fontWeight:800,color:"#0d1326"}}>{value}</p>
-      <p style={{margin:0,fontSize:10,color:"#5a6691"}}>{sub}</p>
-    </div>
-  );
-  const expRows=[
-    {label:"Salaries and Wages",value:SAL},
-    {label:"Office Rent",value:RNT},
-    {label:"GDS and Tech Charges",value:GDS},
-    {label:"Telephone and Internet",value:TEL},
-    {label:"Advertising",value:ADV},
-    {label:"Software Subscriptions",value:SOFT},
-    {label:"Bank Charges",value:BNK},
-    {label:"Depreciation",value:DEPN},
-  ];
-  return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
-        <div>
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Profit and Loss Statement</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{(brCode||"Travkings Group")+" · "+periodLabel+" · Live from voucher data"}</p>
-          <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {period==="YTD"?rangeNote('ytd'):rangeNote('month',{month:period})} · use the period selector to change</p>
-        </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-            {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-          </select>
-          <button onClick={()=>setView("pnl")} style={{...(view==="pnl"?btnG:btnGh),fontSize:11}}>Summary</button>
-          <button onClick={()=>setView("module")} style={{...(view==="module"?btnG:btnGh),fontSize:11}}>By Module</button>
-          <button style={{...btnGh,fontSize:11}}><Download size={12}/> Export</button>
-        </div>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-        <Kpi label="Revenue" value={f(revenue)} sub={"Prev: "+f(prevRev)} color="#185FA5" bg="#E6F1FB"/>
-        <Kpi label="Gross Profit" value={f(gp)} sub={"GP "+gpPct+"%"} color="#27500A" bg="#EAF3DE"/>
-        <Kpi label="Total Expenses" value={f(totalExp)} sub={(revenue>0?Math.round(totalExp/revenue*100):0)+"% of rev"} color="#A32D2D" bg="#FCEBEB"/>
-        <Kpi label="Net Profit" value={f(netPft)} sub={"Margin "+netPct+"%"} color={netPft>=0?"#1D9E75":"#A32D2D"} bg={netPft>=0?"#EAF3DE":"#FCEBEB"}/>
-        <Kpi label="Bookings" value={String(bills.length)} sub={"Prev: "+String(billsPrev.length)} color="#384677" bg="#f3f4f8"/>
-      </div>
-      {view==="pnl"&&(
-        <div style={{background:"#fff",borderRadius:10,boxShadow:"0 1px 6px rgba(0,0,0,0.06)",overflow:"hidden"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-            <thead>
-              <tr style={{background:"#0d1326"}}>
-                <th style={{padding:"10px 16px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:10}}>Item</th>
-                <th style={{padding:"10px 12px",textAlign:"right",color:"#d4a437",fontWeight:700,fontSize:10}}>Current</th>
-                {prevRev>0&&<th style={{padding:"10px 12px",textAlign:"right",color:"#8b94b3",fontWeight:700,fontSize:10}}>Previous</th>}
-                <th style={{padding:"10px 12px",textAlign:"right",color:"#8b94b3",fontWeight:700,fontSize:10}}>of Rev</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr style={{borderBottom:"1px solid #f3f4f8"}}>
-                <td style={{padding:"8px 16px",color:"#384677"}}>Revenue — Net Sales</td>
-                <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(revenue)}</td>
-                {prevRev>0&&<td style={{padding:"8px 12px",textAlign:"right",color:"#bfc3d6",fontVariantNumeric:"tabular-nums"}}>{f(prevRev)}</td>}
-                <td style={{padding:"8px 12px",textAlign:"right",color:"#5a6691"}}>100%</td>
-              </tr>
-              <tr style={{borderBottom:"1px solid #f3f4f8"}}>
-                <td style={{padding:"8px 16px",color:"#A32D2D"}}>Less: Cost of Sales</td>
-                <td style={{padding:"8px 12px",textAlign:"right",color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{f(-cost)}</td>
-                {prevRev>0&&<td style={{padding:"8px 12px",textAlign:"right",color:"#bfc3d6",fontVariantNumeric:"tabular-nums"}}>{prevRev>0?f(-billsPrev.reduce((s,b)=>s+b.cost,0)):"—"}</td>}
-                <td style={{padding:"8px 12px",textAlign:"right",color:"#5a6691"}}>{revenue>0?Math.round(cost/revenue*100):0}%</td>
-              </tr>
-              <tr style={{background:"#f9fafb",borderBottom:"2px solid #e1e3ec"}}>
-                <td style={{padding:"11px 16px",fontWeight:700,color:"#27500A",fontSize:12}}>GROSS PROFIT</td>
-                <td style={{padding:"11px 12px",textAlign:"right",fontWeight:800,color:"#27500A",fontSize:14,fontVariantNumeric:"tabular-nums"}}>{f(gp)}</td>
-                {prevRev>0&&<td style={{padding:"11px 12px",textAlign:"right",color:"#bfc3d6",fontVariantNumeric:"tabular-nums"}}>{f(prevGP)}</td>}
-                <td style={{padding:"11px 12px",textAlign:"right",fontWeight:700,color:"#27500A"}}>{gpPct}%</td>
-              </tr>
-              <tr style={{background:"#f3f4f8"}}>
-                <td colSpan={4} style={{padding:"6px 16px",fontSize:9.5,fontWeight:800,color:"#384677",textTransform:"uppercase"}}>Indirect Expenses</td>
-              </tr>
-              {expRows.map((row,i)=>(
-                <tr key={row.label} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-                  <td style={{padding:"8px 16px 8px 24px",color:"#384677"}}>{row.label}</td>
-                  <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#A32D2D"}}>{f(-row.value)}</td>
-                  {prevRev>0&&<td style={{padding:"8px 12px",textAlign:"right",color:"#bfc3d6"}}>—</td>}
-                  <td style={{padding:"8px 12px",textAlign:"right",color:"#5a6691"}}>{revenue>0?Math.round(row.value/revenue*100):0}%</td>
-                </tr>
-              ))}
-              <tr style={{background:"#f9fafb",borderBottom:"2px solid #e1e3ec"}}>
-                <td style={{padding:"9px 16px",fontWeight:700,color:"#A32D2D"}}>Total Expenses</td>
-                <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{f(-totalExp)}</td>
-                {prevRev>0&&<td/>}
-                <td style={{padding:"9px 12px",textAlign:"right",color:"#5a6691"}}>{revenue>0?Math.round(totalExp/revenue*100):0}%</td>
-              </tr>
-              <tr style={{background:"#fff"}}>
-                <td style={{padding:"11px 16px",fontWeight:700,color:netPft>=0?"#27500A":"#A32D2D",fontSize:12}}>NET PROFIT / (LOSS)</td>
-                <td style={{padding:"11px 12px",textAlign:"right",fontWeight:800,fontSize:14,fontVariantNumeric:"tabular-nums",color:netPft>=0?"#27500A":"#A32D2D"}}>{f(netPft)}</td>
-                {prevRev>0&&<td/>}
-                <td style={{padding:"11px 12px",textAlign:"right",fontWeight:700,color:netPct>=0?"#27500A":"#A32D2D"}}>{netPct}%</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
-      {view==="module"&&(
-        <div style={{background:"#fff",borderRadius:10,boxShadow:"0 1px 6px rgba(0,0,0,0.06)",overflow:"hidden"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-            <thead>
-              <tr style={{background:"#0d1326"}}>
-                <th style={{padding:"9px 12px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>Module</th>
-                <th style={{padding:"9px 12px",textAlign:"right",color:"#d4a437",fontWeight:700,fontSize:9.5}}>Revenue</th>
-                <th style={{padding:"9px 12px",textAlign:"right",color:"#d4a437",fontWeight:700,fontSize:9.5}}>Cost</th>
-                <th style={{padding:"9px 12px",textAlign:"right",color:"#d4a437",fontWeight:700,fontSize:9.5}}>GP</th>
-                <th style={{padding:"9px 12px",textAlign:"right",color:"#d4a437",fontWeight:700,fontSize:9.5}}>GP%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {modRows.map((m,i)=>(
-                <tr key={m.mod} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-                  <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{m.mod}</td>
-                  <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(m.rev)}</td>
-                  <td style={{padding:"8px 12px",textAlign:"right",color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{f(m.cost)}</td>
-                  <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,color:"#27500A",fontVariantNumeric:"tabular-nums"}}>{f(m.gp)}</td>
-                  <td style={{padding:"8px 12px",textAlign:"right"}}>
-                    <span style={{fontSize:10.5,padding:"2px 7px",borderRadius:999,fontWeight:800,background:m.gpPct>=15?"#EAF3DE":m.gpPct>=8?"#FAEEDA":"#FCEBEB",color:m.gpPct>=15?"#27500A":m.gpPct>=8?"#854F0B":"#A32D2D"}}>{m.gpPct}%</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
-                <td style={{padding:"9px 12px",fontWeight:700,color:"#d4a437",fontSize:12}}>TOTAL</td>
-                <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(revenue)}</td>
-                <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:"#F7C1C1",fontVariantNumeric:"tabular-nums"}}>{f(cost)}</td>
-                <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(gp)}</td>
-                <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:gpPct>=12?"#5ab84b":"#FAC775"}}>{gpPct}%</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export function ReportBS({branch}){
-  const mob=useMobile();
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-  const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState(CUR_MONTH);
-  const PERIODS=MONTH_OPTIONS;
-
-  // FY_MONTHS imported from core/dates = current financial year (Apr–Mar)
-  const ytdMonths=FY_MONTHS.filter(m=>m<=period);
-  const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&ytdMonths.includes(b.date.slice(0,7)));
-  const actuals=EXP_ACTUALS.filter(a=>(!brCode||a.br===brCode)&&ytdMonths.includes(a.m));
-  const hr=HR_EMPLOYEES_DATA.filter(e=>!brCode||e.branch===brCode);
-
-  const revenue=bills.reduce((s,b)=>s+b.sell,0);
-  const cogs=bills.reduce((s,b)=>s+b.cost,0);
-  const expenses=actuals.reduce((s,a)=>s+a.a,0);
-  const netProfit=revenue-cogs-expenses;
-  const debtors=revenue*0.25;
-  const creditors=cogs*0.18;
-  const bank=Math.max(netProfit*0.6+revenue*0.15,0);
-  const cash=expenses*0.08;
-  const gstPayable=revenue*0.04-cogs*0.02;
-  const advanceFromClients=revenue*0.04;
-  const capital=0;
-  const retained=netProfit;
-  const fixedAssets=0;
-  const deposits=0;
-  const tdsPayable=expenses*0.02;
-
-  const ASSETS=[
-    {section:"Fixed Assets",items:[
-      {name:"Fixed Assets (net of depreciation)",amt:fixedAssets},
-      {name:"Security Deposits & Advances",amt:deposits},
-    ]},
-    {section:"Current Assets",items:[
-      {name:"Bank Accounts (all)",amt:bank,bold:false},
-      {name:"Cash in Hand",amt:cash},
-      {name:"Trade Receivables (clients)",amt:debtors},
-      {name:"Advance to Suppliers",amt:cogs*0.03},
-      {name:"Input GST/VAT Credit",amt:cogs*0.02},
-      {name:"TDS Receivable",amt:expenses*0.01},
-    ]},
-  ];
-  const LIABILITIES=[
-    {section:"Capital & Reserves",items:[
-      {name:"Proprietor's Capital",amt:capital},
-      {name:"Retained Earnings (FY)",amt:Math.max(retained,0)},
-    ]},
-    {section:"Current Liabilities",items:[
-      {name:"Trade Payables (suppliers)",amt:creditors},
-      {name:"Advance from Clients",amt:advanceFromClients},
-      {name:"GST / VAT Payable (net)",amt:Math.max(gstPayable,0)},
-      {name:"TDS Payable",amt:tdsPayable},
-      {name:"Salary Payable",amt:hr.reduce((s,e)=>s+(e.basic+e.hra+e.da)*0.05,0)},
-    ]},
-  ];
-
-  const totAssets=ASSETS.flatMap(s=>s.items).reduce((s,i)=>s+i.amt,0);
-  const totLiab  =LIABILITIES.flatMap(s=>s.items).reduce((s,i)=>s+i.amt,0);
-  const f=n=>n>0?cur+Number(Math.round(n)).toLocaleString("en-IN"):"—";
-
-  const Side=({title,sections,tot,accent})=>(
-    <div style={{flex:1,minWidth:0}}>
-      <div style={{background:accent,padding:"10px 14px",borderRadius:"9px 9px 0 0"}}>
-        <p style={{margin:0,fontSize:13,fontWeight:800,color:"#fff"}}>{title}</p>
-        <p style={{margin:"1px 0 0",fontSize:10,color:"rgba(255,255,255,0.7)"}}>{PERIODS.find(p=>p.v===period)?.l} · {brCode||"Travkings Group"}</p>
-      </div>
-      <div style={{border:`1px solid ${accent}40`,borderTop:"none",borderRadius:"0 0 9px 9px",overflow:"hidden"}}>
-        {sections.map((sec,si)=>(
-          <div key={si}>
-            <div style={{background:"#f3f4f8",padding:"7px 14px",borderBottom:"1px solid #e1e3ec"}}>
-              <p style={{margin:0,fontSize:10,fontWeight:700,color:"#384677",textTransform:"uppercase",letterSpacing:"0.5px"}}>{sec.section}</p>
-            </div>
-            {sec.items.map((item,ii)=>(
-              <div key={ii} style={{display:"flex",justifyContent:"space-between",padding:"9px 14px",
-                borderBottom:"1px solid #f3f4f8",background:"#fff"}}>
-                <span style={{fontSize:11,color:"#384677"}}>{item.name}</span>
-                <span style={{fontSize:11,fontWeight:600,fontVariantNumeric:"tabular-nums",color:accent}}>{f(item.amt)}</span>
-              </div>
-            ))}
-          </div>
-        ))}
-        <div style={{display:"flex",justifyContent:"space-between",padding:"11px 14px",
-          background:accent,borderRadius:"0 0 9px 9px"}}>
-          <span style={{fontWeight:800,color:"#fff",fontSize:13}}>TOTAL {title.toUpperCase()}</span>
-          <span style={{fontWeight:800,color:"#fff",fontSize:15,fontVariantNumeric:"tabular-nums"}}>{f(tot)}</span>
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
-        <div>
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Balance Sheet</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>
-            Financial position as at end of {monthLabel(period)} · {brCode||"Travkings Group"}
-          </p>
-          <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 Cumulative {CUR_FY.label} year-to-date · as at end of {monthLabel(period)} · use selector to change</p>
-        </div>
-        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-          {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-        </select>
-      </div>
-      {Math.abs(totAssets-totLiab)>100
-        ?<div style={{marginBottom:10,padding:"8px 14px",borderRadius:8,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:10.5,color:"#A32D2D",fontWeight:600}}>⚠ Balance Sheet does not tally — difference: {f(Math.abs(totAssets-totLiab))}</div>
-        :<div style={{marginBottom:10,padding:"8px 14px",borderRadius:8,background:"#EAF3DE",border:"1px solid #C0DD97",fontSize:10.5,color:"#27500A",fontWeight:600}}>✔ Balance Sheet tallied — Assets = Liabilities = {f(totAssets)}</div>
-      }
-      <div style={{display:"flex",gap:14,flexWrap:mob?"wrap":"nowrap"}}>
-        <Side title="Assets"      sections={ASSETS}      tot={totAssets} accent="#185FA5"/>
-        <Side title="Liabilities" sections={LIABILITIES} tot={totLiab}   accent="#0d1326"/>
-      </div>
     </div>
   );
 }
@@ -479,283 +174,6 @@ export function ReportCF({branch}){
         Positive = cash generated, Negative (in brackets) = cash used.
       </div>
       </>)}
-    </div>
-  );
-}
-
-export function ReportReceivables({branch}){
-  const mob=useMobile();
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-  const brCode=branch==="ALL"?null:branch?.code;
-  const [search,setSearch]=useState("");
-  const TODAY=todayISO();
-
-  /* Aggregate by client from GP_BILLS — simulate 75% collected, 25% outstanding */
-  const clientMap={};
-  GP_BILLS.filter(b=>!brCode||b.branch===brCode).forEach(b=>{
-    if(!clientMap[b.client])clientMap[b.client]={client:b.client,branch:b.branch,invoices:[]};
-    const outstanding=Math.round(b.sell*0.25);
-    const daysOld=Math.floor((new Date(TODAY)-new Date(b.date))/(1000*60*60*24));
-    if(outstanding>0)clientMap[b.client].invoices.push({vno:b.id,date:b.date,amount:b.sell,outstanding,daysOld});
-  });
-
-  const rows=Object.values(clientMap)
-    .map(c=>{
-      const tot=c.invoices.reduce((s,i)=>s+i.outstanding,0);
-      const d0=c.invoices.filter(i=>i.daysOld<=30).reduce((s,i)=>s+i.outstanding,0);
-      const d30=c.invoices.filter(i=>i.daysOld>30&&i.daysOld<=60).reduce((s,i)=>s+i.outstanding,0);
-      const d60=c.invoices.filter(i=>i.daysOld>60&&i.daysOld<=90).reduce((s,i)=>s+i.outstanding,0);
-      const d90=c.invoices.filter(i=>i.daysOld>90).reduce((s,i)=>s+i.outstanding,0);
-      return {client:c.client,branch:c.branch,total:tot,d0:d0,d30:d30,d60:d60,d90:d90,invoices:c.invoices.length};
-    })
-    .filter(r=>r.total>0&&(!search||r.client.toLowerCase().includes(search.toLowerCase())))
-    .sort((a,b)=>b.d90-a.d90||b.total-a.total);
-
-  const totals=rows.reduce((s,r)=>({total:s.total+r.total,d0:s.d0+r.d0,d30:s.d30+r.d30,d60:s.d60+r.d60,d90:s.d90+r.d90}),{total:0,d0:0,d30:0,d60:0,d90:0});
-  const f=n=>n>0?cur+Number(Math.round(n)).toLocaleString("en-IN"):"—";
-  const ageBg=d=>d.d90>0?"#FCEBEB":d.d60>0?"#FAEEDA":"#fff";
-
-  return (
-    <div style={{padding:"12px 10px",maxWidth:1260,margin:"0 auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
-        <div>
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Receivables Ageing</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>As on {TODAY} · {brCode||"Travkings Group"} · {rows.length} debtors</p>
-        </div>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search client..." style={{...inp,width:220,minHeight:32,fontSize:11}}/>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:14}}>
-        <div style={{...card,borderTop:"3px solid #185FA5",padding:"11px 13px",background:"#E6F1FB"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#185FA5",textTransform:"uppercase"}}>Total Outstanding</p><p style={{margin:"4px 0 0",fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>{f(totals.total)}</p></div>
-          <div style={{...card,borderTop:"3px solid #27500A",padding:"11px 13px",background:"#EAF3DE"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#27500A",textTransform:"uppercase"}}>0–30 Days (current)</p><p style={{margin:"4px 0 0",fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>{f(totals.d0)}</p></div>
-          <div style={{...card,borderTop:"3px solid #854F0B",padding:"11px 13px",background:"#FAEEDA"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#854F0B",textTransform:"uppercase"}}>31–60 Days</p><p style={{margin:"4px 0 0",fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>{f(totals.d30)}</p></div>
-          <div style={{...card,borderTop:"3px solid #A32D2D",padding:"11px 13px",background:"#FCEBEB"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#A32D2D",textTransform:"uppercase"}}>61–90 Days</p><p style={{margin:"4px 0 0",fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>{f(totals.d60)}</p></div>
-          <div style={{...card,borderTop:"3px solid #7B1F1F",padding:"11px 13px",background:"#FCEBEB"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#7B1F1F",textTransform:"uppercase"}}>90+ Days (overdue)</p><p style={{margin:"4px 0 0",fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>{f(totals.d90)}</p></div>
-      </div>
-      <div style={{...card,padding:0,overflow:"hidden"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr style={{background:"#0d1326"}}>
-            {["Client","Branch","Invoices","Total Outstanding","0–30 Days","31–60 Days","61–90 Days","90+ Days","Status"].map((h,i)=>(
-              <th key={i} style={{padding:"9px 12px",textAlign:i>=2?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
-            ))}
-          </tr></thead>
-          <tbody>{rows.map((r,i)=>(
-            <tr key={r.client} style={{borderBottom:"1px solid #f3f4f8",background:ageBg(r)}}>
-              <td style={{padding:"9px 12px",fontWeight:600,color:"#0d1326"}}>{r.client}</td>
-              <td style={{padding:"9px 12px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,fontWeight:700,background:"#E6F1FB",color:"#185FA5"}}>{r.branch}</span></td>
-              <td style={{padding:"9px 12px",textAlign:"right",color:"#5a6691"}}>{r.invoices}</td>
-              <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(r.total)}</td>
-              <td style={{padding:"9px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:r.d0>0?"#27500A":"#bfc3d6"}}>{f(r.d0)}</td>
-              <td style={{padding:"9px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:r.d30>0?"#854F0B":"#bfc3d6"}}>{f(r.d30)}</td>
-              <td style={{padding:"9px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:r.d60>0?"#A32D2D":"#bfc3d6"}}>{f(r.d60)}</td>
-              <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:r.d90>0?"#7B1F1F":"#bfc3d6"}}>{f(r.d90)}</td>
-              <td style={{padding:"9px 12px"}}>
-                <span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,
-                  background:r.d90>0?"#FCEBEB":r.d60>0?"#FAEEDA":"#EAF3DE",
-                  color:r.d90>0?"#A32D2D":r.d60>0?"#854F0B":"#27500A"}}>
-                  {r.d90>0?"Overdue":r.d60>0?"At risk":"Current"}
-                </span>
-              </td>
-            </tr>
-          ))}</tbody>
-          <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
-            <td colSpan={3} style={{padding:"9px 12px",fontWeight:700,color:"#d4a437",fontSize:12}}>TOTAL — {rows.length} clients</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(totals.total)}</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totals.d0)}</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totals.d30)}</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totals.d60)}</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#F7C1C1",fontVariantNumeric:"tabular-nums"}}>{f(totals.d90)}</td>
-            <td/>
-          </tr></tfoot>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-export function ReportPayables({branch}){
-  const mob=useMobile();
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-  const brCode=branch==="ALL"?null:branch?.code;
-  const [search,setSearch]=useState("");
-  const TODAY=todayISO();
-
-  const suppMap={};
-  GP_BILLS.filter(b=>!brCode||b.branch===brCode).forEach(b=>{
-    if(!suppMap[b.supplier])suppMap[b.supplier]={supplier:b.supplier,branch:b.branch,items:[]};
-    const owed=Math.round(b.cost*0.20);
-    const daysOld=Math.floor((new Date(TODAY)-new Date(b.date))/(1000*60*60*24));
-    if(owed>0)suppMap[b.supplier].items.push({vno:b.id,date:b.date,cost:b.cost,owed,daysOld,mod:b.mod});
-  });
-
-  const rows=Object.values(suppMap)
-    .map(s=>{
-      const tot=s.items.reduce((x,i)=>x+i.owed,0);
-      const d0 =s.items.filter(i=>i.daysOld<=7 ).reduce((x,i)=>x+i.owed,0); // BSP is weekly
-      const d30=s.items.filter(i=>i.daysOld>7&&i.daysOld<=30).reduce((x,i)=>x+i.owed,0);
-      const d60=s.items.filter(i=>i.daysOld>30&&i.daysOld<=60).reduce((x,i)=>x+i.owed,0);
-      const d90=s.items.filter(i=>i.daysOld>60).reduce((x,i)=>x+i.owed,0);
-      const mods=[...new Set(s.items.map(i=>i.mod))];
-      return {supplier:s.supplier,branch:s.branch,tot:tot,d0:d0,d30:d30,d60:d60,d90:d90,mods:mods};
-    })
-    .filter(r=>r.tot>0&&(!search||r.supplier.toLowerCase().includes(search.toLowerCase())))
-    .sort((a,b)=>b.d90-a.d90||b.tot-a.tot);
-
-  const totals=rows.reduce((s,r)=>({tot:s.tot+r.tot,d0:s.d0+r.d0,d30:s.d30+r.d30,d60:s.d60+r.d60,d90:s.d90+r.d90}),{tot:0,d0:0,d30:0,d60:0,d90:0});
-  const f=n=>n>0?cur+Number(Math.round(n)).toLocaleString("en-IN"):"—";
-
-  return (
-    <div style={{padding:"12px 10px",maxWidth:1260,margin:"0 auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
-        <div>
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Payables Ageing</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>As on {TODAY} · {brCode||"Travkings Group"} · {rows.length} creditors</p>
-        </div>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search supplier..." style={{...inp,width:220,minHeight:32,fontSize:11}}/>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:14}}>
-        <div style={{...card,borderTop:"3px solid #185FA5",padding:"11px 13px",background:"#E6F1FB"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#185FA5",textTransform:"uppercase"}}>Total Payable</p><p style={{margin:"4px 0 0",fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>{f(totals.tot)}</p></div>
-          <div style={{...card,borderTop:"3px solid #A32D2D",padding:"11px 13px",background:"#FCEBEB"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#A32D2D",textTransform:"uppercase"}}>Due ≤7 Days (BSP)</p><p style={{margin:"4px 0 0",fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>{f(totals.d0)}</p></div>
-          <div style={{...card,borderTop:"3px solid #854F0B",padding:"11px 13px",background:"#FAEEDA"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#854F0B",textTransform:"uppercase"}}>8–30 Days</p><p style={{margin:"4px 0 0",fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>{f(totals.d30)}</p></div>
-          <div style={{...card,borderTop:"3px solid #854F0B",padding:"11px 13px",background:"#FAEEDA"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#854F0B",textTransform:"uppercase"}}>31–60 Days</p><p style={{margin:"4px 0 0",fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>{f(totals.d60)}</p></div>
-          <div style={{...card,borderTop:"3px solid #7B1F1F",padding:"11px 13px",background:"#FCEBEB"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#7B1F1F",textTransform:"uppercase"}}>60+ Days Overdue</p><p style={{margin:"4px 0 0",fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>{f(totals.d90)}</p></div>
-      </div>
-      <div style={{...card,padding:0,overflow:"hidden"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr style={{background:"#0d1326"}}>
-            {["Supplier","Branch","Modules","Total Payable","Due ≤7d","8–30d","31–60d","60+d","Status"].map((h,i)=>(
-              <th key={i} style={{padding:"9px 12px",textAlign:i>=3?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
-            ))}
-          </tr></thead>
-          <tbody>{rows.map((r,i)=>(
-            <tr key={r.supplier} style={{borderBottom:"1px solid #f3f4f8",background:r.d90>0?"#fff9f9":i%2===0?"#fff":"#fafafa"}}>
-              <td style={{padding:"9px 12px",fontWeight:600,color:"#0d1326"}}>{r.supplier}</td>
-              <td style={{padding:"9px 12px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,fontWeight:700,background:"#E6F1FB",color:"#185FA5"}}>{r.branch}</span></td>
-              <td style={{padding:"9px 12px",fontSize:10,color:"#5a6691"}}>{r.mods.join(", ")}</td>
-              <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(r.tot)}</td>
-              <td style={{padding:"9px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:r.d0>0?"#A32D2D":"#bfc3d6",fontWeight:r.d0>0?700:400}}>{f(r.d0)}</td>
-              <td style={{padding:"9px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:r.d30>0?"#854F0B":"#bfc3d6"}}>{f(r.d30)}</td>
-              <td style={{padding:"9px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:r.d60>0?"#854F0B":"#bfc3d6"}}>{f(r.d60)}</td>
-              <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:r.d90>0?"#7B1F1F":"#bfc3d6"}}>{f(r.d90)}</td>
-              <td style={{padding:"9px 12px"}}>
-                <button style={{...btnG,padding:"3px 10px",fontSize:10,background:r.d0>0?"#A32D2D":"#0d1326"}}>Pay</button>
-              </td>
-            </tr>
-          ))}</tbody>
-          <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
-            <td colSpan={3} style={{padding:"9px 12px",fontWeight:700,color:"#d4a437",fontSize:12}}>TOTAL — {rows.length} suppliers</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(totals.tot)}</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:"#F7C1C1",fontVariantNumeric:"tabular-nums"}}>{f(totals.d0)}</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totals.d30)}</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totals.d60)}</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#F7C1C1",fontVariantNumeric:"tabular-nums"}}>{f(totals.d90)}</td>
-            <td/>
-          </tr></tfoot>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-export function ReportSalesReg({branch}){
-  const mob=useMobile();
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-  const brCode=branch==="ALL"?null:branch?.code;
-  const [modFilter,setModFilter]=useState("All");
-  const [search,setSearch]=useState("");
-  const [dateFrom,setDateFrom]=useState(ALL_TIME_FROM);
-  const [dateTo,setDateTo]=useState(todayISO());
-  const [sortKey,setSortKey]=useState("date");
-  const [sortDir,setSortDir]=useState("desc");
-
-  const MODS=["All","Flight","Holiday","Hotel","Car","Visa","Insurance","Misc"];
-  const MOD_CLR={Flight:"#185FA5",Holiday:"#27500A",Hotel:"#854F0B",Car:"#384677",Visa:"#1D9E75",Insurance:"#A32D2D",Misc:"#5a6691"};
-  const MOD_BG ={Flight:"#E6F1FB",Holiday:"#EAF3DE",Hotel:"#FAEEDA",Car:"#f3f4f8",Visa:"#EAF3DE",Insurance:"#FCEBEB",Misc:"#f3f4f8"};
-
-  const rows=useMemo(()=>{
-    let r=GP_BILLS
-      .filter(b=>(!brCode||b.branch===brCode)&&(modFilter==="All"||b.mod===modFilter)&&b.date>=dateFrom&&b.date<=dateTo)
-      .filter(b=>!search||b.id.toLowerCase().includes(search.toLowerCase())||b.client.toLowerCase().includes(search.toLowerCase())||b.dest.toLowerCase().includes(search.toLowerCase()))
-      .map(b=>({...b,gp:b.sell-b.cost,gpPct:+((b.sell-b.cost)/b.sell*100).toFixed(1)}));
-    r.sort((a,b2)=>{
-      const av=a[sortKey]||0, bv=b2[sortKey]||0;
-      return sortDir==="asc"?(av>bv?1:-1):(av<bv?1:-1);
-    });
-    return r;
-  },[branch,modFilter,search,dateFrom,dateTo,sortKey,sortDir]);
-
-  const totSell=rows.reduce((s,r)=>s+r.sell,0);
-  const totGP  =rows.reduce((s,r)=>s+r.gp,0);
-  const totGPPct=totSell>0?+(totGP/totSell*100).toFixed(1):0;
-  const f=n=>cur+Number(Math.round(n)).toLocaleString("en-IN");
-
-  const SH=({k,children})=>(
-    <th onClick={()=>{if(sortKey===k)setSortDir(d=>d==="asc"?"desc":"asc");else{setSortKey(k);setSortDir("desc");}}}
-      style={{padding:"9px 10px",textAlign:["sell","cost","gp","gpPct"].includes(k)?"right":"left",
-        color:"#d4a437",fontWeight:700,fontSize:10,cursor:"pointer",whiteSpace:"nowrap",userSelect:"none"}}>
-      {children} {sortKey===k?(sortDir==="desc"?"▼":"▲"):""}
-    </th>
-  );
-
-  return (
-    <div style={{padding:"12px 10px",maxWidth:1360,margin:"0 auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:14}}>
-        <div>
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Sales Register</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{rows.length} bookings · {f(totSell)} revenue · {totGPPct}% GP</p>
-          <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {(dateFrom<=ALL_TIME_FROM?"Showing all entries since inception":"Showing "+fmtDate(dateFrom))+" → "+fmtDate(dateTo)+" · change dates to filter"}</p>
-        </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-          <select value={modFilter} onChange={e=>setModFilter(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>{MODS.map(m=><option key={m}>{m}</option>)}</select>
-          <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{...inp,width:130,minHeight:32,fontSize:11}}/>
-          <span style={{fontSize:11,color:"#5a6691"}}>to</span>
-          <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{...inp,width:130,minHeight:32,fontSize:11}}/>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Voucher / client / dest..." style={{...inp,width:200,minHeight:32,fontSize:11}}/>
-        </div>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:14}}>
-        <div style={{...card,borderTop:"3px solid #384677",padding:"11px 13px",background:"#f3f4f8"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#384677",textTransform:"uppercase"}}>Bookings</p><p style={{margin:"4px 0 0",fontSize:mob?17:20,fontWeight:800,color:"#0d1326"}}>{String(rows.length)}</p></div>
-          <div style={{...card,borderTop:"3px solid #185FA5",padding:"11px 13px",background:"#E6F1FB"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#185FA5",textTransform:"uppercase"}}>Revenue</p><p style={{margin:"4px 0 0",fontSize:mob?17:20,fontWeight:800,color:"#0d1326"}}>{f(totSell)}</p></div>
-          <div style={{...card,borderTop:"3px solid #27500A",padding:"11px 13px",background:"#EAF3DE"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#27500A",textTransform:"uppercase"}}>Gross Profit</p><p style={{margin:"4px 0 0",fontSize:mob?17:20,fontWeight:800,color:"#0d1326"}}>{f(totGP)}</p></div>
-          <div style={{...card,borderTop:`3px solid ${totGPPct>=12?"#27500A":"#A32D2D"}`,padding:"11px 13px",background:totGPPct>=12?"#EAF3DE":"#FCEBEB"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:totGPPct>=12?"#27500A":"#A32D2D",textTransform:"uppercase"}}>GP%</p><p style={{margin:"4px 0 0",fontSize:mob?17:20,fontWeight:800,color:"#0d1326"}}>{`${totGPPct}%`}</p></div>
-      </div>
-      <div style={{...card,padding:0,overflow:"hidden"}}>
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:900}}>
-            <thead><tr style={{background:"#0d1326"}}>
-              <SH k="id">Voucher No.</SH><SH k="date">Date</SH>
-              <th style={{padding:"9px 10px",color:"#d4a437",fontWeight:700,fontSize:10}}>Module</th>
-              <th style={{padding:"9px 10px",color:"#d4a437",fontWeight:700,fontSize:10}}>Client</th>
-              <th style={{padding:"9px 10px",color:"#d4a437",fontWeight:700,fontSize:10}}>Destination</th>
-              <th style={{padding:"9px 10px",color:"#d4a437",fontWeight:700,fontSize:10}}>Consultant</th>
-              <SH k="sell">Revenue</SH><SH k="gp">GP</SH><SH k="gpPct">GP%</SH>
-            </tr></thead>
-            <tbody>{rows.map((r,i)=>(
-              <tr key={r.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-                <td style={{padding:"7px 10px",fontFamily:"monospace",fontSize:10,color:"#185FA5",whiteSpace:"nowrap"}}>{r.id}</td>
-                <td style={{padding:"7px 10px",fontSize:10,color:"#5a6691",whiteSpace:"nowrap"}}>{r.date}</td>
-                <td style={{padding:"7px 10px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:MOD_BG[r.mod]||"#f3f4f8",color:MOD_CLR[r.mod]||"#384677"}}>{r.mod}</span></td>
-                <td style={{padding:"7px 10px",fontWeight:600,color:"#0d1326",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.client}</td>
-                <td style={{padding:"7px 10px",color:"#384677"}}>{r.dest}</td>
-                <td style={{padding:"7px 10px",fontSize:10,color:"#5a6691"}}>{r.consultant}</td>
-                <td style={{padding:"7px 10px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{cur+Number(r.sell).toLocaleString()}</td>
-                <td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:r.gpPct>=12?"#27500A":"#A32D2D"}}>{cur+Number(r.gp).toLocaleString()}</td>
-                <td style={{padding:"7px 10px",textAlign:"right"}}>
-                  <span style={{fontSize:10,padding:"2px 7px",borderRadius:999,fontWeight:800,background:r.gpPct>=12?"#EAF3DE":r.gpPct>=8?"#FAEEDA":"#FCEBEB",color:r.gpPct>=12?"#27500A":r.gpPct>=8?"#854F0B":"#A32D2D"}}>{r.gpPct}%</span>
-                </td>
-              </tr>
-            ))}</tbody>
-            <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
-              <td colSpan={6} style={{padding:"9px 10px",fontWeight:700,color:"#d4a437",fontSize:11}}>TOTAL — {rows.length} bookings</td>
-              <td style={{padding:"9px 10px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(totSell)}</td>
-              <td style={{padding:"9px 10px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totGP)}</td>
-              <td style={{padding:"9px 10px",textAlign:"right"}}><span style={{fontSize:11,padding:"3px 9px",borderRadius:999,fontWeight:800,background:"#FAEEDA",color:"#854F0B"}}>{totGPPct}%</span></td>
-            </tr></tfoot>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }
@@ -2075,32 +1493,6 @@ export function ClientConcentration({branch}){
           </table>
         </div>
       </div>
-    </div>
-  );
-}
-
-/* ── ITEM 3: CASH RUNWAY added as KpiCard in Dashboard (as component) ── */
-
-export function CashRunwayCard({branch}){
-  const brCode=branch==="ALL"?null:branch?.code;
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-
-  const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith("2026-05"));
-  const acts =EXP_ACTUALS.filter(a=>(!brCode||a.br===brCode)&&a.m==="2026-05");
-  const monthlyBurn=acts.reduce((s,a)=>s+a.a,0);
-  const monthlyRev=bills.reduce((s,b)=>s+b.sell,0);
-  const cashBalance=monthlyRev*0.35; // estimated bank balance
-  const runway=monthlyBurn>0?Math.round(cashBalance/monthlyBurn*30):999;
-  const f=n=>cur+Number(Math.round(n)).toLocaleString("en-IN");
-  const clr=runway>60?"#27500A":runway>30?"#854F0B":"#A32D2D";
-  const bg=runway>60?"#EAF3DE":runway>30?"#FAEEDA":"#FCEBEB";
-
-  return (
-    <div style={{...card,borderTop:`3px solid ${clr}`,padding:"12px 14px",background:bg}}>
-      <p style={{margin:0,fontSize:9,fontWeight:700,color:clr,textTransform:"uppercase"}}>Cash Runway</p>
-      <p style={{margin:"4px 0 2px",fontSize:24,fontWeight:800,color:"#0d1326"}}>{runway > 365 ? ">1yr" : `${runway}d`}</p>
-      <p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Bank est. {f(cashBalance)} · Burn {f(monthlyBurn)}/mo</p>
     </div>
   );
 }
@@ -3704,6 +3096,107 @@ export function ReportsMetaDemo(){
         </div>
       </div>
     </PHASE2_Page>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   TAX SUMMARY — GST / VAT RETURN VIEW (live, branch-regime-aware)
+   Output − Input tax (net payable to the authority) + withholding (WHT/TDS)
+   + TCS, from the double-entry engine. VAT branches (Africa) show VAT;
+   India branches show GST. GET /api/accounting/tax-summary.
+   ════════════════════════════════════════════════════════════════════ */
+export function RPT_TaxSummary({ branch }) {
+  const [range, setRange] = useState(() => ({ mode: 'all', ...resolveReportRange('all') }));
+  const q = useTaxSummary(branch, { from: range.from || undefined, to: range.to || undefined });
+  const d = q.data || null;
+  const cfg = bc(branch);
+  const cur = cfg.cur || '₹';
+  const regime = d?.regime || (cfg.taxType === 'VAT' ? 'VAT' : 'GST');
+  const isVat = regime === 'VAT';
+  const f = (n) => cur + ' ' + Number(Math.round(n || 0)).toLocaleString('en-IN');
+  const brLabel = (!branch || branch === 'ALL') ? 'All branches' : (branch.code || branch);
+
+  const out = d?.output || { total: 0, lines: [] };
+  const inp = d?.input || { total: 0, lines: [] };
+  const wh  = d?.withholding || { payable: 0, receivable: 0, payableLines: [], receivableLines: [] };
+  const tcs = d?.tcs || { payable: 0, receivable: 0 };
+  const net = d?.netPayable ?? (out.total - inp.total);
+
+  const exportRows = [
+    ...out.lines.map((l) => ({ section: 'Output Tax', ledger: l.ledger, amount: l.amount })),
+    ...inp.lines.map((l) => ({ section: 'Input Tax', ledger: l.ledger, amount: l.amount })),
+    ...wh.payableLines.map((l) => ({ section: 'Withholding Payable', ledger: l.ledger, amount: l.amount })),
+    ...wh.receivableLines.map((l) => ({ section: 'Withholding Receivable', ledger: l.ledger, amount: l.amount })),
+  ];
+
+  const kpis = [
+    { l: 'Output ' + (isVat ? 'VAT' : 'GST'), v: f(out.total), c: '#185FA5', bg: '#E6F1FB' },
+    { l: 'Input ' + (isVat ? 'VAT' : 'GST'), v: f(inp.total), c: '#854F0B', bg: '#FAEEDA' },
+    { l: 'Net ' + (net >= 0 ? 'Payable' : 'Refundable'), v: f(Math.abs(net)), c: net >= 0 ? '#A32D2D' : '#27500A', bg: net >= 0 ? '#FBEAEA' : '#EAF3DE' },
+    { l: (isVat ? 'WHT' : 'TDS') + ' Payable', v: f(wh.payable), c: '#384677', bg: '#f3f4f8' },
+    { l: (isVat ? 'WHT' : 'TDS') + ' Receivable', v: f(wh.receivable), c: '#1D9E75', bg: '#EAF3DE' },
+    ...(!isVat ? [{ l: 'TCS Payable', v: f(tcs.payable), c: '#7F77DD', bg: '#EFEEFB' }] : []),
+  ];
+
+  const Section = ({ title, lines }) => (
+    <div style={{ ...card, padding: 0, marginBottom: 14, overflow: 'hidden' }}>
+      <div style={{ padding: '9px 13px', background: '#f3f5f9', fontSize: 11, fontWeight: 800, color: '#384677', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{title}</div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+        <tbody>
+          {(lines || []).length === 0 && <tr><td style={{ padding: '10px 13px', color: '#9aa2c0' }}>No movement in this period.</td></tr>}
+          {(lines || []).map((l, i) => (
+            <tr key={i} style={{ borderTop: '1px solid #f1f3f8' }}>
+              <td style={{ padding: '8px 13px', color: '#0d1326' }}>{l.ledger}</td>
+              <td style={{ padding: '8px 13px', textAlign: 'right', fontWeight: 600, color: '#0d1326' }}>{f(l.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <div style={{ padding: '12px 10px', maxWidth: 1000, margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: isVat ? '#EAF3DE' : '#E6F1FB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🧾</div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0d1326' }}>{isVat ? 'VAT Return' : 'GST Summary'} · {brLabel}</h2>
+            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#5a6691' }}>{regime}{d?.vatRate ? ' ' + d.vatRate + '%' : ''} · live from the double-entry engine · {cur}</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <ReportDateBar value={range} onChange={setRange} />
+          <button onClick={() => exportToCSV(exportRows, ['section', 'ledger', 'amount'], 'tax-summary.csv')} style={{ ...btnGh, fontSize: 11 }} disabled={!exportRows.length}><Download size={12} /> CSV</button>
+        </div>
+      </div>
+
+      {q.isLoading && <div style={{ ...card, padding: 24, textAlign: 'center', color: '#5a6691' }}>Loading…</div>}
+      {q.isError && <div style={{ ...card, padding: 16, color: '#A32D2D', fontWeight: 600 }}>⚠ {q.error?.message || 'Failed to load'} — is the backend running and are you logged in?</div>}
+
+      {!q.isLoading && !q.isError && (<>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 16 }}>
+          {kpis.map((k, i) => (
+            <div key={i} style={{ ...card, borderTop: `3px solid ${k.c}`, padding: '11px 13px', background: k.bg }}>
+              <p style={{ margin: 0, fontSize: 9, fontWeight: 700, color: k.c, textTransform: 'uppercase' }}>{k.l}</p>
+              <p style={{ margin: '4px 0 0', fontSize: 19, fontWeight: 800, color: '#0d1326' }}>{k.v}</p>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ ...card, padding: '12px 14px', marginBottom: 14, background: net >= 0 ? '#FBEAEA' : '#EAF3DE', borderLeft: `4px solid ${net >= 0 ? '#A32D2D' : '#27500A'}` }}>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0d1326' }}>
+            Net {isVat ? 'VAT' : 'GST'} {net >= 0 ? 'payable to' : 'refundable from'} the authority: {f(Math.abs(net))}
+          </span>
+          <span style={{ fontSize: 11, color: '#5a6691', marginLeft: 8 }}>= Output {f(out.total)} − Input {f(inp.total)}</span>
+        </div>
+
+        <Section title={`Output ${isVat ? 'VAT' : 'GST'} (on sales)`} lines={out.lines} />
+        <Section title={`Input ${isVat ? 'VAT' : 'GST'} (on purchases)`} lines={inp.lines} />
+        <Section title={`${isVat ? 'WHT' : 'TDS'} Payable (we withheld)`} lines={wh.payableLines} />
+        <Section title={`${isVat ? 'WHT' : 'TDS'} Receivable (withheld from us)`} lines={wh.receivableLines} />
+      </>)}
+    </div>
   );
 }
 

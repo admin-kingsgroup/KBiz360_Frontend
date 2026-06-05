@@ -8,10 +8,12 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
-import { Plus, Pencil, Trash2, X, Download } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus, Pencil, Trash2, X, Download, Copy } from 'lucide-react';
 import { card, inp } from '../core/styles';
-import { ACTIVE_CURRENCIES } from '../core/data';
+import { ACTIVE_CURRENCIES, BRANCHES, BRANCH_CODES, VAT_RATE } from '../core/data';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
+import { apiPost } from '../core/api';
 import { exportToExcel } from '../core/exportExcel';
 
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
@@ -88,7 +90,7 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   );
 }
 
-export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note }) {
+export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note, toolbar }) {
   const list = useMasterList(resource, params);
   const { create, update, remove } = useMasterMutations(resource);
   const [editing, setEditing] = useState(null); // record being edited, or {} for new
@@ -142,7 +144,8 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>{title}</h2>
           <p style={{ margin: '2px 0 0', fontSize: 10.5, color: DIM }}>{subtitle} · {rows.length} record{rows.length === 1 ? '' : 's'}</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {toolbar}
           <button onClick={exportSheet} disabled={rows.length === 0} title="Export all records to Excel"
             style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', opacity: rows.length === 0 ? 0.5 : 1, cursor: rows.length === 0 ? 'not-allowed' : 'pointer' }}>
             <Download size={14} /> Export Excel
@@ -308,7 +311,7 @@ export const SubGroupsMaster = () => {
   return (
     <MasterCrud title="Sub-Groups" subtitle="Custom Chart-of-Accounts sub-groups — nest under any group, to any depth"
       resource="subgroups"
-      note="Create a sub-group under one of the 28 fixed groups (or under another sub-group). Nature & Statement (BS/PL) are inherited from the parent automatically. For indirect-expense sub-groups, set a Group Type (Fixed / Variable) so they roll up under the right head in Profit & Loss — leave blank to inherit from the parent."
+      note="Sub-groups are SHARED across all branches (they are not branch-scoped), so you create them once and every branch's chart uses them. Create a sub-group under one of the 28 fixed groups (or under another sub-group). Nature & Statement (BS/PL) are inherited from the parent automatically. For indirect-expense sub-groups, set a Group Type (Fixed / Variable) so they roll up under the right head in Profit & Loss — leave blank to inherit from the parent."
       fields={[
         { key: 'name', label: 'Sub-Group Name', type: 'text', required: true },
         { key: 'parent', label: 'Parent Group', type: 'select', options: parentOptions.length ? parentOptions : TALLY_GROUP_NAMES, required: true },
@@ -319,6 +322,111 @@ export const SubGroupsMaster = () => {
       ]} />
   );
 };
+
+// ── Replicate Chart-of-Accounts skeleton: BOM → other branches ─────────────
+// BOM holds the full hand-built chart. This clones its STRUCTURAL skeleton
+// (income / expense / tax heads + inter-branch accounts, re-currencied to each
+// branch's main currency) into a chosen branch — skipping BOM-specific named
+// parties (banks, suppliers, clients, capital, fixed assets, FDs, staff loans).
+const REPL_SOURCE = 'BOM';
+const REPL_TARGETS = ['AMD', 'NBO', 'DAR', 'FBM', 'TKHO'];
+const branchCurrency = (code) => (BRANCHES.find((b) => b.code === code)?.currency || 'INR');
+// Africa branches run VAT + WHT (not Indian GST/TDS); VAT_RATE is the shared
+// frontend source of truth (core/referenceCache → data).
+const branchTax = (code) => (VAT_RATE[code] != null ? `VAT ${VAT_RATE[code]}%` : 'GST');
+
+function ReplicateChartModal({ onClose, onDone }) {
+  const [to, setTo] = useState(REPL_TARGETS[0]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [result, setResult] = useState(null);
+
+  const run = async () => {
+    setBusy(true); setErr('');
+    try {
+      const summary = await apiPost('/api/ledgers/clone-chart', { from: REPL_SOURCE, to });
+      setResult(summary);
+      onDone?.();
+    } catch (e) { setErr(e.message || 'Replication failed'); }
+    finally { setBusy(false); }
+  };
+
+  const targetLabel = to === 'ALL' ? 'all target branches' : to;
+  const curNote = to === 'ALL'
+    ? 'AMD/TKHO → INR · GST/TDS  ·  NBO/DAR/FBM → USD · VAT + WHT (Indian tax heads excluded)'
+    : (VAT_RATE[to] != null
+        ? `${branchCurrency(to)} · ${branchTax(to)} + WHT — Indian GST/TDS heads are excluded`
+        : `${branchCurrency(to)} · ${branchTax(to)} + TDS / Professional Tax`);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', zIndex: 700, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '8vh' }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 480, maxWidth: '94vw', padding: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid #e5e9f0' }}>
+          <h3 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: DARK }}>Replicate standard chart → branch</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM }}><X size={18} /></button>
+        </div>
+
+        {!result ? (
+          <>
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{ margin: 0, fontSize: 12, color: DIM, lineHeight: 1.5 }}>
+                Copies <b>{REPL_SOURCE}</b>’s structural chart skeleton — all income / expense / tax heads
+                and inter-branch accounts — into the target branch. Tax heads follow the branch’s regime:
+                India branches keep <b>GST + TDS</b>; Africa branches (NBO/DAR/FBM) get a <b>VAT + WHT</b>
+                skeleton instead. Branch-specific named parties (banks, suppliers, clients, capital, fixed
+                assets, staff loans) are <b>not</b> copied. Idempotent: safe to re-run.
+              </p>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: DIM, marginBottom: 4 }}>Target branch</label>
+                <select value={to} onChange={(e) => setTo(e.target.value)} style={{ ...inp, fontSize: 12.5 }}>
+                  {REPL_TARGETS.map((b) => <option key={b} value={b}>{b} ({branchCurrency(b)} · {branchTax(b)})</option>)}
+                  <option value="ALL">All target branches (AMD, NBO, DAR, FBM, TKHO)</option>
+                </select>
+                <p style={{ margin: '6px 0 0', fontSize: 10.5, color: DIM }}>{curNote}</p>
+              </div>
+              {err && <div style={{ fontSize: 11.5, color: RED, fontWeight: 600 }}>⚠ {err}</div>}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 16px', borderTop: '1px solid #e5e9f0' }}>
+              <button onClick={onClose} style={btn('#eef1f6', DIM)}>Cancel</button>
+              <button disabled={busy} onClick={run} style={{ ...btn(BLUE, '#fff'), opacity: busy ? 0.6 : 1 }}>
+                {busy ? 'Replicating…' : `Replicate → ${targetLabel}`}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 12.5, color: GREEN, fontWeight: 700 }}>✓ Chart replicated from {result.from}</div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+                <thead><tr style={{ background: '#f3f5f9' }}>
+                  {['Branch', 'Cur', 'Tax', 'Created', 'Updated', 'Removed', 'Total'].map((h) => (
+                    <th key={h} style={{ textAlign: ['Branch', 'Cur', 'Tax'].includes(h) ? 'left' : 'right', padding: '6px 9px', color: DIM, fontWeight: 800, fontSize: 10, textTransform: 'uppercase' }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {(result.results || []).map((r) => (
+                    <tr key={r.branch} style={{ borderBottom: '1px solid #f1f3f8' }}>
+                      <td style={{ padding: '6px 9px', fontWeight: 700, color: DARK }}>{r.branch}</td>
+                      <td style={{ padding: '6px 9px', color: '#334155' }}>{r.currency}</td>
+                      <td style={{ padding: '6px 9px', color: '#334155' }}>{r.regime === 'VAT' ? `VAT${r.vatRate != null ? ' ' + r.vatRate + '%' : ''}` : 'GST'}</td>
+                      <td style={{ padding: '6px 9px', textAlign: 'right', color: GREEN, fontWeight: 700 }}>{r.created}</td>
+                      <td style={{ padding: '6px 9px', textAlign: 'right', color: DIM }}>{r.updated}</td>
+                      <td style={{ padding: '6px 9px', textAlign: 'right', color: r.removed ? RED : '#c2c8d6' }}>{r.removed || 0}</td>
+                      <td style={{ padding: '6px 9px', textAlign: 'right', color: '#334155' }}>{r.total}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 16px', borderTop: '1px solid #e5e9f0' }}>
+              <button onClick={onClose} style={btn(BLUE, '#fff')}>Done</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export const LedgersMaster = () => {
   // Suggest group names in a dropdown — live from /api/groups (28 Tally + custom),
@@ -341,21 +449,56 @@ export const LedgersMaster = () => {
     }
     return out.sort();
   };
+
+  // Branch view filter (a branch chart = its own ledgers + the org-wide 'ALL'
+  // ledgers; see ledgers.service.getAll) and the Replicate-chart action.
+  const qc = useQueryClient();
+  const [branchView, setBranchView] = useState('ALL');
+  const [replicating, setReplicating] = useState(false);
+  const branchOptions = ['ALL', ...BRANCH_CODES];
+
+  const toolbar = (
+    <>
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
+        Branch
+        <select value={branchView} onChange={(e) => setBranchView(e.target.value)}
+          style={{ ...inp, fontSize: 12, padding: '7px 9px', width: 'auto', minWidth: 120 }}>
+          <option value="ALL">All branches</option>
+          {BRANCH_CODES.map((b) => <option key={b} value={b}>{b}</option>)}
+        </select>
+      </label>
+      <button onClick={() => setReplicating(true)} title="Copy BOM's standard chart skeleton into a branch"
+        style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6' }}>
+        <Copy size={14} /> Replicate chart
+      </button>
+    </>
+  );
+
   return (
-    <MasterCrud title="Ledgers" subtitle="Chart of Accounts — ledger accounts (live)"
-      resource="ledgers"
-      note="Set Group to the parent Tally group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups."
-      fields={[
-        { key: 'code', label: 'Code', type: 'text', required: true },
-        { key: 'name', label: 'Ledger Name', type: 'text', required: true },
-        { key: 'group', label: 'Group', type: 'select', options: groupOptions.length ? groupOptions : TALLY_GROUP_NAMES, required: true },
-        { key: 'subGroup', label: 'Sub-Group', type: 'select', table: false, emptyLabel: '— None —',
-          options: (form) => { const subs = subGroupsUnder(form.group); return form.subGroup && !subs.includes(form.subGroup) ? [form.subGroup, ...subs] : subs; } },
-        { key: 'branch', label: 'Branch', type: 'text', default: 'ALL' },
-        { key: 'currency', label: 'Currency', type: 'select', options: ACTIVE_CURRENCIES, default: 'INR' },
-        { key: 'openingBalance', label: 'Opening Balance', type: 'number', default: 0 },
-        { key: 'drCr', label: 'Dr/Cr', type: 'select', options: ['Dr', 'Cr'], default: 'Dr' },
-        { key: 'active', label: 'Active', type: 'bool', default: true },
-      ]} />
+    <>
+      <MasterCrud title="Ledgers" subtitle={`Chart of Accounts — ledger accounts (live)${branchView !== 'ALL' ? ` · ${branchView} + shared` : ''}`}
+        resource="ledgers"
+        params={branchView !== 'ALL' ? { branch: branchView } : {}}
+        toolbar={toolbar}
+        note="Set Group to the parent Tally group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. Use “Replicate chart” to copy BOM’s standard heads into another branch."
+        fields={[
+          { key: 'code', label: 'Code', type: 'text', required: true },
+          { key: 'name', label: 'Ledger Name', type: 'text', required: true },
+          { key: 'group', label: 'Group', type: 'select', options: groupOptions.length ? groupOptions : TALLY_GROUP_NAMES, required: true },
+          { key: 'subGroup', label: 'Sub-Group', type: 'select', table: false, emptyLabel: '— None —',
+            options: (form) => { const subs = subGroupsUnder(form.group); return form.subGroup && !subs.includes(form.subGroup) ? [form.subGroup, ...subs] : subs; } },
+          { key: 'branch', label: 'Branch', type: 'select', options: branchOptions, default: 'ALL' },
+          { key: 'currency', label: 'Currency', type: 'select', options: ACTIVE_CURRENCIES, default: 'INR' },
+          { key: 'openingBalance', label: 'Opening Balance', type: 'number', default: 0 },
+          { key: 'drCr', label: 'Dr/Cr', type: 'select', options: ['Dr', 'Cr'], default: 'Dr' },
+          { key: 'active', label: 'Active', type: 'bool', default: true },
+        ]} />
+      {replicating && (
+        <ReplicateChartModal
+          onClose={() => setReplicating(false)}
+          onDone={() => qc.invalidateQueries({ queryKey: ['master', 'ledgers'] })}
+        />
+      )}
+    </>
   );
 };

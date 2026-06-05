@@ -96,9 +96,41 @@ export function setBranchCfg(profiles) {
   (profiles || []).forEach((p) => { if (p && p.code) { map[p.code] = profileToCfg(p); raw[p.code] = p; } });
   if (Object.keys(map).length) { _branchCfg = map; _profiles = raw; }
 }
+
+// Africa branches run VAT (Kenya/DR Congo 16%, Tanzania 18%); mirrors the backend
+// shared/constants/taxRegime.js. The single frontend source of truth for which
+// branches are VAT — also used by the import templates' regime toggle.
+export const VAT_RATE = { NBO: 16, DAR: 18, FBM: 16 };
+
+// Derive a branch's tax/currency config from the branch record when no
+// company-profile doc exists. Without this every branch fell back to BOM's
+// GST/INR config, so the Africa branches never showed VAT in the voucher forms.
+function deriveCfgFromBranch(code) {
+  const b = BRANCHES.find((x) => x.code === code);
+  if (!b) return null;
+  const taxStr = String(b.tax || '');
+  const isVat = VAT_RATE[code] != null || /vat/i.test(taxStr);
+  const vr = VAT_RATE[code] ?? (parseFloat((taxStr.match(/(\d+(?:\.\d+)?)\s*%/) || [])[1]) || null);
+  return {
+    cur: b.currency === 'USD' ? '$' : b.currency === 'INR' ? '₹' : (b.currency || ''),
+    curCode: b.currency || 'INR',
+    taxType: isVat ? 'VAT' : 'GST',
+    vatRate: isVat ? vr : null,
+    gstRates: isVat ? [] : [5, 12, 18],
+    hasIGST: !isVat,
+    psOptions: [],
+    voucherPrefix: code,
+    secondaryCur: '',
+    secondaryCurCode: (b.currencies && b.currencies[1]) || '',
+    isHO: !!b.isHO,
+  };
+}
+
 export function branchCfg(code) {
   if (code === 'ALL') return _branchCfg.ALL || FALLBACK_CFG_ALL;
-  return _branchCfg[code] || _branchCfg.BOM || FALLBACK_CFG;
+  // company-profile (if seeded) wins; else derive from the branch record so a
+  // VAT/USD branch is correct out of the box; else the minimal BOM/GST fallback.
+  return _branchCfg[code] || deriveCfgFromBranch(code) || _branchCfg.BOM || FALLBACK_CFG;
 }
 // Full company-profile doc (legal/bank/address) for printed documents, etc.
 export function companyProfile(code) { return _profiles[code] || _profiles.BOM || {}; }

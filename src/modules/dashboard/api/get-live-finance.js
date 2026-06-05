@@ -68,6 +68,22 @@ export async function getReceivablesOutstanding(branchCode) {
   }
 }
 
+// Unsettled receivable + payable in one ageing call — the dashboard "pending to
+// settle" tiles. Receivable = open sale bills net of receipts/credit-notes;
+// Payable = open purchase/expense bills net of payments/debit-notes. Same FIFO
+// engine the bill-wise allocation panel settles against.
+export async function getAgeingTotals(branchCode) {
+  try {
+    const d = await apiGet('/api/accounting/ageing', { branch: branchCode });
+    return {
+      receivable: Math.round(d?.receivables?.totals?.total || 0),
+      payable:    Math.round(d?.payables?.totals?.total || 0),
+    };
+  } catch {
+    return { receivable: 0, payable: 0 };
+  }
+}
+
 // Cash & bank position (live) — Σ closing balances of the Bank Accounts +
 // Cash-in-Hand groups from the Balance Sheet (already INR, as-on date).
 const CASH_GROUPS = new Set(['Bank Accounts', 'Cash-in-Hand']);

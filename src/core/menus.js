@@ -80,6 +80,8 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Credit Note", href:"/finance/credit-note"},
     {label:"Debit Note", href:"/finance/debit-note"},
     {label:"Purchase Expense Voucher", href:"/purchase-expense"},
+    {label:"Refund (against Sale)", href:"/finance/refund"},
+    {label:"Reissue (against Sale)", href:"/finance/reissue"},
   ]},
   {label:"Voucher Tools", children:[
     {label:"Multi-Currency Voucher", href:"/finance/multi-currency"},
@@ -173,6 +175,7 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
   ]},
   {label:"Compliance & Variance", children:[
     {label:"Variance Analysis", href:"/reports/variance"},
+    {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
     {label:"Statutory Dues Calendar", href:"/reports/statutory-dues"},
     {label:"Tax Filing Status Board", href:"/reports/tax-board"},
     {label:"Currency Exposure", href:"/reports/fx-exposure"},

@@ -162,6 +162,44 @@ for (const s of SPECS) {
 
 const GROUPS = ['Masters', 'Parties', 'Sales & Purchase', 'Vouchers'];
 
+/* ── Tax regime (India GST vs Africa VAT) ──────────────────────────────────
+   India templates carry GST (CGST/SGST/IGST) + India-only TCS/TDS/incentive
+   columns. The Africa branches (NBO/DAR/FBM) run VAT, so for the VAT regime we
+   collapse the GST columns into ONE "VAT" column, drop the India-only tax
+   columns, and switch the example branch → NBO / currency → USD. The backend
+   sums any cgst|sgst|igst|vat column into taxAmt and posts it per the branch's
+   regime (VAT Output/Input for Africa, CGST/SGST for India), so a VAT file just
+   works. Sub-groups and non-tax columns are identical across regimes. */
+const REGIMES = [
+  { key: 'GST', label: 'India · GST', hint: 'BOM · AMD · TKHO' },
+  { key: 'VAT', label: 'Africa · VAT', hint: 'NBO · DAR · FBM' },
+];
+const isGstCol = (c) => /cgst|sgst|igst/i.test(c);
+const isIndiaOnlyCol = (c) => /\btcs\b/i.test(c) || /tds deducted/i.test(c) || /incentive\s*\/\s*discount/i.test(c);
+
+// Re-point an example cell to a VAT branch (NBO/USD/Nairobi); blank the
+// BOM-specific Reference Ledger sample so users pick their own branch's ledger.
+function vatExampleCell(col, val) {
+  if (/currency/i.test(col)) return 'USD';
+  if (/^branch$/i.test(col)) return 'NBO';
+  if (/reference ledger/i.test(col)) return '';
+  return String(val ?? '').replace(/\bBOM\b/g, 'NBO').replace(/Maharashtra/gi, 'Nairobi');
+}
+
+// Derive the branch/regime-specific template from a base (India/GST) spec.
+function applyRegime(spec, regime) {
+  if (regime !== 'VAT') return spec; // India / default — unchanged
+  const cols = []; const ex = [];
+  let vatDone = false;
+  const vatSample = spec.columns.reduce((s, c, i) => (isGstCol(c) ? s + (Number(spec.example[i]) || 0) : s), 0);
+  spec.columns.forEach((c, i) => {
+    if (isGstCol(c)) { if (!vatDone) { cols.push('VAT'); ex.push(String(vatSample || 0)); vatDone = true; } return; }
+    if (isIndiaOnlyCol(c)) return; // drop India-only TCS/TDS/incentive columns
+    cols.push(c); ex.push(vatExampleCell(c, spec.example[i]));
+  });
+  return { ...spec, columns: cols, example: ex };
+}
+
 /* ── CSV helpers ─────────────────────────────────────────────────────────── */
 const csvCell = (v) => {
   const s = String(v ?? '');
@@ -251,6 +289,7 @@ function EntityCard({ spec, onUpload, state }) {
 
 export function DataImportPage({ currentUser }) {
   const [states, setStates] = useState({}); // entity → { busy, result, error }
+  const [regime, setRegime] = useState('GST'); // India (GST) | Africa (VAT) template variant
 
   if (currentUser && currentUser.role !== 'Super Admin') {
     return (
@@ -287,12 +326,32 @@ export function DataImportPage({ currentUser }) {
           {' '}On Sales & Purchase, put the <strong>same Link No</strong> on a sale and its related purchase(s) to tie them for invoice-wise profit.
         </p>
       </div>
+
+      {/* Tax-regime selector: swaps GST↔VAT tax columns + example branch/currency. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: DIM }}>Template region:</span>
+        <div style={{ display: 'inline-flex', border: '1px solid #d6dbe6', borderRadius: 8, overflow: 'hidden' }}>
+          {REGIMES.map((r) => (
+            <button key={r.key} onClick={() => setRegime(r.key)} title={r.hint}
+              style={{ padding: '7px 14px', border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 700,
+                background: regime === r.key ? BLUE : '#fff', color: regime === r.key ? '#fff' : DIM }}>
+              {r.label}
+            </button>
+          ))}
+        </div>
+        <span style={{ fontSize: 10.5, color: DIM }}>
+          {regime === 'VAT'
+            ? 'VAT branches (NBO/DAR/FBM): one VAT column, USD, no GST/TCS/TDS.'
+            : 'GST branches (BOM/AMD/TKHO): CGST/SGST/IGST + TCS/TDS as applicable.'}
+        </span>
+      </div>
+
       {GROUPS.map((g) => (
         <div key={g} style={{ marginBottom: 18 }}>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: BLUE, marginBottom: 8 }}>{g}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
             {SPECS.filter((s) => s.group === g).map((s) => (
-              <EntityCard key={s.entity} spec={s} state={states[s.entity]} onUpload={onUpload} />
+              <EntityCard key={s.entity} spec={applyRegime(s, regime)} state={states[s.entity]} onUpload={onUpload} />
             ))}
           </div>
         </div>

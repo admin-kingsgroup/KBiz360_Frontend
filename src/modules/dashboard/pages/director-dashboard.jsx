@@ -44,7 +44,7 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
   }
 
   const { revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers } = data;
-  const fig = data.figures || { revenue: 0, gp: 0, gpPct: 0, netProfit: 0, outstanding: 0 };
+  const fig = data.figures || { revenue: 0, gp: 0, gpPct: 0, netProfit: 0, outstanding: 0, payable: 0 };
   const rangeShort = RANGE_SHORT[range] || 'This Month';
   const topCust = topCustomers[0] || { share: 0, name: '—' };
   const highValueApprovals = 0;
@@ -78,7 +78,8 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
         <KPICard label={`Revenue · ${rangeShort}`} value={fmtINR(fig.revenue)} delta="" color="#d4a437" onClick={() => navigate('/reports/pnl')} />
         <KPICard label={`Gross Profit · ${rangeShort}`} value={fmtINR(fig.gp)} delta={fig.gpPct ? `${fig.gpPct}% GP` : ''} color="#22c55e" onClick={() => navigate('/reports/gp')} />
         <KPICard label={`Net Profit · ${rangeShort}`} value={fmtINR(fig.netProfit)} delta="" color={fig.netProfit >= 0 ? '#1D9E75' : '#A32D2D'} onClick={() => navigate('/reports/pnl')} />
-        <KPICard label="Outstanding (Receivables)" value={fmtINR(fig.outstanding)} delta="open AR" color="#854F0B" onClick={() => navigate('/reports/rec')} />
+        <KPICard label="Unsettled Receivable" value={fmtINR(fig.outstanding)} delta="pending to collect" color="#854F0B" onClick={() => navigate('/reports/rec')} />
+        <KPICard label="Unsettled Payable" value={fmtINR(fig.payable)} delta="pending to pay" color="#A32D2D" onClick={() => navigate('/reports/pay')} />
         <KPICard
           label="Concentration Risk"
           value={topCust.share + '%'}
