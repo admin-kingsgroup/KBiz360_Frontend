@@ -1439,6 +1439,12 @@ const RR_MODULES = {
   Misc:      {tab:"Misc.",      supplier:"Vendor (Creditor)",               sup:"vendor",         ref1:"Reference No",   ref2:"Invoice No",      rfCancel:"Vendor Cancellation Charge",   riFee:"Service / Amendment Fee",      diff:"Amount Difference"},
 };
 const RR_ORDER = ["Flight","Holiday","Hotel","Car","Insurance","Visa","Misc"];
+// Per-module Purchase/Cost ledger the supplier's service charge is debited to on a
+// refund/reissue (so it reduces that module's GP). Mirrors the backend PRODUCT_META.
+const RR_COST_LEDGER = {
+  Flight:"Purchase — Air Tickets", Holiday:"Purchase — Holiday Packages", Hotel:"Purchase — Hotels",
+  Car:"Purchase — Car Rental", Insurance:"Purchase — Insurance", Visa:"Purchase — Visa", Misc:"Purchase — Misc",
+};
 
 /* ── Sale-invoice fare breakup (client mirror of backend vouchers.dto) ──────────
    The Books frontend points at PROD by default, so a Refund/Reissue must stay
@@ -1764,8 +1770,12 @@ function RefundReissueVoucher({branch,kind}){
   const ourCharges=_r2(svc+gstSvc+markup+gstMk);
   const supRefund=_r2(Math.max(0,origFare-supCancel-supSvc-supGst));  // refund: net the supplier returns us
   const supPayable=_r2(changeFee+fareDiff+supSvc+supGst);             // reissue: net we owe the supplier
-  const custRefund=_r2(supRefund-ourCharges);            // refund: balance to customer (may be <0 → invalid)
-  const custBill=_r2(supPayable+ourCharges);             // reissue: total billed to customer
+  // The supplier's service charge is OUR cost (booked separately, see supChargeRows) —
+  // it is NOT adjusted against the customer. So the customer figure is the fare/fee
+  // only ± our charges, never ± the supplier's service charge.
+  const custRefund=_r2((origFare-supCancel)-ourCharges);  // refund: balance to customer (may be <0 → invalid)
+  const custBill=_r2((changeFee+fareDiff)+ourCharges);    // reissue: total billed to customer
+  const supSvcLedger=RR_COST_LEDGER[module]||"Purchase — Misc";
   const supplierAmt=isRefund?supRefund:supPayable;
   const total=isRefund?custRefund:custBill;
 
@@ -1777,20 +1787,31 @@ function RefundReissueVoucher({branch,kind}){
     ...(svc>0?[{side:"CR",ledger:"Service Charge Income",amount:svc,note:"retained service charge"}]:[]),
     ...(markup>0?[{side:"CR",ledger:"Markup Income",amount:markup,note:"retained markup"}]:[]),
   ];
+  // Supplier service charge → our own cost (per-module Purchase head, reduces GP); its
+  // GST → claimable Input credit. Both are SEPARATE legs, never netted with the customer.
+  const supChargeRows=[
+    ...(supSvc>0?[{side:"DR",ledger:supSvcLedger,amount:supSvc,note:"supplier service charge (our cost)"}]:[]),
+    ...(supGst>0?(gstMode==="inter"
+      ?[{side:"DR",ledger:"IGST Input",amount:supGst,note:"input IGST on supplier charge (claimable)"}]
+      :[{side:"DR",ledger:"CGST Input",amount:_r2(supGst/2),note:"input CGST on supplier charge"},{side:"DR",ledger:"SGST Input",amount:_r2(supGst-_r2(supGst/2)),note:"input SGST on supplier charge"}]):[]),
+  ];
   const jrows=isRefund?[
-    {side:"DR",ledger:supplierName,amount:supRefund,note:"refund receivable from supplier"},
+    {side:"DR",ledger:supplierName,amount:supRefund,note:"refund receivable from supplier (net of its charges)"},
+    ...supChargeRows,
     {side:"CR",ledger:customerName||"Customer (Debtor)",amount:custRefund,note:"refund payable to customer"},
     ...incomeRows,...gstRows,
   ]:[
     {side:"DR",ledger:customerName||"Customer (Debtor)",amount:custBill,note:"total billed to customer"},
-    {side:"CR",ledger:supplierName,amount:supPayable,note:"fee + difference payable to supplier"},
+    ...supChargeRows,
+    {side:"CR",ledger:supplierName,amount:supPayable,note:"fee + difference + supplier charges payable"},
     ...incomeRows,...gstRows,
   ];
   const tDr=jrows.reduce((s,r)=>s+(r.side==="DR"?r.amount:0),0);
   const tCr=jrows.reduce((s,r)=>s+(r.side==="CR"?r.amount:0),0);
 
-  // Gross profit = our service charge + markup (mirrors the mockup GP cards).
-  const gp=_r2(svc+markup);
+  // Gross profit = our service charge + markup LESS the supplier's service charge
+  // (a direct cost). Its GST is claimable input credit, so it never hits GP.
+  const gp=_r2(svc+markup-supSvc);
   const gpBase=isRefund?supRefund:custBill;
   const gpPct=gpBase>0?_r2(gp/gpBase*100):0;
 
@@ -1807,7 +1828,7 @@ function RefundReissueVoucher({branch,kind}){
     post.mutate({
       vno:vNo, type:isRefund?"RF":"RI", category:isRefund?"refund":"reissue", branch:brPost, date,
       party:customerName, partyType:"customer", partyGroup:customerGroup,
-      counterParty:supplierName, counterPartyGroup:supplierGroup, supplierAmt, supplierSvc:supSvc, supplierGst:supGst,
+      counterParty:supplierName, counterPartyGroup:supplierGroup, supplierAmt, supplierSvc:supSvc, supplierGst:supGst, supplierSvcLedger:supSvcLedger,
       lines:[
         {ledger:"Service Charge Income", amt:svc, desc:"Retained service charge", drCr:"Cr"},
         {ledger:"Markup Income", amt:markup, desc:"Retained markup", drCr:"Cr"},
@@ -1830,8 +1851,8 @@ function RefundReissueVoucher({branch,kind}){
       <div style={{padding:"14px 16px"}}>
         <VExplain>
           {isRefund
-            ?<><b style={{color:"#A07828"}}>Refund:</b> a customer cancels a {module.toLowerCase()} booking. The {cfgM.sup} refunds the fare minus its cancellation charge; you retain a service charge + markup (+GST) and refund the balance to the customer. The supplier is <b>Debited</b> (receivable); the customer, your income & GST are <b>Credited</b>. <b>Pick both the sales invoice</b> being cancelled <b>and its purchase invoice</b> below.</>
-            :<><b style={{color:"#A07828"}}>Reissue:</b> a customer changes a {module.toLowerCase()} booking. The {cfgM.sup} charges a change fee plus any fare difference; you add a service charge + markup (+GST) and bill the total to the customer. The customer is <b>Debited</b>; the supplier, your income & GST are <b>Credited</b>. <b>Pick both the sales invoice</b> being amended <b>and its purchase invoice</b> below.</>}
+            ?<><b style={{color:"#A07828"}}>Refund:</b> a customer cancels a {module.toLowerCase()} booking. The {cfgM.sup} refunds the fare minus its cancellation charge; you retain a service charge + markup (+GST) and refund the balance to the customer. The supplier is <b>Debited</b> (receivable); the customer, your income & GST are <b>Credited</b>. Any <b>service charge the {cfgM.sup} levies is booked as your own cost</b> (separate {supSvcLedger} leg, reducing GP) and its GST as input credit — <b>not</b> passed to the customer. <b>Pick both the sales invoice</b> being cancelled <b>and its purchase invoice</b> below.</>
+            :<><b style={{color:"#A07828"}}>Reissue:</b> a customer changes a {module.toLowerCase()} booking. The {cfgM.sup} charges a change fee plus any fare difference; you add a service charge + markup (+GST) and bill the total to the customer. The customer is <b>Debited</b>; the supplier, your income & GST are <b>Credited</b>. Any <b>service charge the {cfgM.sup} levies is booked as your own cost</b> (separate {supSvcLedger} leg, reducing GP) and its GST as input credit — <b>not</b> added to the customer's bill. <b>Pick both the sales invoice</b> being amended <b>and its purchase invoice</b> below.</>}
         </VExplain>
 
         {/* Module strip — mirrors the mockup tabs */}
@@ -1879,15 +1900,15 @@ function RefundReissueVoucher({branch,kind}){
             {isRefund?<>
               <RRLine label="Original Fare" sub={selPur?`from purchase ${selPur.vno} (excl. svc + GST)`:`paid to ${cfgM.sup}`}>{num(origFare,setOrigFare)}</RRLine>
               <RRLine label={cfgM.rfCancel} sub={`${cfgM.sup} retains`}>{num(supCancel,setSupCancel)}</RRLine>
-              <RRLine label="Supplier Service Charge" sub={`charged by ${cfgM.sup}`}>{num(supSvc,setSupSvc)}</RRLine>
-              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="CGST/SGST/IGST by supplier" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
+              <RRLine label="Supplier Service Charge" sub={`our cost → ${supSvcLedger} (reduces GP)`}>{num(supSvc,setSupSvc)}</RRLine>
+              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="input credit (claimable)" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
               <RRLine label="Supplier Refund to Us" sub="fare − cancellation − supplier charges" derived><input type="number" value={supRefund} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
               <div/>
             </>:<>
               <RRLine label={cfgM.riFee} sub={`charged by ${cfgM.sup}`}>{num(changeFee,setChangeFee)}</RRLine>
               <RRLine label={cfgM.diff} sub="new − old">{num(fareDiff,setFareDiff)}</RRLine>
-              <RRLine label="Supplier Service Charge" sub={`charged by ${cfgM.sup}`}>{num(supSvc,setSupSvc)}</RRLine>
-              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="CGST/SGST/IGST by supplier" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
+              <RRLine label="Supplier Service Charge" sub={`our cost → ${supSvcLedger} (reduces GP)`}>{num(supSvc,setSupSvc)}</RRLine>
+              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="input credit (claimable)" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
               <RRLine label="Payable to Supplier" sub="fee + difference + supplier charges" derived><input type="number" value={supPayable} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
               <div/>
             </>}
@@ -1898,7 +1919,7 @@ function RefundReissueVoucher({branch,kind}){
           </div>
           {/* Highlight: amount to / from customer */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginTop:12,padding:"11px 14px",borderRadius:8,background:"#FDFAF4",border:"1px solid "+(chargesExceed?"#F7C1C1":"#EFE7D4")}}>
-            <span style={{fontSize:12.5,fontWeight:800,color:chargesExceed?"#A32D2D":"#A07828"}}>{isRefund?"Refund to Customer":"Total Billed to Customer"}<span style={{display:"block",fontSize:10,fontWeight:400,color:"#9A9A9A"}}>{isRefund?"supplier refund − our charges":"supplier + service + markup + GST"}</span></span>
+            <span style={{fontSize:12.5,fontWeight:800,color:chargesExceed?"#A32D2D":"#A07828"}}>{isRefund?"Refund to Customer":"Total Billed to Customer"}<span style={{display:"block",fontSize:10,fontWeight:400,color:"#9A9A9A"}}>{isRefund?"(fare − cancellation) − our charges · excl. supplier svc":"fee + difference + service + markup + GST · excl. supplier svc"}</span></span>
             <span style={{fontSize:17,fontWeight:800,color:chargesExceed?"#A32D2D":"#A07828",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,isRefund?custRefund:custBill)}</span>
           </div>
         </div>
@@ -1910,8 +1931,8 @@ function RefundReissueVoucher({branch,kind}){
         {/* Gross Profit cards */}
         <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:14}}>
           <div style={{flex:1,minWidth:160,...card,padding:"12px 16px",background:"#f3f4f8"}}>
-            <div style={{fontSize:9,fontWeight:700,letterSpacing:".6px",color:"#5a6691",textTransform:"uppercase"}}>Gross Profit (Service + Markup)</div>
-            <div style={{fontSize:18,fontWeight:800,color:"#1B6B4C",marginTop:3,fontVariantNumeric:"tabular-nums"}}>{vf2(cur,gp)}</div>
+            <div style={{fontSize:9,fontWeight:700,letterSpacing:".6px",color:"#5a6691",textTransform:"uppercase"}}>Gross Profit (Service + Markup − Supplier Svc)</div>
+            <div style={{fontSize:18,fontWeight:800,color:gp<0?"#A32D2D":"#1B6B4C",marginTop:3,fontVariantNumeric:"tabular-nums"}}>{vf2(cur,gp)}</div>
           </div>
           <div style={{flex:1,minWidth:160,...card,padding:"12px 16px",background:"#f3f4f8"}}>
             <div style={{fontSize:9,fontWeight:700,letterSpacing:".6px",color:"#5a6691",textTransform:"uppercase"}}>GP % <span style={{textTransform:"none",fontWeight:400}}>(on {isRefund?"supplier refund":"total billed"})</span></div>
