@@ -807,7 +807,7 @@ export function SalesFlight({branch,setRoute}){
 
 export function SalesCar({branch,setRoute}){
   const vNo=useVNo(branch,"SC");
-  const [row,setRow]=useState({pickup:"Mumbai Airport T2",drop:"Pune Station",days:3,basic:12600,otherFare:1500,svc:800});
+  const [row,setRow]=useState({vehicle:"Toyota Innova Crysta",pickup:"Mumbai Airport T2",drop:"Pune Station",days:3,basic:12600,otherFare:1500,svc:800});
   const [partyGstin,setPartyGstin]=useState("27AACNI2211J1Z1");
   const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(k,v)=>setRow(r=>({...r,[k]:v}));
@@ -831,7 +831,7 @@ export function SalesCar({branch,setRoute}){
             <tr style={{borderBottom:"1px solid #e1e3ec"}}>
               <VTD c={1}/>
               <td style={{padding:3}}>
-                <input value="Car rental" readOnly style={{...inp,minHeight:28,fontSize:11,background:"#f3f4f8",color:"#5a6691",fontWeight:600,cursor:"not-allowed"}}/>
+                <input value={row.vehicle} onChange={e=>upd("vehicle",e.target.value)} style={{...inp,minHeight:28,fontSize:11}} title="Vehicle type / model"/>
               </td>
               <td style={{padding:3}}><input value={row.pickup} onChange={e=>upd("pickup",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
               <td style={{padding:3}}><input value={row.drop} onChange={e=>upd("drop",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
@@ -1225,7 +1225,7 @@ export function SalesMisc({branch,setRoute}){
       <ARow label="Service / item details" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:760}}>
           <thead><tr>
-            {["#","G.L Name","SAC code","GST %","Amount ₹","GST ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=3&&i<=6}/>)}
+            {["#","G.L Name","SAC code","Amount ₹","GST %","GST ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=3&&i<=6}/>)}
           </tr></thead>
           <tbody>{rows.map((r,i)=>{
             const amt=+r.amt||0;
@@ -1235,12 +1235,12 @@ export function SalesMisc({branch,setRoute}){
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.gl} onChange={e=>upd(r.id,"gl",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:220}}/></td>
                 <td style={{padding:3}}><input value={r.sac} onChange={e=>upd(r.id,"sac",e.target.value)} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:90}}/></td>
+                <td style={{padding:3}}><input type="number" value={r.amt} onChange={e=>upd(r.id,"amt",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
                 <td style={{padding:3}}>
                   <select value={r.gstPct} onChange={e=>upd(r.id,"gstPct",+e.target.value)} style={{...inp,minHeight:28,fontSize:11,background:rateBg[r.gstPct],color:rateC[r.gstPct],fontWeight:600,width:75}}>
                     <option value={0}>0%</option><option value={5}>5%</option><option value={12}>12%</option><option value={18}>18%</option>
                   </select>
                 </td>
-                <td style={{padding:3}}><input type="number" value={r.amt} onChange={e=>upd(r.id,"amt",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
                 <VTD c={fmt(g)} r/>
                 <td style={{padding:"4px 7px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{fmt(amt+g)}</td>
                 <DBtn fn={()=>rm(r.id)}/>
@@ -1249,8 +1249,9 @@ export function SalesMisc({branch,setRoute}){
           })}</tbody>
           <tfoot>
             <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
-              <td colSpan={4} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
+              <td colSpan={3} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(sub)}</td>
+              <td/>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#27500A"}}>{fmt(gstAmt)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(total)}</td>
               <td/>
@@ -2380,14 +2381,14 @@ export function PurchaseHotelVoucher({branch,setRoute}){
 export function PurchaseVisa({branch,setRoute}){
   const vNo=useVNo(branch,"PV");
   const [rows,setRows]=useState([
-    {id:1,applicant:"Rajiv Sharma",pp:"Z1234567",country:"UAE",vtype:"Tourist 30D",vfsFee:1500,taxes:270,otherTax:100},
-    {id:2,applicant:"Rohan",pp:"Z1234568",country:"UAE",vtype:"Tourist 30D",vfsFee:1500,taxes:270,otherTax:100},
+    {id:1,name:"Rajiv Sharma",pp:"Z1234567",country:"UAE",vtype:"Tourist 30D",vfsFee:1500,taxes:270,otherTax:100},
+    {id:2,name:"Rohan",pp:"Z1234568",country:"UAE",vtype:"Tourist 30D",vfsFee:1500,taxes:270,otherTax:100},
   ]);
   const [svc,setSvc]=useState(1500);
   const [partyGstin,setPartyGstin]=useState("27AABVV4321F1Z6");
   const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:Date.now(),applicant:"",pp:"",country:"",vtype:"",vfsFee:0,taxes:0,otherTax:0}]);
+  const add=()=>setRows(rs=>[...rs,{id:Date.now(),name:"",pp:"",country:"",vtype:"",vfsFee:0,taxes:0,otherTax:0}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
 
   const vfsTotal=rows.reduce((s,r)=>s+(+r.vfsFee||0),0);
@@ -2427,7 +2428,7 @@ export function PurchaseVisa({branch,setRoute}){
             return (
               <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
                 <VTD c={i+1}/>
-                <td style={{padding:3}}><input value={r.applicant} onChange={e=>upd(r.id,"applicant",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:150}}/></td>
+                <td style={{padding:3}}><input value={r.name} onChange={e=>upd(r.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:150}}/></td>
                 <td style={{padding:3}}><input value={r.pp} onChange={e=>upd(r.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:100}}/></td>
                 <td style={{padding:3}}><input value={r.country} onChange={e=>upd(r.id,"country",e.target.value)} style={{...inp,minHeight:28,fontSize:11,width:90}}/></td>
                 <td style={{padding:3}}><input value={r.vtype} onChange={e=>upd(r.id,"vtype",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
@@ -2492,7 +2493,7 @@ export function PurchaseVisa({branch,setRoute}){
 
 export function PurchaseCar({branch,setRoute}){
   const vNo=useVNo(branch,"PC");
-  const [row,setRow]=useState({vendor:"Riya Travels Mumbai",pickup:"BOM T2",drop:"Pune Station",days:1,basic:4500,otherFare:500,svc:0});
+  const [row,setRow]=useState({vendor:"Riya Travels Mumbai",vehicle:"Toyota Innova Crysta",pickup:"BOM T2",drop:"Pune Station",days:1,basic:4500,otherFare:500,svc:0});
   const [partyGstin,setPartyGstin]=useState("27AAACR1234R1Z0");
   const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(k,v)=>setRow(r=>({...r,[k]:v}));
@@ -2517,7 +2518,7 @@ export function PurchaseCar({branch,setRoute}){
               <VTD c={1}/>
               <td style={{padding:3}}><input value={row.vendor} onChange={e=>upd("vendor",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
               <td style={{padding:3}}>
-                <input value="Car rental" readOnly style={{...inp,minHeight:28,fontSize:11,background:"#f3f4f8",color:"#5a6691",fontWeight:600,cursor:"not-allowed"}}/>
+                <input value={row.vehicle} onChange={e=>upd("vehicle",e.target.value)} style={{...inp,minHeight:28,fontSize:11}} title="Vehicle type / model"/>
               </td>
               <td style={{padding:3}}><input value={row.pickup} onChange={e=>upd("pickup",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
               <td style={{padding:3}}><input value={row.drop} onChange={e=>upd("drop",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
@@ -2675,7 +2676,7 @@ export function PurchaseMisc({branch,setRoute}){
       <ARow label="Expense / purchase lines" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:840}}>
           <thead><tr>
-            {["#","Vendor","G.L Name","SAC","GST %","Amount ₹","Input GST ₹","TDS?","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=4&&i<=8}/>)}
+            {["#","Vendor","G.L Name","SAC","Amount ₹","GST %","Input GST ₹","TDS?","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=4&&i<=8}/>)}
           </tr></thead>
           <tbody>{rows.map((r,i)=>{
             const amt=+r.amt||0;
@@ -2687,12 +2688,12 @@ export function PurchaseMisc({branch,setRoute}){
                 <td style={{padding:3}}><input value={r.vendor} onChange={e=>upd(r.id,"vendor",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:160}}/></td>
                 <td style={{padding:3}}><input value={r.gl} onChange={e=>upd(r.id,"gl",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:200}}/></td>
                 <td style={{padding:3}}><input value={r.sac} onChange={e=>upd(r.id,"sac",e.target.value)} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:90}}/></td>
+                <td style={{padding:3}}><input type="number" value={r.amt} onChange={e=>upd(r.id,"amt",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
                 <td style={{padding:3}}>
                   <select value={r.gstPct} onChange={e=>upd(r.id,"gstPct",+e.target.value)} style={{...inp,minHeight:28,fontSize:11,background:rateBg[r.gstPct],color:rateC[r.gstPct],fontWeight:600,width:75}}>
                     <option value={0}>0%</option><option value={5}>5%</option><option value={12}>12%</option><option value={18}>18%</option>
                   </select>
                 </td>
-                <td style={{padding:3}}><input type="number" value={r.amt} onChange={e=>upd(r.id,"amt",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
                 <VTD c={fmt(gst)} r/>
                 <td style={{padding:"4px 7px",textAlign:"center"}}>
                   <input type="checkbox" checked={r.tds} onChange={e=>upd(r.id,"tds",e.target.checked)} title="TDS 194C applicable" style={{cursor:"pointer",width:16,height:16}}/>
@@ -2707,8 +2708,9 @@ export function PurchaseMisc({branch,setRoute}){
           })}</tbody>
           <tfoot>
             <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
-              <td colSpan={5} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
+              <td colSpan={4} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(sub)}</td>
+              <td/>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#185FA5"}}>{fmt(inputGst)}</td>
               <td style={{padding:"7px 8px",textAlign:"center",fontSize:10,color:"#854F0B"}}>{tdsAmt>0?"TDS: ("+fmt(tdsAmt)+")":""}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(total)}</td>

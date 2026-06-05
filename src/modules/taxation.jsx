@@ -5,7 +5,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, Calendar, Download, Plus, Settings, Users } from 'lucide-react';
-import { GP_BILLS } from '../core/data';
+import { useGpBills } from '../core/useAccounting';
 import { useTaxCalendar } from '../core/useReference';
 import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY, fyOptions, rangeNote } from '../core/dates';
 import { fmt, fmtINR } from '../core/format';
@@ -39,7 +39,8 @@ export function TaxGstr1({branch}){
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
 
-  const bills=GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period));
+  const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
+  const bills=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period));
   const B2B_CLIENTS=[]; // TODO: derive B2B/B2C split from the customer master's GST-registration flag
 
   const b2b=bills.filter(b=>B2B_CLIENTS.includes(b.client));
@@ -128,9 +129,10 @@ export function TaxGstr3b({branch}){
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
 
-  const sales=GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period));
-  const purch=GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period));
-  const rcm=GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&b.supplier.includes("BSP")); // GDS as RCM proxy
+  const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
+  const sales=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period));
+  const purch=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period));
+  const rcm=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&b.supplier.includes("BSP")); // GDS as RCM proxy
 
   const gstRate=mod=>mod==="Holiday"?5:18;
   const totOutward =sales.reduce((s,b)=>s+b.sell/(1+gstRate(b.mod)/100)*(gstRate(b.mod)/100),0);
@@ -213,11 +215,12 @@ export function TaxRcm({branch}){
   const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
+  const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
 
   /* Identify RCM entries: overseas DMC purchases + GDS charges */
   const rcmEntries=useMemo(()=>{
     const OVERSEAS_SUPPLIERS=[]; // TODO: flag overseas suppliers in the supplier master
-    return GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&
+    return GP.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&
       OVERSEAS_SUPPLIERS.some(s=>b.supplier.includes(s.split(" ")[0]))).map(b=>{
       const igst=Math.round(b.cost/(1+0.18)*0.18);
       return {date:b.date,party:b.supplier,desc:`${b.mod} — ${b.dest}`,taxable:Math.round(b.cost/(1+0.18)),igst,status:"Paid",vno:b.id};
@@ -279,11 +282,12 @@ export function TaxVat({branch}){
   const mob=useMobile();
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
+  const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
 
   const AFRICA_BRANCHES=[];
 
   const getBranchData=(brCode,rate)=>{
-    const bills=GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period));
+    const bills=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period));
     const sales=bills.reduce((s,b)=>s+b.sell,0);
     const taxable=sales/(1+rate/100);
     const outputVAT=taxable*(rate/100);
@@ -482,7 +486,8 @@ export function GstrRecon({branch}){
   const PERIODS=MONTH_OPTIONS;
 
   /* Simulate GSTR-2B data vs books */
-  const bills=GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&["BSP India","Emirates GSA","Bali Tours DMC"].includes(b.supplier));
+  const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
+  const bills=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&["BSP India","Emirates GSA","Bali Tours DMC"].includes(b.supplier));
   const recon=bills.map((b,i)=>{
     const itcBooks=Math.round(b.cost/(1+0.18)*0.18);
     const gstr2bAmt=i%3===1?Math.round(itcBooks*0.85):itcBooks; // simulate 1-in-3 mismatch
@@ -574,9 +579,10 @@ export function TallyExport({branch}){
   const [period,setPeriod]=useState(CUR_MONTH);
   const [exportType,setExportType]=useState("trial-balance");
   const PERIODS=MONTH_OPTIONS;
+  const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
 
   const generateXML=()=>{
-    const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period));
+    const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period));
     const totRev=bills.reduce((s,b)=>s+b.sell,0);
     const totCost=bills.reduce((s,b)=>s+b.cost,0);
 

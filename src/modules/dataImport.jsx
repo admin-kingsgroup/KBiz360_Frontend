@@ -44,11 +44,11 @@ const SPECS = [
     example: ['Provisional', 'true', 'Journal;Contra', '', 'Actuals + provisional', 'true'] },
   // ── Parties ──────────────────────────────────────────────────────────────
   { group: 'Parties', entity: 'customers', label: 'Customers (Clients)',
-    desc: 'Sundry debtors.',
+    desc: 'Sundry debtors. Also added to the chart as a Sundry Debtors ledger, so each is immediately selectable in vouchers and shows on the Balance Sheet.',
     columns: ['name', 'branch', 'phone', 'email'],
     example: ['Acme Travels', 'BOM', '+91 98200 00000', 'accounts@acme.com'] },
   { group: 'Parties', entity: 'suppliers', label: 'Suppliers',
-    desc: 'Sundry creditors / vendors.',
+    desc: 'Sundry creditors / vendors. Also added to the chart as a Sundry Creditors ledger, so each is immediately selectable in vouchers and shows on the Balance Sheet.',
     columns: ['name', 'category', 'type', 'branch', 'gstin', 'pan', 'contact', 'phone', 'email', 'city', 'country', 'creditDays', 'active'],
     example: ['Emirates GSA', 'Air', 'GSA', 'BOM', '27AABCE1234M1Z5', 'AABCE1234M', 'Mr. Khan', '+91 98201 00000', 'gsa@emirates.com', 'Mumbai', 'India', '7', 'true'] },
   // ── Sales & Purchase by product (post double-entry on import) ──────────────
