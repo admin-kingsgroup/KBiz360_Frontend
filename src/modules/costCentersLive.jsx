@@ -11,6 +11,7 @@
 
 import React, { useState } from 'react';
 import { useCostCenters, useBackfillCostCenters } from '../core/useAccounting';
+import { exportToExcel } from '../core/exportExcel';
 
 const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691', GREEN = '#27500A';
 const isSuperAdmin = (u) => /super\s*admin/i.test(u?.role || '');
@@ -47,6 +48,10 @@ export function CostCenterMasterLive({ currentUser }) {
   // Group leaves under their module, in the seeded module order.
   const byModule = modules.map((m) => ({ ...m, leaves: centers.filter((c) => c.module === m.key) }));
 
+  const exportSheet = () => exportToExcel('cost-centres',
+    [{ key: 'code', label: 'Code' }, { key: 'name', label: 'Cost Centre' }, { key: 'module', label: 'Module' }, { key: 'appliesTo', label: 'Applies To' }, { key: 'status', label: 'Status' }],
+    centers.map((c) => ({ code: c.code, name: c.name, module: c.module, appliesTo: 'Sales & Purchase', status: 'Active' })));
+
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: '12px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
@@ -57,6 +62,8 @@ export function CostCenterMasterLive({ currentUser }) {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ padding: '4px 10px', background: '#eef4ec', color: GREEN, border: '1px solid #cfe3c4', borderRadius: 14, fontSize: 11, fontWeight: 700 }}>🔒 Seeded · View only</span>
           <span style={{ padding: '4px 10px', background: '#fff7e6', color: '#8a6300', border: '1px solid #f0dca6', borderRadius: 14, fontSize: 11, fontWeight: 700 }}>{centers.length} cost centres</span>
+          <button onClick={exportSheet} disabled={centers.length === 0} title="Export to Excel"
+            style={{ padding: '6px 12px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: centers.length === 0 ? 'not-allowed' : 'pointer', opacity: centers.length === 0 ? 0.5 : 1 }}>📤 Export</button>
           <button onClick={runBackfill} disabled={backfill.isPending}
             style={{ padding: '6px 12px', background: DARK, color: GOLD, border: 'none', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: backfill.isPending ? 'wait' : 'pointer' }}
             title="Re-derive the cost centre for already-imported vouchers from their saved Ticket Type / Service Type / Country">

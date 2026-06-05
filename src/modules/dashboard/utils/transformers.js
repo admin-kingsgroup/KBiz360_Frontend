@@ -1,4 +1,6 @@
 import { PRODUCT_MODULES, FX_TO_INR } from './constants';
+import { fmtINR } from '../../../core/format';
+import { fmtDate, todayISO } from '../../../core/dates';
 
 export const filterBillsByBranchPeriod = (bills, branchCode, monthPrefix) =>
   bills.filter(
@@ -91,6 +93,58 @@ export const consultantsFromSales = (saleVouchers, gpPct = 0, limit = 5) => {
     .map((c) => ({ ...c, rev: Math.round(c.rev), gp: Math.round(c.gp) }))
     .sort((a, b) => b.rev - a.rev)
     .slice(0, limit);
+};
+
+/* ── Key Alerts (live) ─────────────────────────────────────────────────────
+   Derives the director dashboard's "Key Alerts" from live figures — AR/AP
+   ageing, module P&L, net result and customer concentration — instead of a
+   static seed list, so the panel surfaces real problems the moment they
+   appear. Each alert is { title, type, date, severity, route } where severity
+   is 'high' | 'med' | 'low' and route is an in-app report path.              */
+const SEV_RANK = { high: 0, med: 1, low: 2 };
+// Ageing buckets arrive labelled ("90+ days", "61–90 days" …); match on the
+// numeric token so we don't depend on the exact dash/spacing.
+const pickBucket = (buckets, test) => (buckets || []).find((b) => test(b.bucket)) || { amount: 0, count: 0 };
+const parties = (n) => `${n} ${n === 1 ? 'party' : 'parties'}`;
+
+export const buildKeyAlerts = ({ arAgeing = [], apAgeing = [], mpl, topCustomers = [], figures = {} } = {}) => {
+  const alerts = [];
+  const asOf = fmtDate(todayISO());
+
+  // Receivables: 90+ days is critical, 61–90 is a heads-up.
+  const ar90 = pickBucket(arAgeing, (l) => /90\s*\+/.test(l));
+  if (ar90.amount > 0)
+    alerts.push({ severity: 'high', type: 'Receivables', date: asOf, route: '/reports/rec',
+      title: `${fmtINR(ar90.amount)} receivables overdue 90+ days · ${parties(ar90.count)}` });
+  const ar60 = pickBucket(arAgeing, (l) => /^\s*61/.test(l));
+  if (ar60.amount > 0)
+    alerts.push({ severity: 'med', type: 'Receivables', date: asOf, route: '/reports/rec',
+      title: `${fmtINR(ar60.amount)} receivables ageing 61–90 days · ${parties(ar60.count)}` });
+
+  // Payables we're sitting on past 90 days (supplier-relationship / cash risk).
+  const ap90 = pickBucket(apAgeing, (l) => /90\s*\+/.test(l));
+  if (ap90.amount > 0)
+    alerts.push({ severity: 'med', type: 'Payables', date: asOf, route: '/reports/pay',
+      title: `${fmtINR(ap90.amount)} payables overdue 90+ days · ${parties(ap90.count)}` });
+
+  // Net loss for the selected period.
+  if (typeof figures.netProfit === 'number' && figures.netProfit < 0)
+    alerts.push({ severity: 'high', type: 'Profitability', date: asOf, route: '/reports/pnl',
+      title: `Net loss this period: ${fmtINR(figures.netProfit)}` });
+
+  // Modules earning revenue but bleeding GP.
+  for (const m of gpByModuleFromMpl(mpl))
+    if (m.gp < 0)
+      alerts.push({ severity: 'high', type: 'Module P&L', date: asOf, route: '/reports/gp',
+        title: `${m.mod} running at a loss · ${fmtINR(m.gp)} GP` });
+
+  // Over-reliance on a single customer.
+  const top = topCustomers[0];
+  if (top && top.share >= 40)
+    alerts.push({ severity: 'med', type: 'Concentration', date: asOf, route: '/reports/concentration',
+      title: `Concentration risk: ${top.name} = ${top.share}% of revenue` });
+
+  return alerts.sort((a, b) => (SEV_RANK[a.severity] ?? 9) - (SEV_RANK[b.severity] ?? 9));
 };
 
 export const computeTotalBankBalanceInr = (accounts) =>

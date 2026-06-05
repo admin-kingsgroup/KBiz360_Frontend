@@ -8,7 +8,6 @@ import {
 import {
   CASH_FORECAST_13W,
   FY_TARGETS_DATA,
-  KEY_ALERTS_DATA,
 } from '../../../core/data';
 import { apiGet } from '../../../core/api';
 
@@ -66,7 +65,7 @@ const topEntities = async (category, branchCode) => {
     const grand = all.reduce((s, r) => s + r.value, 0);
     return all.sort((a, b) => b.value - a.value).slice(0, 8).map((r) => ({
       name: r.name, branch: r.branch,
-      revenue: Math.round(r.value), purchases: Math.round(r.value), value: Math.round(r.value),
+      revenue: Math.round(r.value), purchases: Math.round(r.value), spend: Math.round(r.value), value: Math.round(r.value),
       bookings: r.count, vouchers: r.count, count: r.count,
       share: grand > 0 ? +((r.value / grand) * 100).toFixed(1) : 0,
     }));
@@ -102,7 +101,8 @@ export const getApAgeingSummary = async () => ageingSide('payables');
 export const getBankAccounts = async () => BANK_ACCOUNTS_DATA;
 export const getFyTargets = async () => FY_TARGETS_DATA;
 export const getBranchHeatmap = async () => BRANCH_PL_HEATMAP;
-export const getKeyAlerts = async () => KEY_ALERTS_DATA;
+// Key Alerts are now derived live in the dashboard service (buildKeyAlerts) from
+// ageing + module P&L + concentration — no seed accessor needed.
 export const getCashForecast = async () => CASH_FORECAST_13W;
 export const getPeriodClose = async () => PERIOD_CLOSE_DATA;
 export const getReconStatus = async () => RECON_STATUS_DATA;

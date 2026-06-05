@@ -60,7 +60,7 @@ export function getUnmatchedTickets(branch){
 export function getUnreadCount(){return _NOTIFS.filter(n=>!n.read).length;}
 
 /* ════════════════════════════════════════════════════════════════
-   DEBIT NOTE  /sales/debit-note  (SDN)
+   DEBIT NOTE  /finance/debit-note  (SDN)
    ════════════════════════════════════════════════════════════════ */
 
 export function exportToCSV(rows,headers,filename){

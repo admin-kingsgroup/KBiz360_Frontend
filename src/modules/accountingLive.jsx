@@ -16,6 +16,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { card, inp, bc } from '../core/styles';
 import { exportToExcel, vouchersToSheet } from '../core/exportExcel';
+import { CUR_QUARTER, CUR_FY } from '../core/dates';
 import {
   useTrialBalance, useProfitAndLoss, useBalanceSheet, useDayBook,
   useLedgerStatement, useLedgerGroups, useChartOfAccounts,
@@ -73,16 +74,34 @@ function dateInRange(value, fromISO, toISO) {
 const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const monthStartISO = () => { const t = new Date(); return isoDate(new Date(t.getFullYear(), t.getMonth(), 1)); };
 const todayISO = () => isoDate(new Date());
+// Rolling window start = N days back from today (negative day index is normalised by Date).
+const daysAgoISO = (n) => { const t = new Date(); return isoDate(new Date(t.getFullYear(), t.getMonth(), t.getDate() - n)); };
 
-// From/to date inputs with quick presets. Defaults to the current month.
-function DateRange({ from, to, setFrom, setTo }) {
-  const Preset = ({ label, f, t }) => (
-    <button onClick={() => { setFrom(f); setTo(t); }} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 10.5, cursor: 'pointer', fontWeight: 700, color: DIM }}>{label}</button>
-  );
+// From/to date inputs with quick presets. The shared report date filter — every
+// report (current and future) imports this so the date-range UX is identical
+// everywhere. `from`/`to` are ISO strings; '' on both = open-ended ("All").
+// Defaults are owned by each caller (most seed `monthStartISO()`→`todayISO()`).
+export function DateRange({ from, to, setFrom, setTo }) {
+  const PRESETS = [
+    { label: 'Today',              f: todayISO(),          t: todayISO() },
+    { label: 'This Month',         f: monthStartISO(),     t: todayISO() },
+    { label: 'Last 3M',            f: daysAgoISO(90),      t: todayISO() },
+    { label: CUR_QUARTER.label.split(' ')[0], f: CUR_QUARTER.startISO, t: CUR_QUARTER.endISO }, // "Q1"
+    { label: `FY ${CUR_FY.label}`, f: CUR_FY.startISO,     t: CUR_FY.endISO },
+    { label: 'All',                f: '',                  t: '' },
+  ];
+  const Preset = ({ label, f, t }) => {
+    const active = (from || '') === f && (to || '') === t;
+    return (
+      <button onClick={() => { setFrom(f); setTo(t); }}
+        style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 10.5, cursor: 'pointer', fontWeight: 700,
+          ...(active ? { background: GOLD, color: '#fff', borderColor: GOLD } : { color: DIM }) }}>
+        {label}</button>
+    );
+  };
   return (
     <>
-      <Preset label="This Month" f={monthStartISO()} t={todayISO()} />
-      <Preset label="All" f="" t="" />
+      {PRESETS.map((p) => <Preset key={p.label} {...p} />)}
       <DateInput value={from} onChange={(e) => setFrom(e.target.value)} />
       <span style={{ lineHeight: '32px', color: DIM, fontSize: 11 }}>to</span>
       <DateInput value={to} onChange={(e) => setTo(e.target.value)} />
@@ -246,101 +265,454 @@ function ViewToggle({ view, setView }) {
   return <><B id="summary" label="Summary" /><B id="detailed" label="Detailed" /></>;
 }
 
+// Two-mode view switch with custom labels (Detailed / Minimal).
+function ModeToggle({ view, setView, modes }) {
+  return <>{modes.map((m) => (
+    <button key={m.id} onClick={() => setView(m.id)} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === m.id ? DARK : '#fff', color: view === m.id ? GOLD : DIM, borderColor: view === m.id ? DARK : '#e1e3ec' }}>{m.label}</button>
+  ))}</>;
+}
+
+// Indian-FY start (1 Apr). Used by the report range presets.
+const fyStartISO = () => { const t = new Date(); const y = t.getMonth() >= 3 ? t.getFullYear() : t.getFullYear() - 1; return isoDate(new Date(y, 3, 1)); };
+// Yesterday and start-of-week (Monday) — extra quick presets for full books.
+const yesterdayISO = () => { const t = new Date(); t.setDate(t.getDate() - 1); return isoDate(t); };
+const weekStartISO = () => { const t = new Date(); const back = (t.getDay() + 6) % 7; t.setDate(t.getDate() - back); return isoDate(t); };
+
+// From/To range with quick presets. Defaults are seeded by each report (today),
+// but the presets make it one tap to widen to month / financial year / all.
+// Pass `full` for the complete accounting-book preset row (Today · Yesterday ·
+// This Week · This Month · This Quarter · YTD · Current FY · All) — used by the
+// Cash Book and other primary Finance books.
+function RangeBar({ from, to, setFrom, setTo, onChange, full }) {
+  const apply = (f, t) => { setFrom(f); setTo(t); onChange && onChange(); };
+  const Preset = ({ label, f, t }) => {
+    const active = from === f && to === t;
+    return <button onClick={() => apply(f, t)} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 10.5, cursor: 'pointer', fontWeight: 700, background: active ? DARK : '#fff', color: active ? GOLD : DIM, borderColor: active ? DARK : '#e1e3ec' }}>{label}</button>;
+  };
+  return (
+    <>
+      <Preset label="Today" f={todayISO()} t={todayISO()} />
+      {full && <Preset label="Yesterday" f={yesterdayISO()} t={yesterdayISO()} />}
+      {full && <Preset label="This Week" f={weekStartISO()} t={todayISO()} />}
+      <Preset label={full ? 'This Month' : 'Month'} f={monthStartISO()} t={todayISO()} />
+      {full && <Preset label="This Quarter" f={CUR_QUARTER.startISO} t={todayISO()} />}
+      {full && <Preset label="YTD" f={CUR_FY.startISO} t={todayISO()} />}
+      {full
+        ? <Preset label="Current FY" f={CUR_FY.startISO} t={CUR_FY.endISO} />
+        : <Preset label="FY" f={fyStartISO()} t={todayISO()} />}
+      <Preset label="All" f="" t="" />
+      <DateInput value={from} onChange={(e) => { setFrom(e.target.value); onChange && onChange(); }} />
+      <span style={{ lineHeight: '32px', color: DIM, fontSize: 11 }}>to</span>
+      <DateInput value={to} onChange={(e) => { setTo(e.target.value); onChange && onChange(); }} />
+    </>
+  );
+}
+
+// Search box — filters the current report by any free text (narration, ledger,
+// voucher no, party). Controlled; clears the page back to 1 via onChange.
+function SearchInput({ value, onChange, placeholder = 'Search…' }) {
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+        style={{ ...inp, width: 200, minHeight: 32, fontSize: 11, paddingRight: value ? 26 : 10 }} />
+      {value && <button onClick={() => onChange('')} title="Clear" style={{ position: 'absolute', right: 6, background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 14, lineHeight: 1 }}>✕</button>}
+    </span>
+  );
+}
+
+const PAGE_SIZES = [50, 100, 250, 1000];
+// Client-side pager. `total` is the full filtered count; the table renders only
+// the current page's slice while the sticky footer keeps the full-set totals.
+function Pagination({ total, page, setPage, pageSize, setPageSize, unit = 'rows' }) {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  if (total <= PAGE_SIZES[0]) return null;
+  const cur = Math.min(page, pages - 1);
+  const Btn = ({ label, to, disabled }) => (
+    <button disabled={disabled} onClick={() => setPage(to)} style={{ ...inp, width: 'auto', minHeight: 30, fontSize: 11, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1, fontWeight: 700, color: DIM }}>{label}</button>
+  );
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap', marginTop: 10, fontSize: 11, color: DIM }}>
+      <span>{(cur * pageSize + 1).toLocaleString('en-IN')}–{Math.min((cur + 1) * pageSize, total).toLocaleString('en-IN')} of {total.toLocaleString('en-IN')} {unit}</span>
+      <Btn label="« First" to={0} disabled={cur === 0} />
+      <Btn label="‹ Prev" to={cur - 1} disabled={cur === 0} />
+      <span style={{ fontWeight: 700, color: DARK }}>Page {cur + 1} / {pages}</span>
+      <Btn label="Next ›" to={cur + 1} disabled={cur >= pages - 1} />
+      <Btn label="Last »" to={pages - 1} disabled={cur >= pages - 1} />
+      <select value={pageSize} onChange={(e) => { setPageSize(+e.target.value); setPage(0); }} style={{ ...inp, width: 'auto', minHeight: 30, fontSize: 11, cursor: 'pointer' }}>
+        {PAGE_SIZES.map((n) => <option key={n} value={n}>{n} / page</option>)}
+      </select>
+    </div>
+  );
+}
+
+// Narration cell with expand/collapse for long text.
+function NarrationCell({ text, clamp = 55 }) {
+  const [open, setOpen] = useState(false);
+  if (!text) return <span style={{ color: '#cfd3e0' }}>—</span>;
+  const long = String(text).length > clamp;
+  if (!long) return <span style={{ color: '#384677' }}>{text}</span>;
+  return (
+    <span style={{ color: '#384677' }}>
+      {open ? text : String(text).slice(0, clamp) + '… '}
+      <button onClick={() => setOpen((o) => !o)} style={{ background: 'none', border: 'none', color: BLUE, cursor: 'pointer', fontWeight: 700, fontSize: 10, padding: 0 }}>{open ? 'less' : 'more'}</button>
+    </span>
+  );
+}
+
+// Plain number for export/print (no currency symbol; blank when zero).
+const nfmt = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : ''; };
+
+// Open a print-ready window for the report (Print, or "Save as PDF" in the
+// dialog). Builds a clean B/W table from the same columns/rows used for export.
+function openReportPrint(title, sub, columns, rows, totalRow) {
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const cell = (c, v) => `<td style="text-align:${c.num ? 'right' : 'left'}">${esc(v)}</td>`;
+  const head = columns.map((c) => `<th style="text-align:${c.num ? 'right' : 'left'}">${esc(c.label)}</th>`).join('');
+  const body = rows.map((r) => '<tr>' + columns.map((c) => cell(c, r[c.key])).join('') + '</tr>').join('');
+  const foot = totalRow ? '<tfoot><tr>' + columns.map((c) => cell(c, totalRow[c.key])).join('') + '</tr></tfoot>' : '';
+  const win = window.open('', '_blank', 'width=1100,height=800');
+  if (!win) { alert('Please allow pop-ups to Print / Save as PDF.'); return; }
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+  <style>
+    *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#222;padding:14px;margin:0}
+    h1{font-size:15pt;margin:0;color:#0d1326} .sub{font-size:9pt;color:#5a6691;margin:2px 0 12px}
+    table{width:100%;border-collapse:collapse;font-size:8.5pt}
+    th{background:#0d1326;color:#d4a437;padding:6px 8px;border:1px solid #0d1326;white-space:nowrap}
+    td{padding:4px 8px;border:1px solid #e1e3ec}
+    tbody tr:nth-child(even) td{background:#fafafa}
+    tfoot td{font-weight:700;background:#0d1326;color:#fff;border-color:#0d1326}
+    @media print{.np{display:none}}
+    .np{margin-bottom:12px;padding:8px;background:#f3f4f8;border-radius:6px;font-size:9pt;text-align:center}
+  </style></head><body>
+  <div class="np">Press <b>Ctrl/Cmd + P</b> → choose <b>Save as PDF</b> or your printer.</div>
+  <h1>${esc(title)}</h1><div class="sub">${esc(sub)}</div>
+  <table><thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot}</table>
+  </body></html>`);
+  win.document.close(); win.focus();
+  setTimeout(() => { try { win.print(); } catch (e) { /* user can print manually */ } }, 400);
+}
+
+// "Print / PDF" toolbar button (mirrors ExportBtn styling).
+function PrintBtn({ onClick, disabled }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6,
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, background: '#fff', color: DARK, borderColor: '#d6dbe6' }}
+      title="Open a print view — choose your printer or Save as PDF">🖨 Print / PDF</button>
+  );
+}
+
+/* ════════════════════ LEDGER DRILL (TB → ledger statement → voucher) ═══ */
+// Opened from the Trial Balance: shows the selected ledger's statement for the
+// SAME date range, every line tappable down to the editable voucher.
+function LedgerDrill({ branch, ledger, from, to, onClose }) {
+  const cur = curOf(branch);
+  const [voucher, setVoucher] = useState(null);
+  const q = useLedgerStatement(ledger, branch, { from, to });
+  const d = q.data;
+  const crumbs = [
+    { label: ledger, onClick: voucher ? () => setVoucher(null) : null },
+    ...(voucher ? [{ label: voucher.vno }] : []),
+  ];
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(840px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+          <Crumb items={crumbs} />
+          <span style={{ fontSize: 10, color: DIM }}>{from || '…'} → {to || '…'}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
+        </div>
+        {voucher && <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} />}
+        {!voucher && (
+          <div>
+            {q.isLoading && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading ledger…</div>}
+            {q.isError && <div style={{ padding: 16, color: RED }}>⚠ {q.error?.message || 'Failed to load ledger'}</div>}
+            {d && <>
+              <div style={{ padding: '8px 14px', background: '#f3f5f9', fontSize: 11, color: DIM, display: 'flex', justifyContent: 'space-between' }}>
+                <span>Opening {money(cur, d.openingBalance)} {d.openingSide}</span>
+                <span style={{ fontWeight: 700, color: DARK }}>Closing {money(cur, d.closingBalance)} {d.closingSide}</span>
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+                <thead><tr style={headRow}><Th>Date</Th><Th>Voucher</Th><Th>Particulars</Th><Th right>Dr</Th><Th right>Cr</Th><Th right>Balance</Th></tr></thead>
+                <tbody>
+                  {(d.lines || []).length === 0 && <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: DIM }}>No postings in this range.</td></tr>}
+                  {(d.lines || []).map((ln, i) => (
+                    <tr key={i} style={{ ...rowBg(i), cursor: ln.voucherId ? 'pointer' : 'default' }} onClick={() => ln.voucherId && setVoucher({ id: ln.voucherId, vno: ln.vno })}>
+                      <td style={{ padding: '8px 12px', color: DIM, whiteSpace: 'nowrap' }}>{ln.date}</td>
+                      <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{ln.vno}</td>
+                      <td style={{ padding: '8px 12px', color: '#384677' }}>{ln.narration || ln.party || ln.category}</td>
+                      <td style={{ padding: '8px 12px', ...num, color: ln.debit > 0 ? BLUE : '#dfe2ee' }}>{money(cur, ln.debit)}</td>
+                      <td style={{ padding: '8px 12px', ...num, color: ln.credit > 0 ? RED : '#dfe2ee' }}>{money(cur, ln.credit)}</td>
+                      <td style={{ padding: '8px 12px', ...num, fontWeight: 700, color: ln.balanceSide === 'Cr' ? RED : BLUE }}>{money(cur, Math.abs(ln.balance))} {ln.balanceSide}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                {d && <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
+                  <td colSpan={3} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD }}>CLOSING — {d.ledger}</td>
+                  <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, d.totalDebit)}</td>
+                  <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, d.totalCredit)}</td>
+                  <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, d.closingBalance)} {d.closingSide}</td>
+                </tr></tfoot>}
+              </table>
+            </>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ════════════════════ TRIAL BALANCE ════════════════════════════════ */
 export function TrialBalanceLive({ branch }) {
   const cur = curOf(branch);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [from, setFrom] = useState(todayISO);
+  const [to, setTo] = useState(todayISO);
+  const [view, setView] = useState('detailed'); // detailed (4-col) | summary (closing only)
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(100);
+  const [drill, setDrill] = useState(null); // ledger name
   const q = useTrialBalance(branch, { from, to });
-  const rows = q.data?.rows || [];
-  const totDr = q.data?.totalDebit || 0, totCr = q.data?.totalCredit || 0;
-  const balanced = q.data ? q.data.balanced : true;
-  const groups = useMemo(() => [...new Set(rows.map((r) => r.group))], [rows]);
+
+  // Normalise: a not-yet-redeployed backend returns only debit/credit (= closing
+  // on side). Map that onto the new columns so the screen still works.
+  const rows = useMemo(() => (q.data?.rows || []).map((r) => (
+    r.closingDebit != null || r.closingCredit != null
+      ? r
+      : { ...r, openingDebit: 0, openingCredit: 0, closingDebit: r.debit || 0, closingCredit: r.credit || 0, debit: 0, credit: 0 }
+  )), [q.data]);
+
+  const term = search.trim().toLowerCase();
+  const filtered = useMemo(() => (term
+    ? rows.filter((r) => `${r.ledger} ${r.group} ${r.code || ''}`.toLowerCase().includes(term))
+    : rows), [rows, term]);
+
+  const T = useMemo(() => {
+    const s = (k) => Math.round(filtered.reduce((a, r) => a + (r[k] || 0), 0));
+    return { openDr: s('openingDebit'), openCr: s('openingCredit'), dr: s('debit'), cr: s('credit'), clDr: s('closingDebit'), clCr: s('closingCredit') };
+  }, [filtered]);
+  const groupTotals = useMemo(() => {
+    const m = new Map();
+    for (const r of filtered) {
+      if (!m.has(r.group)) m.set(r.group, { clDr: 0, clCr: 0, n: 0 });
+      const g = m.get(r.group); g.clDr += r.closingDebit || 0; g.clCr += r.closingCredit || 0; g.n += 1;
+    }
+    return m;
+  }, [filtered]);
+
+  // Balanced banner reflects the FULL trial balance, not the searched subset —
+  // otherwise a search that hides one side would falsely read "out of balance".
+  const fullClDr = q.data?.totalClosingDebit != null ? q.data.totalClosingDebit : (q.data?.totalDebit || 0);
+  const fullClCr = q.data?.totalClosingCredit != null ? q.data.totalClosingCredit : (q.data?.totalCredit || 0);
+  const balanced = q.data ? Math.abs(fullClDr - fullClCr) < 1 : true;
+  const pageRows = useMemo(() => filtered.slice(page * pageSize, page * pageSize + pageSize), [filtered, page, pageSize]);
+
+  // Export / print share one column+row set (raw numbers, group on each row).
+  const expColumns = view === 'summary'
+    ? [{ key: 'group', label: 'Group' }, { key: 'ledger', label: 'Ledger' }, { key: 'closingDebit', label: `Closing Dr (${cur})`, num: true }, { key: 'closingCredit', label: `Closing Cr (${cur})`, num: true }]
+    : [{ key: 'group', label: 'Group' }, { key: 'code', label: 'Code' }, { key: 'ledger', label: 'Ledger' },
+       { key: 'openingDebit', label: `Opening Dr`, num: true }, { key: 'openingCredit', label: `Opening Cr`, num: true },
+       { key: 'debit', label: `Debit`, num: true }, { key: 'credit', label: `Credit`, num: true },
+       { key: 'closingDebit', label: `Closing Dr`, num: true }, { key: 'closingCredit', label: `Closing Cr`, num: true }];
+  const expRows = filtered.map((r) => ({ ...r, code: r.code || '' }));
+  const printRows = filtered.map((r) => { const o = { group: r.group, code: r.code || '', ledger: r.ledger }; for (const c of expColumns) if (c.num) o[c.key] = nfmt(r[c.key]); return o; });
+  const totalRow = view === 'summary'
+    ? { group: 'TOTAL', ledger: '', closingDebit: nfmt(T.clDr), closingCredit: nfmt(T.clCr) }
+    : { group: 'TOTAL', code: '', ledger: '', openingDebit: nfmt(T.openDr), openingCredit: nfmt(T.openCr), debit: nfmt(T.dr), credit: nfmt(T.cr), closingDebit: nfmt(T.clDr), closingCredit: nfmt(T.clCr) };
+  const sub = `${branchLabel(branch)} · ${filtered.length} ledgers · Closing Dr ${money(cur, T.clDr)} / Cr ${money(cur, T.clCr)}`;
+  const exportNow = () => filtered.length && exportToExcel(`trial-balance-${branchLabel(branch)}`, expColumns, expRows);
+  const printNow = () => filtered.length && openReportPrint('Trial Balance', sub, expColumns, printRows, totalRow);
+
+  // group-header bookkeeping while rendering the page slice
+  let lastGroup = null;
 
   return (
     <Page
+      wide={view === 'detailed'}
       title="Trial Balance"
-      sub={`${branchLabel(branch)} · ${rows.length} ledgers · Dr ${money(cur, totDr)} / Cr ${money(cur, totCr)}`}
+      sub={sub}
       right={<>
-        <span style={{ lineHeight: '32px', fontSize: 11, color: DIM }}>From</span>
-        <DateInput value={from} onChange={(e) => setFrom(e.target.value)} />
-        <span style={{ lineHeight: '32px', fontSize: 11, color: DIM }}>to</span>
-        <DateInput value={to} onChange={(e) => setTo(e.target.value)} />
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Ledger / group…" />
+        <ModeToggle view={view} setView={setView} modes={[{ id: 'detailed', label: 'Detailed' }, { id: 'summary', label: 'Summary' }]} />
+        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(0)} />
+        <ExportBtn onClick={exportNow} disabled={!filtered.length} />
+        <PrintBtn onClick={printNow} disabled={!filtered.length} />
       </>}
     >
       {q.data && (balanced
-        ? <Banner tone="ok">✔ Trial Balance tallied — Dr {money(cur, totDr)} = Cr {money(cur, totCr)}</Banner>
-        : <Banner tone="err">⚠ Out of balance — Dr {money(cur, totDr)} ≠ Cr {money(cur, totCr)}</Banner>)}
-      <State q={q} empty={rows.length === 0}>
+        ? <Banner tone="ok">✔ Trial Balance tallied — Closing Dr {money(cur, fullClDr)} = Cr {money(cur, fullClCr)}{term ? ' (full set)' : ''}</Banner>
+        : <Banner tone="err">⚠ Out of balance — Closing Dr {money(cur, fullClDr)} ≠ Cr {money(cur, fullClCr)}</Banner>)}
+      <State q={q} empty={filtered.length === 0}>
         <Table>
-          <thead><tr style={headRow}><Th>Group</Th><Th>Ledger Account</Th><Th right>Debit ({cur})</Th><Th right>Credit ({cur})</Th></tr></thead>
+          <thead><tr style={headRow}>
+            <Th>Ledger Account</Th>
+            {view === 'detailed' && <><Th right>Opening Dr</Th><Th right>Opening Cr</Th><Th right>Debit</Th><Th right>Credit</Th></>}
+            <Th right>Closing Dr ({cur})</Th><Th right>Closing Cr ({cur})</Th>
+          </tr></thead>
           <tbody>
-            {groups.map((grp) => {
-              const gl = rows.filter((r) => r.group === grp);
-              return gl.map((l, i) => (
-                <tr key={(l.code || '') + l.ledger} style={rowBg(i)}>
-                  {i === 0 && <td rowSpan={gl.length} style={{ padding: '9px 14px', fontWeight: 700, color: DARK, borderRight: '2px solid #e1e3ec', verticalAlign: 'top', fontSize: 10.5, background: '#f9fafb' }}>{grp}</td>}
-                  <td style={{ padding: '9px 14px', color: '#384677' }}>{l.ledger}{l.code ? <span style={{ color: '#b9bed4', fontSize: 9.5, marginLeft: 6 }}>{l.code}</span> : null}</td>
-                  <td style={{ padding: '9px 14px', ...num, color: l.debit > 0 ? DARK : '#bfc3d6' }}>{money(cur, l.debit)}</td>
-                  <td style={{ padding: '9px 14px', ...num, color: l.credit > 0 ? DARK : '#bfc3d6' }}>{money(cur, l.credit)}</td>
-                </tr>
-              ));
+            {pageRows.map((l, i) => {
+              const showGroup = l.group !== lastGroup;
+              lastGroup = l.group;
+              const gt = groupTotals.get(l.group);
+              return (
+                <React.Fragment key={(l.code || '') + l.ledger + i}>
+                  {showGroup && (
+                    <tr style={{ background: '#eef1f7' }}>
+                      <td style={{ padding: '7px 14px', fontWeight: 800, color: DARK, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{l.group} <span style={{ color: DIM, fontWeight: 600 }}>· {gt?.n} ledger(s)</span></td>
+                      {view === 'detailed' && <td colSpan={4} />}
+                      <td style={{ padding: '7px 14px', ...num, fontWeight: 700, color: DIM, fontSize: 10.5 }}>{money(cur, gt?.clDr)}</td>
+                      <td style={{ padding: '7px 14px', ...num, fontWeight: 700, color: DIM, fontSize: 10.5 }}>{money(cur, gt?.clCr)}</td>
+                    </tr>
+                  )}
+                  <tr style={{ ...rowBg(i), cursor: 'pointer' }}
+                    onClick={() => setDrill(l.ledger)}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
+                    <td style={{ padding: '8px 14px 8px 26px', color: BLUE, fontWeight: 600 }}>{l.ledger}{l.code ? <span style={{ color: '#b9bed4', fontSize: 9.5, marginLeft: 6 }}>{l.code}</span> : null} <span style={{ color: '#cfd3e0', fontSize: 10 }}>›</span></td>
+                    {view === 'detailed' && <>
+                      <td style={{ padding: '8px 14px', ...num, color: l.openingDebit > 0 ? DARK : '#cfd3e0' }}>{money(cur, l.openingDebit)}</td>
+                      <td style={{ padding: '8px 14px', ...num, color: l.openingCredit > 0 ? DARK : '#cfd3e0' }}>{money(cur, l.openingCredit)}</td>
+                      <td style={{ padding: '8px 14px', ...num, color: l.debit > 0 ? BLUE : '#cfd3e0' }}>{money(cur, l.debit)}</td>
+                      <td style={{ padding: '8px 14px', ...num, color: l.credit > 0 ? RED : '#cfd3e0' }}>{money(cur, l.credit)}</td>
+                    </>}
+                    <td style={{ padding: '8px 14px', ...num, fontWeight: 700, color: l.closingDebit > 0 ? DARK : '#cfd3e0' }}>{money(cur, l.closingDebit)}</td>
+                    <td style={{ padding: '8px 14px', ...num, fontWeight: 700, color: l.closingCredit > 0 ? DARK : '#cfd3e0' }}>{money(cur, l.closingCredit)}</td>
+                  </tr>
+                </React.Fragment>
+              );
             })}
           </tbody>
           <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
-            <td colSpan={2} style={{ padding: '10px 14px', fontWeight: 700, color: GOLD, fontSize: 12 }}>TOTAL</td>
-            <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff', fontSize: 13 }}>{money(cur, totDr)}</td>
-            <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: GOLD, fontSize: 13 }}>{money(cur, totCr)}</td>
+            <td style={{ padding: '10px 14px', fontWeight: 700, color: GOLD, fontSize: 12 }}>TOTAL — {filtered.length} ledgers</td>
+            {view === 'detailed' && <>
+              <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, T.openDr)}</td>
+              <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, T.openCr)}</td>
+              <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, T.dr)}</td>
+              <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, T.cr)}</td>
+            </>}
+            <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff', fontSize: 13 }}>{money(cur, T.clDr)}</td>
+            <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: GOLD, fontSize: 13 }}>{money(cur, T.clCr)}</td>
           </tr></tfoot>
         </Table>
+        <Pagination total={filtered.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} unit="ledgers" />
       </State>
+      {drill && <LedgerDrill branch={branch} ledger={drill} from={from} to={to} onClose={() => setDrill(null)} />}
     </Page>
   );
 }
 
 /* ════════════════════ DAY BOOK ═════════════════════════════════════ */
+const TYPE_CLR = { sale: BLUE, purchase: '#854F0B', receipt: GREEN, payment: RED, journal: '#384677', contra: '#6b21a8', 'credit-note': RED, 'debit-note': '#854F0B' };
+// Normalise any date string to ISO for stable day-grouping (Tally dates vary).
+const dayKey = (d) => { const p = parseAnyDate(d); return p ? isoDate(p) : String(d || ''); };
+
 export function DayBookLive({ branch }) {
   const cur = curOf(branch);
-  const [date, setDate] = useState(todayISO);
-  const range = date ? { from: date, to: date } : {};
-  const q = useDayBook(branch, range);
-  const journals = q.data || [];
-  const totDr = journals.reduce((s, j) => s + (j.totalDebit || 0), 0);
-  const totCr = journals.reduce((s, j) => s + (j.totalCredit || 0), 0);
-  const TYPE_CLR = { sale: BLUE, purchase: '#854F0B', receipt: GREEN, payment: RED, journal: '#384677', contra: '#6b21a8', 'credit-note': RED, 'debit-note': '#854F0B' };
+  const [from, setFrom] = useState(todayISO);
+  const [to, setTo] = useState(todayISO);
+  const [view, setView] = useState('minimal'); // minimal | detailed
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(100);
+  // Fetch all journals; date filtering is client-side (Tally dates are mixed-format strings).
+  const q = useDayBook(branch);
+  const allJournals = q.data || [];
+
+  const term = search.trim().toLowerCase();
+  const sorted = useMemo(() => {
+    const f = allJournals
+      .filter((j) => dateInRange(j.date, from, to))
+      .filter((j) => !term || (`${j.vno} ${j.type} ${j.category} ${j.party} ${j.narration} ${(j.postings || []).map((p) => p.ledger).join(' ')}`.toLowerCase().includes(term)));
+    return f.sort((a, b) => { const ta = parseAnyDate(a.date)?.getTime() || 0, tb = parseAnyDate(b.date)?.getTime() || 0; return ta - tb || String(a.vno).localeCompare(String(b.vno)); });
+  }, [allJournals, from, to, term]);
+
+  const dayTotals = useMemo(() => {
+    const m = new Map();
+    for (const j of sorted) { const k = dayKey(j.date); if (!m.has(k)) m.set(k, { label: j.date, dr: 0, cr: 0, n: 0 }); const g = m.get(k); g.dr += j.totalDebit || 0; g.cr += j.totalCredit || 0; g.n += 1; }
+    return m;
+  }, [sorted]);
+
+  const postingRows = useMemo(() => sorted.flatMap((j) => (j.postings || []).map((p) => ({
+    dateKey: dayKey(j.date), date: j.date, vno: j.vno, type: j.type, category: j.category, branch: j.branch || '',
+    ledger: p.ledger, group: p.group, debit: p.debit, credit: p.credit,
+    narration: p.narration || j.narration || '', party: j.party || '',
+  }))), [sorted]);
+
+  const gDr = Math.round(sorted.reduce((s, j) => s + (j.totalDebit || 0), 0));
+  const gCr = Math.round(sorted.reduce((s, j) => s + (j.totalCredit || 0), 0));
+  const pageRows = useMemo(() => postingRows.slice(page * pageSize, page * pageSize + pageSize), [postingRows, page, pageSize]);
+
+  const expColumns = view === 'minimal'
+    ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'ledger', label: 'Ledger' }, { key: 'debit', label: `Debit (${cur})`, num: true }, { key: 'credit', label: `Credit (${cur})`, num: true }]
+    : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'type', label: 'Type' }, { key: 'category', label: 'Category' }, { key: 'branch', label: 'Branch' }, { key: 'ledger', label: 'Ledger' }, { key: 'group', label: 'Group' }, { key: 'debit', label: `Debit (${cur})`, num: true }, { key: 'credit', label: `Credit (${cur})`, num: true }, { key: 'narration', label: 'Narration' }];
+  const printRows = postingRows.map((r) => ({ ...r, debit: nfmt(r.debit), credit: nfmt(r.credit) }));
+  const totalRow = { date: 'TOTAL', vno: `${sorted.length} vouchers`, debit: nfmt(gDr), credit: nfmt(gCr) };
+  const sub = `${branchLabel(branch)} · ${sorted.length} vouchers · ${postingRows.length} lines · Dr ${money(cur, gDr)} = Cr ${money(cur, gCr)}`;
+  const exportNow = () => postingRows.length && exportToExcel(`day-book-${branchLabel(branch)}`, expColumns, postingRows);
+  const printNow = () => postingRows.length && openReportPrint('Day Book', sub, expColumns, printRows, totalRow);
+
+  const colCount = view === 'detailed' ? 8 : 5;
+  let lastKey = null;
 
   return (
     <Page
+      wide={view === 'detailed'}
       title="Day Book"
-      sub={`${branchLabel(branch)} · ${journals.length} vouchers · Dr ${money(cur, totDr)} = Cr ${money(cur, totCr)}`}
+      sub={sub}
       right={<>
-        <DateInput value={date} onChange={(e) => setDate(e.target.value)} />
-        {date && <button onClick={() => setDate('')} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer' }}>All dates</button>}
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Narration / voucher / ledger…" />
+        <ModeToggle view={view} setView={setView} modes={[{ id: 'minimal', label: 'Minimal' }, { id: 'detailed', label: 'Detailed' }]} />
+        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(0)} />
+        <ExportBtn onClick={exportNow} disabled={!postingRows.length} />
+        <PrintBtn onClick={printNow} disabled={!postingRows.length} />
       </>}
     >
-      <State q={q} empty={journals.length === 0}>
+      <State q={q} empty={postingRows.length === 0}>
         <Table>
           <thead><tr style={headRow}>
-            <Th>Date</Th><Th>Voucher</Th><Th>Type</Th><Th>Ledger Account</Th><Th right>Dr</Th><Th right>Cr</Th>
+            <Th>Date</Th><Th>Voucher</Th>
+            {view === 'detailed' && <><Th>Type</Th><Th>Branch</Th></>}
+            <Th>Ledger Account</Th><Th right>Dr</Th><Th right>Cr</Th>
+            {view === 'detailed' && <Th>Narration</Th>}
           </tr></thead>
           <tbody>
-            {journals.map((j) => j.postings.map((p, pi) => (
-              <tr key={j.vno + '-' + pi} style={{ borderBottom: pi === j.postings.length - 1 ? '1px solid #e1e3ec' : '1px solid #f6f7fa', background: '#fff' }}>
-                {pi === 0 && <td rowSpan={j.postings.length} style={{ padding: '8px 12px', color: DIM, whiteSpace: 'nowrap', verticalAlign: 'top', borderRight: '1px solid #f3f4f8' }}>{j.date}</td>}
-                {pi === 0 && <td rowSpan={j.postings.length} style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE, verticalAlign: 'top' }}>{j.vno}</td>}
-                {pi === 0 && <td rowSpan={j.postings.length} style={{ padding: '8px 12px', verticalAlign: 'top' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: (TYPE_CLR[j.category] || '#384677') + '22', color: TYPE_CLR[j.category] || '#384677' }}>{j.category}</span></td>}
-                <td style={{ padding: '6px 12px', color: '#0d1326', paddingLeft: p.debit > 0 ? 12 : 28 }}>{p.ledger}<span style={{ color: '#b9bed4', fontSize: 9.5, marginLeft: 6 }}>{p.group}</span></td>
-                <td style={{ padding: '6px 12px', ...num, color: p.debit > 0 ? BLUE : '#dfe2ee' }}>{money(cur, p.debit)}</td>
-                <td style={{ padding: '6px 12px', ...num, color: p.credit > 0 ? RED : '#dfe2ee' }}>{money(cur, p.credit)}</td>
-              </tr>
-            )))}
+            {pageRows.map((r, i) => {
+              const showDay = r.dateKey !== lastKey;
+              lastKey = r.dateKey;
+              const dt = dayTotals.get(r.dateKey);
+              return (
+                <React.Fragment key={r.vno + '-' + r.ledger + '-' + i}>
+                  {showDay && (
+                    <tr style={{ background: '#eef1f7' }}>
+                      <td colSpan={colCount} style={{ padding: '7px 12px', fontWeight: 800, color: DARK, fontSize: 10.5 }}>
+                        📅 {dt?.label || r.date} <span style={{ color: DIM, fontWeight: 600 }}>· {dt?.n} voucher(s) · Dr {money(cur, dt?.dr)} = Cr {money(cur, dt?.cr)}</span>
+                      </td>
+                    </tr>
+                  )}
+                  <tr style={rowBg(i)}>
+                    <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.date}</td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE, whiteSpace: 'nowrap' }}>{r.vno}</td>
+                    {view === 'detailed' && <>
+                      <td style={{ padding: '7px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: (TYPE_CLR[r.category] || '#384677') + '22', color: TYPE_CLR[r.category] || '#384677' }}>{r.category}</span></td>
+                      <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.branch || '—'}</td>
+                    </>}
+                    <td style={{ padding: '7px 12px', color: '#0d1326', paddingLeft: r.debit > 0 ? 12 : 26 }}>{r.ledger}{view === 'detailed' && <span style={{ color: '#b9bed4', fontSize: 9.5, marginLeft: 6 }}>{r.group}</span>}</td>
+                    <td style={{ padding: '7px 12px', ...num, color: r.debit > 0 ? BLUE : '#dfe2ee' }}>{money(cur, r.debit)}</td>
+                    <td style={{ padding: '7px 12px', ...num, color: r.credit > 0 ? RED : '#dfe2ee' }}>{money(cur, r.credit)}</td>
+                    {view === 'detailed' && <td style={{ padding: '7px 12px', maxWidth: 320 }}><NarrationCell text={r.narration} /></td>}
+                  </tr>
+                </React.Fragment>
+              );
+            })}
           </tbody>
           <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
-            <td colSpan={4} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD, fontSize: 12 }}>TOTAL — {journals.length} vouchers</td>
-            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, totDr)}</td>
-            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, totCr)}</td>
+            <td colSpan={view === 'detailed' ? 5 : 3} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD, fontSize: 12 }}>TOTAL — {sorted.length} vouchers</td>
+            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, gDr)}</td>
+            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, gCr)}</td>
+            {view === 'detailed' && <td />}
           </tr></tfoot>
         </Table>
+        <Pagination total={postingRows.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} unit="lines" />
       </State>
     </Page>
   );
@@ -550,12 +922,18 @@ function DrillDown({ branch, group, onClose }) {
             <div style={{ padding: '8px 14px', fontSize: 11, color: DIM, background: '#f3f5f9' }}>{groupLedgers.length} ledger(s) in {group} — tap to open</div>
             {tb.isLoading && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading…</div>}
             {!tb.isLoading && groupLedgers.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>No ledgers in this group.</div>}
-            {groupLedgers.map((r, i) => (
-              <div key={i} style={tapRow} onClick={() => setLedger(r.ledger)}>
-                <span style={{ fontSize: 12.5, color: DARK, fontWeight: 600 }}>{r.ledger}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: r.debit ? BLUE : RED, whiteSpace: 'nowrap' }}>{money(cur, r.debit || r.credit)} {r.debit ? 'Dr' : 'Cr'}</span>
-              </div>
-            ))}
+            {groupLedgers.map((r, i) => {
+              // TB rows now expose closingDebit/closingCredit; fall back to the
+              // legacy debit/credit shape if the backend isn't redeployed yet.
+              const clDr = r.closingDebit != null ? r.closingDebit : r.debit;
+              const clCr = r.closingCredit != null ? r.closingCredit : r.credit;
+              return (
+                <div key={i} style={tapRow} onClick={() => setLedger(r.ledger)}>
+                  <span style={{ fontSize: 12.5, color: DARK, fontWeight: 600 }}>{r.ledger}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: clDr ? BLUE : RED, whiteSpace: 'nowrap' }}>{money(cur, clDr || clCr)} {clDr ? 'Dr' : 'Cr'}</span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -1007,7 +1385,9 @@ export function LedgerGroupsLive() {
     </div>
   );
   return (
-    <Page title="Ledger Groups — Tally's 28 Pre-Defined Groups" sub="Every ledger belongs to one of these groups; the group fixes whether it lands in the Balance Sheet or P&L.">
+    <Page title="Ledger Groups — Tally's 28 Pre-Defined Groups" sub="Every ledger belongs to one of these groups; the group fixes whether it lands in the Balance Sheet or P&L."
+      right={<button onClick={() => exportToExcel('ledger-groups', [{ key: 'id', label: '#' }, { key: 'name', label: 'Group' }, { key: 'nature', label: 'Nature' }, { key: 'cls', label: 'Golden-Rule Class' }, { key: 'naturalSide', label: 'Natural Side' }, { key: 'statement', label: 'Statement' }, { key: 'parent', label: 'Under' }], groups)} disabled={groups.length === 0} title="Export to Excel"
+        style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: groups.length === 0 ? 'not-allowed' : 'pointer', opacity: groups.length === 0 ? 0.5 : 1 }}>📤 Export</button>}>
       <State q={q} empty={groups.length === 0}>
         <Section title="Balance Sheet" list={groups.filter((g) => g.statement === 'BS')} />
         <Section title="Profit & Loss Account" list={groups.filter((g) => g.statement === 'PL')} />
@@ -1023,7 +1403,9 @@ export function ChartOfAccountsLive({ branch }) {
   const ledgers = q.data || [];
   const groups = useMemo(() => [...new Set(ledgers.map((l) => l.group))].sort(), [ledgers]);
   return (
-    <Page title="Chart of Accounts" sub={`${branchLabel(branch)} · ${ledgers.length} ledgers across ${groups.length} groups`}>
+    <Page title="Chart of Accounts" sub={`${branchLabel(branch)} · ${ledgers.length} ledgers across ${groups.length} groups`}
+      right={<button onClick={() => exportToExcel(`chart-of-accounts-${branchLabel(branch)}`, [{ key: 'group', label: 'Group' }, { key: 'code', label: 'Code' }, { key: 'name', label: 'Ledger' }, { key: 'nature', label: 'Nature' }, { key: 'statement', label: 'Statement' }, { key: 'openingBalance', label: 'Opening Balance' }, { key: 'drCr', label: 'Dr/Cr' }], ledgers)} disabled={ledgers.length === 0} title="Export to Excel"
+        style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: ledgers.length === 0 ? 'not-allowed' : 'pointer', opacity: ledgers.length === 0 ? 0.5 : 1 }}>📤 Export</button>}>
       <State q={q} empty={ledgers.length === 0}>
         <Table>
           <thead><tr style={headRow}><Th>Group</Th><Th>Code</Th><Th>Ledger</Th><Th>Nature</Th><Th>Statement</Th><Th right>Opening</Th></tr></thead>
@@ -1044,6 +1426,154 @@ export function ChartOfAccountsLive({ branch }) {
           </tbody>
         </Table>
       </State>
+    </Page>
+  );
+}
+
+/* ════════════════════ CASH BOOK (live) ═════════════════════════════
+   A true Tally Cash Book: the ledger account of a Cash-in-Hand ledger.
+   Opening b/d → every receipt (Dr) / payment (Cr) with a running balance →
+   closing balance. Derived live from the ledger statement (full history fetched
+   so the period opening is exact for any from/to), no demo data.            */
+export function CashBookLive({ branch }) {
+  const cur = curOf(branch);
+  const [from, setFrom] = useState(todayISO);
+  const [to, setTo] = useState(todayISO);
+  const [view, setView] = useState('detailed'); // detailed | minimal
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(100);
+  const [ledger, setLedger] = useState('');
+  const [voucher, setVoucher] = useState(null); // { id, vno } — drill-down to the voucher
+
+  const chart = useChartOfAccounts(branch);
+  const cashLedgers = useMemo(() => (chart.data || []).filter((l) => /cash/i.test(l.group || '')).sort((a, b) => a.name.localeCompare(b.name)), [chart.data]);
+  const selected = ledger || cashLedgers[0]?.name || '';
+  // Full history (no date filter) → period opening is computed exactly client-side.
+  const q = useLedgerStatement(selected, branch);
+  const d = q.data;
+
+  const signedOpen = (v) => (v.openingSide === 'Cr' ? -1 : 1) * (v.openingBalance || 0);
+  const masterOpen = d ? signedOpen(d) : 0;
+  const allLines = d?.lines || [];
+  // Period opening = master opening + movement strictly before `from`.
+  const periodOpen = useMemo(() => {
+    if (!from) return masterOpen;
+    const f = parseAnyDate(from);
+    let bal = masterOpen;
+    for (const ln of allLines) { const dt = parseAnyDate(ln.date); if (dt && f && dt < f) bal += (ln.debit || 0) - (ln.credit || 0); }
+    return Math.round(bal * 100) / 100;
+  }, [allLines, masterOpen, from]);
+
+  // In-range lines with a running balance carried from the period opening.
+  const rowsFull = useMemo(() => {
+    let run = periodOpen;
+    return allLines.filter((ln) => dateInRange(ln.date, from, to)).map((ln) => {
+      run = Math.round((run + (ln.debit || 0) - (ln.credit || 0)) * 100) / 100;
+      return { date: ln.date, vno: ln.vno, category: ln.category, voucherId: ln.voucherId, debit: ln.debit || 0, credit: ln.credit || 0, particulars: ln.narration || ln.party || ln.category || '', running: run };
+    });
+  }, [allLines, periodOpen, from, to]);
+
+  const receipts = Math.round(rowsFull.reduce((s, r) => s + r.debit, 0));
+  const payments = Math.round(rowsFull.reduce((s, r) => s + r.credit, 0));
+  const closing = Math.round(periodOpen + receipts - payments);
+
+  const term = search.trim().toLowerCase();
+  const rowsShown = useMemo(() => (term ? rowsFull.filter((r) => `${r.vno} ${r.particulars} ${r.category}`.toLowerCase().includes(term)) : rowsFull), [rowsFull, term]);
+  const pageRows = useMemo(() => rowsShown.slice(page * pageSize, page * pageSize + pageSize), [rowsShown, page, pageSize]);
+
+  const expColumns = view === 'minimal'
+    ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'particulars', label: 'Particulars' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }]
+    : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'category', label: 'Type' }, { key: 'particulars', label: 'Particulars' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }, { key: 'running', label: `Balance (${cur})`, num: true }];
+  const printRows = rowsFull.map((r) => ({ ...r, debit: nfmt(r.debit), credit: nfmt(r.credit), running: nfmt(r.running) }));
+  const totalRow = { date: 'CLOSING', vno: '', particulars: '', debit: nfmt(receipts), credit: nfmt(payments), running: nfmt(closing) };
+  const sub = `${selected || 'Cash account'} · ${branchLabel(branch)} · ${rowsFull.length} entries · Closing ${money(cur, closing)}`;
+  const exportNow = () => rowsFull.length && exportToExcel(`cash-book-${branchLabel(branch)}`, expColumns, rowsFull);
+  const printNow = () => rowsFull.length && openReportPrint(`Cash Book — ${selected}`, sub, expColumns, printRows, totalRow);
+
+  const colCount = view === 'detailed' ? 7 : 5;
+  const summary = [
+    { l: 'Opening Balance', v: money(cur, Math.abs(periodOpen)) + (periodOpen < 0 ? ' Cr' : ''), c: BLUE, bg: '#E6F1FB' },
+    { l: 'Total Receipts (Dr)', v: money(cur, receipts), c: GREEN, bg: '#EAF3DE' },
+    { l: 'Total Payments (Cr)', v: money(cur, payments), c: RED, bg: '#FCEBEB' },
+    { l: 'Closing Balance', v: money(cur, Math.abs(closing)) + (closing < 0 ? ' Cr' : ''), c: closing >= 0 ? GREEN : RED, bg: closing >= 0 ? '#EAF3DE' : '#FCEBEB' },
+    { l: 'Entries', v: String(rowsFull.length), c: '#384677', bg: '#f3f4f8' },
+  ];
+
+  return (
+    <Page
+      wide={view === 'detailed'}
+      title="Cash Book"
+      sub={sub}
+      right={<>
+        <select value={selected} onChange={(e) => { setLedger(e.target.value); setPage(0); }} style={{ ...inp, width: 200, minHeight: 32, fontSize: 11, cursor: 'pointer' }}>
+          {cashLedgers.length === 0 && <option value="">No cash ledger</option>}
+          {cashLedgers.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
+        </select>
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Particulars / voucher…" />
+        <ModeToggle view={view} setView={setView} modes={[{ id: 'detailed', label: 'Detailed' }, { id: 'minimal', label: 'Minimal' }]} />
+        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(0)} full />
+        <ExportBtn onClick={exportNow} disabled={!rowsFull.length} />
+        <PrintBtn onClick={printNow} disabled={!rowsFull.length} />
+      </>}
+    >
+      {!chart.isLoading && cashLedgers.length === 0 && <Banner tone="info">No ledger found under the “Cash-in-Hand” group yet. Cash receipts/payments will appear here once posted.</Banner>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 14 }}>
+        {summary.map((k, i) => (
+          <div key={i} style={{ ...card, borderTop: `3px solid ${k.c}`, padding: '10px 12px', background: k.bg }}>
+            <p style={{ margin: 0, fontSize: 9, fontWeight: 700, color: k.c, textTransform: 'uppercase' }}>{k.l}</p>
+            <p style={{ margin: '3px 0 0', fontSize: 17, fontWeight: 800, color: DARK }}>{k.v}</p>
+          </div>
+        ))}
+      </div>
+      <State q={q} empty={!selected ? false : rowsFull.length === 0}>
+        <Table>
+          <thead><tr style={headRow}>
+            <Th>Date</Th><Th>Voucher</Th>
+            {view === 'detailed' && <Th>Type</Th>}
+            <Th>Particulars</Th><Th right>Receipt (Dr)</Th><Th right>Payment (Cr)</Th>
+            {view === 'detailed' && <Th right>Balance</Th>}
+          </tr></thead>
+          <tbody>
+            {page === 0 && !term && (
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #f3f4f8' }}>
+                <td colSpan={colCount - 1} style={{ padding: '8px 12px', fontWeight: 700, color: BLUE }}>Opening Balance b/d</td>
+                <td style={{ padding: '8px 12px', ...num, fontWeight: 700 }}>{money(cur, Math.abs(periodOpen))} {periodOpen < 0 ? 'Cr' : 'Dr'}</td>
+              </tr>
+            )}
+            {pageRows.map((r, i) => (
+              <tr key={r.vno + '-' + i} title={r.voucherId ? 'Open voucher' : ''} onClick={() => r.voucherId && setVoucher({ id: r.voucherId, vno: r.vno })} style={{ ...rowBg(i), background: r.debit > 0 ? '#f4fbf4' : (i % 2 === 0 ? '#fff' : '#fafafa'), cursor: r.voucherId ? 'pointer' : 'default' }}>
+                <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.date}</td>
+                <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE, whiteSpace: 'nowrap' }}>{r.vno}</td>
+                {view === 'detailed' && <td style={{ padding: '7px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: (TYPE_CLR[r.category] || '#384677') + '22', color: TYPE_CLR[r.category] || '#384677' }}>{r.category || '—'}</span></td>}
+                <td style={{ padding: '7px 12px', maxWidth: 360 }}><NarrationCell text={r.particulars} /></td>
+                <td style={{ padding: '7px 12px', ...num, fontWeight: 600, color: r.debit > 0 ? GREEN : '#dfe2ee' }}>{money(cur, r.debit)}</td>
+                <td style={{ padding: '7px 12px', ...num, fontWeight: 600, color: r.credit > 0 ? RED : '#dfe2ee' }}>{money(cur, r.credit)}</td>
+                {view === 'detailed' && <td style={{ padding: '7px 12px', ...num, fontWeight: 700, color: r.running >= 0 ? DARK : RED }}>{money(cur, Math.abs(r.running))} {r.running < 0 ? 'Cr' : ''}</td>}
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
+            <td colSpan={view === 'detailed' ? 4 : 3} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD, fontSize: 12 }}>CLOSING BALANCE</td>
+            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#5ab84b' }}>{money(cur, receipts)}</td>
+            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#F7C1C1' }}>{money(cur, payments)}</td>
+            {view === 'detailed' && <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, Math.abs(closing))} {closing < 0 ? 'Cr' : 'Dr'}</td>}
+          </tr></tfoot>
+        </Table>
+        <Pagination total={rowsShown.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} unit="entries" />
+      </State>
+      {closing < 0 && <Banner tone="err">⚠ Cash book shows a negative (credit) balance. Verify all entries — a physical cash count is required.</Banner>}
+      {voucher && (
+        <div onClick={() => setVoucher(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(840px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+              <Crumb items={[{ label: selected || 'Cash Book', onClick: () => setVoucher(null) }, { label: voucher.vno }]} />
+              <button onClick={() => setVoucher(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
+            </div>
+            <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} />
+          </div>
+        </div>
+      )}
     </Page>
   );
 }

@@ -7,12 +7,13 @@ import React, { useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, Calendar, Check, Clock, Download, Plus, Printer, Save, Search } from 'lucide-react';
 import { Area, Line } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from '../core/business-logic';
-import { ACTIVE_CURRENCIES, ADM_DATA, BRANCHES, BRANCH_CODES, GP_BILLS, PURCHASE_REGISTRY, SALE_TO_PURCH_MOD, branchCurrencies, branchMainCurrency } from '../core/data';
+import { ACTIVE_CURRENCIES, ADM_DATA, BRANCHES, BRANCH_CODES, GP_BILLS, PURCHASE_REGISTRY, SALE_TO_PURCH_MOD, branchCurrencies, branchMainCurrency, genVNo } from '../core/data';
 import { useAdmReasonCodes, useLedgerRegistry } from '../core/useReference';
-import { useLivePurchaseRegistry } from '../core/useVouchers';
+import { useLedgerStatement, useCreateVoucher } from '../core/useAccounting';
+import { useLivePurchaseRegistry, useLiveSalesTickets } from '../core/useVouchers';
 import { fmt, fmtINR } from '../core/format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS } from '../core/dates';
-import { ACM_DATA, ACM_REASON_CODES, LedgerSelect, RECURRING_DATA, REFUNDS_DATA, Recruitment, STATUS_FLOW, TAB_Page, TRow, TrainingRecords, VTD, VTH, _ADM_LIST, _TICKET_CTRL, cardStyle, tabPanel } from '../core/helpers';
+import { ACM_DATA, ACM_REASON_CODES, LedgerSelect, RECURRING_DATA, REFUNDS_DATA, Recruitment, STATUS_FLOW, TAB_Page, TRow, TrainingRecords, VTD, VTH, _ACM_LIST, _ADM_LIST, _TICKET_CTRL, cardStyle, tabPanel } from '../core/helpers';
 import { triggerSaveRefresh, useMobile, useVNo } from '../core/hooks';
 import { ARow, B, DBtn, FL, RPT_tdStyle, RPT_thStyle, SalespersonField, VHead, VNarr, VParty, VTot, VWrap, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../core/styles';
 import { Dashboard } from './dashboard';
@@ -22,6 +23,33 @@ import { ApiKeySettings } from './settings';
 import { Form26AS } from './taxation';
 import { NotificationCentre } from '../shell/NotifPanel';
 import { PHASE2_Page } from '../shell/PHASE2_Page';
+
+/* ════════════════════════════════════════════════════════════════════
+   FINANCE VOUCHER PERSISTENCE
+   Every Finance voucher (Receipt/Payment/Contra/Journal/Credit/Debit/Purchase
+   Expense) posts a balanced double-entry to the live engine (POST /api/vouchers).
+   The backend builds the journal and the reports (Trial Balance, P&L, Balance
+   Sheet, Day Book, GST, ageing) aggregate from it — so a saved voucher updates
+   everything at once. Helpers below are shared by all the voucher forms.
+   ════════════════════════════════════════════════════════════════════ */
+
+// The consolidated "ALL" view can't post (a voucher belongs to one branch);
+// returns the branch code, or null when on ALL.
+export function brCodeOf(branch){ return (branch && branch !== "ALL") ? (branch.code || branch) : null; }
+
+// Travel module → canonical Sales / Purchase ledger name (so a note posts the
+// reversal against the right revenue / cost head; the engine resolves the group
+// from the live chart, defaulting to Sales / Purchase Accounts).
+export const SALES_LEDGER_BY_MODULE = { Flight:"Sales — Air Tickets", Holiday:"Sales — Holiday Packages", Hotel:"Sales — Hotel Bookings", Car:"Sales — Car Rentals", Visa:"Sales — Visa Services", Insurance:"Sales — Travel Insurance", Misc:"Sales — Other Services" };
+export const PURCH_LEDGER_BY_MODULE = { Flight:"Purchase — Air Tickets", Holiday:"Purchase — Land Packages", Hotel:"Purchase — Hotel Costs", Car:"Purchase — Car Rentals", Visa:"Purchase — Visa Costs", Insurance:"Purchase — Insurance Costs", Misc:"Purchase — Other Services" };
+
+// Inline save status banner driven by a react-query mutation result.
+export function VSaveMsg({m,okText}){
+  if(m.isPending) return <div style={{padding:"10px",borderRadius:9,background:"#E6F1FB",fontSize:11,color:"#185FA5",fontWeight:700,textAlign:"center",marginBottom:8}}>Posting voucher…</div>;
+  if(m.isError)   return <div style={{padding:"10px",borderRadius:9,background:"#FCEBEB",fontSize:11,color:"#A32D2D",fontWeight:700,textAlign:"center",marginBottom:8}}>✗ {String(m.error?.message||"Could not save voucher")}</div>;
+  if(m.isSuccess) return <div style={{padding:"10px",borderRadius:9,background:"#EAF3DE",fontSize:11,color:"#27500A",fontWeight:700,textAlign:"center",marginBottom:8}}>{okText}</div>;
+  return null;
+}
 
 export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
   const mob=useMobile();
@@ -1073,6 +1101,33 @@ export function SalesCreditNote({branch,setRoute}){
 
   const modClr={Flight:{bg:"#E6F1FB",c:"#185FA5"},Holiday:{bg:"#EAF3DE",c:"#27500A"},Hotel:{bg:"#FAEEDA",c:"#854F0B"},Car:{bg:"#F3E8FF",c:"#5B21B6"},Visa:{bg:"#FCEBEB",c:"#A32D2D"},Insurance:{bg:"#FEF3C7",c:"#92400E"},Misc:{bg:"#f3f4f8",c:"#5a6691"}};
 
+  // Post each line as its own credit-note voucher (Dr Sales + Dr Output GST, Cr
+  // customer; TCS reversed) so the customer outstanding, GST and reports all drop.
+  const post=useCreateVoucher();
+  const brPost=brCodeOf(branch);
+  const [cnMsg,setCnMsg]=useState(null);
+  const validRows=rows.filter(r=>r.party&&((+r.taxable||0)+(+r.gstAmt||0)+(+r.tcsAmt||0))>0);
+  const postCN=async()=>{
+    if(!brPost||!validRows.length||post.isPending)return;
+    setCnMsg(null);
+    try{
+      for(let i=0;i<validRows.length;i++){
+        const r=validRows[i];
+        const lineTotal=+(((+r.taxable||0)+(+r.gstAmt||0)+(+r.tcsAmt||0)).toFixed(2));
+        await post.mutateAsync({
+          vno:validRows.length>1?`${vNo}-${i+1}`:vNo,
+          type:"SCN", category:"credit-note", branch:brPost, date:r.origDate||todayISO(),
+          party:r.party, partyType:"customer",
+          lines:[{ledger:SALES_LEDGER_BY_MODULE[r.module]||"Sales", amt:+r.taxable||0, desc:r.reason||`Credit note vs ${r.origVno||"invoice"}`}],
+          subtotal:+r.taxable||0, taxAmt:+r.gstAmt||0, tcsAmt:+r.tcsAmt||0, total:lineTotal,
+          linkNo:r.origVno||"", remarks:`Credit note (${cnType}) vs ${r.origVno||"original invoice"}${r.reason?` — ${r.reason}`:""}`,
+          status:"saved",
+        });
+      }
+      setCnMsg({ok:true,text:`✔ ${validRows.length} credit note${validRows.length>1?"s":""} posted · Sales & customer outstanding reduced · GST/TCS reversed`});
+    }catch(e){ setCnMsg({ok:false,text:String(e?.message||"Could not post credit note")}); }
+  };
+
   return (
     <VWrap title="Sales Credit Note" icon="📋" vNo={vNo} branch={branch} type="sales" saleMod="SCN" saleAmt={totCredit||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
@@ -1168,6 +1223,15 @@ export function SalesCreditNote({branch,setRoute}){
           </div>
         </div>
       </VNarr>
+      <div style={{padding:"4px 16px 14px"}}>
+        {cnMsg&&<div style={{padding:"10px",borderRadius:9,fontSize:11,fontWeight:700,textAlign:"center",marginBottom:8,background:cnMsg.ok?"#EAF3DE":"#FCEBEB",color:cnMsg.ok?"#27500A":"#A32D2D"}}>{cnMsg.ok?cnMsg.text:`✗ ${cnMsg.text}`}</div>}
+        {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post to the books.</div>}
+        <div style={{display:"flex",justifyContent:"flex-end"}}>
+          <button onClick={postCN} disabled={!brPost||!validRows.length||post.isPending} style={{...btnG,background:(brPost&&validRows.length)?"#A32D2D":"#bfc3d6",opacity:(!brPost||!validRows.length||post.isPending)?0.6:1}}>
+            📋 Post Credit Note to Books {validRows.length>1?`(${validRows.length} lines)`:""}{post.isPending?" …":""}
+          </button>
+        </div>
+      </div>
     </VWrap>
   );
 }
@@ -2207,10 +2271,38 @@ export function SalesDebitNote({branch,setRoute}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?"BOM":branch?.code||"BOM";
-  const [notes]=useState([]);
+  const [notes,setNotes]=useState([]);
   const REASONS=["Date change fee","Cancellation charge","Excess baggage surcharge","Amendment fee","Upgrade difference","Additional service charge","Other"];
   const [modal,setModal]=useState(false);
   const [form,setForm]=useState({client:"",origVno:"",reason:"Date change fee",amount:0});
+
+  // A debit note here raises an ADDITIONAL charge against the customer — it
+  // increases the customer's receivable and our income. So it posts in the
+  // sale direction (Dr Customer, Cr Income + Output GST), traceable as type SDN.
+  const post=useCreateVoucher();
+  const brPost=brCodeOf(branch);
+  const [dnMsg,setDnMsg]=useState(null);
+  const raiseDN=async()=>{
+    const amt=+form.amount||0;
+    if(!brPost||!form.client.trim()||amt<=0||post.isPending)return;
+    const gst=+(amt*0.18).toFixed(2);
+    const total=+(amt+gst).toFixed(2);
+    const vno=genVNo(branch,"SDN");
+    setDnMsg(null);
+    try{
+      await post.mutateAsync({
+        vno, type:"SDN", category:"sale", branch:brPost, date:todayISO(),
+        party:form.client.trim(), partyType:"customer",
+        lines:[{ledger:"Sales — Other Services", amt, desc:form.reason}],
+        subtotal:amt, taxAmt:gst, total,
+        linkNo:form.origVno||"", remarks:`Debit note — ${form.reason} vs ${form.origVno||"original invoice"}`,
+        status:"saved",
+      });
+      setNotes(ns=>[{id:vno,date:todayISO(),origVno:form.origVno,client:form.client.trim(),reason:form.reason,amount:amt,gst,total,status:"Raised"},...ns]);
+      setForm({client:"",origVno:"",reason:"Date change fee",amount:0});
+      setModal(false);
+    }catch(e){ setDnMsg(String(e?.message||"Could not raise debit note")); }
+  };
 
   return (
     <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
@@ -2259,10 +2351,12 @@ export function SalesDebitNote({branch,setRoute}){
               <FL label="Reason"><select value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} style={inp}>{REASONS.map(r=><option key={r}>{r}</option>)}</select></FL>
               <FL label="Charge amount (excl. GST)"><input type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:+e.target.value}))} style={inp}/></FL>
               <div style={{padding:"9px 12px",borderRadius:8,background:"#E6F1FB",fontSize:10,color:"#185FA5"}}>GST 18% on debit note: {cur}{Math.round(form.amount*0.18).toLocaleString()} · Total: {cur}{Math.round(form.amount*1.18).toLocaleString()}</div>
+              {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10,color:"#854F0B",fontWeight:600}}>Select a specific branch (not “All”) to post this debit note.</div>}
+              {dnMsg&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FCEBEB",fontSize:10,color:"#A32D2D",fontWeight:600}}>✗ {dnMsg}</div>}
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={()=>setModal(false)} style={btnG}>💾 Raise Debit Note</button>
+              <button onClick={raiseDN} disabled={!brPost||!form.client.trim()||(+form.amount||0)<=0||post.isPending} style={{...btnG,opacity:(!brPost||!form.client.trim()||(+form.amount||0)<=0||post.isPending)?0.6:1}}>💾 {post.isPending?"Posting…":"Raise Debit Note"}</button>
             </div>
           </div>
         </div>
@@ -2692,21 +2786,57 @@ export function AdmRegister({branch}){
 
 export function BspSummary({branch}){
   const mob=useMobile();
+  const cfg=bc(branch);
+  const cur=cfg.cur;
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
   const brCode=branch==="ALL"?null:branch?.code;
+  const ADM_REASON_CODES=useAdmReasonCodes().data||{};   // DB-backed (/api/adm-reason-codes)
 
-  /* Compute from real data */
-  const tickets=GP_BILLS.filter(b=>b.mod==="Flight"&&(!brCode||b.branch===brCode)&&b.date.startsWith(period));
-  const grossSales=tickets.reduce((s,b)=>s+b.sell,0);
-  const ticketCost=tickets.reduce((s,b)=>s+b.cost,0);
+  /* Selected month → [from, to] date range (1st → last day of month) */
+  const [py,pm]=period.split("-").map(Number);
+  const from=`${period}-01`;
+  const to=`${period}-${String(new Date(py,pm,0).getDate()).padStart(2,"0")}`;
+
+  /* ── LIVE DATA ────────────────────────────────────────────────────
+     This page now reads the REAL books instead of the (empty) demo
+     arrays it used to filter:
+       · BSP Supplier (Sundry Creditor) ledger → outstanding payable +
+         every posting against it, from the double-entry engine.
+       · Live flight Sales / Purchases         → period settlement maths.
+       · ADM / ACM registers                   → debit / credit memos.   */
+
+  // 1) Resolve the BSP supplier ledger from the live chart of accounts.
+  //    Prefer a Sundry-Creditor "BSP" ledger; fall back to any BSP ledger.
+  const ledgers=useLedgerRegistry(branch).data||[];
+  const bspLedger=ledgers.find(l=>/bsp/i.test(l.name||"")&&/credit/i.test(l.group||""))
+                ||ledgers.find(l=>/bsp/i.test(l.name||"")&&l.type==="Creditor")
+                ||ledgers.find(l=>/bsp/i.test(l.name||""));
+  const bspLedgerName=bspLedger?.name||"BSP India (IATA)";
+
+  // 2) BSP supplier ledger statement — authoritative transactions + balance.
+  const stmtQ=useLedgerStatement(bspLedgerName,branch,{from,to});
+  const stmt=stmtQ.data;
+  const stmtLines=stmt?.lines||[];
+  // Outstanding payable to BSP: a Creditor balance is naturally Cr (positive).
+  const closingPayable=stmt?(stmt.closingSide==="Cr"?stmt.closingBalance:-stmt.closingBalance):0;
+
+  // 3) Live flight sales / purchases for the period settlement computation.
+  const sales=useLiveSalesTickets("SF",brCode).filter(s=>s.date>=from&&s.date<=to);
+  const purch=useLivePurchaseRegistry("PF",brCode).filter(p=>p.date>=from&&p.date<=to);
+  const grossSales=sales.reduce((s,t)=>s+(Number(t.saleAmt)||0),0);
+  const ticketCost=purch.reduce((s,p)=>s+(Number(p.amt)||0),0);
   const commission=Math.round(ticketCost*0.02);
   const bspCharge =Math.round(ticketCost*0.0025);
-  const admTotal  =ADM_DATA.filter(a=>(!brCode||a.branch===brCode)&&a.date.startsWith(period)&&a.currency==="INR").reduce((s,a)=>s+a.amount,0);
-  const acmTotal  =ACM_DATA.filter(a=>(!brCode||a.branch===brCode)&&a.date.startsWith(period)&&a.currency==="INR").reduce((s,a)=>s+a.amount,0);
-  const netBsp    =ticketCost-commission-bspCharge-admTotal+acmTotal;
 
-  const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
+  // 4) ADM / ACM memos for the period (same store the ADM register uses).
+  const admList=_ADM_LIST.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&(!a.currency||a.currency===cur));
+  const acmList=_ACM_LIST.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&(!a.currency||a.currency===cur));
+  const admTotal=admList.reduce((s,a)=>s+(Number(a.amount)||0),0);
+  const acmTotal=acmList.reduce((s,a)=>s+(Number(a.amount)||0),0);
+  const netBsp  =ticketCost-commission-bspCharge-admTotal+acmTotal;
+
+  const f=n=>cur+Number(Math.round(n||0)).toLocaleString("en-IN");
 
   const rows=[
     {label:"Gross ticket sales (BSP)",               amt:grossSales,  type:"neutral",bold:false},
@@ -2729,7 +2859,7 @@ export function BspSummary({branch}){
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>BSP Settlement Summary</h2>
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>
-              Net BSP position — Ticket sales minus ADMs plus ACMs minus BSP charges
+              Linked to <b style={{color:"#185FA5"}}>{bspLedgerName}</b> ({bspLedger?.group||"Sundry Creditors"}) · Net BSP position from live books
             </p>
           </div>
         </div>
@@ -2742,10 +2872,11 @@ export function BspSummary({branch}){
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>
         {[
           {l:"Ticket Sales",      v:f(grossSales), c:"#185FA5",bg:"#E6F1FB"},
-          {l:"Commission Income", v:f(commission), c:"#27500A",bg:"#EAF3DE"},
+          {l:"Ticket Cost (BSP)", v:f(ticketCost), c:"#854F0B",bg:"#FAEEDA"},
           {l:"ADM Debits",        v:f(admTotal),   c:"#A32D2D",bg:"#FCEBEB"},
           {l:"ACM Credits",       v:f(acmTotal),   c:"#1D9E75",bg:"#EAF3DE"},
           {l:"Net Settlement",    v:f(netBsp),     c:netBsp>0?"#27500A":"#A32D2D",bg:netBsp>0?"#EAF3DE":"#FCEBEB"},
+          {l:`BSP Payable (${stmt?.closingSide||"Cr"})`, v:f(Math.abs(closingPayable)), c:"#0d1326",bg:"#eef0f6"},
         ].map((k,i)=>(
           <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"11px 13px",background:k.bg}}>
             <p style={{margin:0,fontSize:9,fontWeight:700,color:k.c,textTransform:"uppercase"}}>{k.l}</p>
@@ -2782,14 +2913,66 @@ export function BspSummary({branch}){
         </table>
       </div>
 
+      {/* BSP Supplier ledger — live transactions & running balance */}
+      <div style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
+        <div style={{padding:"10px 16px",background:"#0d1326",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+          <div>
+            <p style={{margin:0,fontSize:12,fontWeight:700,color:"#d4a437"}}>🔗 BSP Supplier Ledger — {bspLedgerName}</p>
+            <p style={{margin:"2px 0 0",fontSize:9.5,color:"#8b93b3"}}>{bspLedger?.group||"Sundry Creditors"} · {stmtLines.length} postings · {from} → {to}</p>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <p style={{margin:0,fontSize:9,color:"#8b93b3",textTransform:"uppercase",fontWeight:700}}>Outstanding payable</p>
+            <p style={{margin:"2px 0 0",fontSize:16,fontWeight:800,color:closingPayable>=0?"#F7C1C1":"#C0DD97"}}>{f(Math.abs(closingPayable))} {stmt?.closingSide||"Cr"}</p>
+          </div>
+        </div>
+        {stmtQ.isLoading
+          ?<div style={{padding:"24px",textAlign:"center",color:"#5a6691",fontSize:12}}>Loading BSP ledger…</div>
+          :stmtQ.isError
+          ?<div style={{padding:"20px",textAlign:"center",color:"#A32D2D",fontSize:12}}>⚠ Couldn't load BSP ledger — {stmtQ.error?.message||"check your connection"}</div>
+          :(<>
+            <div style={{padding:"8px 16px",background:"#f3f4f8",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between",fontSize:11,flexWrap:"wrap",gap:6}}>
+              <span style={{color:"#5a6691"}}>Opening: {f(stmt?.openingBalance)} {stmt?.openingSide||"Cr"}</span>
+              <span style={{color:"#5a6691"}}>Period: Dr {f(stmt?.totalDebit)} · Cr {f(stmt?.totalCredit)}</span>
+            </div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
+                <thead><tr style={{background:"#0d1326"}}>
+                  {["Date","Voucher","Particulars","Dr","Cr","Balance"].map((h,i)=>(
+                    <th key={i} style={{padding:"8px 12px",textAlign:i>=3?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {stmtLines.length===0&&<tr><td colSpan={6} style={{padding:"24px",textAlign:"center",color:"#5a6691",fontSize:11.5}}>No BSP postings in {PERIODS.find(p=>p.v===period)?.l}. Book a flight purchase or BSP payment against {bspLedgerName}.</td></tr>}
+                  {stmtLines.map((e,i)=>(
+                    <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+                      <td style={{padding:"7px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{e.date}</td>
+                      <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{e.vno}</td>
+                      <td style={{padding:"7px 12px",color:"#384677"}}>{e.narration||e.party||e.category}</td>
+                      <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:e.debit>0?"#185FA5":"#bfc3d6"}}>{e.debit>0?f(e.debit):"—"}</td>
+                      <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:e.credit>0?"#A32D2D":"#bfc3d6"}}>{e.credit>0?f(e.credit):"—"}</td>
+                      <td style={{padding:"7px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:e.balanceSide==="Cr"?"#A32D2D":"#185FA5"}}>{f(Math.abs(e.balance))} {e.balanceSide}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                {stmtLines.length>0&&<tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
+                  <td colSpan={3} style={{padding:"9px 12px",fontWeight:700,color:"#d4a437",fontSize:12}}>CLOSING — {bspLedgerName}</td>
+                  <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(stmt?.totalDebit)}</td>
+                  <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(stmt?.totalCredit)}</td>
+                  <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(Math.abs(closingPayable))} {stmt?.closingSide||"Cr"}</td>
+                </tr></tfoot>}
+              </table>
+            </div>
+          </>)}
+      </div>
+
       {/* ADM/ACM breakdown */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
         {/* ADMs this period */}
         <div style={{...card}}>
           <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#A32D2D"}}>📩 ADMs This Period</p>
-          {ADM_DATA.filter(a=>(!brCode||a.branch===brCode)&&a.date.startsWith(period)).length===0
+          {admList.length===0
             ?<p style={{margin:0,fontSize:11,color:"#5a6691"}}>No ADMs this period</p>
-            :ADM_DATA.filter(a=>(!brCode||a.branch===brCode)&&a.date.startsWith(period)).map(a=>(
+            :admList.map(a=>(
               <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f3f4f8",fontSize:11}}>
                 <div>
                   <p style={{margin:0,fontWeight:600,color:"#0d1326",fontSize:10.5}}>{a.id}</p>
@@ -2805,9 +2988,9 @@ export function BspSummary({branch}){
         {/* ACMs this period */}
         <div style={{...card}}>
           <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#27500A"}}>📨 ACMs This Period</p>
-          {ACM_DATA.filter(a=>(!brCode||a.branch===brCode)&&a.date.startsWith(period)).length===0
+          {acmList.length===0
             ?<p style={{margin:0,fontSize:11,color:"#5a6691"}}>No ACMs this period</p>
-            :ACM_DATA.filter(a=>(!brCode||a.branch===brCode)&&a.date.startsWith(period)).map(a=>(
+            :acmList.map(a=>(
               <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f3f4f8",fontSize:11}}>
                 <div>
                   <p style={{margin:0,fontWeight:600,color:"#0d1326",fontSize:10.5}}>{a.id}</p>
@@ -3177,7 +3360,6 @@ export function ReceiptVoucher({branch}){
   const [tdsAmt,setTdsAmt]=useState(0);
   const [againstInv,setAgainstInv]=useState("");
   const [narration,setNarration]=useState("");
-  const [saved,setSaved]=useState(false);
 
   const bankName=LEDGER_REGISTRY.find(l=>l.id===bankLedger)?.name||bankLedger;
   const partyName=LEDGER_REGISTRY.find(l=>l.id===party)?.name||party;
@@ -3196,6 +3378,21 @@ export function ReceiptVoucher({branch}){
   const autoNarr=()=>{
     const n=`Being receipt from ${partyName} via ${payMode}${utr?` UTR ${utr}`:""}${againstInv?` against ${againstInv}`:""}`;
     setNarration(n);
+  };
+
+  const post=useCreateVoucher();
+  const brPost=brCodeOf(branch);
+  const doSave=()=>{
+    if(!balanced||!brPost||post.isPending)return;
+    post.mutate({
+      vno:vNo, type:"RV", category:"receipt", branch:brPost, date,
+      party:partyName, partyType:"customer",
+      bankRef:bankName,                 // bank/cash ledger NAME drives the posting leg
+      paymentMode:payMode,
+      subtotal:netReceipt, total:grossAmt, tdsAmt:tdsDeducted?tdsAmt:0,
+      remarks:narration||`Being receipt from ${partyName} via ${payMode}${utr?` UTR ${utr}`:""}${againstInv?` against ${againstInv}`:""}`,
+      status:"saved",
+    });
   };
 
   const jEntries=[
@@ -3324,10 +3521,11 @@ export function ReceiptVoucher({branch}){
       <VNarr def={narration||`Being receipt from ${partyName} via ${payMode}${utr?" ref "+utr:""}${againstInv?" against "+againstInv:""}`}/>
       <VTot label="Total Receipt" val={amount} cur={cur}/>
 
-      {saved&&<div style={{padding:"10px 14px",borderRadius:9,background:"#EAF3DE",fontSize:11,color:"#27500A",fontWeight:700,textAlign:"center"}}>✔ Receipt Voucher {vNo} saved · Ledger {partyName} updated</div>}
+      <VSaveMsg m={post} okText={`✔ Receipt Voucher ${vNo} posted · ${partyName} & ${bankName} updated · Trial Balance / Day Book refreshed`}/>
+      {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this voucher.</div>}
       <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:10}}>
-        <button onClick={()=>setSaved(true)} disabled={!balanced} style={{...btnG,opacity:!balanced?0.5:1,background:balanced?"#27500A":"#bfc3d6"}}>
-          💾 Post Receipt {!balanced?"(Balance First)":""}
+        <button onClick={doSave} disabled={!balanced||!brPost||post.isPending} style={{...btnG,opacity:(!balanced||!brPost||post.isPending)?0.5:1,background:(balanced&&brPost)?"#27500A":"#bfc3d6"}}>
+          💾 Post Receipt {!balanced?"(Balance First)":post.isPending?"…":""}
         </button>
       </div>
     </VWrap>
@@ -3357,7 +3555,6 @@ export function PaymentVoucher({branch}){
   const [tdsAmt,setTdsAmt]=useState(0);
   const [againstInv,setAgainstInv]=useState("");
   const [narration,setNarration]=useState("");
-  const [saved,setSaved]=useState(false);
   const [isBsp,setIsBsp]=useState(false);
 
   const partyName=LEDGER_REGISTRY.find(l=>l.id===party)?.name||party;
@@ -3382,6 +3579,21 @@ export function PaymentVoucher({branch}){
   const tDr=jEntries.filter(e=>e.side==="Dr").reduce((s,e)=>s+e.amount,0);
   const tCr=jEntries.filter(e=>e.side==="Cr").reduce((s,e)=>s+e.amount,0);
   const balanced=Math.abs(tDr-tCr)<0.01;
+
+  const post=useCreateVoucher();
+  const brPost=brCodeOf(branch);
+  const doSave=()=>{
+    if(!balanced||!brPost||post.isPending)return;
+    post.mutate({
+      vno:vNo, type:"PMT", category:"payment", branch:brPost, date,
+      party:partyName, partyType:"supplier",
+      bankRef:bankName,                 // bank/cash ledger NAME drives the posting leg
+      paymentMode:payMode,
+      subtotal:netBank, total:grossAmt, tdsAmt:deductTds?tdsAmt:0,
+      remarks:narration||`Being payment to ${partyName} via ${payMode}${utr?` UTR ${utr}`:""}${againstInv?` against ${againstInv}`:""}`,
+      status:"saved",
+    });
+  };
 
   return (
     <VWrap title="Payment Voucher" icon="💸" vNo={vNo} branch={branch}>
@@ -3478,10 +3690,11 @@ export function PaymentVoucher({branch}){
       </div>
 
       <VTot label="Total Payment" val={amount} cur={cur}/>
-      {saved&&<div style={{padding:"10px",borderRadius:9,background:"#EAF3DE",fontSize:11,color:"#27500A",fontWeight:700,textAlign:"center"}}>✔ Payment Voucher {vNo} posted · {partyName} ledger updated{deductTds&&tdsAmt>0?` · TDS ${f(tdsAmt)} to deposit by 7th`:""}</div>}
+      <VSaveMsg m={post} okText={`✔ Payment Voucher ${vNo} posted · ${partyName} ledger updated${deductTds&&tdsAmt>0?` · TDS ${f(tdsAmt)} to deposit by 7th`:""}`}/>
+      {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this voucher.</div>}
       <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:10}}>
-        <button onClick={()=>setSaved(true)} disabled={!balanced} style={{...btnG,background:balanced?"#A32D2D":"#bfc3d6",opacity:!balanced?0.6:1}}>
-          💸 Post Payment {!balanced?"(Balance First)":""}
+        <button onClick={doSave} disabled={!balanced||!brPost||post.isPending} style={{...btnG,background:(balanced&&brPost)?"#A32D2D":"#bfc3d6",opacity:(!balanced||!brPost||post.isPending)?0.6:1}}>
+          💸 Post Payment {!balanced?"(Balance First)":post.isPending?"…":""}
         </button>
       </div>
     </VWrap>
@@ -3505,11 +3718,26 @@ export function ContraVoucher({branch}){
   const [amount,setAmount]=useState(10000);
   const [ref,setRef]=useState("");
   const [narration,setNarration]=useState("");
-  const [saved,setSaved]=useState(false);
   const fromName=LEDGER_REGISTRY.find(l=>l.id===fromLedger)?.name||fromLedger;
   const toName  =LEDGER_REGISTRY.find(l=>l.id===toLedger)?.name||toLedger;
   const isSame=fromLedger===toLedger;
   const f=n=>cur+Number(Math.round(n)).toLocaleString("en-IN");
+
+  const post=useCreateVoucher();
+  const brPost=brCodeOf(branch);
+  const doSave=()=>{
+    if(isSame||amount<=0||!brPost||post.isPending)return;
+    post.mutate({
+      vno:vNo, type:"CV", category:"contra", branch:brPost, date,
+      party:"", partyType:"bank",
+      bankRef:fromName,                       // source (Cr) bank/cash ledger NAME
+      lines:[{ledger:toName, amt:amount, desc:`Transfer in from ${fromName}`}], // destination (Dr)
+      subtotal:amount, total:amount,
+      remarks:narration||`Being contra — transfer from ${fromName} to ${toName}${ref?` (${ref})`:""}`,
+      status:"saved",
+    });
+  };
+
   return (
     <VWrap title="Contra Entry" icon="🔄" vNo={vNo} branch={branch}>
       <VHead vNo={vNo}/>
@@ -3544,9 +3772,10 @@ export function ContraVoucher({branch}){
           </div>
         ))}
       </div>
-      {saved&&<div style={{padding:"10px",borderRadius:9,background:"#EAF3DE",fontSize:11,color:"#27500A",fontWeight:700,textAlign:"center",marginBottom:8}}>✔ Contra {vNo} posted</div>}
+      <VSaveMsg m={post} okText={`✔ Contra ${vNo} posted · ${fromName} → ${toName}`}/>
+      {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this voucher.</div>}
       <div style={{display:"flex",justifyContent:"flex-end"}}>
-        <button onClick={()=>setSaved(true)} disabled={isSame||amount<=0} style={{...btnG,background:!isSame&&amount>0?"#185FA5":"#bfc3d6",opacity:isSame||amount<=0?0.5:1}}>🔄 Post Contra</button>
+        <button onClick={doSave} disabled={isSame||amount<=0||!brPost||post.isPending} style={{...btnG,background:(!isSame&&amount>0&&brPost)?"#185FA5":"#bfc3d6",opacity:(isSame||amount<=0||!brPost||post.isPending)?0.5:1}}>🔄 Post Contra</button>
       </div>
     </VWrap>
   );
@@ -3602,7 +3831,6 @@ export function JournalEntry({branch}){
   ]);
   const [date,setDate]=useState(todayISO());
   const [masterNarr,setMasterNarr]=useState("Being GST payment for April 2026");
-  const [saved,setSaved]=useState(false);
 
   const upd=(id,k,v)=>setEntries(es=>es.map(e=>e.id===id?{...e,[k]:v}:e));
   const add=()=>setEntries(es=>[...es,{id:Date.now(),ledger:"",dr:0,cr:0,narr:""}]);
@@ -3616,6 +3844,26 @@ export function JournalEntry({branch}){
   const balanced=Math.abs(tDr-tCr)<0.01;
   const f=n=>n>0?cur+Number(Math.round(n)).toLocaleString("en-IN"):"—";
   const getLedgerName=id=>LEDGER_REGISTRY.find(l=>l.id===id)?.name||id;
+
+  const post=useCreateVoucher();
+  const brPost=brCodeOf(branch);
+  const postLines=entries.filter(e=>e.ledger&&((+e.dr||0)!==0||(+e.cr||0)!==0));
+  const canPost=balanced&&postLines.length>=2&&brPost;
+  const doSave=()=>{
+    if(!canPost||post.isPending)return;
+    post.mutate({
+      vno:vNo, type:"JV", category:"journal", branch:brPost, date,
+      lines:postLines.map(e=>({
+        ledger:getLedgerName(e.ledger),
+        amt:(+e.dr||0)>0?+e.dr:+e.cr,
+        drCr:(+e.dr||0)>0?"Dr":"Cr",
+        desc:e.narr||"",
+      })),
+      subtotal:tDr, total:tDr,
+      remarks:masterNarr,
+      status:"saved",
+    });
+  };
 
   return (
     <VWrap title="Journal Entry" icon="📒" vNo={vNo} branch={branch}>
@@ -3700,10 +3948,212 @@ export function JournalEntry({branch}){
       </div>}
 
       <VNarr def={masterNarr}/>
-      {saved&&<div style={{padding:"10px",borderRadius:9,background:"#EAF3DE",fontSize:11,color:"#27500A",fontWeight:700,textAlign:"center",marginBottom:8}}>✔ Journal Entry {vNo} posted · {entries.length} ledgers updated</div>}
+      <VSaveMsg m={post} okText={`✔ Journal Entry ${vNo} posted · ${postLines.length} ledgers updated · Trial Balance refreshed`}/>
+      {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this voucher.</div>}
       <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-        <button onClick={()=>setSaved(true)} disabled={!balanced||entries.length<2} style={{...btnG,background:balanced&&entries.length>=2?"#185FA5":"#bfc3d6",opacity:!balanced||entries.length<2?0.6:1}}>
-          📒 Post Journal {!balanced?"(Balance First)":entries.length<2?"(Min 2 lines)":""}
+        <button onClick={doSave} disabled={!canPost||post.isPending} style={{...btnG,background:canPost?"#185FA5":"#bfc3d6",opacity:(!canPost||post.isPending)?0.6:1}}>
+          📒 Post Journal {!balanced?"(Balance First)":postLines.length<2?"(Min 2 lines)":!brPost?"(Pick Branch)":post.isPending?"…":""}
+        </button>
+      </div>
+    </VWrap>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PURCHASE EXPENSE VOUCHER  /purchase-expense
+   Supplier expenses & asset purchases bought on credit, with GST:
+     Expense / Asset A/c   Dr
+     Input CGST/SGST/IGST  Dr
+     To Supplier A/c       Cr
+   Posts a real balanced journal (category 'purchase-expense', type PXP) so the
+   ledgers, Trial Balance, P&L (expense) / Balance Sheet (asset), GST report and
+   supplier outstanding all update at once.
+   ════════════════════════════════════════════════════════════════ */
+
+export function PurchaseExpenseVoucher({branch}){
+  const mob=useMobile();
+  const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];   // live chart of accounts
+  const vNo=useVNo(branch,"PXP");
+  const cfg=bc(branch);
+  const cur=cfg.cur;
+  const GST_RATES=[0,5,12,18,28];
+
+  const [date,setDate]=useState(todayISO());
+  const [party,setParty]=useState("");
+  const [lines,setLines]=useState([{id:1,ledger:"",amt:0,desc:""}]);
+  const [gstApplicable,setGstApplicable]=useState(true);
+  const [gstMode,setGstMode]=useState("intra");   // intra → CGST+SGST · inter → IGST
+  const [gstPct,setGstPct]=useState(18);
+  const [narration,setNarration]=useState("");
+  const [attachments,setAttachments]=useState([]);
+  const [attName,setAttName]=useState("");
+
+  const getLedgerName=id=>LEDGER_REGISTRY.find(l=>l.id===id)?.name||id;
+  const partyLedger=LEDGER_REGISTRY.find(l=>l.id===party);
+  const partyName=partyLedger?.name||party;
+  const partyGroup=partyLedger?.group||"";
+
+  const updLine=(id,k,v)=>setLines(ls=>ls.map(l=>l.id===id?{...l,[k]:v}:l));
+  const addLine=()=>setLines(ls=>[...ls,{id:Date.now(),ledger:"",amt:0,desc:""}]);
+  const rmLine=id=>setLines(ls=>ls.length>1?ls.filter(l=>l.id!==id):ls);
+  const addAtt=()=>{ if(attName.trim()){ setAttachments(a=>[...a,{name:attName.trim()}]); setAttName(""); } };
+
+  const lineRows=lines.filter(l=>(+l.amt||0)!==0);
+  const taxable=lineRows.reduce((s,l)=>s+(+l.amt||0),0);
+  const gstAmt=gstApplicable?+(taxable*gstPct/100).toFixed(2):0;
+  const total=+(taxable+gstAmt).toFixed(2);
+  const cgst=gstMode==="intra"?+(gstAmt/2).toFixed(2):0;
+  const sgst=gstMode==="intra"?+(gstAmt-cgst).toFixed(2):0;
+  const igst=gstMode==="inter"?gstAmt:0;
+  const f=n=>cur+Number(Math.round(n)).toLocaleString("en-IN");
+
+  const jEntries=[
+    ...lineRows.map(l=>({side:"Dr",ledger:getLedgerName(l.ledger)||"Expense/Asset",amount:+l.amt||0,note:l.desc||"Expense / asset"})),
+    ...(gstApplicable&&gstAmt>0?(gstMode==="intra"
+        ?[{side:"Dr",ledger:"CGST Input",amount:cgst,note:`CGST @ ${gstPct/2}%`},{side:"Dr",ledger:"SGST Input",amount:sgst,note:`SGST @ ${gstPct/2}%`}]
+        :[{side:"Dr",ledger:"IGST Input",amount:igst,note:`IGST @ ${gstPct}%`}]):[]),
+    {side:"Cr",ledger:partyName||"Supplier",amount:total,note:"Supplier / vendor (Sundry Creditor)"},
+  ];
+
+  const post=useCreateVoucher();
+  const brPost=brCodeOf(branch);
+  const canPost=!!brPost&&!!party&&lineRows.length>0&&lineRows.every(l=>l.ledger)&&total>0;
+  const submit=(status)=>{
+    if(!canPost||post.isPending)return;
+    post.mutate({
+      vno:vNo, type:"PXP", category:"purchase-expense", branch:brPost, date,
+      party:partyName, partyType:"supplier", partyGroup,
+      lines:lineRows.map(l=>({ledger:getLedgerName(l.ledger), amt:+l.amt||0, desc:l.desc||""})),
+      subtotal:taxable, taxAmt:gstAmt, gstMode:gstApplicable?gstMode:"", total,
+      attachments:attachments.filter(a=>a.name.trim()).map(a=>({name:a.name.trim(),url:a.url||""})),
+      remarks:narration||`Being ${gstApplicable?"GST ":""}expense/asset purchase from ${partyName}`,
+      status,
+    });
+  };
+
+  return (
+    <VWrap title="Purchase Expense Voucher" icon="🧾" vNo={vNo} branch={branch}>
+      <VHead vNo={vNo}/>
+
+      <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:14,padding:"14px 0"}}>
+        <FL label="Voucher date"><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inp}/></FL>
+        <FL label="Supplier / Vendor (party ledger — Cr)">
+          <LedgerSelect value={party} onChange={setParty} filter={l=>l.type==="Creditor"} placeholder="Sundry Creditors / Supplier Others..."/>
+        </FL>
+      </div>
+
+      {/* Debit side — expense & asset ledgers */}
+      <p style={{margin:"0 0 6px",fontSize:10.5,fontWeight:700,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px"}}>Debit — expense / asset ledgers</p>
+      <div style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:640}}>
+            <thead><tr style={{background:"#0d1326"}}>
+              <th style={{padding:"8px 10px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5,width:34}}>#</th>
+              <th style={{padding:"8px 10px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>Expense / Asset Ledger</th>
+              <th style={{padding:"8px 10px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>Description</th>
+              <th style={{padding:"8px 10px",textAlign:"right",color:"#5da0e0",fontWeight:700,fontSize:9.5,width:140}}>Amount ({cur})</th>
+              <th style={{width:32}}/>
+            </tr></thead>
+            <tbody>
+              {lines.map((l,i)=>(
+                <tr key={l.id} style={{borderBottom:"1px solid #f3f4f8",background:(+l.amt||0)>0?"#f0f8ff":"#fff"}}>
+                  <td style={{padding:"4px 8px",textAlign:"center",fontSize:10.5,color:"#5a6691"}}>{i+1}</td>
+                  <td style={{padding:"3px 6px",minWidth:240}}>
+                    <LedgerSelect value={l.ledger} onChange={v=>updLine(l.id,"ledger",v)} filter={x=>x.type==="Expense"||x.type==="Asset"} placeholder="Office Rent / Computer Asset..." style={{minHeight:30,fontSize:10.5}}/>
+                  </td>
+                  <td style={{padding:"3px 6px"}}>
+                    <input value={l.desc} onChange={e=>updLine(l.id,"desc",e.target.value)} style={{...inp,minHeight:30,fontSize:10.5}} placeholder="e.g. June office rent / 5× laptops"/>
+                  </td>
+                  <td style={{padding:"3px 6px"}}>
+                    <input type="number" value={l.amt||""} onChange={e=>updLine(l.id,"amt",+e.target.value||0)} placeholder="0.00" style={{...inp,textAlign:"right",minHeight:30,fontSize:11,color:"#185FA5",fontWeight:600}}/>
+                  </td>
+                  <td style={{padding:"3px 6px",textAlign:"center"}}>
+                    <button onClick={()=>rmLine(l.id)} style={{background:"transparent",border:"none",cursor:"pointer",color:"#A32D2D",fontSize:16,lineHeight:1}}>✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+                <td colSpan={3} style={{padding:"8px 10px"}}><button onClick={addLine} style={{...btnGh,fontSize:10.5,padding:"4px 12px"}}><Plus size={12}/> Add Line</button></td>
+                <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,fontVariantNumeric:"tabular-nums",color:"#185FA5",fontSize:14}}>{f(taxable)}</td>
+                <td/>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* GST panel */}
+      <div style={{padding:"12px 14px",borderRadius:10,background:"#E6F1FB",border:"1px solid #c7ddf5",marginBottom:12}}>
+        <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:gstApplicable?10:0}}>
+          <input type="checkbox" checked={gstApplicable} onChange={e=>setGstApplicable(e.target.checked)} style={{cursor:"pointer",accentColor:"#185FA5"}}/>
+          <span style={{fontSize:11.5,fontWeight:700,color:"#185FA5"}}>GST Applicable (Input Tax Credit)</span>
+        </label>
+        {gstApplicable&&<div style={{display:"grid",gridTemplateColumns:mob?"1fr":"auto auto 1fr",gap:12,alignItems:"end"}}>
+          <FL label="Supply type">
+            <div style={{display:"flex",gap:6}}>
+              {[["intra","Intra-state (CGST+SGST)"],["inter","Inter-state (IGST)"]].map(([k,lab])=>(
+                <button key={k} onClick={()=>setGstMode(k)} style={{padding:"6px 11px",borderRadius:6,fontSize:10.5,fontWeight:600,cursor:"pointer",
+                  background:gstMode===k?"#185FA5":"#fff",color:gstMode===k?"#fff":"#384677",border:"1.5px solid "+(gstMode===k?"#185FA5":"#c7ddf5")}}>{lab}</button>
+              ))}
+            </div>
+          </FL>
+          <FL label="GST rate">
+            <select value={gstPct} onChange={e=>setGstPct(+e.target.value)} style={{...inp,minWidth:90}}>{GST_RATES.map(r=><option key={r} value={r}>{r}%</option>)}</select>
+          </FL>
+          <div style={{display:"flex",gap:14,flexWrap:"wrap",justifyContent:"flex-end",fontSize:11}}>
+            {gstMode==="intra"?<>
+              <span>CGST <b style={{color:"#185FA5"}}>{f(cgst)}</b></span>
+              <span>SGST <b style={{color:"#185FA5"}}>{f(sgst)}</b></span>
+            </>:<span>IGST <b style={{color:"#185FA5"}}>{f(igst)}</b></span>}
+            <span>Taxable <b>{f(taxable)}</b></span>
+          </div>
+        </div>}
+      </div>
+
+      {/* Accounting effect */}
+      <div style={{marginBottom:12,padding:"12px 14px",borderRadius:10,background:"#f3f4f8",border:"1px solid #e1e3ec"}}>
+        <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#0d1326"}}>📒 Accounting Effect (Double Entry)</p>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+          <thead><tr style={{background:"#0d1326"}}>{["Dr/Cr","Ledger","Amount","Note"].map((h,i)=><th key={i} style={{padding:"6px 10px",textAlign:i===2?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>{h}</th>)}</tr></thead>
+          <tbody>{jEntries.map((e,i)=>(
+            <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:e.side==="Dr"?"#f0f8ff":"#f0fff4"}}>
+              <td style={{padding:"7px 10px",fontWeight:800,color:e.side==="Dr"?"#185FA5":"#27500A",fontFamily:"monospace"}}>{e.side}</td>
+              <td style={{padding:"7px 10px",fontWeight:500}}>{e.ledger}</td>
+              <td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(e.amount)}</td>
+              <td style={{padding:"7px 10px",fontSize:10,color:"#5a6691"}}>{e.note}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+
+      {/* Narration + attachments */}
+      <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:12,marginBottom:12}}>
+        <FL label="Narration"><textarea value={narration} onChange={e=>setNarration(e.target.value)} rows={2} style={{...inp,resize:"vertical"}} placeholder="e.g. Being office rent for June 2026 payable to ABC Realtors..."/></FL>
+        <FL label="Attachments (bill / invoice reference)">
+          <div style={{display:"flex",gap:6}}>
+            <input value={attName} onChange={e=>setAttName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addAtt();}}} style={{...inp,flex:1}} placeholder="Filename or reference..."/>
+            <button onClick={addAtt} style={{...btnGh,padding:"4px 10px"}}>＋ Attach</button>
+          </div>
+          {attachments.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6}}>
+            {attachments.map((a,i)=>(
+              <span key={i} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:10,padding:"3px 8px",borderRadius:999,background:"#f3f4f8",color:"#384677",border:"1px solid #e1e3ec"}}>
+                📎 {a.name}<button onClick={()=>setAttachments(x=>x.filter((_,j)=>j!==i))} style={{background:"transparent",border:"none",cursor:"pointer",color:"#A32D2D"}}>✕</button>
+              </span>
+            ))}
+          </div>}
+          <p style={{margin:"4px 0 0",fontSize:9,color:"#8b94b3"}}>References are saved with the voucher; binary file upload to storage is not yet wired.</p>
+        </FL>
+      </div>
+
+      <VTot label="Total Invoice Value" val={total} cur={cur}/>
+      <VSaveMsg m={post} okText={`✔ Purchase Expense Voucher ${vNo} posted · ${partyName} outstanding ↑ · ledgers / Trial Balance / GST report refreshed`}/>
+      {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this voucher.</div>}
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}>
+        <button onClick={()=>submit("draft")} disabled={!canPost||post.isPending} style={{...btnGh,opacity:(!canPost||post.isPending)?0.5:1}}>Save Draft</button>
+        <button onClick={()=>submit("saved")} disabled={!canPost||post.isPending} style={{...btnG,background:canPost?"#27500A":"#bfc3d6",opacity:(!canPost||post.isPending)?0.6:1}}>
+          🧾 Post Voucher {!party?"(Select Supplier)":lineRows.length===0?"(Add a Line)":post.isPending?"…":""}
         </button>
       </div>
     </VWrap>
@@ -4279,150 +4729,6 @@ export function VoucherEntryTabbed(){
         </div>
       )}
     </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   4. REPORT VIEWER (9 tabs) — generic report wrapper
-   ════════════════════════════════════════════════════════════════════ */
-
-
-export function BulkVoucherImport(){
-  const [step,setStep]=useState(1);
-  const [vType,setVType]=useState("Payment Voucher");
-  const vTypes=[
-    {type:"Receipt Voucher",icon:"⬇",desc:"Customer receipts in bulk"},
-    {type:"Payment Voucher",icon:"⬆",desc:"Vendor payments in bulk"},
-    {type:"Journal Voucher",icon:"📒",desc:"Adjustments, provisions, corrections"},
-    {type:"Tax Invoice (Sales)",icon:"📄",desc:"Batch sales invoice creation"},
-    {type:"Purchase Invoice",icon:"📥",desc:"Vendor bills from CSV/Excel"},
-    {type:"Contra Voucher",icon:"🔄",desc:"Bank-to-bank transfers"},
-  ];
-  const inp={padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%"};
-
-  const PREVIEW_ROWS=[
-    {r:1,date:"2026-05-01",party:"Air India Ltd. (BSP)",ledger:"Air India BSP Payable",amount:4250000,branch:"BOM",status:"valid"},
-    {r:2,date:"2026-05-01",party:"Dubai Wonders DMC",ledger:"DMC Payable",amount:1240000,branch:"BOM",status:"valid"},
-    {r:4,date:"2026-05-02",party:"",ledger:"Marriott Group",amount:680000,branch:"BOM",status:"error",msg:"Party name missing"},
-    {r:5,date:"2026-05-03",party:"VFS Global",ledger:"VFS Payable",amount:0,branch:"BOM",status:"error",msg:"Amount cannot be 0"},
-    {r:6,date:"2026-05-03",party:"Hertz Car Rental",ledger:"Hertz Payable",amount:450000,branch:"AMD",status:"warning",msg:"Possible duplicate of PV-AMD/2026/1015"},
-    {r:7,date:"2026-05-04",party:"Bajaj Allianz Ins.",ledger:"Insurance Payable",amount:380000,branch:"BOM",status:"valid"},
-  ];
-
-  return (
-    <PHASE2_Page title="Bulk Voucher Import via Excel"
-      subtitle="Post multiple vouchers in one shot from a spreadsheet — supports Receipt, Payment, Journal, Sales, Purchase">
-      {/* Stepper */}
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18,padding:"14px 18px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:8}}>
-        {[{n:1,label:"Voucher Type"},{n:2,label:"Template & Upload"},{n:3,label:"Preview & Post"}].map((s,i,arr)=>(
-          <div key={s.n} style={{display:"flex",alignItems:"center",gap:10,flex:1}}>
-            <div style={{width:34,height:34,borderRadius:"50%",background:step>=s.n?"#d4a437":"#e1e3ec",color:step>=s.n?"#0d1326":"#5a6691",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:13,flexShrink:0}}>{step>s.n?"✓":s.n}</div>
-            <div><p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{s.label}</p></div>
-            {i<arr.length-1&&<div style={{flex:1,height:2,background:step>s.n?"#d4a437":"#e1e3ec",marginLeft:4}}/>}
-          </div>
-        ))}
-      </div>
-
-      {step===1&&(
-        <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:20}}>
-          <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#0d1326"}}>What type of vouchers are you importing?</p>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
-            {vTypes.map(v=>(
-              <label key={v.type} style={{padding:14,border:vType===v.type?"2px solid #d4a437":"1px solid #e1e3ec",borderRadius:6,cursor:"pointer",background:vType===v.type?"#fff8e8":"#fff",display:"flex",alignItems:"flex-start",gap:10}}>
-                <input type="radio" checked={vType===v.type} onChange={()=>setVType(v.type)} style={{marginTop:3}}/>
-                <div><p style={{margin:0,fontSize:12.5,fontWeight:700,color:"#0d1326"}}>{v.icon} {v.type}</p><p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{v.desc}</p></div>
-              </label>
-            ))}
-          </div>
-          <div style={{marginTop:18,display:"flex",gap:10,alignItems:"center"}}>
-            <label style={{fontSize:11.5,color:"#5a6691"}}>Branch:</label>
-            <select style={{...inp,width:160}} defaultValue="BOM"><option>All branches</option><option>BOM</option><option>AMD</option></select>
-            <label style={{fontSize:11.5,color:"#5a6691",marginLeft:8}}>Period:</label>
-            <select style={{...inp,width:180}}><option>May 2026</option><option>Apr 2026</option><option>Mar 2026</option></select>
-          </div>
-          <div style={{marginTop:20,display:"flex",justifyContent:"flex-end"}}>
-            <button onClick={()=>setStep(2)} style={{padding:"9px 22px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>Next →</button>
-          </div>
-        </div>
-      )}
-
-      {step===2&&(
-        <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:20}}>
-          <p style={{margin:"0 0 4px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Importing: <span style={{color:"#d4a437"}}>{vType}</span></p>
-          <p style={{margin:"0 0 14px",fontSize:11.5,color:"#5a6691"}}>Required columns: Date · Party Name · Ledger · Amount · Narration · Branch · Currency</p>
-          <div style={{padding:16,background:"#fafbfd",border:"1px dashed #cbd0dc",borderRadius:6,marginBottom:14}}>
-            <p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>📥 Download Template</p>
-            <p style={{margin:"4px 0 10px",fontSize:11,color:"#5a6691"}}>Get the pre-formatted Excel sheet with sample rows, data validation, and dropdown menus</p>
-            <div style={{display:"flex",gap:8}}>
-              <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #d4a437",color:"#d4a437",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>📥 Download Template.xlsx</button>
-              <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:5,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📋 Download Sample CSV</button>
-            </div>
-          </div>
-          <div style={{padding:32,background:"#fff",border:"2px dashed #cbd0dc",borderRadius:8,textAlign:"center"}}>
-            <p style={{margin:0,fontSize:32}}>📤</p>
-            <p style={{margin:"6px 0 4px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Drag &amp; drop your file here, or click to browse</p>
-            <p style={{margin:"0 0 10px",fontSize:11,color:"#5a6691"}}>Supports .xlsx, .xls, .csv · Max 5 MB · Max 1000 rows per batch</p>
-            <button style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>📁 Browse Files</button>
-          </div>
-          <div style={{marginTop:20,display:"flex",justifyContent:"space-between"}}>
-            <button onClick={()=>setStep(1)} style={{padding:"9px 18px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>← Back</button>
-            <button onClick={()=>setStep(3)} style={{padding:"9px 22px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>Validate →</button>
-          </div>
-        </div>
-      )}
-
-      {step===3&&(
-        <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:20}}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
-            <div style={{padding:12,background:"#d4edda",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:22,fontWeight:700,color:"#155724"}}>4</p><p style={{margin:0,fontSize:11,color:"#155724",fontWeight:600}}>Ready to post</p></div>
-            <div style={{padding:12,background:"#fff3cd",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:22,fontWeight:700,color:"#856404"}}>1</p><p style={{margin:0,fontSize:11,color:"#856404",fontWeight:600}}>Duplicate warning</p></div>
-            <div style={{padding:12,background:"#f8d7da",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:22,fontWeight:700,color:"#721c24"}}>2</p><p style={{margin:0,fontSize:11,color:"#721c24",fontWeight:600}}>Errors (will skip)</p></div>
-            <div style={{padding:12,background:"#e6e8f1",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(PREVIEW_ROWS.filter(r=>r.status==="valid").reduce((s,r)=>s+r.amount,0))}</p><p style={{margin:0,fontSize:11,color:"#5a6691",fontWeight:600}}>Total valid value</p></div>
-          </div>
-          <div style={{border:"1px solid #e1e3ec",borderRadius:6,overflow:"hidden",marginBottom:16}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-              <thead style={{background:"#f7f8fb"}}><tr><th style={RPT_thStyle}>Row</th><th style={RPT_thStyle}>Date</th><th style={RPT_thStyle}>Party</th><th style={RPT_thStyle}>Ledger</th><th style={{...RPT_thStyle,textAlign:"right"}}>Amount</th><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
-              <tbody>{PREVIEW_ROWS.map(r=>(
-                <tr key={r.r} style={{background:r.status==="error"?"#fff5f5":r.status==="warning"?"#fffbed":"#fff",borderBottom:"1px solid #f0f2f7"}}>
-                  <td style={{...RPT_tdStyle,color:"#5a6691"}}>{r.r}</td>
-                  <td style={{...RPT_tdStyle,fontFamily:"monospace"}}>{r.date}</td>
-                  <td style={RPT_tdStyle}>{r.party||<span style={{color:"#A32D2D"}}>—</span>}</td>
-                  <td style={{...RPT_tdStyle,color:"#5a6691"}}>{r.ledger}</td>
-                  <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{r.amount>0?fmtINR(r.amount):<span style={{color:"#A32D2D"}}>0</span>}</td>
-                  <td style={RPT_tdStyle}><span style={{padding:"1px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{r.branch}</span></td>
-                  <td style={{...RPT_tdStyle,textAlign:"center"}}>
-                    {r.status==="valid"&&<span style={{padding:"2px 8px",background:"#d4edda",color:"#155724",borderRadius:3,fontSize:10,fontWeight:700}}>✓ Valid</span>}
-                    {r.status==="warning"&&<span title={r.msg} style={{padding:"2px 8px",background:"#fff3cd",color:"#856404",borderRadius:3,fontSize:10,fontWeight:700,cursor:"help"}}>⚠ {r.msg?.split(" ").slice(0,2).join(" ")}</span>}
-                    {r.status==="error"&&<span title={r.msg} style={{padding:"2px 8px",background:"#f8d7da",color:"#721c24",borderRadius:3,fontSize:10,fontWeight:700,cursor:"help"}}>✗ {r.msg}</span>}
-                  </td>
-                </tr>
-              ))}</tbody>
-            </table>
-          </div>
-          <div style={{padding:10,background:"#fafbfd",borderRadius:6,marginBottom:16}}>
-            <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"#0d1326",cursor:"pointer"}}>
-              <input type="checkbox"/>
-              Post all 4 valid vouchers to BOM · May 2026. Voucher numbers will be assigned automatically using the Numbering Series Master.
-            </label>
-          </div>
-          <div style={{display:"flex",justifyContent:"space-between"}}>
-            <button onClick={()=>setStep(2)} style={{padding:"9px 18px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>← Back</button>
-            <div style={{display:"flex",gap:8}}>
-              <button style={{padding:"9px 16px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Download Error Report</button>
-              <button style={{padding:"9px 22px",background:"#22c55e",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>✓ Post 4 Valid Vouchers</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div style={{marginTop:16,padding:14,background:"#fff",border:"1px solid #e1e3ec",borderRadius:8}}>
-        <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Recent batch imports</p>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Date</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>By</th><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"right"}}>Rows</th><th style={{...RPT_thStyle,textAlign:"right"}}>Posted</th><th style={{...RPT_thStyle,textAlign:"right"}}>Total Value</th></tr></thead>
-          <tbody>{[{date:"2026-05-15",type:"Payment Voucher",user:"Rohan",branch:"BOM",rows:18,posted:16,value:12450000},{date:"2026-04-30",type:"Receipt Voucher",user:"Mohan",branch:"AMD",rows:12,posted:11,value:4200000}].map((r,i)=>(<tr key={i}><td style={RPT_tdStyle}>{r.date}</td><td style={RPT_tdStyle}>{r.type}</td><td style={RPT_tdStyle}>{r.user}</td><td style={RPT_tdStyle}><span style={{padding:"1px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{r.branch}</span></td><td style={{...RPT_tdStyle,textAlign:"right"}}>{r.rows}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#22c55e"}}>{r.posted}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(r.value)}</td></tr>))}</tbody>
-        </table>
-      </div>
-    </PHASE2_Page>
   );
 }
 

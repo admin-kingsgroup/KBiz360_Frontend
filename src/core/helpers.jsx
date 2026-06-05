@@ -7,8 +7,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronRight, Download, Lock, Plus, Printer, Save, Search, Settings, User } from 'lucide-react';
 import { Cell } from 'recharts';
 import { exportToCSV } from './business-logic';
-import { ADM_DATA, CASH, FY_TARGETS_DATA, GP_BILLS, HR_EMPLOYEES_DATA, NOTIFICATIONS_DATA, _EXP_BGT_LISTENERS, _EXP_BUDGETS } from './data';
+import { exportToExcel } from './exportExcel';
+import { ADM_DATA, CASH, FY_TARGETS_DATA, GP_BILLS, HR_EMPLOYEES_DATA, NOTIFICATIONS_DATA, SUBAGENTS, _EXP_BGT_LISTENERS, _EXP_BUDGETS } from './data';
 import { useLedgerRegistry } from './useReference';
+import { useGpBills } from './useAccounting';
 import { fmt, fmtINR } from './format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS, PERIOD_OPTIONS as MONTH_PERIOD_OPTIONS, FY_YTD_MONTHS } from './dates';
 import { useMobile } from './hooks';
@@ -22,6 +24,14 @@ import { ContraVoucher, PaymentVoucher, ReceiptVoucher } from '../modules/transa
 export const VTH=({c,r})=><th style={{textAlign:r?"right":"left",padding:"6px 8px",fontWeight:500,color:"#5a6691",fontSize:10.5,whiteSpace:"nowrap",background:"#f3f4f8"}}>{c}</th>;
 
 export const VTD=({c,r})=><td style={{padding:"4px 7px",textAlign:r?"right":"left",fontSize:11,fontVariantNumeric:r?"tabular-nums":"normal"}}>{c}</td>;
+
+// "Export to Excel" toolbar button for the masters defined in this file. Pass the
+// rows array + {key,label} columns; greys out when there's nothing to export.
+export const HExportBtn=({name,columns,rows,label="📤 Export"})=>{
+  const empty=!rows||rows.length===0;
+  return <button onClick={()=>exportToExcel(name,columns,rows||[])} disabled={empty} title="Export to Excel"
+    style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11,cursor:empty?"not-allowed":"pointer",opacity:empty?0.5:1}}>{label}</button>;
+};
 
 export const BANK_LIST_V=[
   "HDFC Bank CA — Nariman Point","HDFC Bank CA — Ahmedabad","ICICI Bank CA — Fort",
@@ -283,7 +293,10 @@ export function MarkupRateSheet({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Per-client markup rules · GP floor alerts · All modules</p>
           </div>
         </div>
-        <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Add Rule</button>
+        <div style={{display:"flex",gap:8}}>
+          <HExportBtn name="markup-rules" rows={rules} columns={[{key:"id",label:"ID"},{key:"client",label:"Client / Segment"},{key:"type",label:"Type"},{key:"module",label:"Module"},{key:"markupType",label:"Markup Type"},{key:"value",label:"Markup Value"},{key:"floor",label:"GP Floor %"},{key:"note",label:"Notes"}]}/>
+          <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Add Rule</button>
+        </div>
       </div>
 
       {alertCount>0&&<div style={{marginBottom:12,padding:"10px 14px",borderRadius:9,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:10.5,color:"#A32D2D",fontWeight:600,display:"flex",gap:8}}>
@@ -797,84 +810,6 @@ export function PackagePnL({branch}){
   );
 }
 
-/* ── SUB-AGENT COMMISSION STATEMENT ──────────────────────────── */
-
-export function SubAgentStatement({branch}){
-  const mob=useMobile();
-  const brCode=branch==="ALL"?null:branch?.code;
-  const [agent,setAgent]=useState("SA001");
-  const [period,setPeriod]=useState(CUR_MONTH);
-  const PERIODS=MONTH_OPTIONS;
-  const selAgent=SUBAGENTS?.find(s=>s.id===agent)||{name:"Skyline Travels",commType:"% of GP",commRate:15,creditDays:30};
-  const bills=useMemo(()=>GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period)).slice(0,12),[brCode,period]);
-  const commAmt=b=>selAgent.commType?.includes("%")?Math.round((b.sell-b.cost)*(selAgent.commRate||10)/100):(selAgent.commRate||500);
-  const totRev=bills.reduce((s,b)=>s+b.sell,0);
-  const totGP=bills.reduce((s,b)=>s+b.sell-b.cost,0);
-  const totComm=bills.reduce((s,b)=>s+commAmt(b),0);
-  const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
-
-  return(
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🤝</div>
-          <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Sub-Agent Commission Statement</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{selAgent.name} · {PERIODS.find(p=>p.v===period)?.l} · {selAgent.commType} {selAgent.commRate}{selAgent.commType?.includes("%")?"%":"₹"}</p>
-          </div>
-        </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <select value={agent} onChange={e=>setAgent(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-            {(SUBAGENTS||[]).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-            {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-          </select>
-          <button onClick={()=>window.open(`https://wa.me/?text=${encodeURIComponent(`Commission Statement for ${period}: Total bookings ${bills.length}, Revenue ${f(totRev)}, Your commission ${f(totComm)}`)}`, "_blank","noopener")} style={{...btnG,fontSize:11,background:"#25D366"}}>💬 WhatsApp</button>
-          <button onClick={()=>window.print()} style={{...btnGh,fontSize:11}}><Printer size={12}/> Print</button>
-        </div>
-      </div>
-
-      {/* Summary */}
-      <div style={{...card,marginBottom:14}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10}}>
-<div style={{textAlign:"center",padding:"8px 10px",borderRadius:8,background:"#f3f4f8"}}><p style={{margin:0,fontSize:8.5,color:"#5a6691",textTransform:"uppercase"}}>Total Revenue</p><p style={{margin:"2px 0 0",fontSize:13,fontWeight:700,color:"#0d1326"}}>{f(totRev)}</p></div><div style={{textAlign:"center",padding:"8px 10px",borderRadius:8,background:"#f3f4f8"}}><p style={{margin:0,fontSize:8.5,color:"#5a6691",textTransform:"uppercase"}}>Total GP</p><p style={{margin:"2px 0 0",fontSize:13,fontWeight:700,color:"#0d1326"}}>{f(totGP)}</p></div><div style={{textAlign:"center",padding:"8px 10px",borderRadius:8,background:"#f3f4f8"}}><p style={{margin:0,fontSize:8.5,color:"#5a6691",textTransform:"uppercase"}}>Bookings</p><p style={{margin:"2px 0 0",fontSize:13,fontWeight:700,color:"#0d1326"}}>{String(bills.length)}</p></div><div style={{textAlign:"center",padding:"8px 10px",borderRadius:8,background:"#f3f4f8"}}><p style={{margin:0,fontSize:8.5,color:"#5a6691",textTransform:"uppercase"}}>Commission Rate</p><p style={{margin:"2px 0 0",fontSize:13,fontWeight:700,color:"#0d1326"}}>{`${selAgent.commRate}${selAgent.commType?.includes("%")?"%":"\u20b9/bk"}`}</p></div><div style={{textAlign:"center",padding:"8px 10px",borderRadius:8,background:"#EAF3DE",border:"1px solid #C0DD97"}}><p style={{margin:0,fontSize:8.5,color:"#5a6691",textTransform:"uppercase"}}>Commission Due</p><p style={{margin:"2px 0 0",fontSize:16,fontWeight:800,color:"#27500A"}}>{f(totComm)}</p></div>
-        </div>
-      </div>
-
-      <div style={{...card,padding:0,overflow:"hidden"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr style={{background:"#0d1326"}}>
-            {["Date","Booking ID","Client","Module","Sell Price","GP","Commission"].map((h,i)=>(
-              <th key={i} style={{padding:"9px 12px",textAlign:i>=4?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
-            ))}
-          </tr></thead>
-          <tbody>{bills.map((b,i)=>(
-            <tr key={b.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-              <td style={{padding:"8px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{b.date}</td>
-              <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{b.id}</td>
-              <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{b.client}</td>
-              <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5"}}>{b.mod}</span></td>
-              <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(b.sell)}</td>
-              <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#27500A"}}>{f(b.sell-b.cost)}</td>
-              <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,color:"#27500A",fontVariantNumeric:"tabular-nums"}}>{f(commAmt(b))}</td>
-            </tr>
-          ))}</tbody>
-          <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
-            <td colSpan={4} style={{padding:"9px 12px",fontWeight:700,color:"#d4a437",fontSize:12}}>COMMISSION PAYABLE — {selAgent.name}</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(totRev)}</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totGP)}</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totComm)}</td>
-          </tr></tfoot>
-        </table>
-      </div>
-      <div style={{marginTop:10,display:"flex",gap:8,justifyContent:"flex-end"}}>
-        <button style={{...btnG,background:"#27500A",fontSize:11}}>💸 Record Commission Payment</button>
-      </div>
-    </div>
-  );
-}
-
 /* ── REFUND TRACKER ──────────────────────────────────────────── */
 
 export const REFUNDS_DATA=[];
@@ -1093,6 +1028,8 @@ export function SeatInventory({branch}){
     {id:"SI004",flight:"AI-101",route:"DEL-LHR",date:"2026-06-16",aircraft:"B777",classConfig:[{cls:"Economy",total:240,held:14,sold:220,avail:6},{cls:"Business",total:48,held:1,sold:40,avail:7}],status:"Open",dep:"01:45"},
   ];
   const filtered=SEATS.filter(s=>!search||(s.flight+s.route).toLowerCase().includes(search.toLowerCase()));
+  // Flatten the per-flight class config into one row per flight × cabin class for export.
+  const seatRows=filtered.flatMap(s=>s.classConfig.map(c=>({flight:s.flight,route:s.route,date:s.date,dep:s.dep,aircraft:s.aircraft,status:s.status,cls:c.cls,total:c.total,sold:c.sold,held:c.held,avail:c.avail})));
   const STATUS_CLR={"Near Full":"#A32D2D",Open:"#27500A",Closed:"#5a6691"};
 
   return(
@@ -1108,6 +1045,7 @@ export function SeatInventory({branch}){
         <div style={{display:"flex",gap:8}}>
           <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}/>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Flight / route..." style={{...inp,width:160,minHeight:32,fontSize:11}}/>
+          <HExportBtn name="seat-inventory" rows={seatRows} columns={[{key:"flight",label:"Flight"},{key:"route",label:"Route"},{key:"date",label:"Date"},{key:"dep",label:"Departure"},{key:"aircraft",label:"Aircraft"},{key:"status",label:"Status"},{key:"cls",label:"Class"},{key:"total",label:"Total Seats"},{key:"sold",label:"Sold"},{key:"held",label:"Held"},{key:"avail",label:"Available"}]}/>
           <button style={{...btnG,fontSize:11}}><Plus size={13}/> Reserve Seats</button>
         </div>
       </div>
@@ -1570,7 +1508,7 @@ export function DocumentTypeMaster(){
         <p style={{margin:0,fontSize:12,color:"#5a6691"}}>10 document templates configured · {DOCUMENT_TYPES_DATA.filter(d=>d.active).length} active</p>
         <div style={{flex:1}}/>
         <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
-        <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📤 Export</button>
+        <HExportBtn name="document-types" rows={DOCUMENT_TYPES_DATA} columns={[{key:"type",label:"Document Type"},{key:"layout",label:"Layout"},{key:"header",label:"Header"},{key:"footer",label:"Footer"},{key:"numberingSeries",label:"Numbering Series"},{key:"active",label:"Active"}]}/>
         <button style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Document Type</button>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(360px,1fr))",gap:12}}>

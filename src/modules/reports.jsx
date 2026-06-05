@@ -7,11 +7,14 @@ import React, { useMemo, useState } from 'react';
 import { Download, Printer, Save, Search } from 'lucide-react';
 import { Bar, Legend, Line } from 'recharts';
 import { exportToCSV } from '../core/business-logic';
+import { exportToExcel } from '../core/exportExcel';
 import { ACTIVE_CURRENCIES, BRANCHES, BRANCH_CODES, CASH, CURRENCY_META, EXP_ACTUALS, FX_RATES, GP_BILLS, HR_EMPLOYEES_DATA, MODULE_ICONS } from '../core/data';
 import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../core/useReference';
+import { useBalanceSheet, useGpBills, useModulePL, useAgeing } from '../core/useAccounting';
 import { fmt, fmtINR } from '../core/format';
-import { CUR_MONTH, CUR_FY, MONTH_OPTIONS, PERIOD_OPTIONS, FY_MONTHS, FY_YTD_MONTHS, ALL_TIME_FROM, todayISO, fmtDate, rangeNote, monthLabel, prevMonthKey } from '../core/dates';
-import { BUILDER_FIELD_CATALOG, DEMO_REPORT_DATA, DrillModal, ExportDropdown, GRP_COLORS, PKG_D, PKG_SC, PackagePnL, SAVED_VIEWS_DATA, SCHEDULED_REPORTS_DATA, Sparkline, SubAgentStatement, TAB_Page, cardStyle, tabPanel } from '../core/helpers';
+import { CUR_MONTH, CUR_FY, MONTH_OPTIONS, PERIOD_OPTIONS, FY_MONTHS, FY_YTD_MONTHS, ALL_TIME_FROM, todayISO, fmtDate, rangeNote, monthLabel, prevMonthKey, presetRange, fyQuarterKey } from '../core/dates';
+import { ReportDateBar, resolveReportRange, priorYearRange } from '../core/reportDateBar';
+import { BUILDER_FIELD_CATALOG, DEMO_REPORT_DATA, DrillModal, ExportDropdown, GRP_COLORS, PKG_D, PKG_SC, PackagePnL, SAVED_VIEWS_DATA, SCHEDULED_REPORTS_DATA, Sparkline, TAB_Page, cardStyle, tabPanel } from '../core/helpers';
 import { useBgtRefresh, useMobile } from '../core/hooks';
 import { B, FL, KpiCard, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../core/styles';
 import { Dashboard } from './dashboard';
@@ -350,61 +353,91 @@ export function ReportCF({branch}){
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
 
-  const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period));
-  const actuals=EXP_ACTUALS.filter(a=>(!brCode||a.br===brCode)&&a.m===period);
-  const hr=HR_EMPLOYEES_DATA.filter(e=>!brCode||e.branch===brCode);
+  // LIVE indirect cash flow — derived from two double-entry Balance Sheet
+  // snapshots (opening = end of prior month, closing = end of selected month)
+  // plus the period's Module P&L. No fabricated ratios; empty books → empty state.
+  const monthEnd=(key)=>{const[y,m]=String(key).split("-").map(Number);const last=new Date(y,m,0).getDate();return `${key}-${String(last).padStart(2,"0")}`;};
+  const to=monthEnd(period);
+  const openTo=monthEnd(prevMonthKey(period));
+  const qPL=useModulePL(branch,{from:`${period}-01`,to});
+  const qC=useBalanceSheet(branch,{to});
+  const qO=useBalanceSheet(branch,{to:openTo});
+  const loading=qPL.isLoading||qC.isLoading||qO.isLoading;
+  const errored=qPL.isError||qC.isError||qO.isError;
 
-  const revenue=bills.reduce((s,b)=>s+b.sell,0);
-  const cogs=bills.reduce((s,b)=>s+b.cost,0);
-  const expenses=actuals.reduce((s,a)=>s+a.a,0);
-  const salaries=hr.reduce((s,e)=>s+(e.basic+e.hra+e.da+e.travel+e.medical-e.pf-e.esi-e.tds),0);
-  const netProfit=revenue-cogs-expenses;
-  const depn=actuals.filter(a=>a.id==="DEP").reduce((s,a)=>s+a.a,0);
-  const debtorIncrease=revenue*0.08;
-  const creditorDecrease=cogs*0.05;
-  const advanceReceived=revenue*0.04;
+  const gmap=d=>{const m={};[...(d?.assets||[]),...(d?.liabilities||[])].forEach(x=>{m[x.group]=(m[x.group]||0)+(x.amount||0);});return m;};
+  const C=gmap(qC.data), O=gmap(qO.data);
+  const g=(m,k)=>m[k]||0;
+  const cashOf=m=>g(m,"Bank Accounts")+g(m,"Cash-in-Hand");
 
-  const operatingCF=netProfit+depn-debtorIncrease+creditorDecrease+advanceReceived;
-  const investingCF=-15000; // minor asset purchase
-  const financingCF=-salaries*0.03; // loan repayment equivalent
-  const netCF=operatingCF+investingCF+financingCF;
-  const openingCash=Math.abs(netProfit)*3.2;
-  const closingCash=openingCash+netCF;
+  const netProfit=qPL.data?qPL.data.bridge.netProfit||0:0;
+  const depn=qPL.data?(((qPL.data.indirect&&qPL.data.indirect.groups)||[]).filter(x=>/deprec|amortis|amortiz/i.test(x.name)).reduce((s,x)=>s+(x.amount||0),0)):0;
+
+  const dRecv=g(C,"Sundry Debtors")-g(O,"Sundry Debtors");
+  const dPay =g(C,"Sundry Creditors")-g(O,"Sundry Creditors");
+  const dInv =g(C,"Stock-in-Hand")-g(O,"Stock-in-Hand");
+  const dFA  =(g(C,"Fixed Assets")+g(C,"Investments"))-(g(O,"Fixed Assets")+g(O,"Investments"));
+  const dCap =g(C,"Capital Account")-g(O,"Capital Account");
+  const dBorrow=(g(C,"Loans (Liability)")+g(C,"Bank OD Accounts"))-(g(O,"Loans (Liability)")+g(O,"Bank OD Accounts"));
+
+  const operatingCF=netProfit+depn-dRecv+dPay-dInv;
+  const investingCF=-dFA;
+  const financingCF=dCap+dBorrow;
+  const openingCash=cashOf(O);
+  const closingCash=cashOf(C);
+  const netCF=closingCash-openingCash;                     // actual cash movement (reconciles to the BS)
+  const other=netCF-(operatingCF+investingCF+financingCF); // unclassified balancing line
 
   const sections=[
-    {title:"A. OPERATING ACTIVITIES",color:"#185FA5",bg:"#E6F1FB",rows:[
-      {l:"Net Profit before tax",v:netProfit,bold:false},
-      {l:"Add: Depreciation (non-cash)",v:depn,bold:false},
-      {l:"Add: Advance from clients",v:advanceReceived,bold:false},
-      {l:"Less: Increase in trade receivables"  ,v:-debtorIncrease,bold:false},
-      {l:"Less: Decrease in trade payables",v:-creditorDecrease,bold:false},
+    {title:"A. OPERATING ACTIVITIES",color:"#185FA5",rows:[
+      {l:"Net Profit before tax",v:netProfit},
+      {l:"Add: Depreciation & amortisation (non-cash)",v:depn},
+      {l:"(Increase) / decrease in trade receivables",v:-dRecv},
+      {l:"Increase / (decrease) in trade payables",v:dPay},
+      {l:"(Increase) / decrease in inventories",v:-dInv},
       {l:"Net Cash from Operating Activities",v:operatingCF,bold:true,border:true},
     ]},
-    {title:"B. INVESTING ACTIVITIES",color:"#27500A",bg:"#EAF3DE",rows:[
-      {l:"Purchase of fixed assets / equipment",v:investingCF,bold:false},
+    {title:"B. INVESTING ACTIVITIES",color:"#27500A",rows:[
+      {l:"Net (purchase) / sale of fixed assets & investments",v:investingCF},
       {l:"Net Cash from Investing Activities",v:investingCF,bold:true,border:true},
     ]},
-    {title:"C. FINANCING ACTIVITIES",color:"#854F0B",bg:"#FAEEDA",rows:[
-      {l:"Loan repayments / drawings",v:financingCF,bold:false},
+    {title:"C. FINANCING ACTIVITIES",color:"#854F0B",rows:[
+      {l:"Change in share / capital account",v:dCap},
+      {l:"Change in borrowings",v:dBorrow},
       {l:"Net Cash from Financing Activities",v:financingCF,bold:true,border:true},
     ]},
   ];
+  if(Math.abs(other)>=1) sections.push({title:"D. OTHER MOVEMENTS",color:"#5a6691",rows:[
+    {l:"Unclassified / other balance movements",v:other,bold:true,border:true},
+  ]});
 
-  const f=n=>{const abs=Math.abs(Math.round(n));const fmt=cur+abs.toLocaleString("en-IN");return n<0?`(${fmt})`:fmt;};
+  const f=n=>{const abs=Math.abs(Math.round(n));const s=cur+abs.toLocaleString("en-IN");return n<0?`(${s})`:s;};
   const clr=n=>n>=0?"#27500A":"#A32D2D";
+  const hasData=!!qC.data && (Math.abs(closingCash)>0.01||Math.abs(openingCash)>0.01||Math.abs(netProfit)>0.01);
 
   return (
     <div style={{padding:"12px 10px",maxWidth:900,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Cash Flow Statement</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Indirect method · {monthLabel(period)} · {brCode||"Travkings Group"}</p>
-          <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {rangeNote('month',{month:period})} · use selector to change</p>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Indirect method · {monthLabel(period)} · {brCode||"All branches"} · live double-entry</p>
         </div>
         <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
           {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
         </select>
       </div>
+
+      {loading && <div style={{...card,textAlign:"center",color:"#5a6691",fontSize:12.5,padding:"40px 14px"}}>Loading live books…</div>}
+      {!loading && errored && <div style={{...card,textAlign:"center",color:"#A32D2D",fontSize:12.5,padding:"40px 14px"}}>Could not load accounting data.</div>}
+      {!loading && !errored && !hasData && (
+        <div style={{...card,textAlign:"center",padding:"44px 14px"}}>
+          <div style={{fontSize:34,marginBottom:8}}>📭</div>
+          <h3 style={{margin:"0 0 6px",fontSize:15,color:"#0d1326"}}>No transactions found</h3>
+          <p style={{margin:0,fontSize:12,color:"#5a6691"}}>Cash flow is derived from posted vouchers for {monthLabel(period)}. Record transactions to populate this statement.</p>
+        </div>
+      )}
+
+      {!loading && !errored && hasData && (<>
       {sections.map((sec,si)=>(
         <div key={si} style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
           <div style={{padding:"10px 14px",background:sec.color}}>
@@ -431,7 +464,7 @@ export function ReportCF({branch}){
                 <td style={{padding:"11px 14px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#384677"}}>{f(openingCash)}</td>
               </tr>
               <tr key="nc" style={{background:"#fff",borderBottom:"1px solid #f3f4f8"}}>
-                <td style={{padding:"11px 14px",fontWeight:400,color:"#0d1326"}}>Net Change in Cash (A+B+C)</td>
+                <td style={{padding:"11px 14px",fontWeight:400,color:"#0d1326"}}>Net Change in Cash</td>
                 <td style={{padding:"11px 14px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:clr(netCF)}}>{f(netCF)}</td>
               </tr>
               <tr key="cl" style={{background:"#0d1326",borderBottom:"1px solid #f3f4f8"}}>
@@ -442,9 +475,10 @@ export function ReportCF({branch}){
         </table>
       </div>
       <div style={{...card,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:10,color:"#185FA5"}}>
-        Cash Flow computed using indirect method: Net Profit + non-cash items ± working capital changes.
+        Indirect method from live double-entry: opening vs closing Balance Sheet (Bank + Cash), Net Profit + non-cash items ± working-capital changes.
         Positive = cash generated, Negative (in brackets) = cash used.
       </div>
+      </>)}
     </div>
   );
 }
@@ -726,14 +760,22 @@ export function ReportSalesReg({branch}){
   );
 }
 
-const BR_D=[
-  {branch:"BOM", rev:38500000,gp:6850000,gpPct:17.8,color:"#185FA5"},
-  {branch:"AMD", rev:14200000,gp:2480000,gpPct:17.5,color:"#854F0B"},
-];
-
 export function ReportBranch(){
-  const maxR=Math.max(...BR_D.map(b=>b.rev));
-  const totR=BR_D.reduce((s,b)=>s+b.rev,0);
+  const PALETTE=["#185FA5","#854F0B","#27500A","#A32D2D","#5B21B6","#0d7a6b"];
+  // LIVE — one row per booking file from the double-entry engine, grouped by
+  // branch. No hardcoded branch figures; empty books → empty state.
+  const q=useGpBills("ALL",{});
+  const bills=q.data||[];
+  const BR_D=useMemo(()=>{
+    const m={};
+    bills.forEach(b=>{const code=b.branch||"—";if(!m[code])m[code]={branch:code,rev:0,gp:0};m[code].rev+=(+b.sell||0);m[code].gp+=((+b.sell||0)-(+b.cost||0));});
+    return Object.values(m).map((r,i)=>({...r,gpPct:r.rev>0?+(r.gp/r.rev*100).toFixed(1):0,color:PALETTE[i%PALETTE.length]})).sort((a,b)=>b.rev-a.rev);
+  },[bills]);
+  const hasData=BR_D.length>0;
+  const maxR=Math.max(...BR_D.map(b=>b.rev),1);
+  const totR=BR_D.reduce((s,b)=>s+b.rev,0)||1;
+  if(q.isLoading) return <RptShell title="Branch Comparison" subtitle="All branches · live double-entry"><div style={{...card,textAlign:"center",color:"#5a6691",fontSize:12.5,padding:"40px 14px"}}>Loading live data…</div></RptShell>;
+  if(!hasData) return <RptShell title="Branch Comparison" subtitle="All branches · live double-entry"><div style={{...card,textAlign:"center",padding:"44px 14px"}}><div style={{fontSize:34,marginBottom:8}}>📭</div><h3 style={{margin:"0 0 6px",fontSize:15,color:"#0d1326"}}>No transactions found</h3><p style={{margin:0,fontSize:12,color:"#5a6691"}}>Branch revenue and gross profit appear here once sale/purchase vouchers are posted.</p></div></RptShell>;
   return (
     <RptShell title="Branch Comparison" subtitle="FY 2026-27 (Apr–May) · All branches">
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:14}}>
@@ -853,28 +895,49 @@ export function ReportGP({branch,setRoute}){
   const cur=cfg.cur;
   const [tab,setTab]=useState("summary");
   const [search,setSearch]=useState("");
-  const [dateFrom,setDateFrom]=useState(ALL_TIME_FROM);
+  const [periodMode,setPeriodMode]=useState("ytd");        // all | month | quarter | ytd | custom
+  const [periodGran,setPeriodGran]=useState("month");      // month | quarter (Monthly / Quarterly view)
+  const [dateFrom,setDateFrom]=useState(CUR_FY.startISO);  // default: FY start → today (year-to-date)
   const [dateTo,setDateTo]=useState(todayISO());
   const [modFilter,setModFilter]=useState("All");
   const [sortCol,setSortCol]=useState("gp");
   const [sortDir,setSortDir]=useState("desc");
 
-  /* ── Filter + enrich bills ── */
+  /* ── Live booking-file GP list from the double-entry engine (real data) ──
+       One row per file (vouchers sharing a Link No) with module / airline /
+       destination / client / supplier / consultant / branch, so every tab below
+       is a pure client-side pivot. Empty in → "no data" message (not zeros). */
+  const gpQuery=useGpBills(branch,{from:dateFrom||undefined,to:dateTo||undefined});
+  const GP_DATA=gpQuery.data||[];
+
+  /* ── Period presets — one shared window map (All / Monthly / Quarterly / YTD) ── */
+  const setPeriod=(mode)=>{
+    setPeriodMode(mode);
+    if(mode==="custom")return;                             // user edits From / To directly
+    const r=presetRange(mode);                             // month | quarter | ytd | all
+    setDateFrom(r.from); setDateTo(r.to);
+    if(mode==="month"){setPeriodGran("month");setTab("period");}
+    else if(mode==="quarter"){setPeriodGran("quarter");setTab("period");}
+    else setTab("summary");                                // ytd / all → overview
+  };
+  const onDate=(setter)=>(e)=>{setter(e.target.value);setPeriodMode("custom");};
+
+  /* ── Filter + enrich bills (server scopes branch+date; client adds module /
+       search and a defensive date guard so empty bounds = "no limit") ── */
   const bills=useMemo(()=>{
     const brCode=branch==="ALL"?null:branch?.code;
-    return GP_BILLS
+    const q=search.trim().toLowerCase();
+    return GP_DATA
       .filter(b=>(
         (!brCode||b.branch===brCode)&&
-        b.date>=dateFrom&&b.date<=dateTo&&
+        (!dateFrom||b.date>=dateFrom)&&(!dateTo||b.date<=dateTo)&&
         (modFilter==="All"||b.mod===modFilter)&&
-        (!search||b.id.toLowerCase().includes(search.toLowerCase())||
-         b.client.toLowerCase().includes(search.toLowerCase())||
-         b.dest.toLowerCase().includes(search.toLowerCase())||
-         b.airline.toLowerCase().includes(search.toLowerCase())||
-         b.supplier.toLowerCase().includes(search.toLowerCase()))
+        (!q||[b.id,b.client,b.dest,b.airline,b.supplier].some(x=>String(x||"").toLowerCase().includes(q)))
       ))
-      .map(b=>({...b,gp:b.sell-b.cost,gpPct:+((b.sell-b.cost)/b.sell*100).toFixed(1)}));
-  },[branch,dateFrom,dateTo,modFilter,search]);
+      .map(b=>({...b,gp:b.sell-b.cost,gpPct:b.sell>0?+((b.sell-b.cost)/b.sell*100).toFixed(1):0}));
+  },[GP_DATA,branch,dateFrom,dateTo,modFilter,search]);
+
+  const hasData=!gpQuery.isLoading&&!gpQuery.error&&bills.length>0;
 
   const totSell=bills.reduce((s,b)=>s+b.sell,0);
   const totCost=bills.reduce((s,b)=>s+b.cost,0);
@@ -888,18 +951,46 @@ export function ReportGP({branch,setRoute}){
     return Object.values(m).map(r=>({...r,gpPct:r.sell>0?+(r.gp/r.sell*100).toFixed(1):0}));
   };
 
-  /* ── Monthly data ── */
+  /* ── Monthly buckets — derived from the data in range (no hard-coded months) ── */
   const monthly=useMemo(()=>{
-    const months=["Dec'25","Jan'26","Feb'26","Mar'26","Apr'26","May'26"];
-    const keys=["2025-12","2026-01","2026-02","2026-03","2026-04","2026-05"];
-    return months.map((m,i)=>{
-      const rows=bills.filter(b=>b.date.startsWith(keys[i]));
-      const sell=rows.reduce((s,b)=>s+b.sell,0);
-      const cost=rows.reduce((s,b)=>s+b.cost,0);
-      const gp=sell-cost;
-      return {m:m,sell:sell,cost:cost,gp:gp,gpPct:sell>0?+(gp/sell*100).toFixed(1):0,count:rows.length};
+    const map=new Map();
+    bills.forEach(b=>{
+      const k=String(b.date).slice(0,7);                   // YYYY-MM
+      if(!/^\d{4}-\d{2}$/.test(k))return;
+      if(!map.has(k))map.set(k,{sell:0,cost:0,count:0});
+      const r=map.get(k);r.sell+=b.sell;r.cost+=b.cost;r.count++;
+    });
+    return [...map.keys()].sort().map(k=>{
+      const r=map.get(k),gp=r.sell-r.cost;
+      return {key:k,m:monthLabel(k),sell:r.sell,cost:r.cost,gp,gpPct:r.sell>0?+(gp/r.sell*100).toFixed(1):0,count:r.count};
     });
   },[bills]);
+
+  /* ── Quarterly buckets — month rows folded into FY quarters Q1–Q4 ── */
+  const quarterly=useMemo(()=>{
+    const map=new Map();
+    bills.forEach(b=>{
+      const k=String(b.date).slice(0,7);
+      if(!/^\d{4}-\d{2}$/.test(k))return;
+      const q=fyQuarterKey(k);
+      if(!map.has(q.label))map.set(q.label,{m:q.label,sort:q.sortKey,sell:0,cost:0,count:0});
+      const r=map.get(q.label);r.sell+=b.sell;r.cost+=b.cost;r.count++;
+    });
+    return [...map.values()].sort((a,b)=>a.sort-b.sort).map(r=>{
+      const gp=r.sell-r.cost;
+      return {...r,gp,gpPct:r.sell>0?+(gp/r.sell*100).toFixed(1):0};
+    });
+  },[bills]);
+
+  /* ── Export the current (filtered) bills to Excel / CSV ── */
+  const exportBills=()=>{
+    exportToExcel(`GP-Report-${dateFrom||"all"}_to_${dateTo||todayISO()}`,
+      [{key:"id",label:"Voucher / File"},{key:"date",label:"Date"},{key:"mod",label:"Module"},
+       {key:"client",label:"Client"},{key:"dest",label:"Destination"},{key:"airline",label:"Airline"},
+       {key:"supplier",label:"Supplier"},{key:"consultant",label:"Consultant"},
+       {key:"sell",label:"Revenue"},{key:"cost",label:"Cost"},{key:"gp",label:"Gross Profit"},{key:"gpPct",label:"GP %"}],
+      [...bills].sort((a,b)=>b.gp-a.gp));
+  };
 
   /* ── Sorted grouped table helper ── */
   const sort=(data,col,dir)=>[...data].sort((a,b)=>dir==="asc"?a[col]-b[col]:b[col]-a[col]);
@@ -1021,13 +1112,58 @@ export function ReportGP({branch,setRoute}){
             style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
             {MODS.map(m=><option key={m}>{m}</option>)}
           </select>
-          <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
+          <input type="date" value={dateFrom} onChange={onDate(setDateFrom)}
             style={{...inp,width:130,minHeight:32,fontSize:11}}/>
           <span style={{fontSize:11,color:"#5a6691"}}>to</span>
-          <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
+          <input type="date" value={dateTo} onChange={onDate(setDateTo)}
             style={{...inp,width:130,minHeight:32,fontSize:11}}/>
+          <button onClick={exportBills} title="Export to Excel / CSV"
+            style={{...btnGh,minHeight:32,fontSize:11,display:"flex",alignItems:"center",gap:5}}>
+            <Download size={13}/> Export
+          </button>
+          <button onClick={()=>window.print()} title="Print / Save as PDF"
+            style={{...btnGh,minHeight:32,fontSize:11,display:"flex",alignItems:"center",gap:5}}>
+            <Printer size={13}/> Print
+          </button>
         </div>
       </div>
+
+      {/* Period presets — All · Monthly · Quarterly · YTD · Custom */}
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:12}}>
+        {[{k:"all",l:"All"},{k:"month",l:"Monthly"},{k:"quarter",l:"Quarterly"},{k:"ytd",l:"YTD"},{k:"custom",l:"Custom"}].map(p=>(
+          <button key={p.k} onClick={()=>setPeriod(p.k)}
+            style={{padding:"5px 13px",borderRadius:999,cursor:"pointer",fontSize:11,
+              border:"1px solid "+(periodMode===p.k?"#0d1326":"#e1e3ec"),
+              fontWeight:periodMode===p.k?700:500,
+              background:periodMode===p.k?"#0d1326":"#fff",
+              color:periodMode===p.k?"#d4a437":"#5a6691"}}>
+            {p.l}
+          </button>
+        ))}
+        <span style={{fontSize:10.5,color:"#8a92b2",marginLeft:4}}>
+          {periodMode==="custom"?rangeNote("range",{from:dateFrom,to:dateTo}):presetRange(periodMode).label}
+        </span>
+      </div>
+
+      {/* Loading / error / empty states — never show hard-coded zeros */}
+      {gpQuery.isLoading&&(
+        <div style={{...card,textAlign:"center",padding:"48px 20px",color:"#5a6691",fontSize:13}}>Loading GP data…</div>
+      )}
+      {gpQuery.error&&!gpQuery.isLoading&&(
+        <div style={{...card,textAlign:"center",padding:"40px 20px"}}>
+          <p style={{margin:0,fontSize:14,fontWeight:700,color:"#A32D2D"}}>Couldn't load GP data</p>
+          <p style={{margin:"6px 0 0",fontSize:11,color:"#5a6691"}}>{String(gpQuery.error?.message||gpQuery.error)}</p>
+        </div>
+      )}
+      {!gpQuery.isLoading&&!gpQuery.error&&bills.length===0&&(
+        <div style={{...card,textAlign:"center",padding:"48px 20px"}}>
+          <p style={{margin:0,fontSize:30}}>📊</p>
+          <p style={{margin:"8px 0 0",fontSize:14,fontWeight:700,color:"#0d1326"}}>No GP data available for the selected period</p>
+          <p style={{margin:"6px 0 0",fontSize:11,color:"#5a6691"}}>Try widening the date range, or changing the branch / module filter.</p>
+        </div>
+      )}
+
+      {hasData&&(<>
 
       {/* KPI row */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",
@@ -1175,54 +1311,69 @@ export function ReportGP({branch,setRoute}){
       {tab==="consultant" &&<GrpTable data={group(bills,"consultant")} nameKey="key" nameLbl="Consultant"   icon="👤"/>}
       {tab==="branch"     &&<GrpTable data={group(bills,"branch")}     nameKey="key" nameLbl="Branch"       icon="🏦"/>}
 
-      {/* ── MONTHLY ── */}
-      {tab==="period"&&(
-        <div style={{...card,padding:0,overflow:"hidden"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-            <thead><tr style={{background:"#0d1326"}}>
-              {["Month","Bookings","Revenue","Cost","Gross Profit","GP%","vs Prior"].map((h,i)=>(
-                <th key={i} style={{padding:"9px 12px",textAlign:i>=2?"right":"left",
-                  color:"#d4a437",fontWeight:700,fontSize:10}}>{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>{monthly.map((m,i)=>{
-              const prev=monthly[i-1];
-              const delta=prev&&prev.gpPct>0?+(m.gpPct-prev.gpPct).toFixed(1):null;
-              return (
-                <tr key={m.m} style={{borderBottom:"1px solid #f3f4f8",
-                  background:i%2===0?"#fff":"#fafafa"}}>
-                  <td style={{padding:"9px 12px",fontWeight:700,color:"#0d1326"}}>{m.m}</td>
-                  <td style={{padding:"9px 12px",color:"#5a6691"}}>{m.count}</td>
-                  <td style={{padding:"9px 12px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{m.sell>0?cur+f(m.sell):"—"}</td>
-                  <td style={{padding:"9px 12px",textAlign:"right",color:"#5a6691",fontVariantNumeric:"tabular-nums"}}>{m.cost>0?cur+f(m.cost):"—"}</td>
-                  <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,
-                    color:gpClr(m.gpPct),fontVariantNumeric:"tabular-nums"}}>{m.gp>0?cur+f(m.gp):"—"}</td>
-                  <td style={{padding:"9px 12px",textAlign:"right"}}>
-                    {m.gpPct>0&&<span style={{fontSize:11,padding:"3px 9px",borderRadius:999,fontWeight:800,
-                      background:gpBg(m.gpPct),color:gpClr(m.gpPct)}}>{fPct(m.gpPct)}</span>}
-                  </td>
-                  <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,
-                    color:delta===null?"#bfc3d6":delta>0?"#27500A":delta<0?"#A32D2D":"#5a6691"}}>
-                    {delta===null?"—":delta>0?"+"+delta+"%":delta+"%"}
-                  </td>
-                </tr>
-              );
-            })}</tbody>
-            <tfoot><tr style={{background:"#f3f4f8",borderTop:"2px solid #0d1326"}}>
-              <td style={{padding:"8px 12px",fontWeight:700,color:"#0d1326"}}>6-Month Total</td>
-              <td style={{padding:"8px 12px",fontWeight:700}}>{bills.length}</td>
-              <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{cur}{f(totSell)}</td>
-              <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{cur}{f(totCost)}</td>
-              <td style={{padding:"8px 12px",textAlign:"right",fontWeight:800,color:gpClr(totGPPct),fontVariantNumeric:"tabular-nums"}}>{cur}{f(totGP)}</td>
-              <td style={{padding:"8px 12px",textAlign:"right"}}>
-                <span style={{fontSize:12,padding:"3px 10px",borderRadius:999,fontWeight:800,
-                  background:gpBg(totGPPct),color:gpClr(totGPPct)}}>{fPct(totGPPct)}</span>
-              </td>
-              <td/>
-            </tr></tfoot>
-          </table>
+      {/* ── MONTHLY / QUARTERLY ── */}
+      {tab==="period"&&(()=>{
+        const rows=periodGran==="quarter"?quarterly:monthly;
+        const colLbl=periodGran==="quarter"?"Quarter":"Month";
+        return (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{display:"flex",gap:6}}>
+            {[{k:"month",l:"📅 Monthly"},{k:"quarter",l:"🗓 Quarterly"}].map(g=>(
+              <button key={g.k} onClick={()=>setPeriodGran(g.k)}
+                style={{padding:"5px 13px",borderRadius:7,border:"none",cursor:"pointer",fontSize:11,
+                  fontWeight:periodGran===g.k?700:500,
+                  background:periodGran===g.k?"#0d1326":"#eef0f6",
+                  color:periodGran===g.k?"#d4a437":"#5a6691"}}>{g.l}</button>
+            ))}
+          </div>
+          <div style={{...card,padding:0,overflow:"hidden"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
+              <thead><tr style={{background:"#0d1326"}}>
+                {[colLbl,"Bookings","Revenue","Cost","Gross Profit","GP%","vs Prior"].map((h,i)=>(
+                  <th key={i} style={{padding:"9px 12px",textAlign:i>=2?"right":"left",
+                    color:"#d4a437",fontWeight:700,fontSize:10}}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>{rows.map((m,i)=>{
+                const prev=rows[i-1];
+                const delta=prev&&prev.gpPct>0?+(m.gpPct-prev.gpPct).toFixed(1):null;
+                return (
+                  <tr key={m.m} style={{borderBottom:"1px solid #f3f4f8",
+                    background:i%2===0?"#fff":"#fafafa"}}>
+                    <td style={{padding:"9px 12px",fontWeight:700,color:"#0d1326"}}>{m.m}</td>
+                    <td style={{padding:"9px 12px",color:"#5a6691"}}>{m.count}</td>
+                    <td style={{padding:"9px 12px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{m.sell>0?cur+f(m.sell):"—"}</td>
+                    <td style={{padding:"9px 12px",textAlign:"right",color:"#5a6691",fontVariantNumeric:"tabular-nums"}}>{m.cost>0?cur+f(m.cost):"—"}</td>
+                    <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,
+                      color:gpClr(m.gpPct),fontVariantNumeric:"tabular-nums"}}>{m.gp!==0?cur+f(m.gp):"—"}</td>
+                    <td style={{padding:"9px 12px",textAlign:"right"}}>
+                      {m.sell>0&&<span style={{fontSize:11,padding:"3px 9px",borderRadius:999,fontWeight:800,
+                        background:gpBg(m.gpPct),color:gpClr(m.gpPct)}}>{fPct(m.gpPct)}</span>}
+                    </td>
+                    <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,
+                      color:delta===null?"#bfc3d6":delta>0?"#27500A":delta<0?"#A32D2D":"#5a6691"}}>
+                      {delta===null?"—":delta>0?"+"+delta+"%":delta+"%"}
+                    </td>
+                  </tr>
+                );
+              })}</tbody>
+              <tfoot><tr style={{background:"#f3f4f8",borderTop:"2px solid #0d1326"}}>
+                <td style={{padding:"8px 12px",fontWeight:700,color:"#0d1326"}}>{rows.length} {colLbl.toLowerCase()}{rows.length!==1?"s":""}</td>
+                <td style={{padding:"8px 12px",fontWeight:700}}>{bills.length}</td>
+                <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{cur}{f(totSell)}</td>
+                <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{cur}{f(totCost)}</td>
+                <td style={{padding:"8px 12px",textAlign:"right",fontWeight:800,color:gpClr(totGPPct),fontVariantNumeric:"tabular-nums"}}>{cur}{f(totGP)}</td>
+                <td style={{padding:"8px 12px",textAlign:"right"}}>
+                  <span style={{fontSize:12,padding:"3px 10px",borderRadius:999,fontWeight:800,
+                    background:gpBg(totGPPct),color:gpClr(totGPPct)}}>{fPct(totGPPct)}</span>
+                </td>
+                <td/>
+              </tr></tfoot>
+            </table>
+          </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── TOP 10 ── */}
       {tab==="top10"&&(
@@ -1266,6 +1417,7 @@ export function ReportGP({branch,setRoute}){
           ))}
         </div>
       )}
+      </>)}
     </div>
   );
 }
@@ -1500,11 +1652,12 @@ export function ReportCommission({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState(CUR_MONTH);
-  const PERIODS=MONTH_OPTIONS;
+  // Live per-file GP — branch + date scoped server-side.
+  const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
+  const q=useGpBills(branch,{from:range.from||undefined,to:range.to||undefined});
+  const bills=q.data||[];
 
   const rows=useMemo(()=>{
-    const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period));
     const suppMap={};
     bills.forEach(b=>{
       if(!suppMap[b.supplier])suppMap[b.supplier]={supplier:b.supplier,mod:b.mod,bookings:0,revenue:0,commRate:0,commission:0};
@@ -1516,7 +1669,7 @@ export function ReportCommission({branch}){
       suppMap[b.supplier].commission+=comm;
     });
     return Object.values(suppMap).sort((a,b2)=>b2.commission-a.commission);
-  },[brCode,period]);
+  },[bills]);
 
   const totComm=rows.reduce((s,r)=>s+r.commission,0);
   const totRev =rows.reduce((s,r)=>s+r.revenue,0);
@@ -1533,9 +1686,7 @@ export function ReportCommission({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Override commission from airlines, insurers, hotels · TDS 194H on payout</p>
           </div>
         </div>
-        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-          {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-        </select>
+        <ReportDateBar value={range} onChange={setRange}/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>
         {[
@@ -1596,20 +1747,29 @@ export function MisReport({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
 
-  /* Current period */
-  const bills  =GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period));
-  const prev   =GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(prevMonthKey(period)));
-  const acts   =EXP_ACTUALS.filter(a=>(!brCode||a.br===brCode)&&a.m===period);
+  /* LIVE — booking-file GP from the double-entry engine (no demo arrays).
+     Fetched wide (all-time → today) and pivoted client-side by period, exactly
+     like the GP Report. Expenses from Module P&L; overdue from AR ageing.
+     Empty in → zeros (never fabricated). */
+  const monthEnd=(key)=>{const[y,m]=String(key).split("-").map(Number);const last=new Date(y,m,0).getDate();return `${key}-${String(last).padStart(2,"0")}`;};
+  const gpQ=useGpBills(branch,{from:ALL_TIME_FROM,to:todayISO()});
+  const GP_DATA=gpQ.data||[];
+  const plQ=useModulePL(branch,{from:`${period}-01`,to:monthEnd(period)});
+  const agQ=useAgeing(branch);
+
+  const inBr=b=>(!brCode||b.branch===brCode);
+  const bills  =GP_DATA.filter(b=>inBr(b)&&String(b.date).startsWith(period));
+  const prev   =GP_DATA.filter(b=>inBr(b)&&String(b.date).startsWith(prevMonthKey(period)));
   const tgt    =null; /* sales targets module removed — CRM app now owns this */
 
-  const rev    =bills.reduce((s,b)=>s+b.sell,0);
-  const cost   =bills.reduce((s,b)=>s+b.cost,0);
+  const rev    =bills.reduce((s,b)=>s+(+b.sell||0),0);
+  const cost   =bills.reduce((s,b)=>s+(+b.cost||0),0);
   const gp     =rev-cost;
   const gpPct  =rev>0?+(gp/rev*100).toFixed(1):0;
-  const exp    =acts.reduce((s,a)=>s+a.a,0);
+  const exp    =plQ.data?((plQ.data.indirect&&plQ.data.indirect.expense)||0):0;
   const netPft =gp-exp;
-  const prevRev=prev.reduce((s,b)=>s+b.sell,0);
-  const prevGP =prev.reduce((s,b)=>s+b.sell-b.cost,0);
+  const prevRev=prev.reduce((s,b)=>s+(+b.sell||0),0);
+  const prevGP =prev.reduce((s,b)=>s+((+b.sell||0)-(+b.cost||0)),0);
   const tgtRev =tgt?Object.values(tgt).reduce((s,t)=>s+(t.sell||0),0):0;
   const tgtGP  =tgt?Object.values(tgt).reduce((s,t)=>s+(t.gp||0),0):0;
   const revAchv=tgtRev>0?Math.round(rev/tgtRev*100):null;
@@ -1619,23 +1779,26 @@ export function MisReport({branch}){
 
   /* Top consultants */
   const consultMap={};
-  bills.forEach(b=>{if(!consultMap[b.consultant])consultMap[b.consultant]={rev:0,gp:0,bks:0};consultMap[b.consultant].rev+=b.sell;consultMap[b.consultant].gp+=b.sell-b.cost;consultMap[b.consultant].bks++;});
+  bills.forEach(b=>{const k=b.consultant||"—";if(!consultMap[k])consultMap[k]={rev:0,gp:0,bks:0};consultMap[k].rev+=(+b.sell||0);consultMap[k].gp+=((+b.sell||0)-(+b.cost||0));consultMap[k].bks++;});
   const topConsult=Object.entries(consultMap).sort((a,b)=>b[1].gp-a[1].gp).slice(0,3);
 
   /* Top clients */
   const clientMap={};
-  bills.forEach(b=>{if(!clientMap[b.client])clientMap[b.client]={rev:0,gp:0};clientMap[b.client].rev+=b.sell;clientMap[b.client].gp+=b.sell-b.cost;});
+  bills.forEach(b=>{const k=b.client||"—";if(!clientMap[k])clientMap[k]={rev:0,gp:0};clientMap[k].rev+=(+b.sell||0);clientMap[k].gp+=((+b.sell||0)-(+b.cost||0));});
   const topClients=Object.entries(clientMap).sort((a,b)=>b[1].rev-a[1].rev).slice(0,3);
 
-  /* Overdue receivables */
-  const overdueClients=Object.entries(clientMap).filter(([,v])=>v.rev>50000).map(([k,v])=>({client:k,outstanding:Math.round(v.rev*0.25)}));
+  /* Overdue receivables — LIVE AR ageing (>60 days outstanding), not a % of revenue */
+  const overdueClients=((agQ.data&&agQ.data.receivables&&agQ.data.receivables.rows)||[])
+    .map(r=>({client:r.party,outstanding:(r.d60||0)+(r.d90||0)}))
+    .filter(c=>c.outstanding>0)
+    .sort((a,b)=>b.outstanding-a.outstanding);
 
-  /* Monthly trend (last 5 months) */
-  const trendMonths=["2025-12","2026-01","2026-02","2026-03","2026-04","2026-05"].filter(m=>m<=period).slice(-5);
+  /* Monthly trend — last 5 months up to the selected period */
+  const trendMonths=Array.from({length:5},(_,i)=>{const[y,m]=period.split("-").map(Number);const d=new Date(y,m-1-(4-i),1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;});
   const trendData=trendMonths.map(m=>{
-    const mb=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(m));
-    const mr=mb.reduce((s,b)=>s+b.sell,0);
-    const mg=mb.reduce((s,b)=>s+b.sell-b.cost,0);
+    const mb=GP_DATA.filter(b=>inBr(b)&&String(b.date).startsWith(m));
+    const mr=mb.reduce((s,b)=>s+(+b.sell||0),0);
+    const mg=mb.reduce((s,b)=>s+((+b.sell||0)-(+b.cost||0)),0);
     return {m:m,rev:mr,gp:mg,gpPct:mr>0?+(mg/mr*100).toFixed(1):0};
   });
   const maxRev=Math.max(...trendData.map(t=>t.rev),1);
@@ -1795,10 +1958,10 @@ export function ClientConcentration({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState(CUR_MONTH);
-  const PERIODS=[...MONTH_OPTIONS,{v:"ALL",l:"All Time"}];
-
-  const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&(period==="ALL"||b.date.startsWith(period)));
+  // Live per-file GP — branch + date scoped server-side.
+  const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
+  const q=useGpBills(branch,{from:range.from||undefined,to:range.to||undefined});
+  const bills=q.data||[];
   const totalRev=bills.reduce((s,b)=>s+b.sell,0);
 
   const clientMap={};
@@ -1830,9 +1993,7 @@ export function ClientConcentration({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Revenue dependency by client — diversification analysis</p>
           </div>
         </div>
-        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-          {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-        </select>
+        <ReportDateBar value={range} onChange={setRange}/>
       </div>
 
       {/* Risk alerts */}
@@ -1948,50 +2109,48 @@ export function CashRunwayCard({branch}){
 
 export function ConsolidatedBS(){
   const mob=useMobile();
-  const [period,setPeriod]=useState(CUR_MONTH);
-  const PERIODS=MONTH_OPTIONS;
-  const FX=FX_RATES;
+  // LIVE — consolidated balance sheet across ALL branches from the double-entry
+  // engine + per-branch revenue/GP contribution. No synthesised ratios / FX
+  // guesses; empty books → empty state.
+  const qBS=useBalanceSheet("ALL",{to:""});
+  const qGP=useGpBills("ALL",{});
+  const d=qBS.data;
+  const loading=qBS.isLoading;
+  const errored=qBS.isError;
 
-  const getBranchBS=(code)=>{
-    const br=BRANCHES.find(b=>b.code===code)||{currency:"INR"};
-    const rate=FX[br.currency]||1;
-    const fyM=FY_MONTHS.filter(m=>m<=period);
-    const bills=GP_BILLS.filter(b=>b.branch===code&&fyM.includes(b.date.slice(0,7)));
-    const acts=EXP_ACTUALS.filter(a=>a.br===code&&fyM.includes(a.m));
-    const rev=bills.reduce((s,b)=>s+b.sell,0)*rate;
-    const cost=bills.reduce((s,b)=>s+b.cost,0)*rate;
-    const exp=acts.reduce((s,a)=>s+a.a,0)*rate;
-    const gp=rev-cost;const np=gp-exp;
-    const debtors=rev*0.25;const creditors=cost*0.18;
-    const bank=Math.max(np*0.6+rev*0.15,0);
-    return {code,rev,gp,np,debtors,creditors,bank,capital:250000*rate,retained:Math.max(np,0),
-      fixedAssets:120000*rate,gstPayable:Math.max(rev*0.04-cost*0.02,0),advance:rev*0.04};
-  };
+  const sideMap=rows=>{const m={};(rows||[]).forEach(g=>{m[g.group]=(m[g.group]||0)+(g.amount||0);});return m;};
+  const A=sideMap(d&&d.assets), L=sideMap(d&&d.liabilities);
+  const r2=n=>Math.round((n||0)*100)/100;
 
-  const branches=["BOM","AMD"].map(getBranchBS);
+  const fixedAssets=A["Fixed Assets"]||0;
+  const investments=A["Investments"]||0;
+  const bank=(A["Bank Accounts"]||0)+(A["Cash-in-Hand"]||0);
+  const debtors=A["Sundry Debtors"]||0;
+  const totalAssets=d?r2(d.totalAssets):0;
+  const otherAssets=r2(totalAssets-(fixedAssets+investments+bank+debtors));
 
-  /* Group sums (eliminating intercompany - simplified: 5% of creditors are intercompany) */
-  const sumKey=(key)=>branches.reduce((s,b)=>s+b[key],0);
-  const group={
-    fixedAssets: sumKey("fixedAssets"),
-    bank:        sumKey("bank"),
-    debtors:     sumKey("debtors")*0.95, // 5% elimination
-    capital:     sumKey("capital"),
-    retained:    sumKey("retained"),
-    creditors:   sumKey("creditors")*0.95,
-    gstPayable:  sumKey("gstPayable"),
-    advance:     sumKey("advance"),
-  };
-  const totalAssets=group.fixedAssets+group.bank+group.debtors+20000;
-  const totalLiab  =group.capital+group.retained+group.creditors+group.gstPayable+group.advance;
-  const f=n=>"₹"+Number(Math.round(n/1000)).toLocaleString()+"K";
+  const capital=L["Capital Account"]||0;
+  const reserves=(L["Reserves & Surplus"]||0)+(L["Profit & Loss A/c"]||0);
+  const creditors=L["Sundry Creditors"]||0;
+  const gst=L["Duties & Taxes"]||0;
+  const borrowings=(L["Loans (Liability)"]||0)+(L["Bank OD Accounts"]||0);
+  const totalLiab=d?r2(d.totalLiabilities):0;
+  const otherLiab=r2(totalLiab-(capital+reserves+creditors+gst+borrowings));
+
+  const branchRows=useMemo(()=>{
+    const m={};(qGP.data||[]).forEach(b=>{const code=b.branch||"—";if(!m[code])m[code]={code,rev:0,gp:0};m[code].rev+=(+b.sell||0);m[code].gp+=((+b.sell||0)-(+b.cost||0));});
+    return Object.values(m).map(x=>({...x,gpPct:x.rev>0?+(x.gp/x.rev*100).toFixed(1):0})).sort((a,b)=>b.rev-a.rev);
+  },[qGP.data]);
+
+  const f=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
+  const hasData=!!d && Math.abs(totalAssets)>0.01;
 
   const Row=({label,val,sub,bold,indent})=>(
     <div style={{display:"flex",justifyContent:"space-between",padding:`${bold?"10px":"7px"} 14px`,
       borderBottom:"1px solid #f3f4f8",background:bold?"#f3f4f8":"#fff"}}>
       <span style={{fontSize:11,fontWeight:bold?700:400,color:"#0d1326",paddingLeft:indent?12:0}}>{label}</span>
       <div style={{textAlign:"right"}}>
-        <p style={{margin:0,fontWeight:bold?800:500,color:bold?"#0d1326":"#384677",fontVariantNumeric:"tabular-nums",fontSize:bold?13:11}}>{f(val)}</p>
+        <p style={{margin:0,fontWeight:bold?800:500,color:bold?"#0d1326":"#384677",fontVariantNumeric:"tabular-nums",fontSize:bold?13:11}}>{val?f(val):"—"}</p>
         {sub&&<p style={{margin:0,fontSize:9,color:"#5a6691"}}>{sub}</p>}
       </div>
     </div>
@@ -2004,42 +2163,47 @@ export function ConsolidatedBS(){
           <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📊</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Consolidated Balance Sheet</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>All branches · INR-equivalent · 5% intercompany elimination</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>All branches · live double-entry · as at {fmtDate(todayISO())}</p>
           </div>
         </div>
-        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-          {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-        </select>
       </div>
 
-      {/* Branch forex legend */}
-      <div style={{...card,padding:"10px 14px",marginBottom:12,background:"#f3f4f8",fontSize:10,color:"#5a6691"}}>
-        <b>Reporting currency:</b> INR · BOM/AMD native INR
-      </div>
+      {loading && <div style={{...card,textAlign:"center",color:"#5a6691",fontSize:12.5,padding:"40px 14px"}}>Loading live books…</div>}
+      {!loading && errored && <div style={{...card,textAlign:"center",color:"#A32D2D",fontSize:12.5,padding:"40px 14px"}}>Could not load accounting data.</div>}
+      {!loading && !errored && !hasData && (
+        <div style={{...card,textAlign:"center",padding:"44px 14px"}}>
+          <div style={{fontSize:34,marginBottom:8}}>📭</div>
+          <h3 style={{margin:"0 0 6px",fontSize:15,color:"#0d1326"}}>No transactions found</h3>
+          <p style={{margin:0,fontSize:12,color:"#5a6691"}}>The consolidated balance sheet is built from posted vouchers across all branches. Record transactions to populate it.</p>
+        </div>
+      )}
 
-      {Math.abs(totalAssets-totalLiab)<totalAssets*0.05
-        ?<div style={{marginBottom:10,padding:"8px 14px",borderRadius:8,background:"#EAF3DE",border:"1px solid #C0DD97",fontSize:10.5,color:"#27500A",fontWeight:600}}>✔ Consolidated Balance Sheet tallied (within 5% rounding) · Total: {f(totalAssets)}</div>
-        :<div style={{marginBottom:10,padding:"8px 14px",borderRadius:8,background:"#FAEEDA",border:"1px solid #FAC775",fontSize:10.5,color:"#854F0B",fontWeight:600}}>⚠ Difference: {f(Math.abs(totalAssets-totalLiab))} — adjustment entry required</div>
+      {!loading && !errored && hasData && (<>
+      {d.balanced
+        ?<div style={{marginBottom:10,padding:"8px 14px",borderRadius:8,background:"#EAF3DE",border:"1px solid #C0DD97",fontSize:10.5,color:"#27500A",fontWeight:600}}>✔ Consolidated Balance Sheet balanced · Total: {f(totalAssets)}</div>
+        :<div style={{marginBottom:10,padding:"8px 14px",borderRadius:8,background:"#FAEEDA",border:"1px solid #FAC775",fontSize:10.5,color:"#854F0B",fontWeight:600}}>⚠ Difference: {f(Math.abs(totalAssets-totalLiab))} — review postings</div>
       }
 
       <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:12}}>
         {/* Assets */}
         <div style={{...card,padding:0,overflow:"hidden"}}>
           <div style={{background:"#185FA5",padding:"10px 14px"}}><p style={{margin:0,fontSize:13,fontWeight:800,color:"#fff"}}>ASSETS</p></div>
-          <Row label="Fixed Assets (net)" val={group.fixedAssets} sub="Equipment, furniture across all branches"/>
-          <Row label="Bank Accounts (all branches)" val={group.bank} sub="Converted to INR at current FX"/>
-          <Row label="Trade Receivables" val={group.debtors} sub="Post 5% intercompany elimination"/>
-          <Row label="Other Assets" val={20000} sub="Deposits, advances"/>
+          <Row label="Fixed Assets (net)" val={fixedAssets} sub="Tangible + intangible across all branches"/>
+          <Row label="Non-current Investments" val={investments}/>
+          <Row label="Bank & Cash" val={bank} sub="All branches"/>
+          <Row label="Trade Receivables" val={debtors} sub="Sundry Debtors"/>
+          <Row label="Other Assets" val={otherAssets} sub="Deposits, advances, current assets"/>
           <Row label="TOTAL ASSETS" val={totalAssets} bold/>
         </div>
         {/* Liabilities */}
         <div style={{...card,padding:0,overflow:"hidden"}}>
           <div style={{background:"#0d1326",padding:"10px 14px"}}><p style={{margin:0,fontSize:13,fontWeight:800,color:"#fff"}}>LIABILITIES & CAPITAL</p></div>
-          <Row label="Capital — all entities" val={group.capital} sub="₹2.5L equivalent per branch"/>
-          <Row label="Retained Earnings (FY)" val={group.retained} sub="Cumulative net profit"/>
-          <Row label="Trade Payables" val={group.creditors} sub="Post 5% intercompany elimination"/>
-          <Row label="GST/VAT Payable (net)" val={group.gstPayable} sub="Output minus input credit"/>
-          <Row label="Advance from Clients" val={group.advance} sub="Booking deposits"/>
+          <Row label="Capital Account" val={capital}/>
+          <Row label="Reserves & Surplus (incl. P&L)" val={reserves} sub="Cumulative net profit"/>
+          <Row label="Borrowings" val={borrowings} sub="Loans + bank OD"/>
+          <Row label="Trade Payables" val={creditors} sub="Sundry Creditors"/>
+          <Row label="Duties & Taxes (GST/VAT/TDS)" val={gst}/>
+          <Row label="Other Liabilities" val={otherLiab} sub="Provisions, current liabilities"/>
           <Row label="TOTAL LIABILITIES" val={totalLiab} bold/>
         </div>
       </div>
@@ -2047,26 +2211,27 @@ export function ConsolidatedBS(){
       {/* Branch breakdown */}
       <div style={{...card,padding:0,overflow:"hidden",marginTop:12}}>
         <div style={{padding:"10px 14px",background:"#f3f4f8",borderBottom:"1px solid #e1e3ec"}}>
-          <p style={{margin:0,fontSize:11,fontWeight:700,color:"#384677"}}>Branch Contribution — INR Equivalent</p>
+          <p style={{margin:0,fontSize:11,fontWeight:700,color:"#384677"}}>Branch Contribution — Revenue &amp; Gross Profit (live)</p>
         </div>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
+        {branchRows.length===0
+          ?<div style={{padding:"18px 14px",textAlign:"center",fontSize:11,color:"#5a6691"}}>No sale/purchase vouchers posted yet.</div>
+          :<table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#0d1326"}}>
-            {["Branch","Revenue (INR)","Gross Profit","Net Profit","Bank Balance","Receivables"].map((h,i)=>(
+            {["Branch","Revenue","Gross Profit","GP %"].map((h,i)=>(
               <th key={i} style={{padding:"8px 12px",textAlign:i>=1?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
-          <tbody>{branches.map((b,i)=>(
+          <tbody>{branchRows.map((b,i)=>(
             <tr key={b.code} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
               <td style={{padding:"8px 12px",fontWeight:700,color:"#0d1326"}}>{BRANCHES.find(br=>br.code===b.code)?.flag||""} {b.code}</td>
               <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(b.rev)}</td>
               <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#27500A"}}>{f(b.gp)}</td>
-              <td style={{padding:"8px 12px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",color:b.np>0?"#1D9E75":"#A32D2D"}}>{f(b.np)}</td>
-              <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(b.bank)}</td>
-              <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(b.debtors)}</td>
+              <td style={{padding:"8px 12px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",color:"#27500A"}}>{b.gpPct}%</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table>}
       </div>
+      </>)}
     </div>
   );
 }
@@ -2080,19 +2245,21 @@ export function ConsolidatedBS(){
 export function ConsultantReport({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState(CUR_MONTH);
+  // Unified date control (Monthly/Quarterly/YTD/All + back-dated From/To) instead
+  // of the old fixed month dropdown that couldn't reach historical periods.
+  // Default to All so the historical book shows immediately (the current month
+  // is usually empty); live per-file GP from the double-entry engine,
+  // branch- and date-scoped server-side.
+  const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
   const [view,setView]=useState("table"); // table | trend
-  const PERIODS=PERIOD_OPTIONS;
-  const FY_MONTHS=FY_YTD_MONTHS;
 
-  const bills=useMemo(()=>GP_BILLS.filter(b=>
-    (!brCode||b.branch===brCode)&&
-    (period==="YTD"?FY_MONTHS.includes(b.date.slice(0,7)):b.date.startsWith(period))
-  ),[brCode,period]);
+  const q=useGpBills(branch,{from:range.from||undefined,to:range.to||undefined});
+  const bills=q.data||[];
 
-  const billsPrev=useMemo(()=>GP_BILLS.filter(b=>
-    (!brCode||b.branch===brCode)&&b.date.startsWith("2026-04")
-  ),[brCode]);
+  // Year-over-year: the same window shifted exactly 12 months back.
+  const prevRange=priorYearRange(range);
+  const qPrev=useGpBills(branch,{from:prevRange.from||undefined,to:prevRange.to||undefined});
+  const billsPrev=qPrev.data||[];
 
   // Build per-consultant stats
   const stats=useMemo(()=>{
@@ -2118,18 +2285,18 @@ export function ConsultantReport({branch}){
     return m;
   },[billsPrev]);
 
-  // Month-by-month for trend view
+  // Month-by-month for trend view — the last 3 months present in the live data.
   const trendData=useMemo(()=>{
-    const months=["2026-03","2026-04","2026-05"];
-    const consults=[...new Set(GP_BILLS.filter(b=>!brCode||b.branch===brCode).map(b=>b.consultant))];
+    const months=[...new Set(bills.map(b=>String(b.date||"").slice(0,7)).filter(Boolean))].sort().slice(-3);
+    const consults=[...new Set(bills.map(b=>b.consultant).filter(Boolean))];
     return consults.slice(0,5).map(name=>({
       name,
       data:months.map(m=>{
-        const mb=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.consultant===name&&b.date.startsWith(m));
+        const mb=bills.filter(b=>b.consultant===name&&String(b.date||"").startsWith(m));
         return{m:m,gp:mb.reduce((s,b)=>s+b.sell-b.cost,0),bks:mb.length};
       }),
     }));
-  },[brCode]);
+  },[bills]);
 
   const totRev=stats.reduce((s,c)=>s+c.rev,0);
   const totGP =stats.reduce((s,c)=>s+c.gp,0);
@@ -2148,10 +2315,8 @@ export function ConsultantReport({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{stats.length} consultants · {totBks} bookings · Total GP {f(totGP)}</p>
           </div>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-            {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-          </select>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <ReportDateBar value={range} onChange={setRange}/>
           <button onClick={()=>setView("table")} style={{padding:"7px 14px",border:"none",cursor:"pointer",fontWeight:view==="table"?700:500,background:view==="table"?"#fff":"transparent",borderRadius:6}}>📊 Table</button><button onClick={()=>setView("trend")} style={{padding:"7px 14px",border:"none",cursor:"pointer",fontWeight:view==="trend"?700:500,background:view==="trend"?"#fff":"transparent",borderRadius:6}}>📈 Trend</button>
           <button onClick={()=>exportToCSV(stats,["name","rev","cost","gp","gpPct","bks","avgTicket","topMod"],"consultants.csv")} style={{...btnGh,fontSize:11}}><Download size={12}/> CSV</button>
         </div>
@@ -2178,11 +2343,13 @@ export function ConsultantReport({branch}){
         <div style={{...card,padding:0,overflow:"hidden"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#0d1326"}}>
-              {["Rank","Consultant","Revenue","Cost","Gross Profit","GP%","Bookings","Avg Ticket","Top Module","vs Prev Month"].map((h,i)=>(
+              {["Rank","Consultant","Revenue","Cost","Gross Profit","GP%","Bookings","Avg Ticket","Top Module","vs 1 Yr Ago"].map((h,i)=>(
                 <th key={i} style={{padding:"9px 11px",textAlign:i>=2&&i<=8?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{stats.map((c,i)=>{
+            <tbody>{stats.length===0&&(
+              <tr><td colSpan={10} style={{padding:"26px 11px",textAlign:"center",color:"#5a6691",fontSize:12}}>No bookings in this date range. Widen the range (try “All”) or check that sale vouchers are posted for this branch.</td></tr>
+            )}{stats.map((c,i)=>{
               const prev=prevMap[c.name];
               const gpDelta=prev?c.gp-prev.gp:null;
               return(
@@ -2263,19 +2430,23 @@ export function ClientStatement({branch}){
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
   const [client,setClient]=useState("");
-  const [period,setPeriod]=useState(CUR_MONTH);
+  const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
   const [showModal,setShowModal]=useState(false);
-  const PERIODS=[...MONTH_OPTIONS,{v:"ALL",l:"All Time"}];
-  const clients=[...new Set(GP_BILLS.filter(b=>!brCode||b.branch===brCode).map(b=>b.client))].sort();
+  // Live per-file GP for this branch (all history → client list + date-filtered statement).
+  const q=useGpBills(branch,{});
+  const allBills=q.data||[];
+  const clients=[...new Set(allBills.map(b=>b.client).filter(Boolean))].sort();
+  const inR=(d)=>{const s=String(d||"");return (!range.from||s>=range.from)&&(!range.to||s<=range.to);};
+  const rangeLabel=range.mode==='all'?'All Time':`${range.from||'start'} → ${range.to||'today'}`;
 
   const txns=useMemo(()=>{
-    const b=GP_BILLS.filter(x=>x.client===client&&(!brCode||x.branch===brCode)&&(period==="ALL"||x.date.startsWith(period)));
+    const b=allBills.filter(x=>x.client===client&&inR(x.date));
     // Invoices (Dr the client)
     const invs=b.map(x=>({date:x.date,type:"Invoice",ref:x.id,desc:`${x.mod} — ${x.dest||""}`,dr:x.sell,cr:0}));
     // Simulated receipts (Cr the client)
     const recs=b.filter((_,i)=>i%3!==0).map(x=>({date:x.date.replace(/-\d\d$/,"-"+String(parseInt(x.date.slice(8))+5).padStart(2,"0")),type:"Receipt",ref:x.id.replace("/SF","/RV").replace("/SH","/RV"),desc:"Payment received — NEFT",dr:0,cr:Math.round(x.sell*0.85)}));
     return [...invs,...recs].sort((a,z)=>a.date.localeCompare(z.date));
-  },[client,period,brCode]);
+  },[client,range.from,range.to,allBills]);
 
   let running=0;
   const txnsWithBal=txns.map(t=>{running+=t.dr-t.cr;return{...t,bal:running};});
@@ -2302,17 +2473,16 @@ export function ClientStatement({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📄</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Client Account Statement</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{client} · {PERIODS.find(p=>p.v===period)?.l}</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{client||'Select a client'} · {rangeLabel}</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           <select value={client} onChange={e=>setClient(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
+            <option value="">— Select client —</option>
             {clients.map(c=><option key={c}>{c}</option>)}
           </select>
-          <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-            {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-          </select>
-          <button onClick={()=>window.open(`https://wa.me/?text=${encodeURIComponent(`Hi! Your account statement for ${period === "ALL" ? "all time" : period} — Outstanding: ${f(outstanding)}. Please contact us to settle the balance.`)}`, "_blank","noopener")} style={{...btnG,fontSize:11,background:"#25D366"}}>💬 WhatsApp</button>
+          <ReportDateBar value={range} onChange={setRange}/>
+          <button onClick={()=>window.open(`https://wa.me/?text=${encodeURIComponent(`Hi! Your account statement for ${rangeLabel} — Outstanding: ${f(outstanding)}. Please contact us to settle the balance.`)}`, "_blank","noopener")} style={{...btnG,fontSize:11,background:"#25D366"}}>💬 WhatsApp</button>
           <button onClick={()=>window.print()} style={{...btnGh,fontSize:11}}><Printer size={12}/> Print</button>
         </div>
       </div>
@@ -2469,14 +2639,10 @@ export function ForexReport({branch}){
 export function DestinationIntelligence({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?null:branch?.code;
-  const [period,setPeriod]=useState("YTD");
-  const PERIODS=PERIOD_OPTIONS;
-  const FY_MONTHS=FY_YTD_MONTHS;
-
-  const bills=useMemo(()=>GP_BILLS.filter(b=>
-    (!brCode||b.branch===brCode)&&
-    (period==="YTD"?FY_MONTHS.includes(b.date.slice(0,7)):b.date.startsWith(period))
-  ),[brCode,period]);
+  // Live per-file GP from the double-entry engine — branch + date scoped server-side.
+  const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
+  const q=useGpBills(branch,{from:range.from||undefined,to:range.to||undefined});
+  const bills=q.data||[];
 
   // Aggregate by destination
   const destMap={};
@@ -2508,9 +2674,7 @@ export function DestinationIntelligence({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{destRows.length} destinations · {bills.length} bookings · Revenue & GP breakdown</p>
           </div>
         </div>
-        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-          {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-        </select>
+        <ReportDateBar value={range} onChange={setRange}/>
       </div>
 
       {/* Destination cards */}
@@ -2675,50 +2839,78 @@ export function RatioAnalysis({branch,setRoute}){
   const mob=useMobile();
   const cfg=bc(branch);
   const cur=cfg.cur;
-  const [period,setPeriod]=useState(CUR_MONTH);
-
-  // Sample ratios with trend (last 6 months)
-  const RATIOS=[
-    {category:"Liquidity",name:"Current Ratio",current:1.85,prev:1.72,benchmark:"≥ 1.5",ideal:2.0,fmt:"x",trend:[1.45,1.52,1.68,1.71,1.72,1.85],good:true},
-    {category:"Liquidity",name:"Quick Ratio (Acid Test)",current:1.42,prev:1.38,benchmark:"≥ 1.0",ideal:1.5,fmt:"x",trend:[1.18,1.22,1.30,1.35,1.38,1.42],good:true},
-    {category:"Liquidity",name:"Cash Ratio",current:0.52,prev:0.48,benchmark:"≥ 0.3",ideal:0.75,fmt:"x",trend:[0.35,0.38,0.42,0.45,0.48,0.52],good:true},
-    {category:"Activity",name:"DSO (Days Sales Outstanding)",current:38,prev:42,benchmark:"≤ 45",ideal:30,fmt:"d",trend:[55,52,48,45,42,38],good:true},
-    {category:"Activity",name:"DPO (Days Payables Outstanding)",current:52,prev:48,benchmark:"≥ 40",ideal:60,fmt:"d",trend:[38,42,45,46,48,52],good:true},
-    {category:"Activity",name:"Asset Turnover",current:3.4,prev:3.2,benchmark:"≥ 2.0",ideal:4.0,fmt:"x",trend:[2.8,2.9,3.0,3.1,3.2,3.4],good:true},
-    {category:"Leverage",name:"Debt-Equity Ratio",current:0.38,prev:0.42,benchmark:"≤ 1.0",ideal:0.3,fmt:"x",trend:[0.55,0.52,0.48,0.45,0.42,0.38],good:true},
-    {category:"Leverage",name:"Interest Coverage Ratio",current:8.5,prev:7.2,benchmark:"≥ 3.0",ideal:10,fmt:"x",trend:[5.8,6.2,6.8,7.0,7.2,8.5],good:true},
-    {category:"Profitability",name:"Gross Profit Margin",current:13.8,prev:13.2,benchmark:"≥ 10%",ideal:18,fmt:"%",trend:[11.5,11.8,12.3,12.8,13.2,13.8],good:true},
-    {category:"Profitability",name:"Net Profit Margin",current:4.2,prev:3.8,benchmark:"≥ 3%",ideal:7,fmt:"%",trend:[2.8,3.0,3.4,3.6,3.8,4.2],good:true},
-    {category:"Profitability",name:"Return on Assets (ROA)",current:12.5,prev:11.2,benchmark:"≥ 8%",ideal:15,fmt:"%",trend:[9.5,9.8,10.5,10.8,11.2,12.5],good:true},
-    {category:"Profitability",name:"Return on Equity (ROE)",current:18.5,prev:16.8,benchmark:"≥ 12%",ideal:20,fmt:"%",trend:[14.2,14.8,15.5,16.2,16.8,18.5],good:true},
-  ];
-
-  const catColor={Liquidity:"#185FA5",Activity:"#854F0B",Leverage:"#A32D2D",Profitability:"#27500A"};
   const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
 
-  // Mini sparkline
-  const Spark=({data,color})=>{
-    const max=Math.max(...data),min=Math.min(...data),range=max-min||1;
-    const W=80,H=24;
-    const pts=data.map((v,i)=>`${(i/(data.length-1))*W},${H-((v-min)/range)*H}`).join(" ");
-    return(<svg width={W} height={H} style={{verticalAlign:"middle"}}><polyline points={pts} fill="none" stroke={color} strokeWidth={1.5}/></svg>);
-  };
+  // LIVE — ratios computed from the double-entry Balance Sheet + Module P&L.
+  // No hardcoded ratios / fabricated trends; empty books → empty state.
+  const qBS=useBalanceSheet(branch,{to:""});
+  const qPL=useModulePL(branch,{});
+  const bs=qBS.data, pl=qPL.data;
+  const loading=qBS.isLoading||qPL.isLoading;
+  const errored=qBS.isError||qPL.isError;
+
+  const sideMap=rows=>{const m={};(rows||[]).forEach(g=>{m[g.group]=(m[g.group]||0)+(g.amount||0);});return m;};
+  const A=sideMap(bs&&bs.assets), L=sideMap(bs&&bs.liabilities);
+  const sum=(map,keys)=>keys.reduce((s,k)=>s+(map[k]||0),0);
+  const CA=sum(A,["Current Assets","Bank Accounts","Cash-in-Hand","Deposits (Asset)","Loans & Advances (Asset)","Stock-in-Hand","Sundry Debtors"]);
+  const CL=sum(L,["Current Liabilities","Duties & Taxes","Provisions","Sundry Creditors","Bank OD Accounts"]);
+  const inv=A["Stock-in-Hand"]||0;
+  const cash=(A["Bank Accounts"]||0)+(A["Cash-in-Hand"]||0);
+  const recv=A["Sundry Debtors"]||0;
+  const pay=L["Sundry Creditors"]||0;
+  const totA=bs?bs.totalAssets||0:0;
+  const equity=sum(L,["Capital Account","Reserves & Surplus","Profit & Loss A/c"]);
+  const debt=sum(L,["Loans (Liability)","Secured Loans","Unsecured Loans","Bank OD Accounts"]);
+  const rev=pl?pl.totals.sales||0:0;
+  const cogs=pl?pl.totals.cogs||0:0;
+  const gp=pl?pl.totals.gp||0:0;
+  const net=pl?pl.bridge.netProfit||0:0;
+  const safe=(a,b)=>b?a/b:null;
+
+  const RATIOS=[
+    {category:"Liquidity",name:"Current Ratio",value:safe(CA,CL),fmt:"x",bench:1.5,dir:"up"},
+    {category:"Liquidity",name:"Quick Ratio (Acid Test)",value:safe(CA-inv,CL),fmt:"x",bench:1.0,dir:"up"},
+    {category:"Liquidity",name:"Cash Ratio",value:safe(cash,CL),fmt:"x",bench:0.3,dir:"up"},
+    {category:"Activity",name:"DSO — Days Sales Outstanding (annualised)",value:rev?recv/rev*365:null,fmt:"d",bench:45,dir:"down"},
+    {category:"Activity",name:"DPO — Days Payables Outstanding (annualised)",value:cogs?pay/cogs*365:null,fmt:"d",bench:40,dir:"up"},
+    {category:"Activity",name:"Asset Turnover",value:safe(rev,totA),fmt:"x",bench:2.0,dir:"up"},
+    {category:"Leverage",name:"Debt-Equity Ratio",value:safe(debt,equity),fmt:"x",bench:1.0,dir:"down"},
+    {category:"Profitability",name:"Gross Profit Margin",value:rev?gp/rev*100:null,fmt:"%",bench:10,dir:"up"},
+    {category:"Profitability",name:"Net Profit Margin",value:rev?net/rev*100:null,fmt:"%",bench:3,dir:"up"},
+    {category:"Profitability",name:"Return on Assets (ROA)",value:totA?net/totA*100:null,fmt:"%",bench:8,dir:"up"},
+    {category:"Profitability",name:"Return on Equity (ROE)",value:equity?net/equity*100:null,fmt:"%",bench:12,dir:"up"},
+  ];
+  RATIOS.forEach(r=>{ r.good = r.value==null?false:(r.dir==="up"?r.value>=r.bench:r.value<=r.bench); });
+
+  const catColor={Liquidity:"#185FA5",Activity:"#854F0B",Leverage:"#A32D2D",Profitability:"#27500A"};
+  const sfx=r=>r.fmt==="%"?"%":r.fmt==="d"?"d":"x";
+  const benchTxt=r=>(r.dir==="up"?"≥ ":"≤ ")+r.bench+sfx(r);
+  const valTxt=r=>r.value==null?"—":r.value.toFixed(r.fmt==="d"?0:2)+sfx(r);
+  const hasData=!!bs && (Math.abs(totA)>0.01 || rev>0);
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>📊 Financial Ratio Analysis</h2>
-          <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Liquidity · Activity · Leverage · Profitability ratios with 6-month trend</p>
+          <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Liquidity · Activity · Leverage · Profitability — live from the double-entry books</p>
         </div>
-        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:7,fontSize:11.5}}>
-          {MONTH_OPTIONS.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
-        </select>
       </div>
 
+      {loading && <div style={{...card,textAlign:"center",color:"#5a6691",fontSize:12.5,padding:"40px 14px"}}>Loading live books…</div>}
+      {!loading && errored && <div style={{...card,textAlign:"center",color:"#A32D2D",fontSize:12.5,padding:"40px 14px"}}>Could not load accounting data.</div>}
+      {!loading && !errored && !hasData && (
+        <div style={{...card,textAlign:"center",padding:"44px 14px"}}>
+          <div style={{fontSize:34,marginBottom:8}}>📭</div>
+          <h3 style={{margin:"0 0 6px",fontSize:15,color:"#0d1326"}}>No transactions found</h3>
+          <p style={{margin:0,fontSize:12,color:"#5a6691"}}>Financial ratios are derived from posted vouchers. Record transactions to populate this analysis.</p>
+        </div>
+      )}
+
+      {!loading && !errored && hasData && (<>
       <div style={{display:"grid",gridTemplateColumns:mob?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:14}}>
         {Object.entries(catColor).map(([cat,col])=>{
-          const ratios=RATIOS.filter(r=>r.category===cat);
+          const ratios=RATIOS.filter(r=>r.category===cat&&r.value!=null);
           const goodCount=ratios.filter(r=>r.good).length;
           return(
             <div key={cat} style={{...card,borderTop:`3px solid ${col}`}}>
@@ -2738,36 +2930,26 @@ export function RatioAnalysis({branch,setRoute}){
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                 <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
                   <th style={{padding:"9px 8px",textAlign:"left"}}>Ratio</th>
-                  <th style={{padding:"9px 8px",textAlign:"right"}}>Current</th>
-                  <th style={{padding:"9px 8px",textAlign:"right"}}>Previous</th>
-                  <th style={{padding:"9px 8px",textAlign:"center"}}>Change</th>
+                  <th style={{padding:"9px 8px",textAlign:"right"}}>Value</th>
                   <th style={{padding:"9px 8px",textAlign:"center"}}>Benchmark</th>
-                  <th style={{padding:"9px 8px",textAlign:"center"}}>6-month Trend</th>
                   <th style={{padding:"9px 8px",textAlign:"center"}}>Status</th>
                 </tr></thead>
                 <tbody>
-                  {RATIOS.filter(r=>r.category===cat).map((r,i)=>{
-                    const change=r.current-r.prev;
-                    return(
-                      <tr key={i} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #e1e3ec"}}>
-                        <td style={{padding:"7px 8px",fontWeight:600}}>{r.name}</td>
-                        <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:catColor[cat]}}>{r.current.toFixed(2)}{r.fmt}</td>
-                        <td style={{padding:"7px 8px",textAlign:"right",color:"#5a6691"}}>{r.prev.toFixed(2)}{r.fmt}</td>
-                        <td style={{padding:"7px 8px",textAlign:"center",fontWeight:600,color:(change>0&&r.fmt!=="d")||(change<0&&r.fmt==="d")?"#27500A":"#A32D2D"}}>
-                          {change>0?"+":""}{change.toFixed(2)}
-                        </td>
-                        <td style={{padding:"7px 8px",textAlign:"center",fontSize:10,color:"#5a6691"}}>{r.benchmark}</td>
-                        <td style={{padding:"7px 8px",textAlign:"center"}}><Spark data={r.trend} color={catColor[cat]}/></td>
-                        <td style={{padding:"7px 8px",textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:10,fontSize:9.5,fontWeight:700,background:r.good?"#EAF3DE":"#FCEBEB",color:r.good?"#27500A":"#A32D2D"}}>{r.good?"✓ Healthy":"⚠ Watch"}</span></td>
-                      </tr>
-                    );
-                  })}
+                  {RATIOS.filter(r=>r.category===cat).map((r,i)=>(
+                    <tr key={i} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #e1e3ec"}}>
+                      <td style={{padding:"7px 8px",fontWeight:600}}>{r.name}</td>
+                      <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:catColor[cat]}}>{valTxt(r)}</td>
+                      <td style={{padding:"7px 8px",textAlign:"center",fontSize:10,color:"#5a6691"}}>{benchTxt(r)}</td>
+                      <td style={{padding:"7px 8px",textAlign:"center"}}>{r.value==null?<span style={{fontSize:10,color:"#5a6691"}}>—</span>:<span style={{padding:"2px 8px",borderRadius:10,fontSize:9.5,fontWeight:700,background:r.good?"#EAF3DE":"#FCEBEB",color:r.good?"#27500A":"#A32D2D"}}>{r.good?"✓ Healthy":"⚠ Watch"}</span>}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
       ))}
+      </>)}
     </div>
   );
 }
@@ -2777,64 +2959,113 @@ export function ScheduleIIIBS({branch,setRoute}){
   const mob=useMobile();
   const cfg=bc(branch);
   const cur=cfg.cur;
+  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const round2=n=>Math.round((n||0)*100)/100;
+
+  // LIVE double-entry data — NO hardcoded figures. Same source as the main
+  // Balance Sheet (/reports/bs): GET /api/accounting/balance-sheet, which
+  // aggregates every posted voucher's journal + opening balances by Tally group.
+  // Empty books → zero/empty state (never fabricated balances).
+  const q=useBalanceSheet(branch,{to:""});
+  const d=q.data;
+
+  // Roll the live Tally-group balances up into Schedule III line items. Each
+  // group's `amount` is already signed positive on its natural side.
+  const sideMap=rows=>{const m={};(rows||[]).forEach(g=>{m[g.group]=(m[g.group]||0)+(g.amount||0);});return m;};
+  const liab=sideMap(d&&d.liabilities);
+  const asset=sideMap(d&&d.assets);
+  const pick=(map,names)=>names.reduce((s,n)=>s+(map[n]||0),0);
+
+  // ── I. EQUITY & LIABILITIES ──
+  const shareCapital   = pick(liab,["Capital Account"]);
+  const reserves       = pick(liab,["Reserves & Surplus","Profit & Loss A/c"]);
+  const shareholders   = shareCapital+reserves;
+  const ltBorrowings   = pick(liab,["Loans (Liability)","Secured Loans","Unsecured Loans"]);
+  const stBorrowings   = pick(liab,["Bank OD Accounts"]);
+  const tradePayables  = pick(liab,["Sundry Creditors"]);
+  const dutiesTaxes    = pick(liab,["Duties & Taxes","Current Liabilities"]);
+  const stProvisions   = pick(liab,["Provisions"]);
+  const totLiab        = d? round2(d.totalLiabilities||0) : 0;
+  // Any liability group not explicitly mapped above lands in Other Current
+  // Liabilities, so the statement always reconciles to the live total.
+  const otherCurrLiab  = round2(totLiab-(shareholders+ltBorrowings+stBorrowings+tradePayables+dutiesTaxes+stProvisions));
+  const currLiab       = stBorrowings+tradePayables+dutiesTaxes+otherCurrLiab+stProvisions;
 
   const EQUITY_LIABILITIES=[
-    {head:"(1) Shareholders' Funds",bold:true,total:48500000},
-    {head:"    (a) Share Capital",value:5000000},
-    {head:"    (b) Reserves and Surplus",value:43500000},
+    {head:"(1) Shareholders' Funds",bold:true,total:shareholders},
+    {head:"    (a) Share Capital",value:shareCapital},
+    {head:"    (b) Reserves and Surplus",value:reserves},
     {head:"(2) Share Application Money Pending Allotment",value:0,bold:true},
-    {head:"(3) Non-Current Liabilities",bold:true,total:18500000},
-    {head:"    (a) Long-term Borrowings",value:14250000},
-    {head:"    (b) Deferred Tax Liabilities (Net)",value:1850000},
-    {head:"    (c) Other Long-term Liabilities",value:1200000},
-    {head:"    (d) Long-term Provisions",value:1200000},
-    {head:"(4) Current Liabilities",bold:true,total:34850000},
-    {head:"    (a) Short-term Borrowings",value:8500000},
-    {head:"    (b) Trade Payables",value:18250000},
-    {head:"    (c) Other Current Liabilities",value:5850000},
-    {head:"    (d) Short-term Provisions",value:2250000},
+    {head:"(3) Non-Current Liabilities",bold:true,total:ltBorrowings},
+    {head:"    (a) Long-term Borrowings",value:ltBorrowings},
+    {head:"(4) Current Liabilities",bold:true,total:currLiab},
+    {head:"    (a) Short-term Borrowings",value:stBorrowings},
+    {head:"    (b) Trade Payables",value:tradePayables},
+    {head:"    (c) Other Current Liabilities",value:round2(dutiesTaxes+otherCurrLiab)},
+    {head:"    (d) Short-term Provisions",value:stProvisions},
   ];
+
+  // ── II. ASSETS ──
+  const fixedAssets    = pick(asset,["Fixed Assets"]);
+  const investmentsNC  = pick(asset,["Investments"]);
+  const ltLoansAdv     = pick(asset,["Deposits (Asset)"]);
+  const otherNCAssets  = pick(asset,["Misc. Expenses (Asset)"]);
+  const nonCurrAssets  = fixedAssets+investmentsNC+ltLoansAdv+otherNCAssets;
+  const inventories    = pick(asset,["Stock-in-Hand"]);
+  const tradeRecv      = pick(asset,["Sundry Debtors"]);
+  const cashBank       = pick(asset,["Bank Accounts","Cash-in-Hand"]);
+  const stLoansAdv     = pick(asset,["Loans & Advances (Asset)"]);
+  const totAssets      = d? round2(d.totalAssets||0) : 0;
+  const otherCurrAsset = round2(totAssets-(nonCurrAssets+inventories+tradeRecv+cashBank+stLoansAdv));
+  const currAssets     = inventories+tradeRecv+cashBank+stLoansAdv+otherCurrAsset;
+
   const ASSETS=[
-    {head:"(1) Non-Current Assets",bold:true,total:42850000},
-    {head:"    (a) Fixed Assets",value:0,sub:true},
-    {head:"        (i) Tangible Assets",value:18500000},
-    {head:"        (ii) Intangible Assets",value:850000},
-    {head:"        (iii) Capital Work-in-Progress",value:2500000},
-    {head:"    (b) Non-current Investments",value:8500000},
-    {head:"    (c) Deferred Tax Assets (Net)",value:0},
-    {head:"    (d) Long-term Loans and Advances",value:8500000},
-    {head:"    (e) Other Non-current Assets",value:4000000},
-    {head:"(2) Current Assets",bold:true,total:59000000},
-    {head:"    (a) Current Investments",value:5000000},
-    {head:"    (b) Inventories",value:850000},
-    {head:"    (c) Trade Receivables",value:22500000},
-    {head:"    (d) Cash and Cash Equivalents",value:18500000},
-    {head:"    (e) Short-term Loans and Advances",value:8500000},
-    {head:"    (f) Other Current Assets",value:3650000},
+    {head:"(1) Non-Current Assets",bold:true,total:nonCurrAssets},
+    {head:"    (a) Fixed Assets",value:fixedAssets},
+    {head:"    (b) Non-current Investments",value:investmentsNC},
+    {head:"    (c) Long-term Loans and Advances",value:ltLoansAdv},
+    {head:"    (d) Other Non-current Assets",value:otherNCAssets},
+    {head:"(2) Current Assets",bold:true,total:currAssets},
+    {head:"    (a) Inventories",value:inventories},
+    {head:"    (b) Trade Receivables",value:tradeRecv},
+    {head:"    (c) Cash and Cash Equivalents",value:cashBank},
+    {head:"    (d) Short-term Loans and Advances",value:stLoansAdv},
+    {head:"    (e) Other Current Assets",value:otherCurrAsset},
   ];
 
-  const totEqLiab=101850000;
-  const totAssets=101850000;
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
-
-  const Row=({head,value,total,bold,sub})=>(
-    <tr style={{borderBottom:"1px solid #e1e3ec",background:bold?"#FAEEDA":sub?"#f3f4f8":"#fff"}}>
-      <td style={{padding:"7px 10px",fontWeight:bold?700:sub?500:400,fontSize:bold?11.5:11,color:bold?"#0d1326":"#0d1326"}}>{head}</td>
-      <td style={{padding:"7px 10px",textAlign:"right",fontWeight:bold?700:400,color:bold?"#0d1326":"#5a6691"}}>{value!==undefined&&value>0?cur+fmt(value):value===0?"—":""}</td>
+  const Row=({head,value,total,bold})=>(
+    <tr style={{borderBottom:"1px solid #e1e3ec",background:bold?"#FAEEDA":"#fff"}}>
+      <td style={{padding:"7px 10px",fontWeight:bold?700:400,fontSize:bold?11.5:11,color:"#0d1326"}}>{head}</td>
+      <td style={{padding:"7px 10px",textAlign:"right",fontWeight:bold?700:400,color:bold?"#0d1326":"#5a6691"}}>{value!==undefined?(value?cur+fmt(value):"—"):""}</td>
       <td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,color:"#185FA5"}}>{total!==undefined?cur+fmt(total):""}</td>
     </tr>
   );
+
+  const hasData = !!d && (Math.abs(totLiab)>0.01 || Math.abs(totAssets)>0.01);
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>📜 Balance Sheet — Schedule III</h2>
-          <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Companies Act 2013 prescribed format · As at 31 March 2026 · Required for Pvt Ltd entities</p>
+          <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Companies Act 2013 prescribed format · As at {fmtDate(todayISO())} · Live from posted vouchers</p>
         </div>
-        <button style={{padding:"7px 14px",border:"none",background:"#d4a437",color:"#0d1326",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer"}}>📄 Export PDF</button>
+        {hasData && (d.balanced
+          ? <span style={{padding:"6px 12px",borderRadius:7,fontSize:11,fontWeight:700,background:"#EAF3DE",color:"#27500A"}}>✓ Balanced</span>
+          : <span style={{padding:"6px 12px",borderRadius:7,fontSize:11,fontWeight:700,background:"#FCEBEB",color:"#A32D2D"}}>⚠ Out by {cur+fmt(Math.abs(totAssets-totLiab))}</span>)}
       </div>
 
+      {q.isLoading && <div style={{...card,textAlign:"center",color:"#5a6691",fontSize:12.5,padding:"40px 14px"}}>Loading live books…</div>}
+      {q.isError && <div style={{...card,textAlign:"center",color:"#A32D2D",fontSize:12.5,padding:"40px 14px"}}>Could not load accounting data{q.error?.message?` — ${q.error.message}`:""}.</div>}
+      {!q.isLoading && !q.isError && !hasData && (
+        <div style={{...card,textAlign:"center",padding:"44px 14px"}}>
+          <div style={{fontSize:34,marginBottom:8}}>📭</div>
+          <h3 style={{margin:"0 0 6px",fontSize:15,color:"#0d1326"}}>No transactions found</h3>
+          <p style={{margin:0,fontSize:12,color:"#5a6691"}}>The Schedule III Balance Sheet is generated from posted vouchers and opening balances. Record transactions to populate this statement.</p>
+        </div>
+      )}
+
+      {!q.isLoading && !q.isError && hasData && (
       <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:14}}>
         <div style={{...card,padding:0,overflow:"hidden"}}>
           <h3 style={{margin:0,padding:"10px 12px",fontSize:13,background:"#0d1326",color:"#d4a437"}}>I. EQUITY AND LIABILITIES</h3>
@@ -2844,7 +3075,7 @@ export function ScheduleIIIBS({branch,setRoute}){
               <tr style={{background:"#0d1326",color:"#d4a437"}}>
                 <td style={{padding:"10px",fontWeight:700,fontSize:12}}>TOTAL</td>
                 <td></td>
-                <td style={{padding:"10px",textAlign:"right",fontWeight:700,fontSize:12}}>{cur+fmt(totEqLiab)}</td>
+                <td style={{padding:"10px",textAlign:"right",fontWeight:700,fontSize:12}}>{cur+fmt(totLiab)}</td>
               </tr>
             </tbody>
           </table>
@@ -2864,9 +3095,10 @@ export function ScheduleIIIBS({branch,setRoute}){
           </table>
         </div>
       </div>
+      )}
 
       <p style={{marginTop:14,fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>
-        💡 As per Division I of Schedule III of Companies Act, 2013 · Reproduce with Notes 1-30 for full statutory compliance
+        💡 As per Division I of Schedule III of Companies Act, 2013 · Figures derived live from the Tally 28-group double-entry books · Reproduce with Notes 1-30 for full statutory compliance
       </p>
     </div>
   );

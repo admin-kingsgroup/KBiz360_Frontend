@@ -84,6 +84,40 @@ export const FY_MONTHS = fyMonthKeys(CUR_FY.startYear);                         
 export const FY_YTD_MONTHS = FY_MONTHS.filter((m) => m <= CUR_MONTH);
 export function fyMonthsUpTo(key) { return FY_MONTHS.filter((m) => m <= key); }
 
+/* ── financial-year quarter (Apr-Jun=Q1 · Jul-Sep=Q2 · Oct-Dec=Q3 · Jan-Mar=Q4) ─ */
+export function fyQuarterOf(d = new Date()) {
+  const fy = fyOf(d);
+  const fyOffset = (d.getMonth() - 3 + 12) % 12;                                 // 0=Apr … 11=Mar
+  const q = Math.floor(fyOffset / 3);                                            // 0..3
+  const startMonthIdx = 3 + q * 3;                                               // 3,6,9,12 (12 → Jan next yr; JS normalizes)
+  const start = new Date(fy.startYear, startMonthIdx, 1);
+  const end = new Date(fy.startYear, startMonthIdx + 3, 0);                      // last day of the quarter
+  return {
+    q: q + 1,                                                                    // 1..4
+    label: `Q${q + 1} FY${fy.label}`,                                            // "Q1 FY2026-27"
+    startISO: isoDate(start), endISO: isoDate(end),
+  };
+}
+export const CUR_QUARTER = fyQuarterOf();                                        // today → e.g. Q1 FY2026-27 (Apr 1 → Jun 30)
+
+/* ── current calendar month range (1st → last day) ─────────────────── */
+export function monthRangeOf(d = new Date()) {
+  const s = new Date(d.getFullYear(), d.getMonth(), 1);
+  const e = new Date(d.getFullYear(), d.getMonth() + 1, 0);                       // day 0 of next month = last day of this one
+  return { startISO: isoDate(s), endISO: isoDate(e) };
+}
+export const CUR_MONTH_RANGE = monthRangeOf();
+
+/* FY quarter a month key ("YYYY-MM") falls in — used to bucket monthly report
+   rows into Q1–Q4. `sortKey` orders quarters across financial years. */
+export function fyQuarterKey(key) {
+  const [y, m] = String(key).split('-').map(Number);
+  const fy = fyOf(new Date(y, (m || 1) - 1, 1));
+  const off = (((m || 1) - 1) - 3 + 12) % 12;                                    // 0=Apr … 11=Mar
+  const q = Math.floor(off / 3) + 1;                                             // 1..4
+  return { q, fyLabel: fy.label, label: `Q${q} FY${fy.label}`, sortKey: fy.startYear * 10 + q };
+}
+
 /* ── dropdown option builders ──────────────────────────────────────── */
 /* rolling list of recent months (newest first) so users can still reach
    months that already have data while the default stays "current month". */
@@ -112,6 +146,26 @@ export function fyOptions(count = 4) {
 export function fyRange(label) {
   const s = parseInt(String(label).slice(0, 4), 10);
   return { from: `${s}-04-01`, to: `${s + 1}-03-31` };
+}
+
+/* Preset report windows for period toggles (All · Monthly · Quarterly · YTD).
+   Returns { from, to, label } so a report can both fetch and caption the window. */
+export function presetRange(mode) {
+  switch (mode) {
+    case 'month': {
+      const r = monthRangeOf();
+      return { from: r.startISO, to: r.endISO, label: `${CUR_MONTH_LABEL} (current month)` };
+    }
+    case 'quarter': {
+      const q = fyQuarterOf();
+      return { from: q.startISO, to: q.endISO, label: q.label };
+    }
+    case 'ytd':
+      return { from: CUR_FY.startISO, to: todayISO(), label: `YTD ${CUR_FY.label}` };
+    case 'all':
+    default:
+      return { from: ALL_TIME_FROM, to: todayISO(), label: 'All time' };
+  }
 }
 
 /* ── "show full data from inception" reports ───────────────────────── */

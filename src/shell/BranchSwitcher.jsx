@@ -11,7 +11,7 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
   const [open,setOpen]=useState(false);
   const isAll=branch==="ALL";
   const brFlag=isAll?"🌐":branch?.flag||"🇮🇳";
-  const brLabel=isAll?"Travkings Group":(branch?.code||"BOM")+" — "+(branch?.city||"");
+  const brLabel=isAll?"Travkings Group":(branch?.code||"BOM")+(branch?.city?" — "+branch.city:"");
   const brTagLabel=isAll?"Consolidated":(branch?.isHO?"Main Branch":"Branch");
 
   // Fiori Light vs Dark colors
@@ -50,9 +50,10 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
             const FULL_SCOPE=["Super Admin","Director","Senior Finance Manager","Sr. Accounts Executive"];
             const userBranches = Array.isArray(currentUser?.branches) ? currentUser.branches : null;
             const isFull = !currentUser || FULL_SCOPE.includes(currentUser.role);
-            // No branch list on the user → show all branches (don't crash / blank).
-            const allowed = userBranches ? BRANCHES.filter(b=>userBranches.includes(b.code)) : BRANCHES;
-            const includeAll = isFull && (userBranches ? userBranches.length>1 : true);
+            // Full-scope roles always see every branch (incl. any newly added, e.g.
+            // TKHO) even if their stored list is stale; others are filtered to theirs.
+            const allowed = (isFull || !userBranches) ? BRANCHES : BRANCHES.filter(b=>userBranches.includes(b.code));
+            const includeAll = isFull && allowed.length>1;
             const list = includeAll ? [...allowed,{code:"ALL",city:"Travkings Group",country:"Consolidated",flag:"🌐",currency:"INR",tax:"MULTI"}] : allowed;
             return list;
           })().map(b=>{
@@ -71,7 +72,7 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
                 <div>
                   <p style={{margin:0,fontSize:11.5,fontWeight:sel?700:400,
                     color:optColor}}>
-                    {b.code==="ALL"?"Travkings Group":b.code+" — "+b.city}
+                    {b.code==="ALL"?"Travkings Group":b.code+(b.city?" — "+b.city:"")}
                   </p>
                   <p style={{margin:0,fontSize:9.5,color:"#64748b"}}>
                     {b.code==="ALL"?"Consolidated":b.isHO?"Main Branch":"Branch"} · {b.currency||b.cur} · {b.tax||b.taxType||""}

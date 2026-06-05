@@ -18,9 +18,13 @@
      · Prior-year columns/trends fetch the previous FY live and compare.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQueries } from '@tanstack/react-query';
 import { card, inp, bc } from '../core/styles';
-import { useModulePL, useBalanceSheet, useLedgerStatement, useAgeing } from '../core/useAccounting';
+import { useModulePL, useBalanceSheet, useLedgerStatement, useAgeing, branchCode } from '../core/useAccounting';
+import { apiGet, getAuthToken } from '../core/api';
+import { exportToExcel } from '../core/exportExcel';
+import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../core/dates';
 import { VoucherEditor } from './accountingLive';
 import { useMobile } from '../core/hooks';
 
@@ -80,20 +84,6 @@ function FioriHead({ system, title, sub, right }) {
     </>
   );
 }
-const FyPicker = ({ fy, setFy, compare, setCompare, label = 'Period' }) => (
-  <>
-    <span style={{ color: '#fff', fontSize: 11, opacity: 0.8 }}>{label}</span>
-    <select value={fy} onChange={(e) => setFy(e.target.value)} style={{ ...inp, width: 'auto', minHeight: 30, fontSize: 11, cursor: 'pointer' }}>
-      <option value="ALL">All periods</option>
-      {fyOptions().map((f) => <option key={f} value={f}>FY {f}</option>)}
-    </select>
-    {fy !== 'ALL' && (
-      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#fff', fontSize: 11, cursor: 'pointer' }}>
-        <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} /> vs prior&nbsp;yr
-      </label>
-    )}
-  </>
-);
 function StateBox({ q, empty, children }) {
   if (q.isLoading) return <div style={{ ...card, padding: 30, textAlign: 'center', color: SAP.sec, fontSize: 12, borderRadius: '0 0 8px 8px' }}>Loading live data…</div>;
   if (q.isError) return <div style={{ ...card, padding: 16, color: SAP.red, fontSize: 12, fontWeight: 600, borderRadius: '0 0 8px 8px' }}>⚠ {q.error?.message || 'Failed to load from backend'}</div>;
@@ -273,27 +263,282 @@ function LedgerVoucherDrill({ ledger, branch, to, cur, mobile, onClose }) {
 const Th = ({ children, right, w }) => <th style={{ background: '#f7f8f9', color: SAP.sec, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: right ? '9px 20px 9px 16px' : '9px 16px', borderBottom: `2px solid ${SAP.border}`, textAlign: right ? 'right' : 'left', width: w }}>{children}</th>;
 
 /* ═══════════════════ PROFIT & LOSS (Fiori ⇄ Tally Classic) ══════════════ */
+/* ── period model — drives every section live off { from, to } ─────────
+   Modes: all | ytd | month (matrix) | quarter (matrix) | custom.
+   All ranges flow into useModulePL, so Revenue/COGS/GP/overheads/Net Profit
+   and every % recompute for the selection. Source of truth: core/dates.js. */
+const PNL_PERIOD_KEY = 'kb360-pnl-period';
+function loadSavedPeriod() {
+  try { return JSON.parse(localStorage.getItem(PNL_PERIOD_KEY) || '{}') || {}; } catch { return {}; }
+}
+const toolBtn = { padding: '6px 12px', fontSize: 11.5, fontWeight: 600, color: SAP.sec, background: '#fff', border: `1px solid ${SAP.border}`, borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap' };
+
+// last calendar day of a YYYY-MM key, as ISO (month is 1-based → day 0 of next).
+const monthRange = (key) => { const [y, m] = String(key).split('-').map(Number); return { from: `${key}-01`, to: isoDate(new Date(y, m, 0)) }; };
+// FY months (Apr→Mar); the current FY is capped at the current month so future
+// months don't render as empty columns.
+const fyMonthsFor = (label) => {
+  const start = parseInt(String(label).slice(0, 4), 10);
+  const keys = fyMonthKeys(start);
+  return label === CUR_FY.label ? keys.filter((k) => k <= CUR_MONTH) : keys;
+};
+const QTR_SPAN = { Q1: 'Apr–Jun', Q2: 'Jul–Sep', Q3: 'Oct–Dec', Q4: 'Jan–Mar' };
+const fyQuartersFor = (label) => {
+  const start = parseInt(String(label).slice(0, 4), 10);
+  const all = fyMonthKeys(start);
+  const live = new Set(fyMonthsFor(label));
+  const out = [];
+  for (let qi = 0; qi < 4; qi++) {
+    const seg = all.slice(qi * 3, qi * 3 + 3).filter((k) => live.has(k));
+    if (!seg.length) continue;
+    const code = `Q${qi + 1}`;
+    out.push({ key: `${label}-${code}`, label: code, span: QTR_SPAN[code], from: monthRange(seg[0]).from, to: monthRange(seg[seg.length - 1]).to });
+  }
+  return out;
+};
+// mode → resolved single-period { from, to, label, note }. month/quarter use the
+// matrix; if one of their columns is drilled the focus range is used directly.
+function resolvePeriod(mode, fy, custom) {
+  if (mode === 'all') return { from: '', to: '', label: 'All Time', note: rangeNote('all', { to: todayISO() }) };
+  if (mode === 'custom') {
+    const from = custom.from || CUR_FY.startISO, to = custom.to || todayISO();
+    return { from, to, label: 'Custom Range', note: rangeNote('range', { from, to }) };
+  }
+  const r = fyRange(fy);
+  const to = fy === CUR_FY.label ? todayISO() : r.to;       // current FY → year-to-date
+  return { from: r.from, to, label: `FY ${fy} YTD`, note: rangeNote('range', { from: r.from, to }) };
+}
+// comparison window: previous FY (ytd) or the equal-length window immediately
+// before a custom range.
+function priorPeriod(mode, fy, custom) {
+  if (mode === 'custom') {
+    const a = new Date(custom.from), b = new Date(custom.to);
+    if (isNaN(a.getTime()) || isNaN(b.getTime())) return null;
+    const days = Math.round((b - a) / 86400000) + 1;
+    const pe = new Date(a); pe.setDate(pe.getDate() - 1);
+    const ps = new Date(pe); ps.setDate(ps.getDate() - days + 1);
+    return { from: isoDate(ps), to: isoDate(pe), label: 'Previous range' };
+  }
+  const p = fyPrior(fy);
+  return { from: p.from, to: p.to, label: 'FY prior' };
+}
+// Flatten a single-period payload into an Excel sheet (Section A modules + the
+// indirect-expense groups + the net-profit line).
+function exportDetail(d, period, cur) {
+  if (!d) return;
+  const rows = [];
+  (d.modules || []).forEach((m) => rows.push({ section: 'Gross Profit', particulars: m.name, sales: m.sales, cogs: m.cogs, amount: m.gp, gpPct: m.gpPct, pctSales: m.pctOfSales }));
+  rows.push({ section: 'Gross Profit', particulars: 'TOTAL — Gross Profit', sales: d.totals.sales, cogs: d.totals.cogs, amount: d.totals.gp, gpPct: d.totals.gpPct, pctSales: 100 });
+  const expBuckets = (Array.isArray(d.indirect.buckets) && d.indirect.buckets.length)
+    ? d.indirect.buckets
+    : [{ name: 'Indirect Expenses', amount: d.indirect.expense, groups: d.indirect.groups || [] }];
+  expBuckets.forEach((b) => {
+    rows.push({ section: 'Indirect Expenses', particulars: b.name, amount: -b.amount, pctSales: b.pctOfSales });
+    (b.groups || []).forEach((g) => {
+      rows.push({ section: 'Indirect Expenses', particulars: `   ${g.name}`, amount: -g.amount, pctSales: g.pctOfSales });
+      (g.ledgers || []).forEach((l) => rows.push({ section: 'Indirect Expenses', particulars: `      ${l.name}`, amount: -l.amount, pctSales: l.pctOfSales }));
+    });
+    rows.push({ section: 'Indirect Expenses', particulars: `${b.name} — Total`, amount: -b.amount });
+  });
+  rows.push({ section: 'Indirect Expenses', particulars: 'TOTAL INDIRECT EXPENSES', amount: -d.indirect.expense });
+  if (d.bridge.indirectIncome) rows.push({ section: 'Indirect Income', particulars: 'Indirect Income', amount: d.bridge.indirectIncome });
+  rows.push({ section: 'Net Profit', particulars: 'NET PROFIT', amount: d.bridge.netProfit });
+  const columns = [
+    { key: 'section', label: 'Section' }, { key: 'particulars', label: 'Particulars' },
+    { key: 'sales', label: `Sales (${cur})` }, { key: 'cogs', label: `COGS (${cur})` },
+    { key: 'amount', label: `Amount (${cur})` }, { key: 'gpPct', label: 'GP %' }, { key: 'pctSales', label: '% of Sales' },
+  ];
+  exportToExcel(`PnL_${period.label} ${period.from || 'inception'}_to_${period.to || todayISO()}`, columns, rows);
+}
+
+/* ── period toolbar (quick filters + comparison + custom range + export) ── */
+function PnlPeriodBar({ mode, setMode, fy, setFy, compare, setCompare, custom, setCustom, view, setView, showView, canExport, onExport }) {
+  const MODES = [['all', 'All Time'], ['ytd', 'YTD'], ['month', 'Monthly'], ['quarter', 'Quarterly'], ['custom', 'Custom']];
+  const tab = (active) => ({ padding: '6px 13px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: active ? SAP.blue : '#fff', color: active ? '#fff' : SAP.sec });
+  const needsFy = mode === 'ytd' || mode === 'month' || mode === 'quarter';
+  return (
+    <div style={{ background: '#fff', border: `1px solid ${SAP.border}`, borderTop: 'none', padding: '9px 14px', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ display: 'inline-flex', border: `1px solid ${SAP.border}`, borderRadius: 6, overflow: 'hidden' }}>
+        {MODES.map(([id, label]) => <button key={id} onClick={() => setMode(id)} style={tab(mode === id)}>{label}</button>)}
+      </div>
+      {needsFy && (
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: SAP.sec }}>
+          Financial Year
+          <select value={fy} onChange={(e) => setFy(e.target.value)} style={{ ...inp, width: 'auto', minHeight: 30, fontSize: 11.5, cursor: 'pointer' }}>
+            {fyOptions().map((f) => <option key={f} value={f}>FY {f}</option>)}
+          </select>
+        </label>
+      )}
+      {mode === 'custom' && (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: SAP.sec, flexWrap: 'wrap' }}>
+          From <input type="date" value={custom.from} onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))} style={{ ...inp, width: 'auto', minHeight: 30, fontSize: 11.5 }} />
+          To <input type="date" value={custom.to} onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))} style={{ ...inp, width: 'auto', minHeight: 30, fontSize: 11.5 }} />
+        </span>
+      )}
+      {(mode === 'ytd' || mode === 'custom') && (
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: SAP.sec, cursor: 'pointer' }}>
+          <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} /> Compare vs previous
+        </label>
+      )}
+      <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+        {showView && <PnlViewSwitcher view={view} setView={setView} />}
+        {canExport && <button onClick={onExport} style={toolBtn}>⬇ Excel</button>}
+        <button onClick={() => window.print()} style={toolBtn}>🖨 Print / PDF</button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Monthly / Quarterly side-by-side matrix (one column per period) ─────
+   Fires one module-PL query per column (cache-shared with the detail view's
+   key), rolls up a FY-Total column, and drills any column → its full P&L. */
+function PnLMatrix({ branch, cur, fy, grain, onFocus }) {
+  const code = branchCode(branch);
+  const cols = useMemo(
+    () => (grain === 'month'
+      ? fyMonthsFor(fy).map((k) => ({ key: k, label: monthLabel(k), ...monthRange(k) }))
+      : fyQuartersFor(fy)),
+    [grain, fy],
+  );
+  const results = useQueries({
+    queries: cols.map((c) => ({
+      queryKey: ['accounting', 'module-pl', code || 'all', c.from, c.to],
+      queryFn: () => apiGet('/api/accounting/module-pl', { branch: code, from: c.from, to: c.to }),
+      enabled: !!getAuthToken(),
+      staleTime: 30_000,
+    })),
+  });
+  const loading = results.some((r) => r.isLoading);
+  const errored = results.find((r) => r.isError);
+  const datas = results.map((r) => r.data);
+
+  const agg = useMemo(() => {
+    const t = { sales: 0, cogs: 0, gp: 0, indExp: 0, indInc: 0, net: 0 };
+    datas.forEach((d) => {
+      if (!d) return;
+      t.sales += d.totals.sales || 0; t.cogs += d.totals.cogs || 0; t.gp += d.totals.gp || 0;
+      t.indExp += d.indirect.expense || 0; t.indInc += d.bridge.indirectIncome || 0; t.net += d.bridge.netProfit || 0;
+    });
+    return t;
+  }, [datas]);
+
+  const pctSafe = (a, b) => (b ? (a / b) * 100 : 0);
+  const METRICS = [
+    { label: 'Revenue (Sales)', get: (d) => d.totals.sales, total: agg.sales, money: true },
+    { label: 'Direct Cost (COGS)', get: (d) => d.totals.cogs, total: agg.cogs, money: true },
+    { label: 'Gross Profit', get: (d) => d.totals.gp, total: agg.gp, strong: true, good: true },
+    { label: 'Gross Profit %', get: (d) => d.totals.gpPct, total: pctSafe(agg.gp, agg.sales), pct: true },
+    { label: 'Indirect Expenses', get: (d) => d.indirect.expense, total: agg.indExp, neg: true },
+    { label: 'Indirect Income', get: (d) => d.bridge.indirectIncome, total: agg.indInc },
+    { label: 'Net Profit', get: (d) => d.bridge.netProfit, total: agg.net, strong: true, good: true },
+    { label: 'Net Profit %', get: (d) => pctSafe(d.bridge.netProfit, d.totals.sales), total: pctSafe(agg.net, agg.sales), pct: true },
+  ];
+  const fmtCell = (m, d) => (!d ? '—' : (m.pct ? pctTxt(m.get(d)) : inr(m.get(d))));
+
+  const doExport = () => {
+    const columns = [{ key: 'metric', label: grain === 'month' ? 'Metric / Month' : 'Metric / Quarter' }, ...cols.map((c) => ({ key: c.key, label: c.label })), { key: 'fytotal', label: 'FY Total' }];
+    const rows = METRICS.map((m) => {
+      const row = { metric: m.label };
+      cols.forEach((c, i) => { row[c.key] = datas[i] ? (m.pct ? +m.get(datas[i]).toFixed(2) : Math.round(m.get(datas[i]))) : ''; });
+      row.fytotal = m.pct ? +m.total.toFixed(2) : Math.round(m.total);
+      return row;
+    });
+    exportToExcel(`PnL_${grain}_FY${fy}`, columns, rows);
+  };
+
+  if (errored) return <div style={{ ...card, padding: 16, color: SAP.red, fontSize: 12, fontWeight: 600 }}>⚠ {errored.error?.message || 'Failed to load the period matrix'}</div>;
+
+  return (
+    <FCard
+      title={grain === 'month' ? `Month-wise Profit & Loss — FY ${fy}` : `Quarter-wise Profit & Loss — FY ${fy}`}
+      sub={`Each column is a ${grain === 'month' ? 'month' : 'quarter'} of the financial year · click a column header to drill into its full P&L → vouchers · ${cur} excl. GST`}
+      badge={<Badge bg={SAP.blueBg} c={SAP.blue} bd="#b8d6ff">{cols.length} {grain === 'month' ? 'months' : 'quarters'}</Badge>}
+    >
+      <div style={{ padding: '8px 12px 0', display: 'flex', justifyContent: 'flex-end' }}>
+        <button onClick={doExport} style={toolBtn}>⬇ Excel</button>
+      </div>
+      {loading ? (
+        <div style={{ padding: 30, textAlign: 'center', color: SAP.sec, fontSize: 12 }}>Loading {cols.length} periods…</div>
+      ) : cols.length === 0 ? (
+        <div style={{ padding: 30, textAlign: 'center', color: SAP.sec, fontSize: 12 }}>No periods in this financial year yet.</div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 180 + cols.length * 96 }}>
+            <thead>
+              <tr>
+                <Th w={180}>Particulars</Th>
+                {cols.map((c) => (
+                  <th key={c.key} onClick={() => onFocus({ from: c.from, to: c.to, label: grain === 'month' ? c.label : `${c.label} FY${fy}`, note: rangeNote('range', { from: c.from, to: c.to }) })}
+                    title="Click to drill into this period's full P&L"
+                    style={{ background: '#f7f8f9', color: SAP.blue, fontSize: 11, fontWeight: 700, padding: '9px 12px', borderBottom: `2px solid ${SAP.border}`, textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    {c.label}{c.span ? <div style={{ fontSize: 9, color: SAP.label, fontWeight: 500 }}>{c.span}</div> : null} ›
+                  </th>
+                ))}
+                <th style={{ background: SAP.headerBg, color: SAP.text, fontSize: 11, fontWeight: 800, padding: '9px 12px', borderBottom: `2px solid ${SAP.border}`, textAlign: 'right' }}>FY Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {METRICS.map((m, ri) => (
+                <tr key={m.label} style={{ background: m.strong ? SAP.greenBg : (ri % 2 ? SAP.rowAlt : '#fff'), borderBottom: `1px solid ${SAP.borderLt}` }}>
+                  <td style={{ padding: '7px 14px', fontWeight: m.strong ? 700 : 500, color: m.strong ? SAP.greenDk : SAP.text }}>{m.label}</td>
+                  {cols.map((c, i) => (
+                    <td key={c.key} style={{ ...num, padding: '7px 12px', fontWeight: m.strong ? 700 : 400, color: m.good ? SAP.greenDk : (m.neg ? SAP.red : SAP.text) }}>{fmtCell(m, datas[i])}</td>
+                  ))}
+                  <td style={{ ...num, padding: '7px 12px', fontWeight: 700, color: m.good ? SAP.greenDk : (m.neg ? SAP.red : SAP.text), background: m.strong ? '#dff5df' : SAP.headerBg }}>
+                    {m.pct ? pctTxt(m.total) : inr(m.total)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </FCard>
+  );
+}
+
 export function ReportPnLLive({ branch }) {
   const cur = curOf(branch);
-  const [fy, setFy] = useState('ALL');
-  const [compare, setCompare] = useState(true);
-  const [view, setView] = useState('fiori'); // 'fiori' | 'classic'
-  const period = fy === 'ALL' ? { from: '', to: '' } : fyRange(fy);
-  const showPY = fy !== 'ALL' && compare;
-  const prior = showPY ? fyPrior(fy) : { from: '', to: '' };
+  const mobile = useMobile();
+  const saved = useMemo(loadSavedPeriod, []);
+  const [mode, setMode] = useState(saved.mode || 'ytd');                // all | ytd | month | quarter | custom
+  const [fy, setFy] = useState(saved.fy || CUR_FY.label);
+  const [compare, setCompare] = useState(saved.compare ?? true);
+  const [custom, setCustom] = useState(saved.custom || { from: CUR_FY.startISO, to: todayISO() });
+  const [view, setView] = useState(saved.view || 'fiori');             // 'fiori' | 'classic'
+  const [focus, setFocus] = useState(null);                            // matrix → drilled column { from, to, label, note }
+  useEffect(() => { try { localStorage.setItem(PNL_PERIOD_KEY, JSON.stringify({ mode, fy, compare, custom, view })); } catch { /* ignore */ } }, [mode, fy, compare, custom, view]);
+  useEffect(() => { setFocus(null); }, [mode, fy]);                    // realigning the matrix clears any open drill
 
-  const q = useModulePL(branch, period);
-  const qP = useModulePL(branch, prior);
+  const isMatrix = (mode === 'month' || mode === 'quarter') && !focus;
+  const period = focus || resolvePeriod(mode, fy, custom);
+  const showPY = !isMatrix && !focus && compare && mode !== 'all';
+  const prior = showPY ? priorPeriod(mode, fy, custom) : null;
+
+  const q = useModulePL(branch, { from: period.from, to: period.to });
+  // No comparison → reuse the same range (cache hit, no extra fetch); prev stays null.
+  const qP = useModulePL(branch, prior ? { from: prior.from, to: prior.to } : { from: period.from, to: period.to });
   const d = q.data;
   const prev = showPY ? qP.data : null;
 
-  const mobile = useMobile();
   const [openMod, setOpenMod] = useState({});
   const [openSub, setOpenSub] = useState({});
   const [openExp, setOpenExp] = useState({});
+  const [openBucket, setOpenBucket] = useState({});
   const [drillFile, setDrillFile] = useState(null);
+  const [drillLedger, setDrillLedger] = useState(null);
+  const [expDetail, setExpDetail] = useState('detailed'); // Indirect Expenses: detailed (full tree) | summary (Fixed/Variable totals)
 
   const ranking = useMemo(() => (d?.modules || []).slice().sort((a, b) => b.gp - a.gp), [d]);
+  // Indirect-expense Fixed/Variable buckets. New module-PL payloads carry
+  // `indirect.buckets`; fall back to wrapping the flat group list in one bucket
+  // so an older cached payload still renders.
+  const expBuckets = useMemo(() => {
+    if (!d) return [];
+    if (Array.isArray(d.indirect.buckets) && d.indirect.buckets.length) return d.indirect.buckets;
+    const groups = d.indirect.groups || [];
+    return groups.length ? [{ name: 'Indirect Expenses', amount: d.indirect.expense, pctOfSales: d.totals.sales ? (d.indirect.expense / d.totals.sales) * 100 : 0, groups }] : [];
+  }, [d]);
   // Estimated tax provision → PAT (matches the HTML's Section C; statutory rate, flagged estimated).
   const TAX_RATE = 0.2517;
   const tax = d ? Math.max(d.bridge.netProfit, 0) * TAX_RATE : 0;
@@ -314,18 +559,32 @@ export function ReportPnLLive({ branch }) {
       ['Break-even GP needed', compact(cur, d.indirect.expense)],
     ];
   }, [d, pat, cur]);
-  const periodTxt = fy === 'ALL' ? 'all periods' : `FY ${fy} (Apr–Mar)`;
-  const classicPeriod = fy === 'ALL' ? 'All periods' : `${asOn(period.from)} to ${asOn(period.to)}`;
+  const periodTxt = period.note || period.label || 'all periods';
+  const classicPeriod = period.from ? `${asOn(period.from)} to ${asOn(period.to)}` : 'All periods';
 
   return (
     <Wrap>
       <FioriHead
         system="KBiz360 · Finance"
         title="Profit & Loss — Module-wise Gross Profit"
-        sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} INR (excl. GST) &nbsp;|&nbsp; {periodTxt} &nbsp;|&nbsp; Tally double-entry · live</>}
-        right={<><PnlViewSwitcher view={view} setView={setView} /><FyPicker fy={fy} setFy={setFy} compare={compare} setCompare={setCompare} /></>}
+        sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} INR (excl. GST) &nbsp;|&nbsp; {isMatrix ? `FY ${fy} · ${mode === 'month' ? 'month-wise' : 'quarter-wise'}` : periodTxt} &nbsp;|&nbsp; Tally double-entry · live</>}
       />
-      <div style={{ background: SAP.pageBg, padding: view === 'classic' ? 0 : 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+      <PnlPeriodBar
+        mode={mode} setMode={setMode} fy={fy} setFy={setFy}
+        compare={compare} setCompare={setCompare} custom={custom} setCustom={setCustom}
+        view={view} setView={setView} showView={!isMatrix}
+        canExport={!isMatrix && !!d} onExport={() => exportDetail(d, period, cur)}
+      />
+      {focus && (
+        <div style={{ background: '#eef4fb', padding: '8px 16px', fontSize: 12, color: SAP.subText, display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${SAP.border}`, borderTop: 'none' }}>
+          <button onClick={() => setFocus(null)} style={toolBtn}>← Back to {mode === 'month' ? 'monthly' : 'quarterly'} matrix</button>
+          <span>Showing detail for <strong>{focus.label}</strong> · {focus.note}</span>
+        </div>
+      )}
+      <div style={{ background: SAP.pageBg, padding: (!isMatrix && view === 'classic') ? 0 : 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+        {isMatrix ? (
+          <PnLMatrix branch={branch} cur={cur} fy={fy} grain={mode} onFocus={setFocus} />
+        ) : (
         <StateBox q={q} empty={!d || !(d.modules || []).length}>
           {d && view === 'fiori' && <>
             {/* KPIs */}
@@ -399,39 +658,62 @@ export function ReportPnLLive({ branch }) {
               </div>
             </FCard>
 
-            {/* Section B — indirect expenses */}
-            <FCard title="Section B — Indirect Expenses (Overheads)"
-              sub={`${(d.indirect.groups || []).length} expense group(s) · grouped by ledger sub-group · click to expand`}
-              badge={<Badge bg="#fef7e0" c={SAP.gold} bd="#ffd966">{(d.indirect.groups || []).length} Groups</Badge>}>
+            {/* Section B — indirect expenses, split Fixed vs Variable */}
+            <FCard title="Section B — Indirect Expenses (Fixed vs Variable)"
+              sub={`${expBuckets.length ? expBuckets.map((b) => b.name).join(' · ') : 'no overheads'} · Indirect Expenses → Fixed / Variable → sub-group → ledger → voucher`}
+              badge={<ExpDetailToggle view={expDetail} setView={setExpDetail} />}>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                  <thead><tr><Th w="48%">Expense Head</Th><Th right>Amount</Th><Th right>% of Group</Th><Th right>% of Sales</Th></tr></thead>
+                  <thead><tr><Th w="48%">Expense Head</Th><Th right>Amount</Th><Th right>% Share</Th><Th right>% of Sales</Th></tr></thead>
                   <tbody>
-                    {(d.indirect.groups || []).length === 0 && <tr><td colSpan={4} style={{ padding: 18, textAlign: 'center', color: SAP.sec }}>No indirect overheads posted for this period.</td></tr>}
-                    {(d.indirect.groups || []).map((g, gi) => {
-                      const open = openExp[g.name] !== false; // default expanded
+                    {expBuckets.length === 0 && <tr><td colSpan={4} style={{ padding: 18, textAlign: 'center', color: SAP.sec }}>No indirect overheads posted for this period.</td></tr>}
+                    {expBuckets.map((b) => {
+                      const bOpen = openBucket[b.name] !== false; // default expanded
+                      const isFixed = /fixed/i.test(b.name);
+                      const headBg = isFixed ? '#eaf2ff' : '#fef3e2';
+                      const headColor = isFixed ? SAP.blue : '#a85d00';
+                      const showTree = expDetail === 'detailed' && bOpen;
                       return (
-                        <React.Fragment key={g.name}>
-                          <tr onClick={() => setOpenExp((s) => ({ ...s, [g.name]: !(s[g.name] !== false) }))}
-                            style={{ background: SAP.subBg, color: SAP.subText, cursor: 'pointer', borderTop: gi ? `1px solid ${SAP.border}` : 'none' }}>
-                            <td style={{ padding: '8px 16px', fontWeight: 700 }}><Toggle open={open} />{g.name}</td>
-                            <td style={{ ...num, fontWeight: 700, color: SAP.red }}>{inr(g.amount)}</td>
-                            <td style={{ ...num, color: SAP.sec }}>100%</td>
-                            <td style={{ ...num, color: SAP.sec }}>{pctTxt(g.pctOfSales)}</td>
+                        <React.Fragment key={b.name}>
+                          {/* Fixed / Variable head row (= its total) */}
+                          <tr onClick={() => setOpenBucket((s) => ({ ...s, [b.name]: !(s[b.name] !== false) }))}
+                            style={{ background: headBg, color: headColor, cursor: 'pointer', borderTop: `2px solid ${headColor}33` }}>
+                            <td style={{ padding: '9px 16px', fontWeight: 800, letterSpacing: 0.2 }}>{expDetail === 'detailed' && <Toggle open={bOpen} />}{b.name}</td>
+                            <td style={{ ...num, fontWeight: 800 }}>{inr(b.amount)}</td>
+                            <td style={{ ...num, color: SAP.sec }}>{pctTxt(d.indirect.expense ? b.amount / d.indirect.expense * 100 : 0)}</td>
+                            <td style={{ ...num, color: SAP.sec }}>{pctTxt(b.pctOfSales != null ? b.pctOfSales : (d.totals.sales ? b.amount / d.totals.sales * 100 : 0))}</td>
                           </tr>
-                          {open && (g.ledgers || []).map((l, i) => (
-                            <tr key={i} style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}` }}>
-                              <td style={{ padding: '5px 16px 5px 48px', color: SAP.text }}>{l.name}</td>
-                              <td style={{ ...num, color: SAP.red }}>{inr(l.amount)}</td>
-                              <td style={{ ...num, color: SAP.sec }}>{pctTxt(l.pctOfGroup)}</td>
-                              <td style={{ ...num, color: SAP.sec }}>{pctTxt(l.pctOfSales)}</td>
-                            </tr>
-                          ))}
+                          {/* sub-group rows → ledger rows (detailed view only) */}
+                          {showTree && (b.groups || []).map((g) => {
+                            const gKey = `${b.name}|${g.name}`;
+                            const gOpen = openExp[gKey] !== false; // default expanded
+                            return (
+                              <React.Fragment key={gKey}>
+                                <tr onClick={() => setOpenExp((s) => ({ ...s, [gKey]: !(s[gKey] !== false) }))}
+                                  style={{ background: SAP.subBg, color: SAP.subText, cursor: 'pointer', borderBottom: `1px solid ${SAP.borderLt}` }}>
+                                  <td style={{ padding: '7px 16px 7px 34px', fontWeight: 700 }}><Toggle open={gOpen} />{g.name}</td>
+                                  <td style={{ ...num, fontWeight: 700, color: SAP.red }}>{inr(g.amount)}</td>
+                                  <td style={{ ...num, color: SAP.sec }}>{pctTxt(g.pctOfBucket != null ? g.pctOfBucket : (b.amount ? g.amount / b.amount * 100 : 0))}</td>
+                                  <td style={{ ...num, color: SAP.sec }}>{pctTxt(g.pctOfSales)}</td>
+                                </tr>
+                                {gOpen && (g.ledgers || []).map((l, i) => (
+                                  <tr key={i} onClick={() => setDrillLedger(l.name)}
+                                    style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: 'pointer' }}
+                                    title="Drill to vouchers">
+                                    <td style={{ padding: '5px 16px 5px 56px', color: SAP.text }}>{l.name}<span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span></td>
+                                    <td style={{ ...num, color: SAP.red }}>{inr(l.amount)}</td>
+                                    <td style={{ ...num, color: SAP.sec }}>{pctTxt(l.pctOfGroup)}</td>
+                                    <td style={{ ...num, color: SAP.sec }}>{pctTxt(l.pctOfSales)}</td>
+                                  </tr>
+                                ))}
+                              </React.Fragment>
+                            );
+                          })}
                         </React.Fragment>
                       );
                     })}
-                    <tr style={{ background: '#fff3f3', color: SAP.red, fontWeight: 700, borderTop: '1px solid #ffb3b3', borderBottom: '1px solid #ffb3b3' }}>
-                      <td style={{ padding: '9px 16px' }}>TOTAL INDIRECT EXPENSES</td>
+                    <tr style={{ background: '#fff3f3', color: SAP.red, fontWeight: 800, borderTop: '2px solid #ffb3b3', borderBottom: '1px solid #ffb3b3' }}>
+                      <td style={{ padding: '10px 16px' }}>TOTAL INDIRECT EXPENSES</td>
                       <td style={num}>{inr(d.indirect.expense)}</td>
                       <td style={num} />
                       <td style={num}>{pctTxt(d.totals.sales ? d.indirect.expense / d.totals.sales * 100 : 0)}</td>
@@ -495,7 +777,7 @@ export function ReportPnLLive({ branch }) {
                   </tbody>
                 </table>
               </FCard>
-              <FCard title="Key Profitability Ratios" badge={<Badge>FY {fy === 'ALL' ? 'all' : fy}</Badge>}>
+              <FCard title="Key Profitability Ratios" badge={<Badge>{period.label}</Badge>}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                   <tbody>
                     {ratios.map(([k, v], i) => (
@@ -513,9 +795,22 @@ export function ReportPnLLive({ branch }) {
             <ClassicPnL d={d} cur={cur} mobile={mobile} branch={branch} to={period.to} tax={tax} pat={pat} periodTxt={classicPeriod} />
           )}
         </StateBox>
+        )}
       </div>
       {drillFile && <FileVoucherDrill file={drillFile} cur={cur} mobile={mobile} onClose={() => setDrillFile(null)} />}
+      {drillLedger && <LedgerVoucherDrill ledger={drillLedger} branch={branch} to={period.to} cur={cur} mobile={mobile} onClose={() => setDrillLedger(null)} />}
     </Wrap>
+  );
+}
+
+/* ── Indirect Expenses: Detailed (full Fixed/Variable tree) ⇄ Summary (totals) ── */
+function ExpDetailToggle({ view, setView }) {
+  return (
+    <div style={{ display: 'inline-flex', background: '#fff', border: `1px solid ${SAP.border}`, borderRadius: 6, overflow: 'hidden' }}>
+      {[['detailed', 'Detailed'], ['summary', 'Summary']].map(([id, label]) => (
+        <button key={id} onClick={(e) => { e.stopPropagation(); setView(id); }} style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: view === id ? SAP.blue : '#fff', color: view === id ? '#fff' : SAP.sec }}>{label}</button>
+      ))}
+    </div>
   );
 }
 
@@ -542,6 +837,9 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   const company = (branch && branch !== 'ALL') ? (branch.code || branch) : 'All Branches — Consolidated';
   const modules = d.modules || [];
   const groups = d.indirect?.groups || [];
+  const buckets = (Array.isArray(d.indirect?.buckets) && d.indirect.buckets.length)
+    ? d.indirect.buckets
+    : (groups.length ? [{ name: 'Indirect Expenses', amount: d.indirect.expense, groups }] : []);
   const indIncome = d.bridge?.indirectIncome || 0;
   const grossProfit = d.bridge?.grossProfit ?? d.totals.gp;
 
@@ -561,12 +859,16 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   ];
   const tradeTotal = d.totals.sales + incentive;
 
-  // Profit & Loss account — Indirect Exp + Tax + Net Profit (Dr) vs GP b/d + Indirect Income (Cr).
+  // Profit & Loss account — Indirect Exp (Fixed/Variable → sub-group → ledger) +
+  // Tax + Net Profit (Dr) vs GP b/d + Indirect Income (Cr).
   const plLeft = [
     { label: 'Indirect Expenses', amount: d.indirect.expense, group: true },
-    ...groups.flatMap((g) => [
-      { label: g.name, amount: g.amount, sub: true },
-      ...(g.ledgers || []).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true })),
+    ...buckets.flatMap((b) => [
+      { label: b.name, amount: b.amount, bucket: true },
+      ...(b.groups || []).flatMap((g) => [
+        { label: g.name, amount: g.amount, sub: true },
+        ...(g.ledgers || []).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true })),
+      ]),
     ]),
     ...(tax > 0 ? [{ label: 'Provision for Tax @ 25.17% (est.)', amount: tax }] : []),
     { label: 'Net Profit (to Capital A/c)', amount: pat, result: true },
@@ -584,17 +886,17 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     const sep = side === 'cr' ? { borderLeft: '1px solid #d6d6d6' } : {};
     if (!r) return (<><td style={{ ...mono, ...sep }} /><td style={{ ...mono }} /></>);
     const clickable = !!(r.module || r.ledger);
-    const color = r.result ? TALLY.green : r.group ? TALLY.head : '#1a1a1a';
-    const pad = r.leaf ? 40 : r.sub ? 26 : 12;
+    const color = r.result ? TALLY.green : (r.group || r.bucket) ? TALLY.head : '#1a1a1a';
+    const pad = r.leaf ? 46 : r.sub ? 32 : r.bucket ? 20 : 12;
     return (
       <>
         <td onClick={clickable ? () => onRowClick(r) : undefined}
           className={clickable ? 'cl-drill' : undefined}
-          style={{ padding: '2px 12px', paddingLeft: pad, color, fontWeight: (r.group || r.result) ? 700 : 400, cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...sep, ...mono }}>
+          style={{ padding: '2px 12px', paddingLeft: pad, color, fontWeight: (r.group || r.bucket || r.result) ? 700 : 400, cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...sep, ...mono }}>
           {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{clickable ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
         <td onClick={clickable ? () => onRowClick(r) : undefined}
-          style={{ padding: '2px 12px', textAlign: 'right', color, fontWeight: r.result ? 700 : 400, cursor: clickable ? 'pointer' : 'default', ...mono }}>{inr(r.amount)}</td>
+          style={{ padding: '2px 12px', textAlign: 'right', color, fontWeight: (r.result || r.bucket) ? 700 : 400, cursor: clickable ? 'pointer' : 'default', ...mono }}>{inr(r.amount)}</td>
       </>
     );
   };
@@ -659,15 +961,234 @@ const CURRENT_LIABS = new Set(['Current Liabilities', 'Duties & Taxes', 'Provisi
 const NETWORTH = new Set(['Capital Account', 'Reserves & Surplus', 'Profit & Loss A/c']);
 const sumGroups = (rows, set) => (rows || []).filter((g) => set.has(g.group)).reduce((s, g) => s + (g.amount || 0), 0);
 
+/* ════════════════════════════════════════════════════════════════════
+   Balance-Sheet "As On Date" controls — reporting modes, quick filters,
+   comparison, Summary/Detailed and PDF/Excel/Print export.
+
+   A Balance Sheet is an "as on a date" statement: the backend accumulates
+   every posting from inception up to `to`. So every mode below reduces to a
+   primary as-on date `to` and an optional comparison as-on date `toPrev`,
+   both fed to the same live useBalanceSheet hook + renderer.
+   ════════════════════════════════════════════════════════════════════ */
+const prevFyLabel = () => { const s = CUR_FY.startYear - 1; return `${s}-${String(s + 1).slice(2)}`; };
+const monthEndISO = (key) => { const [y, m] = String(key).split('-').map(Number); return isoDate(new Date(y, m, 0)); };
+
+const BS_QUICK = [
+  ['today', 'Today'],
+  ['month', 'Current Month-End'],
+  ['quarter', 'Current Quarter-End'],
+  ['ytd', 'YTD (Year-to-Date)'],
+  ['cfy', 'Current Financial Year'],
+  ['pfy', 'Previous Financial Year'],
+  ['custom', 'Custom Date'],
+];
+const BS_COMPARE = [
+  ['none', 'No comparison'],
+  ['prevDate', 'vs Previous Date (1 yr ago)'],
+  ['prevFY', 'vs Previous Financial Year'],
+  ['prevMonthEnd', 'vs Previous Month-End'],
+];
+// Quick filter → the single "as on" cut-off the balance sheet is drawn to.
+function bsQuickDate(quick, customDate) {
+  switch (quick) {
+    case 'today': return todayISO();
+    case 'month': return monthEndISO(CUR_MONTH);
+    case 'quarter': return CUR_QUARTER.endISO;
+    case 'ytd': return todayISO();                 // FY-to-date position = as on today
+    case 'cfy': return CUR_FY.endISO;              // 31-Mar of the current FY
+    case 'pfy': return fyRange(prevFyLabel()).to;  // 31-Mar of the previous FY
+    case 'custom': return customDate || todayISO();
+    default: return todayISO();
+  }
+}
+// Comparison mode → the prior "as on" date, derived from the primary `to`.
+function bsCompareDate(mode, to) {
+  if (!to || mode === 'none') return '';
+  const d = new Date(to);
+  switch (mode) {
+    case 'prevDate': return isoDate(new Date(d.getFullYear() - 1, d.getMonth(), d.getDate()));
+    case 'prevFY': { const sy = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; return `${sy}-03-31`; }
+    case 'prevMonthEnd': return isoDate(new Date(d.getFullYear(), d.getMonth(), 0));
+    default: return '';
+  }
+}
+
+// Segmented button group (light on the white toolbar, dark on the Fiori shell).
+function Segmented({ value, onChange, options, dark }) {
+  return (
+    <div style={{ display: 'inline-flex', background: dark ? 'rgba(255,255,255,0.1)' : '#fff', border: `1px solid ${dark ? 'rgba(255,255,255,0.28)' : SAP.border}`, borderRadius: 6, overflow: 'hidden' }}>
+      {options.map(([id, label]) => (
+        <button key={id} onClick={() => onChange(id)} style={{ padding: '6px 12px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: value === id ? SAP.blue : 'transparent', color: value === id ? '#fff' : (dark ? '#dfe7ef' : SAP.sec) }}>{label}</button>
+      ))}
+    </div>
+  );
+}
+
+// White filter band under the Fiori header: mode · as-on/range dates · compare · detail.
+function BSToolbar({ mode, setMode, quick, setQuick, customDate, setCustomDate, rangeFrom, setRangeFrom, rangeTo, setRangeTo, cmp, setCmp, detail, setDetail, to, toPrev }) {
+  const lbl = { fontSize: 10, fontWeight: 700, color: SAP.label, textTransform: 'uppercase', letterSpacing: 0.4 };
+  const sel = { ...inp, width: 'auto', minHeight: 30, fontSize: 11.5, cursor: 'pointer' };
+  const di = { ...inp, width: 'auto', minHeight: 30, fontSize: 11.5 };
+  const fw = { display: 'flex', alignItems: 'center', gap: 6 };
+  return (
+    <div style={{ background: '#fff', border: `1px solid ${SAP.border}`, borderTop: 'none', padding: '10px 16px', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={fw}><span style={lbl}>Mode</span><Segmented value={mode} onChange={setMode} options={[['asOn', 'As On Date'], ['range', 'Date Range']]} /></div>
+      {mode === 'asOn' ? (
+        <>
+          <div style={fw}><span style={lbl}>As On</span>
+            <select style={sel} value={quick} onChange={(e) => setQuick(e.target.value)}>{BS_QUICK.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+            {quick === 'custom' && <input type="date" style={di} value={customDate} onChange={(e) => setCustomDate(e.target.value)} />}
+          </div>
+          <div style={fw}><span style={lbl}>Compare</span>
+            <select style={sel} value={cmp} onChange={(e) => setCmp(e.target.value)}>{BS_COMPARE.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={fw}><span style={lbl}>From</span><input type="date" style={di} value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} /></div>
+          <div style={fw}><span style={lbl}>To</span><input type="date" style={di} value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} /></div>
+        </>
+      )}
+      <div style={fw}><span style={lbl}>Detail</span><Segmented value={detail} onChange={setDetail} options={[['summary', 'Summary'], ['detailed', 'Detailed']]} /></div>
+      <div style={{ marginLeft: 'auto', fontSize: 11, color: SAP.sec }}>
+        {mode === 'range'
+          ? <>Movement <strong style={{ color: SAP.text }}>{fmtDate(toPrev)}</strong> → <strong style={{ color: SAP.text }}>{fmtDate(to)}</strong></>
+          : <>Position as on <strong style={{ color: SAP.text }}>{fmtDate(to)}</strong> · all postings since inception{toPrev ? <> · vs {fmtDate(toPrev)}</> : null}</>}
+      </div>
+    </div>
+  );
+}
+
+// Prev / Difference / %-Change cells, shared by every comparison row. Renders
+// nothing when not comparing; three dashes when there is no prior figure.
+function DiffCells({ cur, prev, showPY, dark }) {
+  if (!showPY) return null;
+  const sec = dark ? '#9fb4cc' : SAP.sec;
+  if (prev == null) return (<><td style={{ ...num, color: sec }}>—</td><td style={{ ...num, color: sec }}>—</td><td style={{ ...num, color: sec }}>—</td></>);
+  const diff = cur - prev;
+  const pct = (prev === 0 || !isFinite(prev)) ? null : (diff / Math.abs(prev)) * 100;
+  const dc = diff >= 0 ? (dark ? '#7ee07e' : SAP.greenDk) : (dark ? '#ff9a9a' : SAP.red);
+  return (<>
+    <td style={{ ...num, color: sec }}>{inr(prev)}</td>
+    <td style={{ ...num, color: dc }}>{diff === 0 ? '—' : (diff > 0 ? `+${inr(diff)}` : inr(diff))}</td>
+    <td style={{ ...num, color: dc }}>{pct == null ? '—' : `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`}</td>
+  </>);
+}
+
+// ── Export: Excel (flatten to rows) + PDF/Print (printable HTML window) ──────
+const bsEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function bsExportRows({ d, prev, prevMap, showPY, detail }) {
+  const out = [];
+  const cell = (side, level, name, amount, prevAmt) => {
+    const a = Math.round(Number(amount) || 0);
+    const r = { side, level, name, amount: a };
+    if (showPY) {
+      if (prevAmt == null) { r.prev = ''; r.diff = ''; r.pct = ''; }
+      else { const p = Math.round(Number(prevAmt) || 0); r.prev = p; r.diff = a - p; r.pct = p === 0 ? '' : (((a - p) / Math.abs(p)) * 100).toFixed(1); }
+    }
+    out.push(r);
+  };
+  const side = (groups, name) => {
+    for (const g of groups || []) {
+      cell(name, 'Group', g.group, g.amount, showPY ? prevMap[g.group] : null);
+      if (detail === 'detailed') {
+        const { subs, direct } = splitSubGroups(g.ledgers);
+        for (const sg of subs) { cell(name, 'Sub-Group', `  ${sg.name}`, sg.amount, null); for (const l of sg.ledgers) cell(name, 'Ledger', `    ${l.name}`, l.amount, null); }
+        for (const l of direct) cell(name, 'Ledger', `    ${l.name}`, l.amount, null);
+      }
+    }
+  };
+  side(d.liabilities, 'Liabilities');
+  cell('Liabilities', 'Total', 'TOTAL LIABILITIES', d.totalLiabilities, showPY ? prev?.totalLiabilities : null);
+  side(d.assets, 'Assets');
+  cell('Assets', 'Total', 'TOTAL ASSETS', d.totalAssets, showPY ? prev?.totalAssets : null);
+  return out;
+}
+
+function buildBSHtml({ d, prev, prevMap, showPY, detail, cur, branch, curLabel, prevLabel }) {
+  const money = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : '—'; };
+  const cols = 2 + (showPY ? 3 : 0);
+  const diffTd = (c, p) => {
+    if (!showPY) return '';
+    if (p == null) return '<td class="r sec">—</td><td class="r sec">—</td><td class="r sec">—</td>';
+    const diff = c - p, pct = p === 0 ? null : (diff / Math.abs(p)) * 100, cls = diff >= 0 ? 'pos' : 'neg';
+    const ds = diff === 0 ? '—' : (diff > 0 ? '+' : '') + money(diff);
+    const ps = pct == null ? '—' : `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+    return `<td class="r">${money(p)}</td><td class="r ${cls}">${ds}</td><td class="r ${cls}">${ps}</td>`;
+  };
+  const sideTable = (label, groups, total, totalLabel, prevTotal) => {
+    let body = '';
+    for (const g of groups || []) {
+      body += `<tr class="grp"><td>${bsEsc(g.group)}</td><td class="r">${money(g.amount)}</td>${diffTd(g.amount, showPY ? prevMap[g.group] : null)}</tr>`;
+      if (detail === 'detailed') {
+        const { subs, direct } = splitSubGroups(g.ledgers);
+        for (const sg of subs) {
+          body += `<tr class="sub"><td>${bsEsc(sg.name)}</td><td class="r">${money(sg.amount)}</td>${diffTd(sg.amount, null)}</tr>`;
+          for (const l of sg.ledgers) body += `<tr class="led"><td>${bsEsc(l.name)}</td><td class="r">${money(l.amount)}</td>${diffTd(l.amount, null)}</tr>`;
+        }
+        for (const l of direct) body += `<tr class="led"><td>${bsEsc(l.name)}</td><td class="r">${money(l.amount)}</td>${diffTd(l.amount, null)}</tr>`;
+      }
+    }
+    const head = showPY
+      ? `<th>Particulars</th><th class="r">${bsEsc(curLabel)}</th><th class="r">${bsEsc(prevLabel)}</th><th class="r">Difference</th><th class="r">% Chg</th>`
+      : `<th>Particulars</th><th class="r">${bsEsc(curLabel)}</th>`;
+    return `<table><thead><tr class="hd"><th colspan="${cols}">${bsEsc(label)}</th></tr><tr class="sh">${head}</tr></thead><tbody>${body}<tr class="tot"><td>${bsEsc(totalLabel)}</td><td class="r">${money(total)}</td>${diffTd(total, showPY ? prevTotal : null)}</tr></tbody></table>`;
+  };
+  const bal = d.balanced, asOnTxt = curLabel.replace('as at ', '');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Balance Sheet · ${bsEsc(branchLabel(branch))} · ${bsEsc(asOnTxt)}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#222;background:#fff;padding:16px;max-width:1000px;margin:0 auto}
+  h1{font-size:18px;color:#1d2d3e}.meta{color:#555;font-size:11px;margin:3px 0 12px}
+  .banner{padding:8px 14px;border-radius:6px;font-weight:700;margin-bottom:14px;font-size:11.5px;border:1px solid ${bal ? '#b8ecb8' : '#ffb3b3'};background:${bal ? '#f1fdf1' : '#fff3f3'};color:${bal ? '#0d6b0d' : '#bb0000'}}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px}
+  th,td{padding:4px 10px;border-bottom:1px solid #eee;text-align:left}
+  .r{text-align:right;font-variant-numeric:tabular-nums}
+  .hd th{background:#1d2d3e;color:#fff;font-size:12px;padding:7px 10px;text-align:left}
+  .sh th{background:#f0f3f4;color:#6a6d70;font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #d9d9d9}
+  .grp td{background:#e8f0fb;color:#0a2955;font-weight:700;border-top:1px solid #b3ccf5}
+  .sub td{background:#f3f7fc;color:#1a3a6e;font-weight:600;padding-left:26px}
+  .led td{padding-left:40px;color:#32363a}
+  .tot td{background:#1d2d3e;color:#fff;font-weight:700}
+  .pos{color:#0d6b0d}.neg{color:#bb0000}.sec{color:#6a6d70}
+  .ft{margin-top:10px;color:#888;font-size:10px;border-top:1px solid #ddd;padding-top:8px}
+  @media print{body{padding:0}.noprint{display:none}}
+</style></head><body>
+  <div class="noprint" style="background:#f0f3f4;padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:11px;color:#555">Use your browser's print dialog and choose <b>Save as PDF</b> to export. <button onclick="window.print()" style="margin-left:8px;padding:4px 10px;cursor:pointer">Print / Save PDF</button></div>
+  <h1>Balance Sheet</h1>
+  <div class="meta"><b>${bsEsc(branchLabel(branch))}</b> &nbsp;·&nbsp; ${bsEsc(cur)} (excl. GST) &nbsp;·&nbsp; ${bsEsc(curLabel)}${showPY ? ` &nbsp;·&nbsp; compared with ${bsEsc(prevLabel)}` : ''} &nbsp;·&nbsp; ${detail === 'summary' ? 'Summary' : 'Detailed'} view</div>
+  <div class="banner">${bal ? '✓ Balanced' : '! Out of balance'} — Total Assets ${bsEsc(cur)}${money(d.totalAssets)} ${bal ? '=' : '≠'} Total Liabilities ${bsEsc(cur)}${money(d.totalLiabilities)} &nbsp;|&nbsp; Net Profit ${bsEsc(cur)}${money(d.netProfit)}</div>
+  ${sideTable('Liabilities & Capital', d.liabilities, d.totalLiabilities, 'TOTAL LIABILITIES', prev?.totalLiabilities)}
+  ${sideTable('Assets', d.assets, d.totalAssets, 'TOTAL ASSETS', prev?.totalAssets)}
+  <div class="ft">KBiz360 Books · live double-entry (Tally 28-group master) · balances accumulated from inception up to ${bsEsc(asOnTxt)}. Computer-generated — no signature required.</div>
+</body></html>`;
+}
+
+function openBSPrint(opts) {
+  const html = buildBSHtml(opts);
+  const w = window.open('', '_blank', 'width=980,height=800');
+  if (!w) { window.alert('Please allow pop-ups to print or save the Balance Sheet as PDF.'); return; }
+  w.document.open(); w.document.write(html); w.document.close(); w.focus();
+  setTimeout(() => { try { w.print(); } catch { /* the page carries its own Print button */ } }, 400);
+}
+
 export function ReportBSLive({ branch }) {
   const cur = curOf(branch);
   const mobile = useMobile();
-  const [view, setView] = useState('fiori'); // 'fiori' | 'classic'
-  const [fy, setFy] = useState('ALL');
-  const [compare, setCompare] = useState(true);
-  const to = fy === 'ALL' ? '' : fyRange(fy).to;
-  const showPY = fy !== 'ALL' && compare;
-  const toPrev = showPY ? fyPrior(fy).to : '';
+  const [view, setView] = useState('fiori');           // 'fiori' | 'classic'
+  const [mode, setMode] = useState('asOn');            // 'asOn' | 'range' — default As On Date
+  const [quick, setQuick] = useState('today');         // default cut-off = current date
+  const [customDate, setCustomDate] = useState(todayISO());
+  const [rangeFrom, setRangeFrom] = useState(CUR_FY.startISO);
+  const [rangeTo, setRangeTo] = useState(todayISO());
+  const [cmp, setCmp] = useState('none');              // comparison (As On mode only)
+  const [detail, setDetail] = useState('detailed');    // 'summary' | 'detailed'
+
+  // Every mode collapses to a primary as-on date + an optional comparison date.
+  const to = mode === 'range' ? rangeTo : bsQuickDate(quick, customDate);
+  const toPrev = mode === 'range' ? rangeFrom : bsCompareDate(cmp, to);
+  const showPY = !!toPrev;
 
   const q = useBalanceSheet(branch, { to });
   const qP = useBalanceSheet(branch, { to: toPrev });
@@ -677,30 +1198,42 @@ export function ReportBSLive({ branch }) {
     const m = {}; [...(prev?.liabilities || []), ...(prev?.assets || [])].forEach((g) => { m[g.group] = g.amount; }); return m;
   }, [prev]);
 
-  const curLabel = `as at ${asOn(to || (d && d.filter && d.filter.to))}`;
+  const curLabel = `as at ${asOn(to)}`;
   const prevLabel = `as at ${asOn(toPrev)}`;
 
-  const Switcher = () => (
-    <div style={{ display: 'inline-flex', background: '#fff', border: `1px solid ${SAP.border}`, borderRadius: 6, overflow: 'hidden' }}>
-      {[['fiori', '▪ SAP Fiori'], ['classic', '▭ Tally Classic']].map(([id, label]) => (
-        <button key={id} onClick={() => setView(id)} style={{ padding: '7px 14px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: view === id ? SAP.blue : '#fff', color: view === id ? '#fff' : SAP.sec }}>{label}</button>
-      ))}
-    </div>
-  );
+  const doExcel = () => {
+    if (!d) return;
+    const cols = [{ key: 'side', label: 'Side' }, { key: 'level', label: 'Level' }, { key: 'name', label: 'Particulars' }, { key: 'amount', label: `Amount ${curLabel} (${cur})` }];
+    if (showPY) cols.push({ key: 'prev', label: `Previous ${prevLabel} (${cur})` }, { key: 'diff', label: `Difference (${cur})` }, { key: 'pct', label: '% Change' });
+    exportToExcel(`Balance-Sheet_${branchLabel(branch)}_${to || 'latest'}`, cols, bsExportRows({ d, prev, prevMap, showPY, detail }));
+  };
+  const doPrint = () => { if (d) openBSPrint({ d, prev, prevMap, showPY, detail, cur, branch, curLabel, prevLabel }); };
+  const expBtn = (dis) => ({ padding: '6px 11px', fontSize: 11, fontWeight: 600, border: '1px solid rgba(255,255,255,0.3)', borderRadius: 5, cursor: dis ? 'default' : 'pointer', background: 'rgba(255,255,255,0.1)', color: '#fff', opacity: dis ? 0.45 : 1 });
 
   return (
     <Wrap>
       <FioriHead
         system="KBiz360 · Finance"
         title={`Balance Sheet — ${curLabel}`}
-        sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} INR (excl. GST) &nbsp;|&nbsp; Tally 28-Group Master &nbsp;|&nbsp; live double-entry</>}
-        right={<><Switcher /><FyPicker fy={fy} setFy={setFy} compare={compare} setCompare={setCompare} label="As on" /></>}
+        sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} INR (excl. GST) &nbsp;|&nbsp; Tally 28-Group Master &nbsp;|&nbsp; balances from inception up to {asOn(to)}</>}
+        right={<>
+          <Segmented dark value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic']]} />
+          <button onClick={doPrint} disabled={!d} style={expBtn(!d)}>⤓ PDF</button>
+          <button onClick={doExcel} disabled={!d} style={expBtn(!d)}>⤓ Excel</button>
+          <button onClick={doPrint} disabled={!d} style={expBtn(!d)}>🖨 Print</button>
+        </>}
+      />
+      <BSToolbar
+        mode={mode} setMode={setMode} quick={quick} setQuick={setQuick}
+        customDate={customDate} setCustomDate={setCustomDate}
+        rangeFrom={rangeFrom} setRangeFrom={setRangeFrom} rangeTo={rangeTo} setRangeTo={setRangeTo}
+        cmp={cmp} setCmp={setCmp} detail={detail} setDetail={setDetail} to={to} toPrev={toPrev}
       />
       <div style={{ background: SAP.pageBg, padding: view === 'classic' ? 0 : 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
         <StateBox q={q} empty={!d}>
           {d && (view === 'fiori'
-            ? <FioriBS d={d} prev={prev} prevMap={prevMap} cur={cur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} branch={branch} to={to} mobile={mobile} />
-            : <ClassicBS d={d} cur={cur} curLabel={curLabel} />)}
+            ? <FioriBS d={d} prev={prev} prevMap={prevMap} cur={cur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} branch={branch} to={to} mobile={mobile} detail={detail} />
+            : <ClassicBS d={d} cur={cur} curLabel={curLabel} detail={detail} />)}
         </StateBox>
       </div>
     </Wrap>
@@ -708,7 +1241,7 @@ export function ReportBSLive({ branch }) {
 }
 
 /* ── Fiori vertical view ─────────────────────────────────────────────── */
-function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, to, mobile }) {
+function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, to, mobile, detail }) {
   const netWorth = sumGroups(d.liabilities, NETWORTH);
   const ca = sumGroups(d.assets, CURRENT_ASSETS), cl = sumGroups(d.liabilities, CURRENT_LIABS);
   const workingCap = ca - cl;
@@ -729,9 +1262,9 @@ function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, t
       </KpiGrid>
 
       <BSSideCard title="Liabilities — Tally Groups" rows={d.liabilities} total={d.totalLiabilities} totalLabel="TOTAL LIABILITIES"
-        prevMap={prevMap} prevTotal={prev?.totalLiabilities} cur={cur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} onPickLedger={setDrillLedger} />
+        prevMap={prevMap} prevTotal={prev?.totalLiabilities} cur={cur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} detail={detail} onPickLedger={detail === 'detailed' ? setDrillLedger : null} />
       <BSSideCard title="Assets — Tally Groups" rows={d.assets} total={d.totalAssets} totalLabel="TOTAL ASSETS"
-        prevMap={prevMap} prevTotal={prev?.totalAssets} cur={cur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} onPickLedger={setDrillLedger} />
+        prevMap={prevMap} prevTotal={prev?.totalAssets} cur={cur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} detail={detail} onPickLedger={detail === 'detailed' ? setDrillLedger : null} />
 
       <div style={{ background: '#fff', border: `1px solid ${SAP.border}`, borderRadius: 8, padding: '10px 18px', fontSize: 11, color: SAP.sec, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, boxShadow: SHADOW }}>
         <span><strong style={{ color: SAP.text }}>Group Master:</strong> Tally Default 28 Groups &nbsp;|&nbsp; <strong style={{ color: SAP.text }}>Net Profit:</strong> {cur}{inr(d.netProfit)} (from P&amp;L A/c) &nbsp;|&nbsp; <strong style={{ color: SAP.text }}>Tax:</strong> Excl. GST</span>
@@ -764,25 +1297,30 @@ function bsLedgerRow(l, i, indent, onPickLedger, showPY) {
       style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: onPickLedger ? 'pointer' : 'default' }}>
       <td style={{ padding: `5px 16px 5px ${indent}px`, color: SAP.text }}>{l.name}{onPickLedger ? <span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span> : null}</td>
       <td style={num}>{inr(l.amount)}</td>
-      {showPY && <td style={{ ...num, color: SAP.sec }}>—</td>}
+      <DiffCells cur={l.amount} prev={null} showPY={showPY} />
     </tr>
   );
 }
 
-function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, showPY, curLabel, prevLabel, onPickLedger }) {
+function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, showPY, curLabel, prevLabel, onPickLedger, detail }) {
   const [open, setOpen] = useState({});
   const [openSub, setOpenSub] = useState({});
+  const summary = detail === 'summary';
   return (
-    <FCard title={title} sub="Click a group → sub-group (if any) → ledger → voucher" badge={<Badge bg="#fef0e0" c={SAP.orange} bd="#ffcf9e">Tally Logic</Badge>}>
+    <FCard title={title} sub={summary ? 'Major Tally groups — high-level position' : 'Click a group → sub-group (if any) → ledger → voucher'} badge={<Badge bg="#fef0e0" c={SAP.orange} bd="#ffcf9e">Tally Logic</Badge>}>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-          <thead><tr><Th w={showPY ? '50%' : '64%'}>Group / Sub-group / Ledger</Th><Th right>{curLabel} ({cur})</Th>{showPY && <Th right>{prevLabel} ({cur})</Th>}</tr></thead>
+          <thead><tr>
+            <Th w={showPY ? '40%' : '64%'}>Group / Sub-group / Ledger</Th>
+            <Th right>{curLabel} ({cur})</Th>
+            {showPY && <><Th right>{prevLabel} ({cur})</Th><Th right>Δ ({cur})</Th><Th right>Δ %</Th></>}
+          </tr></thead>
           <tbody>
             {rows.map((g, gi) => {
               const { subs, direct } = splitSubGroups(g.ledgers);
-              const hasChildren = subs.length > 0 || direct.length > 0;
+              const hasChildren = !summary && (subs.length > 0 || direct.length > 0);
               const isOpen = !!open[g.group];
-              const pv = prevMap[g.group];
+              const pv = showPY ? (prevMap[g.group] ?? null) : null;
               const rowBg = g.isResult ? SAP.greenBg : SAP.grpBg;
               const rowColor = g.isResult ? SAP.greenDk : SAP.grpText;
               return (
@@ -791,10 +1329,10 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
                     style={{ background: rowBg, color: rowColor, cursor: hasChildren ? 'pointer' : 'default', borderTop: '2px solid #b3ccf5', fontWeight: 700 }}>
                     <td style={{ padding: '9px 16px' }}>{hasChildren ? <Toggle open={isOpen} /> : <span style={{ marginRight: 7 }}>{g.isResult ? '●' : '•'}</span>}{g.group}</td>
                     <td style={num}>{inr(g.amount)}</td>
-                    {showPY && <td style={{ ...num, color: SAP.sec }}>{pv == null ? '—' : inr(pv)}</td>}
+                    <DiffCells cur={g.amount} prev={pv} showPY={showPY} />
                   </tr>
                   {/* Sub-groups (if the ledgers carry one) → expand to their ledgers */}
-                  {isOpen && subs.map((sg) => {
+                  {!summary && isOpen && subs.map((sg) => {
                     const sk = `${g.group}|${sg.name}`;
                     const so = !!openSub[sk];
                     return (
@@ -803,21 +1341,21 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
                           style={{ background: SAP.subBg, color: SAP.subText, cursor: 'pointer', borderBottom: `1px solid ${SAP.borderLt}`, fontWeight: 600 }}>
                           <td style={{ padding: '6px 16px 6px 38px' }}><Toggle open={so} />{sg.name}<span style={{ fontSize: 9, color: SAP.label, marginLeft: 6 }}>· {sg.ledgers.length} ledger{sg.ledgers.length > 1 ? 's' : ''}</span></td>
                           <td style={{ ...num, fontWeight: 600 }}>{inr(sg.amount)}</td>
-                          {showPY && <td style={{ ...num, color: SAP.sec }}>—</td>}
+                          <DiffCells cur={sg.amount} prev={null} showPY={showPY} />
                         </tr>
                         {so && sg.ledgers.map((l, i) => bsLedgerRow(l, i, 62, onPickLedger, showPY))}
                       </React.Fragment>
                     );
                   })}
                   {/* Ledgers with no sub-group hang directly under the 28-group head */}
-                  {isOpen && direct.map((l, i) => bsLedgerRow(l, i, 48, onPickLedger, showPY))}
+                  {!summary && isOpen && direct.map((l, i) => bsLedgerRow(l, i, 48, onPickLedger, showPY))}
                 </React.Fragment>
               );
             })}
             <tr style={{ background: SAP.shell, color: '#fff', fontWeight: 700, borderTop: `2px solid ${SAP.blue}` }}>
               <td style={{ padding: '11px 16px' }}>{totalLabel}</td>
               <td style={num}>{inr(total)}</td>
-              {showPY && <td style={{ ...num, color: '#9fb4cc' }}>{prevTotal == null ? '—' : inr(prevTotal)}</td>}
+              <DiffCells cur={total} prev={showPY ? (prevTotal ?? null) : null} showPY={showPY} dark />
             </tr>
           </tbody>
         </table>
@@ -827,7 +1365,8 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
 }
 
 /* ── Tally Classic (white) view ──────────────────────────────────────── */
-const sideRows = (groups) => (groups || []).flatMap((g) => {
+const sideRows = (groups, summary) => (groups || []).flatMap((g) => {
+  if (summary) return [{ label: g.group, amount: g.amount, group: true, result: g.isResult }];
   const { subs, direct } = splitSubGroups(g.ledgers);
   return [
     { label: g.group, amount: g.amount, group: true, result: g.isResult },
@@ -838,8 +1377,9 @@ const sideRows = (groups) => (groups || []).flatMap((g) => {
     ...direct.map((l) => ({ label: l.name, amount: l.amount })),
   ];
 });
-function ClassicBS({ d, cur, curLabel }) {
-  const left = sideRows(d.liabilities), right = sideRows(d.assets);
+function ClassicBS({ d, cur, curLabel, detail }) {
+  const summary = detail === 'summary';
+  const left = sideRows(d.liabilities, summary), right = sideRows(d.assets, summary);
   const n = Math.max(left.length, right.length);
   const mono = { fontFamily: "'Courier New', Courier, monospace" };
   const Cell = ({ r }) => r ? (

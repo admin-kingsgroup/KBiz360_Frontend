@@ -77,12 +77,28 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Payment Voucher", href:"/payments"},
     {label:"Contra Entry", href:"/contra"},
     {label:"Journal Entry", href:"/journal"},
+    {label:"Credit Note", href:"/finance/credit-note"},
+    {label:"Debit Note", href:"/finance/debit-note"},
+    {label:"Purchase Expense Voucher", href:"/purchase-expense"},
+  ]},
+  {label:"Voucher Tools", children:[
+    {label:"Multi-Currency Voucher", href:"/finance/multi-currency"},
+    {label:"Comments Thread (Collaborate)", href:"/finance/comments-demo"},
+    {label:"Print Preview Before Saving", href:"/finance/print-preview"},
+    {label:"Auto-linked Vouchers", href:"/finance/auto-linked"},
   ]},
   {label:"Books", children:[
     {label:"Day Book", href:"/day-book"},
+    {label:"Cash Book", href:"/finance/cash-book"},
     {label:"Ledger Account", href:"/ledger"},
     {label:"Trial Balance", href:"/trial-balance"},
     {label:"Bank Reconciliation", href:"/bank-reco"},
+  ]},
+  {label:"BSP Settlement", children:[
+    {label:"BSP Summary", href:"/purchase/bsp-summary"},
+    {label:"BSP Statement Import", href:"/purchase/bsp-import"},
+    {label:"Ticket Control Register", href:"/purchase/ticket-control"},
+    {label:"GDS / PNR Import", href:"/purchase/gds-import"},
   ]},
   {label:"Verification", children:[
     {label:"Payment Verification", href:"/finance/verification"},
@@ -122,9 +138,9 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
     {label:"Cash Flow Statement", href:"/reports/cf"},
     {label:"Schedule III Balance Sheet", href:"/reports/schedule3-bs"},
     {label:"Consolidated BS", href:"/reports/consolidated-bs"},
-    {label:"Cash Book", href:"/reports/cashbook"},
   ]},
   {label:"Profitability", children:[
+    {label:"Sales & GP Analytics", href:"/reports/sales-gp-analytics"},
     {label:"Invoice-wise GP (by Link No)", href:"/reports/invoice-gp"},
     {label:"GP Reports (Multi-view)", href:"/reports/gp"},
     {label:"Yield by Destination", href:"/reports/yield-destination"},
@@ -142,7 +158,6 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
     {label:"Sales Register", href:"/reports/sreg"},
     {label:"Purchase Register", href:"/reports/preg"},
     {label:"Consultant Report", href:"/reports/consultant"},
-    {label:"Sub-Agent Statement", href:"/reports/sa-statement"},
     {label:"Supplier 360 View", href:"/reports/supplier-360"},
     {label:"Destination Intel", href:"/reports/destination"},
     {label:"Forex Report", href:"/reports/forex"},
@@ -288,27 +303,10 @@ export const MENU_TRANSACTIONS = {label:"Transactions", icon:ShoppingCart, child
     {label:"Sale — Misc", href:"/sales/misc"},
     {label:"Purchase — Misc", href:"/purchase/misc"},
   ]},
-  {label:"Adjustments", children:[
-    {label:"Credit Notes (Sales)", href:"/sales/credit-note"},
-    {label:"Debit Notes (Sales)", href:"/sales/debit-note"},
-  ]},
   {label:"Cancellations & Refunds", children:[
     {label:"Sales Cancellations", href:"/sales/cancellation"},
     {label:"Purchase Refunds", href:"/purchase/refunds"},
   ]},
-  {label:"BSP Settlement", children:[
-    {label:"BSP Summary", href:"/purchase/bsp-summary"},
-    {label:"BSP Statement Import", href:"/purchase/bsp-import"},
-    {label:"Ticket Control Register", href:"/purchase/ticket-control"},
-    {label:"GDS / PNR Import", href:"/purchase/gds-import"},
-  ]},
-  {label:"Voucher Tools", children:[
-    {label:"Bulk Voucher Import (Excel)", href:"/transactions/bulk-import"},
-    {label:"Multi-Currency Voucher", href:"/transactions/multi-currency"},
-    {label:"Comments Thread (Collaborate)", href:"/transactions/comments-demo"},
-    {label:"Print Preview Before Saving", href:"/transactions/print-preview"},
-    {label:"Auto-linked Vouchers", href:"/transactions/auto-linked"},
-  ]}
 ]};
 
 /* ── HO CONTROL CENTER ─────────────────────────────────────────── */

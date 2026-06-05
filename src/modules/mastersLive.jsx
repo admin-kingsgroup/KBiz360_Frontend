@@ -8,10 +8,11 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Download } from 'lucide-react';
 import { card, inp } from '../core/styles';
 import { ACTIVE_CURRENCIES } from '../core/data';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
+import { exportToExcel } from '../core/exportExcel';
 
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
 const btn = (bg, fg) => ({ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: bg, color: fg });
@@ -108,6 +109,24 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
 
   const del = (r) => { if (window.confirm(`Delete "${r.name}"?`)) remove.mutate(r.id); };
 
+  // Export every record (all fields, not just the table-visible ones) to Excel.
+  // bool → Yes/No, tags → comma-joined, so the sheet stays human-readable.
+  const exportSheet = () => {
+    const expFields = fields.filter((f) => f.export !== false);
+    const columns = expFields.map((f) => ({ key: f.key, label: f.label }));
+    const data = rows.map((r) => {
+      const o = {};
+      for (const f of expFields) {
+        const v = r[f.key];
+        o[f.key] = f.type === 'bool' ? (v ? 'Yes' : 'No')
+          : f.type === 'tags' ? (Array.isArray(v) ? v.join(', ') : (v || ''))
+          : v ?? '';
+      }
+      return o;
+    });
+    exportToExcel(resource, columns, data);
+  };
+
   const cell = (r, f) => {
     const v = r[f.key];
     if (f.type === 'bool') return v ? <span style={{ color: GREEN, fontWeight: 700 }}>✓</span> : <span style={{ color: '#c2c8d6' }}>—</span>;
@@ -123,7 +142,13 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>{title}</h2>
           <p style={{ margin: '2px 0 0', fontSize: 10.5, color: DIM }}>{subtitle} · {rows.length} record{rows.length === 1 ? '' : 's'}</p>
         </div>
-        {!readOnly && <button onClick={openNew} style={btn(BLUE, '#fff')}><Plus size={14} /> New</button>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={exportSheet} disabled={rows.length === 0} title="Export all records to Excel"
+            style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', opacity: rows.length === 0 ? 0.5 : 1, cursor: rows.length === 0 ? 'not-allowed' : 'pointer' }}>
+            <Download size={14} /> Export Excel
+          </button>
+          {!readOnly && <button onClick={openNew} style={btn(BLUE, '#fff')}><Plus size={14} /> New</button>}
+        </div>
       </div>
       {note && <div style={{ ...card, padding: '9px 13px', marginBottom: 12, fontSize: 11, color: DIM }}>{note}</div>}
 
@@ -283,10 +308,11 @@ export const SubGroupsMaster = () => {
   return (
     <MasterCrud title="Sub-Groups" subtitle="Custom Chart-of-Accounts sub-groups — nest under any group, to any depth"
       resource="subgroups"
-      note="Create a sub-group under one of the 28 fixed groups (or under another sub-group). Nature & Statement (BS/PL) are inherited from the parent automatically."
+      note="Create a sub-group under one of the 28 fixed groups (or under another sub-group). Nature & Statement (BS/PL) are inherited from the parent automatically. For indirect-expense sub-groups, set a Group Type (Fixed / Variable) so they roll up under the right head in Profit & Loss — leave blank to inherit from the parent."
       fields={[
         { key: 'name', label: 'Sub-Group Name', type: 'text', required: true },
         { key: 'parent', label: 'Parent Group', type: 'select', options: parentOptions.length ? parentOptions : TALLY_GROUP_NAMES, required: true },
+        { key: 'expenseType', label: 'Group Type (Expense)', type: 'select', options: ['Fixed Expense', 'Variable Expense'], emptyLabel: '— Inherit from parent —' },
         { key: 'nature', label: 'Nature', type: 'text', input: false },
         { key: 'statement', label: 'Statement', type: 'text', input: false },
         { key: 'active', label: 'Active', type: 'bool', default: true },

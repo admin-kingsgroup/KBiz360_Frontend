@@ -108,6 +108,64 @@ export function useModulePL(branch, { from, to } = {}) {
   });
 }
 
+// Flat per-file Gross Profit list for the multi-tab GP Report: one row per
+// booking file (vouchers sharing a Link No), enriched with module / airline /
+// destination / client / supplier / consultant / branch so the UI pivots every
+// tab client-side. GET /api/accounting/gp-bills?branch=&from=&to=.
+export function useGpBills(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'gp-bills', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/gp-bills', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
+// Revenue & GP ranked by destination. GET /api/accounting/yield-by-destination.
+export function useYieldByDestination(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'yield-destination', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/yield-by-destination', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
+// Lifetime value / recency per customer. GET /api/accounting/customer-ltv.
+export function useCustomerLtv(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'customer-ltv', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/customer-ltv', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
+// ABC / Pareto split (by=customer|supplier|destination). GET /api/accounting/abc-analysis.
+export function useAbcAnalysis(branch, { from, to, by = 'customer' } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'abc', by, code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/abc-analysis', { branch: code, from, to, by }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
+// Year-over-Year P&L: current window vs same window last year. GET /api/accounting/yoy.
+export function useYearOverYear(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'yoy', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/yoy', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 // AR / AP ageing (receivables & payables, FIFO, as-of today). GET /api/accounting/ageing.
 export function useAgeing(branch) {
   const code = branchCode(branch);
@@ -167,6 +225,21 @@ export function useVoucher(id) {
     queryFn: () => apiGet(`/api/vouchers/${id}`),
     enabled: enabled() && !!id,
     staleTime: 10_000,
+  });
+}
+
+// Create a new voucher (Receipt / Payment / Contra / Journal / Credit Note /
+// Debit Note / Purchase Expense). The backend posts a balanced double-entry,
+// so we invalidate every accounting report + register so the new voucher shows
+// in the Trial Balance, P&L, Balance Sheet, Day Book and ageing immediately.
+export function useCreateVoucher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => apiPost('/api/vouchers', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['accounting'] });
+      qc.invalidateQueries({ queryKey: ['vouchers'] });
+    },
   });
 }
 

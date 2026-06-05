@@ -6,15 +6,30 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Check, Download, Plus, Save, Search, Settings } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { ACTIVE_CURRENCIES, ADM_DATA, BRANCH_CODES, CASH, CUSTOMERS, FOREX_RATES_DATA, GP_BILLS } from '../core/data';
+import { ACTIVE_CURRENCIES, ADM_DATA, BRANCH_CODES, CASH, CUSTOMERS, FOREX_RATES_DATA, GP_BILLS, SUBAGENTS } from '../core/data';
 import { useNumberingSeries } from '../core/useReference';
 import { fmt, fmtINR } from '../core/format';
 import { exportToExcel } from '../core/exportExcel';
 import { ACM_DATA, APPROVAL_LIMITS_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, CURRENCY_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, MstrModal, MstrShell, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, _PASSPORTS, cardStyle, tabPanel } from '../core/helpers';
 import { useMobile } from '../core/hooks';
+import { useGpBills } from '../core/useAccounting';
+import { ReportDateBar, resolveReportRange } from '../core/reportDateBar';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../core/styles';
 import { PHASE2_Page } from '../shell/PHASE2_Page';
 import { TopBar } from '../shell/TopBar';
+
+// Shared "Export to Excel" toolbar button — wires a master's visible rows to the
+// dependency-free CSV exporter. Pass the rows array + {key,label} columns. The
+// button greys out when there's nothing to export.
+export function ExportBtn({ name, columns, rows, label = "📤 Export" }) {
+  const empty = !rows || rows.length === 0;
+  return (
+    <button onClick={() => exportToExcel(name, columns, rows || [])} disabled={empty} title="Export to Excel"
+      style={{ padding: "8px 14px", background: "#fff", border: "1px solid #e1e3ec", borderRadius: 6, fontSize: 12, cursor: empty ? "not-allowed" : "pointer", opacity: empty ? 0.5 : 1 }}>
+      {label}
+    </button>
+  );
+}
 
 export function MastersForex(){
   const [rates,setRates]=useState(FOREX_RATES_DATA);
@@ -38,7 +53,10 @@ export function MastersForex(){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Used in foreign currency vouchers for INR conversion · Source: RBI / CBK / BOT</p>
           </div>
         </div>
-        <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Add Rate</button>
+        <div style={{display:"flex",gap:8}}>
+          <ExportBtn name="forex-rates" rows={rates} columns={[{key:"date",label:"Date"},{key:"from",label:"From Currency"},{key:"to",label:"To Currency"},{key:"rate",label:"Exchange Rate"},{key:"source",label:"Source"}]}/>
+          <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Add Rate</button>
+        </div>
       </div>
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
@@ -94,21 +112,28 @@ export function Supplier360({branch}){
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
 
-  const ALL_SUPPLIERS=[...new Set(GP_BILLS.filter(b=>!brCode||b.branch===brCode).map(b=>b.supplier))];
-  const [supplier,setSupplier]=useState(ALL_SUPPLIERS[0]||"BSP India");
+  /* Live supplier purchases from the double-entry engine (one row per booking
+     file, net of incentive). Branch-scoped server-side; date-scoped by the bar. */
+  const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
+  const gpQ=useGpBills(branch,{from:range.from||undefined,to:range.to||undefined});
+  const BILLS=gpQ.data||[];
 
-  const suppBills=GP_BILLS.filter(b=>b.supplier===supplier&&(!brCode||b.branch===brCode));
+  const ALL_SUPPLIERS=[...new Set(BILLS.filter(b=>b.supplier).map(b=>b.supplier))].sort((a,b)=>a.localeCompare(b));
+  const [supplier,setSupplier]=useState('');
+  const selSupplier=(supplier&&ALL_SUPPLIERS.includes(supplier))?supplier:(ALL_SUPPLIERS[0]||'');
+
+  const suppBills=BILLS.filter(b=>b.supplier===selSupplier);
   const totCost=suppBills.reduce((s,b)=>s+b.cost,0);
   const totRev =suppBills.reduce((s,b)=>s+b.sell,0);
   const totGP  =totRev-totCost;
   const gpPct  =totRev>0?+(totGP/totRev*100).toFixed(1):0;
   const outstanding=Math.round(totCost*0.20);
-  const mods=[...new Set(suppBills.map(b=>b.mod))];
-  const branches=[...new Set(suppBills.map(b=>b.branch))];
+  const mods=[...new Set(suppBills.map(b=>b.mod).filter(Boolean))];
+  const branches=[...new Set(suppBills.map(b=>b.branch).filter(Boolean))];
 
-  /* ADMs/ACMs for this supplier */
-  const suppADMs=ADM_DATA.filter(a=>a.airline===supplier||a.airline.includes(supplier.split(" ")[0]));
-  const suppACMs=ACM_DATA.filter(a=>a.airline===supplier||a.airline.includes(supplier.split(" ")[0]));
+  /* ADMs/ACMs for this supplier (no live memo source yet → graceful empty). */
+  const suppADMs=ADM_DATA.filter(a=>selSupplier&&(a.airline===selSupplier||a.airline.includes(selSupplier.split(" ")[0])));
+  const suppACMs=ACM_DATA.filter(a=>selSupplier&&(a.airline===selSupplier||a.airline.includes(selSupplier.split(" ")[0])));
   const f=n=>cur+Number(Math.round(n)).toLocaleString("en-IN");
 
   return (
@@ -121,10 +146,39 @@ export function Supplier360({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Complete supplier profile — purchases, outstanding, ADMs, ACMs, performance</p>
           </div>
         </div>
-        <select value={supplier} onChange={e=>setSupplier(e.target.value)} style={{...inp,width:240,minHeight:32,fontSize:11}}>
-          {ALL_SUPPLIERS.map(s=><option key={s}>{s}</option>)}
-        </select>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <ReportDateBar value={range} onChange={setRange}/>
+          <select value={selSupplier} onChange={e=>setSupplier(e.target.value)} disabled={!ALL_SUPPLIERS.length} style={{...inp,width:220,minHeight:32,fontSize:11,opacity:ALL_SUPPLIERS.length?1:0.6}}>
+            {ALL_SUPPLIERS.length
+              ? ALL_SUPPLIERS.map(s=><option key={s}>{s}</option>)
+              : <option value="">No supplier data yet</option>}
+          </select>
+        </div>
       </div>
+
+      {gpQ.isError && (
+        <div style={{...card,marginBottom:14,background:"#FCEBEB",border:"1px solid #E8B4B4",display:"flex",gap:10,alignItems:"flex-start"}}>
+          <span style={{fontSize:18,lineHeight:1}}>⚠️</span>
+          <div>
+            <p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>Couldn’t load supplier purchases</p>
+            <p style={{margin:"3px 0 0",fontSize:11,color:"#A32D2D"}}>{gpQ.error?.message||"Request failed."} — check you’re signed in and the ERP API is reachable.</p>
+          </div>
+        </div>
+      )}
+
+      {!gpQ.isError && !gpQ.isLoading && ALL_SUPPLIERS.length===0 && (
+        <div style={{...card,marginBottom:14,background:"#FFF8E8",border:"1px solid #F0D98A",display:"flex",gap:10,alignItems:"flex-start"}}>
+          <span style={{fontSize:18,lineHeight:1}}>ℹ️</span>
+          <div>
+            <p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>No supplier purchases for {brCode||"this branch"}{range.mode!=="all"?" in this period":""}</p>
+            <p style={{margin:"3px 0 0",fontSize:11,color:"#5a6691"}}>This view aggregates supplier purchases from posted bills. Widen the date range (try “All”) or bill some purchase vouchers and they’ll appear here automatically.</p>
+          </div>
+        </div>
+      )}
+
+      {gpQ.isLoading && (
+        <div style={{...card,marginBottom:14,textAlign:"center",color:"#5a6691",fontSize:12}}>Loading supplier purchases…</div>
+      )}
 
       {/* Profile card */}
       <div style={{...card,marginBottom:14,background:"linear-gradient(135deg,#0d1326,#185FA5)",border:"none"}}>
@@ -159,14 +213,14 @@ export function Supplier360({branch}){
                   <th key={i} style={{padding:"8px 10px",textAlign:i>=4?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr></thead>
-              <tbody>{suppBills.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).map((b,i)=>{
-                const gp=b.sell-b.cost;const gpPct2=+(gp/b.sell*100).toFixed(1);
+              <tbody>{suppBills.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,10).map((b,i)=>{
+                const gp=b.sell-b.cost;const gpPct2=b.sell>0?+(gp/b.sell*100).toFixed(1):0;
                 return (
                   <tr key={b.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
                     <td style={{padding:"7px 10px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{b.id}</td>
                     <td style={{padding:"7px 10px",color:"#5a6691"}}>{b.date}</td>
                     <td style={{padding:"7px 10px"}}><span style={{fontSize:9.5,padding:"2px 6px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{b.mod}</span></td>
-                    <td style={{padding:"7px 10px",color:"#384677"}}>{b.dest}</td>
+                    <td style={{padding:"7px 10px",color:"#384677"}}>{b.dest||"—"}</td>
                     <td style={{padding:"7px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(b.cost)}</td>
                     <td style={{padding:"7px 10px",textAlign:"right",fontWeight:600,color:gp>0?"#27500A":"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{f(gp)}</td>
                     <td style={{padding:"7px 10px",textAlign:"right"}}><span style={{fontSize:9.5,padding:"2px 6px",borderRadius:999,fontWeight:800,background:gpPct2>=12?"#EAF3DE":"#FAEEDA",color:gpPct2>=12?"#27500A":"#854F0B"}}>{gpPct2}%</span></td>
@@ -225,13 +279,6 @@ export function MastersSubAgents(){
   const [form,setForm]=useState({name:"",iata:"",email:"",phone:"",type:"Retail",city:"",currency:"INR",
     commType:"Percentage of GP",commRate:10,creditLimit:200000,creditDays:30,paymentCycle:"Monthly"});
 
-  const SUBAGENTS=[
-    {id:"SA001",name:"Skyline Travels",        iata:"14-3 88888 1",email:"info@skyline.in",   phone:"+91 22 1234 5678",type:"Retail",   city:"Mumbai",  currency:"INR",commType:"% of GP",  commRate:15,creditLimit:500000,creditDays:30,paymentCycle:"Monthly",revYTD:840000,gpYTD:126000,books:24,active:true,joined:"2021-06-01",territory:"Mumbai, Thane"},
-    {id:"SA002",name:"Global Wings",            iata:"",            email:"gw@global.in",     phone:"+91 79 2345 6789",type:"Corporate",city:"Ahmedabad",currency:"INR",commType:"Fixed ₹",  commRate:1200,creditLimit:300000,creditDays:45,paymentCycle:"Monthly",revYTD:560000,gpYTD:67200,books:18,active:true,joined:"2022-03-15",territory:"Gujarat"},
-    {id:"SA003",name:"Paradise Holidays",       iata:"14-3 77777 2",email:"paradise@ph.in",   phone:"+91 11 3456 7890",type:"Retail",   city:"Delhi",   currency:"INR",commType:"% of sell",commRate:8, creditLimit:400000,creditDays:30,paymentCycle:"Bi-weekly",revYTD:1120000,gpYTD:89600,books:31,active:true,joined:"2020-11-01",territory:"Delhi NCR"},
-    {id:"SA005",name:"Online Deals (OTA)",      iata:"",            email:"ops@onlinedeals.in",phone:"+91 80 4567 8901",type:"Online",  city:"Bangalore",currency:"INR",commType:"% of sell",commRate:6, creditLimit:1000000,creditDays:15,paymentCycle:"Weekly",revYTD:2340000,gpYTD:140400,books:67,active:true,joined:"2022-08-01",territory:"Pan India Online"},
-  ];
-
   const TYPE_CLR={Retail:"#185FA5",Corporate:"#854F0B",Local:"#27500A",Online:"#1D9E75"};
   const TYPE_BG ={Retail:"#E6F1FB",Corporate:"#FAEEDA",Local:"#EAF3DE",Online:"#EAF3DE"};
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
@@ -246,7 +293,10 @@ export function MastersSubAgents(){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Commission structure · Performance · Credit limits · Payment cycles</p>
           </div>
         </div>
-        <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Add Sub-Agent</button>
+        <div style={{display:"flex",gap:8}}>
+          <ExportBtn name="sub-agents" rows={SUBAGENTS} columns={[{key:"id",label:"ID"},{key:"name",label:"Agency Name"},{key:"iata",label:"IATA"},{key:"type",label:"Type"},{key:"city",label:"City"},{key:"email",label:"Email"},{key:"phone",label:"Phone"},{key:"currency",label:"Currency"},{key:"commType",label:"Commission Type"},{key:"commRate",label:"Commission Rate"},{key:"creditLimit",label:"Credit Limit"},{key:"creditDays",label:"Credit Days"},{key:"paymentCycle",label:"Payment Cycle"},{key:"revYTD",label:"YTD Revenue"},{key:"gpYTD",label:"YTD GP"},{key:"books",label:"Bookings"},{key:"territory",label:"Territory"},{key:"joined",label:"Joined"}]}/>
+          <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Add Sub-Agent</button>
+        </div>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>
@@ -382,12 +432,15 @@ export function VendorTermsMaster({branch}){
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
   return (
     <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-        <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>⏰</div>
-        <div>
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Vendor Payment Terms</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{f(totDue)} due in 7 days · TDS to deduct: {f(totTds)}</p>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>⏰</div>
+          <div>
+            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Vendor Payment Terms</h2>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{f(totDue)} due in 7 days · TDS to deduct: {f(totTds)}</p>
+          </div>
         </div>
+        <ExportBtn name="vendor-payment-terms" rows={terms} columns={[{key:"supplier",label:"Supplier"},{key:"type",label:"Type"},{key:"terms",label:"Terms"},{key:"dueAmt",label:"Amount Due"},{key:"dueDate",label:"Due Date"},{key:"tds",label:"TDS Section"},{key:"tdsRate",label:"TDS Rate %"}]}/>
       </div>
       {terms.filter(t=>daysLeft(t.dueDate)<=0).length>0&&(
         <div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:10.5,color:"#A32D2D",fontWeight:600,display:"flex",gap:8}}>
@@ -1142,6 +1195,7 @@ export function MastersAirlines(){
       actions={[
         <input key="s" value={search} onChange={e=>setSearch(e.target.value)}
           placeholder="Search airline, IATA..." style={{...inp,width:210,minHeight:32,fontSize:11}}/>,
+        <ExportBtn key="x" name="airlines" rows={filtered} columns={[{key:"iata",label:"IATA"},{key:"name",label:"Airline Name"},{key:"country",label:"Country"},{key:"type",label:"Type"},{key:"hub",label:"Hub"},{key:"bsp",label:"BSP"},{key:"alliance",label:"Alliance"},{key:"gds",label:"GDS"},{key:"commPct",label:"Comm %"}]}/>,
         <button key="a" onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}>
           <Plus size={13}/> New Airline
         </button>
@@ -1251,6 +1305,9 @@ export function MastersHotels(){
         </div>,
         <input key="s" value={search} onChange={e=>setSearch(e.target.value)}
           placeholder="Search..." style={{...inp,width:180,minHeight:32,fontSize:11}}/>,
+        tab==="hotels"
+          ? <ExportBtn key="x" name="hotels" rows={filt_h} columns={[{key:"name",label:"Hotel Name"},{key:"city",label:"City"},{key:"stars",label:"Stars"},{key:"gstSlab",label:"GST Slab %"},{key:"tariff",label:"Rack Rate"},{key:"chain",label:"Chain"},{key:"contract",label:"Contract"}]}/>
+          : <ExportBtn key="x" name="dmcs" rows={filt_d} columns={[{key:"name",label:"DMC Name"},{key:"country",label:"Country"},{key:"speciality",label:"Speciality"},{key:"currency",label:"Currency"},{key:"commPct",label:"Commission %"},{key:"contract",label:"Contract"}]}/>,
         <button key="a" onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}>
           <Plus size={13}/> {tab==="hotels"?"New Hotel":"New DMC"}
         </button>
@@ -1403,6 +1460,11 @@ export function MastersTaxRates(){
         </div>,
         tab==="gst"&&<input key="s" value={search} onChange={e=>setSearch(e.target.value)}
           placeholder="Search SAC, module..." style={{...inp,width:200,minHeight:32,fontSize:11}}/>,
+        tab==="gst"
+          ? <ExportBtn key="x" name="gst-rates" rows={filt_g} columns={[{key:"sac",label:"SAC Code"},{key:"service",label:"Service"},{key:"module",label:"Module"},{key:"basis",label:"Taxable Basis"},{key:"rate",label:"GST %"},{key:"itc",label:"ITC"},{key:"tcs",label:"TCS"}]}/>
+          : tab==="tcstds"
+          ? <ExportBtn key="x" name="tds-tcs-rates" rows={tcsTds} columns={[{key:"section",label:"Section"},{key:"nature",label:"Nature"},{key:"rate",label:"Rate"},{key:"threshold",label:"Threshold"},{key:"applicability",label:"When it applies"}]}/>
+          : <ExportBtn key="x" name="africa-vat" rows={afVat} columns={[{key:"country",label:"Country"},{key:"rate",label:"Rate"}]}/>,
       ]}>
       {tab==="gst"&&(
         <div style={{...card,padding:0,overflow:"hidden"}}>
@@ -1517,6 +1579,7 @@ export function TourCodeMaster({branch,setRoute}){
         </div>
         <div style={{display:"flex",gap:8}}>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search packages..." style={{...inp,width:200,minHeight:32,fontSize:11}}/>
+          <ExportBtn name="tour-codes" rows={filtered} columns={[{key:"id",label:"Package ID"},{key:"name",label:"Package Name"},{key:"dest",label:"Destination"},{key:"nights",label:"Nights"},{key:"days",label:"Days"},{key:"pax",label:"Pax Type"},{key:"base",label:"Base Price"},{key:"off",label:"Off-peak Price"},{key:"peak",label:"Peak Price"},{key:"gp",label:"GP %"},{key:"mods",label:"Modules"},{key:"tags",label:"Tags"}]}/>
           <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> New Package</button>
         </div>
       </div>
@@ -1773,7 +1836,7 @@ export function CurrencyMaster(){
           style={{flex:"1 1 280px",minWidth:200,padding:"8px 11px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12.5}}/>
         <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #d4a437",color:"#d4a437",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>↻ Refresh Rates Now</button>
         <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
-        <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📤 Export</button>
+        <ExportBtn name="currencies" rows={filtered} columns={[{key:"code",label:"Code"},{key:"name",label:"Name"},{key:"symbol",label:"Symbol"},{key:"dailyRate",label:"1 unit = INR"},{key:"lastUpdated",label:"Last Updated"},{key:"isBase",label:"Base"},{key:"active",label:"Active"}]}/>
         <button style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Currency</button>
       </div>
       <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
@@ -1832,7 +1895,7 @@ export function CostCenterMaster(){
         <input type="text" placeholder="Search code, name, manager..." value={search} onChange={e=>setSearch(e.target.value)}
           style={{flex:"1 1 280px",minWidth:200,padding:"8px 11px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12.5}}/>
         <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
-        <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📤 Export</button>
+        <ExportBtn name="cost-centers" rows={filtered} columns={[{key:"code",label:"Code"},{key:"name",label:"Name"},{key:"parent",label:"Parent"},{key:"manager",label:"Manager"},{key:"desc",label:"Description"},{key:"active",label:"Active"}]}/>
         <button style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Cost Center</button>
       </div>
       <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
@@ -1918,7 +1981,7 @@ export function ProjectMaster(){
           {["Active","Quoted","Booked","Completed","Cancelled"].map(s=><option key={s} value={s}>{s}</option>)}
         </select>
         <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
-        <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📤 Export</button>
+        <ExportBtn name="projects" rows={filtered} columns={[{key:"code",label:"Code"},{key:"name",label:"Project / Tour"},{key:"client",label:"Client"},{key:"startDate",label:"Start Date"},{key:"endDate",label:"End Date"},{key:"manager",label:"Manager"},{key:"budget",label:"Budget"},{key:"actual",label:"Actual"},{key:"status",label:"Status"}]}/>
         <button style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ New Project / Tour Code</button>
       </div>
       <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
@@ -1979,7 +2042,7 @@ export function ApprovalLimitsMaster(){
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
         <p style={{margin:0,fontSize:12,color:"#5a6691"}}>{APPROVAL_LIMITS_DATA.length} rules configured across {Object.keys(groupByType).length} voucher types</p>
         <div style={{flex:1}}/>
-        <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📤 Export Matrix</button>
+        <ExportBtn name="approval-limits" label="📤 Export Matrix" rows={APPROVAL_LIMITS_DATA} columns={[{key:"voucherType",label:"Voucher Type"},{key:"role",label:"Approver Role"},{key:"minAmount",label:"From (>=)"},{key:"maxAmount",label:"To (<=)"},{key:"backup",label:"Backup Approver"}]}/>
         <button style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Limit Rule</button>
       </div>
       {Object.entries(groupByType).map(([type,rules])=>(
@@ -2044,7 +2107,7 @@ export function NumberingSeriesMaster({branch}){
           {BRANCH_CODES.map(b=><option key={b} value={b}>{b}</option>)}
         </select>
         <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
-        <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📤 Export</button>
+        <ExportBtn name="numbering-series" rows={filtered} columns={[{key:"branch",label:"Branch"},{key:"voucherType",label:"Voucher Type"},{key:"prefix",label:"Prefix"},{key:"format",label:"Format"},{key:"nextNo",label:"Next No"},{key:"active",label:"Active"}]}/>
         <button style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Series</button>
       </div>
       <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
@@ -2901,6 +2964,7 @@ export function PassportManager({branch}){
         </div>
         <div style={{display:"flex",gap:8}}>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Name / passport / client..." style={{...inp,width:220,minHeight:32,fontSize:11}}/>
+          <ExportBtn name="passports" rows={filtered} columns={[{key:"person",label:"Person"},{key:"client",label:"Client"},{key:"passport",label:"Passport No."},{key:"nationality",label:"Nationality"},{key:"issued",label:"Issued"},{key:"expiry",label:"Expiry"},{key:"visas",label:"Visas in Passport"},{key:"branch",label:"Branch"}]}/>
           <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Add Passport</button>
         </div>
       </div>

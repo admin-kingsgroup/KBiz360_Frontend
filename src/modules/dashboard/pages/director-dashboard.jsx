@@ -13,7 +13,7 @@ import { BranchPlHeatmap } from '../components/shared/BranchPlHeatmap';
 import { KeyAlertsPanel } from '../components/shared/KeyAlertsPanel';
 import { TopEntitiesTable } from '../components/tables/TopEntitiesTable';
 
-const RANGE_SHORT = { month: 'This Month', ytd: 'YTD', all: 'All Time' };
+const RANGE_SHORT = { month: 'This Month', quarter: 'This Quarter', ytd: 'YTD', all: 'All Time' };
 
 export function DirectorDashboardPage({ currentUser, setRoute }) {
   const { navigate } = useDashboardActions(setRoute);

@@ -9,11 +9,13 @@ import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
 import { ErrorBoundary } from './shell/ErrorBoundary';
 import { BRANCHES } from './core/data';
-import { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, GratuityRegister, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, SubAgentStatement, TdsCertRegister, TrainingRecords, UxPreferences } from './core/helpers';
+import { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, GratuityRegister, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, TdsCertRegister, TrainingRecords, UxPreferences } from './core/helpers';
 import { useMobile } from './core/hooks';
 import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
-import { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RPT_CashPosition, RPT_CurrencyExposure, RPT_CustomerLTV, RPT_FSNotes, RPT_InterbranchElim, RPT_LeaveUtilization, RPT_StatutoryDues, RPT_TaxFilingBoard, RPT_YieldConsultant, RPT_YieldDestination, RPT_YieldSupplier, RPT_YoY } from './core/styles';
+import { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RPT_CashPosition, RPT_CurrencyExposure, RPT_CustomerLTV, RPT_LeaveUtilization, RPT_StatutoryDues, RPT_TaxFilingBoard, RPT_YieldConsultant, RPT_YieldDestination, RPT_YieldSupplier, RPT_YoY } from './core/styles';
+import { RPT_InterbranchElim } from './modules/interbranch';
+import { SalesGpAnalytics } from './modules/salesGpAnalytics';
 import { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } from './modules/assets';
 import { Dashboard } from './modules/dashboard';
 import { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose } from './modules/finance';
@@ -23,9 +25,10 @@ import { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccou
 import { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBS, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportPayables, ReportPnL, ReportReceivables, ReportSalesReg, ReportViewerTabbed, ReportsMetaDemo, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } from './modules/reports';
 import { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } from './modules/settings';
 import { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } from './modules/taxation';
-import { AdmRegister, AutoLinkedVouchers, BspCsvImport, BspSummary, BulkVoucherImport, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
-import { TrialBalanceLive, DayBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, InvoiceGPLive } from './modules/accountingLive';
+import { AdmRegister, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
+import { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, InvoiceGPLive } from './modules/accountingLive';
 import { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } from './modules/reportsFinancial';
+import { NotesToFinancials } from './modules/reportsNotes';
 import { CostCenterMasterLive } from './modules/costCentersLive';
 import { PaymentVerificationLive } from './modules/paymentVerification';
 import { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, GroupsMaster, SubGroupsMaster, LedgersMaster } from './modules/mastersLive';
@@ -45,14 +48,19 @@ export default function KB360App(){
     return null;
   })();
 
-  /* ── Branch: restore the user's first allowed branch, else default to TKHO (Head Office) ── */
+  /* ── Branch: restore the user's first allowed *operating* branch. We skip the
+     Head-Office (isHO) branch as a default because HO holds no transactional data
+     (vouchers are posted at the operating branches), so defaulting to it would
+     blank every branch-scoped dashboard/report. HO stays selectable in the
+     switcher; it's just never the implicit default. ── */
   const [branch,setBranch]=useState(()=>{
     const codes = restoredUser?.branches;
     if(Array.isArray(codes) && codes.length){
-      const b = BRANCHES.find(x => codes.includes(x.code));
+      const b = BRANCHES.find(x => codes.includes(x.code) && !x.isHO)
+            ||  BRANCHES.find(x => codes.includes(x.code));
       if(b) return b;
     }
-    return BRANCHES[0];
+    return BRANCHES.find(x => !x.isHO) || BRANCHES[0];
   });
   /* ── Route: restore the last visited page so a refresh keeps you where you
      were (only when signed in; logged-out always lands on the login screen). */
@@ -98,6 +106,7 @@ export default function KB360App(){
     // Route → module mapping (URL prefix-based)
     const routeModule = (() => {
       if(route==="/dashboard") return null; // always allowed
+      if(route==="/purchase-expense") return "Finance"; // Finance voucher, despite the /purchase prefix
       if(route.startsWith("/settings")) return "Settings";
       if(route.startsWith("/hr"))       return "HR & Payroll";
       if(route.startsWith("/reports"))  return "Reports";
@@ -148,15 +157,15 @@ export default function KB360App(){
     /* New Financial Reports */
     if(route==="/reports/cash-position")  return <RPT_CashPosition branch={branch}/>;
     if(route==="/reports/interbranch")    return <RPT_InterbranchElim/>;
-    if(route==="/reports/fs-notes")       return <RPT_FSNotes/>;
+    if(route==="/reports/fs-notes")       return <NotesToFinancials branch={branch}/>;
     if(route==="/reports/audit-trail")    return <RPT_AuditTrail/>;
     /* New Profitability Reports */
-    if(route==="/reports/yield-destination")return <RPT_YieldDestination/>;
-    if(route==="/reports/yield-consultant") return <RPT_YieldConsultant/>;
-    if(route==="/reports/yield-supplier")   return <RPT_YieldSupplier/>;
-    if(route==="/reports/yoy")              return <RPT_YoY/>;
-    if(route==="/reports/customer-ltv")     return <RPT_CustomerLTV/>;
-    if(route==="/reports/abc-analysis")     return <RPT_ABCAnalysis/>;
+    if(route==="/reports/yield-destination")return <RPT_YieldDestination branch={branch}/>;
+    if(route==="/reports/yield-consultant") return <RPT_YieldConsultant branch={branch}/>;
+    if(route==="/reports/yield-supplier")   return <RPT_YieldSupplier branch={branch}/>;
+    if(route==="/reports/yoy")              return <RPT_YoY branch={branch}/>;
+    if(route==="/reports/customer-ltv")     return <RPT_CustomerLTV branch={branch}/>;
+    if(route==="/reports/abc-analysis")     return <RPT_ABCAnalysis branch={branch}/>;
     /* New HR Reports */
     if(route==="/hr/attrition")           return <RPT_Attrition/>;
     if(route==="/hr/leave-utilization")   return <RPT_LeaveUtilization/>;
@@ -211,11 +220,10 @@ export default function KB360App(){
     if(route==="/finance/investments")   return <InvestmentRegister/>;
     if(route==="/finance/loan-amort")    return <LoanAmortization/>;
     if(route==="/finance/reco-queue")    return <ReconciliationQueue/>;
-    if(route==="/transactions/bulk-import")    return <BulkVoucherImport/>;
-    if(route==="/transactions/multi-currency")  return <MultiCurrencyVoucher/>;
-    if(route==="/transactions/comments-demo")   return <VoucherCommentsDemo/>;
-    if(route==="/transactions/print-preview")   return <PrintPreviewDemo/>;
-    if(route==="/transactions/auto-linked")     return <AutoLinkedVouchers/>;
+    if(route==="/finance/multi-currency")  return <MultiCurrencyVoucher/>;
+    if(route==="/finance/comments-demo")   return <VoucherCommentsDemo/>;
+    if(route==="/finance/print-preview")   return <PrintPreviewDemo/>;
+    if(route==="/finance/auto-linked")     return <AutoLinkedVouchers/>;
     if(route==="/masters/customer-detail-demo") return <CustomerMasterDetail/>;
     if(route==="/masters/bulk-import")          return <BulkImportMaster/>;
     if(route==="/masters/merge")                return <MergeRecordsUtility/>;
@@ -234,7 +242,7 @@ export default function KB360App(){
     if(route==="/sales/hotel")        return <SalesHotel branch={branch} setRoute={navigate}/>;
     if(route==="/sales/insurance")    return <SalesInsurance branch={branch} setRoute={navigate}/>;
     if(route==="/sales/misc")         return <SalesMisc branch={branch} setRoute={navigate}/>;
-    if(route==="/sales/credit-note")  return <SalesCreditNote branch={branch} setRoute={navigate}/>;
+    if(route==="/finance/credit-note" || route==="/sales/credit-note")  return <SalesCreditNote branch={branch} setRoute={navigate}/>;
     if(route==="/purchase/flight")    return <PurchaseFlight branch={branch} setRoute={navigate}/>;
     if(route==="/purchase/holiday")   return <PurchaseHoliday branch={branch} setRoute={navigate}/>;
     if(route==="/purchase/hotel")     return <PurchaseHotelVoucher branch={branch} setRoute={navigate}/>;
@@ -244,12 +252,14 @@ export default function KB360App(){
     if(route==="/purchase/misc")      return <PurchaseMisc branch={branch} setRoute={navigate}/>;
     if(route==="/receipts")           return <ReceiptVoucher branch={branch}/>;
     if(route==="/payments")           return <PaymentVoucher branch={branch}/>;
+    if(route==="/purchase-expense")   return <PurchaseExpenseVoucher branch={branch}/>;
     if(route==="/contra")             return <ContraVoucher branch={branch}/>;
     if(route==="/bank-reco")          return <BankReco/>;
     if(route==="/journal")            return <JournalEntry branch={branch}/>;
     if(route==="/finance/verification") return <PaymentVerificationLive/>;
     if(route==="/import")               return <DataImportPage currentUser={currentUser}/>;
     if(route==="/day-book")           return <DayBookLive branch={branch}/>;
+    if(route==="/finance/cash-book")  return <CashBookLive branch={branch}/>;
     if(route==="/ledger")             return <LedgerAcLive branch={branch}/>;
     if(route==="/trial-balance")      return <TrialBalanceLive branch={branch}/>;
     if(route==="/tax/gstr1")          return <TaxGstr1/>;
@@ -267,9 +277,10 @@ export default function KB360App(){
     if(route==="/reports/sreg")       return <RegisterLive branch={branch} initial="sales"/>;
     if(route==="/reports/preg")       return <RegisterLive branch={branch} initial="purchase"/>;
     if(route==="/reports/invoice-gp") return <InvoiceGPLive branch={branch}/>;
+    if(route==="/reports/sales-gp-analytics") return <SalesGpAnalytics branch={branch}/>;
     if(route==="/reports/branch")     return <ReportBranch/>;
     if(route==="/reports/pkg")        return <ReportPackagePnL/>;
-    if(route==="/sales/debit-note")     return <SalesDebitNote branch={branch} setRoute={navigate}/>;
+    if(route==="/finance/debit-note" || route==="/sales/debit-note")     return <SalesDebitNote branch={branch} setRoute={navigate}/>;
     if(route==="/sales/cancellation")   return <SalesCancellation branch={branch} setRoute={navigate}/>;
     if(route==="/purchase/refunds")     return <PurchaseRefunds branch={branch} setRoute={navigate}/>;
     if(route==="/purchase/adm")          return <AdmRegister branch={branch}/>;
@@ -330,12 +341,11 @@ export default function KB360App(){
     if(route==="/settings/integrations")return <ApiKeySettings/>;
     if(route==="/tax/form26as")         return <Form26AS branch={branch}/>;
     if(route==="/reports/client-statement") return <ClientStatement branch={branch}/>;
-    if(route==="/reports/cashbook")         return <CashBookReport branch={branch}/>;
+    if(route==="/reports/cashbook")         return <CashBookLive branch={branch}/>;  /* legacy alias — Cash Book now lives under Finance ▸ Books */
     if(route==="/accounting/year-close")    return <YearEndClose branch={branch}/>;
     if(route==="/reports/forex")            return <ForexReport branch={branch}/>;
     if(route==="/reports/destination")      return <DestinationIntelligence branch={branch}/>;
     if(route==="/reports/package-pl")       return <PackagePnL branch={branch}/>;
-    if(route==="/reports/sa-statement")     return <SubAgentStatement branch={branch}/>;
     if(route==="/hr/recruitment")           return <Recruitment branch={branch}/>;
     if(route==="/hr/training")              return <TrainingRecords branch={branch}/>;
     if(route==="/reports/budget")           return <BudgetPlanning branch={branch}/>;

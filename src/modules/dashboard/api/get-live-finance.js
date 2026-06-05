@@ -1,5 +1,5 @@
 import { apiGet } from '../../../core/api';
-import { CUR_MONTH, CUR_FY, todayISO, monthLabel, prevMonthKey } from '../../../core/dates';
+import { CUR_MONTH, CUR_FY, CUR_QUARTER, todayISO, monthLabel, prevMonthKey } from '../../../core/dates';
 
 /**
  * Live finance accessors for the dashboards — sourced from the same double-entry
@@ -13,15 +13,17 @@ import { CUR_MONTH, CUR_FY, todayISO, monthLabel, prevMonthKey } from '../../../
 
 /**
  * ISO date range + label for a dashboard period mode:
- *   'month' → current calendar month (default)
- *   'ytd'   → financial-year-to-date (Apr 1 → today)
- *   'all'   → every entry since inception (no bounds)
+ *   'month'   → current calendar month (default)
+ *   'quarter' → current financial-year quarter (e.g. Apr 1 → Jun 30)
+ *   'ytd'     → financial-year-to-date (Apr 1 → today)
+ *   'all'     → every entry since inception (no bounds)
  * Upper bounds use the `-31` day sentinel: for ISO YYYY-MM-DD dates no day in a
  * month sorts above `-31`, so `$lte 'YYYY-MM-31'` captures the whole month and
  * nothing past it.
  */
 export function rangeToDates(mode = 'month') {
   switch (mode) {
+    case 'quarter': return { from: CUR_QUARTER.startISO, to: CUR_QUARTER.endISO, label: `${CUR_QUARTER.label} · current quarter` };
     case 'ytd': return { from: CUR_FY.startISO, to: todayISO(), label: `FY ${CUR_FY.label} · year-to-date` };
     case 'all': return { from: '', to: '', label: 'All time · since inception' };
     case 'month':

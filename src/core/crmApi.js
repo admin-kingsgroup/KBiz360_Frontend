@@ -11,7 +11,7 @@
 
 import { getAuthToken } from './api';
 
-const CRM_BASE = import.meta.env.VITE_CRM_API_BASE || 'http://localhost:5000/api';
+const CRM_BASE = import.meta.env.VITE_CRM_API_BASE || 'http://localhost:8080/api';
 
 async function request(method, path, { params, body } = {}) {
   const url = new URL(CRM_BASE + path);

@@ -4,6 +4,7 @@ import {
   filesOf,
   gpByModuleFromMpl,
   consultantsFromSales,
+  buildKeyAlerts,
 } from '../utils/transformers';
 import { growthPct } from '../utils/helpers';
 
@@ -55,19 +56,26 @@ export const loadBranchDashboard = async ({ branchCode }) => {
 
 export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}) => {
   const dates = api.rangeToDates(range); // 'month' | 'ytd' | 'all' → ISO range + label
-  const [revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers, bankAccounts, mpl, outstanding, cash] =
+  const [revenueTrend, fyTargets, branchHeatmap, topCustomers, topSuppliers, bankAccounts, mpl, outstanding, cash, arAgeing, apAgeing] =
     await Promise.all([
       api.getRevenueTrend(branchCode),
       api.getFyTargets(),
       api.getBranchHeatmap(),
-      api.getKeyAlerts(),
       api.getTopCustomers(branchCode),
       api.getTopSuppliers(branchCode),
       api.getBankAccounts(),
       api.getModulePL({ branchCode, from: dates.from, to: dates.to }), // live, period + scope driven
       api.getReceivablesOutstanding(branchCode),
       api.getCashPosition(branchCode),
+      api.getArAgeingSummary(),
+      api.getApAgeingSummary(),
     ]);
+
+  // Key Alerts are computed live from ageing + module P&L + concentration, not seeded.
+  const keyAlerts = buildKeyAlerts({
+    arAgeing, apAgeing, mpl, topCustomers,
+    figures: { netProfit: mpl?.bridge?.netProfit, gpPct: mpl?.totals?.gpPct },
+  });
 
   return {
     revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers, bankAccounts,

@@ -3,8 +3,10 @@
    Auto-generated from KBiz360_v2.jsx · 1893 lines · 20 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useMemo, useState } from 'react';
-import { AlertTriangle, Download, Lock, Plus, Printer, Save } from 'lucide-react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { AlertTriangle, Download, Lock, Plus, Printer, Save, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
+import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement } from '../core/useBankReco';
+import { branchCode } from '../core/useAccounting';
 import { exportToCSV } from '../core/business-logic';
 import { BRANCH_CODES, CASH, EXP_ACTUALS, FX_RATES, GP_BILLS, LOAN_REGISTER } from '../core/data';
 import { fmt, fmtINR } from '../core/format';
@@ -20,121 +22,370 @@ import { EWayBill, Form26AS } from './taxation';
 import { RecurringVouchers } from './transactions';
 import { PHASE2_Page } from '../shell/PHASE2_Page';
 
+/* ════════════════════════════════════════════════════════════════════
+   BANK RECONCILIATION  —  live book (ledger) vs imported bank statement.
+   Book side  : GET /api/bank-reconciliation/book      (double-entry engine)
+   Bank side  : GET /api/bank-reconciliation/statement (imported CSV/paste)
+   Matching   : auto (amount+date+reference) and manual; 4 reconciliation states.
+   ════════════════════════════════════════════════════════════════════ */
+
+const RECON_CLR = {
+  reconciled:   { c:"#27500A", bg:"#EAF3DE", label:"Reconciled" },
+  unreconciled: { c:"#8a5a00", bg:"#FFF4D6", label:"Unreconciled" },
+  partial:      { c:"#185FA5", bg:"#E6F1FB", label:"Partial" },
+  exception:    { c:"#A32D2D", bg:"#FCEBEB", label:"Exception" },
+};
+
+function StatusChip({status}){
+  const s=RECON_CLR[status]||RECON_CLR.unreconciled;
+  return <span style={{fontSize:9,padding:"2px 7px",borderRadius:999,fontWeight:700,background:s.bg,color:s.c,whiteSpace:"nowrap"}}>{s.label}</span>;
+}
+
+/* Parse CSV (commas) or TSV (paste from Excel) → { headers, rows:string[][] }. */
+function parseDelimited(text){
+  const clean=String(text||"").replace(/\r\n/g,"\n").replace(/\r/g,"\n").trim();
+  if(!clean) return {headers:[],rows:[]};
+  const first=clean.split("\n")[0];
+  const delim=(first.split("\t").length>first.split(",").length)?"\t":",";
+  const recs=[]; let field="",row=[],inQ=false;
+  for(let i=0;i<clean.length;i++){
+    const ch=clean[i];
+    if(inQ){
+      if(ch==='"'){ if(clean[i+1]==='"'){ field+='"'; i++; } else inQ=false; }
+      else field+=ch;
+    } else if(ch==='"') inQ=true;
+    else if(ch===delim){ row.push(field); field=""; }
+    else if(ch==="\n"){ row.push(field); recs.push(row); row=[]; field=""; }
+    else field+=ch;
+  }
+  row.push(field); recs.push(row);
+  const headers=(recs.shift()||[]).map(h=>h.trim());
+  const rows=recs.filter(r=>r.some(c=>String(c).trim()!==""));
+  return {headers,rows};
+}
+
+const IMPORT_FIELDS=[
+  {k:"date",        label:"Date *"},
+  {k:"reference",   label:"Reference"},
+  {k:"chequeNo",    label:"Cheque No."},
+  {k:"utr",         label:"UTR / RRN"},
+  {k:"description", label:"Description"},
+  {k:"debit",       label:"Withdrawal / Debit"},
+  {k:"credit",      label:"Deposit / Credit"},
+  {k:"amountSigned",label:"Amount (signed, − = out)"},
+  {k:"balance",     label:"Running Balance"},
+];
+
+/* Best-guess column → field mapping from the statement's header row. */
+function guessMapping(headers){
+  const m={}; const has=(h,...w)=>w.some(x=>h.includes(x));
+  headers.forEach((raw,idx)=>{
+    const h=String(raw||"").toLowerCase();
+    if(m.date==null && has(h,"date")) m.date=idx;
+    else if(m.chequeNo==null && has(h,"cheque","chq")) m.chequeNo=idx;
+    else if(m.utr==null && has(h,"utr","rrn")) m.utr=idx;
+    else if(m.description==null && has(h,"narration","description","particular","remark","detail")) m.description=idx;
+    else if(m.debit==null && has(h,"withdrawal","paid out","debit")) m.debit=idx;
+    else if(m.credit==null && has(h,"deposit","paid in","credit")) m.credit=idx;
+    else if(m.balance==null && has(h,"balance")) m.balance=idx;
+    else if(m.reference==null && has(h,"ref")) m.reference=idx;
+    else if(m.amountSigned==null && has(h,"amount")) m.amountSigned=idx;
+  });
+  return m;
+}
+
+function parseNum(x){
+  let s=String(x==null?"":x).trim(); if(!s) return 0;
+  const neg=/^\(.*\)$/.test(s)||s.startsWith("-")||/\bdr\b/i.test(s);
+  s=s.replace(/[^0-9.]/g,""); let n=parseFloat(s);
+  if(!isFinite(n)) return 0; return neg?-n:n;
+}
+
+/* Normalise common Indian bank date formats to ISO YYYY-MM-DD. */
+function normDate(v){
+  const s=String(v||"").trim(); if(!s) return "";
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if(m){ let [,d,mo,y]=m; if(y.length===2) y="20"+y; return `${y}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
+  const MON={jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12"};
+  m=s.match(/^(\d{1,2})[\-\s]([A-Za-z]{3})[A-Za-z]*[\-\s](\d{2,4})/);
+  if(m){ let [,d,mon,y]=m; if(y.length===2) y="20"+y; const mm=MON[mon.toLowerCase()]; if(mm) return `${y}-${mm}-${String(d).padStart(2,"0")}`; }
+  const t=Date.parse(s); if(!isNaN(t)) return new Date(t).toISOString().slice(0,10);
+  return s.slice(0,10);
+}
+
+/* Build importable rows from the raw grid + the chosen column mapping. */
+function buildImportRows(rows,mapping){
+  const at=(r,k)=> mapping[k]!=null ? r[mapping[k]] : "";
+  return rows.map(r=>{
+    let debit = mapping.debit!=null ? Math.abs(parseNum(at(r,"debit"))) : 0;
+    let credit= mapping.credit!=null ? Math.abs(parseNum(at(r,"credit"))) : 0;
+    if(mapping.amountSigned!=null && !debit && !credit){
+      const a=parseNum(at(r,"amountSigned")); if(a<0) debit=Math.abs(a); else credit=a;
+    }
+    return {
+      date:normDate(at(r,"date")),
+      reference:String(at(r,"reference")||"").trim(),
+      chequeNo:String(at(r,"chequeNo")||"").trim(),
+      utr:String(at(r,"utr")||"").trim(),
+      description:String(at(r,"description")||"").trim(),
+      debit, credit,
+      balance: mapping.balance!=null ? parseNum(at(r,"balance")) : null,
+    };
+  });
+}
+
+/* Dependency-free CSV download. */
+function downloadCSV(filename,headerArr,rowArrs){
+  const esc=v=>{ const s=String(v==null?"":v); return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s; };
+  const csv=[headerArr.join(","),...rowArrs.map(r=>r.map(esc).join(","))].join("\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
+}
+
 export function BankReco({branch}){
   const mob=useMobile();
   const cfg=bc(branch);
   const cur=cfg.cur;
-  const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
-  const [period,setPeriod]=useState(CUR_MONTH);
-  const [tab,setTab]=useState("reco"); // reco | pdc | bounce
-  const PERIODS=MONTH_OPTIONS;
-  const [matchedIds,setMatchedIds]=useState(new Set([0,1,2,3,4]));
-  const toggleMatch=id=>setMatchedIds(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
+  const code=branchCode(branch);
 
-  /* PDC Register — no bundled demo cheques (empty until a PDC backend is added) */
+  /* ── Bank ledger picker (live) ── */
+  const {data:bankLedgers=[],isLoading:ledgersLoading}=useBankLedgers(branch);
+  const [ledger,setLedger]=useState("");
+  useEffect(()=>{ if(!ledger && bankLedgers.length) setLedger(bankLedgers[0].name); },[bankLedgers,ledger]);
+
+  /* ── Date filters (default: current month → today) ── */
+  const [from,setFrom]=useState(CUR_MONTH+"-01");
+  const [to,setTo]=useState(todayISO());
+  const range={from,to};
+
+  /* ── Live data ── */
+  const {data:book,isLoading:bookLoading}=useBankBook(ledger,branch,range);
+  const {data:stmt=[],isLoading:stmtLoading}=useBankStatement(ledger,branch,range);
+  const {data:summary}=useBankReconSummary(ledger,branch,range);
+
+  /* ── Mutations ── */
+  const importMut=useImportStatement();
+  const autoMut=useAutoMatch();
+  const matchMut=useManualMatch();
+  const unmatchMut=useUnmatch();
+  const statusMut=useSetReconStatus();
+  const clearMut=useClearStatement();
+
+  /* ── UI state ── */
+  const [tab,setTab]=useState("reco");        // reco | pdc | bounce
+  const [view,setView]=useState("detailed");  // detailed | minimal
+  const [search,setSearch]=useState("");
+  const [selBook,setSelBook]=useState(null);   // { bookKey, vno, debit, credit }
+  const [selStmt,setSelStmt]=useState(null);   // statement line
+  const [showImport,setShowImport]=useState(false);
+
+  /* PDC Register — local demo state (separate feature; empty until a PDC backend exists) */
   const [pdcs,setPdcs]=useState([]);
-  const depositPDC=id=>setPdcs(ps=>ps.map(p=>p.id===id?{...p,status:"Deposited",depositDate:"2026-05-19"}:p));
+  const depositPDC=id=>setPdcs(ps=>ps.map(p=>p.id===id?{...p,status:"Deposited",depositDate:todayISO()}:p));
   const bouncePDC=id=>setPdcs(ps=>ps.map(p=>p.id===id?{...p,status:"Bounced"}:p));
-
-  /* Book entries */
-  const bookEntries=useMemo(()=>{
-    const bills=GP_BILLS.filter(b=>b.branch===brCode&&b.date.startsWith(period));
-    return bills.slice(0,8).map((b,i)=>({id:i,date:b.date,vno:b.id.replace('/SF','/RV').replace('/SH','/RV'),desc:`Receipt — ${b.client}`,amt:Math.round(b.sell*0.75),type:"CR"}));
-  },[brCode,period]);
-
-  const stmtEntries=useMemo(()=>[
-    ...bookEntries.map((e,i)=>({id:i,date:e.date,utr:`UTR${(9000000+i)}`,desc:`NEFT CR ${e.desc}`,amt:e.amt,type:"CR",matched:matchedIds.has(i)})),
-    {id:90,date:period+"-05",utr:"UTR9999001",desc:"Bank charges Q1",amt:850,type:"DR",matched:false},
-    {id:91,date:period+"-15",utr:"UTR9999002",desc:"Interest credit",amt:4200,type:"CR",matched:false},
-  ],[bookEntries,matchedIds,period]);
-
-  const bookBal=bookEntries.reduce((s,e)=>s+e.amt,0);
-  const stmtBal=stmtEntries.filter(e=>e.type==="CR").reduce((s,e)=>s+e.amt,0)-stmtEntries.filter(e=>e.type==="DR").reduce((s,e)=>s+e.amt,0);
-  const unmatched=stmtEntries.filter(e=>!e.matched).length;
-  const f=n=>cur+Number(Math.round(n)).toLocaleString("en-IN");
   const PDC_CLR={Pending:"#185FA5",Deposited:"#27500A",Bounced:"#A32D2D"};
   const PDC_BG ={Pending:"#E6F1FB",Deposited:"#EAF3DE",Bounced:"#FCEBEB"};
 
+  const f=n=>(n==null||isNaN(n))?"—":(n<0?"-":"")+cur+Math.abs(Math.round(n)).toLocaleString("en-IN");
+  const bankCcy=(bankLedgers.find(b=>b.name===ledger)||{}).currency||cfg.cur;
+
+  const bookLines=book?.lines||[];
+  const q=search.trim().toLowerCase();
+  const bookFiltered=bookLines.filter(l=>!q||`${l.date} ${l.vno} ${l.narration} ${l.party}`.toLowerCase().includes(q));
+  const stmtFiltered=stmt.filter(l=>!q||`${l.date} ${l.reference} ${l.chequeNo} ${l.utr} ${l.description}`.toLowerCase().includes(q));
+
+  /* ── Manual match: pair one selected book line with one statement line ── */
+  const variancePreview=(selBook&&selStmt)?Math.round(((selStmt.credit-selStmt.debit)-(selBook.debit-selBook.credit))*100)/100:0;
+  const confirmMatch=()=>{
+    if(!selBook||!selStmt) return;
+    matchMut.mutate(
+      {id:selStmt.id,bookKey:selBook.bookKey,vno:selBook.vno,bookDebit:selBook.debit,bookCredit:selBook.credit},
+      {onSuccess:()=>{setSelBook(null);setSelStmt(null);}}
+    );
+  };
+  const runAutoMatch=()=>autoMut.mutate({ledger,branch:code,from,to});
+
+  const exportRecon=()=>{
+    const rows=[
+      ...stmtFiltered.map(l=>["STATEMENT",l.date,l.reference||l.chequeNo||l.utr,l.description,l.debit||"",l.credit||"",RECON_CLR[l.status]?.label||l.status]),
+      ...bookFiltered.map(l=>["BOOK",l.date,l.vno,l.narration,l.credit||"",l.debit||"",l.reconciled?"Reconciled":"Unreconciled"]),
+    ];
+    downloadCSV(`bank-reco-${ledger}-${from}_to_${to}.csv`,["Side","Date","Ref / Voucher","Narration","Debit","Credit","Status"],rows);
+  };
+
+  /* KPI definitions from the live summary */
+  const KPIS=[
+    {l:"Book Balance",   v:f(summary?.bookBalance),   c:"#27500A", bg:"#EAF3DE"},
+    {l:`Bank Balance${summary?.bankBalanceDerived?" *":""}`, v:f(summary?.bankBalance), c:"#185FA5", bg:"#E6F1FB"},
+    {l:"Reconciled",     v:f(summary?.reconciledAmount), sub:`${summary?.counts?.statementReconciled||0} lines`, c:"#27500A", bg:"#EAF3DE"},
+    {l:"Unreconciled",   v:f(summary?.unreconciledAmount), sub:`${(summary?.counts?.statementUnreconciled||0)} stmt · ${(summary?.counts?.bookUnreconciled||0)} book`, c:"#8a5a00", bg:"#FFF4D6"},
+    {l:"Difference",     v:f(summary?.differenceAmount), c:Math.abs(summary?.differenceAmount||0)<1?"#27500A":"#A32D2D", bg:Math.abs(summary?.differenceAmount||0)<1?"#EAF3DE":"#FCEBEB"},
+  ];
+
   return (
-    <div style={{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
+    <div style={{padding:"12px 10px",maxWidth:1320,margin:"0 auto"}}>
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:12}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🏦</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Bank Reconciliation</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {PERIODS.find(p=>p.v===period)?.l} · Click to match · PDC Register · Bounce tracking</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{code||"All branches"} · Book (ledger) vs Bank statement · auto &amp; manual matching</p>
           </div>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-            {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <select value={ledger} onChange={e=>{setLedger(e.target.value);setSelBook(null);setSelStmt(null);}} style={{...inp,width:"auto",minWidth:180,minHeight:32,fontSize:11}}>
+            {bankLedgers.length===0&&<option value="">{ledgersLoading?"Loading banks…":"No bank ledgers"}</option>}
+            {bankLedgers.map(b=><option key={b.code||b.name} value={b.name}>{b.name}{b.currency&&b.currency!=="INR"?` (${b.currency})`:""}</option>)}
           </select>
-          <button style={{...btnG,fontSize:11}}><Download size={12}/> Import CSV</button>
+          <input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}/>
+          <span style={{fontSize:11,color:"#5a6691"}}>to</span>
+          <input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}/>
+          <button onClick={runAutoMatch} disabled={!ledger||autoMut.isPending} style={{...btnG,fontSize:11,opacity:(!ledger||autoMut.isPending)?0.6:1}}><RefreshCw size={12}/> {autoMut.isPending?"Matching…":"Auto-match"}</button>
+          <button onClick={()=>setShowImport(s=>!s)} disabled={!ledger} style={{...btnGh,fontSize:11,opacity:!ledger?0.6:1}}><Upload size={12}/> Import</button>
+          <button onClick={exportRecon} disabled={!ledger} style={{...btnGh,fontSize:11,opacity:!ledger?0.6:1}}><Download size={12}/> Export</button>
         </div>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-        {[{l:"Bank Statement Bal",v:f(stmtBal),c:"#185FA5",bg:"#E6F1FB"},
-          {l:"Book Balance",v:f(bookBal),c:"#27500A",bg:"#EAF3DE"},
-          {l:"Difference",v:f(Math.abs(stmtBal-bookBal)),c:Math.abs(stmtBal-bookBal)<100?"#27500A":"#A32D2D",bg:Math.abs(stmtBal-bookBal)<100?"#EAF3DE":"#FCEBEB"},
-          {l:"Unmatched",v:String(unmatched),c:unmatched>0?"#A32D2D":"#27500A",bg:unmatched>0?"#FCEBEB":"#EAF3DE"},
-          {l:"PDC Pending",v:String(pdcs.filter(p=>p.status==="Pending").length),c:"#185FA5",bg:"#E6F1FB"},
-          {l:"Bounced Cheques",v:String(pdcs.filter(p=>p.status==="Bounced").length),c:"#A32D2D",bg:"#FCEBEB"},
-        ].map((k,i)=>(
+      {/* Auto-match result toast */}
+      {autoMut.isSuccess&&autoMut.data&&(
+        <div style={{...card,padding:"8px 12px",marginBottom:10,background:"#EAF3DE",border:"1px solid #c3e0a0",fontSize:11,color:"#27500A"}}>
+          ✔ Auto-match: {autoMut.data.matched} reconciled (of {autoMut.data.scannedStatement} statement / {autoMut.data.scannedBook} book lines scanned).
+        </div>
+      )}
+
+      {/* No bank ledgers helper */}
+      {!ledgersLoading&&bankLedgers.length===0&&(
+        <div style={{...card,padding:"14px 16px",marginBottom:12,background:"#FFF4D6",border:"1px solid #f0d98a",fontSize:11.5,color:"#8a5a00"}}>
+          No bank ledgers found. Create one under <b>Masters → Bank Accounts</b> (group “Bank Accounts”), or post any bank receipt/payment — the ledger is auto-created — then return here.
+        </div>
+      )}
+
+      {/* Import panel */}
+      {showImport&&ledger&&<ImportPanel ledger={ledger} code={code} from={from} to={to}
+        onClose={()=>setShowImport(false)} importMut={importMut} clearMut={clearMut}/>}
+
+      {/* KPI cards */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:12}}>
+        {KPIS.map((k,i)=>(
           <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"10px 12px",background:k.bg}}>
             <p style={{margin:0,fontSize:8.5,fontWeight:700,color:k.c,textTransform:"uppercase"}}>{k.l}</p>
-            <p style={{margin:"3px 0 0",fontSize:18,fontWeight:800,color:"#0d1326"}}>{k.v}</p>
+            <p style={{margin:"3px 0 0",fontSize:17,fontWeight:800,color:"#0d1326"}}>{k.v}</p>
+            {k.sub&&<p style={{margin:"2px 0 0",fontSize:9,color:k.c}}>{k.sub}</p>}
           </div>
         ))}
       </div>
+      {summary?.bankBalanceDerived&&<p style={{margin:"-6px 0 10px",fontSize:9.5,color:"#5a6691"}}>* Bank Balance derived from book opening + statement movement (no running-balance column was imported).</p>}
 
       {/* Tabs */}
       <div style={{display:"flex",gap:0,background:"#f3f4f8",borderRadius:"9px 9px 0 0",border:"1px solid #e1e3ec"}}>
-        <button onClick={()=>setTab("reco")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="reco"?700:500,background:tab==="reco"?"#fff":"transparent",borderRadius:6,fontSize:11}}>🔄 Bank Reconciliation</button><button onClick={()=>setTab("pdc")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="pdc"?700:500,background:tab==="pdc"?"#fff":"transparent",borderRadius:6,fontSize:11}}>📑 PDC Register</button><button onClick={()=>setTab("bounce")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="bounce"?700:500,background:tab==="bounce"?"#fff":"transparent",borderRadius:6,fontSize:11}}>🔴 Bounce / Returns</button>
+        <button onClick={()=>setTab("reco")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="reco"?700:500,background:tab==="reco"?"#fff":"transparent",borderRadius:6,fontSize:11}}>🔄 Reconciliation</button><button onClick={()=>setTab("pdc")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="pdc"?700:500,background:tab==="pdc"?"#fff":"transparent",borderRadius:6,fontSize:11}}>📑 PDC Register</button><button onClick={()=>setTab("bounce")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="bounce"?700:500,background:tab==="bounce"?"#fff":"transparent",borderRadius:6,fontSize:11}}>🔴 Bounce / Returns</button>
       </div>
 
       {tab==="reco"&&(
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,padding:12,border:"1px solid #e1e3ec",borderTop:"none",borderRadius:"0 0 9px 9px",background:"#fff"}}>
-          {/* Bank Statement */}
-          <div>
-            <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Bank Statement</p>
-            <div style={{...card,padding:0,overflow:"hidden"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#0d1326"}}>{["Date","UTR","Description","Amount","✓"].map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:i===3?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>{h}</th>)}</tr></thead>
-                <tbody>{stmtEntries.map((e,i)=>(
-                  <tr key={e.id} onClick={()=>toggleMatch(e.id)} style={{borderBottom:"1px solid #f3f4f8",cursor:"pointer",background:e.matched?"#EAF3DE":i%2===0?"#fff":"#fafafa"}}
-                    onMouseEnter={ev=>{if(!e.matched)ev.currentTarget.style.background="#f0f8ff";}}
-                    onMouseLeave={ev=>{ev.currentTarget.style.background=e.matched?"#EAF3DE":i%2===0?"#fff":"#fafafa";}}>
-                    <td style={{padding:"6px 9px",color:"#5a6691",fontSize:10}}>{e.date}</td>
-                    <td style={{padding:"6px 9px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{e.utr}</td>
-                    <td style={{padding:"6px 9px",fontSize:10.5,color:"#384677",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.desc}</td>
-                    <td style={{padding:"6px 9px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",color:e.type==="CR"?"#27500A":"#A32D2D"}}>{e.type==="DR"?"-":"+"}₹{e.amt.toLocaleString()}</td>
-                    <td style={{padding:"6px 9px",textAlign:"center"}}>{e.matched?"✅":"⭕"}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
+        <div style={{border:"1px solid #e1e3ec",borderTop:"none",borderRadius:"0 0 9px 9px",background:"#fff",padding:12}}>
+          {/* Toolbar */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,background:"#f3f4f8",borderRadius:8,padding:"4px 8px"}}>
+              <Search size={13} color="#5a6691"/>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search date / ref / narration…" style={{border:"none",background:"transparent",outline:"none",fontSize:11,minWidth:200}}/>
+            </div>
+            <div style={{display:"flex",gap:4}}>
+              {["detailed","minimal"].map(v=>(
+                <button key={v} onClick={()=>setView(v)} style={{...((view===v)?btnG:btnGh),fontSize:10,padding:"4px 10px",textTransform:"capitalize"}}>{v}</button>
+              ))}
             </div>
           </div>
-          {/* Book Entries */}
-          <div>
-            <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Book Entries (Ledger)</p>
-            <div style={{...card,padding:0,overflow:"hidden"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#0d1326"}}>{["Date","Voucher","Narration","Amount","✓"].map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:i===3?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>{h}</th>)}</tr></thead>
-                <tbody>{bookEntries.map((e,i)=>(
-                  <tr key={e.id} onClick={()=>toggleMatch(e.id)} style={{borderBottom:"1px solid #f3f4f8",cursor:"pointer",background:matchedIds.has(e.id)?"#EAF3DE":i%2===0?"#fff":"#fafafa"}}
-                    onMouseEnter={ev=>{if(!matchedIds.has(e.id))ev.currentTarget.style.background="#f0f8ff";}}
-                    onMouseLeave={ev=>{ev.currentTarget.style.background=matchedIds.has(e.id)?"#EAF3DE":i%2===0?"#fff":"#fafafa";}}>
-                    <td style={{padding:"6px 9px",color:"#5a6691",fontSize:10}}>{e.date}</td>
-                    <td style={{padding:"6px 9px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{e.vno}</td>
-                    <td style={{padding:"6px 9px",fontSize:10.5,color:"#384677",maxWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.desc}</td>
-                    <td style={{padding:"6px 9px",textAlign:"right",fontWeight:600,color:"#27500A",fontVariantNumeric:"tabular-nums"}}>₹{e.amt.toLocaleString()}</td>
-                    <td style={{padding:"6px 9px",textAlign:"center"}}>{matchedIds.has(e.id)?"✅":"⭕"}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
+
+          {/* Manual-match action bar */}
+          {(selBook||selStmt)&&(
+            <div style={{...card,padding:"8px 12px",marginBottom:10,background:"#E6F1FB",border:"1px solid #B5D4F4",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+              <div style={{fontSize:11,color:"#185FA5"}}>
+                <b>Manual match —</b> Book: {selBook?`${selBook.vno} (${f(selBook.debit-selBook.credit)})`:<i>select a book entry</i>} ↔ Statement: {selStmt?`${selStmt.date} (${f(selStmt.credit-selStmt.debit)})`:<i>select a statement line</i>}
+                {selBook&&selStmt&&Math.abs(variancePreview)>0.01&&<span style={{color:"#A32D2D",fontWeight:700}}> · variance {f(variancePreview)} → Partial</span>}
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={confirmMatch} disabled={!selBook||!selStmt||matchMut.isPending} style={{...btnG,fontSize:10.5,padding:"4px 12px",background:"#27500A",opacity:(!selBook||!selStmt)?0.5:1}}><Link2 size={12}/> Match</button>
+                <button onClick={()=>{setSelBook(null);setSelStmt(null);}} style={{...btnGh,fontSize:10.5,padding:"4px 10px"}}><X size={12}/> Clear</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:12}}>
+            {/* Book entries */}
+            <div>
+              <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Book Entries (Ledger) <span style={{fontWeight:400,color:"#5a6691"}}>· {bookFiltered.length}</span></p>
+              <div style={{...card,padding:0,overflow:"hidden"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                  <thead><tr style={{background:"#0d1326"}}>{(view==="minimal"?["Date","Voucher","Amount","Status"]:["Date","Voucher","Narration","Debit","Credit","Status"]).map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:(h==="Debit"||h==="Credit"||h==="Amount")?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9}}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {bookLoading&&<tr><td colSpan={6} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
+                    {!bookLoading&&bookFiltered.length===0&&<tr><td colSpan={6} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No book entries for this bank/period.</td></tr>}
+                    {bookFiltered.map((l,i)=>{
+                      const sel=selBook?.bookKey===l.bookKey;
+                      const net=l.debit-l.credit;
+                      return (
+                        <tr key={l.bookKey} onClick={()=>{ if(l.reconciled) return; setSelBook(sel?null:{bookKey:l.bookKey,vno:l.vno,debit:l.debit,credit:l.credit}); }}
+                          style={{borderBottom:"1px solid #f3f4f8",cursor:l.reconciled?"default":"pointer",background:sel?"#FFF4D6":l.reconciled?"#EAF3DE":i%2===0?"#fff":"#fafafa"}}>
+                          <td style={{padding:"6px 9px",color:"#5a6691",fontSize:10,whiteSpace:"nowrap"}}>{fmtDate?fmtDate(l.date):l.date}</td>
+                          <td style={{padding:"6px 9px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{l.vno}</td>
+                          {view!=="minimal"&&<td style={{padding:"6px 9px",fontSize:10.5,color:"#384677",maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={l.narration}>{l.narration||l.party}</td>}
+                          {view==="minimal"
+                            ?<td style={{padding:"6px 9px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",color:net>=0?"#27500A":"#A32D2D"}}>{f(net)}</td>
+                            :<><td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#A32D2D"}}>{l.debit?f(l.debit):""}</td>
+                               <td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#27500A"}}>{l.credit?f(l.credit):""}</td></>}
+                          <td style={{padding:"6px 9px",textAlign:"center"}}><StatusChip status={l.reconciled?l.status:"unreconciled"}/></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Bank statement */}
+            <div>
+              <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Bank Statement <span style={{fontWeight:400,color:"#5a6691"}}>· {stmtFiltered.length}</span></p>
+              <div style={{...card,padding:0,overflow:"hidden"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                  <thead><tr style={{background:"#0d1326"}}>{(view==="minimal"?["Date","Description","Amount","Status",""]:["Date","Ref / Cheque / UTR","Description","Debit","Credit","Status",""]).map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:(h==="Debit"||h==="Credit"||h==="Amount")?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9}}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {stmtLoading&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
+                    {!stmtLoading&&stmtFiltered.length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No statement lines. Use <b>Import</b> to load a bank statement (CSV / paste).</td></tr>}
+                    {stmtFiltered.map((l,i)=>{
+                      const sel=selStmt?.id===l.id;
+                      const net=l.credit-l.debit;
+                      const ref=l.reference||l.chequeNo||l.utr||"";
+                      const open=l.status==="unreconciled"||l.status==="exception";
+                      return (
+                        <tr key={l.id} onClick={()=>{ if(!open) return; setSelStmt(sel?null:l); }}
+                          style={{borderBottom:"1px solid #f3f4f8",cursor:open?"pointer":"default",background:sel?"#FFF4D6":l.status==="reconciled"?"#EAF3DE":l.status==="partial"?"#E6F1FB":l.status==="exception"?"#FCEBEB":i%2===0?"#fff":"#fafafa"}}>
+                          <td style={{padding:"6px 9px",color:"#5a6691",fontSize:10,whiteSpace:"nowrap"}}>{fmtDate?fmtDate(l.date):l.date}</td>
+                          {view!=="minimal"&&<td style={{padding:"6px 9px",fontFamily:"monospace",fontSize:9,color:"#185FA5",maxWidth:110,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={ref}>{ref}</td>}
+                          <td style={{padding:"6px 9px",fontSize:10.5,color:"#384677",maxWidth:view==="minimal"?180:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={l.description}>{l.description}</td>
+                          {view==="minimal"
+                            ?<td style={{padding:"6px 9px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",color:net>=0?"#27500A":"#A32D2D"}}>{f(net)}</td>
+                            :<><td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#A32D2D"}}>{l.debit?f(l.debit):""}</td>
+                               <td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#27500A"}}>{l.credit?f(l.credit):""}</td></>}
+                          <td style={{padding:"6px 9px",textAlign:"center"}}><StatusChip status={l.status}/></td>
+                          <td style={{padding:"6px 6px",textAlign:"center",whiteSpace:"nowrap"}}>
+                            {(l.status==="reconciled"||l.status==="partial")
+                              ? <button title="Unmatch" onClick={e=>{e.stopPropagation();unmatchMut.mutate({id:l.id});}} style={{...btnGh,padding:"2px 6px",fontSize:9,color:"#A32D2D"}}><Unlink size={11}/></button>
+                              : l.status==="exception"
+                                ? <button title="Clear exception" onClick={e=>{e.stopPropagation();statusMut.mutate({id:l.id,status:"unreconciled"});}} style={{...btnGh,padding:"2px 6px",fontSize:9}}>↺</button>
+                                : <button title="Flag exception" onClick={e=>{e.stopPropagation();statusMut.mutate({id:l.id,status:"exception"});}} style={{...btnGh,padding:"2px 6px",fontSize:9,color:"#8a5a00"}}><AlertTriangle size={11}/></button>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
+          <p style={{margin:"10px 2px 0",fontSize:9.5,color:"#5a6691"}}>Tip: select one Book entry and one Statement line, then <b>Match</b>. Use <b>Auto-match</b> to pair by amount + date + reference. Reconciliation state is saved server-side and survives voucher edits.</p>
         </div>
       )}
 
@@ -142,7 +393,7 @@ export function BankReco({branch}){
         <div style={{...card,borderTop:"none",borderRadius:"0 0 9px 9px",padding:0,overflow:"hidden"}}>
           <div style={{padding:"10px 14px",background:"#E6F1FB",borderBottom:"1px solid #B5D4F4",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <p style={{margin:0,fontSize:11,color:"#185FA5"}}>PDC Register — Post-Dated Cheques received from clients. Deposit on or after cheque date.</p>
-            <span style={{fontSize:10.5,fontWeight:700,color:"#185FA5"}}>Due soon: {pdcs.filter(p=>p.status==="Pending"&&p.date<="2026-05-30").length}</span>
+            <span style={{fontSize:10.5,fontWeight:700,color:"#185FA5"}}>Pending: {pdcs.filter(p=>p.status==="Pending").length}</span>
           </div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#0d1326"}}>
@@ -150,14 +401,16 @@ export function BankReco({branch}){
                 <th key={i} style={{padding:"9px 12px",textAlign:i===5?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{pdcs.map((p,i)=>(
+            <tbody>
+              {pdcs.length===0&&<tr><td colSpan={8} style={{padding:14,textAlign:"center",color:"#5a6691"}}>No post-dated cheques on record.</td></tr>}
+              {pdcs.map((p,i)=>(
               <tr key={p.id} style={{borderBottom:"1px solid #f3f4f8",background:p.status==="Bounced"?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{p.id}</td>
                 <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{p.client}</td>
                 <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10.5}}>{p.chqNo}</td>
                 <td style={{padding:"8px 12px",color:"#5a6691"}}>{p.bank}</td>
                 <td style={{padding:"8px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{p.date}</td>
-                <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>₹{p.amount.toLocaleString()}</td>
+                <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(p.amount)}</td>
                 <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:PDC_BG[p.status],color:PDC_CLR[p.status]}}>{p.status}</span></td>
                 <td style={{padding:"8px 12px"}}>
                   {p.status==="Pending"&&<div style={{display:"flex",gap:4}}>
@@ -177,19 +430,16 @@ export function BankReco({branch}){
         <div style={{...card,borderTop:"none",borderRadius:"0 0 9px 9px"}}>
           <div style={{padding:"10px 14px",borderRadius:9,background:"#FCEBEB",border:"1px solid #F7C1C1",marginBottom:12}}>
             <p style={{margin:0,fontSize:11,fontWeight:700,color:"#A32D2D"}}>⚠ Bounced Cheque Workflow</p>
-            <p style={{margin:"4px 0 0",fontSize:10.5,color:"#A32D2D"}}>When a cheque bounces: (1) Reverse the receipt entry in books · (2) Charge bank bounce fee (₹350-500) · (3) Notify client · (4) Issue demand notice · (5) Re-present or collect NEFT</p>
+            <p style={{margin:"4px 0 0",fontSize:10.5,color:"#A32D2D"}}>When a cheque bounces: (1) Reverse the receipt entry in books · (2) Charge bank bounce fee · (3) Notify client · (4) Issue demand notice · (5) Re-present or collect NEFT</p>
           </div>
           {pdcs.filter(p=>p.status==="Bounced").map(p=>(
             <div key={p.id} style={{...card,marginBottom:8,borderLeft:"4px solid #A32D2D",padding:"12px 14px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                 <div>
                   <p style={{margin:0,fontSize:13,fontWeight:700,color:"#A32D2D"}}>{p.client} — Cheque #{p.chqNo}</p>
-                  <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{p.bank} · Date: {p.date} · ₹{p.amount.toLocaleString()}</p>
+                  <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{p.bank} · Date: {p.date} · {f(p.amount)}</p>
                 </div>
                 <span style={{fontSize:10.5,padding:"3px 10px",borderRadius:999,background:"#FCEBEB",color:"#A32D2D",fontWeight:700}}>BOUNCED</span>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:8,marginBottom:10}}>
-                <div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"6px 0",borderBottom:"1px solid #f3f4f8"}}><span style={{fontSize:14}}>✅</span><div><div style={{fontWeight:600,fontSize:11}}>Action</div><div style={{fontSize:10.5}}>Reverse Receipt Voucher</div></div></div><div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"6px 0",borderBottom:"1px solid #f3f4f8"}}><span style={{fontSize:14}}>⬜</span><div><div style={{fontWeight:600,fontSize:11}}>Bank Bounce Fee</div><div style={{fontSize:10.5}}>₹350 debit to customer</div></div></div><div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"6px 0"}}><span style={{fontSize:14}}>⬜</span><div><div style={{fontWeight:600,fontSize:11}}>Notify Customer</div><div style={{fontSize:10.5}}>Send bounce notice</div></div></div>
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button style={{...btnGh,fontSize:10.5,padding:"4px 12px"}}>💬 WhatsApp Client</button>
@@ -201,6 +451,76 @@ export function BankReco({branch}){
           {pdcs.filter(p=>p.status==="Bounced").length===0&&<p style={{fontSize:11,color:"#27500A"}}>✔ No bounced cheques</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+/* Statement import — paste or upload CSV, map columns, preview, import. */
+function ImportPanel({ledger,code,from,to,onClose,importMut,clearMut}){
+  const [raw,setRaw]=useState("");
+  const [fileName,setFileName]=useState("");
+  const {headers,rows}=useMemo(()=>parseDelimited(raw),[raw]);
+  const [mapping,setMapping]=useState({});
+  useEffect(()=>{ setMapping(guessMapping(headers)); },[raw]); // re-guess whenever a new file/paste lands
+  const built=useMemo(()=>buildImportRows(rows,mapping),[rows,mapping]);
+  const valid=built.filter(r=>r.date&&(r.debit||r.credit));
+  const onFile=e=>{ const file=e.target.files?.[0]; if(!file) return; setFileName(file.name); const rd=new FileReader(); rd.onload=()=>setRaw(String(rd.result||"")); rd.readAsText(file); };
+  const doImport=()=>importMut.mutate({ledger,branch:code,rows:built,fileName},{onSuccess:()=>{ setRaw(""); setFileName(""); }});
+
+  return (
+    <div style={{...card,padding:14,marginBottom:12,border:"1px solid #B5D4F4",background:"#fbfdff"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <p style={{margin:0,fontSize:12.5,fontWeight:700,color:"#185FA5"}}><FileText size={14} style={{verticalAlign:"-2px"}}/> Import Bank Statement — {ledger}</p>
+        <button onClick={onClose} style={{...btnGh,fontSize:10.5,padding:"3px 8px"}}><X size={12}/> Close</button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div>
+          <label style={{fontSize:10,fontWeight:700,color:"#5a6691",textTransform:"uppercase"}}>1 · Upload CSV or paste from Excel</label>
+          <input type="file" accept=".csv,.txt,.tsv" onChange={onFile} style={{display:"block",margin:"6px 0",fontSize:11}}/>
+          <textarea value={raw} onChange={e=>setRaw(e.target.value)} placeholder={"Paste rows here (Tab or comma separated). First row = headers, e.g.\nDate,Cheque No,Narration,Withdrawal,Deposit,Balance"} rows={6} style={{...inp,width:"100%",fontSize:10.5,fontFamily:"monospace",resize:"vertical"}}/>
+          {fileName&&<p style={{margin:"4px 0 0",fontSize:10,color:"#5a6691"}}>Loaded: {fileName}</p>}
+        </div>
+        <div>
+          <label style={{fontSize:10,fontWeight:700,color:"#5a6691",textTransform:"uppercase"}}>2 · Map columns</label>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:6}}>
+            {IMPORT_FIELDS.map(fl=>(
+              <div key={fl.k} style={{display:"flex",flexDirection:"column"}}>
+                <span style={{fontSize:9,color:"#5a6691"}}>{fl.label}</span>
+                <select value={mapping[fl.k]==null?"":mapping[fl.k]} onChange={e=>setMapping(m=>({...m,[fl.k]:e.target.value===""?null:Number(e.target.value)}))} style={{...inp,minHeight:28,fontSize:10,padding:"3px 6px"}} disabled={!headers.length}>
+                  <option value="">(none)</option>
+                  {headers.map((h,idx)=><option key={idx} value={idx}>{h||`Col ${idx+1}`}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Preview */}
+      {valid.length>0&&(
+        <div style={{marginTop:10}}>
+          <p style={{margin:"0 0 4px",fontSize:10,fontWeight:700,color:"#5a6691"}}>3 · Preview ({valid.length} valid of {rows.length} rows)</p>
+          <div style={{...card,padding:0,overflow:"auto",maxHeight:160}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
+              <thead><tr style={{background:"#0d1326"}}>{["Date","Ref","Cheque","UTR","Description","Debit","Credit","Balance"].map((h,i)=><th key={i} style={{padding:"5px 8px",textAlign:["Debit","Credit","Balance"].includes(h)?"right":"left",color:"#d4a437",fontSize:8.5}}>{h}</th>)}</tr></thead>
+              <tbody>{valid.slice(0,8).map((r,i)=>(
+                <tr key={i} style={{borderBottom:"1px solid #f3f4f8"}}>
+                  <td style={{padding:"4px 8px"}}>{r.date}</td><td style={{padding:"4px 8px"}}>{r.reference}</td><td style={{padding:"4px 8px"}}>{r.chequeNo}</td><td style={{padding:"4px 8px"}}>{r.utr}</td>
+                  <td style={{padding:"4px 8px",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.description}</td>
+                  <td style={{padding:"4px 8px",textAlign:"right"}}>{r.debit||""}</td><td style={{padding:"4px 8px",textAlign:"right"}}>{r.credit||""}</td><td style={{padding:"4px 8px",textAlign:"right"}}>{r.balance??""}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div style={{display:"flex",gap:8,marginTop:10,alignItems:"center"}}>
+        <button onClick={doImport} disabled={!valid.length||mapping.date==null||importMut.isPending} style={{...btnG,fontSize:11,opacity:(!valid.length||mapping.date==null||importMut.isPending)?0.5:1}}><Upload size={12}/> {importMut.isPending?"Importing…":`Import ${valid.length} lines`}</button>
+        <button onClick={()=>{ if(window.confirm(`Delete ALL statement lines for ${ledger} between ${from} and ${to}? This cannot be undone.`)) clearMut.mutate({ledger,from,to}); }} disabled={clearMut.isPending} style={{...btnGh,fontSize:11,color:"#A32D2D"}}><Trash2 size={12}/> Clear period</button>
+        {importMut.isSuccess&&importMut.data&&<span style={{fontSize:10.5,color:"#27500A"}}>✔ {importMut.data.inserted} imported{importMut.data.skipped?`, ${importMut.data.skipped} skipped (blank/duplicate)`:""}.</span>}
+        {(importMut.isError||clearMut.isError)&&<span style={{fontSize:10.5,color:"#A32D2D"}}>{String(importMut.error?.message||clearMut.error?.message||"Failed")}</span>}
+      </div>
     </div>
   );
 }

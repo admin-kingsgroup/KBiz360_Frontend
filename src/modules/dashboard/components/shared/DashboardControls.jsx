@@ -5,7 +5,8 @@ import { rangeToDates } from '../../api/get-live-finance';
 /**
  * Dashboard control bar — period mode + branch/group scope.
  *
- *   Period : This Month (default) · YTD (FY-to-date) · All (since inception)
+ *   Period : This Month · This Quarter (current FY quarter) · YTD (FY-to-date) ·
+ *            All (since inception)
  *   Scope  : Group Company (all branches) · any individual branch
  *
  * Both drive the LIVE double-entry queries (see dashboard.service). The little
@@ -13,6 +14,7 @@ import { rangeToDates } from '../../api/get-live-finance';
  */
 const RANGE_TABS = [
   { id: 'month', label: 'This Month' },
+  { id: 'quarter', label: 'This Quarter' },
   { id: 'ytd', label: 'YTD' },
   { id: 'all', label: 'All' },
 ];
