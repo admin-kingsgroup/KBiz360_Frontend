@@ -413,16 +413,7 @@ export function MastersSubAgents(){
 export function VendorTermsMaster({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
-  const [terms,setTerms]=useState([
-    {id:"VT001",supplier:"BSP India",type:"BSP",terms:"Weekly — every Monday",days:7,dueAmt:214000,dueDate:"2026-05-20",tds:"194H",tdsRate:5,status:"Due Soon"},
-    {id:"VT002",supplier:"Air India",type:"Airline",terms:"30 days from invoice",days:30,dueAmt:88000,dueDate:"2026-06-06",tds:"None",tdsRate:0,status:"Upcoming"},
-    {id:"VT003",supplier:"Emirates GSA",type:"Airline",terms:"30 days from invoice",days:30,dueAmt:155000,dueDate:"2026-06-07",tds:"None",tdsRate:0,status:"Upcoming"},
-    {id:"VT004",supplier:"Bali Tours DMC",type:"DMC",terms:"50% advance, balance 7d before departure",days:7,dueAmt:107000,dueDate:"2026-06-03",tds:"194C",tdsRate:2,status:"Upcoming"},
-    {id:"VT005",supplier:"Island Escapes",type:"DMC",terms:"Full payment on confirmation",days:0,dueAmt:96000,dueDate:"2026-05-21",tds:"194C",tdsRate:2,status:"Due Soon"},
-    {id:"VT006",supplier:"VFS Global",type:"Visa Agency",terms:"Immediate on application",days:0,dueAmt:16800,dueDate:"2026-05-19",tds:"194J",tdsRate:10,status:"Due Today"},
-    {id:"VT007",supplier:"TATA AIG",type:"Insurer",terms:"Immediate on policy issue",days:0,dueAmt:6900,dueDate:"2026-05-20",tds:"194D",tdsRate:5,status:"Due Soon"},
-    {id:"VT008",supplier:"KQ Direct",type:"Airline",terms:"Weekly BSP settlement",days:7,dueAmt:760000,dueDate:"2026-05-26",tds:"None",tdsRate:0,status:"Upcoming"},
-  ]);
+  const [terms,setTerms]=useState([]);   // demo data removed — populate from live vendor terms
   const TODAY="2026-05-19";
   const daysLeft=d=>Math.ceil((new Date(d)-new Date(TODAY))/(1000*60*60*24));
   const totDue=terms.filter(t=>daysLeft(t.dueDate)<=7).reduce((s,t)=>s+t.dueAmt,0);
