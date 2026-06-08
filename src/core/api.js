@@ -24,6 +24,22 @@ export function getAuthToken() {
   }
 }
 
+// A dead session (expired/invalid token) → clear it and tell the app to show the
+// login screen. A 403 "Insufficient permissions" (role denial) is NOT a dead
+// session, so we only bounce on 401, or a 403 whose message is about the token.
+function handleAuthFailure(status, message) {
+  const m = String(message || '');
+  const dead = status === 401 || (status === 403 && /token|expired|sign ?in|books access|access to kbiz/i.test(m));
+  if (!dead) return;
+  try { localStorage.removeItem('kb360-token'); localStorage.removeItem('kb360-user'); } catch { /* ignore */ }
+  try { window.dispatchEvent(new CustomEvent('kbiz:auth-expired', { detail: { status, message: m } })); } catch { /* ignore */ }
+}
+
+// Pull the human message out of a {success,message} error body (falls back to raw).
+function errMessage(text) {
+  try { return JSON.parse(text).message || text; } catch { return text; }
+}
+
 export async function apiGet(path, params = {}) {
   const url = new URL(BASE + path);
   Object.entries(params).forEach(([k, v]) => {
@@ -34,6 +50,7 @@ export async function apiGet(path, params = {}) {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
+    handleAuthFailure(res.status, errMessage(text));
     throw new Error(`API ${res.status}: ${text || res.statusText}`);
   }
   const json = await res.json();
@@ -54,8 +71,8 @@ async function apiWrite(method, path, body) {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    let msg = text;
-    try { msg = JSON.parse(text).message || text; } catch { /* keep raw text */ }
+    const msg = errMessage(text);
+    handleAuthFailure(res.status, msg);
     throw new Error(msg || `API ${res.status}: ${res.statusText}`);
   }
   if (res.status === 204) return null;

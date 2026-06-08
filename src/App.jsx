@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
+import { apiPost } from './core/api';
 import { ErrorBoundary } from './shell/ErrorBoundary';
 import { BRANCHES } from './core/data';
 import { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, GratuityRegister, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, TdsCertRegister, TrainingRecords, UxPreferences } from './core/helpers';
@@ -26,6 +27,9 @@ import { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport,
 import { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } from './modules/settings';
 import { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } from './modules/taxation';
 import { AdmRegister, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
+import { BookingOrderEntry, BookingOrdersList } from './modules/bookingOrder';
+import { PnLTallyLive } from './modules/pnlTally';
+import { BalanceSheetTallyLive } from './modules/balanceSheetTally';
 import { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, InvoiceGPLive } from './modules/accountingLive';
 import { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } from './modules/reportsFinancial';
 import { NotesToFinancials } from './modules/reportsNotes';
@@ -101,6 +105,29 @@ export default function KB360App(){
     if(!u){ try{ localStorage.removeItem("kb360-token"); localStorage.removeItem("kb360-user"); }catch{} }
     setCurrentUser(u);
   };
+
+  /* ── Auto-renew the JWT so an open session never reaches the token expiry.
+     Renew on load + every 10 min while signed in; the fresh token replaces the
+     stored one. A failed renew fires 'kbiz:auth-expired' (handled below). */
+  useEffect(()=>{
+    if(!currentUser) return;
+    let alive=true;
+    const renew=async()=>{
+      try{ const r=await apiPost("/api/auth/refresh"); if(alive && r && r.token){ try{ localStorage.setItem("kb360-token", r.token); }catch{ /* ignore */ } } }
+      catch{ /* a dead session is handled by the auth-expired listener */ }
+    };
+    renew();
+    const id=setInterval(renew, 10*60*1000);
+    return ()=>{ alive=false; clearInterval(id); };
+  },[currentUser]);
+
+  /* ── Any API call that 401s / 403s (expired or invalid token) signs the user
+     out and lands them on the login screen — instead of showing broken data. */
+  useEffect(()=>{
+    const onExpired=()=>{ setUser(null); setRoute("/dashboard"); };
+    window.addEventListener("kbiz:auth-expired", onExpired);
+    return ()=> window.removeEventListener("kbiz:auth-expired", onExpired);
+  },[]);
 
   function Page(){
     // Route → module mapping (URL prefix-based)
@@ -236,6 +263,8 @@ export default function KB360App(){
     if(route==="/masters/approval-limits")return <ApprovalLimitsMaster/>;
     if(route==="/masters/numbering")      return <NumberingSeriesMaster branch={branch}/>;
     if(route==="/dashboard")          return <DashboardRouter branch={branch} setRoute={navigate} currentUser={currentUser}/>;
+    if(route==="/bookings/new")       return <BookingOrderEntry branch={branch} setRoute={navigate}/>;
+    if(route==="/bookings/list")      return <BookingOrdersList branch={branch} setRoute={navigate}/>;
     if(route==="/sales/flight")       return <SalesFlight branch={branch} setRoute={navigate}/>;
     if(route==="/sales/holiday")      return <SalesHoliday branch={branch} setRoute={navigate}/>;
     if(route==="/sales/car")          return <SalesCar branch={branch} setRoute={navigate}/>;
@@ -272,8 +301,10 @@ export default function KB360App(){
     if(route==="/tax/vat")            return <TaxVat/>;
     if(route==="/tax/einvoice")       return <TaxEInvoice/>;
     if(route==="/reports/gp")        return <ReportGP branch={branch} setRoute={navigate}/>;
-    if(route==="/reports/pnl")        return <ReportPnLLive branch={branch}/>;
-    if(route==="/reports/bs")         return <ReportBSLive branch={branch}/>;
+    if(route==="/reports/pnl" || route==="/reports/pnl-tally") return <PnLTallyLive branch={branch}/>;
+    if(route==="/reports/pnl-modulewise") return <ReportPnLLive branch={branch}/>;
+    if(route==="/reports/bs" || route==="/reports/bs-tally") return <BalanceSheetTallyLive branch={branch}/>;
+    if(route==="/reports/bs-modulewise") return <ReportBSLive branch={branch}/>;
     if(route==="/reports/cf")         return <ReportCF/>;
     if(route==="/reports/rec")        return <ReceivablesLive branch={branch}/>;
     if(route==="/reports/pay")        return <PayablesLive branch={branch}/>;

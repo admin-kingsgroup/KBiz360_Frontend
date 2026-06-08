@@ -131,12 +131,14 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
 export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
   {label:"Financial", children:[
     {label:"Profit & Loss", href:"/reports/pnl"},
+    {label:"Profit & Loss — Module GP", href:"/reports/pnl-modulewise"},
     {label:"Report Viewer (9-Tab View)", href:"/reports/viewer"},
     {label:"Cash Position Summary", href:"/reports/cash-position"},
     {label:"Inter-branch Elimination", href:"/reports/interbranch"},
     {label:"Notes to Financial Statements", href:"/reports/fs-notes"},
     {label:"Audit Trail Report", href:"/reports/audit-trail"},
     {label:"Balance Sheet", href:"/reports/bs"},
+    {label:"Balance Sheet — Grouped", href:"/reports/bs-modulewise"},
     {label:"Cash Flow Statement", href:"/reports/cf"},
     {label:"Schedule III Balance Sheet", href:"/reports/schedule3-bs"},
     {label:"Consolidated BS", href:"/reports/consolidated-bs"},
@@ -271,6 +273,11 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
 /* ── FINAL MENU ASSEMBLY ─────────────────────────────────────── */
 
 export const MENU_TRANSACTIONS = {label:"Transactions", icon:ShoppingCart, children:[
+  /* SO / PO / GP — one booking spawns a linked Sales + Purchase voucher */
+  {label:"Booking (SO/PO/GP)", children:[
+    {label:"New Booking", href:"/bookings/new"},
+    {label:"Bookings List", href:"/bookings/list"},
+  ]},
   /* Standardized 8-tab Voucher Entry pattern */
   {label:"Standardized Patterns", children:[
     {label:"Voucher Entry (8-Tab View)", href:"/transactions/voucher-tabs"},

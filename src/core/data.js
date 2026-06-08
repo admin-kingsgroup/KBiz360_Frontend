@@ -262,6 +262,12 @@ export const LEDGER_REGISTRY=[]; /* moved to DB — fetch via API/hook */
 
 export const ROUTE_TITLES={
   "/dashboard":            "Dashboard",
+  "/reports/pnl-tally":    "Profit & Loss — Tally View",
+  "/reports/pnl-modulewise": "Profit & Loss — Module GP",
+  "/reports/bs-tally":       "Balance Sheet — Tally View",
+  "/reports/bs-modulewise":  "Balance Sheet — Grouped",
+  "/bookings/new":         "New Booking — SO / PO / GP",
+  "/bookings/list":        "Bookings — SO / PO / GP",
   "/sales/flight":         "Sales — Flight Tickets",
   "/sales/holiday":        "Sales — Holiday Packages",
   "/sales/hotel":          "Sales — Hotels",

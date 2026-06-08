@@ -148,8 +148,14 @@ function VoucherLines({ voucher: v, cur }) {
       <div style={{ fontSize: 12, color: DARK, fontWeight: 600 }}>{val || '—'}</div>
     </div>
   );
+  const lockedByBooking = v.locked && v.source === 'booking';
   return (
     <>
+      {lockedByBooking && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: '#FAEEDA', border: '1px solid #FAC775', color: '#854F0B', fontSize: 11.5, fontWeight: 600 }}>
+          🔒 Locked — driven by booking <b>{v.bookingId}</b>. Edit it on the SO / PO / GP booking (this Sales/Purchase voucher is read-only).
+        </div>
+      )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 12 }}>
         <F label="Voucher" val={v.vno} /><F label="Date" val={v.date} /><F label="Branch" val={v.branch} />
         <F label={v.category === 'purchase' ? 'Supplier' : 'Customer'} val={v.party} />
@@ -1134,7 +1140,10 @@ export function RegisterLive({ branch, initial = 'sales' }) {
                   onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
                   <td style={{ padding: '8px 12px', color: DIM, whiteSpace: 'nowrap' }}>{v.date}</td>
-                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{v.vno}</td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE, whiteSpace: 'nowrap' }}>
+                    {v.locked && v.source === 'booking' && <span title={`Locked — driven by booking ${v.bookingId}`} style={{ marginRight: 4 }}>🔒</span>}
+                    {v.vno}
+                  </td>
                   <td style={{ padding: '8px 12px', color: '#384677' }}>{v.type}</td>
                   <td style={{ padding: '8px 12px', fontWeight: 600, color: DARK }}>{v.party || '—'}</td>
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, color: '#6b21a8' }}>{v.linkNo || '—'}</td>
