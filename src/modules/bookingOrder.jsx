@@ -1,334 +1,644 @@
-// ─── SO / PO / GP Booking ─────────────────────────────────────────────────────
-// One combined screen (mirrors the CRM Confirm-Booking modal): fill the Purchase
-// (cost) grid + a markup %, the Sales side auto-derives, Gross Profit shows live.
-// On Save the backend mints a Link No and spawns a LOCKED Sales voucher + Purchase
-// voucher joined by that Link No — both non-editable except through this booking.
+// ─── SO / PO / GP Voucher (approval-gated) ────────────────────────────────────
+// Travkings-style combined voucher across all 7 modules. The user fills the
+// Purchase grid (cost) + per-line markup & service charge; the Sales side derives,
+// Gross Profit shows live. Saving creates a PENDING voucher — NO books impact.
+// It then appears under Pending; an approver reviews the full JV (which ledger,
+// which group, Dr/Cr) and Approves & Posts → that spawns the linked LOCKED Sales
+// + Purchase vouchers (and their double-entry), and it moves to Approved. One
+// Link No ties SO/PO/GP so profit is tracked invoice-wise.
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, Save, ArrowRight, Check, Lock, RefreshCw } from 'lucide-react';
+import {
+  Plus, Trash2, Save, ArrowRight, Check, Lock, RefreshCw, Clock, CheckCircle2,
+  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil,
+} from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../core/styles.jsx';
-import { apiGet, apiPost, apiDelete } from '../core/api';
+import { apiGet, apiPost, apiPut, apiDelete } from '../core/api';
 import {
-  BOOKING_SPECS, BOOKING_MODULE_LIST, seedRows, blankRow,
-  computeTotals, deriveSales, grossProfit,
-} from '../core/bookingSpecs.js';
+  VSPECS, VMODULE_LIST, seedLines, blankLine, bookingTotals, lineCalc,
+} from '../core/voucherSpecs.js';
 
+const GOLD = '#A07828', DARK = '#0d1326', DR = '#1B6B4C', CR = '#9B2C2C', BLUE = '#185FA5';
 const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || 'BOM'));
 const today = () => new Date().toISOString().slice(0, 10);
 const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 
-/* ── Editable grid driven by a module's column spec ─────────────────────────── */
-function Grid({ spec, rows, onChange, readOnly = false }) {
-  const moneyKeys = spec.columns.filter((c) => c.money).map((c) => c.key);
-  const upd = (i, k, v) => onChange(rows.map((r, idx) => (idx === i ? { ...r, [k]: v } : r)));
-  const add = () => onChange([...rows, blankRow(spec.columns)]);
-  const rm = (i) => onChange(rows.filter((_, idx) => idx !== i));
-  const lineTotalOf = (r) => moneyKeys.reduce((a, k) => a + (Number(r[k]) || 0), 0);
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
-        <thead><tr style={{ background: '#f3f4f8' }}>
-          <th style={th}>#</th>
-          {spec.columns.map((c) => <th key={c.key} style={{ ...th, textAlign: c.money || c.type === 'number' ? 'right' : 'left' }}>{c.label}</th>)}
-          <th style={{ ...th, textAlign: 'right' }}>Line ₹</th>
-          {!readOnly && <th style={th}></th>}
-        </tr></thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #e1e3ec' }}>
-              <td style={{ ...td, color: '#5a6691' }}>{i + 1}</td>
-              {spec.columns.map((c) => (
-                <td key={c.key} style={{ padding: 3 }}>
-                  {readOnly
-                    ? <div style={{ ...inp, background: '#f7f8fb', textAlign: c.money || c.type === 'number' ? 'right' : 'left', minHeight: 28 }}>{String(r[c.key] ?? '') || '—'}</div>
-                    : c.type === 'select'
-                      ? <select value={r[c.key]} onChange={(e) => upd(i, c.key, e.target.value)} style={{ ...inp, minHeight: 28 }}>{c.options.map((o) => <option key={o}>{o}</option>)}</select>
-                      : <input type={c.type === 'number' ? 'number' : c.type === 'date' ? 'date' : 'text'} value={r[c.key]}
-                          onChange={(e) => upd(i, c.key, c.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value)}
-                          style={{ ...inp, minHeight: 28, textAlign: c.money || c.type === 'number' ? 'right' : 'left' }} />}
-                </td>
-              ))}
-              <td style={{ ...td, textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(lineTotalOf(r))}</td>
-              {!readOnly && (
-                <td style={{ ...td, textAlign: 'center' }}>
-                  <button onClick={() => rm(i)} disabled={rows.length <= 1} title="Remove row"
-                    style={{ background: 'transparent', border: 'none', cursor: rows.length <= 1 ? 'not-allowed' : 'pointer', color: '#8b94b3', opacity: rows.length <= 1 ? 0.4 : 1 }}>
-                    <Trash2 size={13} />
-                  </button>
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {!readOnly && (
-        <button onClick={add} style={{ ...btnGh, marginTop: 8, padding: '5px 11px', fontSize: 11 }}><Plus size={12} /> Add row</button>
-      )}
-    </div>
-  );
-}
-const th = { padding: '7px 8px', textAlign: 'left', fontSize: 10, color: '#5a6691', fontWeight: 600, whiteSpace: 'nowrap' };
-const td = { padding: '4px 8px', fontSize: 11.5 };
+/* shared cell styles */
+const thM = { padding: '7px 6px', fontSize: 9, fontWeight: 700, letterSpacing: '.3px', color: '#27500A', textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #cfe6d8', background: '#f4faf6' };
+const thA = { padding: '7px 6px', fontSize: 9, fontWeight: 700, letterSpacing: '.3px', color: GOLD, textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #d9c79a', background: '#f7f2e6' };
+const thL = { textAlign: 'left' };
+const tdC = { padding: '3px 6px', fontSize: 11.5, textAlign: 'right', borderBottom: '1px solid #eef0f5', fontVariantNumeric: 'tabular-nums' };
+const tdAuto = { ...tdC, background: '#faf7ef', color: '#5a6691', fontWeight: 600 };
+const tdTot = { ...tdC, fontWeight: 800, color: DARK };
+const cellInp = { width: 78, padding: '5px 6px', fontSize: 11.5, textAlign: 'right', border: '1px solid #e1e3ec', borderRadius: 3, background: '#fff', fontFamily: 'inherit' };
+const cellTxt = { width: 90, padding: '5px 6px', fontSize: 11.5, textAlign: 'left', border: '1px solid #e1e3ec', borderRadius: 3, background: '#fff', fontFamily: 'inherit', fontWeight: 600 };
+const tfTd = { borderTop: '1.5px solid ' + DARK, padding: '8px 6px', fontWeight: 800, fontSize: 11.5, background: '#f7f8fb', textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
 
-/* ── Totals strip ───────────────────────────────────────────────────────────── */
-function Totals({ t, cur, label, accent }) {
-  const row = (l, v, strong) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, padding: '2px 0', fontWeight: strong ? 700 : 400, color: strong ? '#0d1326' : '#5a6691' }}>
-      <span>{l}</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{cur + ' ' + fmt(v)}</span>
-    </div>
-  );
-  return (
-    <div style={{ ...card, padding: '10px 13px', background: '#fff' }}>
-      <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</p>
-      {row('Line total', t.lineTotal)}
-      {t.serviceCharge > 0 && row('Service charge / margin', t.serviceCharge)}
-      {t.gst > 0 && row('GST', t.gst)}
-      {t.tcs > 0 && row('TCS', t.tcs)}
-      <div style={{ borderTop: '1px solid #e1e3ec', marginTop: 4, paddingTop: 4 }}>{row('Total', t.total, true)}</div>
-    </div>
-  );
-}
-
-/* ── SO / PO / GP entry screen ──────────────────────────────────────────────── */
-export function BookingOrderEntry({ branch, setRoute }) {
+/* ════════════════════════════════════════════════════════════════════════════
+   SO / PO / GP Voucher entry
+   ════════════════════════════════════════════════════════════════════════════ */
+export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null }) {
   const qc = useQueryClient();
-  const brCode = brCodeOf(branch);
-  const cur = bc(branch).cur;
+  const editing = !!editBooking;
+  // Editing keeps the booking's own branch; a fresh voucher uses the top-bar branch.
+  const brCode = editing ? (editBooking.branch || brCodeOf(branch)) : brCodeOf(branch);
+  const cur = bc(editing ? { code: editBooking.branch } : branch).cur;
 
-  const [moduleCode, setModuleCode] = useState('SHT');
-  const spec = BOOKING_SPECS[moduleCode];
+  const initModule = (editing && VSPECS[editBooking.module]) ? editBooking.module : 'SF';
+  const [moduleCode, setModuleCode] = useState(initModule);
+  const spec = VSPECS[moduleCode];
 
-  const [customer, setCustomer] = useState({ name: '', gstin: '', group: '' });
-  const [supplier, setSupplier] = useState({ name: '', gstin: '', ledgerName: '', ledgerGroup: '' });
-  const [poLines, setPoLines] = useState(() => seedRows(BOOKING_SPECS.SHT));
-  const [markupPct, setMarkupPct] = useState(15);
-  const [packageType, setPackageType] = useState('International');
-  const [gstMode, setGstMode] = useState('intra');
-  const [date, setDate] = useState(today());
-  const [remarks, setRemarks] = useState('');
+  const [lines, setLines] = useState(() => {
+    if (editing) {
+      const rows = Array.isArray(editBooking.rows) ? editBooking.rows : [];
+      return rows.length ? rows.map((r) => ({ ...r })) : [blankLine(VSPECS[initModule])];
+    }
+    return seedLines(VSPECS.SF);
+  });
+  const [date, setDate] = useState(editing ? (editBooking.date || today()) : today());
+  const [headerRef, setHeaderRef] = useState(editing ? (editBooking.headerRef || '') : '');
+  const [customer, setCustomer] = useState(editing
+    ? { name: editBooking.customer?.name || '', gstin: editBooking.customer?.gstin || '', group: editBooking.customer?.group || '' }
+    : { name: '', gstin: '', group: '' });
+  const [supplier, setSupplier] = useState(editing
+    ? { name: editBooking.supplier?.name || '', gstin: editBooking.supplier?.gstin || '', ledgerGroup: editBooking.supplier?.ledgerGroup || '' }
+    : { name: '', gstin: '', ledgerGroup: '' });
+  const [gstMode, setGstMode] = useState(editing ? (editBooking.gstMode || 'intra') : 'intra');
+  const [packageType, setPackageType] = useState(editing ? (editBooking.packageType || 'Domestic') : 'Domestic');
+  const [remarks, setRemarks] = useState(editing ? (editBooking.remarks || '') : '');
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
 
-  // Reset the purchase grid whenever the module changes.
-  useEffect(() => { setPoLines(seedRows(BOOKING_SPECS[moduleCode])); setResult(null); setError(''); }, [moduleCode]);
+  // Switching module reloads the seed grid for that module — never while editing
+  // (the module is locked to the existing voucher so its lines aren't wiped).
+  useEffect(() => { if (editing) return; setLines(seedLines(VSPECS[moduleCode])); setResult(null); setError(''); }, [moduleCode]);
 
-  const poTotals = useMemo(() => computeTotals(spec, poLines, { serviceCharge: 0, packageType }), [spec, poLines, packageType]);
-  const sales = useMemo(() => deriveSales(spec, poLines, markupPct, { packageType }), [spec, poLines, markupPct, packageType]);
-  const gp = useMemo(() => grossProfit(poTotals, sales.totals), [poTotals, sales]);
+  const totals = useMemo(() => bookingTotals(spec, lines, { packageType }), [spec, lines, packageType]);
+  const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
 
-  const canSave = !!brCode && !saving && poTotals.total > 0 && sales.totals.total > 0 && supplier.name.trim() && customer.name.trim();
+  const setLine = (i, key, val, numeric) =>
+    setLines(lines.map((l, idx) => (idx === i ? { ...l, [key]: numeric ? (val === '' ? '' : Number(val)) : val } : l)));
+  const addLine = () => setLines([...lines, blankLine(spec)]);
+  const delLine = (i) => setLines(lines.length > 1 ? lines.filter((_, idx) => idx !== i) : [blankLine(spec)]);
 
-  const save = async () => {
+  const canSave = !!brCode && !saving && totals.po.total > 0 && totals.so.total > 0 && supplier.name.trim() && customer.name.trim();
+
+  const save = async (thenApprove = false) => {
     setError(''); setSaving(true);
     try {
+      const gpLines = lines.map((l) => {
+        const c = lineCalc(spec, l);
+        return { fn: l.fn, sn: l.sn, finalSales: c.finalSales, salesGST: c.salesGST, finalPurchase: c.finalPurchase, gstPur: c.gstPur, gp: c.gp, gpPct: c.gpPct };
+      });
       const payload = {
         module: moduleCode, branch: brCode, date,
-        customer, supplier,
-        markupPct: Number(markupPct) || 0,
-        packageType: spec.packageTypeField ? packageType : '',
-        gstMode,
-        po: { lines: poLines, serviceCharge: 0, lineTotal: poTotals.lineTotal, gst: poTotals.gst, tcs: poTotals.tcs, total: poTotals.total },
-        so: { lines: sales.lines, serviceCharge: sales.serviceCharge, lineTotal: sales.totals.lineTotal, gst: sales.totals.gst, tcs: sales.totals.tcs, total: sales.totals.total },
-        gp: { total: gp.total, pct: gp.pct },
+        customer: { name: customer.name, gstin: customer.gstin, group: customer.group },
+        supplier: { name: supplier.name, gstin: supplier.gstin, ledgerGroup: supplier.ledgerGroup },
+        gstMode, packageType: hasPackage ? packageType : '',
+        headerRef, rows: lines,
+        po: totals.po, so: totals.so,
+        gp: { lines: gpLines, total: totals.gp.total, pct: totals.gp.pct },
         remarks,
       };
-      const booking = await apiPost('/api/booking-orders', payload);
-      setResult(booking);
+      let booking = editing
+        ? await apiPut('/api/booking-orders/' + editBooking.id, payload)
+        : await apiPost('/api/booking-orders', payload);
+      if (thenApprove) booking = await apiPost('/api/booking-orders/' + booking.id + '/approve');
+      setResult({ ...booking, _approved: thenApprove, _edited: editing });
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
-    } catch (e) { setError(e.message || 'Failed to save booking'); }
+    } catch (e) { setError(e.message || 'Failed to save voucher'); }
     finally { setSaving(false); }
   };
 
+  const reset = () => { setLines(seedLines(spec)); setCustomer({ name: '', gstin: '', group: '' }); setSupplier({ name: '', gstin: '', ledgerGroup: '' }); setResult(null); setError(''); };
+
   if (result) {
+    const approved = result._approved;
+    const fields = [['Booking No', result.bookingNo], ['Link No', result.linkNo], ['Module', VSPECS[result.module]?.name || result.module], ['Status', (result.status || 'pending').toUpperCase()]];
+    if (approved) { fields.push(['Sales invoice', result.saleVno || '—'], ['Purchase invoice', result.purchaseVno || '—']); }
+    else { fields.push(['Sales (incl GST)', cur + ' ' + fmt(result.so?.total)], ['Gross Profit', cur + ' ' + fmt(result.gp?.total) + ` (${result.gp?.pct ?? 0}%)`]); }
     return (
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: '24px 12px' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
         <div style={{ ...card, textAlign: 'center', padding: 28 }}>
-          <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#EAF3DE', color: '#27500A', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}><Check size={28} /></div>
-          <h2 style={{ margin: '0 0 4px', fontSize: 18, color: '#0d1326' }}>Booking posted</h2>
-          <p style={{ margin: '0 0 18px', fontSize: 12.5, color: '#5a6691' }}>The Sales &amp; Purchase vouchers were created and linked. Both are locked to this booking.</p>
+          <div style={{ width: 54, height: 54, borderRadius: '50%', background: approved ? '#EAF3DE' : '#FEF6E6', color: approved ? '#27500A' : GOLD, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>{approved ? <Check size={28} /> : <Clock size={28} />}</div>
+          <h2 style={{ margin: '0 0 4px', fontSize: 18, color: DARK }}>
+            {approved ? 'Voucher approved & posted' : result._edited ? 'Voucher updated — still Pending' : 'Voucher saved — Pending approval'}
+          </h2>
+          <p style={{ margin: '0 0 18px', fontSize: 12.5, color: '#5a6691' }}>
+            {approved
+              ? <>The linked <b>Sales &amp; Purchase invoices</b> were generated and posted to the books, tied by the Link No.</>
+              : <>It has <b>no effect on the books yet</b>. Approve it under <b>Pending</b> to post the linked Sales &amp; Purchase invoices.</>}
+          </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, textAlign: 'left' }}>
-            {[['Booking No', result.bookingNo], ['Link No', result.linkNo], ['Sales voucher', result.saleVno], ['Purchase voucher', result.purchaseVno], ['Gross Profit', cur + ' ' + fmt(result.gp?.total) + ` (${result.gp?.pct ?? 0}%)`], ['Cost centre', result.costCenter || '—']].map(([k, v]) => (
+            {fields.map(([k, v]) => (
               <div key={k} style={{ background: '#f7f8fb', borderRadius: 8, padding: '8px 12px' }}>
                 <p style={{ margin: 0, fontSize: 9.5, color: '#8b94b3', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{k}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 700, color: '#0d1326', fontFamily: 'monospace' }}>{v}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 700, color: DARK, fontFamily: 'monospace' }}>{v}</p>
               </div>
             ))}
           </div>
           <div style={{ display: 'flex', gap: 9, justifyContent: 'center', marginTop: 20 }}>
-            <button onClick={() => { setResult(null); setPoLines(seedRows(spec)); setCustomer({ name: '', gstin: '', group: '' }); setSupplier({ name: '', gstin: '', ledgerName: '', ledgerGroup: '' }); }} style={btnG}><Plus size={14} /> New booking</button>
-            <button onClick={() => setRoute && setRoute('/bookings/list')} style={btnGh}>View all bookings <ArrowRight size={14} /></button>
+            {editing
+              ? <button onClick={() => (onDone ? onDone() : setRoute && setRoute(approved ? '/bookings/approved' : '/bookings/pending'))} style={btnG}><ArrowRight size={14} /> Back to list</button>
+              : <>
+                  <button onClick={reset} style={btnG}><Plus size={14} /> New voucher</button>
+                  <button onClick={() => setRoute && setRoute(approved ? '/bookings/approved' : '/bookings/pending')} style={btnGh}>Go to {approved ? 'Approved' : 'Pending'} <ArrowRight size={14} /></button>
+                </>}
           </div>
         </div>
       </div>
     );
   }
 
+  const refKeys = spec.idCols.slice(2); // module reference fields (Ticket/PNR/etc.)
+
   return (
-    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px 80px' }}>
+    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px 90px' }}>
       {/* Header */}
-      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
-        <div style={{ padding: '12px 16px', background: '#0d1326', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
+        <div style={{ padding: '14px 18px', background: DARK, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#fff' }}>SO / PO / GP Booking</p>
-            <p style={{ margin: 0, fontSize: 10.5, color: '#8b94b3' }}>Enter cost + markup → auto-spawns linked Sales &amp; Purchase · {brCode || 'select a branch'}</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : 'SO / PO / GP VOUCHER'}</p>
+            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#8b94b3' }}>
+              {editing
+                ? <>Fix any data-entry mistake, then <b style={{ color: GOLD }}>Save</b> or <b style={{ color: GOLD }}>Save &amp; Approve</b> · {brCode} · still Pending until approved</>
+                : <>Enter cost + markup → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
+            </p>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {BOOKING_MODULE_LIST.map((m) => (
-              <button key={m.code} onClick={() => setModuleCode(m.code)}
-                style={{ padding: '5px 11px', borderRadius: 999, border: '1px solid ' + (moduleCode === m.code ? '#d4a437' : '#2a3450'), background: moduleCode === m.code ? '#d4a437' : 'transparent', color: moduleCode === m.code ? '#0d1326' : '#8b94b3', fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}>
+            {VMODULE_LIST.map((m) => (
+              <button key={m.code} disabled={editing && m.code !== moduleCode} onClick={() => { if (!editing) setModuleCode(m.code); }}
+                title={editing ? 'Module is locked while editing' : ''}
+                style={{ padding: '5px 11px', borderRadius: 999, border: '1px solid ' + (moduleCode === m.code ? GOLD : '#2a3450'), background: moduleCode === m.code ? GOLD : 'transparent', color: moduleCode === m.code ? '#fff' : '#8b94b3', fontSize: 10.5, fontWeight: 700, cursor: editing ? (m.code === moduleCode ? 'default' : 'not-allowed') : 'pointer', opacity: editing && m.code !== moduleCode ? 0.35 : 1 }}>
                 {m.icon} {m.name}
               </button>
             ))}
           </div>
         </div>
+        {/* Link band */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: '#1b2138' }}>
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#C49A3C', textTransform: 'uppercase' }}>Link No</span>
+          <span style={{ padding: '5px 12px', borderRadius: 4, background: '#11162a', color: '#fff', fontWeight: 800, letterSpacing: '.5px', fontFamily: 'monospace', fontSize: 13 }}>Auto · assigned on save</span>
+          <span style={{ fontSize: 10.5, color: '#9aa2c0', fontStyle: 'italic' }}>links the Sales Order, Purchase Order &amp; Gross Profit of this invoice</span>
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            {['SO', 'PO', 'GP'].map((c) => <span key={c} style={{ fontSize: 9, fontWeight: 800, padding: '3px 9px', borderRadius: 20, background: '#262c47', color: '#C49A3C' }}>{c}</span>)}
+          </span>
+        </div>
       </div>
 
       {!brCode && (
         <div style={{ ...card, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#A32D2D', fontSize: 12, marginBottom: 14 }}>
-          Select a specific branch (not “All branches”) from the top bar to create a booking.
+          Select a specific branch (not “All branches”) from the top bar to create a voucher.
         </div>
       )}
 
-      {/* Booking header fields */}
+      {editing && !(Array.isArray(editBooking.rows) && editBooking.rows.length) && (
+        <div style={{ ...card, background: '#FFF7E6', border: '1px solid #F0C36D', color: '#7a5b12', fontSize: 12, marginBottom: 14 }}>
+          ⓘ This voucher was bulk-imported without per-line detail. Re-enter the line(s) below — <b>saving recomputes the totals</b> from what you enter here.
+        </div>
+      )}
+
+      {/* Header fields */}
       <div style={{ ...card, marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
-          <FL label="Date"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></FL>
-          <FL label="Customer name"><input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} placeholder="Bill to…" style={inp} /></FL>
-          <FL label="Customer GSTIN"><input value={customer.gstin} onChange={(e) => setCustomer({ ...customer, gstin: e.target.value.toUpperCase() })} style={{ ...inp, fontFamily: 'monospace' }} /></FL>
-          <FL label="Supplier name"><input value={supplier.name} onChange={(e) => setSupplier({ ...supplier, name: e.target.value })} placeholder="Pay to…" style={inp} /></FL>
+          <FL label="Booking date"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></FL>
+          <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
+          <FL label="Customer"><input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} placeholder="Bill to…" style={inp} /></FL>
+          <FL label="Customer group"><input value={customer.group} onChange={(e) => setCustomer({ ...customer, group: e.target.value })} placeholder="e.g. Sundry Debtors" style={inp} /></FL>
+          <FL label="Supplier"><input value={supplier.name} onChange={(e) => setSupplier({ ...supplier, name: e.target.value })} placeholder="Pay to…" style={inp} /></FL>
           <FL label="Supplier ledger group"><input value={supplier.ledgerGroup} onChange={(e) => setSupplier({ ...supplier, ledgerGroup: e.target.value })} placeholder="e.g. Supplier Air Lines" style={inp} /></FL>
           <FL label="GST mode"><select value={gstMode} onChange={(e) => setGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
-          {spec.packageTypeField && (
-            <FL label="Package type"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={inp}><option>Domestic</option><option>International</option></select></FL>
-          )}
+          {hasPackage && <FL label="Package type"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={inp}><option>Domestic</option><option>International</option></select></FL>}
         </div>
       </div>
 
-      {/* Purchase (cost) grid */}
-      <div style={{ ...card, marginBottom: 14 }}>
-        <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 700, color: '#9B2C2C' }}>① Purchase Order — supplier cost ({spec.icon} {spec.name})</p>
-        <Grid spec={spec} rows={poLines} onChange={setPoLines} />
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 18, alignItems: 'center', padding: '8px 14px', marginBottom: 12, background: '#FDFAF4', border: '1px solid #eee3cf', borderRadius: 8, flexWrap: 'wrap' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#fff', border: '1px solid #C49A3C' }} /> Manual — you enter</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#faf7ef', border: '1px dashed #9A9A9A' }} /> Auto — calculated</span>
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · markup is GST-inclusive (GST = markup × 18 ÷ 118)</span>
       </div>
 
-      {/* Markup */}
-      <div style={{ ...card, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0d1326' }}>② Markup</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input type="number" value={markupPct} onChange={(e) => setMarkupPct(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inp, width: 90, textAlign: 'right' }} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#5a6691' }}>% on cost</span>
+      {/* ① Sales Order */}
+      <Section n="1" name="Sales Order" sub="what the customer pays · markup is GST-inclusive" accent={BLUE}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
+            <thead><tr>
+              {spec.idCols.map((c) => <th key={c.key} style={{ ...thM, ...thL }}>{c.label}</th>)}
+              {spec.fareCols.map((c) => <th key={c.key} style={thA}>{c.label}</th>)}
+              <th style={thM}>Markup</th><th style={thM}>Service Chg</th>
+              <th style={thA}>GST/Service</th><th style={thA}>GST/Markup</th><th style={thA}>Total</th><th style={thA}></th>
+            </tr></thead>
+            <tbody>
+              {lines.map((l, i) => {
+                const c = lineCalc(spec, l);
+                return (
+                  <tr key={i}>
+                    {spec.idCols.map((col) => (
+                      <td key={col.key} style={{ ...tdC, textAlign: 'left', padding: 3 }}>
+                        <input value={l[col.key] ?? ''} onChange={(e) => setLine(i, col.key, e.target.value)} style={{ ...cellTxt, color: col.kind === 'pnr' ? GOLD : DARK }} />
+                      </td>
+                    ))}
+                    {spec.fareCols.map((col) => <td key={col.key} style={tdAuto}>{fmt(l[col.key])}</td>)}
+                    <td style={{ padding: 3 }}><input type="number" min="0" value={l.markup} onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>
+                    <td style={{ padding: 3 }}><input type="number" min="0" value={l.ssvc} onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>
+                    <td style={tdAuto}>{fmt(c.gstSvc)}</td>
+                    <td style={tdAuto}>{fmt(c.gstMk)}</td>
+                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef' }}>{fmt(c.finalSales)}</td>
+                    <td style={{ ...tdC, textAlign: 'center', background: '#faf7ef' }}><button onClick={() => delLine(i)} title="Remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={13} /></button></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot><tr>
+              <td style={{ ...tfTd, textAlign: 'left' }}>TOTAL</td>
+              {spec.idCols.slice(1).map((c) => <td key={c.key} style={tfTd} />)}
+              {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
+              <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>
+              <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>
+              <td style={tfTd} colSpan={2}>{fmt(totals.so.gst)} GST</td>
+              <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd} />
+            </tr></tfoot>
+          </table>
         </div>
-        <span style={{ fontSize: 11.5, color: '#5a6691' }}>Margin = {cur} {fmt(sales.margin)} → the Sales side below is derived automatically.</span>
-      </div>
+        <button onClick={addLine} style={{ ...btnGh, marginTop: 8, padding: '6px 12px', fontSize: 11 }}><Plus size={12} /> Add line</button>
+      </Section>
 
-      {/* Derived Sales (read-only) */}
-      <div style={{ ...card, marginBottom: 14 }}>
-        <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 700, color: '#185FA5' }}>③ Sales Order — auto-derived (cost + markup)</p>
-        <Grid spec={spec} rows={sales.lines} onChange={() => {}} readOnly />
-      </div>
-
-      {/* Totals + GP */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12, marginBottom: 14 }}>
-        <Totals t={poTotals} cur={cur} label="Purchase (cost)" accent="#9B2C2C" />
-        <Totals t={sales.totals} cur={cur} label="Sales" accent="#185FA5" />
-        <div style={{ ...card, padding: '12px 14px', background: '#0d1326' }}>
-          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, color: '#d4a437', textTransform: 'uppercase', letterSpacing: '0.5px' }}>④ Gross Profit</p>
-          <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{cur} {fmt(gp.total)}</p>
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: '#8b94b3' }}>Margin {gp.pct}% · sale {cur} {fmt(gp.saleNet)} − cost {cur} {fmt(gp.costNet)} (ex-tax)</p>
+      {/* ② Purchase Order */}
+      <Section n="2" name="Purchase Order" sub="what you pay the airline / supplier" accent={CR}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
+            <thead><tr>
+              <th style={{ ...thM, ...thL }}>{spec.idCols[0].label}</th>
+              <th style={{ ...thM, ...thL }}>{spec.idCols[1].label}</th>
+              {refKeys.map((c) => <th key={c.key} style={{ ...thA, ...thL }}>{c.label}</th>)}
+              {spec.fareCols.map((c) => <th key={c.key} style={thM}>{c.label}</th>)}
+              <th style={thM}>Supplier Service</th><th style={thA}>GST</th><th style={thA}>Total</th>
+            </tr></thead>
+            <tbody>
+              {lines.map((l, i) => {
+                const c = lineCalc(spec, l);
+                return (
+                  <tr key={i}>
+                    <td style={{ ...tdC, textAlign: 'left', padding: 3 }}><input value={l.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} style={cellTxt} /></td>
+                    <td style={{ ...tdC, textAlign: 'left', padding: 3 }}><input value={l.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} style={cellTxt} /></td>
+                    {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A' }}>{l[col.key] || '—'}</td>)}
+                    {spec.fareCols.map((col) => <td key={col.key} style={{ padding: 3 }}><input type="number" min="0" value={l[col.key]} onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
+                    <td style={{ padding: 3 }}><input type="number" min="0" value={l.psvc} onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} /></td>
+                    <td style={tdAuto}>{fmt(c.gstPur)}</td>
+                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef' }}>{fmt(c.finalPurchase)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot><tr>
+              <td style={{ ...tfTd, textAlign: 'left' }}>TOTAL</td>
+              <td style={tfTd} />
+              {refKeys.map((c) => <td key={c.key} style={tfTd} />)}
+              {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
+              <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
+              <td style={tfTd}>{fmt(totals.po.gst)}</td>
+              <td style={tfTd}>{fmt(totals.po.total)}</td>
+            </tr></tfoot>
+          </table>
         </div>
-      </div>
+      </Section>
+
+      {/* ③ Gross Profit */}
+      <Section n="3" name="Gross Profit" sub="GP = net sales − net purchase · % on final sales value" accent={DR}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 12 }}>
+          <GpCard k={'Total Sales (incl GST' + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(totals.so.total)} color={DARK} />
+          <GpCard k="Total Purchase (incl GST)" v={cur + ' ' + fmt(totals.po.total)} color={CR} />
+          <GpCard k="Gross Profit" v={cur + ' ' + fmt(totals.gp.total)} color={DR} pct={totals.gp.pct + '% margin'} />
+        </div>
+        {totals.so.tcs > 0 && (
+          <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 7, background: '#FFF7E6', border: '1px solid #F0C36D', color: '#7a5b12', fontSize: 11.5 }}>
+            Incl. <b>TCS @ {spec.tcs.rate}% = {cur} {fmt(totals.so.tcs)}</b> collected from the customer on this International package (u/s 206C(1G)) — posts to <b>TCS Payable</b> (Balance Sheet), not income, so GP is unaffected.
+          </div>
+        )}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
+            <thead><tr>
+              <th style={{ ...thA, ...thL }}>First Name</th><th style={{ ...thA, ...thL }}>Surname</th>
+              <th style={thA}>Final Sales</th><th style={thA}>Sales GST</th><th style={thA}>Final Purchase</th><th style={thA}>Purchase GST</th>
+              <th style={thA}>Gross Profit</th><th style={thA}>GP %</th>
+            </tr></thead>
+            <tbody>
+              {lines.map((l, i) => {
+                const c = lineCalc(spec, l);
+                return (
+                  <tr key={i}>
+                    <td style={{ ...tdAuto, textAlign: 'left' }}>{l.fn || '—'}</td><td style={{ ...tdAuto, textAlign: 'left' }}>{l.sn || ''}</td>
+                    <td style={tdAuto}>{fmt(c.finalSales)}</td><td style={tdAuto}>{fmt(c.salesGST)}</td>
+                    <td style={tdAuto}>{fmt(c.finalPurchase)}</td><td style={tdAuto}>{fmt(c.gstPur)}</td>
+                    <td style={{ ...tdAuto, fontWeight: 800, color: DR }}>{fmt(c.gp)}</td>
+                    <td style={{ ...tdAuto, fontWeight: 800, color: GOLD }}>{c.gpPct.toFixed(2)}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot><tr>
+              <td style={{ ...tfTd, textAlign: 'left' }} colSpan={2}>TOTAL</td>
+              <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd}>{fmt(totals.so.gst)}</td>
+              <td style={tfTd}>{fmt(totals.po.total)}</td><td style={tfTd}>{fmt(totals.po.gst)}</td>
+              <td style={{ ...tfTd, color: DR }}>{fmt(totals.gp.total)}</td><td style={{ ...tfTd, color: GOLD }}>{totals.gp.pct.toFixed(2)}%</td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </Section>
 
       {error && <div style={{ ...card, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#A32D2D', fontSize: 12, marginBottom: 14 }}>{error}</div>}
 
-      {/* Footer actions */}
-      <div style={{ position: 'sticky', bottom: 0, background: '#f3f4f8', borderTop: '1px solid #e1e3ec', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center' }}>
-        <span style={{ fontSize: 11, color: '#5a6691', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}><Lock size={12} /> Saving spawns a locked Sales + Purchase voucher linked by one Link No.</span>
+      {/* Footer */}
+      <div style={{ position: 'sticky', bottom: 0, background: '#f3f4f8', borderTop: '1px solid #e1e3ec', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, color: '#5a6691', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+          {editing ? <><Pencil size={12} /> Editing a pending voucher — “Save &amp; Approve” fixes it and posts the books in one step.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
+        </span>
         <FL label="Remarks"><input value={remarks} onChange={(e) => setRemarks(e.target.value)} style={{ ...inp, width: 220 }} placeholder="optional" /></FL>
-        <button disabled={!canSave} onClick={save}
-          style={{ ...btnG, background: canSave ? '#27500A' : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7 }}>
-          {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Posting…' : 'Save & post booking'}
+        {editing && (
+          <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} style={btnGh}><XCircle size={14} /> Cancel</button>
+        )}
+        <button disabled={!canSave} onClick={() => save(false)}
+          style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7 }}>
+          {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (editing ? 'Save changes' : 'Save voucher (Pending)')}
         </button>
+        {editing && (
+          <button disabled={!canSave} onClick={() => save(true)}
+            style={{ ...btnG, background: canSave ? DR : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7 }}>
+            {saving ? <RefreshCw size={14} className="spin" /> : <CheckCircle2 size={14} />} Save &amp; Approve
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-/* ── Bookings list + read-only detail ───────────────────────────────────────── */
-export function BookingOrdersList({ branch, setRoute }) {
-  const brCode = brCodeOf(branch) || 'ALL';
-  const cur = bc(branch).cur;
-  const qc = useQueryClient();
-  const { data = [], isLoading } = useQuery({
+function Section({ n, name, sub, accent, children }) {
+  return (
+    <div style={{ ...card, marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <span style={{ width: 24, height: 24, borderRadius: '50%', background: DARK, color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{n}</span>
+        <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.5px', color: accent, textTransform: 'uppercase' }}>{name}</span>
+        <span style={{ fontSize: 10.5, color: '#9A9A9A', fontStyle: 'italic' }}>{sub}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function GpCard({ k, v, color, pct }) {
+  return (
+    <div style={{ border: '1px solid #e8e2d2', borderRadius: 8, padding: '12px 14px', background: '#faf7ef' }}>
+      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.7px', color: '#9A9A9A', textTransform: 'uppercase' }}>{k}</div>
+      <div style={{ fontSize: 20, fontWeight: 800, marginTop: 4, color }}>{v}</div>
+      {pct && <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginTop: 2 }}>{pct}</div>}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   JV / posting detail view (one voucher side)
+   ════════════════════════════════════════════════════════════════════════════ */
+function PostingTable({ side, accent, title }) {
+  if (!side) return null;
+  const balanced = Math.abs((side.totalDr || 0) - (side.totalCr || 0)) < 0.01;
+  return (
+    <div style={{ border: '1px solid #e1e3ec', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: accent + '12', borderBottom: '1px solid #e1e3ec' }}>
+        <span style={{ fontSize: 11.5, fontWeight: 800, color: accent }}>{title}</span>
+        <span style={{ fontSize: 10.5, fontFamily: 'monospace', color: '#5a6691' }}>{side.vno} · {side.type}</span>
+      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr style={{ background: '#f7f8fb' }}>
+          {['Ledger', 'Group', 'Debit', 'Credit'].map((h, i) => <th key={h} style={{ padding: '6px 10px', fontSize: 9.5, fontWeight: 700, color: '#5a6691', textTransform: 'uppercase', textAlign: i >= 2 ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>)}
+        </tr></thead>
+        <tbody>
+          {(side.postings || []).map((p, i) => (
+            <tr key={i} style={{ borderBottom: '1px solid #f0f2f7' }}>
+              <td style={{ padding: '5px 10px', fontSize: 11.5, fontWeight: 600, color: DARK, paddingLeft: p.credit > 0 ? 22 : 10 }}>{p.ledger}</td>
+              <td style={{ padding: '5px 10px', fontSize: 10.5, color: '#8b94b3' }}>{p.group}</td>
+              <td style={{ padding: '5px 10px', fontSize: 11.5, textAlign: 'right', color: DR, fontVariantNumeric: 'tabular-nums' }}>{p.debit > 0 ? fmt(p.debit) : ''}</td>
+              <td style={{ padding: '5px 10px', fontSize: 11.5, textAlign: 'right', color: CR, fontVariantNumeric: 'tabular-nums' }}>{p.credit > 0 ? fmt(p.credit) : ''}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot><tr style={{ borderTop: '1.5px solid ' + DARK, background: '#f7f8fb' }}>
+          <td style={{ padding: '6px 10px', fontSize: 11, fontWeight: 800 }} colSpan={2}>{balanced ? '✓ Balanced' : '⚠ Unbalanced'}</td>
+          <td style={{ padding: '6px 10px', fontSize: 11.5, fontWeight: 800, textAlign: 'right', color: DR }}>{fmt(side.totalDr)}</td>
+          <td style={{ padding: '6px 10px', fontSize: 11.5, fontWeight: 800, textAlign: 'right', color: CR }}>{fmt(side.totalCr)}</td>
+        </tr></tfoot>
+      </table>
+    </div>
+  );
+}
+
+function JournalView({ id, cur }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['booking-journal', id],
+    queryFn: () => apiGet('/api/booking-orders/' + id + '/journal'),
+  });
+  if (isLoading) return <div style={{ padding: 14, fontSize: 12, color: '#8b94b3' }}>Building JV…</div>;
+  if (error) return <div style={{ padding: 14, fontSize: 12, color: '#A32D2D' }}>{error.message || 'Failed to build JV'}</div>;
+  if (!data) return null;
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 10, fontSize: 11.5, color: '#5a6691' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'monospace', fontWeight: 700, color: BLUE }}><Link2 size={13} /> {data.linkNo}</span>
+        <span>Gross Profit: <b style={{ color: DR }}>{cur} {fmt(data.gp?.total)}</b> ({data.gp?.pct ?? 0}%)</span>
+        <span style={{ fontStyle: 'italic', color: '#9A9A9A' }}>journal entries that {data.status === 'approved' || data.status === 'posted' ? 'were posted' : 'will post on approval'}</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(330px,1fr))', gap: 12 }}>
+        <PostingTable side={data.purchase} accent={CR} title="Purchase invoice (Dr cost · Cr supplier)" />
+        <PostingTable side={data.sale} accent={BLUE} title="Sales invoice (Dr customer · Cr sales)" />
+      </div>
+      <WhereItPosts approved={data.status === 'approved' || data.status === 'posted'} />
+    </div>
+  );
+}
+
+// Plain-English map of where the two invoices flow once approved.
+function WhereItPosts({ approved }) {
+  const items = [
+    ['Day Book / Ledgers', 'both vouchers appear in the Day Book and each ledger statement (Sundry Debtors, Supplier, every Sales/Purchase component head, GST).'],
+    ['Trial Balance', 'every Dr/Cr leg above lands in the Trial Balance under its group.'],
+    ['Profit & Loss', 'each SO head (Base Fare, K3, Taxes, Supplier Service, Markup, Service Charge) sits under Sales Accounts and each PO head under Purchase Accounts — the margin (= GP) is visible head-wise.'],
+    ['Balance Sheet', 'customer (Sundry Debtors, asset), supplier (Sundry Creditors, liability), CGST/SGST (Duties & Taxes) and any TCS Payable sit on the Balance Sheet.'],
+    ['Sales & Purchase Registers', 'the sale shows in the Sales Register, the purchase in the Purchase Register.'],
+    ['Invoice GP / Sales-GP Analytics', 'both are tied by the Link No, so GP is tracked invoice-wise.'],
+    ['GST reports (GSTR-1 / 3B)', 'Output GST (sale) and Input GST (purchase) flow into the GST returns; TCS into the TCS return.'],
+  ];
+  return (
+    <div style={{ marginTop: 14, border: '1px dashed #cdbb8e', borderRadius: 8, background: '#FDFAF4', padding: '12px 14px' }}>
+      <div style={{ fontSize: 11, fontWeight: 800, color: GOLD, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+        {approved ? '✓ Where this is posted' : 'Where this will post on approval'}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: '6px 18px' }}>
+        {items.map(([k, v]) => (
+          <div key={k} style={{ fontSize: 11, color: '#3A3A3A', lineHeight: 1.45 }}>
+            <b style={{ color: DARK }}>{k}</b> — {v}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Pending & Approved lists
+   ════════════════════════════════════════════════════════════════════════════ */
+function useBookings(brCode) {
+  return useQuery({
     queryKey: ['booking-orders', brCode],
     queryFn: () => apiGet('/api/booking-orders', { branch: brCode === 'ALL' ? '' : brCode }),
   });
-  const [open, setOpen] = useState(null);
+}
 
-  const cancel = async (id) => {
-    if (!window.confirm('Cancel this booking? Its Sales & Purchase vouchers will be un-posted.')) return;
-    try { await apiDelete('/api/booking-orders/' + id); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); }
-    catch (e) { window.alert(e.message || 'Cancel failed'); }
+function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, onCancel, onEdit, busyId }) {
+  const cols = mode === 'pending'
+    ? ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'Date', 'Actions']
+    : ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'Approved', 'Actions'];
+  return (
+    <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr style={{ background: '#f3f4f8' }}>
+          {cols.map((h, i) => <th key={i} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#5a6691', textTransform: 'uppercase', textAlign: i >= 6 && i <= 8 ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>)}
+        </tr></thead>
+        <tbody>
+          {isLoading && <tr><td colSpan={cols.length} style={{ padding: 20, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>Loading…</td></tr>}
+          {!isLoading && rows.length === 0 && <tr><td colSpan={cols.length} style={{ padding: 22, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>{mode === 'pending' ? 'No pending vouchers. Create one under “SO/PO/GP Voucher”.' : 'No approved vouchers yet.'}</td></tr>}
+          {rows.map((b) => {
+            const sp = VSPECS[b.module];
+            const isOpen = open === b.id;
+            return (
+              <React.Fragment key={b.id}>
+                <tr onClick={() => setOpen(isOpen ? null : b.id)} style={{ borderBottom: '1px solid #f0f2f7', cursor: 'pointer', background: isOpen ? '#faf7ef' : '#fff' }}>
+                  <td style={{ padding: '8px 12px' }}>{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}</td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: BLUE, fontSize: 11.5 }}>{b.linkNo}</td>
+                  <td style={{ padding: '8px 12px', fontSize: 12 }}>{sp ? sp.icon + ' ' + sp.name : b.module}</td>
+                  {mode === 'pending' ? (
+                    <>
+                      <td style={{ padding: '8px 12px', fontSize: 12 }}>{b.customer?.name || '—'}</td>
+                      <td style={{ padding: '8px 12px', fontSize: 12 }}>{b.supplier?.name || '—'}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11 }}>{b.saleVno || '—'}</td>
+                      <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11 }}>{b.purchaseVno || '—'}</td>
+                    </>
+                  )}
+                  <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.so?.total)}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.po?.total)}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.gp?.total)}</td>
+                  <td style={{ padding: '8px 12px', fontSize: 11, color: '#5a6691' }}>{mode === 'pending' ? b.date : (b.approvedAt ? String(b.approvedAt).slice(0, 10) : '—')}</td>
+                  <td style={{ padding: '8px 12px' }} onClick={(e) => e.stopPropagation()}>
+                    {mode === 'pending' ? (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button disabled={busyId === b.id} onClick={() => onEdit(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit</button>
+                        <button disabled={busyId === b.id} onClick={() => onApprove(b)} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: DR }}>
+                          {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve
+                        </button>
+                        <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><XCircle size={12} /> Reject</button>
+                      </div>
+                    ) : (
+                      <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}>Cancel &amp; un-post</button>
+                    )}
+                  </td>
+                </tr>
+                {isOpen && (
+                  <tr><td colSpan={cols.length} style={{ padding: '12px 16px', background: '#faf9f5', borderBottom: '1px solid #eee3cf' }}>
+                    <JournalView id={b.id} cur={cur} />
+                  </td></tr>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function PendingBookings({ branch, setRoute }) {
+  const brCode = brCodeOf(branch) || 'ALL';
+  const cur = bc(branch).cur;
+  const qc = useQueryClient();
+  const { data = [], isLoading } = useBookings(brCode);
+  const [open, setOpen] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+  const [msg, setMsg] = useState('');
+  const [editing, setEditing] = useState(null);
+
+  const rows = data.filter((b) => b.status === 'pending');
+
+  // Editing a pending voucher reuses the full SO/PO/GP entry form (PUT on save).
+  if (editing) {
+    return <SoPoGpVoucherEntry branch={branch} setRoute={setRoute} editBooking={editing}
+      onDone={() => { setEditing(null); setOpen(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }} />;
+  }
+
+  const onApprove = async (b) => {
+    setBusyId(b.id); setMsg('');
+    try {
+      const res = await apiPost('/api/booking-orders/' + b.id + '/approve');
+      setMsg(`✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno} under Link ${res.linkNo}.`);
+      qc.invalidateQueries({ queryKey: ['booking-orders'] });
+    } catch (e) { setMsg('⚠ ' + (e.message || 'Approve failed')); }
+    finally { setBusyId(null); }
+  };
+  const onCancel = async (b) => {
+    if (!window.confirm(`Reject pending voucher ${b.bookingNo}? It will be archived (it has not touched the books).`)) return;
+    setBusyId(b.id);
+    try { await apiDelete('/api/booking-orders/' + b.id); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); }
+    catch (e) { setMsg('⚠ ' + (e.message || 'Reject failed')); }
+    finally { setBusyId(null); }
   };
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 17, color: '#0d1326' }}>SO / PO / GP Bookings</h2>
-          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>Each booking drives one linked Sales + Purchase voucher</p>
+          <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><Clock size={18} style={{ color: GOLD }} /> Pending Approval</h2>
+          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>These have <b>no books impact</b> yet. Expand a row to review the full JV, then <b>Approve &amp; Post</b> to generate the linked Sales &amp; Purchase invoices.</p>
         </div>
-        <button onClick={() => setRoute && setRoute('/bookings/new')} style={btnG}><Plus size={14} /> New booking</button>
+        <button onClick={() => setRoute && setRoute('/bookings/new')} style={btnG}><Plus size={14} /> New voucher</button>
       </div>
+      {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, color: msg.startsWith('⚠') ? '#A32D2D' : '#27500A', background: msg.startsWith('⚠') ? '#FCEBEB' : '#EAF3DE', border: '1px solid ' + (msg.startsWith('⚠') ? '#F7C1C1' : '#cde3b6') }}>{msg}</div>}
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="pending" onApprove={onApprove} onCancel={onCancel} onEdit={setEditing} busyId={busyId} />
+    </div>
+  );
+}
 
-      <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={{ background: '#f3f4f8' }}>
-            {['Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'Status', ''].map((h, i) => (
-              <th key={i} style={{ ...th, padding: '9px 12px', textAlign: i >= 5 && i <= 7 ? 'right' : 'left' }}>{h}</th>
-            ))}
-          </tr></thead>
-          <tbody>
-            {isLoading && <tr><td colSpan={10} style={{ padding: 20, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>Loading…</td></tr>}
-            {!isLoading && data.length === 0 && <tr><td colSpan={10} style={{ padding: 22, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>No bookings yet. Create one with “New booking”.</td></tr>}
-            {data.map((b) => {
-              const spec = BOOKING_SPECS[b.module];
-              return (
-                <tr key={b.id} onClick={() => setOpen(open === b.id ? null : b.id)} style={{ borderBottom: '1px solid #f0f2f7', cursor: 'pointer', background: open === b.id ? '#f7f8fb' : '#fff' }}>
-                  <td style={{ ...td, padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700 }}>{b.bookingNo}</td>
-                  <td style={{ ...td, padding: '8px 12px', fontFamily: 'monospace', color: '#185FA5' }}>{b.linkNo}</td>
-                  <td style={{ ...td, padding: '8px 12px' }}>{spec ? spec.icon + ' ' + spec.name : b.module}</td>
-                  <td style={{ ...td, padding: '8px 12px' }}>{b.customer?.name || '—'}</td>
-                  <td style={{ ...td, padding: '8px 12px' }}>{b.supplier?.name || '—'}</td>
-                  <td style={{ ...td, padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(b.so?.total)}</td>
-                  <td style={{ ...td, padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(b.po?.total)}</td>
-                  <td style={{ ...td, padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#27500A', fontVariantNumeric: 'tabular-nums' }}>{fmt(b.gp?.total)}</td>
-                  <td style={{ ...td, padding: '8px 12px' }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: b.status === 'cancelled' ? '#FCEBEB' : '#EAF3DE', color: b.status === 'cancelled' ? '#A32D2D' : '#27500A' }}>{b.status}</span>
-                  </td>
-                  <td style={{ ...td, padding: '8px 12px', textAlign: 'right' }}>
-                    {b.status !== 'cancelled' && <button onClick={(e) => { e.stopPropagation(); cancel(b.id); }} style={{ ...btnGh, padding: '3px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}>Cancel</button>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+export function ApprovedBookings({ branch, setRoute }) {
+  const brCode = brCodeOf(branch) || 'ALL';
+  const cur = bc(branch).cur;
+  const qc = useQueryClient();
+  const { data = [], isLoading } = useBookings(brCode);
+  const [open, setOpen] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  const rows = data.filter((b) => b.status === 'approved' || b.status === 'posted');
+
+  const onCancel = async (b) => {
+    if (!window.confirm(`Cancel ${b.bookingNo}? Its Sales & Purchase invoices will be un-posted from the books.`)) return;
+    setBusyId(b.id);
+    try { await apiDelete('/api/booking-orders/' + b.id); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); }
+    catch (e) { window.alert(e.message || 'Cancel failed'); }
+    finally { setBusyId(null); }
+  };
+
+  return (
+    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><FileCheck2 size={18} style={{ color: DR }} /> Approved &amp; Posted</h2>
+          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>Posted to the books as linked Sales + Purchase invoices. Expand to see the JV &amp; ledger posting. The <b>Link No</b> tracks invoice-wise GP everywhere.</p>
+        </div>
+        <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>
-
-      {/* Read-only detail of the selected booking */}
-      {open && (() => {
-        const b = data.find((x) => x.id === open); if (!b) return null;
-        const spec = BOOKING_SPECS[b.module];
-        return (
-          <div style={{ ...card, marginTop: 14 }}>
-            <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700 }}>{b.bookingNo} · {spec ? spec.name : b.module}</p>
-            <p style={{ margin: '0 0 12px', fontSize: 11, color: '#5a6691' }}>Link {b.linkNo} · Sale {b.saleVno} · Purchase {b.purchaseVno} · Cost centre {b.costCenter || '—'}</p>
-            {spec && b.po?.lines && (<><p style={{ margin: '8px 0 6px', fontSize: 11, fontWeight: 700, color: '#9B2C2C' }}>Purchase (cost)</p><Grid spec={spec} rows={b.po.lines} onChange={() => {}} readOnly /></>)}
-            {spec && b.so?.lines && (<><p style={{ margin: '12px 0 6px', fontSize: 11, fontWeight: 700, color: '#185FA5' }}>Sales</p><Grid spec={spec} rows={b.so.lines} onChange={() => {}} readOnly /></>)}
-            <p style={{ margin: '12px 0 0', fontSize: 13, fontWeight: 700, color: '#27500A' }}>Gross Profit: {cur} {fmt(b.gp?.total)} ({b.gp?.pct ?? 0}%)</p>
-          </div>
-        );
-      })()}
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" onCancel={onCancel} busyId={busyId} />
     </div>
   );
 }

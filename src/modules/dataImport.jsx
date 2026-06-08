@@ -51,6 +51,14 @@ const SPECS = [
     desc: 'Sundry creditors / vendors. Also added to the chart as a Sundry Creditors ledger, so each is immediately selectable in vouchers and shows on the Balance Sheet.',
     columns: ['name', 'category', 'type', 'branch', 'gstin', 'pan', 'contact', 'phone', 'email', 'city', 'country', 'creditDays', 'active'],
     example: ['Emirates GSA', 'Air', 'GSA', 'BOM', '27AABCE1234M1Z5', 'AABCE1234M', 'Mr. Khan', '+91 98201 00000', 'gsa@emirates.com', 'Mumbai', 'India', '7', 'true'] },
+  // ── SO/PO/GP Voucher (imported as PENDING — NO books impact) ───────────────
+  // One row = one booking. It is saved pending; approve it under
+  // SO/PO/GP Voucher ▸ Pending to post the linked Sales + Purchase invoices.
+  { group: 'SO/PO/GP Voucher', entity: 'booking-order', label: 'SO / PO / GP Voucher (bulk)',
+    desc: 'One row = one booking, saved as PENDING (no books impact). Approve under SO/PO/GP Voucher ▸ Pending to post the linked Sales & Purchase invoices. Module = Flight/Holiday/Hotel/Visa/Insurance/Car/Misc. Same Link No ties invoice-wise GP (blank → auto).',
+    columns: ['Link No', 'Module', 'Branch', 'Date', 'Customer Name', 'Customer Group', 'Supplier Name', 'Supplier Group', 'Package Type', 'GST Mode', 'Markup %', 'Purchase Cost', 'Purchase GST', 'Purchase Total', 'Sales Value', 'Sales GST', 'Sales Total', 'Narration'],
+    example: ['', 'Flight', 'BOM', '2025-06-18', 'Global Konnection', 'Sundry Debtors', 'IndiGo GSA', 'Supplier Air Lines', 'Domestic', 'intra', '0', '10000', '90', '10090', '11000', '270', '11270', 'TIR-JAI booking'] },
+
   // ── Sales & Purchase by product (post double-entry on import) ──────────────
   // Same Link No on a sale + its purchase ties them for invoice-wise profit.
   // GST (CGST/SGST/IGST) is auto-summed; TOTAL is used as the invoice grand total.
@@ -176,7 +184,7 @@ for (const s of SPECS) {
   }
 }
 
-const GROUPS = ['Masters', 'Parties', 'Sales & Purchase', 'Vouchers'];
+const GROUPS = ['Masters', 'Parties', 'SO/PO/GP Voucher', 'Sales & Purchase', 'Vouchers'];
 
 /* ── Tax regime (India GST vs Africa VAT) ──────────────────────────────────
    India templates carry GST (CGST/SGST/IGST) + India-only TCS/TDS/incentive

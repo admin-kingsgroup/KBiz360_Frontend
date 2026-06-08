@@ -273,10 +273,11 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
 /* ── FINAL MENU ASSEMBLY ─────────────────────────────────────── */
 
 export const MENU_TRANSACTIONS = {label:"Transactions", icon:ShoppingCart, children:[
-  /* SO / PO / GP — one booking spawns a linked Sales + Purchase voucher */
-  {label:"Booking (SO/PO/GP)", children:[
-    {label:"New Booking", href:"/bookings/new"},
-    {label:"Bookings List", href:"/bookings/list"},
+  /* SO / PO / GP — one voucher; on approval spawns a linked Sales + Purchase invoice */
+  {label:"SO/PO/GP Voucher", children:[
+    {label:"SO/PO/GP Voucher", href:"/bookings/new"},
+    {label:"Pending", href:"/bookings/pending"},
+    {label:"Approved", href:"/bookings/approved"},
   ]},
   /* Standardized 8-tab Voucher Entry pattern */
   {label:"Standardized Patterns", children:[
