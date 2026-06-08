@@ -6,13 +6,15 @@
 //   • identity columns (passenger / guest name + module refs — Ticket/PNR/etc.)
 //   • purchase "fare" columns (the supplier cost, pass-through, NOT separately
 //     taxed — K3/taxes are already tax figures) — entered in the Purchase Order
-//   • psvc  — Supplier Service charge (purchase side, GST @18% input credit)
+//   • psvc  — Supplier Service charge (purchase side, GST @18% input credit) — an
+//             agency cost, NOT billed to the customer, so it reduces GP
 //   • markup — agency markup, GST-INCLUSIVE (GST = markup × 18 ÷ 118)
 //   • ssvc  — agency Service Charge (sales side, GST @18% output, added on top)
 //
-// The Sales side = the whole purchase cost (fares + supplier service) passed
-// through, plus markup + service charge (+ their GST). Gross Profit excludes GST
-// on both sides, so GP = net markup + service charge.  (Matches the mock-up.)
+// The Sales side = the purchase FARES passed through, plus markup + service charge
+// (+ their GST). The Supplier Service charge is an agency cost that is NOT billed to
+// the customer, so it sits only on the purchase side and REDUCES GP. Gross Profit
+// excludes GST on both sides:  GP = net markup + service charge − supplier service.
 
 export const GST_RATE = 0.18;
 
@@ -133,7 +135,9 @@ export const gstMk  = (l) => r2(num(l.markup) * GST_RATE / (1 + GST_RATE)); // G
 export const gstPur = (l) => r2(num(l.psvc) * GST_RATE);                    // input GST on supplier service
 
 export const finalPurchase = (spec, l) => r2(fareSum(spec, l) + num(l.psvc) + gstPur(l));
-export const finalSales = (spec, l) => r2(fareSum(spec, l) + num(l.psvc) + num(l.markup) + num(l.ssvc) + gstSvc(l));
+// Supplier service is NOT passed through to the customer (it's an agency cost), so
+// the sale excludes psvc — that's what makes it reduce GP.
+export const finalSales = (spec, l) => r2(fareSum(spec, l) + num(l.markup) + num(l.ssvc) + gstSvc(l));
 export const salesGST = (l) => r2(gstSvc(l) + gstMk(l));
 export const gpOf = (spec, l) => r2((finalSales(spec, l) - salesGST(l)) - (finalPurchase(spec, l) - gstPur(l)));
 export const gpPctOf = (spec, l) => { const fs = finalSales(spec, l); return fs > 0 ? r2((gpOf(spec, l) / fs) * 100) : 0; };
@@ -141,7 +145,7 @@ export const gpPctOf = (spec, l) => { const fs = finalSales(spec, l); return fs 
 // All computed figures for one line — handy for the read-only voucher view.
 export function lineCalc(spec, l) {
   return {
-    pass: r2(fareSum(spec, l) + num(l.psvc)),
+    pass: r2(fareSum(spec, l)),
     gstSvc: gstSvc(l), gstMk: gstMk(l), gstPur: gstPur(l),
     finalSales: finalSales(spec, l), finalPurchase: finalPurchase(spec, l),
     salesGST: salesGST(l), gp: gpOf(spec, l), gpPct: gpPctOf(spec, l),
@@ -172,10 +176,10 @@ export function bookingTotals(spec, lines, { packageType = '' } = {}) {
     so.serviceCharge += num(l.ssvc);
     so.gst += c.salesGST; so.total += c.finalSales;
     so.lines.push({ ...id, ...fares, pass: c.pass, markup: num(l.markup), ssvc: num(l.ssvc), gstMk: c.gstMk, gstSvc: c.gstSvc, gst: c.salesGST, total: c.finalSales });
-    // heads — pass-through fares (sale = purchase), supplier service (both),
-    // then sale-only markup (net of its embedded GST) + service charge.
+    // heads — pass-through fares (sale = purchase); Supplier Service is purchase-only
+    // (agency cost, not billed); Markup (net of embedded GST) + Service Charge are sale-only.
     spec.fareCols.forEach((col) => { addH(sH, col.key, col.label, num(l[col.key])); addH(pH, col.key, col.label, num(l[col.key])); });
-    addH(sH, 'psvc', 'Supplier Service', num(l.psvc)); addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
+    addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
     addH(sH, 'markup', 'Markup', r2(num(l.markup) - c.gstMk));
     addH(sH, 'ssvc', 'Service Charge', num(l.ssvc));
   });

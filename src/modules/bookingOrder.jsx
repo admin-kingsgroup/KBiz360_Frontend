@@ -14,6 +14,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../core/styles.jsx';
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/api';
+import { useLedgerRegistry } from '../core/useReference';
 import {
   VSPECS, VMODULE_LIST, seedLines, blankLine, bookingTotals, lineCalc,
 } from '../core/voucherSpecs.js';
@@ -205,10 +206,16 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
           <FL label="Booking date"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></FL>
           <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
-          <FL label="Customer"><input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} placeholder="Bill to…" style={inp} /></FL>
-          <FL label="Customer group"><input value={customer.group} onChange={(e) => setCustomer({ ...customer, group: e.target.value })} placeholder="e.g. Sundry Debtors" style={inp} /></FL>
-          <FL label="Supplier"><input value={supplier.name} onChange={(e) => setSupplier({ ...supplier, name: e.target.value })} placeholder="Pay to…" style={inp} /></FL>
-          <FL label="Supplier ledger group"><input value={supplier.ledgerGroup} onChange={(e) => setSupplier({ ...supplier, ledgerGroup: e.target.value })} placeholder="e.g. Supplier Air Lines" style={inp} /></FL>
+          <FL label="Customer (Bill to)">
+            <PartyPicker branch={branch} kind="customer" value={{ name: customer.name, group: customer.group }}
+              onChange={(v) => setCustomer({ ...customer, name: v.name, group: v.group })} />
+          </FL>
+          <FL label="Customer sub-group (auto)"><input value={customer.group} readOnly placeholder="picks with the customer" style={{ ...inp, background: '#faf7ef', color: '#5a6691' }} /></FL>
+          <FL label="Supplier (Pay to)">
+            <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
+              onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
+          </FL>
+          <FL label="Supplier sub-group (auto)"><input value={supplier.ledgerGroup} readOnly placeholder="picks with the supplier" style={{ ...inp, background: '#faf7ef', color: '#5a6691' }} /></FL>
           <FL label="GST mode"><select value={gstMode} onChange={(e) => setGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
           {hasPackage && <FL label="Package type"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={inp}><option>Domestic</option><option>International</option></select></FL>}
         </div>
@@ -398,6 +405,48 @@ function GpCard({ k, v, color, pct }) {
   );
 }
 
+// Searchable customer / supplier picker — lists existing debtor / creditor ledgers
+// and auto-fills the SUB-GROUP when one is chosen (the most specific chart bucket,
+// e.g. "B2B Clients" / "Supplier Air Lines"; falls back to the top group when the
+// ledger has no sub-group). Typing a NEW name keeps it (default Sundry Debtors /
+// Sundry Creditors) so a fresh party still works — the posting auto-creates its
+// ledger on approval.
+const subGroupOf = (l) => (l && (l.subGroup || l.group)) || '';
+function PartyPicker({ branch, kind, value, onChange }) {
+  const wantType = kind === 'customer' ? 'Debtor' : 'Creditor';
+  const defaultGroup = kind === 'customer' ? 'Sundry Debtors' : 'Sundry Creditors';
+  const reg = useLedgerRegistry(branch).data || [];
+  const list = reg.filter((l) => l.type === wantType);
+  const [open, setOpen] = useState(false);
+  const q = value.name || '';
+  const matches = list.filter((l) => !q || l.name.toLowerCase().includes(q.toLowerCase())).slice(0, 12);
+  const setName = (v) => {
+    const exact = list.find((l) => l.name.trim().toLowerCase() === v.trim().toLowerCase());
+    onChange({ name: v, group: exact ? subGroupOf(exact) : defaultGroup });
+  };
+  const pick = (l) => { onChange({ name: l.name, group: subGroupOf(l) || defaultGroup }); setOpen(false); };
+  return (
+    <div style={{ position: 'relative' }}>
+      <input value={q} placeholder={kind === 'customer' ? 'Search or type customer…' : 'Search or type supplier…'}
+        onChange={(e) => { setName(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} style={inp} />
+      {open && matches.length > 0 && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 60, marginTop: 2, background: '#fff', border: '1px solid #e1e3ec', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', maxHeight: 220, overflowY: 'auto' }}>
+          {matches.map((l) => (
+            <div key={l.id} onMouseDown={() => pick(l)}
+              style={{ padding: '7px 11px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5 }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f4ff')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+              <span style={{ color: '#0d1326', fontWeight: 500 }}>{l.name}</span>
+              <span style={{ color: '#8b94b3', fontSize: 9.5, flexShrink: 0 }}>{subGroupOf(l) || l.group}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
    JV / posting detail view (one voucher side)
    ════════════════════════════════════════════════════════════════════════════ */
@@ -463,7 +512,7 @@ function WhereItPosts({ approved }) {
   const items = [
     ['Day Book / Ledgers', 'both vouchers appear in the Day Book and each ledger statement (Sundry Debtors, Supplier, every Sales/Purchase component head, GST).'],
     ['Trial Balance', 'every Dr/Cr leg above lands in the Trial Balance under its group.'],
-    ['Profit & Loss', 'each SO head (Base Fare, K3, Taxes, Supplier Service, Markup, Service Charge) sits under Sales Accounts and each PO head under Purchase Accounts — the margin (= GP) is visible head-wise.'],
+    ['Profit & Loss', 'each head nests in the Tally chart — Sales Accounts → module sub-group (Ticketing → Domestic/International) → DT-Base Fare / DT-K3-Taxes / DT-Other Taxes / DT-Service Charges; Purchase Accounts → … [Pur] incl. Supplier Service (an agency cost that reduces GP). Drill the P&L to see it head-wise.'],
     ['Balance Sheet', 'customer (Sundry Debtors, asset), supplier (Sundry Creditors, liability), CGST/SGST (Duties & Taxes) and any TCS Payable sit on the Balance Sheet.'],
     ['Sales & Purchase Registers', 'the sale shows in the Sales Register, the purchase in the Purchase Register.'],
     ['Invoice GP / Sales-GP Analytics', 'both are tied by the Link No, so GP is tracked invoice-wise.'],
