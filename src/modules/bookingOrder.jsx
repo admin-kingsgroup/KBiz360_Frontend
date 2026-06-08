@@ -16,7 +16,7 @@ import { inp, card, btnG, btnGh, FL, bc } from '../core/styles.jsx';
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/api';
 import { useLedgerRegistry } from '../core/useReference';
 import {
-  VSPECS, VMODULE_LIST, seedLines, blankLine, bookingTotals, lineCalc,
+  VSPECS, VMODULE_LIST, blankLine, bookingTotals, lineCalc,
 } from '../core/voucherSpecs.js';
 
 const GOLD = '#A07828', DARK = '#0d1326', DR = '#1B6B4C', CR = '#9B2C2C', BLUE = '#185FA5';
@@ -55,7 +55,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       const rows = Array.isArray(editBooking.rows) ? editBooking.rows : [];
       return rows.length ? rows.map((r) => ({ ...r })) : [blankLine(VSPECS[initModule])];
     }
-    return seedLines(VSPECS.SF);
+    return [blankLine(VSPECS.SF)];   // start blank — no demo rows
   });
   const [date, setDate] = useState(editing ? (editBooking.date || today()) : today());
   const [headerRef, setHeaderRef] = useState(editing ? (editBooking.headerRef || '') : '');
@@ -74,7 +74,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   // Switching module reloads the seed grid for that module — never while editing
   // (the module is locked to the existing voucher so its lines aren't wiped).
-  useEffect(() => { if (editing) return; setLines(seedLines(VSPECS[moduleCode])); setResult(null); setError(''); }, [moduleCode]);
+  useEffect(() => { if (editing) return; setLines([blankLine(VSPECS[moduleCode])]); setResult(null); setError(''); }, [moduleCode]);
 
   const totals = useMemo(() => bookingTotals(spec, lines, { packageType }), [spec, lines, packageType]);
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
@@ -113,7 +113,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     finally { setSaving(false); }
   };
 
-  const reset = () => { setLines(seedLines(spec)); setCustomer({ name: '', gstin: '', group: '' }); setSupplier({ name: '', gstin: '', ledgerGroup: '' }); setResult(null); setError(''); };
+  const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', group: '' }); setSupplier({ name: '', gstin: '', ledgerGroup: '' }); setResult(null); setError(''); };
 
   if (result) {
     const approved = result._approved;

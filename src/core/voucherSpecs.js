@@ -129,10 +129,13 @@ export function blankLine(spec) {
 export const seedLines = (spec) => (spec.seed || []).map((s) => ({ ...blankLine(spec), ...s }));
 
 // ── Per-line money math (the GST-inclusive engine) ───────────────────────────
+// Each GST honours an explicit per-line override (l.svcGst / l.mkGst / l.psvcGst,
+// e.g. from a bulk import) and otherwise auto-computes; blank/missing → auto.
+const ovr = (v) => { if (v === undefined || v === null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
 export const fareSum = (spec, l) => r2(spec.fareCols.reduce((s, c) => s + num(l[c.key]), 0));
-export const gstSvc = (l) => r2(num(l.ssvc) * GST_RATE);                    // GST on agency service charge
-export const gstMk  = (l) => r2(num(l.markup) * GST_RATE / (1 + GST_RATE)); // GST embedded in GST-incl markup
-export const gstPur = (l) => r2(num(l.psvc) * GST_RATE);                    // input GST on supplier service
+export const gstSvc = (l) => { const o = ovr(l.svcGst);  return r2(o !== null ? o : num(l.ssvc) * GST_RATE); };       // GST on agency service charge
+export const gstMk  = (l) => { const o = ovr(l.mkGst);   return r2(o !== null ? o : num(l.markup) * GST_RATE / (1 + GST_RATE)); }; // GST embedded in GST-incl markup
+export const gstPur = (l) => { const o = ovr(l.psvcGst); return r2(o !== null ? o : num(l.psvc) * GST_RATE); };       // input GST on supplier service
 
 export const finalPurchase = (spec, l) => r2(fareSum(spec, l) + num(l.psvc) + gstPur(l));
 // Supplier service is NOT passed through to the customer (it's an agency cost), so

@@ -902,20 +902,6 @@ export function SalesVisa({branch,setRoute}){
     <VWrap title="Sales Voucher — Visas" icon="🛂" vNo={vNo} branch={branch} type="sales" saleMod="SV" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} name="" gstin={partyGstin} onGstinChange={setPartyGstin}/>
-      <div style={{padding:"8px 16px",borderBottom:"1px solid #e1e3ec",background:"#f9fafb",display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
-        <span style={{fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px"}}>Demo presets</span>
-        <button onClick={()=>setPartyGstin("27AABCS1234L1Z5")}
-          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(intra?"#27500A":"#c7cbe0"),
-            background:intra?"#27500A":"#fff",color:intra?"#fff":"#27500A",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
-          Intra-state · Mumbai (27)
-        </button>
-        <button onClick={()=>setPartyGstin("24AAGCG7456L1Z9")}
-          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(!intra?"#185FA5":"#c7cbe0"),
-            background:!intra?"#185FA5":"#fff",color:!intra?"#fff":"#185FA5",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
-          Inter-state · Gujarat (24)
-        </button>
-        <span style={{fontSize:10,color:"#5a6691",marginLeft:"auto"}}>Click a preset to load a demo customer and watch CGST/SGST flip to IGST.</span>
-      </div>
       <ARow label="Applicant details" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
@@ -1008,20 +994,6 @@ export function SalesHotel({branch,setRoute}){
     <VWrap title="Sales Voucher — Hotels" icon="🏨" vNo={vNo} branch={branch} type="sales" saleMod="SHT" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} name="" gstin={partyGstin} onGstinChange={setPartyGstin}/>
-      <div style={{padding:"8px 16px",borderBottom:"1px solid #e1e3ec",background:"#f9fafb",display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
-        <span style={{fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px"}}>Demo presets</span>
-        <button onClick={()=>setPartyGstin("27AAPFL9876K1Z3")}
-          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(intra?"#27500A":"#c7cbe0"),
-            background:intra?"#27500A":"#fff",color:intra?"#fff":"#27500A",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
-          Intra-state · Mumbai (27)
-        </button>
-        <button onClick={()=>setPartyGstin("24AAGCG7456L1Z9")}
-          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(!intra?"#185FA5":"#c7cbe0"),
-            background:!intra?"#185FA5":"#fff",color:!intra?"#fff":"#185FA5",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
-          Inter-state · Gujarat (24)
-        </button>
-        <span style={{fontSize:10,color:"#5a6691",marginLeft:"auto"}}>Click a preset to load a demo customer and watch CGST/SGST flip to IGST.</span>
-      </div>
       <ARow label="Accommodation details" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:960}}>
           <thead><tr>
@@ -2289,20 +2261,6 @@ export function PurchaseHotelVoucher({branch,setRoute}){
     <VWrap title="Purchase Voucher — Hotels" icon="🏨" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} label="Hotel / Supplier" name="Hyatt Regency Ahmedabad" gstin={partyGstin} onGstinChange={setPartyGstin}/>
-      <div style={{padding:"8px 16px",borderBottom:"1px solid #e1e3ec",background:"#f9fafb",display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
-        <span style={{fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px"}}>Demo presets</span>
-        <button onClick={()=>setPartyGstin("27AABCH1234M1Z2")}
-          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(intra?"#27500A":"#c7cbe0"),
-            background:intra?"#27500A":"#fff",color:intra?"#fff":"#27500A",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
-          Intra-state · Mumbai supplier (27)
-        </button>
-        <button onClick={()=>setPartyGstin("24AABCH7890J1Z5")}
-          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(!intra?"#185FA5":"#c7cbe0"),
-            background:!intra?"#185FA5":"#fff",color:!intra?"#fff":"#185FA5",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
-          Inter-state · Gujarat supplier (24)
-        </button>
-        <span style={{fontSize:10,color:"#5a6691",marginLeft:"auto"}}>Click a preset to flip supplier GSTIN and watch Input CGST/SGST become Input IGST.</span>
-      </div>
       <ARow label="Hotel purchase lines" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:960}}>
           <thead><tr>
@@ -2404,20 +2362,6 @@ export function PurchaseVisa({branch,setRoute}){
     <VWrap title="Purchase Voucher — Visas" icon="🛂" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} label="Primary Supplier" name="VFS Global Services" gstin={partyGstin} onGstinChange={setPartyGstin}/>
-      <div style={{padding:"8px 16px",borderBottom:"1px solid #e1e3ec",background:"#f9fafb",display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
-        <span style={{fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px"}}>Demo presets</span>
-        <button onClick={()=>setPartyGstin("27AABVV4321F1Z6")}
-          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(intra?"#27500A":"#c7cbe0"),
-            background:intra?"#27500A":"#fff",color:intra?"#fff":"#27500A",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
-          Intra-state · Mumbai supplier (27)
-        </button>
-        <button onClick={()=>setPartyGstin("07AABVV9988N1Z4")}
-          style={{padding:"4px 11px",borderRadius:999,border:"1px solid "+(!intra?"#185FA5":"#c7cbe0"),
-            background:!intra?"#185FA5":"#fff",color:!intra?"#fff":"#185FA5",fontSize:10.5,fontWeight:600,cursor:"pointer"}}>
-          Inter-state · Delhi supplier (07)
-        </button>
-        <span style={{fontSize:10,color:"#5a6691",marginLeft:"auto"}}>Click a preset to flip supplier GSTIN and watch Input CGST/SGST become Input IGST.</span>
-      </div>
       <ARow label="Visa fee payment lines" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
@@ -3789,21 +3733,26 @@ export function BspCsvImport({branch}){
   const [matched,setMatched]=useState([]);
   const [step,setStep]=useState(1); // 1=upload 2=preview 3=reconcile
 
-  const handleFile=e=>{
+  const handleFile=async e=>{
     const f=e.target.files[0];
     if(!f)return;
     setFile(f);
-    /* Simulate CSV parse */
-    const SAMPLE_ROWS=[
-      {ticketNo:"098-2156789012",airline:"Air India",pax:"Rajiv Sharma",sector:"BOM-DXB",amount:"41000.00",currency:"INR",type:"SALE",status:"Ticketed"},
-      {ticketNo:"176-8901234567",airline:"Emirates",pax:"Priya Mehta",sector:"BOM-DXB-LHR",amount:"69000.00",currency:"INR",type:"SALE",status:"Ticketed"},
-      {ticketNo:"526-3456789012",airline:"IndiGo",pax:"Rohan",sector:"BOM-DEL",amount:"7600.00",currency:"INR",type:"REFUND",status:"Refunded"},
-      {ticketNo:"098-2156789099",airline:"Air India",pax:"New Passenger",sector:"BOM-SIN",amount:"55000.00",currency:"INR",type:"SALE",status:"Ticketed"},
-    ];
-    setParsed(SAMPLE_ROWS);
-    /* Auto-match against PURCHASE_REGISTRY */
-    const matchResult=SAMPLE_ROWS.map(row=>({...row,inBooks:row.ticketNo!=="098-2156789099",variance:row.ticketNo!=="098-2156789099"?0:55000}));
-    setMatched(matchResult);
+    // Parse the uploaded BSP CSV (no demo rows). Columns are matched by header
+    // name; rows are flagged for reconciliation against the live books.
+    let rows=[];
+    try{
+      const text=await f.text();
+      const lines=text.replace(/\r/g,"").split("\n").filter(l=>l.trim());
+      if(lines.length>1){
+        const heads=lines[0].split(",").map(h=>h.trim().toLowerCase());
+        const ix=re=>heads.findIndex(h=>re.test(h));
+        const iT=ix(/ticket/),iA=ix(/airline/),iP=ix(/pax|passenger|name/),iS=ix(/sector|route/),iAmt=ix(/amount|fare|total/),iC=ix(/currency/),iTy=ix(/type/),iSt=ix(/status/);
+        rows=lines.slice(1).map(l=>{const c=l.split(",");const g=i=>i>=0?(c[i]||"").trim():"";return{
+          ticketNo:g(iT),airline:g(iA),pax:g(iP),sector:g(iS),amount:g(iAmt)||"0",currency:g(iC)||"INR",type:g(iTy)||"SALE",status:g(iSt)};});
+      }
+    }catch{ rows=[]; }
+    setParsed(rows);
+    setMatched(rows.map(row=>({...row,inBooks:false,variance:0})));
     setStep(2);
   };
 

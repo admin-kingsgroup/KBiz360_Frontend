@@ -12,6 +12,7 @@ import React, { useState } from 'react';
 import { Download, Upload, CheckCircle2, AlertTriangle, FileSpreadsheet, ShieldAlert } from 'lucide-react';
 import { card } from '../core/styles';
 import { apiPost } from '../core/api';
+import { VSPECS } from '../core/voucherSpecs';
 
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
 
@@ -52,12 +53,8 @@ const SPECS = [
     columns: ['name', 'category', 'type', 'branch', 'gstin', 'pan', 'contact', 'phone', 'email', 'city', 'country', 'creditDays', 'active'],
     example: ['Emirates GSA', 'Air', 'GSA', 'BOM', '27AABCE1234M1Z5', 'AABCE1234M', 'Mr. Khan', '+91 98201 00000', 'gsa@emirates.com', 'Mumbai', 'India', '7', 'true'] },
   // ── SO/PO/GP Voucher (imported as PENDING — NO books impact) ───────────────
-  // One row = one booking. It is saved pending; approve it under
-  // SO/PO/GP Voucher ▸ Pending to post the linked Sales + Purchase invoices.
-  { group: 'SO/PO/GP Voucher', entity: 'booking-order', label: 'SO / PO / GP Voucher (bulk)',
-    desc: 'One row = one booking, saved as PENDING (no books impact). Approve under SO/PO/GP Voucher ▸ Pending to post the linked Sales & Purchase invoices. Module = Flight/Holiday/Hotel/Visa/Insurance/Car/Misc. Same Link No ties invoice-wise GP (blank → auto).',
-    columns: ['Link No', 'Module', 'Branch', 'Date', 'Customer Name', 'Customer Group', 'Supplier Name', 'Supplier Group', 'Package Type', 'GST Mode', 'Markup %', 'Purchase Cost', 'Purchase GST', 'Purchase Total', 'Sales Value', 'Sales GST', 'Sales Total', 'Narration'],
-    example: ['', 'Flight', 'BOM', '2025-06-18', 'Global Konnection', 'Sundry Debtors', 'IndiGo GSA', 'Supplier Air Lines', 'Domestic', 'intra', '0', '10000', '90', '10090', '11000', '270', '11270', 'TIR-JAI booking'] },
+  // One card PER MODULE, generated below from the live VSPECS so the columns match
+  // each module's SO/PO/GP entry grid exactly. (see makeBookingSpecs)
 
   // ── Sales & Purchase by product (post double-entry on import) ──────────────
   // Same Link No on a sale + its purchase ties them for invoice-wise profit.
@@ -183,6 +180,40 @@ for (const s of SPECS) {
     s.example.splice(at + 1, 0, 'Supplier Air Lines');
   }
 }
+
+/* ── SO/PO/GP Voucher bulk templates — one per module, built from VSPECS so the
+   columns exactly match each module's entry grid. The module is fixed by the
+   entity (booking-<module>); rows are per-passenger lines grouped by Link No. ── */
+const BOOKING_ENTITY = { SF: 'booking-flight', SH: 'booking-holiday', SHT: 'booking-hotel', SV: 'booking-visa', SI: 'booking-insurance', SC: 'booking-car', SM: 'booking-misc' };
+const BOOKING_HEADER_SAMPLE = { SF: 'TIR-JAI / IndiGo', SH: 'Bali / Honeymoon', SHT: 'Taj Lands End / Mumbai', SV: 'UAE / VFS', SI: 'Schengen / TATA AIG', SC: 'BOM-Pune / Ola', SM: 'Documentation / Vendor' };
+const BOOKING_SUPPLIER_SAMPLE = { SF: ['IndiGo GSA', 'Supplier Air Lines'], SH: ['Bali Tours DMC', 'Sundry Creditors'], SHT: ['Island Escapes', 'Sundry Creditors'], SV: ['VFS Global', 'Sundry Creditors'], SI: ['TATA AIG', 'Sundry Creditors'], SC: ['City Cabs', 'Sundry Creditors'], SM: ['Misc Vendor', 'Sundry Creditors'] };
+const r2x = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+function makeBookingSpec(code) {
+  const sp = VSPECS[code];
+  const hasPkg = code === 'SF' || code === 'SH';
+  const header = ['Link No', 'Branch', 'Date', sp.headerLabel, 'Customer Name', 'Customer Sub-Group', 'Supplier Name', 'Supplier Sub-Group', ...(hasPkg ? ['Package Type'] : []), 'GST Mode'];
+  const idLabels = sp.idCols.map((c) => c.label);
+  const fareLabels = sp.fareCols.map((c) => c.label);
+  const tail = ['Supplier Service', 'Supplier Service GST', 'Markup', 'Markup GST', 'Service Charge', 'Service Charge GST'];
+  const columns = [...header, ...idLabels, ...fareLabels, ...tail];
+
+  const seed = (sp.seed && sp.seed[0]) || {};
+  const n = (v) => Number(v) || 0;
+  const [supName, supGrp] = BOOKING_SUPPLIER_SAMPLE[code];
+  const exHeader = ['BKL-0001', 'BOM', '2025-06-18', BOOKING_HEADER_SAMPLE[code], 'Global Konnection', 'B2B Clients', supName, supGrp, ...(hasPkg ? ['Domestic'] : []), 'intra'];
+  const exId = sp.idCols.map((c) => String(seed[c.key] ?? ''));
+  const exFare = sp.fareCols.map((c) => String(n(seed[c.key])));
+  const exTail = [String(n(seed.psvc)), String(r2x(n(seed.psvc) * 0.18)), String(n(seed.markup)), String(r2x(n(seed.markup) * 0.18 / 1.18)), String(n(seed.ssvc)), String(r2x(n(seed.ssvc) * 0.18))];
+  const example = [...exHeader, ...exId, ...exFare, ...exTail];
+
+  return {
+    group: 'SO/PO/GP Voucher', entity: BOOKING_ENTITY[code], label: `${sp.name} — SO/PO/GP (bulk)`,
+    desc: `One row = one ${code === 'SHT' ? 'guest' : 'passenger'}/line for a ${sp.name} booking (same fields as the SO/PO/GP Voucher screen). Put the SAME Link No on rows of one booking (multi-line); blank = a standalone single-line booking. Supplier Service is an agency cost (reduces GP). The three “… GST” columns are optional — blank = auto (markup GST-inclusive; service & supplier-service @18%), or fill to import the exact GST. Header fields are read from the first row of each Link No. Imported as PENDING — approve to post the linked Sales & Purchase invoices.`,
+    columns, example,
+  };
+}
+for (const code of ['SF', 'SH', 'SHT', 'SV', 'SI', 'SC', 'SM']) SPECS.push(makeBookingSpec(code));
 
 const GROUPS = ['Masters', 'Parties', 'SO/PO/GP Voucher', 'Sales & Purchase', 'Vouchers'];
 
