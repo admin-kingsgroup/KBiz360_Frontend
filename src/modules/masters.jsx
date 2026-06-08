@@ -991,7 +991,7 @@ export function MastersCustomers(){
             {/* B2C FORM */}
             {tab==="B2C"&&(
               <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-                <FL label="Customer full name"><input value={editRec.name||""} onChange={e=>set({name:e.target.value})} style={inp} placeholder="e.g. Rohan"/></FL>
+                <FL label="Customer full name"><input value={editRec.name||""} onChange={e=>set({name:e.target.value})} style={inp} placeholder="e.g. ABC Corp"/></FL>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                   <FL label="Country"><input value={editRec.country||""} onChange={e=>set({country:e.target.value})} style={inp} placeholder="India"/></FL>
                   <FL label="City"><input value={editRec.city||""} onChange={e=>set({city:e.target.value})} style={inp}/></FL>
@@ -1075,20 +1075,7 @@ export function MastersSuppliers(){
   const [modal,setModal]=useState(false);
   const [search,setSearch]=useState("");
   const [typeFilter,setTypeFilter]=useState("All");
-  const supps=[
-    {id:1, name:"BSP India (IATA Clearing)",  type:"Airline/BSP",   gstin:"27AABCB1234A1Z1",currency:"INR",tds:"194C",commPct:0,active:true},
-    {id:2, name:"Emirates GSA India",          type:"Airline/BSP",   gstin:"27AABCE5678B1Z2",currency:"INR",tds:"",    commPct:5,active:true},
-    {id:3, name:"Air India Ltd.",              type:"Airline/BSP",   gstin:"07AABCA9012C1Z3",currency:"INR",tds:"",    commPct:3,active:true},
-    {id:4, name:"Bali Tours DMC Co.",          type:"DMC/Operator",  gstin:"",               currency:"INR",tds:"",    commPct:10,active:true},
-    {id:5, name:"Singapore MICE & Events DMC", type:"DMC/Operator",  gstin:"",               currency:"INR",tds:"",    commPct:8, active:true},
-    {id:6, name:"Island Escapes Maldives DMC", type:"DMC/Operator",  gstin:"",               currency:"INR",tds:"",    commPct:12,active:true},
-    {id:7, name:"Hyatt Hotels & Resorts",      type:"Hotel",         gstin:"27AABCH3456D1Z4",currency:"INR",tds:"194C",commPct:10,active:true},
-    {id:8, name:"ITC Hotels Ltd.",             type:"Hotel",         gstin:"27AABCI7890E1Z5",currency:"INR",tds:"194C",commPct:12,active:true},
-    {id:9, name:"Riya Travels & Tours",        type:"Car/Transport", gstin:"27AABCR2345F1Z6",currency:"INR",tds:"194C",commPct:0, active:true},
-    {id:10,name:"VFS Global India",            type:"Visa Agency",   gstin:"27AABCV6789G1Z7",currency:"INR",tds:"",    commPct:0, active:true},
-    {id:11,name:"TATA AIG General Insurance",  type:"Insurance",     gstin:"27AABCT0123H1Z8",currency:"INR",tds:"194D",commPct:15,active:true},
-    {id:12,name:"Jubilee Insurance (Kenya)",   type:"Insurance",     gstin:"",               currency:"INR",tds:"",    commPct:12,active:true},
-  ];
+  const supps=[];
   const types=["All",...new Set(supps.map(s=>s.type))];
   const filtered=supps.filter(s=>
     (typeFilter==="All"||s.type===typeFilter)&&
@@ -1163,19 +1150,7 @@ export function MastersSuppliers(){
 export function MastersAirlines(){
   const [modal,setModal]=useState(false);
   const [search,setSearch]=useState("");
-  const airlines=[
-    {id:1, iata:"AI",  name:"Air India",           country:"India",       type:"Full Service",hub:"DEL",bsp:true, alliance:"None",   gds:"1A/1G/1B",commPct:3},
-    {id:2, iata:"EK",  name:"Emirates",             country:"UAE",         type:"Full Service",hub:"DXB",bsp:true, alliance:"None",   gds:"1A/1G/1B",commPct:5},
-    {id:3, iata:"6E",  name:"IndiGo",               country:"India",       type:"Low Cost",    hub:"DEL",bsp:true, alliance:"None",   gds:"1G",      commPct:0},
-    {id:4, iata:"SG",  name:"SpiceJet",             country:"India",       type:"Low Cost",    hub:"DEL",bsp:true, alliance:"None",   gds:"1G",      commPct:0},
-    {id:5, iata:"QR",  name:"Qatar Airways",        country:"Qatar",       type:"Full Service",hub:"DOH",bsp:true, alliance:"One",    gds:"1A/1G/1B",commPct:5},
-    {id:6, iata:"EY",  name:"Etihad Airways",       country:"UAE",         type:"Full Service",hub:"AUH",bsp:true, alliance:"None",   gds:"1A/1G",   commPct:4},
-    {id:7, iata:"G9",  name:"Air Arabia",           country:"UAE",         type:"Low Cost",    hub:"SHJ",bsp:false,alliance:"None",   gds:"Direct",  commPct:0},
-    {id:9, iata:"ET",  name:"Ethiopian Airlines",   country:"Ethiopia",    type:"Full Service",hub:"ADD",bsp:true, alliance:"Star",   gds:"1A/1G/1B",commPct:5},
-    {id:10,iata:"LH",  name:"Lufthansa",            country:"Germany",     type:"Full Service",hub:"FRA",bsp:true, alliance:"Star",   gds:"1A/1G/1B",commPct:5},
-    {id:11,iata:"BA",  name:"British Airways",      country:"UK",          type:"Full Service",hub:"LHR",bsp:true, alliance:"One",    gds:"1A/1B",   commPct:5},
-    {id:12,iata:"9W",  name:"Jet Airways",          country:"India",       type:"Full Service",hub:"BOM",bsp:false,alliance:"None",   gds:"",        commPct:0},
-  ];
+  const airlines=[];
   const filtered=airlines.filter(a=>!search||
     a.name.toLowerCase().includes(search.toLowerCase())||
     a.iata.toLowerCase().includes(search.toLowerCase())||
@@ -1258,28 +1233,8 @@ export function MastersHotels(){
   const [modal,setModal]=useState(false);
   const [tab,setTab]=useState("hotels");
   const [search,setSearch]=useState("");
-  const hotels=[
-    {id:1, name:"Hyatt Regency Ahmedabad", city:"Ahmedabad",stars:5,gstSlab:18,tariff:8500, chain:"Hyatt",contract:true},
-    {id:2, name:"ITC Grand Central Mumbai",city:"Mumbai",   stars:5,gstSlab:18,tariff:12000,chain:"ITC",  contract:true},
-    {id:3, name:"Oberoi New Delhi",        city:"New Delhi", stars:5,gstSlab:18,tariff:15000,chain:"Oberoi",contract:true},
-    {id:4, name:"Taj Lands End Mumbai",    city:"Mumbai",   stars:5,gstSlab:18,tariff:11000,chain:"Taj",  contract:false},
-    {id:5, name:"Radisson Blu Ahmedabad",  city:"Ahmedabad",stars:4,gstSlab:18,tariff:6500, chain:"Radisson",contract:true},
-    {id:6, name:"Lemon Tree Premier",      city:"Mumbai",   stars:4,gstSlab:12,tariff:4500, chain:"Lemon Tree",contract:true},
-    {id:7, name:"Ibis Mumbai Airport",     city:"Mumbai",   stars:3,gstSlab:12,tariff:3200, chain:"Ibis",  contract:false},
-    {id:8, name:"Nairobi Serena Hotel",    city:"Nairobi",  stars:5,gstSlab:16,tariff:18000,chain:"Serena",contract:true},
-    {id:9, name:"Hyatt Regency Dar",       city:"Dar es Salaam",stars:5,gstSlab:18,tariff:22000,chain:"Hyatt",contract:true},
-    {id:10,name:"Karavia Hotel Lubumbashi",city:"Lubumbashi",stars:4,gstSlab:16,tariff:180,  chain:"Karavia",contract:true},
-  ];
-  const dmcs=[
-    {id:1, name:"Bali Tours DMC Co.",        country:"Indonesia",speciality:"Beach/Adventure",currency:"INR",commPct:10,contract:true},
-    {id:2, name:"Singapore MICE & Events",   country:"Singapore", speciality:"MICE/Corporate", currency:"INR",commPct:8, contract:true},
-    {id:3, name:"Island Escapes Maldives",   country:"Maldives",  speciality:"Luxury Beach",   currency:"INR",commPct:12,contract:true},
-    {id:4, name:"Thailand Discovery DMC",    country:"Thailand",  speciality:"Cultural/Beach",  currency:"INR",commPct:10,contract:false},
-    {id:5, name:"Dubai Wonders DMC",         country:"UAE",       speciality:"City/Shopping",   currency:"INR",commPct:8, contract:true},
-    {id:6, name:"Maasai Mara Safaris",       country:"Kenya",     speciality:"Safari/Wildlife", currency:"INR",commPct:10,contract:true},
-    {id:7, name:"Zanzibar Beach DMC",        country:"Tanzania",  speciality:"Beach/Spice",     currency:"INR",commPct:12,contract:true},
-    {id:8, name:"DRC Safari Operator",       country:"DRC",       speciality:"Gorilla/Nature",  currency:"INR",commPct:15,contract:false},
-  ];
+  const hotels=[];
+  const dmcs=[];
   const filt_h=hotels.filter(h=>!search||h.name.toLowerCase().includes(search.toLowerCase())||h.city.toLowerCase().includes(search.toLowerCase()));
   const filt_d=dmcs.filter(d=>!search||d.name.toLowerCase().includes(search.toLowerCase())||d.country.toLowerCase().includes(search.toLowerCase()));
   const gstColor={0:"#bfc3d6",12:"#854F0B",16:"#185FA5",18:"#A32D2D"};
@@ -2159,8 +2114,8 @@ export function CustomerMasterTabbed(){
     {id:"history",label:"9. History"},{id:"linked",label:"10. Linked Vouchers"},
     {id:"outstanding",label:"11. Outstanding"},{id:"custom",label:"12. Custom Fields"},
   ];
-  return TAB_Page("L&T Limited", "Customer Master · CUST-BOM-00128 · Class A · Standardised 12-tab structure",
-    {user:"Faiz Patel",date:"2026-05-19 14:08",created:"2024-08-15 09:12"},
+  return TAB_Page("Customer Master", "Standardised 12-tab structure",
+    {user:"",date:"",created:""},
     <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
       <div style={{display:"flex",borderBottom:"1px solid #e1e3ec",overflowX:"auto",background:"#fafbfd"}}>
         {tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}
@@ -2173,7 +2128,7 @@ export function CustomerMasterTabbed(){
           <FL label="Country"><select style={inpStd}><option>India</option><option>UAE</option><option>Kenya</option><option>Singapore</option></select></FL>
           <FL label="Industry"><input defaultValue="Engineering & Construction" style={inpStd}/></FL>
           <FL label="Branch"><select style={inpStd}><option>BOM (Mumbai)</option><option>AMD</option></select></FL>
-          <FL label="Account Manager"><select style={inpStd}><option>Rohan</option><option>Mohan</option></select></FL>
+          <FL label="Account Manager"><select style={inpStd}><option value="">— Select —</option></select></FL>
           <FL label="Status"><div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
             <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}><input type="radio" checked={active} onChange={()=>setActive(true)}/><span style={{fontSize:12}}>Active</span></label>
             <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}><input type="radio" checked={!active} onChange={()=>setActive(false)}/><span style={{fontSize:12}}>Inactive</span></label>
@@ -2194,9 +2149,7 @@ export function CustomerMasterTabbed(){
         </div>
       )}
       {tab==="contact"&&tabPanel(
-        <div>{[{n:"Priya Krishnan",r:"Travel Desk Manager",e:"priya.k@larsentoubro.com",p:"+91 98201 12345",pri:true},
-          {n:"Rajat Verma",r:"Finance Controller",e:"rajat.v@larsentoubro.com",p:"+91 98201 54321",pri:false},
-          {n:"Anjali Mehta",r:"Procurement Head",e:"anjali.m@larsentoubro.com",p:"+91 98201 99887",pri:false}].map((c,i)=>(
+        <div>{[].map((c,i)=>(
           <div key={i} style={{display:"grid",gridTemplateColumns:"40px 1fr 1fr 1fr 1fr 80px",gap:10,alignItems:"center",padding:"10px 12px",background:"#fafbfd",borderRadius:6,marginBottom:8,border:"1px solid #e1e3ec"}}>
             <div style={{width:34,height:34,borderRadius:"50%",background:"#0d1326",color:"#d4a437",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:11}}>{c.n.substring(0,2).toUpperCase()}</div>
             <input defaultValue={c.n} style={inpStd}/>
@@ -2218,7 +2171,7 @@ export function CustomerMasterTabbed(){
             <th style={{padding:"9px 12px",textAlign:"center",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Primary</th>
             <th style={{padding:"9px 12px",textAlign:"center",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Action</th>
           </tr></thead>
-          <tbody>{[{b:"State Bank of India",a:"XXXX 7892",i:"SBIN0001234",c:"INR",p:true},{b:"HDFC Bank",a:"XXXX 1245",i:"HDFC0000045",c:"INR",p:false},{b:"ICICI Bank",a:"XXXX 5566",i:"ICIC0000004",c:"INR",p:false}].map((b,i)=>(
+          <tbody>{[].map((b,i)=>(
             <tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}>
               <td style={{padding:"10px 12px",fontWeight:600}}>{b.b}</td><td style={{padding:"10px 12px",fontFamily:"monospace"}}>{b.a}</td>
               <td style={{padding:"10px 12px",fontFamily:"monospace"}}>{b.i}</td><td style={{padding:"10px 12px"}}>{b.c}</td>
@@ -2279,9 +2232,7 @@ export function CustomerMasterTabbed(){
       )}
       {tab==="notes"&&tabPanel(
         <div>
-          {[{ts:"2026-05-19 11:30",u:"Rohan",txt:"Priya confirmed Q2 budget of ₹50L for senior management travel — added to forecast",pin:true},
-            {ts:"2026-04-22 14:00",u:"Rohan",txt:"Customer requested all bookings to be billed under MSA framework; updated billing terms accordingly",pin:false},
-            {ts:"2025-12-08 09:15",u:"Faiz Patel",txt:"Approved credit limit increase ₹5L → ₹8L based on payment history (DSO 28 days)",pin:false}].map((n,i)=>(
+          {[].map((n,i)=>(
             <div key={i} style={{padding:"10px 12px",background:n.pin?"#fff8e7":"#fafbfd",borderRadius:6,marginBottom:8,borderLeft:"3px solid "+(n.pin?"#d4a437":"#e1e3ec")}}>
               <p style={{margin:0,fontSize:12,color:"#0d1326",lineHeight:1.5}}>{n.pin&&"📌 "}{n.txt}</p>
               <p style={{margin:"4px 0 0",fontSize:10,color:"#5a6691"}}>{n.u} · {n.ts}</p>
@@ -2294,14 +2245,14 @@ export function CustomerMasterTabbed(){
         <>
           <p style={{margin:"0 0 12px",fontSize:11.5,color:"#5a6691"}}>Last 12 months transaction summary</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
-            {[{l:"Bookings",v:"42",c:"#0d1326"},{l:"Revenue",v:"₹1.85 Cr",c:"#22c55e"},{l:"Avg Basket",v:"₹4.4L",c:"#d4a437"},{l:"DSO",v:"28 days",c:"#22c55e"}].map(k=>(
+            {[].map(k=>(
               <div key={k.l} style={{padding:12,background:"#fafbfd",borderRadius:6,border:"1px solid #e1e3ec",borderTop:"3px solid "+k.c}}>
                 <p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p>
                 <p style={{margin:"3px 0 0",fontSize:20,fontWeight:700,color:"#0d1326"}}>{k.v}</p>
               </div>))}
           </div>
           <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={[{m:"Jun",r:1450000},{m:"Jul",r:1820000},{m:"Aug",r:1580000},{m:"Sep",r:2120000},{m:"Oct",r:1650000},{m:"Nov",r:1880000},{m:"Dec",r:2450000},{m:"Jan",r:1320000},{m:"Feb",r:1180000},{m:"Mar",r:1620000},{m:"Apr",r:1480000},{m:"May",r:1850000}]}>
+            <BarChart data={[]}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f7"/><XAxis dataKey="m" tick={{fontSize:10,fill:"#5a6691"}}/><YAxis tick={{fontSize:10,fill:"#5a6691"}} tickFormatter={v=>(v/100000).toFixed(0)+"L"}/><Tooltip formatter={v=>"₹"+v.toLocaleString("en-IN")}/>
               <Bar dataKey="r" fill="#d4a437"/>
             </BarChart>
@@ -2311,14 +2262,14 @@ export function CustomerMasterTabbed(){
       {tab==="linked"&&tabPanel(
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead style={{background:"#f7f8fb"}}><tr>{["Voucher","Date","Type","Branch","Amount","Status","Action"].map((h,i)=><th key={h} style={{padding:"9px 12px",textAlign:i===4?"right":i===5||i===6?"center":"left",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-          <tbody>{[{v:"INV-BOM/2026/8742",d:"2026-05-20",t:"Tax Invoice",b:"BOM",a:142500,s:"Posted"},{v:"RV-BOM/2026/4521",d:"2026-05-19",t:"Receipt",b:"BOM",a:485000,s:"Cleared"},{v:"INV-BOM/2026/8721",d:"2026-05-15",t:"Tax Invoice",b:"BOM",a:325000,s:"Paid"},{v:"INV-BOM/2026/8688",d:"2026-05-08",t:"Tax Invoice",b:"BOM",a:185000,s:"Paid"},{v:"INV-BOM/2026/8654",d:"2026-04-28",t:"Tax Invoice",b:"BOM",a:265000,s:"Paid"}].map(r=>(
+          <tbody>{[].map(r=>(
             <tr key={r.v} style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",fontFamily:"monospace",fontWeight:600}}>{r.v}</td><td style={{padding:"9px 12px",color:"#5a6691"}}>{r.d}</td><td style={{padding:"9px 12px"}}>{r.t}</td><td style={{padding:"9px 12px"}}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{r.b}</span></td><td style={{padding:"9px 12px",textAlign:"right",fontWeight:700}}>₹{r.a.toLocaleString("en-IN")}</td><td style={{padding:"9px 12px",textAlign:"center"}}><span style={{padding:"2px 8px",background:r.s==="Paid"||r.s==="Cleared"?"#d4edda":"#fff3cd",color:r.s==="Paid"||r.s==="Cleared"?"#155724":"#856404",borderRadius:3,fontSize:10,fontWeight:700}}>{r.s}</span></td><td style={{padding:"9px 12px",textAlign:"center"}}><button style={{padding:"3px 8px",background:"transparent",border:"1px solid #d4a437",color:"#d4a437",borderRadius:4,fontSize:10,cursor:"pointer",fontWeight:600}}>Open</button></td></tr>))}</tbody>
         </table>
       )}
       {tab==="outstanding"&&tabPanel(
         <>
           <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:14}}>
-            {[{b:"Current",a:142500,c:"#22c55e"},{b:"1-30 d",a:185000,c:"#22c55e"},{b:"31-60 d",a:0,c:"#eab308"},{b:"61-90 d",a:0,c:"#f97316"},{b:">90 d",a:0,c:"#A32D2D"}].map(b=>(
+            {[].map(b=>(
               <div key={b.b} style={{padding:10,background:"#fafbfd",borderRadius:6,border:"1px solid #e1e3ec",borderLeft:"3px solid "+b.c}}>
                 <p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{b.b}</p>
                 <p style={{margin:"3px 0 0",fontSize:14,fontWeight:700,color:"#0d1326"}}>₹{b.a.toLocaleString("en-IN")}</p>
@@ -2360,8 +2311,8 @@ export function CustomerMasterTabbed(){
 export function SupplierMasterTabbed(){
   const [tab,setTab]=useState("basic");
   const tabs=[{id:"basic",label:"1. Basic Info"},{id:"address",label:"2. Address"},{id:"contact",label:"3. Contact Persons"},{id:"bank",label:"4. Bank Details"},{id:"tax",label:"5. Tax Info"},{id:"credit",label:"6. Payment Terms"},{id:"docs",label:"7. Documents"},{id:"notes",label:"8. Notes"},{id:"history",label:"9. History"},{id:"linked",label:"10. Linked Vouchers"},{id:"outstanding",label:"11. Outstanding"},{id:"custom",label:"12. Custom Fields"}];
-  return TAB_Page("Air India Limited (BSP)", "Supplier Master · SUPP-BOM-AI001 · Tier-A · Same 12-tab structure as Customer Master",
-    {user:"Sughra Sayed",date:"2026-05-18 16:30",created:"2018-04-12 11:00"},
+  return TAB_Page("Supplier Master", "Same 12-tab structure as Customer Master",
+    {user:"",date:"",created:""},
     <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
       <div style={{display:"flex",borderBottom:"1px solid #e1e3ec",overflowX:"auto",background:"#fafbfd"}}>{tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}</div>
       {tab==="basic"&&tabPanel(
@@ -2372,7 +2323,7 @@ export function SupplierMasterTabbed(){
           <FL label="Country"><select style={inpStd}><option>India</option><option>UAE</option><option>Kenya</option></select></FL>
           <FL label="Category"><input defaultValue="Domestic + International Airline" style={inpStd}/></FL>
           <FL label="Branch"><select style={inpStd}><option>BOM (Mumbai)</option><option>All Branches</option></select></FL>
-          <FL label="Vendor Manager"><select style={inpStd}><option>Faiz Patel</option><option>Rohan</option></select></FL>
+          <FL label="Vendor Manager"><select style={inpStd}><option value="">— Select —</option></select></FL>
           <FL label="Status"><span style={{display:"inline-block",padding:"6px 12px",background:"#d4edda",color:"#155724",borderRadius:5,fontSize:12,fontWeight:700}}>✓ Active · BSP-eligible</span></FL>
           <FL label="Preferred"><label style={{display:"flex",alignItems:"center",gap:6,paddingTop:6,cursor:"pointer"}}><input type="checkbox" defaultChecked/><span style={{fontSize:12}}>Yes — Tier-A Vendor</span></label></FL>
         </div>
@@ -2402,7 +2353,7 @@ export function SupplierMasterTabbed(){
       {tab==="bank"&&tabPanel(
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead style={{background:"#f7f8fb"}}><tr>{["Bank","Account","IFSC","Currency","Beneficiary","Primary"].map(h=><th key={h} style={{padding:"9px 12px",textAlign:"left",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-          <tbody>{[{b:"State Bank of India — BSP Settlement",a:"XXXX BSP01",i:"SBIN0000691",c:"INR",bn:"BSP India Settlement A/c",p:true},{b:"HDFC Bank — Direct",a:"XXXX 8847",i:"HDFC0000060",c:"INR",bn:"Air India Limited",p:false}].map((b,i)=>(
+          <tbody>{[].map((b,i)=>(
             <tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"10px 12px",fontWeight:600}}>{b.b}</td><td style={{padding:"10px 12px",fontFamily:"monospace"}}>{b.a}</td><td style={{padding:"10px 12px",fontFamily:"monospace"}}>{b.i}</td><td style={{padding:"10px 12px"}}>{b.c}</td><td style={{padding:"10px 12px",fontSize:11,color:"#5a6691"}}>{b.bn}</td><td style={{padding:"10px 12px",color:b.p?"#d4a437":"#cbd0dc",fontSize:16}}>★</td></tr>))}</tbody>
         </table>
       )}
@@ -2444,7 +2395,7 @@ export function SupplierMasterTabbed(){
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10}}>{["GSA Agreement","BSP Settlement Mandate","IATA Authorization","GST Certificate","PAN Card"].map(d=>(<div key={d} style={{padding:14,background:"#fafbfd",border:"1px solid #e1e3ec",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:32}}>📄</p><p style={{margin:"6px 0 2px",fontSize:11.5,color:"#0d1326",fontWeight:600}}>{d}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>2018-04-12</p><button style={{marginTop:6,padding:"3px 10px",background:"transparent",border:"1px solid #d4a437",color:"#d4a437",borderRadius:4,fontSize:10,cursor:"pointer",fontWeight:600}}>View</button></div>))}</div>
       )}
       {tab==="notes"&&tabPanel(
-        <div>{[{ts:"2026-05-18 10:00",u:"Faiz Patel",txt:"BSP settlement amounts to be reconciled against IATA Cycle Statement before payment release",pin:true},{ts:"2026-04-15 14:20",u:"Rohan",txt:"Air India introduced 5% fuel surcharge effective May 1 — communicated to all consultants",pin:false}].map((n,i)=>(<div key={i} style={{padding:"10px 12px",background:n.pin?"#fff8e7":"#fafbfd",borderRadius:6,marginBottom:8,borderLeft:"3px solid "+(n.pin?"#d4a437":"#e1e3ec")}}><p style={{margin:0,fontSize:12,color:"#0d1326",lineHeight:1.5}}>{n.pin&&"📌 "}{n.txt}</p><p style={{margin:"4px 0 0",fontSize:10,color:"#5a6691"}}>{n.u} · {n.ts}</p></div>))}</div>
+        <div>{[].map((n,i)=>(<div key={i} style={{padding:"10px 12px",background:n.pin?"#fff8e7":"#fafbfd",borderRadius:6,marginBottom:8,borderLeft:"3px solid "+(n.pin?"#d4a437":"#e1e3ec")}}><p style={{margin:0,fontSize:12,color:"#0d1326",lineHeight:1.5}}>{n.pin&&"📌 "}{n.txt}</p><p style={{margin:"4px 0 0",fontSize:10,color:"#5a6691"}}>{n.u} · {n.ts}</p></div>))}</div>
       )}
       {tab==="history"&&tabPanel(
         <>
@@ -2531,7 +2482,7 @@ export function CustomerMasterDetail(){
           {tab==="basic" && (
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <CMDLabel label="Customer Code"><input style={{...inp,fontFamily:"monospace"}} defaultValue="CUST-BOM-00142"/></CMDLabel>
-              <CMDLabel label="Customer Name"><input style={inp} defaultValue="L&T Limited"/></CMDLabel>
+              <CMDLabel label="Customer Name"><input style={inp} defaultValue=""/></CMDLabel>
               <CMDLabel label="Type"><select style={inp}><option>Corporate</option><option>Individual</option><option>Sub-Agent</option><option>Govt / PSU</option></select></CMDLabel>
               <CMDLabel label="Branch"><select style={inp}><option>BOM</option><option>AMD</option></select></CMDLabel>
               <CMDLabel label="Industry"><select style={inp}><option>Engineering & Construction</option><option>IT/ITES</option><option>Manufacturing</option><option>BFSI</option></select></CMDLabel>
@@ -2557,7 +2508,7 @@ export function CustomerMasterDetail(){
           {tab==="contact" && (
             <div>
               <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>3 contact persons</p>
-              {[{name:"Mr. Rajesh Iyer",role:"Travel Manager",email:"rajesh.iyer@lntech.com",phone:"+91 98200 12345"},{name:"Ms. Priya Sharma",role:"Finance Controller",email:"priya.sharma@lntech.com",phone:"+91 98200 67890"},{name:"Mr. Anil Joshi",role:"Procurement Head",email:"anil.joshi@lntech.com",phone:"+91 98200 24680"}].map((c,i)=>(
+              {[].map((c,i)=>(
                 <div key={i} style={{padding:10,border:"1px solid #e1e3ec",borderRadius:6,marginBottom:6,display:"grid",gridTemplateColumns:"2fr 2fr 1.5fr",gap:10,alignItems:"center"}}>
                   <div><p style={{margin:0,fontSize:12,fontWeight:600,color:"#0d1326"}}>{c.name}</p><p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{c.role}</p></div>
                   <div style={{fontSize:11,color:"#5a6691"}}>{c.email}</div>
@@ -2608,7 +2559,7 @@ export function CustomerMasterDetail(){
           {tab==="history" && (
             <div>
               <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Last 6 changes (inline audit history)</p>
-              {[{ts:"2026-05-14 11:42",user:"Rohan",action:"Credit limit increased ₹40L → ₹50L"},{ts:"2026-05-08 14:20",user:"Faiz Patel",action:"Approved credit limit increase"},{ts:"2026-04-01 09:15",user:"Rohan",action:"Updated annual agreement document"},{ts:"2026-03-12 16:40",user:"Rohan",action:"Added contact: Mr. Anil Joshi"},{ts:"2026-02-28 10:30",user:"Sughra Sayed",action:"Updated billing address"},{ts:"2024-04-10 12:00",user:"AD",action:"Created customer master"}].map((h,i)=>(
+              {[].map((h,i)=>(
                 <div key={i} style={{display:"flex",gap:10,padding:"6px 0",borderBottom:"1px solid #f0f2f7"}}>
                   <span style={{fontSize:10.5,fontFamily:"monospace",color:"#5a6691",minWidth:120}}>{h.ts}</span>
                   <span style={{fontSize:11.5,fontWeight:600,color:"#0d1326",minWidth:110}}>{h.user}</span>
@@ -2630,7 +2581,7 @@ export function CustomerMasterDetail(){
             <div>
               <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Custom fields (configured in Settings → Custom Fields Manager)</p>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-                <CMDLabel label="Account Manager"><input style={inp} defaultValue="Rohan (BOM)"/></CMDLabel>
+                <CMDLabel label="Account Manager"><input style={inp} defaultValue=""/></CMDLabel>
                 <CMDLabel label="Procurement Code (Client side)"><input style={{...inp,fontFamily:"monospace"}} defaultValue="LNT-VEN-04258"/></CMDLabel>
                 <CMDLabel label="SLA Tier"><select style={inp}><option>Platinum</option><option>Gold</option><option>Silver</option></select></CMDLabel>
                 <CMDLabel label="Loyalty Score"><input type="number" style={inp} defaultValue="92"/></CMDLabel>
@@ -2646,7 +2597,7 @@ export function CustomerMasterDetail(){
       {/* Last-modified footer */}
       <div style={{marginTop:14,padding:"10px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,color:"#5a6691"}}>
         <span>Created by <b style={{color:"#0d1326"}}>AD</b> on 2024-04-10 12:00</span>
-        <span>Last modified by <b style={{color:"#0d1326"}}>Rohan</b> on 2026-05-14 11:42</span>
+        <span>Last modified by <b style={{color:"#0d1326"}}>—</b></span>
         <span>Record ID: <span style={{fontFamily:"monospace"}}>CUST-BOM-00142</span></span>
       </div>
     </PHASE2_Page>
@@ -2759,7 +2710,7 @@ export function BulkImportMaster(){
         <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Recent imports</p>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Date</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>By</th><th style={{...RPT_thStyle,textAlign:"right"}}>Rows</th><th style={{...RPT_thStyle,textAlign:"right"}}>Imported</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
-          <tbody>{[{date:"2026-05-14",type:"Customers",user:"Faiz Patel",rows:42,imported:40,status:"Complete"},{date:"2026-04-22",type:"Forex Rates",user:"Sughra Sayed",rows:7,imported:7,status:"Complete"},{date:"2026-04-01",type:"Suppliers",user:"AD",rows:124,imported:120,status:"Complete"}].map((r,i)=>(<tr key={i}><td style={RPT_tdStyle}>{r.date}</td><td style={RPT_tdStyle}>{r.type}</td><td style={RPT_tdStyle}>{r.user}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{r.rows}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#22c55e"}}>{r.imported}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 8px",background:"#d4edda",color:"#155724",borderRadius:3,fontSize:10,fontWeight:700}}>{r.status}</span></td></tr>))}</tbody>
+          <tbody>{[].map((r,i)=>(<tr key={i}><td style={RPT_tdStyle}>{r.date}</td><td style={RPT_tdStyle}>{r.type}</td><td style={RPT_tdStyle}>{r.user}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{r.rows}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#22c55e"}}>{r.imported}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 8px",background:"#d4edda",color:"#155724",borderRadius:3,fontSize:10,fontWeight:700}}>{r.status}</span></td></tr>))}</tbody>
         </table>
       </div>
     </PHASE2_Page>
@@ -2774,7 +2725,7 @@ export function BulkImportMaster(){
 export function MergeRecordsUtility(){
   const [masterType, setMasterType] = useState("Customers");
   const [source, setSource] = useState("L T Group (CUST-AMD-00012)");
-  const [target, setTarget] = useState("L&T Limited (CUST-BOM-00142)");
+  const [target, setTarget] = useState("");
   const inp = {padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%"};
 
   return (
@@ -2814,7 +2765,7 @@ export function MergeRecordsUtility(){
             <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Field</th><th style={{...RPT_thStyle,color:"#A32D2D"}}>Source (out)</th><th style={{...RPT_thStyle,color:"#22c55e"}}>Target (kept)</th><th style={{...RPT_thStyle,textAlign:"center"}}>After Merge</th></tr></thead>
             <tbody>
               {[
-                {field:"Name",src:"L T Group",tgt:"L&T Limited",result:"L&T Limited"},
+                {field:"Name",src:"",tgt:"",result:""},
                 {field:"GSTIN",src:"24AAACL0140P1ZH (AMD)",tgt:"27AAACL0140P1ZW (BOM)",result:"Both kept as alternate GSTINs"},
                 {field:"Credit Limit",src:"₹10L",tgt:"₹50L",result:"₹50L (higher)"},
                 {field:"Address Count",src:"1",tgt:"3",result:"4 (combined)"},

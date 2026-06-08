@@ -1867,7 +1867,7 @@ export const EMAIL_TEMPLATES_DATA = [
 
 
 export const CUSTOM_FIELDS_DATA = [
-  {id:"CF-001",master:"Customer",label:"Account Manager",type:"Dropdown",required:false,options:"Rohan,Mohan,Mujeet,Rujeet,Sujeet",active:true},
+  {id:"CF-001",master:"Customer",label:"Account Manager",type:"Dropdown",required:false,options:"",active:true},
   {id:"CF-002",master:"Customer",label:"SLA Tier",type:"Dropdown",required:false,options:"Platinum,Gold,Silver,Standard",active:true},
   {id:"CF-003",master:"Customer",label:"Procurement Code",type:"Text",required:false,options:"",active:true},
   {id:"CF-004",master:"Customer",label:"Next Review Date",type:"Date",required:false,options:"",active:true},

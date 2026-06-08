@@ -1353,11 +1353,11 @@ export const GSTR_FILING_STATUS = [
 
 
 export function Form16Generator(){
-  const [selEmp,setSelEmp]=useState("Rohan (TK-BOM-003)");
+  const [selEmp,setSelEmp]=useState("");
   const [fy,setFy]=useState(CUR_FY.label);
   return(
     <PHASE2_Page title="Form 16 Generator — India" subtitle="Annual salary certificate for income tax filing · generated from payroll data"
-      toolbar={<><select value={selEmp} onChange={e=>setSelEmp(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{["Afshin Dhanani (TK-HO-000)","Faiz Patel (TK-HO-001)","Sughra Sayed (TK-HO-002)","Rohan (TK-BOM-003)","Mohan (TK-AMD-002)"].map(e=><option key={e}>{e}</option>)}</select><select value={fy} onChange={e=>setFy(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{fyOptions().map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select><button onClick={()=>window.print()} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download Form 16</button></>}>
+      toolbar={<><select value={selEmp} onChange={e=>setSelEmp(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{[].map(e=><option key={e}>{e}</option>)}</select><select value={fy} onChange={e=>setFy(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{fyOptions().map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select><button onClick={()=>window.print()} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download Form 16</button></>}>
       <div style={{maxWidth:760,margin:"0 auto",background:"#fff",border:"2px solid #0d1326",borderRadius:6,overflow:"hidden",fontSize:12}}>
         {/* Header */}
         <div style={{padding:"12px 20px",background:"#0d1326",color:"#fff",textAlign:"center"}}>
@@ -1368,7 +1368,7 @@ export function Form16Generator(){
         <div style={{padding:"14px 20px",borderBottom:"2px solid #0d1326"}}>
           <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,background:"#0d1326",color:"#d4a437",padding:"4px 10px",display:"inline-block"}}>PART A — TDS Details</p>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:11.5}}>
-            {[{l:"Employer (Deductor) Name",v:"Travkings Tours & Travels Pvt. Ltd."},{l:"Employer PAN",v:"AAACT1234A"},{l:"Employer TAN",v:"MUMA12345B"},{l:"Employee Name",v:"Rohan"},{l:"Employee PAN",v:"ABCPR1234A"},{l:"Assessment Year",v:fy==="2025-26"?"2026-27":"2025-26"},{l:"Period of Employment",v:"01-Apr-2025 to 31-Mar-2026"},{l:"TDS Deposited",v:"₹22,200"}].map(f=>(
+            {[{l:"Employer (Deductor) Name",v:"Travkings Tours & Travels Pvt. Ltd."},{l:"Employer PAN",v:"AAACT1234A"},{l:"Employer TAN",v:"MUMA12345B"},{l:"Employee Name",v:""},{l:"Employee PAN",v:""},{l:"Assessment Year",v:fy==="2025-26"?"2026-27":"2025-26"},{l:"Period of Employment",v:"01-Apr-2025 to 31-Mar-2026"},{l:"TDS Deposited",v:""}].map(f=>(
               <div key={f.l} style={{display:"flex",gap:6,padding:"4px 0",borderBottom:"1px solid #f0f2f7"}}><span style={{color:"#5a6691",minWidth:180}}>{f.l}</span><b>{f.v}</b></div>
             ))}
           </div>
@@ -1417,12 +1417,7 @@ export function Form16Generator(){
 export const GSTR1_B2B = [];
 
 
-export const GSTR1_B2C = [
-  {place:"Maharashtra",taxable:1850000,rate:18,igst:0,   cgst:166500,sgst:166500},
-  {place:"Gujarat",    taxable:480000, rate:18,igst:86400,cgst:0,     sgst:0},
-  {place:"Karnataka",  taxable:320000, rate:18,igst:57600,cgst:0,     sgst:0},
-  {place:"Delhi",      taxable:280000, rate:18,igst:50400,cgst:0,     sgst:0},
-];
+export const GSTR1_B2C = [];
 
 
 export const GSTR3B_SUMMARY = {

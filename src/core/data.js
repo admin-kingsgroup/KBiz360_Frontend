@@ -413,12 +413,7 @@ export const TAX_CALENDAR_EVENTS = []; /* moved to DB — fetch via API/hook */
    Master screen (masters.jsx) AND the Sub-Agent Commission Statement
    (helpers.jsx). Kept here so the statement screen can't reference an
    undeclared `SUBAGENTS` (which previously crashed the page). */
-export const SUBAGENTS = [
-  {id:"SA001",name:"Skyline Travels",   iata:"14-3 88888 1",email:"info@skyline.in",    phone:"+91 22 1234 5678",type:"Retail",   city:"Mumbai",   currency:"INR",commType:"% of GP",  commRate:15,  creditLimit:500000, creditDays:30,paymentCycle:"Monthly",  revYTD:840000, gpYTD:126000,books:24,active:true,joined:"2021-06-01",territory:"Mumbai, Thane"},
-  {id:"SA002",name:"Global Wings",      iata:"",            email:"gw@global.in",       phone:"+91 79 2345 6789",type:"Corporate",city:"Ahmedabad",currency:"INR",commType:"Fixed ₹",  commRate:1200,creditLimit:300000, creditDays:45,paymentCycle:"Monthly",  revYTD:560000, gpYTD:67200, books:18,active:true,joined:"2022-03-15",territory:"Gujarat"},
-  {id:"SA003",name:"Paradise Holidays", iata:"14-3 77777 2",email:"paradise@ph.in",     phone:"+91 11 3456 7890",type:"Retail",   city:"Delhi",    currency:"INR",commType:"% of sell",commRate:8,   creditLimit:400000, creditDays:30,paymentCycle:"Bi-weekly",revYTD:1120000,gpYTD:89600, books:31,active:true,joined:"2020-11-01",territory:"Delhi NCR"},
-  {id:"SA005",name:"Online Deals (OTA)",iata:"",            email:"ops@onlinedeals.in", phone:"+91 80 4567 8901",type:"Online",   city:"Bangalore",currency:"INR",commType:"% of sell",commRate:6,   creditLimit:1000000,creditDays:15,paymentCycle:"Weekly",   revYTD:2340000,gpYTD:140400,books:67,active:true,joined:"2022-08-01",territory:"Pan India Online"},
-];
+export const SUBAGENTS = [];   // demo data removed — populate from live sub-agent master
 
 /* ════════════════════════════════════════════════════════════════════
    10. GSTR-1 AUTO-PREP

@@ -952,20 +952,7 @@ export function SettingsAudit(){
   const [typeFilter,setTypeFilter]=useState("All");
   const [brFilter,setBrFilter]=useState("All");
 
-  const LOGS=[
-    {id:1,ts:"2026-05-17 12:04",user:"Rohan",    branch:"BOM",action:"CREATE",module:"Sales/Flight",desc:"Created voucher BOM/1726/SF00046",ip:"10.0.1.12"},
-    {id:2,ts:"2026-05-17 11:58",user:"Rohan",   branch:"BOM",action:"SAVE",  module:"Sales/Flight",desc:"Saved & settled purchase PF00045 → SF00046",ip:"10.0.1.15"},
-    {id:3,ts:"2026-05-17 11:42",user:"Rohan",    branch:"BOM",action:"CREATE",module:"Journal",     desc:"Created JV BOM/1726/JV00012 — Salary provision",ip:"10.0.1.18"},
-    {id:4,ts:"2026-05-17 11:30",user:"Rohan",    branch:"BOM",action:"LOGIN", module:"Auth",        desc:"User login from Mumbai office network",ip:"10.0.1.12"},
-    {id:5,ts:"2026-05-17 11:15",user:"Mohan",    branch:"AMD",action:"CREATE",module:"Sales/Visa",  desc:"Created voucher AMD/1726/SV00006",ip:"10.0.2.20"},
-    {id:7,ts:"2026-05-17 10:44",user:"Rohan",    branch:"BOM",action:"EDIT",  module:"Masters",     desc:"Updated supplier: Emirates GSA India — commission updated to 5%",ip:"10.0.1.18"},
-    {id:8,ts:"2026-05-17 10:30",user:"AD",            branch:"BOM",action:"LOGIN", module:"Auth",        desc:"Admin login — settings access",ip:"10.0.1.5"},
-    {id:10,ts:"2026-05-17 09:55",user:"Rohan",  branch:"BOM",action:"PRINT", module:"Sales/Flight",desc:"Downloaded PDF for BOM/1726/SF00045",ip:"10.0.1.15"},
-    {id:11,ts:"2026-05-17 09:40",user:"Mohan",  branch:"AMD",action:"EDIT",  module:"Payroll",     desc:"Processed payroll run — AMD May 2026",ip:"10.0.2.22"},
-    {id:12,ts:"2026-05-17 09:14",user:"Rohan",  branch:"BOM",action:"LOGIN", module:"Auth",        desc:"User login",ip:"10.0.1.15"},
-    {id:13,ts:"2026-05-16 18:22",user:"Mohan",   branch:"AMD",action:"LOGOUT",module:"Auth",        desc:"User logout",ip:"10.0.2.20"},
-    {id:15,ts:"2026-05-16 16:30",user:"Rohan",   branch:"BOM",action:"DELETE",module:"Draft",       desc:"Deleted draft voucher BOM/1726/SF00040-D (unsaved draft)",ip:"10.0.1.12"},
-  ];
+  const LOGS=[];
 
   const ACTION_CLR={CREATE:"#27500A",SAVE:"#185FA5",EDIT:"#854F0B",LOGIN:"#384677",LOGOUT:"#5a6691",PRINT:"#1D9E75",DELETE:"#A32D2D"};
   const ACTION_BG= {CREATE:"#EAF3DE",SAVE:"#E6F1FB",EDIT:"#FAEEDA",LOGIN:"#f3f4f8",LOGOUT:"#f3f4f8",PRINT:"#EAF3DE",DELETE:"#FCEBEB"};
@@ -1325,7 +1312,7 @@ export function DocTemplateEditor(){
               {/* Body placeholder */}
               <div style={{padding:14}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
-                  <div style={{fontSize:11}}><p style={{margin:0,fontWeight:700}}>Bill To: L&T Limited</p><p style={{margin:0,color:"#5a6691"}}>GSTIN: 27AAACL0140P1ZW</p></div>
+                  <div style={{fontSize:11}}><p style={{margin:0,fontWeight:700}}>Bill To: —</p><p style={{margin:0,color:"#5a6691"}}>GSTIN: 27AAACL0140P1ZW</p></div>
                   <div style={{fontSize:11,textAlign:"right"}}><p style={{margin:0}}>Date: 20 May 2026</p><p style={{margin:0}}>Due: 04 Jul 2026</p></div>
                 </div>
                 <div style={{height:60,background:"#f7f8fb",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:10}}>

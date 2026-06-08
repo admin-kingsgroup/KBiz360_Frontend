@@ -2590,7 +2590,7 @@ export function ReportViewerTabbed(){
   const [tab,setTab]=useState("view");
   const tabs=[{id:"view",label:"1. View"},{id:"filter",label:"2. Filter"},{id:"group",label:"3. Group By"},{id:"sort",label:"4. Sort"},{id:"compare",label:"5. Compare"},{id:"format",label:"6. Format"},{id:"export",label:"7. Export"},{id:"schedule",label:"8. Schedule"},{id:"share",label:"9. Share"}];
   return TAB_Page("Profit & Loss Statement — May 2026", "Generic 9-tab Report Viewer · applies to any report in the system",
-    {user:"Faiz Patel",date:"2026-05-20 09:00",created:"Auto-generated"},
+    {user:"",date:"",created:""},
     <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
       <div style={{display:"flex",borderBottom:"1px solid #e1e3ec",overflowX:"auto",background:"#fafbfd"}}>{tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}</div>
       {tab==="view"&&tabPanel(

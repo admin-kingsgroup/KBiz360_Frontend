@@ -535,10 +535,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
 export function SalesFlight({branch,setRoute}){
   const vNo=useVNo(branch,"SF");
   const [linkedPurch,setLinkedPurch]=useState(null);
-  const [pax,setPax]=useState([
-    {id:1,name:"Mr. Rajiv Sharma",  ticket:"098-2156789012",airline:"Air India",sector:"BOM-DXB",date:"2026-05-16",cls:"Economy",base:18000,k3:1400,tax:0,otherTax:1100},
-    {id:2,name:"Mrs. Rohan", ticket:"098-2156789013",airline:"Air India",sector:"BOM-DXB",date:"2026-05-16",cls:"Economy",base:18000,k3:1400,tax:0,otherTax:1100},
-  ]);
+  const [pax,setPax]=useState([{id:1,name:"",ticket:"",airline:"",sector:"",date:"",cls:"Economy",base:0,k3:0,tax:0,otherTax:0}]);
   const [sc,setSc]=useState(1500);
   const [tripType,setTripType]=useState("International"); // International | Domestic
   const [irn,setIrn]=useState("a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456");
@@ -880,10 +877,7 @@ export function SalesCar({branch,setRoute}){
 
 export function SalesVisa({branch,setRoute}){
   const vNo=useVNo(branch,"SV");
-  const [appl,setAppl]=useState([
-    {id:1,name:"Mr. Rajiv Sharma",pp:"Z1234567",country:"UAE",vtype:"Tourist 30D",vfsFee:1800,taxes:324,otherTax:150},
-    {id:2,name:"Mrs. Rohan",pp:"Z1234568",country:"UAE",vtype:"Tourist 30D",vfsFee:1800,taxes:324,otherTax:150},
-  ]);
+  const [appl,setAppl]=useState([{id:1,name:"",pp:"",country:"",vtype:"Tourist 30D",vfsFee:0,taxes:0,otherTax:0}]);
   const [svc,setSvc]=useState(2500);
   const [partyGstin,setPartyGstin]=useState("27AABCS1234L1Z5");
   const intra=(partyGstin||"").trim().slice(0,2)==="27";
@@ -970,9 +964,7 @@ export function SalesVisa({branch,setRoute}){
 
 export function SalesHotel({branch,setRoute}){
   const vNo=useVNo(branch,"SHT");
-  const [rows,setRows]=useState([
-    {id:1,passenger:"Mr. Rajiv Sharma",ci:"2026-06-05",co:"2026-06-08",rtype:"Deluxe King",meal:"CP",basic:24000,taxes:2880,otherTax:600},
-  ]);
+  const [rows,setRows]=useState([{id:1,passenger:"",ci:"",co:"",rtype:"",meal:"CP",basic:0,taxes:0,otherTax:0}]);
   const [svc,setSvc]=useState(1500);
   const [partyGstin,setPartyGstin]=useState("27AAPFL9876K1Z3");
   const intra=(partyGstin||"").trim().slice(0,2)==="27";
@@ -1072,10 +1064,7 @@ export function SalesHotel({branch,setRoute}){
 
 export function SalesInsurance({branch,setRoute}){
   const vNo=useVNo(branch,"SI");
-  const [rows,setRows]=useState([
-    {id:1,name:"TATA AIG General Insurance",pp:"Z1234567",dest:"Bali, Indonesia",basic:4200,otherTax:0,svc:500},
-    {id:2,name:"TATA AIG General Insurance",pp:"Z1234568",dest:"Bali, Indonesia",basic:4200,otherTax:0,svc:500},
-  ]);
+  const [rows,setRows]=useState([{id:1,name:"",pp:"",dest:"",basic:0,otherTax:0,svc:0}]);
   const [partyGstin,setPartyGstin]=useState("24AABCM8765G1Z2");
   const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
@@ -1165,11 +1154,7 @@ export function SalesInsurance({branch,setRoute}){
 
 export function SalesMisc({branch,setRoute}){
   const vNo=useVNo(branch,"SM");
-  const [rows,setRows]=useState([
-    {id:1,gl:"SIM card — Airtel International Roaming",sac:"996429",amt:1998,gstPct:18},
-    {id:2,gl:"Travel documentation & attestation charges",sac:"998212",amt:1500,gstPct:18},
-    {id:3,gl:"Forex card issuance fee (Niyo Global)",sac:"996611",amt:200,gstPct:18},
-  ]);
+  const [rows,setRows]=useState([{id:1,gl:"",sac:"",amt:0,gstPct:18}]);
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
   const add=()=>setRows(rs=>[...rs,{id:Date.now(),gl:"",sac:"",amt:0,gstPct:18}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
@@ -1944,10 +1929,7 @@ function RRLine({label,sub,children,derived}){
 
 export function PurchaseFlight({branch,setRoute}){
   const vNo=useVNo(branch,"PF");
-  const [pax,setPax]=useState([
-    {id:1,name:"Mr. Rajiv Sharma",ticket:"098-2156789012",airline:"Air India",sector:"BOM-DXB",cls:"Economy",date:"2026-05-28",base:18500,k3:2200,otherTax:1600},
-    {id:2,name:"Mrs. Rohan",ticket:"098-2156789013",airline:"Air India",sector:"BOM-DXB",cls:"Economy",date:"2026-05-28",base:18500,k3:2200,otherTax:1600},
-  ]);
+  const [pax,setPax]=useState([{id:1,name:"",ticket:"",airline:"",sector:"",cls:"Economy",date:"",base:0,k3:0,otherTax:0}]);
   const [tripType,setTripType]=useState("International"); // International | Domestic
   const [irn,setIrn]=useState("f6e5d4c3b2a1987654321fedcba9876543210abcdef1234567890abcdef98765");
   const [terms,setTerms]=useState("1. Supplier invoice subject to BSP weekly settlement timelines.\n2. Refunds processed only after airline credits the BSP ARC report.\n3. ADM/ACM raised by airline will be passed on without markup.\n4. Tickets governed by airline's published conditions of carriage.\n5. Disputes to be raised within 7 days of BSP report.");
@@ -2237,9 +2219,7 @@ export function PurchaseHoliday({branch,setRoute}){
 
 export function PurchaseHotelVoucher({branch,setRoute}){
   const vNo=useVNo(branch,"PHT");
-  const [rows,setRows]=useState([
-    {id:1,passenger:"Mr. Rajiv Sharma",ci:"2026-06-05",co:"2026-06-08",rtype:"Deluxe King",meal:"CP",basic:20000,taxes:2400,otherTax:500},
-  ]);
+  const [rows,setRows]=useState([{id:1,passenger:"",ci:"",co:"",rtype:"",meal:"CP",basic:0,taxes:0,otherTax:0}]);
   const [svc,setSvc]=useState(0);
   const [partyGstin,setPartyGstin]=useState("24AABCH7890J1Z5");
   const intra=(partyGstin||"").trim().slice(0,2)==="27";
@@ -2338,10 +2318,7 @@ export function PurchaseHotelVoucher({branch,setRoute}){
 
 export function PurchaseVisa({branch,setRoute}){
   const vNo=useVNo(branch,"PV");
-  const [rows,setRows]=useState([
-    {id:1,name:"Rajiv Sharma",pp:"Z1234567",country:"UAE",vtype:"Tourist 30D",vfsFee:1500,taxes:270,otherTax:100},
-    {id:2,name:"Rohan",pp:"Z1234568",country:"UAE",vtype:"Tourist 30D",vfsFee:1500,taxes:270,otherTax:100},
-  ]);
+  const [rows,setRows]=useState([{id:1,name:"",pp:"",country:"",vtype:"Tourist 30D",vfsFee:0,taxes:0,otherTax:0}]);
   const [svc,setSvc]=useState(1500);
   const [partyGstin,setPartyGstin]=useState("27AABVV4321F1Z6");
   const intra=(partyGstin||"").trim().slice(0,2)==="27";
@@ -2510,10 +2487,7 @@ export function PurchaseCar({branch,setRoute}){
 
 export function PurchaseInsurance({branch,setRoute}){
   const vNo=useVNo(branch,"PI");
-  const [rows,setRows]=useState([
-    {id:1,name:"TATA AIG General Insurance",pp:"Z1234567",dest:"Bali, Indonesia",basic:3500,otherTax:0,svc:200},
-    {id:2,name:"TATA AIG General Insurance",pp:"Z1234568",dest:"Bali, Indonesia",basic:3500,otherTax:0,svc:200},
-  ]);
+  const [rows,setRows]=useState([{id:1,name:"",pp:"",dest:"",basic:0,otherTax:0,svc:0}]);
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
   const add=()=>setRows(rs=>[...rs,{id:Date.now(),name:"",pp:"",dest:"",basic:0,otherTax:0,svc:0}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
@@ -2526,7 +2500,7 @@ export function PurchaseInsurance({branch,setRoute}){
   return (
     <VWrap title="Purchase Voucher — Insurance" icon="🛡" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
-      <VParty branch={branch} label="Insurer / Supplier" name="TATA AIG General Insurance" gstin="27AABCT1234G1Z5"/>
+      <VParty branch={branch} label="Insurer / Supplier" name="" gstin=""/>
       <ARow label="Policy purchase details" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
@@ -2589,11 +2563,7 @@ export function PurchaseInsurance({branch,setRoute}){
 
 export function PurchaseMisc({branch,setRoute}){
   const vNo=useVNo(branch,"PM");
-  const [rows,setRows]=useState([
-    {id:1,vendor:"Airtel Business",gl:"International SIM cards x10",sac:"996429",amt:8500,gstPct:18,tds:false},
-    {id:2,vendor:"Singh Stationery",gl:"Office stationery & printing",sac:"996812",amt:3200,gstPct:18,tds:false},
-    {id:3,vendor:"M/s Cleantech Services",gl:"Office housekeeping — May",sac:"998531",amt:12000,gstPct:18,tds:true},
-  ]);
+  const [rows,setRows]=useState([{id:1,vendor:"",gl:"",sac:"",amt:0,gstPct:18,tds:false}]);
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
   const add=()=>setRows(rs=>[...rs,{id:Date.now(),vendor:"",gl:"",sac:"",amt:0,gstPct:18,tds:false}]);
   const rm=id=>setRows(rs=>rs.filter(r=>r.id!==id));
@@ -3778,8 +3748,6 @@ export function BspCsvImport({branch}){
           <p style={{margin:"0 0 20px",fontSize:11,color:"#5a6691"}}>Download from BSP Link → Reports → Billing Statement → CSV format. Supported: BSP India (IATA), KQ Direct, any airline CSV.</p>
           <input type="file" accept=".csv,.txt" onChange={handleFile} style={{display:"none"}} id="bspFileInput"/>
           <label htmlFor="bspFileInput" style={{...btnG,cursor:"pointer",display:"inline-block",padding:"10px 24px",fontSize:12}}>📂 Choose CSV File</label>
-          <p style={{margin:"16px 0 0",fontSize:9.5,color:"#5a6691"}}>Or click below to use sample data for demo</p>
-          <button onClick={()=>handleFile({target:{files:[{name:"BSP_May2026.csv"}]}})} style={{...btnGh,marginTop:8,fontSize:10}}>Use Sample Data</button>
         </div>
       )}
 
@@ -4987,8 +4955,8 @@ export function QuickPOS({branch,setRoute}){
 export function VoucherEntryTabbed(){
   const [tab,setTab]=useState("entry");
   const tabs=[{id:"entry",label:"1. Entry"},{id:"lines",label:"2. Line Items"},{id:"tax",label:"3. Tax Computation"},{id:"attach",label:"4. Attachments"},{id:"approval",label:"5. Approvals"},{id:"audit",label:"6. Audit Trail"},{id:"related",label:"7. Related Vouchers"},{id:"notes",label:"8. Notes"}];
-  return TAB_Page("Receipt Voucher — RV-BOM/2026/4521", "Customer: L&T Limited · Amount: ₹4,85,000 · Posted 2026-05-19 · Standardised 8-tab structure",
-    {user:"Rohan",date:"2026-05-19 17:42",created:"2026-05-19 17:30"},
+  return TAB_Page("Receipt Voucher", "Standardised 8-tab structure",
+    {user:"",date:"",created:""},
     <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
       <div style={{display:"flex",borderBottom:"1px solid #e1e3ec",overflowX:"auto",background:"#fafbfd"}}>{tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}</div>
       {tab==="entry"&&tabPanel(
@@ -4996,7 +4964,7 @@ export function VoucherEntryTabbed(){
           <FL label="Voucher No."><input defaultValue="RV-BOM/2026/4521" readOnly style={{...inpStd,fontFamily:"monospace",background:"#fafbfd"}}/></FL>
           <FL label="Voucher Date"><input type="date" defaultValue={todayISO()} style={inpStd}/></FL>
           <FL label="Branch"><select style={inpStd}><option>BOM (Mumbai)</option></select></FL>
-          <FL label="Customer"><select style={inpStd}><option>L&T Limited (CUST-BOM-00128)</option></select></FL>
+          <FL label="Customer"><select style={inpStd}><option value="">— Select —</option></select></FL>
           <FL label="Bank/Cash A/c"><select style={inpStd}><option>HDFC BOM Operational — XXXX4321</option><option>SBI BOM — XXXX2255</option></select></FL>
           <FL label="Payment Mode"><select style={inpStd}><option>NEFT</option><option>RTGS</option><option>Cheque</option><option>UPI</option></select></FL>
           <FL label="Amount (₹)"><input type="number" defaultValue="485000" style={{...inpStd,fontWeight:700,fontSize:14}}/></FL>
@@ -5041,7 +5009,7 @@ export function VoucherEntryTabbed(){
       {tab==="approval"&&tabPanel(
         <div>
           <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Approval Workflow</p>
-          {[{step:"Created",by:"Rohan",ts:"2026-05-19 17:30",status:"done"},{step:"Maker Review",by:"Rohan",ts:"2026-05-19 17:42",status:"done"},{step:"Checker (Sr.AE)",by:"Sughra Sayed",ts:"2026-05-19 18:08",status:"done"},{step:"Sr. FM Approval",by:"Auto-skipped (within Sr.AE limit)",ts:"—",status:"skip"},{step:"Posted to Books",by:"System",ts:"2026-05-19 18:08",status:"done"}].map((s,i)=>(
+          {[].map((s,i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 14px",background:"#fafbfd",borderRadius:6,marginBottom:8,border:"1px solid #e1e3ec"}}>
               <div style={{width:32,height:32,borderRadius:"50%",background:s.status==="done"?"#22c55e":s.status==="skip"?"#cbd0dc":"#d4a437",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:14}}>{s.status==="done"?"✓":s.status==="skip"?"⊘":"○"}</div>
               <div style={{flex:1}}><p style={{margin:0,fontSize:12.5,fontWeight:700,color:"#0d1326"}}>{s.step}</p><p style={{margin:"2px 0 0",fontSize:11,color:"#5a6691"}}>by {s.by} · {s.ts}</p></div>
@@ -5050,7 +5018,7 @@ export function VoucherEntryTabbed(){
         </div>
       )}
       {tab==="audit"&&tabPanel(
-        <div>{[{ts:"2026-05-19 18:08",u:"System",a:"POSTED",d:"Posted to General Ledger"},{ts:"2026-05-19 18:08",u:"Sughra Sayed",a:"APPROVED",d:"Approved within ₹50K-₹2L tier"},{ts:"2026-05-19 17:42",u:"Rohan",a:"SUBMITTED",d:"Submitted for approval"},{ts:"2026-05-19 17:40",u:"Rohan",a:"EDITED",d:"Reference No. updated: blank → UTR123456789"},{ts:"2026-05-19 17:30",u:"Rohan",a:"CREATED",d:"Receipt voucher created against L&T Limited"}].map((h,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 12px",borderBottom:"1px solid #f0f2f7"}}><span style={{fontFamily:"monospace",fontSize:10.5,color:"#5a6691",minWidth:130}}>{h.ts}</span><span style={{fontSize:11.5,color:"#0d1326",fontWeight:600,minWidth:110}}>{h.u}</span><span style={{padding:"2px 8px",background:h.a==="POSTED"||h.a==="APPROVED"?"#d4edda":h.a==="CREATED"?"#cfe2ff":"#fff3cd",color:h.a==="POSTED"||h.a==="APPROVED"?"#155724":h.a==="CREATED"?"#004085":"#856404",borderRadius:3,fontSize:9.5,fontWeight:700,minWidth:80,textAlign:"center"}}>{h.a}</span><span style={{fontSize:11.5,color:"#5a6691"}}>{h.d}</span></div>))}</div>
+        <div>{[].map((h,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 12px",borderBottom:"1px solid #f0f2f7"}}><span style={{fontFamily:"monospace",fontSize:10.5,color:"#5a6691",minWidth:130}}>{h.ts}</span><span style={{fontSize:11.5,color:"#0d1326",fontWeight:600,minWidth:110}}>{h.u}</span><span style={{padding:"2px 8px",background:h.a==="POSTED"||h.a==="APPROVED"?"#d4edda":h.a==="CREATED"?"#cfe2ff":"#fff3cd",color:h.a==="POSTED"||h.a==="APPROVED"?"#155724":h.a==="CREATED"?"#004085":"#856404",borderRadius:3,fontSize:9.5,fontWeight:700,minWidth:80,textAlign:"center"}}>{h.a}</span><span style={{fontSize:11.5,color:"#5a6691"}}>{h.d}</span></div>))}</div>
       )}
       {tab==="related"&&tabPanel(
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
@@ -5060,7 +5028,7 @@ export function VoucherEntryTabbed(){
       )}
       {tab==="notes"&&tabPanel(
         <div>
-          {[{u:"Rohan",ts:"2026-05-19 17:30",txt:"Customer settled INV-8721 fully and partial INV-8688. ₹25K of INV-8688 still pending — to follow up next week.",me:true},{u:"Sughra Sayed",ts:"2026-05-19 18:08",txt:"Approved. Please ensure TDS certificate is collected when Q1 returns are filed by L&T.",me:false}].map((c,i)=>(<div key={i} style={{display:"flex",gap:10,marginBottom:10,flexDirection:c.me?"row-reverse":"row"}}><div style={{width:32,height:32,borderRadius:"50%",background:c.me?"#2F7A8E":"#6B4C8B",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:11,flexShrink:0}}>{c.u.substring(0,2).toUpperCase()}</div><div style={{maxWidth:"70%",padding:"8px 12px",background:c.me?"#0d1326":"#fafbfd",color:c.me?"#fff":"#0d1326",borderRadius:c.me?"8px 8px 2px 8px":"8px 8px 8px 2px",border:c.me?"none":"1px solid #e1e3ec"}}><p style={{margin:0,fontSize:11,opacity:0.7,fontWeight:600}}>{c.u}</p><p style={{margin:"3px 0",fontSize:12,lineHeight:1.45}}>{c.txt}</p><p style={{margin:0,fontSize:9.5,opacity:0.6}}>{c.ts}</p></div></div>))}
+          {[].map((c,i)=>(<div key={i} style={{display:"flex",gap:10,marginBottom:10,flexDirection:c.me?"row-reverse":"row"}}><div style={{width:32,height:32,borderRadius:"50%",background:c.me?"#2F7A8E":"#6B4C8B",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:11,flexShrink:0}}>{c.u.substring(0,2).toUpperCase()}</div><div style={{maxWidth:"70%",padding:"8px 12px",background:c.me?"#0d1326":"#fafbfd",color:c.me?"#fff":"#0d1326",borderRadius:c.me?"8px 8px 2px 8px":"8px 8px 8px 2px",border:c.me?"none":"1px solid #e1e3ec"}}><p style={{margin:0,fontSize:11,opacity:0.7,fontWeight:600}}>{c.u}</p><p style={{margin:"3px 0",fontSize:12,lineHeight:1.45}}>{c.txt}</p><p style={{margin:0,fontSize:9.5,opacity:0.6}}>{c.ts}</p></div></div>))}
           <div style={{marginTop:10,display:"flex",gap:8}}><input placeholder="Add comment..." style={{flex:1,padding:9,border:"1px solid #e1e3ec",borderRadius:6,fontSize:12}}/><button style={{padding:"9px 18px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,cursor:"pointer",fontWeight:700}}>Send</button></div>
         </div>
       )}
@@ -5156,13 +5124,7 @@ export function MultiCurrencyVoucher(){
 
 export function VoucherCommentsDemo(){
   const [comment,setComment]=useState("");
-  const THREAD=[
-    {user:"Rohan",role:"Accts Exec — BOM",ts:"2026-05-17 10:15",color:"#2F7A8E",msg:"Payment for Air India BSP settlement — April 2026. BSP debit note received. Amount ₹2,85,000 confirmed by BSP portal.",attachment:"BSP_April_Debit.pdf"},
-    {user:"Sughra Sayed",role:"Sr. Accounts Executive",ts:"2026-05-17 11:30",color:"#6B4C8B",msg:"Please check — my BSP reconciliation shows ₹2,84,150. Difference of ₹850. Is this a charge? Also please attach the BSP statement showing the debit, not just the debit note.",attachment:null},
-    {user:"Rohan",role:"Accts Exec — BOM",ts:"2026-05-17 14:22",color:"#2F7A8E",msg:"Attached the BSP statement. The ₹850 difference is the SURC (System Usage & Reporting Charge) levied by BSP directly. This was pre-approved by Faiz sir per Board minute 2026-03-15.",attachment:"BSP_Statement_April.pdf"},
-    {user:"Faiz Patel",role:"Senior Finance Manager",ts:"2026-05-17 15:45",color:"#0d1326",msg:"Confirmed. SURC of ₹850 is a BSP-mandated charge approved in our Board minute dated 15-Mar-2026 (item 6.4). Total ₹2,85,000 is correct. Sughra please proceed with approval.",attachment:null},
-    {user:"Sughra Sayed",role:"Sr. Accounts Executive",ts:"2026-05-17 16:10",color:"#6B4C8B",msg:"Understood. Voucher approved ✓. Rohan please collect Faiz sir's physical signature as well.",attachment:null},
-  ];
+  const THREAD=[];
   const voucherInfo={no:"PV-BOM/2026/0892",date:"2026-05-17",type:"Payment Voucher",party:"Air India Ltd. (BSP)",amount:285000,status:"Approved"};
 
   return (
@@ -5184,7 +5146,7 @@ export function VoucherCommentsDemo(){
           </div>
           <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:14}}>
             <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Approval Timeline</p>
-            {[{user:"Rohan",action:"Created & submitted",ts:"10:15",color:"#2F7A8E"},{user:"Sughra Sayed",action:"Query raised",ts:"11:30",color:"#6B4C8B"},{user:"Faiz Patel",action:"Clarified SURC",ts:"15:45",color:"#0d1326"},{user:"Sughra Sayed",action:"Approved ✓",ts:"16:10",color:"#22c55e"}].map((t,i)=>(
+            {[].map((t,i)=>(
               <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:10}}>
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
                   <div style={{width:28,height:28,borderRadius:"50%",background:t.color,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700}}>{t.user.substring(0,2).toUpperCase()}</div>
@@ -5323,11 +5285,7 @@ export function PrintPreviewDemo(){
 
 export function AutoLinkedVouchers(){
   const [cycle,setCycle]=useState("sale");
-  const SALE_CYCLE=[
-    {step:1,voucher:"INV-BOM/2026/8742",type:"Tax Invoice",party:"L&T Limited",amount:485000,date:"2026-05-10",status:"Outstanding",color:"#d4a437"},
-    {step:2,voucher:"RV-BOM/2026/4521",type:"Receipt Voucher",party:"L&T Limited",amount:485000,date:"2026-05-15",status:"Posted",color:"#22c55e"},
-    {step:3,voucher:"INV-BOM/2026/8742",type:"Tax Invoice (auto-updated)",party:"L&T Limited",amount:485000,date:"2026-05-10",status:"PAID ✓",color:"#22c55e"},
-  ];
+  const SALE_CYCLE=[];
   const PUR_CYCLE=[
     {step:1,voucher:"PUR-BOM/2026/3214",type:"Purchase Invoice",party:"Air India BSP",amount:285000,date:"2026-05-12",status:"Unpaid",color:"#A32D2D"},
     {step:2,voucher:"PV-BOM/2026/0892",type:"Payment Voucher",party:"Air India BSP",amount:285000,date:"2026-05-17",status:"Approved",color:"#d4a437"},

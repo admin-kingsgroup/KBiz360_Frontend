@@ -863,7 +863,7 @@ export function HrPayroll({branch}){
 
 export function HrPayslips({branch}){
   const [month,setMonth]=useState("2026-05");
-  const [empId,setEmpId]=useState("TK-BOM-003");
+  const [empId,setEmpId]=useState("");
   const [brFilter,setBrFilter]=useState(branch==="ALL"?"All":branch?.code||"All");
 
   const MONTHS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
@@ -1030,7 +1030,7 @@ export function HrLeave({branch}){
   const [leaves,setLeaves]=useState(_LEAVES);
   const [modal,setModal]=useState(false);
   const [tab,setTab]=useState("requests"); // requests | calendar | balances
-  const [form,setForm]=useState({empId:"TK-BOM-003",empName:"Rohan",type:"Annual Leave",from:"",to:"",reason:""});
+  const [form,setForm]=useState({empId:"",empName:"",type:"Annual Leave",from:"",to:"",reason:""});
 
   const filtered=leaves.filter(l=>!brCode||HR_EMPLOYEES_DATA.find(e=>e.id===l.empId&&e.branch===brCode));
   const pending =filtered.filter(l=>l.status==="Pending");
@@ -1165,7 +1165,7 @@ export function HrExpenses({branch}){
   const brCode=branch==="ALL"?null:branch?.code;
   const [claims,setClaims]=useState(_EXPENSE_CLAIMS);
   const [modal,setModal]=useState(false);
-  const [form,setForm]=useState({empId:"TK-BOM-003",empName:"Rohan",date:"",category:"Travel",desc:"",amount:0});
+  const [form,setForm]=useState({empId:"",empName:"",date:"",category:"Travel",desc:"",amount:0});
 
   const filtered=claims.filter(c=>!brCode||HR_EMPLOYEES_DATA.find(e=>e.id===c.empId&&e.branch===brCode));
   const totPending =filtered.filter(c=>!c.paid).reduce((s,c)=>s+c.amount,0);
@@ -1653,21 +1653,21 @@ export function EmployeeAdvances({branch,setRoute}){
 export function EmployeeMasterTabbed(){
   const [tab,setTab]=useState("basic");
   const tabs=[{id:"basic",label:"1. Basic Info"},{id:"address",label:"2. Address"},{id:"bank",label:"3. Bank Details"},{id:"tax",label:"4. Tax Info"},{id:"salary",label:"5. Salary Components"},{id:"leave",label:"6. Leave Balance"},{id:"attend",label:"7. Attendance"},{id:"perf",label:"8. Performance"},{id:"docs",label:"9. Documents"},{id:"notes",label:"10. Notes"}];
-  return TAB_Page("Faiz Patel", "Employee Master · TK-HO-001 · Senior Finance Manager · Head Office · 10-tab structure",
+  return TAB_Page("Employee Master", "10-tab structure",
     {user:"AD",date:"2026-05-19 11:30",created:"2017-06-01 09:00"},
     <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
       <div style={{display:"flex",borderBottom:"1px solid #e1e3ec",overflowX:"auto",background:"#fafbfd"}}>{tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}</div>
       {tab==="basic"&&tabPanel(
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}>
-          <FL label="Full Name"><input defaultValue="Faiz Patel" style={inpStd}/></FL>
-          <FL label="Employee ID"><input defaultValue="TK-HO-001" readOnly style={{...inpStd,fontFamily:"monospace",background:"#fafbfd"}}/></FL>
+          <FL label="Full Name"><input defaultValue="" style={inpStd}/></FL>
+          <FL label="Employee ID"><input defaultValue="" readOnly style={{...inpStd,fontFamily:"monospace",background:"#fafbfd"}}/></FL>
           <FL label="Date of Birth"><input type="date" defaultValue="1985-03-22" style={inpStd}/></FL>
           <FL label="Designation"><input defaultValue="Senior Finance Manager (CFO-equivalent)" style={inpStd}/></FL>
           <FL label="Department"><select style={inpStd}><option>Finance</option><option>Operations</option><option>HR</option><option>IT</option></select></FL>
           <FL label="Branch"><select style={inpStd}><option>BOM</option><option>AMD</option></select></FL>
           <FL label="Date of Joining"><input type="date" defaultValue="2017-06-01" style={inpStd}/></FL>
           <FL label="Years of Service"><input defaultValue="9 years" readOnly style={{...inpStd,background:"#fafbfd"}}/></FL>
-          <FL label="Reporting To"><select style={inpStd}><option>Afshin Dhanani (Director)</option></select></FL>
+          <FL label="Reporting To"><select style={inpStd}><option value="">— Select —</option></select></FL>
           <FL label="Email (Official)"><input defaultValue="faiz.fm@travkings.com" style={{...inpStd,fontFamily:"monospace",fontSize:11}}/></FL>
           <FL label="Phone"><input defaultValue="+91 98201 47892" style={inpStd}/></FL>
           <FL label="Status"><span style={{display:"inline-block",padding:"6px 12px",background:"#d4edda",color:"#155724",borderRadius:5,fontSize:12,fontWeight:700}}>✓ Active · Permanent</span></FL>
@@ -1758,7 +1758,7 @@ export function EmployeeMasterTabbed(){
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10}}>{["Offer Letter","Employment Contract","Background Verification","Educational Certificates","CA Membership Certificate","PAN Card Copy","Aadhaar Card Copy"].map(d=>(<div key={d} style={{padding:14,background:"#fafbfd",border:"1px solid #e1e3ec",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:32}}>📄</p><p style={{margin:"6px 0 2px",fontSize:11.5,color:"#0d1326",fontWeight:600}}>{d}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>2017-06-01</p><button style={{marginTop:6,padding:"3px 10px",background:"transparent",border:"1px solid #d4a437",color:"#d4a437",borderRadius:4,fontSize:10,cursor:"pointer",fontWeight:600}}>View</button></div>))}<button style={{padding:24,background:"transparent",border:"2px dashed #d4a437",color:"#d4a437",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:600}}>+ Upload</button></div>
       )}
       {tab==="notes"&&tabPanel(
-        <div>{[{ts:"2026-05-19 11:30",u:"AD",txt:"Faiz has been instrumental in the GST automation project. Recommended for additional responsibility on group consolidation."},{ts:"2024-03-15 14:00",u:"AD",txt:"Promoted to Senior Finance Manager. Recognised CFO-equivalent authority for approvals up to ₹25L."}].map((n,i)=>(<div key={i} style={{padding:"10px 12px",background:"#fafbfd",borderRadius:6,marginBottom:8,borderLeft:"3px solid #d4a437"}}><p style={{margin:0,fontSize:12,color:"#0d1326",lineHeight:1.5}}>{n.txt}</p><p style={{margin:"4px 0 0",fontSize:10,color:"#5a6691"}}>{n.u} · {n.ts}</p></div>))}</div>
+        <div>{[].map((n,i)=>(<div key={i} style={{padding:"10px 12px",background:"#fafbfd",borderRadius:6,marginBottom:8,borderLeft:"3px solid #d4a437"}}><p style={{margin:0,fontSize:12,color:"#0d1326",lineHeight:1.5}}>{n.txt}</p><p style={{margin:"4px 0 0",fontSize:10,color:"#5a6691"}}>{n.u} · {n.ts}</p></div>))}</div>
       )}
     </div>
   );
@@ -1781,7 +1781,7 @@ export function HRPortal({setRoute}){
     {icon:"🎓",title:"Skill Matrix",sub:"My skills & development",route:"/hr/skills",color:"#2F7A8E"},
   ];
   return(
-    <PHASE2_Page title="Employee Self-Service Portal" subtitle="Rohan · TK-BOM-003 · Accounts Executive — BOM · Joined 2022-06-15">
+    <PHASE2_Page title="Employee Self-Service Portal" subtitle="">
       {/* Quick stats */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12,marginBottom:18}}>
         {[{l:"Leave Balance",v:"7 days",c:"#22c55e"},{l:"Pending Claims",v:"₹1,240",c:"#f97316"},{l:"Last Payslip",v:"Apr 2026",c:"#d4a437"},{l:"Tax Declared",v:"₹2,44,600",c:"#6B4C8B"}].map(k=>(
@@ -1815,20 +1815,16 @@ export function LeaveApply(){
   const days=Math.max(1,Math.round((new Date(to)-new Date(from))/86400000)+1);
   const balances=[{type:"Casual Leave",balance:4},{type:"Sick Leave",balance:8},{type:"Earned Leave",balance:7},{type:"LOP",balance:null}];
   const bal=balances.find(b=>b.type===type);
-  const MY_LEAVE_HISTORY=[
-    {dates:"2026-03-10 → 2026-03-12",type:"Casual Leave",days:3,status:"Approved",approver:"Faiz Patel"},
-    {dates:"2026-02-14",type:"Sick Leave",days:1,status:"Approved",approver:"Faiz Patel"},
-    {dates:"2025-12-24 → 2025-12-26",type:"Earned Leave",days:3,status:"Approved",approver:"Faiz Patel"},
-  ];
+  const MY_LEAVE_HISTORY=[];
   return(
-    <PHASE2_Page title="Leave Application" subtitle="Apply for leave · auto-routed to Faiz Patel for approval">
+    <PHASE2_Page title="Leave Application" subtitle="Apply for leave">
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14}}>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {submitted?(
             <div style={{padding:24,background:"#d4edda",border:"1px solid #bbf7d0",borderRadius:8,textAlign:"center"}}>
               <p style={{margin:0,fontSize:32}}>✅</p>
               <p style={{margin:"10px 0 4px",fontSize:15,fontWeight:700,color:"#155724"}}>Leave application submitted!</p>
-              <p style={{margin:0,fontSize:12,color:"#155724"}}>Awaiting approval from Faiz Patel · You'll receive an email notification</p>
+              <p style={{margin:0,fontSize:12,color:"#155724"}}>Awaiting approval · You'll receive an email notification</p>
               <button onClick={()=>setSubmitted(false)} style={{marginTop:14,padding:"8px 18px",background:"#155724",color:"#fff",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>Apply Another</button>
             </div>
           ):(
@@ -1847,7 +1843,7 @@ export function LeaveApply(){
                   {bal?.balance==null&&<span style={{color:"#5a6691"}}>LOP — salary deducted</span>}
                 </div>
                 <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Reason</label><textarea value={reason} onChange={e=>setReason(e.target.value)} rows={3} style={{...inp,fontFamily:"inherit",resize:"vertical"}} placeholder="Brief reason for leave…"/></div>
-                <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Backup arrangement (who will cover)</label><input style={inp} placeholder="E.g. Sughra will handle urgent approvals"/></div>
+                <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Backup arrangement (who will cover)</label><input style={inp} placeholder="Who will cover"/></div>
                 <button onClick={()=>reason.length>0&&setSubmitted(true)} style={{padding:"10px",background:reason.length>0?"#d4a437":"#e1e3ec",color:reason.length>0?"#0d1326":"#5a6691",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:reason.length>0?"pointer":"not-allowed"}}>Submit Application</button>
               </div>
             </div>
@@ -1875,8 +1871,8 @@ export function LeaveApply(){
           </div>
           <div style={{padding:14,background:"#fafbfd",border:"1px solid #e1e3ec",borderRadius:8,fontSize:11.5,color:"#5a6691"}}>
             <p style={{margin:"0 0 6px",fontWeight:700,color:"#0d1326",fontSize:12}}>Approval chain</p>
-            <p style={{margin:0}}>1. Faiz Patel (Sr. FM) — primary approver</p>
-            <p style={{margin:"3px 0 0"}}>2. Afshin Dhanani — for leaves &gt; 5 days</p>
+            <p style={{margin:0}}>1. Reporting Manager — primary approver</p>
+            <p style={{margin:"3px 0 0"}}>2. Department Head — for leaves &gt; 5 days</p>
             <p style={{margin:"8px 0 0",fontSize:10.5}}>Approved within 1 working day</p>
           </div>
         </div>
@@ -2148,7 +2144,7 @@ export function Feedback360(){
       )}
       {tab==="give"&&(
         <div style={cardStyle}>
-          <p style={{margin:"0 0 4px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Give Feedback to: <select style={{border:"1px solid #e1e3ec",borderRadius:4,padding:"3px 8px",fontSize:12}}><option>Mohan (Peer)</option><option>Mujeet (Peer)</option><option>Sughra Sayed (Senior)</option></select></p>
+          <p style={{margin:"0 0 4px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Give Feedback to: <select style={{border:"1px solid #e1e3ec",borderRadius:4,padding:"3px 8px",fontSize:12}}><option value="">— Select —</option></select></p>
           <p style={{margin:"0 0 14px",fontSize:10.5,color:"#5a6691"}}>Your feedback is anonymous to the recipient (visible only to HR)</p>
           {QUESTIONS.map((q,i)=>(
             <div key={i} style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid #f0f2f7"}}>
@@ -2181,8 +2177,8 @@ export function Feedback360(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function SkillMatrix(){
-  const [selEmp,setSelEmp]=useState("Rohan");
-  const emps=["Afshin Dhanani","Faiz Patel","Sughra Sayed","Rohan","Mohan","Mujeet","Rujeet","Sujeet"];
+  const [selEmp,setSelEmp]=useState("");
+  const emps=[];
   const categories=[...new Set(SKILLS_DATA.map(s=>s.category))];
   const Stars=({n,max=5,color="#d4a437"})=><span style={{letterSpacing:1}}>{Array.from({length:max},(_,i)=><span key={i} style={{color:i<n?color:"#e1e3ec",fontSize:14}}>★</span>)}</span>;
   return(

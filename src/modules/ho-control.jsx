@@ -407,11 +407,7 @@ export function PeriodLocking({branch,setRoute}){
 
 export function BankingApiSettings({branch,setRoute}){
   const mob=useMobile();
-  const BANK_INTEGRATIONS=[
-    {bank:"HDFC Bank — Connect API",branch:"BOM",account:"50100012345678",status:"Connected",lastSync:"2026-05-19 11:42",balance:1845000,features:["Balance · Transactions · Bulk NEFT"]},
-    {bank:"ICICI Bank — Corporate Banking",branch:"BOM",account:"007205012345",status:"Connected",lastSync:"2026-05-19 11:45",balance:892000,features:["Balance · Transactions · Auto-Recon"]},
-    {bank:"ICICI Bank — Corporate Banking",branch:"AMD",account:"077301098765",status:"Connected",lastSync:"2026-05-19 10:15",balance:485000,features:["Balance · Transactions"]},
-  ];
+  const BANK_INTEGRATIONS=[];
   const connected=BANK_INTEGRATIONS.filter(b=>b.status==="Connected").length;
   const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
 
@@ -460,31 +456,13 @@ export function BankingApiSettings({branch,setRoute}){
 }
 
 
-export const HO_ASSET_REQUESTS = [
-  {id:"AR-001",branch:"BOM",requestedBy:"Rohan",date:"2026-05-15",item:"Dell Laptops × 5",category:"IT Equipment",amount:425000,gst:76500,supplier:"Dell India Pvt Ltd",stage:"Approved",approvedBy:"Faiz Patel",approvedDate:"2026-05-17",priority:"Normal"},
-  {id:"AR-002",branch:"AMD",requestedBy:"Mohan",date:"2026-05-18",item:"Office furniture set",category:"Furniture",amount:185000,gst:33300,supplier:"Featherlite",stage:"Sughra Review",approvedBy:"—",approvedDate:"—",priority:"Normal"},
-  {id:"AR-004",branch:"BOM",requestedBy:"Sughra Sayed",date:"2026-05-20",item:"Software licenses — MS 365 (50 seats)",category:"Software",amount:520000,gst:93600,supplier:"Microsoft India",stage:"Pending Director",approvedBy:"—",approvedDate:"—",priority:"Normal"},
-  {id:"AR-006",branch:"BOM",requestedBy:"Rohan",date:"2026-04-28",item:"Conference room AV setup",category:"Equipment",amount:240000,gst:43200,supplier:"Sennheiser India",stage:"Delivered",approvedBy:"Faiz Patel",approvedDate:"2026-04-30",priority:"Normal"},
-];
+export const HO_ASSET_REQUESTS = [];
 
 
-export const HO_LOCKED_VENDORS = [
-  {id:"V-001",name:"Air India Ltd. (BSP)",       category:"Airline-BSP",   pan:"AAACA1234D",gstin:"27AAACA1234D1ZA",bank:"HDFC ...8821",credit:"30 days",lockedBy:"Faiz Patel",lockedSince:"2024-04-01",lastAttempt:"2026-05-12 by Rohan (BOM) — DENIED"},
-  {id:"V-002",name:"Dubai Wonders DMC",          category:"DMC",           pan:"AAACB5678E",gstin:"-",bank:"HDFC ...5512 (Forex)",credit:"45 days",lockedBy:"Faiz Patel",lockedSince:"2024-06-15",lastAttempt:"—"},
-  {id:"V-003",name:"Marriott Group (Global)",    category:"Hotel-Chain",   pan:"-",         gstin:"-",bank:"HDFC ...5512 (Forex)",credit:"60 days",lockedBy:"Faiz Patel",lockedSince:"2024-07-01",lastAttempt:"—"},
-  {id:"V-004",name:"VFS Global",                  category:"Visa",          pan:"AAACV9012F",gstin:"27AAACV9012F1ZC",bank:"ICICI ...4423",credit:"15 days",lockedBy:"Sughra Sayed",lockedSince:"2024-05-10",lastAttempt:"2026-04-22 by Mohan (AMD) — DENIED"},
-  {id:"V-005",name:"Bajaj Allianz Insurance",     category:"Insurance",     pan:"AAACB4321D",gstin:"27AAACB4321D1ZQ",bank:"HDFC ...1129",credit:"30 days",lockedBy:"Faiz Patel",lockedSince:"2024-08-01",lastAttempt:"—"},
-  {id:"V-006",name:"Hertz Car Rental",            category:"Ground-Tspt",   pan:"AAACH3456G",gstin:"27AAACH3456G1ZD",bank:"HDFC ...7765",credit:"30 days",lockedBy:"Sughra Sayed",lockedSince:"2024-09-15",lastAttempt:"—"},
-  {id:"V-007",name:"Kenya Safari Lodge (KSL)",    category:"Hotel-Local",   pan:"-",         gstin:"-",bank:"KCB Nairobi ...2231",credit:"30 days",lockedBy:"Faiz Patel",lockedSince:"2024-10-01",lastAttempt:"—"},
-];
+export const HO_LOCKED_VENDORS = [];
 
 
-export const HO_BANK_CONTROL = [
-  {bank:"HDFC Bank — BOM Current",     acct:"...4321",branch:"BOM", currency:"INR",controlLevel:"Branch-Op",     signatory:"Faiz + Rohan",         purpose:"Branch operations",balance:12400000},
-  {bank:"ICICI Bank — BOM Current",    acct:"...7766",branch:"BOM", currency:"INR",controlLevel:"Branch-Op",     signatory:"Faiz + Rohan",         purpose:"Branch operations",balance:6800000},
-  {bank:"HDFC Bank — AMD Current",     acct:"...5544",branch:"AMD", currency:"INR",controlLevel:"Branch-Op",     signatory:"Faiz + Mohan",         purpose:"Branch operations",balance:5200000},
-  {bank:"HDFC Bank — Forex (BOM)",     acct:"...5512",branch:"BOM", currency:"INR",controlLevel:"HO-Locked",     signatory:"Faiz + Afshin",        purpose:"International payments",balance:84500},
-];
+export const HO_BANK_CONTROL = [];
 
 
 export function HOAssetProcurement(){
@@ -637,10 +615,7 @@ export function HOVendorMasterLock(){
       {/* Recent denied attempts log */}
       <div style={{...cardStyle,marginTop:14}}>
         <p style={{margin:"0 0 10px",fontSize:13,fontWeight:700,color:"#0d1326"}}>🚨 Recent Change-Attempt Log</p>
-        {[
-          {date:"2026-05-12 14:23",user:"Rohan (BOM)",vendor:"Air India BSP",attempted:"Change bank account from HDFC ...8821 to ICICI ...6612",action:"DENIED",denyReason:"Locked field. Requires Faiz approval."},
-          {date:"2026-04-22 11:05",user:"Mohan (AMD)",vendor:"VFS Global",attempted:"Update PAN from AAACV9012F to AAACV9012X",action:"DENIED",denyReason:"Locked field. Requires Sughra approval."},
-        ].map((log,i)=>(
+        {[].map((log,i)=>(
           <div key={i} style={{padding:"10px 12px",background:"#fff5f5",borderLeft:"3px solid #A32D2D",borderRadius:5,marginBottom:6,fontSize:11.5}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
               <span style={{fontWeight:700,color:"#0d1326"}}>{log.user}</span>
@@ -934,10 +909,7 @@ export function PeriodLockControl(){
         <p style={{margin:"0 0 10px",fontSize:13,fontWeight:700,color:"#0d1326"}}>📋 Period Override Register</p>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Override Date</th><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Period</th><th style={RPT_thStyle}>Requested By</th><th style={RPT_thStyle}>Reason</th><th style={RPT_thStyle}>Approved By</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
-          <tbody>{[
-            {date:"2026-05-08",branch:"AMD",period:"2026-04",requestedBy:"Mohan",reason:"Vendor credit note received post-cutoff for adjustment",approvedBy:"Sughra Sayed",status:"Approved"},
-            {date:"2026-05-02",branch:"BOM",period:"2026-03",requestedBy:"Rohan",reason:"Late expense reimbursement claim from team",approvedBy:"Sughra Sayed",status:"Approved"},
-          ].map((o,i)=>(
+          <tbody>{[].map((o,i)=>(
             <tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}>
               <td style={{...RPT_tdStyle,fontFamily:"monospace"}}>{o.date}</td>
               <td style={RPT_tdStyle}><span style={{padding:"1px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{o.branch}</span></td>
