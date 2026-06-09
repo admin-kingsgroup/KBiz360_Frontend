@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../core/styles.jsx';
-import { apiGet, apiPost, apiPut, apiDelete } from '../core/api';
+import { apiGet, apiPost, apiPut } from '../core/api';
 import { useLedgerRegistry } from '../core/useReference';
 import {
   VSPECS, VMODULE_LIST, blankLine, bookingTotals, lineCalc,
@@ -544,12 +544,14 @@ function useBookings(brCode) {
   });
 }
 
-function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, onCancel, onEdit, busyId }) {
+function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, onCancel, onDelete, canDelete, onEdit, busyId }) {
   const cols = mode === 'approved'
     ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'Approved', 'Actions']
     : mode === 'rejected'
       ? ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'Date', 'Reason']
-      : ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'Date', 'Actions'];
+      : mode === 'deleted'
+        ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'Deleted', 'By']
+        : ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'Date', 'Actions'];
   return (
     <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -558,7 +560,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, on
         </tr></thead>
         <tbody>
           {isLoading && <tr><td colSpan={cols.length} style={{ padding: 20, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>Loading…</td></tr>}
-          {!isLoading && rows.length === 0 && <tr><td colSpan={cols.length} style={{ padding: 22, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>{mode === 'pending' ? 'No pending vouchers. Create one under “SO/PO/GP Voucher”.' : mode === 'rejected' ? 'No rejected vouchers.' : 'No approved vouchers yet.'}</td></tr>}
+          {!isLoading && rows.length === 0 && <tr><td colSpan={cols.length} style={{ padding: 22, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>{mode === 'pending' ? 'No pending vouchers. Create one under “SO/PO/GP Voucher”.' : mode === 'rejected' ? 'No rejected vouchers.' : mode === 'deleted' ? 'No deleted vouchers.' : 'No approved vouchers yet.'}</td></tr>}
           {rows.map((b) => {
             const sp = VSPECS[b.module];
             const isOpen = open === b.id;
@@ -569,7 +571,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, on
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}</td>
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: BLUE, fontSize: 11.5 }}>{b.linkNo}</td>
                   <td style={{ padding: '8px 12px', fontSize: 12 }}>{sp ? sp.icon + ' ' + sp.name : b.module}</td>
-                  {mode === 'approved' ? (
+                  {mode === 'approved' || mode === 'deleted' ? (
                     <>
                       <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11 }}>{b.saleVno || '—'}</td>
                       <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11 }}>{b.purchaseVno || '—'}</td>
@@ -583,7 +585,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, on
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.so?.total)}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.po?.total)}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.gp?.total)}</td>
-                  <td style={{ padding: '8px 12px', fontSize: 11, color: '#5a6691' }}>{mode === 'approved' ? (b.approvedAt ? String(b.approvedAt).slice(0, 10) : '—') : b.date}</td>
+                  <td style={{ padding: '8px 12px', fontSize: 11, color: '#5a6691' }}>{mode === 'approved' ? (b.approvedAt ? String(b.approvedAt).slice(0, 10) : '—') : mode === 'deleted' ? (b.deletedAt ? String(b.deletedAt).slice(0, 10) : '—') : b.date}</td>
                   <td style={{ padding: '8px 12px' }} onClick={(e) => e.stopPropagation()}>
                     {mode === 'pending' ? (
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -594,7 +596,11 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, on
                         <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><XCircle size={12} /> Reject</button>
                       </div>
                     ) : mode === 'approved' ? (
-                      <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}>Cancel &amp; un-post</button>
+                      canDelete
+                        ? <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><Trash2 size={12} /> Delete</button>
+                        : <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>admin only</span>
+                    ) : mode === 'deleted' ? (
+                      <span style={{ fontSize: 11, color: '#8b94b3' }} title={b.deletedReason || ''}>{b.deletedBy || '—'}{b.deletedReason ? ` · ${b.deletedReason}` : ''}</span>
                     ) : (
                       <span style={{ fontSize: 11, color: '#8b94b3' }}>{b.rejectedReason || '—'}</span>
                     )}
@@ -665,21 +671,29 @@ export function PendingBookings({ branch, setRoute }) {
   );
 }
 
-export function ApprovedBookings({ branch, setRoute }) {
+const isAdminRole = (u) => ['Super Admin', 'Director'].includes(u?.role);
+
+export function ApprovedBookings({ branch, setRoute, currentUser }) {
   const brCode = brCodeOf(branch) || 'ALL';
   const cur = bc(branch).cur;
   const qc = useQueryClient();
   const { data = [], isLoading } = useBookings(brCode);
   const [open, setOpen] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const canDelete = isAdminRole(currentUser);
 
   const rows = data.filter((b) => b.status === 'approved' || b.status === 'posted');
 
-  const onCancel = async (b) => {
-    if (!window.confirm(`Cancel ${b.bookingNo}? Its Sales & Purchase invoices will be un-posted from the books.`)) return;
+  // Admin-only delete: reverses the posted Sales/Purchase out of the books (no
+  // accounting effect) and keeps a view-only record under Deleted; the numbers are
+  // never reused.
+  const onDelete = async (b) => {
+    if (!canDelete) return;
+    const reason = window.prompt(`Delete approved booking ${b.bookingNo}?\n\nIts Sales (${b.saleVno}) & Purchase (${b.purchaseVno}) invoices will be reversed out of the books. The record stays view-only under Deleted and its numbers can never be reused.\n\nOptional reason:`, '');
+    if (reason === null) return;
     setBusyId(b.id);
-    try { await apiDelete('/api/booking-orders/' + b.id); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); }
-    catch (e) { window.alert(e.message || 'Cancel failed'); }
+    try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); }
+    catch (e) { window.alert(e.message || 'Delete failed'); }
     finally { setBusyId(null); }
   };
 
@@ -688,11 +702,33 @@ export function ApprovedBookings({ branch, setRoute }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><FileCheck2 size={18} style={{ color: DR }} /> Approved &amp; Posted</h2>
-          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>Posted to the books as linked Sales + Purchase invoices. Expand to see the JV &amp; ledger posting. The <b>Link No</b> tracks invoice-wise GP everywhere.</p>
+          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>Posted to the books as linked Sales + Purchase invoices. Expand to see the JV &amp; ledger posting. The <b>Link No</b> tracks invoice-wise GP everywhere.{canDelete ? ' Admins can Delete a booking — it reverses out of the books and is kept view-only under Deleted.' : ''}</p>
         </div>
         <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" onCancel={onCancel} busyId={busyId} />
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" onDelete={onDelete} canDelete={canDelete} busyId={busyId} />
+    </div>
+  );
+}
+
+export function DeletedBookings({ branch, setRoute }) {
+  const brCode = brCodeOf(branch) || 'ALL';
+  const cur = bc(branch).cur;
+  const { data = [], isLoading } = useBookings(brCode);
+  const [open, setOpen] = useState(null);
+
+  const rows = data.filter((b) => b.status === 'deleted');
+
+  return (
+    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><Trash2 size={18} style={{ color: '#A32D2D' }} /> Deleted</h2>
+          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>Approved bookings an admin deleted. They were <b>reversed out of the books</b> (no accounting effect). This is a <b>view-only</b> audit trail — the Booking No, Link No and Sale/Purchase invoice numbers shown here are <b>permanently retired and can never be reused</b>.</p>
+        </div>
+        <button onClick={() => setRoute && setRoute('/bookings/approved')} style={btnGh}><FileCheck2 size={14} /> View approved</button>
+      </div>
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="deleted" busyId={null} />
     </div>
   );
 }

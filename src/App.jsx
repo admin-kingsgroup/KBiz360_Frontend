@@ -27,7 +27,7 @@ import { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport,
 import { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } from './modules/settings';
 import { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } from './modules/taxation';
 import { AdmRegister, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
-import { SoPoGpVoucherEntry, PendingBookings, ApprovedBookings, RejectedBookings } from './modules/bookingOrder';
+import { SoPoGpVoucherEntry, PendingBookings, ApprovedBookings, RejectedBookings, DeletedBookings } from './modules/bookingOrder';
 import { PnLTallyLive } from './modules/pnlTally';
 import { BalanceSheetTallyLive } from './modules/balanceSheetTally';
 import { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, InvoiceGPLive } from './modules/accountingLive';
@@ -265,9 +265,10 @@ export default function KB360App(){
     if(route==="/dashboard")          return <DashboardRouter branch={branch} setRoute={navigate} currentUser={currentUser}/>;
     if(route==="/bookings/new")       return <SoPoGpVoucherEntry branch={branch} setRoute={navigate}/>;
     if(route==="/bookings/pending")   return <PendingBookings branch={branch} setRoute={navigate}/>;
-    if(route==="/bookings/approved")  return <ApprovedBookings branch={branch} setRoute={navigate}/>;
+    if(route==="/bookings/approved")  return <ApprovedBookings branch={branch} setRoute={navigate} currentUser={currentUser}/>;
     if(route==="/bookings/rejected")  return <RejectedBookings branch={branch} setRoute={navigate}/>;
-    if(route==="/bookings/list")      return <ApprovedBookings branch={branch} setRoute={navigate}/>;  // legacy alias
+    if(route==="/bookings/deleted")   return <DeletedBookings branch={branch} setRoute={navigate}/>;
+    if(route==="/bookings/list")      return <ApprovedBookings branch={branch} setRoute={navigate} currentUser={currentUser}/>;  // legacy alias
     if(route==="/sales/flight")       return <SalesFlight branch={branch} setRoute={navigate}/>;
     if(route==="/sales/holiday")      return <SalesHoliday branch={branch} setRoute={navigate}/>;
     if(route==="/sales/car")          return <SalesCar branch={branch} setRoute={navigate}/>;

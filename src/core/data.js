@@ -270,6 +270,7 @@ export const ROUTE_TITLES={
   "/bookings/pending":     "SO / PO / GP — Pending Approval",
   "/bookings/approved":    "SO / PO / GP — Approved & Posted",
   "/bookings/rejected":    "SO / PO / GP — Rejected",
+  "/bookings/deleted":     "SO / PO / GP — Deleted (view only)",
   "/bookings/list":        "SO / PO / GP — Approved & Posted",
   "/sales/flight":         "Sales — Flight Tickets",
   "/sales/holiday":        "Sales — Holiday Packages",

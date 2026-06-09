@@ -279,6 +279,7 @@ export const MENU_TRANSACTIONS = {label:"Transactions", icon:ShoppingCart, child
     {label:"Pending", href:"/bookings/pending"},
     {label:"Approved", href:"/bookings/approved"},
     {label:"Rejected", href:"/bookings/rejected"},
+    {label:"Deleted", href:"/bookings/deleted"},
   ]},
   /* Standardized 8-tab Voucher Entry pattern */
   {label:"Standardized Patterns", children:[
