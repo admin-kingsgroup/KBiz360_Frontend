@@ -45,6 +45,7 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
 
   const { revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers } = data;
   const fig = data.figures || { revenue: 0, gp: 0, gpPct: 0, netProfit: 0, outstanding: 0, payable: 0 };
+  const pb = data.pendingBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
   const rangeShort = RANGE_SHORT[range] || 'This Month';
   const topCust = topCustomers[0] || { share: 0, name: '—' };
   const highValueApprovals = 0;
@@ -94,6 +95,23 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
           color="#f97316"
           onClick={() => navigate('/approvals')}
         />
+      </div>
+
+      {/* Pending SO/PO/GP pipeline — value sitting in the approval queue (not yet posted). */}
+      <div style={{ marginBottom: 6, fontSize: 12, fontWeight: 600, color: '#5a6691' }}>
+        Pending SO/PO/GP {pb.count ? `· ${pb.count} awaiting approval` : ''}
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))',
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
+        <KPICard label="Pending Sales" value={fmtINR(pb.sales)} delta={`${pb.count} booking${pb.count === 1 ? '' : 's'}`} color="#d4a437" onClick={() => navigate('/bookings/pending')} />
+        <KPICard label="Pending Purchase" value={fmtINR(pb.purchase)} delta="awaiting approval" color="#854F0B" onClick={() => navigate('/bookings/pending')} />
+        <KPICard label="Pending GP" value={fmtINR(pb.gp)} delta={pb.sales > 0 ? `${((pb.gp / pb.sales) * 100).toFixed(1)}% GP` : ''} color="#22c55e" onClick={() => navigate('/bookings/pending')} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14, marginBottom: 14 }}>

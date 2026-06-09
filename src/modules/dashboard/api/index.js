@@ -1,6 +1,7 @@
 export * from './get-bills';
 export * from './get-expenses';
 export * from './get-live-finance';
+export * from './get-pending-bookings';
 export * from './get-action-items';
 export * from './get-upcoming-travel';
 export * from './get-unmatched';

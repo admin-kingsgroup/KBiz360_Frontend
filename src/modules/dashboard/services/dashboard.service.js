@@ -57,7 +57,7 @@ export const loadBranchDashboard = async ({ branchCode }) => {
 
 export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}) => {
   const dates = api.rangeToDates(range); // 'month' | 'ytd' | 'all' → ISO range + label
-  const [revenueTrend, fyTargets, branchHeatmap, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing] =
+  const [revenueTrend, fyTargets, branchHeatmap, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, pendingBookings] =
     await Promise.all([
       api.getRevenueTrend(branchCode),
       api.getFyTargets(),
@@ -70,6 +70,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}
       api.getCashPosition(branchCode),
       api.getArAgeingSummary(),
       api.getApAgeingSummary(),
+      api.getPendingBookingSummary(branchCode), // pending SO/PO/GP pipeline (not date-bound — whole queue)
     ]);
 
   // Key Alerts are computed live from ageing + module P&L + concentration, not seeded.
@@ -80,6 +81,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}
 
   return {
     revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers, bankAccounts,
+    pendingBookings,
     rangeLabel: dates.label,
     figures: {
       revenue: mpl.totals.sales,
