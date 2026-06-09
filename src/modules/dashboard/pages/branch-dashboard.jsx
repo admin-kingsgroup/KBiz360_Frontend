@@ -25,6 +25,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
   const pb = data.pendingBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
   const ab = data.approvedBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
   const rb = data.rejectedBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
+  const db = data.deletedBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
   const formatMoney = (n) => formatCurrency(currencySymbol, n);
 
   return (
@@ -103,6 +104,46 @@ export function BranchDashboardPage({ branch, setRoute }) {
           onClick={() => navigate('/reports/pnl')}
         />
         <KpiTile
+          label="Actual Sales"
+          value={formatMoney(kpis.revenue)}
+          sub="from the books (MTD)"
+          icon="📒"
+          color="#185FA5"
+          onClick={() => navigate('/reports/pnl')}
+        />
+        <KpiTile
+          label="Actual Purchase"
+          value={formatMoney(kpis.cost)}
+          sub="COGS (MTD)"
+          icon="📒"
+          color="#854F0B"
+          onClick={() => navigate('/reports/pnl')}
+        />
+        <KpiTile
+          label="Actual GP"
+          value={formatMoney(kpis.gp)}
+          sub={kpis.gpPct + '% GP'}
+          icon="📒"
+          color="#27500A"
+          onClick={() => navigate('/reports/gp')}
+        />
+        <KpiTile
+          label="Actual Expenses"
+          value={formatMoney(kpis.expenses)}
+          sub="indirect (MTD)"
+          icon="📒"
+          color="#A32D2D"
+          onClick={() => navigate('/reports/pnl')}
+        />
+        <KpiTile
+          label="Actual NP"
+          value={formatMoney(kpis.netProfit)}
+          sub="net profit (MTD)"
+          icon="📒"
+          color={kpis.netProfit > 0 ? '#1D9E75' : '#A32D2D'}
+          onClick={() => navigate('/reports/pnl')}
+        />
+        <KpiTile
           label="Approved Sales"
           value={formatMoney(ab.sales)}
           sub={`${ab.count} approved booking${ab.count === 1 ? '' : 's'}`}
@@ -173,6 +214,22 @@ export function BranchDashboardPage({ branch, setRoute }) {
           icon="🚫"
           color="#A32D2D"
           onClick={() => navigate('/bookings/rejected')}
+        />
+        <KpiTile
+          label="Deleted Sales"
+          value={formatMoney(db.sales)}
+          sub={`${db.count} deleted booking${db.count === 1 ? '' : 's'}`}
+          icon="🗑"
+          color="#6b7280"
+          onClick={() => navigate('/bookings/deleted')}
+        />
+        <KpiTile
+          label="Deleted Purchase"
+          value={formatMoney(db.purchase)}
+          sub="reversed out"
+          icon="🗑"
+          color="#6b7280"
+          onClick={() => navigate('/bookings/deleted')}
         />
       </div>
 

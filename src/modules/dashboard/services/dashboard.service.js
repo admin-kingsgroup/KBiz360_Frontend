@@ -38,6 +38,7 @@ export const loadBranchDashboard = async ({ branchCode }) => {
     pendingBookings: bookingSummary.pending,
     approvedBookings: bookingSummary.approved,
     rejectedBookings: bookingSummary.rejected,
+    deletedBookings: bookingSummary.deleted,
     kpis: {
       revenue: cur.totals.sales,
       cost: cur.totals.cogs,
@@ -88,11 +89,14 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}
     pendingBookings: bookingSummary.pending,
     approvedBookings: bookingSummary.approved,
     rejectedBookings: bookingSummary.rejected,
+    deletedBookings: bookingSummary.deleted,
     rangeLabel: dates.label,
     figures: {
       revenue: mpl.totals.sales,
+      purchase: mpl.totals.cogs,        // Actual Purchase (COGS) from the books
       gp: mpl.totals.gp,
       gpPct: mpl.totals.gpPct,
+      expenses: mpl.indirect.expense,   // Actual indirect Expenses from the books
       netProfit: mpl.bridge.netProfit,
       outstanding: unsettled.receivable,  // unsettled receivable (pending to collect)
       payable: unsettled.payable,         // unsettled payable (pending to pay)

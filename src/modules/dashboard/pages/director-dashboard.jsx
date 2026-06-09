@@ -48,6 +48,7 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
   const pb = data.pendingBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
   const ab = data.approvedBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
   const rb = data.rejectedBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
+  const db = data.deletedBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
   const rangeShort = RANGE_SHORT[range] || 'This Month';
   const topCust = topCustomers[0] || { share: 0, name: '—' };
   const highValueApprovals = 0;
@@ -99,6 +100,25 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
         />
       </div>
 
+      {/* Actual — the real posted figures from the books (module-wise P&L). */}
+      <div style={{ marginBottom: 6, fontSize: 12, fontWeight: 600, color: '#5a6691' }}>
+        Actual (from the books) · {rangeShort}
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))',
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
+        <KPICard label="Actual Sales" value={fmtINR(fig.revenue)} delta="" color="#d4a437" onClick={() => navigate('/reports/pnl')} />
+        <KPICard label="Actual Purchase" value={fmtINR(fig.purchase)} delta="COGS" color="#854F0B" onClick={() => navigate('/reports/pnl')} />
+        <KPICard label="Actual GP" value={fmtINR(fig.gp)} delta={fig.gpPct ? `${fig.gpPct}% GP` : ''} color="#22c55e" onClick={() => navigate('/reports/gp')} />
+        <KPICard label="Actual Expenses" value={fmtINR(fig.expenses)} delta="indirect" color="#A32D2D" onClick={() => navigate('/reports/pnl')} />
+        <KPICard label="Actual NP" value={fmtINR(fig.netProfit)} delta="net profit" color={fig.netProfit >= 0 ? '#1D9E75' : '#A32D2D'} onClick={() => navigate('/reports/pnl')} />
+      </div>
+
       {/* SO/PO/GP — realized totals from approved/posted bookings. */}
       <div style={{ marginBottom: 6, fontSize: 12, fontWeight: 600, color: '#5a6691' }}>
         SO/PO/GP {ab.count ? `· ${ab.count} approved` : ''}
@@ -148,6 +168,22 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
         <KPICard label="Rejected Sales" value={fmtINR(rb.sales)} delta={`${rb.count} booking${rb.count === 1 ? '' : 's'}`} color="#A32D2D" onClick={() => navigate('/bookings/rejected')} />
         <KPICard label="Rejected Purchase" value={fmtINR(rb.purchase)} delta="declined" color="#A32D2D" onClick={() => navigate('/bookings/rejected')} />
         <KPICard label="Rejected GP" value={fmtINR(rb.gp)} delta={rb.sales > 0 ? `${((rb.gp / rb.sales) * 100).toFixed(1)}% GP` : ''} color="#A32D2D" onClick={() => navigate('/bookings/rejected')} />
+      </div>
+
+      {/* Deleted SO/PO/GP — admin-deleted bookings (reversed out of the books; reporting only). */}
+      <div style={{ marginBottom: 6, fontSize: 12, fontWeight: 600, color: '#5a6691' }}>
+        Deleted SO/PO/GP {db.count ? `· ${db.count} deleted` : ''}
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))',
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
+        <KPICard label="Deleted Sales" value={fmtINR(db.sales)} delta={`${db.count} booking${db.count === 1 ? '' : 's'}`} color="#6b7280" onClick={() => navigate('/bookings/deleted')} />
+        <KPICard label="Deleted Purchase" value={fmtINR(db.purchase)} delta="reversed out" color="#6b7280" onClick={() => navigate('/bookings/deleted')} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14, marginBottom: 14 }}>

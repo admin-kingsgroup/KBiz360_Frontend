@@ -17,8 +17,9 @@ export async function getBookingSummary(branchCode) {
       pending: { ...BLANK, ...(d.pending || {}) },
       approved: { ...BLANK, ...(d.approved || {}) },
       rejected: { ...BLANK, ...(d.rejected || {}) },
+      deleted: { ...BLANK, ...(d.deleted || {}) },
     };
   } catch {
-    return { pending: { ...BLANK }, approved: { ...BLANK }, rejected: { ...BLANK } };
+    return { pending: { ...BLANK }, approved: { ...BLANK }, rejected: { ...BLANK }, deleted: { ...BLANK } };
   }
 }
