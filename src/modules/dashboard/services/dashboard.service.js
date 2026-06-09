@@ -20,7 +20,7 @@ import { growthPct } from '../utils/helpers';
 
 export const loadBranchDashboard = async ({ branchCode }) => {
   const p = api.periods();
-  const [cur, prev, ytd, unsettled, saleVouchers, actionItems, upcomingTravel] = await Promise.all([
+  const [cur, prev, ytd, unsettled, saleVouchers, actionItems, upcomingTravel, pendingBookings] = await Promise.all([
     api.getModulePL({ branchCode, ...p.month }),
     api.getModulePL({ branchCode, ...p.prevMonth }),
     api.getModulePL({ branchCode, ...p.ytd }),
@@ -28,12 +28,14 @@ export const loadBranchDashboard = async ({ branchCode }) => {
     api.getSaleVouchers({ branchCode, ...p.month }),
     api.getActionItems(),
     api.getUpcomingTravel({ limit: 5 }),
+    api.getPendingBookingSummary(branchCode), // pending SO/PO/GP pipeline (whole queue, not date-bound)
   ]);
 
   return {
     billsYtd: filesOf(ytd),
     actionItems,
     upcomingTravel,
+    pendingBookings,
     kpis: {
       revenue: cur.totals.sales,
       cost: cur.totals.cogs,

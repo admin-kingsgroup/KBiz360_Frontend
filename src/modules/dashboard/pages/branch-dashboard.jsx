@@ -22,6 +22,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
   }
 
   const { kpis, gpByModule, topConsultants, actionItems, upcomingTravel, billsYtd } = data;
+  const pb = data.pendingBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
   const formatMoney = (n) => formatCurrency(currencySymbol, n);
 
   return (
@@ -98,6 +99,30 @@ export function BranchDashboardPage({ branch, setRoute }) {
           icon="📊"
           color="#5a6691"
           onClick={() => navigate('/reports/pnl')}
+        />
+        <KpiTile
+          label="Pending Sales"
+          value={formatMoney(pb.sales)}
+          sub={`${pb.count} pending booking${pb.count === 1 ? '' : 's'}`}
+          icon="🧾"
+          color="#185FA5"
+          onClick={() => navigate('/bookings/pending')}
+        />
+        <KpiTile
+          label="Pending Purchase"
+          value={formatMoney(pb.purchase)}
+          sub="awaiting approval"
+          icon="📥"
+          color="#854F0B"
+          onClick={() => navigate('/bookings/pending')}
+        />
+        <KpiTile
+          label="Pending GP"
+          value={formatMoney(pb.gp)}
+          sub={pb.sales > 0 ? `${((pb.gp / pb.sales) * 100).toFixed(1)}% GP` : 'SO/PO/GP queue'}
+          icon="⌛"
+          color="#27500A"
+          onClick={() => navigate('/bookings/pending')}
         />
       </div>
 
