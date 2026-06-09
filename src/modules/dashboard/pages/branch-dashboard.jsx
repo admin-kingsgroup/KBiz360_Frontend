@@ -102,7 +102,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           onClick={() => navigate('/reports/pnl')}
         />
         <KpiTile
-          label="Sales (SO/PO/GP)"
+          label="Approved Sales"
           value={formatMoney(ab.sales)}
           sub={`${ab.count} approved booking${ab.count === 1 ? '' : 's'}`}
           icon="🧾"
@@ -110,7 +110,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           onClick={() => navigate('/bookings/approved')}
         />
         <KpiTile
-          label="Purchase (SO/PO/GP)"
+          label="Approved Purchase"
           value={formatMoney(ab.purchase)}
           sub="approved & posted"
           icon="📦"
@@ -118,7 +118,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           onClick={() => navigate('/bookings/approved')}
         />
         <KpiTile
-          label="GP (SO/PO/GP)"
+          label="Approved GP"
           value={formatMoney(ab.gp)}
           sub={ab.sales > 0 ? `${((ab.gp / ab.sales) * 100).toFixed(1)}% GP` : 'approved bookings'}
           icon="📈"

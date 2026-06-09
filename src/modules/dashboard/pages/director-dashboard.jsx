@@ -110,9 +110,9 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
           marginBottom: 14,
         }}
       >
-        <KPICard label="Sales" value={fmtINR(ab.sales)} delta={`${ab.count} booking${ab.count === 1 ? '' : 's'}`} color="#d4a437" onClick={() => navigate('/bookings/approved')} />
-        <KPICard label="Purchase" value={fmtINR(ab.purchase)} delta="approved & posted" color="#854F0B" onClick={() => navigate('/bookings/approved')} />
-        <KPICard label="GP" value={fmtINR(ab.gp)} delta={ab.sales > 0 ? `${((ab.gp / ab.sales) * 100).toFixed(1)}% GP` : ''} color="#22c55e" onClick={() => navigate('/bookings/approved')} />
+        <KPICard label="Approved Sales" value={fmtINR(ab.sales)} delta={`${ab.count} booking${ab.count === 1 ? '' : 's'}`} color="#d4a437" onClick={() => navigate('/bookings/approved')} />
+        <KPICard label="Approved Purchase" value={fmtINR(ab.purchase)} delta="approved & posted" color="#854F0B" onClick={() => navigate('/bookings/approved')} />
+        <KPICard label="Approved GP" value={fmtINR(ab.gp)} delta={ab.sales > 0 ? `${((ab.gp / ab.sales) * 100).toFixed(1)}% GP` : ''} color="#22c55e" onClick={() => navigate('/bookings/approved')} />
       </div>
 
       {/* Pending SO/PO/GP pipeline — value sitting in the approval queue (not yet posted). */}
