@@ -58,11 +58,11 @@ export function useTaxSummary(branch, { from, to } = {}) {
   });
 }
 
-export function useBalanceSheet(branch, { to } = {}) {
+export function useBalanceSheet(branch, { to, includeZero } = {}) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['accounting', 'balance-sheet', code || 'all', to || ''],
-    queryFn: () => apiGet('/api/accounting/balance-sheet', { branch: code, to }),
+    queryKey: ['accounting', 'balance-sheet', code || 'all', to || '', !!includeZero],
+    queryFn: () => apiGet('/api/accounting/balance-sheet', { branch: code, to, ...(includeZero ? { includeZero: 1 } : {}) }),
     enabled: enabled(),
     staleTime: 30_000,
   });
@@ -110,11 +110,11 @@ export function useInvoiceGP(branch, { from, to } = {}) {
 // Module-wise P&L: Sales/COGS/Gross Profit per product module (Flights, Holiday,
 // Hotels, Visa…) + indirect overheads + a Gross→Net profit bridge. Live from the
 // double-entry engine (GET /api/accounting/module-pl).
-export function useModulePL(branch, { from, to } = {}) {
+export function useModulePL(branch, { from, to, includeZero } = {}) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['accounting', 'module-pl', code || 'all', from || '', to || ''],
-    queryFn: () => apiGet('/api/accounting/module-pl', { branch: code, from, to }),
+    queryKey: ['accounting', 'module-pl', code || 'all', from || '', to || '', !!includeZero],
+    queryFn: () => apiGet('/api/accounting/module-pl', { branch: code, from, to, ...(includeZero ? { includeZero: 1 } : {}) }),
     enabled: enabled(),
     staleTime: 30_000,
   });

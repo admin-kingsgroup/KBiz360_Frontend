@@ -352,7 +352,7 @@ function exportDetail(d, period, cur) {
 }
 
 /* ── period toolbar (quick filters + comparison + custom range + export) ── */
-function PnlPeriodBar({ mode, setMode, fy, setFy, compare, setCompare, custom, setCustom, view, setView, showView, canExport, onExport }) {
+function PnlPeriodBar({ mode, setMode, fy, setFy, compare, setCompare, custom, setCustom, view, setView, showView, showZero, setShowZero, canExport, onExport }) {
   const MODES = [['all', 'All Time'], ['ytd', 'YTD'], ['month', 'Monthly'], ['quarter', 'Quarterly'], ['custom', 'Custom']];
   const tab = (active) => ({ padding: '6px 13px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: active ? SAP.blue : '#fff', color: active ? '#fff' : SAP.sec });
   const needsFy = mode === 'ytd' || mode === 'month' || mode === 'quarter';
@@ -378,6 +378,11 @@ function PnlPeriodBar({ mode, setMode, fy, setFy, compare, setCompare, custom, s
       {(mode === 'ytd' || mode === 'custom') && (
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: SAP.sec, cursor: 'pointer' }}>
           <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} /> Compare vs previous
+        </label>
+      )}
+      {typeof setShowZero === 'function' && (
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: SAP.sec, cursor: 'pointer' }} title="Show every account in the chart, including those with a zero balance / no entries">
+          <input type="checkbox" checked={!!showZero} onChange={(e) => setShowZero(e.target.checked)} /> Show zero-balance accounts
         </label>
       )}
       <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
@@ -506,6 +511,7 @@ export function ReportPnLLive({ branch }) {
   const [compare, setCompare] = useState(saved.compare ?? true);
   const [custom, setCustom] = useState(saved.custom || { from: CUR_FY.startISO, to: todayISO() });
   const [view, setView] = useState(saved.view || 'fiori');             // 'fiori' | 'classic'
+  const [showZero, setShowZero] = useState(false);                     // include zero-balance accounts
   const [focus, setFocus] = useState(null);                            // matrix → drilled column { from, to, label, note }
   useEffect(() => { try { localStorage.setItem(PNL_PERIOD_KEY, JSON.stringify({ mode, fy, compare, custom, view })); } catch { /* ignore */ } }, [mode, fy, compare, custom, view]);
   useEffect(() => { setFocus(null); }, [mode, fy]);                    // realigning the matrix clears any open drill
@@ -515,9 +521,9 @@ export function ReportPnLLive({ branch }) {
   const showPY = !isMatrix && !focus && compare && mode !== 'all';
   const prior = showPY ? priorPeriod(mode, fy, custom) : null;
 
-  const q = useModulePL(branch, { from: period.from, to: period.to });
+  const q = useModulePL(branch, { from: period.from, to: period.to, includeZero: showZero });
   // No comparison → reuse the same range (cache hit, no extra fetch); prev stays null.
-  const qP = useModulePL(branch, prior ? { from: prior.from, to: prior.to } : { from: period.from, to: period.to });
+  const qP = useModulePL(branch, prior ? { from: prior.from, to: prior.to, includeZero: showZero } : { from: period.from, to: period.to, includeZero: showZero });
   const d = q.data;
   const prev = showPY ? qP.data : null;
 
@@ -573,6 +579,7 @@ export function ReportPnLLive({ branch }) {
         mode={mode} setMode={setMode} fy={fy} setFy={setFy}
         compare={compare} setCompare={setCompare} custom={custom} setCustom={setCustom}
         view={view} setView={setView} showView={!isMatrix}
+        showZero={showZero} setShowZero={setShowZero}
         canExport={!isMatrix && !!d} onExport={() => exportDetail(d, period, cur)}
       />
       {focus && (
@@ -1025,7 +1032,7 @@ function Segmented({ value, onChange, options, dark }) {
 }
 
 // White filter band under the Fiori header: mode · as-on/range dates · compare · detail.
-function BSToolbar({ mode, setMode, quick, setQuick, customDate, setCustomDate, rangeFrom, setRangeFrom, rangeTo, setRangeTo, cmp, setCmp, detail, setDetail, to, toPrev }) {
+function BSToolbar({ mode, setMode, quick, setQuick, customDate, setCustomDate, rangeFrom, setRangeFrom, rangeTo, setRangeTo, cmp, setCmp, detail, setDetail, showZero, setShowZero, to, toPrev }) {
   const lbl = { fontSize: 10, fontWeight: 700, color: SAP.label, textTransform: 'uppercase', letterSpacing: 0.4 };
   const sel = { ...inp, width: 'auto', minHeight: 30, fontSize: 11.5, cursor: 'pointer' };
   const di = { ...inp, width: 'auto', minHeight: 30, fontSize: 11.5 };
@@ -1050,6 +1057,11 @@ function BSToolbar({ mode, setMode, quick, setQuick, customDate, setCustomDate, 
         </>
       )}
       <div style={fw}><span style={lbl}>Detail</span><Segmented value={detail} onChange={setDetail} options={[['summary', 'Summary'], ['detailed', 'Detailed']]} /></div>
+      {typeof setShowZero === 'function' && (
+        <label style={{ ...fw, fontSize: 11.5, color: SAP.sec, cursor: 'pointer' }} title="Show every account in the chart, including those with a zero balance / no entries">
+          <input type="checkbox" checked={!!showZero} onChange={(e) => setShowZero(e.target.checked)} /> Show zero-balance accounts
+        </label>
+      )}
       <div style={{ marginLeft: 'auto', fontSize: 11, color: SAP.sec }}>
         {mode === 'range'
           ? <>Movement <strong style={{ color: SAP.text }}>{fmtDate(toPrev)}</strong> → <strong style={{ color: SAP.text }}>{fmtDate(to)}</strong></>
@@ -1184,14 +1196,15 @@ export function ReportBSLive({ branch }) {
   const [rangeTo, setRangeTo] = useState(todayISO());
   const [cmp, setCmp] = useState('none');              // comparison (As On mode only)
   const [detail, setDetail] = useState('detailed');    // 'summary' | 'detailed'
+  const [showZero, setShowZero] = useState(false);     // include zero-balance accounts
 
   // Every mode collapses to a primary as-on date + an optional comparison date.
   const to = mode === 'range' ? rangeTo : bsQuickDate(quick, customDate);
   const toPrev = mode === 'range' ? rangeFrom : bsCompareDate(cmp, to);
   const showPY = !!toPrev;
 
-  const q = useBalanceSheet(branch, { to });
-  const qP = useBalanceSheet(branch, { to: toPrev });
+  const q = useBalanceSheet(branch, { to, includeZero: showZero });
+  const qP = useBalanceSheet(branch, { to: toPrev, includeZero: showZero });
   const d = q.data;
   const prev = showPY ? qP.data : null;
   const prevMap = useMemo(() => {
@@ -1227,7 +1240,8 @@ export function ReportBSLive({ branch }) {
         mode={mode} setMode={setMode} quick={quick} setQuick={setQuick}
         customDate={customDate} setCustomDate={setCustomDate}
         rangeFrom={rangeFrom} setRangeFrom={setRangeFrom} rangeTo={rangeTo} setRangeTo={setRangeTo}
-        cmp={cmp} setCmp={setCmp} detail={detail} setDetail={setDetail} to={to} toPrev={toPrev}
+        cmp={cmp} setCmp={setCmp} detail={detail} setDetail={setDetail}
+        showZero={showZero} setShowZero={setShowZero} to={to} toPrev={toPrev}
       />
       <div style={{ background: SAP.pageBg, padding: view === 'classic' ? 0 : 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
         <StateBox q={q} empty={!d}>
