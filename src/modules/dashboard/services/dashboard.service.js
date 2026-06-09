@@ -37,6 +37,7 @@ export const loadBranchDashboard = async ({ branchCode }) => {
     upcomingTravel,
     pendingBookings: bookingSummary.pending,
     approvedBookings: bookingSummary.approved,
+    rejectedBookings: bookingSummary.rejected,
     kpis: {
       revenue: cur.totals.sales,
       cost: cur.totals.cogs,
@@ -86,6 +87,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}
     revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers, bankAccounts,
     pendingBookings: bookingSummary.pending,
     approvedBookings: bookingSummary.approved,
+    rejectedBookings: bookingSummary.rejected,
     rangeLabel: dates.label,
     figures: {
       revenue: mpl.totals.sales,

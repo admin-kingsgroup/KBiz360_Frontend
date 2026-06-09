@@ -24,6 +24,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
   const { kpis, gpByModule, topConsultants, actionItems, upcomingTravel, billsYtd } = data;
   const pb = data.pendingBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
   const ab = data.approvedBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
+  const rb = data.rejectedBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
   const formatMoney = (n) => formatCurrency(currencySymbol, n);
 
   return (
@@ -148,6 +149,30 @@ export function BranchDashboardPage({ branch, setRoute }) {
           icon="⌛"
           color="#27500A"
           onClick={() => navigate('/bookings/pending')}
+        />
+        <KpiTile
+          label="Rejected Sales"
+          value={formatMoney(rb.sales)}
+          sub={`${rb.count} rejected booking${rb.count === 1 ? '' : 's'}`}
+          icon="🚫"
+          color="#A32D2D"
+          onClick={() => navigate('/bookings/rejected')}
+        />
+        <KpiTile
+          label="Rejected Purchase"
+          value={formatMoney(rb.purchase)}
+          sub="declined"
+          icon="🚫"
+          color="#A32D2D"
+          onClick={() => navigate('/bookings/rejected')}
+        />
+        <KpiTile
+          label="Rejected GP"
+          value={formatMoney(rb.gp)}
+          sub={rb.sales > 0 ? `${((rb.gp / rb.sales) * 100).toFixed(1)}% GP` : 'declined bookings'}
+          icon="🚫"
+          color="#A32D2D"
+          onClick={() => navigate('/bookings/rejected')}
         />
       </div>
 

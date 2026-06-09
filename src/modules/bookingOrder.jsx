@@ -545,9 +545,11 @@ function useBookings(brCode) {
 }
 
 function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, onCancel, onEdit, busyId }) {
-  const cols = mode === 'pending'
-    ? ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'Date', 'Actions']
-    : ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'Approved', 'Actions'];
+  const cols = mode === 'approved'
+    ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'Approved', 'Actions']
+    : mode === 'rejected'
+      ? ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'Date', 'Reason']
+      : ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'Date', 'Actions'];
   return (
     <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -556,7 +558,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, on
         </tr></thead>
         <tbody>
           {isLoading && <tr><td colSpan={cols.length} style={{ padding: 20, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>Loading…</td></tr>}
-          {!isLoading && rows.length === 0 && <tr><td colSpan={cols.length} style={{ padding: 22, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>{mode === 'pending' ? 'No pending vouchers. Create one under “SO/PO/GP Voucher”.' : 'No approved vouchers yet.'}</td></tr>}
+          {!isLoading && rows.length === 0 && <tr><td colSpan={cols.length} style={{ padding: 22, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>{mode === 'pending' ? 'No pending vouchers. Create one under “SO/PO/GP Voucher”.' : mode === 'rejected' ? 'No rejected vouchers.' : 'No approved vouchers yet.'}</td></tr>}
           {rows.map((b) => {
             const sp = VSPECS[b.module];
             const isOpen = open === b.id;
@@ -567,21 +569,21 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, on
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}</td>
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: BLUE, fontSize: 11.5 }}>{b.linkNo}</td>
                   <td style={{ padding: '8px 12px', fontSize: 12 }}>{sp ? sp.icon + ' ' + sp.name : b.module}</td>
-                  {mode === 'pending' ? (
-                    <>
-                      <td style={{ padding: '8px 12px', fontSize: 12 }}>{b.customer?.name || '—'}</td>
-                      <td style={{ padding: '8px 12px', fontSize: 12 }}>{b.supplier?.name || '—'}</td>
-                    </>
-                  ) : (
+                  {mode === 'approved' ? (
                     <>
                       <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11 }}>{b.saleVno || '—'}</td>
                       <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11 }}>{b.purchaseVno || '—'}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td style={{ padding: '8px 12px', fontSize: 12 }}>{b.customer?.name || '—'}</td>
+                      <td style={{ padding: '8px 12px', fontSize: 12 }}>{b.supplier?.name || '—'}</td>
                     </>
                   )}
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.so?.total)}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.po?.total)}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.gp?.total)}</td>
-                  <td style={{ padding: '8px 12px', fontSize: 11, color: '#5a6691' }}>{mode === 'pending' ? b.date : (b.approvedAt ? String(b.approvedAt).slice(0, 10) : '—')}</td>
+                  <td style={{ padding: '8px 12px', fontSize: 11, color: '#5a6691' }}>{mode === 'approved' ? (b.approvedAt ? String(b.approvedAt).slice(0, 10) : '—') : b.date}</td>
                   <td style={{ padding: '8px 12px' }} onClick={(e) => e.stopPropagation()}>
                     {mode === 'pending' ? (
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -591,8 +593,10 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, on
                         </button>
                         <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><XCircle size={12} /> Reject</button>
                       </div>
-                    ) : (
+                    ) : mode === 'approved' ? (
                       <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}>Cancel &amp; un-post</button>
+                    ) : (
+                      <span style={{ fontSize: 11, color: '#8b94b3' }}>{b.rejectedReason || '—'}</span>
                     )}
                   </td>
                 </tr>
@@ -638,9 +642,10 @@ export function PendingBookings({ branch, setRoute }) {
     finally { setBusyId(null); }
   };
   const onCancel = async (b) => {
-    if (!window.confirm(`Reject pending voucher ${b.bookingNo}? It will be archived (it has not touched the books).`)) return;
+    const reason = window.prompt(`Reject voucher ${b.bookingNo}? It will be marked Rejected (no books impact). Optional reason:`, '');
+    if (reason === null) return; // user dismissed the prompt
     setBusyId(b.id);
-    try { await apiDelete('/api/booking-orders/' + b.id); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); }
+    try { await apiPost('/api/booking-orders/' + b.id + '/reject', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); setMsg(`✓ Rejected ${b.bookingNo}.`); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Reject failed')); }
     finally { setBusyId(null); }
   };
@@ -688,6 +693,28 @@ export function ApprovedBookings({ branch, setRoute }) {
         <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>
       <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" onCancel={onCancel} busyId={busyId} />
+    </div>
+  );
+}
+
+export function RejectedBookings({ branch, setRoute }) {
+  const brCode = brCodeOf(branch) || 'ALL';
+  const cur = bc(branch).cur;
+  const { data = [], isLoading } = useBookings(brCode);
+  const [open, setOpen] = useState(null);
+
+  const rows = data.filter((b) => b.status === 'rejected');
+
+  return (
+    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><XCircle size={18} style={{ color: '#A32D2D' }} /> Rejected</h2>
+          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>Declined SO/PO/GP vouchers. They <b>never touched the books</b> (no Sales/Purchase invoices posted). Expand a row to review what was entered.</p>
+        </div>
+        <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
+      </div>
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="rejected" busyId={null} />
     </div>
   );
 }

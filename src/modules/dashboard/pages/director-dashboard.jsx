@@ -47,6 +47,7 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
   const fig = data.figures || { revenue: 0, gp: 0, gpPct: 0, netProfit: 0, outstanding: 0, payable: 0 };
   const pb = data.pendingBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
   const ab = data.approvedBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
+  const rb = data.rejectedBookings || { count: 0, sales: 0, purchase: 0, gp: 0 };
   const rangeShort = RANGE_SHORT[range] || 'This Month';
   const topCust = topCustomers[0] || { share: 0, name: '—' };
   const highValueApprovals = 0;
@@ -130,6 +131,23 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
         <KPICard label="Pending Sales" value={fmtINR(pb.sales)} delta={`${pb.count} booking${pb.count === 1 ? '' : 's'}`} color="#d4a437" onClick={() => navigate('/bookings/pending')} />
         <KPICard label="Pending Purchase" value={fmtINR(pb.purchase)} delta="awaiting approval" color="#854F0B" onClick={() => navigate('/bookings/pending')} />
         <KPICard label="Pending GP" value={fmtINR(pb.gp)} delta={pb.sales > 0 ? `${((pb.gp / pb.sales) * 100).toFixed(1)}% GP` : ''} color="#22c55e" onClick={() => navigate('/bookings/pending')} />
+      </div>
+
+      {/* Rejected SO/PO/GP — declined bookings (never posted). */}
+      <div style={{ marginBottom: 6, fontSize: 12, fontWeight: 600, color: '#5a6691' }}>
+        Rejected SO/PO/GP {rb.count ? `· ${rb.count} rejected` : ''}
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))',
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
+        <KPICard label="Rejected Sales" value={fmtINR(rb.sales)} delta={`${rb.count} booking${rb.count === 1 ? '' : 's'}`} color="#A32D2D" onClick={() => navigate('/bookings/rejected')} />
+        <KPICard label="Rejected Purchase" value={fmtINR(rb.purchase)} delta="declined" color="#A32D2D" onClick={() => navigate('/bookings/rejected')} />
+        <KPICard label="Rejected GP" value={fmtINR(rb.gp)} delta={rb.sales > 0 ? `${((rb.gp / rb.sales) * 100).toFixed(1)}% GP` : ''} color="#A32D2D" onClick={() => navigate('/bookings/rejected')} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14, marginBottom: 14 }}>
