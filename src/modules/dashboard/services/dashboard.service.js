@@ -20,7 +20,7 @@ import { growthPct } from '../utils/helpers';
 
 export const loadBranchDashboard = async ({ branchCode }) => {
   const p = api.periods();
-  const [cur, prev, ytd, unsettled, saleVouchers, actionItems, upcomingTravel, pendingBookings] = await Promise.all([
+  const [cur, prev, ytd, unsettled, saleVouchers, actionItems, upcomingTravel, bookingSummary] = await Promise.all([
     api.getModulePL({ branchCode, ...p.month }),
     api.getModulePL({ branchCode, ...p.prevMonth }),
     api.getModulePL({ branchCode, ...p.ytd }),
@@ -28,14 +28,15 @@ export const loadBranchDashboard = async ({ branchCode }) => {
     api.getSaleVouchers({ branchCode, ...p.month }),
     api.getActionItems(),
     api.getUpcomingTravel({ limit: 5 }),
-    api.getPendingBookingSummary(branchCode), // pending SO/PO/GP pipeline (whole queue, not date-bound)
+    api.getBookingSummary(branchCode), // SO/PO/GP pipeline { pending, approved } (whole queue, not date-bound)
   ]);
 
   return {
     billsYtd: filesOf(ytd),
     actionItems,
     upcomingTravel,
-    pendingBookings,
+    pendingBookings: bookingSummary.pending,
+    approvedBookings: bookingSummary.approved,
     kpis: {
       revenue: cur.totals.sales,
       cost: cur.totals.cogs,
@@ -59,7 +60,7 @@ export const loadBranchDashboard = async ({ branchCode }) => {
 
 export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}) => {
   const dates = api.rangeToDates(range); // 'month' | 'ytd' | 'all' → ISO range + label
-  const [revenueTrend, fyTargets, branchHeatmap, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, pendingBookings] =
+  const [revenueTrend, fyTargets, branchHeatmap, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, bookingSummary] =
     await Promise.all([
       api.getRevenueTrend(branchCode),
       api.getFyTargets(),
@@ -72,7 +73,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}
       api.getCashPosition(branchCode),
       api.getArAgeingSummary(),
       api.getApAgeingSummary(),
-      api.getPendingBookingSummary(branchCode), // pending SO/PO/GP pipeline (not date-bound — whole queue)
+      api.getBookingSummary(branchCode), // SO/PO/GP pipeline { pending, approved } (not date-bound — whole queue)
     ]);
 
   // Key Alerts are computed live from ageing + module P&L + concentration, not seeded.
@@ -83,7 +84,8 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}
 
   return {
     revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers, bankAccounts,
-    pendingBookings,
+    pendingBookings: bookingSummary.pending,
+    approvedBookings: bookingSummary.approved,
     rangeLabel: dates.label,
     figures: {
       revenue: mpl.totals.sales,

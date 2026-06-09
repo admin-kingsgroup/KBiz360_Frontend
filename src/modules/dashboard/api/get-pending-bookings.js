@@ -1,19 +1,22 @@
 import { apiGet } from '../../../core/api';
 
+const BLANK = { count: 0, sales: 0, purchase: 0, gp: 0 };
+
 /**
- * Pending SO/PO/GP pipeline totals — the dashboard's "Pending Sales / Purchase /
- * GP" tiles. Sourced from bookings still in `status: 'pending'` (not yet
- * approved/posted), so it reflects value sitting in the approval queue. Falls
- * back to zeros on error so one failed call never blanks the dashboard.
+ * SO/PO/GP pipeline totals for the dashboard tiles, split by lifecycle:
+ *   pending  → not-yet-approved bookings  → "Pending Sales / Purchase / GP"
+ *   approved → approved + posted bookings → "Sales / Purchase / GP"
+ * Branch-scoped. Falls back to zeros on error so one failed call never blanks
+ * the dashboard.
  */
-export async function getPendingBookingSummary(branchCode) {
+export async function getBookingSummary(branchCode) {
   try {
-    return (
-      (await apiGet('/api/booking-orders/summary', { branch: branchCode })) || {
-        count: 0, sales: 0, purchase: 0, gp: 0,
-      }
-    );
+    const d = (await apiGet('/api/booking-orders/summary', { branch: branchCode })) || {};
+    return {
+      pending: { ...BLANK, ...(d.pending || {}) },
+      approved: { ...BLANK, ...(d.approved || {}) },
+    };
   } catch {
-    return { count: 0, sales: 0, purchase: 0, gp: 0 };
+    return { pending: { ...BLANK }, approved: { ...BLANK } };
   }
 }
