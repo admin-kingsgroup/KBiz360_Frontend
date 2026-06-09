@@ -335,13 +335,14 @@ export function VoucherView({ id, cur }) {
 export function PnLTallyLive({ branch }) {
   const cur = bc(branch).cur;
   const [range, setRange] = useState(fyDefault);
+  const [showZero, setShowZero] = useState(false);
   const [stack, setStack] = useState([{ kind: 'pl' }]);
   const top = stack[stack.length - 1];
   const periodLabel = `${dmy(range.from)} to ${dmy(range.to)}`;
 
   const { data: pl, isLoading, error } = useQuery({
-    queryKey: ['pl-tally', brCodeOf(branch), range.from, range.to],
-    queryFn: () => apiGet('/api/accounting/pl-tally', { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from: range.from, to: range.to }),
+    queryKey: ['pl-tally', brCodeOf(branch), range.from, range.to, showZero],
+    queryFn: () => apiGet('/api/accounting/pl-tally', { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from: range.from, to: range.to, ...(showZero ? { includeZero: 1 } : {}) }),
   });
 
   const pick = (line) => {
@@ -367,6 +368,9 @@ export function PnLTallyLive({ branch }) {
           <p style={{ margin: 0, fontSize: 10.5, color: '#8b94b3' }}>{brCodeOf(branch)} (Branch) · {periodLabel}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#cfd6ea', fontSize: 11, cursor: 'pointer', userSelect: 'none' }} title="Show every ledger in the chart, including those with a zero balance / no entries">
+            <input type="checkbox" checked={showZero} onChange={(e) => setShowZero(e.target.checked)} /> Show zero-balance accounts
+          </label>
           <input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} style={dateInp} />
           <span style={{ color: '#8b94b3', fontSize: 11 }}>to</span>
           <input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} style={dateInp} />
