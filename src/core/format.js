@@ -17,8 +17,12 @@ export function fmt(n){
 /* Responsive hook */
 
 export const fmtINR = n => {
-  const v = Number(n) || 0;  // tolerate undefined/null/NaN → ₹0
-  return "₹"+(v>=10000000?(v/10000000).toFixed(2)+"Cr":v>=100000?(v/100000).toFixed(2)+"L":v.toLocaleString("en-IN"));
+  const v = Number(n) || 0;            // tolerate undefined/null/NaN → ₹0
+  const a = Math.abs(v);               // threshold on magnitude so negatives abbreviate too
+  const sign = v < 0 ? '-' : '';       // keep the sign outside the abbreviation
+  if (a >= 10000000) return `₹${sign}${(a / 10000000).toFixed(2)}Cr`;
+  if (a >= 100000)   return `₹${sign}${(a / 100000).toFixed(2)}L`;
+  return `₹${sign}${Math.round(a).toLocaleString('en-IN')}`; // rounded rupees — no paise on summary tiles
 };
 
 /* ════════════════════════════════════════════════════════════════════
