@@ -585,7 +585,7 @@ export function ReportPnLLive({ branch }) {
         {isMatrix ? (
           <PnLMatrix branch={branch} cur={cur} fy={fy} grain={mode} onFocus={setFocus} />
         ) : (
-        <StateBox q={q} empty={!d || !(d.modules || []).length}>
+        <StateBox q={q} empty={!d || (!(d.modules || []).length && !d.indirect?.expense && !d.bridge?.indirectIncome && !d.bridge?.netProfit)}>
           {d && view === 'fiori' && <>
             {/* KPIs */}
             <KpiGrid>
