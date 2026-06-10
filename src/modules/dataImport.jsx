@@ -130,7 +130,7 @@ const SPECS = [
     columns: ['vno', 'date', 'branch', 'debitLedger', 'creditLedger', 'amount', 'remarks'],
     example: ['JV/26/0001', '2025-06-30', 'BOM', 'Rent & Utilities', 'Accounts Payable', '25000', 'June rent'] },
   { group: 'Vouchers', entity: 'purchase-expense', label: 'Purchase Voucher (Expense / Asset)',
-    desc: 'Supplier expense / asset bought on credit. Dr ledger + input GST · Cr supplier (net of TDS). subtotal = taxable, total = invoice value.',
+    desc: 'Supplier expense / asset bought on credit. ⏳ Approval-gated (like SO/PO/GP): each row imports as a PENDING voucher with NO books impact — approve it under Finance ▸ Purchase Expense ▸ Pending to post (Dr ledger + input GST · Cr supplier, net of TDS).',
     columns: ['vno', 'date', 'branch', 'party', 'partyGroup', 'ledger', 'description', 'subtotal', 'gstMode', 'taxAmt', 'tdsAmt', 'total', 'billNo', 'remarks'],
     example: ['PXP/26/0001', '2025-06-30', 'BOM', 'ABC Realtors', 'Sundry Creditors', 'Office Rent', 'June 2026 office rent', '25000', 'intra', '4500', '500', '29500', 'VEND-4471', 'Being office rent for June payable to ABC Realtors'] },
   { group: 'Vouchers', entity: 'contra', label: 'Contra',

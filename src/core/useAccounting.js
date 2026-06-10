@@ -282,6 +282,19 @@ export function useCreateVoucher() {
   });
 }
 
+// Save an approval-gated Purchase Expense voucher as a PENDING order (no books
+// impact). Approval (under the Pending list) spawns the locked PXP voucher and
+// posts its journal — mirrors the SO/PO/GP booking flow.
+export function useCreateExpenseOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => apiPost('/api/purchase-expense-orders', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['purchase-expense-orders'] });
+    },
+  });
+}
+
 // Save an edited voucher; re-posts the journal server-side. Invalidates the
 // reports/registers so the change shows everywhere immediately.
 export function useUpdateVoucher() {

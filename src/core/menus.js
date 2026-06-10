@@ -80,7 +80,15 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Journal Entry", href:"/journal"},
     {label:"Credit Note", href:"/finance/credit-note"},
     {label:"Debit Note", href:"/finance/debit-note"},
-    {label:"Purchase Expense Voucher", href:"/purchase-expense"},
+    /* Purchase Expense — approval-gated (mirrors SO/PO/GP): saving creates a Pending
+       voucher; approval spawns the linked PXP voucher + posts its journal. */
+    {label:"Purchase Expense Voucher", children:[
+      {label:"New Voucher", href:"/purchase-expense"},
+      {label:"Pending", href:"/purchase-expense/pending"},
+      {label:"Approved", href:"/purchase-expense/approved"},
+      {label:"Rejected", href:"/purchase-expense/rejected"},
+      {label:"Deleted", href:"/purchase-expense/deleted"},
+    ]},
     {label:"Refund (against Sale)", href:"/finance/refund"},
     {label:"Reissue (against Sale)", href:"/finance/reissue"},
   ]},
