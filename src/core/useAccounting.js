@@ -109,6 +109,43 @@ export function useGroupTree(branch) {
   });
 }
 
+// Voucher approval queue (gated types: payment/receipt/contra/journal/CN/DN/PXP).
+// Returns { counts, status, entries, byGroup, bySubGroup, byLedger }.
+export function useVoucherApprovals(branch, status = 'pending', { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['vouchers', 'approvals', code || 'all', status, from || '', to || ''],
+    queryFn: () => apiGet('/api/vouchers/approvals', { branch: code, status, from, to }),
+    enabled: enabled(),
+    staleTime: 15_000,
+  });
+}
+export function useApproveVoucher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, approver }) => apiPost(`/api/vouchers/${id}/approve`, { approver }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['groups'] }); },
+  });
+}
+export function useRejectVoucher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, by, reason }) => apiPost(`/api/vouchers/${id}/reject`, { by, reason }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); },
+  });
+}
+export function useApproveAll() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ branch, category, approver }) => {
+      const code = branchCode(branch);
+      const qs = new URLSearchParams({ ...(code ? { branch: code } : {}), ...(category ? { category } : {}) }).toString();
+      return apiPost(`/api/vouchers/approve-all${qs ? '?' + qs : ''}`, { approver });
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['groups'] }); },
+  });
+}
+
 export function useInvoiceGP(branch, { from, to } = {}) {
   const code = branchCode(branch);
   return useQuery({

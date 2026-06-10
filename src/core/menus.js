@@ -282,6 +282,8 @@ export const MENU_TRANSACTIONS = {label:"Transactions", icon:ShoppingCart, child
     {label:"Rejected", href:"/bookings/rejected"},
     {label:"Deleted", href:"/bookings/deleted"},
   ]},
+  /* Voucher approval queue — Payment/Receipt/Contra/Journal/CN/DN/Purchase Expense */
+  {label:"Voucher Approvals", href:"/transactions/voucher-approvals"},
   /* Standardized 8-tab Voucher Entry pattern */
   {label:"Standardized Patterns", children:[
     {label:"Voucher Entry (8-Tab View)", href:"/transactions/voucher-tabs"},
