@@ -340,6 +340,23 @@ export const MENU_IMPORT = {label:"Data Import", icon:Upload, href:"/import"};
 // Back-office sections grouped under one "Admin" header pill (cleaner top bar).
 export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_HR, MENU_ASSETS, MENU_HO_CONTROL, MENU_SETTINGS, MENU_IMPORT]};
 
+// Director/Super-Admin only: the plain "Dashboard" pill becomes a "Dashboards"
+// dropdown with the whole-company suite. Other roles keep the single Dashboard link.
+export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, children:[
+  {label:"Overview", children:[
+    {label:"Executive Overview", href:"/dashboards/exec"},
+    {label:"My Dashboard", href:"/dashboard"},
+  ]},
+  {label:"Financials", children:[
+    {label:"Profitability (P&L)", href:"/dashboards/profitability"},
+    {label:"Cash & Liquidity", href:"/dashboards/cash"},
+    {label:"Receivables & Payables", href:"/dashboards/arap"},
+  ]},
+  {label:"Business", children:[
+    {label:"Branch Performance", href:"/dashboards/branch"},
+  ]},
+]};
+
 export function getMenu(branch, currentUser){
   const isAll   = branch==="ALL";
   const isIndia = !isAll && branch?.code && ["BOM","AMD"].includes(branch.code);
@@ -360,8 +377,13 @@ export function getMenu(branch, currentUser){
     "HO Control":       "Settings",
   };
   // OPEN ACCESS: every ERP user sees every menu (no role-based filtering).
-  // 7 pills: Dashboard · Finance · Approvals · Reports · Taxation · Masters · Admin
-  const menus = [...MENU_COMMON_TOP, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
+  // Director/Super Admin get the multi-dashboard dropdown in place of the plain
+  // Dashboard pill; everyone else keeps the single Dashboard link.
+  const role = currentUser?.role || 'Super Admin';
+  const isDir = role === 'Director' || role === 'Super Admin';
+  const top = isDir ? [MENU_DASHBOARDS, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
+  // 7 pills: Dashboard(s) · Finance · Approvals · Reports · Taxation · Masters · Admin
+  const menus = [...top, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
   return menus;
 }
 
