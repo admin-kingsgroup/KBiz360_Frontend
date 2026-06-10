@@ -84,7 +84,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const addLine = () => setLines([...lines, blankLine(spec)]);
   const delLine = (i) => setLines(lines.length > 1 ? lines.filter((_, idx) => idx !== i) : [blankLine(spec)]);
 
-  const canSave = !!brCode && !saving && totals.po.total > 0 && totals.so.total > 0 && supplier.name.trim() && customer.name.trim();
+  // Both posting ledgers are mandatory: the customer's Debtor ledger (receivable)
+  // and the supplier's Creditor ledger (payable).
+  const hasCustLedger = !!(customer.ledgerName || '').trim();
+  const hasSuppLedger = !!supplier.name.trim();
+  const canSave = !!brCode && !saving && totals.po.total > 0 && totals.so.total > 0 && hasSuppLedger && customer.name.trim() && hasCustLedger;
 
   const save = async (thenApprove = false) => {
     setError(''); setSaving(true);
@@ -216,13 +220,15 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 ledgerGroup: (!c.ledgerGroup || c.ledgerGroup === c.group) ? v.group : c.ledgerGroup,
               }))} />
           </FL>
-          <FL label="Post receivable to (Debtor ledger)">
+          <FL label="Post receivable to (Debtor ledger) *">
             <PartyPicker branch={branch} kind="customer" value={{ name: customer.ledgerName, group: customer.ledgerGroup }}
               onChange={(v) => setCustomer({ ...customer, ledgerName: v.name, ledgerGroup: v.group })} />
+            {!hasCustLedger && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — pick the Debtor ledger to post & follow for payment</span>}
           </FL>
-          <FL label="Supplier (Pay to)">
+          <FL label="Supplier ledger (Pay to) *">
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
               onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
+            {!hasSuppLedger && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — pick the Creditor ledger to post & pay against</span>}
           </FL>
           <FL label="Supplier sub-group (auto)"><input value={supplier.ledgerGroup} readOnly placeholder="picks with the supplier" style={{ ...inp, background: '#faf7ef', color: '#5a6691' }} /></FL>
           <FL label="GST mode"><select value={gstMode} onChange={(e) => setGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
