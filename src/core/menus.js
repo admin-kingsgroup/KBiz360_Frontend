@@ -74,6 +74,7 @@ export const MENU_ASSETS={label:"Assets",icon:Wrench,children:[
 
 export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
   {label:"Vouchers", children:[
+    {label:"SO/PO/GP Voucher", href:"/bookings/new"},
     {label:"Receipt Voucher", href:"/receipts"},
     {label:"Payment Voucher", href:"/payments"},
     {label:"Contra Entry", href:"/contra"},
@@ -89,6 +90,8 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Refund (against Sale)", href:"/finance/refund"},
     {label:"Reissue (against Sale)", href:"/finance/reissue"},
   ]},
+  /* Read-only views of the 7 products (entry is via SO/PO/GP). Sales/Purchase invoices printable, Link No stamped. */
+  {label:"Module Register (Flight/Holiday/…)", href:"/finance/module-register"},
   {label:"Voucher Tools", children:[
     {label:"Multi-Currency Voucher", href:"/finance/multi-currency"},
     {label:"Comments Thread (Collaborate)", href:"/finance/comments-demo"},
@@ -279,43 +282,17 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
 /* ── FINAL MENU ASSEMBLY ─────────────────────────────────────── */
 
 export const MENU_TRANSACTIONS = {label:"Transactions", icon:ShoppingCart, children:[
-  /* SO / PO / GP — create a booking (on approval spawns a linked Sales + Purchase).
-     All approvals (SO/PO/GP + Vouchers) live in the top-level "Approvals" section. */
-  {label:"SO/PO/GP Voucher", href:"/bookings/new"},
+  /* SO/PO/GP Voucher creation now lives under Finance ▸ Vouchers; all approvals
+     (SO/PO/GP + Vouchers) live in the top-level "Approvals" section. */
   /* Standardized 8-tab Voucher Entry pattern */
   {label:"Standardized Patterns", children:[
     {label:"Voucher Entry (8-Tab View)", href:"/transactions/voucher-tabs"},
   ]},
-  /* Each product is a NESTED collapsible — click to expand Sale + Purchase pair */
-  {label:"Flight", children:[
-    {label:"Sale — Flight", href:"/sales/flight"},
-    {label:"Purchase — Flight", href:"/purchase/flight"},
+  /* Per-module Sale/Purchase ENTRY retired — all 7 products are entered via SO/PO/GP
+     (Finance ▸ Vouchers ▸ SO/PO/GP Voucher) and VIEWED via Finance ▸ Module Register. */
+  {label:"Airline Memos", children:[
     {label:"ADM — Agent Debit Memos", href:"/purchase/adm"},
     {label:"ACM — Agent Credit Memos", href:"/purchase/acm"},
-  ]},
-  {label:"Holiday", children:[
-    {label:"Sale — Holiday", href:"/sales/holiday"},
-    {label:"Purchase — Holiday", href:"/purchase/holiday"},
-  ]},
-  {label:"Hotel", children:[
-    {label:"Sale — Hotel", href:"/sales/hotel"},
-    {label:"Purchase — Hotel", href:"/purchase/hotel"},
-  ]},
-  {label:"Visa", children:[
-    {label:"Sale — Visa", href:"/sales/visa"},
-    {label:"Purchase — Visa", href:"/purchase/visa"},
-  ]},
-  {label:"Car Rental", children:[
-    {label:"Sale — Car", href:"/sales/car"},
-    {label:"Purchase — Car", href:"/purchase/car"},
-  ]},
-  {label:"Insurance", children:[
-    {label:"Sale — Insurance", href:"/sales/insurance"},
-    {label:"Purchase — Insurance", href:"/purchase/insurance"},
-  ]},
-  {label:"Miscellaneous", children:[
-    {label:"Sale — Misc", href:"/sales/misc"},
-    {label:"Purchase — Misc", href:"/purchase/misc"},
   ]},
   {label:"Cancellations & Refunds", children:[
     {label:"Sales Cancellations", href:"/sales/cancellation"},

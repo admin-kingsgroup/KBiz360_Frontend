@@ -29,6 +29,7 @@ import { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3
 import { AdmRegister, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
 import { SoPoGpVoucherEntry } from './modules/bookingOrder';
 import { UnifiedApprovals } from './modules/voucherApprovals';
+import { ModuleRegister } from './modules/moduleRegister';
 import { PnLTallyLive } from './modules/pnlTally';
 import { BalanceSheetTallyLive } from './modules/balanceSheetTally';
 import { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, AccountsChartLive, InvoiceGPLive } from './modules/accountingLive';
@@ -270,21 +271,11 @@ export default function KB360App(){
     if(route==="/transactions/approvals")          return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="sopogp"/>;
     if(route==="/transactions/voucher-approvals")  return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;
     if(/^\/bookings\/(pending|approved|rejected|deleted|list)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="sopogp"/>;
-    if(route==="/sales/flight")       return <SalesFlight branch={branch} setRoute={navigate}/>;
-    if(route==="/sales/holiday")      return <SalesHoliday branch={branch} setRoute={navigate}/>;
-    if(route==="/sales/car")          return <SalesCar branch={branch} setRoute={navigate}/>;
-    if(route==="/sales/visa")         return <SalesVisa branch={branch} setRoute={navigate}/>;
-    if(route==="/sales/hotel")        return <SalesHotel branch={branch} setRoute={navigate}/>;
-    if(route==="/sales/insurance")    return <SalesInsurance branch={branch} setRoute={navigate}/>;
-    if(route==="/sales/misc")         return <SalesMisc branch={branch} setRoute={navigate}/>;
+    // Per-module Sale/Purchase ENTRY is retired — all product entry is via SO/PO/GP.
+    // These routes now open the read-only Module Register (view + print invoices).
+    if(/^\/(sales|purchase)\/(flight|holiday|hotel|visa|car|insurance|misc)$/.test(route)) return <ModuleRegister branch={branch}/>;
+    if(route==="/finance/module-register") return <ModuleRegister branch={branch}/>;
     if(route==="/finance/credit-note" || route==="/sales/credit-note")  return <SalesCreditNote branch={branch} setRoute={navigate}/>;
-    if(route==="/purchase/flight")    return <PurchaseFlight branch={branch} setRoute={navigate}/>;
-    if(route==="/purchase/holiday")   return <PurchaseHoliday branch={branch} setRoute={navigate}/>;
-    if(route==="/purchase/hotel")     return <PurchaseHotelVoucher branch={branch} setRoute={navigate}/>;
-    if(route==="/purchase/visa")      return <PurchaseVisa branch={branch} setRoute={navigate}/>;
-    if(route==="/purchase/car")       return <PurchaseCar branch={branch} setRoute={navigate}/>;
-    if(route==="/purchase/insurance") return <PurchaseInsurance branch={branch} setRoute={navigate}/>;
-    if(route==="/purchase/misc")      return <PurchaseMisc branch={branch} setRoute={navigate}/>;
     if(route==="/receipts")           return <ReceiptVoucher branch={branch}/>;
     if(route==="/payments")           return <PaymentVoucher branch={branch}/>;
     if(route==="/purchase-expense")          return <PurchaseExpenseVoucher branch={branch} setRoute={navigate}/>;

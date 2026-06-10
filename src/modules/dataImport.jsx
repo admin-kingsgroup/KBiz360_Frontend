@@ -215,7 +215,9 @@ function makeBookingSpec(code) {
 }
 for (const code of ['SF', 'SH', 'SHT', 'SV', 'SI', 'SC', 'SM']) SPECS.push(makeBookingSpec(code));
 
-const GROUPS = ['Masters', 'Parties', 'SO/PO/GP Voucher', 'Sales & Purchase', 'Vouchers'];
+// Direct "Sales & Purchase" imports are retired — all product entry/import is via the
+// SO/PO/GP Voucher templates (approval-gated). Masters/Parties/Vouchers remain.
+const GROUPS = ['Masters', 'Parties', 'SO/PO/GP Voucher', 'Vouchers'];
 
 /* ── Tax regime (India GST vs Africa VAT) ──────────────────────────────────
    India templates carry GST (CGST/SGST/IGST) + India-only TCS/TDS/incentive
