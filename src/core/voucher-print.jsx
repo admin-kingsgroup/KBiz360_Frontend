@@ -6,6 +6,7 @@
 import { Save } from 'lucide-react';
 import { bc } from './styles';
 import { companyProfile } from './referenceCache';
+import { openPrintPreview } from './PrintPreview';
 
 export function openPrintWindow(branch,vNo,title,el){
   const cfg=bc(branch);
@@ -19,16 +20,9 @@ export function openPrintWindow(branch,vNo,title,el){
   const bodyHTML=el?el.innerHTML:"<p style='color:#999'>Voucher content not available for preview.</p>";
   const safeName=(vNo||"voucher").replace(/\//g,"-");
 
-  const html=`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<title>${title} · ${vNo}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Arial,Helvetica,sans-serif;font-size:10.5pt;color:#222;background:#fff}
-  @media screen{body{padding:12mm;max-width:210mm;margin:0 auto;box-shadow:0 0 20px rgba(0,0,0,0.12)}}
-  @media print{body{padding:8mm;max-width:none;box-shadow:none}}
+  const css=`
+  .vp *{box-sizing:border-box;margin:0;padding:0}
+  .vp{font-family:Arial,Helvetica,sans-serif;font-size:10.5pt;color:#222;background:#fff}
   .top-bar{background:#0d1326;color:#d4a437;padding:10px 16px;display:flex;
     justify-content:space-between;align-items:center;font-weight:700;font-size:11pt}
   .top-bar span{color:#fff;font-size:9pt;font-weight:400}
@@ -54,20 +48,13 @@ export function openPrintWindow(branch,vNo,title,el){
     font-size:8pt;color:#5a6691;border-radius:4px}
   .no-print{text-align:center;padding:16px;background:#f3f4f8;border-radius:8px;
     margin-bottom:16px;font-size:10pt}
-  @media print{.no-print{display:none}}
-</style>
-</head>
-<body>
-<div class="no-print">
-  <strong>KBiz360 Voucher Preview</strong> &nbsp;·&nbsp;
-  Press <kbd>Ctrl+P</kbd> (or <kbd>Cmd+P</kbd> on Mac) → choose <strong>Save as PDF</strong>
-</div>
+  @media print{.no-print{display:none}}`;
 
+  const content=`<div class="vp">
 <div class="top-bar">
   <span style="color:#d4a437;font-size:12pt">TRAVKINGS &nbsp;·&nbsp; KBiz360 Smart Travel ERP — The Business Engine</span>
   <span>Printed: ${new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}</span>
 </div>
-
 <div class="letterhead">
   <div>
     <div class="company">${companyName}</div>
@@ -75,21 +62,17 @@ export function openPrintWindow(branch,vNo,title,el){
   </div>
   <div class="addr">${addr}</div>
 </div>
-
 <div class="voucher-meta">
   <div class="voucher-title">${title}</div>
   <div class="voucher-no">${vNo}</div>
 </div>
-
 <div class="content">${bodyHTML}</div>
-
 <div class="tax-note">
   ${isIndia
     ?"Subject to GST as applicable. E.&amp;O.E. This is a computer-generated document."
     :"Subject to VAT as applicable. E.&amp;O.E. This is a computer-generated document."}
   &nbsp; Payment terms: 7 days net. Jurisdiction: ${branch?.city||"Mumbai"}.
 </div>
-
 <div class="footer">
   <div>
     <div>${cfg.curCode} · ${isIndia?"GST":"VAT"} · KBiz360 v1.0</div>
@@ -100,24 +83,10 @@ export function openPrintWindow(branch,vNo,title,el){
     <div style="margin-top:4px">${(branch?.code||"BOM")} Branch</div>
   </div>
 </div>
-</body>
-</html>`;
+</div>`;
 
-  /* ── Trigger HTML file download ── */
-  try{
-    const blob=new Blob([html],{type:"text/html;charset=utf-8"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");
-    a.href=url;
-    a.download=`${safeName}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(()=>URL.revokeObjectURL(url),2000);
-  }catch(err){
-    /* Fallback: show in preview modal if download blocked */
-    if(_printModalSetter)_printModalSetter({html:html,vNo:vNo,title:title});
-  }
+  // Open the unified in-app A4 preview (orientation / shrink-to-fit / Save-as-PDF).
+  openPrintPreview({ title: `${title} · ${vNo}`, recommend: 'portrait', html: `<style>${css}</style>${content}` });
 }
 
 /* ── Shared style objects ── */

@@ -4,7 +4,8 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, Printer } from 'lucide-react';
+import { openPrintPreview } from '../core/PrintPreview';
 import { KBIZ_LOGO } from '../core/brand';
 import { getUnreadCount } from '../core/business-logic';
 import { useMobile, useNotifRefresh } from '../core/hooks';
@@ -45,6 +46,13 @@ export function TopBar({setRoute,currentUser,setCurrentUser,branch}){
         <ModuleSearch branch={branch} currentUser={currentUser} setRoute={setRoute}/>
 
         <div style={{display:"flex",alignItems:"center",gap:4}}>
+          {/* Global Print / Save-as-PDF — opens the in-app A4 preview of the current screen */}
+          <button title="Print / Save as PDF" onClick={()=>openPrintPreview({ selector:'main', title:'Document', recommend:'portrait' })}
+            style={{background:"transparent",border:"none",color:"#5a6691",cursor:"pointer",padding:6,display:"flex",alignItems:"center",borderRadius:4,transition:"all 0.15s ease-in-out"}}
+            onMouseEnter={e=>{e.currentTarget.style.color="#0070f2";e.currentTarget.style.background="rgba(0,112,242,0.05)"}}
+            onMouseLeave={e=>{e.currentTarget.style.color="#5a6691";e.currentTarget.style.background="transparent"}}>
+            <Printer size={18}/>
+          </button>
           {/* Notification bell */}
           <div style={{position:"relative"}}>
             <button onClick={()=>setShowNotif(s=>!s)}

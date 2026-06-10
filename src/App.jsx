@@ -42,6 +42,7 @@ import { Placeholder } from './shell/Placeholder';
 import { SideNav } from './shell/SideNav';
 import { TopNav } from './shell/TopNav';
 import { TopBar } from './shell/TopBar';
+import { PrintPreviewHost } from './core/PrintPreview';
 
 export default function KB360App(){
   /* ── Restore the session from localStorage so a refresh keeps the user
@@ -455,6 +456,7 @@ export default function KB360App(){
           </ErrorBoundary>
         </main>
       </div>
+      <PrintPreviewHost/>
     </div>
     </ReferenceProvider>
   );

@@ -27,6 +27,7 @@ import { exportToExcel } from '../core/exportExcel';
 import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../core/dates';
 import { VoucherEditor } from './accountingLive';
 import { useMobile } from '../core/hooks';
+import { openPrintPreview } from '../core/PrintPreview';
 
 /* ── palette (SAP Fiori) ─────────────────────────────────────────────── */
 const SAP = {
@@ -357,7 +358,7 @@ function PnlPeriodBar({ mode, setMode, fy, setFy, compare, setCompare, custom, s
   const tab = (active) => ({ padding: '6px 13px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: active ? SAP.blue : '#fff', color: active ? '#fff' : SAP.sec });
   const needsFy = mode === 'ytd' || mode === 'month' || mode === 'quarter';
   return (
-    <div style={{ background: '#fff', border: `1px solid ${SAP.border}`, borderTop: 'none', padding: '9px 14px', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+    <div className="noprint" style={{ background: '#fff', border: `1px solid ${SAP.border}`, borderTop: 'none', padding: '9px 14px', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
       <div style={{ display: 'inline-flex', border: `1px solid ${SAP.border}`, borderRadius: 6, overflow: 'hidden' }}>
         {MODES.map(([id, label]) => <button key={id} onClick={() => setMode(id)} style={tab(mode === id)}>{label}</button>)}
       </div>
@@ -388,7 +389,7 @@ function PnlPeriodBar({ mode, setMode, fy, setFy, compare, setCompare, custom, s
       <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
         {showView && <PnlViewSwitcher view={view} setView={setView} />}
         {canExport && <button onClick={onExport} style={toolBtn}>⬇ Excel</button>}
-        <button onClick={() => window.print()} style={toolBtn}>🖨 Print / PDF</button>
+        <button onClick={() => openPrintPreview({ selector: 'main', title: 'Profit & Loss', recommend: 'landscape' })} style={toolBtn}>🖨 Print / PDF</button>
       </div>
     </div>
   );
@@ -1075,7 +1076,7 @@ function BSToolbar({ mode, setMode, quick, setQuick, customDate, setCustomDate, 
   const di = { ...inp, width: 'auto', minHeight: 30, fontSize: 11.5 };
   const fw = { display: 'flex', alignItems: 'center', gap: 6 };
   return (
-    <div style={{ background: '#fff', border: `1px solid ${SAP.border}`, borderTop: 'none', padding: '10px 16px', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+    <div className="noprint" style={{ background: '#fff', border: `1px solid ${SAP.border}`, borderTop: 'none', padding: '10px 16px', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
       <div style={fw}><span style={lbl}>Mode</span><Segmented value={mode} onChange={setMode} options={[['asOn', 'As On Date'], ['range', 'Date Range']]} /></div>
       {mode === 'asOn' ? (
         <>
@@ -1257,7 +1258,7 @@ export function ReportBSLive({ branch }) {
     if (showPY) cols.push({ key: 'prev', label: `Previous ${prevLabel} (${cur})` }, { key: 'diff', label: `Difference (${cur})` }, { key: 'pct', label: '% Change' });
     exportToExcel(`Balance-Sheet_${branchLabel(branch)}_${to || 'latest'}`, cols, bsExportRows({ d, prev, prevMap, showPY, detail }));
   };
-  const doPrint = () => { if (d) openBSPrint({ d, prev, prevMap, showPY, detail, cur, branch, curLabel, prevLabel }); };
+  const doPrint = () => { if (d) openPrintPreview({ selector: 'main', title: 'Balance Sheet', recommend: 'landscape' }); };
   const expBtn = (dis) => ({ padding: '6px 11px', fontSize: 11, fontWeight: 600, border: '1px solid rgba(255,255,255,0.3)', borderRadius: 5, cursor: dis ? 'default' : 'pointer', background: 'rgba(255,255,255,0.1)', color: '#fff', opacity: dis ? 0.45 : 1 });
 
   return (
