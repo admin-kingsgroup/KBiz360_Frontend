@@ -148,10 +148,10 @@ function FileRows({ files, indent = 48, onPick }) {
 const tapRow = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: `1px solid ${SAP.borderLt}`, cursor: 'pointer' };
 
 // Full-screen on phones, centred sheet on desktop. Tap the backdrop to close.
-function Modal({ title, onClose, mobile, children }) {
+function Modal({ title, onClose, mobile, children, wide }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: mobile ? 'stretch' : 'flex-start', padding: mobile ? 0 : '5vh 12px' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', width: mobile ? '100%' : 'min(720px, 96vw)', height: mobile ? '100%' : 'auto', maxHeight: mobile ? '100%' : '90vh', borderRadius: mobile ? 0 : 10, overflowY: 'auto', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', width: mobile ? '100%' : (wide ? 'min(1040px, 97vw)' : 'min(720px, 96vw)'), height: mobile ? '100%' : 'auto', maxHeight: mobile ? '100%' : '90vh', borderRadius: mobile ? 0 : 10, overflowY: 'auto', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
         <div style={{ position: 'sticky', top: 0, background: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: `1px solid ${SAP.borderLt}`, zIndex: 2 }}>
           <div style={{ fontWeight: 700, color: SAP.text, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, lineHeight: 1, cursor: 'pointer', color: SAP.sec, padding: '2px 8px' }}>✕</button>
@@ -230,32 +230,96 @@ function ModuleVoucherDrill({ module, cur, mobile, onClose }) {
   );
 }
 
-// Balance-sheet ledger → its postings → the voucher → edit.
+// Full Tally-style Ledger Account: Date · Particulars (contra) · Vch Type · Vch No ·
+// Debit · Credit · running Balance, with opening / totals / closing and narration —
+// opened from any ledger in the P&L / Balance Sheet. Click a row to edit its voucher.
+const VCH_TYPE = { journal: 'Journal', payment: 'Payment', receipt: 'Receipt', contra: 'Contra', 'purchase-expense': 'Purchase', purchase: 'Purchase', sale: 'Sales', sales: 'Sales', 'credit-note': 'Credit Note', 'debit-note': 'Debit Note', refund: 'Refund', reissue: 'Reissue' };
 function LedgerVoucherDrill({ ledger, branch, to, cur, mobile, onClose }) {
   const [vid, setVid] = useState(null);
   const q = useLedgerStatement(ledger, branch, { to });
-  const lines = q.data?.lines || [];
+  const d = q.data || {};
+  const lines = d.lines || [];
+  const mono = { fontFamily: "'Courier New', Courier, monospace", fontVariantNumeric: 'tabular-nums' };
+  const amt = (n) => (n ? inr(n) : '');
+  const partic = (ln) => {
+    const ps = ln.particulars || [];
+    if (!ps.length) return ln.party || ln.category || '—';
+    if (ps.length === 1) return ps[0].ledger;
+    return `${ps[0].ledger}  (+${ps.length - 1} more)`;
+  };
+  const cell = { padding: '6px 10px', borderBottom: '1px solid #eef1f6', verticalAlign: 'top', ...mono };
+  const th = { padding: '7px 10px', background: '#0d1326', color: '#d4a437', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, position: 'sticky', top: 0, whiteSpace: 'nowrap' };
   return (
-    <Modal title={vid ? 'Edit Voucher' : ledger} onClose={onClose} mobile={mobile}>
+    <Modal title={vid ? 'Edit Voucher' : `Ledger: ${ledger}`} onClose={onClose} mobile={mobile} wide>
       {vid
         ? <VoucherEditor voucherId={vid} cur={cur} onBack={() => setVid(null)} />
         : (
           <>
             {q.isLoading && <div style={{ padding: 24, textAlign: 'center', color: SAP.sec }}>Loading ledger…</div>}
             {q.isError && <div style={{ padding: 16, color: SAP.red, fontSize: 12 }}>⚠ {q.error?.message}</div>}
-            {!q.isLoading && lines.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: SAP.sec, fontSize: 12 }}>No postings up to this date.</div>}
-            {lines.map((ln, i) => (
-              <div key={i} onClick={() => ln.voucherId && setVid(ln.voucherId)} style={{ ...tapRow, cursor: ln.voucherId ? 'pointer' : 'default' }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ color: SAP.blue, fontWeight: 600, fontSize: 12.5 }}>{ln.vno} <span style={{ color: SAP.label, fontWeight: 400 }}>· {ln.date}</span></div>
-                  <div style={{ fontSize: 11, color: SAP.sec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ln.narration || ln.party || ln.category}</div>
+            {!q.isLoading && !q.isError && (
+              <>
+                <div style={{ padding: '8px 12px', background: '#f4f7fc', borderBottom: `1px solid ${SAP.border}`, fontSize: 11.5, color: SAP.sec, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+                  <span><b style={{ color: SAP.text }}>{d.ledger || ledger}</b>{d.group ? ` · under ${d.group}` : ''}</span>
+                  <span>Opening: <b style={{ color: SAP.text }}>{inr(d.openingBalance || 0)} {d.openingSide || 'Dr'}</b></span>
+                  <span style={{ marginLeft: 'auto' }}>Closing: <b style={{ color: (d.closingSide === 'Cr') ? SAP.red : SAP.blue }}>{inr(d.closingBalance || 0)} {d.closingSide || 'Dr'}</b></span>
                 </div>
-                <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <div style={{ fontWeight: 700, color: ln.debit ? SAP.blue : SAP.red, fontSize: 12 }}>{ln.debit ? `Dr ${inr(ln.debit)}` : `Cr ${inr(ln.credit)}`}</div>
-                  {ln.voucherId ? <div style={{ fontSize: 10, color: SAP.label }}>tap to edit ›</div> : null}
+                <div style={{ overflow: 'auto', maxHeight: mobile ? '60vh' : '64vh' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...th, textAlign: 'left' }}>Date</th>
+                        <th style={{ ...th, textAlign: 'left' }}>Particulars</th>
+                        <th style={{ ...th, textAlign: 'left' }}>Vch Type</th>
+                        <th style={{ ...th, textAlign: 'left' }}>Vch No</th>
+                        <th style={{ ...th, textAlign: 'right' }}>Debit</th>
+                        <th style={{ ...th, textAlign: 'right' }}>Credit</th>
+                        <th style={{ ...th, textAlign: 'right' }}>Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr style={{ background: '#fafbfe' }}>
+                        <td style={cell}></td>
+                        <td style={{ ...cell, fontStyle: 'italic', color: SAP.sec }}>Opening Balance</td>
+                        <td style={cell}></td><td style={cell}></td><td style={cell}></td><td style={cell}></td>
+                        <td style={{ ...cell, textAlign: 'right', fontWeight: 700 }}>{inr(d.openingBalance || 0)} {d.openingSide || 'Dr'}</td>
+                      </tr>
+                      {lines.length === 0 && (
+                        <tr><td colSpan={7} style={{ ...cell, textAlign: 'center', color: SAP.sec, padding: 20 }}>No postings in this period.</td></tr>
+                      )}
+                      {lines.map((ln, i) => (
+                        <tr key={i} onClick={() => ln.voucherId && setVid(ln.voucherId)} title={ln.voucherId ? 'Click to open the voucher' : ''}
+                          style={{ cursor: ln.voucherId ? 'pointer' : 'default', background: i % 2 ? '#fcfdff' : '#fff' }}
+                          onMouseEnter={(e) => { if (ln.voucherId) e.currentTarget.style.background = '#eef4fb'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 ? '#fcfdff' : '#fff'; }}>
+                          <td style={{ ...cell, whiteSpace: 'nowrap', color: SAP.sec }}>{ln.date}</td>
+                          <td style={cell}>
+                            <div style={{ fontWeight: 600, color: SAP.text }}>{partic(ln)}</div>
+                            {(ln.narration || ln.entryNarration) ? <div style={{ fontSize: 10.5, color: SAP.sec, fontStyle: 'italic' }}>{ln.narration || ln.entryNarration}</div> : null}
+                          </td>
+                          <td style={{ ...cell, color: SAP.sec }}>{VCH_TYPE[ln.category] || ln.type || ln.category || '—'}</td>
+                          <td style={{ ...cell, color: SAP.blue, whiteSpace: 'nowrap' }}>{ln.vno}</td>
+                          <td style={{ ...cell, textAlign: 'right', color: SAP.text }}>{amt(ln.debit)}</td>
+                          <td style={{ ...cell, textAlign: 'right', color: SAP.text }}>{amt(ln.credit)}</td>
+                          <td style={{ ...cell, textAlign: 'right', color: ln.balanceSide === 'Cr' ? SAP.red : SAP.blue }}>{inr(ln.balance)} {ln.balanceSide}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ background: '#f0f4fa', fontWeight: 700, borderTop: `2px solid ${SAP.border}` }}>
+                        <td style={{ ...cell, borderBottom: 'none' }}></td>
+                        <td style={{ ...cell, borderBottom: 'none' }}>Totals</td>
+                        <td style={{ ...cell, borderBottom: 'none' }}></td><td style={{ ...cell, borderBottom: 'none' }}></td>
+                        <td style={{ ...cell, borderBottom: 'none', textAlign: 'right' }}>{inr(d.totalDebit || 0)}</td>
+                        <td style={{ ...cell, borderBottom: 'none', textAlign: 'right' }}>{inr(d.totalCredit || 0)}</td>
+                        <td style={{ ...cell, borderBottom: 'none', textAlign: 'right', color: (d.closingSide === 'Cr') ? SAP.red : SAP.blue }}>{inr(d.closingBalance || 0)} {d.closingSide || 'Dr'}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
-              </div>
-            ))}
+                <div style={{ padding: '6px 12px', fontSize: 10.5, color: SAP.label, borderTop: `1px solid ${SAP.border}` }}>Click any row to open and edit its voucher · "Particulars" shows the contra account.</div>
+              </>
+            )}
           </>
         )}
     </Modal>
