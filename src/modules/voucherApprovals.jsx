@@ -5,6 +5,8 @@
 // Single nested sheet: Group › Sub-group › Ledger › Entry (collapsible).
 import React, { useMemo, useState } from 'react';
 import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useApproveMany, useApproveAll } from '../core/useAccounting';
+import { VoucherEditor } from './accountingLive';
+import { bc } from '../core/styles';
 
 // Full rupee amount with Indian grouping — NO Cr/L abbreviation.
 const money = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
@@ -39,6 +41,8 @@ export function VoucherApprovals({ branch }) {
   const [status, setStatus] = useState('pending');
   const [open, setOpen] = useState({});
   const [sel, setSel] = useState(() => new Set()); // selected voucher ids (multi-approve)
+  const [editId, setEditId] = useState(null);      // voucher being edited (fix → approve)
+  const cur = (bc(branch) || {}).cur || '₹';
   const q = useVoucherApprovals(branch, status);
   const d = q.data || {};
   const counts = d.counts || { pending: { n: 0, amount: 0 }, approved: { n: 0, amount: 0 }, rejected: { n: 0, amount: 0 } };
@@ -194,7 +198,8 @@ export function VoucherApprovals({ branch }) {
                                         <td style={{ padding: '5px 8px', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa' }}>
                                           {status === 'pending' ? (
                                             <>
-                                              <button onClick={() => doApprove(e.id)} disabled={busy} style={{ padding: '3px 9px', background: C.green, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Approve</button>
+                                              <button onClick={() => setEditId(e.id)} disabled={busy} style={{ padding: '3px 9px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Edit</button>
+                                              <button onClick={() => doApprove(e.id)} disabled={busy || !e.postable} title={e.postable ? '' : 'Fix the error (Edit) before approving'} style={{ padding: '3px 9px', background: e.postable ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: e.postable ? 'pointer' : 'not-allowed', marginRight: 5 }}>Approve</button>
                                               <button onClick={() => doReject(e.id)} disabled={busy} style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Reject</button>
                                             </>
                                           ) : <span style={{ fontSize: 10, fontWeight: 700, color: status === 'approved' ? C.green : C.red }}>{status === 'approved' ? '✓' : '✗'}</span>}
@@ -218,6 +223,21 @@ export function VoucherApprovals({ branch }) {
         )}
       </div>
       {(approve.isError || reject.isError || approveAll.isError) && <div style={{ marginTop: 8, color: C.red, fontSize: 12 }}>⚠ {(approve.error || reject.error || approveAll.error)?.message}</div>}
+
+      {editId && (
+        <div onClick={() => setEditId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 900, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '5vh 12px' }}>
+          <div onClick={(ev) => ev.stopPropagation()} style={{ background: '#fff', width: 'min(720px, 96vw)', maxHeight: '90vh', overflowY: 'auto', borderRadius: 10, boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, background: '#fff' }}>
+              <strong style={{ color: C.dark }}>Edit Voucher — fix &amp; approve</strong>
+              <button onClick={() => setEditId(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: C.dim }}>✕</button>
+            </div>
+            <div style={{ padding: 4 }}>
+              <VoucherEditor voucherId={editId} cur={cur} onBack={() => setEditId(null)} />
+            </div>
+            <div style={{ padding: '8px 16px', fontSize: 11, color: C.dim, borderTop: `1px solid ${C.border}` }}>Tip: set Subtotal + GST so the total balances, Save, then click Approve on the row.</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
