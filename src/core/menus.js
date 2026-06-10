@@ -279,16 +279,10 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
 /* ── FINAL MENU ASSEMBLY ─────────────────────────────────────── */
 
 export const MENU_TRANSACTIONS = {label:"Transactions", icon:ShoppingCart, children:[
-  /* SO / PO / GP — one voucher; on approval spawns a linked Sales + Purchase invoice */
-  {label:"SO/PO/GP Voucher", children:[
-    {label:"SO/PO/GP Voucher", href:"/bookings/new"},
-    {label:"Pending", href:"/bookings/pending"},
-    {label:"Approved", href:"/bookings/approved"},
-    {label:"Rejected", href:"/bookings/rejected"},
-    {label:"Deleted", href:"/bookings/deleted"},
-  ]},
-  /* Voucher approval queue — Payment/Receipt/Contra/Journal/CN/DN/Purchase Expense */
-  {label:"Voucher Approvals", href:"/transactions/voucher-approvals"},
+  /* SO / PO / GP — create a booking (on approval spawns a linked Sales + Purchase) */
+  {label:"SO/PO/GP Voucher", href:"/bookings/new"},
+  /* ONE approval screen — SO/PO/GP + Vouchers, each Pending/Approved/Rejected/Deleted */
+  {label:"Approvals", href:"/transactions/approvals"},
   /* Standardized 8-tab Voucher Entry pattern */
   {label:"Standardized Patterns", children:[
     {label:"Voucher Entry (8-Tab View)", href:"/transactions/voucher-tabs"},

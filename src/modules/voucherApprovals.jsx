@@ -4,8 +4,9 @@
 // here as PENDING and hit the books only when approved.
 // Single nested sheet: Group › Sub-group › Ledger › Entry (collapsible).
 import React, { useMemo, useState } from 'react';
-import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useApproveMany, useApproveAll } from '../core/useAccounting';
+import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useApproveMany, useApproveAll } from '../core/useAccounting';
 import { VoucherEditor } from './accountingLive';
+import { BookingApprovals } from './bookingOrder';
 import { bc } from '../core/styles';
 
 // Full rupee amount with Indian grouping — NO Cr/L abbreviation.
@@ -45,13 +46,14 @@ export function VoucherApprovals({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const q = useVoucherApprovals(branch, status);
   const d = q.data || {};
-  const counts = d.counts || { pending: { n: 0, amount: 0 }, approved: { n: 0, amount: 0 }, rejected: { n: 0, amount: 0 } };
+  const counts = d.counts || { pending: { n: 0, amount: 0 }, approved: { n: 0, amount: 0 }, rejected: { n: 0, amount: 0 }, deleted: { n: 0, amount: 0 } };
   const entries = d.entries || [];
   const approve = useApproveVoucher();
   const reject = useRejectVoucher();
+  const del = useDeleteVoucher();
   const approveMany = useApproveMany();
   const approveAll = useApproveAll();
-  const busy = approve.isPending || reject.isPending || approveMany.isPending || approveAll.isPending;
+  const busy = approve.isPending || reject.isPending || del.isPending || approveMany.isPending || approveAll.isPending;
 
   const allIds = useMemo(() => [...new Set(entries.map((e) => e.id))], [entries]);
   React.useEffect(() => { setSel(new Set()); }, [status, branch]); // clear selection on tab/branch change
@@ -60,6 +62,7 @@ export function VoucherApprovals({ branch }) {
 
   const doApprove = (id) => approve.mutate({ id, approver: 'admin' });
   const doReject = (id) => { const reason = window.prompt('Reason for rejection?'); if (reason !== null) reject.mutate({ id, by: 'admin', reason }); };
+  const doDelete = (id) => { const reason = window.prompt('Delete this voucher? It will be reversed out of the books and kept view-only (number not reusable). Reason:'); if (reason !== null) del.mutate({ id, by: 'admin', reason }); };
   const doApproveSelected = () => { if (sel.size && window.confirm(`Approve ${sel.size} selected voucher(s)? They will post to the books.`)) approveMany.mutate({ ids: [...sel], approver: 'admin' }, { onSuccess: () => setSel(new Set()) }); };
   const doApproveAll = () => { if (window.confirm(`Approve all ${counts.pending.n} pending vouchers for ${branchLabel(branch)}? They will post to the books.`)) approveAll.mutate({ branch, approver: 'admin' }); };
 
@@ -131,7 +134,7 @@ export function VoucherApprovals({ branch }) {
 
       <div style={{ ...card, marginBottom: 12 }}>
         <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
-          {tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}
+          {tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}
         </div>
         <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: '#fafbfe', alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11.5, color: C.dim, fontWeight: 600 }}>Group › Sub-group › Ledger › Entry</span>
@@ -202,7 +205,11 @@ export function VoucherApprovals({ branch }) {
                                               <button onClick={() => doApprove(e.id)} disabled={busy || !e.postable} title={e.postable ? '' : 'Fix the error (Edit) before approving'} style={{ padding: '3px 9px', background: e.postable ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: e.postable ? 'pointer' : 'not-allowed', marginRight: 5 }}>Approve</button>
                                               <button onClick={() => doReject(e.id)} disabled={busy} style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Reject</button>
                                             </>
-                                          ) : <span style={{ fontSize: 10, fontWeight: 700, color: status === 'approved' ? C.green : C.red }}>{status === 'approved' ? '✓' : '✗'}</span>}
+                                          ) : status === 'approved' ? (
+                                            <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Delete</button>
+                                          ) : status === 'deleted' ? (
+                                            <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
+                                          ) : <span style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected</span>}
                                         </td>
                                       </tr>
                                       );
@@ -238,6 +245,26 @@ export function VoucherApprovals({ branch }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Unified Approvals ────────────────────────────────────────────────────────
+// One screen for ALL approvals: a top toggle switches between SO/PO/GP bookings
+// and Vouchers; each shows Pending · Approved · Rejected · Deleted.
+export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain = 'sopogp' }) {
+  const [domain, setDomain] = useState(initialDomain);
+  const seg = (k, label) => (
+    <button key={k} onClick={() => setDomain(k)} style={{ padding: '8px 18px', fontSize: 13, fontWeight: 800, border: `1px solid ${domain === k ? C.dark : '#d6dbe6'}`, background: domain === k ? C.dark : '#fff', color: domain === k ? C.gold : C.dim, cursor: 'pointer' }}>{label}</button>
+  );
+  return (
+    <div style={{ margin: 12 }}>
+      <div style={{ display: 'inline-flex', borderRadius: 8, overflow: 'hidden', marginBottom: 4 }}>
+        {seg('sopogp', 'SO / PO / GP')}{seg('vouchers', 'Vouchers')}
+      </div>
+      {domain === 'sopogp'
+        ? <BookingApprovals branch={branch} setRoute={setRoute} currentUser={currentUser} />
+        : <VoucherApprovals branch={branch} />}
     </div>
   );
 }

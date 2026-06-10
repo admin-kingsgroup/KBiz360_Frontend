@@ -818,6 +818,92 @@ export function DeletedBookings({ branch, setRoute }) {
   );
 }
 
+// Unified SO/PO/GP approval — Pending · Approved · Rejected · Deleted in one screen
+// with internal tabs (mirrors Voucher Approvals). Reuses BookingTable + all actions.
+export function BookingApprovals({ branch, setRoute, currentUser }) {
+  const brCode = brCodeOf(branch) || 'ALL';
+  const cur = bc(branch).cur;
+  const qc = useQueryClient();
+  const { data = [], isLoading } = useBookings(brCode);
+  const [status, setStatus] = useState('pending');
+  const [open, setOpen] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+  const [msg, setMsg] = useState('');
+  const [editing, setEditing] = useState(null);
+  const [groupBy, setGroupBy] = useState('none');
+  const [sel, setSel] = useState(() => new Set());
+  const canDelete = isAdminRole(currentUser);
+
+  const bucket = (b) => (b.status === 'posted' ? 'approved' : b.status);
+  const counts = { pending: 0, approved: 0, rejected: 0, deleted: 0 };
+  data.forEach((b) => { if (counts[bucket(b)] !== undefined) counts[bucket(b)]++; });
+  const rows = data.filter((b) => bucket(b) === status);
+  const allIds = rows.map((b) => b.id);
+  const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
+  React.useEffect(() => { setSel(new Set()); }, [status, brCode]);
+
+  if (editing) {
+    return <SoPoGpVoucherEntry branch={branch} setRoute={setRoute} editBooking={editing}
+      onDone={() => { setEditing(null); setOpen(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }} />;
+  }
+
+  const onApprove = async (b) => {
+    setBusyId(b.id); setMsg('');
+    try { const res = await apiPost('/api/booking-orders/' + b.id + '/approve'); setMsg(`✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno}.`); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }
+    catch (e) { setMsg('⚠ ' + (e.message || 'Approve failed')); } finally { setBusyId(null); }
+  };
+  const onCancel = async (b) => {
+    const reason = window.prompt(`Reject voucher ${b.bookingNo}? Marked Rejected (no books impact). Optional reason:`, ''); if (reason === null) return;
+    setBusyId(b.id);
+    try { await apiPost('/api/booking-orders/' + b.id + '/reject', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); setMsg(`✓ Rejected ${b.bookingNo}.`); }
+    catch (e) { setMsg('⚠ ' + (e.message || 'Reject failed')); } finally { setBusyId(null); }
+  };
+  const onDelete = async (b) => {
+    if (!canDelete) return;
+    const reason = window.prompt(`Delete approved booking ${b.bookingNo}?\nIts Sales (${b.saleVno}) & Purchase (${b.purchaseVno}) are reversed out of the books; kept view-only under Deleted, numbers never reused.\nReason:`, ''); if (reason === null) return;
+    setBusyId(b.id);
+    try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); setMsg(`✓ Deleted ${b.bookingNo}.`); }
+    catch (e) { setMsg('⚠ ' + (e.message || 'Delete failed')); } finally { setBusyId(null); }
+  };
+  const onApproveSelected = async () => {
+    if (!sel.size || !window.confirm(`Approve ${sel.size} selected voucher(s)? Each posts its linked Sales + Purchase.`)) return;
+    setBusyId('bulk'); setMsg('');
+    try { const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] }); setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`); setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }
+    catch (e) { setMsg('⚠ ' + (e.message || 'Bulk approve failed')); } finally { setBusyId(null); }
+  };
+
+  const tab = (k, label) => (
+    <button key={k} onClick={() => setStatus(k)} style={{ padding: '8px 16px', border: 'none', borderBottom: `3px solid ${status === k ? GOLD : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? DARK : '#5a6691' }}>{label} <span style={{ fontSize: 11, color: '#8b94b3' }}>({counts[k]})</span></button>
+  );
+
+  return (
+    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 17, color: DARK }}>SO/PO/GP Approvals</h2>
+          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>Pending have no books impact; approving posts the linked Sales + Purchase. Deleted are reversed out & view-only.</p>
+        </div>
+        <button onClick={() => setRoute && setRoute('/bookings/new')} style={btnG}><Plus size={14} /> New voucher</button>
+      </div>
+      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 10 }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid #e1e3ec', flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}</div>
+      </div>
+      {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, padding: '8px 12px', color: msg.startsWith('⚠') ? '#A32D2D' : '#27500A', background: msg.startsWith('⚠') ? '#FCEBEB' : '#EAF3DE', border: '1px solid ' + (msg.startsWith('⚠') ? '#F7C1C1' : '#cde3b6') }}>{msg}</div>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+        <GroupByBar value={groupBy} onChange={setGroupBy} />
+        {status === 'pending' && rows.length > 0 && (
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
+            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={onApproveSelected} style={{ ...btnG, padding: '5px 13px', fontSize: 11.5, background: DR }}>{busyId === 'bulk' ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve selected ({sel.size})</button>}
+          </span>
+        )}
+      </div>
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={setEditing} onDelete={onDelete} canDelete={canDelete} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
+    </div>
+  );
+}
+
 export function RejectedBookings({ branch, setRoute }) {
   const brCode = brCodeOf(branch) || 'ALL';
   const cur = bc(branch).cur;
