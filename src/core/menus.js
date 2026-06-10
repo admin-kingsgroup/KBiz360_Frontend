@@ -28,9 +28,6 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
     {label:"Forex Rates", href:"/masters/forex"},
     {label:"Numbering Series", href:"/masters/numbering"},
   ]},
-  {label:"Statutory Info", children:[
-    {label:"Tax / HSN-SAC Codes", href:"/masters/tax"},
-  ]},
   {label:"Parties (Ledgers)", children:[
     {label:"Clients (Sundry Debtors)", href:"/masters/customers"},
     {label:"Customer (12-Tab View)", href:"/masters/customer-tabs"},
@@ -38,6 +35,9 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
     {label:"Supplier (12-Tab View)", href:"/masters/supplier-tabs"},
     {label:"Sub-Agents", href:"/masters/sub-agents"},
     {label:"Project / Tour Code Master", href:"/masters/projects"},
+  ]},
+  {label:"Statutory Info", children:[
+    {label:"Tax / HSN-SAC Codes", href:"/masters/tax"},
   ]},
   {label:"Inventory & Catalog", children:[
     {label:"Airlines & GDSs", href:"/masters/airlines"},
@@ -73,6 +73,7 @@ export const MENU_ASSETS={label:"Assets",icon:Wrench,children:[
 /* ── FINANCE ─────────────────────────────────────────────────── */
 
 export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
+  /* 1 — Vouchers (entry). SO/PO/GP is the single product-entry path. */
   {label:"Vouchers", children:[
     {label:"SO/PO/GP Voucher", href:"/bookings/new"},
     {label:"Receipt Voucher", href:"/receipts"},
@@ -81,70 +82,61 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Journal Entry", href:"/journal"},
     {label:"Credit Note", href:"/finance/credit-note"},
     {label:"Debit Note", href:"/finance/debit-note"},
-    /* Purchase Expense — approval-gated: saving creates a Pending voucher; it posts
-       only when approved in the unified Transactions ▸ Voucher Approvals queue. */
-    {label:"Purchase Expense Voucher", children:[
-      {label:"New Voucher", href:"/purchase-expense"},
-      {label:"Approvals (Pending/Approved/Rejected)", href:"/transactions/voucher-approvals"},
-    ]},
+    {label:"Purchase Expense Voucher", href:"/purchase-expense"},
     {label:"Refund (against Sale)", href:"/finance/refund"},
     {label:"Reissue (against Sale)", href:"/finance/reissue"},
   ]},
-  /* Read-only views of the 7 products (entry is via SO/PO/GP). Invoices printable, Link No stamped. */
-  {label:"Module Registers", children:[
+  /* 2 — Registers (read-only product views) + Books. */
+  {label:"Registers & Books", children:[
     {label:"Module Sales Register", href:"/finance/module-sales-register"},
     {label:"Module Purchase Register", href:"/finance/module-purchase-register"},
     {label:"Module Sales & Purchase Register", href:"/finance/module-register"},
-  ]},
-  /* Folded in from the old Transactions section. */
-  {label:"Memos & Adjustments", children:[
-    {label:"Voucher Entry (8-Tab View)", href:"/transactions/voucher-tabs"},
-    {label:"ADM — Agent Debit Memos", href:"/purchase/adm"},
-    {label:"ACM — Agent Credit Memos", href:"/purchase/acm"},
-    {label:"Sales Cancellations", href:"/sales/cancellation"},
-    {label:"Purchase Refunds", href:"/purchase/refunds"},
-  ]},
-  {label:"Voucher Tools", children:[
-    {label:"Multi-Currency Voucher", href:"/finance/multi-currency"},
-    {label:"Comments Thread (Collaborate)", href:"/finance/comments-demo"},
-    {label:"Print Preview Before Saving", href:"/finance/print-preview"},
-    {label:"Auto-linked Vouchers", href:"/finance/auto-linked"},
-  ]},
-  {label:"Books", children:[
+    {divider:true, label:"Books"},
     {label:"Day Book", href:"/day-book"},
     {label:"Cash Book", href:"/finance/cash-book"},
     {label:"Ledger Account", href:"/ledger"},
     {label:"Trial Balance", href:"/trial-balance"},
     {label:"Bank Reconciliation", href:"/bank-reco"},
   ]},
-  {label:"BSP Settlement", children:[
+  /* 3 — BSP settlement + memos/adjustments. */
+  {label:"BSP & Memos", children:[
     {label:"BSP Summary", href:"/purchase/bsp-summary"},
     {label:"BSP Statement Import", href:"/purchase/bsp-import"},
     {label:"Ticket Control Register", href:"/purchase/ticket-control"},
     {label:"GDS / PNR Import", href:"/purchase/gds-import"},
+    {divider:true, label:"Memos & Adjustments"},
+    {label:"ADM — Agent Debit Memos", href:"/purchase/adm"},
+    {label:"ACM — Agent Credit Memos", href:"/purchase/acm"},
+    {label:"Sales Cancellations", href:"/sales/cancellation"},
+    {label:"Purchase Refunds", href:"/purchase/refunds"},
+    {label:"Voucher Entry (8-Tab View)", href:"/transactions/voucher-tabs"},
   ]},
-  {label:"Verification", children:[
-    {label:"Payment Verification", href:"/finance/verification"},
-  ]},
-  {label:"Period & Year-End", children:[
+  /* 4 — Period-end + accruals/budgets. */
+  {label:"Period & Accruals", children:[
     {label:"Year-End Close", href:"/accounting/year-close"},
     {label:"Recurring Vouchers", href:"/accounting/recurring"},
     {label:"Intercompany", href:"/accounting/intercompany"},
-  ]},
-  {label:"Accruals & Budgets", children:[
+    {divider:true, label:"Accruals & Budgets"},
     {label:"Vendor Advances", href:"/accounting/vendor-advances"},
     {label:"Loan / EMI Register", href:"/accounting/loans"},
     {label:"FX Revaluation", href:"/accounting/fx-revaluation"},
     {label:"Expense Budget", href:"/expense/budget"},
   ]},
-  {label:"Finance Tools", children:[
+  /* 5 — Verification + finance utilities + entry helpers. */
+  {label:"Tools & Verification", children:[
+    {label:"Payment Verification", href:"/finance/verification"},
     {label:"Bank Balance Dashboard", href:"/finance/bank-balance"},
     {label:"TDS Auto-Calculator", href:"/finance/tds-calculator"},
     {label:"Interest Calculator", href:"/finance/interest-calc"},
     {label:"Investment Register", href:"/finance/investments"},
     {label:"Loan Amortization Schedule", href:"/finance/loan-amort"},
     {label:"Reconciliation Queue", href:"/finance/reco-queue"},
-  ]}
+    {divider:true, label:"Entry helpers"},
+    {label:"Multi-Currency Voucher", href:"/finance/multi-currency"},
+    {label:"Comments Thread (Collaborate)", href:"/finance/comments-demo"},
+    {label:"Print Preview Before Saving", href:"/finance/print-preview"},
+    {label:"Auto-linked Vouchers", href:"/finance/auto-linked"},
+  ]},
 ]};
 
 /* ── TAXATION — INDIA GST ────────────────────────────────────── */
