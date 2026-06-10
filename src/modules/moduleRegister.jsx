@@ -74,7 +74,8 @@ function useBookingsReg(brCode) {
   return useQuery({ queryKey: ['booking-orders', brCode], queryFn: () => apiGet('/api/booking-orders', { branch: brCode === 'ALL' ? '' : brCode }) });
 }
 
-export function ModuleRegister({ branch }) {
+// mode: 'sales' (Sales Invoice only) · 'purchase' (Purchase Invoice only) · 'both'
+export function ModuleRegister({ branch, mode = 'both' }) {
   const [mod, setMod] = useState('SF');
   const brCode = branchCode(branch) || 'ALL';
   const { data = [], isLoading } = useBookingsReg(brCode);
@@ -82,6 +83,8 @@ export function ModuleRegister({ branch }) {
   const rows = data.filter((b) => b.module === mod && (b.status === 'approved' || b.status === 'posted'));
   const fmt = (n) => (bc(branch).cur) + Math.round(Number(n) || 0).toLocaleString('en-IN');
   const print = (b, side) => openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: invoiceHtml(b, side, branch) });
+  const showSale = mode !== 'purchase', showPur = mode !== 'sales', showGP = mode === 'both';
+  const heading = mode === 'sales' ? 'Module Sales Register' : mode === 'purchase' ? 'Module Purchase Register' : 'Module Sales & Purchase Register';
 
   const th = { padding: '9px 12px', background: C.dark, color: C.gold, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'left', whiteSpace: 'nowrap' };
   const td = { padding: '8px 12px', borderBottom: '1px solid #f0f2f7', fontSize: 12.5 };
@@ -92,8 +95,8 @@ export function ModuleRegister({ branch }) {
     <div style={{ margin: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 17, fontWeight: 800, color: C.dark }}>Module Register <span style={{ fontSize: 12, fontWeight: 600, color: C.dim }}>(view-only)</span></div>
-          <div style={{ fontSize: 12, color: C.dim }}>Approved SO/PO/GP deals. All entry is via <b>Finance ▸ Vouchers ▸ SO/PO/GP Voucher</b>. Print the Sales Invoice (customer) or Purchase Invoice (filing) — both carry the Link No.</div>
+          <div style={{ fontSize: 17, fontWeight: 800, color: C.dark }}>{heading} <span style={{ fontSize: 12, fontWeight: 600, color: C.dim }}>(view-only)</span></div>
+          <div style={{ fontSize: 12, color: C.dim }}>Approved SO/PO/GP deals. All entry is via <b>Finance ▸ Vouchers ▸ SO/PO/GP Voucher</b>. {mode === 'sales' ? 'Print the Sales Invoice (give to customer)' : mode === 'purchase' ? 'Print the Purchase Invoice (internal filing)' : 'Print the Sales Invoice (customer) or Purchase Invoice (filing)'} — Link No stamped.</div>
         </div>
         <select value={mod} onChange={(e) => setMod(e.target.value)} style={{ marginLeft: 'auto', padding: '8px 12px', fontSize: 13, fontWeight: 700, border: `1px solid ${C.border}`, borderRadius: 6, background: '#fff', color: C.dark }}>
           {MODS.map((m) => <option key={m} value={m}>{(VSPECS[m]?.icon || '') + ' ' + (VSPECS[m]?.name || m)}</option>)}
@@ -103,8 +106,13 @@ export function ModuleRegister({ branch }) {
         <div style={{ maxHeight: '72vh', overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr>
-              <th style={th}>Booking No</th><th style={th}>Link No</th><th style={th}>Date</th><th style={th}>Customer</th><th style={th}>Supplier</th>
-              <th style={{ ...th, ...num }}>Sale</th><th style={{ ...th, ...num }}>Purchase</th><th style={{ ...th, ...num }}>GP</th><th style={{ ...th, textAlign: 'center' }}>Invoices</th>
+              <th style={th}>Booking No</th><th style={th}>Link No</th><th style={th}>Date</th>
+              {showSale && <th style={th}>Customer</th>}
+              {showPur && <th style={th}>Supplier</th>}
+              {showSale && <th style={{ ...th, ...num }}>Sale</th>}
+              {showPur && <th style={{ ...th, ...num }}>Purchase</th>}
+              {showGP && <th style={{ ...th, ...num }}>GP</th>}
+              <th style={{ ...th, textAlign: 'center' }}>Invoice</th>
             </tr></thead>
             <tbody>
               {isLoading && <tr><td colSpan={9} style={{ ...td, textAlign: 'center', color: C.dim, padding: 22 }}>Loading…</td></tr>}
@@ -114,14 +122,14 @@ export function ModuleRegister({ branch }) {
                   <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700 }}>{b.bookingNo}</td>
                   <td style={{ ...td, fontFamily: 'monospace', color: C.blue }}>{b.linkNo || '—'}</td>
                   <td style={{ ...td, color: C.dim, whiteSpace: 'nowrap' }}>{b.date}</td>
-                  <td style={{ ...td }}>{b.customer?.name || '—'}</td>
-                  <td style={{ ...td }}>{b.supplier?.name || '—'}</td>
-                  <td style={{ ...td, ...num }}>{fmt(b.so?.total)}</td>
-                  <td style={{ ...td, ...num }}>{fmt(b.po?.total)}</td>
-                  <td style={{ ...td, ...num, fontWeight: 700, color: C.green }}>{fmt(b.gp?.total)}</td>
+                  {showSale && <td style={{ ...td }}>{b.customer?.name || '—'}</td>}
+                  {showPur && <td style={{ ...td }}>{b.supplier?.name || '—'}</td>}
+                  {showSale && <td style={{ ...td, ...num }}>{fmt(b.so?.total)}</td>}
+                  {showPur && <td style={{ ...td, ...num }}>{fmt(b.po?.total)}</td>}
+                  {showGP && <td style={{ ...td, ...num, fontWeight: 700, color: C.green }}>{fmt(b.gp?.total)}</td>}
                   <td style={{ ...td, textAlign: 'center', whiteSpace: 'nowrap' }}>
-                    <button onClick={() => print(b, 'sale')} style={ibtn('#fff', C.blue)}>🧾 Sales</button>
-                    <button onClick={() => print(b, 'purchase')} style={ibtn('#fff', C.dark)}>📄 Purchase</button>
+                    {showSale && <button onClick={() => print(b, 'sale')} style={ibtn('#fff', C.blue)}>🧾 Sales Invoice</button>}
+                    {showPur && <button onClick={() => print(b, 'purchase')} style={ibtn('#fff', C.dark)}>📄 Purchase Invoice</button>}
                   </td>
                 </tr>
               ))}

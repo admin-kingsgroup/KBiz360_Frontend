@@ -273,8 +273,11 @@ export default function KB360App(){
     if(/^\/bookings\/(pending|approved|rejected|deleted|list)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="sopogp"/>;
     // Per-module Sale/Purchase ENTRY is retired — all product entry is via SO/PO/GP.
     // These routes now open the read-only Module Register (view + print invoices).
-    if(/^\/(sales|purchase)\/(flight|holiday|hotel|visa|car|insurance|misc)$/.test(route)) return <ModuleRegister branch={branch}/>;
-    if(route==="/finance/module-register") return <ModuleRegister branch={branch}/>;
+    if(/^\/sales\/(flight|holiday|hotel|visa|car|insurance|misc)$/.test(route))    return <ModuleRegister branch={branch} mode="sales"/>;
+    if(/^\/purchase\/(flight|holiday|hotel|visa|car|insurance|misc)$/.test(route)) return <ModuleRegister branch={branch} mode="purchase"/>;
+    if(route==="/finance/module-sales-register")    return <ModuleRegister branch={branch} mode="sales"/>;
+    if(route==="/finance/module-purchase-register") return <ModuleRegister branch={branch} mode="purchase"/>;
+    if(route==="/finance/module-register" || route==="/finance/module-sp-register") return <ModuleRegister branch={branch} mode="both"/>;
     if(route==="/finance/credit-note" || route==="/sales/credit-note")  return <SalesCreditNote branch={branch} setRoute={navigate}/>;
     if(route==="/receipts")           return <ReceiptVoucher branch={branch}/>;
     if(route==="/payments")           return <PaymentVoucher branch={branch}/>;

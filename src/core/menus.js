@@ -90,8 +90,12 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Refund (against Sale)", href:"/finance/refund"},
     {label:"Reissue (against Sale)", href:"/finance/reissue"},
   ]},
-  /* Read-only views of the 7 products (entry is via SO/PO/GP). Sales/Purchase invoices printable, Link No stamped. */
-  {label:"Module Register (Flight/Holiday/…)", href:"/finance/module-register"},
+  /* Read-only views of the 7 products (entry is via SO/PO/GP). Invoices printable, Link No stamped. */
+  {label:"Module Registers", children:[
+    {label:"Module Sales Register", href:"/finance/module-sales-register"},
+    {label:"Module Purchase Register", href:"/finance/module-purchase-register"},
+    {label:"Module Sales & Purchase Register", href:"/finance/module-register"},
+  ]},
   {label:"Voucher Tools", children:[
     {label:"Multi-Currency Voucher", href:"/finance/multi-currency"},
     {label:"Comments Thread (Collaborate)", href:"/finance/comments-demo"},
