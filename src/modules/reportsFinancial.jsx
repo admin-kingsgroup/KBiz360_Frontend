@@ -854,6 +854,12 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   const indIncome = d.bridge?.indirectIncome || 0;
   const grossProfit = d.bridge?.grossProfit ?? d.totals.gp;
 
+  // Expand / Collapse all — every bucket + sub-group key in the indirect tree.
+  const allKeys = [];
+  buckets.forEach((b) => { allKeys.push('b:' + b.name); (b.groups || []).forEach((g) => allKeys.push('g:' + b.name + '/' + g.name)); });
+  const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
+  const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
+
   // Trading account — Purchases/COGS (Dr) vs Sales (Cr); both sides total Nett Sales.
   const tradeLeft = [
     { label: 'Purchase Accounts (COGS)', amount: d.totals.cogs, group: true },
@@ -957,6 +963,12 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
         <div style={{ fontSize: 13 }}>Profit &amp; Loss A/c</div>
         <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{periodTxt}</div>
       </div>
+      {allKeys.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #e3e9f2', background: '#fafbfe' }}>
+          <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
+          <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
+        </div>
+      )}
       <div style={{ padding: '4px 0' }}>
         <Section left={tradeLeft} right={tradeRight} total={tradeTotal} />
       </div>
