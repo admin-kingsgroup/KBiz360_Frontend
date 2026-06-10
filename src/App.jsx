@@ -29,7 +29,6 @@ import { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3
 import { AdmRegister, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
 import { SoPoGpVoucherEntry, PendingBookings, ApprovedBookings, RejectedBookings, DeletedBookings } from './modules/bookingOrder';
 import { VoucherApprovals } from './modules/voucherApprovals';
-import { PendingExpenseOrders, ApprovedExpenseOrders, RejectedExpenseOrders, DeletedExpenseOrders } from './modules/purchaseExpenseOrders';
 import { PnLTallyLive } from './modules/pnlTally';
 import { BalanceSheetTallyLive } from './modules/balanceSheetTally';
 import { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, AccountsChartLive, InvoiceGPLive } from './modules/accountingLive';
@@ -291,10 +290,8 @@ export default function KB360App(){
     if(route==="/receipts")           return <ReceiptVoucher branch={branch}/>;
     if(route==="/payments")           return <PaymentVoucher branch={branch}/>;
     if(route==="/purchase-expense")          return <PurchaseExpenseVoucher branch={branch} setRoute={navigate}/>;
-    if(route==="/purchase-expense/pending")  return <PendingExpenseOrders branch={branch} setRoute={navigate}/>;
-    if(route==="/purchase-expense/approved") return <ApprovedExpenseOrders branch={branch} setRoute={navigate} currentUser={currentUser}/>;
-    if(route==="/purchase-expense/rejected") return <RejectedExpenseOrders branch={branch} setRoute={navigate}/>;
-    if(route==="/purchase-expense/deleted")  return <DeletedExpenseOrders branch={branch} setRoute={navigate}/>;
+    // Purchase-Expense pending/approved/etc. now live in the unified Voucher Approvals queue.
+    if(/^\/purchase-expense\/(pending|approved|rejected|deleted)$/.test(route)) return <VoucherApprovals branch={branch}/>;
     if(route==="/finance/refund")     return <RefundVoucher branch={branch}/>;
     if(route==="/finance/reissue")    return <ReissueVoucher branch={branch}/>;
     if(route==="/contra")             return <ContraVoucher branch={branch}/>;

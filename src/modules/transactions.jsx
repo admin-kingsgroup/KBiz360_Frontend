@@ -10,7 +10,7 @@ import { Area, Line } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from '../core/business-logic';
 import { ACTIVE_CURRENCIES, ADM_DATA, BRANCHES, BRANCH_CODES, GP_BILLS, PURCHASE_REGISTRY, SALE_TO_PURCH_MOD, branchCurrencies, branchMainCurrency, genVNo } from '../core/data';
 import { useAdmReasonCodes, useLedgerRegistry } from '../core/useReference';
-import { useLedgerStatement, useCreateVoucher, useCreateExpenseOrder, useOpenBills, useSalesRegister, usePurchaseRegister } from '../core/useAccounting';
+import { useLedgerStatement, useCreateVoucher, useOpenBills, useSalesRegister, usePurchaseRegister } from '../core/useAccounting';
 import { useLivePurchaseRegistry, useLiveSalesTickets } from '../core/useVouchers';
 import { fmt, fmtINR } from '../core/format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS } from '../core/dates';
@@ -4332,20 +4332,22 @@ export function PurchaseExpenseVoucher({branch,setRoute}){
   // Approval-gated: saving creates a PENDING Purchase Expense order (NO books
   // impact). Approval — under Finance ▸ Purchase Expense ▸ Pending — spawns the
   // linked LOCKED PXP voucher and posts its journal. Mirrors SO/PO/GP.
-  const post=useCreateExpenseOrder();
+  // Creates a PURCHASE-EXPENSE voucher; the approval gate (backend) saves it as
+  // pending — no books impact until approved under Transactions ▸ Voucher Approvals.
+  const post=useCreateVoucher();
   const brPost=brCodeOf(branch);
   const canPost=!!brPost&&!!party&&lineRows.length>0&&lineRows.every(l=>l.ledger)&&total>0;
   const submit=()=>{
     if(!canPost||post.isPending)return;
     post.mutate({
-      branch:brPost, date,
-      party:partyName, partyGroup,
-      billNo,
+      vno:vNo, type:"PXP", category:"purchase-expense", branch:brPost, date,
+      party:partyName, partyType:"supplier", partyGroup, billNo,
       lines:lineRows.map(l=>({ledger:getLedgerName(l.ledger), amt:+l.amt||0, desc:l.desc||""})),
-      gstApplicable, gstMode:gstApplicable?gstMode:"", gstPct, taxAmt:gstAmt,
-      tdsSection, tdsAmt:tds, total,
+      subtotal:taxable, taxAmt:gstAmt, gstMode:gstApplicable?gstMode:"", tdsAmt:tds, total,
+      againstInvoice:billNo,
       attachments:attachments.filter(a=>a.name.trim()).map(a=>({name:a.name.trim(),url:a.url||""})),
       remarks:narration||`Being ${gstApplicable?"GST ":""}expense/asset purchase from ${partyName}${billNo?` vide bill ${billNo}`:""}`,
+      status:"saved",
     });
   };
 
@@ -4457,7 +4459,7 @@ export function PurchaseExpenseVoucher({branch,setRoute}){
         <VSaveMsg m={post} okText={`✔ Saved as Pending — no books impact yet. Approve it under Purchase Expense ▸ Pending to post the PXP voucher (${partyName}).`}/>
         {post.isSuccess&&setRoute&&(
           <div style={{display:"flex",justifyContent:"center",marginBottom:10}}>
-            <button onClick={()=>setRoute("/purchase-expense/pending")} style={btnGh}>Go to Pending Approval →</button>
+            <button onClick={()=>setRoute("/transactions/voucher-approvals")} style={btnGh}>Go to Voucher Approvals →</button>
           </div>
         )}
         {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to save this voucher.</div>}
