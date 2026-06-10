@@ -4,7 +4,7 @@
 // here as PENDING and hit the books only when approved.
 // Single nested sheet: Group › Sub-group › Ledger › Entry (collapsible).
 import React, { useMemo, useState } from 'react';
-import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useApproveAll } from '../core/useAccounting';
+import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useApproveMany, useApproveAll } from '../core/useAccounting';
 
 // Full rupee amount with Indian grouping — NO Cr/L abbreviation.
 const money = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
@@ -38,17 +38,25 @@ const drCrOf = (e) => {
 export function VoucherApprovals({ branch }) {
   const [status, setStatus] = useState('pending');
   const [open, setOpen] = useState({});
+  const [sel, setSel] = useState(() => new Set()); // selected voucher ids (multi-approve)
   const q = useVoucherApprovals(branch, status);
   const d = q.data || {};
   const counts = d.counts || { pending: { n: 0, amount: 0 }, approved: { n: 0, amount: 0 }, rejected: { n: 0, amount: 0 } };
   const entries = d.entries || [];
   const approve = useApproveVoucher();
   const reject = useRejectVoucher();
+  const approveMany = useApproveMany();
   const approveAll = useApproveAll();
-  const busy = approve.isPending || reject.isPending || approveAll.isPending;
+  const busy = approve.isPending || reject.isPending || approveMany.isPending || approveAll.isPending;
+
+  const allIds = useMemo(() => [...new Set(entries.map((e) => e.id))], [entries]);
+  React.useEffect(() => { setSel(new Set()); }, [status, branch]); // clear selection on tab/branch change
+  const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
 
   const doApprove = (id) => approve.mutate({ id, approver: 'admin' });
   const doReject = (id) => { const reason = window.prompt('Reason for rejection?'); if (reason !== null) reject.mutate({ id, by: 'admin', reason }); };
+  const doApproveSelected = () => { if (sel.size && window.confirm(`Approve ${sel.size} selected voucher(s)? They will post to the books.`)) approveMany.mutate({ ids: [...sel], approver: 'admin' }, { onSuccess: () => setSel(new Set()) }); };
   const doApproveAll = () => { if (window.confirm(`Approve all ${counts.pending.n} pending vouchers for ${branchLabel(branch)}? They will post to the books.`)) approveAll.mutate({ branch, approver: 'admin' }); };
 
   // Build the nested tree: Group › Sub-group › Ledger › Entries (one row per
@@ -98,9 +106,16 @@ export function VoucherApprovals({ branch }) {
           <div style={{ fontSize: 12, color: C.dim }}>{branchLabel(branch)} · Payment · Receipt · Contra · Journal · Credit/Debit Note · Purchase Expense — manual & bulk post only when approved</div>
         </div>
         {status === 'pending' && counts.pending.n > 0 && (
-          <button onClick={doApproveAll} disabled={busy} style={{ marginLeft: 'auto', padding: '8px 16px', background: C.green, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12.5, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
-            ✓ Approve all {counts.pending.n} pending
-          </button>
+          <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
+            {sel.size > 0 && (
+              <button onClick={doApproveSelected} disabled={busy} style={{ padding: '8px 16px', background: C.blue, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12.5, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+                ✓ Approve selected ({sel.size})
+              </button>
+            )}
+            <button onClick={doApproveAll} disabled={busy} style={{ padding: '8px 16px', background: C.green, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12.5, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+              ✓ Approve all {counts.pending.n} pending
+            </button>
+          </div>
         )}
       </div>
 
@@ -111,6 +126,9 @@ export function VoucherApprovals({ branch }) {
         <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: '#fafbfe', alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11.5, color: C.dim, fontWeight: 600 }}>Group › Sub-group › Ledger › Entry</span>
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6 }}>
+            {status === 'pending' && allIds.length > 0 && (
+              <button onClick={toggleAllSel} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.blue}`, borderRadius: 5, background: sel.size === allIds.length ? C.blue : '#fff', color: sel.size === allIds.length ? '#fff' : C.blue, cursor: 'pointer' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
+            )}
             <button onClick={() => setAll(true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊞ Expand all</button>
             <button onClick={() => setAll(false)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊟ Collapse all</button>
           </span>
@@ -159,7 +177,7 @@ export function VoucherApprovals({ branch }) {
                                       const x = drCrOf(e);
                                       return (
                                       <tr key={e.id + ':' + i} style={{ background: i % 2 ? '#fcfdff' : '#fff' }}>
-                                        <td style={{ padding: '5px 8px 5px 64px', whiteSpace: 'nowrap', color: C.dim, borderBottom: '1px solid #f4f6fa' }}>{fmtDate(e.date)}</td>
+                                        <td style={{ padding: '5px 8px 5px 44px', whiteSpace: 'nowrap', color: C.dim, borderBottom: '1px solid #f4f6fa' }}>{status === 'pending' && <input type="checkbox" checked={sel.has(e.id)} onChange={() => toggleSel(e.id)} onClick={(ev) => ev.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} />}{fmtDate(e.date)}</td>
                                         <td style={{ padding: '5px 8px', color: C.blue, fontWeight: 600, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa' }}>{e.vno}</td>
                                         <td style={{ padding: '5px 8px', color: C.dim, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa' }}>{VCH[e.category] || e.type}</td>
                                         <td style={{ padding: '5px 8px', fontWeight: 600, color: C.blue, borderBottom: '1px solid #f4f6fa', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.drLedger}>{x.drLedger}</td>

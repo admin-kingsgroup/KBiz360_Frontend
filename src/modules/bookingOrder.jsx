@@ -575,7 +575,7 @@ const sumT = (rows, path) => rows.reduce((s, b) => s + ((b[path] && b[path].tota
 const gpPctOf = (gp, sale) => (sale ? (gp / sale) * 100 : 0);
 const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
-function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, busyId }) {
+function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, busyId, sel, onToggleSel }) {
   const cols = mode === 'approved'
     ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
     : mode === 'rejected'
@@ -610,7 +610,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
             return (
               <React.Fragment key={b.id}>
                 <tr onClick={() => setOpen(isOpen ? null : b.id)} style={{ borderBottom: '1px solid #f0f2f7', cursor: 'pointer', background: isOpen ? '#faf7ef' : '#fff' }}>
-                  <td style={{ padding: '8px 12px' }}>{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
+                  <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{mode === 'pending' && onToggleSel && <input type="checkbox" checked={!!(sel && sel.has(b.id))} onChange={() => onToggleSel(b.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} />}{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}</td>
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: BLUE, fontSize: 11.5 }}>{b.linkNo}</td>
                   <td style={{ padding: '8px 12px', fontSize: 12 }}>{sp ? sp.icon + ' ' + sp.name : b.module}</td>
@@ -689,8 +689,12 @@ export function PendingBookings({ branch, setRoute }) {
   const [msg, setMsg] = useState('');
   const [editing, setEditing] = useState(null);
   const [groupBy, setGroupBy] = useState('none');
+  const [sel, setSel] = useState(() => new Set());
 
   const rows = data.filter((b) => b.status === 'pending');
+  const allIds = rows.map((b) => b.id);
+  const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
 
   // Editing a pending voucher reuses the full SO/PO/GP entry form (PUT on save).
   if (editing) {
@@ -715,6 +719,16 @@ export function PendingBookings({ branch, setRoute }) {
     catch (e) { setMsg('⚠ ' + (e.message || 'Reject failed')); }
     finally { setBusyId(null); }
   };
+  const onApproveSelected = async () => {
+    if (!sel.size || !window.confirm(`Approve ${sel.size} selected voucher(s)? Each posts its linked Sales + Purchase.`)) return;
+    setBusyId('bulk'); setMsg('');
+    try {
+      const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] });
+      setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`);
+      setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] });
+    } catch (e) { setMsg('⚠ ' + (e.message || 'Bulk approve failed')); }
+    finally { setBusyId(null); }
+  };
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px' }}>
@@ -726,8 +740,16 @@ export function PendingBookings({ branch, setRoute }) {
         <button onClick={() => setRoute && setRoute('/bookings/new')} style={btnG}><Plus size={14} /> New voucher</button>
       </div>
       {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, color: msg.startsWith('⚠') ? '#A32D2D' : '#27500A', background: msg.startsWith('⚠') ? '#FCEBEB' : '#EAF3DE', border: '1px solid ' + (msg.startsWith('⚠') ? '#F7C1C1' : '#cde3b6') }}>{msg}</div>}
-      <div><GroupByBar value={groupBy} onChange={setGroupBy} /></div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="pending" groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={setEditing} busyId={busyId} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+        <GroupByBar value={groupBy} onChange={setGroupBy} />
+        {rows.length > 0 && (
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
+            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={onApproveSelected} style={{ ...btnG, padding: '5px 13px', fontSize: 11.5, background: DR }}>{busyId === 'bulk' ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve selected ({sel.size})</button>}
+          </span>
+        )}
+      </div>
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="pending" groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={setEditing} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
     </div>
   );
 }

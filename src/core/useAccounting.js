@@ -134,6 +134,13 @@ export function useRejectVoucher() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); },
   });
 }
+export function useApproveMany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, approver }) => apiPost('/api/vouchers/approve-many', { ids, approver }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['groups'] }); },
+  });
+}
 export function useApproveAll() {
   const qc = useQueryClient();
   return useMutation({

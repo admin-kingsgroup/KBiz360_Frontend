@@ -118,31 +118,31 @@ const SPECS = [
 
   // ── Other vouchers (post double-entry on import) ───────────────────────────
   { group: 'Vouchers', entity: 'receipt', label: 'Receipts',
-    desc: 'Dr bank/cash · Cr customer.',
-    columns: ['vno', 'date', 'branch', 'party', 'total', 'paymentMode', 'remarks'],
-    example: ['RV/26/0001', '2025-06-02', 'BOM', 'Acme Travels', '11800', 'HDFC Bank', 'Against SF/26/0001'] },
+    desc: 'Dr bank/cash · Cr party. ⏳ Imported as PENDING — approve under Transactions ▸ Voucher Approvals to post. Optional "group" sets the party ledger group (e.g. Unsecured Loans); blank → existing ledger keeps its own group, new ones default to Sundry Debtors.',
+    columns: ['vno', 'date', 'branch', 'party', 'group', 'total', 'paymentMode', 'remarks'],
+    example: ['RV/26/0001', '2025-06-02', 'BOM', 'Acme Travels', 'Sundry Debtors', '11800', 'HDFC Bank', 'Against SF/26/0001'] },
   { group: 'Vouchers', entity: 'payment', label: 'Payments',
-    desc: 'Dr supplier · Cr bank/cash.',
-    columns: ['vno', 'date', 'branch', 'party', 'total', 'paymentMode', 'remarks'],
-    example: ['PMT/26/0001', '2025-06-03', 'BOM', 'Emirates GSA', '9440', 'HDFC Bank', 'Against PF/26/0001'] },
+    desc: 'Dr party · Cr bank/cash. ⏳ Imported as PENDING — approve under Transactions ▸ Voucher Approvals to post. Optional "group" sets the party ledger group (e.g. Investments, Deposits (Asset)); blank → existing ledger keeps its own group, new ones default to Sundry Creditors.',
+    columns: ['vno', 'date', 'branch', 'party', 'group', 'total', 'paymentMode', 'remarks'],
+    example: ['PMT/26/0001', '2025-06-03', 'BOM', 'Emirates GSA', 'Sundry Creditors', '9440', 'HDFC Bank', 'Against PF/26/0001'] },
   { group: 'Vouchers', entity: 'journal', label: 'Journal',
-    desc: 'Dr one ledger · Cr another, same amount.',
+    desc: 'Dr one ledger · Cr another, same amount. ⏳ Imported as PENDING — approve under Transactions ▸ Voucher Approvals to post.',
     columns: ['vno', 'date', 'branch', 'debitLedger', 'creditLedger', 'amount', 'remarks'],
-    example: ['JV/26/0001', '2025-06-30', 'BOM', 'Rent & Utilities', 'Accounts Payable', '25000', 'June rent'] },
+    example: ['JV/26/0001', '2025-06-30', 'BOM', 'Rent-Office HO', 'HDFC Bank', '25000', 'June rent'] },
   { group: 'Vouchers', entity: 'purchase-expense', label: 'Purchase Voucher (Expense / Asset)',
-    desc: 'Supplier expense / asset bought on credit. ⏳ Approval-gated (like SO/PO/GP): each row imports as a PENDING voucher with NO books impact — approve it under Finance ▸ Purchase Expense ▸ Pending to post (Dr ledger + input GST · Cr supplier, net of TDS).',
+    desc: 'Supplier expense / asset bought on credit. ⏳ Imported as PENDING — approve under Transactions ▸ Voucher Approvals to post (Dr ledger + input GST · Cr supplier, net of TDS).',
     columns: ['vno', 'date', 'branch', 'party', 'partyGroup', 'ledger', 'description', 'subtotal', 'gstMode', 'taxAmt', 'tdsAmt', 'total', 'billNo', 'remarks'],
     example: ['PXP/26/0001', '2025-06-30', 'BOM', 'ABC Realtors', 'Sundry Creditors', 'Office Rent', 'June 2026 office rent', '25000', 'intra', '4500', '500', '29500', 'VEND-4471', 'Being office rent for June payable to ABC Realtors'] },
   { group: 'Vouchers', entity: 'contra', label: 'Contra',
-    desc: 'Bank ↔ cash transfer (from → to).',
+    desc: 'Bank ↔ cash transfer (from → to). ⏳ Imported as PENDING — approve under Transactions ▸ Voucher Approvals to post.',
     columns: ['vno', 'date', 'branch', 'fromAccount', 'toAccount', 'total', 'remarks'],
     example: ['CV/26/0001', '2025-06-04', 'BOM', 'HDFC Bank', 'Cash in Hand — BOM', '50000', 'Cash withdrawal'] },
   { group: 'Vouchers', entity: 'credit-note', label: 'Credit Notes (Sales Return)',
-    desc: 'Dr sales + GST · Cr customer. Link No ties it to the original file.',
+    desc: 'Dr sales + GST · Cr customer. Link No ties it to the original file. ⏳ Imported as PENDING — approve under Transactions ▸ Voucher Approvals to post.',
     columns: ['vno', 'date', 'branch', 'party', 'ledger', 'subtotal', 'taxAmt', 'total', 'linkNo', 'remarks'],
     example: ['SCN/26/0001', '2025-06-05', 'BOM', 'Acme Travels', 'Sales — Air Tickets', '2000', '360', '2360', 'TKB-0001', 'Partial refund'] },
   { group: 'Vouchers', entity: 'debit-note', label: 'Debit Notes (Purchase Return)',
-    desc: 'Dr supplier · Cr purchase + GST. Link No ties it to the original file.',
+    desc: 'Dr supplier · Cr purchase + GST. Link No ties it to the original file. ⏳ Imported as PENDING — approve under Transactions ▸ Voucher Approvals to post.',
     columns: ['vno', 'date', 'branch', 'party', 'ledger', 'subtotal', 'taxAmt', 'total', 'linkNo', 'remarks'],
     example: ['DB/26/0001', '2025-06-05', 'BOM', 'Emirates GSA', 'Purchase — Air Tickets', '1000', '180', '1180', 'TKB-0001', 'Ticket void'] },
   // Refund / Reissue raised against a sale. The customer figure is DERIVED so the
@@ -192,7 +192,7 @@ const r2x = (n) => Math.round((Number(n) || 0) * 100) / 100;
 function makeBookingSpec(code) {
   const sp = VSPECS[code];
   const hasPkg = code === 'SF' || code === 'SH';
-  const header = ['Link No', 'Branch', 'Date', sp.headerLabel, 'Customer Name', 'Customer Sub-Group', 'Supplier Name', 'Supplier Sub-Group', ...(hasPkg ? ['Package Type'] : []), 'GST Mode'];
+  const header = ['Link No', 'Branch', 'Date', sp.headerLabel, 'Customer Name', 'Customer Ledger', 'Customer Sub-Group', 'Supplier Name', 'Supplier Ledger', 'Supplier Sub-Group', ...(hasPkg ? ['Package Type'] : []), 'GST Mode'];
   const idLabels = sp.idCols.map((c) => c.label);
   const fareLabels = sp.fareCols.map((c) => c.label);
   const tail = ['Supplier Service', 'Supplier Service GST', 'Markup', 'Markup GST', 'Service Charge', 'Service Charge GST'];
@@ -201,7 +201,7 @@ function makeBookingSpec(code) {
   const seed = (sp.seed && sp.seed[0]) || {};
   const n = (v) => Number(v) || 0;
   const [supName, supGrp] = BOOKING_SUPPLIER_SAMPLE[code];
-  const exHeader = ['BKL-0001', 'BOM', '2025-06-18', BOOKING_HEADER_SAMPLE[code], 'Global Konnection', 'B2B Clients', supName, supGrp, ...(hasPkg ? ['Domestic'] : []), 'intra'];
+  const exHeader = ['BKL-0001', 'BOM', '2025-06-18', BOOKING_HEADER_SAMPLE[code], 'Global Konnection', 'Global Konnection', 'B2B Clients', supName, supName, supGrp, ...(hasPkg ? ['Domestic'] : []), 'intra'];
   const exId = sp.idCols.map((c) => String(seed[c.key] ?? ''));
   const exFare = sp.fareCols.map((c) => String(n(seed[c.key])));
   const exTail = [String(n(seed.psvc)), String(r2x(n(seed.psvc) * 0.18)), String(n(seed.markup)), String(r2x(n(seed.markup) * 0.18 / 1.18)), String(n(seed.ssvc)), String(r2x(n(seed.ssvc) * 0.18))];
