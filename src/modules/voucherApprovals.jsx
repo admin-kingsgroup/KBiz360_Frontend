@@ -1,23 +1,40 @@
 // ─── Voucher Approvals ────────────────────────────────────────────────────────
 // Approval queue for the gated voucher types (Payment, Receipt, Contra, Journal,
 // Credit Note, Debit Note, Purchase Expense). Manual entries AND bulk uploads land
-// here as PENDING and hit the books only when approved (mirrors SO/PO/GP).
-// Four views: Entry-wise · Ledger-wise · Sub-group-wise · Group-wise.
-import React, { useState } from 'react';
+// here as PENDING and hit the books only when approved.
+// Single nested sheet: Group › Sub-group › Ledger › Entry (collapsible).
+import React, { useMemo, useState } from 'react';
 import { fmtINR } from '../core/format';
 import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useApproveAll } from '../core/useAccounting';
 
-const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec', head: '#1d3a6e' };
+const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec' };
 const VCH = { payment: 'Payment', receipt: 'Receipt', contra: 'Contra', journal: 'Journal', 'credit-note': 'Credit Note', 'debit-note': 'Debit Note', 'purchase-expense': 'Purchase Expense' };
 const card = { background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' };
-const th = { padding: '8px 12px', background: C.dark, color: C.gold, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, position: 'sticky', top: 0, textAlign: 'left' };
-const td = { padding: '7px 12px', borderBottom: '1px solid #f0f2f7', fontSize: 12.5 };
-const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
+const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 const branchLabel = (b) => (!b || b === 'ALL' ? 'All branches' : (b.code || b));
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// Dates arrive mixed (ISO "2026-01-07" and "07-01-2026") — normalise to "07 Jan 2026".
+const fmtDate = (s) => {
+  if (!s) return '';
+  const str = String(s);
+  let iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  let dmy = str.match(/^(\d{2})-(\d{2})-(\d{4})/);
+  let dd, mm, yy;
+  if (iso) { yy = iso[1]; mm = +iso[2]; dd = iso[3]; }
+  else if (dmy) { dd = dmy[1]; mm = +dmy[2]; yy = dmy[3]; }
+  else return str;
+  return `${dd} ${MON[mm - 1] || mm} ${yy}`;
+};
+// Voucher double-entry summary from its postings.
+const drCrOf = (e) => {
+  const dr = (e.postings || []).filter((p) => (p.debit || 0) > 0);
+  const cr = (e.postings || []).filter((p) => (p.credit || 0) > 0);
+  const name = (legs) => (legs.length ? legs[0].ledger + (legs.length > 1 ? ` (+${legs.length - 1})` : '') : '—');
+  return { drLedger: name(dr), crLedger: name(cr), drAmt: dr.reduce((s, p) => s + (p.debit || 0), 0), crAmt: cr.reduce((s, p) => s + (p.credit || 0), 0) };
+};
 
 export function VoucherApprovals({ branch }) {
   const [status, setStatus] = useState('pending');
-  const [view, setView] = useState('entry');
   const [open, setOpen] = useState({});
   const q = useVoucherApprovals(branch, status);
   const d = q.data || {};
@@ -32,32 +49,44 @@ export function VoucherApprovals({ branch }) {
   const doReject = (id) => { const reason = window.prompt('Reason for rejection?'); if (reason !== null) reject.mutate({ id, by: 'admin', reason }); };
   const doApproveAll = () => { if (window.confirm(`Approve all ${counts.pending.n} pending vouchers for ${branchLabel(branch)}? They will post to the books.`)) approveAll.mutate({ branch, approver: 'admin' }); };
 
+  // Build the nested tree: Group › Sub-group › Ledger › Entries (one row per
+  // posting leg, so a voucher appears under each ledger it touches).
+  const { tree, allKeys } = useMemo(() => {
+    const groups = {}; const allKeys = [];
+    const bump = (o, p) => { o.debit += p.debit || 0; o.credit += p.credit || 0; };
+    entries.forEach((e) => (e.postings || []).forEach((p) => {
+      const gName = p.group || '—', sName = p.subGroup || gName, lName = p.ledger || '—';
+      const g = groups[gName] || (groups[gName] = { name: gName, subs: {}, debit: 0, credit: 0 }); bump(g, p);
+      const s = g.subs[sName] || (g.subs[sName] = { name: sName, ledgers: {}, debit: 0, credit: 0 }); bump(s, p);
+      const l = s.ledgers[lName] || (s.ledgers[lName] = { name: lName, entries: [], debit: 0, credit: 0 }); bump(l, p);
+      l.entries.push({ ...e, legDebit: p.debit || 0, legCredit: p.credit || 0, legNarration: p.narration || e.narration });
+    }));
+    const out = Object.values(groups).sort((a, b) => (b.debit + b.credit) - (a.debit + a.credit)).map((g) => {
+      allKeys.push('g:' + g.name);
+      const subs = Object.values(g.subs).sort((a, b) => (b.debit + b.credit) - (a.debit + a.credit)).map((s) => {
+        allKeys.push('s:' + g.name + '/' + s.name);
+        const ledgers = Object.values(s.ledgers).sort((a, b) => (b.debit + b.credit) - (a.debit + a.credit)).map((l) => {
+          allKeys.push('l:' + g.name + '/' + s.name + '/' + l.name);
+          return { ...l, entries: l.entries.sort((x, y) => String(x.date).localeCompare(String(y.date))) };
+        });
+        return { ...s, ledgers };
+      });
+      return { ...g, subs };
+    });
+    return { tree: out, allKeys };
+  }, [entries]);
+
+  const isOpen = (k, def) => (open[k] === undefined ? def : open[k]);
+  const toggle = (k, def) => setOpen((s) => ({ ...s, [k]: !(s[k] === undefined ? def : s[k]) }));
+  const setAll = (v) => setOpen(Object.fromEntries(allKeys.map((k) => [k, v])));
+
   const tab = (k, label) => (
     <button key={k} onClick={() => setStatus(k)} style={{ padding: '8px 16px', border: 'none', borderBottom: `3px solid ${status === k ? C.gold : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? C.dark : C.dim }}>
       {label} <span style={{ fontSize: 11, color: C.dim }}>({counts[k]?.n || 0} · {fmtINR(counts[k]?.amount || 0)})</span>
     </button>
   );
-  const seg = (k, label) => (
-    <button key={k} onClick={() => setView(k)} style={{ padding: '5px 11px', fontSize: 11.5, fontWeight: 700, border: `1px solid ${view === k ? C.dark : '#d6dbe6'}`, background: view === k ? C.dark : '#fff', color: view === k ? C.gold : C.dim, cursor: 'pointer' }}>{label}</button>
-  );
-
-  const RollupTable = ({ rows, label, subLabel }) => (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead><tr><th style={th}>{label}</th>{subLabel && <th style={th}>{subLabel}</th>}<th style={{ ...th, ...num }}>Debit</th><th style={{ ...th, ...num }}>Credit</th><th style={{ ...th, ...num }}>Entries</th></tr></thead>
-      <tbody>
-        {rows.length === 0 && <tr><td style={{ ...td, color: C.dim }} colSpan={5}>No {status} entries.</td></tr>}
-        {rows.map((r, i) => (
-          <tr key={r.name + i} style={{ background: i % 2 ? '#fafbff' : '#fff' }}>
-            <td style={{ ...td, fontWeight: 600, color: C.dark }}>{r.name}</td>
-            {subLabel && <td style={{ ...td, color: C.dim }}>{r.sub || '—'}</td>}
-            <td style={{ ...td, ...num }}>{r.debit ? fmtINR(r.debit) : ''}</td>
-            <td style={{ ...td, ...num }}>{r.credit ? fmtINR(r.credit) : ''}</td>
-            <td style={{ ...td, ...num, color: C.dim }}>{r.n}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
+  const amt = (dr, cr) => (dr ? <span style={{ color: C.blue }}>{fmtINR(dr)} Dr</span> : cr ? <span style={{ color: C.red }}>{fmtINR(cr)} Cr</span> : '');
+  const Caret = ({ o }) => <span style={{ color: C.gold, width: 12, display: 'inline-block' }}>{o ? '▾' : '▸'}</span>;
 
   return (
     <div style={{ margin: 12 }}>
@@ -78,66 +107,87 @@ export function VoucherApprovals({ branch }) {
           {tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}
         </div>
         <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: '#fafbfe', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11.5, color: C.dim, fontWeight: 600, marginRight: 4 }}>View:</span>
-          <span style={{ display: 'inline-flex', borderRadius: 6, overflow: 'hidden' }}>{seg('entry', 'Entry-wise')}{seg('ledger', 'Ledger-wise')}{seg('subgroup', 'Sub-group-wise')}{seg('group', 'Group-wise')}</span>
+          <span style={{ fontSize: 11.5, color: C.dim, fontWeight: 600 }}>Group › Sub-group › Ledger › Entry</span>
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6 }}>
+            <button onClick={() => setAll(true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊞ Expand all</button>
+            <button onClick={() => setAll(false)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊟ Collapse all</button>
+          </span>
           {q.isFetching && <span style={{ fontSize: 11, color: C.dim }}>updating…</span>}
         </div>
       </div>
 
       <div style={{ ...card }}>
         {q.isLoading ? <div style={{ padding: 28, textAlign: 'center', color: C.dim }}>Loading…</div> : (
-          <div style={{ maxHeight: '68vh', overflow: 'auto' }}>
-            {view === 'group' && <RollupTable rows={d.byGroup || []} label="Group" />}
-            {view === 'subgroup' && <RollupTable rows={d.bySubGroup || []} label="Sub-group" subLabel="Under group" />}
-            {view === 'ledger' && <RollupTable rows={d.byLedger || []} label="Ledger" subLabel="Sub-group" />}
-            {view === 'entry' && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead><tr>
-                  <th style={th}>Date</th><th style={th}>Vch No</th><th style={th}>Type</th><th style={th}>Party</th>
-                  <th style={th}>Narration</th><th style={{ ...th, ...num }}>Amount</th><th style={{ ...th, textAlign: 'center' }}>Action</th>
-                </tr></thead>
-                <tbody>
-                  {entries.length === 0 && <tr><td style={{ ...td, color: C.dim }} colSpan={7}>No {status} vouchers.</td></tr>}
-                  {entries.map((e) => (
-                    <React.Fragment key={e.id}>
-                      <tr style={{ cursor: 'pointer' }} onClick={() => setOpen((s) => ({ ...s, [e.id]: !s[e.id] }))}>
-                        <td style={{ ...td, whiteSpace: 'nowrap', color: C.dim }}>{e.date}</td>
-                        <td style={{ ...td, color: C.blue, fontWeight: 600, whiteSpace: 'nowrap' }}>{open[e.id] ? '▾ ' : '▸ '}{e.vno}</td>
-                        <td style={{ ...td }}>{VCH[e.category] || e.type}</td>
-                        <td style={{ ...td, fontWeight: 600, color: C.dark }}>{e.party || '—'}</td>
-                        <td style={{ ...td, color: C.dim, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.narration}{e.rejectedReason ? ` · ✗ ${e.rejectedReason}` : ''}</td>
-                        <td style={{ ...td, ...num, fontWeight: 700 }}>{fmtINR(e.total)}</td>
-                        <td style={{ ...td, textAlign: 'center', whiteSpace: 'nowrap' }} onClick={(ev) => ev.stopPropagation()}>
-                          {status === 'pending' ? (
-                            <>
-                              <button onClick={() => doApprove(e.id)} disabled={busy} style={{ padding: '4px 10px', background: C.green, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 11, cursor: 'pointer', marginRight: 5 }}>Approve</button>
-                              <button onClick={() => doReject(e.id)} disabled={busy} style={{ padding: '4px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>Reject</button>
-                            </>
-                          ) : <span style={{ fontSize: 10.5, fontWeight: 700, color: status === 'approved' ? C.green : C.red }}>{status === 'approved' ? '✓ Approved' : '✗ Rejected'}</span>}
-                        </td>
-                      </tr>
-                      {open[e.id] && (
-                        <tr><td colSpan={7} style={{ padding: '4px 12px 10px 28px', background: '#f7f9fc' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-                            <thead><tr><th style={{ ...td, color: C.dim, fontWeight: 700 }}>Ledger</th><th style={{ ...td, color: C.dim, fontWeight: 700 }}>Group › Sub-group</th><th style={{ ...td, ...num, color: C.dim, fontWeight: 700 }}>Debit</th><th style={{ ...td, ...num, color: C.dim, fontWeight: 700 }}>Credit</th></tr></thead>
-                            <tbody>
-                              {(e.postings || []).map((p, i) => (
-                                <tr key={i}>
-                                  <td style={{ ...td, fontWeight: 600 }}>{p.ledger}</td>
-                                  <td style={{ ...td, color: C.dim }}>{p.group}{p.subGroup && p.subGroup !== p.group ? ` › ${p.subGroup}` : ''}</td>
-                                  <td style={{ ...td, ...num }}>{p.debit ? fmtINR(p.debit) : ''}</td>
-                                  <td style={{ ...td, ...num }}>{p.credit ? fmtINR(p.credit) : ''}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </td></tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          <div style={{ maxHeight: '72vh', overflow: 'auto', fontSize: 12.5 }}>
+            {tree.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: C.dim }}>No {status} vouchers.</div>}
+            {tree.map((g) => {
+              const gk = 'g:' + g.name, gOpen = isOpen(gk, true);
+              return (
+                <div key={gk}>
+                  <div onClick={() => toggle(gk, true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', cursor: 'pointer', fontWeight: 800, color: C.dark }}>
+                    <Caret o={gOpen} /><span style={{ textDecoration: 'underline' }}>{g.name}</span>
+                    <span style={{ marginLeft: 'auto', ...num }}>{amt(g.debit, g.credit)}</span>
+                  </div>
+                  {gOpen && g.subs.map((s) => {
+                    const sk = 's:' + g.name + '/' + s.name, sOpen = isOpen(sk, true);
+                    return (
+                      <div key={sk}>
+                        <div onClick={() => toggle(sk, true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 28px', background: '#f6f9fd', cursor: 'pointer', fontWeight: 700, color: '#1a3a6e' }}>
+                          <Caret o={sOpen} />{s.name}{s.name !== g.name ? <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 4, background: '#e7eef9', color: C.dim, fontWeight: 700 }}>sub-group</span> : null}
+                          <span style={{ marginLeft: 'auto', ...num }}>{amt(s.debit, s.credit)}</span>
+                        </div>
+                        {sOpen && s.ledgers.map((l) => {
+                          const lk = 'l:' + g.name + '/' + s.name + '/' + l.name, lOpen = isOpen(lk, false);
+                          return (
+                            <div key={lk}>
+                              <div onClick={() => toggle(lk, false)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 46px', borderBottom: '1px solid #f0f2f7', cursor: 'pointer', fontWeight: 600, color: C.dark }}>
+                                <Caret o={lOpen} />{l.name}
+                                <span style={{ color: C.dim, fontWeight: 400, fontSize: 11 }}>· {l.entries.length} entr{l.entries.length === 1 ? 'y' : 'ies'}</span>
+                                <span style={{ marginLeft: 'auto', ...num }}>{amt(l.debit, l.credit)}</span>
+                              </div>
+                              {lOpen && (
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                  <thead><tr style={{ background: '#f3f6fb' }}>
+                                    {[['Date', 'left', 64], ['Vch No', 'left', 8], ['Type', 'left', 8], ['Debit Ledger', 'left', 8], ['Credit Ledger', 'left', 8], ['Narration', 'left', 8], ['Debit', 'right', 8], ['Credit', 'right', 8], ['Action', 'center', 8]].map(([h, a, pl]) => (
+                                      <th key={h} style={{ padding: `4px 8px 4px ${pl}px`, textAlign: a, fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: `1px solid ${C.border}` }}>{h}</th>
+                                    ))}
+                                  </tr></thead>
+                                  <tbody>
+                                    {l.entries.map((e, i) => {
+                                      const x = drCrOf(e);
+                                      return (
+                                      <tr key={e.id + ':' + i} style={{ background: i % 2 ? '#fcfdff' : '#fff' }}>
+                                        <td style={{ padding: '5px 8px 5px 64px', whiteSpace: 'nowrap', color: C.dim, borderBottom: '1px solid #f4f6fa' }}>{fmtDate(e.date)}</td>
+                                        <td style={{ padding: '5px 8px', color: C.blue, fontWeight: 600, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa' }}>{e.vno}</td>
+                                        <td style={{ padding: '5px 8px', color: C.dim, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa' }}>{VCH[e.category] || e.type}</td>
+                                        <td style={{ padding: '5px 8px', fontWeight: 600, color: C.blue, borderBottom: '1px solid #f4f6fa', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.drLedger}>{x.drLedger}</td>
+                                        <td style={{ padding: '5px 8px', fontWeight: 600, color: C.red, borderBottom: '1px solid #f4f6fa', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.crLedger}>{x.crLedger}</td>
+                                        <td style={{ padding: '5px 8px', color: C.dim, fontStyle: 'italic', borderBottom: '1px solid #f4f6fa', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.narration || e.legNarration || ''}>{e.narration || e.legNarration || '—'}{e.rejectedReason ? ` · ✗ ${e.rejectedReason}` : ''}</td>
+                                        <td style={{ ...num, padding: '5px 8px', color: C.blue, borderBottom: '1px solid #f4f6fa' }}>{x.drAmt ? fmtINR(x.drAmt) : ''}</td>
+                                        <td style={{ ...num, padding: '5px 8px', color: C.red, borderBottom: '1px solid #f4f6fa' }}>{x.crAmt ? fmtINR(x.crAmt) : ''}</td>
+                                        <td style={{ padding: '5px 8px', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa' }}>
+                                          {status === 'pending' ? (
+                                            <>
+                                              <button onClick={() => doApprove(e.id)} disabled={busy} style={{ padding: '3px 9px', background: C.green, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Approve</button>
+                                              <button onClick={() => doReject(e.id)} disabled={busy} style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Reject</button>
+                                            </>
+                                          ) : <span style={{ fontSize: 10, fontWeight: 700, color: status === 'approved' ? C.green : C.red }}>{status === 'approved' ? '✓' : '✗'}</span>}
+                                        </td>
+                                      </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
