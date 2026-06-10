@@ -97,6 +97,17 @@ export function useLedgerGroups() {
   });
 }
 
+// Full Chart-of-Accounts hierarchy: primary groups → (system) groups → custom
+// sub-groups → ledgers. Authoritative nesting (same buildTree the BS/P&L use).
+export function useGroupTree() {
+  return useQuery({
+    queryKey: ['groups', 'tree'],
+    queryFn: () => apiGet('/api/groups/tree'),
+    enabled: enabled(),
+    staleTime: 60_000,
+  });
+}
+
 export function useInvoiceGP(branch, { from, to } = {}) {
   const code = branchCode(branch);
   return useQuery({

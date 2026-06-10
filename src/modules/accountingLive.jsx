@@ -19,7 +19,7 @@ import { exportToExcel, vouchersToSheet } from '../core/exportExcel';
 import { CUR_QUARTER, CUR_FY } from '../core/dates';
 import {
   useTrialBalance, useProfitAndLoss, useBalanceSheet, useDayBook,
-  useLedgerStatement, useLedgerGroups, useChartOfAccounts,
+  useLedgerStatement, useLedgerGroups, useChartOfAccounts, useGroupTree,
   useSalesRegister, usePurchaseRegister, useInvoiceGP,
   useVoucher, useUpdateVoucher, useCostCenters,
 } from '../core/useAccounting';
@@ -1440,52 +1440,42 @@ export function ChartOfAccountsLive({ branch }) {
 }
 
 /* ════════════════════ ACCOUNTS INFO — CHART (tree + side-by-side) ═══════════
-   One report to inspect the Chart of Accounts two ways:
-   • Grouped hierarchy  : Group → Sub-Group → Ledger (collapsible, as filed)
-   • Side-by-side        : three separate lists — Groups | Sub-Groups | Ledgers
-   Pure read-only view over the live Ledger master + the 28 Tally groups.       */
+   Authoritative Chart-of-Accounts hierarchy from /groups/tree:
+   Primary group → Tally group → custom sub-group → ledger. Two views:
+   • Grouped hierarchy : the full nested tree (collapsible)
+   • Side-by-side       : Groups (Tally) | Sub-Groups (custom) | Ledgers          */
 export function AccountsChartLive({ branch }) {
-  const cur = curOf(branch);
-  const lq = useChartOfAccounts(branch);
-  const gq = useLedgerGroups();
-  const ledgers = lq.data || [];
-  const groups28 = gq.data || [];
-  const [view, setView] = useState('tree');     // 'tree' | 'split'
+  const tq = useGroupTree();
+  const roots = tq.data || [];
+  const [view, setView] = useState('tree');
   const [open, setOpen] = useState({});
   const isOpen = (k, def) => (open[k] === undefined ? def : open[k]);
-  const stmtOf = useMemo(() => { const m = {}; groups28.forEach((g) => { m[g.name] = g.statement; }); return m; }, [groups28]);
 
-  // Group → Sub-Group → Ledgers (Sub-Group '' → "(direct under group)")
-  const tree = useMemo(() => {
-    const by = {};
-    for (const l of ledgers) {
-      const g = l.group || '(ungrouped)';
-      const sg = (l.subGroup || '').trim() || '(direct)';
-      ((by[g] || (by[g] = {}))[sg] || (by[g][sg] = [])).push(l);
-    }
-    return Object.keys(by).sort().map((g) => ({
-      group: g,
-      statement: stmtOf[g],
-      count: Object.values(by[g]).reduce((s, a) => s + a.length, 0),
-      subs: Object.keys(by[g]).sort((a, b) => (a === '(direct)' ? -1 : b === '(direct)' ? 1 : a.localeCompare(b)))
-        .map((sg) => ({ name: sg, ledgers: by[g][sg].slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')) })),
-    }));
-  }, [ledgers, stmtOf]);
+  const countLedgers = (n) => (n.ledgers || []).length + (n.children || []).reduce((s, c) => s + countLedgers(c), 0);
 
-  // Three separate lists.
-  const groupList = useMemo(() => {
-    const m = {}; ledgers.forEach((l) => { const g = l.group || '(ungrouped)'; m[g] = (m[g] || 0) + 1; });
-    return Object.keys(m).sort().map((name) => ({ name, count: m[name], statement: stmtOf[name] }));
-  }, [ledgers, stmtOf]);
-  const subList = useMemo(() => {
-    const m = {}; ledgers.forEach((l) => { const sg = (l.subGroup || '').trim(); if (sg) (m[sg] || (m[sg] = { count: 0, group: l.group })).count++; });
-    return Object.keys(m).sort().map((name) => ({ name, ...m[name] }));
-  }, [ledgers]);
-  const ledgerList = useMemo(() => ledgers.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')), [ledgers]);
+  // Walk the tree → flat Groups (Tally system) / Sub-Groups (custom) / Ledgers.
+  const { groups, subGroups, ledgers, allKeys, totalLedgers } = useMemo(() => {
+    const groups = [], subGroups = [], ledgers = [], allKeys = [];
+    const walk = (node, sysAncestor, statement) => {
+      const isSystem = node.system !== false;          // the 28 Tally groups
+      const stmt = node.statement || statement;
+      const myTop = isSystem ? node.name : sysAncestor;
+      allKeys.push('n:' + (node.id || node.name));
+      if (isSystem) groups.push({ name: node.name, statement: stmt, count: countLedgers(node) });
+      else subGroups.push({ name: node.name, parent: sysAncestor, count: countLedgers(node) });
+      (node.ledgers || []).forEach((l) => ledgers.push({ ...l, topGroup: myTop, subGroup: isSystem ? '' : node.name }));
+      (node.children || []).forEach((c) => walk(c, myTop, stmt));
+    };
+    roots.forEach((r) => walk(r, r.name, r.statement));
+    return {
+      groups: groups.sort((a, b) => a.name.localeCompare(b.name)),
+      subGroups: subGroups.sort((a, b) => a.name.localeCompare(b.name)),
+      ledgers: ledgers.sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+      allKeys, totalLedgers: ledgers.length,
+    };
+  }, [roots]);
 
-  const allKeys = useMemo(() => { const k = []; tree.forEach((t) => { k.push('g:' + t.group); t.subs.forEach((s) => k.push('s:' + t.group + '/' + s.name)); }); return k; }, [tree]);
   const setAll = (v) => setOpen(Object.fromEntries(allKeys.map((k) => [k, v])));
-
   const stmtBadge = (s) => <span style={{ fontSize: 9.5, padding: '1px 6px', borderRadius: 999, fontWeight: 700, background: (s === 'PL' ? GREEN : BLUE) + '1e', color: s === 'PL' ? GREEN : BLUE }}>{s === 'PL' ? 'P&L' : s === 'BS' ? 'Balance Sheet' : '—'}</span>;
   const seg = (active) => ({ padding: '5px 12px', fontSize: 11.5, fontWeight: 700, border: `1px solid ${active ? DARK : '#d6dbe6'}`, background: active ? DARK : '#fff', color: active ? GOLD : DIM, cursor: 'pointer' });
   const Col = ({ title, count, children }) => (
@@ -1495,17 +1485,50 @@ export function AccountsChartLive({ branch }) {
     </div>
   );
 
+  // Recursive node renderer for the hierarchy view.
+  const Node = ({ node, depth }) => {
+    const key = 'n:' + (node.id || node.name);
+    const isSystem = node.system !== false;
+    const kids = node.children || [];
+    const leds = (node.ledgers || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const opened = isOpen(key, depth < 2);            // top two levels open by default
+    const lc = countLedgers(node);
+    return (
+      <div>
+        <div onClick={() => setOpen((s) => ({ ...s, [key]: !opened }))}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: `7px 12px 7px ${12 + depth * 18}px`, background: isSystem ? '#eef3fb' : '#f6f9fd', borderTop: '1px solid #e4ebf5', cursor: 'pointer', fontWeight: isSystem ? 700 : 600, color: isSystem ? DARK : '#1a3a6e' }}>
+          <span style={{ color: GOLD, width: 12 }}>{(kids.length || leds.length) ? (opened ? '▾' : '▸') : ''}</span>
+          <span style={{ textDecoration: isSystem ? 'underline' : 'none' }}>{node.name}</span>
+          {!isSystem && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 4, background: '#e7eef9', color: DIM, fontWeight: 700 }}>sub-group</span>}
+          {isSystem && node.statement && stmtBadge(node.statement)}
+          <span style={{ marginLeft: 'auto', color: DIM, fontWeight: 600, fontSize: 11 }}>{lc} ledger{lc !== 1 ? 's' : ''}</span>
+        </div>
+        {opened && (
+          <>
+            {kids.map((c) => <Node key={c.id || c.name} node={c} depth={depth + 1} />)}
+            {leds.map((l) => (
+              <div key={l.id || l.code || l.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: `5px 12px 5px ${12 + (depth + 1) * 18 + 14}px`, borderBottom: '1px solid #f4f6fa', fontSize: 12 }}>
+                <span style={{ fontWeight: 600, color: DARK }}>{l.name}</span>
+                {l.code ? <span style={{ fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{l.code}</span> : null}
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <Page title="Accounts Info — Chart of Accounts" sub={`${branchLabel(branch)} · ${ledgerList.length} ledgers · ${subList.length} sub-groups · ${groupList.length} groups`}
+    <Page title="Accounts Info — Chart of Accounts" sub={`${branchLabel(branch)} · ${totalLedgers} ledgers · ${subGroups.length} sub-groups · ${groups.length} groups`}
       right={<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <span style={{ display: 'inline-flex', borderRadius: 6, overflow: 'hidden' }}>
           <button onClick={() => setView('tree')} style={{ ...seg(view === 'tree'), borderRight: 'none' }}>Grouped hierarchy</button>
           <button onClick={() => setView('split')} style={seg(view === 'split')}>Side-by-side</button>
         </span>
-        <button onClick={() => exportToExcel(`chart-of-accounts-${branchLabel(branch)}`, [{ key: 'group', label: 'Group' }, { key: 'subGroup', label: 'Sub-Group' }, { key: 'code', label: 'Code' }, { key: 'name', label: 'Ledger' }, { key: 'nature', label: 'Nature' }, { key: 'statement', label: 'Statement' }, { key: 'openingBalance', label: 'Opening' }, { key: 'drCr', label: 'Dr/Cr' }], ledgers)} disabled={ledgers.length === 0}
+        <button onClick={() => exportToExcel(`chart-of-accounts-${branchLabel(branch)}`, [{ key: 'topGroup', label: 'Group' }, { key: 'subGroup', label: 'Sub-Group' }, { key: 'code', label: 'Code' }, { key: 'name', label: 'Ledger' }], ledgers)} disabled={ledgers.length === 0}
           style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: ledgers.length === 0 ? 'not-allowed' : 'pointer', opacity: ledgers.length === 0 ? 0.5 : 1 }}>📤 Export</button>
       </div>}>
-      <State q={lq} empty={ledgers.length === 0}>
+      <State q={tq} empty={roots.length === 0}>
         {view === 'tree' ? (
           <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #eef1f6', background: '#fafbfe' }}>
@@ -1513,64 +1536,32 @@ export function AccountsChartLive({ branch }) {
               <button onClick={() => setAll(false)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${DARK}`, borderRadius: 5, background: '#fff', color: DARK, cursor: 'pointer' }}>⊟ Collapse all</button>
             </div>
             <div className="kb-sticky" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-              {tree.map((g) => {
-                const gk = 'g:' + g.group, gOpen = isOpen(gk, true);
-                return (
-                  <div key={g.group}>
-                    <div onClick={() => setOpen((s) => ({ ...s, [gk]: !gOpen }))} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', cursor: 'pointer', fontWeight: 700, color: DARK }}>
-                      <span style={{ color: GOLD, width: 12 }}>{gOpen ? '▾' : '▸'}</span>
-                      <span style={{ textDecoration: 'underline' }}>{g.group}</span>{stmtBadge(g.statement)}
-                      <span style={{ marginLeft: 'auto', color: DIM, fontWeight: 600, fontSize: 11 }}>{g.count} ledger{g.count !== 1 ? 's' : ''}</span>
-                    </div>
-                    {gOpen && g.subs.map((s) => {
-                      const direct = s.name === '(direct)';
-                      const sk = 's:' + g.group + '/' + s.name, sOpen = isOpen(sk, true);
-                      return (
-                        <div key={sk}>
-                          {!direct && (
-                            <div onClick={() => setOpen((st) => ({ ...st, [sk]: !sOpen }))} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 30px', background: '#f6f9fd', cursor: 'pointer', fontWeight: 600, color: '#1a3a6e' }}>
-                              <span style={{ color: GOLD, width: 12 }}>{sOpen ? '▾' : '▸'}</span>{s.name}
-                              <span style={{ marginLeft: 'auto', color: DIM, fontSize: 10.5 }}>{s.ledgers.length}</span>
-                            </div>
-                          )}
-                          {(direct || sOpen) && s.ledgers.map((l) => (
-                            <div key={l.id || l.code || l.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: `5px 12px 5px ${direct ? 46 : 52}px`, borderBottom: '1px solid #f4f6fa', fontSize: 12 }}>
-                              <span style={{ fontWeight: 600, color: DARK }}>{l.name}</span>
-                              {l.code ? <span style={{ fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{l.code}</span> : null}
-                              <span style={{ marginLeft: 'auto', ...num, color: DIM, fontSize: 11 }}>{l.openingBalance ? `${money(cur, l.openingBalance)} ${l.drCr}` : ''}</span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+              {roots.map((r) => <Node key={r.id || r.name} node={r} depth={0} />)}
             </div>
           </div>
         ) : (
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-            <Col title="Groups" count={groupList.length}>
-              {groupList.map((g, i) => (
+            <Col title="Groups (Tally)" count={groups.length}>
+              {groups.map((g, i) => (
                 <div key={g.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', ...rowBg(i), fontSize: 12 }}>
                   <span style={{ fontWeight: 600, color: DARK }}>{g.name}</span>{stmtBadge(g.statement)}
                   <span style={{ marginLeft: 'auto', color: DIM, fontSize: 11 }}>{g.count}</span>
                 </div>
               ))}
             </Col>
-            <Col title="Sub-Groups" count={subList.length}>
-              {subList.length === 0 ? <div style={{ padding: 14, color: DIM, fontSize: 12 }}>No custom sub-groups.</div> : subList.map((s, i) => (
+            <Col title="Sub-Groups (Custom)" count={subGroups.length}>
+              {subGroups.length === 0 ? <div style={{ padding: 14, color: DIM, fontSize: 12 }}>No custom sub-groups.</div> : subGroups.map((s, i) => (
                 <div key={s.name} style={{ padding: '7px 12px', ...rowBg(i), fontSize: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontWeight: 600, color: '#1a3a6e' }}>{s.name}</span><span style={{ marginLeft: 'auto', color: DIM, fontSize: 11 }}>{s.count}</span></div>
-                  <div style={{ color: DIM, fontSize: 10.5 }}>under {s.group}</div>
+                  <div style={{ color: DIM, fontSize: 10.5 }}>under {s.parent}</div>
                 </div>
               ))}
             </Col>
-            <Col title="Ledgers" count={ledgerList.length}>
-              {ledgerList.map((l, i) => (
+            <Col title="Ledgers" count={ledgers.length}>
+              {ledgers.map((l, i) => (
                 <div key={l.id || l.code || l.name} style={{ padding: '7px 12px', ...rowBg(i), fontSize: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontWeight: 600, color: DARK }}>{l.name}</span>{l.code ? <span style={{ fontFamily: 'monospace', fontSize: 9.5, color: BLUE }}>{l.code}</span> : null}</div>
-                  <div style={{ color: DIM, fontSize: 10.5 }}>{l.group}{(l.subGroup || '').trim() ? ` › ${l.subGroup}` : ''}</div>
+                  <div style={{ color: DIM, fontSize: 10.5 }}>{l.topGroup}{l.subGroup ? ` › ${l.subGroup}` : ''}</div>
                 </div>
               ))}
             </Col>
