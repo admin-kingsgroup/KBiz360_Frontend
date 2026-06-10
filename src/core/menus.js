@@ -3,7 +3,7 @@
    Auto-generated from KBiz360_v2.jsx · 361 lines · 11 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import { BarChart2, Calendar, Database, Download, LayoutDashboard, Lock, Settings, ShoppingCart, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
+import { BarChart2, Calendar, CheckSquare, Database, Download, LayoutDashboard, Lock, Settings, ShoppingCart, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { Recruitment } from './helpers';
 import { PERM_MODULES } from './permissions';
@@ -279,10 +279,9 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
 /* ── FINAL MENU ASSEMBLY ─────────────────────────────────────── */
 
 export const MENU_TRANSACTIONS = {label:"Transactions", icon:ShoppingCart, children:[
-  /* SO / PO / GP — create a booking (on approval spawns a linked Sales + Purchase) */
+  /* SO / PO / GP — create a booking (on approval spawns a linked Sales + Purchase).
+     All approvals (SO/PO/GP + Vouchers) live in the top-level "Approvals" section. */
   {label:"SO/PO/GP Voucher", href:"/bookings/new"},
-  /* ONE approval screen — SO/PO/GP + Vouchers, each Pending/Approved/Rejected/Deleted */
-  {label:"Approvals", href:"/transactions/approvals"},
   /* Standardized 8-tab Voucher Entry pattern */
   {label:"Standardized Patterns", children:[
     {label:"Voucher Entry (8-Tab View)", href:"/transactions/voucher-tabs"},
@@ -344,9 +343,13 @@ export const MENU_HO_CONTROL = {label:"HO Control", icon:Settings, children:[
 ]};
 
 
+// One unified approval screen (SO/PO/GP + Vouchers, each Pending/Approved/Rejected/Deleted).
+export const MENU_APPROVALS = {label:"Approvals", icon:CheckSquare, href:"/transactions/approvals"};
+
 export const MENU_COMMON_TOP = [
   {label:"Dashboard",   icon:LayoutDashboard, href:"/dashboard"},
   MENU_TRANSACTIONS,
+  MENU_APPROVALS,
   MENU_FINANCE,
 ];
 
