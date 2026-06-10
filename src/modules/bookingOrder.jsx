@@ -544,7 +544,18 @@ function useBookings(brCode) {
   });
 }
 
-function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, onCancel, onDelete, canDelete, onEdit, busyId }) {
+// Group bookings for the "… wise" views. 'none' = bill-wise (flat).
+function groupBookings(rows, by) {
+  if (by !== 'client' && by !== 'supplier' && by !== 'module') return [{ key: '__all', label: null, rows }];
+  const keyOf = (b) => (by === 'client' ? (b.customer?.name || '—') : by === 'supplier' ? (b.supplier?.name || '—') : (b.module || '—'));
+  const labelOf = (b) => (by === 'module' ? ((VSPECS[b.module] && VSPECS[b.module].name) || b.module || '—') : keyOf(b));
+  const map = new Map();
+  for (const b of rows) { const k = keyOf(b); if (!map.has(k)) map.set(k, { key: k, label: labelOf(b), rows: [] }); map.get(k).rows.push(b); }
+  return [...map.values()].sort((a, b) => String(a.label).localeCompare(String(b.label)));
+}
+const sumT = (rows, path) => rows.reduce((s, b) => s + ((b[path] && b[path].total) || 0), 0);
+
+function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, busyId }) {
   const cols = mode === 'approved'
     ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'Approved', 'Actions']
     : mode === 'rejected'
@@ -561,7 +572,18 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, on
         <tbody>
           {isLoading && <tr><td colSpan={cols.length} style={{ padding: 20, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>Loading…</td></tr>}
           {!isLoading && rows.length === 0 && <tr><td colSpan={cols.length} style={{ padding: 22, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>{mode === 'pending' ? 'No pending vouchers. Create one under “SO/PO/GP Voucher”.' : mode === 'rejected' ? 'No rejected vouchers.' : mode === 'deleted' ? 'No deleted vouchers.' : 'No approved vouchers yet.'}</td></tr>}
-          {rows.map((b) => {
+          {groupBookings(rows, groupBy).map((g) => (
+            <React.Fragment key={g.key}>
+              {g.label != null && (
+                <tr style={{ background: '#eef1f8' }}>
+                  <td colSpan={6} style={{ padding: '7px 12px', fontWeight: 700, fontSize: 11.5, color: DARK }}>{g.label} <span style={{ color: '#8b94b3', fontWeight: 600 }}>· {g.rows.length} bill{g.rows.length === 1 ? '' : 's'}</span></td>
+                  <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'so'))}</td>
+                  <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'po'))}</td>
+                  <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'gp'))}</td>
+                  <td colSpan={2}></td>
+                </tr>
+              )}
+              {g.rows.map((b) => {
             const sp = VSPECS[b.module];
             const isOpen = open === b.id;
             return (
@@ -614,8 +636,23 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, onApprove, on
               </React.Fragment>
             );
           })}
+            </React.Fragment>
+          ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// Bill-wise / Client-wise / Supplier-wise / Module-wise grouping toggle.
+function GroupByBar({ value, onChange }) {
+  const OPTS = [['none', 'Bill wise'], ['client', 'Client wise'], ['supplier', 'Supplier wise'], ['module', 'Module wise']];
+  return (
+    <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden', marginBottom: 12 }}>
+      {OPTS.map(([v, l]) => (
+        <button key={v} onClick={() => onChange(v)}
+          style={{ padding: '6px 12px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: value === v ? BLUE : '#fff', color: value === v ? '#fff' : '#5a6691' }}>{l}</button>
+      ))}
     </div>
   );
 }
@@ -629,6 +666,7 @@ export function PendingBookings({ branch, setRoute }) {
   const [busyId, setBusyId] = useState(null);
   const [msg, setMsg] = useState('');
   const [editing, setEditing] = useState(null);
+  const [groupBy, setGroupBy] = useState('none');
 
   const rows = data.filter((b) => b.status === 'pending');
 
@@ -666,7 +704,8 @@ export function PendingBookings({ branch, setRoute }) {
         <button onClick={() => setRoute && setRoute('/bookings/new')} style={btnG}><Plus size={14} /> New voucher</button>
       </div>
       {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, color: msg.startsWith('⚠') ? '#A32D2D' : '#27500A', background: msg.startsWith('⚠') ? '#FCEBEB' : '#EAF3DE', border: '1px solid ' + (msg.startsWith('⚠') ? '#F7C1C1' : '#cde3b6') }}>{msg}</div>}
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="pending" onApprove={onApprove} onCancel={onCancel} onEdit={setEditing} busyId={busyId} />
+      <div><GroupByBar value={groupBy} onChange={setGroupBy} /></div>
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="pending" groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={setEditing} busyId={busyId} />
     </div>
   );
 }
@@ -680,6 +719,7 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
   const { data = [], isLoading } = useBookings(brCode);
   const [open, setOpen] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [groupBy, setGroupBy] = useState('none');
   const canDelete = isAdminRole(currentUser);
 
   const rows = data.filter((b) => b.status === 'approved' || b.status === 'posted');
@@ -706,7 +746,8 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
         </div>
         <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" onDelete={onDelete} canDelete={canDelete} busyId={busyId} />
+      <div><GroupByBar value={groupBy} onChange={setGroupBy} /></div>
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" groupBy={groupBy} onDelete={onDelete} canDelete={canDelete} busyId={busyId} />
     </div>
   );
 }
@@ -738,6 +779,7 @@ export function RejectedBookings({ branch, setRoute }) {
   const cur = bc(branch).cur;
   const { data = [], isLoading } = useBookings(brCode);
   const [open, setOpen] = useState(null);
+  const [groupBy, setGroupBy] = useState('none');
 
   const rows = data.filter((b) => b.status === 'rejected');
 
@@ -750,7 +792,8 @@ export function RejectedBookings({ branch, setRoute }) {
         </div>
         <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="rejected" busyId={null} />
+      <div><GroupByBar value={groupBy} onChange={setGroupBy} /></div>
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="rejected" groupBy={groupBy} busyId={null} />
     </div>
   );
 }
