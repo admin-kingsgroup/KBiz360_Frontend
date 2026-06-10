@@ -335,6 +335,19 @@ function EntityCard({ spec, onUpload, state }) {
             <div key={i} style={{ color: RED, marginTop: 3 }}>Row {f.row}: {f.error}</div>
           ))}
           {state.result.failed?.length > 5 && <div style={{ color: DIM, marginTop: 3 }}>…and {state.result.failed.length - 5} more</div>}
+          {state.result.createdLedgers?.length > 0 && (
+            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed #bbf7d0' }}>
+              <div style={{ fontWeight: 700, color: GREEN }}>
+                {state.result.createdLedgers.length} ledger{state.result.createdLedgers.length > 1 ? 's' : ''} created in the Chart of Accounts:
+              </div>
+              {state.result.createdLedgers.slice(0, 8).map((l, i) => (
+                <div key={i} style={{ color: '#27500A', marginTop: 2 }}>
+                  • <strong>{l.name}</strong> → {l.group}{l.subGroup ? ` ▸ ${l.subGroup}` : ''}
+                </div>
+              ))}
+              {state.result.createdLedgers.length > 8 && <div style={{ color: DIM, marginTop: 2 }}>…and {state.result.createdLedgers.length - 8} more</div>}
+            </div>
+          )}
         </div>
       )}
       {state?.error && <div style={{ fontSize: 11, color: RED, fontWeight: 600 }}>⚠ {state.error}</div>}
@@ -342,9 +355,58 @@ function EntityCard({ spec, onUpload, state }) {
   );
 }
 
+// Confirm-before-create gate. Bulk upload never creates a ledger silently: when an
+// upload would add new ledgers to the Chart of Accounts, we first show exactly which
+// ones and where each is filed (Group ▸ Sub-Group), and only import on "Yes".
+function LedgerConfirmModal({ spec, newLedgers, busy, onYes, onNo }) {
+  const n = newLedgers.length;
+  return (
+    <div onClick={onNo} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(580px, 96vw)', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '16px 18px', borderBottom: '1px solid #eef1f6' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlertTriangle size={17} style={{ color: '#854F0B' }} />
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: DARK }}>Create {n} new ledger{n > 1 ? 's' : ''}?</h3>
+          </div>
+          <p style={{ margin: '6px 0 0', fontSize: 11.5, color: DIM }}>
+            “{spec.label}” will add the following to your Chart of Accounts. Review where each ledger is filed, then confirm to create {n > 1 ? 'them' : 'it'} and run the import. Nothing is created if you cancel.
+          </p>
+        </div>
+        <div style={{ overflow: 'auto', padding: '4px 18px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+            <thead>
+              <tr style={{ textAlign: 'left', color: DIM, position: 'sticky', top: 0, background: '#fff' }}>
+                <th style={{ padding: '8px', borderBottom: '1px solid #eef1f6' }}>New Ledger</th>
+                <th style={{ padding: '8px', borderBottom: '1px solid #eef1f6' }}>Group</th>
+                <th style={{ padding: '8px', borderBottom: '1px solid #eef1f6' }}>Sub-Group</th>
+              </tr>
+            </thead>
+            <tbody>
+              {newLedgers.map((l, i) => (
+                <tr key={i}>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #f3f5f9', fontWeight: 600, color: DARK }}>{l.name}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #f3f5f9', color: BLUE, fontWeight: 600 }}>{l.group || '—'}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #f3f5f9', color: DIM }}>{l.subGroup || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ padding: '12px 18px', borderTop: '1px solid #eef1f6', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button onClick={onNo} disabled={busy} style={{ ...btn('#fff', DIM, true), opacity: busy ? 0.5 : 1 }}>Cancel</button>
+          <button onClick={onYes} disabled={busy} style={{ ...btn(BLUE, '#fff'), opacity: busy ? 0.6 : 1 }}>
+            <CheckCircle2 size={13} /> {busy ? 'Creating…' : `Yes, create & import`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DataImportPage({ currentUser }) {
   const [states, setStates] = useState({}); // entity → { busy, result, error }
   const [regime, setRegime] = useState('GST'); // India (GST) | Africa (VAT) template variant
+  const [confirm, setConfirm] = useState(null); // { spec, rows, newLedgers } pending ledger-create confirmation
 
   if (currentUser && currentUser.role !== 'Super Admin') {
     return (
@@ -358,17 +420,49 @@ export function DataImportPage({ currentUser }) {
 
   const setState = (entity, patch) => setStates((s) => ({ ...s, [entity]: { ...s[entity], ...patch } }));
 
+  // Run the real import (creates the confirmed ledgers + posts vouchers), then
+  // surface where each new ledger landed.
+  const runImport = async (spec, rows) => {
+    setState(spec.entity, { busy: true, error: '', result: null });
+    try {
+      const result = await apiPost(`/api/import/${spec.entity}`, { rows });
+      setState(spec.entity, { busy: false, result });
+    } catch (e) {
+      setState(spec.entity, { busy: false, error: e.message });
+    }
+  };
+
   const onUpload = async (spec, file) => {
     setState(spec.entity, { busy: true, error: '', result: null });
     try {
       const text = await file.text();
       const rows = rowsFromCSV(text, spec.columns);
       if (!rows.length) throw new Error('No data rows found in the file');
-      const result = await apiPost(`/api/import/${spec.entity}`, { rows });
-      setState(spec.entity, { busy: false, result });
+      // Step 1 — dry-run: which NEW ledgers would this upload create, and where?
+      // Nothing is written yet.
+      const preview = await apiPost(`/api/import/${spec.entity}/preview`, { rows });
+      setState(spec.entity, { busy: false });
+      if (preview.newLedgers?.length) {
+        // Step 2 — ask before creating any ledger. Import only runs on "Yes".
+        setConfirm({ spec, rows, newLedgers: preview.newLedgers });
+      } else {
+        // No new ledgers — nothing to confirm; import straight through.
+        await runImport(spec, rows);
+      }
     } catch (e) {
       setState(spec.entity, { busy: false, error: e.message });
     }
+  };
+
+  const confirmYes = async () => {
+    const { spec, rows } = confirm;
+    setState(spec.entity, { busy: true });
+    await runImport(spec, rows);
+    setConfirm(null);
+  };
+  const confirmNo = () => {
+    if (confirm) setState(confirm.spec.entity, { busy: false, error: 'Cancelled — no ledgers were created and nothing was imported.' });
+    setConfirm(null);
   };
 
   return (
@@ -379,6 +473,7 @@ export function DataImportPage({ currentUser }) {
           Download a template, fill it from your Tally export, and upload. Recommended order:
           <strong> Ledgers → Customers/Suppliers → Vouchers</strong>. Voucher imports auto-post double-entry to the books.
           {' '}On Sales & Purchase, put the <strong>same Link No</strong> on a sale and its related purchase(s) to tie them for invoice-wise profit.
+          {' '}If an upload would add new ledgers to your Chart of Accounts, you’ll be asked to <strong>confirm</strong> first — showing exactly which ledgers and under which group ▸ sub-group — and nothing is created until you approve.
         </p>
       </div>
 
@@ -411,6 +506,16 @@ export function DataImportPage({ currentUser }) {
           </div>
         </div>
       ))}
+
+      {confirm && (
+        <LedgerConfirmModal
+          spec={confirm.spec}
+          newLedgers={confirm.newLedgers}
+          busy={!!states[confirm.spec.entity]?.busy}
+          onYes={confirmYes}
+          onNo={confirmNo}
+        />
+      )}
     </div>
   );
 }
