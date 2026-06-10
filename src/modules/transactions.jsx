@@ -10,7 +10,7 @@ import { Area, Line } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from '../core/business-logic';
 import { ACTIVE_CURRENCIES, ADM_DATA, BRANCHES, BRANCH_CODES, GP_BILLS, PURCHASE_REGISTRY, SALE_TO_PURCH_MOD, branchCurrencies, branchMainCurrency, genVNo } from '../core/data';
 import { useAdmReasonCodes, useLedgerRegistry } from '../core/useReference';
-import { useLedgerStatement, useCreateVoucher, useOpenBills, useSalesRegister, usePurchaseRegister } from '../core/useAccounting';
+import { useLedgerStatement, useCreateVoucher, useCreateExpenseOrder, useOpenBills, useSalesRegister, usePurchaseRegister } from '../core/useAccounting';
 import { useLivePurchaseRegistry, useLiveSalesTickets } from '../core/useVouchers';
 import { fmt, fmtINR } from '../core/format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS } from '../core/dates';
@@ -4276,7 +4276,7 @@ export function JournalEntry({branch}){
    supplier outstanding all update at once.
    ════════════════════════════════════════════════════════════════ */
 
-export function PurchaseExpenseVoucher({branch}){
+export function PurchaseExpenseVoucher({branch,setRoute}){
   const mob=useMobile();
   const vNo=useVNo(branch,"PXP");
   const cfg=bc(branch);
@@ -4329,20 +4329,23 @@ export function PurchaseExpenseVoucher({branch}){
     ...(tds>0?[{side:"CR",ledger:"TDS Payable",amount:tds,note:`TDS deducted @ ${tdsRate}%`}]:[]),
   ];
 
-  const post=useCreateVoucher();
+  // Approval-gated: saving creates a PENDING Purchase Expense order (NO books
+  // impact). Approval — under Finance ▸ Purchase Expense ▸ Pending — spawns the
+  // linked LOCKED PXP voucher and posts its journal. Mirrors SO/PO/GP.
+  const post=useCreateExpenseOrder();
   const brPost=brCodeOf(branch);
   const canPost=!!brPost&&!!party&&lineRows.length>0&&lineRows.every(l=>l.ledger)&&total>0;
-  const submit=(status)=>{
+  const submit=()=>{
     if(!canPost||post.isPending)return;
     post.mutate({
-      vno:vNo, type:"PXP", category:"purchase-expense", branch:brPost, date,
-      party:partyName, partyType:"supplier", partyGroup,
+      branch:brPost, date,
+      party:partyName, partyGroup,
+      billNo,
       lines:lineRows.map(l=>({ledger:getLedgerName(l.ledger), amt:+l.amt||0, desc:l.desc||""})),
-      subtotal:taxable, taxAmt:gstAmt, gstMode:gstApplicable?gstMode:"", tdsAmt:tds, total,
-      againstInvoice:billNo,
+      gstApplicable, gstMode:gstApplicable?gstMode:"", gstPct, taxAmt:gstAmt,
+      tdsSection, tdsAmt:tds, total,
       attachments:attachments.filter(a=>a.name.trim()).map(a=>({name:a.name.trim(),url:a.url||""})),
       remarks:narration||`Being ${gstApplicable?"GST ":""}expense/asset purchase from ${partyName}${billNo?` vide bill ${billNo}`:""}`,
-      status,
     });
   };
 
@@ -4350,7 +4353,7 @@ export function PurchaseExpenseVoucher({branch}){
     <VWrap title="Purchase Voucher" icon="🧾" vNo={vNo} branch={branch}>
       <VHead vNo={vNo}/>
       <div style={{padding:"14px 16px"}}>
-        <VExplain><b style={{color:"#A07828"}}>Purchase:</b> buying an asset or expense from a supplier. The <b>Asset / Expense account and input GST are Debited</b> (GST is claimable as input credit); the <b>supplier (Sundry Creditors) is Credited</b> with the total. Any <b>TDS</b> is withheld on the taxable value — the supplier gets the net.</VExplain>
+        <VExplain><b style={{color:"#A07828"}}>Purchase:</b> buying an asset or expense from a supplier. The <b>Asset / Expense account and input GST are Debited</b> (GST is claimable as input credit); the <b>supplier (Sundry Creditors) is Credited</b> with the total. Any <b>TDS</b> is withheld on the taxable value — the supplier gets the net. <b style={{color:"#854F0B"}}>⏳ Approval-gated:</b> saving creates a <b>Pending</b> voucher with <b>no books impact</b> — it posts only after it is <b>approved</b> under <b>Pending</b>, exactly like an SO/PO/GP voucher.</VExplain>
 
         <div style={{display:"grid",gridTemplateColumns:mob?"1fr 1fr":"1fr 1fr 1fr",gap:12,marginBottom:14}}>
           <FL label="Voucher date"><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inp}/></FL>
@@ -4451,12 +4454,17 @@ export function PurchaseExpenseVoucher({branch}){
           <span style={{fontSize:16,fontWeight:800,color:"#0d1326"}}>{vf2(cur,total)}</span>
         </div>
 
-        <VSaveMsg m={post} okText={`✔ Purchase Voucher ${vNo} posted · ${partyName} outstanding ↑ · ledgers / Trial Balance / GST report refreshed`}/>
-        {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this voucher.</div>}
-        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-          <button onClick={()=>submit("draft")} disabled={!canPost||post.isPending} style={{...btnGh,opacity:(!canPost||post.isPending)?0.5:1}}>Save Draft</button>
-          <button onClick={()=>submit("saved")} disabled={!canPost||post.isPending} style={{...btnG,background:canPost?"#27500A":"#bfc3d6",opacity:(!canPost||post.isPending)?0.6:1}}>
-            🧾 Save Purchase {!party?"(Select Supplier)":lineRows.length===0?"(Add a Line)":post.isPending?"…":""}
+        <VSaveMsg m={post} okText={`✔ Saved as Pending — no books impact yet. Approve it under Purchase Expense ▸ Pending to post the PXP voucher (${partyName}).`}/>
+        {post.isSuccess&&setRoute&&(
+          <div style={{display:"flex",justifyContent:"center",marginBottom:10}}>
+            <button onClick={()=>setRoute("/purchase-expense/pending")} style={btnGh}>Go to Pending Approval →</button>
+          </div>
+        )}
+        {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to save this voucher.</div>}
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end",alignItems:"center"}}>
+          <span style={{fontSize:11,color:"#854F0B",marginRight:"auto",display:"flex",alignItems:"center",gap:5}}><Clock size={12}/> Saving creates a Pending voucher — it posts to the books only after approval.</span>
+          <button onClick={submit} disabled={!canPost||post.isPending} style={{...btnG,background:canPost?"#A07828":"#bfc3d6",opacity:(!canPost||post.isPending)?0.6:1}}>
+            ⏳ Save (Pending Approval) {!party?"(Select Supplier)":lineRows.length===0?"(Add a Line)":post.isPending?"…":""}
           </button>
         </div>
       </div>
