@@ -158,6 +158,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   }
 
   const refKeys = spec.idCols.slice(2); // module reference fields (Ticket/PNR/etc.)
+  const pkg = spec.model === 'package';  // Holiday tour-operator model (no service charge; 5% GST; entered supplier GST)
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px 90px' }}>
@@ -240,18 +241,18 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', padding: '8px 14px', marginBottom: 12, background: '#FDFAF4', border: '1px solid #eee3cf', borderRadius: 8, flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#fff', border: '1px solid #C49A3C' }} /> Manual — you enter</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#faf7ef', border: '1px dashed #9A9A9A' }} /> Auto — calculated</span>
-        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · markup is GST-inclusive (GST = markup × 18 ÷ 118)</span>
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · {pkg ? 'Holiday package: 5% GST on (Land + Supplier Service + Supplier Service GST + Markup + Markup GST); Intl adds 2% TCS' : 'markup is GST-inclusive (GST = markup × 18 ÷ 118)'}</span>
       </div>
 
       {/* ① Sales Order */}
-      <Section n="1" name="Sales Order" sub="what the customer pays · markup is GST-inclusive" accent={BLUE}>
+      <Section n="1" name="Sales Order" sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · markup is GST-inclusive'} accent={BLUE}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
             <thead><tr>
               {spec.idCols.map((c) => <th key={c.key} style={{ ...thM, ...thL }}>{c.label}</th>)}
               {spec.fareCols.map((c) => <th key={c.key} style={thA}>{c.label}</th>)}
-              <th style={thM}>Markup</th><th style={thM}>Service Chg</th>
-              <th style={thA}>GST/Service</th><th style={thA}>GST/Markup</th><th style={thA}>Total</th><th style={thA}></th>
+              <th style={thM}>Markup</th>{!pkg && <th style={thM}>Service Chg</th>}
+              {!pkg && <th style={thA}>GST/Service</th>}<th style={thA}>GST/Markup{pkg ? ' (5%)' : ''}</th><th style={thA}>Total</th><th style={thA}></th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -265,8 +266,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                     ))}
                     {spec.fareCols.map((col) => <td key={col.key} style={tdAuto}>{fmt(l[col.key])}</td>)}
                     <td style={{ padding: 3 }}><input type="number" min="0" value={l.markup} onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>
-                    <td style={{ padding: 3 }}><input type="number" min="0" value={l.ssvc} onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>
-                    <td style={tdAuto}>{fmt(c.gstSvc)}</td>
+                    {!pkg && <td style={{ padding: 3 }}><input type="number" min="0" value={l.ssvc} onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
+                    {!pkg && <td style={tdAuto}>{fmt(c.gstSvc)}</td>}
                     <td style={tdAuto}>{fmt(c.gstMk)}</td>
                     <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef' }}>{fmt(c.finalSales)}</td>
                     <td style={{ ...tdC, textAlign: 'center', background: '#faf7ef' }}><button onClick={() => delLine(i)} title="Remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={13} /></button></td>
@@ -279,8 +280,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {spec.idCols.slice(1).map((c) => <td key={c.key} style={tfTd} />)}
               {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
               <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>
-              <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>
-              <td style={tfTd} colSpan={2}>{fmt(totals.so.gst)} GST</td>
+              {!pkg && <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
+              <td style={tfTd} colSpan={pkg ? 1 : 2}>{fmt(totals.so.gst)} GST</td>
               <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd} />
             </tr></tfoot>
           </table>
@@ -297,7 +298,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               <th style={{ ...thM, ...thL }}>{spec.idCols[1].label}</th>
               {refKeys.map((c) => <th key={c.key} style={{ ...thA, ...thL }}>{c.label}</th>)}
               {spec.fareCols.map((c) => <th key={c.key} style={thM}>{c.label}</th>)}
-              <th style={thM}>Supplier Service</th><th style={thA}>GST</th><th style={thA}>Total</th>
+              <th style={thM}>Supplier Service</th><th style={pkg ? thM : thA}>{pkg ? 'Supplier Service GST' : 'GST'}</th><th style={thA}>Total</th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -309,7 +310,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                     {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A' }}>{l[col.key] || '—'}</td>)}
                     {spec.fareCols.map((col) => <td key={col.key} style={{ padding: 3 }}><input type="number" min="0" value={l[col.key]} onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
                     <td style={{ padding: 3 }}><input type="number" min="0" value={l.psvc} onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} /></td>
-                    <td style={tdAuto}>{fmt(c.gstPur)}</td>
+                    {pkg
+                      ? <td style={{ padding: 3 }}><input type="number" min="0" value={l.psvcGst} onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} /></td>
+                      : <td style={tdAuto}>{fmt(c.gstPur)}</td>}
                     <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef' }}>{fmt(c.finalPurchase)}</td>
                   </tr>
                 );
@@ -321,7 +324,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {refKeys.map((c) => <td key={c.key} style={tfTd} />)}
               {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
               <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
-              <td style={tfTd}>{fmt(totals.po.gst)}</td>
+              <td style={tfTd}>{pkg ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
               <td style={tfTd}>{fmt(totals.po.total)}</td>
             </tr></tfoot>
           </table>

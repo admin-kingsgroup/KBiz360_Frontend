@@ -17,10 +17,13 @@
 // excludes GST on both sides:  GP = net markup + service charge − supplier service.
 
 export const GST_RATE = 0.18;
+// Tour-operator (Holiday package) GST: 5% output on the gross package value, no ITC.
+export const PKG_GST = 0.05;
 
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 const isIntl = (pt) => String(pt || '').toLowerCase().startsWith('int');
+const isPkg = (spec) => !!spec && spec.model === 'package';
 
 // Does this module collect TCS for the given package type? (Intl Holiday → yes.)
 export function tcsApplies(spec, packageType) {
@@ -47,15 +50,17 @@ export const VSPECS = {
   },
   SH: {
     code: 'SH', name: 'Holiday Package', icon: '🌴', headerLabel: 'Destination / Package',
-    // TCS u/s 206C(1G) — 2% collected from the customer on an International package.
+    // Tour-operator package model: 5% GST on the gross package value (no service
+    // charge), + 2% TCS u/s 206C(1G) on International packages.
+    model: 'package', gstRate: PKG_GST,
     tcs: { rate: 2, intlOnly: true },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'pkg', label: 'Package', kind: 'tkt' }, { key: 'ref', label: 'Ref', kind: 'pnr' },
     ],
-    fareCols: [{ key: 'base', label: 'Land / Air' }, { key: 'tax', label: 'Taxes' }],
+    fareCols: [{ key: 'base', label: 'Land Package' }],
     seed: [
-      { fn: 'RAHUL', sn: 'MEHTA', pkg: 'Bali 5N', ref: 'HL2201', base: 85000, tax: 4250, psvc: 1000, markup: 12000, ssvc: 1500 },
+      { fn: 'RAHUL', sn: 'MEHTA', pkg: 'Bali 5N', ref: 'HL2201', base: 85000, psvc: 1000, psvcGst: 180, markup: 12000 },
     ],
   },
   SHT: {
@@ -122,7 +127,7 @@ export function blankLine(spec) {
   const l = {};
   spec.idCols.forEach((c) => { l[c.key] = ''; });
   spec.fareCols.forEach((c) => { l[c.key] = 0; });
-  l.psvc = 0; l.markup = 0; l.ssvc = 0;
+  l.psvc = 0; l.markup = 0; l.ssvc = 0; l.psvcGst = 0;
   return l;
 }
 
@@ -145,8 +150,33 @@ export const salesGST = (l) => r2(gstSvc(l) + gstMk(l));
 export const gpOf = (spec, l) => r2((finalSales(spec, l) - salesGST(l)) - (finalPurchase(spec, l) - gstPur(l)));
 export const gpPctOf = (spec, l) => { const fs = finalSales(spec, l); return fs > 0 ? r2((gpOf(spec, l) / fs) * 100) : 0; };
 
+// Holiday "package" model (tour-operator): no service charge; Supplier Service GST
+// is entered; Markup is net with GST auto @5%. Actual Sales Price (ASP) =
+// Land + Supplier Service + Supplier Service GST + Markup + Markup GST; output GST
+// = 5% × ASP; TCS (Intl) added at booking level on (ASP + GST). Cost = Land +
+// Supplier Service + Supplier Service GST (no ITC). GP = Markup (net) only.
+export function lineCalcPackage(spec, l) {
+  const rate = spec.gstRate || PKG_GST;
+  const land = num(l.base);
+  const psvc = num(l.psvc);
+  const psvcGst = num(l.psvcGst);          // Supplier Service GST — entered
+  const markup = num(l.markup);            // net markup (agency margin = GP)
+  const markupGst = r2(markup * rate);     // Markup GST — auto @5%
+  const asp = r2(land + psvc + psvcGst + markup + markupGst);
+  const outGst = r2(asp * rate);           // 5% output GST on ASP
+  const finalSales = r2(asp + outGst);     // TCS added at booking level
+  const finalPurchase = r2(land + psvc + psvcGst); // cost (no recoverable ITC)
+  const salesGST = r2(markupGst + outGst);
+  return {
+    pass: land, gstSvc: 0, gstMk: markupGst, gstPur: 0, psvcGst, markup, asp, outGst,
+    finalSales, finalPurchase, salesGST, gp: markup,
+    gpPct: finalSales > 0 ? r2((markup / finalSales) * 100) : 0,
+  };
+}
+
 // All computed figures for one line — handy for the read-only voucher view.
 export function lineCalc(spec, l) {
+  if (isPkg(spec)) return lineCalcPackage(spec, l);
   return {
     pass: r2(fareSum(spec, l)),
     gstSvc: gstSvc(l), gstMk: gstMk(l), gstPur: gstPur(l),
@@ -179,12 +209,20 @@ export function bookingTotals(spec, lines, { packageType = '' } = {}) {
     so.serviceCharge += num(l.ssvc);
     so.gst += c.salesGST; so.total += c.finalSales;
     so.lines.push({ ...id, ...fares, pass: c.pass, markup: num(l.markup), ssvc: num(l.ssvc), gstMk: c.gstMk, gstSvc: c.gstSvc, gst: c.salesGST, total: c.finalSales });
-    // heads — pass-through fares (sale = purchase); Supplier Service is purchase-only
-    // (agency cost, not billed); Markup (net of embedded GST) + Service Charge are sale-only.
+    // heads — pass-through fares (sale = purchase). Package model: Land + Supplier
+    // Service + Supplier Service GST are pass-through (both sides), Markup is sale-only
+    // income (= GP). Fare model: Supplier Service is purchase-only (agency cost),
+    // Markup (net of embedded GST) + Service Charge are sale-only.
     spec.fareCols.forEach((col) => { addH(sH, col.key, col.label, num(l[col.key])); addH(pH, col.key, col.label, num(l[col.key])); });
-    addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
-    addH(sH, 'markup', 'Markup', r2(num(l.markup) - c.gstMk));
-    addH(sH, 'ssvc', 'Service Charge', num(l.ssvc));
+    if (isPkg(spec)) {
+      addH(sH, 'psvc', 'Supplier Service', num(l.psvc)); addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
+      addH(sH, 'psvcGst', 'Supplier Service GST', num(l.psvcGst)); addH(pH, 'psvcGst', 'Supplier Service GST', num(l.psvcGst));
+      addH(sH, 'markup', 'Markup', num(l.markup));
+    } else {
+      addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
+      addH(sH, 'markup', 'Markup', r2(num(l.markup) - c.gstMk));
+      addH(sH, 'ssvc', 'Service Charge', num(l.ssvc));
+    }
   });
   ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'total'].forEach((k) => { po[k] = r2(po[k]); so[k] = r2(so[k]); });
   // TCS u/s 206C(1G) — collected from the customer on the sale value (incl GST),
@@ -198,7 +236,9 @@ export function bookingTotals(spec, lines, { packageType = '' } = {}) {
   const costNet = r2(po.total - po.gst - po.tcs);
   // Finalise the head lists in display order, drop zero heads, and snap each list
   // to sum EXACTLY to its net (adjust the largest head) so the JV always balances.
-  const order = [...spec.fareCols.map((c) => c.key), 'psvc', 'markup', 'ssvc'];
+  const order = isPkg(spec)
+    ? [...spec.fareCols.map((c) => c.key), 'psvc', 'psvcGst', 'markup']
+    : [...spec.fareCols.map((c) => c.key), 'psvc', 'markup', 'ssvc'];
   const finalise = (bag, keys, net) => {
     const heads = keys.map((k) => bag[k]).filter((h) => h && Math.abs(r2(h.amt)) > 0.005).map((h) => ({ ...h, amt: r2(h.amt) }));
     if (!heads.length) return heads;
