@@ -99,10 +99,11 @@ export function useLedgerGroups() {
 
 // Full Chart-of-Accounts hierarchy: primary groups → (system) groups → custom
 // sub-groups → ledgers. Authoritative nesting (same buildTree the BS/P&L use).
-export function useGroupTree() {
+export function useGroupTree(branch) {
+  const code = branchCode(branch);
   return useQuery({
-    queryKey: ['groups', 'tree'],
-    queryFn: () => apiGet('/api/groups/tree'),
+    queryKey: ['groups', 'tree', code || 'all'],
+    queryFn: () => apiGet('/api/groups/tree', { branch: code }),
     enabled: enabled(),
     staleTime: 60_000,
   });

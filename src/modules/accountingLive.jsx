@@ -1445,7 +1445,7 @@ export function ChartOfAccountsLive({ branch }) {
    • Grouped hierarchy : the full nested tree (collapsible)
    • Side-by-side       : Groups (Tally) | Sub-Groups (custom) | Ledgers          */
 export function AccountsChartLive({ branch }) {
-  const tq = useGroupTree();
+  const tq = useGroupTree(branch);
   const roots = tq.data || [];
   const [view, setView] = useState('tree');
   const [open, setOpen] = useState({});
