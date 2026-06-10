@@ -427,12 +427,13 @@ export default function KB360App(){
     <div style={{display:"flex",flexDirection:"column",height:"100vh",
       overflow:"hidden",fontFamily:"system-ui,sans-serif",background:"#f3f4f8"}}>
 
-      {/* Top bar */}
-      <TopBar setRoute={navigate} currentUser={currentUser} setCurrentUser={setUser} branch={branch}/>
-
-      {/* SAP Fiori-style horizontal navigation */}
-      <TopNav branch={branch} setBranch={setBranch} currentUser={currentUser} switchUser={switchUser}
-        route={route} setRoute={navigate}/>
+      {/* Top bar + nav — chrome, excluded from printouts (see index.css @media print) */}
+      <div className="noprint">
+        <TopBar setRoute={navigate} currentUser={currentUser} setCurrentUser={setUser} branch={branch}/>
+        {/* SAP Fiori-style horizontal navigation */}
+        <TopNav branch={branch} setBranch={setBranch} currentUser={currentUser} switchUser={switchUser}
+          route={route} setRoute={navigate}/>
+      </div>
 
       {/* Body */}
       <div style={{display:"flex",flex:1,overflow:"hidden",minHeight:0}}>

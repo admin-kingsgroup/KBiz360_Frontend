@@ -97,3 +97,17 @@ button {
   z-index: 2;
   background: var(--stick-foot, #ffffff);
 }
+
+/* ── Print: report screens use window.print(); the app shell is a 100vh flex with
+   an overflow:auto <main>, so without this only the first viewport page printed and
+   content was clipped at the edges. On print, free the scroll containers so the full
+   report paginates, hide app chrome, and set sane page margins. Separate print
+   windows (vouchers / statements) carry their own styles and are unaffected. ── */
+@media print {
+  @page { margin: 10mm; }
+  html, body, #root { height: auto !important; overflow: visible !important; background: #fff !important; }
+  #root > div { height: auto !important; overflow: visible !important; }
+  #root > div > div { overflow: visible !important; min-height: 0 !important; }
+  main { overflow: visible !important; height: auto !important; flex: none !important; }
+  .noprint, .no-print, .np, .cl-noprint { display: none !important; }
+}
