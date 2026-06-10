@@ -96,6 +96,14 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Module Purchase Register", href:"/finance/module-purchase-register"},
     {label:"Module Sales & Purchase Register", href:"/finance/module-register"},
   ]},
+  /* Folded in from the old Transactions section. */
+  {label:"Memos & Adjustments", children:[
+    {label:"Voucher Entry (8-Tab View)", href:"/transactions/voucher-tabs"},
+    {label:"ADM — Agent Debit Memos", href:"/purchase/adm"},
+    {label:"ACM — Agent Credit Memos", href:"/purchase/acm"},
+    {label:"Sales Cancellations", href:"/sales/cancellation"},
+    {label:"Purchase Refunds", href:"/purchase/refunds"},
+  ]},
   {label:"Voucher Tools", children:[
     {label:"Multi-Currency Voucher", href:"/finance/multi-currency"},
     {label:"Comments Thread (Collaborate)", href:"/finance/comments-demo"},
@@ -329,14 +337,16 @@ export const MENU_APPROVALS = {label:"Approvals", icon:CheckSquare, href:"/trans
 
 export const MENU_COMMON_TOP = [
   {label:"Dashboard",   icon:LayoutDashboard, href:"/dashboard"},
-  MENU_TRANSACTIONS,
+  MENU_FINANCE,        // entry hub (SO/PO/GP + all vouchers + module registers + books)
   MENU_APPROVALS,
-  MENU_FINANCE,
 ];
 
 
 // Tally → Books data migration. Top-level tab, super-admin only (added in getMenu).
 export const MENU_IMPORT = {label:"Data Import", icon:Upload, href:"/import"};
+
+// Back-office sections grouped under one "Admin" header pill (cleaner top bar).
+export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_HR, MENU_ASSETS, MENU_HO_CONTROL, MENU_SETTINGS, MENU_IMPORT]};
 
 export function getMenu(branch, currentUser){
   const isAll   = branch==="ALL";
@@ -358,7 +368,8 @@ export function getMenu(branch, currentUser){
     "HO Control":       "Settings",
   };
   // OPEN ACCESS: every ERP user sees every menu (no role-based filtering).
-  const menus = [...MENU_COMMON_TOP, MENU_REPORTS, taxSection, MENU_HR, MENU_HO_CONTROL, MENU_MASTERS, MENU_ASSETS, MENU_SETTINGS, MENU_IMPORT];
+  // 7 pills: Dashboard · Finance · Approvals · Reports · Taxation · Masters · Admin
+  const menus = [...MENU_COMMON_TOP, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
   return menus;
 }
 
