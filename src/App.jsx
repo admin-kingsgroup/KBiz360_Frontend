@@ -30,7 +30,7 @@ import { AdmRegister, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVouche
 import { SoPoGpVoucherEntry, PendingBookings, ApprovedBookings, RejectedBookings, DeletedBookings } from './modules/bookingOrder';
 import { PnLTallyLive } from './modules/pnlTally';
 import { BalanceSheetTallyLive } from './modules/balanceSheetTally';
-import { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, InvoiceGPLive } from './modules/accountingLive';
+import { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, AccountsChartLive, InvoiceGPLive } from './modules/accountingLive';
 import { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } from './modules/reportsFinancial';
 import { NotesToFinancials } from './modules/reportsNotes';
 import { CostCenterMasterLive } from './modules/costCentersLive';
@@ -364,6 +364,7 @@ export default function KB360App(){
     if(route==="/masters/ledgers")    return <LedgersMaster/>;                    // editable ledger master (live CRUD)
     if(route==="/masters/groups-view")   return <LedgerGroupsLive/>;              // read-only 28-group reference
     if(route==="/masters/ledgers-view")  return <ChartOfAccountsLive branch={branch}/>; // read-only chart of accounts
+    if(route==="/masters/accounts-info") return <AccountsChartLive branch={branch}/>;  // Groups/Sub-Groups/Ledgers — tree + side-by-side
     if(route==="/masters/voucher-types")   return <VoucherTypesMaster/>;
     if(route==="/masters/cost-categories") return <CostCategoriesMaster/>;
     if(route==="/masters/budgets")         return <BudgetsMaster/>;

@@ -1439,6 +1439,148 @@ export function ChartOfAccountsLive({ branch }) {
   );
 }
 
+/* ════════════════════ ACCOUNTS INFO — CHART (tree + side-by-side) ═══════════
+   One report to inspect the Chart of Accounts two ways:
+   • Grouped hierarchy  : Group → Sub-Group → Ledger (collapsible, as filed)
+   • Side-by-side        : three separate lists — Groups | Sub-Groups | Ledgers
+   Pure read-only view over the live Ledger master + the 28 Tally groups.       */
+export function AccountsChartLive({ branch }) {
+  const cur = curOf(branch);
+  const lq = useChartOfAccounts(branch);
+  const gq = useLedgerGroups();
+  const ledgers = lq.data || [];
+  const groups28 = gq.data || [];
+  const [view, setView] = useState('tree');     // 'tree' | 'split'
+  const [open, setOpen] = useState({});
+  const isOpen = (k, def) => (open[k] === undefined ? def : open[k]);
+  const stmtOf = useMemo(() => { const m = {}; groups28.forEach((g) => { m[g.name] = g.statement; }); return m; }, [groups28]);
+
+  // Group → Sub-Group → Ledgers (Sub-Group '' → "(direct under group)")
+  const tree = useMemo(() => {
+    const by = {};
+    for (const l of ledgers) {
+      const g = l.group || '(ungrouped)';
+      const sg = (l.subGroup || '').trim() || '(direct)';
+      ((by[g] || (by[g] = {}))[sg] || (by[g][sg] = [])).push(l);
+    }
+    return Object.keys(by).sort().map((g) => ({
+      group: g,
+      statement: stmtOf[g],
+      count: Object.values(by[g]).reduce((s, a) => s + a.length, 0),
+      subs: Object.keys(by[g]).sort((a, b) => (a === '(direct)' ? -1 : b === '(direct)' ? 1 : a.localeCompare(b)))
+        .map((sg) => ({ name: sg, ledgers: by[g][sg].slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')) })),
+    }));
+  }, [ledgers, stmtOf]);
+
+  // Three separate lists.
+  const groupList = useMemo(() => {
+    const m = {}; ledgers.forEach((l) => { const g = l.group || '(ungrouped)'; m[g] = (m[g] || 0) + 1; });
+    return Object.keys(m).sort().map((name) => ({ name, count: m[name], statement: stmtOf[name] }));
+  }, [ledgers, stmtOf]);
+  const subList = useMemo(() => {
+    const m = {}; ledgers.forEach((l) => { const sg = (l.subGroup || '').trim(); if (sg) (m[sg] || (m[sg] = { count: 0, group: l.group })).count++; });
+    return Object.keys(m).sort().map((name) => ({ name, ...m[name] }));
+  }, [ledgers]);
+  const ledgerList = useMemo(() => ledgers.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')), [ledgers]);
+
+  const allKeys = useMemo(() => { const k = []; tree.forEach((t) => { k.push('g:' + t.group); t.subs.forEach((s) => k.push('s:' + t.group + '/' + s.name)); }); return k; }, [tree]);
+  const setAll = (v) => setOpen(Object.fromEntries(allKeys.map((k) => [k, v])));
+
+  const stmtBadge = (s) => <span style={{ fontSize: 9.5, padding: '1px 6px', borderRadius: 999, fontWeight: 700, background: (s === 'PL' ? GREEN : BLUE) + '1e', color: s === 'PL' ? GREEN : BLUE }}>{s === 'PL' ? 'P&L' : s === 'BS' ? 'Balance Sheet' : '—'}</span>;
+  const seg = (active) => ({ padding: '5px 12px', fontSize: 11.5, fontWeight: 700, border: `1px solid ${active ? DARK : '#d6dbe6'}`, background: active ? DARK : '#fff', color: active ? GOLD : DIM, cursor: 'pointer' });
+  const Col = ({ title, count, children }) => (
+    <div style={{ ...card, padding: 0, overflow: 'hidden', flex: 1, minWidth: 220 }}>
+      <div style={{ padding: '8px 12px', background: DARK, color: GOLD, fontWeight: 700, fontSize: 11.5 }}>{title} — {count}</div>
+      <div className="kb-sticky" style={{ maxHeight: '64vh', overflowY: 'auto' }}>{children}</div>
+    </div>
+  );
+
+  return (
+    <Page title="Accounts Info — Chart of Accounts" sub={`${branchLabel(branch)} · ${ledgerList.length} ledgers · ${subList.length} sub-groups · ${groupList.length} groups`}
+      right={<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <span style={{ display: 'inline-flex', borderRadius: 6, overflow: 'hidden' }}>
+          <button onClick={() => setView('tree')} style={{ ...seg(view === 'tree'), borderRight: 'none' }}>Grouped hierarchy</button>
+          <button onClick={() => setView('split')} style={seg(view === 'split')}>Side-by-side</button>
+        </span>
+        <button onClick={() => exportToExcel(`chart-of-accounts-${branchLabel(branch)}`, [{ key: 'group', label: 'Group' }, { key: 'subGroup', label: 'Sub-Group' }, { key: 'code', label: 'Code' }, { key: 'name', label: 'Ledger' }, { key: 'nature', label: 'Nature' }, { key: 'statement', label: 'Statement' }, { key: 'openingBalance', label: 'Opening' }, { key: 'drCr', label: 'Dr/Cr' }], ledgers)} disabled={ledgers.length === 0}
+          style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: ledgers.length === 0 ? 'not-allowed' : 'pointer', opacity: ledgers.length === 0 ? 0.5 : 1 }}>📤 Export</button>
+      </div>}>
+      <State q={lq} empty={ledgers.length === 0}>
+        {view === 'tree' ? (
+          <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #eef1f6', background: '#fafbfe' }}>
+              <button onClick={() => setAll(true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${DARK}`, borderRadius: 5, background: '#fff', color: DARK, cursor: 'pointer' }}>⊞ Expand all</button>
+              <button onClick={() => setAll(false)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${DARK}`, borderRadius: 5, background: '#fff', color: DARK, cursor: 'pointer' }}>⊟ Collapse all</button>
+            </div>
+            <div className="kb-sticky" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              {tree.map((g) => {
+                const gk = 'g:' + g.group, gOpen = isOpen(gk, true);
+                return (
+                  <div key={g.group}>
+                    <div onClick={() => setOpen((s) => ({ ...s, [gk]: !gOpen }))} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', cursor: 'pointer', fontWeight: 700, color: DARK }}>
+                      <span style={{ color: GOLD, width: 12 }}>{gOpen ? '▾' : '▸'}</span>
+                      <span style={{ textDecoration: 'underline' }}>{g.group}</span>{stmtBadge(g.statement)}
+                      <span style={{ marginLeft: 'auto', color: DIM, fontWeight: 600, fontSize: 11 }}>{g.count} ledger{g.count !== 1 ? 's' : ''}</span>
+                    </div>
+                    {gOpen && g.subs.map((s) => {
+                      const direct = s.name === '(direct)';
+                      const sk = 's:' + g.group + '/' + s.name, sOpen = isOpen(sk, true);
+                      return (
+                        <div key={sk}>
+                          {!direct && (
+                            <div onClick={() => setOpen((st) => ({ ...st, [sk]: !sOpen }))} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 30px', background: '#f6f9fd', cursor: 'pointer', fontWeight: 600, color: '#1a3a6e' }}>
+                              <span style={{ color: GOLD, width: 12 }}>{sOpen ? '▾' : '▸'}</span>{s.name}
+                              <span style={{ marginLeft: 'auto', color: DIM, fontSize: 10.5 }}>{s.ledgers.length}</span>
+                            </div>
+                          )}
+                          {(direct || sOpen) && s.ledgers.map((l) => (
+                            <div key={l.id || l.code || l.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: `5px 12px 5px ${direct ? 46 : 52}px`, borderBottom: '1px solid #f4f6fa', fontSize: 12 }}>
+                              <span style={{ fontWeight: 600, color: DARK }}>{l.name}</span>
+                              {l.code ? <span style={{ fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{l.code}</span> : null}
+                              <span style={{ marginLeft: 'auto', ...num, color: DIM, fontSize: 11 }}>{l.openingBalance ? `${money(cur, l.openingBalance)} ${l.drCr}` : ''}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <Col title="Groups" count={groupList.length}>
+              {groupList.map((g, i) => (
+                <div key={g.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', ...rowBg(i), fontSize: 12 }}>
+                  <span style={{ fontWeight: 600, color: DARK }}>{g.name}</span>{stmtBadge(g.statement)}
+                  <span style={{ marginLeft: 'auto', color: DIM, fontSize: 11 }}>{g.count}</span>
+                </div>
+              ))}
+            </Col>
+            <Col title="Sub-Groups" count={subList.length}>
+              {subList.length === 0 ? <div style={{ padding: 14, color: DIM, fontSize: 12 }}>No custom sub-groups.</div> : subList.map((s, i) => (
+                <div key={s.name} style={{ padding: '7px 12px', ...rowBg(i), fontSize: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontWeight: 600, color: '#1a3a6e' }}>{s.name}</span><span style={{ marginLeft: 'auto', color: DIM, fontSize: 11 }}>{s.count}</span></div>
+                  <div style={{ color: DIM, fontSize: 10.5 }}>under {s.group}</div>
+                </div>
+              ))}
+            </Col>
+            <Col title="Ledgers" count={ledgerList.length}>
+              {ledgerList.map((l, i) => (
+                <div key={l.id || l.code || l.name} style={{ padding: '7px 12px', ...rowBg(i), fontSize: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontWeight: 600, color: DARK }}>{l.name}</span>{l.code ? <span style={{ fontFamily: 'monospace', fontSize: 9.5, color: BLUE }}>{l.code}</span> : null}</div>
+                  <div style={{ color: DIM, fontSize: 10.5 }}>{l.group}{(l.subGroup || '').trim() ? ` › ${l.subGroup}` : ''}</div>
+                </div>
+              ))}
+            </Col>
+          </div>
+        )}
+      </State>
+    </Page>
+  );
+}
+
 /* ════════════════════ CASH BOOK (live) ═════════════════════════════
    A true Tally Cash Book: the ledger account of a Cash-in-Hand ledger.
    Opening b/d → every receipt (Dr) / payment (Cr) with a running balance →

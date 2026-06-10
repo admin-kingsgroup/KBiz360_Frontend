@@ -17,6 +17,7 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
     {label:"Groups (Fixed · 28 Tally)", href:"/masters/groups"},
     {label:"Sub-Groups (Custom)", href:"/masters/subgroups"},
     {label:"Ledgers (Chart of Accounts)", href:"/masters/ledgers"},
+    {label:"Chart — Groups/Sub-Groups/Ledgers", href:"/masters/accounts-info"},
     {label:"Voucher Types", href:"/masters/voucher-types"},
     {label:"Currencies", href:"/masters/currency"},
     {label:"Cost Categories", href:"/masters/cost-categories"},
