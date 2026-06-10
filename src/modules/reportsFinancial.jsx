@@ -1275,7 +1275,7 @@ export function ReportBSLive({ branch }) {
         <StateBox q={q} empty={!d}>
           {d && (view === 'fiori'
             ? <FioriBS d={d} prev={prev} prevMap={prevMap} cur={cur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} branch={branch} to={to} mobile={mobile} detail={detail} />
-            : <ClassicBS d={d} cur={cur} curLabel={curLabel} detail={detail} />)}
+            : <ClassicBS d={d} cur={cur} curLabel={curLabel} detail={detail} branch={branch} to={to} mobile={mobile} />)}
         </StateBox>
       </div>
     </Wrap>
@@ -1407,32 +1407,59 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
 }
 
 /* ── Tally Classic (white) view ──────────────────────────────────────── */
-const sideRows = (groups, summary) => (groups || []).flatMap((g) => {
+const sideRows = (groups, summary, isOpen = () => true, side = '') => (groups || []).flatMap((g) => {
   if (summary) return [{ label: g.group, amount: g.amount, group: true, result: g.isResult }];
   const { subs, direct } = splitSubGroups(g.ledgers);
   return [
     { label: g.group, amount: g.amount, group: true, result: g.isResult },
-    ...subs.flatMap((s) => [
-      { label: s.name, amount: s.amount, sub: true },
-      ...s.ledgers.map((l) => ({ label: l.name, amount: l.amount })),
-    ]),
-    ...direct.map((l) => ({ label: l.name, amount: l.amount })),
+    ...subs.flatMap((s) => {
+      const k = side + ':' + g.group + '/' + s.name;
+      const open = isOpen(k, false); // sub-group collapsed by default → click to reveal ledgers
+      const head = { label: s.name, amount: s.amount, sub: true, expandable: true, ekey: k, open };
+      return open ? [head, ...s.ledgers.map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))] : [head];
+    }),
+    ...direct.map((l) => ({ label: l.name, amount: l.amount, ledger: l.name })),
   ];
 });
-function ClassicBS({ d, cur, curLabel, detail }) {
+function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
   const summary = detail === 'summary';
-  const left = sideRows(d.liabilities, summary), right = sideRows(d.assets, summary);
+  const [openSub, setOpenSub] = useState({});
+  const [drillLedger, setDrillLedger] = useState(null);
+  const isOpen = (k, def) => (openSub[k] === undefined ? def : openSub[k]);
+  const left = sideRows(d.liabilities, summary, isOpen, 'L'), right = sideRows(d.assets, summary, isOpen, 'A');
   const n = Math.max(left.length, right.length);
   const mono = { fontFamily: "'Courier New', Courier, monospace" };
-  const Cell = ({ r }) => r ? (
-    <>
-      <td style={{ padding: '2px 12px', color: r.group || r.sub ? TALLY.head : '#444', fontWeight: r.group ? 700 : r.sub ? 600 : 400, paddingLeft: r.group ? 12 : r.sub ? 28 : 44, ...mono }}>{r.label}</td>
-      <td style={{ padding: '2px 12px', textAlign: 'right', color: r.result ? TALLY.green : '#1a1a1a', fontWeight: r.result || r.sub ? 600 : 400, ...mono }}>{inr(r.amount)}</td>
-    </>
-  ) : (<><td /><td /></>);
+
+  // Expand / Collapse all — every sub-group key across both sides.
+  const allKeys = [];
+  if (!summary) {
+    const collect = (groups, side) => (groups || []).forEach((g) => { splitSubGroups(g.ledgers).subs.forEach((s) => allKeys.push(side + ':' + g.group + '/' + s.name)); });
+    collect(d.liabilities, 'L'); collect(d.assets, 'A');
+  }
+  const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
+  const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
+  const onRowClick = (r) => { if (r.ledger) setDrillLedger(r.ledger); else if (r.expandable) setOpenSub((s) => ({ ...s, [r.ekey]: !r.open })); };
+
+  const Cell = ({ r }) => {
+    if (!r) return (<><td /><td /></>);
+    const clickable = !!(r.ledger || r.expandable);
+    const bold = !!(r.group || r.sub);
+    const color = (r.group || r.sub) ? TALLY.head : '#444';
+    const pad = r.group ? 12 : r.sub ? 28 : 44;
+    return (
+      <>
+        <td onClick={clickable ? () => onRowClick(r) : undefined} className={clickable ? 'cl-drill' : undefined}
+          style={{ padding: '2px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
+          {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}{r.label}{r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
+        </td>
+        <td style={{ padding: '2px 12px', textAlign: 'right', color: r.result ? TALLY.green : '#1a1a1a', fontWeight: (r.result || r.sub) ? 700 : 400, ...mono }}>{inr(r.amount)}</td>
+      </>
+    );
+  };
   const ca = sumGroups(d.assets, CURRENT_ASSETS), cl = sumGroups(d.liabilities, CURRENT_LIABS);
   return (
     <div style={{ background: '#fff', border: '1px solid #b0b0b0', borderRadius: 4, overflow: 'hidden', ...mono, margin: 12 }}>
+      <style>{'.cl-drill:hover{background:#eef4fb;text-decoration:underline}'}</style>
       <div style={{ background: TALLY.titlebar, color: TALLY.head, padding: '5px 12px', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #a9c2e0' }}>
         <span>KBiz360 Books — {branchLabelClassic(d)}</span><span style={{ color: TALLY.gold }}>Balance Sheet</span>
       </div>
@@ -1441,6 +1468,12 @@ function ClassicBS({ d, cur, curLabel, detail }) {
         <div style={{ fontSize: 13 }}>Balance Sheet</div>
         <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{curLabel}</div>
       </div>
+      {allKeys.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #e3e9f2', background: '#fafbfe' }}>
+          <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
+          <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
+        </div>
+      )}
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <tbody>
           <tr style={{ color: TALLY.head, fontWeight: 700, background: '#f0f4fa', borderBottom: `2px solid ${TALLY.head}` }}>
@@ -1461,6 +1494,7 @@ function ClassicBS({ d, cur, curLabel, detail }) {
         <span>Net Profit : <span style={{ color: TALLY.green }}>{inr(d.netProfit)}</span></span>
         <span>Diff in Op Balance : <span style={{ color: TALLY.green }}>{d.balanced ? '0.00' : inr(d.totalLiabilities - d.totalAssets)}</span></span>
       </div>
+      {drillLedger && <LedgerVoucherDrill ledger={drillLedger} branch={branch} to={to} cur={cur} mobile={mobile} onClose={() => setDrillLedger(null)} />}
     </div>
   );
 }
