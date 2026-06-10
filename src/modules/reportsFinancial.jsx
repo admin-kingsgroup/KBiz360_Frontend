@@ -840,6 +840,10 @@ function PnlViewSwitcher({ view, setView }) {
 function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   const [drillModule, setDrillModule] = useState(null);
   const [drillLedger, setDrillLedger] = useState(null);
+  // Collapsible indirect tree: Fixed/Variable buckets default expanded; sub-groups
+  // default collapsed (click a sub-group to reveal its ledgers).
+  const [openSub, setOpenSub] = useState({});
+  const isOpen = (key, defOpen) => (openSub[key] === undefined ? defOpen : openSub[key]);
   const mono = { fontFamily: "'Courier New', Courier, monospace" };
   const company = (branch && branch !== 'ALL') ? (branch.code || branch) : 'All Branches — Consolidated';
   const modules = d.modules || [];
@@ -870,13 +874,19 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   // Tax + Net Profit (Dr) vs GP b/d + Indirect Income (Cr).
   const plLeft = [
     { label: 'Indirect Expenses', amount: d.indirect.expense, group: true },
-    ...buckets.flatMap((b) => [
-      { label: b.name, amount: b.amount, bucket: true },
-      ...(b.groups || []).flatMap((g) => [
-        { label: g.name, amount: g.amount, sub: true },
-        ...(g.ledgers || []).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true })),
-      ]),
-    ]),
+    ...buckets.flatMap((b) => {
+      const bk = 'b:' + b.name;
+      const bOpen = isOpen(bk, true);            // bucket (Fixed/Variable) default expanded
+      const head = { label: b.name, amount: b.amount, bucket: true, expandable: true, ekey: bk, open: bOpen };
+      if (!bOpen) return [head];
+      return [head, ...(b.groups || []).flatMap((g) => {
+        const gk = 'g:' + b.name + '/' + g.name;
+        const gOpen = isOpen(gk, false);         // sub-group default collapsed → click to show ledgers
+        const ghead = { label: g.name, amount: g.amount, sub: true, expandable: true, ekey: gk, open: gOpen };
+        if (!gOpen) return [ghead];
+        return [ghead, ...(g.ledgers || []).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))];
+      })];
+    }),
     ...(tax > 0 ? [{ label: 'Provision for Tax @ 25.17% (est.)', amount: tax }] : []),
     { label: 'Net Profit (to Capital A/c)', amount: pat, result: true },
   ];
@@ -887,23 +897,29 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   const plTotal = grossProfit + indIncome;
 
   const nett = d.totals.sales;
-  const onRowClick = (r) => { if (r.module) setDrillModule(r.module); else if (r.ledger) setDrillLedger(r.ledger); };
+  const onRowClick = (r) => {
+    if (r.module) setDrillModule(r.module);
+    else if (r.ledger) setDrillLedger(r.ledger);
+    else if (r.expandable) setOpenSub((s) => ({ ...s, [r.ekey]: !r.open }));
+  };
 
   const Cell = ({ r, side }) => {
     const sep = side === 'cr' ? { borderLeft: '1px solid #d6d6d6' } : {};
     if (!r) return (<><td style={{ ...mono, ...sep }} /><td style={{ ...mono }} /></>);
-    const clickable = !!(r.module || r.ledger);
-    const color = r.result ? TALLY.green : (r.group || r.bucket) ? TALLY.head : '#1a1a1a';
-    const pad = r.leaf ? 46 : r.sub ? 32 : r.bucket ? 20 : 12;
+    const clickable = !!(r.module || r.ledger || r.expandable);
+    const bold = !!(r.group || r.bucket || r.sub || r.result);              // groups & sub-groups bold
+    const color = r.result ? TALLY.green : (r.group || r.bucket || r.sub) ? TALLY.head : '#1a1a1a';
+    const pad = r.leaf ? 46 : r.sub ? 32 : r.bucket ? 22 : 12;
     return (
       <>
         <td onClick={clickable ? () => onRowClick(r) : undefined}
           className={clickable ? 'cl-drill' : undefined}
-          style={{ padding: '2px 12px', paddingLeft: pad, color, fontWeight: (r.group || r.bucket || r.result) ? 700 : 400, cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...sep, ...mono }}>
-          {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{clickable ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
+          style={{ padding: '2px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...sep, ...mono }}>
+          {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}
+          {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{(r.module || r.ledger) ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
         <td onClick={clickable ? () => onRowClick(r) : undefined}
-          style={{ padding: '2px 12px', textAlign: 'right', color, fontWeight: (r.result || r.bucket) ? 700 : 400, cursor: clickable ? 'pointer' : 'default', ...mono }}>{inr(r.amount)}</td>
+          style={{ padding: '2px 12px', textAlign: 'right', color, fontWeight: bold ? 700 : 400, cursor: clickable ? 'pointer' : 'default', ...mono }}>{inr(r.amount)}</td>
       </>
     );
   };
@@ -953,7 +969,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
         <span>Nett Sales : {inr(nett)}</span>
       </div>
       <div style={{ background: '#d4d4d4', color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: '1px solid #b0b0b0', ...mono }}>
-        <span>Enter / Tap: Drill a module or expense ledger → voucher → edit (re-posts the journal)</span>
+        <span>Tap a sub-group (▸) to expand its ledgers · tap a ledger → its entries (with narration) → voucher → edit</span>
         <span>KBiz360 · live double-entry</span>
       </div>
       {drillModule && <ModuleVoucherDrill module={drillModule} cur={cur} mobile={mobile} onClose={() => setDrillModule(null)} />}
