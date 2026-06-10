@@ -60,8 +60,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const [date, setDate] = useState(editing ? (editBooking.date || today()) : today());
   const [headerRef, setHeaderRef] = useState(editing ? (editBooking.headerRef || '') : '');
   const [customer, setCustomer] = useState(editing
-    ? { name: editBooking.customer?.name || '', gstin: editBooking.customer?.gstin || '', group: editBooking.customer?.group || '' }
-    : { name: '', gstin: '', group: '' });
+    ? { name: editBooking.customer?.name || '', gstin: editBooking.customer?.gstin || '', group: editBooking.customer?.group || '', ledgerName: editBooking.customer?.ledgerName || '', ledgerGroup: editBooking.customer?.ledgerGroup || '' }
+    : { name: '', gstin: '', group: '', ledgerName: '', ledgerGroup: '' });
   const [supplier, setSupplier] = useState(editing
     ? { name: editBooking.supplier?.name || '', gstin: editBooking.supplier?.gstin || '', ledgerGroup: editBooking.supplier?.ledgerGroup || '' }
     : { name: '', gstin: '', ledgerGroup: '' });
@@ -95,7 +95,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       });
       const payload = {
         module: moduleCode, branch: brCode, date,
-        customer: { name: customer.name, gstin: customer.gstin, group: customer.group },
+        customer: { name: customer.name, gstin: customer.gstin, group: customer.group, ledgerName: customer.ledgerName || customer.name, ledgerGroup: customer.ledgerGroup || customer.group },
         supplier: { name: supplier.name, gstin: supplier.gstin, ledgerGroup: supplier.ledgerGroup },
         gstMode, packageType: hasPackage ? packageType : '',
         headerRef, rows: lines,
@@ -113,7 +113,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     finally { setSaving(false); }
   };
 
-  const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', group: '' }); setSupplier({ name: '', gstin: '', ledgerGroup: '' }); setResult(null); setError(''); };
+  const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', group: '', ledgerName: '', ledgerGroup: '' }); setSupplier({ name: '', gstin: '', ledgerGroup: '' }); setResult(null); setError(''); };
 
   if (result) {
     const approved = result._approved;
@@ -208,9 +208,18 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
           <FL label="Customer (Bill to)">
             <PartyPicker branch={branch} kind="customer" value={{ name: customer.name, group: customer.group }}
-              onChange={(v) => setCustomer({ ...customer, name: v.name, group: v.group })} />
+              onChange={(v) => setCustomer((c) => ({
+                ...c, name: v.name, group: v.group,
+                // Default the post-to ledger to the Bill-To party until the user picks a
+                // different debtor; if they'd overridden it, keep their choice.
+                ledgerName: (!c.ledgerName || c.ledgerName === c.name) ? v.name : c.ledgerName,
+                ledgerGroup: (!c.ledgerGroup || c.ledgerGroup === c.group) ? v.group : c.ledgerGroup,
+              }))} />
           </FL>
-          <FL label="Customer sub-group (auto)"><input value={customer.group} readOnly placeholder="picks with the customer" style={{ ...inp, background: '#faf7ef', color: '#5a6691' }} /></FL>
+          <FL label="Post receivable to (Debtor ledger)">
+            <PartyPicker branch={branch} kind="customer" value={{ name: customer.ledgerName, group: customer.ledgerGroup }}
+              onChange={(v) => setCustomer({ ...customer, ledgerName: v.name, ledgerGroup: v.group })} />
+          </FL>
           <FL label="Supplier (Pay to)">
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
               onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
