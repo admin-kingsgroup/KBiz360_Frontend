@@ -1125,9 +1125,7 @@ function DiffCells({ cur, prev, showPY, dark }) {
   </>);
 }
 
-// ── Export: Excel (flatten to rows) + PDF/Print (printable HTML window) ──────
-const bsEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
+// ── Export: Excel (flatten to rows). PDF/Print now go through the in-app A4 preview. ──
 function bsExportRows({ d, prev, prevMap, showPY, detail }) {
   const out = [];
   const cell = (side, level, name, amount, prevAmt) => {
@@ -1154,73 +1152,6 @@ function bsExportRows({ d, prev, prevMap, showPY, detail }) {
   side(d.assets, 'Assets');
   cell('Assets', 'Total', 'TOTAL ASSETS', d.totalAssets, showPY ? prev?.totalAssets : null);
   return out;
-}
-
-function buildBSHtml({ d, prev, prevMap, showPY, detail, cur, branch, curLabel, prevLabel }) {
-  const money = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : '—'; };
-  const cols = 2 + (showPY ? 3 : 0);
-  const diffTd = (c, p) => {
-    if (!showPY) return '';
-    if (p == null) return '<td class="r sec">—</td><td class="r sec">—</td><td class="r sec">—</td>';
-    const diff = c - p, pct = p === 0 ? null : (diff / Math.abs(p)) * 100, cls = diff >= 0 ? 'pos' : 'neg';
-    const ds = diff === 0 ? '—' : (diff > 0 ? '+' : '') + money(diff);
-    const ps = pct == null ? '—' : `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
-    return `<td class="r">${money(p)}</td><td class="r ${cls}">${ds}</td><td class="r ${cls}">${ps}</td>`;
-  };
-  const sideTable = (label, groups, total, totalLabel, prevTotal) => {
-    let body = '';
-    for (const g of groups || []) {
-      body += `<tr class="grp"><td>${bsEsc(g.group)}</td><td class="r">${money(g.amount)}</td>${diffTd(g.amount, showPY ? prevMap[g.group] : null)}</tr>`;
-      if (detail === 'detailed') {
-        const { subs, direct } = splitSubGroups(g.ledgers);
-        for (const sg of subs) {
-          body += `<tr class="sub"><td>${bsEsc(sg.name)}</td><td class="r">${money(sg.amount)}</td>${diffTd(sg.amount, null)}</tr>`;
-          for (const l of sg.ledgers) body += `<tr class="led"><td>${bsEsc(l.name)}</td><td class="r">${money(l.amount)}</td>${diffTd(l.amount, null)}</tr>`;
-        }
-        for (const l of direct) body += `<tr class="led"><td>${bsEsc(l.name)}</td><td class="r">${money(l.amount)}</td>${diffTd(l.amount, null)}</tr>`;
-      }
-    }
-    const head = showPY
-      ? `<th>Particulars</th><th class="r">${bsEsc(curLabel)}</th><th class="r">${bsEsc(prevLabel)}</th><th class="r">Difference</th><th class="r">% Chg</th>`
-      : `<th>Particulars</th><th class="r">${bsEsc(curLabel)}</th>`;
-    return `<table><thead><tr class="hd"><th colspan="${cols}">${bsEsc(label)}</th></tr><tr class="sh">${head}</tr></thead><tbody>${body}<tr class="tot"><td>${bsEsc(totalLabel)}</td><td class="r">${money(total)}</td>${diffTd(total, showPY ? prevTotal : null)}</tr></tbody></table>`;
-  };
-  const bal = d.balanced, asOnTxt = curLabel.replace('as at ', '');
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Balance Sheet · ${bsEsc(branchLabel(branch))} · ${bsEsc(asOnTxt)}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#222;background:#fff;padding:16px;max-width:1000px;margin:0 auto}
-  h1{font-size:18px;color:#1d2d3e}.meta{color:#555;font-size:11px;margin:3px 0 12px}
-  .banner{padding:8px 14px;border-radius:6px;font-weight:700;margin-bottom:14px;font-size:11.5px;border:1px solid ${bal ? '#b8ecb8' : '#ffb3b3'};background:${bal ? '#f1fdf1' : '#fff3f3'};color:${bal ? '#0d6b0d' : '#bb0000'}}
-  table{width:100%;border-collapse:collapse;margin-bottom:16px}
-  th,td{padding:4px 10px;border-bottom:1px solid #eee;text-align:left}
-  .r{text-align:right;font-variant-numeric:tabular-nums}
-  .hd th{background:#1d2d3e;color:#fff;font-size:12px;padding:7px 10px;text-align:left}
-  .sh th{background:#f0f3f4;color:#6a6d70;font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #d9d9d9}
-  .grp td{background:#e8f0fb;color:#0a2955;font-weight:700;border-top:1px solid #b3ccf5}
-  .sub td{background:#f3f7fc;color:#1a3a6e;font-weight:600;padding-left:26px}
-  .led td{padding-left:40px;color:#32363a}
-  .tot td{background:#1d2d3e;color:#fff;font-weight:700}
-  .pos{color:#0d6b0d}.neg{color:#bb0000}.sec{color:#6a6d70}
-  .ft{margin-top:10px;color:#888;font-size:10px;border-top:1px solid #ddd;padding-top:8px}
-  @media print{body{padding:0}.noprint{display:none}}
-</style></head><body>
-  <div class="noprint" style="background:#f0f3f4;padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:11px;color:#555">Use your browser's print dialog and choose <b>Save as PDF</b> to export. <button onclick="window.print()" style="margin-left:8px;padding:4px 10px;cursor:pointer">Print / Save PDF</button></div>
-  <h1>Balance Sheet</h1>
-  <div class="meta"><b>${bsEsc(branchLabel(branch))}</b> &nbsp;·&nbsp; ${bsEsc(cur)} (excl. GST) &nbsp;·&nbsp; ${bsEsc(curLabel)}${showPY ? ` &nbsp;·&nbsp; compared with ${bsEsc(prevLabel)}` : ''} &nbsp;·&nbsp; ${detail === 'summary' ? 'Summary' : 'Detailed'} view</div>
-  <div class="banner">${bal ? '✓ Balanced' : '! Out of balance'} — Total Assets ${bsEsc(cur)}${money(d.totalAssets)} ${bal ? '=' : '≠'} Total Liabilities ${bsEsc(cur)}${money(d.totalLiabilities)} &nbsp;|&nbsp; Net Profit ${bsEsc(cur)}${money(d.netProfit)}</div>
-  ${sideTable('Liabilities & Capital', d.liabilities, d.totalLiabilities, 'TOTAL LIABILITIES', prev?.totalLiabilities)}
-  ${sideTable('Assets', d.assets, d.totalAssets, 'TOTAL ASSETS', prev?.totalAssets)}
-  <div class="ft">KBiz360 Books · live double-entry (Tally 28-group master) · balances accumulated from inception up to ${bsEsc(asOnTxt)}. Computer-generated — no signature required.</div>
-</body></html>`;
-}
-
-function openBSPrint(opts) {
-  const html = buildBSHtml(opts);
-  const w = window.open('', '_blank', 'width=980,height=800');
-  if (!w) { window.alert('Please allow pop-ups to print or save the Balance Sheet as PDF.'); return; }
-  w.document.open(); w.document.write(html); w.document.close(); w.focus();
-  setTimeout(() => { try { w.print(); } catch { /* the page carries its own Print button */ } }, 400);
 }
 
 export function ReportBSLive({ branch }) {
