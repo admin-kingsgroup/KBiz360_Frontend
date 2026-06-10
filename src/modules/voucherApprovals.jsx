@@ -4,8 +4,10 @@
 // here as PENDING and hit the books only when approved.
 // Single nested sheet: Group › Sub-group › Ledger › Entry (collapsible).
 import React, { useMemo, useState } from 'react';
-import { fmtINR } from '../core/format';
 import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useApproveAll } from '../core/useAccounting';
+
+// Full rupee amount with Indian grouping — NO Cr/L abbreviation.
+const money = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec' };
 const VCH = { payment: 'Payment', receipt: 'Receipt', contra: 'Contra', journal: 'Journal', 'credit-note': 'Credit Note', 'debit-note': 'Debit Note', 'purchase-expense': 'Purchase Expense' };
@@ -82,10 +84,10 @@ export function VoucherApprovals({ branch }) {
 
   const tab = (k, label) => (
     <button key={k} onClick={() => setStatus(k)} style={{ padding: '8px 16px', border: 'none', borderBottom: `3px solid ${status === k ? C.gold : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? C.dark : C.dim }}>
-      {label} <span style={{ fontSize: 11, color: C.dim }}>({counts[k]?.n || 0} · {fmtINR(counts[k]?.amount || 0)})</span>
+      {label} <span style={{ fontSize: 11, color: C.dim }}>({counts[k]?.n || 0} · {money(counts[k]?.amount || 0)})</span>
     </button>
   );
-  const amt = (dr, cr) => (dr ? <span style={{ color: C.blue }}>{fmtINR(dr)} Dr</span> : cr ? <span style={{ color: C.red }}>{fmtINR(cr)} Cr</span> : '');
+  const amt = (dr, cr) => (dr ? <span style={{ color: C.blue }}>{money(dr)} Dr</span> : cr ? <span style={{ color: C.red }}>{money(cr)} Cr</span> : '');
   const Caret = ({ o }) => <span style={{ color: C.gold, width: 12, display: 'inline-block' }}>{o ? '▾' : '▸'}</span>;
 
   return (
@@ -163,8 +165,8 @@ export function VoucherApprovals({ branch }) {
                                         <td style={{ padding: '5px 8px', fontWeight: 600, color: C.blue, borderBottom: '1px solid #f4f6fa', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.drLedger}>{x.drLedger}</td>
                                         <td style={{ padding: '5px 8px', fontWeight: 600, color: C.red, borderBottom: '1px solid #f4f6fa', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.crLedger}>{x.crLedger}</td>
                                         <td style={{ padding: '5px 8px', color: C.dim, fontStyle: 'italic', borderBottom: '1px solid #f4f6fa', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.narration || e.legNarration || ''}>{e.narration || e.legNarration || '—'}{e.rejectedReason ? ` · ✗ ${e.rejectedReason}` : ''}</td>
-                                        <td style={{ ...num, padding: '5px 8px', color: C.blue, borderBottom: '1px solid #f4f6fa' }}>{x.drAmt ? fmtINR(x.drAmt) : ''}</td>
-                                        <td style={{ ...num, padding: '5px 8px', color: C.red, borderBottom: '1px solid #f4f6fa' }}>{x.crAmt ? fmtINR(x.crAmt) : ''}</td>
+                                        <td style={{ ...num, padding: '5px 8px', color: C.blue, borderBottom: '1px solid #f4f6fa' }}>{x.drAmt ? money(x.drAmt) : ''}</td>
+                                        <td style={{ ...num, padding: '5px 8px', color: C.red, borderBottom: '1px solid #f4f6fa' }}>{x.crAmt ? money(x.crAmt) : ''}</td>
                                         <td style={{ padding: '5px 8px', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa' }}>
                                           {status === 'pending' ? (
                                             <>
