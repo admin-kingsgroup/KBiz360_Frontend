@@ -569,20 +569,22 @@ function groupBookings(rows, by) {
   return [...map.values()].sort((a, b) => String(a.label).localeCompare(String(b.label)));
 }
 const sumT = (rows, path) => rows.reduce((s, b) => s + ((b[path] && b[path].total) || 0), 0);
+const gpPctOf = (gp, sale) => (sale ? (gp / sale) * 100 : 0);
+const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
 function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, busyId }) {
   const cols = mode === 'approved'
-    ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'Approved', 'Actions']
+    ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
     : mode === 'rejected'
-      ? ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'Date', 'Reason']
+      ? ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Date', 'Reason']
       : mode === 'deleted'
-        ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'Deleted', 'By']
-        : ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'Date', 'Actions'];
+        ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Deleted', 'By']
+        : ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Date', 'Actions'];
   return (
     <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr style={{ background: '#f3f4f8' }}>
-          {cols.map((h, i) => <th key={i} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#5a6691', textTransform: 'uppercase', textAlign: i >= 6 && i <= 8 ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>)}
+          {cols.map((h, i) => <th key={i} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#5a6691', textTransform: 'uppercase', textAlign: i >= 6 && i <= 9 ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>)}
         </tr></thead>
         <tbody>
           {isLoading && <tr><td colSpan={cols.length} style={{ padding: 20, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>Loading…</td></tr>}
@@ -595,6 +597,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'so'))}</td>
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'po'))}</td>
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'gp'))}</td>
+                  <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{gpPctTxt(sumT(g.rows, 'gp'), sumT(g.rows, 'so'))}</td>
                   <td colSpan={2}></td>
                 </tr>
               )}
@@ -622,6 +625,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.so?.total)}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.po?.total)}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.gp?.total)}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right', color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{gpPctTxt(b.gp?.total || 0, b.so?.total || 0)}</td>
                   <td style={{ padding: '8px 12px', fontSize: 11, color: '#5a6691' }}>{mode === 'approved' ? (b.approvedAt ? String(b.approvedAt).slice(0, 10) : '—') : mode === 'deleted' ? (b.deletedAt ? String(b.deletedAt).slice(0, 10) : '—') : b.date}</td>
                   <td style={{ padding: '8px 12px' }} onClick={(e) => e.stopPropagation()}>
                     {mode === 'pending' ? (
