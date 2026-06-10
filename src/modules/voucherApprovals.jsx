@@ -64,13 +64,19 @@ export function VoucherApprovals({ branch }) {
   const { tree, allKeys } = useMemo(() => {
     const groups = {}; const allKeys = [];
     const bump = (o, p) => { o.debit += p.debit || 0; o.credit += p.credit || 0; };
-    entries.forEach((e) => (e.postings || []).forEach((p) => {
-      const gName = p.group || '—', sName = p.subGroup || gName, lName = p.ledger || '—';
-      const g = groups[gName] || (groups[gName] = { name: gName, subs: {}, debit: 0, credit: 0 }); bump(g, p);
-      const s = g.subs[sName] || (g.subs[sName] = { name: sName, ledgers: {}, debit: 0, credit: 0 }); bump(s, p);
-      const l = s.ledgers[lName] || (s.ledgers[lName] = { name: lName, entries: [], debit: 0, credit: 0 }); bump(l, p);
-      l.entries.push({ ...e, legDebit: p.debit || 0, legCredit: p.credit || 0, legNarration: p.narration || e.narration });
-    }));
+    entries.forEach((e) => {
+      // Entries that can't build a posting (e.g. don't balance) still surface here,
+      // under a "Needs attention" node, so they can be reviewed/rejected (not hidden).
+      const pts = (e.postings && e.postings.length) ? e.postings
+        : [{ group: '⚠ Needs attention', subGroup: 'Cannot post — review / fix import / reject', ledger: e.party || '—', debit: 0, credit: 0 }];
+      pts.forEach((p) => {
+        const gName = p.group || '—', sName = p.subGroup || gName, lName = p.ledger || '—';
+        const g = groups[gName] || (groups[gName] = { name: gName, subs: {}, debit: 0, credit: 0 }); bump(g, p);
+        const s = g.subs[sName] || (g.subs[sName] = { name: sName, ledgers: {}, debit: 0, credit: 0 }); bump(s, p);
+        const l = s.ledgers[lName] || (s.ledgers[lName] = { name: lName, entries: [], debit: 0, credit: 0 }); bump(l, p);
+        l.entries.push({ ...e, legDebit: p.debit || 0, legCredit: p.credit || 0, legNarration: p.narration || e.narration });
+      });
+    });
     const out = Object.values(groups).sort((a, b) => (b.debit + b.credit) - (a.debit + a.credit)).map((g) => {
       allKeys.push('g:' + g.name);
       const subs = Object.values(g.subs).sort((a, b) => (b.debit + b.credit) - (a.debit + a.credit)).map((s) => {
@@ -182,7 +188,7 @@ export function VoucherApprovals({ branch }) {
                                         <td style={{ padding: '5px 8px', color: C.dim, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa' }}>{VCH[e.category] || e.type}</td>
                                         <td style={{ padding: '5px 8px', fontWeight: 600, color: C.blue, borderBottom: '1px solid #f4f6fa', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.drLedger}>{x.drLedger}</td>
                                         <td style={{ padding: '5px 8px', fontWeight: 600, color: C.red, borderBottom: '1px solid #f4f6fa', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.crLedger}>{x.crLedger}</td>
-                                        <td style={{ padding: '5px 8px', color: C.dim, fontStyle: 'italic', borderBottom: '1px solid #f4f6fa', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.narration || e.legNarration || ''}>{e.narration || e.legNarration || '—'}{e.rejectedReason ? ` · ✗ ${e.rejectedReason}` : ''}</td>
+                                        <td style={{ padding: '5px 8px', color: e.error ? C.red : C.dim, fontStyle: 'italic', borderBottom: '1px solid #f4f6fa', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.error || e.narration || e.legNarration || ''}>{e.error ? `⚠ ${e.error}` : (e.narration || e.legNarration || '—')}{e.rejectedReason ? ` · ✗ ${e.rejectedReason}` : ''}</td>
                                         <td style={{ ...num, padding: '5px 8px', color: C.blue, borderBottom: '1px solid #f4f6fa' }}>{x.drAmt ? money(x.drAmt) : ''}</td>
                                         <td style={{ ...num, padding: '5px 8px', color: C.red, borderBottom: '1px solid #f4f6fa' }}>{x.crAmt ? money(x.crAmt) : ''}</td>
                                         <td style={{ padding: '5px 8px', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa' }}>
