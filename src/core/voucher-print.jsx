@@ -18,7 +18,6 @@ export function openPrintWindow(branch,vNo,title,el){
   const addr=[prof.operAddr, [taxId, prof.phone?`Phone: ${prof.phone}`:""].filter(Boolean).join(" | ")].filter(Boolean).join("<br/>");
   const companyName=(prof.entity||"Travkings Tours & Travels");
   const bodyHTML=el?el.innerHTML:"<p style='color:#999'>Voucher content not available for preview.</p>";
-  const safeName=(vNo||"voucher").replace(/\//g,"-");
 
   const css=`
   .vp *{box-sizing:border-box;margin:0;padding:0}
