@@ -14,7 +14,8 @@ import { Dashboard } from '../modules/dashboard';
 // Parties (which in Tally are just ledgers) · Inventory & Catalog · Utilities.
 export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
   {label:"Accounts Info", children:[
-    {label:"Groups (Fixed · 28 Tally)", href:"/masters/groups"},
+    {label:"Parent Groups (28 Tally · view)", href:"/masters/groups"},
+    {label:"Chart Builder (Group · Sub-Group · Ledger)", href:"/masters/chart-builder"},
     {label:"Sub-Groups (Custom)", href:"/masters/subgroups"},
     {label:"Ledgers (Chart of Accounts)", href:"/masters/ledgers"},
     {label:"Chart — Groups/Sub-Groups/Ledgers", href:"/masters/accounts-info"},

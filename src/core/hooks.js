@@ -8,9 +8,10 @@ import { Save, Settings, User } from 'lucide-react';
 import { _EXP_BGT_LISTENERS, _SAVE_LISTENERS, genVNo } from './data';
 import { _NOTIF_LISTENERS } from './helpers';
 
-export function useVNo(branch,pfx){
-  const [vNo]=useState(()=>genVNo(branch,pfx));
-  return vNo;
+// VNO is auto-assigned by the server on save (sequential per branch × type, no
+// duplicates). The form shows "Auto" so the displayed number always matches reality.
+export function useVNo(){
+  return 'Auto';
 }
 
 

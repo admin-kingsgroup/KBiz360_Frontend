@@ -291,7 +291,7 @@ const TALLY_GROUP_NAMES = [
 
 // Groups are the 28 FIXED Tally groups — READ-ONLY (no create / edit / delete).
 export const GroupsMaster = () => (
-  <MasterCrud title="Account Groups (Fixed · Read-only)" subtitle="The 28 Tally groups — the fixed primary chart of accounts"
+  <MasterCrud title="Parent Groups (28 Tally · Fixed · Read-only)" subtitle="The 28 fixed Tally parent groups — the top of the chart of accounts"
     resource="groups" readOnly
     note="🔒 The 28 Tally groups are fixed and cannot be created, edited or deleted. To extend the chart, add Sub-Groups under a group (Masters → Sub-Groups)."
     fields={[
@@ -314,7 +314,11 @@ export const SubGroupsMaster = () => {
       note="Sub-groups are SHARED across all branches (they are not branch-scoped), so you create them once and every branch's chart uses them. Create a sub-group under one of the 28 fixed groups (or under another sub-group, to any depth). Nature & Statement (BS/PL) are inherited from the parent automatically. For the P&L Fixed/Variable split, just create real 'Fixed Expenses' and 'Variable Expenses' sub-groups under Indirect Expenses and nest your expense sub-groups under them — the P&L rolls up automatically from the hierarchy."
       fields={[
         { key: 'name', label: 'Sub-Group Name', type: 'text', required: true },
-        { key: 'parent', label: 'Parent Group', type: 'select', options: parentOptions.length ? parentOptions : TALLY_GROUP_NAMES, required: true },
+        // "Parent Group" always shows the 28-Tally root group. The editable "Nest
+        // under" select is the immediate parent (a 28 group OR another sub-group).
+        { key: 'rootGroup', label: 'Parent Group (Tally)', type: 'text', input: false },
+        { key: 'nestedUnder', label: 'Sub-group of', type: 'text', input: false },
+        { key: 'parent', label: 'Nest under (parent group / sub-group)', type: 'select', options: parentOptions.length ? parentOptions : TALLY_GROUP_NAMES, required: true, table: false },
         { key: 'nature', label: 'Nature', type: 'text', input: false },
         { key: 'statement', label: 'Statement', type: 'text', input: false },
         { key: 'active', label: 'Active', type: 'bool', default: true },

@@ -400,7 +400,9 @@ export function useVoucherPreview(body) {
 export function useCreateVoucher() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body) => apiPost('/api/vouchers', body),
+    // VNO is ALWAYS auto-assigned server-side (atomic per branch×type → no duplicates).
+    // Never trust a client-built number — blank it so accounting.create() mints it.
+    mutationFn: (body) => apiPost('/api/vouchers', { ...body, vno: '' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['accounting'] });
       qc.invalidateQueries({ queryKey: ['vouchers'] });
