@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { apiGet } from '../core/api';
 import { bc } from '../core/styles.jsx';
+import { PeriodBar } from '../core/period';
 import { PLSide, GroupSummary, LedgerVouchers, VoucherView } from './pnlTally.jsx';
 
 const DARK = '#0d1326', DIM = '#5a6691', LINE = '#e1e3ec';
@@ -62,9 +63,7 @@ export function BalanceSheetTallyLive({ branch }) {
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#cfd6ea', fontSize: 11, cursor: 'pointer', userSelect: 'none' }} title="Show every ledger in the chart, including those with a zero balance / no entries">
             <input type="checkbox" checked={showZero} onChange={(e) => setShowZero(e.target.checked)} /> Show zero-balance accounts
           </label>
-          <input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} style={dateInp} />
-          <span style={{ color: '#8b94b3', fontSize: 11 }}>to</span>
-          <input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} style={dateInp} />
+          <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => setRange({ from: r.from, to: r.to })} />
         </div>
       </div>
 
