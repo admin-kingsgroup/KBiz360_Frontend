@@ -13,6 +13,7 @@ import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../core/us
 import { useBalanceSheet, useGpBills, useModulePL, useAgeing, useTaxSummary } from '../core/useAccounting';
 import { fmt, fmtINR } from '../core/format';
 import { CUR_MONTH, CUR_FY, MONTH_OPTIONS, PERIOD_OPTIONS, FY_MONTHS, FY_YTD_MONTHS, ALL_TIME_FROM, todayISO, fmtDate, rangeNote, monthLabel, prevMonthKey, presetRange, fyQuarterKey } from '../core/dates';
+import { periodRange } from '../core/period';
 import { ReportDateBar, resolveReportRange, priorYearRange } from '../core/reportDateBar';
 import { BUILDER_FIELD_CATALOG, DEMO_REPORT_DATA, DrillModal, ExportDropdown, GRP_COLORS, PKG_D, PKG_SC, PackagePnL, SAVED_VIEWS_DATA, SCHEDULED_REPORTS_DATA, Sparkline, TAB_Page, cardStyle, tabPanel } from '../core/helpers';
 import { useBgtRefresh, useMobile } from '../core/hooks';
@@ -313,7 +314,7 @@ export function ReportGP({branch,setRoute}){
   const cur=cfg.cur;
   const [tab,setTab]=useState("summary");
   const [search,setSearch]=useState("");
-  const [periodMode,setPeriodMode]=useState("ytd");        // all | month | quarter | ytd | custom
+  const [periodMode,setPeriodMode]=useState("cfy");        // all|today|week|mtd|qtd|cfy|lfy|month|quarter|custom
   const [periodGran,setPeriodGran]=useState("month");      // month | quarter (Monthly / Quarterly view)
   const [dateFrom,setDateFrom]=useState(CUR_FY.startISO);  // default: FY start → today (year-to-date)
   const [dateTo,setDateTo]=useState(todayISO());
@@ -332,6 +333,9 @@ export function ReportGP({branch,setRoute}){
   const setPeriod=(mode)=>{
     setPeriodMode(mode);
     if(mode==="custom")return;                             // user edits From / To directly
+    if(['today','week','mtd','qtd','cfy','lfy'].includes(mode)){ // uniform presets (per-branch FY)
+      const r=periodRange(mode,{branch}); setDateFrom(r.from); setDateTo(r.to); setTab("summary"); return;
+    }
     const r=presetRange(mode);                             // month | quarter | ytd | all
     setDateFrom(r.from); setDateTo(r.to);
     if(mode==="month"){setPeriodGran("month");setTab("period");}
@@ -548,7 +552,7 @@ export function ReportGP({branch,setRoute}){
 
       {/* Period presets — All · Monthly · Quarterly · YTD · Custom */}
       <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:12}}>
-        {[{k:"all",l:"All"},{k:"month",l:"Monthly"},{k:"quarter",l:"Quarterly"},{k:"ytd",l:"YTD"},{k:"custom",l:"Custom"}].map(p=>(
+        {[{k:"all",l:"All"},{k:"today",l:"Today"},{k:"week",l:"Week"},{k:"mtd",l:"MTD"},{k:"qtd",l:"QTD"},{k:"cfy",l:"CFY"},{k:"lfy",l:"LFY"},{k:"month",l:"Monthly"},{k:"quarter",l:"Quarterly"},{k:"custom",l:"Custom"}].map(p=>(
           <button key={p.k} onClick={()=>setPeriod(p.k)}
             style={{padding:"5px 13px",borderRadius:999,cursor:"pointer",fontSize:11,
               border:"1px solid "+(periodMode===p.k?"#0d1326":"#e1e3ec"),
