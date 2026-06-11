@@ -7,6 +7,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { AlertTriangle, Download, Lock, Plus, Printer, Save, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
 import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement } from '../core/useBankReco';
 import { branchCode } from '../core/useAccounting';
+import { PeriodBar } from '../core/period';
 import { exportToCSV } from '../core/business-logic';
 import { BRANCH_CODES, CASH, EXP_ACTUALS, FX_RATES, GP_BILLS, LOAN_REGISTER } from '../core/data';
 import { fmt, fmtINR } from '../core/format';
@@ -240,9 +241,7 @@ export function BankReco({branch}){
             {bankLedgers.length===0&&<option value="">{ledgersLoading?"Loading banks…":"No bank ledgers"}</option>}
             {bankLedgers.map(b=><option key={b.code||b.name} value={b.name}>{b.name}{b.currency&&b.currency!=="INR"?` (${b.currency})`:""}</option>)}
           </select>
-          <input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}/>
-          <span style={{fontSize:11,color:"#5a6691"}}>to</span>
-          <input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}/>
+          <PeriodBar branch={branch} compact defaultPreset="mtd" onChange={(r)=>{setFrom(r.from);setTo(r.to);}}/>
           <button onClick={runAutoMatch} disabled={!ledger||autoMut.isPending} style={{...btnG,fontSize:11,opacity:(!ledger||autoMut.isPending)?0.6:1}}><RefreshCw size={12}/> {autoMut.isPending?"Matching…":"Auto-match"}</button>
           <button onClick={()=>setShowImport(s=>!s)} disabled={!ledger} style={{...btnGh,fontSize:11,opacity:!ledger?0.6:1}}><Upload size={12}/> Import</button>
           <button onClick={exportRecon} disabled={!ledger} style={{...btnGh,fontSize:11,opacity:!ledger?0.6:1}}><Download size={12}/> Export</button>
@@ -657,9 +656,7 @@ export function LedgerAc({branch}){
           <select value={ledger} onChange={e=>setLedger(e.target.value)} style={{...inp,width:200,minHeight:32,fontSize:11}}>
             {LEDGERS.map(l=><option key={l}>{l}</option>)}
           </select>
-          <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{...inp,width:130,minHeight:32,fontSize:11}}/>
-          <span style={{lineHeight:"32px",color:"#5a6691",fontSize:11}}>to</span>
-          <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{...inp,width:130,minHeight:32,fontSize:11}}/>
+          <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r)=>{setDateFrom(r.from);setDateTo(r.to);}}/>
         </div>
       </div>
       <div style={{...card,padding:0,overflow:"hidden"}}>
