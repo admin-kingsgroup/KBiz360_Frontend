@@ -145,25 +145,25 @@ const SPECS = [
 
   // ── Other vouchers (post double-entry on import) ───────────────────────────
   { group: 'Vouchers', entity: 'receipt', label: 'Receipts',
-    desc: 'Dr bank/cash · Cr party. ⏳ Imported as PENDING — approve under Transactions ▸ Voucher Approvals to post. Optional "group" sets the party ledger group (e.g. Unsecured Loans); blank → existing ledger keeps its own group, new ones default to Sundry Debtors.',
-    columns: ['vno', 'date', 'branch', 'party', 'group', 'total', 'paymentMode', 'remarks'],
-    example: ['RV/26/0001', '2025-06-02', 'BOM', 'Acme Travels', 'Sundry Debtors', '11800', 'HDFC Bank', 'Against SF/26/0001'] },
+    desc: 'VNO is AUTO (leave blank). Dr Ledger / Cr Ledger must already exist (not auto-created). Remarks = your original Tally Vch No. ⏳ Imported as PENDING — approve under Approvals ▸ Vouchers to post.',
+    columns: ['VNO', 'Date', 'Branch', 'Debit Ledger', 'Debit Amount', 'Credit Ledger', 'Credit Amount', 'Narration', 'Remarks'],
+    example: ['', '2025-06-02', 'BOM', 'HDFC Bank', '11800', 'Acme Travels', '11800', 'Receipt against SF/26/0001', 'RV-1024'] },
   { group: 'Vouchers', entity: 'payment', label: 'Payments',
-    desc: 'Dr party · Cr bank/cash. ⏳ Imported as PENDING — approve under Transactions ▸ Voucher Approvals to post. Optional "group" sets the party ledger group (e.g. Investments, Deposits (Asset)); blank → existing ledger keeps its own group, new ones default to Sundry Creditors.',
-    columns: ['vno', 'date', 'branch', 'party', 'group', 'total', 'paymentMode', 'remarks'],
-    example: ['PMT/26/0001', '2025-06-03', 'BOM', 'Emirates GSA', 'Sundry Creditors', '9440', 'HDFC Bank', 'Against PF/26/0001'] },
+    desc: 'VNO is AUTO (leave blank). Dr Ledger / Cr Ledger must already exist (not auto-created). Remarks = your original Tally Vch No. ⏳ Imported as PENDING — approve under Approvals ▸ Vouchers to post.',
+    columns: ['VNO', 'Date', 'Branch', 'Debit Ledger', 'Debit Amount', 'Credit Ledger', 'Credit Amount', 'Narration', 'Remarks'],
+    example: ['', '2025-06-03', 'BOM', 'Emirates GSA', '9440', 'HDFC Bank', '9440', 'Payment for PF/26/0001', 'PMT-2048'] },
   { group: 'Vouchers', entity: 'journal', label: 'Journal',
-    desc: 'Dr one ledger · Cr another, same amount. ⏳ Imported as PENDING — approve under Transactions ▸ Voucher Approvals to post.',
-    columns: ['vno', 'date', 'branch', 'debitLedger', 'creditLedger', 'amount', 'remarks'],
-    example: ['JV/26/0001', '2025-06-30', 'BOM', 'Rent-Office HO', 'HDFC Bank', '25000', 'June rent'] },
+    desc: 'VNO is AUTO (leave blank). Dr Ledger / Cr Ledger must already exist (not auto-created). Remarks = your original Tally Vch No. ⏳ Imported as PENDING — approve under Approvals ▸ Vouchers to post.',
+    columns: ['VNO', 'Date', 'Branch', 'Debit Ledger', 'Debit Amount', 'Credit Ledger', 'Credit Amount', 'Narration', 'Remarks'],
+    example: ['', '2025-06-30', 'BOM', 'Rent-Office HO', '25000', 'HDFC Bank', '25000', 'June office rent', 'JV-77'] },
   { group: 'Vouchers', entity: 'purchase-expense', label: 'Purchase Voucher (Expense / Asset)',
     desc: 'Supplier expense / asset bought on credit. ⏳ Imported as PENDING — approve under Transactions ▸ Voucher Approvals to post (Dr ledger + input GST · Cr supplier, net of TDS).',
     columns: ['vno', 'date', 'branch', 'party', 'partyGroup', 'ledger', 'description', 'subtotal', 'gstMode', 'taxAmt', 'tdsAmt', 'total', 'billNo', 'remarks'],
     example: ['PXP/26/0001', '2025-06-30', 'BOM', 'ABC Realtors', 'Sundry Creditors', 'Office Rent', 'June 2026 office rent', '25000', 'intra', '4500', '500', '29500', 'VEND-4471', 'Being office rent for June payable to ABC Realtors'] },
   { group: 'Vouchers', entity: 'contra', label: 'Contra',
-    desc: 'Bank ↔ cash transfer (from → to). ⏳ Imported as PENDING — approve under Transactions ▸ Voucher Approvals to post.',
-    columns: ['vno', 'date', 'branch', 'fromAccount', 'toAccount', 'total', 'remarks'],
-    example: ['CV/26/0001', '2025-06-04', 'BOM', 'HDFC Bank', 'Cash in Hand — BOM', '50000', 'Cash withdrawal'] },
+    desc: 'VNO is AUTO (leave blank). Dr Ledger / Cr Ledger must already exist (not auto-created). Remarks = your original Tally Vch No. ⏳ Imported as PENDING — approve under Approvals ▸ Vouchers to post.',
+    columns: ['VNO', 'Date', 'Branch', 'Debit Ledger', 'Debit Amount', 'Credit Ledger', 'Credit Amount', 'Narration', 'Remarks'],
+    example: ['', '2025-06-04', 'BOM', 'Cash in Hand — BOM', '50000', 'HDFC Bank', '50000', 'Cash withdrawal', 'CV-9'] },
   { group: 'Vouchers', entity: 'credit-note', label: 'Credit Notes (Sales Return)',
     desc: 'Dr sales + GST · Cr customer. Link No ties it to the original file. ⏳ Imported as PENDING — approve under Transactions ▸ Voucher Approvals to post.',
     columns: ['vno', 'date', 'branch', 'party', 'ledger', 'subtotal', 'taxAmt', 'total', 'linkNo', 'remarks'],
@@ -356,6 +356,17 @@ function toBackendRows(spec, rows) {
     return rows
       .map((r) => ({ name: (r['Ledger'] || '').trim(), group: (r['Parent Group'] || '').trim(), subGroup: (r['Sub Group'] || '').trim(), branch: 'ALL', currency: 'INR', openingBalance: 0, drCr: '', active: 'true' }))
       .filter((r) => r.name);   // skip scaffold rows where no Ledger was entered
+  }
+  if (['receipt', 'payment', 'journal', 'contra'].includes(spec.entity)) {
+    // Uniform Dr/Cr format → canonical fields; VNO blank = auto-generated.
+    return rows
+      .map((r) => ({
+        vno: (r['VNO'] || '').trim(), date: (r['Date'] || '').trim(), branch: (r['Branch'] || '').trim(),
+        debitLedger: (r['Debit Ledger'] || '').trim(), debitAmount: (r['Debit Amount'] || '').trim(),
+        creditLedger: (r['Credit Ledger'] || '').trim(), creditAmount: (r['Credit Amount'] || '').trim(),
+        narration: (r['Narration'] || '').trim(), remarks: (r['Remarks'] || '').trim(),
+      }))
+      .filter((r) => r.debitLedger || r.creditLedger);
   }
   return rows;
 }

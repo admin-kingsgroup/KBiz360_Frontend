@@ -109,6 +109,7 @@ export function VoucherApprovals({ branch }) {
   const isOpen = (k, def) => (open[k] === undefined ? def : open[k]);
   const toggle = (k, def) => setOpen((s) => ({ ...s, [k]: !(s[k] === undefined ? def : s[k]) }));
   const setAll = (v) => setOpen(Object.fromEntries(allKeys.map((k) => [k, v])));
+  const setMany = (keys, v) => setOpen((s) => ({ ...s, ...Object.fromEntries(keys.map((k) => [k, v])) }));
 
   const tab = (k, label) => (
     <button key={k} onClick={() => setStatus(k)} style={{ padding: '8px 16px', border: 'none', borderBottom: `3px solid ${status === k ? C.gold : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? C.dark : C.dim }}>
@@ -120,6 +121,20 @@ export function VoucherApprovals({ branch }) {
 
   // ── Shared bits for the flat (Entry wise / Voucher wise) tables ──────────────
   const flatEntries = useMemo(() => [...entries].sort((a, b) => String(a.date).localeCompare(String(b.date))), [entries]);
+  // Total Debit & Total Credit across the shown vouchers — both equal the header
+  // total. (A purchase with TDS credits the supplier NET; the TDS posts to Duties &
+  // Taxes — so the supplier leg alone reads less than the gross header by the TDS.)
+  const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+  const totDr = useMemo(() => r2(flatEntries.reduce((s, e) => s + (e.postings || []).reduce((a, p) => a + (p.debit || 0), 0), 0)), [flatEntries]);
+  const totCr = useMemo(() => r2(flatEntries.reduce((s, e) => s + (e.postings || []).reduce((a, p) => a + (p.credit || 0), 0), 0)), [flatEntries]);
+  const totalsFoot = (cols) => (
+    <tfoot><tr style={{ fontWeight: 800, background: '#eef3fb', borderTop: `2px solid ${C.border}` }}>
+      <td style={{ ...flatTd, color: C.dark }} colSpan={cols}>Total · {flatEntries.length} voucher{flatEntries.length === 1 ? '' : 's'}</td>
+      <td style={{ ...flatTd, textAlign: 'right', color: C.blue }}>{money(totDr)}</td>
+      <td style={{ ...flatTd, textAlign: 'right', color: C.red }}>{money(totCr)}</td>
+      <td style={flatTd} colSpan={2}></td>
+    </tr></tfoot>
+  );
   const flatTh = { padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: `2px solid ${C.border}`, position: 'sticky', top: 0, background: '#f3f6fb', whiteSpace: 'nowrap' };
   const flatTd = { padding: '6px 10px', borderBottom: '1px solid #f4f6fa', whiteSpace: 'nowrap', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis' };
   const ABTN = (col, filled) => ({ padding: '3px 9px', background: filled ? col : '#fff', color: filled ? '#fff' : col, border: filled ? 'none' : `1px solid ${col}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 });
@@ -139,27 +154,51 @@ export function VoucherApprovals({ branch }) {
   );
   const vnoCell = (e, show = true) => <td onClick={() => show && setViewId(e.id)} title={show ? 'View full voucher' : ''} style={{ ...flatTd, color: C.blue, fontWeight: 700, cursor: show ? 'pointer' : 'default', textDecoration: show ? 'underline' : 'none' }}>{show ? e.vno : ''}</td>;
 
-  // Voucher wise — one row per voucher (Dr/Cr summary).
-  const voucherWise = () => (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-      <thead><tr>{['Date', 'Vch No', 'Type', 'Party', 'Debit Ledger', 'Credit Ledger', 'Debit', 'Credit', 'Narration', 'Action'].map((h) => <th key={h} style={{ ...flatTh, textAlign: h === 'Debit' || h === 'Credit' ? 'right' : h === 'Action' ? 'center' : 'left' }}>{h}</th>)}</tr></thead>
-      <tbody>
-        {flatEntries.map((e, i) => { const x = drCrOf(e); return (
-          <tr key={e.id} style={{ background: i % 2 ? '#fcfdff' : '#fff' }}>
-            <td style={{ ...flatTd, color: C.dim }}>{ckbox(e)}{fmtDate(e.date)}</td>
-            {vnoCell(e)}
-            <td style={{ ...flatTd, color: C.dim }}>{VCH[e.category] || e.type}</td>
-            <td style={flatTd} title={e.party}>{e.party || '—'}</td>
-            <td style={{ ...flatTd, color: C.blue, fontWeight: 600 }} title={x.drLedger}>{x.drLedger}</td>
-            <td style={{ ...flatTd, color: C.red, fontWeight: 600 }} title={x.crLedger}>{x.crLedger}</td>
-            <td style={{ ...flatTd, textAlign: 'right', color: C.blue }}>{x.drAmt ? money(x.drAmt) : ''}</td>
-            <td style={{ ...flatTd, textAlign: 'right', color: C.red }}>{x.crAmt ? money(x.crAmt) : ''}</td>
-            <td style={{ ...flatTd, color: e.error ? C.red : C.dim, fontStyle: 'italic' }} title={e.error || e.narration || ''}>{e.error ? `⚠ ${e.error}` : (e.narration || '—')}</td>
-            <td style={{ ...flatTd, textAlign: 'center' }}>{actionCell(e)}</td>
-          </tr>
-        ); })}
-      </tbody>
-    </table>
+  // A single voucher row + the shared header (used by the Voucher-Type-wise groups).
+  const voucherRow = (e, i) => { const x = drCrOf(e); return (
+    <tr key={e.id} style={{ background: i % 2 ? '#fcfdff' : '#fff' }}>
+      <td style={{ ...flatTd, color: C.dim }}>{ckbox(e)}{fmtDate(e.date)}</td>
+      {vnoCell(e)}
+      <td style={{ ...flatTd, color: C.dim }}>{VCH[e.category] || e.type}</td>
+      <td style={flatTd} title={e.party}>{e.party || '—'}</td>
+      <td style={{ ...flatTd, color: C.blue, fontWeight: 600 }} title={x.drLedger}>{x.drLedger}</td>
+      <td style={{ ...flatTd, color: C.red, fontWeight: 600 }} title={x.crLedger}>{x.crLedger}</td>
+      <td style={{ ...flatTd, textAlign: 'right', color: C.blue }}>{x.drAmt ? money(x.drAmt) : ''}</td>
+      <td style={{ ...flatTd, textAlign: 'right', color: C.red }}>{x.crAmt ? money(x.crAmt) : ''}</td>
+      <td style={{ ...flatTd, color: e.error ? C.red : C.dim, fontStyle: 'italic' }} title={e.error || e.narration || ''}>{e.error ? `⚠ ${e.error}` : (e.narration || '—')}</td>
+      <td style={{ ...flatTd, textAlign: 'center' }}>{actionCell(e)}</td>
+    </tr>
+  ); };
+  const VHEAD = ['Date', 'Vch No', 'Type', 'Party', 'Debit Ledger', 'Credit Ledger', 'Debit', 'Credit', 'Narration', 'Action'];
+  const voucherHead = <thead><tr>{VHEAD.map((h) => <th key={h} style={{ ...flatTh, textAlign: h === 'Debit' || h === 'Credit' ? 'right' : h === 'Action' ? 'center' : 'left' }}>{h}</th>)}</tr></thead>;
+
+  // Voucher Type wise — vouchers grouped by type (Receipt / Payment / …), collapsible.
+  const TYPE_ORDER = ['receipt', 'payment', 'contra', 'journal', 'credit-note', 'debit-note', 'purchase-expense'];
+  const byType = useMemo(() => {
+    const m = {};
+    flatEntries.forEach((e) => { (m[e.category] = m[e.category] || []).push(e); });
+    return Object.keys(m).sort((a, b) => TYPE_ORDER.indexOf(a) - TYPE_ORDER.indexOf(b)).map((cat) => {
+      let dr = 0, cr = 0; m[cat].forEach((e) => { const x = drCrOf(e); dr += x.drAmt || 0; cr += x.crAmt || 0; });
+      return { cat, rows: m[cat], debit: r2(dr), credit: r2(cr) };
+    });
+  }, [flatEntries]);
+  const typeKeys = byType.map((g) => 't:' + g.cat);
+  const voucherTypeWise = () => (
+    <div>
+      {byType.map((g) => {
+        const tk = 't:' + g.cat, tOpen = isOpen(tk, true);
+        return (
+          <div key={tk}>
+            <div onClick={() => toggle(tk, true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', cursor: 'pointer', fontWeight: 800, color: C.dark }}>
+              <Caret o={tOpen} /><span>{VCH[g.cat] || g.cat}</span>
+              <span style={{ fontSize: 11, color: C.dim, fontWeight: 600 }}>· {g.rows.length} voucher{g.rows.length === 1 ? '' : 's'}</span>
+              <span style={{ marginLeft: 'auto', ...num }}>{money(g.debit)} Dr · {money(g.credit)} Cr</span>
+            </div>
+            {tOpen && <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>{voucherHead}<tbody>{g.rows.map((e, i) => voucherRow(e, i))}</tbody></table>}
+          </div>
+        );
+      })}
+    </div>
   );
 
   // Entry wise — one row per Dr/Cr posting leg (grouped under its voucher).
@@ -185,6 +224,7 @@ export function VoucherApprovals({ branch }) {
           ));
         })}
       </tbody>
+      {totalsFoot(6)}
     </table>
   );
 
@@ -216,17 +256,18 @@ export function VoucherApprovals({ branch }) {
         </div>
         <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: '#fafbfe', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden' }}>
-            {[['entry', 'Entry wise'], ['voucher', 'Voucher wise'], ['tree', 'Group-Subgroup-Ledger']].map(([v, l]) => (
+            {[['entry', 'Entry wise'], ['voucher', 'Voucher Type wise'], ['tree', 'Group-Subgroup-Ledger-Entry']].map(([v, l]) => (
               <button key={v} onClick={() => setView(v)} style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: view === v ? C.blue : '#fff', color: view === v ? '#fff' : C.dim }}>{l}</button>
             ))}
           </div>
+          <span style={{ fontSize: 11, color: C.dim, fontWeight: 700 }} title="Total Debit = Total Credit = the tab total. A purchase with TDS credits the supplier net; the TDS sits in Duties & Taxes.">Σ Dr {money(totDr)} = Cr {money(totCr)}</span>
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6 }}>
             {status === 'pending' && allIds.length > 0 && (
               <button onClick={toggleAllSel} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.blue}`, borderRadius: 5, background: sel.size === allIds.length ? C.blue : '#fff', color: sel.size === allIds.length ? '#fff' : C.blue, cursor: 'pointer' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
             )}
-            {view === 'tree' && <>
-              <button onClick={() => setAll(true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊞ Expand all</button>
-              <button onClick={() => setAll(false)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊟ Collapse all</button>
+            {(view === 'tree' || view === 'voucher') && <>
+              <button onClick={() => setMany(view === 'tree' ? allKeys : typeKeys, true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊞ Expand all</button>
+              <button onClick={() => setMany(view === 'tree' ? allKeys : typeKeys, false)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊟ Collapse all</button>
             </>}
           </span>
           {q.isFetching && <span style={{ fontSize: 11, color: C.dim }}>updating…</span>}
@@ -237,21 +278,21 @@ export function VoucherApprovals({ branch }) {
         {q.isLoading ? <div style={{ padding: 28, textAlign: 'center', color: C.dim }}>Loading…</div> : (
           <div style={{ maxHeight: '72vh', overflow: 'auto', fontSize: 12.5 }}>
             {flatEntries.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: C.dim }}>No {status} vouchers.</div>}
-            {flatEntries.length > 0 && view === 'voucher' && voucherWise()}
+            {flatEntries.length > 0 && view === 'voucher' && voucherTypeWise()}
             {flatEntries.length > 0 && view === 'entry' && entryWise()}
             {view === 'tree' && tree.map((g) => {
-              const gk = 'g:' + g.name, gOpen = isOpen(gk, true);
+              const gk = 'g:' + g.name, gOpen = isOpen(gk, false);
               return (
                 <div key={gk}>
-                  <div onClick={() => toggle(gk, true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', cursor: 'pointer', fontWeight: 800, color: C.dark }}>
+                  <div onClick={() => toggle(gk, false)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', cursor: 'pointer', fontWeight: 800, color: C.dark }}>
                     <Caret o={gOpen} /><span style={{ textDecoration: 'underline' }}>{g.name}</span>
                     <span style={{ marginLeft: 'auto', ...num }}>{amt(g.debit, g.credit)}</span>
                   </div>
                   {gOpen && g.subs.map((s) => {
-                    const sk = 's:' + g.name + '/' + s.name, sOpen = isOpen(sk, true);
+                    const sk = 's:' + g.name + '/' + s.name, sOpen = isOpen(sk, false);
                     return (
                       <div key={sk}>
-                        <div onClick={() => toggle(sk, true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 28px', background: '#f6f9fd', cursor: 'pointer', fontWeight: 700, color: '#1a3a6e' }}>
+                        <div onClick={() => toggle(sk, false)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 28px', background: '#f6f9fd', cursor: 'pointer', fontWeight: 700, color: '#1a3a6e' }}>
                           <Caret o={sOpen} />{s.name}{s.name !== g.name ? <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 4, background: '#e7eef9', color: C.dim, fontWeight: 700 }}>sub-group</span> : null}
                           <span style={{ marginLeft: 'auto', ...num }}>{amt(s.debit, s.credit)}</span>
                         </div>
