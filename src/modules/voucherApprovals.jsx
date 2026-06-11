@@ -3,7 +3,9 @@
 // Credit Note, Debit Note, Purchase Expense). Manual entries AND bulk uploads land
 // here as PENDING and hit the books only when approved.
 // Single nested sheet: Group › Sub-group › Ledger › Entry (collapsible).
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
+import { VoucherView } from './pnlTally';
+import { openPrintWindow } from '../core/voucher-print';
 import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useApproveMany, useApproveAll } from '../core/useAccounting';
 import { VoucherEditor } from './accountingLive';
 import { BookingApprovals } from './bookingOrder';
@@ -44,6 +46,8 @@ export function VoucherApprovals({ branch }) {
   const [open, setOpen] = useState({});
   const [sel, setSel] = useState(() => new Set()); // selected voucher ids (multi-approve)
   const [editId, setEditId] = useState(null);      // voucher being edited (fix → approve)
+  const [viewId, setViewId] = useState(null);      // voucher being viewed (read-only formatted view)
+  const viewRef = useRef(null);
   const cur = (bc(branch) || {}).cur || '₹';
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
   const q = useVoucherApprovals(branch, status, { from: range.from, to: range.to });
@@ -194,7 +198,7 @@ export function VoucherApprovals({ branch }) {
                                       return (
                                       <tr key={e.id + ':' + i} style={{ background: i % 2 ? '#fcfdff' : '#fff' }}>
                                         <td style={{ padding: '5px 8px 5px 44px', whiteSpace: 'nowrap', color: C.dim, borderBottom: '1px solid #f4f6fa' }}>{status === 'pending' && <input type="checkbox" checked={sel.has(e.id)} onChange={() => toggleSel(e.id)} onClick={(ev) => ev.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} />}{fmtDate(e.date)}</td>
-                                        <td style={{ padding: '5px 8px', color: C.blue, fontWeight: 600, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa' }}>{e.vno}</td>
+                                        <td onClick={() => setViewId(e.id)} title="View full voucher" style={{ padding: '5px 8px', color: C.blue, fontWeight: 700, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa', cursor: 'pointer', textDecoration: 'underline' }}>{e.vno}</td>
                                         <td style={{ padding: '5px 8px', color: C.dim, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa' }}>{VCH[e.category] || e.type}</td>
                                         <td style={{ padding: '5px 8px', fontWeight: 600, color: C.blue, borderBottom: '1px solid #f4f6fa', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.drLedger}>{x.drLedger}</td>
                                         <td style={{ padding: '5px 8px', fontWeight: 600, color: C.red, borderBottom: '1px solid #f4f6fa', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.crLedger}>{x.crLedger}</td>
@@ -234,6 +238,20 @@ export function VoucherApprovals({ branch }) {
       </div>
       {(approve.isError || reject.isError || approveAll.isError) && <div style={{ marginTop: 8, color: C.red, fontSize: 12 }}>⚠ {(approve.error || reject.error || approveAll.error)?.message}</div>}
 
+      {viewId && (
+        <div onClick={() => setViewId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 900, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '5vh 12px' }}>
+          <div onClick={(ev) => ev.stopPropagation()} style={{ background: '#fff', width: 'min(760px, 96vw)', maxHeight: '90vh', overflowY: 'auto', borderRadius: 10, boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, background: '#fff' }}>
+              <strong style={{ color: C.dark }}>Voucher View</strong>
+              <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                <button onClick={() => openPrintWindow(branch, (entries.find((e) => e.id === viewId) || {}).vno || '', 'Voucher', viewRef.current)} style={{ padding: '5px 11px', background: C.dark, color: C.gold, border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 11.5, cursor: 'pointer' }}>🖨 Print / PDF</button>
+                <button onClick={() => setViewId(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: C.dim }}>✕</button>
+              </span>
+            </div>
+            <div ref={viewRef}><VoucherView id={viewId} cur={cur} /></div>
+          </div>
+        </div>
+      )}
       {editId && (
         <div onClick={() => setEditId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 900, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '5vh 12px' }}>
           <div onClick={(ev) => ev.stopPropagation()} style={{ background: '#fff', width: 'min(720px, 96vw)', maxHeight: '90vh', overflowY: 'auto', borderRadius: 10, boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>

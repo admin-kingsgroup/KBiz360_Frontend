@@ -22,7 +22,7 @@ import {
   useTrialBalance, useProfitAndLoss, useBalanceSheet, useDayBook,
   useLedgerStatement, useLedgerGroups, useChartOfAccounts, useGroupTree,
   useSalesRegister, usePurchaseRegister, useInvoiceGP,
-  useVoucher, useUpdateVoucher, useCostCenters,
+  useVoucher, useUpdateVoucher, useCostCenters, useVoucherPreview,
 } from '../core/useAccounting';
 
 const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691', BLUE = '#185FA5', RED = '#A32D2D', GREEN = '#27500A';
@@ -765,65 +765,113 @@ export function VoucherEditor({ voucherId, cur, onBack }) {
   const upd = useUpdateVoucher();
   const ccq = useCostCenters();
   const v = vq.data;
+  const chart = useChartOfAccounts(v && v.branch);
+  const ledgerNames = (chart.data || []).map((l) => l.name).filter(Boolean);
   const [form, setForm] = useState(null);
   const [msg, setMsg] = useState('');
   useEffect(() => {
-    if (v) { setForm({ date: v.date || '', branch: v.branch || '', party: v.party || '', subtotal: v.subtotal ?? 0, taxAmt: v.taxAmt ?? 0, linkNo: v.linkNo || '', costCenter: v.costCenter || '', remarks: v.remarks || '' }); setMsg(''); }
+    if (v) {
+      setForm({
+        date: v.date || '', branch: v.branch || '', party: v.party || '',
+        taxAmt: v.taxAmt ?? 0, tdsAmt: v.tdsAmt ?? 0, tcsAmt: v.tcsAmt ?? 0, linkNo: v.linkNo || '', costCenter: v.costCenter || '', remarks: v.remarks || '',
+        lines: (v.lines && v.lines.length ? v.lines : [{ ledger: '', amt: 0, drCr: 'Dr' }]).map((l) => ({ ...l, ledger: l.ledger || '', amt: Number(l.amt) || 0, drCr: l.drCr || 'Dr' })),
+      });
+      setMsg('');
+    }
   }, [v]);
-  if (vq.isLoading || !form) return <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading voucher…</div>;
-  if (vq.isError) return <div style={{ padding: 16, color: RED }}>⚠ {vq.error?.message}</div>;
+  // computed with optional chaining so the JV-preview hook runs before the early return (rules of hooks)
+  const subtotal = r2((form?.lines || []).reduce((s, l) => s + (Number(l.amt) || 0), 0));
+  const total = r2(subtotal + (Number(form?.taxAmt) || 0));
+  const previewBody = (v && form) ? {
+    ...v, branch: form.branch, party: form.party, taxAmt: Number(form.taxAmt) || 0,
+    tdsAmt: Number(form.tdsAmt) || 0, tcsAmt: Number(form.tcsAmt) || 0, subtotal, total,
+    lines: form.lines.filter((l) => l.ledger).map((l) => ({ ...l, amt: Number(l.amt) || 0 })),
+  } : null;
+  const pv = useVoucherPreview(previewBody).data || {};
+  if (vq.isLoading || !form) return <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading voucher...</div>;
+  if (vq.isError) return <div style={{ padding: 16, color: RED }}>! {vq.error?.message}</div>;
   const set = (k, val) => setForm((f) => ({ ...f, [k]: val }));
-  const total = r2((Number(form.subtotal) || 0) + (Number(form.taxAmt) || 0));
+  const setLine = (i, k, val) => setForm((f) => ({ ...f, lines: f.lines.map((l, j) => (j === i ? { ...l, [k]: val } : l)) }));
+  const addLine = () => setForm((f) => ({ ...f, lines: [...f.lines, { ledger: '', amt: 0, drCr: 'Dr' }] }));
+  const delLine = (i) => setForm((f) => ({ ...f, lines: f.lines.filter((_, j) => j !== i) }));
+  const dlId = 'vl-' + voucherId;
+  const lab = { fontSize: 10, color: DIM, fontWeight: 700, marginBottom: 3 };
+  const fld = { ...inp, fontSize: 12.5 };
   const save = () => {
     setMsg('');
-    const lines = (v.lines && v.lines.length === 1) ? [{ ...v.lines[0], amt: Number(form.subtotal) || 0 }] : v.lines;
-    const body = { ...v, ...form, subtotal: Number(form.subtotal) || 0, taxAmt: Number(form.taxAmt) || 0, total, lines, status: v.status || 'saved' };
+    const lines = form.lines.filter((l) => l.ledger).map((l) => ({ ...l, amt: Number(l.amt) || 0, ledger: l.ledger, drCr: l.drCr || 'Dr' }));
+    const body = { ...v, date: form.date, branch: form.branch, party: form.party, linkNo: form.linkNo, costCenter: form.costCenter, remarks: form.remarks, taxAmt: Number(form.taxAmt) || 0, tdsAmt: Number(form.tdsAmt) || 0, tcsAmt: Number(form.tcsAmt) || 0, subtotal, total, lines, status: v.status || 'saved' };
     delete body.id; delete body.createdAt; delete body.updatedAt;
     upd.mutate({ id: voucherId, body }, { onSuccess: () => setMsg('saved'), onError: (e) => setMsg('err:' + e.message) });
   };
-  const Field = ({ label, k, type = 'text' }) => (
-    <div>
-      <div style={{ fontSize: 10, color: DIM, fontWeight: 700, marginBottom: 3 }}>{label}</div>
-      <input type={type} value={form[k]} onChange={(e) => set(k, e.target.value)} style={{ ...inp, fontSize: 12.5 }} />
-    </div>
-  );
   return (
     <div style={{ padding: 14 }}>
+      <datalist id={dlId}>{ledgerNames.map((n) => <option key={n} value={n} />)}</datalist>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div style={{ fontWeight: 800, color: DARK, fontSize: 14 }}>{v.vno} <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>{v.type} · {v.category}</span></div>
-        <button onClick={onBack} style={{ ...inp, width: 'auto', minHeight: 34, fontSize: 11.5, cursor: 'pointer' }}>← Back</button>
+        <div style={{ fontWeight: 800, color: DARK, fontSize: 14 }}>{v.vno} <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>{v.type} - {v.category}</span></div>
+        <button onClick={onBack} style={{ ...inp, width: 'auto', minHeight: 34, fontSize: 11.5, cursor: 'pointer' }}>Back</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: 10 }}>
-        <Field label="Date" k="date" /><Field label="Branch" k="branch" />
-        <Field label={v.category === 'purchase' ? 'Supplier' : 'Customer'} k="party" />
-        <Field label="Link No" k="linkNo" />
+        <div><div style={lab}>Date</div><input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} style={fld} /></div>
+        <div><div style={lab}>Branch</div><input value={form.branch} onChange={(e) => set('branch', e.target.value)} style={fld} /></div>
+        <div><div style={lab}>{v.category === 'purchase' || v.category === 'purchase-expense' ? 'Supplier (party ledger)' : 'Customer / Party ledger'}</div><input list={dlId} value={form.party} onChange={(e) => set('party', e.target.value)} style={fld} /></div>
+        <div><div style={lab}>Link No</div><input value={form.linkNo} onChange={(e) => set('linkNo', e.target.value)} style={fld} /></div>
         {(v.category === 'sale' || v.category === 'purchase') && (
-          <div>
-            <div style={{ fontSize: 10, color: DIM, fontWeight: 700, marginBottom: 3 }}>Cost Centre (module)</div>
-            <select value={form.costCenter || ''} onChange={(e) => set('costCenter', e.target.value)} style={{ ...inp, fontSize: 12.5, cursor: 'pointer' }}>
-              <option value="">— Unspecified —</option>
-              {(ccq.data?.costCenters || []).map((c) => <option key={c.code} value={c.code}>{c.module} · {c.name}</option>)}
+          <div><div style={lab}>Cost Centre (module)</div>
+            <select value={form.costCenter || ''} onChange={(e) => set('costCenter', e.target.value)} style={{ ...fld, cursor: 'pointer' }}>
+              <option value="">- Unspecified -</option>
+              {(ccq.data?.costCenters || []).map((c) => <option key={c.code} value={c.code}>{c.module} - {c.name}</option>)}
             </select>
           </div>
         )}
-        <Field label="Taxable" k="subtotal" type="number" /><Field label="GST" k="taxAmt" type="number" />
-        <div><div style={{ fontSize: 10, color: DIM, fontWeight: 700, marginBottom: 3 }}>Total (auto)</div><div style={{ ...inp, fontSize: 12.5, background: '#f3f5f9', color: DARK, fontWeight: 700 }}>{money(cur, total)}</div></div>
-        <Field label="Remarks" k="remarks" />
+        <div><div style={lab}>GST / Tax</div><input type="number" value={form.taxAmt} onChange={(e) => set('taxAmt', e.target.value)} style={fld} /></div>
+        <div><div style={lab}>TDS</div><input type="number" value={form.tdsAmt} onChange={(e) => set('tdsAmt', e.target.value)} style={fld} /></div>
+        <div><div style={lab}>TCS</div><input type="number" value={form.tcsAmt} onChange={(e) => set('tcsAmt', e.target.value)} style={fld} /></div>
+        <div><div style={lab}>Total (auto)</div><div style={{ ...fld, background: '#f3f5f9', color: DARK, fontWeight: 700 }}>{money(cur, total)}</div></div>
+        <div><div style={lab}>Remarks</div><input value={form.remarks} onChange={(e) => set('remarks', e.target.value)} style={fld} /></div>
       </div>
-      {(v.lines || []).map((ln, i) => {
-        const meta = ln.meta && typeof ln.meta === 'object' ? ln.meta : {};
-        const ent = Object.entries(meta).filter(([, x]) => x !== '' && x != null);
-        return (
-          <div key={i} style={{ ...card, padding: 10, marginTop: 10, boxShadow: 'none', border: '1px solid #eef1f6' }}>
-            <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>{ln.ledger} · {money(cur, ln.amt)}</div>
-            {ent.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: '3px 12px', marginTop: 6 }}>{ent.map(([k, x]) => <div key={k} style={{ fontSize: 10.5 }}><span style={{ color: DIM }}>{k}: </span><span style={{ color: DARK }}>{String(x)}</span></div>)}</div>}
+      <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Lines — pick ledger from Books (Dr / Cr)</div>
+          <button onClick={addLine} style={{ ...inp, width: 'auto', minHeight: 28, fontSize: 11, cursor: 'pointer' }}>+ Add line</button>
+        </div>
+        {form.lines.map((ln, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 120px 28px', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+            <input list={dlId} value={ln.ledger} placeholder="Ledger (from Books)" onChange={(e) => setLine(i, 'ledger', e.target.value)} style={{ ...inp, fontSize: 12 }} />
+            <select value={ln.drCr || 'Dr'} onChange={(e) => setLine(i, 'drCr', e.target.value)} style={{ ...inp, fontSize: 12, cursor: 'pointer' }}><option value="Dr">Dr</option><option value="Cr">Cr</option></select>
+            <input type="number" value={ln.amt} placeholder="Amount" onChange={(e) => setLine(i, 'amt', e.target.value)} style={{ ...inp, fontSize: 12, textAlign: 'right' }} />
+            <button onClick={() => delLine(i)} title="Remove line" style={{ background: 'none', border: 'none', color: RED, cursor: 'pointer', fontWeight: 700 }}>x</button>
           </div>
-        );
-      })}
+        ))}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 18, marginTop: 6, fontSize: 12 }}>
+          <span style={{ color: DIM }}>Lines subtotal: <b style={{ color: DARK }}>{money(cur, subtotal)}</b></span>
+          <span style={{ color: DIM }}>+ Tax: <b style={{ color: DARK }}>{money(cur, Number(form.taxAmt) || 0)}</b></span>
+          <span style={{ color: DIM }}>= Total: <b style={{ color: DARK }}>{money(cur, total)}</b></span>
+        </div>
+      </div>
+      <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Accounting Effect — Full Journal (where this hits the books)</div>
+          <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.error ? '⚠ ' + pv.error : pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+          <thead><tr><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Ledger</th><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Group</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Debit</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Credit</th></tr></thead>
+          <tbody>
+            {(pv.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
+            {!(pv.postings || []).length && <tr><td colSpan={4} style={{ padding: 12, textAlign: 'center', color: DIM }}>Pick ledgers / amounts to see the journal effect.</td></tr>}
+          </tbody>
+          <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money(cur, pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money(cur, pv.totalCredit)}</td></tr></tfoot>
+        </table>
+        <div style={{ display: 'flex', gap: 14, marginTop: 6, fontSize: 11, color: DIM }}>
+          <span>GST: <b style={{ color: DARK }}>{money(cur, pv.tax?.gst || 0)}</b></span>
+          <span>TDS: <b style={{ color: DARK }}>{money(cur, pv.tax?.tds || 0)}</b></span>
+          <span>TCS: <b style={{ color: DARK }}>{money(cur, pv.tax?.tcs || 0)}</b></span>
+        </div>
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
-        <button disabled={upd.isPending} onClick={save} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: GREEN, color: '#fff' }}>{upd.isPending ? 'Saving…' : 'Save'}</button>
-        {msg === 'saved' && <span style={{ color: GREEN, fontSize: 12, fontWeight: 700 }}>✓ Saved &amp; re-posted</span>}
-        {msg.startsWith('err:') && <span style={{ color: RED, fontSize: 11.5 }}>⚠ {msg.slice(4)}</span>}
+        <button disabled={upd.isPending} onClick={save} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: GREEN, color: '#fff' }}>{upd.isPending ? 'Saving...' : 'Save'}</button>
+        {msg === 'saved' && <span style={{ color: GREEN, fontSize: 12, fontWeight: 700 }}>Saved & re-checked</span>}
+        {msg.startsWith('err:') && <span style={{ color: RED, fontSize: 11.5 }}>! {msg.slice(4)}</span>}
       </div>
     </div>
   );

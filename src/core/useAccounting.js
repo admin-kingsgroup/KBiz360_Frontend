@@ -355,6 +355,18 @@ export function useVoucher(id) {
   });
 }
 
+// Live full-JV preview for the editor: posts the (possibly edited) voucher body and
+// returns every Dr/Cr leg + totals + balanced flag, even when it doesn't balance.
+export function useVoucherPreview(body) {
+  const key = body ? JSON.stringify({ b: body.branch, c: body.category, p: body.party, t: body.taxAmt, d: body.tdsAmt, x: body.tcsAmt, tot: body.total, st: body.subtotal, l: body.lines }) : 'none';
+  return useQuery({
+    queryKey: ['accounting', 'preview-voucher', key],
+    queryFn: () => apiPost('/api/accounting/preview-voucher', body),
+    enabled: enabled() && !!(body && body.category),
+    staleTime: 5_000,
+  });
+}
+
 // Create a new voucher (Receipt / Payment / Contra / Journal / Credit Note /
 // Debit Note / Purchase Expense). The backend posts a balanced double-entry,
 // so we invalidate every accounting report + register so the new voucher shows

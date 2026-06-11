@@ -14,6 +14,8 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../core/styles.jsx';
 import { PeriodBar, periodRange } from '../core/period';
+import { openPrintPreview } from '../core/PrintPreview';
+import { buildBookingInvoice } from '../core/invoiceHtml';
 import { apiGet, apiPost, apiPut } from '../core/api';
 import { useLedgerRegistry } from '../core/useReference';
 import {
@@ -61,11 +63,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const [date, setDate] = useState(editing ? (editBooking.date || today()) : today());
   const [headerRef, setHeaderRef] = useState(editing ? (editBooking.headerRef || '') : '');
   const [customer, setCustomer] = useState(editing
-    ? { name: editBooking.customer?.name || '', gstin: editBooking.customer?.gstin || '', group: editBooking.customer?.group || '', ledgerName: editBooking.customer?.ledgerName || '', ledgerGroup: editBooking.customer?.ledgerGroup || '' }
-    : { name: '', gstin: '', group: '', ledgerName: '', ledgerGroup: '' });
+    ? { name: editBooking.customer?.name || '', gstin: editBooking.customer?.gstin || '', address: editBooking.customer?.address || '', email: editBooking.customer?.email || '', contact: editBooking.customer?.contact || '', group: editBooking.customer?.group || '', ledgerName: editBooking.customer?.ledgerName || '', ledgerGroup: editBooking.customer?.ledgerGroup || '' }
+    : { name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' });
   const [supplier, setSupplier] = useState(editing
-    ? { name: editBooking.supplier?.name || '', gstin: editBooking.supplier?.gstin || '', ledgerGroup: editBooking.supplier?.ledgerGroup || '' }
-    : { name: '', gstin: '', ledgerGroup: '' });
+    ? { name: editBooking.supplier?.name || '', gstin: editBooking.supplier?.gstin || '', address: editBooking.supplier?.address || '', email: editBooking.supplier?.email || '', contact: editBooking.supplier?.contact || '', ledgerGroup: editBooking.supplier?.ledgerGroup || '' }
+    : { name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' });
   const [gstMode, setGstMode] = useState(editing ? (editBooking.gstMode || 'intra') : 'intra');
   const [packageType, setPackageType] = useState(editing ? (editBooking.packageType || 'Domestic') : 'Domestic');
   const [remarks, setRemarks] = useState(editing ? (editBooking.remarks || '') : '');
@@ -100,8 +102,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       });
       const payload = {
         module: moduleCode, branch: brCode, date,
-        customer: { name: customer.name, gstin: customer.gstin, group: customer.group, ledgerName: customer.ledgerName || customer.name, ledgerGroup: customer.ledgerGroup || customer.group },
-        supplier: { name: supplier.name, gstin: supplier.gstin, ledgerGroup: supplier.ledgerGroup },
+        customer: { name: customer.name, gstin: customer.gstin, address: customer.address, email: customer.email, contact: customer.contact, group: customer.group, ledgerName: customer.ledgerName || customer.name, ledgerGroup: customer.ledgerGroup || customer.group },
+        supplier: { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup },
         gstMode, packageType: hasPackage ? packageType : '',
         headerRef, rows: lines,
         po: totals.po, so: totals.so,
@@ -118,7 +120,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     finally { setSaving(false); }
   };
 
-  const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', group: '', ledgerName: '', ledgerGroup: '' }); setSupplier({ name: '', gstin: '', ledgerGroup: '' }); setResult(null); setError(''); };
+  const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' }); setSupplier({ name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }); setResult(null); setError(''); };
 
   if (result) {
     const approved = result._approved;
@@ -235,6 +237,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <FL label="Supplier sub-group (auto)"><input value={supplier.ledgerGroup} readOnly placeholder="picks with the supplier" style={{ ...inp, background: '#faf7ef', color: '#5a6691' }} /></FL>
           <FL label="GST mode"><select value={gstMode} onChange={(e) => setGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
           {hasPackage && <FL label="Package type"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={inp}><option>Domestic</option><option>International</option></select></FL>}
+          <FL label="Customer GSTIN"><input value={customer.gstin} onChange={(e) => setCustomer({ ...customer, gstin: e.target.value })} placeholder="GSTIN" style={inp} /></FL>
+          <FL label="Customer Address"><input value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} placeholder="Billing address (for invoice)" style={inp} /></FL>
+          <FL label="Customer Email"><input value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} placeholder="email" style={inp} /></FL>
+          <FL label="Customer Contact"><input value={customer.contact} onChange={(e) => setCustomer({ ...customer, contact: e.target.value })} placeholder="phone" style={inp} /></FL>
+          <FL label="Supplier GSTIN"><input value={supplier.gstin} onChange={(e) => setSupplier({ ...supplier, gstin: e.target.value })} placeholder="GSTIN" style={inp} /></FL>
+          <FL label="Supplier Address"><input value={supplier.address} onChange={(e) => setSupplier({ ...supplier, address: e.target.value })} placeholder="address" style={inp} /></FL>
+          <FL label="Supplier Email"><input value={supplier.email} onChange={(e) => setSupplier({ ...supplier, email: e.target.value })} placeholder="email" style={inp} /></FL>
+          <FL label="Supplier Contact"><input value={supplier.contact} onChange={(e) => setSupplier({ ...supplier, contact: e.target.value })} placeholder="phone" style={inp} /></FL>
         </div>
       </div>
 
@@ -576,7 +586,7 @@ const sumT = (rows, path) => rows.reduce((s, b) => s + ((b[path] && b[path].tota
 const gpPctOf = (gp, sale) => (sale ? (gp / sale) * 100 : 0);
 const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
-function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, busyId, sel, onToggleSel }) {
+function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, onInvoice, busyId, sel, onToggleSel }) {
   const cols = mode === 'approved'
     ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
     : mode === 'rejected'
@@ -653,6 +663,12 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                 </tr>
                 {isOpen && (
                   <tr><td colSpan={cols.length} style={{ padding: '12px 16px', background: '#faf9f5', borderBottom: '1px solid #eee3cf' }}>
+                    {onInvoice && (b.status === 'approved' || b.status === 'posted') && (
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                        <button onClick={() => onInvoice(b, 'sale')} style={{ ...btnGh, padding: '4px 10px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}>🧾 Sales Invoice</button>
+                        <button onClick={() => onInvoice(b, 'purchase')} style={{ ...btnGh, padding: '4px 10px', fontSize: 10.5 }}>📄 Purchase Invoice</button>
+                      </div>
+                    )}
                     <JournalView id={b.id} cur={cur} />
                   </td></tr>
                 )}
@@ -827,6 +843,10 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   const cur = bc(branch).cur;
   const qc = useQueryClient();
   const { data = [], isLoading } = useBookings(brCode);
+  const custs = useQuery({ queryKey: ['customers'], queryFn: () => apiGet('/api/customers') }).data || [];
+  const sups = useQuery({ queryKey: ['suppliers'], queryFn: () => apiGet('/api/suppliers') }).data || [];
+  const partyBy = (arr) => { const m = {}; (arr || []).forEach((x) => { if (x && x.name) m[String(x.name).toLowerCase().trim()] = x; }); return m; };
+  const custMap = partyBy(custs), supMap = partyBy(sups);
   const [status, setStatus] = useState('pending');
   const [open, setOpen] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -903,7 +923,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
           </span>
         )}
       </div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={setEditing} onDelete={onDelete} canDelete={canDelete} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={setEditing} onDelete={onDelete} canDelete={canDelete} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: buildBookingInvoice(b, side, branch, master) }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
     </div>
   );
 }

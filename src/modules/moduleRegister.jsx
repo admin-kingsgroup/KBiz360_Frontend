@@ -12,6 +12,7 @@ import { companyProfile } from '../core/referenceCache';
 import { bc } from '../core/styles';
 import { PeriodBar, periodRange } from '../core/period';
 import { openPrintPreview } from '../core/PrintPreview';
+import { buildBookingInvoice } from '../core/invoiceHtml';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
@@ -85,7 +86,14 @@ export function ModuleRegister({ branch, mode = 'both' }) {
   const inRange = (d) => (!range.from || d >= range.from) && (!range.to || d <= range.to);
   const rows = data.filter((b) => b.module === mod && (b.status === 'approved' || b.status === 'posted') && inRange(b.date || ''));
   const fmt = (n) => (bc(branch).cur) + Math.round(Number(n) || 0).toLocaleString('en-IN');
-  const print = (b, side) => openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: invoiceHtml(b, side, branch) });
+  const custs = useQuery({ queryKey: ['customers'], queryFn: () => apiGet('/api/customers') }).data || [];
+  const sups = useQuery({ queryKey: ['suppliers'], queryFn: () => apiGet('/api/suppliers') }).data || [];
+  const byName = (arr) => { const m = {}; (arr || []).forEach((x) => { if (x && x.name) m[String(x.name).toLowerCase().trim()] = x; }); return m; };
+  const custMap = byName(custs), supMap = byName(sups);
+  const print = (b, side) => {
+    const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()];
+    openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: buildBookingInvoice(b, side, branch, master) });
+  };
   const showSale = mode !== 'purchase', showPur = mode !== 'sales', showGP = mode === 'both';
   const heading = mode === 'sales' ? 'Module Sales Register' : mode === 'purchase' ? 'Module Purchase Register' : 'Module Sales & Purchase Register';
 

@@ -52,7 +52,6 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
     {label:"Document Type Master", href:"/masters/doc-types"},
     {label:"Approval Limits Master", href:"/masters/approval-limits"},
     {label:"Customer Detail (10-Tab Demo)", href:"/masters/customer-detail-demo"},
-    {label:"Bulk Import Master Data", href:"/masters/bulk-import"},
     {label:"Merge Duplicate Records", href:"/masters/merge"},
   ]},
 ]};
@@ -250,11 +249,6 @@ export const MENU_HR = {label:"HR & Payroll", icon:Users, children:[
 /* ── SETTINGS ────────────────────────────────────────────────── */
 
 export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
-  {label:"Data & Formats", children:[
-    {label:"📤 Export Center (12 formats)", href:"/settings/export-center"},
-    {label:"📥 Import Center (7 modules)", href:"/settings/import-center"},
-    {label:"⚙️ Format Defaults & Mapping", href:"/settings/format-mapping"},
-  ]},
   {label:"Organization", children:[
     {label:"Branches", href:"/settings/branches"},
     {label:"Users & Roles", href:"/settings/users"},
@@ -336,11 +330,27 @@ export const MENU_COMMON_TOP = [
 ];
 
 
-// Tally → Books data migration. Top-level tab, super-admin only (added in getMenu).
-export const MENU_IMPORT = {label:"Data Import", icon:Upload, href:"/import"};
+// All Import & Export of data — Vouchers, Accounts/Chart of Accounts, Masters,
+// Tally migration, BSP/GDS feeds, and every export — consolidated under ONE
+// labelled section in the Admin dropdown.
+export const MENU_IMPORT_EXPORT = {label:"Import / Export Data", icon:Database, children:[
+  {label:"Import", children:[
+    {label:"Data Import — Vouchers, Accounts & Masters", href:"/import"},
+    {label:"Import Center (7 modules)", href:"/settings/import-center"},
+    {label:"BSP Statement Import", href:"/purchase/bsp-import"},
+    {label:"GDS / PNR Import", href:"/purchase/gds-import"},
+  ]},
+  {label:"Export", children:[
+    {label:"Export Center (12 formats)", href:"/settings/export-center"},
+    {label:"Tally XML Export", href:"/reports/tally-export"},
+  ]},
+  {label:"Formats & Mapping", children:[
+    {label:"Format Defaults & Mapping", href:"/settings/format-mapping"},
+  ]},
+]};
 
 // Back-office sections grouped under one "Admin" header pill (cleaner top bar).
-export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_HR, MENU_ASSETS, MENU_HO_CONTROL, MENU_SETTINGS, MENU_IMPORT]};
+export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_HR, MENU_ASSETS, MENU_HO_CONTROL, MENU_SETTINGS, MENU_IMPORT_EXPORT]};
 
 // Director/Super-Admin only: the plain "Dashboard" pill becomes a "Dashboards"
 // dropdown with the whole-company suite. Other roles keep the single Dashboard link.
