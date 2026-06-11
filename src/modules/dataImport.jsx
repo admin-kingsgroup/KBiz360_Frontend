@@ -9,9 +9,10 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Download, Upload, CheckCircle2, AlertTriangle, FileSpreadsheet, ShieldAlert, Eye, X } from 'lucide-react';
 import { card } from '../core/styles';
-import { apiPost } from '../core/api';
+import { apiPost, apiGet } from '../core/api';
 import { VSPECS } from '../core/voucherSpecs';
 
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
@@ -28,33 +29,31 @@ const TALLY_28 = [
   'Indirect Expenses', 'Indirect Income', 'Opening Stock', 'Closing Stock',
   'Misc. Expenses (Asset)', 'Suspense Account',
 ];
-// Which templates carry the 28-group reference + the on-screen "Valid Groups" panel.
-const NEEDS_GROUP_REF = new Set(['groups', 'ledgers']);
-function refLines(entity) {
-  if (!NEEDS_GROUP_REF.has(entity)) return [];
-  const col = entity === 'ledgers' ? 'group' : 'parent';
-  const lines = [
-    '#',
-    `# -- VALID GROUPS: put one of these 28 Tally groups in the "${col}" column --`,
-    '# ' + TALLY_28.slice(0, 9).join(' | '),
-    '# ' + TALLY_28.slice(9, 18).join(' | '),
-    '# ' + TALLY_28.slice(18, 28).join(' | '),
-  ];
-  if (entity === 'ledgers') lines.push('# "subGroup" = a custom sub-group you created via the Sub-Groups import (or leave blank)');
-  return lines;
-}
+const TALLY_28_SET = new Set(TALLY_28.map((g) => g.toLowerCase()));
+
+// Master entities you can BROWSE (View existing) — import entity → live list endpoint.
+const VIEW_API = {
+  groups: '/api/groups', ledgers: '/api/ledgers', 'voucher-types': '/api/voucher-types',
+  'cost-categories': '/api/cost-categories', budgets: '/api/budgets', scenarios: '/api/scenarios',
+  customers: '/api/customers', suppliers: '/api/suppliers',
+};
+const HIDE_FIELDS = new Set(['id', '_id', '__v', 'createdAt', 'updatedAt', 'parentId', 'ancestorIds', 'pathSlug', 'level', 'code']);
+const stripInternal = (r) => { const o = {}; Object.keys(r || {}).forEach((k) => { if (!HIDE_FIELDS.has(k)) o[k] = r[k]; }); return o; };
+// Both the Sub-Groups and Ledgers templates ship as PREFILLED scaffolds (all 28
+// Main Groups + your custom sub-groups listed as rows), so neither needs a separate
+// reference block.
 
 // entity = the backend /api/import/:entity bucket. columns = template headers.
 const SPECS = [
   // ── Masters ──────────────────────────────────────────────────────────────
-  { group: 'Masters', entity: 'groups', label: 'Account Groups / Sub-Groups',
-    desc: 'Custom groups under a parent. The 28 Tally groups are seeded & locked — only add your own.',
-    columns: ['name', 'parent', 'active'],
-    example: ['Reserves & Surplus', 'Capital Account', 'true'] },
+  { group: 'Masters', entity: 'groups', label: 'Sub-Groups (under a Main Group)',
+    desc: 'Two columns — Main Group · Subgroup. The template lists all 28 Main Tally Groups one per row; type a Sub-Group next to the ones you need (add extra rows for multiple sub-groups under the same Main Group; leave a row blank to skip it).',
+    columns: ['Main Group', 'Subgroup'],
+    example: ['Capital Account', 'Reserves & Surplus'] },
   { group: 'Masters', entity: 'ledgers', label: 'Ledgers (Chart of Accounts)',
-    desc: 'Opening balances + groups. Import groups first, then these.',
-    columns: ['code', 'name', 'group', 'subGroup', 'branch', 'currency', 'openingBalance', 'drCr', 'active'],
-    example: ['1001', 'Cash in Hand — BOM', 'Cash-in-Hand', '', 'BOM', 'INR', '50000', 'Dr', 'true'] },
+    desc: 'Three columns — Parent Group · Sub Group · Ledger. The template is prefilled with every Main Group + your custom Sub-Groups; type the Ledger name against the right placement (add rows for more ledgers under the same group). Import Sub-Groups first so they appear here.',
+    columns: ['Parent Group', 'Sub Group', 'Ledger'],
+    example: ['Sundry Creditors', 'Air Travel Suppliers', 'Emirates GSA'] },
   { group: 'Masters', entity: 'voucher-types', label: 'Voucher Types',
     desc: 'Parent type must be one of the 8 Tally types.',
     columns: ['name', 'parentType', 'abbreviation', 'numberingMethod', 'prefix', 'active'],
@@ -291,10 +290,22 @@ const csvCell = (v) => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
-function downloadTemplate(spec) {
-  const ref = refLines(spec.entity);
-  const csv = spec.columns.join(',') + '\n' + spec.example.map(csvCell).join(',') + '\n'
-    + (ref.length ? ref.join('\n') + '\n' : '');
+function downloadTemplate(spec, subgroups = []) {
+  let csv;
+  if (spec.entity === 'groups') {
+    // Scaffold: all 28 Main Groups listed one per row; user types the Sub-Group beside each.
+    csv = 'Main Group,Subgroup\n' + TALLY_28.map((g) => csvCell(g) + ',').join('\n') + '\n';
+  } else if (spec.entity === 'ledgers') {
+    // Scaffold: every Main Group (ledger directly under it) + each custom Sub-Group
+    // (with its parent) prefilled; user types the Ledger name in the 3rd column.
+    const rows = [
+      ...TALLY_28.map((g) => [g, '']),
+      ...subgroups.map((s) => [s.parent, s.name]),
+    ];
+    csv = 'Parent Group,Sub Group,Ledger\n' + rows.map((r) => csvCell(r[0]) + ',' + csvCell(r[1]) + ',').join('\n') + '\n';
+  } else {
+    csv = spec.columns.join(',') + '\n' + spec.example.map(csvCell).join(',') + '\n';
+  }
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -332,10 +343,27 @@ function rowsFromCSV(text, columns) {
   });
 }
 
+// Map a template's friendly columns to the canonical fields the API expects.
+// Sub-Groups: "Main Group" → parent, "Subgroup" → name; skip scaffold rows where
+// no Sub-Group was entered against a Main Group.
+function toBackendRows(spec, rows) {
+  if (spec.entity === 'groups') {
+    return rows
+      .map((r) => ({ name: (r['Subgroup'] || '').trim(), parent: (r['Main Group'] || '').trim(), active: 'true' }))
+      .filter((r) => r.name);
+  }
+  if (spec.entity === 'ledgers') {
+    return rows
+      .map((r) => ({ name: (r['Ledger'] || '').trim(), group: (r['Parent Group'] || '').trim(), subGroup: (r['Sub Group'] || '').trim(), branch: 'ALL', currency: 'INR', openingBalance: 0, drCr: '', active: 'true' }))
+      .filter((r) => r.name);   // skip scaffold rows where no Ledger was entered
+  }
+  return rows;
+}
+
 /* ── UI ──────────────────────────────────────────────────────────────────── */
 const btn = (bg, fg, outline) => ({ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 11px', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: bg, color: fg, border: outline ? `1px solid ${fg}33` : 'none' });
 
-function EntityCard({ spec, onUpload, onPreview, state }) {
+function EntityCard({ spec, onUpload, onPreview, onViewExisting, state, subgroups = [] }) {
   const inputId = `imp-${spec.entity}`;
   const previewId = `prev-${spec.entity}`;
   const [showRef, setShowRef] = useState(false);
@@ -352,9 +380,14 @@ function EntityCard({ spec, onUpload, onPreview, state }) {
       </div>
       <div style={{ fontSize: 9.5, color: '#9aa2c0', fontFamily: 'monospace', wordBreak: 'break-word' }}>{spec.columns.join(', ')}</div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button onClick={() => downloadTemplate(spec)} style={btn('#fff', BLUE, true)}><Download size={13} /> Template</button>
-        <label htmlFor={previewId} style={btn('#fff', DARK, true)} title="View the data with full details + JV before importing">
-          <Eye size={13} /> {state?.previewing ? 'Reading…' : 'View / Preview'}
+        <button onClick={() => downloadTemplate(spec, subgroups)} style={btn('#fff', BLUE, true)}><Download size={13} /> Template</button>
+        {VIEW_API[spec.entity] && (
+          <button onClick={() => onViewExisting(spec)} style={btn('#fff', GREEN, true)} title="Show everything already in the system for this master">
+            <Eye size={13} /> {state?.previewing ? 'Loading…' : 'View existing'}
+          </button>
+        )}
+        <label htmlFor={previewId} style={btn('#fff', DARK, true)} title="Preview the rows in your file (with full details + JV for vouchers) before importing">
+          <Eye size={13} /> {state?.previewing ? 'Reading…' : 'Preview upload'}
         </label>
         <input id={previewId} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onPreview(spec, f); e.target.value = ''; }} />
@@ -364,17 +397,17 @@ function EntityCard({ spec, onUpload, onPreview, state }) {
         <input id={inputId} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(spec, f); e.target.value = ''; }} />
       </div>
-      {NEEDS_GROUP_REF.has(spec.entity) && (
+      {spec.entity === 'ledgers' && (
         <div style={{ borderTop: '1px dashed #e7eaf2', paddingTop: 8 }}>
           <button onClick={() => setShowRef((v) => !v)} style={{ ...btn('#f7f8fb', DIM, true), fontSize: 10.5 }}>
-            {showRef ? '▾' : '▸'} Valid Groups (28 Tally){spec.entity === 'ledgers' ? ' — for "group"' : ' — for "parent"'}
+            {showRef ? '▾' : '▸'} Valid Sub-Groups ({subgroups.length})
           </button>
           {showRef && (
             <div style={{ marginTop: 7, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-              {TALLY_28.map((g) => (
-                <span key={g} style={{ fontSize: 10, padding: '2px 7px', background: '#eef4ff', color: BLUE, borderRadius: 4, fontWeight: 600 }}>{g}</span>
+              {subgroups.length === 0 && <span style={{ fontSize: 10, color: DIM }}>None yet — create them first via the Sub-Groups import.</span>}
+              {subgroups.map((s) => (
+                <span key={s.parent + '·' + s.name} style={{ fontSize: 10, padding: '2px 7px', background: '#eef4ff', color: BLUE, borderRadius: 4, fontWeight: 600 }}>{s.name} <span style={{ color: DIM, fontWeight: 400 }}>· {s.parent}</span></span>
               ))}
-              {spec.entity === 'ledgers' && <div style={{ fontSize: 10, color: DIM, marginTop: 4, width: '100%' }}>“subGroup” = a custom sub-group you created via the Sub-Groups import (or leave blank).</div>}
             </div>
           )}
         </div>
@@ -475,10 +508,11 @@ function PreviewModal({ spec, data, onClose }) {
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(960px, 97vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid #eef1f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: DARK }}>Preview — {spec.label}</h3>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: DARK }}>{data.existing ? 'Existing data' : 'Preview'} — {spec.label}</h3>
             <p style={{ margin: '3px 0 0', fontSize: 11, color: DIM }}>
-              {data.total} row{data.total === 1 ? '' : 's'}{errCount ? ` · ` : ''}{errCount ? <span style={{ color: RED, fontWeight: 700 }}>{errCount} would fail</span> : ''}
-              {data.newLedgers?.length ? ` · ${data.newLedgers.length} new ledger(s) would be created` : ''} · nothing is saved
+              {data.existing
+                ? `${data.total} record${data.total === 1 ? '' : 's'} currently in the system`
+                : <>{data.total} row{data.total === 1 ? '' : 's'}{errCount ? ` · ` : ''}{errCount ? <span style={{ color: RED, fontWeight: 700 }}>{errCount} would fail</span> : ''}{data.newLedgers?.length ? ` · ${data.newLedgers.length} new ledger(s) would be created` : ''} · nothing is saved</>}
             </p>
             {missingCount > 0 && (
               <p style={{ margin: '5px 0 0', fontSize: 11, color: '#854F0B', fontWeight: 700 }}>
@@ -574,7 +608,7 @@ function PreviewModal({ spec, data, onClose }) {
         </div>
 
         <div style={{ padding: '10px 18px', borderTop: '1px solid #eef1f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 10.5, color: DIM }}>This is a preview only — use “Upload CSV” on the card to actually import.</span>
+          <span style={{ fontSize: 10.5, color: DIM }}>{data.existing ? 'Live data currently in the system (read-only).' : 'This is a preview only — use “Upload CSV” on the card to actually import.'}</span>
           <button onClick={onClose} style={btn(BLUE, '#fff')}>Close</button>
         </div>
       </div>
@@ -587,6 +621,11 @@ export function DataImportPage({ currentUser }) {
   const [regime, setRegime] = useState('GST'); // India (GST) | Africa (VAT) template variant
   const [confirm, setConfirm] = useState(null); // { spec, rows, newLedgers } pending ledger-create confirmation
   const [preview, setPreview] = useState(null); // { spec, data } read-only view of an uploaded file
+  // Live custom sub-groups (parent + name) → prefill the Ledgers template + the panel.
+  const groupsQ = useQuery({ queryKey: ['groups', 'list'], queryFn: () => apiGet('/api/groups') });
+  const subgroups = (groupsQ.data || [])
+    .filter((g) => g && g.name && g.parent && !TALLY_28_SET.has(String(g.name).toLowerCase()))
+    .map((g) => ({ parent: g.parent, name: g.name }));
 
   if (currentUser && currentUser.role !== 'Super Admin') {
     return (
@@ -612,13 +651,25 @@ export function DataImportPage({ currentUser }) {
     }
   };
 
+  // Browse what's already in the system for this master (Sub-Groups, Ledgers,
+  // Voucher Types, Cost Categories, Budgets, Scenarios, Customers, Suppliers).
+  const onViewExisting = async (spec) => {
+    setState(spec.entity, { previewing: true, error: '' });
+    try {
+      const res = await apiGet(VIEW_API[spec.entity]);
+      const arr = Array.isArray(res) ? res : (res?.data || []);
+      setState(spec.entity, { previewing: false });
+      setPreview({ spec, data: { existing: true, total: arr.length, detail: { kind: 'master', rows: arr.map((r, i) => ({ row: i + 1, ...stripInternal(r) })) } } });
+    } catch (e) { setState(spec.entity, { previewing: false, error: e.message }); }
+  };
+
   // Read-only: parse the file and show full details + JV (writes nothing).
   const onPreview = async (spec, file) => {
     setState(spec.entity, { previewing: true, error: '' });
     try {
       const text = await file.text();
-      const rows = rowsFromCSV(text, spec.columns);
-      if (!rows.length) throw new Error('No data rows found in the file');
+      const rows = toBackendRows(spec, rowsFromCSV(text, spec.columns));
+      if (!rows.length) throw new Error(spec.entity === 'groups' ? 'No Sub-Groups entered — type a Subgroup next to a Main Group in the template.' : spec.entity === 'ledgers' ? 'No Ledgers entered — type a Ledger next to a Parent Group / Sub Group in the template.' : 'No data rows found in the file');
       const res = await apiPost(`/api/import/${spec.entity}/preview`, { rows });
       setState(spec.entity, { previewing: false });
       setPreview({ spec, data: { ...res, total: rows.length } });
@@ -629,8 +680,8 @@ export function DataImportPage({ currentUser }) {
     setState(spec.entity, { busy: true, error: '', result: null });
     try {
       const text = await file.text();
-      const rows = rowsFromCSV(text, spec.columns);
-      if (!rows.length) throw new Error('No data rows found in the file');
+      const rows = toBackendRows(spec, rowsFromCSV(text, spec.columns));
+      if (!rows.length) throw new Error(spec.entity === 'groups' ? 'No Sub-Groups entered — type a Subgroup next to a Main Group in the template.' : spec.entity === 'ledgers' ? 'No Ledgers entered — type a Ledger next to a Parent Group / Sub Group in the template.' : 'No data rows found in the file');
       // Step 1 — dry-run: which NEW ledgers would this upload create, and where?
       // Nothing is written yet.
       const preview = await apiPost(`/api/import/${spec.entity}/preview`, { rows });
@@ -694,7 +745,7 @@ export function DataImportPage({ currentUser }) {
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: BLUE, marginBottom: 8 }}>{g}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
             {SPECS.filter((s) => s.group === g).map((s) => (
-              <EntityCard key={s.entity} spec={applyRegime(s, regime)} state={states[s.entity]} onUpload={onUpload} onPreview={onPreview} />
+              <EntityCard key={s.entity} spec={applyRegime(s, regime)} state={states[s.entity]} onUpload={onUpload} onPreview={onPreview} onViewExisting={onViewExisting} subgroups={subgroups} />
             ))}
           </div>
         </div>

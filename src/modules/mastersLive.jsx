@@ -311,11 +311,10 @@ export const SubGroupsMaster = () => {
   return (
     <MasterCrud title="Sub-Groups" subtitle="Custom Chart-of-Accounts sub-groups — nest under any group, to any depth"
       resource="subgroups"
-      note="Sub-groups are SHARED across all branches (they are not branch-scoped), so you create them once and every branch's chart uses them. Create a sub-group under one of the 28 fixed groups (or under another sub-group). Nature & Statement (BS/PL) are inherited from the parent automatically. For indirect-expense sub-groups, set a Group Type (Fixed / Variable) so they roll up under the right head in Profit & Loss — leave blank to inherit from the parent."
+      note="Sub-groups are SHARED across all branches (they are not branch-scoped), so you create them once and every branch's chart uses them. Create a sub-group under one of the 28 fixed groups (or under another sub-group, to any depth). Nature & Statement (BS/PL) are inherited from the parent automatically. For the P&L Fixed/Variable split, just create real 'Fixed Expenses' and 'Variable Expenses' sub-groups under Indirect Expenses and nest your expense sub-groups under them — the P&L rolls up automatically from the hierarchy."
       fields={[
         { key: 'name', label: 'Sub-Group Name', type: 'text', required: true },
         { key: 'parent', label: 'Parent Group', type: 'select', options: parentOptions.length ? parentOptions : TALLY_GROUP_NAMES, required: true },
-        { key: 'expenseType', label: 'Group Type (Expense)', type: 'select', options: ['Fixed Expense', 'Variable Expense'], emptyLabel: '— Inherit from parent —' },
         { key: 'nature', label: 'Nature', type: 'text', input: false },
         { key: 'statement', label: 'Statement', type: 'text', input: false },
         { key: 'active', label: 'Active', type: 'bool', default: true },
