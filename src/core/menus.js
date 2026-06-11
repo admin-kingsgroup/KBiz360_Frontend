@@ -336,16 +336,11 @@ export const MENU_COMMON_TOP = [
 export const MENU_IMPORT_EXPORT = {label:"Import / Export Data", icon:Database, children:[
   {label:"Import", children:[
     {label:"Data Import — Vouchers, Accounts & Masters", href:"/import"},
-    {label:"Import Center (7 modules)", href:"/settings/import-center"},
     {label:"BSP Statement Import", href:"/purchase/bsp-import"},
     {label:"GDS / PNR Import", href:"/purchase/gds-import"},
   ]},
   {label:"Export", children:[
-    {label:"Export Center (12 formats)", href:"/settings/export-center"},
     {label:"Tally XML Export", href:"/reports/tally-export"},
-  ]},
-  {label:"Formats & Mapping", children:[
-    {label:"Format Defaults & Mapping", href:"/settings/format-mapping"},
   ]},
 ]};
 

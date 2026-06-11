@@ -173,10 +173,11 @@ export default function KB360App(){
         </div>
       );
     }
-            /* Format / Import / Export Centers */
-    if(route==="/settings/export-center")   return <ExportCenter/>;
-    if(route==="/settings/import-center")   return <ImportCenter/>;
-    if(route==="/settings/format-mapping")  return <FormatMappingSettings/>;
+            /* Format / Import / Export Centers — components were never built; the
+       real working screens are Data Import (/import), BSP/GDS imports and
+       Tally XML Export, all under Admin ▸ Import / Export Data. Routes removed
+       so a stale/direct URL falls through to the not-found handler instead of
+       crashing on an undefined component. */
 
     /* Standardized Tabbed Screens */
     if(route==="/masters/customer-tabs")  return <CustomerMasterTabbed/>;
