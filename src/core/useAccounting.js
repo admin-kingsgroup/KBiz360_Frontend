@@ -58,6 +58,43 @@ export function useTaxSummary(branch, { from, to } = {}) {
   });
 }
 
+// Budget vs actual (indirect-expense heads) — Director "Budget vs Expense" dashboard.
+export function useBudgetVsActual(branch, { from, to, fy } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'budget-vs-actual', code || 'all', from || '', to || '', fy || ''],
+    queryFn: () => apiGet('/api/accounting/budget-vs-actual', { branch: code, from, to, fy }),
+    enabled: enabled(), staleTime: 30_000,
+  });
+}
+
+// Sales / GP / Collections vs target — Director "vs Target" dashboards.
+export function useTargetsVsActual(branch, metric = 'sales', { from, to, fy } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'targets-vs-actual', code || 'all', metric, from || '', to || '', fy || ''],
+    queryFn: () => apiGet('/api/accounting/targets-vs-actual', { branch: code, metric, from, to, fy }),
+    enabled: enabled(), staleTime: 30_000,
+  });
+}
+
+// Targets master (set/list).
+export function useSalesTargets(branch, fy, metric) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['sales-targets', code || 'all', fy || '', metric || ''],
+    queryFn: () => apiGet('/api/sales-targets', { branch: code, fy, metric }),
+    enabled: enabled(),
+  });
+}
+export function useSaveTargets() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => apiPut('/api/sales-targets/bulk', body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sales-targets'] }); qc.invalidateQueries({ queryKey: ['accounting', 'targets-vs-actual'] }); },
+  });
+}
+
 export function useBalanceSheet(branch, { to, includeZero } = {}) {
   const code = branchCode(branch);
   return useQuery({

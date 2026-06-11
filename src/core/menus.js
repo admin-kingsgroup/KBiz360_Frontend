@@ -116,7 +116,9 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Year-End Close", href:"/accounting/year-close"},
     {label:"Recurring Vouchers", href:"/accounting/recurring"},
     {label:"Intercompany", href:"/accounting/intercompany"},
-    {divider:true, label:"Accruals & Budgets"},
+    {divider:true, label:"Targets & Budgets"},
+    {label:"Sales Targets", href:"/finance/targets"},
+    {label:"Expense Budget", href:"/expense/budget"},
     {label:"Vendor Advances", href:"/accounting/vendor-advances"},
     {label:"Loan / EMI Register", href:"/accounting/loans"},
     {label:"FX Revaluation", href:"/accounting/fx-revaluation"},
@@ -360,6 +362,12 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
     {label:"Module / Product GP", href:"/dashboards/module-gp"},
     {label:"Branch Performance", href:"/dashboards/branch"},
     {label:"Supplier / Purchase", href:"/dashboards/supplier"},
+  ]},
+  {label:"Targets", children:[
+    {label:"Sales vs Target", href:"/dashboards/sales-target"},
+    {label:"GP vs Target", href:"/dashboards/gp-target"},
+    {label:"Collections vs Target", href:"/dashboards/collections-target"},
+    {label:"Budget vs Expense", href:"/dashboards/budget-expense"},
   ]},
   {label:"Control", children:[
     {label:"Approvals & Audit", href:"/dashboards/audit"},
