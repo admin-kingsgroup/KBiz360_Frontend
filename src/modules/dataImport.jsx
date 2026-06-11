@@ -9,12 +9,40 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
-import { Download, Upload, CheckCircle2, AlertTriangle, FileSpreadsheet, ShieldAlert } from 'lucide-react';
+import { Download, Upload, CheckCircle2, AlertTriangle, FileSpreadsheet, ShieldAlert, Eye, X } from 'lucide-react';
 import { card } from '../core/styles';
 import { apiPost } from '../core/api';
 import { VSPECS } from '../core/voucherSpecs';
 
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
+
+// The 28 primary Tally groups (fixed & locked) — the only valid values for a
+// sub-group's `parent` and a ledger's `group`. Embedded into the Subgroups/Ledgers
+// templates (as #-comment reference lines) and shown on-screen so there's no guessing.
+const TALLY_28 = [
+  'Capital Account', 'Loans (Liability)', 'Bank OD Accounts', 'Secured Loans', 'Unsecured Loans',
+  'Current Liabilities', 'Duties & Taxes', 'Provisions', 'Sundry Creditors',
+  'Fixed Assets', 'Investments', 'Current Assets', 'Bank Accounts', 'Cash-in-Hand',
+  'Deposits (Asset)', 'Loans & Advances (Asset)', 'Stock-in-Hand', 'Sundry Debtors',
+  'Sales Accounts', 'Direct Income', 'Purchase Accounts', 'Direct Expenses',
+  'Indirect Expenses', 'Indirect Income', 'Opening Stock', 'Closing Stock',
+  'Misc. Expenses (Asset)', 'Suspense Account',
+];
+// Which templates carry the 28-group reference + the on-screen "Valid Groups" panel.
+const NEEDS_GROUP_REF = new Set(['groups', 'ledgers']);
+function refLines(entity) {
+  if (!NEEDS_GROUP_REF.has(entity)) return [];
+  const col = entity === 'ledgers' ? 'group' : 'parent';
+  const lines = [
+    '#',
+    `# -- VALID GROUPS: put one of these 28 Tally groups in the "${col}" column --`,
+    '# ' + TALLY_28.slice(0, 9).join(' | '),
+    '# ' + TALLY_28.slice(9, 18).join(' | '),
+    '# ' + TALLY_28.slice(18, 28).join(' | '),
+  ];
+  if (entity === 'ledgers') lines.push('# "subGroup" = a custom sub-group you created via the Sub-Groups import (or leave blank)');
+  return lines;
+}
 
 // entity = the backend /api/import/:entity bucket. columns = template headers.
 const SPECS = [
@@ -264,7 +292,9 @@ const csvCell = (v) => {
 };
 
 function downloadTemplate(spec) {
-  const csv = spec.columns.join(',') + '\n' + spec.example.map(csvCell).join(',') + '\n';
+  const ref = refLines(spec.entity);
+  const csv = spec.columns.join(',') + '\n' + spec.example.map(csvCell).join(',') + '\n'
+    + (ref.length ? ref.join('\n') + '\n' : '');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -292,7 +322,7 @@ function parseCSV(text) {
 }
 
 function rowsFromCSV(text, columns) {
-  const grid = parseCSV(text);
+  const grid = parseCSV(text).filter((r) => !(r[0] || '').trim().startsWith('#')); // drop reference/comment lines
   if (!grid.length) return [];
   const headers = grid[0].map((h) => h.trim());
   return grid.slice(1).map((cells) => {
@@ -305,8 +335,10 @@ function rowsFromCSV(text, columns) {
 /* ── UI ──────────────────────────────────────────────────────────────────── */
 const btn = (bg, fg, outline) => ({ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 11px', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: bg, color: fg, border: outline ? `1px solid ${fg}33` : 'none' });
 
-function EntityCard({ spec, onUpload, state }) {
+function EntityCard({ spec, onUpload, onPreview, state }) {
   const inputId = `imp-${spec.entity}`;
+  const previewId = `prev-${spec.entity}`;
+  const [showRef, setShowRef] = useState(false);
   return (
     <div style={{ ...card, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -319,14 +351,34 @@ function EntityCard({ spec, onUpload, state }) {
         </div>
       </div>
       <div style={{ fontSize: 9.5, color: '#9aa2c0', fontFamily: 'monospace', wordBreak: 'break-word' }}>{spec.columns.join(', ')}</div>
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button onClick={() => downloadTemplate(spec)} style={btn('#fff', BLUE, true)}><Download size={13} /> Template</button>
+        <label htmlFor={previewId} style={btn('#fff', DARK, true)} title="View the data with full details + JV before importing">
+          <Eye size={13} /> {state?.previewing ? 'Reading…' : 'View / Preview'}
+        </label>
+        <input id={previewId} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) onPreview(spec, f); e.target.value = ''; }} />
         <label htmlFor={inputId} style={btn(BLUE, '#fff')}>
           <Upload size={13} /> {state?.busy ? 'Uploading…' : 'Upload CSV'}
         </label>
         <input id={inputId} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(spec, f); e.target.value = ''; }} />
       </div>
+      {NEEDS_GROUP_REF.has(spec.entity) && (
+        <div style={{ borderTop: '1px dashed #e7eaf2', paddingTop: 8 }}>
+          <button onClick={() => setShowRef((v) => !v)} style={{ ...btn('#f7f8fb', DIM, true), fontSize: 10.5 }}>
+            {showRef ? '▾' : '▸'} Valid Groups (28 Tally){spec.entity === 'ledgers' ? ' — for "group"' : ' — for "parent"'}
+          </button>
+          {showRef && (
+            <div style={{ marginTop: 7, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              {TALLY_28.map((g) => (
+                <span key={g} style={{ fontSize: 10, padding: '2px 7px', background: '#eef4ff', color: BLUE, borderRadius: 4, fontWeight: 600 }}>{g}</span>
+              ))}
+              {spec.entity === 'ledgers' && <div style={{ fontSize: 10, color: DIM, marginTop: 4, width: '100%' }}>“subGroup” = a custom sub-group you created via the Sub-Groups import (or leave blank).</div>}
+            </div>
+          )}
+        </div>
+      )}
       {state?.result && (
         <div style={{ fontSize: 11, padding: '8px 10px', borderRadius: 6, background: state.result.failed?.length ? '#fff7ed' : '#ecfdf3', border: `1px solid ${state.result.failed?.length ? '#fed7aa' : '#bbf7d0'}` }}>
           <div style={{ fontWeight: 700, color: state.result.failed?.length ? '#854F0B' : GREEN, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -405,10 +457,136 @@ function LedgerConfirmModal({ spec, newLedgers, busy, onYes, onNo }) {
   );
 }
 
+// Read-only VIEW of an uploaded file before importing: every row with all its
+// fields, and for vouchers the full double-entry (JV type + Dr/Cr ledgers).
+function PreviewModal({ spec, data, onClose }) {
+  const [open, setOpen] = useState(null);
+  const d = data.detail || {};
+  const rows = d.rows || [];
+  const fmt = (n) => '₹' + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  const errCount = rows.filter((r) => r.error || r._error).length;
+  const missingCount = rows.filter((r) => r.jv?.missing?.length).length;
+  const th = { padding: '7px 8px', borderBottom: '2px solid #e7eaf2', textAlign: 'left', color: DIM, fontWeight: 700, position: 'sticky', top: 0, background: '#fff', whiteSpace: 'nowrap' };
+  const td = { padding: '6px 8px', borderBottom: '1px solid #f3f5f9', whiteSpace: 'nowrap' };
+  const masterCols = d.kind === 'master' && rows.length ? Object.keys(rows[0]).filter((k) => k !== 'row' && k !== '_error') : [];
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(960px, 97vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #eef1f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: DARK }}>Preview — {spec.label}</h3>
+            <p style={{ margin: '3px 0 0', fontSize: 11, color: DIM }}>
+              {data.total} row{data.total === 1 ? '' : 's'}{errCount ? ` · ` : ''}{errCount ? <span style={{ color: RED, fontWeight: 700 }}>{errCount} would fail</span> : ''}
+              {data.newLedgers?.length ? ` · ${data.newLedgers.length} new ledger(s) would be created` : ''} · nothing is saved
+            </p>
+            {missingCount > 0 && (
+              <p style={{ margin: '5px 0 0', fontSize: 11, color: '#854F0B', fontWeight: 700 }}>
+                ⚠ {missingCount} voucher(s) reference a ledger not in the Chart of Accounts. These import as <strong>PENDING</strong> and cannot be approved until you create the ledger in Masters — <strong>no ledger/sub-group/group is auto-created from voucher import</strong>.
+              </p>
+            )}
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM }}><X size={20} /></button>
+        </div>
+
+        <div style={{ overflow: 'auto', padding: '6px 14px 14px' }}>
+          {/* VOUCHERS — show JV type + per-row double-entry */}
+          {d.kind === 'voucher' && (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+              <thead><tr>
+                <th style={th}>#</th><th style={th}>Vch No</th><th style={th}>JV Type</th><th style={th}>Date</th><th style={th}>Party</th>
+                <th style={{ ...th, textAlign: 'right' }}>Subtotal</th><th style={{ ...th, textAlign: 'right' }}>GST</th><th style={{ ...th, textAlign: 'right' }}>TDS</th><th style={{ ...th, textAlign: 'right' }}>Total</th><th style={th}>Status</th>
+              </tr></thead>
+              <tbody>
+                {rows.map((r) => (
+                  <React.Fragment key={r.row}>
+                    <tr onClick={() => !r.error && setOpen(open === r.row ? null : r.row)} style={{ cursor: r.error ? 'default' : 'pointer', background: open === r.row ? '#faf9f5' : '#fff' }}>
+                      <td style={td}>{r.row}</td>
+                      <td style={{ ...td, fontWeight: 700, color: BLUE }}>{r.vno || '—'}</td>
+                      <td style={td}>{r.error ? '—' : <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#eef4ff', color: BLUE }}>{r.type} · {r.category}</span>}</td>
+                      <td style={td}>{r.date || '—'}</td>
+                      <td style={{ ...td, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.party || '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{r.error ? '' : fmt(r.subtotal)}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{r.error ? '' : fmt(r.taxAmt)}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{r.error ? '' : fmt(r.tdsAmt)}</td>
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{r.error ? '' : fmt(r.total)}</td>
+                      <td style={td}>{r.error
+                        ? <span style={{ color: RED, fontWeight: 700 }}>⚠ {r.error}</span>
+                        : r.jv?.missing?.length ? <span style={{ color: '#854F0B', fontWeight: 700 }}>⚠ Missing ledger: {r.jv.missing.join(', ')} — will be held pending (not created)</span>
+                        : r.jv?.balanced ? <span style={{ color: GREEN, fontWeight: 700 }}>✓ Balanced</span> : <span style={{ color: RED, fontWeight: 700 }}>✗ {r.jv?.error || 'Out by ' + fmt(r.jv?.diff)}</span>}
+                      </td>
+                    </tr>
+                    {open === r.row && !r.error && (
+                      <tr><td colSpan={10} style={{ padding: '8px 16px', background: '#faf9f5' }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, color: DIM, marginBottom: 5 }}>Journal effect (where it hits the books):</div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                          <thead><tr><th style={{ ...th, position: 'static' }}>Ledger</th><th style={{ ...th, position: 'static' }}>Group</th><th style={{ ...th, position: 'static', textAlign: 'right' }}>Debit</th><th style={{ ...th, position: 'static', textAlign: 'right' }}>Credit</th></tr></thead>
+                          <tbody>
+                            {(r.jv?.postings || []).map((p, i) => (
+                              <tr key={i}><td style={{ ...td, fontWeight: 600 }}>{p.ledger}</td><td style={{ ...td, color: DIM }}>{p.group}</td><td style={{ ...td, textAlign: 'right', color: BLUE }}>{p.debit ? fmt(p.debit) : ''}</td><td style={{ ...td, textAlign: 'right', color: RED }}>{p.credit ? fmt(p.credit) : ''}</td></tr>
+                            ))}
+                            <tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={td} colSpan={2}>Total</td><td style={{ ...td, textAlign: 'right', color: BLUE }}>{fmt(r.jv?.totalDebit)}</td><td style={{ ...td, textAlign: 'right', color: RED }}>{fmt(r.jv?.totalCredit)}</td></tr>
+                          </tbody>
+                        </table>
+                      </td></tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {/* BOOKINGS (SO/PO/GP) — grouped by Link No */}
+          {d.kind === 'booking' && (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+              <thead><tr><th style={th}>#</th><th style={th}>Link No</th><th style={th}>Module</th><th style={th}>Customer</th><th style={th}>Supplier</th><th style={{ ...th, textAlign: 'right' }}>Sale</th><th style={{ ...th, textAlign: 'right' }}>Purchase</th><th style={{ ...th, textAlign: 'right' }}>GP</th><th style={th}>Lines</th></tr></thead>
+              <tbody>{rows.map((r) => (
+                <tr key={r.row}>
+                  <td style={td}>{r.row}</td><td style={{ ...td, fontWeight: 700, color: BLUE }}>{r.linkNo || '—'}</td><td style={td}>{r.error ? <span style={{ color: RED }}>⚠ {r.error}</span> : r.module}</td>
+                  <td style={td}>{r.customer || '—'}</td><td style={td}>{r.supplier || '—'}</td>
+                  <td style={{ ...td, textAlign: 'right' }}>{fmt(r.saleTotal)}</td><td style={{ ...td, textAlign: 'right' }}>{fmt(r.purchaseTotal)}</td><td style={{ ...td, textAlign: 'right', fontWeight: 700, color: GREEN }}>{fmt(r.gp)}</td><td style={td}>{r.lines}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          )}
+
+          {/* MASTERS / PARTIES — every mapped field + invalid-group flag */}
+          {d.kind === 'master' && (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+              <thead><tr><th style={th}>#</th>{masterCols.map((c) => <th key={c} style={th}>{c}</th>)}<th style={th}>Status</th></tr></thead>
+              <tbody>{rows.map((r) => (
+                <tr key={r.row} style={{ background: r._error ? '#fff7ed' : '#fff' }}>
+                  <td style={td}>{r.row}</td>
+                  {masterCols.map((c) => <td key={c} style={td}>{String(r[c] ?? '')}</td>)}
+                  <td style={td}>{r._error ? <span style={{ color: RED, fontWeight: 700 }}>⚠ {r._error}</span> : <span style={{ color: GREEN, fontWeight: 700 }}>✓ OK</span>}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          )}
+
+          {data.newLedgers?.length > 0 && (
+            <div style={{ marginTop: 12, padding: '8px 10px', background: '#ecfdf3', border: '1px solid #bbf7d0', borderRadius: 6, fontSize: 11 }}>
+              <div style={{ fontWeight: 700, color: GREEN }}>{data.newLedgers.length} new ledger(s) would be created:</div>
+              {data.newLedgers.slice(0, 12).map((l, i) => <div key={i} style={{ color: '#27500A', marginTop: 2 }}>• <strong>{l.name}</strong> → {l.group}{l.subGroup ? ` ▸ ${l.subGroup}` : ''}</div>)}
+              {data.newLedgers.length > 12 && <div style={{ color: DIM, marginTop: 2 }}>…and {data.newLedgers.length - 12} more</div>}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '10px 18px', borderTop: '1px solid #eef1f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 10.5, color: DIM }}>This is a preview only — use “Upload CSV” on the card to actually import.</span>
+          <button onClick={onClose} style={btn(BLUE, '#fff')}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DataImportPage({ currentUser }) {
-  const [states, setStates] = useState({}); // entity → { busy, result, error }
+  const [states, setStates] = useState({}); // entity → { busy, result, error, previewing }
   const [regime, setRegime] = useState('GST'); // India (GST) | Africa (VAT) template variant
   const [confirm, setConfirm] = useState(null); // { spec, rows, newLedgers } pending ledger-create confirmation
+  const [preview, setPreview] = useState(null); // { spec, data } read-only view of an uploaded file
 
   if (currentUser && currentUser.role !== 'Super Admin') {
     return (
@@ -432,6 +610,19 @@ export function DataImportPage({ currentUser }) {
     } catch (e) {
       setState(spec.entity, { busy: false, error: e.message });
     }
+  };
+
+  // Read-only: parse the file and show full details + JV (writes nothing).
+  const onPreview = async (spec, file) => {
+    setState(spec.entity, { previewing: true, error: '' });
+    try {
+      const text = await file.text();
+      const rows = rowsFromCSV(text, spec.columns);
+      if (!rows.length) throw new Error('No data rows found in the file');
+      const res = await apiPost(`/api/import/${spec.entity}/preview`, { rows });
+      setState(spec.entity, { previewing: false });
+      setPreview({ spec, data: { ...res, total: rows.length } });
+    } catch (e) { setState(spec.entity, { previewing: false, error: e.message }); }
   };
 
   const onUpload = async (spec, file) => {
@@ -503,7 +694,7 @@ export function DataImportPage({ currentUser }) {
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: BLUE, marginBottom: 8 }}>{g}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
             {SPECS.filter((s) => s.group === g).map((s) => (
-              <EntityCard key={s.entity} spec={applyRegime(s, regime)} state={states[s.entity]} onUpload={onUpload} />
+              <EntityCard key={s.entity} spec={applyRegime(s, regime)} state={states[s.entity]} onUpload={onUpload} onPreview={onPreview} />
             ))}
           </div>
         </div>
@@ -518,6 +709,8 @@ export function DataImportPage({ currentUser }) {
           onNo={confirmNo}
         />
       )}
+
+      {preview && <PreviewModal spec={preview.spec} data={preview.data} onClose={() => setPreview(null)} />}
     </div>
   );
 }
