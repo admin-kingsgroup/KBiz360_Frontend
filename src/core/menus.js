@@ -349,11 +349,20 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
   ]},
   {label:"Financials", children:[
     {label:"Profitability (P&L)", href:"/dashboards/profitability"},
+    {label:"Balance Sheet", href:"/dashboards/balance-sheet"},
     {label:"Cash & Liquidity", href:"/dashboards/cash"},
     {label:"Receivables & Payables", href:"/dashboards/arap"},
+    {label:"Expenses", href:"/dashboards/expenses"},
+    {label:"Tax & Compliance", href:"/dashboards/tax"},
   ]},
   {label:"Business", children:[
+    {label:"Sales & Bookings", href:"/dashboards/sales"},
+    {label:"Module / Product GP", href:"/dashboards/module-gp"},
     {label:"Branch Performance", href:"/dashboards/branch"},
+    {label:"Supplier / Purchase", href:"/dashboards/supplier"},
+  ]},
+  {label:"Control", children:[
+    {label:"Approvals & Audit", href:"/dashboards/audit"},
   ]},
 ]};
 

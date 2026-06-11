@@ -3,11 +3,11 @@
 // the existing report endpoints (no new accounting logic). Shared toolbar gives
 // period presets; the Executive Overview adds an alert feed + KPI trend arrows.
 import React, { useMemo, useState } from 'react';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { apiGet } from '../core/api';
 import { bc } from '../core/styles';
 import {
-  useProfitAndLoss, useModulePL, useBalanceSheet, useAgeing,
+  useProfitAndLoss, useModulePL, useBalanceSheet, useAgeing, useInvoiceGP,
   useTaxSummary, useTrialBalance, useVoucherApprovals, useYearOverYear,
 } from '../core/useAccounting';
 
@@ -308,11 +308,230 @@ export function BranchPerformanceDash() {
   );
 }
 
+// generic two-column "name + amount" list table
+function ListTable({ title, rows, cur, right, valColor }) {
+  return (
+    <Card title={title} right={right}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i}><td style={{ ...td, fontWeight: r.bold ? 700 : 400, paddingLeft: r.indent ? 28 : 12 }}>{r.name}</td><td style={{ ...td, ...num, fontWeight: r.bold ? 700 : 400, color: valColor ? valColor(r.amount) : C.dark }}>{money(cur, r.amount)}</td></tr>
+          ))}
+          {!rows.length && <tr><td colSpan={2} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No data.</td></tr>}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+const miniBar = (label, val, base, col, cur) => (
+  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+    <span style={{ width: 160, fontSize: 12, color: C.dim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+    <div style={{ flex: 1, background: '#eef1f7', borderRadius: 5, height: 16, minWidth: 60 }}><div style={{ width: `${base ? Math.min(100, Math.abs(val) / base * 100) : 0}%`, background: col, height: '100%', borderRadius: 5 }} /></div>
+    <span style={{ width: 120, textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: val < 0 ? C.red : C.dark }}>{money(cur, val)}</span>
+  </div>
+);
+const topBy = (rows, keyFn, valFn, n = 10) => {
+  const m = {}; rows.forEach((r) => { const k = keyFn(r) || '—'; m[k] = (m[k] || 0) + (valFn(r) || 0); });
+  return Object.entries(m).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount).slice(0, n);
+};
+
+// ── 6) Balance Sheet ──────────────────────────────────────────────────────────
+export function BalanceSheetDash({ branch }) {
+  const { range, ...tb } = usePeriod('fy');
+  const cur = (bc(branch) || {}).cur || '₹';
+  const bs = useBalanceSheet(branch, { to: range.to }).data || {};
+  const assets = bs.assets || [], liabs = bs.liabilities || [];
+  const aT = assets.reduce((s, a) => s + (a.amount || 0), 0), lT = liabs.reduce((s, a) => s + (a.amount || 0), 0);
+  const balanced = Math.abs(aT - lT) < 1;
+  return (
+    <div style={{ margin: 12 }}>
+      <Toolbar title="Balance Sheet" sub={`Financial position as of ${range.to}`} period={tb.period} setPeriod={tb.setPeriod} custom={tb.custom} setCustom={tb.setCustom} branch={branch} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <KPI label="Total Assets" value={money(cur, aT)} />
+        <KPI label="Total Liabilities & Capital" value={money(cur, lT)} />
+        <KPI label="Balanced" value={balanced ? '✓ Yes' : '✗ No'} tone={balanced ? 'good' : 'bad'} sub={balanced ? '' : money(cur, aT - lT) + ' diff'} />
+      </div>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ flex: '1 1 320px' }}><ListTable title="Liabilities & Capital" rows={[...liabs, { name: 'Total', amount: lT, bold: true }]} cur={cur} /></div>
+        <div style={{ flex: '1 1 320px' }}><ListTable title="Assets" rows={[...assets, { name: 'Total', amount: aT, bold: true }]} cur={cur} /></div>
+      </div>
+    </div>
+  );
+}
+
+// ── 7) Module / Product GP ────────────────────────────────────────────────────
+export function ModuleGpDash({ branch }) {
+  const { range, ...tb } = usePeriod('fy');
+  const cur = (bc(branch) || {}).cur || '₹';
+  const mpl = useModulePL(branch, range).data || {};
+  const mods = mpl.modules || [], t = mpl.totals || {};
+  const maxGp = Math.max(1, ...mods.map((m) => Math.abs(m.gp || 0)));
+  return (
+    <div style={{ margin: 12 }}>
+      <Toolbar title="Module / Product GP" sub={`Gross profit by product · ${range.label}`} period={tb.period} setPeriod={tb.setPeriod} custom={tb.custom} setCustom={tb.setCustom} branch={branch} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <KPI label="Sales" value={money(cur, t.sales)} />
+        <KPI label="COGS" value={money(cur, t.cogs)} />
+        <KPI label="Gross Profit" value={money(cur, t.gp)} tone={(t.gp || 0) < 0 ? 'bad' : 'good'} sub={pct(t.gpPct || 0)} />
+      </div>
+      <Card title="GP by Module"><div style={{ padding: '10px 16px' }}>{mods.map((m) => miniBar(m.name || m.key, m.gp, maxGp, (m.gp || 0) < 0 ? C.red : C.green, cur))}{!mods.length && <div style={{ color: C.dim, fontSize: 12 }}>No data.</div>}</div></Card>
+      <Card title="Detail">
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr><th style={th}>Module</th><th style={{ ...th, ...num }}>Sales</th><th style={{ ...th, ...num }}>COGS</th><th style={{ ...th, ...num }}>GP</th><th style={{ ...th, ...num }}>GP %</th><th style={{ ...th, ...num }}>% of Sales</th></tr></thead>
+          <tbody>
+            {mods.map((m) => (<tr key={m.key}><td style={td}>{m.name || m.key}</td><td style={{ ...td, ...num }}>{money(cur, m.sales)}</td><td style={{ ...td, ...num }}>{money(cur, m.cogs)}</td><td style={{ ...td, ...num, fontWeight: 700, color: (m.gp || 0) < 0 ? C.red : C.green }}>{money(cur, m.gp)}</td><td style={{ ...td, ...num }}>{pct(m.gpPct)}</td><td style={{ ...td, ...num }}>{pct(m.pctOfSales)}</td></tr>))}
+            {!mods.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No data.</td></tr>}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+// ── 8) Sales & Bookings ───────────────────────────────────────────────────────
+export function SalesBookingsDash({ branch }) {
+  const { range, ...tb } = usePeriod('fy');
+  const cur = (bc(branch) || {}).cur || '₹';
+  const mpl = useModulePL(branch, range).data || {};
+  const igp = useInvoiceGP(branch, range).data || {};
+  const rows = igp.rows || [], deals = rows.length;
+  const sales = mpl?.totals?.sales || 0;
+  const topCust = topBy(rows, (r) => r.customer, (r) => r.sale, 10);
+  return (
+    <div style={{ margin: 12 }}>
+      <Toolbar title="Sales & Bookings" sub={`Sales, deals & top customers · ${range.label}`} period={tb.period} setPeriod={tb.setPeriod} custom={tb.custom} setCustom={tb.setCustom} branch={branch} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <KPI label="Total Sales" value={money(cur, sales)} />
+        <KPI label="Deals / Bookings" value={String(deals)} />
+        <KPI label="Avg Deal" value={money(cur, deals ? sales / deals : 0)} />
+        <KPI label="Gross Profit" value={money(cur, mpl?.totals?.gp || 0)} tone="good" />
+      </div>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ flex: '1 1 320px' }}><ListTable title="Sales by Module" rows={(mpl.modules || []).map((m) => ({ name: m.name || m.key, amount: m.sales }))} cur={cur} /></div>
+        <div style={{ flex: '1 1 320px' }}><ListTable title="Top 10 Customers (by sales)" rows={topCust} cur={cur} /></div>
+      </div>
+    </div>
+  );
+}
+
+// ── 9) Supplier / Purchase ────────────────────────────────────────────────────
+export function SupplierPurchaseDash({ branch }) {
+  const { range, ...tb } = usePeriod('fy');
+  const cur = (bc(branch) || {}).cur || '₹';
+  const mpl = useModulePL(branch, range).data || {};
+  const igp = useInvoiceGP(branch, range).data || {};
+  const age = useAgeing(branch).data || {};
+  const rows = igp.rows || [];
+  const topSup = topBy(rows, (r) => r.supplier, (r) => r.cost, 10);
+  const payRows = (age.payables?.rows || []).slice(0, 10);
+  return (
+    <div style={{ margin: 12 }}>
+      <Toolbar title="Supplier / Purchase" sub={`Purchases & payables · ${range.label}`} period={tb.period} setPeriod={tb.setPeriod} custom={tb.custom} setCustom={tb.setCustom} branch={branch} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <KPI label="Total Purchases" value={money(cur, mpl?.totals?.cogs || 0)} />
+        <KPI label="Payables Outstanding" value={money(cur, age.payables?.totals?.total || 0)} tone={(age.payables?.totals?.d90 || 0) ? 'bad' : undefined} sub={(age.payables?.totals?.d90 || 0) ? money(cur, age.payables.totals.d90) + ' overdue 90+' : ''} />
+        <KPI label="Suppliers" value={String(topBy(rows, (r) => r.supplier, () => 1, 9999).filter((s) => s.name !== '—').length)} />
+      </div>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ flex: '1 1 320px' }}><ListTable title="Top 10 Suppliers (by purchase)" rows={topSup} cur={cur} /></div>
+        <div style={{ flex: '1 1 320px' }}><ListTable title="Top Payables (outstanding)" rows={payRows.map((r) => ({ name: r.party, amount: r.total }))} cur={cur} valColor={(v) => v < 0 ? C.green : C.red} /></div>
+      </div>
+    </div>
+  );
+}
+
+// ── 10) Tax & Compliance ──────────────────────────────────────────────────────
+export function TaxComplianceDash({ branch }) {
+  const { range, ...tb } = usePeriod('mtd');
+  const cur = (bc(branch) || {}).cur || '₹';
+  const tax = useTaxSummary(branch, range).data || {};
+  return (
+    <div style={{ margin: 12 }}>
+      <Toolbar title="Tax & Compliance" sub={`GST / VAT position · ${range.label}`} period={tb.period} setPeriod={tb.setPeriod} custom={tb.custom} setCustom={tb.setCustom} branch={branch} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <KPI label="Output Tax" value={money(cur, tax.output?.total || 0)} />
+        <KPI label="Input Tax (ITC)" value={money(cur, tax.input?.total || 0)} />
+        <KPI label="Net Payable" value={money(cur, tax.netPayable || 0)} tone={(tax.netPayable || 0) > 0 ? 'bad' : 'good'} sub={(tax.netPayable || 0) >= 0 ? 'payable' : 'refundable'} />
+        <KPI label="TCS Payable" value={money(cur, tax.tcs?.payable || 0)} />
+      </div>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ flex: '1 1 320px' }}><ListTable title="Output Tax (on sales)" rows={(tax.output?.lines || []).map((l) => ({ name: l.ledger, amount: l.amount }))} cur={cur} right={<strong style={{ color: C.dark }}>{money(cur, tax.output?.total || 0)}</strong>} /></div>
+        <div style={{ flex: '1 1 320px' }}><ListTable title="Input Tax (on purchases)" rows={(tax.input?.lines || []).map((l) => ({ name: l.ledger, amount: l.amount }))} cur={cur} right={<strong style={{ color: C.dark }}>{money(cur, tax.input?.total || 0)}</strong>} /></div>
+      </div>
+    </div>
+  );
+}
+
+// ── 11) Expenses ──────────────────────────────────────────────────────────────
+export function ExpensesDash({ branch }) {
+  const { range, ...tb } = usePeriod('fy');
+  const cur = (bc(branch) || {}).cur || '₹';
+  const pl = useProfitAndLoss(branch, range).data || {};
+  const total = pl?.indirect?.debitTotal || 0;
+  // flatten expense heads from the indirect-expense group buckets
+  const heads = [];
+  (pl?.indirect?.debit || []).forEach((g) => (g.items || []).forEach((it) => heads.push({ name: it.name, amount: it.amount })));
+  if (!heads.length) (pl?.indirect?.debit || []).forEach((g) => heads.push({ name: g.name, amount: g.amount }));
+  heads.sort((a, b) => (b.amount || 0) - (a.amount || 0));
+  const maxv = Math.max(1, ...heads.map((h) => Math.abs(h.amount || 0)));
+  return (
+    <div style={{ margin: 12 }}>
+      <Toolbar title="Expenses" sub={`Indirect expenses by head · ${range.label}`} period={tb.period} setPeriod={tb.setPeriod} custom={tb.custom} setCustom={tb.setCustom} branch={branch} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <KPI label="Total Indirect Expense" value={money(cur, total)} />
+        <KPI label="Expense Heads" value={String(heads.length)} />
+        <KPI label="Largest Head" value={heads[0] ? money(cur, heads[0].amount) : '—'} sub={heads[0]?.name || ''} />
+      </div>
+      <Card title="Expenses by Head"><div style={{ padding: '10px 16px' }}>{heads.map((h) => miniBar(h.name, h.amount, maxv, '#c98', cur))}{!heads.length && <div style={{ color: C.dim, fontSize: 12 }}>No expenses for this period.</div>}</div></Card>
+    </div>
+  );
+}
+
+// ── 12) Approvals & Audit ─────────────────────────────────────────────────────
+export function ApprovalsAuditDash({ branch }) {
+  const cur = (bc(branch) || {}).cur || '₹';
+  const va = useVoucherApprovals(branch, 'pending').data || {};
+  const counts = va.counts || {};
+  const brCode = branch === 'ALL' || !branch ? '' : (branch.code || branch);
+  const bq = useQuery({ queryKey: ['booking-orders', brCode || 'all'], queryFn: () => apiGet('/api/booking-orders', { branch: brCode }) });
+  const bookings = bq.data || [];
+  const bCount = (s) => bookings.filter((b) => (s === 'approved' ? (b.status === 'approved' || b.status === 'posted') : b.status === s)).length;
+  const entries = (va.entries || []).slice(0, 15);
+  return (
+    <div style={{ margin: 12 }}>
+      <Toolbar title="Approvals & Audit" sub="Control queue — vouchers + SO/PO/GP bookings" period={'all'} setPeriod={() => {}} custom={null} setCustom={() => {}} branch={branch} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <KPI label="Vouchers Pending" value={String(counts.pending?.n || 0)} sub={money(cur, counts.pending?.amount || 0)} tone={(counts.pending?.n || 0) ? 'bad' : 'good'} />
+        <KPI label="Bookings Pending" value={String(bCount('pending'))} tone={bCount('pending') ? 'bad' : 'good'} />
+        <KPI label="Approved" value={String((counts.approved?.n || 0) + bCount('approved'))} tone="good" />
+        <KPI label="Rejected" value={String((counts.rejected?.n || 0) + bCount('rejected'))} />
+        <KPI label="Deleted" value={String((counts.deleted?.n || 0) + bCount('deleted'))} />
+      </div>
+      <Card title="Pending Vouchers (awaiting your sign-off)">
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr><th style={th}>Vch No</th><th style={th}>Type</th><th style={th}>Party</th><th style={{ ...th, ...num }}>Amount</th></tr></thead>
+          <tbody>
+            {entries.map((e, i) => (<tr key={i}><td style={{ ...td, fontFamily: 'monospace' }}>{e.vno}</td><td style={td}>{e.category || e.type}</td><td style={td}>{e.party || '—'}</td><td style={{ ...td, ...num }}>{money(cur, e.total)}</td></tr>))}
+            {!entries.length && <tr><td colSpan={4} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>Nothing pending — all caught up.</td></tr>}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
 // Router for the Director dropdown routes.
 export function DirectorDash({ which, branch }) {
   if (which === 'profitability') return <ProfitabilityDash branch={branch} />;
   if (which === 'cash') return <CashLiquidityDash branch={branch} />;
   if (which === 'arap') return <ReceivablesPayablesDash branch={branch} />;
   if (which === 'branch') return <BranchPerformanceDash />;
+  if (which === 'balance-sheet') return <BalanceSheetDash branch={branch} />;
+  if (which === 'module-gp') return <ModuleGpDash branch={branch} />;
+  if (which === 'sales') return <SalesBookingsDash branch={branch} />;
+  if (which === 'supplier') return <SupplierPurchaseDash branch={branch} />;
+  if (which === 'tax') return <TaxComplianceDash branch={branch} />;
+  if (which === 'expenses') return <ExpensesDash branch={branch} />;
+  if (which === 'audit') return <ApprovalsAuditDash branch={branch} />;
   return <ExecutiveOverview branch={branch} />;
 }

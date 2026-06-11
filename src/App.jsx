@@ -268,7 +268,7 @@ export default function KB360App(){
     if(route==="/masters/numbering")      return <NumberingSeriesMaster branch={branch}/>;
     if(route==="/dashboard")          return <DashboardRouter branch={branch} setRoute={navigate} currentUser={currentUser}/>;
     // Director/Super-Admin dashboard suite (menu is role-gated in getMenu).
-    if(/^\/dashboards\/(exec|profitability|cash|arap|branch)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch}/>;
+    if(/^\/dashboards\/(exec|profitability|cash|arap|branch|balance-sheet|module-gp|sales|supplier|tax|expenses|audit)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch}/>;
     if(route==="/bookings/new")       return <SoPoGpVoucherEntry branch={branch} setRoute={navigate}/>;
     // Unified Approvals — SO/PO/GP + Vouchers, each with Pending/Approved/Rejected/Deleted.
     if(route==="/transactions/approvals")          return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="sopogp"/>;
