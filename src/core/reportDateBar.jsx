@@ -20,14 +20,22 @@
 import React from 'react';
 import { isoDate, todayISO } from './dates';
 import { inp } from './styles';
+import { periodRange } from './period';
 
 // FY (Apr–Mar) start year for a given date: Jan–Mar belongs to the prior FY.
 const fyStartYearOf = (d = new Date()) => (d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1);
 
-/** Resolve a quick-filter preset to a concrete { from, to } ISO window. */
-export function resolveReportRange(mode) {
+/** Resolve a quick-filter preset to a concrete { from, to } ISO window.
+ *  Uniform presets (today/week/mtd/qtd/cfy/lfy) delegate to the shared periodRange
+ *  (per-branch FY). 'all' → blank window (backend loads full history = inception→today).
+ *  Legacy modes (month/quarter/ytd) kept so any saved state still resolves. */
+export function resolveReportRange(mode, branch) {
   const now = new Date();
   if (mode === 'all') return { from: '', to: '' };                       // no constraints
+  if (['today', 'week', 'mtd', 'qtd', 'cfy', 'lfy'].includes(mode)) {
+    const r = periodRange(mode, { branch });
+    return { from: r.from, to: r.to };
+  }
   if (mode === 'month') {                                                // current calendar month
     return {
       from: isoDate(new Date(now.getFullYear(), now.getMonth(), 1)),
@@ -61,13 +69,13 @@ export function toQueryParams({ from, to } = {}) {
   return p;
 }
 
-export function ReportDateBar({ value, onChange }) {
-  const { mode = 'month', from = '', to = '' } = value || {};
-  const pick = (m) => { const r = resolveReportRange(m); onChange({ mode: m, from: r.from, to: r.to }); };
+export function ReportDateBar({ value, onChange, branch }) {
+  const { mode = 'cfy', from = '', to = '' } = value || {};
+  const pick = (m) => { const r = resolveReportRange(m, branch); onChange({ mode: m, from: r.from, to: r.to }); };
   // Manual edits switch to Custom and clear the active preset highlight.
   const editFrom = (v) => onChange({ mode: 'custom', from: v, to });
   const editTo = (v) => onChange({ mode: 'custom', from, to: v });
-  const PRESETS = [['month', 'Monthly'], ['quarter', 'Quarterly'], ['ytd', 'YTD'], ['all', 'All']];
+  const PRESETS = [['all', 'All'], ['today', 'Today'], ['week', 'Week'], ['mtd', 'MTD'], ['qtd', 'QTD'], ['lfy', 'LFY'], ['cfy', 'CFY']];
   const btn = (active) => ({ padding: '7px 13px', fontSize: 11.5, fontWeight: 700, border: `1px solid ${active ? '#0d1326' : '#e1e3ec'}`, background: active ? '#0d1326' : '#fff', color: active ? '#d4a437' : '#5a6691', borderRadius: 7, cursor: 'pointer' });
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>

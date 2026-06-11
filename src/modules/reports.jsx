@@ -1104,7 +1104,7 @@ export function ReportCommission({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Override commission from airlines, insurers, hotels · TDS 194H on payout</p>
           </div>
         </div>
-        <ReportDateBar value={range} onChange={setRange}/>
+        <ReportDateBar value={range} onChange={setRange} branch={branch}/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>
         {[
@@ -1411,7 +1411,7 @@ export function ClientConcentration({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Revenue dependency by client — diversification analysis</p>
           </div>
         </div>
-        <ReportDateBar value={range} onChange={setRange}/>
+        <ReportDateBar value={range} onChange={setRange} branch={branch}/>
       </div>
 
       {/* Risk alerts */}
@@ -1708,7 +1708,7 @@ export function ConsultantReport({branch}){
           </div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-          <ReportDateBar value={range} onChange={setRange}/>
+          <ReportDateBar value={range} onChange={setRange} branch={branch}/>
           <button onClick={()=>setView("table")} style={{padding:"7px 14px",border:"none",cursor:"pointer",fontWeight:view==="table"?700:500,background:view==="table"?"#fff":"transparent",borderRadius:6}}>📊 Table</button><button onClick={()=>setView("trend")} style={{padding:"7px 14px",border:"none",cursor:"pointer",fontWeight:view==="trend"?700:500,background:view==="trend"?"#fff":"transparent",borderRadius:6}}>📈 Trend</button>
           <button onClick={()=>exportToCSV(stats,["name","rev","cost","gp","gpPct","bks","avgTicket","topMod"],"consultants.csv")} style={{...btnGh,fontSize:11}}><Download size={12}/> CSV</button>
         </div>
@@ -1873,7 +1873,7 @@ export function ClientStatement({branch}){
             <option value="">— Select client —</option>
             {clients.map(c=><option key={c}>{c}</option>)}
           </select>
-          <ReportDateBar value={range} onChange={setRange}/>
+          <ReportDateBar value={range} onChange={setRange} branch={branch}/>
           <button onClick={()=>window.open(`https://wa.me/?text=${encodeURIComponent(`Hi! Your account statement for ${rangeLabel} — Outstanding: ${f(outstanding)}. Please contact us to settle the balance.`)}`, "_blank","noopener")} style={{...btnG,fontSize:11,background:"#25D366"}}>💬 WhatsApp</button>
           <button onClick={()=>window.print()} style={{...btnGh,fontSize:11}}><Printer size={12}/> Print</button>
         </div>
@@ -2066,7 +2066,7 @@ export function DestinationIntelligence({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{destRows.length} destinations · {bills.length} bookings · Revenue & GP breakdown</p>
           </div>
         </div>
-        <ReportDateBar value={range} onChange={setRange}/>
+        <ReportDateBar value={range} onChange={setRange} branch={branch}/>
       </div>
 
       {/* Destination cards */}
@@ -3166,7 +3166,7 @@ export function RPT_TaxSummary({ branch }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <ReportDateBar value={range} onChange={setRange} />
+          <ReportDateBar value={range} onChange={setRange}  branch={branch}/>
           <button onClick={() => exportToCSV(exportRows, ['section', 'ledger', 'amount'], 'tax-summary.csv')} style={{ ...btnGh, fontSize: 11 }} disabled={!exportRows.length}><Download size={12} /> CSV</button>
         </div>
       </div>

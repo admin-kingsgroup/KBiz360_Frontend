@@ -147,7 +147,7 @@ export function Supplier360({branch}){
           </div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-          <ReportDateBar value={range} onChange={setRange}/>
+          <ReportDateBar value={range} onChange={setRange} branch={branch}/>
           <select value={selSupplier} onChange={e=>setSupplier(e.target.value)} disabled={!ALL_SUPPLIERS.length} style={{...inp,width:220,minHeight:32,fontSize:11,opacity:ALL_SUPPLIERS.length?1:0.6}}>
             {ALL_SUPPLIERS.length
               ? ALL_SUPPLIERS.map(s=><option key={s}>{s}</option>)
