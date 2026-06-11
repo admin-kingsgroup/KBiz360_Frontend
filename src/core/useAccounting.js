@@ -371,6 +371,18 @@ export function useSettleAdvance() {
   });
 }
 
+// Live dashboard auto-alerts (overdue, on-account, pending, idle ledgers, masters
+// missing credit terms, …). { generatedAt, counts, alerts:[{severity,type,title,detail,link}] }.
+export function useAlerts(branch) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['alerts', code || 'all'],
+    queryFn: () => apiGet('/api/alerts', { branch: code }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 // Single voucher (drill-down target) — view + edit.
 export function useVoucher(id) {
   return useQuery({

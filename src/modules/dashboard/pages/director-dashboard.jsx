@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertsPanel } from '../../alertsPanel';
 import { DashboardHeader } from '../../../core/helpers';
 import { KPICard, WidgetCard } from '../../../core/styles';
 import { fmtINR } from '../../../core/format';
@@ -100,6 +101,7 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
     <div style={{ padding: 18, maxWidth: 1400, margin: '0 auto' }}>
       <DashboardHeader title="Director Dashboard" subtitle="Whole-company owner view" user={currentUser} onExport={() => window.print()} />
       {Controls}
+      <AlertsPanel branch={scope} onGo={navigate} />
 
       {/* ── Headline KPIs ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, marginBottom: 16 }}>

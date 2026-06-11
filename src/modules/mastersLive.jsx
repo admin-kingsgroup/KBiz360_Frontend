@@ -13,6 +13,7 @@ import { Plus, Pencil, Trash2, X, Download, Copy } from 'lucide-react';
 import { card, inp } from '../core/styles';
 import { ACTIVE_CURRENCIES, BRANCHES, BRANCH_CODES, VAT_RATE } from '../core/data';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
+import { branchCode } from '../core/useAccounting';
 import { apiPost } from '../core/api';
 import { exportToExcel } from '../core/exportExcel';
 
@@ -253,8 +254,14 @@ export const CustomersMaster = () => (
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'branch', label: 'Branch', type: 'text' },
+      { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
+      { key: 'address', label: 'Address', type: 'text', table: false },
+      { key: 'city', label: 'City', type: 'text', table: false },
       { key: 'phone', label: 'Phone', type: 'text' },
-      { key: 'email', label: 'Email', type: 'text' },
+      { key: 'contact', label: 'Contact', type: 'text', table: false },
+      { key: 'email', label: 'Email', type: 'text', table: false },
+      { key: 'creditLimit', label: 'Credit Limit', type: 'number' },
+      { key: 'creditDays', label: 'Credit Days', type: 'number' },
     ]} />
 );
 
@@ -431,7 +438,7 @@ function ReplicateChartModal({ onClose, onDone }) {
   );
 }
 
-export const LedgersMaster = () => {
+export const LedgersMaster = ({ branch }) => {
   // Suggest group names in a dropdown — live from /api/groups (28 Tally + custom),
   // falling back to the 28 Tally names until the list loads.
   const groupsQ = useMasterList('groups');
@@ -456,7 +463,7 @@ export const LedgersMaster = () => {
   // Branch view filter (a branch chart = its own ledgers + the org-wide 'ALL'
   // ledgers; see ledgers.service.getAll) and the Replicate-chart action.
   const qc = useQueryClient();
-  const [branchView, setBranchView] = useState('ALL');
+  const [branchView, setBranchView] = useState(branchCode(branch) || 'ALL'); // default to the current branch
   const [replicating, setReplicating] = useState(false);
   const branchOptions = ['ALL', ...BRANCH_CODES];
 

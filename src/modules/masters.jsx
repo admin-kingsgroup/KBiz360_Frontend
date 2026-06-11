@@ -2036,9 +2036,6 @@ export function ApprovalLimitsMaster(){
 export function NumberingSeriesMaster({branch}){
   const [filterBranch,setFilterBranch]=useState(branch==="ALL"?"BOM":branch?.code||"BOM");
   const [search,setSearch]=useState("");
-  const [edit,setEdit]=useState(null);          // {id?,branch,voucherType,prefix,format,nextNo,active}
-  const [saving,setSaving]=useState(false);
-  const [err,setErr]=useState("");
   const nq=useNumberingSeries();
   const series=nq.data||[];                       // DB-backed (/api/numbering-series)
   const now=new Date(), yy=String(now.getFullYear()).slice(-2), yyyy=String(now.getFullYear()), mm=String(now.getMonth()+1).padStart(2,"0");
@@ -2060,19 +2057,7 @@ export function NumberingSeriesMaster({branch}){
   })();
   const filtered=rows.filter(n=>{ if(!search)return true; const q=search.toLowerCase(); return (n.voucherType||"").toLowerCase().includes(q)||(n.prefix||"").toLowerCase().includes(q)||(n.format||"").toLowerCase().includes(q); });
   const th={padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#5a6691",borderBottom:"1px solid #e1e3ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"};
-  const openEdit=(n)=>{ setErr(""); setEdit({ id:n._virtual?undefined:n.id, branch:n.branch, voucherType:n.voucherType, prefix:n.prefix, format:n.format, nextNo:n.nextNo, active:n.active!==false }); };
-  const openAdd=()=>{ setErr(""); setEdit({ id:undefined, branch:filterBranch==="ALL"?"BOM":filterBranch, voucherType:"", prefix:"", format:"{PREFIX}/{BR}/{YY}/{####}", nextNo:1, active:true }); };
-  const save=async()=>{
-    const b=edit; if(!(b.voucherType||"").trim()||!(b.prefix||"").trim()){ setErr("Voucher Type and Prefix are required"); return; }
-    setSaving(true); setErr("");
-    try{
-      const body={ branch:b.branch, voucherType:b.voucherType.trim(), prefix:b.prefix.trim(), format:(b.format||"").trim()||"{PREFIX}/{BR}/{YY}/{####}", nextNo:Number(b.nextNo)||1, active:!!b.active };
-      if(b.id) await apiPut(`/api/numbering-series/${b.id}`,body); else await apiPost(`/api/numbering-series`,body);
-      await nq.refetch(); setEdit(null);
-    }catch(e){ setErr(e.message||"Save failed"); } finally{ setSaving(false); }
-  };
-  const ef=e=>({...e}); // shorthand
-  return MASTER_PAGE("Numbering Series Master","Per branch × per voucher type. Tokens: {BR} branch · {YY}/{YYYY} year · {MM}/{MMYY} month · {PREFIX} · {####}/{#####} sequence. Every voucher is auto-numbered (manual entry + bulk import).",
+  return MASTER_PAGE("Numbering Series Master","🔒 Numbering is fully AUTOMATIC and SYSTEM-CONTROLLED — prefix, format and sequence are locked and cannot be edited. Every voucher (manual entry + bulk import) is numbered automatically; a series is created on first use. “Next No” = the next number that will be issued.",
     <>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
         <input type="text" placeholder="Search type, prefix, format..." value={search} onChange={e=>setSearch(e.target.value)}
@@ -2083,13 +2068,13 @@ export function NumberingSeriesMaster({branch}){
           {BRANCH_CODES.map(b=><option key={b} value={b}>{b}</option>)}
         </select>
         <ExportBtn name="numbering-series" rows={filtered} columns={[{key:"branch",label:"Branch"},{key:"voucherType",label:"Voucher Type"},{key:"prefix",label:"Prefix"},{key:"format",label:"Format"},{key:"nextNo",label:"Next No"},{key:"active",label:"Active"}]}/>
-        <button onClick={openAdd} style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Series</button>
+        <span style={{padding:"8px 14px",background:"#eef3fb",color:"#185FA5",borderRadius:6,fontSize:11.5,fontWeight:700,display:"inline-flex",alignItems:"center",gap:6}}>🔒 System-controlled · read-only</span>
       </div>
       <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
           <thead style={{background:"#f7f8fb"}}><tr>
             <th style={th}>Branch</th><th style={th}>Voucher Type</th><th style={th}>Prefix</th><th style={th}>Format</th>
-            <th style={{...th,textAlign:"right"}}>Next No</th><th style={th}>Preview (next number)</th><th style={{...th,textAlign:"center"}}>Status</th><th style={{...th,textAlign:"center"}}>Action</th>
+            <th style={{...th,textAlign:"right"}}>Next No</th><th style={th}>Preview (next number)</th><th style={{...th,textAlign:"center"}}>Status</th>
           </tr></thead>
           <tbody>
             {filtered.map((n,i)=>{
@@ -2102,43 +2087,13 @@ export function NumberingSeriesMaster({branch}){
                   <td style={{padding:"9px 12px",fontFamily:"monospace",color:"#5a6691"}}>{n.format}</td>
                   <td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",fontWeight:700,color:"#0d1326"}}>{n._virtual?"—":n.nextNo}</td>
                   <td style={{padding:"9px 12px",fontFamily:"monospace",color:"#d4a437",fontWeight:600}}>{preview}</td>
-                  <td style={{padding:"9px 12px",textAlign:"center"}}><span style={{padding:"2px 7px",background:n._virtual?"#fff3cd":(n.active?"#d4edda":"#f8d7da"),color:n._virtual?"#856404":(n.active?"#155724":"#721c24"),borderRadius:3,fontSize:10.5,fontWeight:600}}>{n._virtual?"Auto (not set)":(n.active?"Active":"Inactive")}</span></td>
-                  <td style={{padding:"9px 12px",textAlign:"center"}}>
-                    <button onClick={()=>openEdit(n)} style={{padding:"3px 10px",background:"transparent",border:"1px solid #d4a437",color:"#d4a437",borderRadius:4,fontSize:10.5,cursor:"pointer",fontWeight:600}}>{n._virtual?"Set up":"Edit"}</button>
-                  </td>
+                  <td style={{padding:"9px 12px",textAlign:"center"}}><span style={{padding:"2px 7px",background:n._virtual?"#e6f0ff":(n.active?"#d4edda":"#f8d7da"),color:n._virtual?"#185FA5":(n.active?"#155724":"#721c24"),borderRadius:3,fontSize:10.5,fontWeight:600}} title={n._virtual?"Auto-numbered on first use":"Auto"}>🔒 {n._virtual?"Auto":(n.active?"Active":"Inactive")}</span></td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-
-      {edit&&(
-        <div onClick={()=>setEdit(null)} style={{position:"fixed",inset:0,background:"rgba(13,19,38,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",width:"min(520px,96vw)",borderRadius:10,boxShadow:"0 12px 40px rgba(0,0,0,0.3)",overflow:"hidden"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #eef1f6",fontWeight:800,color:"#0d1326",fontSize:15}}>{edit.id?"Edit":"Add"} Numbering Series</div>
-            <div style={{padding:"16px 18px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              <div><div style={{fontSize:10.5,fontWeight:700,color:"#5a6691",marginBottom:4}}>Branch</div>
-                <select value={edit.branch} onChange={e=>setEdit({...ef(edit),branch:e.target.value})} style={{width:"100%",padding:"8px 10px",border:"1px solid #d6dbe6",borderRadius:6,fontSize:12.5}}>{BRANCH_CODES.map(b=><option key={b} value={b}>{b}</option>)}</select></div>
-              <div><div style={{fontSize:10.5,fontWeight:700,color:"#5a6691",marginBottom:4}}>Voucher Type</div>
-                <input value={edit.voucherType} onChange={e=>setEdit({...ef(edit),voucherType:e.target.value})} placeholder="RV / PMT / JV…" style={{width:"100%",padding:"8px 10px",border:"1px solid #d6dbe6",borderRadius:6,fontSize:12.5}}/></div>
-              <div><div style={{fontSize:10.5,fontWeight:700,color:"#5a6691",marginBottom:4}}>Prefix</div>
-                <input value={edit.prefix} onChange={e=>setEdit({...ef(edit),prefix:e.target.value})} placeholder="RV" style={{width:"100%",padding:"8px 10px",border:"1px solid #d6dbe6",borderRadius:6,fontSize:12.5,fontFamily:"monospace"}}/></div>
-              <div><div style={{fontSize:10.5,fontWeight:700,color:"#5a6691",marginBottom:4}}>Next No</div>
-                <input type="number" value={edit.nextNo} onChange={e=>setEdit({...ef(edit),nextNo:e.target.value})} style={{width:"100%",padding:"8px 10px",border:"1px solid #d6dbe6",borderRadius:6,fontSize:12.5}}/></div>
-              <div style={{gridColumn:"1 / -1"}}><div style={{fontSize:10.5,fontWeight:700,color:"#5a6691",marginBottom:4}}>Format</div>
-                <input value={edit.format} onChange={e=>setEdit({...ef(edit),format:e.target.value})} placeholder="{PREFIX}/{BR}/{YY}/{####}" style={{width:"100%",padding:"8px 10px",border:"1px solid #d6dbe6",borderRadius:6,fontSize:12.5,fontFamily:"monospace"}}/></div>
-              <div style={{gridColumn:"1 / -1",fontSize:11.5,color:"#5a6691"}}>Preview: <b style={{fontFamily:"monospace",color:"#d4a437"}}>{resolve(edit.format,edit.prefix,edit.nextNo,edit.branch)}</b></div>
-              <label style={{gridColumn:"1 / -1",display:"flex",alignItems:"center",gap:7,fontSize:12.5,color:"#0d1326"}}><input type="checkbox" checked={!!edit.active} onChange={e=>setEdit({...ef(edit),active:e.target.checked})}/> Active</label>
-              {err&&<div style={{gridColumn:"1 / -1",color:"#A32D2D",fontSize:11.5,fontWeight:600}}>⚠ {err}</div>}
-            </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #eef1f6",display:"flex",justifyContent:"flex-end",gap:8}}>
-              <button onClick={()=>setEdit(null)} style={{padding:"8px 14px",borderRadius:6,border:"1px solid #d6dbe6",background:"#fff",color:"#5a6691",fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
-              <button disabled={saving} onClick={save} style={{padding:"8px 18px",borderRadius:6,border:"none",background:"#27500A",color:"#fff",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>{saving?"Saving…":"Save"}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

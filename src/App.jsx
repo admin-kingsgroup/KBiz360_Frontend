@@ -365,8 +365,8 @@ export default function KB360App(){
     if(route==="/settings/audit")        return <SettingsAudit/>;
     if(route==="/masters/groups")        return <GroupsMaster/>;                 // read-only: the 28 fixed Tally groups
     if(route==="/masters/subgroups")     return <SubGroupsMaster/>;              // CRUD: custom sub-groups (any depth)
-    if(route==="/masters/chart-builder") return <ChartBuilder/>;                  // hierarchical: Parent Group ▸ Group ▸ Sub-Group ▸ Ledger
-    if(route==="/masters/ledgers")    return <LedgersMaster/>;                    // editable ledger master (live CRUD)
+    if(route==="/masters/chart-builder") return <ChartBuilder branch={branch}/>;  // hierarchical: Parent Group ▸ Group ▸ Sub-Group ▸ Ledger
+    if(route==="/masters/ledgers")    return <LedgersMaster branch={branch}/>;     // editable ledger master (live CRUD)
     if(route==="/masters/groups-view")   return <LedgerGroupsLive/>;              // read-only 28-group reference
     if(route==="/masters/ledgers-view")  return <ChartOfAccountsLive branch={branch}/>; // read-only chart of accounts
     if(route==="/masters/accounts-info") return <AccountsChartLive branch={branch}/>;  // Groups/Sub-Groups/Ledgers — tree + side-by-side

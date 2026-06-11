@@ -13,6 +13,42 @@ import { useMobile } from '../core/hooks';
 import { B, FL, RPT_tdStyle, RPT_thStyle, btnG, btnGh, card, inp, tabBtnStyle } from '../core/styles';
 import { CUR_MONTH, MONTH_OPTIONS, monthLabel, rangeNote } from '../core/dates';
 import { Dashboard } from './dashboard';
+import { useQueries, useQuery } from '@tanstack/react-query';
+import { apiGet } from '../core/api';
+
+// ── Live consolidated group data (all branches, INR-normalised) ──────────────
+// Replaces the old GROUP_DASH_DATA / GP_BILLS seed: per-branch P&L + invoice GP,
+// plus group cash (Trial Balance) + overdue receivables (Ageing) + top customers.
+function useGroupLive(period) {
+  const from = `${period}-01`, to = `${period}-31`;
+  const brs = BRANCHES.filter((b) => b.code && b.code !== 'ALL');
+  const pq = useQueries({ queries: brs.map((b) => ({ queryKey: ['accounting', 'pnl', b.code, from, to], queryFn: () => apiGet('/api/accounting/profit-and-loss', { branch: b.code, from, to }) })) });
+  const iq = useQueries({ queries: brs.map((b) => ({ queryKey: ['accounting', 'invoice-gp', b.code, from, to], queryFn: () => apiGet('/api/accounting/invoice-gp', { branch: b.code, from, to }) })) });
+  const tb = useQuery({ queryKey: ['accounting', 'tb', 'ALL', from, to], queryFn: () => apiGet('/api/accounting/trial-balance', { from, to }) });
+  const ag = useQuery({ queryKey: ['accounting', 'ageing', 'ALL'], queryFn: () => apiGet('/api/accounting/ageing', {}) });
+  const invAll = useQuery({ queryKey: ['accounting', 'invoice-gp', 'ALL', from, to], queryFn: () => apiGet('/api/accounting/invoice-gp', { from, to }) });
+
+  const rows = brs.map((b, i) => {
+    const p = pq[i].data || {}, inv = iq[i].data || {};
+    const rev = (p.trading && p.trading.creditTotal) || 0;
+    const cost = (p.trading && p.trading.debitTotal) || 0;
+    const gp = p.grossProfit || 0;
+    const exp = (p.indirect && p.indirect.debitTotal) || 0;
+    const np = p.netProfit || 0;
+    const rate = FX_RATES[b.currency] || 1;
+    return { code: b.code, flag: b.flag, city: b.city, cur: b.cur, rate, rev, cost, gp, exp, np, gpPct: rev > 0 ? +(gp / rev * 100).toFixed(1) : 0, books: ((inv.rows) || []).length, revINR: rev * rate, costINR: cost * rate, gpINR: gp * rate, npINR: np * rate };
+  });
+  const totals = rows.reduce((a, r) => ({ rev: a.rev + r.revINR, cost: a.cost + r.costINR, gp: a.gp + r.gpINR, np: a.np + r.npINR, books: a.books + r.books }), { rev: 0, cost: 0, gp: 0, np: 0, books: 0 });
+  totals.gpPct = totals.rev > 0 ? +(totals.gp / totals.rev * 100).toFixed(1) : 0;
+  const tbRows = (tb.data && tb.data.rows) || [];
+  const cash = Math.round(tbRows.filter((r) => /bank|cash/i.test(r.group || '')).reduce((s, r) => s + ((r.closingDebit || 0) - (r.closingCredit || 0)), 0));
+  const recv = (ag.data && ag.data.receivables) || { rows: [], totals: {} };
+  const overdue = { amount: Math.round(recv.totals.total || 0), count: (recv.rows || []).length, over90: Math.round(recv.totals.d90 || 0) };
+  const cmap = {}; ((invAll.data && invAll.data.rows) || []).forEach((r) => { cmap[r.party || '—'] = (cmap[r.party || '—'] || 0) + (r.sale || 0); });
+  const topCustomers = Object.entries(cmap).map(([name, revenue]) => ({ name, revenue })).sort((a, b) => b.revenue - a.revenue).slice(0, 6);
+  const loading = pq.some((q) => q.isLoading) || tb.isLoading || ag.isLoading;
+  return { rows, totals, cash, overdue, topCustomers, loading };
+}
 import { PHASE2_Page } from '../shell/PHASE2_Page';
 
 export function GroupDashboard(){
@@ -20,29 +56,12 @@ export function GroupDashboard(){
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
 
-  /* INR conversion rates */
-  const FX=FX_RATES;
-
-  const getBranch=(code)=>{
-    const bills=GP_BILLS.filter(b=>b.branch===code&&b.date.startsWith(period));
-    const acts=EXP_ACTUALS.filter(a=>a.br===code&&a.m===period);
-    const br=BRANCHES.find(b=>b.code===code)||{cur:"₹"};
-    const rate=FX[br.currency]||1;
-    const rev=bills.reduce((s,b)=>s+b.sell,0);
-    const cost=bills.reduce((s,b)=>s+b.cost,0);
-    const exp=acts.reduce((s,a)=>s+a.a,0);
-    const gp=rev-cost;
-    const np=gp-exp;
-    return {code,rev,cost,gp,exp,np,gpPct:rev>0?+(gp/rev*100).toFixed(1):0,
-      books:bills.length,revINR:rev*rate,gpINR:gp*rate,npINR:np*rate,
-      flag:br.flag,city:br.city,cur:br.cur,rate};
-  };
-
-  const branchData=["BOM","AMD"].map(getBranch);
-  const groupRevINR=branchData.reduce((s,b)=>s+b.revINR,0);
-  const groupGPINR =branchData.reduce((s,b)=>s+b.gpINR,0);
-  const groupNPINR =branchData.reduce((s,b)=>s+b.npINR,0);
-  const groupGPPct =groupRevINR>0?+(groupGPINR/groupRevINR*100).toFixed(1):0;
+  // Live, consolidated across all branches (INR-normalised) — no seed.
+  const { rows: branchData, totals, loading } = useGroupLive(period);
+  const groupRevINR=totals.rev;
+  const groupGPINR =totals.gp;
+  const groupNPINR =totals.np;
+  const groupGPPct =totals.gpPct;
 
   const fmt=n=>"₹"+Number(Math.round(n/1000)).toLocaleString()+"K";
   const fmtL=n=>"₹"+(n/100000).toFixed(1)+"L";
@@ -691,30 +710,31 @@ export function HOBankingControl(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function GroupMonthlyDashboard(){
-  const d=GROUP_DASH_DATA;
-  const totalRev=d.pnlByBranch.reduce((s,b)=>s+b.revenue,0);
-  const totalCost=d.pnlByBranch.reduce((s,b)=>s+b.cost,0);
-  const totalGP=totalRev-totalCost;
-  const gpPct=((totalGP/totalRev)*100).toFixed(1);
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const g=useGroupLive(period);
+  const pnlByBranch=g.rows.map(r=>({branch:r.code,revenue:r.revINR,cost:r.costINR,gp:r.gpINR,gpPct:r.gpPct,bookings:r.books}));
+  const totalRev=g.totals.rev, totalCost=g.totals.cost, totalGP=g.totals.gp;
+  const gpPct=(g.totals.gpPct||0).toFixed(1);
+  const today=new Date().toISOString().slice(0,10);
   return(
     <PHASE2_Page title="Group Monthly Dashboard — Travkings Group"
-      subtitle={`Published by ${d.publishedBy} on ${d.publishedOn} · Month ended: ${d.monthEnded} · Auto-emailed to Director & Sr.FM`}
-      toolbar={<><span style={{padding:"5px 12px",background:"#d4edda",color:"#155724",borderRadius:4,fontSize:11,fontWeight:700}}>✓ Published on 5th</span><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Export PDF</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📧 Re-send to Board</button></>}>
+      subtitle={`🟢 Live · all branches (INR-normalised) · ${monthLabel(period)} · generated ${today}`}
+      toolbar={<><select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>{MONTH_OPTIONS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}</select><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Export PDF</button></>}>
 
       {/* Group KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
         <div style={{...cardStyle,borderTop:"3px solid #22c55e"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Group Revenue</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:700,color:"#0d1326"}}>{fmtINR(totalRev)}</p></div>
         <div style={{...cardStyle,borderTop:"3px solid #d4a437"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Gross Profit</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:700,color:"#22c55e"}}>{fmtINR(totalGP)}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{gpPct}% margin</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #3b82f6"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Group Cash</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:700,color:"#0d1326"}}>{fmtINR(d.cash.total)}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>INR</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #A32D2D"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Overdue Receivables</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:700,color:"#A32D2D"}}>{fmtINR(d.overdue.amount)}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{d.overdue.count} invoices, {d.overdue.over90} over 90d</p></div>
+        <div style={{...cardStyle,borderTop:"3px solid #3b82f6"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Group Cash & Bank</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:700,color:"#0d1326"}}>{fmtINR(g.cash)}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>INR · live</p></div>
+        <div style={{...cardStyle,borderTop:"3px solid #A32D2D"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Overdue Receivables</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:700,color:"#A32D2D"}}>{fmtINR(g.overdue.amount)}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{g.overdue.count} invoices · {fmtINR(g.overdue.over90)} 90d+</p></div>
       </div>
 
       {/* P&L by branch */}
       <div style={{...cardStyle,marginBottom:14}}>
-        <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>1️⃣ P&L by Branch — {d.monthEnded}</p>
+        <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>1️⃣ P&L by Branch — {monthLabel(period)}</p>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"right"}}>Revenue</th><th style={{...RPT_thStyle,textAlign:"right"}}>Cost</th><th style={{...RPT_thStyle,textAlign:"right"}}>GP</th><th style={{...RPT_thStyle,textAlign:"right"}}>GP %</th><th style={{...RPT_thStyle,textAlign:"right"}}>Bookings</th></tr></thead>
-          <tbody>{d.pnlByBranch.map(b=>(
+          <tbody>{pnlByBranch.map(b=>(
             <tr key={b.branch} style={{borderBottom:"1px solid #f0f2f7",background:"#fff"}}>
               <td style={{...RPT_tdStyle,fontWeight:700}}><span style={{padding:"2px 7px",background:"#0d1326",color:"#d4a437",borderRadius:3,fontSize:10.5,fontWeight:700}}>{b.branch}</span></td>
               <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(b.revenue)}</td>
@@ -730,7 +750,7 @@ export function GroupMonthlyDashboard(){
             <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,fontFamily:"monospace"}}>{fmtINR(totalCost)}</td>
             <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#22c55e",fontFamily:"monospace"}}>{fmtINR(totalGP)}</td>
             <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{gpPct}%</td>
-            <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{d.pnlByBranch.reduce((s,b)=>s+b.bookings,0)}</td>
+            <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{pnlByBranch.reduce((s,b)=>s+b.bookings,0)}</td>
           </tr>
           </tbody>
         </table>
@@ -739,22 +759,24 @@ export function GroupMonthlyDashboard(){
       {/* Two-column: Consultants & Customers */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
         <div style={cardStyle}>
-          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>2️⃣ Top Consultants (GP)</p>
-          {d.topConsultants.map((c,i)=>(
-            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f0f2f7"}}>
-              <div><span style={{fontSize:11,color:"#5a6691",fontWeight:700,marginRight:8}}>#{i+1}</span><span style={{fontSize:12,fontWeight:600,color:"#0d1326"}}>{c.name}</span></div>
-              <div style={{textAlign:"right"}}><p style={{margin:0,fontSize:12,fontWeight:700,color:"#22c55e"}}>{fmtINR(c.gp)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>{c.bookings} bookings</p></div>
+          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>2️⃣ GP by Branch (live)</p>
+          {g.rows.slice().sort((a,b)=>b.gpINR-a.gpINR).map((c,i)=>(
+            <div key={c.code} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f0f2f7"}}>
+              <div><span style={{fontSize:11,color:"#5a6691",fontWeight:700,marginRight:8}}>#{i+1}</span><span style={{fontSize:12,fontWeight:600,color:"#0d1326"}}>{c.flag} {c.code} · {c.city}</span></div>
+              <div style={{textAlign:"right"}}><p style={{margin:0,fontSize:12,fontWeight:700,color:c.gpINR>=0?"#22c55e":"#A32D2D"}}>{fmtINR(c.gpINR)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>{c.books} bookings</p></div>
             </div>
           ))}
+          {!g.rows.length&&<p style={{fontSize:11,color:"#5a6691"}}>No data yet.</p>}
         </div>
         <div style={cardStyle}>
-          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>3️⃣ Top Customers (Revenue)</p>
-          {d.topCustomers.map((c,i)=>(
-            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f0f2f7"}}>
+          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>3️⃣ Top Customers (Revenue · live)</p>
+          {g.topCustomers.map((c,i)=>(
+            <div key={c.name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f0f2f7"}}>
               <div><span style={{fontSize:11,color:"#5a6691",fontWeight:700,marginRight:8}}>#{i+1}</span><span style={{fontSize:12,fontWeight:600,color:"#0d1326"}}>{c.name}</span></div>
-              <div style={{textAlign:"right"}}><p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{fmtINR(c.revenue)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>{c.branch}</p></div>
+              <div style={{textAlign:"right"}}><p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{fmtINR(c.revenue)}</p></div>
             </div>
           ))}
+          {!g.topCustomers.length&&<p style={{fontSize:11,color:"#5a6691"}}>No invoiced customers in this period yet.</p>}
         </div>
       </div>
 
@@ -762,7 +784,7 @@ export function GroupMonthlyDashboard(){
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
         <div style={cardStyle}>
           <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>4️⃣ Group Cash Position</p>
-          {[{cur:"INR",amt:d.cash.inr,sym:"₹"}].map(c=>(
+          {[{cur:"INR",amt:g.cash,sym:"₹"}].map(c=>(
             <div key={c.cur} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f0f2f7"}}>
               <span style={{fontSize:12,color:"#0d1326",fontWeight:600}}>{c.cur}</span>
               <span style={{fontSize:12,fontWeight:700,color:"#0d1326",fontFamily:"monospace"}}>{c.sym} {c.amt.toLocaleString("en-IN")}</span>
