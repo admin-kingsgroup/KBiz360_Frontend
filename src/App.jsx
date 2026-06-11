@@ -249,9 +249,9 @@ export default function KB360App(){
     if(route==="/finance/bank-balance")  return <BankBalanceDashboard/>;
     if(route==="/finance/tds-calculator")return <TDSCalculator/>;
     if(route==="/finance/interest-calc") return <InterestCalculator/>;
-    if(route==="/finance/investments")   return <InvestmentRegister/>;
+    if(route==="/finance/investments")   return <InvestmentRegister branch={branch}/>;
     if(route==="/finance/loan-amort")    return <LoanAmortization/>;
-    if(route==="/finance/reco-queue")    return <ReconciliationQueue/>;
+    if(route==="/finance/reco-queue")    return <ReconciliationQueue branch={branch} setRoute={navigate}/>;
     if(route==="/finance/multi-currency")  return <MultiCurrencyVoucher/>;
     if(route==="/finance/comments-demo")   return <VoucherCommentsDemo/>;
     if(route==="/finance/print-preview")   return <PrintPreviewDemo/>;

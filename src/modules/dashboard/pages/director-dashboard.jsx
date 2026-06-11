@@ -13,7 +13,9 @@ import { FyTargetsPanel } from '../components/shared/FyTargetsPanel';
 import { BranchPlHeatmap } from '../components/shared/BranchPlHeatmap';
 import { KeyAlertsPanel } from '../components/shared/KeyAlertsPanel';
 import { TopEntitiesTable } from '../components/tables/TopEntitiesTable';
-import { useModulePL, useBalanceSheet, useAgeing, useTaxSummary, useTrialBalance } from '../../../core/useAccounting';
+import { useModulePL, useBalanceSheet, useAgeing, useTaxSummary, useTrialBalance, useTargetsVsActual } from '../../../core/useAccounting';
+import { useQueries } from '@tanstack/react-query';
+import { apiGet } from '../../../core/api';
 
 const RANGE_SHORT = { month: 'This Month', quarter: 'This Quarter', ytd: 'YTD', all: 'All Time' };
 const C = { dark: '#0d1326', dim: '#5a6691', green: '#1f7a3d', red: '#A32D2D', gold: '#854F0B', border: '#e7e9f0' };
@@ -41,6 +43,20 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
   const age = useAgeing(branchArg).data || {};
   const tax = useTaxSummary(branchArg, dates).data || {};
   const trial = useTrialBalance(branchArg, dates).data || {};
+
+  // Live FY targets (Sales + GP) — replaces the old empty FY_TARGETS_DATA seed.
+  const fy = (() => { const d = new Date(); const y = d.getFullYear(); const s = d.getMonth() >= 3 ? y : y - 1; return `${s}-${String(s + 1).slice(-2)}`; })();
+  const salesTot = useTargetsVsActual(branchArg, 'sales', { from: dates.from, to: dates.to, fy }).data?.totals;
+  const gpTot = useTargetsVsActual(branchArg, 'gp', { from: dates.from, to: dates.to, fy }).data?.totals;
+  const liveTargets = [
+    { metric: 'Sales', actual: salesTot?.actual || 0, target: salesTot?.target || 0, unit: '₹' },
+    { metric: 'Gross Profit', actual: gpTot?.actual || 0, target: gpTot?.target || 0, unit: '₹' },
+  ].filter((t) => t.target > 0);
+
+  // Live per-branch performance — replaces the old empty BRANCH_PL_HEATMAP seed.
+  const brList = BRANCHES.filter((b) => b.code);
+  const bq = useQueries({ queries: brList.map((b) => ({ queryKey: ['accounting', 'module-pl', b.code, dates.from, dates.to], queryFn: () => apiGet('/api/accounting/module-pl', { branch: b.code, from: dates.from, to: dates.to }) })) });
+  const branchRows = brList.map((b, i) => { const d = bq[i].data || {}; return { code: b.code, sales: d?.totals?.sales || 0, gp: d?.totals?.gp || 0, net: d?.bridge?.netProfit || 0 }; });
 
   const Controls = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '4px 0 14px' }}>
@@ -112,7 +128,9 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
           <RevenueTrendChart data={revenueTrend} compareLastYear={compare} onToggleCompare={setCompare} />
         </WidgetCard>
         <WidgetCard title={`FY ${CUR_FY.label} Targets vs Actual`} onPin={() => togglePin('targets')} pinned={pinned.targets} onDrill={() => navigate('/dashboards/sales-target')}>
-          <FyTargetsPanel targets={fyTargets} />
+          {liveTargets.length
+            ? <FyTargetsPanel targets={liveTargets} />
+            : <div style={{ fontSize: 12, color: C.dim, padding: '4px 2px' }}>No targets set. Add them in <b>Finance ▸ Sales Targets</b>.</div>}
         </WidgetCard>
       </div>
 
@@ -163,8 +181,13 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
 
       {/* ── Branch heatmap + Alerts ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14, marginBottom: 14 }}>
-        <WidgetCard title="Branch P&L Heatmap" subtitle="GP % by branch × month — darker = higher margin" onPin={() => togglePin('heat')} pinned={pinned.heat} onDrill={() => navigate('/dashboards/branch')}>
-          <BranchPlHeatmap rows={branchHeatmap} />
+        <WidgetCard title="Branch Performance" subtitle={`Sales · GP · Net Profit · ${rangeShort}`} onPin={() => togglePin('heat')} pinned={pinned.heat} onDrill={() => navigate('/dashboards/branch')}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr><th style={th}>Branch</th><th style={{ ...th, ...num }}>Sales</th><th style={{ ...th, ...num }}>GP</th><th style={{ ...th, ...num }}>GP %</th><th style={{ ...th, ...num }}>Net</th></tr></thead>
+            <tbody>
+              {branchRows.map((r) => <tr key={r.code}><td style={{ ...td, fontWeight: 700 }}>{r.code}</td><td style={{ ...td, ...num }}>{m0(r.sales)}</td><td style={{ ...td, ...num, color: r.gp < 0 ? C.red : C.green }}>{m0(r.gp)}</td><td style={{ ...td, ...num }}>{r.sales ? ((r.gp / r.sales) * 100).toFixed(1) : '0.0'}%</td><td style={{ ...td, ...num, fontWeight: 700, color: r.net < 0 ? C.red : C.dark }}>{m0(r.net)}</td></tr>)}
+            </tbody>
+          </table>
         </WidgetCard>
         <WidgetCard title="Attention Needed" subtitle={keyAlerts.length + ' active'} onPin={() => togglePin('alerts')} pinned={pinned.alerts}>
           <KeyAlertsPanel alerts={keyAlerts} onAlertClick={navigate} />

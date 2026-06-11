@@ -14,7 +14,8 @@ import { fmt, fmtINR } from '../core/format';
 import { CUR_MONTH, MONTH_OPTIONS, FY_MONTHS, monthLabel, todayISO, fmtDate, CUR_FY, rangeNote } from '../core/dates';
 import { BANK_ACCOUNTS_DATA, GratuityRegister, INVESTMENT_DATA, INVESTMENT_SECTIONS, RECO_QUEUE_DATA, _ADVANCES, cardStyle } from '../core/helpers';
 import { useMobile } from '../core/hooks';
-import { useChartOfAccounts } from '../core/useAccounting';
+import { useChartOfAccounts, useTrialBalance } from '../core/useAccounting';
+import { useCrud, useAdvances } from '../core/useRegisters';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp } from '../core/styles';
 import { Dashboard } from './dashboard';
 import { PfEsiChallan } from './hr';
@@ -820,234 +821,113 @@ export function TrialBalance({branch}){
 }
 
 export function AdvanceDepositLedger({branch}){
-  const mob=useMobile();
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-  const brCode=branch==="ALL"?null:branch?.code;
-  const [advances,setAdvances]=useState(_ADVANCES);
-  const [modal,setModal]=useState(false);
-  const [form,setForm]=useState({client:"",fileId:"",received:0,type:"Advance",mode:"NEFT",utr:""});
-
-  const filtered=advances.filter(a=>!brCode||a.id.includes(brCode));
-  const totReceived=filtered.reduce((s,a)=>s+a.received,0);
-  const totAdjusted=filtered.reduce((s,a)=>s+a.adjustedAmt,0);
-  const totPending=totReceived-totAdjusted;
-
-  const STATUS_CLR={"Unadjusted":"#A32D2D","Partially Adjusted":"#854F0B","Fully Adjusted":"#27500A","No File Linked":"#5a6691"};
-  const STATUS_BG ={"Unadjusted":"#FCEBEB","Partially Adjusted":"#FAEEDA","Fully Adjusted":"#EAF3DE","No File Linked":"#f3f4f8"};
-  const f=n=>cur+Number(Math.round(n)).toLocaleString("en-IN");
-
-  return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>💵</div>
-          <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Advance / Deposit Ledger</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Track client advances per booking file · adjust on final invoice</p>
-          </div>
-        </div>
-        <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Record Advance</button>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-        {[{l:"Total Received",v:f(totReceived),c:"#27500A",bg:"#EAF3DE"},
-          {l:"Adjusted vs Invoice",v:f(totAdjusted),c:"#185FA5",bg:"#E6F1FB"},
-          {l:"Pending Adjustment",v:f(totPending),c:"#A32D2D",bg:"#FCEBEB"},
-          {l:"No File Linked",v:String(filtered.filter(a=>!a.fileId).length),c:"#854F0B",bg:"#FAEEDA"},
-        ].map((k,i)=>(
-          <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"11px 13px",background:k.bg}}>
-            <p style={{margin:0,fontSize:9,fontWeight:700,color:k.c,textTransform:"uppercase"}}>{k.l}</p>
-            <p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:"#0d1326"}}>{k.v}</p>
-          </div>
-        ))}
+  const cur=bc(branch).cur;
+  const { data } = useAdvances(branch);
+  const rows=(data&&data.rows)||[];
+  const t=(data&&data.totals)||{customer:0,supplier:0,total:0};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const kc=(label,val,col)=>(<div style={{...card,borderTop:`3px solid ${col}`}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>{label}</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:col}}>{cur+fmt(val)}</p></div>);
+  return(
+    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+      <h2 style={{margin:0,fontSize:19,fontWeight:800,color:"#0d1326"}}>Advance / Deposit Ledger</h2>
+      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Open on-account advances from receipts (customers) & payments (suppliers). Live - 0 until on-account vouchers exist.</p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
+        {kc("Customer Advances",t.customer,"#27500A")}{kc("Supplier Advances",t.supplier,"#854F0B")}{kc("Total On-Account",t.total,"#185FA5")}
       </div>
       <div style={{...card,padding:0,overflow:"hidden"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr style={{background:"#0d1326"}}>
-            {["Advance ID","Date","Client","Booking File","Type","Mode","Amount","Adjusted","Balance","Status"].map((h,i)=>(
-              <th key={i} style={{padding:"9px 11px",textAlign:i>=6&&i<=8?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
-            ))}
-          </tr></thead>
-          <tbody>{filtered.map((a,i)=>(
-            <tr key={a.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-              <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{a.id}</td>
-              <td style={{padding:"8px 11px",color:"#5a6691",whiteSpace:"nowrap"}}>{a.date}</td>
-              <td style={{padding:"8px 11px",fontWeight:600,color:"#0d1326"}}>{a.client}</td>
-              <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:9.5,color:a.fileId?"#27500A":"#A32D2D"}}>{a.fileId||"⚠ Not linked"}</td>
-              <td style={{padding:"8px 11px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{a.type}</span></td>
-              <td style={{padding:"8px 11px",fontSize:10.5,color:"#5a6691"}}>{a.mode}</td>
-              <td style={{padding:"8px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(a.received)}</td>
-              <td style={{padding:"8px 11px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#185FA5"}}>{f(a.adjustedAmt)}</td>
-              <td style={{padding:"8px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:a.received-a.adjustedAmt>0?"#A32D2D":"#27500A"}}>{f(a.received-a.adjustedAmt)}</td>
-              <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:STATUS_BG[a.status]||"#f3f4f8",color:STATUS_CLR[a.status]||"#5a6691"}}>{a.status}</span></td>
-            </tr>
-          ))}</tbody>
-          <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
-            <td colSpan={6} style={{padding:"9px 11px",fontWeight:700,color:"#d4a437",fontSize:12}}>TOTAL — {filtered.length} entries</td>
-            <td style={{padding:"9px 11px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(totReceived)}</td>
-            <td style={{padding:"9px 11px",textAlign:"right",fontWeight:700,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totAdjusted)}</td>
-            <td style={{padding:"9px 11px",textAlign:"right",fontWeight:800,color:"#F7C1C1",fontVariantNumeric:"tabular-nums"}}>{f(totPending)}</td>
-            <td/>
-          </tr></tfoot>
-        </table>
-      </div>
-      {modal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:460,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
-              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Record Client Advance</p>
-              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
-            </div>
-            <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-              <FL label="Client name"><input value={form.client} onChange={e=>setForm(f=>({...f,client:e.target.value}))} style={inp}/></FL>
-              <FL label="Booking File ID (optional)"><input value={form.fileId} onChange={e=>setForm(f=>({...f,fileId:e.target.value}))} style={{...inp,fontFamily:"monospace"}} placeholder="TK-BOM-2026-0401"/></FL>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <FL label="Type"><select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} style={inp}><option>Advance</option><option>Booking Deposit</option><option>Full Payment</option></select></FL>
-                <FL label="Mode"><select value={form.mode} onChange={e=>setForm(f=>({...f,mode:e.target.value}))} style={inp}><option>NEFT</option><option>RTGS</option><option>UPI</option><option>Cheque</option><option>Cash</option></select></FL>
-              </div>
-              <FL label="Amount received"><input type="number" value={form.received} onChange={e=>setForm(f=>({...f,received:+e.target.value}))} style={inp}/></FL>
-              <FL label="UTR / Reference no."><input value={form.utr} onChange={e=>setForm(f=>({...f,utr:e.target.value}))} style={inp}/></FL>
-            </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
-              <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={()=>{
-                const id=`ADV-${(branch?.code||"BOM")}-${String(_ADVANCES.length+1).padStart(3,"0")}`;
-                const rec={...form,id,adjustedAmt:0,status:form.fileId?"Unadjusted":"No File Linked"};
-                _ADVANCES.push(rec);setAdvances([..._ADVANCES]);setModal(false);
-              }} style={btnG}>💾 Record Advance</button>
-            </div>
-          </div>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
+              <th style={{padding:"9px 8px",textAlign:"left"}}>Date</th><th style={{padding:"9px 8px",textAlign:"left"}}>Vch No</th><th style={{padding:"9px 8px",textAlign:"left"}}>Party</th><th style={{padding:"9px 8px",textAlign:"left"}}>Side</th><th style={{padding:"9px 8px",textAlign:"right"}}>On-Account</th>
+            </tr></thead>
+            <tbody>
+              {rows.map((r,i)=>(<tr key={r.id} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #e1e3ec"}}>
+                <td style={{padding:"7px 8px",color:"#5a6691"}}>{r.date}</td>
+                <td style={{padding:"7px 8px",fontFamily:"monospace"}}>{r.vno}</td>
+                <td style={{padding:"7px 8px",fontWeight:600}}>{r.party||"-"}</td>
+                <td style={{padding:"7px 8px"}}>{r.side==="customer"?"Customer (receipt)":"Supplier (payment)"}</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700}}>{cur+fmt(r.onAccount)}</td>
+              </tr>))}
+              {rows.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:"center",color:"#5a6691"}}>No open advances - they appear when receipts/payments are booked on-account.</td></tr>}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </div>
   );
 }
-
-
-/* ══════════════════════════════════════════════════════════════════
-   BATCH B — OPERATIONAL (Items 7–11)
-   7. Passport & Document Manager
-   8. Air Ticket Control Register
-   9. Markup / Net Rate Sheet
-   10. Vendor Payment Terms Master
-   11. Supplier 360° View
-   ════════════════════════════════════════════════════════════════ */
-
-/* ── ITEM 7: PASSPORT & DOCUMENT MANAGER  /masters/passports ──── */
 
 export function CashFlowForecast({branch}){
-  const mob=useMobile();
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-  const brCode=branch==="ALL"?null:branch?.code;
-  const TODAY=todayISO();
-
-  /* Build 90-day forecast */
-  const bills=GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&b.date>="2026-04-01");
-  const acts=EXP_ACTUALS.filter(a=>(!brCode||a.br===brCode)&&a.m>="2026-04");
-
-  const monthlyRev=bills.reduce((s,b)=>s+b.sell,0)/2; // avg 2 months
-  const monthlyBurn=acts.reduce((s,a)=>s+a.a,0)/2;
-  const openingBank=monthlyRev*0.35;
-
-  /* Inflows: receivables collection schedule */
-  // No bundled demo forecast — a real 13-week cash-flow engine feeds this later.
-  const inflows=[];
-
-  /* Outflows: scheduled payments — no bundled demo data */
-  const outflows=[];
-
-  /* Build running balance */
-  const allEvents=[
-    ...inflows.map(e=>({...e,isInflow:true})),
-    ...outflows.map(e=>({...e,isInflow:false})),
-  ].sort((a,b)=>a.date.localeCompare(b.date));
-
-  let running=openingBank;
-  const enriched=allEvents.map(e=>{
-    running+=e.isInflow?e.amt:-e.amt;
-    return{...e,balance:running};
-  });
-
-  const minBalance=Math.min(...enriched.map(e=>e.balance));
-  const f=n=>n>=1000000?cur+(n/100000).toFixed(1)+"L":cur+Number(Math.round(n)).toLocaleString("en-IN");
-  const TYPE_CLR={Receipt:"#27500A",BSP:"#A32D2D",Fixed:"#854F0B",Salary:"#185FA5",Supplier:"#854F0B",Tax:"#A32D2D"};
-  const TYPE_BG={Receipt:"#EAF3DE",BSP:"#FCEBEB",Fixed:"#FAEEDA",Salary:"#E6F1FB",Supplier:"#FAEEDA",Tax:"#FCEBEB"};
-  const maxAbs=Math.max(Math.abs(openingBank),Math.max(...enriched.map(e=>Math.abs(e.balance))));
-
-  return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔮</div>
-          <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Cash Flow Forecast — 90 Days</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Projected bank balance · Inflows vs scheduled outflows · Opening: {f(openingBank)}</p>
-          </div>
+  const cur=bc(branch).cur;
+  const brCode=branch==="ALL"?undefined:branch&&branch.code;
+  const { rows, create, remove } = useCrud('cashflow-forecast', brCode?{branch:brCode}:{});
+  const tb=useTrialBalance(branch,{}).data||{};
+  const openingCash=(tb.rows||[]).filter(r=>/cash|bank/i.test(r.group||"")).reduce((s,r)=>s+((r.closingDebit||0)-(r.closingCredit||0)),0);
+  const blank={date:'',kind:'inflow',category:'',amount:''};
+  const [f,setF]=useState(blank);
+  const set=(k)=>(e)=>setF(s=>({...s,[k]:e.target.value}));
+  const add=()=>{ if(!f.date||!f.amount){return;} create.mutate({branch:brCode||'BOM',date:f.date,kind:f.kind,category:f.category,amount:Number(f.amount)||0},{onSuccess:()=>setF(blank)}); };
+  const today=new Date(); today.setHours(0,0,0,0);
+  const wk=(d)=>{ const dt=new Date(d); return Math.floor((dt-today)/(7*86400000)); };
+  const weeks=Array.from({length:13},(_,i)=>({i,inflow:0,outflow:0}));
+  rows.forEach(r=>{ const w=wk(r.date); if(w>=0&&w<13){ if(r.kind==="inflow")weeks[w].inflow+=r.amount||0; else weeks[w].outflow+=r.amount||0; } });
+  let bal=openingCash; const wrows=weeks.map(w=>{ const net=w.inflow-w.outflow; bal+=net; const d=new Date(today.getTime()+w.i*7*86400000); return {...w,net,bal,label:d.toISOString().slice(5,10)}; });
+  const totIn=weeks.reduce((s,w)=>s+w.inflow,0),totOut=weeks.reduce((s,w)=>s+w.outflow,0);
+  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const ip={...inp,minHeight:30,fontSize:11,width:"100%"};
+  const kc=(label,val,col)=>(<div style={{...card,borderTop:`3px solid ${col}`}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>{label}</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:col}}>{cur+fmt(val)}</p></div>);
+  return(
+    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+      <h2 style={{margin:0,fontSize:19,fontWeight:800,color:"#0d1326"}}>13-Week Cash-Flow Forecast</h2>
+      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Opening cash is live from the books; add expected in/out lines to project the closing balance.</p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
+        {kc("Opening Cash",openingCash,"#185FA5")}{kc("13-wk Inflow",totIn,"#27500A")}{kc("13-wk Outflow",totOut,"#A32D2D")}{kc("Projected Close",openingCash+totIn-totOut,"#854F0B")}
+      </div>
+      <div style={{...card,marginBottom:12}}>
+        <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Add expected cash line</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6,alignItems:"center"}}>
+          <input style={ip} type="date" value={f.date} onChange={set('date')}/>
+          <select style={ip} value={f.kind} onChange={set('kind')}><option value="inflow">Inflow</option><option value="outflow">Outflow</option></select>
+          <input style={ip} placeholder="Category" value={f.category} onChange={set('category')}/>
+          <input style={ip} type="number" placeholder="Amount" value={f.amount} onChange={set('amount')}/>
+          <button onClick={add} disabled={create.isPending} style={{...btnG,minHeight:32,fontSize:11}}>+ Add</button>
         </div>
       </div>
-
-      {minBalance<0&&<div style={{marginBottom:12,padding:"10px 14px",borderRadius:9,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:10.5,color:"#A32D2D",fontWeight:600,display:"flex",gap:8}}>
-        <AlertTriangle size={15}/> Cash deficit projected — minimum balance {f(minBalance)} on {enriched.find(e=>e.balance===minBalance)?.date||"—"}. Review collections or defer payments.
-      </div>}
-
-      {minBalance>=0&&<div style={{marginBottom:12,padding:"8px 14px",borderRadius:9,background:"#EAF3DE",border:"1px solid #C0DD97",fontSize:10.5,color:"#27500A",fontWeight:600}}>
-        ✔ Positive cash position throughout 90-day forecast · Minimum balance: {f(minBalance)}
-      </div>}
-
-      {/* Visual balance chart */}
-      <div style={{...card,marginBottom:12,padding:"14px"}}>
-        <p style={{margin:"0 0 10px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Projected Balance Timeline</p>
-        <div style={{display:"flex",gap:4,alignItems:"flex-end",height:80}}>
-          {enriched.map((e,i)=>{
-            const h=maxAbs>0?Math.abs(e.balance/maxAbs*70):2;
-            return <div key={i} title={`${e.date}: ${f(e.balance)}`} style={{flex:1,height:h,minHeight:2,borderRadius:"2px 2px 0 0",background:e.balance>=0?"#185FA5":"#A32D2D",opacity:0.8}}/>;
-          })}
+      <div style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
+              <th style={{padding:"9px 8px",textAlign:"left"}}>Week of</th><th style={{padding:"9px 8px",textAlign:"right"}}>Inflow</th><th style={{padding:"9px 8px",textAlign:"right"}}>Outflow</th><th style={{padding:"9px 8px",textAlign:"right"}}>Net</th><th style={{padding:"9px 8px",textAlign:"right"}}>Running Balance</th>
+            </tr></thead>
+            <tbody>
+              {wrows.map((w)=>(<tr key={w.i} style={{borderBottom:"1px solid #e1e3ec"}}>
+                <td style={{padding:"6px 8px"}}>W{w.i+1} ({w.label})</td>
+                <td style={{padding:"6px 8px",textAlign:"right",color:"#27500A"}}>{w.inflow?cur+fmt(w.inflow):"-"}</td>
+                <td style={{padding:"6px 8px",textAlign:"right",color:"#A32D2D"}}>{w.outflow?cur+fmt(w.outflow):"-"}</td>
+                <td style={{padding:"6px 8px",textAlign:"right"}}>{cur+fmt(w.net)}</td>
+                <td style={{padding:"6px 8px",textAlign:"right",fontWeight:700,color:w.bal<0?"#A32D2D":"#0d1326"}}>{cur+fmt(w.bal)}</td>
+              </tr>))}
+            </tbody>
+          </table>
         </div>
-        <p style={{margin:"4px 0 0",fontSize:9,color:"#5a6691",textAlign:"center"}}>Each bar = one event (hover for date/amount) · Blue = positive · Red = negative</p>
       </div>
-
-      <div style={{...card,padding:0,overflow:"hidden"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr style={{background:"#0d1326"}}>
-            {["Date","Description","Type","In","Out","Running Balance"].map((h,i)=>(
-              <th key={i} style={{padding:"9px 12px",textAlign:i>=3?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
-            ))}
-          </tr></thead>
-          <tbody>
-            <tr style={{background:"#f3f4f8"}}>
-              <td style={{padding:"9px 12px",color:"#5a6691"}}>{TODAY}</td>
-              <td colSpan={4} style={{padding:"9px 12px",fontWeight:600,color:"#0d1326"}}>Opening Balance (estimated)</td>
-              <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#185FA5",fontSize:13,fontVariantNumeric:"tabular-nums"}}>{f(openingBank)}</td>
-            </tr>
-            {enriched.map((e,i)=>(
-              <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:e.balance<0?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
-                <td style={{padding:"8px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{e.date}</td>
-                <td style={{padding:"8px 12px",color:"#384677"}}>{e.desc}</td>
-                <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:TYPE_BG[e.type]||"#f3f4f8",color:TYPE_CLR[e.type]||"#5a6691"}}>{e.type}</span></td>
-                <td style={{padding:"8px 12px",textAlign:"right",fontWeight:600,color:"#27500A",fontVariantNumeric:"tabular-nums"}}>{e.isInflow?f(e.amt):"—"}</td>
-                <td style={{padding:"8px 12px",textAlign:"right",fontWeight:600,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{!e.isInflow?f(e.amt):"—"}</td>
-                <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontSize:12,fontVariantNumeric:"tabular-nums",color:e.balance>=0?"#185FA5":"#A32D2D"}}>{f(e.balance)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {rows.length>0&&<div style={{...card,padding:0,overflow:"hidden"}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead style={{background:"#f3f4f8"}}><tr><th style={{padding:"7px 8px",textAlign:"left"}}>Date</th><th style={{padding:"7px 8px",textAlign:"left"}}>Kind</th><th style={{padding:"7px 8px",textAlign:"left"}}>Category</th><th style={{padding:"7px 8px",textAlign:"right"}}>Amount</th><th style={{padding:"7px 8px"}}></th></tr></thead>
+            <tbody>
+              {rows.map((r)=>(<tr key={r.id} style={{borderBottom:"1px solid #f0f2f7"}}>
+                <td style={{padding:"6px 8px"}}>{r.date}</td><td style={{padding:"6px 8px"}}>{r.kind}</td><td style={{padding:"6px 8px"}}>{r.category||"-"}</td>
+                <td style={{padding:"6px 8px",textAlign:"right",fontWeight:600,color:r.kind==="inflow"?"#27500A":"#A32D2D"}}>{cur+fmt(r.amount)}</td>
+                <td style={{padding:"6px 8px",textAlign:"center"}}><button onClick={()=>remove.mutate(r.id)} style={{background:"none",border:"none",color:"#A32D2D",cursor:"pointer",fontWeight:700}}>x</button></td>
+              </tr>))}
+            </tbody>
+          </table>
+        </div>
+      </div>}
     </div>
   );
 }
-
-/* ── ITEM 13: GSTR-2B RECONCILIATION  /tax/gstr2b ─────────────── */
-
-export const TDS_SECTIONS={
-  "194C":{label:"194C — Contractors/DMC",rate:2,   threshold:30000,  payable:"tds_pay_c"},
-  "194H":{label:"194H — Commission/BSP", rate:5,   threshold:15000,  payable:"tds_pay_h"},
-  "194J":{label:"194J — Professional Svc",rate:10, threshold:30000,  payable:"tds_pay_j"},
-  "194D":{label:"194D — Insurance",       rate:5,  threshold:15000,  payable:"tds_pay_d"},
-  "None": {label:"No TDS",               rate:0,   threshold:0,      payable:null},
-};
-
-/* ── LEDGER AUTOCOMPLETE COMPONENT ─────────────────────────── */
 
 export function CashBookReport({branch}){
   const mob=useMobile();
@@ -1294,73 +1174,71 @@ export function YearEndClose({branch}){
 
 /* ── RECURRING VOUCHER TEMPLATES ─────────────────────────────── */
 
-export function LoanEmiRegister({branch,setRoute}){
-  const mob=useMobile();
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-  const brCode=branch==="ALL"?null:branch?.code;
+export const TDS_SECTIONS={
+  "194C":{label:"194C - Contractors/DMC",rate:2,   threshold:30000,  payable:"tds_pay_c"},
+  "194H":{label:"194H - Commission/BSP", rate:5,   threshold:15000,  payable:"tds_pay_h"},
+  "194J":{label:"194J - Professional Svc",rate:10, threshold:30000,  payable:"tds_pay_j"},
+  "194D":{label:"194D - Insurance",       rate:5,  threshold:15000,  payable:"tds_pay_d"},
+  "None": {label:"No TDS",               rate:0,   threshold:0,      payable:null},
+};
 
-  const loans=LOAN_REGISTER.filter(l=>!brCode||l.branch===brCode);
-  const totPrincipal=loans.reduce((s,l)=>s+l.principal,0);
-  const totBalance=loans.reduce((s,l)=>s+l.balance,0);
-  const totEmi=loans.reduce((s,l)=>s+l.emi,0);
-  const totPaid=totPrincipal-totBalance;
-
+export function LoanEmiRegister({branch}){
+  const cur=bc(branch).cur;
+  const brCode=branch==="ALL"?undefined:branch&&branch.code;
+  const { rows, create, remove } = useCrud('loans', brCode?{branch:brCode}:{});
+  const blank={lender:'',type:'Term',purpose:'',principal:'',rate:'',tenure:'',emi:'',balance:'',nextDue:''};
+  const [f,setF]=useState(blank);
+  const set=(k)=>(e)=>setF(s=>({...s,[k]:e.target.value}));
+  const add=()=>{ if(!f.lender){return;} create.mutate({branch:brCode||'BOM',lender:f.lender,type:f.type,purpose:f.purpose,principal:Number(f.principal)||0,rate:Number(f.rate)||0,tenure:Number(f.tenure)||0,emi:Number(f.emi)||0,balance:Number(f.balance)||Number(f.principal)||0,nextDue:f.nextDue,status:'active'},{onSuccess:()=>setF(blank)}); };
+  const totP=rows.reduce((s,l)=>s+(l.principal||0),0),totB=rows.reduce((s,l)=>s+(l.balance||0),0),totE=rows.reduce((s,l)=>s+(l.emi||0),0);
   const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
-
+  const ip={...inp,minHeight:30,fontSize:11,width:"100%"};
+  const kc=(label,val,col)=>(<div style={{...card,borderTop:`3px solid ${col}`}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>{label}</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:col}}>{cur+fmt(val)}</p></div>);
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
-      <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>🏦 Loan &amp; EMI Register</h2>
-      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Term loans · Vehicle loans · Working capital · Amortization with principal/interest split</p>
-
-      <div style={{display:"grid",gridTemplateColumns:mob?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:14}}>
-        <div style={{...card,borderTop:"3px solid #185FA5"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Total Borrowed</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#185FA5"}}>{cur+fmt(totPrincipal)}</p></div>
-        <div style={{...card,borderTop:"3px solid #A32D2D"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Outstanding</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#A32D2D"}}>{cur+fmt(totBalance)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>{((totBalance/totPrincipal)*100||0).toFixed(0)}% remaining</p></div>
-        <div style={{...card,borderTop:"3px solid #27500A"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Repaid</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#27500A"}}>{cur+fmt(totPaid)}</p></div>
-        <div style={{...card,borderTop:"3px solid #854F0B"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Monthly EMI</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#854F0B"}}>{cur+fmt(totEmi)}</p></div>
+      <h2 style={{margin:0,fontSize:19,fontWeight:800,color:"#0d1326"}}>Loan & EMI Register</h2>
+      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Term / Vehicle / Working-capital / OD loans. Live - shows 0 until you add a loan.</p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
+        {kc("Total Borrowed",totP,"#185FA5")}{kc("Outstanding",totB,"#A32D2D")}{kc("Repaid",totP-totB,"#27500A")}{kc("Monthly EMI",totE,"#854F0B")}
       </div>
-
+      <div style={{...card,marginBottom:12}}>
+        <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Add loan</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(8,1fr)",gap:6,alignItems:"center"}}>
+          <input style={ip} placeholder="Lender" value={f.lender} onChange={set('lender')}/>
+          <input style={ip} placeholder="Type" value={f.type} onChange={set('type')}/>
+          <input style={ip} type="number" placeholder="Principal" value={f.principal} onChange={set('principal')}/>
+          <input style={ip} type="number" placeholder="Rate %" value={f.rate} onChange={set('rate')}/>
+          <input style={ip} type="number" placeholder="Tenure m" value={f.tenure} onChange={set('tenure')}/>
+          <input style={ip} type="number" placeholder="EMI" value={f.emi} onChange={set('emi')}/>
+          <input style={ip} type="number" placeholder="Balance" value={f.balance} onChange={set('balance')}/>
+          <button onClick={add} disabled={create.isPending} style={{...btnG,minHeight:32,fontSize:11}}>+ Add</button>
+        </div>
+      </div>
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
             <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
-              <th style={{padding:"9px 8px",textAlign:"left"}}>Loan ID</th><th style={{padding:"9px 8px",textAlign:"left"}}>Lender / Type</th>
-              <th style={{padding:"9px 8px",textAlign:"right"}}>Principal</th><th style={{padding:"9px 8px",textAlign:"center"}}>Rate</th>
-              <th style={{padding:"9px 8px",textAlign:"center"}}>Tenure</th><th style={{padding:"9px 8px",textAlign:"right"}}>EMI</th>
-              <th style={{padding:"9px 8px",textAlign:"center"}}>Paid/Remain</th><th style={{padding:"9px 8px",textAlign:"right"}}>Balance</th>
-              <th style={{padding:"9px 8px",textAlign:"center"}}>Next Due</th>
+              <th style={{padding:"9px 8px",textAlign:"left"}}>Lender / Type</th><th style={{padding:"9px 8px",textAlign:"right"}}>Principal</th><th style={{padding:"9px 8px",textAlign:"center"}}>Rate</th><th style={{padding:"9px 8px",textAlign:"center"}}>Tenure</th><th style={{padding:"9px 8px",textAlign:"right"}}>EMI</th><th style={{padding:"9px 8px",textAlign:"right"}}>Balance</th><th style={{padding:"9px 8px",textAlign:"center"}}>Next Due</th><th style={{padding:"9px 8px"}}></th>
             </tr></thead>
             <tbody>
-              {loans.map((l,i)=>(
-                <tr key={l.id} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #e1e3ec"}}>
-                  <td style={{padding:"7px 8px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{l.id}</td>
-                  <td style={{padding:"7px 8px",fontWeight:600}}>{l.lender}<div style={{fontSize:9.5,color:"#5a6691",fontWeight:400}}>{l.type} · {l.purpose}</div></td>
-                  <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600}}>{cur+fmt(l.principal)}</td>
-                  <td style={{padding:"7px 8px",textAlign:"center",color:"#854F0B"}}>{l.rate}%</td>
-                  <td style={{padding:"7px 8px",textAlign:"center",fontSize:10}}>{l.tenure>0?l.tenure+" m":"OD"}</td>
-                  <td style={{padding:"7px 8px",textAlign:"right"}}>{l.emi>0?cur+fmt(l.emi):"—"}</td>
-                  <td style={{padding:"7px 8px",textAlign:"center",fontSize:10}}>{l.tenure>0?`${l.paid}/${l.paid+l.remaining}`:"—"}</td>
-                  <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#A32D2D"}}>{cur+fmt(l.balance)}</td>
-                  <td style={{padding:"7px 8px",textAlign:"center",fontSize:10}}>{l.nextDue}</td>
-                </tr>
-              ))}
+              {rows.map((l,i)=>(<tr key={l.id} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #e1e3ec"}}>
+                <td style={{padding:"7px 8px",fontWeight:600}}>{l.lender}<div style={{fontSize:9.5,color:"#5a6691",fontWeight:400}}>{l.type}{l.purpose?(" - "+l.purpose):''}</div></td>
+                <td style={{padding:"7px 8px",textAlign:"right"}}>{cur+fmt(l.principal)}</td>
+                <td style={{padding:"7px 8px",textAlign:"center",color:"#854F0B"}}>{l.rate}%</td>
+                <td style={{padding:"7px 8px",textAlign:"center"}}>{l.tenure>0?l.tenure+" m":"OD"}</td>
+                <td style={{padding:"7px 8px",textAlign:"right"}}>{l.emi>0?cur+fmt(l.emi):"-"}</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#A32D2D"}}>{cur+fmt(l.balance)}</td>
+                <td style={{padding:"7px 8px",textAlign:"center",fontSize:10}}>{l.nextDue||"-"}</td>
+                <td style={{padding:"7px 8px",textAlign:"center"}}><button onClick={()=>remove.mutate(l.id)} style={{background:"none",border:"none",color:"#A32D2D",cursor:"pointer",fontWeight:700}}>x</button></td>
+              </tr>))}
+              {rows.length===0&&<tr><td colSpan={8} style={{padding:20,textAlign:"center",color:"#5a6691"}}>No loans yet - add one above.</td></tr>}
             </tbody>
-            <tfoot style={{background:"#FAEEDA",fontWeight:700,fontSize:11.5}}>
-              <tr><td colSpan={2} style={{padding:"9px 8px",textAlign:"right"}}>TOTAL</td>
-              <td style={{padding:"9px 8px",textAlign:"right"}}>{cur+fmt(totPrincipal)}</td>
-              <td colSpan={2}></td>
-              <td style={{padding:"9px 8px",textAlign:"right"}}>{cur+fmt(totEmi)}</td>
-              <td></td>
-              <td style={{padding:"9px 8px",textAlign:"right",color:"#A32D2D"}}>{cur+fmt(totBalance)}</td>
-              <td></td></tr>
-            </tfoot>
           </table>
         </div>
       </div>
     </div>
   );
 }
-
 
 export function WorkingCapitalDashboard({branch,setRoute}){
   const mob=useMobile();
@@ -1551,117 +1429,37 @@ export const TDS_SECTIONS_TABLE = [
 
 export function BankBalanceDashboard(){
   const [filterBranch,setFilterBranch]=useState("ALL");
-  const FX=FX_RATES;
-  const toINR=(amt,cur)=>amt*(FX[cur]||1);
-
-  const filtered=BANK_ACCOUNTS_DATA.filter(b=>filterBranch==="ALL"||b.branch===filterBranch);
-  const totalINR=filtered.reduce((s,b)=>s+toINR(b.openingBal,b.currency),0);
-  const totalLimit=filtered.reduce((s,b)=>s+toINR(b.limit,b.currency),0);
-
-  const byBranch=["BOM","AMD"].map(br=>{
-    const accts=BANK_ACCOUNTS_DATA.filter(b=>b.branch===br);
-    const balINR=accts.reduce((s,b)=>s+toINR(b.openingBal,b.currency),0);
-    return {branch:br,balINR,accts:accts.length};
-  });
-  const chartMax=Math.max(...byBranch.map(b=>b.balINR));
-  const byCurrency={};
-  BANK_ACCOUNTS_DATA.forEach(b=>{byCurrency[b.currency]=(byCurrency[b.currency]||0)+b.openingBal;});
-
-  const statusColor=b=>{const p=b.openingBal/b.limit;return p>0.8?"#A32D2D":p>0.5?"#d4a437":"#22c55e";};
-
+  const branchArg = filterBranch==="ALL" ? "ALL" : { code: filterBranch };
+  const tb = useTrialBalance(branchArg, {}).data || {};
+  const rows = (tb.rows||[]).filter(r=>/cash|bank/i.test(r.group||""));
+  const bal = (r)=> (r.closingDebit||0)-(r.closingCredit||0);
+  const cashTotal = rows.filter(r=>/cash/i.test(r.group)).reduce((s,r)=>s+bal(r),0);
+  const bankTotal = rows.filter(r=>/bank/i.test(r.group)).reduce((s,r)=>s+bal(r),0);
+  const total = cashTotal + bankTotal;
+  const kpi=(label,val,sub,col)=>(<div style={{...cardStyle,borderTop:`3px solid ${col}`}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>{label}</p><p style={{margin:"5px 0 2px",fontSize:22,fontWeight:700,color:val<0?"#A32D2D":"#0d1326"}}>{fmtINR(val)}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{sub}</p></div>);
   return(
     <PHASE2_Page title="Bank Balance Dashboard"
-      subtitle="Real-time balances across all accounts · all branches · all currencies"
-      toolbar={<>
-        <select value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>
-          <option value="ALL">All branches</option>
-          {BRANCH_CODES.map(b=><option key={b}>{b}</option>)}
-        </select>
-        <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #d4a437",color:"#d4a437",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>↻ Refresh</button>
-        <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 Export</button>
-      </>}>
-
-      {/* KPI row */}
+      subtitle="Live cash & bank balances from the books · shows 0 until entries are posted"
+      toolbar={<select value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>
+        <option value="ALL">All branches</option>
+        {BRANCH_CODES.map(b=><option key={b}>{b}</option>)}
+      </select>}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginBottom:14}}>
-        <div style={{...cardStyle,borderTop:"3px solid #22c55e"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Total Cash (INR Equiv)</p><p style={{margin:"5px 0 2px",fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(totalINR)}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{filtered.length} accounts</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #d4a437"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Limit Utilised</p><p style={{margin:"5px 0 2px",fontSize:22,fontWeight:700,color:"#0d1326"}}>{Math.round(totalINR/totalLimit*100)}%</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{fmtINR(totalLimit)} total limit</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #3b82f6"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Currencies</p><p style={{margin:"5px 0 2px",fontSize:22,fontWeight:700,color:"#0d1326"}}>{Object.keys(byCurrency).length}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{Object.keys(byCurrency).join(", ")}</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #A32D2D"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Pending Reconciliation</p><p style={{margin:"5px 0 2px",fontSize:22,fontWeight:700,color:"#A32D2D"}}>32</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>transactions unmatched</p></div>
+        {kpi("Total Liquid (INR)",total,`${rows.length} cash/bank ledger${rows.length===1?"":"s"}`,total<0?"#A32D2D":"#22c55e")}
+        {kpi("Bank Balance",bankTotal,"all bank ledgers","#d4a437")}
+        {kpi("Cash in Hand",cashTotal,"all cash ledgers","#3b82f6")}
       </div>
-
-      {/* Branch bar chart + currency summary */}
-      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14,marginBottom:14}}>
-        <div style={cardStyle}>
-          <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Balance by Branch (INR Equivalent)</p>
-          {byBranch.map(b=>(
-            <div key={b.branch} style={{marginBottom:12}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                <span style={{fontSize:12,fontWeight:700,color:"#0d1326"}}>{b.branch}</span>
-                <span style={{fontSize:12,fontWeight:700,color:"#0d1326"}}>{fmtINR(b.balINR)}</span>
-              </div>
-              <div style={{height:10,background:"#f0f2f7",borderRadius:5,overflow:"hidden"}}>
-                <div style={{height:"100%",width:(b.balINR/chartMax*100)+"%",background:"#d4a437",borderRadius:5,minWidth:b.balINR>0?4:0}}/>
-              </div>
-              <p style={{margin:"2px 0 0",fontSize:10,color:"#5a6691"}}>{b.accts} account{b.accts!==1?"s":""}</p>
-            </div>
-          ))}
-        </div>
-        <div style={cardStyle}>
-          <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Balance by Currency</p>
-          {Object.entries(byCurrency).map(([cur,amt])=>(
-            <div key={cur} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f0f2f7"}}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{padding:"2px 7px",background:"#e6e8f1",borderRadius:3,fontSize:10.5,fontWeight:700,color:"#0d1326",fontFamily:"monospace"}}>{cur}</span>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326",fontFamily:"monospace"}}>{amt.toLocaleString("en-IN")}</p>
-                <p style={{margin:0,fontSize:10,color:"#5a6691"}}>≈ {fmtINR(toINR(amt,cur))}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Account-level table */}
-      <div style={{...cardStyle}}>
-        <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>All Accounts — Detail</p>
+      <div style={cardStyle}>
+        <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Cash &amp; Bank Ledgers — Live Balances</p>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-            <thead><tr>
-              <th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Bank · A/c</th>
-              <th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>Currency</th>
-              <th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th>
-              <th style={{...RPT_thStyle,textAlign:"right"}}>INR Equiv</th>
-              <th style={{...RPT_thStyle,textAlign:"right"}}>Limit</th>
-              <th style={{...RPT_thStyle,textAlign:"center"}}>Utilisation</th>
-              <th style={{...RPT_thStyle,textAlign:"center"}}>Status</th>
-            </tr></thead>
-            <tbody>{filtered.map(b=>{
-              const balINR=toINR(b.openingBal,b.currency);
-              const limINR=toINR(b.limit,b.currency);
-              const pct=Math.round(b.openingBal/b.limit*100);
-              return(
-                <tr key={b.id} style={{borderBottom:"1px solid #f0f2f7"}}>
-                  <td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{b.branch}</span></td>
-                  <td style={RPT_tdStyle}><p style={{margin:0,fontSize:12,fontWeight:600,color:"#0d1326"}}>{b.bank}</p><p style={{margin:0,fontSize:10,fontFamily:"monospace",color:"#5a6691"}}>...{b.accountNo.slice(-6)}</p></td>
-                  <td style={{...RPT_tdStyle,fontSize:11}}>{b.type}</td>
-                  <td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:700}}>{b.currency}</td>
-                  <td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:600}}>{b.openingBal.toLocaleString("en-IN")}</td>
-                  <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(balINR)}</td>
-                  <td style={{...RPT_tdStyle,textAlign:"right",color:"#5a6691"}}>{fmtINR(limINR)}</td>
-                  <td style={{padding:"8px 12px",borderBottom:"1px solid #f0f2f7",textAlign:"center"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <div style={{flex:1,height:6,background:"#f0f2f7",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:pct+"%",background:statusColor(b),borderRadius:3}}/></div>
-                      <span style={{fontSize:10.5,fontWeight:700,color:statusColor(b),minWidth:30}}>{pct}%</span>
-                    </div>
-                  </td>
-                  <td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 8px",background:"#d4edda",color:"#155724",borderRadius:3,fontSize:10,fontWeight:700}}>{b.status}</span></td>
-                </tr>
-              );
-            })}</tbody>
+            <thead><tr><th style={RPT_thStyle}>Ledger</th><th style={RPT_thStyle}>Group</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance (INR)</th></tr></thead>
+            <tbody>
+              {rows.map((r,i)=>(<tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}><td style={{...RPT_tdStyle,fontWeight:600}}>{r.ledger}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{r.group}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:bal(r)<0?"#A32D2D":"#0d1326"}}>{fmtINR(bal(r))}</td></tr>))}
+              {rows.length===0&&<tr><td colSpan={3} style={{...RPT_tdStyle,textAlign:"center",color:"#5a6691",padding:20}}>No cash/bank balances yet — post receipts/payments and they appear here.</td></tr>}
+            </tbody>
           </table>
         </div>
-        <p style={{margin:"10px 0 0",fontSize:10.5,color:"#5a6691"}}>Last refreshed: 2026-05-20 11:58 IST · Auto-refreshes every 15 minutes</p>
       </div>
     </PHASE2_Page>
   );
@@ -1871,72 +1669,64 @@ export function InterestCalculator(){
    4. INVESTMENT REGISTER
    ════════════════════════════════════════════════════════════════════ */
 
-export function InvestmentRegister(){
-  const [filter,setFilter]=useState("ALL");
-  const filtered=filter==="ALL"?INVESTMENT_DATA:INVESTMENT_DATA.filter(i=>i.type===filter);
-  const active=INVESTMENT_DATA.filter(i=>i.status==="Active");
-  const totalInvested=active.reduce((s,i)=>s+i.amount,0);
-  const totalMaturity=active.reduce((s,i)=>s+i.maturityValue,0);
-  const totalReturn=totalMaturity-totalInvested;
-  const typeColor={FD:"#3b82f6",MF:"#22c55e",GOI:"#d4a437",NCD:"#6B4C8B"};
-
+export function InvestmentRegister({branch}){
+  const cur=(bc(branch||'ALL')||{}).cur||'INR ';
+  const brCode=(!branch||branch==="ALL")?undefined:branch&&branch.code;
+  const { rows, create, remove } = useCrud('investments', brCode?{branch:brCode}:{});
+  const blank={instrument:'',type:'FD',institution:'',amount:'',rate:'',maturityDate:'',maturityValue:'',status:'active'};
+  const [f,setF]=useState(blank);
+  const set=(k)=>(e)=>setF(s=>({...s,[k]:e.target.value}));
+  const add=()=>{ if(!f.instrument){return;} create.mutate({branch:brCode||'BOM',instrument:f.instrument,type:f.type,institution:f.institution,amount:Number(f.amount)||0,rate:Number(f.rate)||0,maturityDate:f.maturityDate,maturityValue:Number(f.maturityValue)||0,status:f.status},{onSuccess:()=>setF(blank)}); };
+  const totA=rows.reduce((s,i)=>s+(i.amount||0),0),totM=rows.reduce((s,i)=>s+(i.maturityValue||0),0);
+  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const ip={...inp,minHeight:30,fontSize:11,width:"100%"};
+  const kc=(label,val,col)=>(<div style={{...card,borderTop:`3px solid ${col}`}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>{label}</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:col}}>{cur+fmt(val)}</p></div>);
   return(
-    <PHASE2_Page title="Investment Register"
-      subtitle="Fixed Deposits · Mutual Funds · Govt Securities · all treasury investments"
-      toolbar={<>
-        {["ALL","FD","MF","GOI"].map(t=>(
-          <button key={t} onClick={()=>setFilter(t)} style={{padding:"6px 14px",border:filter===t?"2px solid #0d1326":"1px solid #e1e3ec",background:filter===t?"#0d1326":"#fff",color:filter===t?"#d4a437":"#5a6691",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>{t==="ALL"?"All Types":t}</button>
-        ))}
-        <button style={{padding:"7px 12px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>+ Add Investment</button>
-      </>}>
-
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:12,marginBottom:14}}>
-        <div style={{...cardStyle,borderTop:"3px solid #3b82f6"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Total Invested</p><p style={{margin:"5px 0 2px",fontSize:20,fontWeight:700,color:"#0d1326"}}>{fmtINR(totalInvested)}</p><p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{active.length} active investments</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #22c55e"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Expected Returns</p><p style={{margin:"5px 0 2px",fontSize:20,fontWeight:700,color:"#22c55e"}}>+{fmtINR(totalReturn)}</p><p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{((totalReturn/totalInvested)*100).toFixed(1)}% overall yield</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #f97316"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Maturing Soon</p><p style={{margin:"5px 0 2px",fontSize:20,fontWeight:700,color:"#f97316"}}>2</p><p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>within 60 days</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #d4a437"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Maturity Value</p><p style={{margin:"5px 0 2px",fontSize:20,fontWeight:700,color:"#0d1326"}}>{fmtINR(totalMaturity)}</p><p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>at projected rates</p></div>
+    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+      <h2 style={{margin:0,fontSize:19,fontWeight:800,color:"#0d1326"}}>Investment Register</h2>
+      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>FD / Mutual Fund / Bond / Equity / Property. Live - shows 0 until you add an investment.</p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
+        {kc("Total Invested",totA,"#185FA5")}{kc("Maturity Value",totM,"#27500A")}{kc("Expected Gain",totM-totA,"#854F0B")}
       </div>
-
-      <div style={cardStyle}>
+      <div style={{...card,marginBottom:12}}>
+        <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Add investment</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(8,1fr)",gap:6,alignItems:"center"}}>
+          <input style={ip} placeholder="Instrument" value={f.instrument} onChange={set('instrument')}/>
+          <input style={ip} placeholder="Type" value={f.type} onChange={set('type')}/>
+          <input style={ip} placeholder="Institution" value={f.institution} onChange={set('institution')}/>
+          <input style={ip} type="number" placeholder="Amount" value={f.amount} onChange={set('amount')}/>
+          <input style={ip} type="number" placeholder="Rate %" value={f.rate} onChange={set('rate')}/>
+          <input style={ip} type="date" value={f.maturityDate} onChange={set('maturityDate')}/>
+          <input style={ip} type="number" placeholder="Maturity Val" value={f.maturityValue} onChange={set('maturityValue')}/>
+          <button onClick={add} disabled={create.isPending} style={{...btnG,minHeight:32,fontSize:11}}>+ Add</button>
+        </div>
+      </div>
+      <div style={{...card,padding:0,overflow:"hidden"}}>
         <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-            <thead><tr>
-              <th style={RPT_thStyle}>ID</th><th style={RPT_thStyle}>Type</th>
-              <th style={RPT_thStyle}>Institution</th><th style={RPT_thStyle}>Branch</th>
-              <th style={{...RPT_thStyle,textAlign:"right"}}>Invested</th>
-              <th style={{...RPT_thStyle,textAlign:"right"}}>Rate %</th>
-              <th style={RPT_thStyle}>Start</th><th style={RPT_thStyle}>Maturity</th>
-              <th style={RPT_thStyle}>Tenure</th>
-              <th style={{...RPT_thStyle,textAlign:"right"}}>Mat. Value</th>
-              <th style={{...RPT_thStyle,textAlign:"center"}}>Auto-Renew</th>
-              <th style={{...RPT_thStyle,textAlign:"center"}}>Status</th>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
+              <th style={{padding:"9px 8px",textAlign:"left"}}>Instrument</th><th style={{padding:"9px 8px",textAlign:"left"}}>Type</th><th style={{padding:"9px 8px",textAlign:"left"}}>Institution</th><th style={{padding:"9px 8px",textAlign:"right"}}>Amount</th><th style={{padding:"9px 8px",textAlign:"center"}}>Rate</th><th style={{padding:"9px 8px",textAlign:"center"}}>Maturity</th><th style={{padding:"9px 8px",textAlign:"right"}}>Maturity Val</th><th style={{padding:"9px 8px",textAlign:"center"}}>Status</th><th style={{padding:"9px 8px"}}></th>
             </tr></thead>
-            <tbody>{filtered.map(inv=>(
-              <tr key={inv.id} style={{borderBottom:"1px solid #f0f2f7",background:inv.status==="Matured"?"#f7f8fb":"#fff"}}>
-                <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{inv.id}</td>
-                <td style={RPT_tdStyle}><span style={{padding:"2px 8px",borderRadius:3,fontSize:10.5,fontWeight:700,background:(typeColor[inv.type]||"#e1e3ec")+"22",color:typeColor[inv.type]||"#0d1326"}}>{inv.type}</span></td>
-                <td style={{...RPT_tdStyle,fontWeight:600}}>{inv.institution}</td>
-                <td style={RPT_tdStyle}><span style={{padding:"1px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{inv.branch}</span></td>
-                <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(inv.amount)}</td>
-                <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#22c55e"}}>{inv.rate}%</td>
-                <td style={{...RPT_tdStyle,fontSize:11}}>{inv.startDate}</td>
-                <td style={{...RPT_tdStyle,fontSize:11,color:inv.maturityDate!=="—"&&inv.maturityDate<="2026-07-20"?"#f97316":"#5a6691"}}>{inv.maturityDate}</td>
-                <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:11}}>{inv.tenure}</td>
-                <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#22c55e"}}>{fmtINR(inv.maturityValue)}</td>
-                <td style={{...RPT_tdStyle,textAlign:"center"}}>{inv.autoRenew?"✓":"—"}</td>
-                <td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:3,fontSize:10,fontWeight:700,background:inv.status==="Active"?"#d4edda":"#e2e3e5",color:inv.status==="Active"?"#155724":"#383d41"}}>{inv.status}</span></td>
-              </tr>
-            ))}</tbody>
+            <tbody>
+              {rows.map((iv,i)=>(<tr key={iv.id} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #e1e3ec"}}>
+                <td style={{padding:"7px 8px",fontWeight:600}}>{iv.instrument}</td>
+                <td style={{padding:"7px 8px"}}>{iv.type}</td>
+                <td style={{padding:"7px 8px",color:"#5a6691"}}>{iv.institution||"-"}</td>
+                <td style={{padding:"7px 8px",textAlign:"right"}}>{cur+fmt(iv.amount)}</td>
+                <td style={{padding:"7px 8px",textAlign:"center",color:"#854F0B"}}>{iv.rate?iv.rate+"%":"-"}</td>
+                <td style={{padding:"7px 8px",textAlign:"center",fontSize:10}}>{iv.maturityDate||"-"}</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#27500A"}}>{iv.maturityValue?cur+fmt(iv.maturityValue):"-"}</td>
+                <td style={{padding:"7px 8px",textAlign:"center",fontSize:10}}>{iv.status}</td>
+                <td style={{padding:"7px 8px",textAlign:"center"}}><button onClick={()=>remove.mutate(iv.id)} style={{background:"none",border:"none",color:"#A32D2D",cursor:"pointer",fontWeight:700}}>x</button></td>
+              </tr>))}
+              {rows.length===0&&<tr><td colSpan={9} style={{padding:20,textAlign:"center",color:"#5a6691"}}>No investments yet - add one above.</td></tr>}
+            </tbody>
           </table>
         </div>
       </div>
-    </PHASE2_Page>
+    </div>
   );
 }
-
-/* ════════════════════════════════════════════════════════════════════
-   5. LOAN AMORTIZATION SCHEDULE GENERATOR
-   ════════════════════════════════════════════════════════════════════ */
 
 export function LoanAmortization(){
   const [principal,setPrincipal]=useState(5000000);
@@ -2050,119 +1840,34 @@ export function LoanAmortization(){
    6. RECONCILIATION QUEUE
    ════════════════════════════════════════════════════════════════════ */
 
-export function ReconciliationQueue(){
-  const [filterBank,setFilterBank]=useState("ALL");
-  const [filterStatus,setFilterStatus]=useState("ALL");
-  const [matched,setMatched]=useState({});
-  const banks=[...new Set(RECO_QUEUE_DATA.map(r=>r.bank))];
-  const filtered=RECO_QUEUE_DATA.filter(r=>{
-    if(filterBank!=="ALL"&&r.bank!==filterBank) return false;
-    if(filterStatus!=="ALL"&&r.matchStatus!==filterStatus) return false;
-    return true;
-  });
-  const pending=RECO_QUEUE_DATA.filter(r=>r.matchStatus==="pending").length;
-  const autoMatched=RECO_QUEUE_DATA.filter(r=>r.matchStatus==="auto_matched").length;
-  const partial=RECO_QUEUE_DATA.filter(r=>r.matchStatus==="partial").length;
-
-  const statusLabel={auto_matched:"Auto-matched",pending:"Pending",partial:"Partial match"};
-  const statusStyle={
-    auto_matched:{background:"#d4edda",color:"#155724"},
-    pending:{background:"#fff3cd",color:"#856404"},
-    partial:{background:"#cfe2ff",color:"#004085"},
-  };
-
+export function ReconciliationQueue({branch,setRoute}){
+  const { data } = useBankLedgers(branch);
+  const ledgers=data||[];
+  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
   return(
-    <PHASE2_Page title="Reconciliation Queue"
-      subtitle="Bank transactions awaiting voucher match · auto-matched · pending manual review"
-      toolbar={<>
-        <select value={filterBank} onChange={e=>setFilterBank(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,background:"#fff"}}>
-          <option value="ALL">All banks</option>{banks.map(b=><option key={b}>{b}</option>)}
-        </select>
-        <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,background:"#fff"}}>
-          <option value="ALL">All statuses</option><option value="pending">Pending</option><option value="auto_matched">Auto-matched</option><option value="partial">Partial match</option>
-        </select>
-        <button style={{padding:"7px 12px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>↻ Refresh Statement</button>
-      </>}>
-
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:14}}>
-        <div style={{...cardStyle,borderTop:"3px solid #22c55e"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Auto-matched</p><p style={{margin:"5px 0 2px",fontSize:22,fontWeight:700,color:"#22c55e"}}>{autoMatched}</p><p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>no action needed</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #f97316"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Pending Review</p><p style={{margin:"5px 0 2px",fontSize:22,fontWeight:700,color:"#f97316"}}>{pending}</p><p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>manual action required</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #3b82f6"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Partial Match</p><p style={{margin:"5px 0 2px",fontSize:22,fontWeight:700,color:"#3b82f6"}}>{partial}</p><p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>review &amp; confirm</p></div>
-        <div style={{...cardStyle,borderTop:"3px solid #d4a437"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Total Transactions</p><p style={{margin:"5px 0 2px",fontSize:22,fontWeight:700,color:"#0d1326"}}>{RECO_QUEUE_DATA.length}</p><p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>this statement period</p></div>
-      </div>
-
-      <div style={cardStyle}>
+    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+      <h2 style={{margin:0,fontSize:19,fontWeight:800,color:"#0d1326"}}>Reconciliation Queue</h2>
+      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Bank / OD ledgers to reconcile against imported statements. Live - lists your real bank ledgers.</p>
+      <div style={{...card,padding:0,overflow:"hidden"}}>
         <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-            <thead><tr>
-              <th style={RPT_thStyle}>Date</th><th style={RPT_thStyle}>Bank</th>
-              <th style={RPT_thStyle}>Description</th>
-              <th style={{...RPT_thStyle,textAlign:"right"}}>Amount</th>
-              <th style={RPT_thStyle}>Matched Voucher</th>
-              <th style={{...RPT_thStyle,textAlign:"center"}}>Confidence</th>
-              <th style={{...RPT_thStyle,textAlign:"center"}}>Status</th>
-              <th style={{...RPT_thStyle,textAlign:"center"}}>Action</th>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
+              <th style={{padding:"9px 10px",textAlign:"left"}}>Bank Ledger</th><th style={{padding:"9px 10px",textAlign:"left"}}>Group</th><th style={{padding:"9px 10px",textAlign:"center"}}>Action</th>
             </tr></thead>
-            <tbody>{filtered.map(r=>(
-              <tr key={r.id} style={{borderBottom:"1px solid #f0f2f7",background:matched[r.id]?"#f0fff4":"#fff"}}>
-                <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:11}}>{r.date}</td>
-                <td style={{...RPT_tdStyle,fontSize:11,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.bank}</td>
-                <td style={{...RPT_tdStyle,maxWidth:220}}>
-                  <p style={{margin:0,fontSize:11.5,color:"#0d1326"}}>{r.desc}</p>
-                  <p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>{r.type==="credit"?"Cr":"Dr"} · {r.id}</p>
-                </td>
-                <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:r.type==="credit"?"#22c55e":"#A32D2D",fontFamily:"monospace"}}>
-                  {r.type==="credit"?"+":"-"}{fmtINR(r.amount)}
-                </td>
-                <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:11,color:r.matchedVoucher?"#0d1326":"#5a6691"}}>
-                  {r.matchedVoucher||"—"}
-                </td>
-                <td style={{...RPT_tdStyle,textAlign:"center"}}>
-                  {r.confidence>0?(
-                    <div style={{display:"flex",alignItems:"center",gap:6,justifyContent:"center"}}>
-                      <div style={{width:50,height:5,background:"#f0f2f7",borderRadius:3,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:r.confidence+"%",background:r.confidence>90?"#22c55e":r.confidence>60?"#d4a437":"#f97316",borderRadius:3}}/>
-                      </div>
-                      <span style={{fontSize:10.5,fontWeight:700}}>{r.confidence}%</span>
-                    </div>
-                  ):<span style={{color:"#5a6691"}}>—</span>}
-                </td>
-                <td style={{...RPT_tdStyle,textAlign:"center"}}>
-                  <span style={{padding:"3px 9px",borderRadius:3,fontSize:10,fontWeight:700,...(statusStyle[r.matchStatus]||{})}}>{statusLabel[r.matchStatus]}</span>
-                </td>
-                <td style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #f0f2f7"}}>
-                  {r.matchStatus==="auto_matched"&&<span style={{fontSize:10.5,color:"#22c55e",fontWeight:700}}>✓ Confirmed</span>}
-                  {r.matchStatus==="pending"&&(
-                    <div style={{display:"flex",gap:4,justifyContent:"center"}}>
-                      <button onClick={()=>setMatched(p=>({...p,[r.id]:true}))} style={{padding:"3px 8px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>Match</button>
-                      <button style={{padding:"3px 8px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:3,fontSize:10,fontWeight:600,cursor:"pointer"}}>New</button>
-                      <button style={{padding:"3px 8px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:3,fontSize:10,fontWeight:600,cursor:"pointer"}}>Skip</button>
-                    </div>
-                  )}
-                  {r.matchStatus==="partial"&&(
-                    <div style={{display:"flex",gap:4,justifyContent:"center"}}>
-                      <button style={{padding:"3px 8px",background:"#3b82f6",color:"#fff",border:"none",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>Confirm</button>
-                      <button style={{padding:"3px 8px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:3,fontSize:10,fontWeight:600,cursor:"pointer"}}>Review</button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}</tbody>
+            <tbody>
+              {ledgers.map((l,i)=>(<tr key={l.code||l.name||i} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #e1e3ec"}}>
+                <td style={{padding:"8px 10px",fontWeight:600}}>{l.name||l.ledger||l}</td>
+                <td style={{padding:"8px 10px",color:"#5a6691"}}>{l.group||"Bank Accounts"}</td>
+                <td style={{padding:"8px 10px",textAlign:"center"}}><button onClick={()=>setRoute&&setRoute('/bank-reco')} style={{...btnGh,minHeight:28,fontSize:11}}>Reconcile</button></td>
+              </tr>))}
+              {ledgers.length===0&&<tr><td colSpan={3} style={{padding:20,textAlign:"center",color:"#5a6691"}}>No bank ledgers yet - create a Bank ledger to reconcile.</td></tr>}
+            </tbody>
           </table>
         </div>
-        <p style={{margin:"10px 0 0",fontSize:10.5,color:"#5a6691"}}>Auto-match runs on: same bank account · ±1% amount tolerance · ±3 day date window · party name fuzzy match</p>
       </div>
-    </PHASE2_Page>
+    </div>
   );
 }
-
-/* ════════════════════════════════════════════════════════════════════
-   PHASE 2 — REPORTS META CAPABILITIES (4 screens, 7 features)
-   Custom Builder · Saved Views · Scheduled Reports · Meta Demo
-   ════════════════════════════════════════════════════════════════════ */
-
-/* ── Seed data ────────────────────────────────────────────────────── */
-
 
 export function InvestmentDeclaration(){
   const [vals,setVals]=useState(Object.fromEntries(INVESTMENT_SECTIONS.map(s=>[s.section,s.declared])));
