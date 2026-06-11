@@ -345,6 +345,32 @@ export function useOpenBills(party, branch, side = 'customer') {
   });
 }
 
+// Whole-book unsettled bills + on-account advances (the Outstanding & On-Account
+// dashboard). Bills settle ONLY by explicit allocation — no FIFO. Returns
+// { salesBills, purchaseBills, onAccountReceipts, onAccountPayments, totals }.
+export function useOutstanding(branch) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['vouchers', 'outstanding', code || 'all'],
+    queryFn: () => apiGet('/api/vouchers/outstanding', { branch: code }),
+    enabled: enabled(),
+    staleTime: 20_000,
+  });
+}
+
+// Settle an on-account receipt/payment against open bills (bill-wise). Updates the
+// allocation sub-ledger only — no GL re-post.
+export function useSettleAdvance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, allocations }) => apiPut(`/api/vouchers/${id}/settle`, { allocations }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vouchers'] });
+      qc.invalidateQueries({ queryKey: ['accounting'] });
+    },
+  });
+}
+
 // Single voucher (drill-down target) — view + edit.
 export function useVoucher(id) {
   return useQuery({

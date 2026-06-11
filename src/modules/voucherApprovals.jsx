@@ -48,6 +48,7 @@ export function VoucherApprovals({ branch }) {
   const [editId, setEditId] = useState(null);      // voucher being edited (fix → approve)
   const [viewId, setViewId] = useState(null);      // voucher being viewed (read-only formatted view)
   const viewRef = useRef(null);
+  const [view, setView] = useState('tree');        // entry | voucher | tree (Group-Subgroup-Ledger)
   const cur = (bc(branch) || {}).cur || '₹';
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
   const q = useVoucherApprovals(branch, status, { from: range.from, to: range.to });
@@ -117,6 +118,76 @@ export function VoucherApprovals({ branch }) {
   const amt = (dr, cr) => (dr ? <span style={{ color: C.blue }}>{money(dr)} Dr</span> : cr ? <span style={{ color: C.red }}>{money(cr)} Cr</span> : '');
   const Caret = ({ o }) => <span style={{ color: C.gold, width: 12, display: 'inline-block' }}>{o ? '▾' : '▸'}</span>;
 
+  // ── Shared bits for the flat (Entry wise / Voucher wise) tables ──────────────
+  const flatEntries = useMemo(() => [...entries].sort((a, b) => String(a.date).localeCompare(String(b.date))), [entries]);
+  const flatTh = { padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: `2px solid ${C.border}`, position: 'sticky', top: 0, background: '#f3f6fb', whiteSpace: 'nowrap' };
+  const flatTd = { padding: '6px 10px', borderBottom: '1px solid #f4f6fa', whiteSpace: 'nowrap', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis' };
+  const ABTN = (col, filled) => ({ padding: '3px 9px', background: filled ? col : '#fff', color: filled ? '#fff' : col, border: filled ? 'none' : `1px solid ${col}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 });
+  const ckbox = (e) => (status === 'pending' ? <input type="checkbox" checked={sel.has(e.id)} onChange={() => toggleSel(e.id)} onClick={(ev) => ev.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} /> : null);
+  const actionCell = (e) => (
+    status === 'pending' ? (
+      <>
+        <button onClick={() => setEditId(e.id)} disabled={busy} style={ABTN(C.blue)}>Edit</button>
+        <button onClick={() => doApprove(e.id)} disabled={busy || !e.postable} title={e.postable ? '' : 'Fix the error (Edit) before approving'} style={{ ...ABTN(C.green, true), background: e.postable ? C.green : '#cfd6e4', cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
+        <button onClick={() => doReject(e.id)} disabled={busy} style={ABTN(C.red)}>Reject</button>
+      </>
+    ) : status === 'approved' ? (
+      <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={ABTN(C.red)}>Delete</button>
+    ) : status === 'deleted' ? (
+      <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
+    ) : <span style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected</span>
+  );
+  const vnoCell = (e, show = true) => <td onClick={() => show && setViewId(e.id)} title={show ? 'View full voucher' : ''} style={{ ...flatTd, color: C.blue, fontWeight: 700, cursor: show ? 'pointer' : 'default', textDecoration: show ? 'underline' : 'none' }}>{show ? e.vno : ''}</td>;
+
+  // Voucher wise — one row per voucher (Dr/Cr summary).
+  const voucherWise = () => (
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+      <thead><tr>{['Date', 'Vch No', 'Type', 'Party', 'Debit Ledger', 'Credit Ledger', 'Debit', 'Credit', 'Narration', 'Action'].map((h) => <th key={h} style={{ ...flatTh, textAlign: h === 'Debit' || h === 'Credit' ? 'right' : h === 'Action' ? 'center' : 'left' }}>{h}</th>)}</tr></thead>
+      <tbody>
+        {flatEntries.map((e, i) => { const x = drCrOf(e); return (
+          <tr key={e.id} style={{ background: i % 2 ? '#fcfdff' : '#fff' }}>
+            <td style={{ ...flatTd, color: C.dim }}>{ckbox(e)}{fmtDate(e.date)}</td>
+            {vnoCell(e)}
+            <td style={{ ...flatTd, color: C.dim }}>{VCH[e.category] || e.type}</td>
+            <td style={flatTd} title={e.party}>{e.party || '—'}</td>
+            <td style={{ ...flatTd, color: C.blue, fontWeight: 600 }} title={x.drLedger}>{x.drLedger}</td>
+            <td style={{ ...flatTd, color: C.red, fontWeight: 600 }} title={x.crLedger}>{x.crLedger}</td>
+            <td style={{ ...flatTd, textAlign: 'right', color: C.blue }}>{x.drAmt ? money(x.drAmt) : ''}</td>
+            <td style={{ ...flatTd, textAlign: 'right', color: C.red }}>{x.crAmt ? money(x.crAmt) : ''}</td>
+            <td style={{ ...flatTd, color: e.error ? C.red : C.dim, fontStyle: 'italic' }} title={e.error || e.narration || ''}>{e.error ? `⚠ ${e.error}` : (e.narration || '—')}</td>
+            <td style={{ ...flatTd, textAlign: 'center' }}>{actionCell(e)}</td>
+          </tr>
+        ); })}
+      </tbody>
+    </table>
+  );
+
+  // Entry wise — one row per Dr/Cr posting leg (grouped under its voucher).
+  const entryWise = () => (
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+      <thead><tr>{['Date', 'Vch No', 'Type', 'Ledger', 'Group', 'Sub-group', 'Debit', 'Credit', 'Narration', 'Action'].map((h) => <th key={h} style={{ ...flatTh, textAlign: h === 'Debit' || h === 'Credit' ? 'right' : h === 'Action' ? 'center' : 'left' }}>{h}</th>)}</tr></thead>
+      <tbody>
+        {flatEntries.flatMap((e) => {
+          const legs = (e.postable && e.postings && e.postings.length) ? e.postings : [{ ledger: e.party || '—', group: '⚠ Needs attention', subGroup: '', debit: 0, credit: 0, narration: e.error || '' }];
+          return legs.map((p, li) => (
+            <tr key={e.id + ':' + li} style={{ background: '#fff', borderTop: li === 0 ? '1px solid #eef1f6' : 'none' }}>
+              <td style={{ ...flatTd, color: C.dim }}>{li === 0 ? <>{ckbox(e)}{fmtDate(e.date)}</> : ''}</td>
+              {li === 0 ? vnoCell(e) : <td style={flatTd}></td>}
+              <td style={{ ...flatTd, color: C.dim }}>{li === 0 ? (VCH[e.category] || e.type) : ''}</td>
+              <td style={{ ...flatTd, fontWeight: 600, color: C.dark }} title={p.ledger}>{p.ledger}</td>
+              <td style={{ ...flatTd, color: C.dim }} title={p.group}>{p.group}</td>
+              <td style={{ ...flatTd, color: C.dim }} title={p.subGroup || p.group}>{p.subGroup || p.group}</td>
+              <td style={{ ...flatTd, textAlign: 'right', color: C.blue }}>{p.debit ? money(p.debit) : ''}</td>
+              <td style={{ ...flatTd, textAlign: 'right', color: C.red }}>{p.credit ? money(p.credit) : ''}</td>
+              <td style={{ ...flatTd, color: C.dim, fontStyle: 'italic' }} title={p.narration || e.narration || ''}>{p.narration || (li === 0 ? (e.error ? `⚠ ${e.error}` : e.narration) : '') || ''}</td>
+              <td style={{ ...flatTd, textAlign: 'center' }}>{li === 0 ? actionCell(e) : ''}</td>
+            </tr>
+          ));
+        })}
+      </tbody>
+    </table>
+  );
+
   return (
     <div style={{ margin: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -144,13 +215,19 @@ export function VoucherApprovals({ branch }) {
           {tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}
         </div>
         <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: '#fafbfe', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11.5, color: C.dim, fontWeight: 600 }}>Group › Sub-group › Ledger › Entry</span>
+          <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden' }}>
+            {[['entry', 'Entry wise'], ['voucher', 'Voucher wise'], ['tree', 'Group-Subgroup-Ledger']].map(([v, l]) => (
+              <button key={v} onClick={() => setView(v)} style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: view === v ? C.blue : '#fff', color: view === v ? '#fff' : C.dim }}>{l}</button>
+            ))}
+          </div>
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6 }}>
             {status === 'pending' && allIds.length > 0 && (
               <button onClick={toggleAllSel} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.blue}`, borderRadius: 5, background: sel.size === allIds.length ? C.blue : '#fff', color: sel.size === allIds.length ? '#fff' : C.blue, cursor: 'pointer' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
             )}
-            <button onClick={() => setAll(true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊞ Expand all</button>
-            <button onClick={() => setAll(false)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊟ Collapse all</button>
+            {view === 'tree' && <>
+              <button onClick={() => setAll(true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊞ Expand all</button>
+              <button onClick={() => setAll(false)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊟ Collapse all</button>
+            </>}
           </span>
           {q.isFetching && <span style={{ fontSize: 11, color: C.dim }}>updating…</span>}
         </div>
@@ -159,8 +236,10 @@ export function VoucherApprovals({ branch }) {
       <div style={{ ...card }}>
         {q.isLoading ? <div style={{ padding: 28, textAlign: 'center', color: C.dim }}>Loading…</div> : (
           <div style={{ maxHeight: '72vh', overflow: 'auto', fontSize: 12.5 }}>
-            {tree.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: C.dim }}>No {status} vouchers.</div>}
-            {tree.map((g) => {
+            {flatEntries.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: C.dim }}>No {status} vouchers.</div>}
+            {flatEntries.length > 0 && view === 'voucher' && voucherWise()}
+            {flatEntries.length > 0 && view === 'entry' && entryWise()}
+            {view === 'tree' && tree.map((g) => {
               const gk = 'g:' + g.name, gOpen = isOpen(gk, true);
               return (
                 <div key={gk}>
