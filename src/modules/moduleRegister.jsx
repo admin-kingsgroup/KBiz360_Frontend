@@ -10,6 +10,7 @@ import { branchCode } from '../core/useAccounting';
 import { VSPECS } from '../core/voucherSpecs';
 import { companyProfile } from '../core/referenceCache';
 import { bc } from '../core/styles';
+import { PeriodBar, periodRange } from '../core/period';
 import { openPrintPreview } from '../core/PrintPreview';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec' };
@@ -80,7 +81,9 @@ export function ModuleRegister({ branch, mode = 'both' }) {
   const brCode = branchCode(branch) || 'ALL';
   const { data = [], isLoading } = useBookingsReg(brCode);
   const spec = VSPECS[mod] || {};
-  const rows = data.filter((b) => b.module === mod && (b.status === 'approved' || b.status === 'posted'));
+  const [range, setRange] = useState(() => periodRange('all', { branch })); // default All = inception→today
+  const inRange = (d) => (!range.from || d >= range.from) && (!range.to || d <= range.to);
+  const rows = data.filter((b) => b.module === mod && (b.status === 'approved' || b.status === 'posted') && inRange(b.date || ''));
   const fmt = (n) => (bc(branch).cur) + Math.round(Number(n) || 0).toLocaleString('en-IN');
   const print = (b, side) => openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: invoiceHtml(b, side, branch) });
   const showSale = mode !== 'purchase', showPur = mode !== 'sales', showGP = mode === 'both';
@@ -98,9 +101,12 @@ export function ModuleRegister({ branch, mode = 'both' }) {
           <div style={{ fontSize: 17, fontWeight: 800, color: C.dark }}>{heading} <span style={{ fontSize: 12, fontWeight: 600, color: C.dim }}>(view-only)</span></div>
           <div style={{ fontSize: 12, color: C.dim }}>Approved SO/PO/GP deals. All entry is via <b>Finance ▸ Vouchers ▸ SO/PO/GP Voucher</b>. {mode === 'sales' ? 'Print the Sales Invoice (give to customer)' : mode === 'purchase' ? 'Print the Purchase Invoice (internal filing)' : 'Print the Sales Invoice (customer) or Purchase Invoice (filing)'} — Link No stamped.</div>
         </div>
-        <select value={mod} onChange={(e) => setMod(e.target.value)} style={{ marginLeft: 'auto', padding: '8px 12px', fontSize: 13, fontWeight: 700, border: `1px solid ${C.border}`, borderRadius: 6, background: '#fff', color: C.dark }}>
-          {MODS.map((m) => <option key={m} value={m}>{(VSPECS[m]?.icon || '') + ' ' + (VSPECS[m]?.name || m)}</option>)}
-        </select>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <PeriodBar branch={branch} compact defaultPreset="all" onChange={setRange} />
+          <select value={mod} onChange={(e) => setMod(e.target.value)} style={{ padding: '8px 12px', fontSize: 13, fontWeight: 700, border: `1px solid ${C.border}`, borderRadius: 6, background: '#fff', color: C.dark }}>
+            {MODS.map((m) => <option key={m} value={m}>{(VSPECS[m]?.icon || '') + ' ' + (VSPECS[m]?.name || m)}</option>)}
+          </select>
+        </div>
       </div>
       <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
         <div style={{ maxHeight: '72vh', overflow: 'auto' }}>
