@@ -60,8 +60,9 @@ export const loadBranchDashboard = async ({ branchCode }) => {
   };
 };
 
-export const loadDirectorDashboard = async ({ range = 'month', branchCode } = {}) => {
-  const dates = api.rangeToDates(range); // 'month' | 'ytd' | 'all' → ISO range + label
+export const loadDirectorDashboard = async ({ range = 'month', branchCode, from, to } = {}) => {
+  // Prefer explicit from/to (uniform 7-preset bar); fall back to the legacy range preset.
+  const dates = (from != null || to != null) ? { from: from || '', to: to || '', label: 'Custom' } : api.rangeToDates(range);
   const [revenueTrend, fyTargets, branchHeatmap, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, bookingSummary] =
     await Promise.all([
       api.getRevenueTrend(branchCode),
