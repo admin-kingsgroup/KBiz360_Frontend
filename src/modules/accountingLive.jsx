@@ -17,6 +17,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { card, inp, bc } from '../core/styles';
 import { exportToExcel, vouchersToSheet } from '../core/exportExcel';
 import { CUR_QUARTER, CUR_FY } from '../core/dates';
+import { PeriodBar } from '../core/period';
 import {
   useTrialBalance, useProfitAndLoss, useBalanceSheet, useDayBook,
   useLedgerStatement, useLedgerGroups, useChartOfAccounts, useGroupTree,
@@ -81,32 +82,9 @@ const daysAgoISO = (n) => { const t = new Date(); return isoDate(new Date(t.getF
 // report (current and future) imports this so the date-range UX is identical
 // everywhere. `from`/`to` are ISO strings; '' on both = open-ended ("All").
 // Defaults are owned by each caller (most seed `monthStartISO()`→`todayISO()`).
-export function DateRange({ from, to, setFrom, setTo }) {
-  const PRESETS = [
-    { label: 'Today',              f: todayISO(),          t: todayISO() },
-    { label: 'This Month',         f: monthStartISO(),     t: todayISO() },
-    { label: 'Last 3M',            f: daysAgoISO(90),      t: todayISO() },
-    { label: CUR_QUARTER.label.split(' ')[0], f: CUR_QUARTER.startISO, t: CUR_QUARTER.endISO }, // "Q1"
-    { label: `FY ${CUR_FY.label}`, f: CUR_FY.startISO,     t: CUR_FY.endISO },
-    { label: 'All',                f: '',                  t: '' },
-  ];
-  const Preset = ({ label, f, t }) => {
-    const active = (from || '') === f && (to || '') === t;
-    return (
-      <button onClick={() => { setFrom(f); setTo(t); }}
-        style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 10.5, cursor: 'pointer', fontWeight: 700,
-          ...(active ? { background: GOLD, color: '#fff', borderColor: GOLD } : { color: DIM }) }}>
-        {label}</button>
-    );
-  };
-  return (
-    <>
-      {PRESETS.map((p) => <Preset key={p.label} {...p} />)}
-      <DateInput value={from} onChange={(e) => setFrom(e.target.value)} />
-      <span style={{ lineHeight: '32px', color: DIM, fontSize: 11 }}>to</span>
-      <DateInput value={to} onChange={(e) => setTo(e.target.value)} />
-    </>
-  );
+// Uniform period selector (All/Today/Week/MTD/QTD/LFY/CFY + dates, per-branch FY).
+export function DateRange({ from, to, setFrom, setTo, branch }) {
+  return <PeriodBar branch={branch} compact defaultPreset="mtd" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />;
 }
 
 function Banner({ tone = 'info', children }) {
@@ -289,29 +267,8 @@ const weekStartISO = () => { const t = new Date(); const back = (t.getDay() + 6)
 // Pass `full` for the complete accounting-book preset row (Today · Yesterday ·
 // This Week · This Month · This Quarter · YTD · Current FY · All) — used by the
 // Cash Book and other primary Finance books.
-function RangeBar({ from, to, setFrom, setTo, onChange, full }) {
-  const apply = (f, t) => { setFrom(f); setTo(t); onChange && onChange(); };
-  const Preset = ({ label, f, t }) => {
-    const active = from === f && to === t;
-    return <button onClick={() => apply(f, t)} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 10.5, cursor: 'pointer', fontWeight: 700, background: active ? DARK : '#fff', color: active ? GOLD : DIM, borderColor: active ? DARK : '#e1e3ec' }}>{label}</button>;
-  };
-  return (
-    <>
-      <Preset label="Today" f={todayISO()} t={todayISO()} />
-      {full && <Preset label="Yesterday" f={yesterdayISO()} t={yesterdayISO()} />}
-      {full && <Preset label="This Week" f={weekStartISO()} t={todayISO()} />}
-      <Preset label={full ? 'This Month' : 'Month'} f={monthStartISO()} t={todayISO()} />
-      {full && <Preset label="This Quarter" f={CUR_QUARTER.startISO} t={todayISO()} />}
-      {full && <Preset label="YTD" f={CUR_FY.startISO} t={todayISO()} />}
-      {full
-        ? <Preset label="Current FY" f={CUR_FY.startISO} t={CUR_FY.endISO} />
-        : <Preset label="FY" f={fyStartISO()} t={todayISO()} />}
-      <Preset label="All" f="" t="" />
-      <DateInput value={from} onChange={(e) => { setFrom(e.target.value); onChange && onChange(); }} />
-      <span style={{ lineHeight: '32px', color: DIM, fontSize: 11 }}>to</span>
-      <DateInput value={to} onChange={(e) => { setTo(e.target.value); onChange && onChange(); }} />
-    </>
-  );
+function RangeBar({ from, to, setFrom, setTo, onChange, full, branch }) {
+  return <PeriodBar branch={branch} compact defaultPreset="today" onChange={(r) => { setFrom(r.from); setTo(r.to); onChange && onChange(); }} />;
 }
 
 // Search box — filters the current report by any free text (narration, ledger,
@@ -540,7 +497,7 @@ export function TrialBalanceLive({ branch }) {
       right={<>
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Ledger / group…" />
         <ModeToggle view={view} setView={setView} modes={[{ id: 'detailed', label: 'Detailed' }, { id: 'summary', label: 'Summary' }]} />
-        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(0)} />
+        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(0)} branch={branch} />
         <ExportBtn onClick={exportNow} disabled={!filtered.length} />
         <PrintBtn onClick={printNow} disabled={!filtered.length} />
       </>}
@@ -668,7 +625,7 @@ export function DayBookLive({ branch }) {
       right={<>
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Narration / voucher / ledger…" />
         <ModeToggle view={view} setView={setView} modes={[{ id: 'minimal', label: 'Minimal' }, { id: 'detailed', label: 'Detailed' }]} />
-        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(0)} />
+        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(0)} branch={branch} />
         <ExportBtn onClick={exportNow} disabled={!postingRows.length} />
         <PrintBtn onClick={printNow} disabled={!postingRows.length} />
       </>}
@@ -745,9 +702,7 @@ export function LedgerAcLive({ branch }) {
           {ledgers.length === 0 && <option>Loading…</option>}
           {ledgers.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
         </select>
-        <DateInput value={from} onChange={(e) => setFrom(e.target.value)} />
-        <span style={{ lineHeight: '32px', color: DIM, fontSize: 11 }}>to</span>
-        <DateInput value={to} onChange={(e) => setTo(e.target.value)} />
+        <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
       </>}
     >
       <State q={q} empty={!d}>
@@ -1015,9 +970,7 @@ export function ReportPnLLive({ branch }) {
       title="Profit & Loss Account"
       sub={`${branchLabel(branch)}${from || to ? ` · ${from || '…'} → ${to || '…'}` : ' · all periods'}`}
       right={<>
-        <DateInput value={from} onChange={(e) => setFrom(e.target.value)} />
-        <span style={{ lineHeight: '32px', color: DIM, fontSize: 11 }}>to</span>
-        <DateInput value={to} onChange={(e) => setTo(e.target.value)} />
+        <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
       </>}
     >
       <State q={q} empty={!d}>
@@ -1121,7 +1074,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
           {products.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
         <ViewToggle view={view} setView={setView} />
-        <DateRange from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <DateRange from={from} to={to} setFrom={setFrom} setTo={setTo} branch={branch} />
         <ExportBtn onClick={exportNow} disabled={!rows.length} />
       </>}
     >
@@ -1290,7 +1243,7 @@ export function InvoiceGPLive({ branch }) {
       sub={`${branchLabel(branch)} · ${rows.length} rows (${linkedCount} linked files) · ${view === 'detailed' ? 'every sale & purchase with full base-fare / tax bifurcation — scroll right' : 'click a row for the full base-fare / tax bifurcation'}`}
       right={<>
         <ViewToggle view={view} setView={setView} />
-        <DateRange from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <DateRange from={from} to={to} setFrom={setFrom} setTo={setTo} branch={branch} />
         <ExportBtn onClick={exportSummary} disabled={!rows.length} label="Export GP" />
         <ExportBtn onClick={exportDetailed} disabled={!detailSheet.rows.length || !detailReady} label="Export Full Detail" />
       </>}
@@ -1654,7 +1607,7 @@ export function CashBookLive({ branch }) {
         </select>
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Particulars / voucher…" />
         <ModeToggle view={view} setView={setView} modes={[{ id: 'detailed', label: 'Detailed' }, { id: 'minimal', label: 'Minimal' }]} />
-        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(0)} full />
+        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(0)} full branch={branch} />
         <ExportBtn onClick={exportNow} disabled={!rowsFull.length} />
         <PrintBtn onClick={printNow} disabled={!rowsFull.length} />
       </>}
