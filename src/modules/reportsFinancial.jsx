@@ -21,6 +21,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { card, inp, bc } from '../core/styles';
+import { periodRange } from '../core/period';
 import { useModulePL, useBalanceSheet, useLedgerStatement, useAgeing, branchCode } from '../core/useAccounting';
 import { apiGet, getAuthToken } from '../core/api';
 import { exportToExcel } from '../core/exportExcel';
@@ -363,11 +364,16 @@ const fyQuartersFor = (label) => {
 };
 // mode → resolved single-period { from, to, label, note }. month/quarter use the
 // matrix; if one of their columns is drilled the focus range is used directly.
-function resolvePeriod(mode, fy, custom) {
+function resolvePeriod(mode, fy, custom, branch) {
   if (mode === 'all') return { from: '', to: '', label: 'All Time', note: rangeNote('all', { to: todayISO() }) };
   if (mode === 'custom') {
     const from = custom.from || CUR_FY.startISO, to = custom.to || todayISO();
     return { from, to, label: 'Custom Range', note: rangeNote('range', { from, to }) };
+  }
+  // Uniform presets (per-branch FY) via the shared period util.
+  if (['today', 'week', 'mtd', 'qtd', 'cfy', 'lfy'].includes(mode)) {
+    const r = periodRange(mode, { branch });
+    return { from: r.from, to: r.to, label: r.label, note: rangeNote('range', { from: r.from, to: r.to }) };
   }
   const r = fyRange(fy);
   const to = fy === CUR_FY.label ? todayISO() : r.to;       // current FY → year-to-date
@@ -375,16 +381,18 @@ function resolvePeriod(mode, fy, custom) {
 }
 // comparison window: previous FY (ytd) or the equal-length window immediately
 // before a custom range.
-function priorPeriod(mode, fy, custom) {
-  if (mode === 'custom') {
-    const a = new Date(custom.from), b = new Date(custom.to);
+function priorPeriod(mode, fy, custom, period) {
+  // Custom + short presets compare against the equal-length window immediately before.
+  if (mode === 'custom' || ['today', 'week', 'mtd', 'qtd'].includes(mode)) {
+    const ref = mode === 'custom' ? custom : (period || {});
+    const a = new Date(ref.from), b = new Date(ref.to);
     if (isNaN(a.getTime()) || isNaN(b.getTime())) return null;
     const days = Math.round((b - a) / 86400000) + 1;
     const pe = new Date(a); pe.setDate(pe.getDate() - 1);
     const ps = new Date(pe); ps.setDate(ps.getDate() - days + 1);
-    return { from: isoDate(ps), to: isoDate(pe), label: 'Previous range' };
+    return { from: isoDate(ps), to: isoDate(pe), label: 'Previous period' };
   }
-  const p = fyPrior(fy);
+  const p = fyPrior(fy); // ytd / cfy / month / quarter → prior FY
   return { from: p.from, to: p.to, label: 'FY prior' };
 }
 // Flatten a single-period payload into an Excel sheet (Section A modules + the
@@ -418,7 +426,7 @@ function exportDetail(d, period, cur) {
 
 /* ── period toolbar (quick filters + comparison + custom range + export) ── */
 function PnlPeriodBar({ mode, setMode, fy, setFy, compare, setCompare, custom, setCustom, view, setView, showView, showZero, setShowZero, canExport, onExport }) {
-  const MODES = [['all', 'All Time'], ['ytd', 'YTD'], ['month', 'Monthly'], ['quarter', 'Quarterly'], ['custom', 'Custom']];
+  const MODES = [['all', 'All'], ['today', 'Today'], ['week', 'Week'], ['mtd', 'MTD'], ['qtd', 'QTD'], ['cfy', 'CFY'], ['lfy', 'LFY'], ['month', 'Monthly'], ['quarter', 'Quarterly'], ['custom', 'Custom']];
   const tab = (active) => ({ padding: '6px 13px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: active ? SAP.blue : '#fff', color: active ? '#fff' : SAP.sec });
   const needsFy = mode === 'ytd' || mode === 'month' || mode === 'quarter';
   return (
@@ -440,7 +448,7 @@ function PnlPeriodBar({ mode, setMode, fy, setFy, compare, setCompare, custom, s
           To <input type="date" value={custom.to} onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))} style={{ ...inp, width: 'auto', minHeight: 30, fontSize: 11.5 }} />
         </span>
       )}
-      {(mode === 'ytd' || mode === 'custom') && (
+      {(mode !== 'all' && mode !== 'month' && mode !== 'quarter') && (
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: SAP.sec, cursor: 'pointer' }}>
           <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} /> Compare vs previous
         </label>
@@ -571,7 +579,7 @@ export function ReportPnLLive({ branch }) {
   const cur = curOf(branch);
   const mobile = useMobile();
   const saved = useMemo(loadSavedPeriod, []);
-  const [mode, setMode] = useState(saved.mode || 'ytd');                // all | ytd | month | quarter | custom
+  const [mode, setMode] = useState(saved.mode || 'cfy');                // all|today|week|mtd|qtd|cfy|lfy|month|quarter|custom (ytd kept for back-compat)
   const [fy, setFy] = useState(saved.fy || CUR_FY.label);
   const [compare, setCompare] = useState(saved.compare ?? true);
   const [custom, setCustom] = useState(saved.custom || { from: CUR_FY.startISO, to: todayISO() });
@@ -582,9 +590,9 @@ export function ReportPnLLive({ branch }) {
   useEffect(() => { setFocus(null); }, [mode, fy]);                    // realigning the matrix clears any open drill
 
   const isMatrix = (mode === 'month' || mode === 'quarter') && !focus;
-  const period = focus || resolvePeriod(mode, fy, custom);
+  const period = focus || resolvePeriod(mode, fy, custom, branch);
   const showPY = !isMatrix && !focus && compare && mode !== 'all';
-  const prior = showPY ? priorPeriod(mode, fy, custom) : null;
+  const prior = showPY ? priorPeriod(mode, fy, custom, period) : null;
 
   const q = useModulePL(branch, { from: period.from, to: period.to, includeZero: showZero });
   // No comparison → reuse the same range (cache hit, no extra fetch); prev stays null.
