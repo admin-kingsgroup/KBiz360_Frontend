@@ -22,6 +22,7 @@ import { useBalanceSheet, useProfitAndLoss, useTrialBalance, useAgeing, useLedge
 import { VoucherEditor } from './accountingLive';
 import { exportToExcel } from '../core/exportExcel';
 import { buildNotes } from './notesEngine';
+import { PeriodBar, periodRange } from '../core/period';
 
 const INK = '#0d1326', GOLD = '#d4a437', MUTE = '#5a6691', LINE = '#e1e3ec';
 const OK = '#1D9E75', WARN = '#A32D2D';
@@ -227,15 +228,13 @@ function DrillModal({ ledger, branch, to, cur, onClose }) {
 /* ── main report ──────────────────────────────────────────────────────── */
 export function NotesToFinancials({ branch }) {
   const cur = (bc(branch) && bc(branch).cur) || '₹';
-  const [mode, setMode] = useState('all');
-  const [fy, setFy] = useState(CUR_FY.label);
-  const [month, setMonth] = useState(CUR_MONTH);
+  const [range, setRange] = useState(() => periodRange('all', { branch }));
   const [view, setView] = useState('summary');
   const [open, setOpen] = useState({});
   const [openG, setOpenG] = useState({});
   const [drill, setDrill] = useState(null);
 
-  const period = periodOf(mode, fy, month);
+  const period = range;
   const { from, to } = period;
   const detailed = view === 'detailed';
 
@@ -266,15 +265,7 @@ export function NotesToFinancials({ branch }) {
           <p style={{ margin: '3px 0 0', fontSize: 12, color: MUTE }}><strong>{branchLabel(branch)}</strong> · {period.label} · auto-generated & reconciled to the live books · {cur} (excl. internal GST control)</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <select value={mode} onChange={(e) => setMode(e.target.value)} style={ctrl}>
-            <option value="all">All periods</option>
-            <option value="fy">Financial Year</option>
-            <option value="ytd">Year to date</option>
-            <option value="quarter">This quarter</option>
-            <option value="month">Month</option>
-          </select>
-          {mode === 'fy' && <select value={fy} onChange={(e) => setFy(e.target.value)} style={ctrl}>{fyOptions().map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}</select>}
-          {mode === 'month' && <select value={month} onChange={(e) => setMonth(e.target.value)} style={ctrl}>{MONTH_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}</select>}
+          <PeriodBar branch={branch} compact defaultPreset="all" onChange={setRange} />
           <div style={{ display: 'inline-flex', border: `1px solid ${LINE}`, borderRadius: 6, overflow: 'hidden' }}>
             {[['summary', 'Summary'], ['detailed', 'Detailed']].map(([id, l]) => (
               <button key={id} onClick={() => setView(id)} style={{ ...ctrl, border: 'none', borderRadius: 0, background: view === id ? INK : '#fff', color: view === id ? '#fff' : MUTE }}>{l}</button>

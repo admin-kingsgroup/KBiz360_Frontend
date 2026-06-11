@@ -8,6 +8,7 @@ import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVouc
 import { VoucherEditor } from './accountingLive';
 import { BookingApprovals } from './bookingOrder';
 import { bc } from '../core/styles';
+import { PeriodBar, periodRange } from '../core/period';
 
 // Full rupee amount with Indian grouping — NO Cr/L abbreviation.
 const money = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
@@ -44,7 +45,8 @@ export function VoucherApprovals({ branch }) {
   const [sel, setSel] = useState(() => new Set()); // selected voucher ids (multi-approve)
   const [editId, setEditId] = useState(null);      // voucher being edited (fix → approve)
   const cur = (bc(branch) || {}).cur || '₹';
-  const q = useVoucherApprovals(branch, status);
+  const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
+  const q = useVoucherApprovals(branch, status, { from: range.from, to: range.to });
   const d = q.data || {};
   const counts = d.counts || { pending: { n: 0, amount: 0 }, approved: { n: 0, amount: 0 }, rejected: { n: 0, amount: 0 }, deleted: { n: 0, amount: 0 } };
   const entries = d.entries || [];
@@ -118,6 +120,7 @@ export function VoucherApprovals({ branch }) {
           <div style={{ fontSize: 17, fontWeight: 800, color: C.dark }}>Voucher Approvals</div>
           <div style={{ fontSize: 12, color: C.dim }}>{branchLabel(branch)} · Payment · Receipt · Contra · Journal · Credit/Debit Note · Purchase Expense — manual & bulk post only when approved</div>
         </div>
+        <PeriodBar branch={branch} compact defaultPreset="all" onChange={setRange} />
         {status === 'pending' && counts.pending.n > 0 && (
           <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
             {sel.size > 0 && (
