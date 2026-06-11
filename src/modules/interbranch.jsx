@@ -27,6 +27,7 @@ import { fmtINR } from '../core/format';
 import { CUR_FY, todayISO, fmtDate } from '../core/dates';
 import { cardStyle } from '../core/helpers';
 import { RPT_thStyle, RPT_tdStyle } from '../core/styles';
+import { PeriodBar } from '../core/period';
 import { exportToExcel } from '../core/exportExcel';
 import { exportToCSV } from '../core/business-logic';
 import { VoucherEditor } from './accountingLive';
@@ -201,10 +202,7 @@ export function RPT_InterbranchElim() {
           <p style={{ margin: '3px 0 0', fontSize: 12, color: '#5a6691' }}>Group consolidation · Inter-Branch Sundry Debtors ⇄ Sundry Creditors · reconciled & auto-eliminated</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <label style={{ fontSize: 11, color: '#5a6691', fontWeight: 600 }}>From</label>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ ...xBtn, cursor: 'text' }} />
-          <label style={{ fontSize: 11, color: '#5a6691', fontWeight: 600 }}>To</label>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ ...xBtn, cursor: 'text' }} />
+          <PeriodBar branch="ALL" defaultPreset="cfy" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
           <button onClick={() => window.print()} style={xBtn}>📄 PDF</button>
           <button onClick={() => window.print()} style={xBtn}>🖨 Print</button>
           <button onClick={doExcel} style={xBtn}>📊 Excel</button>

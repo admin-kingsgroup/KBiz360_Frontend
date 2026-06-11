@@ -23,6 +23,7 @@ import {
   useTrialBalance, useLedgerStatement,
 } from '../core/useAccounting';
 import { useLedgerRegistry } from '../core/useReference';
+import { PeriodBar } from '../core/period';
 import { BRANCHES } from '../core/data';
 import { fmtINR } from '../core/format';
 import { CUR_FY, CUR_QUARTER, CUR_MONTH, todayISO, fmtDate, monthLabel, fyQuarterOf } from '../core/dates';
@@ -251,14 +252,7 @@ export function SalesGpAnalytics({ branch }) {
 
       {/* time filters */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-        {[['all', 'All'], ['today', 'Today'], ['month', 'Monthly'], ['quarter', 'Quarterly'], ['ytd', 'YTD'], ['fy', 'Financial Year'], ['custom', 'Custom']].map(([id, label]) => (
-          <button key={id} onClick={() => applyPreset(id)} style={tBtn(preset === id)}>{label}</button>
-        ))}
-        <span style={{ width: 1, height: 22, background: '#e1e3ec' }} />
-        <label style={{ fontSize: 11, color: '#5a6691', fontWeight: 600 }}>From</label>
-        <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPreset('custom'); }} style={{ ...xBtn, cursor: 'text' }} />
-        <label style={{ fontSize: 11, color: '#5a6691', fontWeight: 600 }}>To</label>
-        <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPreset('custom'); }} style={{ ...xBtn, cursor: 'text' }} />
+        <PeriodBar branch={branch} defaultPreset="cfy" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
         <span style={{ width: 1, height: 22, background: '#e1e3ec' }} />
         <button onClick={() => setView('summary')} style={tBtn(view === 'summary')}>Summary</button>
         <button onClick={() => setView('detailed')} style={tBtn(view === 'detailed')}>Detailed</button>
