@@ -69,6 +69,10 @@ export function ChartBuilder({ branch }) {
 
   const Caret = ({ k, has }) => <span style={{ width: 14, display: 'inline-block', color: GOLD, cursor: has ? 'pointer' : 'default' }} onClick={() => has && tog(k)}>{has ? (open[k] ? '▾' : '▸') : ''}</span>;
   const ledgerRow = (l, indent) => <div key={'L' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #f5f6fa', color: DARK }}><span style={{ color: GREEN, marginRight: 6 }}>•</span>{l.name}{badge('Ledger', GREEN)}</div>;
+  // Subheading shown above ledgers that hang straight off a Group/Parent Group
+  // (no intermediate sub-group) — only when that node also has child groups, so
+  // it's clear these ledgers aren't nested under one of those groups.
+  const directLabel = (indent) => <div style={{ padding: `4px 12px 3px ${indent}px`, fontSize: 9.5, fontWeight: 700, color: '#9aa2c0', textTransform: 'uppercase', letterSpacing: 0.4, fontStyle: 'italic', background: '#fbfcfe', borderBottom: '1px dashed #eef1f6' }}>— ledgers directly here (no sub-group) —</div>;
 
   // ── Tree view (read-only structure) ──
   const treeView = () => (
@@ -97,11 +101,13 @@ export function ChartBuilder({ branch }) {
                         {open[sg.name] && sg.ledgers.map((l) => ledgerRow(l, 70))}
                       </div>
                     ))}
+                    {grp.ledgers.length > 0 && grp.children.length > 0 && directLabel(48)}
                     {grp.ledgers.map((l) => ledgerRow(l, 52))}
                   </>}
                 </div>
               );
             })}
+            {open[pg.name] && pg.ledgers.length > 0 && pg.children.length > 0 && directLabel(30)}
             {open[pg.name] && pg.ledgers.map((l) => ledgerRow(l, 34))}
           </div>
         );
@@ -124,12 +130,19 @@ export function ChartBuilder({ branch }) {
       </div>
     </div>
   );
-  const pgNode = sel.pg && nodes[sel.pg]; const gNode = sel.g && nodes[sel.g]; const sgNode = sel.sg && nodes[sel.sg];
+  // Effective selection — defaults to the first populated node so the Group /
+  // Sub-Group / Ledger columns show immediately (a click still overrides).
+  const pgName = sel.pg || (roots.find((r) => r.children.length || r.ledgers.length) || roots[0] || {}).name || '';
+  const pgNode = pgName ? nodes[pgName] : null;
+  const gName = sel.g || ((pgNode && (pgNode.children.find((c) => c.children.length || c.ledgers.length) || pgNode.children[0])) || {}).name || '';
+  const gNode = gName ? nodes[gName] : null;
+  const sgName = sel.sg || ((gNode && gNode.children[0]) || {}).name || '';
+  const sgNode = sgName ? nodes[sgName] : null;
   const sideView = () => (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-      {col('Parent Group (28)', roots, sel.pg, (it) => setSel({ pg: it.name, g: '', sg: '' }))}
-      {col('Group', pgNode ? pgNode.children : [], sel.g, (it) => setSel((s) => ({ ...s, g: it.name, sg: '' })))}
-      {col('Sub-Group', gNode ? gNode.children : [], sel.sg, (it) => setSel((s) => ({ ...s, sg: it.name })))}
+      {col('Parent Group (28)', roots, pgName, (it) => setSel({ pg: it.name, g: '', sg: '' }))}
+      {col('Group', pgNode ? pgNode.children : [], gName, (it) => setSel((s) => ({ ...s, g: it.name, sg: '' })))}
+      {col('Sub-Group', gNode ? gNode.children : [], sgName, (it) => setSel((s) => ({ ...s, sg: it.name })))}
       {col('Ledger', sgNode ? sgNode.ledgers : gNode ? gNode.ledgers : pgNode ? pgNode.ledgers : [], '', null, 'ledger')}
     </div>
   );
