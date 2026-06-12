@@ -312,16 +312,21 @@ const TALLY_GROUP_NAMES = [
 export const GroupsMaster = ({ branch }) => {
   const groupsQ = useMasterList('groups');
   const [branchView, setBranchView] = useState(branchCode(branch) || 'ALL');
-  // Ledgers are branch-scoped: a branch view = that branch + the org-wide 'ALL'
-  // ledgers; ALL = consolidated (every branch's ledgers). Groups are org-wide.
-  const ledgersQ = useMasterList('ledgers', branchView === 'ALL' ? {} : { branch: branchView });
+  // Fetch every branch's ledgers once and scope client-side, so we can tell a
+  // globally-empty (shared/common) group apart from one used only by another
+  // branch. Groups are org-wide (not branch-scoped).
+  const ledgersQ = useMasterList('ledgers', {});
   const subMut = useMasterMutations('subgroups');
   const ledMut = useMasterMutations('ledgers');
   const [editing, setEditing] = useState(null);
   const [err, setErr] = useState('');
 
   const groups = groupsQ.data || [];
-  const ledgers = ledgersQ.data || [];
+  const allLedgers = ledgersQ.data || [];
+  // A branch view shows its OWN ledgers + the shared Common ('ALL') ledgers;
+  // the consolidated (ALL) view shows every branch's ledgers.
+  const inScope = (l) => branchView === 'ALL' || !l.branch || l.branch === 'ALL' || l.branch === branchView;
+  const ledgers = allLedgers.filter(inScope);
   const byName = new Map(groups.map((g) => [g.name, g]));
 
   // Walk a group up to its primary root, classifying each level of the chain:
@@ -347,15 +352,15 @@ export const GroupsMaster = ({ branch }) => {
   // child groups and no ledgers) so the structure stays fully visible/editable.
   const attachOf = (l) => ((l.subGroup && byName.has(l.subGroup)) ? l.subGroup : l.group);
   const hasChild = new Set(groups.filter((g) => g.parent).map((g) => g.parent));
-  const groupsWithLedger = new Set(ledgers.map(attachOf));
+  // A group used by SOME branch (any ledger, across all branches) but with no
+  // in-scope ledger belongs only to other branches → hidden in a branch view.
+  // A globally-empty group is part of the shared/common skeleton → shown in
+  // every view, even with no entry.
+  const groupsWithAnyLedger = new Set(allLedgers.map(attachOf));
   const rows = [];
   ledgers.forEach((l) => rows.push({ ...resolvePath(attachOf(l)), ledgerName: l.name, ledgerNode: l, branchTag: l.branch || 'ALL', key: 'L' + l.id }));
-  // Empty (ledger-less) groups belong to the org-wide structure, so they're
-  // shown only in the consolidated (ALL) view. A specific branch shows just the
-  // groups that actually hold one of ITS ledgers (its own + the shared 'ALL') —
-  // otherwise groups used only by other branches would surface as empty rows.
-  if (branchView === 'ALL') groups.forEach((g) => {
-    if (!hasChild.has(g.name) && !groupsWithLedger.has(g.name)) rows.push({ ...resolvePath(g.name), ledgerName: '', ledgerNode: null, branchTag: '', key: 'G' + g.id });
+  groups.forEach((g) => {
+    if (!hasChild.has(g.name) && !groupsWithAnyLedger.has(g.name)) rows.push({ ...resolvePath(g.name), ledgerName: '', ledgerNode: null, branchTag: '', key: 'G' + g.id });
   });
 
   // Sort by the cascade: Tally Parent ▸ Tally Sub ▸ ERP Group ▸ ERP Sub ▸ Ledger
@@ -493,7 +498,7 @@ export const GroupsMaster = ({ branch }) => {
                     return (
                       <td key={c.key} style={{ padding: '8px 12px', color: c.lock ? '#64748b' : '#1f2a44', fontWeight: c.key === 'tallyParent' ? 700 : 400, whiteSpace: 'nowrap' }}>
                         <span style={{ color: v ? undefined : '#c2c8d6' }}>{v || '—'}</span>
-                        {isLedger && v && branchView === 'ALL' && (
+                        {isLedger && v && (branchView === 'ALL' || r.branchTag === 'ALL') && (
                           <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, marginLeft: 6, background: r.branchTag === 'ALL' ? '#eef1f6' : '#e7f0fb', color: r.branchTag === 'ALL' ? DIM : BLUE }}>{r.branchTag === 'ALL' ? 'Common' : r.branchTag}</span>
                         )}
                         {!c.lock && node && (
