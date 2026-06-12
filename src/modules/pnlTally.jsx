@@ -226,7 +226,7 @@ export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
   const grp = String(d.group || '');
   // Bill-wise only applies to party ledgers (Sundry Debtors / Creditors) and not
   // to a cost-centre-filtered drill (which has no opening / bill concept).
-  const partySide = /debtor/i.test(grp) ? 'customer' : /creditor/i.test(grp) ? 'supplier' : '';
+  const partySide = /debtor|customer/i.test(grp) ? 'customer' : /creditor|supplier|vendor/i.test(grp) ? 'supplier' : '';
   const billwiseAvailable = !!partySide && !costCenter;
   const showBillwise = billwiseAvailable && tab === 'billwise';
 
