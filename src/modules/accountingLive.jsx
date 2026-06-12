@@ -681,6 +681,8 @@ export function LedgerAcLive({ branch }) {
   const selected = name || ledgers[0]?.name || '';
   const q = useLedgerStatement(selected, branch, { from, to });
   const d = q.data;
+  const [voucher, setVoucher] = useState(null); // clicked Voucher No → editable voucher modal
+  const closeVoucher = () => { setVoucher(null); q.refetch(); }; // refresh the statement after an edit
 
   return (
     <Page
@@ -709,7 +711,11 @@ export function LedgerAcLive({ branch }) {
               {(d?.lines || []).map((e, i) => (
                 <tr key={i} style={rowBg(i)}>
                   <td style={{ padding: '8px 12px', color: DIM, whiteSpace: 'nowrap' }}>{e.date}</td>
-                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{e.vno}</td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10 }}>
+                    {e.voucherId
+                      ? <button onClick={() => setVoucher({ id: e.voucherId, vno: e.vno })} title="Open & edit this voucher" style={{ background: 'none', border: 'none', padding: 0, color: BLUE, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'monospace', fontSize: 10 }}>{e.vno}</button>
+                      : <span style={{ color: BLUE }}>{e.vno}</span>}
+                  </td>
                   <td style={{ padding: '8px 12px', color: '#384677' }}>{e.narration || e.party || e.category}</td>
                   <td style={{ padding: '8px 12px', ...num, color: e.debit > 0 ? BLUE : '#dfe2ee' }}>{money(cur, e.debit)}</td>
                   <td style={{ padding: '8px 12px', ...num, color: e.credit > 0 ? RED : '#dfe2ee' }}>{money(cur, e.credit)}</td>
@@ -727,6 +733,17 @@ export function LedgerAcLive({ branch }) {
           </div>
         </div>
       </State>
+      {voucher && (
+        <div onClick={closeVoucher} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
+          <div onClick={(ev) => ev.stopPropagation()} style={{ ...card, width: 'min(820px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+              <Crumb items={[{ label: d?.ledger || 'Ledger', onClick: closeVoucher }, { label: voucher.vno }]} />
+              <button onClick={closeVoucher} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
+            </div>
+            <VoucherEditor voucherId={voucher.id} cur={cur} onBack={closeVoucher} onClose={closeVoucher} />
+          </div>
+        </div>
+      )}
     </Page>
   );
 }
