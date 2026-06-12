@@ -4,10 +4,11 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
-import { AlertTriangle, Check, Download, Plus, Save, Search, Settings } from 'lucide-react';
+import { AlertTriangle, Check, Download, Pencil, Plus, Save, Search, Settings, Trash2 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ACTIVE_CURRENCIES, ADM_DATA, BRANCH_CODES, CASH, CUSTOMERS, FOREX_RATES_DATA, GP_BILLS, SUBAGENTS } from '../core/data';
 import { useNumberingSeries } from '../core/useReference';
+import { useMasterList, useMasterMutations } from '../core/useMasters';
 import { apiPost, apiPut } from '../core/api';
 import { fmt, fmtINR } from '../core/format';
 import { exportToExcel } from '../core/exportExcel';
@@ -1369,6 +1370,27 @@ export function MastersHotels(){
 export function MastersTaxRates(){
   const [tab,setTab]=useState("gst");
   const [search,setSearch]=useState("");
+  // India GST HSN/SAC codes are now a live, editable backend master (/api/hsn-codes).
+  const gstQ=useMasterList('hsn-codes');
+  const gstMut=useMasterMutations('hsn-codes');
+  const [editing,setEditing]=useState(null); // record being edited, or {__new:true,...}
+  const [formErr,setFormErr]=useState("");
+  const MODULE_OPTS=["Flight","Holiday","Hotel","Car","Visa","Insurance","Misc"];
+  const ITC_OPTS=["Yes","No","Varies"];
+  const blankHsn={code:"",service:"",module:"Flight",basis:"",rate:0,itc:"Yes",tcs:"No",active:true};
+  const openNewHsn=()=>{setFormErr("");setEditing({__new:true,...blankHsn});};
+  const openEditHsn=(r)=>{setFormErr("");setEditing({...blankHsn,...r});};
+  const setF=(k,v)=>setEditing(f=>({...f,[k]:v}));
+  const saveHsn=()=>{
+    if(!editing.code||!editing.service){setFormErr("HSN/SAC code and Service are required");return;}
+    setFormErr("");
+    const {__new,id,...body}=editing;
+    const onError=(e)=>setFormErr(e.message||"Save failed");
+    if(__new) gstMut.create.mutate(body,{onSuccess:()=>setEditing(null),onError});
+    else gstMut.update.mutate({id,body},{onSuccess:()=>setEditing(null),onError});
+  };
+  const delHsn=(r)=>{ if(window.confirm(`Delete HSN/SAC "${r.code} — ${r.service}"?`)) gstMut.remove.mutate(r.id); };
+  const savingHsn=gstMut.create.isPending||gstMut.update.isPending;
   const gstRates=[
     {id:1, sac:"996421",service:"Flight Tickets — Domestic",       module:"Flight",  basis:"Service charge only",rate:18,itc:"Yes",tcs:"No"},
     {id:2, sac:"996422",service:"Flight Tickets — International",  module:"Flight",  basis:"Service charge only",rate:18,itc:"Yes",tcs:"No"},
@@ -1393,42 +1415,51 @@ export function MastersTaxRates(){
   ];
   const afVat=[
   ];
-  const filt_g=gstRates.filter(r=>!search||
-    r.service.toLowerCase().includes(search.toLowerCase())||
-    r.sac.includes(search)||r.module.toLowerCase().includes(search.toLowerCase())
+  // Live rows; fall back to the built-in defaults until the master is seeded.
+  const liveHsn=gstQ.data;
+  const gstRows=(liveHsn&&liveHsn.length)?liveHsn:gstRates.map(r=>({...r,code:r.sac}));
+  const filt_g=gstRows.filter(r=>!search||
+    (r.service||"").toLowerCase().includes(search.toLowerCase())||
+    (r.code||"").includes(search)||(r.module||"").toLowerCase().includes(search.toLowerCase())
   );
   const rateColor={0:"#5a6691",5:"#27500A",12:"#854F0B",18:"#A32D2D"};
   const rateBg   ={0:"#f3f4f8",5:"#EAF3DE",12:"#FAEEDA",18:"#FCEBEB"};
   return (
-    <MstrShell title="Tax Rates" icon="📋"
+    <MstrShell title="Tax / HSN-SAC Codes" icon="📋"
       actions={[
         <div key="tabs" style={{display:"flex",borderRadius:8,overflow:"hidden",border:"1px solid #e1e3ec"}}>
           <button key="gst" onClick={()=>setTab("gst")} style={{padding:"6px 14px",border:"none",cursor:"pointer",fontSize:11,fontWeight:tab==="gst"?700:400,background:tab==="gst"?"#0d1326":"#fff",color:tab==="gst"?"#d4a437":"#5a6691"}}>India GST</button><button key="tcstds" onClick={()=>setTab("tcstds")} style={{padding:"6px 14px",border:"none",cursor:"pointer",fontSize:11,fontWeight:tab==="tcstds"?700:400,background:tab==="tcstds"?"#0d1326":"#fff",color:tab==="tcstds"?"#d4a437":"#5a6691"}}>TDS/TCS</button><button key="vat" onClick={()=>setTab("vat")} style={{padding:"6px 14px",border:"none",cursor:"pointer",fontSize:11,fontWeight:tab==="vat"?700:400,background:tab==="vat"?"#0d1326":"#fff",color:tab==="vat"?"#d4a437":"#5a6691"}}>Africa VAT</button>
         </div>,
         tab==="gst"&&<input key="s" value={search} onChange={e=>setSearch(e.target.value)}
-          placeholder="Search SAC, module..." style={{...inp,width:200,minHeight:32,fontSize:11}}/>,
+          placeholder="Search HSN/SAC, module..." style={{...inp,width:200,minHeight:32,fontSize:11}}/>,
+        tab==="gst"&&<button key="new" onClick={openNewHsn} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 14px",background:"#185FA5",color:"#fff",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}><Plus size={14}/> HSN/SAC Code</button>,
         tab==="gst"
-          ? <ExportBtn key="x" name="gst-rates" rows={filt_g} columns={[{key:"sac",label:"SAC Code"},{key:"service",label:"Service"},{key:"module",label:"Module"},{key:"basis",label:"Taxable Basis"},{key:"rate",label:"GST %"},{key:"itc",label:"ITC"},{key:"tcs",label:"TCS"}]}/>
+          ? <ExportBtn key="x" name="hsn-sac-codes" rows={filt_g} columns={[{key:"code",label:"HSN/SAC Code"},{key:"service",label:"Service"},{key:"module",label:"Module"},{key:"basis",label:"Taxable Basis"},{key:"rate",label:"GST %"},{key:"itc",label:"ITC"},{key:"tcs",label:"TCS"}]}/>
           : tab==="tcstds"
           ? <ExportBtn key="x" name="tds-tcs-rates" rows={tcsTds} columns={[{key:"section",label:"Section"},{key:"nature",label:"Nature"},{key:"rate",label:"Rate"},{key:"threshold",label:"Threshold"},{key:"applicability",label:"When it applies"}]}/>
           : <ExportBtn key="x" name="africa-vat" rows={afVat} columns={[{key:"country",label:"Country"},{key:"rate",label:"Rate"}]}/>,
       ]}>
       {tab==="gst"&&(
         <div style={{...card,padding:0,overflow:"hidden"}}>
+          {gstQ.isLoading&&<div style={{padding:24,textAlign:"center",color:"#5a6691",fontSize:12}}>Loading HSN/SAC codes…</div>}
+          {gstQ.isError&&<div style={{padding:16,color:"#A32D2D",fontSize:12,fontWeight:600}}>⚠ {gstQ.error?.message||"Failed to load"} — is the backend running and are you logged in?</div>}
+          {!gstQ.isLoading&&!gstQ.isError&&(
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#0d1326"}}>
-              {["SAC Code","Service","Module","Taxable Basis","GST %","ITC","TCS"].map((h,i)=>(
-                <th key={i} style={{padding:"9px 10px",textAlign:i>=4?"center":"left",
+              {["HSN / SAC Code","Service","Module","Taxable Basis","GST %","ITC","TCS",""].map((h,i)=>(
+                <th key={i} style={{padding:"9px 10px",textAlign:i>=4&&i<7?"center":"left",
                   color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{filt_g.map((r,i)=>(
-              <tr key={r.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-                <td style={{padding:"8px 10px",fontFamily:"monospace",fontWeight:700,color:"#185FA5"}}>{r.sac}</td>
+            <tbody>
+            {filt_g.length===0&&<tr><td colSpan={8} style={{padding:24,textAlign:"center",color:"#5a6691"}}>No HSN/SAC codes yet — click “+ HSN/SAC Code” to add one.</td></tr>}
+            {filt_g.map((r,i)=>(
+              <tr key={r.id||(r.code+r.service)} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+                <td style={{padding:"8px 10px",fontFamily:"monospace",fontWeight:700,color:"#185FA5"}}>{r.code}</td>
                 <td style={{padding:"8px 10px",color:"#0d1326"}}>{r.service}</td>
                 <td style={{padding:"8px 10px"}}>
-                  <span style={{fontSize:10,padding:"2px 7px",borderRadius:999,fontWeight:700,
-                    background:"#E6F1FB",color:"#185FA5"}}>{r.module}</span>
+                  {r.module?<span style={{fontSize:10,padding:"2px 7px",borderRadius:999,fontWeight:700,
+                    background:"#E6F1FB",color:"#185FA5"}}>{r.module}</span>:null}
                 </td>
                 <td style={{padding:"8px 10px",fontSize:10.5,color:"#5a6691"}}>{r.basis}</td>
                 <td style={{padding:"8px 10px",textAlign:"center"}}>
@@ -1441,9 +1472,16 @@ export function MastersTaxRates(){
                   color:r.itc==="Yes"?"#27500A":r.itc==="No"?"#A32D2D":"#854F0B"}}>{r.itc}</td>
                 <td style={{padding:"8px 10px",textAlign:"center",fontSize:10,
                   color:r.tcs!=="No"?"#854F0B":"#bfc3d6"}}>{r.tcs}</td>
+                <td style={{padding:"8px 10px",textAlign:"right",whiteSpace:"nowrap"}}>
+                  {r.id?(<>
+                    <button onClick={()=>openEditHsn(r)} title="Edit" style={{background:"none",border:"none",cursor:"pointer",color:"#185FA5",padding:4}}><Pencil size={14}/></button>
+                    <button onClick={()=>delHsn(r)} title="Delete" style={{background:"none",border:"none",cursor:"pointer",color:"#A32D2D",padding:4}}><Trash2 size={14}/></button>
+                  </>):<span title="Built-in default — seed the HSN/SAC master to edit (npm run seed:hsn)" style={{color:"#c2c8d6",fontSize:12}}>🔒</span>}
+                </td>
               </tr>
             ))}</tbody>
           </table>
+          )}
         </div>
       )}
       {tab==="tcstds"&&(
@@ -1495,6 +1533,45 @@ export function MastersTaxRates(){
               </tr>
             ))}</tbody>
           </table>
+        </div>
+      )}
+      {editing&&(
+        <div onClick={()=>setEditing(null)} style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:560,maxHeight:"90vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",borderBottom:"1px solid #e1e3ec"}}>
+              <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326"}}>{editing.__new?"New HSN / SAC Code":"Edit HSN / SAC Code"}</p>
+              <button onClick={()=>setEditing(null)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691",lineHeight:1}}>✕</button>
+            </div>
+            <div style={{padding:"16px 18px",display:"grid",gap:12}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <label style={{fontSize:11,fontWeight:700,color:"#5a6691"}}>HSN / SAC Code *
+                <input value={editing.code} onChange={e=>setF("code",e.target.value)} style={{...inp,marginTop:4}}/></label>
+              <label style={{fontSize:11,fontWeight:700,color:"#5a6691"}}>Module
+                <select value={editing.module} onChange={e=>setF("module",e.target.value)} style={{...inp,marginTop:4}}>
+                  {MODULE_OPTS.map(m=><option key={m} value={m}>{m}</option>)}</select></label>
+            </div>
+            <label style={{fontSize:11,fontWeight:700,color:"#5a6691"}}>Service *
+              <input value={editing.service} onChange={e=>setF("service",e.target.value)} style={{...inp,marginTop:4}}/></label>
+            <label style={{fontSize:11,fontWeight:700,color:"#5a6691"}}>Taxable Basis
+              <input value={editing.basis} onChange={e=>setF("basis",e.target.value)} style={{...inp,marginTop:4}}/></label>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+              <label style={{fontSize:11,fontWeight:700,color:"#5a6691"}}>GST %
+                <input type="number" value={editing.rate} onChange={e=>setF("rate",Number(e.target.value))} style={{...inp,marginTop:4}}/></label>
+              <label style={{fontSize:11,fontWeight:700,color:"#5a6691"}}>ITC
+                <select value={editing.itc} onChange={e=>setF("itc",e.target.value)} style={{...inp,marginTop:4}}>
+                  {ITC_OPTS.map(o=><option key={o} value={o}>{o}</option>)}</select></label>
+              <label style={{fontSize:11,fontWeight:700,color:"#5a6691"}}>TCS
+                <input value={editing.tcs} onChange={e=>setF("tcs",e.target.value)} style={{...inp,marginTop:4}}/></label>
+            </div>
+            <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"#0d1326",cursor:"pointer"}}>
+              <input type="checkbox" checked={editing.active!==false} onChange={e=>setF("active",e.target.checked)}/> Active</label>
+            {formErr&&<div style={{color:"#A32D2D",fontSize:11.5,fontWeight:600}}>⚠ {formErr}</div>}
+            <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:4}}>
+              <button onClick={()=>setEditing(null)} style={{padding:"8px 14px",borderRadius:6,border:"1px solid #e1e3ec",background:"#fff",color:"#5a6691",fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button disabled={savingHsn} onClick={saveHsn} style={{padding:"8px 18px",borderRadius:6,border:"none",background:"#185FA5",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",opacity:savingHsn?0.6:1}}>{savingHsn?"Saving…":"Save"}</button>
+            </div>
+            </div>
+          </div>
         </div>
       )}
     </MstrShell>
