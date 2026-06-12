@@ -364,7 +364,7 @@ export default function KB360App(){
     if(route==="/settings/branches")     return <SettingsBranches/>;
     if(route==="/settings/users")        return <SettingsUsers/>;
     if(route==="/settings/audit")        return <SettingsAudit/>;
-    if(route==="/masters/groups")        return <GroupsMaster/>;                 // read-only: the 28 fixed Tally groups
+    if(route==="/masters/groups")        return <GroupsMaster branch={branch}/>;  // Chart of Accounts matrix (Tally skeleton + editable ERP columns)
     if(route==="/masters/subgroups")     return <SubGroupsMaster/>;              // CRUD: custom sub-groups (any depth)
     if(route==="/masters/accounts-tree" || route==="/masters/chart-builder") return <AccountsTreeView branch={branch}/>;  // read-only viewer: Parent Group ▸ Group ▸ Sub-Group ▸ Ledger (old chart-builder route kept as alias)
     if(route==="/masters/ledgers")    return <LedgersMaster branch={branch}/>;     // editable ledger master (live CRUD)

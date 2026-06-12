@@ -303,32 +303,181 @@ const TALLY_GROUP_NAMES = [
   'Misc. Expenses (Asset)', 'Suspense Account',
 ];
 
-// Groups are the 28 FIXED Tally groups — READ-ONLY (no create / edit / delete).
-export const GroupsMaster = () => (
-  <MasterCrud title="Parent Groups (28 Tally · Fixed · Read-only)" subtitle="The 28 fixed Tally groups, shown as Tally Parent Group ▸ Tally Sub Parent Group (— = the primary group itself)"
-    resource="groups" readOnly rowFilter={(g) => g.system}
-    // Two-level layout: column 1 = the primary (root) group, column 2 = the
-    // sub-group nested under it. A primary group shows itself in col 1 and a
-    // blank (—) sub. Sorted by parent so each primary clusters with its subs.
-    mapRow={(g) => {
-      const isPrimary = !g.parent;
-      return { ...g, tallyParent: isPrimary ? g.name : g.parent, tallySub: isPrimary ? '' : g.name };
-    }}
-    sortRows={(a, b) =>
-      a.tallyParent.localeCompare(b.tallyParent, 'en', { sensitivity: 'base', numeric: true })
-      || (a.tallySub === '' ? -1 : b.tallySub === '' ? 1
-          : a.tallySub.localeCompare(b.tallySub, 'en', { sensitivity: 'base', numeric: true }))}
-    // Primary group rows get a tinted, bold header band so their sub-groups
-    // read as a cluster beneath them.
-    rowStyle={(g) => (g.tallySub === '' ? { background: '#eef3fb', fontWeight: 700 } : null)}
-    note="🔒 The 28 Tally groups are fixed and cannot be created, edited or deleted. To extend the chart, add Sub-Groups under a group (Masters → Sub-Groups)."
-    fields={[
-      { key: 'tallyParent', label: 'Tally Parent Group', type: 'text' },
-      { key: 'tallySub', label: 'Tally Sub Parent Group', type: 'text' },
-      { key: 'nature', label: 'Nature', type: 'text' },
-      { key: 'statement', label: 'Statement', type: 'text' },
-    ]} />
-);
+// Chart-of-Accounts matrix. Flattens the whole hierarchy into one sorted grid:
+//   Tally Parent Group ▸ Tally Sub Parent Group ▸ ERP Group ▸ ERP Sub Group ▸ ERP Ledger
+// The two Tally columns are the fixed 28-group skeleton (read-only, 🔒). The
+// three ERP columns are the user's custom chart — each editable in place via a
+// pencil that opens the existing Sub-Group / Ledger editor (reuses the live
+// CRUD). Sorted by the full path, so each level nests under the one before it.
+export const GroupsMaster = ({ branch }) => {
+  const groupsQ = useMasterList('groups');
+  const [branchView, setBranchView] = useState(branchCode(branch) || 'ALL');
+  // Ledgers are branch-scoped: a branch view = that branch + the org-wide 'ALL'
+  // ledgers; ALL = consolidated (every branch's ledgers). Groups are org-wide.
+  const ledgersQ = useMasterList('ledgers', branchView === 'ALL' ? {} : { branch: branchView });
+  const subMut = useMasterMutations('subgroups');
+  const ledMut = useMasterMutations('ledgers');
+  const [editing, setEditing] = useState(null);
+  const [err, setErr] = useState('');
+
+  const groups = groupsQ.data || [];
+  const ledgers = ledgersQ.data || [];
+  const byName = new Map(groups.map((g) => [g.name, g]));
+
+  // Walk a group up to its primary root, classifying each level of the chain:
+  //   system + no parent → Tally Parent (primary) · system + parent → Tally Sub
+  //   custom (system:false) → ERP Group (first) then ERP Sub Group (deeper).
+  const resolvePath = (startName) => {
+    const chain = []; let cur = byName.get(startName), guard = 0;
+    while (cur && guard++ < 25) { chain.unshift(cur); cur = cur.parent ? byName.get(cur.parent) : null; }
+    const primary = chain.find((n) => n.system && !n.parent);
+    const tallySub = chain.find((n) => n.system && n.parent);
+    const customs = chain.filter((n) => !n.system);
+    return {
+      tallyParent: primary ? primary.name : (chain[0] ? chain[0].name : ''),
+      tallySub: tallySub ? tallySub.name : '',
+      erpGroup: customs[0] ? customs[0].name : '',
+      erpSub: customs.length > 1 ? customs.slice(1).map((n) => n.name).join(' ▸ ') : '',
+      groupNode: customs[0] || null,                                   // editable ERP Group node
+      subGroupNode: customs.length > 1 ? customs[customs.length - 1] : null, // deepest ERP sub-group
+    };
+  };
+
+  // One row per ledger (full ancestry path), plus one per EMPTY leaf group (no
+  // child groups and no ledgers) so the structure stays fully visible/editable.
+  const attachOf = (l) => ((l.subGroup && byName.has(l.subGroup)) ? l.subGroup : l.group);
+  const hasChild = new Set(groups.filter((g) => g.parent).map((g) => g.parent));
+  const groupsWithLedger = new Set(ledgers.map(attachOf));
+  const rows = [];
+  ledgers.forEach((l) => rows.push({ ...resolvePath(attachOf(l)), ledgerName: l.name, ledgerNode: l, branchTag: l.branch || 'ALL', key: 'L' + l.id }));
+  groups.forEach((g) => {
+    if (!hasChild.has(g.name) && !groupsWithLedger.has(g.name)) rows.push({ ...resolvePath(g.name), ledgerName: '', ledgerNode: null, branchTag: '', key: 'G' + g.id });
+  });
+
+  // Sort by the cascade: Tally Parent ▸ Tally Sub ▸ ERP Group ▸ ERP Sub ▸ Ledger
+  // (A→Z, case-insensitive & numeric-aware; blanks sort first within a level).
+  const lc = (x, y) => String(x).localeCompare(String(y), 'en', { sensitivity: 'base', numeric: true });
+  const ef = (x, y) => (x === '' ? (y === '' ? 0 : -1) : (y === '' ? 1 : lc(x, y)));
+  rows.sort((a, b) => ef(a.tallyParent, b.tallyParent) || ef(a.tallySub, b.tallySub)
+    || ef(a.erpGroup, b.erpGroup) || ef(a.erpSub, b.erpSub) || ef(a.ledgerName, b.ledgerName));
+
+  // ── Edit wiring — reuse the Sub-Group / Ledger field configs & live CRUD ──
+  const parentOptions = groups.map((g) => g.name);
+  const parentOf = new Map(groups.map((g) => [g.name, g.parent || '']));
+  const subGroupsUnder = (groupName) => {
+    if (!groupName) return [];
+    const out = [];
+    for (const g of groups) { if (g.system) continue; let p = g.parent, gd = 0; while (p && gd++ < 20) { if (p === groupName) { out.push(g.name); break; } p = parentOf.get(p) || ''; } }
+    return out.sort();
+  };
+  const SUB_FIELDS = [
+    { key: 'name', label: 'Sub-Group Name', type: 'text', required: true },
+    { key: 'parent', label: 'Nest under (parent group / sub-group)', type: 'select', options: parentOptions, required: true },
+    { key: 'active', label: 'Active', type: 'bool', default: true },
+  ];
+  const LED_FIELDS = [
+    { key: 'code', label: 'Code', type: 'text', required: true },
+    { key: 'name', label: 'Ledger Name', type: 'text', required: true },
+    { key: 'group', label: 'Group', type: 'select', options: parentOptions, required: true },
+    { key: 'subGroup', label: 'Sub-Group', type: 'select', emptyLabel: '— None —',
+      options: (form) => { const subs = subGroupsUnder(form.group); return form.subGroup && !subs.includes(form.subGroup) ? [form.subGroup, ...subs] : subs; } },
+    { key: 'branch', label: 'Branch', type: 'select', options: ['ALL', ...BRANCH_CODES], default: 'ALL' },
+    { key: 'currency', label: 'Currency', type: 'select', options: ACTIVE_CURRENCIES, default: 'INR' },
+    { key: 'openingBalance', label: 'Opening Balance', type: 'number', default: 0 },
+    { key: 'drCr', label: 'Dr/Cr', type: 'select', options: ['Dr', 'Cr'], default: 'Dr' },
+    { key: 'active', label: 'Active', type: 'bool', default: true },
+  ];
+  const openEdit = (kind, node) => { if (!node) return; setErr(''); setEditing({ kind, fields: kind === 'ledger' ? LED_FIELDS : SUB_FIELDS, record: { ...node }, label: kind === 'ledger' ? 'Ledger' : 'Sub-Group' }); };
+  const saveEdit = (form) => {
+    setErr('');
+    const { id, __new, ...body } = form;
+    const m = editing.kind === 'ledger' ? ledMut : subMut;
+    m.update.mutate({ id, body }, { onSuccess: () => setEditing(null), onError: (e) => setErr(e.message) });
+  };
+  const saving = editing && (editing.kind === 'ledger' ? ledMut.update.isPending : subMut.update.isPending);
+
+  // ── Render — columns: 2 locked Tally + 3 editable ERP ──
+  const COLS = [
+    { key: 'tallyParent', label: 'Tally Parent Group', lock: true },
+    { key: 'tallySub', label: 'Tally Sub Parent Group', lock: true },
+    { key: 'erpGroup', label: 'ERP Group', kind: 'subgroup', node: 'groupNode' },
+    { key: 'erpSub', label: 'ERP Sub Group', kind: 'subgroup', node: 'subGroupNode' },
+    { key: 'ledgerName', label: 'ERP Ledger', kind: 'ledger', node: 'ledgerNode' },
+  ];
+  const doExport = () => exportToExcel('chart-of-accounts', COLS.map((c) => ({ key: c.key, label: c.label })),
+    rows.map((r) => ({ tallyParent: r.tallyParent, tallySub: r.tallySub, erpGroup: r.erpGroup, erpSub: r.erpSub, ledgerName: r.ledgerName })));
+  const subGroupCount = groups.filter((g) => !g.system).length;
+  const loading = groupsQ.isLoading || ledgersQ.isLoading;
+  const th = { textAlign: 'left', padding: '10px 12px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #e5e9f0', whiteSpace: 'nowrap' };
+  const pencilBtn = { background: 'none', border: 'none', cursor: 'pointer', color: BLUE, padding: 2, marginLeft: 6, verticalAlign: 'middle' };
+
+  return (
+    <div style={{ padding: '12px 10px', maxWidth: 1280, margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>Chart of Accounts</h2>
+          <p style={{ margin: '2px 0 0', fontSize: 10.5, color: DIM }}>Tally Parent ▸ Tally Sub ▸ ERP Group ▸ ERP Sub Group ▸ ERP Ledger · {rows.length} rows · {subGroupCount} sub-groups · {ledgers.length} ledgers{branchView !== 'ALL' ? ` (${branchView} + Common)` : ''}</p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
+            Branch
+            <select value={branchView} onChange={(e) => setBranchView(e.target.value)} style={{ ...inp, fontSize: 12, padding: '7px 9px', width: 'auto', minWidth: 130 }}>
+              <option value="ALL">All branches (consolidated)</option>
+              {BRANCH_CODES.map((b) => <option key={b} value={b}>{b} + Common</option>)}
+            </select>
+          </label>
+          <button onClick={doExport} disabled={!rows.length} style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', opacity: rows.length ? 1 : 0.5, cursor: rows.length ? 'pointer' : 'not-allowed' }}>
+            <Download size={14} /> Export Excel
+          </button>
+        </div>
+      </div>
+      <div style={{ ...card, padding: '9px 13px', marginBottom: 12, fontSize: 11, color: DIM }}>
+        🔒 <b>Tally Parent / Sub Parent Group</b> are the fixed 28-group skeleton (read-only). The <b>ERP Group / Sub Group / Ledger</b> columns are your custom chart — click the <Pencil size={11} style={{ verticalAlign: 'middle', color: BLUE }} /> in a cell to edit that node. To add new ones, use Masters → Sub-Groups / Ledgers.
+      </div>
+
+      {loading && <div style={{ ...card, padding: 28, textAlign: 'center', color: DIM, fontSize: 12 }}>Loading chart…</div>}
+      {(groupsQ.isError || ledgersQ.isError) && <div style={{ ...card, padding: 16, color: RED, fontSize: 12, fontWeight: 600 }}>⚠ Failed to load — is the ERP backend running and are you logged in?</div>}
+
+      {!loading && !groupsQ.isError && (
+        <div className="kb-sticky" style={{ ...card, padding: 0, '--stick-head': '#f3f5f9', maxHeight: 'calc(100vh - 240px)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead><tr style={{ background: '#f3f5f9' }}>
+              {COLS.map((c) => <th key={c.key} style={th}>{c.lock ? '🔒 ' : ''}{c.label}</th>)}
+            </tr></thead>
+            <tbody>
+              {rows.length === 0 && <tr><td colSpan={COLS.length} style={{ padding: 28, textAlign: 'center', color: DIM }}>No accounts yet.</td></tr>}
+              {rows.map((r) => (
+                <tr key={r.key} style={{ borderBottom: '1px solid #f1f3f8' }}>
+                  {COLS.map((c) => {
+                    const v = r[c.key];
+                    const node = c.node ? r[c.node] : null;
+                    const isLedger = c.key === 'ledgerName';
+                    return (
+                      <td key={c.key} style={{ padding: '8px 12px', color: c.lock ? '#64748b' : '#1f2a44', fontWeight: c.key === 'tallyParent' ? 700 : 400, whiteSpace: 'nowrap' }}>
+                        <span style={{ color: v ? undefined : '#c2c8d6' }}>{v || '—'}</span>
+                        {isLedger && v && branchView === 'ALL' && (
+                          <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, marginLeft: 6, background: r.branchTag === 'ALL' ? '#eef1f6' : '#e7f0fb', color: r.branchTag === 'ALL' ? DIM : BLUE }}>{r.branchTag === 'ALL' ? 'Common' : r.branchTag}</span>
+                        )}
+                        {!c.lock && node && (
+                          <button onClick={() => openEdit(c.kind, node)} title={`Edit ${c.label}`} style={pencilBtn}><Pencil size={13} /></button>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {editing && (
+        <EditModal title={`Edit ${editing.label}`} fields={editing.fields} record={editing.record}
+          saving={saving} error={err} onClose={() => setEditing(null)} onSave={saveEdit} />
+      )}
+    </div>
+  );
+};
 
 // Sub-Groups are the user-managed custom nodes. They nest under any group (or
 // another sub-group) to any depth and inherit Nature / Statement from the parent.
