@@ -90,12 +90,14 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   );
 }
 
-export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note, toolbar }) {
+export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note, toolbar, rowFilter }) {
   const list = useMasterList(resource, params);
   const { create, update, remove } = useMasterMutations(resource);
   const [editing, setEditing] = useState(null); // record being edited, or {} for new
   const [err, setErr] = useState('');
-  const rows = list.data || [];
+  // rowFilter narrows the listing client-side (e.g. show only the 28 system
+  // parent groups, not the custom sub-groups that share the same resource).
+  const rows = (list.data || []).filter(rowFilter || (() => true));
   const cols = fields.filter((f) => f.table !== false);
 
   const openNew = () => { setErr(''); setEditing({ __new: true, ...blankFromFields(fields) }); };
@@ -298,7 +300,7 @@ const TALLY_GROUP_NAMES = [
 // Groups are the 28 FIXED Tally groups — READ-ONLY (no create / edit / delete).
 export const GroupsMaster = () => (
   <MasterCrud title="Parent Groups (28 Tally · Fixed · Read-only)" subtitle="The 28 fixed Tally parent groups — the top of the chart of accounts"
-    resource="groups" readOnly
+    resource="groups" readOnly rowFilter={(g) => g.system}
     note="🔒 The 28 Tally groups are fixed and cannot be created, edited or deleted. To extend the chart, add Sub-Groups under a group (Masters → Sub-Groups)."
     fields={[
       { key: 'name', label: 'Group Name', type: 'text' },
