@@ -905,6 +905,11 @@ function PnlViewSwitcher({ view, setView }) {
   );
 }
 
+// Tally Classic alphabetical (A→Z) comparator — case-insensitive, numeric-aware
+// (so "Branch 2" sorts before "Branch 10"). Shared by the Classic P&L and
+// Balance Sheet views to arrange Groups / Sub-Groups / Ledgers / modules.
+const azByName = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'en', { sensitivity: 'base', numeric: true });
+
 /* ── Tally Classic (white) P&L view — Dr/Cr two-column, touch-drillable ── */
 // Trading A/c (COGS vs Sales, balancing with Gross Profit c/d) stacked over the
 // P&L A/c (indirect expenses + tax + net profit vs GP b/d). Tap any module to
@@ -919,7 +924,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   const isOpen = (key, defOpen) => (openSub[key] === undefined ? defOpen : openSub[key]);
   const mono = { fontFamily: "'Courier New', Courier, monospace" };
   const company = (branch && branch !== 'ALL') ? (branch.code || branch) : 'All Branches — Consolidated';
-  const modules = d.modules || [];
+  const modules = [...(d.modules || [])].sort((a, b) => azByName(a.name, b.name)); // A→Z module rows
   const groups = d.indirect?.groups || [];
   const buckets = (Array.isArray(d.indirect?.buckets) && d.indirect.buckets.length)
     ? d.indirect.buckets
@@ -953,17 +958,18 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   // Tax + Net Profit (Dr) vs GP b/d + Indirect Income (Cr).
   const plLeft = [
     { label: 'Indirect Expenses', amount: d.indirect.expense, group: true },
-    ...buckets.flatMap((b) => {
+    // Buckets, sub-groups and ledgers all listed alphabetically (A→Z).
+    ...[...buckets].sort((a, b) => azByName(a.name, b.name)).flatMap((b) => {
       const bk = 'b:' + b.name;
       const bOpen = isOpen(bk, true);            // bucket (Fixed/Variable) default expanded
       const head = { label: b.name, amount: b.amount, bucket: true, expandable: true, ekey: bk, open: bOpen };
       if (!bOpen) return [head];
-      return [head, ...(b.groups || []).flatMap((g) => {
+      return [head, ...[...(b.groups || [])].sort((x, y) => azByName(x.name, y.name)).flatMap((g) => {
         const gk = 'g:' + b.name + '/' + g.name;
         const gOpen = isOpen(gk, false);         // sub-group default collapsed → click to show ledgers
         const ghead = { label: g.name, amount: g.amount, sub: true, expandable: true, ekey: gk, open: gOpen };
         if (!gOpen) return [ghead];
-        return [ghead, ...(g.ledgers || []).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))];
+        return [ghead, ...[...(g.ledgers || [])].sort((x, y) => azByName(x.name, y.name)).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))];
       })];
     }),
     ...(tax > 0 ? [{ label: 'Provision for Tax @ 25.17% (est.)', amount: tax }] : []),
@@ -1425,10 +1431,8 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
 
 /* ── Tally Classic (white) view ──────────────────────────────────────── */
 // Tally Classic lists Groups, Sub-Groups and Ledgers strictly alphabetically
-// (A→Z), case-insensitively, with natural numeric ordering for names like
-// "Branch 2" / "Branch 10". Applied per level inside this view only — the
-// shared splitSubGroups (amount-ranked) and the Fiori view are left untouched.
-const azByName = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'en', { sensitivity: 'base', numeric: true });
+// (A→Z) via azByName. Applied per level inside this view only — the shared
+// splitSubGroups (amount-ranked) and the Fiori view are left untouched.
 const sideRows = (groups, summary, isOpen = () => true, side = '') => [...(groups || [])].sort((a, b) => azByName(a.group, b.group)).flatMap((g) => {
   if (summary) return [{ label: g.group, amount: g.amount, group: true, result: g.isResult }];
   const { subs, direct } = splitSubGroups(g.ledgers);
