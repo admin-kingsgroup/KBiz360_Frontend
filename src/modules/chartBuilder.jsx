@@ -1,13 +1,15 @@
-// ─── Chart Builder — Parent Group ▸ Group ▸ Sub-Group ▸ Ledger ───────────────
-// Two views of the whole chart, both with a top "+ Create New":
-//   • Tree View — read-only structure to understand the hierarchy (expand/collapse).
+// ─── Accounts Tree View — Parent Group ▸ Group ▸ Sub-Group ▸ Ledger ──────────
+// READ-ONLY viewer of the whole chart of accounts (no create / edit here — that
+// lives on the dedicated master screens: Masters ▸ Accounts Master ▸ Groups &
+// Sub-Groups / Ledgers). Two ways to look at the same hierarchy:
+//   • Tree View — expand/collapse structure to understand the hierarchy.
 //   • Side-by-Side — Tally-style miller columns (Parent Group → Group → Sub-Group → Ledger).
-// Create is a single modal (pick Group / Sub-Group / Ledger + its parent). 3 tiers.
+// Ledgers are shown branch-wise (the selected branch + org-wide "ALL" common ledgers).
 import React, { useState } from 'react';
-import { useMasterList, useMasterMutations } from '../core/useMasters';
+import { useMasterList } from '../core/useMasters';
 import { branchCode } from '../core/useAccounting';
 
-const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5', RED = '#A32D2D', GREEN = '#27500A', GOLD = '#A07828';
+const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5', GREEN = '#27500A', GOLD = '#A07828';
 const TALLY_ORDER = [
   'Capital Account', 'Loans (Liability)', 'Bank OD Accounts', 'Secured Loans', 'Unsecured Loans',
   'Current Liabilities', 'Duties & Taxes', 'Provisions', 'Sundry Creditors',
@@ -19,18 +21,13 @@ const TALLY_ORDER = [
 ];
 const badge = (txt, color) => <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: color + '18', color, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>{txt}</span>;
 
-export function ChartBuilder({ branch }) {
+export function AccountsTreeView({ branch }) {
   const brc = branchCode(branch);                    // undefined for ALL → shows all
   const groupsQ = useMasterList('groups');           // groups/sub-groups are SHARED across branches
   const ledgersQ = useMasterList('ledgers', { branch: brc }); // ledgers are branch-scoped (this branch + ALL)
-  const subMut = useMasterMutations('subgroups');
-  const ledMut = useMasterMutations('ledgers');
   const [tab, setTab] = useState('tree');           // 'tree' | 'side'
   const [open, setOpen] = useState({});
-  const [create, setCreate] = useState(null);       // { kind:'group'|'subgroup'|'ledger', parent, name }
-  const [err, setErr] = useState('');
   const [sel, setSel] = useState({ pg: '', g: '', sg: '' });
-  const busy = subMut.create.isPending || ledMut.create.isPending;
 
   const groups = groupsQ.data || [];
   // Branch-scoped ledgers (this branch + org-wide ALL). Dedup by name, preferring
@@ -43,32 +40,13 @@ export function ChartBuilder({ branch }) {
   ledgers.forEach((l) => { const k = (l.name || '').toLowerCase(); if (seenLed.has(k)) return; seenLed.add(k); const t = (l.subGroup && nodes[l.subGroup]) ? l.subGroup : l.group; if (nodes[t]) nodes[t].ledgers.push(l); });
   Object.values(nodes).forEach((n) => { n.children.sort((a, b) => a.name.localeCompare(b.name)); n.ledgers.sort((a, b) => a.name.localeCompare(b.name)); });
   const roots = groups.filter((g) => g.system).map((g) => nodes[g.name]).sort((a, b) => (TALLY_ORDER.indexOf(a.name) - TALLY_ORDER.indexOf(b.name)));
-  const gNames = groups.filter((g) => !g.system && nodes[g.parent] && nodes[g.parent].system).map((g) => g.name).sort();
-  const sgNames = groups.filter((g) => !g.system && nodes[g.parent] && !nodes[g.parent].system).map((g) => g.name).sort();
   const allKeys = groups.map((g) => g.name);
 
   const tog = (k) => setOpen((s) => ({ ...s, [k]: !s[k] }));
   const setAll = (v) => setOpen(v ? Object.fromEntries(allKeys.map((k) => [k, true])) : {});
-  const startCreate = (kind, parent = '') => { setCreate({ kind, parent, name: '' }); setErr(''); };
-  const parentOpts = !create ? [] : create.kind === 'group' ? roots.map((r) => r.name) : create.kind === 'subgroup' ? gNames : [...roots.map((r) => r.name), ...gNames, ...sgNames];
-  const save = async () => {
-    const nm = (create.name || '').trim(); const parent = (create.parent || '').trim();
-    if (!nm) { setErr('Enter a name'); return; }
-    if (!parent) { setErr('Pick a parent'); return; }
-    setErr('');
-    try {
-      if (create.kind === 'ledger') {
-        const code = 'LG-' + nm.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12) + '-' + Date.now().toString(36).slice(-4).toUpperCase();
-        await ledMut.create.mutateAsync({ name: nm, group: parent, code, branch: 'ALL', currency: 'INR', openingBalance: 0 });
-      } else {
-        await subMut.create.mutateAsync({ name: nm, parent });
-      }
-      setCreate(null);
-    } catch (e) { setErr(e.message || 'Failed'); }
-  };
 
   const Caret = ({ k, has }) => <span style={{ width: 14, display: 'inline-block', color: GOLD, cursor: has ? 'pointer' : 'default' }} onClick={() => has && tog(k)}>{has ? (open[k] ? '▾' : '▸') : ''}</span>;
-  const ledgerRow = (l, indent) => <div key={'L' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #f5f6fa', color: DARK }}><span style={{ color: GREEN, marginRight: 6 }}>•</span>{l.name}{badge('Ledger', GREEN)}</div>;
+  const ledgerRow = (l, indent) => <div key={'L' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #f5f6fa', color: DARK }}><span style={{ color: GREEN, marginRight: 6 }}>•</span>{l.name}{l.branch && l.branch !== 'ALL' ? badge(l.branch, BLUE) : badge('Common', DIM)}{badge('Ledger', GREEN)}</div>;
   // Subheading shown above ledgers that hang straight off a Group/Parent Group
   // (no intermediate sub-group) — only when that node also has child groups, so
   // it's clear these ledgers aren't nested under one of those groups.
@@ -153,10 +131,9 @@ export function ChartBuilder({ branch }) {
     <div style={{ padding: '12px 14px', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 6 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK }}>Chart Builder</h2>
-          <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Parent Group (28) ▸ Group ▸ Sub-Group ▸ Ledger · <b>{brc || 'All branches'}</b> ledgers (+ org-wide). Groups/Sub-Groups are shared across all branches.</p>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK }}>Accounts Tree View</h2>
+          <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Parent Group (28) ▸ Group ▸ Sub-Group ▸ Ledger · <b>{brc || 'All branches'}</b> ledgers (+ org-wide common). View-only — create Groups / Sub-Groups / Ledgers under <b>Masters ▸ Accounts Master</b>.</p>
         </div>
-        <button onClick={() => startCreate('group')} style={{ marginLeft: 'auto', padding: '8px 16px', background: GOLD, color: '#0d1326', border: 'none', borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>+ Create New</button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #e5e9f0', marginBottom: 12 }}>
         {tabBtn('tree', 'Tree View')}{tabBtn('side', 'Side-by-Side')}
@@ -170,40 +147,9 @@ export function ChartBuilder({ branch }) {
 
       {(groupsQ.isLoading || ledgersQ.isLoading) && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading chart…</div>}
       {tab === 'tree' ? treeView() : sideView()}
-
-      {create && (
-        <div onClick={() => setCreate(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', width: 'min(460px,96vw)', borderRadius: 10, boxShadow: '0 12px 40px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px', borderBottom: '1px solid #eef1f6', fontWeight: 800, color: DARK, fontSize: 15 }}>Create New</div>
-            <div style={{ padding: '16px 18px', display: 'grid', gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: DIM, marginBottom: 5 }}>What to create</div>
-                <div style={{ display: 'inline-flex', border: '1px solid #d6dbe6', borderRadius: 7, overflow: 'hidden' }}>
-                  {[['group', 'Group'], ['subgroup', 'Sub-Group'], ['ledger', 'Ledger']].map(([k, l]) => (
-                    <button key={k} onClick={() => setCreate((c) => ({ ...c, kind: k, parent: '' }))} style={{ padding: '6px 14px', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: create.kind === k ? BLUE : '#fff', color: create.kind === k ? '#fff' : DIM }}>{l}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: DIM, marginBottom: 5 }}>{create.kind === 'group' ? 'Under Parent Group (28)' : create.kind === 'subgroup' ? 'Under Group' : 'Under Group / Sub-Group'}</div>
-                <select value={create.parent} onChange={(e) => setCreate((c) => ({ ...c, parent: e.target.value }))} style={{ width: '100%', padding: '8px 10px', border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 12.5 }}>
-                  <option value="">— select —</option>
-                  {parentOpts.map((p) => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
-              <div>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: DIM, marginBottom: 5 }}>{create.kind === 'ledger' ? 'Ledger name' : create.kind === 'subgroup' ? 'Sub-Group name' : 'Group name'}</div>
-                <input autoFocus value={create.name} onChange={(e) => setCreate((c) => ({ ...c, name: e.target.value }))} onKeyDown={(e) => e.key === 'Enter' && save()} style={{ width: '100%', padding: '8px 10px', border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 12.5 }} />
-              </div>
-              {err && <div style={{ color: RED, fontSize: 11.5, fontWeight: 600 }}>⚠ {err}</div>}
-            </div>
-            <div style={{ padding: '12px 18px', borderTop: '1px solid #eef1f6', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button onClick={() => setCreate(null)} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #d6dbe6', background: '#fff', color: DIM, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-              <button disabled={busy} onClick={save} style={{ padding: '8px 18px', borderRadius: 6, border: 'none', background: GREEN, color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>{busy ? 'Saving…' : 'Create'}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+
+// Back-compat alias — the route/import historically used "ChartBuilder".
+export const ChartBuilder = AccountsTreeView;

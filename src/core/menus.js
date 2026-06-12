@@ -14,10 +14,11 @@ import { Dashboard } from '../modules/dashboard';
 // Parties (which in Tally are just ledgers) · Inventory & Catalog · Utilities.
 export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
   {label:"Accounts Master", children:[
+    {label:"Accounts Tree View (Parent ▸ Group ▸ Sub-Group ▸ Ledger)", href:"/masters/accounts-tree"},
+    {divider:true, label:"Create / Edit"},
     {label:"Parent Groups (28 Tally · view)", href:"/masters/groups"},
-    {label:"Chart Builder (Group · Sub-Group · Ledger)", href:"/masters/chart-builder"},
-    {label:"Sub-Groups (Custom)", href:"/masters/subgroups"},
-    {label:"Ledgers (Chart of Accounts)", href:"/masters/ledgers"},
+    {label:"Groups & Sub-Groups (Create)", href:"/masters/subgroups"},
+    {label:"Ledgers (Create · Chart of Accounts)", href:"/masters/ledgers"},
     {label:"Bank Accounts", href:"/masters/bank-accounts"},
     {label:"Cost Categories", href:"/masters/cost-categories"},
     {label:"Cost Centres", href:"/masters/cost-centers"},
