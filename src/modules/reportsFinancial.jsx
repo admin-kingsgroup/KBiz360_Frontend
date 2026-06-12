@@ -1075,8 +1075,12 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
 /* ════════════════════════ BALANCE SHEET (Classic ⇄ Fiori) ══════════════ */
 const CURRENT_ASSETS = new Set(['Current Assets', 'Bank Accounts', 'Cash-in-Hand', 'Deposits (Asset)', 'Loans & Advances (Asset)', 'Stock-in-Hand', 'Sundry Debtors']);
 const CURRENT_LIABS = new Set(['Current Liabilities', 'Duties & Taxes', 'Provisions', 'Sundry Creditors', 'Bank OD Accounts']);
-const NETWORTH = new Set(['Capital Account', 'Reserves & Surplus', 'Profit & Loss A/c']);
+// Capital & reserves only — the P&L A/c is added via the signed `netProfit` so
+// Net Worth stays correct regardless of which side a profit/loss is shown on
+// (a net loss parks the P&L A/c on the Assets side, Tally-style).
+const CAPITAL_RESERVES = new Set(['Capital Account', 'Reserves & Surplus']);
 const sumGroups = (rows, set) => (rows || []).filter((g) => set.has(g.group)).reduce((s, g) => s + (g.amount || 0), 0);
+const netWorthOf = (d) => sumGroups(d?.liabilities, CAPITAL_RESERVES) + (d?.netProfit || 0);
 
 /* ════════════════════════════════════════════════════════════════════
    Balance-Sheet "As On Date" controls — reporting modes, quick filters,
@@ -1297,7 +1301,7 @@ export function ReportBSLive({ branch }) {
 
 /* ── Fiori vertical view ─────────────────────────────────────────────── */
 function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, to, mobile, detail }) {
-  const netWorth = sumGroups(d.liabilities, NETWORTH);
+  const netWorth = netWorthOf(d);
   const ca = sumGroups(d.assets, CURRENT_ASSETS), cl = sumGroups(d.liabilities, CURRENT_LIABS);
   const workingCap = ca - cl;
   const ratio = cl > 0 ? (ca / cl).toFixed(2) : '—';
@@ -1311,7 +1315,7 @@ function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, t
 
       <KpiGrid>
         <Kpi tone="blue" label="Balance Sheet Total" value={compact(cur, d.totalAssets)} sub="Assets = Liabilities" />
-        <Kpi tone="green" label="Net Worth" value={compact(cur, netWorth)} sub="Capital + P&L A/c" trend={prev && <Trend cur={netWorth} prev={sumGroups(prev.liabilities, NETWORTH)} />} />
+        <Kpi tone="green" label="Net Worth" value={compact(cur, netWorth)} sub="Capital + P&L A/c" trend={prev && <Trend cur={netWorth} prev={netWorthOf(prev)} />} />
         <Kpi tone="teal" label="Working Capital" value={compact(cur, workingCap)} sub="CA − CL" />
         <Kpi tone="purple" label="Current Ratio" value={ratio} sub={`CA ${compact(cur, ca)} / CL ${compact(cur, cl)}`} />
       </KpiGrid>
