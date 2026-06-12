@@ -17,6 +17,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { card, inp, bc } from '../core/styles';
 import { exportToExcel, vouchersToSheet } from '../core/exportExcel';
 import { openPrintPreview } from '../core/PrintPreview';
+import { LedgerActions } from '../core/ledgerActions';
 import { CUR_QUARTER, CUR_FY } from '../core/dates';
 import { PeriodBar } from '../core/period';
 import {
@@ -680,74 +681,6 @@ export function LedgerAcLive({ branch }) {
   const selected = name || ledgers[0]?.name || '';
   const q = useLedgerStatement(selected, branch, { from, to });
   const d = q.data;
-  const hasData = !!(d && (d.lines || []).length);
-
-  // ── Export to Excel: opening row, every posting, then the closing total ──
-  const doExport = () => {
-    if (!d) return;
-    const cols = [
-      { key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher' }, { key: 'particulars', label: 'Particulars' },
-      { key: 'debit', label: 'Debit' }, { key: 'credit', label: 'Credit' }, { key: 'balance', label: 'Balance' }, { key: 'side', label: 'Dr/Cr' },
-    ];
-    const rows = [
-      { date: '', vno: '', particulars: 'Opening Balance', debit: '', credit: '', balance: Math.abs(d.openingBalance || 0), side: d.openingSide || '' },
-      ...(d.lines || []).map((e) => ({
-        date: e.date, vno: e.vno, particulars: e.narration || e.party || e.category || '',
-        debit: e.debit || 0, credit: e.credit || 0, balance: Math.abs(e.balance || 0), side: e.balanceSide || '',
-      })),
-      { date: '', vno: '', particulars: `Closing Balance — ${d.ledger}`, debit: d.totalDebit || 0, credit: d.totalCredit || 0, balance: Math.abs(d.closingBalance || 0), side: d.closingSide || '' },
-    ];
-    exportToExcel(`ledger-${d.ledger}-${branchLabel(branch)}`, cols, rows);
-  };
-
-  // ── Print / Save-as-PDF: portrait A4 via the shared in-app preview ──
-  const doPrint = () => {
-    if (!d) return;
-    const fmt = (n) => { const v = Math.round(Number(n) || 0); return v ? cur + v.toLocaleString('en-IN') : ''; };
-    const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-    const period = from || to ? `${from || '…'} to ${to || '…'}` : 'All dates';
-    const body = (d.lines || []).map((e) => `<tr>
-      <td>${esc(e.date)}</td>
-      <td class="mono">${esc(e.vno)}</td>
-      <td>${esc(e.narration || e.party || e.category || '')}</td>
-      <td class="r">${fmt(e.debit)}</td>
-      <td class="r">${fmt(e.credit)}</td>
-      <td class="r b">${fmt(Math.abs(e.balance || 0))} ${esc(e.balanceSide || '')}</td>
-    </tr>`).join('');
-    const html = `<style>
-      .lg{font-family:'Segoe UI',Arial,sans-serif;color:#0d1326}
-      .lg h1{font-size:16px;margin:0 0 2px}
-      .lg .meta{font-size:10px;color:#5a6691;margin:0 0 10px}
-      .lg .op{display:flex;justify-content:space-between;font-size:10.5px;background:#f3f4f8;border:1px solid #e1e3ec;padding:6px 9px;margin-bottom:6px}
-      .lg table{width:100%;border-collapse:collapse;font-size:10px}
-      .lg th{background:#0d1326;color:#d4a437;text-align:left;padding:6px 8px;font-size:9.5px}
-      .lg th.r,.lg td.r{text-align:right}
-      .lg td{padding:5px 8px;border-bottom:1px solid #eceef4}
-      .lg td.mono{font-family:'Courier New',monospace;font-size:9px;color:#185FA5}
-      .lg td.b{font-weight:700}
-      .lg tfoot td{background:#0d1326;color:#fff;font-weight:800;border-top:2px solid #d4a437}
-      .lg tfoot td.gold{color:#d4a437}
-    </style>
-    <div class="lg">
-      <h1>Ledger Account — ${esc(d.ledger)}</h1>
-      <p class="meta">${esc(d.group || '')} · ${esc(branchLabel(branch))} · ${esc(period)}</p>
-      <div class="op"><span>Opening Balance: ${fmt(d.openingBalance)} ${esc(d.openingSide || '')}</span>
-        <span>Closing Balance: ${fmt(d.closingBalance)} ${esc(d.closingSide || '')}</span></div>
-      <table>
-        <thead><tr><th>Date</th><th>Voucher</th><th>Particulars</th><th class="r">Debit</th><th class="r">Credit</th><th class="r">Balance</th></tr></thead>
-        <tbody>${body || '<tr><td colspan="6" style="text-align:center;padding:20px;color:#5a6691">No postings in range.</td></tr>'}</tbody>
-        <tfoot><tr>
-          <td colspan="3" class="gold">CLOSING — ${esc(d.ledger)}</td>
-          <td class="r">${fmt(d.totalDebit)}</td>
-          <td class="r gold">${fmt(d.totalCredit)}</td>
-          <td class="r">${fmt(d.closingBalance)} ${esc(d.closingSide || '')}</td>
-        </tr></tfoot>
-      </table>
-    </div>`;
-    openPrintPreview({ title: `Ledger — ${d.ledger}`, recommend: 'portrait', html });
-  };
-
-  const actBtn = (disabled) => ({ padding: '7px 12px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1 });
 
   return (
     <Page
@@ -759,9 +692,7 @@ export function LedgerAcLive({ branch }) {
           {ledgers.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
         </select>
         <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
-        <button onClick={doPrint} disabled={!hasData} title="Print (portrait A4)" style={actBtn(!hasData)}>🖨 Print</button>
-        <button onClick={doPrint} disabled={!hasData} title="Save as PDF (portrait A4)" style={actBtn(!hasData)}>📄 PDF</button>
-        <button onClick={doExport} disabled={!hasData} title="Export to Excel" style={actBtn(!hasData)}>📤 Excel</button>
+        <LedgerActions d={d} cur={cur} branchLabel={branchLabel(branch)} from={from} to={to} />
       </>}
     >
       <State q={q} empty={!d}>
@@ -864,8 +795,68 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
     const lines = form.lines.filter((l) => l.ledger).map((l) => ({ ...l, amt: Number(l.amt) || 0, ledger: l.ledger, drCr: l.drCr || 'Dr' }));
     const body = { ...v, date: form.date, branch: form.branch, party: form.party, linkNo: form.linkNo, costCenter: form.costCenter, remarks: form.remarks, taxAmt: Number(form.taxAmt) || 0, tdsAmt: Number(form.tdsAmt) || 0, tcsAmt: Number(form.tcsAmt) || 0, subtotal, total, lines, status: v.status || 'saved' };
     delete body.id; delete body.createdAt; delete body.updatedAt;
-    upd.mutate({ id: voucherId, body }, { onSuccess: () => setMsg('saved'), onError: (e) => setMsg('err:' + e.message) });
+    upd.mutate({ id: voucherId, body }, { onSuccess: () => { setMsg('saved'); setDone(true); }, onError: (e) => setMsg('err:' + e.message) });
   };
+  // Build a printable A4 view of the full journal entry and hand it to the print preview.
+  const printEntry = () => {
+    const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? cur + x.toLocaleString('en-IN') : ''; };
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    const rows = (pv.postings || []).map((p) => `<tr>
+      <td>${esc(p.ledger)}</td><td>${esc(p.group || '')}</td>
+      <td class="r">${fmt(p.debit)}</td><td class="r">${fmt(p.credit)}</td></tr>`).join('');
+    const html = `<style>
+      .ve{font-family:'Segoe UI',Arial,sans-serif;color:#0d1326}
+      .ve h1{font-size:16px;margin:0 0 2px}
+      .ve .meta{font-size:10.5px;color:#5a6691;margin:0 0 4px}
+      .ve table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:8px}
+      .ve th{background:#0d1326;color:#d4a437;text-align:left;padding:6px 8px;font-size:9.5px}
+      .ve th.r,.ve td.r{text-align:right}
+      .ve td{padding:5px 8px;border-bottom:1px solid #eceef4}
+      .ve tfoot td{background:#f3f5f9;font-weight:800;border-top:2px solid #0d1326}
+    </style>
+    <div class="ve">
+      <h1>Voucher — ${esc(v.vno)}</h1>
+      <p class="meta">${esc(v.type)} · ${esc(v.category)} · ${esc(form.date)} · ${esc(form.branch)}${form.party ? ' · ' + esc(form.party) : ''}</p>
+      ${form.remarks ? `<p class="meta">${esc(form.remarks)}</p>` : ''}
+      <table>
+        <thead><tr><th>Ledger</th><th>Group</th><th class="r">Debit</th><th class="r">Credit</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td colspan="2">Total</td><td class="r">${fmt(pv.totalDebit)}</td><td class="r">${fmt(pv.totalCredit)}</td></tr></tfoot>
+      </table>
+    </div>`;
+    openPrintPreview({ title: `Voucher — ${v.vno}`, recommend: 'portrait', html });
+  };
+  // Post-save: show the full journal entry with Print / Close. Close dismisses the modal.
+  if (done) {
+    return (
+      <div style={{ padding: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ fontWeight: 800, color: GREEN, fontSize: 14 }}>✓ Saved — {v.vno}</div>
+          <button onClick={dismiss} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18 }}>✕</button>
+        </div>
+        <div style={{ fontSize: 11.5, color: DIM, marginBottom: 10 }}>
+          {v.type} · {v.category} · {form.date} · {form.branch}{form.party ? ` · ${form.party}` : ''}
+        </div>
+        <div style={{ ...card, padding: 10, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Full Journal Entry</div>
+            <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+            <thead><tr><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Ledger</th><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Group</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Debit</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Credit</th></tr></thead>
+            <tbody>
+              {(pv.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
+            </tbody>
+            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money(cur, pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money(cur, pv.totalCredit)}</td></tr></tfoot>
+          </table>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <button onClick={printEntry} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
+          <button onClick={dismiss} style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #d6dbe6', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ padding: 14 }}>
       <datalist id={dlId}>{ledgerNames.map((n) => <option key={n} value={n} />)}</datalist>
@@ -936,7 +927,19 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
-        <button disabled={upd.isPending} onClick={save} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: GREEN, color: '#fff' }}>{upd.isPending ? 'Saving...' : 'Save'}</button>
+        {/* Block Save only when the preview KNOWS it's unbalanced (=== false), so a
+            slow/failed preview never locks the user out — the backend enforces balance too. */}
+        {(() => {
+          const blocked = pv.balanced === false;
+          return (
+            <button disabled={upd.isPending || blocked} onClick={save}
+              title={blocked ? `Cannot save — debit and credit must match (out by ${money(cur, pv.diff)})` : 'Save voucher'}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: (upd.isPending || blocked) ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: blocked ? '#9bbfa0' : GREEN, color: '#fff', opacity: blocked ? 0.75 : 1 }}>
+              {upd.isPending ? 'Saving...' : 'Save'}
+            </button>
+          );
+        })()}
+        {pv.balanced === false && <span style={{ color: RED, fontSize: 11.5, fontWeight: 600 }}>Debit ≠ Credit — balance the entry to save (out by {money(cur, pv.diff)})</span>}
         {msg === 'saved' && <span style={{ color: GREEN, fontSize: 12, fontWeight: 700 }}>Saved & re-checked</span>}
         {msg.startsWith('err:') && <span style={{ color: RED, fontSize: 11.5 }}>! {msg.slice(4)}</span>}
       </div>
@@ -966,7 +969,7 @@ function DrillDown({ branch, group, onClose }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
         </div>
 
-        {voucher && <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} />}
+        {voucher && <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} onClose={onClose} />}
 
         {!voucher && ledger && (
           <div>

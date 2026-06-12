@@ -12,6 +12,7 @@ import { ChevronRight, ChevronLeft, X } from 'lucide-react';
 import { apiGet } from '../core/api';
 import { bc } from '../core/styles.jsx';
 import { PeriodBar } from '../core/period';
+import { LedgerActions } from '../core/ledgerActions';
 
 const DARK = '#0d1326', DIM = '#5a6691', LINE = '#e1e3ec', HEAD = '#1c3a5e';
 const money = (n) => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -244,12 +245,15 @@ export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
             <input type="checkbox" checked={showNarration} onChange={(e) => setShowNarration(e.target.checked)} /> Show narration
           </label>
         )}
-        {billwiseAvailable && (
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            <button style={tabBtn(tab === 'ledger')} onClick={() => setTab('ledger')}>Ledger</button>
-            <button style={tabBtn(tab === 'billwise')} onClick={() => setTab('billwise')}>Bill-wise</button>
-          </div>
-        )}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {billwiseAvailable && (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button style={tabBtn(tab === 'ledger')} onClick={() => setTab('ledger')}>Ledger</button>
+              <button style={tabBtn(tab === 'billwise')} onClick={() => setTab('billwise')}>Bill-wise</button>
+            </div>
+          )}
+          {!showBillwise && <LedgerActions d={d} cur={bc(branch).cur} branchLabel={brCodeOf(branch)} from={range.from} to={range.to} particulars={contraLabel} />}
+        </div>
       </div>
 
       {isLoading && <div style={{ padding: 20, color: DIM, fontSize: 12 }}>Loading ledger…</div>}

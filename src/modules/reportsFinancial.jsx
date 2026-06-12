@@ -29,6 +29,7 @@ import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys
 import { VoucherEditor } from './accountingLive';
 import { useMobile } from '../core/hooks';
 import { openPrintPreview } from '../core/PrintPreview';
+import { LedgerActions } from '../core/ledgerActions';
 
 /* ── palette (SAP Fiori) ─────────────────────────────────────────────── */
 const SAP = {
@@ -170,7 +171,7 @@ function FileVoucherDrill({ file, cur, mobile, onClose }) {
   return (
     <Modal title={vid ? 'Edit Voucher' : `${file.ref} — ${vouchers.length} voucher(s)`} onClose={onClose} mobile={mobile}>
       {vid
-        ? <VoucherEditor voucherId={vid} cur={cur} onBack={() => setVid(null)} />
+        ? <VoucherEditor voucherId={vid} cur={cur} onBack={() => setVid(null)} onClose={onClose} />
         : (vouchers.length === 0
           ? <div style={{ padding: 24, textAlign: 'center', color: SAP.sec, fontSize: 12 }}>Aggregated row — open a specific sub-centre to reach individual vouchers.</div>
           : vouchers.map((vh) => (
@@ -200,7 +201,7 @@ function ModuleVoucherDrill({ module, cur, mobile, onClose }) {
   return (
     <Modal title={title} onClose={onClose} mobile={mobile}>
       {vid ? (
-        <VoucherEditor voucherId={vid} cur={cur} onBack={() => setVid(null)} />
+        <VoucherEditor voucherId={vid} cur={cur} onBack={() => setVid(null)} onClose={onClose} />
       ) : file ? (
         (file.vouchers || []).map((vh) => (
           <div key={vh.id} onClick={() => setVid(vh.id)} style={tapRow}>
@@ -253,17 +254,18 @@ function LedgerVoucherDrill({ ledger, branch, to, cur, mobile, onClose }) {
   return (
     <Modal title={vid ? 'Edit Voucher' : `Ledger: ${ledger}`} onClose={onClose} mobile={mobile} wide>
       {vid
-        ? <VoucherEditor voucherId={vid} cur={cur} onBack={() => setVid(null)} />
+        ? <VoucherEditor voucherId={vid} cur={cur} onBack={() => setVid(null)} onClose={onClose} />
         : (
           <>
             {q.isLoading && <div style={{ padding: 24, textAlign: 'center', color: SAP.sec }}>Loading ledger…</div>}
             {q.isError && <div style={{ padding: 16, color: SAP.red, fontSize: 12 }}>⚠ {q.error?.message}</div>}
             {!q.isLoading && !q.isError && (
               <>
-                <div style={{ padding: '8px 12px', background: '#f4f7fc', borderBottom: `1px solid ${SAP.border}`, fontSize: 11.5, color: SAP.sec, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+                <div style={{ padding: '8px 12px', background: '#f4f7fc', borderBottom: `1px solid ${SAP.border}`, fontSize: 11.5, color: SAP.sec, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14 }}>
                   <span><b style={{ color: SAP.text }}>{d.ledger || ledger}</b>{d.group ? ` · under ${d.group}` : ''}</span>
                   <span>Opening: <b style={{ color: SAP.text }}>{inr(d.openingBalance || 0)} {d.openingSide || 'Dr'}</b></span>
-                  <span style={{ marginLeft: 'auto' }}>Closing: <b style={{ color: (d.closingSide === 'Cr') ? SAP.red : SAP.blue }}>{inr(d.closingBalance || 0)} {d.closingSide || 'Dr'}</b></span>
+                  <span>Closing: <b style={{ color: (d.closingSide === 'Cr') ? SAP.red : SAP.blue }}>{inr(d.closingBalance || 0)} {d.closingSide || 'Dr'}</b></span>
+                  <span style={{ marginLeft: 'auto' }}><LedgerActions d={d} cur={cur} branchLabel={branch?.code || (typeof branch === 'string' ? branch : '')} to={to} particulars={partic} /></span>
                 </div>
                 <div style={{ overflow: 'auto', maxHeight: mobile ? '60vh' : '64vh' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>

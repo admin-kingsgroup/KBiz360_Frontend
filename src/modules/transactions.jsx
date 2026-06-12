@@ -11,6 +11,7 @@ import { getUnmatchedTickets, settlePurchaseEntry } from '../core/business-logic
 import { ACTIVE_CURRENCIES, ADM_DATA, BRANCHES, BRANCH_CODES, GP_BILLS, PURCHASE_REGISTRY, SALE_TO_PURCH_MOD, branchCurrencies, branchMainCurrency, genVNo } from '../core/data';
 import { useAdmReasonCodes, useLedgerRegistry } from '../core/useReference';
 import { useLedgerStatement, useCreateVoucher, useOpenBills, useSalesRegister, usePurchaseRegister } from '../core/useAccounting';
+import { LedgerActions } from '../core/ledgerActions';
 import { useLivePurchaseRegistry, useLiveSalesTickets } from '../core/useVouchers';
 import { fmt, fmtINR } from '../core/format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS } from '../core/dates';
@@ -3472,9 +3473,12 @@ export function BspSummary({branch}){
             <p style={{margin:0,fontSize:12,fontWeight:700,color:"#d4a437"}}>🔗 BSP Supplier Ledger — {bspLedgerName}</p>
             <p style={{margin:"2px 0 0",fontSize:9.5,color:"#8b93b3"}}>{bspLedger?.group||"Sundry Creditors"} · {stmtLines.length} postings · {from} → {to}</p>
           </div>
-          <div style={{textAlign:"right"}}>
-            <p style={{margin:0,fontSize:9,color:"#8b93b3",textTransform:"uppercase",fontWeight:700}}>Outstanding payable</p>
-            <p style={{margin:"2px 0 0",fontSize:16,fontWeight:800,color:closingPayable>=0?"#F7C1C1":"#C0DD97"}}>{f(Math.abs(closingPayable))} {stmt?.closingSide||"Cr"}</p>
+          <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+            <LedgerActions d={stmt} cur="₹" branchLabel={brCode||"India"} from={from} to={to} variant="dark" />
+            <div style={{textAlign:"right"}}>
+              <p style={{margin:0,fontSize:9,color:"#8b93b3",textTransform:"uppercase",fontWeight:700}}>Outstanding payable</p>
+              <p style={{margin:"2px 0 0",fontSize:16,fontWeight:800,color:closingPayable>=0?"#F7C1C1":"#C0DD97"}}>{f(Math.abs(closingPayable))} {stmt?.closingSide||"Cr"}</p>
+            </div>
           </div>
         </div>
         {stmtQ.isLoading
