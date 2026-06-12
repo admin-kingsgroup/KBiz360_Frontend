@@ -1424,18 +1424,24 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
 }
 
 /* ── Tally Classic (white) view ──────────────────────────────────────── */
-const sideRows = (groups, summary, isOpen = () => true, side = '') => (groups || []).flatMap((g) => {
+// Tally Classic lists Groups, Sub-Groups and Ledgers strictly alphabetically
+// (A→Z), case-insensitively, with natural numeric ordering for names like
+// "Branch 2" / "Branch 10". Applied per level inside this view only — the
+// shared splitSubGroups (amount-ranked) and the Fiori view are left untouched.
+const azByName = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'en', { sensitivity: 'base', numeric: true });
+const sideRows = (groups, summary, isOpen = () => true, side = '') => [...(groups || [])].sort((a, b) => azByName(a.group, b.group)).flatMap((g) => {
   if (summary) return [{ label: g.group, amount: g.amount, group: true, result: g.isResult }];
   const { subs, direct } = splitSubGroups(g.ledgers);
   return [
     { label: g.group, amount: g.amount, group: true, result: g.isResult },
-    ...subs.flatMap((s) => {
+    ...[...subs].sort((a, b) => azByName(a.name, b.name)).flatMap((s) => {
       const k = side + ':' + g.group + '/' + s.name;
       const open = isOpen(k, false); // sub-group collapsed by default → click to reveal ledgers
       const head = { label: s.name, amount: s.amount, sub: true, expandable: true, ekey: k, open };
-      return open ? [head, ...s.ledgers.map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))] : [head];
+      const ledgers = [...s.ledgers].sort((a, b) => azByName(a.name, b.name));
+      return open ? [head, ...ledgers.map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))] : [head];
     }),
-    ...direct.map((l) => ({ label: l.name, amount: l.amount, ledger: l.name })),
+    ...[...direct].sort((a, b) => azByName(a.name, b.name)).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name })),
   ];
 });
 function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
