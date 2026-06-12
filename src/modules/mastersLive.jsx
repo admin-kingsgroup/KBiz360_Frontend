@@ -90,14 +90,17 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   );
 }
 
-export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note, toolbar, rowFilter }) {
+export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note, toolbar, rowFilter, mapRow, sortRows }) {
   const list = useMasterList(resource, params);
   const { create, update, remove } = useMasterMutations(resource);
   const [editing, setEditing] = useState(null); // record being edited, or {} for new
   const [err, setErr] = useState('');
   // rowFilter narrows the listing client-side (e.g. show only the 28 system
-  // parent groups, not the custom sub-groups that share the same resource).
-  const rows = (list.data || []).filter(rowFilter || (() => true));
+  // parent groups). mapRow derives extra display columns per row; sortRows
+  // orders the final list. All three are optional and view-specific.
+  let rows = (list.data || []).filter(rowFilter || (() => true));
+  if (mapRow) rows = rows.map(mapRow);
+  if (sortRows) rows = [...rows].sort(sortRows);
   const cols = fields.filter((f) => f.table !== false);
 
   const openNew = () => { setErr(''); setEditing({ __new: true, ...blankFromFields(fields) }); };
@@ -299,15 +302,23 @@ const TALLY_GROUP_NAMES = [
 
 // Groups are the 28 FIXED Tally groups — READ-ONLY (no create / edit / delete).
 export const GroupsMaster = () => (
-  <MasterCrud title="Parent Groups (28 Tally · Fixed · Read-only)" subtitle="The 28 fixed Tally groups — “Under” is the primary group each one nests within (— = a top-level primary group)"
+  <MasterCrud title="Parent Groups (28 Tally · Fixed · Read-only)" subtitle="The 28 fixed Tally groups, shown as Tally Parent Group ▸ Tally Sub Parent Group (— = the primary group itself)"
     resource="groups" readOnly rowFilter={(g) => g.system}
+    // Two-level layout: column 1 = the primary (root) group, column 2 = the
+    // sub-group nested under it. A primary group shows itself in col 1 and a
+    // blank (—) sub. Sorted by parent so each primary clusters with its subs.
+    mapRow={(g) => {
+      const isPrimary = !g.parent;
+      return { ...g, tallyParent: isPrimary ? g.name : g.parent, tallySub: isPrimary ? '' : g.name };
+    }}
+    sortRows={(a, b) =>
+      a.tallyParent.localeCompare(b.tallyParent, 'en', { sensitivity: 'base', numeric: true })
+      || (a.tallySub === '' ? -1 : b.tallySub === '' ? 1
+          : a.tallySub.localeCompare(b.tallySub, 'en', { sensitivity: 'base', numeric: true }))}
     note="🔒 The 28 Tally groups are fixed and cannot be created, edited or deleted. To extend the chart, add Sub-Groups under a group (Masters → Sub-Groups)."
     fields={[
-      { key: 'name', label: 'Group Name', type: 'text' },
-      // Tally calls this column “Under” (the group this one nests within), NOT
-      // “Parent Group” — that wording clashed with the screen title and confused
-      // users. “—” marks a top-level primary group.
-      { key: 'parent', label: 'Under', type: 'text' },
+      { key: 'tallyParent', label: 'Tally Parent Group', type: 'text' },
+      { key: 'tallySub', label: 'Tally Sub Parent Group', type: 'text' },
       { key: 'nature', label: 'Nature', type: 'text' },
       { key: 'statement', label: 'Statement', type: 'text' },
     ]} />
