@@ -19,7 +19,7 @@ import { buildBookingInvoice } from '../core/invoiceHtml';
 import { apiGet, apiPost, apiPut } from '../core/api';
 import { useLedgerRegistry } from '../core/useReference';
 import {
-  VSPECS, VMODULE_LIST, blankLine, bookingTotals, lineCalc,
+  VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc,
 } from '../core/voucherSpecs.js';
 
 const GOLD = '#A07828', DARK = '#0d1326', DR = '#1B6B4C', CR = '#9B2C2C', BLUE = '#185FA5';
@@ -55,8 +55,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   const [lines, setLines] = useState(() => {
     if (editing) {
+      const sp = VSPECS[initModule];
       const rows = Array.isArray(editBooking.rows) ? editBooking.rows : [];
-      return rows.length ? rows.map((r) => ({ ...r })) : [blankLine(VSPECS[initModule])];
+      return rows.length ? rows.map((r) => normalizeLine(sp, r)) : [blankLine(sp)];
     }
     return [blankLine(VSPECS.SF)];   // start blank — no demo rows
   });
@@ -87,6 +88,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const addLine = () => setLines([...lines, blankLine(spec)]);
   const delLine = (i) => setLines(lines.length > 1 ? lines.filter((_, idx) => idx !== i) : [blankLine(spec)]);
 
+  // ── Sectors (Flight): per-sector travel detail, entered on the Purchase grid ──
+  const setSec = (li, si, key, val) => setLines(lines.map((l, i) => (i === li ? { ...l, sectors: (l.sectors || []).map((s, j) => (j === si ? { ...s, [key]: val } : s)) } : l)));
+  const addSec = (li) => setLines(lines.map((l, i) => (i === li ? { ...l, sectors: [...(l.sectors || []), blankSector()] } : l)));
+  const delSec = (li, si) => setLines(lines.map((l, i) => (i === li ? { ...l, sectors: (l.sectors || []).length > 1 ? l.sectors.filter((_, j) => j !== si) : l.sectors } : l)));
+
   // Both posting ledgers are mandatory: the customer's Debtor ledger (receivable)
   // and the supplier's Creditor ledger (payable).
   const hasCustLedger = !!(customer.ledgerName || '').trim();
@@ -105,7 +111,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         customer: { name: customer.name, gstin: customer.gstin, address: customer.address, email: customer.email, contact: customer.contact, group: customer.group, ledgerName: customer.ledgerName || customer.name, ledgerGroup: customer.ledgerGroup || customer.group },
         supplier: { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup },
         gstMode, packageType: hasPackage ? packageType : '',
-        headerRef, rows: lines,
+        headerRef, rows: lines.map((l) => syncLineRefs(spec, l)),
         po: totals.po, so: totals.so,
         gp: { lines: gpLines, total: totals.gp.total, pct: totals.gp.pct },
         remarks,
@@ -162,6 +168,43 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   const refKeys = spec.idCols.slice(2); // module reference fields (Ticket/PNR/etc.)
   const pkg = spec.model === 'package';  // Holiday tour-operator model (no service charge; 5% GST; entered supplier GST)
+  // Bill-To is free text ONLY for B2C debtors (pooled per-staff ledgers); a named
+  // B2B/B2E client IS the ledger, so its name doubles as the Bill-To.
+  const isB2C = /b2c/i.test(customer.ledgerGroup || '');
+  // Column counts for the full-width sectors sub-row (Flight only).
+  const soCols = spec.idCols.length + spec.fareCols.length + 1 + (pkg ? 0 : 1) + (pkg ? 0 : 1) + 1 + 1 + 1;
+  const poCols = 2 + refKeys.length + spec.fareCols.length + 3;
+
+  // Sectors sub-table for a passenger line — editable on the Purchase grid,
+  // read-only ("fetched & locked") on the Sales grid.
+  const sectorBlock = (l, li, readOnly, colSpan) => (
+    <tr key={'sec-' + li}>
+      <td colSpan={colSpan} style={{ padding: '2px 6px 8px 26px', background: readOnly ? '#faf7ef' : '#fbfcff', borderBottom: '1px solid #eef0f5' }}>
+        <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: '.3px', color: '#9A9A9A', textTransform: 'uppercase', margin: '2px 0' }}>{readOnly ? '▣ Sectors — from Purchase (locked)' : '✎ Sectors — enter each segment'}</div>
+        <table style={{ borderCollapse: 'collapse' }}>
+          <thead><tr>
+            {spec.sectorCols.map((sc) => <th key={sc.key} style={{ ...thA, ...thL, fontSize: 8.5, padding: '3px 6px' }}>{sc.label}</th>)}
+            {!readOnly && <th style={{ ...thA, width: 26 }} />}
+          </tr></thead>
+          <tbody>
+            {(l.sectors || []).map((s, si) => (
+              <tr key={si}>
+                {spec.sectorCols.map((sc) => (
+                  <td key={sc.key} style={{ padding: 2 }}>
+                    {readOnly
+                      ? <span style={{ fontSize: 11, fontWeight: 600, color: sc.kind === 'pnr' ? GOLD : '#3A3A3A' }}>{s[sc.key] || '—'}</span>
+                      : <input type={sc.type === 'date' ? 'date' : 'text'} value={s[sc.key] ?? ''} onChange={(e) => setSec(li, si, sc.key, e.target.value)} style={{ ...cellTxt, width: sc.type === 'date' ? 124 : 92, color: sc.kind === 'pnr' ? GOLD : DARK }} />}
+                  </td>
+                ))}
+                {!readOnly && <td style={{ padding: 2, textAlign: 'center' }}><button onClick={() => delSec(li, si)} title="Remove sector" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={12} /></button></td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!readOnly && <button onClick={() => addSec(li)} style={{ ...btnGh, marginTop: 4, padding: '3px 9px', fontSize: 10 }}><Plus size={11} /> Add sector</button>}
+      </td>
+    </tr>
+  );
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px 90px' }}>
@@ -214,21 +257,22 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
           <FL label="Booking date"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></FL>
           <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
-          <FL label="Customer (Bill to)">
-            <PartyPicker branch={branch} kind="customer" value={{ name: customer.name, group: customer.group }}
-              onChange={(v) => setCustomer((c) => ({
-                ...c, name: v.name, group: v.group,
-                // Default the post-to ledger to the Bill-To party until the user picks a
-                // different debtor; if they'd overridden it, keep their choice.
-                ledgerName: (!c.ledgerName || c.ledgerName === c.name) ? v.name : c.ledgerName,
-                ledgerGroup: (!c.ledgerGroup || c.ledgerGroup === c.group) ? v.group : c.ledgerGroup,
-              }))} />
-          </FL>
           <FL label="Post receivable to (Debtor ledger) *">
             <PartyPicker branch={branch} kind="customer" value={{ name: customer.ledgerName, group: customer.ledgerGroup }}
-              onChange={(v) => setCustomer({ ...customer, ledgerName: v.name, ledgerGroup: v.group })} />
+              onChange={(v) => setCustomer((c) => {
+                const b2c = /b2c/i.test(v.group || '');
+                // B2B/B2E: the ledger IS the customer → Bill-To = ledger name.
+                // B2C (pooled per-staff ledger): keep the free-typed end-customer name.
+                return { ...c, ledgerName: v.name, ledgerGroup: v.group, group: v.group, name: b2c ? c.name : v.name };
+              })} />
             {!hasCustLedger && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — pick the Debtor ledger to post & follow for payment</span>}
           </FL>
+          {isB2C && (
+            <FL label="Customer (Bill to) — free text *">
+              <input value={customer.name} onChange={(e) => setCustomer((c) => ({ ...c, name: e.target.value }))} placeholder="End-customer name (B2C)" style={inp} />
+              {!customer.name.trim() && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — type the end customer's name for the invoice</span>}
+            </FL>
+          )}
           <FL label="Supplier ledger (Pay to) *">
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
               onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
@@ -269,10 +313,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {lines.map((l, i) => {
                 const c = lineCalc(spec, l);
                 return (
-                  <tr key={i}>
+                  <React.Fragment key={i}>
+                  <tr>
                     {spec.idCols.map((col) => (
                       <td key={col.key} style={{ ...tdC, textAlign: 'left', padding: 3 }}>
-                        <input value={l[col.key] ?? ''} onChange={(e) => setLine(i, col.key, e.target.value)} style={{ ...cellTxt, color: col.kind === 'pnr' ? GOLD : DARK }} />
+                        {spec.sectors
+                          ? <span style={{ fontSize: 11.5, fontWeight: 600, color: DARK }}>{l[col.key] || '—'}</span>
+                          : <input value={l[col.key] ?? ''} onChange={(e) => setLine(i, col.key, e.target.value)} style={{ ...cellTxt, color: col.kind === 'pnr' ? GOLD : DARK }} />}
                       </td>
                     ))}
                     {spec.fareCols.map((col) => <td key={col.key} style={tdAuto}>{fmt(l[col.key])}</td>)}
@@ -283,6 +330,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                     <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef' }}>{fmt(c.finalSales)}</td>
                     <td style={{ ...tdC, textAlign: 'center', background: '#faf7ef' }}><button onClick={() => delLine(i)} title="Remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={13} /></button></td>
                   </tr>
+                  {spec.sectors && sectorBlock(l, i, true, soCols)}
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -315,7 +364,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {lines.map((l, i) => {
                 const c = lineCalc(spec, l);
                 return (
-                  <tr key={i}>
+                  <React.Fragment key={i}>
+                  <tr>
                     <td style={{ ...tdC, textAlign: 'left', padding: 3 }}><input value={l.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} style={cellTxt} /></td>
                     <td style={{ ...tdC, textAlign: 'left', padding: 3 }}><input value={l.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} style={cellTxt} /></td>
                     {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A' }}>{l[col.key] || '—'}</td>)}
@@ -326,6 +376,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                       : <td style={tdAuto}>{fmt(c.gstPur)}</td>}
                     <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef' }}>{fmt(c.finalPurchase)}</td>
                   </tr>
+                  {spec.sectors && sectorBlock(l, i, false, poCols)}
+                  </React.Fragment>
                 );
               })}
             </tbody>

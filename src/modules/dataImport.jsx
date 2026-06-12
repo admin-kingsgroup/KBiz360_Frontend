@@ -221,22 +221,25 @@ function makeBookingSpec(code) {
   const hasPkg = code === 'SF' || code === 'SH';
   const header = ['Link No', 'Branch', 'Date', sp.headerLabel, 'Customer Name', 'Customer Ledger', 'Customer Sub-Group', 'Supplier Name', 'Supplier Ledger', 'Supplier Sub-Group', ...(hasPkg ? ['Package Type'] : []), 'GST Mode'];
   const idLabels = sp.idCols.map((c) => c.label);
+  const sectorLabels = (sp.sectorCols || []).map((c) => c.label);
   const fareLabels = sp.fareCols.map((c) => c.label);
   const tail = ['Supplier Service', 'Supplier Service GST', 'Markup', 'Markup GST', 'Service Charge', 'Service Charge GST'];
-  const columns = [...header, ...idLabels, ...fareLabels, ...tail];
+  const columns = [...header, ...idLabels, ...sectorLabels, ...fareLabels, ...tail];
 
   const seed = (sp.seed && sp.seed[0]) || {};
+  const seedSec = (seed.sectors && seed.sectors[0]) || {};
   const n = (v) => Number(v) || 0;
   const [supName, supGrp] = BOOKING_SUPPLIER_SAMPLE[code];
   const exHeader = ['BKL-0001', 'BOM', '2025-06-18', BOOKING_HEADER_SAMPLE[code], 'Global Konnection', 'Global Konnection', 'B2B Clients', supName, supName, supGrp, ...(hasPkg ? ['Domestic'] : []), 'intra'];
   const exId = sp.idCols.map((c) => String(seed[c.key] ?? ''));
+  const exSector = (sp.sectorCols || []).map((c) => String(seedSec[c.key] ?? ''));
   const exFare = sp.fareCols.map((c) => String(n(seed[c.key])));
   const exTail = [String(n(seed.psvc)), String(r2x(n(seed.psvc) * 0.18)), String(n(seed.markup)), String(r2x(n(seed.markup) * 0.18 / 1.18)), String(n(seed.ssvc)), String(r2x(n(seed.ssvc) * 0.18))];
-  const example = [...exHeader, ...exId, ...exFare, ...exTail];
+  const example = [...exHeader, ...exId, ...exSector, ...exFare, ...exTail];
 
   return {
     group: 'SO/PO/GP Voucher', entity: BOOKING_ENTITY[code], label: `${sp.name} — SO/PO/GP (bulk)`,
-    desc: `One row = one ${code === 'SHT' ? 'guest' : 'passenger'}/line for a ${sp.name} booking (same fields as the SO/PO/GP Voucher screen). Put the SAME Link No on rows of one booking (multi-line); blank = a standalone single-line booking. Supplier Service is an agency cost (reduces GP). The three “… GST” columns are optional — blank = auto (markup GST-inclusive; service & supplier-service @18%), or fill to import the exact GST. Header fields are read from the first row of each Link No. Imported as PENDING — approve to post the linked Sales & Purchase invoices.`,
+    desc: `One row = one ${code === 'SHT' ? 'guest' : 'passenger'}/line for a ${sp.name} booking (same fields as the SO/PO/GP Voucher screen). Put the SAME Link No on rows of one booking (multi-line); blank = a standalone single-line booking.${sp.sectors ? ' Flight travel detail (Sector / Airline / Flight No / Ticket No / PNR / Travel Date) imports as ONE sector per row; add any extra sectors for a passenger in the voucher screen after import.' : ''} Supplier Service is an agency cost (reduces GP). The three “… GST” columns are optional — blank = auto (markup GST-inclusive; service & supplier-service @18%), or fill to import the exact GST. Header fields are read from the first row of each Link No. Imported as PENDING — approve to post the linked Sales & Purchase invoices.`,
     columns, example,
   };
 }

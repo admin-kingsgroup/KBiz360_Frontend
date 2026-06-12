@@ -113,8 +113,17 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const fareRows = rows.map((p) => {
     const base = Number(p.base) || 0, k3 = Number(p.k3) || 0, tax = Number(p.tax) || 0, markup = Number(p.markup) || 0, psvc = Number(p.psvc) || 0;
     const pax = [p.fn, p.sn].filter(Boolean).join(' ');
-    const idline = [pax ? `PAX: ${esc(pax)}` : '', (p.tkt || p.pkg || p.htl) ? `TKT: ${esc(p.tkt || p.pkg || p.htl)}` : '', (p.pnr || p.ref || p.conf) ? `PNR: ${esc(p.pnr || p.ref || p.conf)}` : ''].filter(Boolean).join(' &nbsp;|&nbsp; ');
-    const desc = `<td class="l desc"><div class="nm">${esc(headerRef || 'Booking')}</div><div class="sub">${idline}</div></td>`;
+    // Flight bookings carry per-sector travel detail; list each sector under the
+    // passenger. Other modules keep the single TKT/PNR line.
+    const secs = Array.isArray(p.sectors) ? p.sectors.filter((s) => s && (s.sector || s.airline || s.flightNo || s.ticketNo || s.pnr || s.travelDate)) : [];
+    const secLines = secs.map((s) => {
+      const parts = [s.sector, s.airline, s.flightNo, s.ticketNo ? `TKT ${s.ticketNo}` : '', s.pnr ? `PNR ${s.pnr}` : '', s.travelDate].filter(Boolean).map(esc).join(' &nbsp;·&nbsp; ');
+      return parts ? `<div class="sub">${parts}</div>` : '';
+    }).join('');
+    const idline = secs.length
+      ? (pax ? `PAX: ${esc(pax)}` : '')
+      : [pax ? `PAX: ${esc(pax)}` : '', (p.tkt || p.pkg || p.htl) ? `TKT: ${esc(p.tkt || p.pkg || p.htl)}` : '', (p.pnr || p.ref || p.conf) ? `PNR: ${esc(p.pnr || p.ref || p.conf)}` : ''].filter(Boolean).join(' &nbsp;|&nbsp; ');
+    const desc = `<td class="l desc"><div class="nm">${esc(headerRef || 'Booking')}</div><div class="sub">${idline}</div>${secLines}</td>`;
     if (isSale) {
       const totalFare = base + k3 + tax + markup;
       return `<tr>${desc}<td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax + markup)}</td><td class="tf">${cur}${n2(totalFare)}</td></tr>`;

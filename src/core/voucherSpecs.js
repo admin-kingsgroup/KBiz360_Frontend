@@ -38,14 +38,23 @@ export function tcsApplies(spec, packageType) {
 export const VSPECS = {
   SF: {
     code: 'SF', name: 'Flight', icon: '✈', headerLabel: 'Sector / Airline',
+    // Flight bookings capture travel detail PER SECTOR (a passenger's ticket can
+    // span several segments). Sectors are entered on the Purchase grid and shown
+    // LOCKED on the Sales grid. Fares stay PER PASSENGER (one ticket = one fare),
+    // so the GP/GST math is unchanged.
+    sectors: true,
+    sectorCols: [
+      { key: 'sector', label: 'Sector' }, { key: 'airline', label: 'Airline' },
+      { key: 'flightNo', label: 'Flight No' }, { key: 'ticketNo', label: 'Ticket No', kind: 'tkt' },
+      { key: 'pnr', label: 'PNR', kind: 'pnr' }, { key: 'travelDate', label: 'Travel Date', type: 'date' },
+    ],
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
-      { key: 'tkt', label: 'Ticket No', kind: 'tkt' }, { key: 'pnr', label: 'PNR', kind: 'pnr' },
     ],
     fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'k3', label: 'K3' }, { key: 'tax', label: 'Taxes' }],
     seed: [
-      { fn: 'KUNAL', sn: 'CHAUHAN', tkt: '0981234567801', pnr: 'TJ1021', base: 4000, k3: 800, tax: 287, psvc: 50, markup: 500, ssvc: 100 },
-      { fn: 'MUNAL', sn: 'CHAUHAN', tkt: '0981234567802', pnr: 'TJ1021', base: 4000, k3: 800, tax: 287, psvc: 50, markup: 500, ssvc: 100 },
+      { fn: 'KUNAL', sn: 'CHAUHAN', base: 4000, k3: 800, tax: 287, psvc: 50, markup: 500, ssvc: 100,
+        sectors: [{ sector: 'BOM-DXB', airline: 'Emirates', flightNo: 'EK 501', ticketNo: '0981234567801', pnr: 'TJ1021', travelDate: '' }] },
     ],
   },
   SH: {
@@ -122,13 +131,37 @@ export const VSPECS = {
 
 export const VMODULE_LIST = Object.values(VSPECS);
 
+// A blank travel sector (Flight): all text, entered on the Purchase grid.
+export function blankSector() {
+  return { sector: '', airline: '', flightNo: '', ticketNo: '', pnr: '', travelDate: '' };
+}
+
 // A blank booking line for a module: all numbers 0, all texts ''.
 export function blankLine(spec) {
   const l = {};
   spec.idCols.forEach((c) => { l[c.key] = ''; });
   spec.fareCols.forEach((c) => { l[c.key] = 0; });
   l.psvc = 0; l.markup = 0; l.ssvc = 0; l.psvcGst = 0;
+  if (spec.sectors) l.sectors = [blankSector()];
   return l;
+}
+
+// Coerce a saved/legacy line into the spec's shape. For sector modules (Flight),
+// guarantees a sectors[] array, migrating any legacy line-level Ticket/PNR into a
+// single sector so older bookings still load, render and edit.
+export function normalizeLine(spec, line) {
+  if (!spec || !spec.sectors) return { ...line };
+  let sectors = Array.isArray(line.sectors) ? line.sectors.map((s) => ({ ...blankSector(), ...s })) : [];
+  if (!sectors.length) sectors = [{ ...blankSector(), ticketNo: line.tkt || '', pnr: line.pnr || '' }];
+  return { ...line, sectors };
+}
+
+// Mirror the first sector's Ticket/PNR back onto the line so name-keyed views
+// (invoice, registers) that read line.tkt / line.pnr keep working unchanged.
+export function syncLineRefs(spec, line) {
+  if (!spec || !spec.sectors) return line;
+  const first = Array.isArray(line.sectors) && line.sectors[0];
+  return first ? { ...line, tkt: first.ticketNo || '', pnr: first.pnr || '' } : line;
 }
 
 export const seedLines = (spec) => (spec.seed || []).map((s) => ({ ...blankLine(spec), ...s }));
