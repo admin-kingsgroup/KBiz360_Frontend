@@ -4,12 +4,18 @@
 // Sub-Groups / Ledgers). Two ways to look at the same hierarchy:
 //   • Tree View — expand/collapse structure to understand the hierarchy.
 //   • Side-by-Side — Tally-style miller columns (Parent Group → Group → Sub-Group → Ledger).
-// Ledgers are shown branch-wise (the selected branch + org-wide "ALL" common ledgers).
+//
+// SCOPE MODEL (important): Groups & Sub-Groups have NO branch — they are ALWAYS
+// shared across every branch (org-wide). Only LEDGERS carry a branch: either
+// 'ALL' (Common, shared by every branch) or a branch code (branch-specific).
+// So this screen lets you pick a Branch view + a ledger Scope filter; the group
+// structure never changes, only which ledgers are shown / how they're tagged.
 import React, { useState } from 'react';
 import { useMasterList } from '../core/useMasters';
 import { branchCode } from '../core/useAccounting';
+import { BRANCH_CODES } from '../core/data';
 
-const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5', GREEN = '#27500A', GOLD = '#A07828';
+const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5', GREEN = '#27500A', GOLD = '#A07828', GREY = '#7b86a8';
 const TALLY_ORDER = [
   'Capital Account', 'Loans (Liability)', 'Bank OD Accounts', 'Secured Loans', 'Unsecured Loans',
   'Current Liabilities', 'Duties & Taxes', 'Provisions', 'Sundry Creditors',
@@ -20,33 +26,78 @@ const TALLY_ORDER = [
   'Misc. Expenses (Asset)', 'Suspense Account',
 ];
 const badge = (txt, color) => <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: color + '18', color, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>{txt}</span>;
+// Scope of a single ledger: Common (org-wide 'ALL') vs a specific branch.
+const isCommon = (l) => !l.branch || l.branch === 'ALL';
+const scopeBadge = (l) => (isCommon(l) ? badge('Common', GREY) : badge(l.branch, BLUE));
+// "8 common · 4 BOM" style mini-summary for a node's ledger set.
+const countNote = (leds) => {
+  const c = leds.filter(isCommon).length, b = leds.length - c;
+  if (!leds.length) return '';
+  return `${c} common${b ? ` · ${b} branch` : ''}`;
+};
 
 export function AccountsTreeView({ branch }) {
   const brc = branchCode(branch);                    // undefined for ALL → shows all
+  const [branchView, setBranchView] = useState(() => brc || 'ALL'); // in-page branch picker
+  const [scope, setScope] = useState('all');         // 'all' | 'common' | 'branch'
   const groupsQ = useMasterList('groups');           // groups/sub-groups are SHARED across branches
-  const ledgersQ = useMasterList('ledgers', { branch: brc }); // ledgers are branch-scoped (this branch + ALL)
+  // Ledgers are branch-scoped. A specific branch view fetches that branch + the
+  // org-wide 'ALL' ledgers; "All branches" fetches every branch's ledgers.
+  const ledgersQ = useMasterList('ledgers', branchView === 'ALL' ? {} : { branch: branchView });
   const [tab, setTab] = useState('tree');           // 'tree' | 'side'
   const [open, setOpen] = useState({});
   const [sel, setSel] = useState({ pg: '', g: '', sg: '' });
 
   const groups = groupsQ.data || [];
-  // Branch-scoped ledgers (this branch + org-wide ALL). Dedup by name, preferring
-  // the branch-specific copy over the ALL copy so nothing shows twice.
-  const ledgers = (ledgersQ.data || []).slice().sort((a, b) => (a.branch === 'ALL' ? 1 : 0) - (b.branch === 'ALL' ? 1 : 0));
+
+  // ── Resolve which ledgers to display, per the Branch view + Scope filter ──
+  // Group raw ledgers by name so we can detect a branch copy that OVERRIDES a
+  // Common ('ALL') one of the same name (Tally shows only the effective ledger).
+  const byName = new Map();
+  (ledgersQ.data || []).forEach((l) => { const k = (l.name || '').toLowerCase(); (byName.get(k) || byName.set(k, []).get(k)).push(l); });
+  let display = [];
+  for (const copies of byName.values()) {
+    const common = copies.find(isCommon);
+    const branchCopies = copies.filter((c) => !isCommon(c));
+    if (branchView === 'ALL') {
+      // Consolidated: show the Common copy + every branch-specific copy distinctly.
+      if (common) display.push({ ...common });
+      branchCopies.forEach((c) => display.push({ ...c }));
+    } else {
+      // Specific branch: the effective ledger is the branch copy if it exists,
+      // else the Common one. Flag it when a branch copy shadows a Common copy.
+      const bc = branchCopies.find((c) => c.branch === branchView) || branchCopies[0];
+      const eff = bc || common;
+      if (eff) display.push({ ...eff, _overrides: !!(bc && common) });
+    }
+  }
+  // Scope filter (ledgers only — groups/sub-groups are always org-wide).
+  display = display.filter((l) => (scope === 'all' ? true : scope === 'common' ? isCommon(l) : !isCommon(l)));
+
+  // ── Build the group tree and file the resolved ledgers into it ──
   const nodes = {};
   groups.forEach((g) => { nodes[g.name] = { ...g, children: [], ledgers: [] }; });
   groups.forEach((g) => { if (g.parent && nodes[g.parent]) nodes[g.parent].children.push(nodes[g.name]); });
-  const seenLed = new Set();
-  ledgers.forEach((l) => { const k = (l.name || '').toLowerCase(); if (seenLed.has(k)) return; seenLed.add(k); const t = (l.subGroup && nodes[l.subGroup]) ? l.subGroup : l.group; if (nodes[t]) nodes[t].ledgers.push(l); });
+  display.forEach((l) => { const t = (l.subGroup && nodes[l.subGroup]) ? l.subGroup : l.group; if (nodes[t]) nodes[t].ledgers.push(l); });
   Object.values(nodes).forEach((n) => { n.children.sort((a, b) => a.name.localeCompare(b.name)); n.ledgers.sort((a, b) => a.name.localeCompare(b.name)); });
   const roots = groups.filter((g) => g.system).map((g) => nodes[g.name]).sort((a, b) => (TALLY_ORDER.indexOf(a.name) - TALLY_ORDER.indexOf(b.name)));
   const allKeys = groups.map((g) => g.name);
+
+  // Header summary counts.
+  const subGroupCount = groups.filter((g) => !g.system).length;
+  const commonCount = display.filter(isCommon).length;
+  const branchCount = display.length - commonCount;
 
   const tog = (k) => setOpen((s) => ({ ...s, [k]: !s[k] }));
   const setAll = (v) => setOpen(v ? Object.fromEntries(allKeys.map((k) => [k, true])) : {});
 
   const Caret = ({ k, has }) => <span style={{ width: 14, display: 'inline-block', color: GOLD, cursor: has ? 'pointer' : 'default' }} onClick={() => has && tog(k)}>{has ? (open[k] ? '▾' : '▸') : ''}</span>;
-  const ledgerRow = (l, indent) => <div key={'L' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #f5f6fa', color: DARK }}><span style={{ color: GREEN, marginRight: 6 }}>•</span>{l.name}{l.branch && l.branch !== 'ALL' ? badge(l.branch, BLUE) : badge('Common', DIM)}{badge('Ledger', GREEN)}</div>;
+  const ledgerRow = (l, indent) => (
+    <div key={'L' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #f5f6fa', color: DARK }}>
+      <span style={{ color: GREEN, marginRight: 6 }}>•</span>{l.name}{scopeBadge(l)}
+      {l._overrides && <span style={{ fontSize: 9, color: GOLD, marginLeft: 6, fontStyle: 'italic' }}>overrides Common</span>}
+    </div>
+  );
   // Subheading shown above ledgers that hang straight off a Group/Parent Group
   // (no intermediate sub-group) — only when that node also has child groups, so
   // it's clear these ledgers aren't nested under one of those groups.
@@ -61,7 +112,7 @@ export function AccountsTreeView({ branch }) {
           <div key={pg.name}>
             <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', fontWeight: 800, color: DARK }}>
               <Caret k={pg.name} has={pgHas} /><span onClick={() => pgHas && tog(pg.name)} style={{ cursor: pgHas ? 'pointer' : 'default' }}>{pg.name}</span>{badge('Parent Group', BLUE)}
-              <span style={{ marginLeft: 'auto', fontSize: 10.5, color: DIM }}>{pg.children.length} group{pg.children.length === 1 ? '' : 's'}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 10.5, color: DIM }}>{pg.children.length} group{pg.children.length === 1 ? '' : 's'}{pg.ledgers.length ? ` · ${countNote(pg.ledgers)}` : ''}</span>
             </div>
             {open[pg.name] && pg.children.map((grp) => {
               const grpHas = grp.children.length || grp.ledgers.length;
@@ -69,12 +120,14 @@ export function AccountsTreeView({ branch }) {
                 <div key={grp.name}>
                   <div style={{ display: 'flex', alignItems: 'center', padding: '7px 12px 7px 26px', background: '#f6f9fd', fontWeight: 700, color: '#1a3a6e' }}>
                     <Caret k={grp.name} has={grpHas} /><span onClick={() => grpHas && tog(grp.name)} style={{ cursor: grpHas ? 'pointer' : 'default' }}>{grp.name}</span>{badge('Group', '#1a3a6e')}
+                    {grp.ledgers.length > 0 && <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM }}>{countNote(grp.ledgers)}</span>}
                   </div>
                   {open[grp.name] && <>
                     {grp.children.map((sg) => (
                       <div key={sg.name}>
                         <div style={{ display: 'flex', alignItems: 'center', padding: '6px 12px 6px 46px', fontWeight: 600, color: DARK, borderBottom: '1px solid #f0f2f7' }}>
                           <Caret k={sg.name} has={sg.ledgers.length} /><span onClick={() => sg.ledgers.length && tog(sg.name)} style={{ cursor: sg.ledgers.length ? 'pointer' : 'default' }}>{sg.name}</span>{badge('Sub-Group', GOLD)}
+                          {sg.ledgers.length > 0 && <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM }}>{countNote(sg.ledgers)}</span>}
                         </div>
                         {open[sg.name] && sg.ledgers.map((l) => ledgerRow(l, 70))}
                       </div>
@@ -99,8 +152,8 @@ export function AccountsTreeView({ branch }) {
       <div style={{ padding: '8px 10px', fontSize: 10, fontWeight: 800, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, borderBottom: '1px solid #eef1f6', background: '#f7f8fb' }}>{title} <span style={{ color: '#9aa2c0' }}>({items.length})</span></div>
       <div style={{ overflow: 'auto' }}>
         {items.map((it) => (
-          <div key={it.name || it.id} onClick={() => onPick && onPick(it)} style={{ padding: '6px 10px', fontSize: 12, cursor: onPick ? 'pointer' : 'default', background: selVal === (it.name) ? '#eef3fb' : 'transparent', borderBottom: '1px solid #f5f6fa', color: kind === 'ledger' ? DARK : DARK, fontWeight: selVal === it.name ? 700 : 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>{kind === 'ledger' ? <><span style={{ color: GREEN, marginRight: 6 }}>•</span>{it.name}</> : it.name}</span>
+          <div key={it.name || it.id} onClick={() => onPick && onPick(it)} style={{ padding: '6px 10px', fontSize: 12, cursor: onPick ? 'pointer' : 'default', background: selVal === (it.name) ? '#eef3fb' : 'transparent', borderBottom: '1px solid #f5f6fa', color: DARK, fontWeight: selVal === it.name ? 700 : 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>{kind === 'ledger' ? <><span style={{ color: GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}</> : it.name}</span>
             {onPick && kind !== 'ledger' && <span style={{ color: '#c3cbe0' }}>›</span>}
           </div>
         ))}
@@ -126,15 +179,42 @@ export function AccountsTreeView({ branch }) {
   );
 
   const tabBtn = (k, l) => <button key={k} onClick={() => setTab(k)} style={{ padding: '7px 14px', fontSize: 12, fontWeight: 700, border: 'none', borderBottom: `3px solid ${tab === k ? GOLD : 'transparent'}`, background: 'transparent', cursor: 'pointer', color: tab === k ? DARK : DIM }}>{l}</button>;
+  const scopePill = (k, l) => <button key={k} onClick={() => setScope(k)} style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: scope === k ? BLUE : '#fff', color: scope === k ? '#fff' : DIM }}>{l}</button>;
 
   return (
     <div style={{ padding: '12px 14px', maxWidth: 1100, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 6 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK }}>Accounts Tree View</h2>
-          <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Parent Group (28) ▸ Group ▸ Sub-Group ▸ Ledger · <b>{brc || 'All branches'}</b> ledgers (+ org-wide common). View-only — create Groups / Sub-Groups / Ledgers under <b>Masters ▸ Accounts Master</b>.</p>
-        </div>
+      <div style={{ marginBottom: 8 }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK }}>Accounts Tree View</h2>
+        <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Parent Group (28) ▸ Group ▸ Sub-Group ▸ Ledger · View-only — create under <b>Masters ▸ Accounts Master</b>.</p>
       </div>
+
+      {/* Scope legend — Groups/Sub-Groups are org-wide; only Ledgers carry a branch. */}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, background: '#f7f9fc', border: '1px solid #e5e9f0', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 11.5, color: DIM }}>
+        <span><b style={{ color: DARK }}>Groups & Sub-Groups</b> are shared across all branches (org-wide). Only <b style={{ color: DARK }}>Ledgers</b> are branch-scoped:</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Common', GREY)}<span style={{ marginLeft: 4 }}>= shared by every branch (ALL)</span></span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('BOM', BLUE)}<span style={{ marginLeft: 4 }}>= specific to that branch</span></span>
+      </div>
+
+      {/* Controls: in-page Branch view + Ledger Scope filter */}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 10 }}>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
+          Branch view
+          <select value={branchView} onChange={(e) => setBranchView(e.target.value)} style={{ padding: '6px 9px', borderRadius: 6, border: '1px solid #d6dbe6', fontSize: 12, minWidth: 150 }}>
+            <option value="ALL">All branches (consolidated)</option>
+            {BRANCH_CODES.map((b) => <option key={b} value={b}>{b} + Common</option>)}
+          </select>
+        </label>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
+          Ledger scope
+          <span style={{ display: 'inline-flex', border: '1px solid #d6dbe6', borderRadius: 7, overflow: 'hidden' }}>
+            {scopePill('all', 'All')}{scopePill('common', 'Common only')}{scopePill('branch', 'Branch-specific only')}
+          </span>
+        </span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: DIM }}>
+          28 parent groups · <b style={{ color: DARK }}>{subGroupCount}</b> sub-groups <span style={{ color: '#9aa2c0' }}>(org-wide)</span> · <b style={{ color: DARK }}>{display.length}</b> ledgers (<b style={{ color: GREY }}>{commonCount}</b> common + <b style={{ color: BLUE }}>{branchCount}</b> branch)
+        </span>
+      </div>
+
       <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #e5e9f0', marginBottom: 12 }}>
         {tabBtn('tree', 'Tree View')}{tabBtn('side', 'Side-by-Side')}
         {tab === 'tree' && (
