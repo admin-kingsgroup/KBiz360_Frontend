@@ -387,14 +387,40 @@ export const GroupsMaster = ({ branch }) => {
     { key: 'drCr', label: 'Dr/Cr', type: 'select', options: ['Dr', 'Cr'], default: 'Dr' },
     { key: 'active', label: 'Active', type: 'bool', default: true },
   ];
+  // Create-mode field sets. An ERP Group nests under a Tally (system) group; an
+  // ERP Sub Group nests under an existing custom sub-group. Both are subgroups.
+  const GROUP_NEW_FIELDS = [
+    { key: 'name', label: 'ERP Group Name', type: 'text', required: true },
+    { key: 'parent', label: 'Under (Tally group)', type: 'select', options: groups.filter((g) => g.system).map((g) => g.name), required: true },
+    { key: 'active', label: 'Active', type: 'bool', default: true },
+  ];
+  const SUBGROUP_NEW_FIELDS = [
+    { key: 'name', label: 'ERP Sub Group Name', type: 'text', required: true },
+    { key: 'parent', label: 'Under (ERP group / sub-group)', type: 'select', options: groups.filter((g) => !g.system).map((g) => g.name), required: true },
+    { key: 'active', label: 'Active', type: 'bool', default: true },
+  ];
+
   const openEdit = (kind, node) => { if (!node) return; setErr(''); setEditing({ kind, fields: kind === 'ledger' ? LED_FIELDS : SUB_FIELDS, record: { ...node }, label: kind === 'ledger' ? 'Ledger' : 'Sub-Group' }); };
+  const openNew = (what) => {
+    setErr('');
+    const fields = what === 'ledger' ? LED_FIELDS : what === 'group' ? GROUP_NEW_FIELDS : SUBGROUP_NEW_FIELDS;
+    setEditing({
+      kind: what === 'ledger' ? 'ledger' : 'subgroup',
+      fields, record: { __new: true, ...blankFromFields(fields) },
+      label: what === 'ledger' ? 'ERP Ledger' : what === 'group' ? 'ERP Group' : 'ERP Sub Group',
+    });
+  };
   const saveEdit = (form) => {
     setErr('');
     const { id, __new, ...body } = form;
     const m = editing.kind === 'ledger' ? ledMut : subMut;
-    m.update.mutate({ id, body }, { onSuccess: () => setEditing(null), onError: (e) => setErr(e.message) });
+    const opts = { onSuccess: () => setEditing(null), onError: (e) => setErr(e.message) };
+    if (__new) m.create.mutate(body, opts);
+    else m.update.mutate({ id, body }, opts);
   };
-  const saving = editing && (editing.kind === 'ledger' ? ledMut.update.isPending : subMut.update.isPending);
+  const saving = editing && (editing.kind === 'ledger'
+    ? (ledMut.update.isPending || ledMut.create.isPending)
+    : (subMut.update.isPending || subMut.create.isPending));
 
   // ── Render — columns: 2 locked Tally + 3 editable ERP ──
   const COLS = [
@@ -430,6 +456,14 @@ export const GroupsMaster = ({ branch }) => {
             <Download size={14} /> Export Excel
           </button>
         </div>
+      </div>
+
+      {/* Create row — one button per ERP level (Tally groups are fixed, so none here). */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: DIM, marginRight: 2 }}>New:</span>
+        <button onClick={() => openNew('group')} style={btn(BLUE, '#fff')}><Plus size={14} /> ERP Group</button>
+        <button onClick={() => openNew('subgroup')} style={btn('#1a3a6e', '#fff')}><Plus size={14} /> ERP Sub Group</button>
+        <button onClick={() => openNew('ledger')} style={btn(GREEN, '#fff')}><Plus size={14} /> ERP Ledger</button>
       </div>
       <div style={{ ...card, padding: '9px 13px', marginBottom: 12, fontSize: 11, color: DIM }}>
         🔒 <b>Tally Parent / Sub Parent Group</b> are the fixed 28-group skeleton (read-only). The <b>ERP Group / Sub Group / Ledger</b> columns are your custom chart — click the <Pencil size={11} style={{ verticalAlign: 'middle', color: BLUE }} /> in a cell to edit that node. To add new ones, use Masters → Sub-Groups / Ledgers.
@@ -472,7 +506,7 @@ export const GroupsMaster = ({ branch }) => {
       )}
 
       {editing && (
-        <EditModal title={`Edit ${editing.label}`} fields={editing.fields} record={editing.record}
+        <EditModal title={`${editing.record?.__new ? 'New' : 'Edit'} ${editing.label}`} fields={editing.fields} record={editing.record}
           saving={saving} error={err} onClose={() => setEditing(null)} onSave={saveEdit} />
       )}
     </div>
