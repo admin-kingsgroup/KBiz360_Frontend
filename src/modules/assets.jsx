@@ -11,6 +11,7 @@ import { ACM_REASON_CODES, FIXED_ASSETS_DATA, _ACM_LIST } from '../core/helpers'
 import { useAssetCategories } from '../core/useReference';
 import { BRANCH_CODES, branchCurrencies, branchMainCurrency } from '../core/data';
 import { useMobile } from '../core/hooks';
+import { useModalEsc } from '../core/ux/useModalEsc';
 import { FL, bc, btnG, btnGh, card, inp } from '../core/styles';
 
 export function AcmRegister({branch}){
@@ -20,7 +21,7 @@ export function AcmRegister({branch}){
   const brCode=branch==="ALL"?null:branch?.code;
 
   const [acms,setAcms]=useState(_ACM_LIST);
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [statusFilter,setStatusFilter]=useState("All");
   const [search,setSearch]=useState("");
   const [form,setForm]=useState({airline:"Air India",airlineCode:"AI",ticketNo:"",

@@ -6,6 +6,8 @@
 import React, { useState } from 'react';
 import { card, bc } from '../core/styles';
 import { useOutstanding, useOpenBills, useSettleAdvance } from '../core/useAccounting';
+import { openLedgerModal } from '../core/LedgerModalHost';
+import { useModalEsc } from '../core/ux/useModalEsc';
 
 const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5', RED = '#A32D2D', GREEN = '#27500A', GOLD = '#A07828';
 const money = (cur, n) => { const v = Math.round(Number(n) || 0); return (v < 0 ? '-' : '') + cur + Math.abs(v).toLocaleString('en-IN'); };
@@ -14,6 +16,7 @@ const ageColor = (d) => (d > 90 ? RED : d > 30 ? '#854F0B' : DIM);
 
 // Settle an on-account advance against the party's open bills (bill-wise).
 function SettleModal({ adv, side, branch, cur, onClose }) {
+  useModalEsc(onClose);
   const bq = useOpenBills(adv.party, branch, side);
   const settle = useSettleAdvance();
   const [amts, setAmts] = useState({});
@@ -102,7 +105,7 @@ export function OutstandingOnAccount({ branch }) {
       <tbody>
         {rows.map((r, i) => (
           <tr key={i}>
-            <td style={{ ...td, fontWeight: 600, color: DARK }}>{r.party || '—'}</td>
+            <td style={td}>{r.party ? <button onClick={() => openLedgerModal(r.party)} title="Open ledger account" style={{ background: 'none', border: 'none', padding: 0, fontWeight: 600, color: BLUE, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>{r.party}</button> : '—'}</td>
             <td style={{ ...td, color: BLUE, fontWeight: 600 }}>{r.billVno}</td>
             <td style={td}>{r.date}</td>
             <td style={tdR}>{money(cur, r.total)}</td>
@@ -125,7 +128,7 @@ export function OutstandingOnAccount({ branch }) {
       <tbody>
         {rows.map((r, i) => (
           <tr key={i}>
-            <td style={{ ...td, fontWeight: 600, color: DARK }}>{r.party || '—'}</td>
+            <td style={td}>{r.party ? <button onClick={() => openLedgerModal(r.party)} title="Open ledger account" style={{ background: 'none', border: 'none', padding: 0, fontWeight: 600, color: BLUE, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>{r.party}</button> : '—'}</td>
             <td style={{ ...td, color: BLUE, fontWeight: 600 }}>{r.vno}</td>
             <td style={td}>{r.date}</td>
             <td style={tdR}>{money(cur, r.total)}</td>

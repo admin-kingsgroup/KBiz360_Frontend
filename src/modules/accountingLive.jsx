@@ -17,7 +17,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { card, inp, bc } from '../core/styles';
 import { exportToExcel, vouchersToSheet } from '../core/exportExcel';
 import { openPrintPreview } from '../core/PrintPreview';
-import { LedgerActions } from '../core/ledgerActions';
+import { LedgerAccountView } from '../core/ledgerUI';
+import { openLedgerModal } from '../core/LedgerModalHost';
+import { usePrefs } from '../core/prefs';
+import { pushModal } from '../core/ux/modalStore';
+import { toast } from '../core/ux/toast';
 import { CUR_QUARTER, CUR_FY } from '../core/dates';
 import { PeriodBar } from '../core/period';
 import {
@@ -27,6 +31,8 @@ import {
   useVoucher, useUpdateVoucher, useCostCenters, useVoucherPreview,
 } from '../core/useAccounting';
 import { LedgerVouchers } from './pnlTally.jsx';
+import { VoucherShell } from '../core/voucher/VoucherShell';
+import { hasRegistry } from '../core/voucher/registry';
 
 const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691', BLUE = '#185FA5', RED = '#A32D2D', GREEN = '#27500A';
 const curOf = (branch) => bc(branch).cur;
@@ -374,6 +380,7 @@ function PrintBtn({ onClick, disabled }) {
 function LedgerDrill({ branch, ledger, from, to, onClose }) {
   const cur = curOf(branch);
   const [voucher, setVoucher] = useState(null);
+  useEffect(() => pushModal(onClose), []); // Esc closes (topmost-first)
   const crumbs = [
     { label: ledger, onClick: voucher ? () => setVoucher(null) : null },
     ...(voucher ? [{ label: voucher.vno }] : []),
@@ -396,6 +403,7 @@ function LedgerDrill({ branch, ledger, from, to, onClose }) {
 // Standalone voucher viewer modal — opened from the Day Book (and reusable).
 function VoucherModal({ branch, voucher, onClose }) {
   const cur = curOf(branch);
+  useEffect(() => pushModal(onClose), []); // Esc closes
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(840px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
@@ -670,74 +678,49 @@ export function DayBookLive({ branch }) {
   );
 }
 
-/* ════════════════════ LEDGER ACCOUNT ═══════════════════════════════ */
+/* ════════════════════ LEDGER ACCOUNT ═══════════════════════════════
+   Full-page host for the UNIFIED ledger UI (src/core/ledgerUI). The SAME
+   <LedgerAccountView/> renders here, in the Ctrl+L full-screen modal, and in
+   every drill — one design, live data, identical print. */
 export function LedgerAcLive({ branch }) {
   const cur = curOf(branch);
   const chart = useChartOfAccounts(branch);
   const ledgers = chart.data || [];
+  const { prefs, setPref } = usePrefs();
   const [name, setName] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const selected = name || ledgers[0]?.name || '';
-  const q = useLedgerStatement(selected, branch, { from, to });
-  const d = q.data;
+  // Selection priority: explicit pick → last-opened (per-user pref) → first ledger.
+  const selected = name || prefs.lastLedger || ledgers[0]?.name || '';
+  const pickLedger = (n) => { setName(n); if (n) setPref('lastLedger', n); };
+  // "Open ledger" from any screen (legacy in-page event) switches the ledger live.
+  useEffect(() => {
+    const onOpen = (e) => { const n = e.detail?.name; if (n) { setName(n); setPref('lastLedger', n); } };
+    window.addEventListener('kb:open-ledger', onOpen);
+    return () => window.removeEventListener('kb:open-ledger', onOpen);
+  }, [setPref]);
   const [voucher, setVoucher] = useState(null); // clicked Voucher No → editable voucher modal
-  const closeVoucher = () => { setVoucher(null); q.refetch(); }; // refresh the statement after an edit
+  const closeVoucher = () => setVoucher(null);
+  useEffect(() => (voucher ? pushModal(closeVoucher) : undefined), [voucher]); // Esc closes the voucher modal
 
   return (
     <Page
       title="Ledger Account"
-      sub={d ? `${d.ledger} · ${d.group || ''} · ${d.lines?.length || 0} entries` : selected}
+      sub={selected}
+      wide
       right={<>
-        <select value={selected} onChange={(e) => setName(e.target.value)} style={{ ...inp, width: 220, minHeight: 32, fontSize: 11 }}>
+        <select value={selected} onChange={(e) => pickLedger(e.target.value)} style={{ ...inp, width: 240, minHeight: 32, fontSize: 11 }}>
           {ledgers.length === 0 && <option>Loading…</option>}
           {ledgers.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
         </select>
-        <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
-        <LedgerActions d={d} cur={cur} branchLabel={branchLabel(branch)} from={from} to={to} />
       </>}
     >
-      <State q={q} empty={!d}>
-        <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '10px 14px', background: '#f3f4f8', borderBottom: '1px solid #e1e3ec', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, color: DIM }}>Opening: {money(cur, d?.openingBalance)} {d?.openingSide}</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: d?.closingSide === 'Cr' ? RED : BLUE }}>Closing: {money(cur, d?.closingBalance)} {d?.closingSide}</span>
-          </div>
-          <div className="kb-sticky" style={{ '--stick-head': DARK, '--stick-foot': DARK, maxHeight: 'calc(100vh - 250px)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-            <thead><tr style={headRow}><Th>Date</Th><Th>Voucher</Th><Th>Particulars</Th><Th right>Dr</Th><Th right>Cr</Th><Th right>Balance</Th></tr></thead>
-            <tbody>
-              {(d?.lines || []).length === 0 && <tr><td colSpan={6} style={{ padding: 28, textAlign: 'center', color: DIM }}>No postings in range.</td></tr>}
-              {(d?.lines || []).map((e, i) => (
-                <tr key={i} style={rowBg(i)}>
-                  <td style={{ padding: '8px 12px', color: DIM, whiteSpace: 'nowrap' }}>{e.date}</td>
-                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10 }}>
-                    {e.voucherId
-                      ? <button onClick={() => setVoucher({ id: e.voucherId, vno: e.vno })} title="Open & edit this voucher" style={{ background: 'none', border: 'none', padding: 0, color: BLUE, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'monospace', fontSize: 10 }}>{e.vno}</button>
-                      : <span style={{ color: BLUE }}>{e.vno}</span>}
-                  </td>
-                  <td style={{ padding: '8px 12px', color: '#384677' }}>{e.narration || e.party || e.category}</td>
-                  <td style={{ padding: '8px 12px', ...num, color: e.debit > 0 ? BLUE : '#dfe2ee' }}>{money(cur, e.debit)}</td>
-                  <td style={{ padding: '8px 12px', ...num, color: e.credit > 0 ? RED : '#dfe2ee' }}>{money(cur, e.credit)}</td>
-                  <td style={{ padding: '8px 12px', ...num, fontWeight: 700, color: e.balanceSide === 'Cr' ? RED : BLUE }}>{money(cur, Math.abs(e.balance))} {e.balanceSide}</td>
-                </tr>
-              ))}
-            </tbody>
-            {d && <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
-              <td colSpan={3} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD }}>CLOSING — {d.ledger}</td>
-              <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, d.totalDebit)}</td>
-              <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, d.totalCredit)}</td>
-              <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, d.closingBalance)} {d.closingSide}</td>
-            </tr></tfoot>}
-          </table>
-          </div>
-        </div>
-      </State>
+      <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+        <LedgerAccountView name={selected} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} maxHeight="calc(100vh - 330px)" />
+      </div>
       {voucher && (
         <div onClick={closeVoucher} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
           <div onClick={(ev) => ev.stopPropagation()} style={{ ...card, width: 'min(820px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
-              <Crumb items={[{ label: d?.ledger || 'Ledger', onClick: closeVoucher }, { label: voucher.vno }]} />
+              <Crumb items={[{ label: selected || 'Ledger', onClick: closeVoucher }, { label: voucher.vno }]} />
               <button onClick={closeVoucher} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
             </div>
             <VoucherEditor voucherId={voucher.id} cur={cur} onBack={closeVoucher} onClose={closeVoucher} />
@@ -800,6 +783,11 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   const pv = useVoucherPreview(previewBody).data || {};
   if (vq.isLoading || !form) return <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading voucher...</div>;
   if (vq.isError) return <div style={{ padding: 16, color: RED }}>! {vq.error?.message}</div>;
+  // Option C: categories with a registry entry render through the unified shell so
+  // editing matches the create screen. Others fall back to this generic editor.
+  if (hasRegistry(v.category)) {
+    return <VoucherShell category={v.category} mode="edit" voucher={v} voucherId={voucherId} cur={cur} onBack={onBack} onClose={onClose} />;
+  }
   const set = (k, val) => setForm((f) => ({ ...f, [k]: val }));
   const setLine = (i, k, val) => setForm((f) => ({ ...f, lines: f.lines.map((l, j) => (j === i ? { ...l, [k]: val } : l)) }));
   const addLine = () => setForm((f) => ({ ...f, lines: [...f.lines, { ledger: '', amt: 0, drCr: 'Dr' }] }));
@@ -812,7 +800,10 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
     const lines = form.lines.filter((l) => l.ledger).map((l) => ({ ...l, amt: Number(l.amt) || 0, ledger: l.ledger, drCr: l.drCr || 'Dr' }));
     const body = { ...v, date: form.date, branch: form.branch, party: form.party, linkNo: form.linkNo, costCenter: form.costCenter, remarks: form.remarks, taxAmt: Number(form.taxAmt) || 0, tdsAmt: Number(form.tdsAmt) || 0, tcsAmt: Number(form.tcsAmt) || 0, subtotal, total, lines, status: v.status || 'saved' };
     delete body.id; delete body.createdAt; delete body.updatedAt;
-    upd.mutate({ id: voucherId, body }, { onSuccess: () => { setMsg('saved'); setDone(true); }, onError: (e) => setMsg('err:' + e.message) });
+    upd.mutate({ id: voucherId, body }, {
+      onSuccess: () => { setMsg('saved'); setDone(true); toast(`Voucher ${v.vno} saved`); },
+      onError: (e) => { setMsg('err:' + e.message); toast(`Could not save — ${e.message}`, 'error'); },
+    });
   };
   // Build a printable A4 view of the full journal entry and hand it to the print preview.
   const printEntry = () => {
@@ -1513,7 +1504,9 @@ export function ChartOfAccountsLive({ branch }) {
                 <tr key={l.id || l.code} style={rowBg(i)}>
                   {i === 0 && <td rowSpan={gl.length} style={{ padding: '9px 14px', fontWeight: 700, color: DARK, borderRight: '2px solid #e1e3ec', verticalAlign: 'top', fontSize: 10.5, background: '#f9fafb' }}>{grp}</td>}
                   <td style={{ padding: '9px 14px', fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{l.code}</td>
-                  <td style={{ padding: '9px 14px', fontWeight: 600, color: DARK }}>{l.name}</td>
+                  <td style={{ padding: '9px 14px', fontWeight: 600 }}>
+                    <button onClick={() => openLedgerModal(l.name)} title="Open ledger account" style={{ background: 'none', border: 'none', padding: 0, color: BLUE, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2, fontSize: 'inherit' }}>{l.name}</button>
+                  </td>
                   <td style={{ padding: '9px 14px', color: '#384677' }}>{l.nature || '—'}</td>
                   <td style={{ padding: '9px 14px', color: DIM }}>{l.statement === 'PL' ? 'P&L' : l.statement === 'BS' ? 'Balance Sheet' : '—'}</td>
                   <td style={{ padding: '9px 14px', ...num }}>{l.openingBalance ? `${money(cur, l.openingBalance)} ${l.drCr}` : '—'}</td>
@@ -1596,7 +1589,7 @@ export function AccountsChartLive({ branch }) {
             {kids.map((c) => <Node key={c.id || c.name} node={c} depth={depth + 1} />)}
             {leds.map((l) => (
               <div key={l.id || l.code || l.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: `5px 12px 5px ${12 + (depth + 1) * 18 + 14}px`, borderBottom: '1px solid #f4f6fa', fontSize: 12 }}>
-                <span style={{ fontWeight: 600, color: DARK }}>{l.name}</span>
+                <span onClick={() => openLedgerModal(l.name)} title="Open ledger account" style={{ fontWeight: 600, color: BLUE, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>{l.name}</span>
                 {l.code ? <span style={{ fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{l.code}</span> : null}
               </div>
             ))}
@@ -1648,7 +1641,7 @@ export function AccountsChartLive({ branch }) {
             <Col title="Ledgers" count={ledgers.length}>
               {ledgers.map((l, i) => (
                 <div key={l.id || l.code || l.name} style={{ padding: '7px 12px', ...rowBg(i), fontSize: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontWeight: 600, color: DARK }}>{l.name}</span>{l.code ? <span style={{ fontFamily: 'monospace', fontSize: 9.5, color: BLUE }}>{l.code}</span> : null}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span onClick={() => openLedgerModal(l.name)} title="Open ledger account" style={{ fontWeight: 600, color: BLUE, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>{l.name}</span>{l.code ? <span style={{ fontFamily: 'monospace', fontSize: 9.5, color: BLUE }}>{l.code}</span> : null}</div>
                   <div style={{ color: DIM, fontSize: 10.5 }}>{l.topGroup}{l.subGroup ? ` › ${l.subGroup}` : ''}</div>
                 </div>
               ))}

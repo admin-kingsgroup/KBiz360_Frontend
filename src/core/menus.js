@@ -353,6 +353,7 @@ export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_HR, MENU_ASS
 export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, children:[
   {label:"Overview", children:[
     {label:"Executive Overview", href:"/dashboards/exec"},
+    {label:"Capital vs Investment", href:"/dashboards/capital"},
     {label:"My Dashboard", href:"/dashboard"},
   ]},
   {label:"Financials", children:[

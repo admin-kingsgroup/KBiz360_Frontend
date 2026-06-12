@@ -15,7 +15,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 import React from 'react';
 import { exportToExcel } from './exportExcel';
-import { openPrintPreview } from './PrintPreview';
+import { printLedgerUI } from './ledgerUI';
 
 const DARK = '#0d1326', GOLD = '#d4a437';
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -52,50 +52,12 @@ export function exportLedgerExcel(d, { branchLabel = '', particulars = ledgerPar
   exportToExcel(`ledger-${d.ledger || 'statement'}${branchLabel ? '-' + branchLabel : ''}`, cols, rows);
 }
 
-// ── Print / Save-as-PDF: portrait A4 via the shared in-app preview ────────────
-export function printLedgerStatement(d, { cur = '₹', branchLabel = '', from = '', to = '', particulars = ledgerParticulars } = {}) {
+// ── Print / Save-as-PDF: the UNIFIED ledger template (screen == paper) ────────
+// Delegates to the single source of truth in ledgerUI so every screen prints the
+// exact same Tally-style ledger it shows. `bills` (optional) prints bill-wise.
+export function printLedgerStatement(d, { cur = '₹', branchLabel = '', from = '', to = '', bills = [], view = 'ledger', showNarr = false, showDetail = false } = {}) {
   if (!d) return;
-  const fmt = (n) => { const v = Math.round(Number(n) || 0); return v ? cur + v.toLocaleString('en-IN') : ''; };
-  const period = (from || to) ? `${from || '…'} to ${to || '…'}` : 'All dates';
-  const body = (d.lines || []).map((e) => `<tr>
-    <td>${esc(e.date)}</td>
-    <td class="mono">${esc(e.vno)}</td>
-    <td>${esc(particulars(e))}</td>
-    <td class="r">${fmt(e.debit)}</td>
-    <td class="r">${fmt(e.credit)}</td>
-    <td class="r b">${fmt(Math.abs(e.balance || 0))} ${esc(e.balanceSide || '')}</td>
-  </tr>`).join('');
-  const html = `<style>
-    .lg{font-family:'Segoe UI',Arial,sans-serif;color:#0d1326}
-    .lg h1{font-size:16px;margin:0 0 2px}
-    .lg .meta{font-size:10px;color:#5a6691;margin:0 0 10px}
-    .lg .op{display:flex;justify-content:space-between;font-size:10.5px;background:#f3f4f8;border:1px solid #e1e3ec;padding:6px 9px;margin-bottom:6px}
-    .lg table{width:100%;border-collapse:collapse;font-size:10px}
-    .lg th{background:#0d1326;color:#d4a437;text-align:left;padding:6px 8px;font-size:9.5px}
-    .lg th.r,.lg td.r{text-align:right}
-    .lg td{padding:5px 8px;border-bottom:1px solid #eceef4}
-    .lg td.mono{font-family:'Courier New',monospace;font-size:9px;color:#185FA5}
-    .lg td.b{font-weight:700}
-    .lg tfoot td{background:#0d1326;color:#fff;font-weight:800;border-top:2px solid #d4a437}
-    .lg tfoot td.gold{color:#d4a437}
-  </style>
-  <div class="lg">
-    <h1>Ledger Account — ${esc(d.ledger || '')}</h1>
-    <p class="meta">${esc(d.group || '')}${d.group ? ' · ' : ''}${esc(branchLabel)}${branchLabel ? ' · ' : ''}${esc(period)}</p>
-    <div class="op"><span>Opening Balance: ${fmt(d.openingBalance)} ${esc(d.openingSide || '')}</span>
-      <span>Closing Balance: ${fmt(d.closingBalance)} ${esc(d.closingSide || '')}</span></div>
-    <table>
-      <thead><tr><th>Date</th><th>Voucher</th><th>Particulars</th><th class="r">Debit</th><th class="r">Credit</th><th class="r">Balance</th></tr></thead>
-      <tbody>${body || '<tr><td colspan="6" style="text-align:center;padding:20px;color:#5a6691">No postings in range.</td></tr>'}</tbody>
-      <tfoot><tr>
-        <td colspan="3" class="gold">CLOSING — ${esc(d.ledger || '')}</td>
-        <td class="r">${fmt(d.totalDebit)}</td>
-        <td class="r gold">${fmt(d.totalCredit)}</td>
-        <td class="r">${fmt(d.closingBalance)} ${esc(d.closingSide || '')}</td>
-      </tr></tfoot>
-    </table>
-  </div>`;
-  openPrintPreview({ title: `Ledger — ${d.ledger || 'Statement'}`, recommend: 'portrait', html });
+  printLedgerUI({ d, bills, view, group: d.group, cur, branchLabel, from, to, showNarr, showDetail });
 }
 
 // ── Toolbar button group: 🖨 Print · 📄 PDF · 📤 Excel ────────────────────────

@@ -22,6 +22,7 @@ import { useBalanceSheet, useProfitAndLoss, useTrialBalance, useAgeing, useLedge
 import { VoucherEditor } from './accountingLive';
 import { exportToExcel } from '../core/exportExcel';
 import { buildNotes } from './notesEngine';
+import { useModalEsc } from '../core/ux/useModalEsc';
 import { PeriodBar, periodRange } from '../core/period';
 
 const INK = '#0d1326', GOLD = '#d4a437', MUTE = '#5a6691', LINE = '#e1e3ec';
@@ -190,6 +191,7 @@ function NoteTable({ note, cur, openG, toggleG, detailed, onDrill }) {
 /* ── ledger → voucher drill modal ─────────────────────────────────────── */
 function DrillModal({ ledger, branch, to, cur, onClose }) {
   const [vid, setVid] = useState(null);
+  useModalEsc(onClose);
   const q = useLedgerStatement(ledger, branch, { to });
   const lines = q.data?.lines || [];
   return (

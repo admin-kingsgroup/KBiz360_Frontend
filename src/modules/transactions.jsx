@@ -12,6 +12,7 @@ import { ACTIVE_CURRENCIES, ADM_DATA, BRANCHES, BRANCH_CODES, GP_BILLS, PURCHASE
 import { useAdmReasonCodes, useLedgerRegistry } from '../core/useReference';
 import { useLedgerStatement, useCreateVoucher, useOpenBills, useSalesRegister, usePurchaseRegister } from '../core/useAccounting';
 import { LedgerActions } from '../core/ledgerActions';
+import { useModalEsc } from '../core/ux/useModalEsc';
 import { useLivePurchaseRegistry, useLiveSalesTickets } from '../core/useVouchers';
 import { fmt, fmtINR } from '../core/format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS } from '../core/dates';
@@ -25,6 +26,7 @@ import { ApiKeySettings } from './settings';
 import { Form26AS } from './taxation';
 import { NotificationCentre } from '../shell/NotifPanel';
 import { PHASE2_Page } from '../shell/PHASE2_Page';
+import { VoucherShell } from '../core/voucher/VoucherShell';
 
 /* ════════════════════════════════════════════════════════════════════
    FINANCE VOUCHER PERSISTENCE
@@ -1252,122 +1254,16 @@ export function SalesMisc({branch,setRoute}){
 
 /* ── SALES: CREDIT NOTES ─────────────────────────────────── */
 
-export function SalesCreditNote({branch,setRoute}){
-  return <NoteVoucher branch={branch} kind="credit"/>;
+// Credit/Debit Note CREATE render through the unified VoucherShell (Option C),
+// sharing one form with the ledger-account edit screen.
+export function SalesCreditNote({ branch }) {
+  return <VoucherShell category="credit-note" mode="create" branch={branch} />;
 }
 
 /* Credit Note (sales return — reduce what a customer owes) and Debit Note
    (purchase return — reduce what we owe a supplier) share one form; `kind` flips
    the party side, the base ledger and the GST direction. Follows the HTML notes:
    Place of Supply switches CGST+SGST ↔ IGST; income/expense + GST are reversed and
-   the party is settled. GST + TCS reversal are kept from the live app. */
-function NoteVoucher({branch,kind}){
-  const isCredit=kind==="credit";
-  const mob=useMobile();
-  const vNo=useVNo(branch,isCredit?"SCN":"SDN");
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-  const GST_RATES=[0,5,12,18,28];
-  const REASONS=isCredit
-    ?["Ticket Cancellation / Refund","Fare Correction","Sales Return","Discount Allowed","Rate Difference"]
-    :["Ticket Cancellation by Airline","Purchase Return","Rate Difference","Overcharge Correction","Discount Received"];
-  const baseLedger=isCredit?"Sales Return":"Purchase Return";
-  const gstKind=isCredit?"Output":"Input";
-
-  const [date,setDate]=useState(todayISO());
-  const [againstInv,setAgainstInv]=useState("");
-  const [gstMode,setGstMode]=useState("intra");   // intra → CGST+SGST · inter → IGST
-  const [party,setParty]=useState("");
-  const [reason,setReason]=useState(REASONS[0]);
-  const [taxableStr,setTaxableStr]=useState("");
-  const [gstPct,setGstPct]=useState(18);
-  const [tcsStr,setTcsStr]=useState("");
-  const [narration,setNarration]=useState("");
-
-  const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];
-  const partyName=LEDGER_REGISTRY.find(l=>l.id===party)?.name||"";
-  const taxable=_r2(+taxableStr||0);
-  const gstAmt=_r2(taxable*gstPct/100);
-  const tcs=_r2(+tcsStr||0);
-  const total=_r2(taxable+gstAmt+tcs);
-  const cgst=gstMode==="intra"?_r2(gstAmt/2):0;
-  const sgst=gstMode==="intra"?_r2(gstAmt-cgst):0;
-  const noteSide=isCredit?"DR":"CR";   // income/expense + GST reversed on this side
-  const gstRows=gstAmt>0?(gstMode==="inter"
-    ?[{side:noteSide,ledger:`IGST ${gstKind}`,amount:gstAmt,note:`IGST @ ${gstPct}% reversed`}]
-    :[{side:noteSide,ledger:`CGST ${gstKind}`,amount:cgst,note:`CGST @ ${gstPct/2}% reversed`},{side:noteSide,ledger:`SGST ${gstKind}`,amount:sgst,note:`SGST @ ${gstPct/2}% reversed`}]):[];
-  const tcsRow=tcs>0?[{side:noteSide,ledger:isCredit?"TCS Payable — 206C(1G)":"TCS Receivable",amount:tcs,note:"TCS reversed"}]:[];
-  const baseRow={side:noteSide,ledger:baseLedger,amount:taxable,note:reason};
-  const partyRow={side:isCredit?"CR":"DR",ledger:partyName||(isCredit?"Customer (Debtor)":"Supplier (Creditor)"),amount:total,note:isCredit?"Customer outstanding reduced":"Supplier outstanding reduced"};
-  const jrows=isCredit?[baseRow,...gstRows,...tcsRow,partyRow]:[partyRow,baseRow,...gstRows,...tcsRow];
-
-  const post=useCreateVoucher();
-  const brPost=brCodeOf(branch);
-  const canPost=!!brPost&&!!partyName&&taxable>0&&!post.isPending;
-  const reset=()=>{ setTaxableStr("");setTcsStr("");setNarration("");setAgainstInv(""); };
-  const doSave=()=>{
-    if(!canPost)return;
-    post.mutate({
-      vno:vNo, type:isCredit?"SCN":"SDN", category:isCredit?"credit-note":"debit-note", branch:brPost, date,
-      party:partyName, partyType:isCredit?"customer":"supplier",
-      lines:[{ledger:baseLedger, amt:taxable, desc:reason}],
-      subtotal:taxable, taxAmt:gstAmt, gstMode, tcsAmt:tcs, total,
-      againstInvoice:againstInv, linkNo:againstInv,
-      remarks:narration||`Being ${isCredit?"credit":"debit"} note — ${reason}${againstInv?` vs ${againstInv}`:""}`,
-      status:"saved",
-    });
-  };
-
-  const tDr=jrows.reduce((s,r)=>s+(r.side==="DR"?r.amount:0),0);
-  const tCr=jrows.reduce((s,r)=>s+(r.side==="CR"?r.amount:0),0);
-  const title=isCredit?"Credit Note":"Debit Note";
-  return (
-    <VWrap title={title} icon={isCredit?"📋":"📈"} vNo={vNo} branch={branch}>
-      <VHead vNo={vNo}/>
-      <div style={{padding:"14px 16px"}}>
-        <VExplain>
-          {isCredit
-            ?<><b style={{color:"#A07828"}}>Credit Note:</b> issued to a <b>customer</b> to reduce what they owe (cancellation, refund, fare correction). The income &amp; output GST are <b>Debited</b> (reversed); the customer is <b>Credited</b>. Outside-state Place of Supply switches the GST to <b>IGST</b>.</>
-            :<><b style={{color:"#A07828"}}>Debit Note:</b> issued to a <b>supplier</b> to reduce what you owe (purchase return, overcharge, airline cancellation). The supplier is <b>Debited</b>; the purchase &amp; input GST are <b>Credited</b> (reversed). Outside-state Place of Supply switches the GST to <b>IGST</b>.</>}
-        </VExplain>
-
-        <div style={{display:"grid",gridTemplateColumns:mob?"1fr 1fr":"1fr 1fr 1fr",gap:12,marginBottom:14}}>
-          <FL label="Date"><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inp}/></FL>
-          <FL label="Against invoice"><input value={againstInv} onChange={e=>setAgainstInv(e.target.value)} style={inp} placeholder="DS/32/26-27"/></FL>
-          <VPlaceOfSupply mode={gstMode} onChange={setGstMode}/>
-        </div>
-
-        <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:12,marginBottom:14}}>
-          <FL label={isCredit?"Credit To (Customer / Debtor)":"Debit To (Supplier / Creditor)"}>
-            <LedgerSelect branch={branch} value={party} onChange={setParty} filter={l=>l.type===(isCredit?"Debtor":"Creditor")} placeholder={isCredit?"Select customer / debtor...":"Select supplier / creditor..."}/>
-          </FL>
-          <FL label="Reason"><select value={reason} onChange={e=>setReason(e.target.value)} style={inp}>{REASONS.map(r=><option key={r}>{r}</option>)}</select></FL>
-        </div>
-
-        <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr 1fr",gap:12,marginBottom:14}}>
-          <FL label={`Taxable amount (${cur})`}><input type="number" value={taxableStr} onChange={e=>setTaxableStr(e.target.value)} placeholder="0.00" style={{...inp,textAlign:"right",fontWeight:700}}/></FL>
-          <FL label="GST rate"><select value={gstPct} onChange={e=>setGstPct(+e.target.value)} style={inp}>{GST_RATES.map(r=><option key={r} value={r}>{r}%</option>)}</select></FL>
-          <FL label={`TCS reversed (${cur}, optional)`}><input type="number" value={tcsStr} onChange={e=>setTcsStr(e.target.value)} placeholder="0.00" style={{...inp,textAlign:"right"}}/></FL>
-        </div>
-
-        <p style={{margin:"0 0 6px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#A07828",textTransform:"uppercase"}}>Account Entries</p>
-        <VJournalPreview rows={jrows} cur={cur}/>
-        <VBalanceBar dr={tDr} cr={tCr} cur={cur} emptyText="Enter the taxable amount to build the note"/>
-
-        <FL label="Narration"><textarea value={narration} onChange={e=>setNarration(e.target.value)} rows={2} style={{...inp,resize:"vertical",marginBottom:12}} placeholder={`Being ${isCredit?"credit":"debit"} note for ${reason.toLowerCase()}${againstInv?` against ${againstInv}`:""}`}/></FL>
-
-        <VSaveMsg m={post} okText={`✔ ${title} ${vNo} posted · ${partyName} outstanding ${isCredit?"reduced":"reduced"} ${vf2(cur,total)} · GST${tcs>0?"/TCS":""} reversed · books refreshed`}/>
-        {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this note.</div>}
-        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-          <button onClick={reset} style={btnGh}>Reset</button>
-          <button onClick={doSave} disabled={!canPost} style={{...btnG,background:canPost?(isCredit?"#9B2C2C":"#1B6B4C"):"#bfc3d6",opacity:canPost?1:0.55}}>
-            {isCredit?"📋":"📈"} Save {title} {post.isPending?"…":!partyName?`(Pick ${isCredit?"Customer":"Supplier"})`:taxable<=0?"(Enter Amount)":""}
-          </button>
-        </div>
-      </div>
-    </VWrap>
-  );
-}
 
 
 /* ════════════════════════════════════════════════════════════════
@@ -2914,8 +2810,8 @@ export function UnmatchedTickets({branch,setRoute}){
    ════════════════════════════════════════════════════════════════ */
 
 
-export function SalesDebitNote({branch,setRoute}){
-  return <NoteVoucher branch={branch} kind="debit"/>;
+export function SalesDebitNote({ branch }) {
+  return <VoucherShell category="debit-note" mode="create" branch={branch} />;
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -2926,7 +2822,7 @@ export function SalesCancellation({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const [cancellations]=useState([]);
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
 
   const totCancCharge=cancellations.reduce((s,c)=>s+c.cancCharge,0);
   const totRefund    =cancellations.reduce((s,c)=>s+c.refundToClient,0);
@@ -3062,7 +2958,7 @@ export function AdmRegister({branch}){
   const brCode=branch==="ALL"?null:branch?.code;
 
   const [adms,setAdms]=useState(_ADM_LIST);
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [disputeModal,setDisputeModal]=useState(null);
   const [statusFilter,setStatusFilter]=useState("All");
   const [search,setSearch]=useState("");
@@ -3896,159 +3792,10 @@ export function GdsPnrImport({branch,setRoute}){
    ITEM 23: TALLY XML EXPORT  /reports/tally-export
    ════════════════════════════════════════════════════════════════ */
 
-export function ReceiptVoucher({branch}){
-  return <RcptPmtVoucher branch={branch} side="customer"/>;
-}
-
-/* Receipt (money IN from a debtor) and Payment (money OUT to a creditor) share
-   the bill-wise allocation + On-Account engine; `side` flips the direction. */
-function RcptPmtVoucher({branch,side}){
-  const isReceipt=side==="customer";
-  const mob=useMobile();
-  const vNo=useVNo(branch,isReceipt?"RV":"PMT");
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-  const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];   // live chart of accounts
-
-  const [date,setDate]=useState(todayISO());
-  const [bankLedger,setBankLedger]=useState("");
-  const [party,setParty]=useState("");
-  const [payMode,setPayMode]=useState("NEFT");
-  const [utr,setUtr]=useState("");
-  const [amount,setAmount]=useState(0);            // net cash moved
-  const [tds,setTds]=useState(false);
-  const [tdsSection,setTdsSection]=useState("194H");
-  const [tdsAmt,setTdsAmt]=useState(0);
-  const [narration,setNarration]=useState("");
-  // Bill-wise allocation state
-  const [mode,setMode]=useState("bills");          // 'bills' | 'onaccount'
-  const [alloc,setAlloc]=useState({});             // billVno → amount
-  const [parkOnAcc,setParkOnAcc]=useState(false);
-
-  const bankName=LEDGER_REGISTRY.find(l=>l.id===bankLedger)?.name||"";
-  const partyName=LEDGER_REGISTRY.find(l=>l.id===party)?.name||"";
-  const tdsSec=TDS_SECTIONS[tdsSection];
-  const net=+amount||0;
-  const gross=_r2(net+(tds?(+tdsAmt||0):0));        // gross = what settles the bill(s)
-
-  // Live open bills for the selected party.
-  const billsQ=useOpenBills(partyName,branch,side);
-  const billIdMap=useMemo(()=>{const m={};(billsQ.data?.bills||[]).forEach(b=>{m[b.billVno]=b.billId;});return m;},[billsQ.data]);
-
-  // Reset allocation whenever the party changes (their bills change).
-  useEffect(()=>{ setAlloc({}); setParkOnAcc(false); setMode("bills"); },[partyName]);
-
-  const sum=allocSummary(alloc,gross,parkOnAcc,mode);
-  const setAllocFor=(vno,val,out)=>{ let v=+val||0; if(v<0)v=0; if(v>out)v=out; setAlloc(a=>({...a,[vno]:v})); };
-  const fullAlloc=(vno,out)=>{
-    const others=Object.entries(alloc).reduce((s,[k,v])=>k===vno?s:s+(+v||0),0);
-    const remain=Math.max(0,_r2(gross-others));
-    setAlloc(a=>({...a,[vno]:gross>0?Math.min(out,remain):out}));
-  };
-  const autoTds=()=>{ if(tds&&tdsSec){ setTdsAmt(Math.round(net*tdsSec.rate/(100-tdsSec.rate))); } };
-
-  const jrows=isReceipt?[
-    {side:"DR",ledger:bankName||"Bank / Cash",amount:net,note:"Amount received"},
-    ...(tds&&+tdsAmt>0?[{side:"DR",ledger:`TDS Receivable (${tdsSection})`,amount:+tdsAmt,note:"TDS deducted by party"}]:[]),
-    {side:"CR",ledger:partyName||"Debtor",amount:gross,note:"Customer outstanding cleared"},
-  ]:[
-    {side:"DR",ledger:partyName||"Creditor",amount:gross,note:"Supplier account settled"},
-    {side:"CR",ledger:bankName||"Bank / Cash",amount:net,note:"Paid from bank / cash"},
-    ...(tds&&+tdsAmt>0?[{side:"CR",ledger:`TDS Payable (${tdsSection})`,amount:+tdsAmt,note:"TDS withheld at source"}]:[]),
-  ];
-
-  const post=useCreateVoucher();
-  const brPost=brCodeOf(branch);
-  const canPost=!!brPost&&!!partyName&&!!bankName&&gross>0&&sum.valid&&!post.isPending;
-  const reset=()=>{ setAmount(0);setUtr("");setNarration("");setTds(false);setTdsAmt(0);setAlloc({});setParkOnAcc(false);setMode("bills"); };
-  const doSave=()=>{
-    if(!canPost)return;
-    const allocations=Object.entries(alloc).filter(([,v])=>(+v||0)>0).map(([vno,v])=>({billVno:vno,billId:billIdMap[vno]||"",amount:+v}));
-    post.mutate({
-      vno:vNo, type:isReceipt?"RV":"PMT", category:isReceipt?"receipt":"payment", branch:brPost, date,
-      party:partyName, partyType:isReceipt?"customer":"supplier",
-      bankRef:bankName, paymentMode:payMode,
-      subtotal:net, total:gross, tdsAmt:tds?(+tdsAmt||0):0,
-      allocations, onAccount:sum.onAcc, applyMode:mode,
-      remarks:narration||`Being ${isReceipt?"receipt from":"payment to"} ${partyName} via ${payMode}${utr?` ref ${utr}`:""}`,
-      status:"saved",
-    });
-  };
-
-  const accent=isReceipt?"#27500A":"#A32D2D";
-  return (
-    <VWrap title={isReceipt?"Receipt Voucher":"Payment Voucher"} icon={isReceipt?"💰":"💸"} vNo={vNo} branch={branch}>
-      <VHead vNo={vNo}/>
-      <div style={{padding:"14px 16px"}}>
-        <VExplain>
-          {isReceipt
-            ?<><b style={{color:"#A07828"}}>Receipt:</b> money coming <b>in</b> from a debtor. Cash/Bank is <b>Debited</b>, the customer <b>Credited</b>. Pick the customer to load their open bills and allocate the receipt — park any balance <b>On Account</b> as an advance.</>
-            :<><b style={{color:"#A07828"}}>Payment:</b> money going <b>out</b> to a creditor. The supplier is <b>Debited</b>, Cash/Bank <b>Credited</b>. Pick the supplier to load their open bills and allocate the payment — park any balance <b>On Account</b> as an advance.</>}
-        </VExplain>
-
-        <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:14}}>
-          {/* Left */}
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <FL label="Date"><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inp}/></FL>
-            <FL label={isReceipt?"Received from (Customer / Debtor — Cr)":"Pay to (Supplier / Creditor — Dr)"}>
-              <LedgerSelect branch={branch} value={party} onChange={setParty} filter={l=>l.type===(isReceipt?"Debtor":"Creditor")} placeholder={isReceipt?"Select customer / debtor...":"Select supplier / creditor..."}/>
-            </FL>
-            <FL label={isReceipt?"Received in (Bank / Cash — Dr)":"Paid from (Bank / Cash — Cr)"}>
-              <LedgerSelect branch={branch} value={bankLedger} onChange={setBankLedger} filter={l=>l.type==="Bank"||l.type==="Cash"} placeholder="Select bank / cash account..."/>
-            </FL>
-          </div>
-          {/* Right */}
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <FL label="Payment mode">
-              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                {["NEFT","RTGS","UPI","Cheque","Cash"].map(m=>(
-                  <button key={m} onClick={()=>setPayMode(m)} style={{padding:"5px 11px",borderRadius:6,fontSize:10.5,fontWeight:600,cursor:"pointer",
-                    background:payMode===m?"#0d1326":"#f3f4f8",color:payMode===m?"#d4a437":"#384677",border:"1.5px solid "+(payMode===m?"#d4a437":"#e1e3ec")}}>{m}</button>
-                ))}
-              </div>
-            </FL>
-            {payMode!=="Cash"&&<FL label="UTR / Reference"><input value={utr} onChange={e=>setUtr(e.target.value)} style={{...inp,fontFamily:"monospace"}} placeholder="UTR / cheque / txn ref"/></FL>}
-            <FL label={isReceipt?"Amount received (net of TDS)":"Amount paid (net of TDS)"}>
-              <input type="number" value={amount||""} onChange={e=>setAmount(+e.target.value||0)} placeholder="0.00" style={{...inp,fontSize:16,fontWeight:700,color:accent}}/>
-            </FL>
-          </div>
-        </div>
-
-        {/* TDS (kept from the live app) */}
-        <div style={{padding:"10px 12px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775",margin:"12px 0"}}>
-          <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:tds?8:0}}>
-            <input type="checkbox" checked={tds} onChange={e=>setTds(e.target.checked)} style={{cursor:"pointer",accentColor:"#854F0B"}}/>
-            <span style={{fontSize:11,fontWeight:700,color:"#854F0B"}}>{isReceipt?"Party has deducted TDS before paying":"Deduct TDS at source before paying"}</span>
-          </label>
-          {tds&&<div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr 1fr auto",gap:8,alignItems:"end"}}>
-            <FL label="TDS Section"><select value={tdsSection} onChange={e=>setTdsSection(e.target.value)} style={inp}>{Object.entries(TDS_SECTIONS).filter(([k])=>k!=="None").map(([k,v])=><option key={k} value={k}>{k} ({v.rate}%)</option>)}</select></FL>
-            <FL label="Rate"><div style={{...inp,background:"#f9fafb",color:"#854F0B",fontWeight:700,display:"flex",alignItems:"center"}}>{tdsSec?.rate||0}%</div></FL>
-            <FL label="TDS amount"><input type="number" value={tdsAmt||""} onChange={e=>setTdsAmt(+e.target.value||0)} style={inp}/></FL>
-            <button onClick={autoTds} style={{...btnGh,fontSize:10,padding:"7px 10px"}}>Auto-calc</button>
-          </div>}
-          {tds&&+tdsAmt>0&&<p style={{margin:"6px 0 0",fontSize:10,color:"#854F0B"}}>Gross settlement <b>{vf2(cur,gross)}</b> · {isReceipt?"TDS receivable":"TDS payable"} <b>{vf2(cur,tdsAmt)}</b> · {isReceipt?"Net received":"Net paid"} <b>{vf2(cur,net)}</b></p>}
-        </div>
-
-        {/* Bill-wise allocation */}
-        <BillAllocPanel side={side} party={partyName} q={billsQ} amount={gross}
-          alloc={alloc} onSetAlloc={setAllocFor} onFull={fullAlloc}
-          mode={mode} onMode={setMode} parkOnAcc={parkOnAcc} onParkOnAcc={setParkOnAcc} cur={cur}/>
-
-        <VJournalPreview rows={jrows} cur={cur}/>
-
-        <FL label="Narration"><textarea value={narration} onChange={e=>setNarration(e.target.value)} rows={2} style={{...inp,resize:"vertical",marginBottom:12}} placeholder={partyName?`Being ${isReceipt?"receipt from":"payment to"} ${partyName}`:"Accounting narration..."}/></FL>
-
-        <VSaveMsg m={post} okText={`✔ ${isReceipt?"Receipt":"Payment"} ${vNo} posted · ${partyName} ${isReceipt?"received":"paid"} ${vf2(cur,gross)}${sum.onAcc>0?` · ${vf2(cur,sum.onAcc)} On Account`:""} · books refreshed`}/>
-        {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this voucher.</div>}
-        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-          <button onClick={reset} style={btnGh}>Reset</button>
-          <button onClick={doSave} disabled={!canPost} style={{...btnG,background:canPost?accent:"#bfc3d6",opacity:canPost?1:0.55}}>
-            {isReceipt?"💰":"💸"} Save Voucher {post.isPending?"…":!partyName?`(Pick ${isReceipt?"Customer":"Supplier"})`:!bankName?"(Pick Bank)":gross<=0?"(Enter Amount)":!sum.valid?(mode==="bills"?"(Allocate / On Account)":""):""}
-          </button>
-        </div>
-      </div>
-    </VWrap>
-  );
+// Receipt CREATE renders through the unified VoucherShell (Option C), sharing one
+// form with the ledger-account edit screen.
+export function ReceiptVoucher({ branch }) {
+  return <VoucherShell category="receipt" mode="create" branch={branch} />;
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -4056,8 +3803,8 @@ function RcptPmtVoucher({branch,side}){
    Dr Creditor  |  Cr Bank  |  Cr TDS Payable (if TDS deducted)
    ════════════════════════════════════════════════════════════════ */
 
-export function PaymentVoucher({branch}){
-  return <RcptPmtVoucher branch={branch} side="supplier"/>;
+export function PaymentVoucher({ branch }) {
+  return <VoucherShell category="payment" mode="create" branch={branch} />;
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -4065,96 +3812,10 @@ export function PaymentVoucher({branch}){
    Cash/Bank → Cash/Bank transfer only
    ════════════════════════════════════════════════════════════════ */
 
-export function ContraVoucher({branch}){
-  const mob=useMobile();
-  const vNo=useVNo(branch,"CV");
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-  const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];   // live chart of accounts
-  const [date,setDate]=useState(todayISO());
-  // HTML semantics: DR = "Transferred To" (account receiving), CR = "Transferred From" (source).
-  const [drLedger,setDrLedger]=useState("");   // destination (Dr) → posts as lines[0].ledger
-  const [crLedger,setCrLedger]=useState("");   // source (Cr)      → posts as bankRef
-  const [amount,setAmount]=useState(0);
-  const [ref,setRef]=useState("");
-  const [narration,setNarration]=useState("");
-
-  const drName=LEDGER_REGISTRY.find(l=>l.id===drLedger)?.name||"";
-  const crName=LEDGER_REGISTRY.find(l=>l.id===crLedger)?.name||"";
-  const isSame=!!drLedger&&drLedger===crLedger;
-  const amt=+amount||0;
-  const ready=drName&&crName&&!isSame&&amt>0;
-
-  const jrows=[
-    {side:"DR",ledger:drName,amount:amt,note:"Account receiving funds"},
-    {side:"CR",ledger:crName,amount:amt,note:"Account transferring funds"},
-  ];
-
-  const post=useCreateVoucher();
-  const brPost=brCodeOf(branch);
-  const doReset=()=>{ setAmount(0); setRef(""); setNarration(""); };
-  const doSave=()=>{
-    if(!ready||!brPost||post.isPending)return;
-    post.mutate({
-      vno:vNo, type:"CV", category:"contra", branch:brPost, date,
-      party:"", partyType:"bank",
-      bankRef:crName,                          // source (Cr) bank/cash ledger NAME
-      lines:[{ledger:drName, amt, desc:`Transfer in from ${crName}`}], // destination (Dr)
-      subtotal:amt, total:amt,
-      remarks:narration||`Being contra — transfer from ${crName} to ${drName}${ref?` (${ref})`:""}`,
-      status:"saved",
-    });
-  };
-
-  return (
-    <VWrap title="Contra Voucher" icon="🔄" vNo={vNo} branch={branch}>
-      <VHead vNo={vNo}/>
-      <div style={{padding:"14px 16px"}}>
-        <VExplain><b style={{color:"#A07828"}}>Contra:</b> moving funds between your own Cash &amp; Bank accounts. One is <b>Debited</b>, the other <b>Credited</b> — same amount, entered once.</VExplain>
-
-        <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:14,marginBottom:14}}>
-          <FL label="Date"><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inp}/></FL>
-          <FL label="Reference (UTR / cash receipt no.)"><input value={ref} onChange={e=>setRef(e.target.value)} style={inp} placeholder="Optional"/></FL>
-        </div>
-
-        {/* DR — transferred to */}
-        <div style={{marginBottom:14}}>
-          <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:7}}>
-            <span style={{fontSize:9.5,fontWeight:800,letterSpacing:".5px",padding:"3px 10px",borderRadius:4,color:"#fff",background:V_DR}}>DR</span>
-            <span style={{fontSize:11,fontWeight:700,color:"#5a6691"}}>Transferred To (Cash / Bank)</span>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 180px",gap:12}}>
-            <LedgerSelect branch={branch} value={drLedger} onChange={setDrLedger} filter={l=>l.type==="Bank"||l.type==="Cash"} placeholder="Select bank / cash account..."/>
-            <input type="number" value={amount||""} onChange={e=>setAmount(+e.target.value||0)} placeholder="0.00" style={{...inp,textAlign:"right",fontSize:15,fontWeight:700,borderLeft:`3px solid ${V_DR}`}}/>
-          </div>
-        </div>
-
-        {/* CR — transferred from */}
-        <div style={{marginBottom:14}}>
-          <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:7}}>
-            <span style={{fontSize:9.5,fontWeight:800,letterSpacing:".5px",padding:"3px 10px",borderRadius:4,color:"#fff",background:V_CR}}>CR</span>
-            <span style={{fontSize:11,fontWeight:700,color:"#5a6691"}}>Transferred From (Cash / Bank)</span>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 180px",gap:12}}>
-            <LedgerSelect branch={branch} value={crLedger} onChange={setCrLedger} filter={l=>(l.type==="Bank"||l.type==="Cash")&&l.id!==drLedger} placeholder="Select bank / cash account..."/>
-            <input type="number" value={amount||""} onChange={e=>setAmount(+e.target.value||0)} placeholder="0.00" style={{...inp,textAlign:"right",fontSize:15,fontWeight:700,borderLeft:`3px solid ${V_CR}`}}/>
-          </div>
-        </div>
-
-        {isSame&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FCEBEB",fontSize:10.5,color:"#A32D2D",fontWeight:600,marginBottom:10}}>⚠ The two accounts must be different.</div>}
-        <VBalanceBar dr={ready?amt:0} cr={ready?amt:0} cur={cur} emptyText="Pick two accounts and enter the amount"/>
-
-        <FL label="Narration"><textarea value={narration} onChange={e=>setNarration(e.target.value)} rows={2} style={{...inp,resize:"vertical",marginBottom:12}} placeholder={crName&&drName?`Being contra — transfer from ${crName} to ${drName}`:"Being cash withdrawn / deposited between own accounts"}/></FL>
-
-        <VSaveMsg m={post} okText={`✔ Contra ${vNo} posted · ${crName} → ${drName} · books refreshed`}/>
-        {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this voucher.</div>}
-        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-          <button onClick={doReset} style={btnGh}>Reset</button>
-          <button onClick={doSave} disabled={!ready||!brPost||post.isPending} style={{...btnG,background:(ready&&brPost)?"#185FA5":"#bfc3d6",opacity:(!ready||!brPost||post.isPending)?0.55:1}}>🔄 Save Voucher {post.isPending?"…":""}</button>
-        </div>
-      </div>
-    </VWrap>
-  );
+// Contra CREATE renders through the unified VoucherShell (Option C), sharing one
+// form with the ledger-account edit screen.
+export function ContraVoucher({ branch }) {
+  return <VoucherShell category="contra" mode="create" branch={branch} />;
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -4162,111 +3823,10 @@ export function ContraVoucher({branch}){
    Multi-line Dr/Cr with ledger autocomplete and validation
    ════════════════════════════════════════════════════════════════ */
 
-export function JournalEntry({branch}){
-  const vNo=useVNo(branch,"JV");
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-  const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];   // live chart of accounts
-
-  const [date,setDate]=useState(todayISO());
-  const [masterNarr,setMasterNarr]=useState("");
-  const [rows,setRows]=useState([{id:1,ledger:"",type:"DR",amount:""},{id:2,ledger:"",type:"CR",amount:""}]);
-  const nextId=useRef(3);
-
-  const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
-  const add=()=>setRows(rs=>[...rs,{id:nextId.current++,ledger:"",type:"DR",amount:""}]);
-  const del=id=>setRows(rs=>{const next=rs.filter(r=>r.id!==id);return next.length?next:[{id:nextId.current++,ledger:"",type:"DR",amount:""}];});
-  const reset=()=>{setRows([{id:nextId.current++,ledger:"",type:"DR",amount:""},{id:nextId.current++,ledger:"",type:"CR",amount:""}]);setMasterNarr("");};
-
-  const getLedgerName=id=>LEDGER_REGISTRY.find(l=>l.id===id)?.name||"";
-  const tDr=rows.reduce((s,r)=>s+(r.type==="DR"?(+r.amount||0):0),0);
-  const tCr=rows.reduce((s,r)=>s+(r.type==="CR"?(+r.amount||0):0),0);
-  const balanced=Math.abs(tDr-tCr)<0.01;
-
-  const post=useCreateVoucher();
-  const brPost=brCodeOf(branch);
-  const postLines=rows.filter(r=>r.ledger&&(+r.amount||0)>0);
-  const canPost=balanced&&(tDr>0)&&postLines.length>=2&&brPost;
-  const doSave=()=>{
-    if(!canPost||post.isPending)return;
-    post.mutate({
-      vno:vNo, type:"JV", category:"journal", branch:brPost, date,
-      lines:postLines.map(r=>({ledger:getLedgerName(r.ledger), amt:+r.amount||0, drCr:r.type==="DR"?"Dr":"Cr", desc:masterNarr||""})),
-      subtotal:tDr, total:tDr,
-      remarks:masterNarr||"Being adjustment entry passed",
-      status:"saved",
-    });
-  };
-
-  return (
-    <VWrap title="Journal Voucher" icon="📒" vNo={vNo} branch={branch}>
-      <VHead vNo={vNo}/>
-      <div style={{padding:"14px 16px"}}>
-        <VExplain><b style={{color:"#A07828"}}>Journal:</b> adjustment entries with line-by-line DR/CR. Add as many lines as needed — <b>Total Debit must equal Total Credit</b> to save.</VExplain>
-
-        <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:12,marginBottom:14}}>
-          <FL label="Journal date"><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inp}/></FL>
-          <FL label="Master narration"><input value={masterNarr} onChange={e=>setMasterNarr(e.target.value)} style={inp} placeholder="Being adjustment entry passed"/></FL>
-        </div>
-
-        <p style={{margin:"0 0 7px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#A07828",textTransform:"uppercase"}}>Account Entries</p>
-        <div style={{...card,padding:0,overflow:"hidden",marginBottom:6}}>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",minWidth:620}}>
-              <thead><tr style={{background:"#0d1326"}}>
-                <th style={{padding:"8px 10px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>Ledger Account</th>
-                <th style={{padding:"8px 10px",textAlign:"center",color:"#d4a437",fontWeight:700,fontSize:9.5,width:74}}>Dr / Cr</th>
-                <th style={{padding:"8px 10px",textAlign:"right",color:"#d4a437",fontWeight:700,fontSize:9.5,width:150}}>Amount ({cur})</th>
-                <th style={{width:38}}/>
-              </tr></thead>
-              <tbody>
-                {rows.map(r=>(
-                  <tr key={r.id} style={{borderBottom:"1px solid #f3f4f8",background:r.type==="DR"?"#f0fbf5":"#fdf3f3"}}>
-                    <td style={{padding:"4px 8px",minWidth:240}}>
-                      <LedgerSelect branch={branch} value={r.ledger} onChange={v=>upd(r.id,"ledger",v)} placeholder="Select ledger..." style={{minHeight:30,fontSize:11}}/>
-                    </td>
-                    <td style={{padding:"4px 8px"}}>
-                      <div style={{display:"flex",border:"1px solid #e1e3ec",borderRadius:5,overflow:"hidden",width:64,margin:"0 auto"}}>
-                        {["DR","CR"].map(t=>(
-                          <button key={t} onClick={()=>upd(r.id,"type",t)} style={{flex:1,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:9.5,fontWeight:800,padding:"6px 0",
-                            background:r.type===t?(t==="DR"?V_DR:V_CR):"#fff",color:r.type===t?"#fff":"#9A9A9A"}}>{t}</button>
-                        ))}
-                      </div>
-                    </td>
-                    <td style={{padding:"4px 8px"}}>
-                      <input type="number" min="0" step="0.01" value={r.amount} onChange={e=>upd(r.id,"amount",e.target.value)} placeholder="0.00" style={{...inp,textAlign:"right",minHeight:30,fontWeight:600}}/>
-                    </td>
-                    <td style={{padding:"4px 8px",textAlign:"center"}}>
-                      <button onClick={()=>del(r.id)} style={{background:"transparent",border:"none",cursor:"pointer",color:"#9A9A9A",fontSize:16,lineHeight:1}} title="Remove line">×</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
-                  <td style={{padding:"8px 10px"}}><button onClick={add} style={{...btnGh,fontSize:10.5,padding:"4px 12px"}}><Plus size={12}/> Add Entry Line</button></td>
-                  <td style={{padding:"8px 6px",textAlign:"right",fontSize:9,fontWeight:700,color:"#5a6691"}}>TOTAL</td>
-                  <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,fontSize:13,fontVariantNumeric:"tabular-nums",color:"#0d1326"}}>{vf2(cur,tDr)} / {vf2(cur,tCr)}</td>
-                  <td/>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-
-        <VBalanceBar dr={tDr} cr={tCr} cur={cur} emptyText="Enter amounts to balance the voucher"/>
-
-        <VSaveMsg m={post} okText={`✔ Journal Voucher ${vNo} posted · ${postLines.length} ledgers updated · Trial Balance refreshed`}/>
-        {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this voucher.</div>}
-        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-          <button onClick={reset} style={btnGh}>Reset</button>
-          <button onClick={doSave} disabled={!canPost||post.isPending} style={{...btnG,background:canPost?"#185FA5":"#bfc3d6",opacity:(!canPost||post.isPending)?0.6:1}}>
-            📒 Save Voucher {!balanced?"(Balance First)":postLines.length<2?"(Min 2 lines)":!brPost?"(Pick Branch)":post.isPending?"…":""}
-          </button>
-        </div>
-      </div>
-    </VWrap>
-  );
+// Journal voucher CREATE renders through the unified VoucherShell (Option C), so
+// create and the ledger-account edit screen share one form.
+export function JournalEntry({ branch }) {
+  return <VoucherShell category="journal" mode="create" branch={branch} />;
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -4280,202 +3840,10 @@ export function JournalEntry({branch}){
    supplier outstanding all update at once.
    ════════════════════════════════════════════════════════════════ */
 
-export function PurchaseExpenseVoucher({branch,setRoute}){
-  const mob=useMobile();
-  const vNo=useVNo(branch,"PXP");
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-  const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];   // live chart of accounts
-  const GST_RATES=[0,5,12,18,28];
-  const TDS_OPTS=[["None","No TDS"],["194C","194C — Contractor / DMC (2%)"],["194J","194J — Professional / Technical (10%)"],["194H","194H — Commission / Brokerage (5%)"],["194D","194D — Insurance (5%)"]];
-
-  const [date,setDate]=useState(todayISO());
-  const [billNo,setBillNo]=useState("");
-  const [party,setParty]=useState("");
-  const [lines,setLines]=useState([{id:1,ledger:"",amt:0,desc:""}]);
-  const nextId=useRef(2);
-  const [gstApplicable,setGstApplicable]=useState(true);
-  const [gstMode,setGstMode]=useState("intra");   // intra → CGST+SGST · inter → IGST
-  const [gstPct,setGstPct]=useState(18);
-  const [tdsSection,setTdsSection]=useState("None");
-  const [narration,setNarration]=useState("");
-  const [attachments,setAttachments]=useState([]);
-  const [attName,setAttName]=useState("");
-
-  const getLedgerName=id=>LEDGER_REGISTRY.find(l=>l.id===id)?.name||id;
-  const partyLedger=LEDGER_REGISTRY.find(l=>l.id===party);
-  const partyName=partyLedger?.name||"";
-  const partyGroup=partyLedger?.group||"";
-
-  const updLine=(id,k,v)=>setLines(ls=>ls.map(l=>l.id===id?{...l,[k]:v}:l));
-  const addLine=()=>setLines(ls=>[...ls,{id:nextId.current++,ledger:"",amt:0,desc:""}]);
-  const rmLine=id=>setLines(ls=>ls.length>1?ls.filter(l=>l.id!==id):ls);
-  const addAtt=()=>{ if(attName.trim()){ setAttachments(a=>[...a,{name:attName.trim()}]); setAttName(""); } };
-
-  const lineRows=lines.filter(l=>(+l.amt||0)!==0);
-  const taxable=_r2(lineRows.reduce((s,l)=>s+(+l.amt||0),0));
-  const gstAmt=gstApplicable?_r2(taxable*gstPct/100):0;
-  const total=_r2(taxable+gstAmt);                              // invoice value
-  const cgst=gstMode==="intra"?_r2(gstAmt/2):0;
-  const sgst=gstMode==="intra"?_r2(gstAmt-cgst):0;
-  const igst=gstMode==="inter"?gstAmt:0;
-  const tdsSec=TDS_SECTIONS[tdsSection]||{rate:0};
-  const tdsRate=tdsSec.rate||0;
-  const tds=_r2(taxable*tdsRate/100);                           // TDS on the taxable value
-  const payable=_r2(total-tds);                                 // supplier gets total net of TDS
-
-  const jrows=[
-    ...lineRows.map(l=>({side:"DR",ledger:getLedgerName(l.ledger)||"Expense / Asset",amount:+l.amt||0,note:l.desc||"Taxable value"})),
-    ...(gstApplicable&&gstAmt>0?(gstMode==="intra"
-        ?[{side:"DR",ledger:"CGST Input",amount:cgst,note:`input CGST @ ${gstPct/2}% (claimable)`},{side:"DR",ledger:"SGST Input",amount:sgst,note:`input SGST @ ${gstPct/2}% (claimable)`}]
-        :[{side:"DR",ledger:"IGST Input",amount:igst,note:`input IGST @ ${gstPct}% (claimable)`}]):[]),
-    {side:"CR",ledger:partyName||"Supplier (Sundry Creditor)",amount:payable,note:tds>0?"payable (net of TDS)":"total payable to supplier"},
-    ...(tds>0?[{side:"CR",ledger:"TDS Payable",amount:tds,note:`TDS deducted @ ${tdsRate}%`}]:[]),
-  ];
-
-  // Approval-gated: saving creates a PENDING Purchase Expense order (NO books
-  // impact). Approval — under Finance ▸ Purchase Expense ▸ Pending — spawns the
-  // linked LOCKED PXP voucher and posts its journal. Mirrors SO/PO/GP.
-  // Creates a PURCHASE-EXPENSE voucher; the approval gate (backend) saves it as
-  // pending — no books impact until approved under Transactions ▸ Voucher Approvals.
-  const post=useCreateVoucher();
-  const brPost=brCodeOf(branch);
-  const canPost=!!brPost&&!!party&&lineRows.length>0&&lineRows.every(l=>l.ledger)&&total>0;
-  const submit=()=>{
-    if(!canPost||post.isPending)return;
-    post.mutate({
-      vno:vNo, type:"PXP", category:"purchase-expense", branch:brPost, date,
-      party:partyName, partyType:"supplier", partyGroup, billNo,
-      lines:lineRows.map(l=>({ledger:getLedgerName(l.ledger), amt:+l.amt||0, desc:l.desc||""})),
-      subtotal:taxable, taxAmt:gstAmt, gstMode:gstApplicable?gstMode:"", tdsAmt:tds, total,
-      againstInvoice:billNo,
-      attachments:attachments.filter(a=>a.name.trim()).map(a=>({name:a.name.trim(),url:a.url||""})),
-      remarks:narration||`Being ${gstApplicable?"GST ":""}expense/asset purchase from ${partyName}${billNo?` vide bill ${billNo}`:""}`,
-      status:"saved",
-    });
-  };
-
-  return (
-    <VWrap title="Purchase Voucher" icon="🧾" vNo={vNo} branch={branch}>
-      <VHead vNo={vNo}/>
-      <div style={{padding:"14px 16px"}}>
-        <VExplain><b style={{color:"#A07828"}}>Purchase:</b> buying an asset or expense from a supplier. The <b>Asset / Expense account and input GST are Debited</b> (GST is claimable as input credit); the <b>supplier (Sundry Creditors) is Credited</b> with the total. Any <b>TDS</b> is withheld on the taxable value — the supplier gets the net. <b style={{color:"#854F0B"}}>⏳ Approval-gated:</b> saving creates a <b>Pending</b> voucher with <b>no books impact</b> — it posts only after it is <b>approved</b> under <b>Pending</b>, exactly like an SO/PO/GP voucher.</VExplain>
-
-        <div style={{display:"grid",gridTemplateColumns:mob?"1fr 1fr":"1fr 1fr 1fr",gap:12,marginBottom:14}}>
-          <FL label="Voucher date"><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inp}/></FL>
-          <FL label="Bill / Invoice no."><input value={billNo} onChange={e=>setBillNo(e.target.value)} style={inp} placeholder="VEND-4471"/></FL>
-          {gstApplicable?<VPlaceOfSupply mode={gstMode} onChange={setGstMode}/>:<div/>}
-        </div>
-
-        <FL label="Supplier / Vendor (party ledger — Cr)"><LedgerSelect branch={branch} value={party} onChange={setParty} filter={l=>l.type==="Creditor"} placeholder="Sundry Creditors / Supplier Others..."/></FL>
-
-        {/* Debit side — expense & asset ledgers */}
-        <p style={{margin:"14px 0 6px",fontSize:9,fontWeight:700,color:"#A07828",textTransform:"uppercase",letterSpacing:"1px"}}>Debit — Asset / Expense Ledgers</p>
-        <div style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",minWidth:640}}>
-              <thead><tr style={{background:"#0d1326"}}>
-                <th style={{padding:"8px 10px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5,width:34}}>#</th>
-                <th style={{padding:"8px 10px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>Expense / Asset Ledger</th>
-                <th style={{padding:"8px 10px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>Description</th>
-                <th style={{padding:"8px 10px",textAlign:"right",color:"#d4a437",fontWeight:700,fontSize:9.5,width:140}}>Amount ({cur})</th>
-                <th style={{width:32}}/>
-              </tr></thead>
-              <tbody>
-                {lines.map((l,i)=>(
-                  <tr key={l.id} style={{borderBottom:"1px solid #f3f4f8",background:(+l.amt||0)>0?"#f0fbf5":"#fff"}}>
-                    <td style={{padding:"4px 8px",textAlign:"center",fontSize:10.5,color:"#5a6691"}}>{i+1}</td>
-                    <td style={{padding:"3px 6px",minWidth:240}}>
-                      <LedgerSelect branch={branch} value={l.ledger} onChange={v=>updLine(l.id,"ledger",v)} filter={x=>x.type==="Expense"||x.type==="Asset"} placeholder="Office Rent / Computer Asset..." style={{minHeight:30,fontSize:10.5}}/>
-                    </td>
-                    <td style={{padding:"3px 6px"}}>
-                      <input value={l.desc} onChange={e=>updLine(l.id,"desc",e.target.value)} style={{...inp,minHeight:30,fontSize:10.5}} placeholder="e.g. June office rent / 5× laptops"/>
-                    </td>
-                    <td style={{padding:"3px 6px"}}>
-                      <input type="number" value={l.amt||""} onChange={e=>updLine(l.id,"amt",+e.target.value||0)} placeholder="0.00" style={{...inp,textAlign:"right",minHeight:30,fontSize:11,fontWeight:600}}/>
-                    </td>
-                    <td style={{padding:"3px 6px",textAlign:"center"}}>
-                      <button onClick={()=>rmLine(l.id)} style={{background:"transparent",border:"none",cursor:"pointer",color:"#9A9A9A",fontSize:16,lineHeight:1}}>×</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
-                  <td colSpan={3} style={{padding:"8px 10px"}}><button onClick={addLine} style={{...btnGh,fontSize:10.5,padding:"4px 12px"}}><Plus size={12}/> Add Line</button></td>
-                  <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,fontVariantNumeric:"tabular-nums",color:"#0d1326",fontSize:14}}>{vf2(cur,taxable)}</td>
-                  <td/>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-
-        {/* GST + TDS */}
-        <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:12,marginBottom:12}}>
-          <div style={{padding:"12px 14px",borderRadius:10,background:"#FDFAF4",border:"1px solid #EFE7D4"}}>
-            <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:gstApplicable?10:0}}>
-              <input type="checkbox" checked={gstApplicable} onChange={e=>setGstApplicable(e.target.checked)} style={{cursor:"pointer",accentColor:"#A07828"}}/>
-              <span style={{fontSize:11.5,fontWeight:700,color:"#A07828"}}>GST Applicable (Input Tax Credit)</span>
-            </label>
-            {gstApplicable&&<div style={{display:"flex",gap:14,alignItems:"end",flexWrap:"wrap"}}>
-              <FL label="GST rate"><select value={gstPct} onChange={e=>setGstPct(+e.target.value)} style={{...inp,minWidth:90}}>{GST_RATES.map(r=><option key={r} value={r}>{r}%</option>)}</select></FL>
-              <div style={{fontSize:11,display:"flex",gap:12,flexWrap:"wrap"}}>
-                {gstMode==="intra"?<><span>CGST <b>{vf2(cur,cgst)}</b></span><span>SGST <b>{vf2(cur,sgst)}</b></span></>:<span>IGST <b>{vf2(cur,igst)}</b></span>}
-              </div>
-            </div>}
-          </div>
-          <div style={{padding:"12px 14px",borderRadius:10,background:"#FAEEDA",border:"1px solid #FAC775"}}>
-            <p style={{margin:"0 0 8px",fontSize:11.5,fontWeight:700,color:"#854F0B"}}>TDS Deduction (on taxable value)</p>
-            <div style={{display:"flex",gap:12,alignItems:"end",flexWrap:"wrap"}}>
-              <FL label="TDS Section"><select value={tdsSection} onChange={e=>setTdsSection(e.target.value)} style={{...inp,minWidth:200}}>{TDS_OPTS.map(([k,lab])=><option key={k} value={k}>{lab}</option>)}</select></FL>
-              <div style={{fontSize:11}}>Rate <b style={{color:"#854F0B"}}>{tdsRate}%</b> · TDS <b style={{color:"#854F0B"}}>{vf2(cur,tds)}</b></div>
-            </div>
-          </div>
-        </div>
-
-        <VJournalPreview rows={jrows} cur={cur} title="Voucher Entry (auto-generated)"/>
-
-        {/* Narration + attachments */}
-        <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:12,marginBottom:12}}>
-          <FL label="Narration"><textarea value={narration} onChange={e=>setNarration(e.target.value)} rows={2} style={{...inp,resize:"vertical"}} placeholder="e.g. Being office rent for June 2026 payable to ABC Realtors..."/></FL>
-          <FL label="Attachments (bill / invoice reference)">
-            <div style={{display:"flex",gap:6}}>
-              <input value={attName} onChange={e=>setAttName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addAtt();}}} style={{...inp,flex:1}} placeholder="Filename or reference..."/>
-              <button onClick={addAtt} style={{...btnGh,padding:"4px 10px"}}>＋ Attach</button>
-            </div>
-            {attachments.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6}}>
-              {attachments.map((a,i)=>(
-                <span key={i} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:10,padding:"3px 8px",borderRadius:999,background:"#f3f4f8",color:"#384677",border:"1px solid #e1e3ec"}}>
-                  📎 {a.name}<button onClick={()=>setAttachments(x=>x.filter((_,j)=>j!==i))} style={{background:"transparent",border:"none",cursor:"pointer",color:"#A32D2D"}}>✕</button>
-                </span>
-              ))}
-            </div>}
-            <p style={{margin:"4px 0 0",fontSize:9,color:"#8b94b3"}}>References are saved with the voucher; binary upload to storage is not yet wired.</p>
-          </FL>
-        </div>
-
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",borderRadius:8,background:"#f3f4f8",marginBottom:12,fontSize:12}}>
-          <span style={{fontWeight:700,color:"#5a6691"}}>Invoice {vf2(cur,total)}{tds>0?` · TDS ${vf2(cur,tds)} · Supplier gets ${vf2(cur,payable)}`:""}</span>
-          <span style={{fontSize:16,fontWeight:800,color:"#0d1326"}}>{vf2(cur,total)}</span>
-        </div>
-
-        <VSaveMsg m={post} okText={`✔ Saved as Pending — no books impact yet. Approve it under Purchase Expense ▸ Pending to post the PXP voucher (${partyName}).`}/>
-        {post.isSuccess&&setRoute&&(
-          <div style={{display:"flex",justifyContent:"center",marginBottom:10}}>
-            <button onClick={()=>setRoute("/transactions/voucher-approvals")} style={btnGh}>Go to Voucher Approvals →</button>
-          </div>
-        )}
-        {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to save this voucher.</div>}
-        <div style={{display:"flex",gap:10,justifyContent:"flex-end",alignItems:"center"}}>
-          <span style={{fontSize:11,color:"#854F0B",marginRight:"auto",display:"flex",alignItems:"center",gap:5}}><Clock size={12}/> Saving creates a Pending voucher — it posts to the books only after approval.</span>
-          <button onClick={submit} disabled={!canPost||post.isPending} style={{...btnG,background:canPost?"#A07828":"#bfc3d6",opacity:(!canPost||post.isPending)?0.6:1}}>
-            ⏳ Save (Pending Approval) {!party?"(Select Supplier)":lineRows.length===0?"(Add a Line)":post.isPending?"…":""}
-          </button>
-        </div>
-      </div>
-    </VWrap>
-  );
+// Purchase-Expense CREATE renders through the unified VoucherShell (Option C),
+// sharing one form with the ledger-account edit screen.
+export function PurchaseExpenseVoucher({ branch }) {
+  return <VoucherShell category="purchase-expense" mode="create" branch={branch} />;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -4650,7 +4018,7 @@ export function SalesHoliday({branch,setRoute}){
 export function RecurringVouchers({branch}){
   const mob=useMobile();
   const [templates,setTemplates]=useState(RECURRING_DATA);
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [form,setForm]=useState({name:"",type:"Journal",freq:"Monthly",day:1,dr:"",cr:"",amt:0});
   const TODAY=todayISO();
   const due=templates.filter(t=>t.active&&t.nextRun<=TODAY);

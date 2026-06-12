@@ -36,6 +36,7 @@ import { OutstandingOnAccount } from './modules/outstanding';
 import { AccountsTreeView } from './modules/chartBuilder';
 import { PnLTallyLive } from './modules/pnlTally';
 import { BalanceSheetTallyLive } from './modules/balanceSheetTally';
+import { CapitalVsInvestmentLive } from './modules/capitalVsInvestment';
 import { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, AccountsChartLive, InvoiceGPLive } from './modules/accountingLive';
 import { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } from './modules/reportsFinancial';
 import { NotesToFinancials } from './modules/reportsNotes';
@@ -49,6 +50,14 @@ import { SideNav } from './shell/SideNav';
 import { TopNav } from './shell/TopNav';
 import { TopBar } from './shell/TopBar';
 import { PrintPreviewHost } from './core/PrintPreview';
+import { PrefsProvider } from './core/prefs';
+import { HotkeysProvider } from './core/ux/hotkeys';
+import { NavContext } from './core/ux/nav';
+import { ToastHost } from './core/ux/toast';
+import { ContextBar } from './shell/ContextBar';
+import { LedgerSwitcher } from './shell/LedgerSwitcher';
+import { LedgerModalHost } from './core/LedgerModalHost';
+import { ShortcutHelp } from './shell/ShortcutHelp';
 
 export default function KB360App(){
   /* ── Restore the session from localStorage so a refresh keeps the user
@@ -75,14 +84,27 @@ export default function KB360App(){
   });
   /* ── Route: restore the last visited page so a refresh keeps you where you
      were (only when signed in; logged-out always lands on the login screen). */
-  const [route,setRoute]=useState(()=>{
-    try { if(localStorage.getItem("kb360-token")) return localStorage.getItem("kb360-route")||"/dashboard"; }
+  /* ── Route + in-app history stack. A single linear stack with a cursor gives
+     real Back/Forward (Esc, Alt+←/→, the ContextBar arrows) instead of always
+     bouncing to the dashboard. The current route survives a refresh. ── */
+  const [hist,setHist]=useState(()=>{
+    let init="/dashboard";
+    try { if(localStorage.getItem("kb360-token")) init=localStorage.getItem("kb360-route")||"/dashboard"; }
     catch { /* ignore */ }
-    return "/dashboard";
+    return { stack:[init], idx:0 };
   });
+  const route=hist.stack[hist.idx];
   const [currentUser,setCurrentUser]=useState(restoredUser);  // null → LoginScreen shows on app load
   const mob=useMobile();
-  const navigate=r=>{setRoute(r);};
+  const navigate=(r)=>setHist(h=>{
+    if(!r || r===h.stack[h.idx]) return h;                 // ignore no-op re-navigation
+    const stack=h.stack.slice(0,h.idx+1); stack.push(r);
+    const capped=stack.slice(-50);                          // bound memory
+    return { stack:capped, idx:capped.length-1 };
+  });
+  const goBack=()=>setHist(h=>h.idx>0?{...h,idx:h.idx-1}:h);
+  const goForward=()=>setHist(h=>h.idx<h.stack.length-1?{...h,idx:h.idx+1}:h);
+  const navValue={ route, navigate, goBack, goForward, canBack:hist.idx>0, canForward:hist.idx<hist.stack.length-1 };
 
   /* Persist the current route so it survives a page refresh. */
   useEffect(()=>{ try{ localStorage.setItem("kb360-route", route); }catch{ /* ignore */ } },[route]);
@@ -104,7 +126,7 @@ export default function KB360App(){
       }
     }
     // Redirect to dashboard on user switch (since current route may be forbidden)
-    setRoute("/dashboard");
+    navigate("/dashboard");
   };
 
   /* ── Sign out: clear the stored JWT + user so the next session must log in ── */
@@ -131,7 +153,7 @@ export default function KB360App(){
   /* ── Any API call that 401s / 403s (expired or invalid token) signs the user
      out and lands them on the login screen — instead of showing broken data. */
   useEffect(()=>{
-    const onExpired=()=>{ setUser(null); setRoute("/dashboard"); };
+    const onExpired=()=>{ setUser(null); navigate("/dashboard"); };
     window.addEventListener("kbiz:auth-expired", onExpired);
     return ()=> window.removeEventListener("kbiz:auth-expired", onExpired);
   },[]);
@@ -272,6 +294,7 @@ export default function KB360App(){
     if(route==="/masters/approval-limits")return <ApprovalLimitsMaster/>;
     if(route==="/masters/numbering")      return <NumberingSeriesMaster branch={branch}/>;
     if(route==="/dashboard")          return <DashboardRouter branch={branch} setRoute={navigate} currentUser={currentUser}/>;
+    if(route==="/dashboards/capital") return <CapitalVsInvestmentLive branch={branch}/>; // Capital vs Investment (live from BS + P&L)
     // Director/Super-Admin dashboard suite (menu is role-gated in getMenu).
     if(/^\/dashboards\/(exec|profitability|cash|arap|branch|balance-sheet|module-gp|sales|supplier|tax|expenses|audit|sales-target|gp-target|collections-target|budget-expense)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch}/>;
     if(route==="/finance/targets") return <TargetsMaster branch={branch}/>;
@@ -431,6 +454,9 @@ export default function KB360App(){
   }
 
   return (
+    <PrefsProvider enabled={!!currentUser}>
+    <HotkeysProvider>
+    <NavContext.Provider value={navValue}>
     <ReferenceProvider>
     <div style={{display:"flex",flexDirection:"column",height:"100vh",
       overflow:"hidden",fontFamily:"system-ui,sans-serif",background:"#f3f4f8"}}>
@@ -441,6 +467,8 @@ export default function KB360App(){
         {/* SAP Fiori-style horizontal navigation */}
         <TopNav branch={branch} setBranch={setBranch} currentUser={currentUser} switchUser={switchUser}
           route={route} setRoute={navigate}/>
+        {/* App-wide Back / Forward / breadcrumb / Recents — works on every screen */}
+        <ContextBar/>
       </div>
 
       {/* Body */}
@@ -463,9 +491,18 @@ export default function KB360App(){
           </ErrorBoundary>
         </main>
       </div>
+
+      {/* Global overlays / hosts (mounted once) */}
       <PrintPreviewHost/>
+      <ToastHost/>
+      <LedgerSwitcher branch={branch}/>
+      <LedgerModalHost branch={branch}/>
+      <ShortcutHelp/>
     </div>
     </ReferenceProvider>
+    </NavContext.Provider>
+    </HotkeysProvider>
+    </PrefsProvider>
   );
 }
 

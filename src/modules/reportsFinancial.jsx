@@ -30,6 +30,8 @@ import { VoucherEditor } from './accountingLive';
 import { useMobile } from '../core/hooks';
 import { openPrintPreview } from '../core/PrintPreview';
 import { LedgerActions } from '../core/ledgerActions';
+import { openLedgerModal } from '../core/LedgerModalHost';
+import { pushModal } from '../core/ux/modalStore';
 
 /* ── palette (SAP Fiori) ─────────────────────────────────────────────── */
 const SAP = {
@@ -151,6 +153,7 @@ const tapRow = { display: 'flex', justifyContent: 'space-between', alignItems: '
 
 // Full-screen on phones, centred sheet on desktop. Tap the backdrop to close.
 function Modal({ title, onClose, mobile, children, wide }) {
+  useEffect(() => pushModal(onClose), []); // Esc closes the topmost modal
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: mobile ? 'stretch' : 'flex-start', padding: mobile ? 0 : '5vh 12px' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', width: mobile ? '100%' : (wide ? 'min(1040px, 97vw)' : 'min(720px, 96vw)'), height: mobile ? '100%' : 'auto', maxHeight: mobile ? '100%' : '90vh', borderRadius: mobile ? 0 : 10, overflowY: 'auto', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
@@ -1583,7 +1586,7 @@ function AgeingReport({ branch, side }) {
                 <thead><tr><Th w="30%">{partyLabel}</Th>{BUCKETS.map(([, lbl]) => <Th key={lbl} right>{lbl}</Th>)}<Th right>Total</Th></tr></thead>
                 <tbody>
                   {rows.map((r, i) => (
-                    <tr key={r.party + i} onClick={() => setDrillLedger(r.party)}
+                    <tr key={r.party + i} onClick={() => openLedgerModal(r.party)}
                       style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: 'pointer' }}>
                       <td style={{ padding: '7px 16px', color: SAP.text, fontWeight: 600 }}>{r.party}<span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span></td>
                       {BUCKETS.map(([k]) => <td key={k} style={{ ...num, color: r[k] ? bucketColor(k) : SAP.label }}>{inr(r[k])}</td>)}

@@ -14,6 +14,7 @@ import { Download, Upload, CheckCircle2, AlertTriangle, FileSpreadsheet, ShieldA
 import { card } from '../core/styles';
 import { apiPost, apiGet } from '../core/api';
 import { VSPECS } from '../core/voucherSpecs';
+import { useModalEsc } from '../core/ux/useModalEsc';
 
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
 
@@ -460,6 +461,7 @@ function EntityCard({ spec, onUpload, onPreview, onViewExisting, state, subgroup
 // upload would add new ledgers to the Chart of Accounts, we first show exactly which
 // ones and where each is filed (Group ▸ Sub-Group), and only import on "Yes".
 function LedgerConfirmModal({ spec, newLedgers, busy, onYes, onNo }) {
+  useModalEsc(onNo);
   const n = newLedgers.length;
   return (
     <div onClick={onNo} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
@@ -507,6 +509,7 @@ function LedgerConfirmModal({ spec, newLedgers, busy, onYes, onNo }) {
 // Read-only VIEW of an uploaded file before importing: every row with all its
 // fields, and for vouchers the full double-entry (JV type + Dr/Cr ledgers).
 function PreviewModal({ spec, data, onClose }) {
+  useModalEsc(onClose);
   const [open, setOpen] = useState(null);
   const d = data.detail || {};
   const rows = d.rows || [];

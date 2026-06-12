@@ -15,7 +15,7 @@
    nested addresses[], contacts[], banks[], documents[], notes[], customFields[]).
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
@@ -23,6 +23,10 @@ import { apiGet, getAuthToken } from '../core/api';
 import { BRANCH_CODES } from '../core/data';
 import { FL, inpStd, tabBtnStyle } from '../core/styles';
 import { TAB_Page, tabPanel, cardStyle } from '../core/helpers';
+import { openLedgerModal } from '../core/LedgerModalHost';
+import { useHotkey } from '../core/ux/hotkeys';
+import { toast } from '../core/ux/toast';
+import { Kbd } from '../core/ux/widgets.jsx';
 
 const GOLD = '#d4a437', DARK = '#0d1326', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#22c55e';
 const SUPPLIER_CATS = ['Airline', 'DMC', 'Hotel', 'Visa', 'Insurance', 'Car', 'Misc'];
@@ -98,10 +102,16 @@ function usePartyMaster(resource, side) {
         setBaseline(JSON.stringify(rec));
         setSavedAt(Date.now());
         list.refetch();
+        toast(`${rec.name || 'Record'} saved`);
       },
-      onError: (e) => setErr(e.message || 'Save failed'),
+      onError: (e) => { setErr(e.message || 'Save failed'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); },
     });
   };
+
+  // Ctrl/Cmd+Enter saves from anywhere on the (multi-tab) party form, when dirty.
+  const liveRef = useRef(null);
+  liveRef.current = { save, dirty, saving: update.isPending };
+  useHotkey('mod+enter', () => { const s = liveRef.current; if (s && s.dirty && !s.saving) s.save(); }, []);
 
   return {
     list, rows, current, form, setField, setSelectedId, save,
@@ -311,14 +321,18 @@ function PartyShell({ title, subtitle, m, tabs, tab, setTab, children }) {
         {rows.map((r) => <option key={r.id} value={r.id}>{r.name}{r.branch ? ` · ${r.branch}` : ''}</option>)}
       </select>
       <span style={{ fontSize: 11, color: DIM }}>{rows.length} record{rows.length === 1 ? '' : 's'}</span>
+      {current && current.name && (
+        <button type="button" onClick={() => openLedgerModal(current.name)} title="Open this party's ledger account (current branch)"
+          style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}>📒 Open Ledger</button>
+      )}
       <div style={{ flex: 1 }} />
       {err && <span style={{ fontSize: 11.5, color: RED, fontWeight: 600 }}>⚠ {err}</span>}
       {!err && savedAt > 0 && !dirty && <span style={{ fontSize: 11.5, color: GREEN, fontWeight: 600 }}>✓ Saved</span>}
       <button
-        onClick={save} disabled={!current || saving || !dirty}
-        style={{ padding: '8px 16px', background: dirty ? GOLD : '#e6e8f1', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, color: dirty ? DARK : DIM, cursor: !current || saving || !dirty ? 'not-allowed' : 'pointer' }}
+        onClick={save} disabled={!current || saving || !dirty} title="Save (Ctrl/Cmd+Enter)"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 16px', background: dirty ? GOLD : '#e6e8f1', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, color: dirty ? DARK : DIM, cursor: !current || saving || !dirty ? 'not-allowed' : 'pointer' }}
       >
-        {saving ? 'Saving…' : '💾 Save changes'}
+        {saving ? 'Saving…' : <>💾 Save changes <Kbd>⌃↵</Kbd></>}
       </button>
     </div>
   );

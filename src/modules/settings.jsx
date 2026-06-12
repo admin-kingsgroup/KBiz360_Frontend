@@ -11,6 +11,7 @@ import { exportToCSV } from '../core/business-logic';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES } from '../core/data';
 import { apiPost, apiPut, apiDelete } from '../core/api';
 import { useUsersAdmin, useRoles, useCompanyProfiles, useApprovalRules } from '../core/useReference';
+import { useModalEsc } from '../core/ux/useModalEsc';
 import { fmt } from '../core/format';
 import { APPROVAL_LIMITS_DATA, CUSTOM_FIELDS_DATA, EMAIL_TEMPLATES_DATA, FIELD_ACCESS_DATA, PERM_ACTIONS, cardStyle } from '../core/helpers';
 import { useIsMob, useMobile } from '../core/hooks';
@@ -493,7 +494,7 @@ export function SettingsUsers(){
   const [selUser,setSelUser]=useState(null);
   const [selRole,setSelRole]=useState(null);
   const [editPerms,setEditPerms]=useState(null); // {userId, perms, special}
-  const [newUserModal,setNewUserModal]=useState(false);
+  const [newUserModal,setNewUserModal]=useState(false); useModalEsc(()=>setNewUserModal(false),newUserModal);
   const [newUserForm,setNewUserForm]=useState({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"]});
   const [search,setSearch]=useState("");
   const mob=useMobile();
@@ -1052,7 +1053,7 @@ export function ApiKeySettings(){
     {id:4,name:"SMTP Email (Travkings)",service:"Email",key:"smtp.travkings.com",secret:"••••••••",env:"Production",status:"Active",lastTest:"2026-05-19 07:00"},
     {id:5,name:"IRP E-Invoice API",service:"GSTN IRP",key:"IRP-XXXX-XXXX-XXXX",secret:"••••••••",env:"Sandbox",status:"Testing",lastTest:"2026-05-10"},
   ]);
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const SVC_ICONS={Amadeus:"✈",WhatsApp:"💬","IATA BSP":"📋",Email:"📧","GSTN IRP":"🏛",Custom:"⚙"};
   const STATUS_CLR={Active:"#27500A",Testing:"#854F0B",Inactive:"#A32D2D"};
   const STATUS_BG ={Active:"#EAF3DE",Testing:"#FAEEDA",Inactive:"#FCEBEB"};

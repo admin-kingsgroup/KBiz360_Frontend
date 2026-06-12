@@ -5,6 +5,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useModalEsc } from './ux/useModalEsc';
 import { AlertTriangle, ChevronDown, ChevronRight, Download, Lock, Plus, Printer, Save, Search, Settings, User } from 'lucide-react';
 import { Cell } from 'recharts';
 import { exportToCSV } from './business-logic';
@@ -696,6 +697,7 @@ export function MstrShell({title,icon,badge,badgeBg,badgeC,actions,children}){
 /* ── Modal wrapper ────────────────────────────────────────────── */
 
 export function MstrModal({title,onClose,children}){
+  useModalEsc(onClose);
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",
       zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>

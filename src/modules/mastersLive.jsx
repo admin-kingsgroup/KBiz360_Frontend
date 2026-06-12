@@ -7,7 +7,7 @@
    modal; each master is just a field config.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, X, Download } from 'lucide-react';
 import { card, inp } from '../core/styles';
 import { ACTIVE_CURRENCIES, BRANCH_CODES } from '../core/data';
@@ -15,6 +15,10 @@ import { useMasterList, useMasterMutations } from '../core/useMasters';
 import { branchCode } from '../core/useAccounting';
 import { apiPost } from '../core/api';
 import { exportToExcel } from '../core/exportExcel';
+import { pushModal } from '../core/ux/modalStore';
+import { useFormKeys } from '../core/ux/forms';
+import { toast } from '../core/ux/toast';
+import { Kbd } from '../core/ux/widgets.jsx';
 
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
 const btn = (bg, fg) => ({ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: bg, color: fg });
@@ -63,6 +67,10 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const editable = fields.filter((f) => f.input !== false); // table-only fields (e.g. derived) aren't edited
   const missing = editable.filter((f) => f.required && (form[f.key] === '' || form[f.key] == null));
+  const submit = () => { if (!saving && !missing.length) onSave(form); };
+  useEffect(() => pushModal(onClose), []); // Esc closes
+  // Enter advances fields; Enter on the last field (or Ctrl/Cmd+Enter) saves; Esc cancels.
+  const formKeys = useFormKeys({ onSubmit: submit, onCancel: onClose });
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', zIndex: 700, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '7vh' }} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 460, maxWidth: '94vw', maxHeight: '82vh', overflowY: 'auto', padding: 0 }}>
@@ -70,7 +78,7 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
           <h3 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: DARK }}>{title}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM }}><X size={18} /></button>
         </div>
-        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {editable.map((f) => (
             <div key={f.key}>
               {f.type !== 'bool' && <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: DIM, marginBottom: 4 }}>{f.label}{f.required && <span style={{ color: RED }}> *</span>}</label>}
@@ -81,8 +89,8 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 16px', borderTop: '1px solid #e5e9f0' }}>
           <button onClick={onClose} style={btn('#eef1f6', DIM)}>Cancel</button>
-          <button disabled={saving || missing.length > 0} onClick={() => onSave(form)} style={{ ...btn(BLUE, '#fff'), opacity: missing.length ? 0.5 : 1 }}>
-            {saving ? 'Saving…' : 'Save'}
+          <button disabled={saving || missing.length > 0} onClick={submit} title="Save (Ctrl/Cmd+Enter)" style={{ ...btn(BLUE, '#fff'), opacity: missing.length ? 0.5 : 1 }}>
+            {saving ? 'Saving…' : <>Save <Kbd>⌃↵</Kbd></>}
           </button>
         </div>
       </div>
@@ -109,12 +117,17 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
   const save = (form) => {
     setErr('');
     const { __new, id, ...body } = form;
-    const onError = (e) => setErr(e.message);
-    if (__new) create.mutate(body, { onSuccess: () => setEditing(null), onError });
-    else update.mutate({ id, body }, { onSuccess: () => setEditing(null), onError });
+    const label = body.name || body.code || 'Record';
+    const onError = (e) => { setErr(e.message); toast(`Could not save — ${e.message}`, 'error'); };
+    const onSuccess = () => { setEditing(null); toast(`${label} saved`); };
+    if (__new) create.mutate(body, { onSuccess, onError });
+    else update.mutate({ id, body }, { onSuccess, onError });
   };
 
-  const del = (r) => { if (window.confirm(`Delete "${r.name}"?`)) remove.mutate(r.id); };
+  const del = (r) => {
+    if (!window.confirm(`Delete "${r.name}"?`)) return;
+    remove.mutate(r.id, { onSuccess: () => toast(`${r.name || 'Record'} deleted`), onError: (e) => toast(`Could not delete — ${e.message}`, 'error') });
+  };
 
   // Export every record (all fields, not just the table-visible ones) to Excel.
   // bool → Yes/No, tags → comma-joined, so the sheet stays human-readable.

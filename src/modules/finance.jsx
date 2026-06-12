@@ -1174,13 +1174,9 @@ export function YearEndClose({branch}){
 
 /* ── RECURRING VOUCHER TEMPLATES ─────────────────────────────── */
 
-export const TDS_SECTIONS={
-  "194C":{label:"194C - Contractors/DMC",rate:2,   threshold:30000,  payable:"tds_pay_c"},
-  "194H":{label:"194H - Commission/BSP", rate:5,   threshold:15000,  payable:"tds_pay_h"},
-  "194J":{label:"194J - Professional Svc",rate:10, threshold:30000,  payable:"tds_pay_j"},
-  "194D":{label:"194D - Insurance",       rate:5,  threshold:15000,  payable:"tds_pay_d"},
-  "None": {label:"No TDS",               rate:0,   threshold:0,      payable:null},
-};
+// Single source of truth lives in core/taxSections; re-exported here for the
+// existing importers of this module.
+export { TDS_SECTIONS } from '../core/taxSections';
 
 export function LoanEmiRegister({branch}){
   const cur=bc(branch).cur;

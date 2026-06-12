@@ -18,6 +18,8 @@ import { openPrintPreview } from '../core/PrintPreview';
 import { buildBookingInvoice } from '../core/invoiceHtml';
 import { apiGet, apiPost, apiPut } from '../core/api';
 import { useLedgerRegistry } from '../core/useReference';
+import { useHotkey } from '../core/ux/hotkeys';
+import { toast } from '../core/ux/toast';
 import {
   VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc,
 } from '../core/voucherSpecs.js';
@@ -122,9 +124,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       if (thenApprove) booking = await apiPost('/api/booking-orders/' + booking.id + '/approve');
       setResult({ ...booking, _approved: thenApprove, _edited: editing });
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
-    } catch (e) { setError(e.message || 'Failed to save voucher'); }
+      toast(thenApprove ? `Voucher ${booking.bookingNo || ''} approved & posted` : `Voucher ${booking.bookingNo || ''} saved — pending approval`);
+    } catch (e) { setError(e.message || 'Failed to save voucher'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
     finally { setSaving(false); }
   };
+  // Ctrl/Cmd+Enter saves from anywhere on this (large, multi-grid) entry screen.
+  useHotkey('mod+enter', () => { if (canSave) save(false); }, [canSave]);
 
   const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' }); setSupplier({ name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }); setResult(null); setError(''); };
 

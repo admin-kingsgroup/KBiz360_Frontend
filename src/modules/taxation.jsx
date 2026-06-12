@@ -11,6 +11,7 @@ import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY,
 import { fmt, fmtINR } from '../core/format';
 import { FORM16A_DATA, _TCS_ENTRIES, _TDS_ENTRIES, cardStyle } from '../core/helpers';
 import { useMobile } from '../core/hooks';
+import { useModalEsc } from '../core/ux/useModalEsc';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, tabBtnStyle } from '../core/styles';
 import { TDS_SECTIONS } from './finance';
 import { PHASE2_Page } from '../shell/PHASE2_Page';
@@ -689,7 +690,7 @@ export function TaxTdsTcs({branch}){
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
   const [tdsEntries,setTdsEntries]=useState(_TDS_ENTRIES);
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [form,setForm]=useState({payee:"",pan:"",section:"194C",nature:"",gross:0,date:""});
 
   const tFiltered=tdsEntries.filter(t=>t.date.startsWith(period));
@@ -959,7 +960,7 @@ export function EWayBill({branch}){
     {id:"EWB-2122-1234567890",invoice:"BOM/1726/SF00041",date:"2026-05-15",from:"Mumbai",to:"Pune",goods:"Travel documents & MICE materials",value:185000,vehicle:"MH01AB1234",distance:150,validity:"2026-05-16",status:"Active"},
     {id:"EWB-2122-9876543210",invoice:"BOM/1726/SH00028",date:"2026-05-12",from:"Mumbai",to:"Ahmedabad",goods:"Tour kits and branded merchandise",value:92000,vehicle:"GJ01CD5678",distance:530,validity:"2026-05-14",status:"Expired"},
   ]);
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const STATUS_CLR={Active:"#27500A",Expired:"#A32D2D",Cancelled:"#5a6691"};
   const STATUS_BG ={Active:"#EAF3DE",Expired:"#FCEBEB",Cancelled:"#f3f4f8"};
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");

@@ -15,6 +15,7 @@ import { exportToExcel } from '../core/exportExcel';
 import { ACM_DATA, APPROVAL_LIMITS_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, CURRENCY_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, MstrModal, MstrShell, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, _PASSPORTS, cardStyle, tabPanel } from '../core/helpers';
 import { useMobile } from '../core/hooks';
 import { useGpBills } from '../core/useAccounting';
+import { useModalEsc } from '../core/ux/useModalEsc';
 import { ReportDateBar, resolveReportRange } from '../core/reportDateBar';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../core/styles';
 import { PHASE2_Page } from '../shell/PHASE2_Page';
@@ -35,7 +36,7 @@ export function ExportBtn({ name, columns, rows, label = "📤 Export" }) {
 
 export function MastersForex(){
   const [rates,setRates]=useState(FOREX_RATES_DATA);
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [form,setForm]=useState({from:"INR",to:"INR",rate:0,source:"Manual"});
   const CURRENCIES=ACTIVE_CURRENCIES;
 
@@ -276,7 +277,7 @@ export function Supplier360({branch}){
 
 export function MastersSubAgents(){
   const mob=useMobile();
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [sel,setSel]=useState(null);
   const [form,setForm]=useState({name:"",iata:"",email:"",phone:"",type:"Retail",city:"",currency:"INR",
     commType:"Percentage of GP",commRate:10,creditLimit:200000,creditDays:30,paymentCycle:"Monthly"});
@@ -481,7 +482,7 @@ export function VendorTermsMaster({branch}){
 
 export function ChartOfAccounts(){
   const [search,setSearch]=useState("");
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [form,setForm]=useState({name:"",type:"Asset",parent:"Current Assets"});
 
   const COA_GROUPS=[
@@ -622,7 +623,7 @@ export function ChartOfAccounts(){
 }
 
 export function MastersLedgers(){
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [search,setSearch]=useState("");
   const [filter,setFilter]=useState("All");
   // Superseded by the live LedgersMaster (/api/ledgers). No bundled demo ledgers.
@@ -705,7 +706,7 @@ export function MastersCustomers(){
   const mob=useMobile();
   const [tab,setTab]=useState("B2B");
   const [search,setSearch]=useState("");
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [editRec,setEditRec]=useState(null);
 
   /* ══ SEPARATE DATA STORES — never mixed ══════════════════════════
@@ -1074,7 +1075,7 @@ export function MastersCustomers(){
 }
 
 export function MastersSuppliers(){
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [search,setSearch]=useState("");
   const [typeFilter,setTypeFilter]=useState("All");
   const supps=[];
@@ -1150,7 +1151,7 @@ export function MastersSuppliers(){
    ════════════════════════════════════════════════════════════════ */
 
 export function MastersAirlines(){
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [search,setSearch]=useState("");
   const airlines=[];
   const filtered=airlines.filter(a=>!search||
@@ -1232,7 +1233,7 @@ export function MastersAirlines(){
    ════════════════════════════════════════════════════════════════ */
 
 export function MastersHotels(){
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [tab,setTab]=useState("hotels");
   const [search,setSearch]=useState("");
   const hotels=[];
@@ -1582,7 +1583,7 @@ export function MastersTaxRates(){
 export function TourCodeMaster({branch,setRoute}){
   const mob=useMobile();
   const [codes,setCodes]=useState(TOUR_CODES_DATA);
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [search,setSearch]=useState("");
   const [form,setForm]=useState({id:"",name:"",dest:"",nights:4,days:5,pax:"FIT",base:0,peak:0,off:0,gp:12,active:true,tags:[],mods:["Flight","Hotel"]});
 
@@ -2634,7 +2635,7 @@ export function PassportManager({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?null:branch?.code;
   const [search,setSearch]=useState("");
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [form,setForm]=useState({client:"",person:"",passport:"",nationality:"Indian",issued:"",expiry:"",branch:"BOM"});
   const [passports,setPassports]=useState(_PASSPORTS);
   const TODAY="2026-05-19";

@@ -335,11 +335,14 @@ export function useSalesRegister(branch, { from, to } = {}) {
 // side 'supplier' → creditor's open purchase bills (Payment). Returns
 // { party, side, bills:[{billVno,date,total,allocated,outstanding,status,ageDays}], advances }.
 // Needs a real party name + a specific branch (a voucher belongs to one branch).
-export function useOpenBills(party, branch, side = 'customer') {
+// `excludeId` (optional) — when editing a receipt/payment, pass its id so the
+// open-bills query ignores this voucher's own settlement; the bills it already
+// cleared then show at full outstanding and its allocation can be re-edited.
+export function useOpenBills(party, branch, side = 'customer', excludeId) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || ''],
-    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side }),
+    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || '', excludeId || ''],
+    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side, excludeId }),
     enabled: enabled() && !!party && !!code,
     staleTime: 15_000,
   });
@@ -396,7 +399,7 @@ export function useVoucher(id) {
 // Live full-JV preview for the editor: posts the (possibly edited) voucher body and
 // returns every Dr/Cr leg + totals + balanced flag, even when it doesn't balance.
 export function useVoucherPreview(body) {
-  const key = body ? JSON.stringify({ b: body.branch, c: body.category, p: body.party, t: body.taxAmt, d: body.tdsAmt, x: body.tcsAmt, tot: body.total, st: body.subtotal, l: body.lines }) : 'none';
+  const key = body ? JSON.stringify({ b: body.branch, c: body.category, p: body.party, t: body.taxAmt, d: body.tdsAmt, x: body.tcsAmt, tot: body.total, st: body.subtotal, l: body.lines, br: body.bankRef, pm: body.paymentMode }) : 'none';
   return useQuery({
     queryKey: ['accounting', 'preview-voucher', key],
     queryFn: () => apiPost('/api/accounting/preview-voucher', body),

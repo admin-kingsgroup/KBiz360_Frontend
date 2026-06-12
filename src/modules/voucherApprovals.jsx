@@ -6,6 +6,7 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { VoucherView } from './pnlTally';
 import { openPrintWindow } from '../core/voucher-print';
+import { useModalEsc } from '../core/ux/useModalEsc';
 import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useApproveMany, useApproveAll } from '../core/useAccounting';
 import { VoucherEditor } from './accountingLive';
 import { BookingApprovals } from './bookingOrder';
@@ -49,6 +50,8 @@ export function VoucherApprovals({ branch }) {
   const [viewId, setViewId] = useState(null);      // voucher being viewed (read-only formatted view)
   const viewRef = useRef(null);
   const [view, setView] = useState('tree');        // entry | voucher | tree (Group-Subgroup-Ledger)
+  useModalEsc(() => setViewId(null), !!viewId);     // Esc closes the view modal
+  useModalEsc(() => setEditId(null), !!editId);     // Esc closes the edit modal
   const cur = (bc(branch) || {}).cur || '₹';
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
   const q = useVoucherApprovals(branch, status, { from: range.from, to: range.to });

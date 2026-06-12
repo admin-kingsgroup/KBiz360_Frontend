@@ -10,6 +10,7 @@ import { BRANCHES, EMP_LOANS_DATA, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } 
 import { fmt, fmtINR } from '../core/format';
 import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, _LEAVES, _LEAVE_BALANCES, _REVISION_DUE, _SALARY_HISTORY, cardStyle, tabPanel } from '../core/helpers';
 import { useMobile } from '../core/hooks';
+import { useModalEsc } from '../core/ux/useModalEsc';
 import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../core/useReference';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiPut } from '../core/api';
@@ -199,7 +200,7 @@ export function ExpenseBudget({branch,setRoute}){
 
 export function HrEmployees({branch}){
   const mob=useMobile();
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [selected,setSelected]=useState(null);
   const [search,setSearch]=useState("");
   const [deptFilter,setDeptFilter]=useState("All");
@@ -1028,7 +1029,7 @@ export function HrLeave({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?null:branch?.code;
   const [leaves,setLeaves]=useState(_LEAVES);
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [tab,setTab]=useState("requests"); // requests | calendar | balances
   const [form,setForm]=useState({empId:"",empName:"",type:"Annual Leave",from:"",to:"",reason:""});
 
@@ -1164,7 +1165,7 @@ export function HrLeave({branch}){
 export function HrExpenses({branch}){
   const brCode=branch==="ALL"?null:branch?.code;
   const [claims,setClaims]=useState(_EXPENSE_CLAIMS);
-  const [modal,setModal]=useState(false);
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [form,setForm]=useState({empId:"",empName:"",date:"",category:"Travel",desc:"",amount:0});
 
   const filtered=claims.filter(c=>!brCode||HR_EMPLOYEES_DATA.find(e=>e.id===c.empId&&e.branch===brCode));
