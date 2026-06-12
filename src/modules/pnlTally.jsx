@@ -61,18 +61,19 @@ function PLLines({ line, onPick }) {
         onMouseEnter={(e) => drillable && (e.currentTarget.style.background = '#eef4ff')}
         onMouseLeave={(e) => (e.currentTarget.style.background = line.isGroup ? '#fcfdff' : '#fff')}>
         <td style={{ ...tdName, fontWeight: line.isGroup ? 700 : 400, color: line.isGroup ? DARK : '#1f3a8a', paddingLeft: line.isGroup ? 12 : 26 }}>
-          {line.name}{drillable && <ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9aa6c4' }} />}
+          {line.name}{line.isGroup && <ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9aa6c4' }} />}
         </td>
         <td style={tdNum}>{line.isGroup ? '' : money(line.amount)}</td>
         <td style={{ ...tdNum, fontWeight: 700 }}>{line.isGroup ? money(line.amount) : ''}</td>
       </tr>
-      {/* Tally shows the immediate breakup inline under each group. */}
-      {line.isGroup && (line.items || []).map((it, j) => (
+      {/* Tally shows ONLY the sub-group breakup inline. Ledgers stay hidden under
+          their head until you drill into that group / sub-group. */}
+      {line.isGroup && (line.items || []).filter((it) => it.isGroup).map((it, j) => (
         <tr key={j} onClick={() => onPick(it)} style={{ cursor: 'pointer' }}
           onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-          <td style={{ ...tdName, paddingLeft: 30, color: it.isGroup ? DARK : '#1f3a8a', fontWeight: it.isGroup ? 600 : 400 }}>
-            {it.name}{(it.isGroup || it.ledger) && <ChevronRight size={10} style={{ verticalAlign: 'middle', marginLeft: 3, color: '#b6c0da' }} />}
+          <td style={{ ...tdName, paddingLeft: 30, color: DARK, fontWeight: 600 }}>
+            {it.name}<ChevronRight size={10} style={{ verticalAlign: 'middle', marginLeft: 3, color: '#b6c0da' }} />
           </td>
           <td style={tdNum}>{money(it.amount)}</td>
           <td />
@@ -101,7 +102,7 @@ export function GroupSummary({ frame, onPick }) {
               onMouseEnter={(e) => drillable && (e.currentTarget.style.background = '#eef4ff')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
               <td style={{ ...tdName, fontWeight: it.isGroup ? 700 : 400, color: it.isGroup ? DARK : '#1f3a8a' }}>
-                {it.name}{drillable && <ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9aa6c4' }} />}
+                {it.name}{it.isGroup && <ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9aa6c4' }} />}
               </td>
               <td style={tdNum}>{it.side === 'Dr' ? money(it.amount) : ''}</td>
               <td style={tdNum}>{it.side === 'Cr' ? money(it.amount) : ''}</td>
@@ -197,46 +198,159 @@ function LedgerDrill({ name, branch, from, to, onPick }) {
   );
 }
 
-/* ── View 4: Ledger Vouchers (optionally filtered to one cost-centre) ── */
+/* ── View 4: Ledger Vouchers — Tally "Display → Ledger" with its own period, a
+   narration toggle, a running-balance column, and (for party ledgers) a Bill-wise
+   tab. Particulars shows the contra ledger(s), as Tally does. Optionally filtered
+   to one cost-centre when drilled from the Domestic/International split. ── */
+const lightInp = { padding: '4px 8px', borderRadius: 6, border: '1px solid ' + LINE, fontSize: 11, color: DARK, background: '#fff' };
+const tabBtn = (active) => ({ padding: '4px 12px', borderRadius: 6, border: '1px solid ' + (active ? DARK : LINE), background: active ? DARK : '#fff', color: active ? '#fff' : DARK, fontSize: 11, fontWeight: 600, cursor: 'pointer' });
+const addDaysStr = (s, n) => { const d = new Date(s); if (Number.isNaN(d.getTime())) return s; d.setDate(d.getDate() + (Number(n) || 0)); return d.toISOString().slice(0, 10); };
+const ageColor = (n) => (n <= 7 ? '#27500A' : n <= 30 ? '#8a6d00' : '#9B2C2C');
+// Tally's "Particulars" is the contra leg of the voucher (every other ledger).
+const contraLabel = (ln) => {
+  const ps = ln.particulars || [];
+  if (!ps.length) return ln.party || '—';
+  return ps.length === 1 ? ps[0].ledger : `${ps[0].ledger} (+${ps.length - 1} more)`;
+};
+
 export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
+  const [range, setRange] = useState({ from, to });
+  const [showNarration, setShowNarration] = useState(false);
+  const [tab, setTab] = useState('ledger'); // 'ledger' | 'billwise'
+
   const { data, isLoading } = useQuery({
-    queryKey: ['acc-ledger', name, brCodeOf(branch), from, to, costCenter || ''],
-    queryFn: () => apiGet('/api/accounting/ledger/' + encodeURIComponent(name), { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from, to, ...(costCenter ? { costCenter } : {}) }),
+    queryKey: ['acc-ledger', name, brCodeOf(branch), range.from, range.to, costCenter || ''],
+    queryFn: () => apiGet('/api/accounting/ledger/' + encodeURIComponent(name), { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from: range.from, to: range.to, ...(costCenter ? { costCenter } : {}) }),
   });
-  if (isLoading) return <div style={{ padding: 20, color: DIM, fontSize: 12 }}>Loading ledger…</div>;
   const d = data || {};
+  const grp = String(d.group || '');
+  // Bill-wise only applies to party ledgers (Sundry Debtors / Creditors) and not
+  // to a cost-centre-filtered drill (which has no opening / bill concept).
+  const partySide = /debtor/i.test(grp) ? 'customer' : /creditor/i.test(grp) ? 'supplier' : '';
+  const billwiseAvailable = !!partySide && !costCenter;
+  const showBillwise = billwiseAvailable && tab === 'billwise';
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '8px 12px', borderBottom: '1px solid ' + LINE, background: '#fafbfe' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: DIM }}>
+          <span>From</span>
+          <input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} style={lightInp} />
+          <span>To</span>
+          <input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} style={lightInp} />
+        </div>
+        {!showBillwise && (
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: DIM, cursor: 'pointer', userSelect: 'none' }}>
+            <input type="checkbox" checked={showNarration} onChange={(e) => setShowNarration(e.target.checked)} /> Show narration
+          </label>
+        )}
+        {billwiseAvailable && (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <button style={tabBtn(tab === 'ledger')} onClick={() => setTab('ledger')}>Ledger</button>
+            <button style={tabBtn(tab === 'billwise')} onClick={() => setTab('billwise')}>Bill-wise</button>
+          </div>
+        )}
+      </div>
+
+      {isLoading && <div style={{ padding: 20, color: DIM, fontSize: 12 }}>Loading ledger…</div>}
+
+      {!isLoading && showBillwise && <LedgerBillwise name={name} branch={branch} side={partySide} />}
+
+      {!isLoading && !showBillwise && (
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr style={{ background: HEAD }}>
+            {['Date', 'Particulars', 'Vch Type', 'Vch No.', 'Debit', 'Credit', 'Balance'].map((h, i) => (
+              <th key={i} style={{ ...th, textAlign: i >= 4 ? 'right' : 'left' }}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            <tr style={{ background: '#f7f8fb' }}>
+              <td style={tdName} colSpan={4}><b>Opening Balance</b></td>
+              <td style={tdNum}>{d.openingSide === 'Dr' ? money(d.openingBalance) : ''}</td>
+              <td style={tdNum}>{d.openingSide === 'Cr' ? money(d.openingBalance) : ''}</td>
+              <td style={{ ...tdNum, fontWeight: 700 }}>{money(d.openingBalance)} {d.openingSide}</td>
+            </tr>
+            {(d.lines || []).map((ln, i) => (
+              <React.Fragment key={i}>
+                <tr onClick={() => ln.voucherId && onPick({ kind: 'voucher', id: ln.voucherId, vno: ln.vno })}
+                  style={{ cursor: ln.voucherId ? 'pointer' : 'default', borderBottom: showNarration ? 'none' : '1px solid #f0f2f7' }}
+                  onMouseEnter={(e) => ln.voucherId && (e.currentTarget.style.background = '#eef4ff')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+                  <td style={{ ...tdName, color: DIM, whiteSpace: 'nowrap' }}>{dmy(ln.date)}</td>
+                  <td style={{ ...tdName, fontWeight: 600 }}>{contraLabel(ln)}</td>
+                  <td style={{ ...tdName, textTransform: 'capitalize' }}>{ln.category || ''}</td>
+                  <td style={{ ...tdName, fontFamily: 'monospace', fontSize: 11 }}>{ln.vno}</td>
+                  <td style={tdNum}>{ln.debit ? money(ln.debit) : ''}</td>
+                  <td style={tdNum}>{ln.credit ? money(ln.credit) : ''}</td>
+                  <td style={{ ...tdNum, color: DIM }}>{money(Math.abs(ln.balance))} {ln.balanceSide}</td>
+                </tr>
+                {showNarration && (ln.narration || ln.entryNarration) && (
+                  <tr style={{ borderBottom: '1px solid #f0f2f7' }}>
+                    <td />
+                    <td colSpan={6} style={{ ...tdName, color: DIM, fontStyle: 'italic', fontSize: 11, paddingTop: 0 }}>{ln.narration || ln.entryNarration}</td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+          <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
+            <td style={{ ...tdName, fontWeight: 800 }} colSpan={4}>Current Total / Closing</td>
+            <td style={{ ...tdNum, fontWeight: 800 }}>{money(d.totalDebit)}</td>
+            <td style={{ ...tdNum, fontWeight: 800 }}>{money(d.totalCredit)}</td>
+            <td style={{ ...tdNum, fontWeight: 800 }}>{money(d.closingBalance)} {d.closingSide}</td>
+          </tr></tfoot>
+        </table>
+      )}
+    </div>
+  );
+}
+
+/* ── Bill-wise outstanding for a party ledger (Tally "Bill-wise details").
+   Reuses the existing receipt/payment allocation sub-ledger via /open-bills. ── */
+function LedgerBillwise({ name, branch, side }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['ledger-billwise', name, brCodeOf(branch), side],
+    queryFn: () => apiGet('/api/vouchers/open-bills', { party: name, branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), side }),
+  });
+  if (isLoading) return <div style={{ padding: 20, color: DIM, fontSize: 12 }}>Loading bills…</div>;
+  const bills = (data && data.bills) || [];
+  const advances = (data && data.advances) || 0;
+  if (!bills.length && advances <= 0.01) return <div style={{ padding: 24, textAlign: 'center', color: DIM, fontSize: 12 }}>No open bills for this ledger.</div>;
+  const totalOut = bills.reduce((s, b) => s + (b.outstanding || 0), 0);
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
       <thead><tr style={{ background: HEAD }}>
-        {['Date', 'Particulars', 'Vch Type', 'Vch No.', 'Debit', 'Credit'].map((h, i) => (
-          <th key={i} style={{ ...th, textAlign: i >= 4 ? 'right' : 'left' }}>{h}</th>
+        {['Date', 'Ref No.', 'Due Date', 'Bill Amount', 'Settled', 'Outstanding', 'Age'].map((h, i) => (
+          <th key={i} style={{ ...th, textAlign: i >= 3 && i <= 5 ? 'right' : 'left' }}>{h}</th>
         ))}
       </tr></thead>
       <tbody>
-        <tr style={{ background: '#f7f8fb' }}>
-          <td style={tdName} colSpan={4}><b>Opening Balance</b></td>
-          <td style={tdNum}>{d.openingSide === 'Dr' ? money(d.openingBalance) : ''}</td>
-          <td style={tdNum}>{d.openingSide === 'Cr' ? money(d.openingBalance) : ''}</td>
-        </tr>
-        {(d.lines || []).map((ln, i) => (
-          <tr key={i} onClick={() => ln.voucherId && onPick({ kind: 'voucher', id: ln.voucherId, vno: ln.vno })}
-            style={{ cursor: ln.voucherId ? 'pointer' : 'default', borderBottom: '1px solid #f0f2f7' }}
-            onMouseEnter={(e) => ln.voucherId && (e.currentTarget.style.background = '#eef4ff')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-            <td style={{ ...tdName, color: DIM, whiteSpace: 'nowrap' }}>{dmy(ln.date)}</td>
-            <td style={{ ...tdName, fontWeight: 600 }}>{ln.party || '—'}</td>
-            <td style={{ ...tdName, textTransform: 'capitalize' }}>{ln.category || ''}</td>
-            <td style={{ ...tdName, fontFamily: 'monospace', fontSize: 11 }}>{ln.vno}</td>
-            <td style={tdNum}>{ln.debit ? money(ln.debit) : ''}</td>
-            <td style={tdNum}>{ln.credit ? money(ln.credit) : ''}</td>
+        {bills.map((b, i) => (
+          <tr key={i} style={{ borderBottom: '1px solid #f0f2f7' }}>
+            <td style={{ ...tdName, color: DIM, whiteSpace: 'nowrap' }}>{dmy(b.date)}</td>
+            <td style={{ ...tdName, fontWeight: 600, fontFamily: 'monospace', fontSize: 11 }}>{b.billVno}</td>
+            <td style={{ ...tdName, color: DIM, whiteSpace: 'nowrap' }}>{b.creditDays ? dmy(addDaysStr(b.date, b.creditDays)) : '—'}</td>
+            <td style={tdNum}>{money(b.total)}</td>
+            <td style={{ ...tdNum, color: DIM }}>{b.allocated ? money(b.allocated) : ''}</td>
+            <td style={{ ...tdNum, fontWeight: 700 }}>{money(b.outstanding)}</td>
+            <td style={{ ...tdName, fontWeight: 600, color: ageColor(b.ageDays) }}>{b.ageDays}d</td>
           </tr>
         ))}
       </tbody>
-      <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
-        <td style={{ ...tdName, fontWeight: 800 }} colSpan={4}>Current Total / Closing</td>
-        <td style={{ ...tdNum, fontWeight: 800 }}>{money(d.totalDebit)}{d.closingSide === 'Dr' ? '  (' + money(d.closingBalance) + ' Dr)' : ''}</td>
-        <td style={{ ...tdNum, fontWeight: 800 }}>{money(d.totalCredit)}{d.closingSide === 'Cr' ? '  (' + money(d.closingBalance) + ' Cr)' : ''}</td>
-      </tr></tfoot>
+      <tfoot>
+        <tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
+          <td style={{ ...tdName, fontWeight: 800 }} colSpan={5}>Total Outstanding</td>
+          <td style={{ ...tdNum, fontWeight: 800 }}>{money(totalOut)}</td>
+          <td />
+        </tr>
+        {advances > 0.01 && (
+          <tr style={{ background: '#fff' }}>
+            <td style={{ ...tdName, color: DIM, fontStyle: 'italic' }} colSpan={5}>On-Account (advance, unallocated)</td>
+            <td style={{ ...tdNum, color: DIM, fontStyle: 'italic' }}>{money(advances)}</td>
+            <td />
+          </tr>
+        )}
+      </tfoot>
     </table>
   );
 }

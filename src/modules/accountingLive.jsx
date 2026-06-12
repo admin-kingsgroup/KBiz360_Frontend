@@ -24,6 +24,7 @@ import {
   useSalesRegister, usePurchaseRegister, useInvoiceGP,
   useVoucher, useUpdateVoucher, useCostCenters, useVoucherPreview,
 } from '../core/useAccounting';
+import { LedgerVouchers } from './pnlTally.jsx';
 
 const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691', BLUE = '#185FA5', RED = '#A32D2D', GREEN = '#27500A';
 const curOf = (branch) => bc(branch).cur;
@@ -371,55 +372,36 @@ function PrintBtn({ onClick, disabled }) {
 function LedgerDrill({ branch, ledger, from, to, onClose }) {
   const cur = curOf(branch);
   const [voucher, setVoucher] = useState(null);
-  const q = useLedgerStatement(ledger, branch, { from, to });
-  const d = q.data;
   const crumbs = [
     { label: ledger, onClick: voucher ? () => setVoucher(null) : null },
     ...(voucher ? [{ label: voucher.vno }] : []),
   ];
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(840px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(960px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
           <Crumb items={crumbs} />
-          <span style={{ fontSize: 10, color: DIM }}>{from || '…'} → {to || '…'}</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
         </div>
-        {voucher && <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} />}
-        {!voucher && (
-          <div>
-            {q.isLoading && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading ledger…</div>}
-            {q.isError && <div style={{ padding: 16, color: RED }}>⚠ {q.error?.message || 'Failed to load ledger'}</div>}
-            {d && <>
-              <div style={{ padding: '8px 14px', background: '#f3f5f9', fontSize: 11, color: DIM, display: 'flex', justifyContent: 'space-between' }}>
-                <span>Opening {money(cur, d.openingBalance)} {d.openingSide}</span>
-                <span style={{ fontWeight: 700, color: DARK }}>Closing {money(cur, d.closingBalance)} {d.closingSide}</span>
-              </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-                <thead><tr style={headRow}><Th>Date</Th><Th>Voucher</Th><Th>Particulars</Th><Th right>Dr</Th><Th right>Cr</Th><Th right>Balance</Th></tr></thead>
-                <tbody>
-                  {(d.lines || []).length === 0 && <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: DIM }}>No postings in this range.</td></tr>}
-                  {(d.lines || []).map((ln, i) => (
-                    <tr key={i} style={{ ...rowBg(i), cursor: ln.voucherId ? 'pointer' : 'default' }} onClick={() => ln.voucherId && setVoucher({ id: ln.voucherId, vno: ln.vno })}>
-                      <td style={{ padding: '8px 12px', color: DIM, whiteSpace: 'nowrap' }}>{ln.date}</td>
-                      <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{ln.vno}</td>
-                      <td style={{ padding: '8px 12px', color: '#384677' }}>{ln.narration || ln.party || ln.category}</td>
-                      <td style={{ padding: '8px 12px', ...num, color: ln.debit > 0 ? BLUE : '#dfe2ee' }}>{money(cur, ln.debit)}</td>
-                      <td style={{ padding: '8px 12px', ...num, color: ln.credit > 0 ? RED : '#dfe2ee' }}>{money(cur, ln.credit)}</td>
-                      <td style={{ padding: '8px 12px', ...num, fontWeight: 700, color: ln.balanceSide === 'Cr' ? RED : BLUE }}>{money(cur, Math.abs(ln.balance))} {ln.balanceSide}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                {d && <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
-                  <td colSpan={3} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD }}>CLOSING — {d.ledger}</td>
-                  <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, d.totalDebit)}</td>
-                  <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, d.totalCredit)}</td>
-                  <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, d.closingBalance)} {d.closingSide}</td>
-                </tr></tfoot>}
-              </table>
-            </>}
-          </div>
-        )}
+        {voucher
+          ? <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} />
+          : <LedgerVouchers name={ledger} branch={branch} from={from} to={to} onPick={(f) => f?.kind === 'voucher' && setVoucher({ id: f.id, vno: f.vno })} />}
+      </div>
+    </div>
+  );
+}
+
+// Standalone voucher viewer modal — opened from the Day Book (and reusable).
+function VoucherModal({ branch, voucher, onClose }) {
+  const cur = curOf(branch);
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(840px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+          <Crumb items={[{ label: voucher.vno }]} />
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
+        </div>
+        <VoucherEditor voucherId={voucher.id} cur={cur} onBack={onClose} />
       </div>
     </div>
   );
@@ -577,6 +559,7 @@ export function DayBookLive({ branch }) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(100);
+  const [voucher, setVoucher] = useState(null); // clicked Day Book line → voucher modal
   // Fetch all journals; date filtering is client-side (Tally dates are mixed-format strings).
   const q = useDayBook(branch);
   const allJournals = q.data || [];
@@ -596,7 +579,7 @@ export function DayBookLive({ branch }) {
   }, [sorted]);
 
   const postingRows = useMemo(() => sorted.flatMap((j) => (j.postings || []).map((p) => ({
-    dateKey: dayKey(j.date), date: j.date, vno: j.vno, type: j.type, category: j.category, branch: j.branch || '',
+    dateKey: dayKey(j.date), date: j.date, vno: j.vno, voucherId: j.voucherId, type: j.type, category: j.category, branch: j.branch || '',
     ledger: p.ledger, group: p.group, debit: p.debit, credit: p.credit,
     narration: p.narration || j.narration || '', party: j.party || '',
   }))), [sorted]);
@@ -652,7 +635,10 @@ export function DayBookLive({ branch }) {
                       </td>
                     </tr>
                   )}
-                  <tr style={rowBg(i)}>
+                  <tr style={{ ...rowBg(i), cursor: r.voucherId ? 'pointer' : 'default' }}
+                    onClick={() => r.voucherId && setVoucher({ id: r.voucherId, vno: r.vno })}
+                    onMouseEnter={(e) => { if (r.voucherId) e.currentTarget.style.background = '#eff6ff'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
                     <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.date}</td>
                     <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE, whiteSpace: 'nowrap' }}>{r.vno}</td>
                     {view === 'detailed' && <>
@@ -677,6 +663,7 @@ export function DayBookLive({ branch }) {
         </Table>
         <Pagination total={postingRows.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} unit="lines" />
       </State>
+      {voucher && <VoucherModal branch={branch} voucher={voucher} onClose={() => setVoucher(null)} />}
     </Page>
   );
 }
