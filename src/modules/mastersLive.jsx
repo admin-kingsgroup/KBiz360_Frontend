@@ -299,12 +299,15 @@ const TALLY_GROUP_NAMES = [
 
 // Groups are the 28 FIXED Tally groups — READ-ONLY (no create / edit / delete).
 export const GroupsMaster = () => (
-  <MasterCrud title="Parent Groups (28 Tally · Fixed · Read-only)" subtitle="The 28 fixed Tally parent groups — the top of the chart of accounts"
+  <MasterCrud title="Parent Groups (28 Tally · Fixed · Read-only)" subtitle="The 28 fixed Tally groups — “Under” is the primary group each one nests within (— = a top-level primary group)"
     resource="groups" readOnly rowFilter={(g) => g.system}
     note="🔒 The 28 Tally groups are fixed and cannot be created, edited or deleted. To extend the chart, add Sub-Groups under a group (Masters → Sub-Groups)."
     fields={[
       { key: 'name', label: 'Group Name', type: 'text' },
-      { key: 'parent', label: 'Parent Group', type: 'text' },
+      // Tally calls this column “Under” (the group this one nests within), NOT
+      // “Parent Group” — that wording clashed with the screen title and confused
+      // users. “—” marks a top-level primary group.
+      { key: 'parent', label: 'Under', type: 'text' },
       { key: 'nature', label: 'Nature', type: 'text' },
       { key: 'statement', label: 'Statement', type: 'text' },
     ]} />
