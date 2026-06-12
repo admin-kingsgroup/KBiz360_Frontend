@@ -90,7 +90,7 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   );
 }
 
-export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note, toolbar, rowFilter, mapRow, sortRows }) {
+export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note, toolbar, rowFilter, mapRow, sortRows, rowStyle }) {
   const list = useMasterList(resource, params);
   const { create, update, remove } = useMasterMutations(resource);
   const [editing, setEditing] = useState(null); // record being edited, or {} for new
@@ -173,8 +173,11 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
             <tbody>
               {rows.length === 0 && <tr><td colSpan={cols.length + 1} style={{ padding: 28, textAlign: 'center', color: DIM }}>No records yet — click “New” to add one.</td></tr>}
               {rows.map((r) => (
-                <tr key={r.id} style={{ borderBottom: '1px solid #f1f3f8' }}>
-                  {cols.map((f) => <td key={f.key} style={{ padding: '9px 13px', textAlign: f.type === 'number' ? 'right' : 'left', color: '#334155', fontWeight: f.key === 'name' ? 700 : 400 }}>{cell(r, f)}</td>)}
+                // rowStyle lets a view emphasize certain rows (e.g. a tinted,
+                // bold band on each primary Tally group). Cell weight inherits
+                // from the row so a bold rowStyle cascades to the text.
+                <tr key={r.id} style={{ borderBottom: '1px solid #f1f3f8', ...(rowStyle ? rowStyle(r) : null) }}>
+                  {cols.map((f) => <td key={f.key} style={{ padding: '9px 13px', textAlign: f.type === 'number' ? 'right' : 'left', color: '#334155', fontWeight: f.key === 'name' ? 700 : 'inherit' }}>{cell(r, f)}</td>)}
                   <td style={{ padding: '9px 13px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {readOnly || (lockedRow && lockedRow(r))
                       ? <span title="Locked" style={{ color: '#c2c8d6', fontSize: 13 }}>🔒</span>
@@ -315,6 +318,9 @@ export const GroupsMaster = () => (
       a.tallyParent.localeCompare(b.tallyParent, 'en', { sensitivity: 'base', numeric: true })
       || (a.tallySub === '' ? -1 : b.tallySub === '' ? 1
           : a.tallySub.localeCompare(b.tallySub, 'en', { sensitivity: 'base', numeric: true }))}
+    // Primary group rows get a tinted, bold header band so their sub-groups
+    // read as a cluster beneath them.
+    rowStyle={(g) => (g.tallySub === '' ? { background: '#eef3fb', fontWeight: 700 } : null)}
     note="🔒 The 28 Tally groups are fixed and cannot be created, edited or deleted. To extend the chart, add Sub-Groups under a group (Masters → Sub-Groups)."
     fields={[
       { key: 'tallyParent', label: 'Tally Parent Group', type: 'text' },
