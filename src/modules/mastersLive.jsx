@@ -350,7 +350,11 @@ export const GroupsMaster = ({ branch }) => {
   const groupsWithLedger = new Set(ledgers.map(attachOf));
   const rows = [];
   ledgers.forEach((l) => rows.push({ ...resolvePath(attachOf(l)), ledgerName: l.name, ledgerNode: l, branchTag: l.branch || 'ALL', key: 'L' + l.id }));
-  groups.forEach((g) => {
+  // Empty (ledger-less) groups belong to the org-wide structure, so they're
+  // shown only in the consolidated (ALL) view. A specific branch shows just the
+  // groups that actually hold one of ITS ledgers (its own + the shared 'ALL') —
+  // otherwise groups used only by other branches would surface as empty rows.
+  if (branchView === 'ALL') groups.forEach((g) => {
     if (!hasChild.has(g.name) && !groupsWithLedger.has(g.name)) rows.push({ ...resolvePath(g.name), ledgerName: '', ledgerNode: null, branchTag: '', key: 'G' + g.id });
   });
 
