@@ -66,7 +66,7 @@ export function SrAeDashboardPage({ currentUser, setRoute }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         <WidgetCard title="Monthly Close Checklist" subtitle={CUR_MONTH_LABEL}>
-          <CloseChecklist />
+          <CloseChecklist onGo={navigate} />
         </WidgetCard>
 
         <WidgetCard title="Top 5 Vendors — Overdue Payables">

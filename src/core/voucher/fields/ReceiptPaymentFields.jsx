@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { FL, inp, btnGh } from '../../styles';
 import { useOpenBills } from '../../useAccounting';
+import { useLedgerRegistry } from '../../useReference';
 import { BillAllocPanel } from '../../../modules/transactions';
 import { PMT_MODES_V } from '../../helpers';
 import { TDS_SECTIONS } from '../../taxSections';
@@ -19,9 +20,21 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
   const accent = isReceipt ? GREEN : RED;
   const patch = (p) => setState((s) => ({ ...s, ...p }));
 
+  // The "other side" can be ANY ledger (customer, supplier, expense, loan, tax…).
+  // Bill-wise allocation + TDS apply ONLY when it's a true party ledger:
+  //   receipt → Debtor, payment → Creditor. Anything else posts as a plain
+  //   Dr/Cr pair (Tally-style direct entry). otherType is mirrored into state so
+  //   the registry's toBody/validate can branch without the chart.
+  const chart = useLedgerRegistry(branch).data || [];
+  const otherType = (chart.find((l) => l.name === state.party) || {}).type || '';
+  const isParty = otherType === (isReceipt ? 'Debtor' : 'Creditor');
+  useEffect(() => {
+    if (state.party && otherType && state.otherType !== otherType) setState((s) => ({ ...s, otherType }));
+  }, [otherType, state.party]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Live open bills for the chosen party. When editing, exclude this voucher's own
   // settlement so the bills it already cleared reappear and stay re-allocatable.
-  const billsQ = useOpenBills(state.party, branch, side, ctx.editId);
+  const billsQ = useOpenBills(isParty ? state.party : '', branch, side, ctx.editId);
 
   // Keep billVno→billId in sync as bills load, so toBody can carry billId.
   useEffect(() => {
@@ -57,8 +70,8 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
       <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: 14 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <FL label="Date"><input type="date" value={state.date || ''} onChange={(e) => patch({ date: e.target.value })} style={inp} /></FL>
-          <FL label={isReceipt ? 'Received from (Customer / Debtor — Cr)' : 'Pay to (Supplier / Creditor — Dr)'}>
-            <LedgerPicker branch={branch} value={state.party} onChange={onParty} filter={(l) => l.type === (isReceipt ? 'Debtor' : 'Creditor')} placeholder={isReceipt ? 'Select customer / debtor...' : 'Select supplier / creditor...'} />
+          <FL label={isReceipt ? 'Received from (account credited — Cr)' : 'Paid to (account debited — Dr)'}>
+            <LedgerPicker branch={branch} value={state.party} onChange={onParty} filter={(l) => l.type !== 'Bank' && l.type !== 'Cash'} placeholder={isReceipt ? 'Customer, loan, income, any account…' : 'Supplier, expense, salary, tax, any account…'} />
           </FL>
           <FL label={isReceipt ? 'Received in (Bank / Cash — Dr)' : 'Paid from (Bank / Cash — Cr)'}>
             <LedgerPicker branch={branch} value={state.bankRef} onChange={(v) => patch({ bankRef: v })} filter={(l) => l.type === 'Bank' || l.type === 'Cash'} placeholder="Select bank / cash account..." />
@@ -83,7 +96,15 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
         </div>
       </div>
 
-      {/* TDS */}
+      {/* Direct (non-party) entry note — e.g. an expense paid or income received */}
+      {state.party && !isParty && (
+        <div style={{ padding: '9px 12px', borderRadius: 9, background: '#EAF1FB', border: '1px solid #B9D6F2', margin: '12px 0', fontSize: 10.5, color: '#185FA5', fontWeight: 600 }}>
+          Direct entry — posts <b>{isReceipt ? `Dr ${state.bankRef || 'Bank'} · Cr ${state.party}` : `Dr ${state.party} · Cr ${state.bankRef || 'Bank'}`}</b>. {otherType ? `“${state.party}” is ${otherType}, not a party — ` : ''}no bill-wise / TDS. For a credit GST bill use Purchase-Expense; for a split entry use Journal.
+        </div>
+      )}
+
+      {/* TDS (party receipts/payments only) */}
+      {isParty && (
       <div style={{ padding: '10px 12px', borderRadius: 9, background: '#FAEEDA', border: '1px solid #FAC775', margin: '12px 0' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: state.tds ? 8 : 0 }}>
           <input type="checkbox" checked={!!state.tds} onChange={(e) => patch({ tds: e.target.checked })} style={{ cursor: 'pointer', accentColor: '#854F0B' }} />
@@ -99,14 +120,17 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
         )}
         {state.tds && tds > 0 && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#854F0B' }}>Gross settlement <b>{money2(cur, gross)}</b> · {isReceipt ? 'TDS receivable' : 'TDS payable'} <b>{money2(cur, tds)}</b> · {isReceipt ? 'Net received' : 'Net paid'} <b>{money2(cur, net)}</b></p>}
       </div>
+      )}
 
-      {/* Bill-wise allocation */}
+      {/* Bill-wise allocation (party ledgers only) */}
+      {isParty && (
       <BillAllocPanel
         side={side} party={state.party} q={billsQ} amount={gross}
         alloc={state.alloc} onSetAlloc={setAllocFor} onFull={fullAlloc}
         mode={state.applyMode} onMode={(m) => patch({ applyMode: m })}
         parkOnAcc={state.parkOnAcc} onParkOnAcc={(v) => patch({ parkOnAcc: v })} cur={cur}
       />
+      )}
 
       <FL label="Narration"><textarea value={state.remarks || ''} onChange={(e) => patch({ remarks: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder={state.party ? `Being ${isReceipt ? 'receipt from' : 'payment to'} ${state.party}` : 'Accounting narration...'} /></FL>
     </>

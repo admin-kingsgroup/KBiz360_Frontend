@@ -15,6 +15,7 @@ import { apiGet } from '../core/api';
 import { bc } from '../core/styles.jsx';
 import { PeriodBar } from '../core/period';
 import { PLSide, GroupSummary, LedgerVouchers, VoucherView } from './pnlTally.jsx';
+import { openLedgerModal } from '../core/LedgerModalHost';
 
 const DARK = '#0d1326', DIM = '#5a6691', LINE = '#e1e3ec';
 const money = (n) => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -39,7 +40,8 @@ export function BalanceSheetTallyLive({ branch }) {
 
   // Clicking a group → its Group Summary; a ledger → its Ledger Vouchers.
   const pick = (line) => {
-    if (line.ledger || (!line.isGroup && !line.items?.length)) setStack((s) => [...s, { kind: 'ledger', name: line.ledger || line.name, title: line.name }]);
+    // Leaf ledger → the ONE unified ledger modal; groups still drill in-place.
+    if (line.ledger || (!line.isGroup && !line.items?.length)) openLedgerModal(line.ledger || line.name);
     else if (line.isGroup) setStack((s) => [...s, { kind: 'group', title: line.name, items: line.items || [] }]);
   };
   const pickFrame = (f) => setStack((s) => (f && f.kind ? [...s, f] : s));

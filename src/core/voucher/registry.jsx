@@ -38,28 +38,77 @@ function makeRcptPmt(side) {
     label: isReceipt ? 'Receipt Voucher' : 'Payment Voucher',
     icon: isReceipt ? '💰' : '💸',
     explain: isReceipt
-      ? (<><b style={{ color: '#A07828' }}>Receipt:</b> money coming <b>in</b> from a debtor. Cash/Bank is <b>Debited</b>, the customer <b>Credited</b>. Pick the customer to load their open bills and allocate the receipt — park any balance <b>On Account</b>.</>)
-      : (<><b style={{ color: '#A07828' }}>Payment:</b> money going <b>out</b> to a creditor. The supplier is <b>Debited</b>, Cash/Bank <b>Credited</b>. Pick the supplier to load their open bills and allocate the payment — park any balance <b>On Account</b>.</>),
+      ? (<><b style={{ color: '#A07828' }}>Receipt:</b> money coming <b>in</b>. Cash/Bank is <b>Debited</b> and the chosen account <b>Credited</b> — a <b>customer</b> (with bill-wise allocation), or any other account (loan, interest, capital…) as a direct entry.</>)
+      : (<><b style={{ color: '#A07828' }}>Payment:</b> money going <b>out</b>. Cash/Bank is <b>Credited</b> and the chosen account <b>Debited</b> — a <b>supplier</b> (with bill-wise allocation), or any other account (rent, salary, loan, tax…) as a direct expense entry.</>),
 
     initial: () => ({
-      date: todayISO(), party: '', bankRef: '', paymentMode: 'NEFT', utr: '',
+      date: todayISO(), party: '', otherType: '', bankRef: '', paymentMode: 'NEFT', utr: '',
       amount: '', tds: false, tdsAmt: 0, tdsSection: '194H', remarks: '',
       alloc: {}, applyMode: 'bills', parkOnAcc: false, _billIds: {},
     }),
 
     fromVoucher: (v) => {
-      const net = v.subtotal != null ? v.subtotal : ((+v.total || 0) - (+v.tdsAmt || 0));
       const alloc = {}, billIds = {};
       (v.allocations || []).forEach((a) => { alloc[a.billVno] = a.amount; billIds[a.billVno] = a.billId || ''; });
+      // Receipts/payments entered or imported as explicit Dr/Cr legs (Tally import,
+      // CRM push, legacy entry) carry NO party/bankRef — recover them from the lines
+      // so the edit form shows what was actually entered:
+      //   receipt → Dr = Bank/Cash, Cr = party (debtor)
+      //   payment → Dr = party (creditor), Cr = Bank/Cash
+      const lines = v.lines || [];
+      const bankish = (l) => /\bbank\b|\bcash\b|petty/i.test(l && l.ledger || '');
+      const drLines = lines.filter((l) => l.drCr === 'Dr');
+      const crLines = lines.filter((l) => l.drCr === 'Cr');
+      const bankLines = isReceipt ? drLines : crLines;   // bank/cash leg side
+      const partyLines = isReceipt ? crLines : drLines;  // counter-ledger side
+      const bankLine = bankLines.find(bankish) || bankLines[0] || null;
+      const partyLine = partyLines.find((l) => !bankish(l)) || partyLines[0] || null;
+      let party = v.party || '';
+      let bankRef = v.bankRef || '';
+      if (!party && partyLine) party = partyLine.ledger || '';
+      if (!bankRef && bankLine) bankRef = bankLine.ledger || '';
+      // Amount: prefer an explicit net (subtotal>0) → else total net of TDS → else the bank-leg amount.
+      let amount = (+v.subtotal > 0) ? +v.subtotal : ((+v.total || 0) - (+v.tdsAmt || 0));
+      if (!(amount > 0) && bankLine) amount = +bankLine.amt || 0;
+      // Best-effort party flag so the model is right on first render; the field
+      // component re-derives otherType from the live chart once it loads.
+      const looksParty = !!v.party && (v.partyType === (isReceipt ? 'customer' : 'supplier') || (v.allocations || []).length > 0);
       return {
-        date: v.date || '', party: v.party || '', bankRef: v.bankRef || '', paymentMode: v.paymentMode || 'NEFT', utr: v.utr || '',
-        amount: net, tds: (+v.tdsAmt || 0) > 0, tdsAmt: +v.tdsAmt || 0, tdsSection: v.tdsSection || '194H', remarks: v.remarks || '',
+        date: v.date || '', party, otherType: looksParty ? (isReceipt ? 'Debtor' : 'Creditor') : '', bankRef, paymentMode: v.paymentMode || 'NEFT', utr: v.utr || '',
+        amount, tds: (+v.tdsAmt || 0) > 0, tdsAmt: +v.tdsAmt || 0, tdsSection: v.tdsSection || '194H', remarks: v.remarks || '',
         alloc, applyMode: v.applyMode || 'bills', parkOnAcc: (+v.onAccount || 0) > 0, _billIds: billIds,
       };
     },
 
+    // A true party leg (Debtor for a receipt, Creditor for a payment) keeps the
+    // bill-wise model: party + total + allocations, no lines → the backend infers
+    // the journal and tracks the sub-ledger. ANY OTHER ledger (expense, loan, tax,
+    // income…) posts as an explicit Dr/Cr pair, exactly like Tally — the backend's
+    // receiptLines/paymentLines post lines with drCr verbatim (no inference).
+    isParty: (s) => s.otherType === (isReceipt ? 'Debtor' : 'Creditor'),
+
     toBody: (s, ctx) => {
       const net = +s.amount || 0;
+      const party = s.otherType === (isReceipt ? 'Debtor' : 'Creditor');
+      const common = {
+        type: isReceipt ? 'RV' : 'PMT', category: isReceipt ? 'receipt' : 'payment',
+        branch: ctx.branchCode, date: s.date,
+        bankRef: s.bankRef, paymentMode: s.paymentMode,
+        status: 'saved',
+      };
+      if (!party) {
+        // Direct (non-party) entry — a clean two-leg journal. No TDS/bill-wise here
+        // (use Purchase-Expense for a credit GST bill, Journal for a split entry).
+        const amt = r2(net);
+        const lines = isReceipt
+          ? [{ ledger: s.bankRef, amt, drCr: 'Dr', desc: s.remarks || '' }, { ledger: s.party, amt, drCr: 'Cr', desc: s.remarks || '' }]
+          : [{ ledger: s.party, amt, drCr: 'Dr', desc: s.remarks || '' }, { ledger: s.bankRef, amt, drCr: 'Cr', desc: s.remarks || '' }];
+        return {
+          ...common, party: '', partyType: '',
+          lines, subtotal: amt, total: amt, tdsAmt: 0, allocations: [], onAccount: 0, applyMode: '',
+          remarks: s.remarks || `Being ${isReceipt ? 'amount received — Cr' : 'amount paid — Dr'} ${s.party} via ${s.paymentMode}${s.utr ? ` ref ${s.utr}` : ''}`,
+        };
+      }
       const tds = s.tds ? (+s.tdsAmt || 0) : 0;
       const gross = r2(net + tds);
       const sum = allocSummary(s.alloc, gross, s.parkOnAcc, s.applyMode);
@@ -67,26 +116,26 @@ function makeRcptPmt(side) {
         .filter(([, v]) => (+v || 0) > 0)
         .map(([vno, v]) => ({ billVno: vno, billId: (s._billIds || {})[vno] || '', amount: +v }));
       return {
-        type: isReceipt ? 'RV' : 'PMT', category: isReceipt ? 'receipt' : 'payment',
-        branch: ctx.branchCode, date: s.date,
-        party: s.party, partyType: isReceipt ? 'customer' : 'supplier',
-        bankRef: s.bankRef, paymentMode: s.paymentMode,
+        ...common, party: s.party, partyType: isReceipt ? 'customer' : 'supplier',
         subtotal: net, total: gross, tdsAmt: tds, tdsSection: s.tds ? (s.tdsSection || '') : '',
         allocations, onAccount: sum.onAcc, applyMode: s.applyMode,
         remarks: s.remarks || `Being ${isReceipt ? 'receipt from' : 'payment to'} ${s.party} via ${s.paymentMode}${s.utr ? ` ref ${s.utr}` : ''}`,
-        status: 'saved',
       };
     },
 
     validate: (s) => {
       const net = +s.amount || 0;
+      const party = s.otherType === (isReceipt ? 'Debtor' : 'Creditor');
+      let hint = '';
+      if (!s.party) hint = `(Pick ${isReceipt ? 'account credited' : 'account debited'})`;
+      else if (!s.bankRef) hint = '(Pick Bank / Cash)';
+      else if (net <= 0 && !party) hint = '(Enter Amount)';
+      if (!party) return { ok: !!s.party && !!s.bankRef && net > 0, hint };
+      // party leg → keep the bill-wise / on-account allocation rule
       const tds = s.tds ? (+s.tdsAmt || 0) : 0;
       const gross = r2(net + tds);
       const sum = allocSummary(s.alloc, gross, s.parkOnAcc, s.applyMode);
-      let hint = '';
-      if (!s.party) hint = `(Pick ${isReceipt ? 'Customer' : 'Supplier'})`;
-      else if (!s.bankRef) hint = '(Pick Bank)';
-      else if (gross <= 0) hint = '(Enter Amount)';
+      if (gross <= 0) hint = '(Enter Amount)';
       else if (!sum.valid) hint = s.applyMode === 'bills' ? '(Allocate / On Account)' : '';
       return { ok: !!s.party && !!s.bankRef && gross > 0 && sum.valid, hint };
     },
@@ -164,14 +213,22 @@ export const VOUCHER_REGISTRY = {
 
     initial: () => ({ date: todayISO(), drLedger: '', crLedger: '', amount: '', ref: '', remarks: '' }),
 
-    fromVoucher: (v) => ({
-      date: v.date || '',
-      drLedger: (v.lines && v.lines[0] && v.lines[0].ledger) || '', // destination (Dr)
-      crLedger: v.bankRef || '',                                    // source (Cr)
-      amount: v.total ?? '',
-      ref: '',
-      remarks: v.remarks || '',
-    }),
+    fromVoucher: (v) => {
+      // Imported/legacy contras store BOTH legs in lines with an empty bankRef;
+      // new-form contras store the Dr leg in lines[0] + the source (Cr) in bankRef.
+      // Recover both directions so the edit form shows what was entered.
+      const lines = v.lines || [];
+      const drLine = lines.find((l) => l.drCr === 'Dr') || lines[0] || null;
+      const crLine = lines.find((l) => l.drCr === 'Cr') || (lines.length > 1 ? lines[1] : null);
+      return {
+        date: v.date || '',
+        drLedger: (drLine && drLine.ledger) || '',           // destination (Dr)
+        crLedger: v.bankRef || (crLine && crLine.ledger) || '', // source (Cr)
+        amount: (+v.total > 0) ? v.total : (drLine ? (drLine.amt ?? '') : ''),
+        ref: '',
+        remarks: v.remarks || '',
+      };
+    },
 
     toBody: (s, ctx) => {
       const amt = r2(+s.amount || 0);

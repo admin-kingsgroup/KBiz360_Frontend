@@ -145,18 +145,14 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
 
 export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
   {label:"Financial Statements", children:[
-    {label:"Profit & Loss", href:"/reports/pnl"},
-    {label:"Profit & Loss — Module GP", href:"/reports/pnl-modulewise"},
+    {label:"Profit & Loss", href:"/reports/pnl"},          // Fiori · Classic · Vertical · Tally · TKF
+    {label:"Balance Sheet", href:"/reports/bs"},            // + Schedule III · Consolidated as modes
+    {label:"Cash Flow Statement", href:"/reports/cf"},
     {label:"Report Viewer (9-Tab View)", href:"/reports/viewer"},
     {label:"Cash Position Summary", href:"/reports/cash-position"},
     {label:"Inter-branch Elimination", href:"/reports/interbranch"},
     {label:"Notes to Financial Statements", href:"/reports/fs-notes"},
     {label:"Audit Trail Report", href:"/reports/audit-trail"},
-    {label:"Balance Sheet", href:"/reports/bs"},
-    {label:"Balance Sheet — Grouped", href:"/reports/bs-modulewise"},
-    {label:"Cash Flow Statement", href:"/reports/cf"},
-    {label:"Schedule III Balance Sheet", href:"/reports/schedule3-bs"},
-    {label:"Consolidated BS", href:"/reports/consolidated-bs"},
   ]},
   {label:"Profitability & GP", children:[
     {label:"Sales & GP Analytics", href:"/reports/sales-gp-analytics"},
@@ -353,6 +349,7 @@ export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_HR, MENU_ASS
 export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, children:[
   {label:"Overview", children:[
     {label:"Executive Overview", href:"/dashboards/exec"},
+    {label:"Alerts Dashboard", href:"/dashboard/alerts"},
     {label:"Capital vs Investment", href:"/dashboards/capital"},
     {label:"My Dashboard", href:"/dashboard"},
   ]},

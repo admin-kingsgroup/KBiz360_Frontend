@@ -10,6 +10,7 @@ import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, ChevronLeft, X } from 'lucide-react';
 import { apiGet } from '../core/api';
+import { openLedgerModal } from '../core/LedgerModalHost';
 import { bc } from '../core/styles.jsx';
 import { PeriodBar } from '../core/period';
 import { LedgerActions } from '../core/ledgerActions';
@@ -49,7 +50,7 @@ export function PLSide({ lines, total, periodLabel, onPick, title = 'Particulars
 
 /* A group header row (outer total + bold, clickable) followed by its indented items. */
 function PLLines({ line, onPick }) {
-  const drillable = line.isGroup || line.ledger;
+  const drillable = line.isGroup || line.ledger || (!line.isGroup && !!line.name);
   if (line.isCarry || line.isResult) {
     return (
       <tr><td style={{ ...tdName, fontStyle: 'italic', fontWeight: 700, color: line.isResult ? '#9B2C2C' : DARK }}>{line.name}</td>
@@ -97,7 +98,7 @@ export function GroupSummary({ frame, onPick }) {
       </tr></thead>
       <tbody>
         {items.map((it, i) => {
-          const drillable = it.isGroup || it.ledger;
+          const drillable = it.isGroup || it.ledger || !!it.name;
           return (
             <tr key={i} onClick={() => drillable && onPick(it)} style={{ cursor: drillable ? 'pointer' : 'default', borderBottom: '1px solid #f0f2f7' }}
               onMouseEnter={(e) => drillable && (e.currentTarget.style.background = '#eef4ff')}
@@ -465,7 +466,9 @@ export function PnLTallyLive({ branch }) {
   });
 
   const pick = (line) => {
-    if (line.ledger || (!line.isGroup && !line.items?.length)) setStack((s) => [...s, { kind: 'ledger', name: line.ledger || line.name, title: line.name }]);
+    // Leaf ledger → the ONE unified ledger modal (Statement · Bill-wise · Cost-Centre
+    // (DOM/INT) · Components). Groups still drill in-place to reveal their ledgers.
+    if (line.ledger || (!line.isGroup && !line.items?.length)) openLedgerModal(line.ledger || line.name);
     else if (line.isGroup) setStack((s) => [...s, { kind: 'group', title: line.name, items: line.items || [] }]);
   };
   const pickFrame = (f) => setStack((s) => [...s, f.kind ? f : null].filter(Boolean));

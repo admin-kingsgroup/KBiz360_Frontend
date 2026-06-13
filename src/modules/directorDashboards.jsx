@@ -5,6 +5,7 @@
 import React, { useMemo, useState } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { apiGet } from '../core/api';
+import { FocusBanner } from '../core/ux/FocusBanner';
 import { bc } from '../core/styles';
 import { PeriodBar, periodRange } from '../core/period';
 import {
@@ -591,6 +592,7 @@ export function TargetsMaster({ branch }) {
   const sel = { padding: '7px 10px', fontSize: 13, fontWeight: 700, border: `1px solid ${C.border}`, borderRadius: 6, background: '#fff', color: C.dark };
   return (
     <div style={{ margin: 12, maxWidth: 720 }}>
+      <FocusBanner />
       <div style={{ fontSize: 18, fontWeight: 800, color: C.dark }}>Sales Targets</div>
       <div style={{ fontSize: 12, color: C.dim, marginBottom: 12 }}>Set whole-FY targets per module. The Director "vs Target" dashboards pro-rate these to the period and compare against actuals.</div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>

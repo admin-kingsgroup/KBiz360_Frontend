@@ -7,6 +7,8 @@ import React, { useMemo, useState, useRef } from 'react';
 import { VoucherView } from './pnlTally';
 import { openPrintWindow } from '../core/voucher-print';
 import { useModalEsc } from '../core/ux/useModalEsc';
+import { FocusBanner } from '../core/ux/FocusBanner';
+import { useNavFocusStore } from '../core/ux/navFocus';
 import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useApproveMany, useApproveAll } from '../core/useAccounting';
 import { VoucherEditor } from './accountingLive';
 import { BookingApprovals } from './bookingOrder';
@@ -64,6 +66,20 @@ export function VoucherApprovals({ branch }) {
   const approveMany = useApproveMany();
   const approveAll = useApproveAll();
   const busy = approve.isPending || reject.isPending || del.isPending || approveMany.isPending || approveAll.isPending;
+
+  // P3 deep-link: opened from an Alert targeting voucher(s) → jump to the flagged
+  // status and auto-open the first unpostable voucher's editor (once per focus).
+  // The flagged vnos are highlighted in the list. Focus persists (banner stays)
+  // until dismissed; the openedRef stops it re-opening after the modal is closed.
+  const navFocus = useNavFocusStore((s) => s.focus);
+  const fp = navFocus && navFocus.params && navFocus.params.kind === 'voucher' ? navFocus.params : null;
+  const flagged = useMemo(() => new Set(fp?.sample || []), [fp]);
+  const openedRef = useRef(null);
+  React.useEffect(() => {
+    if (!fp) return;
+    if (fp.status && fp.status !== status) setStatus(fp.status);
+    if (fp.open && openedRef.current !== fp.open) { openedRef.current = fp.open; setEditId(fp.open); }
+  }, [fp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allIds = useMemo(() => [...new Set(entries.map((e) => e.id))], [entries]);
   React.useEffect(() => { setSel(new Set()); }, [status, branch]); // clear selection on tab/branch change
@@ -155,7 +171,7 @@ export function VoucherApprovals({ branch }) {
       <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
     ) : <span style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected</span>
   );
-  const vnoCell = (e, show = true) => <td onClick={() => show && setViewId(e.id)} title={show ? 'View full voucher' : ''} style={{ ...flatTd, color: C.blue, fontWeight: 700, cursor: show ? 'pointer' : 'default', textDecoration: show ? 'underline' : 'none' }}>{show ? e.vno : ''}</td>;
+  const vnoCell = (e, show = true) => <td onClick={() => show && setViewId(e.id)} title={show ? 'View full voucher' : ''} style={{ ...flatTd, color: C.blue, fontWeight: 700, cursor: show ? 'pointer' : 'default', textDecoration: show ? 'underline' : 'none', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{show ? e.vno : ''}</td>;
 
   // A single voucher row + the shared header (used by the Voucher-Type-wise groups).
   const voucherRow = (e, i) => { const x = drCrOf(e); return (
@@ -321,7 +337,7 @@ export function VoucherApprovals({ branch }) {
                                       return (
                                       <tr key={e.id + ':' + i} style={{ background: i % 2 ? '#fcfdff' : '#fff' }}>
                                         <td style={{ padding: '5px 8px 5px 44px', whiteSpace: 'nowrap', color: C.dim, borderBottom: '1px solid #f4f6fa' }}>{status === 'pending' && <input type="checkbox" checked={sel.has(e.id)} onChange={() => toggleSel(e.id)} onClick={(ev) => ev.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} />}{fmtDate(e.date)}</td>
-                                        <td onClick={() => setViewId(e.id)} title="View full voucher" style={{ padding: '5px 8px', color: C.blue, fontWeight: 700, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa', cursor: 'pointer', textDecoration: 'underline' }}>{e.vno}</td>
+                                        <td onClick={() => setViewId(e.id)} title="View full voucher" style={{ padding: '5px 8px', color: C.blue, fontWeight: 700, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa', cursor: 'pointer', textDecoration: 'underline', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{e.vno}</td>
                                         <td style={{ padding: '5px 8px', color: C.dim, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa' }}>{VCH[e.category] || e.type}</td>
                                         <td style={{ padding: '5px 8px', fontWeight: 600, color: C.blue, borderBottom: '1px solid #f4f6fa', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.drLedger}>{x.drLedger}</td>
                                         <td style={{ padding: '5px 8px', fontWeight: 600, color: C.red, borderBottom: '1px solid #f4f6fa', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.crLedger}>{x.crLedger}</td>
@@ -397,12 +413,16 @@ export function VoucherApprovals({ branch }) {
 // One screen for ALL approvals: a top toggle switches between SO/PO/GP bookings
 // and Vouchers; each shows Pending · Approved · Rejected · Deleted.
 export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain = 'sopogp' }) {
-  const [domain, setDomain] = useState(initialDomain);
+  // Opened from an Alert deep-link targeting a voucher → start on the Vouchers tab.
+  const navFocus = useNavFocusStore((s) => s.focus);
+  const focusVoucher = navFocus && navFocus.params && navFocus.params.kind === 'voucher';
+  const [domain, setDomain] = useState(focusVoucher ? 'vouchers' : initialDomain);
   const seg = (k, label) => (
     <button key={k} onClick={() => setDomain(k)} style={{ padding: '8px 18px', fontSize: 13, fontWeight: 800, border: `1px solid ${domain === k ? C.dark : '#d6dbe6'}`, background: domain === k ? C.dark : '#fff', color: domain === k ? C.gold : C.dim, cursor: 'pointer' }}>{label}</button>
   );
   return (
     <div style={{ margin: 12 }}>
+      <FocusBanner />
       <div style={{ display: 'inline-flex', borderRadius: 8, overflow: 'hidden', marginBottom: 4 }}>
         {seg('sopogp', 'SO / PO / GP')}{seg('vouchers', 'Vouchers')}
       </div>

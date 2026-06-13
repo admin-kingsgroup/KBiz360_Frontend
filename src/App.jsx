@@ -18,7 +18,7 @@ import { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, R
 import { RPT_InterbranchElim } from './modules/interbranch';
 import { SalesGpAnalytics } from './modules/salesGpAnalytics';
 import { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } from './modules/assets';
-import { Dashboard } from './modules/dashboard';
+import { Dashboard, AlertsDashboard } from './modules/dashboard';
 import { DirectorDash, TargetsMaster } from './modules/directorDashboards';
 import { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose } from './modules/finance';
 import { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } from './modules/ho-control';
@@ -39,6 +39,7 @@ import { BalanceSheetTallyLive } from './modules/balanceSheetTally';
 import { CapitalVsInvestmentLive } from './modules/capitalVsInvestment';
 import { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, AccountsChartLive, InvoiceGPLive } from './modules/accountingLive';
 import { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } from './modules/reportsFinancial';
+import { ProfitAndLossUnified, BalanceSheetUnified } from './modules/financialStatements';
 import { NotesToFinancials } from './modules/reportsNotes';
 import { CostCenterMasterLive } from './modules/costCentersLive';
 import { PaymentVerificationLive } from './modules/paymentVerification';
@@ -294,6 +295,7 @@ export default function KB360App(){
     if(route==="/masters/approval-limits")return <ApprovalLimitsMaster/>;
     if(route==="/masters/numbering")      return <NumberingSeriesMaster branch={branch}/>;
     if(route==="/dashboard")          return <DashboardRouter branch={branch} setRoute={navigate} currentUser={currentUser}/>;
+    if(route==="/dashboard/alerts")   return <AlertsDashboard branch={branch} setRoute={navigate}/>;
     if(route==="/dashboards/capital") return <CapitalVsInvestmentLive branch={branch}/>; // Capital vs Investment (live from BS + P&L)
     // Director/Super-Admin dashboard suite (menu is role-gated in getMenu).
     if(/^\/dashboards\/(exec|profitability|cash|arap|branch|balance-sheet|module-gp|sales|supplier|tax|expenses|audit|sales-target|gp-target|collections-target|budget-expense)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch}/>;
@@ -334,10 +336,11 @@ export default function KB360App(){
     if(route==="/tax/vat")            return <TaxVat/>;
     if(route==="/tax/einvoice")       return <TaxEInvoice/>;
     if(route==="/reports/gp")        return <ReportGP branch={branch} setRoute={navigate}/>;
-    if(route==="/reports/pnl" || route==="/reports/pnl-tally") return <PnLTallyLive branch={branch}/>;
-    if(route==="/reports/pnl-modulewise") return <ReportPnLLive branch={branch}/>;
-    if(route==="/reports/bs" || route==="/reports/bs-tally") return <BalanceSheetTallyLive branch={branch}/>;
-    if(route==="/reports/bs-modulewise") return <ReportBSLive branch={branch}/>;
+    // Unified statements: one P&L screen and one BS screen, view-switched
+    // (Fiori · Classic · Vertical · Tally · TKF [· Schedule III · Consolidated]).
+    // All legacy routes point here so existing links keep working.
+    if(route==="/reports/pnl" || route==="/reports/pnl-tally" || route==="/reports/pnl-modulewise") return <ProfitAndLossUnified branch={branch}/>;
+    if(route==="/reports/bs" || route==="/reports/bs-tally" || route==="/reports/bs-modulewise") return <BalanceSheetUnified branch={branch}/>;
     if(route==="/reports/cf")         return <ReportCF/>;
     if(route==="/reports/rec")        return <ReceivablesLive branch={branch}/>;
     if(route==="/reports/pay")        return <PayablesLive branch={branch}/>;

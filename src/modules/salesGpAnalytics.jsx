@@ -26,6 +26,7 @@ import { useLedgerRegistry } from '../core/useReference';
 import { PeriodBar } from '../core/period';
 import { BRANCHES } from '../core/data';
 import { fmtINR } from '../core/format';
+import { openLedgerModal } from '../core/LedgerModalHost';
 import { CUR_FY, CUR_QUARTER, CUR_MONTH, todayISO, fmtDate, monthLabel, fyQuarterOf } from '../core/dates';
 import { cardStyle } from '../core/helpers';
 import { RPT_thStyle, RPT_tdStyle } from '../core/styles';
@@ -560,7 +561,10 @@ function InterBranchTab({ branch, from, to, invoices, onVoucher }) {
                   <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0d1326' }}><span style={{ color: '#b9bed4', marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{l.ledger}</p>
                   <p style={{ margin: '1px 0 0 16px', fontSize: 10, color: '#5a6691' }}>{l.owning ? brName(l.owning) : '—'} · {l.side}</p>
                 </div>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: l.side === 'Receivable' ? '#185FA5' : '#A32D2D' }}>{money(l.outstanding)}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: l.side === 'Receivable' ? '#185FA5' : '#A32D2D' }}>{money(l.outstanding)}</span>
+                  <button onClick={(e) => { e.stopPropagation(); openLedgerModal(l.ledger); }} title="Open full ledger account" style={{ border: '1px solid #d6dbe6', background: '#fff', borderRadius: 6, fontSize: 11, padding: '3px 8px', cursor: 'pointer', color: '#0d1326', fontWeight: 700 }}>📒 Ledger</button>
+                </span>
               </div>
               {isOpen && <IBLedgerVouchers ledger={l.ledger} branch={branch} from={from} to={to} onVoucher={onVoucher} />}
             </div>

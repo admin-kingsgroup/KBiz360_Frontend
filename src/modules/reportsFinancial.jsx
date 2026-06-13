@@ -235,101 +235,17 @@ function ModuleVoucherDrill({ module, cur, mobile, onClose }) {
   );
 }
 
-// Full Tally-style Ledger Account: Date · Particulars (contra) · Vch Type · Vch No ·
-// Debit · Credit · running Balance, with opening / totals / closing and narration —
-// opened from any ledger in the P&L / Balance Sheet. Click a row to edit its voucher.
-const VCH_TYPE = { journal: 'Journal', payment: 'Payment', receipt: 'Receipt', contra: 'Contra', 'purchase-expense': 'Purchase', purchase: 'Purchase', sale: 'Sales', sales: 'Sales', 'credit-note': 'Credit Note', 'debit-note': 'Debit Note', refund: 'Refund', reissue: 'Reissue' };
-function LedgerVoucherDrill({ ledger, branch, to, cur, mobile, onClose }) {
-  const [vid, setVid] = useState(null);
-  const q = useLedgerStatement(ledger, branch, { to });
-  const d = q.data || {};
-  const lines = d.lines || [];
-  const mono = { fontFamily: "'Courier New', Courier, monospace", fontVariantNumeric: 'tabular-nums' };
-  const amt = (n) => (n ? inr(n) : '');
-  const partic = (ln) => {
-    const ps = ln.particulars || [];
-    if (!ps.length) return ln.party || ln.category || '—';
-    if (ps.length === 1) return ps[0].ledger;
-    return `${ps[0].ledger}  (+${ps.length - 1} more)`;
-  };
-  const cell = { padding: '6px 10px', borderBottom: '1px solid #eef1f6', verticalAlign: 'top', ...mono };
-  const th = { padding: '7px 10px', background: '#0d1326', color: '#d4a437', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, position: 'sticky', top: 0, whiteSpace: 'nowrap' };
-  return (
-    <Modal title={vid ? 'Edit Voucher' : `Ledger: ${ledger}`} onClose={onClose} mobile={mobile} wide>
-      {vid
-        ? <VoucherEditor voucherId={vid} cur={cur} onBack={() => setVid(null)} onClose={onClose} />
-        : (
-          <>
-            {q.isLoading && <div style={{ padding: 24, textAlign: 'center', color: SAP.sec }}>Loading ledger…</div>}
-            {q.isError && <div style={{ padding: 16, color: SAP.red, fontSize: 12 }}>⚠ {q.error?.message}</div>}
-            {!q.isLoading && !q.isError && (
-              <>
-                <div style={{ padding: '8px 12px', background: '#f4f7fc', borderBottom: `1px solid ${SAP.border}`, fontSize: 11.5, color: SAP.sec, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14 }}>
-                  <span><b style={{ color: SAP.text }}>{d.ledger || ledger}</b>{d.group ? ` · under ${d.group}` : ''}</span>
-                  <span>Opening: <b style={{ color: SAP.text }}>{inr(d.openingBalance || 0)} {d.openingSide || 'Dr'}</b></span>
-                  <span>Closing: <b style={{ color: (d.closingSide === 'Cr') ? SAP.red : SAP.blue }}>{inr(d.closingBalance || 0)} {d.closingSide || 'Dr'}</b></span>
-                  <span style={{ marginLeft: 'auto' }}><LedgerActions d={d} cur={cur} branchLabel={branch?.code || (typeof branch === 'string' ? branch : '')} to={to} particulars={partic} /></span>
-                </div>
-                <div style={{ overflow: 'auto', maxHeight: mobile ? '60vh' : '64vh' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ ...th, textAlign: 'left' }}>Date</th>
-                        <th style={{ ...th, textAlign: 'left' }}>Particulars</th>
-                        <th style={{ ...th, textAlign: 'left' }}>Vch Type</th>
-                        <th style={{ ...th, textAlign: 'left' }}>Vch No</th>
-                        <th style={{ ...th, textAlign: 'right' }}>Debit</th>
-                        <th style={{ ...th, textAlign: 'right' }}>Credit</th>
-                        <th style={{ ...th, textAlign: 'right' }}>Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr style={{ background: '#fafbfe' }}>
-                        <td style={cell}></td>
-                        <td style={{ ...cell, fontStyle: 'italic', color: SAP.sec }}>Opening Balance</td>
-                        <td style={cell}></td><td style={cell}></td><td style={cell}></td><td style={cell}></td>
-                        <td style={{ ...cell, textAlign: 'right', fontWeight: 700 }}>{inr(d.openingBalance || 0)} {d.openingSide || 'Dr'}</td>
-                      </tr>
-                      {lines.length === 0 && (
-                        <tr><td colSpan={7} style={{ ...cell, textAlign: 'center', color: SAP.sec, padding: 20 }}>No postings in this period.</td></tr>
-                      )}
-                      {lines.map((ln, i) => (
-                        <tr key={i} onClick={() => ln.voucherId && setVid(ln.voucherId)} title={ln.voucherId ? 'Click to open the voucher' : ''}
-                          style={{ cursor: ln.voucherId ? 'pointer' : 'default', background: i % 2 ? '#fcfdff' : '#fff' }}
-                          onMouseEnter={(e) => { if (ln.voucherId) e.currentTarget.style.background = '#eef4fb'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 ? '#fcfdff' : '#fff'; }}>
-                          <td style={{ ...cell, whiteSpace: 'nowrap', color: SAP.sec }}>{ln.date}</td>
-                          <td style={cell}>
-                            <div style={{ fontWeight: 600, color: SAP.text }}>{partic(ln)}</div>
-                            {(ln.narration || ln.entryNarration) ? <div style={{ fontSize: 10.5, color: SAP.sec, fontStyle: 'italic' }}>{ln.narration || ln.entryNarration}</div> : null}
-                          </td>
-                          <td style={{ ...cell, color: SAP.sec }}>{VCH_TYPE[ln.category] || ln.type || ln.category || '—'}</td>
-                          <td style={{ ...cell, color: SAP.blue, whiteSpace: 'nowrap' }}>{ln.vno}</td>
-                          <td style={{ ...cell, textAlign: 'right', color: SAP.text }}>{amt(ln.debit)}</td>
-                          <td style={{ ...cell, textAlign: 'right', color: SAP.text }}>{amt(ln.credit)}</td>
-                          <td style={{ ...cell, textAlign: 'right', color: ln.balanceSide === 'Cr' ? SAP.red : SAP.blue }}>{inr(ln.balance)} {ln.balanceSide}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr style={{ background: '#f0f4fa', fontWeight: 700, borderTop: `2px solid ${SAP.border}` }}>
-                        <td style={{ ...cell, borderBottom: 'none' }}></td>
-                        <td style={{ ...cell, borderBottom: 'none' }}>Totals</td>
-                        <td style={{ ...cell, borderBottom: 'none' }}></td><td style={{ ...cell, borderBottom: 'none' }}></td>
-                        <td style={{ ...cell, borderBottom: 'none', textAlign: 'right' }}>{inr(d.totalDebit || 0)}</td>
-                        <td style={{ ...cell, borderBottom: 'none', textAlign: 'right' }}>{inr(d.totalCredit || 0)}</td>
-                        <td style={{ ...cell, borderBottom: 'none', textAlign: 'right', color: (d.closingSide === 'Cr') ? SAP.red : SAP.blue }}>{inr(d.closingBalance || 0)} {d.closingSide || 'Dr'}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-                <div style={{ padding: '6px 12px', fontSize: 10.5, color: SAP.label, borderTop: `1px solid ${SAP.border}` }}>Click any row to open and edit its voucher · "Particulars" shows the contra account.</div>
-              </>
-            )}
-          </>
-        )}
-    </Modal>
-  );
+// Ledger drill — now a thin shim onto the ONE unified ledger UI. Every P&L /
+// Balance Sheet / GP ledger click flows through here, so they all open the exact
+// same `LedgerAccountView` modal (Statement · Bill-wise · Cost-Centre · Components),
+// scoped to the top-right global branch. (No bespoke ledger view any more.)
+function LedgerVoucherDrill({ ledger, onClose }) {
+  useEffect(() => {
+    if (ledger) openLedgerModal(ledger);   // branch comes from the global selector
+    if (onClose) onClose();                  // immediately release local drill state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
 }
 const Th = ({ children, right, w }) => <th style={{ background: '#f7f8f9', color: SAP.sec, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: right ? '9px 20px 9px 16px' : '9px 16px', borderBottom: `2px solid ${SAP.border}`, textAlign: right ? 'right' : 'left', width: w }}>{children}</th>;
 
@@ -580,7 +496,7 @@ function PnLMatrix({ branch, cur, fy, grain, onFocus }) {
   );
 }
 
-export function ReportPnLLive({ branch }) {
+export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
   const cur = curOf(branch);
   const mobile = useMobile();
   const saved = useMemo(loadSavedPeriod, []);
@@ -588,10 +504,11 @@ export function ReportPnLLive({ branch }) {
   const [fy, setFy] = useState(saved.fy || CUR_FY.label);
   const [compare, setCompare] = useState(saved.compare ?? true);
   const [custom, setCustom] = useState(saved.custom || { from: CUR_FY.startISO, to: todayISO() });
-  const [view, setView] = useState(saved.view || 'fiori');             // 'fiori' | 'classic'
+  const [viewState, setView] = useState(saved.view || 'fiori');        // 'fiori' | 'classic' | 'vertical'
+  const view = forceView || viewState;                                 // merged screen can pin the view
   const [showZero, setShowZero] = useState(false);                     // include zero-balance accounts
   const [focus, setFocus] = useState(null);                            // matrix → drilled column { from, to, label, note }
-  useEffect(() => { try { localStorage.setItem(PNL_PERIOD_KEY, JSON.stringify({ mode, fy, compare, custom, view })); } catch { /* ignore */ } }, [mode, fy, compare, custom, view]);
+  useEffect(() => { try { localStorage.setItem(PNL_PERIOD_KEY, JSON.stringify({ mode, fy, compare, custom, view: viewState })); } catch { /* ignore */ } }, [mode, fy, compare, custom, viewState]);
   useEffect(() => { setFocus(null); }, [mode, fy]);                    // realigning the matrix clears any open drill
 
   const isMatrix = (mode === 'month' || mode === 'quarter') && !focus;
@@ -656,7 +573,7 @@ export function ReportPnLLive({ branch }) {
       <PnlPeriodBar
         mode={mode} setMode={setMode} fy={fy} setFy={setFy}
         compare={compare} setCompare={setCompare} custom={custom} setCustom={setCustom}
-        view={view} setView={setView} showView={!isMatrix}
+        view={view} setView={setView} showView={!isMatrix && !hideSwitcher}
         showZero={showZero} setShowZero={setShowZero}
         canExport={!isMatrix && !!d} onExport={() => exportDetail(d, period, cur)}
       />
@@ -879,6 +796,9 @@ export function ReportPnLLive({ branch }) {
           {d && view === 'classic' && (
             <ClassicPnL d={d} cur={cur} mobile={mobile} branch={branch} to={period.to} tax={tax} pat={pat} periodTxt={classicPeriod} />
           )}
+          {d && view === 'vertical' && (
+            <VerticalPnL d={d} cur={cur} mobile={mobile} branch={branch} to={period.to} tax={tax} pat={pat} periodTxt={classicPeriod} />
+          )}
         </StateBox>
         )}
       </div>
@@ -903,7 +823,7 @@ function ExpDetailToggle({ view, setView }) {
 function PnlViewSwitcher({ view, setView }) {
   return (
     <div style={{ display: 'inline-flex', background: '#fff', border: `1px solid ${SAP.border}`, borderRadius: 6, overflow: 'hidden' }}>
-      {[['fiori', '▪ SAP Fiori'], ['classic', '▭ Tally Classic']].map(([id, label]) => (
+      {[['fiori', '▪ SAP Fiori'], ['classic', '▭ Tally Classic'], ['vertical', '▤ Vertical']].map(([id, label]) => (
         <button key={id} onClick={() => setView(id)} style={{ padding: '7px 14px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: view === id ? SAP.blue : '#fff', color: view === id ? '#fff' : SAP.sec }}>{label}</button>
       ))}
     </div>
@@ -1083,6 +1003,132 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   );
 }
 
+/* ── Vertical (single-column, statement-style) P&L view ───────────────────────
+   Renders the SAME `d`, modules, indirect-expense tree, grossProfit and `pat`
+   that ClassicPnL uses — just flowing top-to-bottom: Income → less COGS →
+   Gross Profit → add Other Income → less Indirect Expenses → Net Profit.
+   Fully drillable (module / ledger / sub-group) exactly like Classic. */
+function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
+  const [drillModule, setDrillModule] = useState(null);
+  const [drillLedger, setDrillLedger] = useState(null);
+  const [openSub, setOpenSub] = useState({});
+  const isOpen = (key, defOpen) => (openSub[key] === undefined ? defOpen : openSub[key]);
+  const mono = { fontFamily: "'Courier New', Courier, monospace" };
+  const company = (branch && branch !== 'ALL') ? (branch.code || branch) : 'All Branches — Consolidated';
+  const modules = [...(d.modules || [])].sort((a, b) => azByName(a.name, b.name));
+  const groups = d.indirect?.groups || [];
+  const buckets = (Array.isArray(d.indirect?.buckets) && d.indirect.buckets.length)
+    ? d.indirect.buckets
+    : (groups.length ? [{ name: 'Indirect Expenses', amount: d.indirect.expense, groups }] : []);
+  const indIncome = d.bridge?.indirectIncome || 0;
+  const grossProfit = d.bridge?.grossProfit ?? d.totals.gp;
+  const incentive = d.totals.incentive || 0;
+  const revenueTrading = d.totals.sales + incentive;
+  const nett = d.totals.sales;
+
+  // Indirect-expense tree (bucket → sub-group → ledger) — identical to ClassicPnL.
+  const expenseRows = buckets.flatMap((b) => {
+    const bk = 'b:' + b.name;
+    const bOpen = isOpen(bk, true);
+    const head = { label: b.name, amount: b.amount, bucket: true, expandable: true, ekey: bk, open: bOpen };
+    if (!bOpen) return [head];
+    return [head, ...(b.groups || []).flatMap((g) => {
+      const gk = 'g:' + b.name + '/' + g.name;
+      const gOpen = isOpen(gk, false);
+      const ghead = { label: g.name, amount: g.amount, sub: true, expandable: true, ekey: gk, open: gOpen };
+      if (!gOpen) return [ghead];
+      return [ghead, ...(g.ledgers || []).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))];
+    })];
+  });
+
+  const onRowClick = (r) => {
+    if (r.module) setDrillModule(r.module);
+    else if (r.ledger) setDrillLedger(r.ledger);
+    else if (r.expandable) setOpenSub((s) => ({ ...s, [r.ekey]: !r.open }));
+  };
+
+  // allKeys for expand/collapse all (buckets + sub-groups).
+  const allKeys = [];
+  buckets.forEach((b) => { allKeys.push('b:' + b.name); (b.groups || []).forEach((g) => allKeys.push('g:' + b.name + '/' + g.name)); });
+  const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
+  const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
+
+  const Row = ({ r, neg }) => {
+    const clickable = !!(r.module || r.ledger || r.expandable);
+    const bold = !!(r.group || r.bucket || r.sub || r.result);
+    const color = r.result ? TALLY.green : (r.group || r.bucket || r.sub) ? TALLY.head : '#1a1a1a';
+    const pad = r.leaf ? 50 : r.sub ? 34 : r.bucket ? 24 : 14;
+    const amt = neg ? -Math.abs(r.amount) : r.amount;
+    return (
+      <tr style={{ borderBottom: '1px solid #f4f4f4' }}>
+        <td onClick={clickable ? () => onRowClick(r) : undefined} className={clickable ? 'cl-drill' : undefined}
+          style={{ padding: '3px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
+          {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}
+          {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{(r.module || r.ledger) ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
+        </td>
+        <td style={{ padding: '3px 12px', textAlign: 'right', color, fontWeight: bold ? 700 : 400, ...mono }}>{inr(amt)}</td>
+      </tr>
+    );
+  };
+  const Head = ({ txt }) => (<tr style={{ background: '#f0f4fa', color: TALLY.head, borderBottom: `2px solid ${TALLY.head}` }}><td colSpan={2} style={{ padding: '7px 12px', fontWeight: 800, letterSpacing: 0.4, ...mono }}>{txt}</td></tr>);
+  const Sub = ({ txt, val, neg }) => (<tr style={{ borderTop: '1px solid #c8c8c8', background: '#fafbfe' }}><td style={{ padding: '6px 12px', fontWeight: 700, color: TALLY.head, ...mono }}>{txt}</td><td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 700, ...mono }}>{inr(neg ? -Math.abs(val) : val)}</td></tr>);
+  const Result = ({ txt, val }) => (<tr style={{ borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}><td style={{ padding: '8px 12px', fontWeight: 800, color: TALLY.head, ...mono }}>{txt}</td><td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: TALLY.green, ...mono }}>{inr(val)}</td></tr>);
+
+  return (
+    <div className="tally-print-doc" style={{ background: '#fff', border: '1px solid #b0b0b0', borderRadius: 4, overflow: 'hidden', margin: 12, ...mono }}>
+      <style>{`.cl-drill:hover{background:#eef4fb;text-decoration:underline}
+@media print {
+  @page { size: A4 portrait; margin: 8mm; }
+  body * { visibility: hidden !important; }
+  .tally-print-doc, .tally-print-doc * { visibility: visible !important; }
+  .tally-print-doc { position: absolute !important; left: 0; top: 0; width: 100% !important; margin: 0 !important; border: none !important; border-radius: 0 !important; }
+  .tally-print-doc .cl-noprint { display: none !important; }
+}`}</style>
+      <div style={{ background: TALLY.titlebar, color: TALLY.head, padding: '5px 12px', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #a9c2e0' }}>
+        <span>KBiz360 Books — {company}</span><span style={{ color: TALLY.gold }}>Profit &amp; Loss A/c · Vertical</span>
+      </div>
+      <div style={{ textAlign: 'center', padding: '10px 8px 8px', borderBottom: `2px solid ${TALLY.head}` }}>
+        <div style={{ color: TALLY.head, fontSize: 16, fontWeight: 700 }}>{company}</div>
+        <div style={{ fontSize: 13 }}>Profit &amp; Loss A/c (Vertical)</div>
+        <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{periodTxt}</div>
+      </div>
+      {allKeys.length > 0 && (
+        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #e3e9f2', background: '#fafbfe' }}>
+          <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
+          <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
+        </div>
+      )}
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, maxWidth: 760, margin: '0 auto' }}>
+        <tbody>
+          <Head txt="Income" />
+          <Row r={{ label: 'Revenue from Operations (Sales)', amount: d.totals.sales, group: true }} />
+          {modules.map((m, i) => <Row key={'s' + i} r={{ label: m.name, amount: m.sales, sub: true, module: m, icon: m.icon }} />)}
+          {incentive > 0 && <Row r={{ label: 'Supplier Incentive (Direct Income)', amount: incentive }} />}
+          <Sub txt="Total Revenue (Trading)" val={revenueTrading} />
+          <Head txt="Less: Cost of Sales (COGS)" />
+          <Row r={{ label: 'Purchase Accounts (COGS)', amount: d.totals.cogs, group: true }} neg />
+          {modules.map((m, i) => <Row key={'c' + i} r={{ label: m.name, amount: m.cogs, sub: true, module: m, icon: m.icon }} neg />)}
+          <Sub txt="Total Cost of Sales" val={d.totals.cogs} neg />
+          <Result txt="Gross Profit" val={grossProfit} />
+          {indIncome > 0 && <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome }} />}
+          <Head txt="Less: Indirect Expenses" />
+          <Row r={{ label: 'Indirect Expenses', amount: d.indirect.expense, group: true }} neg />
+          {expenseRows.map((r, i) => <Row key={'e' + i} r={r} neg />)}
+          {tax > 0 && <Row r={{ label: 'Provision for Tax @ 25.17% (est.)', amount: tax }} neg />}
+          <Result txt="Net Profit (to Capital A/c)" val={pat} />
+        </tbody>
+      </table>
+      <div style={{ background: TALLY.titlebar, color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: `2px solid ${TALLY.head}`, ...mono }}>
+        <span>Gross Profit : <span style={{ color: TALLY.green }}>{inr(grossProfit)} ({pctTxt(d.totals.gpPct)})</span></span>
+        <span>Net Profit : <span style={{ color: TALLY.green }}>{inr(pat)} ({pctTxt(nett ? (pat / nett) * 100 : 0)})</span></span>
+        <span>Nett Sales : {inr(nett)}</span>
+      </div>
+      {drillModule && <ModuleVoucherDrill module={drillModule} cur={cur} mobile={mobile} onClose={() => setDrillModule(null)} />}
+      {drillLedger && <LedgerVoucherDrill ledger={drillLedger} branch={branch} to={to} cur={cur} mobile={mobile} onClose={() => setDrillLedger(null)} />}
+    </div>
+  );
+}
+
 /* ════════════════════════ BALANCE SHEET (Classic ⇄ Fiori) ══════════════ */
 const CURRENT_ASSETS = new Set(['Current Assets', 'Bank Accounts', 'Cash-in-Hand', 'Deposits (Asset)', 'Loans & Advances (Asset)', 'Stock-in-Hand', 'Sundry Debtors']);
 const CURRENT_LIABS = new Set(['Current Liabilities', 'Duties & Taxes', 'Provisions', 'Sundry Creditors', 'Bank OD Accounts']);
@@ -1241,10 +1287,11 @@ function bsExportRows({ d, prev, prevMap, showPY, detail }) {
   return out;
 }
 
-export function ReportBSLive({ branch }) {
+export function ReportBSLive({ branch, forceView, hideSwitcher }) {
   const cur = curOf(branch);
   const mobile = useMobile();
-  const [view, setView] = useState('fiori');           // 'fiori' | 'classic'
+  const [viewState, setView] = useState('fiori');      // 'fiori' | 'classic' | 'vertical'
+  const view = forceView || viewState;                 // merged screen can pin the view
   const [mode, setMode] = useState('asOn');            // 'asOn' | 'range' — default As On Date
   const [quick, setQuick] = useState('today');         // default cut-off = current date
   const [customDate, setCustomDate] = useState(todayISO());
@@ -1286,7 +1333,7 @@ export function ReportBSLive({ branch }) {
         title={`Balance Sheet — ${curLabel}`}
         sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} INR (excl. GST) &nbsp;|&nbsp; Tally 28-Group Master &nbsp;|&nbsp; balances from inception up to {asOn(to)}</>}
         right={<>
-          <Segmented dark value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic']]} />
+          {!hideSwitcher && <Segmented dark value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic'], ['vertical', '▤ Vertical']]} />}
           <button onClick={doPrint} disabled={!d} style={expBtn(!d)}>⤓ PDF</button>
           <button onClick={doExcel} disabled={!d} style={expBtn(!d)}>⤓ Excel</button>
           <button onClick={doPrint} disabled={!d} style={expBtn(!d)}>🖨 Print</button>
@@ -1299,10 +1346,12 @@ export function ReportBSLive({ branch }) {
         cmp={cmp} setCmp={setCmp} detail={detail} setDetail={setDetail}
         showZero={showZero} setShowZero={setShowZero} to={to} toPrev={toPrev}
       />
-      <div style={{ background: SAP.pageBg, padding: view === 'classic' ? 0 : 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+      <div style={{ background: SAP.pageBg, padding: (view === 'classic' || view === 'vertical') ? 0 : 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
         <StateBox q={q} empty={!d}>
           {d && (view === 'fiori'
             ? <FioriBS d={d} prev={prev} prevMap={prevMap} cur={cur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} branch={branch} to={to} mobile={mobile} detail={detail} />
+            : view === 'vertical'
+            ? <VerticalBS d={d} cur={cur} curLabel={curLabel} detail={detail} branch={branch} to={to} mobile={mobile} />
             : <ClassicBS d={d} cur={cur} curLabel={curLabel} detail={detail} branch={branch} to={to} mobile={mobile} />)}
         </StateBox>
       </div>
@@ -1540,6 +1589,101 @@ function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
   );
 }
 const branchLabelClassic = (d) => (d?.filter?.branch && d.filter.branch !== 'ALL' ? d.filter.branch : 'All Branches — Consolidated');
+
+/* ── Vertical (single-column, statutory-style) Balance Sheet view ─────────────
+   Renders the SAME `d` as Fiori/Classic (same groups via sideRows/splitSubGroups,
+   same totals d.totalLiabilities/d.totalAssets) — just stacked top-to-bottom:
+   Equity & Liabilities above Assets. Fully drillable like Classic. */
+function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
+  const summary = detail === 'summary';
+  const [openSub, setOpenSub] = useState({});
+  const [drillLedger, setDrillLedger] = useState(null);
+  const isOpen = (k, def) => (openSub[k] === undefined ? def : openSub[k]);
+  const left = sideRows(d.liabilities, summary, isOpen, 'L');
+  const right = sideRows(d.assets, summary, isOpen, 'A');
+  const mono = { fontFamily: "'Courier New', Courier, monospace" };
+
+  const allKeys = [];
+  if (!summary) {
+    const collect = (groups, side) => (groups || []).forEach((g) => { splitSubGroups(g.ledgers).subs.forEach((s) => allKeys.push(side + ':' + g.group + '/' + s.name)); });
+    collect(d.liabilities, 'L'); collect(d.assets, 'A');
+  }
+  const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
+  const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
+  const onRowClick = (r) => { if (r.ledger) setDrillLedger(r.ledger); else if (r.expandable) setOpenSub((s) => ({ ...s, [r.ekey]: !r.open })); };
+
+  const Row = ({ r }) => {
+    if (!r) return null;
+    const clickable = !!(r.ledger || r.expandable);
+    const bold = !!(r.group || r.sub);
+    const color = (r.group || r.sub) ? TALLY.head : '#444';
+    const pad = r.group ? 16 : r.sub ? 32 : 50;
+    return (
+      <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+        <td onClick={clickable ? () => onRowClick(r) : undefined} className={clickable ? 'cl-drill' : undefined}
+          style={{ padding: '3px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
+          {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}{r.label}{r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
+        </td>
+        <td style={{ padding: '3px 12px', textAlign: 'right', color: r.result ? TALLY.green : '#1a1a1a', fontWeight: (r.result || r.sub) ? 700 : 400, ...mono }}>{inr(r.amount)}</td>
+      </tr>
+    );
+  };
+  const sectionHead = (txt) => (
+    <tr style={{ background: '#f0f4fa', color: TALLY.head, borderBottom: `2px solid ${TALLY.head}` }}>
+      <td style={{ padding: '7px 12px', fontWeight: 800, letterSpacing: 0.4, ...mono }}>{txt}</td>
+      <td style={{ padding: '7px 12px', textAlign: 'right', ...mono }}>{curLabel}</td>
+    </tr>
+  );
+  const totalRow = (txt, val) => (
+    <tr style={{ color: TALLY.head, fontWeight: 700, borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}>
+      <td style={{ padding: '8px 12px', ...mono }}>{txt}</td>
+      <td style={{ padding: '8px 12px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(val)}</td>
+    </tr>
+  );
+  const ca = sumGroups(d.assets, CURRENT_ASSETS), cl = sumGroups(d.liabilities, CURRENT_LIABS);
+  return (
+    <div className="tally-print-doc" style={{ background: '#fff', border: '1px solid #b0b0b0', borderRadius: 4, overflow: 'hidden', ...mono, margin: 12 }}>
+      <style>{`.cl-drill:hover{background:#eef4fb;text-decoration:underline}
+@media print {
+  @page { size: A4 portrait; margin: 8mm; }
+  body * { visibility: hidden !important; }
+  .tally-print-doc, .tally-print-doc * { visibility: visible !important; }
+  .tally-print-doc { position: absolute !important; left: 0; top: 0; width: 100% !important; margin: 0 !important; border: none !important; border-radius: 0 !important; }
+  .tally-print-doc .cl-noprint { display: none !important; }
+}`}</style>
+      <div style={{ background: TALLY.titlebar, color: TALLY.head, padding: '5px 12px', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #a9c2e0' }}>
+        <span>KBiz360 Books — {branchLabelClassic(d)}</span><span style={{ color: TALLY.gold }}>Balance Sheet · Vertical</span>
+      </div>
+      <div style={{ textAlign: 'center', padding: '10px 8px 8px', borderBottom: `2px solid ${TALLY.head}` }}>
+        <div style={{ color: TALLY.head, fontSize: 16, fontWeight: 700 }}>{branchLabelClassic(d)}</div>
+        <div style={{ fontSize: 13 }}>Balance Sheet (Vertical)</div>
+        <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{curLabel}</div>
+      </div>
+      {allKeys.length > 0 && (
+        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #e3e9f2', background: '#fafbfe' }}>
+          <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
+          <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
+        </div>
+      )}
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, maxWidth: 760, margin: '0 auto' }}>
+        <tbody>
+          {sectionHead('I.  Equity & Liabilities')}
+          {left.map((r, i) => <Row key={'L' + i} r={r} />)}
+          {totalRow('Total — Equity & Liabilities', d.totalLiabilities)}
+          {sectionHead('II. Assets')}
+          {right.map((r, i) => <Row key={'A' + i} r={r} />)}
+          {totalRow('Total — Assets', d.totalAssets)}
+        </tbody>
+      </table>
+      <div style={{ background: TALLY.titlebar, color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: `2px solid ${TALLY.head}`, ...mono }}>
+        <span>Working Capital : <span style={{ color: TALLY.green }}>{inr(ca - cl)}</span></span>
+        <span>Net Profit : <span style={{ color: TALLY.green }}>{inr(d.netProfit)}</span></span>
+        <span>Diff in Op Balance : <span style={{ color: TALLY.green }}>{d.balanced ? '0.00' : inr(d.totalLiabilities - d.totalAssets)}</span></span>
+      </div>
+      {drillLedger && <LedgerVoucherDrill ledger={drillLedger} branch={branch} to={to} cur={cur} mobile={mobile} onClose={() => setDrillLedger(null)} />}
+    </div>
+  );
+}
 
 /* ════════════════════════ AR / AP AGEING (Phase 2, live) ═══════════════════ */
 export function ReceivablesLive({ branch }) { return <AgeingReport branch={branch} side="receivables" />; }

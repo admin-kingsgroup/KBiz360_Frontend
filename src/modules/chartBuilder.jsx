@@ -10,9 +10,11 @@
 // 'ALL' (Common, shared by every branch) or a branch code (branch-specific).
 // So this screen lets you pick a Branch view + a ledger Scope filter; the group
 // structure never changes, only which ledgers are shown / how they're tagged.
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useMasterList } from '../core/useMasters';
 import { branchCode } from '../core/useAccounting';
+import { FocusBanner } from '../core/ux/FocusBanner';
+import { useNavFocusStore } from '../core/ux/navFocus';
 import { BRANCH_CODES } from '../core/data';
 
 const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5', GREEN = '#27500A', GOLD = '#A07828', GREY = '#7b86a8';
@@ -91,9 +93,29 @@ export function AccountsTreeView({ branch }) {
   const tog = (k) => setOpen((s) => ({ ...s, [k]: !s[k] }));
   const setAll = (v) => setOpen(v ? Object.fromEntries(allKeys.map((k) => [k, true])) : {});
 
+  // P4 deep-link: opened from an "idle ledger" Alert → expand the tree down to
+  // that ledger (Parent Group ▸ Group ▸ Sub-Group), switch to Tree view, then
+  // scroll it into view and highlight it. Applied once per focused name.
+  const fLedger = useNavFocusStore((s) => (s.focus && s.focus.params && s.focus.params.kind === 'ledger' ? s.focus.params.name : null));
+  const fLower = (fLedger || '').toLowerCase();
+  const appliedRef = useRef('');
+  useEffect(() => {
+    if (!fLedger || !display.length || !groups.length || appliedRef.current === fLedger) return;
+    const led = display.find((l) => (l.name || '').toLowerCase() === fLower);
+    if (!led) return;
+    const filing = (led.subGroup && nodes[led.subGroup]) ? led.subGroup : led.group;
+    const opens = {};
+    let curName = filing, guard = 0;
+    while (curName && nodes[curName] && guard++ < 20) { opens[curName] = true; curName = nodes[curName].parent; }
+    setTab('tree');
+    setOpen((s) => ({ ...s, ...opens }));
+    appliedRef.current = fLedger;
+    setTimeout(() => { const el = document.getElementById('led-' + led.id); if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 90);
+  }, [fLedger, display.length, groups.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const Caret = ({ k, has }) => <span style={{ width: 14, display: 'inline-block', color: GOLD, cursor: has ? 'pointer' : 'default' }} onClick={() => has && tog(k)}>{has ? (open[k] ? '▾' : '▸') : ''}</span>;
   const ledgerRow = (l, indent) => (
-    <div key={'L' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #f5f6fa', color: DARK }}>
+    <div key={'L' + l.id} id={'led-' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #f5f6fa', color: DARK, background: fLower && (l.name || '').toLowerCase() === fLower ? '#FFF6D6' : undefined }}>
       <span style={{ color: GREEN, marginRight: 6 }}>•</span>{l.name}{scopeBadge(l)}
       {l._overrides && <span style={{ fontSize: 9, color: GOLD, marginLeft: 6, fontStyle: 'italic' }}>overrides Common</span>}
     </div>
@@ -183,6 +205,7 @@ export function AccountsTreeView({ branch }) {
 
   return (
     <div style={{ padding: '12px 14px', maxWidth: 1100, margin: '0 auto' }}>
+      <FocusBanner />
       <div style={{ marginBottom: 8 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK }}>Accounts Tree View</h2>
         <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Parent Group (28) ▸ Group ▸ Sub-Group ▸ Ledger · View-only — create under <b>Masters ▸ Accounts Master</b>.</p>

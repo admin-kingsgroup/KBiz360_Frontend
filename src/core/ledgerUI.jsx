@@ -14,8 +14,14 @@
 import React, { useMemo, useState } from 'react';
 import { bc } from './styles';
 import { PeriodBar } from './period';
-import { useLedgerStatement, useOpenBills, branchCode } from './useAccounting';
+import { useLedgerStatement, useOpenBills, useLedgerSplit, useLedgerComponents, branchCode } from './useAccounting';
 import { openPrintPreview } from './PrintPreview';
+import {
+  esc, fmt, fmtB, dmy, vtLabel, billwiseSide, isBillwiseLedger,
+  mapLedger, mapBills, groupByBranch, branchSeg, AGE_BUCKETS, AGE_COLORS, ageingOf,
+} from './ledgerMath';
+
+export { billwiseSide, isBillwiseLedger } from './ledgerMath';
 
 /* ── palette (the Tally "paper" ledger look) ─────────────────────────────── */
 const GOLD = '#A07828';
@@ -127,88 +133,7 @@ export const LEDGER_CSS = `
 @media(max-width:680px){.kbled .picker{grid-template-columns:1fr}.kbled .summary{grid-template-columns:1fr 1fr}.kbled .agecards{grid-template-columns:1fr 1fr 1fr}}
 `;
 
-/* ── formatting + live-data mapping ──────────────────────────────────────── */
-const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-const fmt = (n) => (n ? Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
-const fmtB = (n) => Math.abs(Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const dmy = (s) => (s ? String(s).slice(0, 10).split('-').reverse().join('-') : '');
-
-const VT_LABEL = {
-  sale: 'Sales', purchase: 'Purchase', receipt: 'Receipt', payment: 'Payment', contra: 'Contra',
-  journal: 'Journal', 'credit-note': 'Credit Note', 'debit-note': 'Debit Note',
-  'purchase-expense': 'Purch. Exp', refund: 'Refund', reissue: 'Reissue',
-};
-const vtLabel = (c) => VT_LABEL[c] || String(c || '').replace(/\b\w/g, (m) => m.toUpperCase());
-
-// A party ledger (Sundry Debtor/Creditor) is the only kind that carries
-// bill-wise outstanding. Decide the open-bills "side" from its group.
-export function billwiseSide(group = '') {
-  const g = String(group).toLowerCase();
-  if (g.includes('debtor')) return 'customer';
-  if (g.includes('creditor')) return 'supplier';
-  return null;
-}
-export const isBillwiseLedger = (group) => !!billwiseSide(group);
-
-// Live ledger-statement payload → the row model this UI renders.
-function mapLedger(d) {
-  if (!d) return null;
-  return {
-    name: d.ledger, group: d.group, code: d.code,
-    opening: { amt: d.openingBalance || 0, side: d.openingSide || 'Dr' },
-    rows: (d.lines || []).map((e) => ({
-      date: e.date, vno: e.vno, voucherId: e.voucherId, branch: e.branch || '',
-      part: (e.particulars && e.particulars[0] && e.particulars[0].ledger) || e.party || vtLabel(e.category),
-      toBy: e.debit > 0 ? 'To' : 'By',
-      vt: vtLabel(e.category || e.type),
-      dr: e.debit || 0, cr: e.credit || 0,
-      narr: e.narration || e.entryNarration || '',
-      detail: (e.particulars || []).map((p) => ({ n: p.ledger, side: p.side, amt: p.amount })),
-      balance: e.balance, balanceSide: e.balanceSide,
-    })),
-    totalDebit: d.totalDebit || 0, totalCredit: d.totalCredit || 0,
-    closing: { amt: d.closingBalance || 0, side: d.closingSide || 'Dr' },
-  };
-}
-
-// Live open-bills payload → bill-wise rows + ageing buckets (by days outstanding).
-function mapBills(bw) {
-  const list = (bw && bw.bills) || [];
-  const bills = list.map((b) => ({
-    ref: b.billVno, bdate: b.date, amt: b.total || 0, settled: b.allocated || 0,
-    pend: (b.outstanding != null) ? b.outstanding : ((b.total || 0) - (b.allocated || 0)),
-    age: b.ageDays || 0, status: b.status || '',
-  }));
-  return bills;
-}
-
-// Group a ledger's rows by their branch, preserving first-appearance order.
-// Used for the consolidated TK HO Group view — each branch is shown as its own
-// segment (separate books) instead of one blended list.
-function groupByBranch(rows) {
-  const m = new Map();
-  rows.forEach((r) => { const b = r.branch || '—'; if (!m.has(b)) m.set(b, []); m.get(b).push(r); });
-  return [...m.entries()].map(([branch, rs]) => ({ branch, rows: rs }));
-}
-const branchSeg = (code) => (!code || code === '—' || code === 'ALL') ? 'Unspecified' : code;
-
-const AGE_BUCKETS = ['Not Due', '0-30', '31-60', '61-90', '90+'];
-const AGE_COLORS = { 'Not Due': '#2C5C8F', '0-30': '#1B6B4C', '31-60': '#B7791F', '61-90': '#C0651A', '90+': '#9B2C2C' };
-function ageingOf(bills) {
-  const age = { 'Not Due': 0, '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 };
-  let totPend = 0;
-  bills.forEach((b) => {
-    if (b.pend <= 0) return;
-    totPend += b.pend;
-    const d = b.age;
-    if (d <= 0) age['Not Due'] += b.pend;
-    else if (d <= 30) age['0-30'] += b.pend;
-    else if (d <= 60) age['31-60'] += b.pend;
-    else if (d <= 90) age['61-90'] += b.pend;
-    else age['90+'] += b.pend;
-  });
-  return { age, totPend };
-}
+/* Pure formatting / mapping / ageing helpers live in ./ledgerMath (unit-tested). */
 
 /* ════════════════════════════════════════════════════════════════════════
    <LedgerAccountView/> — the one on-screen ledger, fed by live data.
@@ -243,6 +168,17 @@ export function LedgerAccountView({
   const group = d?.group || q.data?.group || '';
   const side = billwiseSide(group);
 
+  // Analytical tabs (Cost-Centre DOM/INT split + fare Components) apply only to
+  // trading ledgers (Sales/Purchase/Direct). Fetch lazily, show the tab only when
+  // there's data — so option B keeps the P&L analysis without a separate screen.
+  const analytical = /sales|purchase|direct\s*(income|expense)/i.test(group);
+  const splitQ = useLedgerSplit(name, branch, { from, to }, analytical);
+  const compQ = useLedgerComponents(name, branch, { from, to }, analytical);
+  const splitRows = Array.isArray(splitQ.data) ? splitQ.data : [];
+  const compRows = (compQ.data && compQ.data.rows) || [];
+  const hasSplit = splitRows.length > 1;        // a real DOM/INT split (not a single bucket)
+  const hasComp = compRows.length > 0;
+
   // Bill-wise needs a real party + a concrete branch (a bill belongs to a branch).
   // Only party ledgers (debtors/creditors) carry bills — skip the query otherwise.
   const bw = useOpenBills(side ? name : null, branch, side || 'customer');
@@ -268,8 +204,10 @@ export function LedgerAccountView({
           <div className="seg">
             <button className={view === 'ledger' ? 'active' : ''} onClick={() => setView('ledger')}>Ledger</button>
             <button className={view === 'bill' ? 'active' : ''} onClick={() => setView('bill')}>Bill-wise</button>
+            {hasSplit && <button className={view === 'cc' ? 'active' : ''} onClick={() => setView('cc')}>Cost-Centre</button>}
+            {hasComp && <button className={view === 'comp' ? 'active' : ''} onClick={() => setView('comp')}>Components</button>}
           </div>
-          <div className={'toggles' + (view === 'bill' ? ' disabled' : '')}>
+          <div className={'toggles' + (view !== 'ledger' ? ' disabled' : '')}>
             <label className="tg"><input type="checkbox" checked={showNarr} onChange={(e) => setShowNarr(e.target.checked)} /> Show Narration</label>
             <label className="tg"><input type="checkbox" checked={showDetail} onChange={(e) => setShowDetail(e.target.checked)} /> Detailed (full voucher)</label>
           </div>
@@ -295,6 +233,8 @@ export function LedgerAccountView({
         {!q.isLoading && view === 'bill' && (
           <BillwiseBody side={side} bills={bills} loading={bw.isLoading} hasBranch={hasBranch} group={group} name={name} maxHeight={maxHeight} />
         )}
+        {view === 'cc' && <BreakdownBody title="Cost-Centre Split (Domestic / International)" rows={splitRows} loading={splitQ.isLoading} maxHeight={maxHeight} hint="Module cost-centre split of this ledger (Tally sub-ledger level). Drill the full statement from the Ledger tab." />}
+        {view === 'comp' && <BreakdownBody title="Fare / Charge Components" rows={compRows} loading={compQ.isLoading} maxHeight={maxHeight} hint="Component breakup (Base Fare, K3, Taxes, Service Charge…) summed from each voucher's fare detail." />}
       </div>
     </div>
   );
@@ -472,6 +412,34 @@ function BillwiseBody({ side, bills, loading, hasBranch, group, name, maxHeight 
         </table>
       </div>
       <div className="hint">Bill-wise outstanding. Pending total ties to the ledger closing balance. Age = days the bill has been outstanding.</div>
+    </>
+  );
+}
+
+/* ── Cost-Centre / Components breakdown body (Dr/Cr table, cream-gold theme) ── */
+function BreakdownBody({ title, rows, loading, maxHeight, hint }) {
+  if (loading) return <div className="loading">Loading…</div>;
+  const list = rows || [];
+  const grand = list.reduce((s, r) => s + (r.side === 'Cr' ? r.amount : -r.amount), 0);
+  return (
+    <>
+      <div className="tblwrap" style={{ maxHeight, overflowY: 'auto' }}>
+        <table>
+          <thead><tr><th className="l">{title}</th><th>Debit</th><th>Credit</th></tr></thead>
+          <tbody>
+            {list.length === 0 && <tr><td className="l" colSpan={3} style={{ textAlign: 'center', padding: 26, color: '#9A9A9A' }}>No breakdown for this ledger / period.</td></tr>}
+            {list.map((r, i) => (
+              <tr key={i}>
+                <td className="l part">{r.label}</td>
+                <td className="num drc">{r.side === 'Dr' ? fmt(r.amount) : ''}</td>
+                <td className="num crc">{r.side === 'Cr' ? fmt(r.amount) : ''}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr><td className="l">Grand Total</td><td className="num">{grand < 0 ? fmt(-grand) : ''}</td><td className="num">{grand >= 0 ? fmt(grand) : ''}</td></tr></tfoot>
+        </table>
+      </div>
+      {hint && <div className="hint">{hint}</div>}
     </>
   );
 }

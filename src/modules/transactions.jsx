@@ -12,6 +12,7 @@ import { ACTIVE_CURRENCIES, ADM_DATA, BRANCHES, BRANCH_CODES, GP_BILLS, PURCHASE
 import { useAdmReasonCodes, useLedgerRegistry } from '../core/useReference';
 import { useLedgerStatement, useCreateVoucher, useOpenBills, useSalesRegister, usePurchaseRegister } from '../core/useAccounting';
 import { LedgerActions } from '../core/ledgerActions';
+import { openLedgerModal } from '../core/LedgerModalHost';
 import { useModalEsc } from '../core/ux/useModalEsc';
 import { useLivePurchaseRegistry, useLiveSalesTickets } from '../core/useVouchers';
 import { fmt, fmtINR } from '../core/format';
@@ -3370,6 +3371,7 @@ export function BspSummary({branch}){
             <p style={{margin:"2px 0 0",fontSize:9.5,color:"#8b93b3"}}>{bspLedger?.group||"Sundry Creditors"} · {stmtLines.length} postings · {from} → {to}</p>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+            <button onClick={()=>openLedgerModal(bspLedgerName)} title="Open in the unified Ledger view" style={{border:"1px solid #2a3556",background:"rgba(255,255,255,0.08)",color:"#e7ecfb",borderRadius:6,fontSize:11,fontWeight:700,padding:"6px 11px",cursor:"pointer"}}>📒 Open Ledger</button>
             <LedgerActions d={stmt} cur="₹" branchLabel={brCode||"India"} from={from} to={to} variant="dark" />
             <div style={{textAlign:"right"}}>
               <p style={{margin:0,fontSize:9,color:"#8b93b3",textTransform:"uppercase",fontWeight:700}}>Outstanding payable</p>

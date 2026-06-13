@@ -16,6 +16,7 @@ export { SrFmDashboardPage as SrFmDashboard, SrFmDashboardPage } from './pages/s
 export { SrAeDashboardPage as SrAeDashboard, SrAeDashboardPage } from './pages/sr-ae-dashboard';
 export { AcctsExecDashboardPage as AcctsExecDashboard, AcctsExecDashboardPage } from './pages/accts-exec-dashboard';
 export { HrMgrDashboardPage as HrMgrDashboard, HrMgrDashboardPage } from './pages/hr-mgr-dashboard';
+export { AlertsDashboard } from './pages/alerts-dashboard';
 
 export { dashboardRoutes } from './routes';
 export { useDashboardStore } from './store/dashboard.store';

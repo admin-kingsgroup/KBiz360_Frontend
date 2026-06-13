@@ -125,6 +125,31 @@ export function useLedgerStatement(name, branch, { from, to } = {}) {
   });
 }
 
+// Cost-centre (Domestic/International) split of a P&L ledger — the Tally sub-ledger
+// level for Flights/Holidays. Returns an array [{ costCenter, label, amount, side }].
+// `on` gates the fetch (only trading ledgers have a meaningful split).
+export function useLedgerSplit(name, branch, { from, to } = {}, on = true) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'ledger-split', name || '', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/ledger-split/' + encodeURIComponent(name), { branch: code, from, to }),
+    enabled: enabled() && !!name && on,
+    staleTime: 30_000,
+  });
+}
+
+// Fare/charge component breakdown (Base Fare, K3, Taxes…) of a P&L ledger, per
+// cost-centre. Returns { rows:[{ component, label, amount, side }], side }.
+export function useLedgerComponents(name, branch, { from, to, costCenter } = {}, on = true) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'ledger-components', name || '', code || 'all', from || '', to || '', costCenter || ''],
+    queryFn: () => apiGet('/api/accounting/ledger-components/' + encodeURIComponent(name), { branch: code, from, to, ...(costCenter ? { costCenter } : {}) }),
+    enabled: enabled() && !!name && on,
+    staleTime: 30_000,
+  });
+}
+
 export function useLedgerGroups() {
   return useQuery({
     queryKey: ['accounting', 'groups'],
@@ -383,6 +408,18 @@ export function useAlerts(branch) {
     queryFn: () => apiGet('/api/alerts', { branch: code }),
     enabled: enabled(),
     staleTime: 30_000,
+    refetchInterval: 180_000, // keep the Alerts dashboard reasonably live
+  });
+}
+
+// Set an alert's lifecycle status (Finish / Remind Later / re-open). Pass the
+// alert's current signature+magnitude so the backend can later detect change /
+// worsening. Invalidates the alerts feed so the dashboard reflects the move.
+export function useSetAlertStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => apiPut('/api/alert-states', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['alerts'] }),
   });
 }
 

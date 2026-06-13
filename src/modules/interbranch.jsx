@@ -31,6 +31,7 @@ import { PeriodBar } from '../core/period';
 import { exportToExcel } from '../core/exportExcel';
 import { exportToCSV } from '../core/business-logic';
 import { VoucherEditor } from './accountingLive';
+import { openLedgerModal } from '../core/LedgerModalHost';
 
 /* ── inter-branch ledger detector ──────────────────────────────────────
    Only fires INSIDE the Sundry Debtors / Sundry Creditors groups (checked
@@ -387,6 +388,7 @@ function DetailGroup({ title, accent, side, rows, open, setOpen, from, to, onVou
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: accent, fontVariantNumeric: 'tabular-nums' }}>{fmtINR(r.outstanding)}</span>
+                <button onClick={(e) => { e.stopPropagation(); openLedgerModal(r.ledger); }} title="Open full ledger account" style={{ border: '1px solid #d6dbe6', background: '#fff', borderRadius: 6, fontSize: 11, padding: '3px 8px', cursor: 'pointer', color: '#0d1326', fontWeight: 700 }}>📒</button>
                 <Badge status={r.status} />
               </div>
             </div>
