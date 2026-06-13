@@ -3,7 +3,7 @@
 // captured line + flight sectors); Sales/Purchase Register searches the posted
 // voucher (header + line labels + line meta). A passenger name typed in either
 // box must surface its deal.
-import { bookingHaystack, voucherHaystack, filterBookingsForRegister } from '../core/registerSearch';
+import { bookingHaystack, voucherHaystack, filterBookingsForRegister, bookingTravelDetail } from '../core/registerSearch';
 
 // A realistic approved Flight SO/PO booking as returned by /api/booking-orders.
 const flightBooking = {
@@ -56,6 +56,39 @@ const salesVoucher = {
     { label: 'Output GST', meta: {} },
   ],
 };
+
+describe('bookingTravelDetail — flatten passengers/tickets/PNRs/sectors to one cell', () => {
+  // Multi-passenger flight: ticket/PNR come from row + sectors, deduped.
+  const flight = {
+    module: 'SF',
+    rows: [
+      { fn: 'SHARFUDDIN', sn: 'SHAIKH', tkt: 'EF137Q', pnr: 'TJ1021',
+        sectors: [{ sector: 'CCU BOM', ticketNo: 'EF137Q', pnr: 'TJ1021' }, { sector: 'BOM DXB', ticketNo: '0987', pnr: '' }] },
+      { fn: 'AISHA', sn: 'KHAN', tkt: '', pnr: '',
+        sectors: [{ sector: 'CCU BOM', ticketNo: 'EF200X', pnr: 'TJ3000' }] },
+    ],
+  };
+  test('joins every passenger name', () => {
+    expect(bookingTravelDetail(flight).passengers).toBe('SHARFUDDIN SHAIKH, AISHA KHAN');
+  });
+  test('collects + dedupes tickets across row and sectors', () => {
+    expect(bookingTravelDetail(flight).tickets).toBe('EF137Q, 0987, EF200X');
+  });
+  test('collects + dedupes PNRs and sectors', () => {
+    expect(bookingTravelDetail(flight).pnrs).toBe('TJ1021, TJ3000');
+    expect(bookingTravelDetail(flight).sectors).toBe('CCU BOM, BOM DXB'); // CCU BOM deduped
+  });
+  test('non-flight module: name only, empty ticket/PNR/sector', () => {
+    const hotel = { module: 'SH', rows: [{ fn: 'Ashiwini Kumar', sn: 'Mishra' }] };
+    const tv = bookingTravelDetail(hotel);
+    expect(tv.passengers).toBe('Ashiwini Kumar Mishra');
+    expect(tv).toMatchObject({ tickets: '', pnrs: '', sectors: '' });
+  });
+  test('no rows → all empty, no throw', () => {
+    expect(bookingTravelDetail({})).toEqual({ passengers: '', tickets: '', pnrs: '', sectors: '' });
+    expect(bookingTravelDetail(undefined)).toEqual({ passengers: '', tickets: '', pnrs: '', sectors: '' });
+  });
+});
 
 describe('filterBookingsForRegister — single-line module register rows', () => {
   const data = [

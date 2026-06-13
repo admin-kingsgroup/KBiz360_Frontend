@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../core/api';
 import { branchCode } from '../core/useAccounting';
 import { VSPECS } from '../core/voucherSpecs';
-import { filterBookingsForRegister } from '../core/registerSearch';
+import { filterBookingsForRegister, bookingTravelDetail } from '../core/registerSearch';
 import { companyProfile } from '../core/referenceCache';
 import { bc } from '../core/styles';
 import { PeriodBar, periodRange } from '../core/period';
@@ -105,6 +105,7 @@ export function ModuleRegister({ branch, mode = 'both' }) {
   const showMod = mod === 'ALL';
   // every datum is now a column on the single row → colSpan for loading/empty spans
   const colSpan = 3 /* bkg·link·date */ + (showMod ? 1 : 0) + 2 /* customer·supplier */
+    + 4 /* passenger·ticket·pnr·sector */
     + (showSale ? 2 : 0) /* sale·saleGST */ + (showPur ? 2 : 0) /* purchase·purGST */
     + 1 /* GP */ + (showSale ? 1 : 0) /* saleInv */ + (showPur ? 1 : 0) /* purInv */ + 1 /* invoice */;
 
@@ -147,6 +148,10 @@ export function ModuleRegister({ branch, mode = 'both' }) {
               {showMod && <th style={th}>Module</th>}
               <th style={th}>Customer</th>
               <th style={th}>Service / Vendor</th>
+              <th style={th}>Passenger / Name</th>
+              <th style={th}>Ticket No</th>
+              <th style={th}>PNR</th>
+              <th style={th}>Sector</th>
               {showSale && <th style={{ ...th, ...num }}>Sale (incl GST)</th>}
               {showSale && <th style={{ ...th, ...num }}>Sale GST</th>}
               {showPur && <th style={{ ...th, ...num }}>Purchase (incl GST)</th>}
@@ -159,7 +164,9 @@ export function ModuleRegister({ branch, mode = 'both' }) {
             <tbody>
               {isLoading && <tr><td colSpan={colSpan} style={{ ...td, textAlign: 'center', color: C.dim, padding: 22 }}>Loading…</td></tr>}
               {!isLoading && rows.length === 0 && <tr><td colSpan={colSpan} style={{ ...td, textAlign: 'center', color: C.dim, padding: 22 }}>{needle ? `No deals match “${q.trim()}”.` : `No approved ${mod === 'ALL' ? '' : (spec.name || mod) + ' '}deals. Create one in SO/PO/GP Voucher → approve it.`}</td></tr>}
-              {rows.map((b, i) => (
+              {rows.map((b, i) => {
+                const tv = bookingTravelDetail(b);
+                return (
                 <tr key={b.id} style={{ background: i % 2 ? '#fafbff' : '#fff' }}>
                   <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700 }}>{b.bookingNo}</td>
                   <td style={{ ...td, fontFamily: 'monospace', color: C.blue }}>{b.linkNo || '—'}</td>
@@ -167,6 +174,10 @@ export function ModuleRegister({ branch, mode = 'both' }) {
                   {showMod && <td style={{ ...td, whiteSpace: 'nowrap' }}>{(VSPECS[b.module]?.icon || '') + ' ' + (VSPECS[b.module]?.name || b.module)}</td>}
                   <td style={{ ...td }}>{b.customer?.name || '—'}</td>
                   <td style={{ ...td }}>{b.noSupplier ? '—' : (b.supplier?.name || '—')}</td>
+                  <td style={{ ...td, minWidth: 140 }}>{tv.passengers || '—'}</td>
+                  <td style={{ ...td, fontFamily: 'monospace', fontSize: 11 }}>{tv.tickets || '—'}</td>
+                  <td style={{ ...td, fontFamily: 'monospace', fontSize: 11, color: C.gold }}>{tv.pnrs || '—'}</td>
+                  <td style={{ ...td, whiteSpace: 'nowrap' }}>{tv.sectors || '—'}</td>
                   {showSale && <td style={{ ...td, ...num }}>{fmt(b.so?.total)}</td>}
                   {showSale && <td style={{ ...td, ...num, color: '#854F0B' }}>{fmt(b.so?.gst)}</td>}
                   {showPur && <td style={{ ...td, ...num }}>{b.noSupplier ? '—' : fmt(b.po?.total)}</td>}
@@ -179,7 +190,8 @@ export function ModuleRegister({ branch, mode = 'both' }) {
                     {showPur && !b.noSupplier && <button onClick={() => print(b, 'purchase')} style={ibtn('#fff', C.dark)}>📄 Purchase Invoice</button>}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

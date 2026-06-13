@@ -35,6 +35,30 @@ export function filterBookingsForRegister(data, { mod = 'ALL', from, to, needle 
     .filter((b) => !n || bookingHaystack(b).includes(n));
 }
 
+// Flatten a booking's per-passenger lines + flight sectors into single comma-
+// joined strings so the module register can show passenger / ticket / PNR /
+// sector on ONE row (no expand). Non-flight modules simply have empty ticket/
+// PNR/sector. Values are de-duplicated and order-preserving.
+export function bookingTravelDetail(b) {
+  const rows = (b && b.rows) || [];
+  const names = [];
+  const tkts = [], pnrs = [], secs = [];
+  const push = (arr, v) => { const s = String(v == null ? '' : v).trim(); if (s && !arr.includes(s)) arr.push(s); };
+  for (const r of rows) {
+    const nm = `${r.fn || ''} ${r.sn || ''}`.trim();
+    if (nm) names.push(nm);
+    push(tkts, r.tkt);
+    push(pnrs, r.pnr);
+    for (const s of (r.sectors || [])) {
+      push(tkts, s.ticketNo);
+      push(pnrs, s.pnr);
+      push(secs, s.sector);
+    }
+  }
+  const join = (arr) => (arr.length ? arr.join(', ') : '');
+  return { passengers: join(names), tickets: join(tkts), pnrs: join(pnrs), sectors: join(secs) };
+}
+
 // Global search — a per-file GP bill (/api/accounting/gp-bills) flattened to the
 // searchable fields shown in the results table.
 export function gpBillHaystack(b) {

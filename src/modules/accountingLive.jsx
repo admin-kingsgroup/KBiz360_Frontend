@@ -775,7 +775,13 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   // computed with optional chaining so the JV-preview hook runs before the early return (rules of hooks)
   // Credit lines (e.g. Discount Received) subtract from the payable; debit lines add.
   const subtotal = r2((form?.lines || []).reduce((s, l) => s + (l.drCr === 'Cr' ? -1 : 1) * (Number(l.amt) || 0), 0));
-  const total = r2(subtotal + (Number(form?.taxAmt) || 0));
+  // TCS is collected from the customer on a sale (raises the receivable) and paid to
+  // the supplier on a purchase (raises the recoverable asset) — either way it RIDES
+  // INSIDE total. The posting builder credits TCS Payable / debits TCS Receivable and
+  // balances it against this total, so the figure must carry it or the journal is out
+  // by exactly the TCS amount. TDS is NOT added: on a sale it posts only when the
+  // customer withholds at receipt time, so it never affects the bill total here.
+  const total = r2(subtotal + (Number(form?.taxAmt) || 0) + (Number(form?.tcsAmt) || 0));
   const previewBody = (v && form) ? {
     ...v, branch: form.branch, party: form.party, taxAmt: Number(form.taxAmt) || 0,
     tdsAmt: Number(form.tdsAmt) || 0, tcsAmt: Number(form.tcsAmt) || 0, subtotal, total,
@@ -866,6 +872,21 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
       </div>
     );
   }
+  // Passenger / traveller detail rides on each saved line (passenger, ticket, sector,
+  // pnr, travelDate…) — shown read-only here so the edit screen isn't "passenger
+  // details not available". Editing those fields stays in the booking/CRM source; the
+  // spread on save preserves them, this panel just surfaces what was recorded.
+  const paxRows = (v.lines || [])
+    .map((l) => ({
+      passenger: l.passenger || l.meta?.guest || '',
+      ticket: l.ticket || '',
+      airline: l.airline || '',
+      sector: l.sector || '',
+      cls: l.cls || '',
+      pnr: l.pnr || '',
+      travelDate: l.travelDate || '',
+    }))
+    .filter((p) => p.passenger || p.ticket || p.pnr || p.sector);
   return (
     <div style={{ padding: 14 }}>
       <datalist id={dlId}>{ledgerNames.map((n) => <option key={n} value={n} />)}</datalist>
@@ -892,6 +913,31 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         <div><div style={lab}>Total (auto)</div><div style={{ ...fld, background: '#f3f5f9', color: DARK, fontWeight: 700 }}>{money(cur, total)}</div></div>
         <div><div style={lab}>Remarks</div><input value={form.remarks} onChange={(e) => set('remarks', e.target.value)} style={fld} /></div>
       </div>
+      {paxRows.length > 0 && (
+        <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+          <div style={{ fontWeight: 700, color: DARK, fontSize: 12, marginBottom: 8 }}>Passenger / Traveller Details</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+            <thead><tr>
+              {['Passenger', 'Ticket', 'Airline', 'Sector', 'Class', 'PNR', 'Travel Date'].map((h) => (
+                <th key={h} style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {paxRows.map((p, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}>
+                  <td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.passenger || '—'}</td>
+                  <td style={{ padding: '5px 8px', color: DIM }}>{p.ticket || '—'}</td>
+                  <td style={{ padding: '5px 8px', color: DIM }}>{p.airline || '—'}</td>
+                  <td style={{ padding: '5px 8px', color: DIM }}>{p.sector || '—'}</td>
+                  <td style={{ padding: '5px 8px', color: DIM }}>{p.cls || '—'}</td>
+                  <td style={{ padding: '5px 8px', color: DIM }}>{p.pnr || '—'}</td>
+                  <td style={{ padding: '5px 8px', color: DIM }}>{p.travelDate || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #eef1f6' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Lines — pick ledger from Books (Dr / Cr)</div>
@@ -908,6 +954,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 18, marginTop: 6, fontSize: 12 }}>
           <span style={{ color: DIM }}>Lines subtotal: <b style={{ color: DARK }}>{money(cur, subtotal)}</b></span>
           <span style={{ color: DIM }}>+ Tax: <b style={{ color: DARK }}>{money(cur, Number(form.taxAmt) || 0)}</b></span>
+          {(Number(form.tcsAmt) || 0) > 0 && <span style={{ color: DIM }}>+ TCS: <b style={{ color: DARK }}>{money(cur, Number(form.tcsAmt) || 0)}</b></span>}
           <span style={{ color: DIM }}>= Total: <b style={{ color: DARK }}>{money(cur, total)}</b></span>
         </div>
       </div>
