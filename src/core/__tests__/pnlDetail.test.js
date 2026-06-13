@@ -1,5 +1,8 @@
 // P&L "expand all" drill helpers — pure, DOM-free unit tests.
-import { moduleDetailRows, moduleExpandKeys, moduleHasDetail, moduleDetailKey, ledgerDetailKey } from '../pnlDetail';
+import {
+  moduleDetailRows, moduleExpandKeys, moduleHasDetail, moduleDetailKey, ledgerDetailKey,
+  moduleHasSubs, moduleSubDetailRows, moduleDrillRows, subDetailKey, subLedgerDetailKey,
+} from '../pnlDetail';
 
 const flights = {
   key: 'Flights', name: 'Flights', sales: 15000, cogs: 13000,
@@ -13,6 +16,26 @@ const hotelsNoComps = {
   heads: { sales: [{ ledger: 'Sales — Hotel Bookings', amount: 500, components: [] }], cogs: [] },
 };
 const bare = { key: 'Misc', name: 'Miscellaneous', sales: 0, cogs: 0 }; // no heads at all
+
+// Multi-leaf module (Flights) with Int'l / Domestic / Unspecified sub-centres.
+// `heads` at module level is the merged roll-up; each sub carries its own split.
+const flightsSubs = {
+  key: 'Flights', name: 'Flights', hasSubs: true, sales: 15000, cogs: 13000,
+  heads: {
+    sales: [{ ledger: 'Sales — Air Tickets', amount: 15000, components: [{ label: 'Base Fare', amount: 12000 }] }],
+    cogs: [{ ledger: 'Purchase — Air Tickets', amount: 13000, components: [] }],
+  },
+  subs: [
+    { code: 'FLT-INT', name: 'Flight — International', sales: 10000, cogs: 9000,
+      heads: { sales: [{ ledger: 'Sales — Air Tickets', amount: 10000, components: [{ label: 'Base Fare', amount: 8000 }, { label: 'K3', amount: 2000 }] }],
+               cogs: [{ ledger: 'Purchase — Air Tickets', amount: 9000, components: [] }] } },
+    { code: 'FLT-DOM', name: 'Flight — Domestic', sales: 5000, cogs: 4000,
+      heads: { sales: [{ ledger: 'Sales — Air Tickets', amount: 5000, components: [{ label: 'Base Fare', amount: 4000 }] }],
+               cogs: [{ ledger: 'Purchase — Air Tickets', amount: 4000, components: [] }] } },
+    // Unspecified: a sales amount but no captured heads → shown, not expandable.
+    { code: 'FLT-UNS', name: 'Flight — Unspecified', sales: 200, cogs: 0, heads: { sales: [], cogs: [] } },
+  ],
+};
 
 // isOpen stub backed by a Set of "open" keys.
 const opener = (openKeys) => (key) => openKeys.has(key);
@@ -80,5 +103,83 @@ describe('moduleExpandKeys', () => {
   test('empty / undefined module list → []', () => {
     expect(moduleExpandKeys([])).toEqual([]);
     expect(moduleExpandKeys(undefined)).toEqual([]);
+  });
+
+  test('multi-leaf module emits sub-centre + nested ledger keys (not module ledger keys)', () => {
+    const keys = moduleExpandKeys([flightsSubs], '', ['sales']);
+    expect(keys).toContain(moduleDetailKey(flightsSubs, 'sales'));
+    expect(keys).toContain(subDetailKey(flightsSubs, 'sales', 'FLT-INT'));
+    expect(keys).toContain(subDetailKey(flightsSubs, 'sales', 'FLT-DOM'));
+    expect(keys).toContain(subLedgerDetailKey(flightsSubs, 'sales', 'FLT-INT', 'Sales — Air Tickets'));
+    // Unspecified has an amount but no heads → its sub key IS included, no ledger key under it.
+    expect(keys).toContain(subDetailKey(flightsSubs, 'sales', 'FLT-UNS'));
+    expect(keys.some((k) => k.includes('FLT-UNS:'))).toBe(false);
+    // The merged module-level ledger key is NOT used for multi-leaf modules.
+    expect(keys).not.toContain(ledgerDetailKey(flightsSubs, 'sales', 'Sales — Air Tickets'));
+  });
+});
+
+describe('moduleHasSubs / moduleHasDetail (multi-leaf)', () => {
+  test('moduleHasSubs true only for hasSubs modules with a subs array', () => {
+    expect(moduleHasSubs(flightsSubs)).toBe(true);
+    expect(moduleHasSubs(flights)).toBe(false);       // no subs
+    expect(moduleHasSubs(hotelsNoComps)).toBe(false);
+  });
+
+  test('moduleHasDetail true when a sub-centre has activity even without module heads', () => {
+    const noMergedHeads = { ...flightsSubs, heads: { sales: [], cogs: [] } };
+    expect(moduleHasDetail(noMergedHeads, 'sales')).toBe(true); // subs still carry detail
+  });
+});
+
+describe('moduleSubDetailRows', () => {
+  test('collapsed module → one row per active sub-centre, Int\'l + Domestic + Unspecified', () => {
+    const rows = moduleSubDetailRows(flightsSubs, 'sales', opener(new Set()));
+    expect(rows).toHaveLength(3);
+    expect(rows.map((r) => r.label)).toEqual(['Flight — International', 'Flight — Domestic', 'Flight — Unspecified']);
+    expect(rows.every((r) => r.costCentre)).toBe(true);
+    expect(rows[0]).toMatchObject({ subCode: 'FLT-INT', amount: 10000, expandable: true, open: false });
+  });
+
+  test('Unspecified shows with its amount but is not expandable (no heads)', () => {
+    const uns = moduleSubDetailRows(flightsSubs, 'sales', opener(new Set())).find((r) => r.subCode === 'FLT-UNS');
+    expect(uns).toMatchObject({ amount: 200, expandable: false });
+  });
+
+  test('sub-centre with no activity on a side is skipped (Unspecified has no cogs)', () => {
+    const cogs = moduleSubDetailRows(flightsSubs, 'cogs', opener(new Set()));
+    expect(cogs.map((r) => r.subCode)).toEqual(['FLT-INT', 'FLT-DOM']); // FLT-UNS (cogs 0) dropped
+  });
+
+  test('open sub-centre → its own split ledger → components, keyed per cost-centre', () => {
+    const sk = subDetailKey(flightsSubs, 'sales', 'FLT-INT');
+    const lk = subLedgerDetailKey(flightsSubs, 'sales', 'FLT-INT', 'Sales — Air Tickets');
+    const rows = moduleSubDetailRows(flightsSubs, 'sales', opener(new Set([sk, lk])));
+    const int = rows.find((r) => r.subCode === 'FLT-INT');
+    expect(int.open).toBe(true);
+    // Int'l ledger components are the Int'l ones (8000 + 2000), NOT the merged module set.
+    const comps = rows.filter((r) => r.component);
+    expect(comps).toEqual([
+      { label: 'Base Fare', amount: 8000, component: true },
+      { label: 'K3', amount: 2000, component: true },
+    ]);
+  });
+
+  test('ledger keys are namespaced by sub-centre so Int\'l and Domestic do not collide', () => {
+    const intKey = subLedgerDetailKey(flightsSubs, 'sales', 'FLT-INT', 'Sales — Air Tickets');
+    const domKey = subLedgerDetailKey(flightsSubs, 'sales', 'FLT-DOM', 'Sales — Air Tickets');
+    expect(intKey).not.toBe(domKey);
+  });
+});
+
+describe('moduleDrillRows', () => {
+  test('routes multi-leaf modules through the sub-centre split', () => {
+    const rows = moduleDrillRows(flightsSubs, 'sales', opener(new Set()));
+    expect(rows.every((r) => r.costCentre)).toBe(true);
+  });
+
+  test('routes single-leaf modules through the flat ledger drill', () => {
+    const rows = moduleDrillRows(flights, 'sales', opener(new Set()));
+    expect(rows.every((r) => r.ledgerHead)).toBe(true);
   });
 });

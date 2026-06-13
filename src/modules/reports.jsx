@@ -8,9 +8,9 @@ import { Download, Printer, Save, Search } from 'lucide-react';
 import { Bar, Legend, Line } from 'recharts';
 import { exportToCSV } from '../core/business-logic';
 import { exportToExcel } from '../core/exportExcel';
-import { ACTIVE_CURRENCIES, BRANCHES, BRANCH_CODES, CURRENCY_META, EXP_ACTUALS, MODULE_ICONS } from '../core/data';
+import { ACTIVE_CURRENCIES, BRANCHES, BRANCH_CODES, CURRENCY_META, MODULE_ICONS } from '../core/data';
 import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../core/useReference';
-import { useBalanceSheet, useGpBills, useModulePL, useAgeing, useTaxSummary } from '../core/useAccounting';
+import { useBalanceSheet, useGpBills, useModulePL, useAgeing, useTaxSummary, useLedgerStatement, useBudgetVsActual } from '../core/useAccounting';
 import { fmt, fmtINR } from '../core/format';
 import { CUR_MONTH, CUR_FY, MONTH_OPTIONS, PERIOD_OPTIONS, FY_MONTHS, FY_YTD_MONTHS, ALL_TIME_FROM, todayISO, fmtDate, rangeNote, monthLabel, prevMonthKey, presetRange, fyQuarterKey } from '../core/dates';
 import { periodRange } from '../core/period';
@@ -865,18 +865,24 @@ export function ReportExpenseBgt({branch,setRoute}){
   const cur=cfg.cur;
   const fyObj=FY_LIST.find(f=>f.v===fy||f.l===fy)||FY_LIST[1]||{l:fy,v:fy,keys:[],months:[]};
   const budget=bgtFor(brCode,fyObj.v);
-  const ytdMonths=(fyObj.keys||[]).filter(k=>k<=selMonth);
+  const fyKeys=fyObj.keys||[];
+  const ytdMonths=fyKeys.filter(k=>k<=selMonth);
 
-  /* Actuals helper */
-  const getAct=(id,months)=>EXP_ACTUALS.filter(a=>a.id===id&&a.br===brCode&&months.includes(a.m)).reduce((s,a)=>s+a.a,0);
-  const getTotAct=(months)=>EXP_LEDGERS.reduce((s,l)=>s+getAct(l.id,months),0);
-  const getTotBgt=()=>EXP_LEDGERS.reduce((s,l)=>s+(budget[l.id]?.monthly||0),0);
+  /* LIVE actuals — from /api/accounting/budget-vs-actual for the active branch and
+     the current view's period. Actuals are real expense-ledger debit movement
+     (no hardcoded EXP_ACTUALS). Keyed by ledger code (= expense-ledger id). */
+  const mEnd=(key)=>{const[y,m]=String(key).split("-").map(Number);return `${key}-${String(new Date(y,m,0).getDate()).padStart(2,"0")}`;};
+  const viewFrom=view==="mtd"?`${selMonth}-01`:`${fyKeys[0]||selMonth}-01`;
+  const viewTo=view==="annual"?mEnd(fyKeys[fyKeys.length-1]||selMonth):mEnd(selMonth);
+  const bvaQ=useBudgetVsActual(brObj,{from:viewFrom,to:viewTo,fy:fyObj.v});
+  const actByCode=Object.fromEntries((bvaQ.data?.rows||[]).map(r=>[r.code,r.actual||0]));
+  const getAct=(id)=>actByCode[id]||0;
 
-  /* Per-view bgt/act */
+  /* Per-view bgt/act — actual already scoped to the view's period by the query. */
   const getViewData=(id)=>{
-    if(view==="mtd")  return {bgt:budget[id]?.monthly||0,     act:getAct(id,[selMonth])};
-    if(view==="ytd")  return {bgt:(budget[id]?.monthly||0)*ytdMonths.length, act:getAct(id,ytdMonths)};
-    return {bgt:budget[id]?.yearly||0, act:getAct(id,fyObj.keys)};
+    if(view==="mtd")  return {bgt:budget[id]?.monthly||0,     act:getAct(id)};
+    if(view==="ytd")  return {bgt:(budget[id]?.monthly||0)*ytdMonths.length, act:getAct(id)};
+    return {bgt:budget[id]?.yearly||0, act:getAct(id)};
   };
 
   const pctColor=p=>p===null?"#bfc3d6":p<=80?"#27500A":p<=100?"#1D9E75":p<=120?"#854F0B":"#A32D2D";
@@ -901,14 +907,17 @@ export function ReportExpenseBgt({branch,setRoute}){
   );
 
   /* All-branches summary */
+  /* Per-branch budget is live; per-branch ACTUALS need that branch's own query,
+     so only the active branch shows live actuals here — others prompt to open
+     the branch (no fabricated cross-branch actuals). */
   const allBranchSummary=isAll?BRANCHES.map(b=>{
     const bBgt=bgtFor(b.code,fyObj.v);
     const bCur=bc(b).cur;
-    const months=view==="mtd"?[selMonth]:view==="ytd"?ytdMonths:fyObj.keys;
     const totB=EXP_LEDGERS.reduce((s,l)=>s+(view==="annual"?bBgt[l.id]?.yearly||0:(bBgt[l.id]?.monthly||0)*(view==="ytd"?ytdMonths.length:1)),0);
-    const totA=EXP_ACTUALS.filter(a=>a.br===b.code&&months.includes(a.m)).reduce((s,a)=>s+a.a,0);
-    const pct=totB>0?+(totA/totB*100).toFixed(1):null;
-    return {b:b,bCur:bCur,totB:totB,totA:totA,var:totB-totA,pct:pct};
+    const isActive=b.code===brCode;
+    const totA=isActive?totAct:null;
+    const pct=isActive&&totB>0?+(totA/totB*100).toFixed(1):null;
+    return {b:b,bCur:bCur,totB:totB,totA:totA,var:totA==null?null:totB-totA,pct:pct,isActive};
   }):null;
 
   const viewLabel=view==="mtd"?`MTD — ${fyObj.months[fyObj.keys.indexOf(selMonth)]||selMonth}`:view==="ytd"?`YTD — ${ytdMonths.length} months to ${fyObj.months[fyObj.keys.indexOf(selMonth)]||selMonth}`:`Full Year — ${fyObj.l}`;
@@ -970,11 +979,11 @@ export function ReportExpenseBgt({branch,setRoute}){
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginBottom:8,fontSize:10.5}}>
                   <div><p style={{margin:0,color:"#5a6691"}}>Budget</p><p style={{margin:0,fontWeight:700,color:"#384677"}}>{bCur}{f(totB)}</p></div>
-                  <div><p style={{margin:0,color:"#5a6691"}}>Actual</p><p style={{margin:0,fontWeight:700,color:totA>totB?"#A32D2D":"#27500A"}}>{bCur}{f(totA)}</p></div>
+                  <div><p style={{margin:0,color:"#5a6691"}}>Actual</p><p style={{margin:0,fontWeight:700,color:totA==null?"#bfc3d6":totA>totB?"#A32D2D":"#27500A"}}>{totA==null?"—":bCur+f(totA)}</p></div>
                 </div>
                 <Bar pct={pct} h={8}/>
-                <p style={{margin:"5px 0 0",fontSize:9.5,fontWeight:700,color:v>=0?"#27500A":"#A32D2D"}}>
-                  {v>=0?"Under":"Over"} by {bCur}{f(Math.abs(v))}
+                <p style={{margin:"5px 0 0",fontSize:9.5,fontWeight:700,color:v==null?"#5a6691":v>=0?"#27500A":"#A32D2D"}}>
+                  {v==null?"Open this branch for actuals":`${v>=0?"Under":"Over"} by ${bCur}${f(Math.abs(v))}`}
                 </p>
               </div>
             ))}
@@ -1037,9 +1046,11 @@ export function ReportExpenseBgt({branch,setRoute}){
         <p style={{margin:"0 0 12px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Monthly Trend — {fyObj.l} · {brCode}</p>
         <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:6}}>
           {fyObj.keys.map((k,ki)=>{
-            const mAct=EXP_ACTUALS.filter(a=>a.m===k&&a.br===brCode).reduce((s,a)=>s+a.a,0);
+            // Live actual only for the month currently queried (MTD view); other
+            // months show "no data" rather than a fabricated figure.
+            const mAct=(view==="mtd"&&k===selMonth)?totAct:null;
             const mBgt=EXP_LEDGERS.reduce((s,l)=>s+(budget[l.id]?.monthly||0),0);
-            const mPct=mBgt>0?+(mAct/mBgt*100).toFixed(0):null;
+            const mPct=(mBgt>0&&mAct!=null)?+(mAct/mBgt*100).toFixed(0):null;
             const isSelected=k===selMonth;
             return (
               <div key={k} onClick={()=>{setSelMonth(k);if(view==="annual")setView("mtd");}}
@@ -1048,7 +1059,7 @@ export function ReportExpenseBgt({branch,setRoute}){
                 <p style={{margin:"0 0 2px",fontSize:9,fontWeight:700,color:isSelected?"#d4a437":"#384677"}}>{fyObj.months[ki]}</p>
                 <p style={{margin:"0 0 4px",fontSize:16,fontWeight:800,color:isSelected?"#fff":pctColor(mPct)}}>{mPct!==null?`${mPct}%`:"—"}</p>
                 <Bar pct={mPct} h={5}/>
-                <p style={{margin:"3px 0 0",fontSize:8,color:isSelected?"#8b94b3":"#bfc3d6"}}>{mAct>0?cur+f(mAct):"no data"}</p>
+                <p style={{margin:"3px 0 0",fontSize:8,color:isSelected?"#8b94b3":"#bfc3d6"}}>{mAct!=null&&mAct>0?cur+f(mAct):"no data"}</p>
               </div>
             );
           })}
@@ -1828,32 +1839,34 @@ export function ClientStatement({branch}){
   const [client,setClient]=useState("");
   const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
   const [showModal,setShowModal]=useState(false);
-  // Live per-file GP for this branch (all history → client list + date-filtered statement).
+  // Live per-file GP — used ONLY to populate the client selector (the set of parties
+  // that have sales). The statement itself is the party's real account ledger.
   const q=useGpBills(branch,{});
   const allBills=q.data||[];
   const clients=[...new Set(allBills.map(b=>b.client).filter(Boolean))].sort();
-  const inR=(d)=>{const s=String(d||"");return (!range.from||s>=range.from)&&(!range.to||s<=range.to);};
   const rangeLabel=range.mode==='all'?'All Time':`${range.from||'start'} → ${range.to||'today'}`;
 
-  const txns=useMemo(()=>{
-    const b=allBills.filter(x=>x.client===client&&inR(x.date));
-    // Invoices (Dr the client)
-    const invs=b.map(x=>({date:x.date,type:"Invoice",ref:x.id,desc:`${x.mod} — ${x.dest||""}`,dr:x.sell,cr:0}));
-    // Simulated receipts (Cr the client)
-    const recs=b.filter((_,i)=>i%3!==0).map(x=>({date:x.date.replace(/-\d\d$/,"-"+String(parseInt(x.date.slice(8))+5).padStart(2,"0")),type:"Receipt",ref:x.id.replace("/SF","/RV").replace("/SH","/RV"),desc:"Payment received — NEFT",dr:0,cr:Math.round(x.sell*0.85)}));
-    return [...invs,...recs].sort((a,z)=>a.date.localeCompare(z.date));
-  },[client,range.from,range.to,allBills]);
+  // LIVE account statement: the client's own ledger (real invoices Dr + real receipts Cr).
+  // No simulated receipts — every Dr/Cr row is a posted voucher line from the books.
+  const stmtQ=useLedgerStatement(client,branch,{from:range.from||undefined,to:range.to||undefined});
+  const stmt=stmtQ.data;
 
-  let running=0;
-  const txnsWithBal=txns.map(t=>{running+=t.dr-t.cr;return{...t,bal:running};});
-  const totDr=txns.reduce((s,t)=>s+t.dr,0);
-  const totCr=txns.reduce((s,t)=>s+t.cr,0);
-  const outstanding=totDr-totCr;
+  const txnsWithBal=(stmt?.lines||[]).map(p=>({
+    date:p.date,
+    type:p.debit>0?"Invoice":"Receipt",
+    ref:p.vno,
+    desc:p.narration||p.entryNarration||(p.particulars&&p.particulars[0]?.ledger)||p.category||"—",
+    dr:p.debit||0,cr:p.credit||0,
+    bal:p.balanceSide==="Cr"?-(p.balance||0):(p.balance||0),
+  }));
+  const totDr=stmt?.totalDebit||0;
+  const totCr=stmt?.totalCredit||0;
+  const outstanding=stmt?(stmt.closingSide==="Cr"?-(stmt.closingBalance||0):(stmt.closingBalance||0)):0;
 
-  // Ageing buckets (0-30, 31-60, 61-90, >90)
-  const today=new Date("2026-05-19");
+  // Ageing buckets (0-30, 31-60, 61-90, >90) — from real open invoice (Dr) lines vs today.
+  const today=new Date();
   const ageing={a0:0,a30:0,a60:0,a90:0};
-  txnsWithBal.filter(t=>t.type==="Invoice"&&t.bal>0).forEach(t=>{
+  txnsWithBal.filter(t=>t.dr>0).forEach(t=>{
     const days=Math.ceil((today-new Date(t.date))/(86400000));
     if(days<=30)ageing.a0+=t.dr;
     else if(days<=60)ageing.a30+=t.dr;
@@ -1905,7 +1918,7 @@ export function ClientStatement({branch}){
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <div style={{padding:"10px 14px",background:"#f3f4f8",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <p style={{margin:0,fontSize:11,fontWeight:700,color:"#0d1326"}}>Account Ledger — {client}</p>
-          <p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{txns.length} transactions</p>
+          <p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{txnsWithBal.length} transactions</p>
         </div>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5,minWidth:700}}>
@@ -1914,7 +1927,13 @@ export function ClientStatement({branch}){
                 <th key={i} style={{padding:"8px 12px",textAlign:i>=4?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{txnsWithBal.map((t,i)=>(
+            <tbody>{!client?(
+                <tr><td colSpan={7} style={{padding:"22px 12px",textAlign:"center",color:"#5a6691",fontSize:11.5}}>Select a client to view their live account statement.</td></tr>
+              ):stmtQ.isLoading?(
+                <tr><td colSpan={7} style={{padding:"22px 12px",textAlign:"center",color:"#5a6691",fontSize:11.5}}>Loading statement…</td></tr>
+              ):txnsWithBal.length===0?(
+                <tr><td colSpan={7} style={{padding:"22px 12px",textAlign:"center",color:"#5a6691",fontSize:11.5}}>No posted transactions for {client} in this period.</td></tr>
+              ):txnsWithBal.map((t,i)=>(
               <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:t.type==="Receipt"?"#f0fff4":i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"7px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{t.date}</td>
                 <td style={{padding:"7px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:t.type==="Invoice"?"#E6F1FB":"#EAF3DE",color:t.type==="Invoice"?"#185FA5":"#27500A"}}>{t.type}</span></td>

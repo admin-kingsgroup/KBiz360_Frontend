@@ -28,7 +28,7 @@ import { exportToExcel } from '../core/exportExcel';
 import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../core/dates';
 import { VoucherEditor } from './accountingLive';
 import { useMobile } from '../core/hooks';
-import { moduleDetailRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail } from '../core/pnlDetail';
+import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail } from '../core/pnlDetail';
 import { openPrintPreview } from '../core/PrintPreview';
 import { LedgerActions } from '../core/ledgerActions';
 import { openLedgerModal } from '../core/LedgerModalHost';
@@ -625,8 +625,8 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
                             <td style={{ ...num, fontWeight: 700, color: gpColor(m.gpPct) }}>{pctTxt(m.gpPct)}</td>
                             <td style={{ ...num, color: SAP.sec }}>{pctTxt(m.pctOfSales)}</td>
                           </tr>
-                          {/* ledger composition — captured fares (Base Fare, K3, Taxes …) */}
-                          {open && <FioriLedgerRows m={m} openHead={openHead} setOpenHead={setOpenHead} />}
+                          {/* single-leaf modules: ledger composition at module level (captured fares — Base Fare, K3, Taxes …) */}
+                          {open && !m.hasSubs && <FioriLedgerRows m={m} openHead={openHead} setOpenHead={setOpenHead} />}
                           {/* multi-leaf modules (Flights/Holiday) → sub-centre rows → files */}
                           {open && m.hasSubs && (m.subs || []).map((s) => {
                             const sk = `${m.key}|${s.code}`;
@@ -642,6 +642,8 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
                                   <td style={{ ...num, fontWeight: 600, color: gpColor(s.gpPct) }}>{pctTxt(s.gpPct)}</td>
                                   <td style={{ ...num, color: SAP.sec }}>{pctTxt(s.pctOfSales)}</td>
                                 </tr>
+                                {/* per-sub-centre ledger composition — fares split by Int'l/Domestic, not merged */}
+                                {so && <FioriLedgerRows heads={s.heads} keyBase={sk} openHead={openHead} setOpenHead={setOpenHead} />}
                                 {so && <FileRows files={s.files} indent={62} onPick={setDrillFile} />}
                               </React.Fragment>
                             );
@@ -817,12 +819,16 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
    the entry (Base Fare, K3, Taxes …). Sales ledgers show their amount in the
    Sales column, Purchase ledgers in the COGS column; click a ledger to reveal
    its components. Same six columns as the module table (colSpan-aware). */
-function FioriLedgerRows({ m, openHead, setOpenHead }) {
+function FioriLedgerRows({ m, heads: headsProp, keyBase, openHead, setOpenHead }) {
+  // Module-level (m.heads) for single-leaf modules, or a sub-centre's own heads
+  // (Int'l/Domestic) when `heads` + `keyBase` are passed — so fares are split, not merged.
+  const allHeads = headsProp || (m && m.heads) || {};
+  const base = keyBase || (m && m.key) || '';
   const rows = [];
   for (const side of ['sales', 'cogs']) {
-    const heads = (m.heads && m.heads[side]) || [];
+    const heads = allHeads[side] || [];
     for (const h of heads) {
-      const hk = `${m.key}:${side}:${h.ledger}`;
+      const hk = `${base}:${side}:${h.ledger}`;
       const comps = h.components || [];
       const hasComps = comps.length > 0;
       const ho = !!openHead[hk];
@@ -926,7 +932,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     const ekey = moduleDetailKey(m, side);
     const open = hasDetail && isOpen(ekey, false);
     const row = { label: m.name, amount, sub: true, module: m, icon: m.icon, expandable: hasDetail, ekey, open };
-    return open ? [row, ...moduleDetailRows(m, side, isOpen)] : [row];
+    return open ? [row, ...moduleDrillRows(m, side, isOpen)] : [row];
   };
 
   // Trading account — Purchases/COGS (Dr) vs Sales (Cr); both sides total Nett Sales.
@@ -986,11 +992,11 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     const sep = side === 'cr' ? { borderLeft: '1px solid #d6d6d6' } : {};
     if (!r) return (<><td style={{ ...mono, ...sep }} /><td style={{ ...mono }} /></>);
     const clickable = !!(r.module || r.ledger || r.expandable);
-    const bold = !!(r.group || r.bucket || r.sub || r.result);              // groups & sub-groups bold
+    const bold = !!(r.group || r.bucket || r.sub || r.costCentre || r.result); // groups, sub-groups & cost-centres bold
     const color = r.component ? '#6a6a6a'
       : r.result ? TALLY.green
-        : (r.group || r.bucket || r.sub) ? TALLY.head : '#1a1a1a';
-    const pad = r.component ? 58 : r.ledgerHead ? 42 : r.leaf ? 46 : r.sub ? 32 : r.bucket ? 22 : 12;
+        : (r.group || r.bucket || r.sub || r.costCentre) ? TALLY.head : '#1a1a1a';
+    const pad = r.component ? 58 : r.ledgerHead ? 42 : r.leaf ? 46 : r.costCentre ? 38 : r.sub ? 32 : r.bucket ? 22 : 12;
     return (
       <>
         <td onClick={clickable ? () => onRowClick(r) : undefined}
@@ -1126,7 +1132,7 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     const ekey = moduleDetailKey(m, side);
     const open = hasDetail && isOpen(ekey, false);
     const row = { label: m.name, amount, sub: true, module: m, icon: m.icon, expandable: hasDetail, ekey, open };
-    return open ? [row, ...moduleDetailRows(m, side, isOpen)] : [row];
+    return open ? [row, ...moduleDrillRows(m, side, isOpen)] : [row];
   };
 
   // allKeys for expand/collapse all (buckets + sub-groups + module/ledger drill).
@@ -1138,9 +1144,9 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
 
   const Row = ({ r, neg }) => {
     const clickable = !!(r.module || r.ledger || r.expandable);
-    const bold = !!(r.group || r.bucket || r.sub || r.result);
-    const color = r.component ? '#6a6a6a' : r.result ? TALLY.green : (r.group || r.bucket || r.sub) ? TALLY.head : '#1a1a1a';
-    const pad = r.component ? 64 : r.ledgerHead ? 46 : r.leaf ? 50 : r.sub ? 34 : r.bucket ? 24 : 14;
+    const bold = !!(r.group || r.bucket || r.sub || r.costCentre || r.result);
+    const color = r.component ? '#6a6a6a' : r.result ? TALLY.green : (r.group || r.bucket || r.sub || r.costCentre) ? TALLY.head : '#1a1a1a';
+    const pad = r.component ? 64 : r.ledgerHead ? 46 : r.leaf ? 50 : r.costCentre ? 42 : r.sub ? 34 : r.bucket ? 24 : 14;
     const amt = neg ? -Math.abs(r.amount) : r.amount;
     return (
       <tr style={{ borderBottom: '1px solid #f4f4f4' }}>
