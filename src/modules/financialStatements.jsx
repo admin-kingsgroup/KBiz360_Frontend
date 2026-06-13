@@ -130,9 +130,19 @@ function TkfPnL({ branch, from, to }) {
     ...(d.modules || []).flatMap((m) => moduleStmtRows(m, 'sales')),
     { label: 'Total Revenue (Sales)', amount: d.totals.sales, subtotal: true },
   ];
+  // Module rows foot to the operating GP (Sales − COGS); the full Tally Gross
+  // Profit also adds Direct Income (and other trading items). Show that bridge so
+  // the statement foots: Operating GP + Direct Income = GROSS PROFIT.
+  const operatingGP = d.totals.operatingGP != null ? d.totals.operatingGP : (d.totals.sales - d.totals.cogs);
   const cogsRows = [
     ...(d.modules || []).flatMap((m) => moduleStmtRows(m, 'cogs')),
     { label: 'Total Direct Cost (COGS)', amount: d.totals.cogs, subtotal: true },
+    ...(d.totals.tradingOther
+      ? [
+        { label: 'Operating Gross Profit (Sales − COGS)', amount: operatingGP, subtotal: true },
+        { label: 'Add: Direct Income', amount: d.totals.tradingOther },
+      ]
+      : []),
     { label: 'GROSS PROFIT', amount: d.totals.gp, subtotal: true, bold: true },
   ];
   const expRows = [];
