@@ -12,6 +12,7 @@ import { Search } from 'lucide-react';
 import { BRANCHES } from '../core/data';
 import { ALL_TIME_FROM, todayISO } from '../core/dates';
 import { apiGet } from '../core/api';
+import { filterGpBills } from '../core/registerSearch';
 import { btnGh, card, inp } from '../core/styles';
 
 export function GlobalSearch({setRoute}){
@@ -27,15 +28,7 @@ export function GlobalSearch({setRoute}){
     staleTime: 60_000,
   });
 
-  const results = useMemo(() => {
-    if (!q || q.length < 2) return [];
-    const lower = q.toLowerCase();
-    const has = (v) => String(v || '').toLowerCase().includes(lower);
-    return (bills || [])
-      .filter((b) => has(b.id) || has(b.client) || has(b.dest) || has(b.supplier) || has(b.consultant) || has(b.airline))
-      .slice(0, 50)
-      .map((b) => { const gp = (b.sell || 0) - (b.cost || 0); return { ...b, gp, gpPct: b.sell ? +((gp / b.sell) * 100).toFixed(1) : 0 }; });
-  }, [q, bills]);
+  const results = useMemo(() => filterGpBills(bills, q), [q, bills]);
 
   const cfg2=b=>BRANCHES.find(x=>x.code===b)||{cur:"₹"};
 

@@ -28,7 +28,7 @@ import { exportToExcel } from '../core/exportExcel';
 import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../core/dates';
 import { VoucherEditor } from './accountingLive';
 import { useMobile } from '../core/hooks';
-import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail } from '../core/pnlDetail';
+import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail, stripLeafPrefix } from '../core/pnlDetail';
 import { openPrintPreview } from '../core/PrintPreview';
 import { LedgerActions } from '../core/ledgerActions';
 import { openLedgerModal } from '../core/LedgerModalHost';
@@ -643,7 +643,7 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
                                   <td style={{ ...num, color: SAP.sec }}>{pctTxt(s.pctOfSales)}</td>
                                 </tr>
                                 {/* per-sub-centre ledger composition — fares split by Int'l/Domestic, not merged */}
-                                {so && <FioriLedgerRows heads={s.heads} keyBase={sk} openHead={openHead} setOpenHead={setOpenHead} />}
+                                {so && <FioriLedgerRows heads={s.heads} keyBase={sk} stripPrefix openHead={openHead} setOpenHead={setOpenHead} />}
                                 {so && <FileRows files={s.files} indent={62} onPick={setDrillFile} />}
                               </React.Fragment>
                             );
@@ -819,11 +819,13 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
    the entry (Base Fare, K3, Taxes …). Sales ledgers show their amount in the
    Sales column, Purchase ledgers in the COGS column; click a ledger to reveal
    its components. Same six columns as the module table (colSpan-aware). */
-function FioriLedgerRows({ m, heads: headsProp, keyBase, openHead, setOpenHead }) {
+function FioriLedgerRows({ m, heads: headsProp, keyBase, stripPrefix, openHead, setOpenHead }) {
   // Module-level (m.heads) for single-leaf modules, or a sub-centre's own heads
   // (Int'l/Domestic) when `heads` + `keyBase` are passed — so fares are split, not merged.
+  // Under an Int'l/Domestic head the leaf prefix is redundant, so strip it for display.
   const allHeads = headsProp || (m && m.heads) || {};
   const base = keyBase || (m && m.key) || '';
+  const ledgerLabel = (name) => (stripPrefix ? stripLeafPrefix(name) : name);
   const rows = [];
   for (const side of ['sales', 'cogs']) {
     const heads = allHeads[side] || [];
@@ -837,7 +839,7 @@ function FioriLedgerRows({ m, heads: headsProp, keyBase, openHead, setOpenHead }
         <tr key={hk} onClick={hasComps ? () => setOpenHead((s) => ({ ...s, [hk]: !s[hk] })) : undefined}
           style={{ background: '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: hasComps ? 'pointer' : 'default' }}>
           <td style={{ padding: '5px 16px 5px 62px', color: SAP.text, fontWeight: 600 }}>
-            {hasComps ? <Toggle open={ho} /> : <span style={{ display: 'inline-block', width: 21 }} />}{h.ledger}
+            {hasComps ? <Toggle open={ho} /> : <span style={{ display: 'inline-block', width: 21 }} />}{ledgerLabel(h.ledger)}
           </td>
           <td style={num}>{salesCol ? inr(h.amount) : ''}</td>
           <td style={num}>{salesCol ? '' : inr(h.amount)}</td>

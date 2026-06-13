@@ -1,7 +1,7 @@
 // P&L "expand all" drill helpers — pure, DOM-free unit tests.
 import {
   moduleDetailRows, moduleExpandKeys, moduleHasDetail, moduleDetailKey, ledgerDetailKey,
-  moduleHasSubs, moduleSubDetailRows, moduleDrillRows, subDetailKey, subLedgerDetailKey,
+  moduleHasSubs, moduleSubDetailRows, moduleDrillRows, subDetailKey, subLedgerDetailKey, stripLeafPrefix,
 } from '../pnlDetail';
 
 const flights = {
@@ -169,6 +169,31 @@ describe('moduleSubDetailRows', () => {
     const intKey = subLedgerDetailKey(flightsSubs, 'sales', 'FLT-INT', 'Sales — Air Tickets');
     const domKey = subLedgerDetailKey(flightsSubs, 'sales', 'FLT-DOM', 'Sales — Air Tickets');
     expect(intKey).not.toBe(domKey);
+  });
+});
+
+describe('stripLeafPrefix', () => {
+  test('strips only the leading short cost-centre prefix', () => {
+    expect(stripLeafPrefix('IT-Base Fare')).toBe('Base Fare');
+    expect(stripLeafPrefix('DT-K3-Taxes')).toBe('K3-Taxes');   // inner token kept
+    expect(stripLeafPrefix('HP-Land Package')).toBe('Land Package');
+    expect(stripLeafPrefix('IT-Base Fare [Pur]')).toBe('Base Fare [Pur]'); // suffix kept
+    expect(stripLeafPrefix('Sales — Air Tickets')).toBe('Sales — Air Tickets'); // no prefix
+  });
+});
+
+describe('moduleSubDetailRows label stripping', () => {
+  const prefixed = {
+    key: 'Flights', name: 'Flights', hasSubs: true, sales: 100, cogs: 0,
+    subs: [{ code: 'FLT-INT', name: 'Flight — International', sales: 100, cogs: 0,
+      heads: { sales: [{ ledger: 'IT-Base Fare', amount: 100, components: [{ label: 'Servicecharge', amount: 5 }] }], cogs: [] } }],
+  };
+  test('open sub → ledger label stripped, real ledger name preserved for drill', () => {
+    const sk = subDetailKey(prefixed, 'sales', 'FLT-INT');
+    const rows = moduleSubDetailRows(prefixed, 'sales', opener(new Set([sk])));
+    const head = rows.find((r) => r.ledgerHead);
+    expect(head.label).toBe('Base Fare');     // prefix stripped for display
+    expect(head.ledger).toBe('IT-Base Fare'); // drill-through keeps the real ledger
   });
 });
 

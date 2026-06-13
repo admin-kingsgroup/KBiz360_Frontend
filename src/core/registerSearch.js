@@ -22,6 +22,29 @@ export function bookingHaystack(b) {
   return parts.filter((x) => x != null && x !== '').join('  ').toLowerCase();
 }
 
+// Global search — a per-file GP bill (/api/accounting/gp-bills) flattened to the
+// searchable fields shown in the results table.
+export function gpBillHaystack(b) {
+  return [b.id, b.client, b.dest, b.supplier, b.consultant, b.airline]
+    .filter((x) => x != null && x !== '')
+    .join('  ')
+    .toLowerCase();
+}
+
+// Filter + rank live GP bills for the global search bar. Returns at most `limit`
+// matches, each enriched with gp / gpPct (guarding a zero-revenue divide).
+export function filterGpBills(bills, query, limit = 50) {
+  const needle = String(query || '').trim().toLowerCase();
+  if (needle.length < 2) return [];
+  return (bills || [])
+    .filter((b) => gpBillHaystack(b).includes(needle))
+    .slice(0, limit)
+    .map((b) => {
+      const gp = (b.sell || 0) - (b.cost || 0);
+      return { ...b, gp, gpPct: b.sell ? +((gp / b.sell) * 100).toFixed(1) : 0 };
+    });
+}
+
 // Posted voucher (Sales/Purchase Register) — header + every line's label and meta
 // (passenger / ticket / PNR / sector …).
 export function voucherHaystack(v) {

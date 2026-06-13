@@ -62,19 +62,29 @@ export const ledgerDetailKey = (m, side, ledger, keyPrefix = '') => `${keyPrefix
 export const subLedgerDetailKey = (m, side, subCode, ledger, keyPrefix = '') => `${keyPrefix}l:${side}:${m.key}:${subCode}:${ledger}`;
 
 /**
+ * Strip a leaf cost-centre prefix (e.g. "IT-", "DT-", "HP-") from a ledger name
+ * for display UNDER its Int'l/Domestic head, where the prefix is redundant
+ * ("IT-Base Fare" → "Base Fare"). Only the leading short uppercase token is
+ * removed, so internal tokens like "DT-K3-Taxes" → "K3-Taxes" are preserved. The
+ * real ledger name is kept on the row's `ledger` field for drill-through.
+ */
+export const stripLeafPrefix = (name) => String(name || '').replace(/^[A-Z]{1,3}-/, '');
+
+/**
  * Turn an array of ledger heads into ledgerHead (+ component) rows. `keyOf(ledger)`
  * builds each ledger row's expand key so the same routine serves both the module
- * level and the nested sub-centre level.
+ * level and the nested sub-centre level. `labelOf(ledger)` formats the displayed
+ * label (defaults to the raw ledger name; the sub-centre drill strips the prefix).
  *   ledgerHead row → { label, amount, ledger, ledgerHead, expandable, ekey, open }
  *   component row  → { label, amount, component: true }
  */
-function headRows(heads, isOpen, keyOf) {
+function headRows(heads, isOpen, keyOf, labelOf = (s) => s) {
   return (heads || []).flatMap((h) => {
     const comps = Array.isArray(h.components) ? h.components : [];
     const hasComps = comps.length > 0;
     const ekey = keyOf(h.ledger);
     const open = hasComps && isOpen(ekey, false);
-    const head = { label: h.ledger, amount: h.amount, ledger: h.ledger, ledgerHead: true, expandable: hasComps, ekey, open };
+    const head = { label: labelOf(h.ledger), amount: h.amount, ledger: h.ledger, ledgerHead: true, expandable: hasComps, ekey, open };
     return open ? [head, ...comps.map((c) => ({ label: c.label, amount: c.amount, component: true }))] : [head];
   });
 }
@@ -100,7 +110,7 @@ export function moduleSubDetailRows(m, side, isOpen, keyPrefix = '') {
     const open = expandable && isOpen(ekey, false);
     const row = { label: s.name, amount: subAmount(s, side), costCentre: true, subCode: s.code, expandable, ekey, open };
     if (!open) return [row];
-    return [row, ...headRows(heads, isOpen, (ledger) => subLedgerDetailKey(m, side, s.code, ledger, keyPrefix))];
+    return [row, ...headRows(heads, isOpen, (ledger) => subLedgerDetailKey(m, side, s.code, ledger, keyPrefix), stripLeafPrefix)];
   });
 }
 
