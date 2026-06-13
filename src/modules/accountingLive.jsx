@@ -16,6 +16,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { card, inp, bc } from '../core/styles';
 import { exportToExcel, vouchersToSheet } from '../core/exportExcel';
+import { voucherHaystack } from '../core/registerSearch';
 import { openPrintPreview } from '../core/PrintPreview';
 import { LedgerAccountView } from '../core/ledgerUI';
 import { openLedgerModal } from '../core/LedgerModalHost';
@@ -1167,6 +1168,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   const [tab, setTab] = useState(initial === 'purchase' ? 'purchase' : 'sales'); // sales | purchase
   const [view, setView] = useState('summary'); // summary | detailed
   const [product, setProduct] = useState('all');
+  const [search, setSearch] = useState('');
   const [from, setFrom] = useState(monthStartISO);
   const [to, setTo] = useState(todayISO);
   const [detail, setDetail] = useState(null);
@@ -1176,9 +1178,11 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   const q = tab === 'sales' ? sales : purch;
   const allRows = q.data || [];
   const products = useMemo(() => [...new Set(allRows.map(productOf))].sort(), [allRows]);
+  const needle = search.trim().toLowerCase();
   const rows = useMemo(() => allRows
     .filter((v) => product === 'all' || productOf(v) === product)
-    .filter((v) => dateInRange(v.date, from, to)), [allRows, product, from, to]);
+    .filter((v) => dateInRange(v.date, from, to))
+    .filter((v) => !needle || voucherHaystack(v).includes(needle)), [allRows, product, from, to, needle]);
   const sum = (k) => rows.reduce((s, v) => s + (v[k] || 0), 0);
   const sheet = useMemo(() => vouchersToSheet(rows), [rows]);
   const exportNow = () => {
@@ -1195,6 +1199,8 @@ export function RegisterLive({ branch, initial = 'sales' }) {
       sub={`${branchLabel(branch)} · ${rows.length} vouchers · Total ${money(cur, sum('total'))} · ${view === 'detailed' ? 'every Tally column shown — scroll right' : 'click a row for full detail'}`}
       right={<>
         <Tab id="sales" label="Sales" /><Tab id="purchase" label="Purchase" />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Search passenger / party / ticket / link no / voucher…"
+          style={{ ...inp, width: 280, minHeight: 32, fontSize: 11 }} />
         <select value={product} onChange={(e) => setProduct(e.target.value)} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer' }}>
           <option value="all">All products</option>
           {products.map((p) => <option key={p} value={p}>{p}</option>)}
