@@ -7,8 +7,8 @@ import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../core/api';
 import { branchCode } from '../core/useAccounting';
-import { VSPECS, lineCalc } from '../core/voucherSpecs';
-import { bookingHaystack } from '../core/registerSearch';
+import { VSPECS } from '../core/voucherSpecs';
+import { filterBookingsForRegister } from '../core/registerSearch';
 import { companyProfile } from '../core/referenceCache';
 import { bc } from '../core/styles';
 import { PeriodBar, periodRange } from '../core/period';
@@ -82,17 +82,15 @@ function useBookingsReg(brCode) {
 export function ModuleRegister({ branch, mode = 'both' }) {
   const [mod, setMod] = useState('ALL');
   const [q, setQ] = useState('');
-  const [open, setOpen] = useState(() => new Set()); // expanded booking ids (full SO/PO detail)
   const brCode = branchCode(branch) || 'ALL';
   const { data = [], isLoading } = useBookingsReg(brCode);
   const spec = VSPECS[mod] || {};
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All = inception→today
-  const inRange = (d) => (!range.from || d >= range.from) && (!range.to || d <= range.to);
   const needle = q.trim().toLowerCase();
-  const rows = useMemo(() => data
-    .filter((b) => (mod === 'ALL' || b.module === mod) && (b.status === 'approved' || b.status === 'posted') && inRange(b.date || ''))
-    .filter((b) => !needle || bookingHaystack(b).includes(needle)),
-    [data, mod, range.from, range.to, needle]);
+  const rows = useMemo(
+    () => filterBookingsForRegister(data, { mod, from: range.from, to: range.to, needle }),
+    [data, mod, range.from, range.to, needle],
+  );
   const fmt = (n) => (bc(branch).cur) + Math.round(Number(n) || 0).toLocaleString('en-IN');
   const custs = useQuery({ queryKey: ['customers'], queryFn: () => apiGet('/api/customers') }).data || [];
   const sups = useQuery({ queryKey: ['suppliers'], queryFn: () => apiGet('/api/suppliers') }).data || [];
@@ -102,12 +100,13 @@ export function ModuleRegister({ branch, mode = 'both' }) {
     const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()];
     openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: buildBookingInvoice(b, side, branch, master) });
   };
-  const toggle = (id) => setOpen((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const showSale = mode !== 'purchase', showPur = mode !== 'sales', showGP = mode === 'both';
+  const showSale = mode !== 'purchase', showPur = mode !== 'sales';
   const heading = mode === 'sales' ? 'Module Sales Register' : mode === 'purchase' ? 'Module Purchase Register' : 'Module Sales & Purchase Register';
   const showMod = mod === 'ALL';
-  // total columns for the full-width detail cell
-  const colSpan = 1 + 3 + (showMod ? 1 : 0) + (showSale ? 1 : 0) + (showPur ? 1 : 0) + (showSale ? 1 : 0) + (showPur ? 1 : 0) + (showGP ? 1 : 0) + 1;
+  // every datum is now a column on the single row → colSpan for loading/empty spans
+  const colSpan = 3 /* bkg·link·date */ + (showMod ? 1 : 0) + 2 /* customer·supplier */
+    + (showSale ? 2 : 0) /* sale·saleGST */ + (showPur ? 2 : 0) /* purchase·purGST */
+    + 1 /* GP */ + (showSale ? 1 : 0) /* saleInv */ + (showPur ? 1 : 0) /* purInv */ + 1 /* invoice */;
 
   const th = { padding: '9px 12px', background: C.dark, color: C.gold, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'left', whiteSpace: 'nowrap' };
   const td = { padding: '8px 12px', borderBottom: '1px solid #f0f2f7', fontSize: 12.5 };
@@ -119,7 +118,7 @@ export function ModuleRegister({ branch, mode = 'both' }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 17, fontWeight: 800, color: C.dark }}>{heading} <span style={{ fontSize: 12, fontWeight: 600, color: C.dim }}>(view-only)</span></div>
-          <div style={{ fontSize: 12, color: C.dim }}>Approved SO/PO/GP deals — click any row to see <b>all data captured</b> (passengers, tickets, sectors, fares). All entry is via <b>Finance ▸ Vouchers ▸ SO/PO/GP Voucher</b>. {mode === 'sales' ? 'Print the Sales Invoice (give to customer)' : mode === 'purchase' ? 'Print the Purchase Invoice (internal filing)' : 'Print the Sales Invoice (customer) or Purchase Invoice (filing)'} — Link No stamped.</div>
+          <div style={{ fontSize: 12, color: C.dim }}>Approved SO/PO/GP deals — <b>one line per booking</b> with full sale / purchase / GST / GP detail. All entry is via <b>Finance ▸ Vouchers ▸ SO/PO/GP Voucher</b>. {mode === 'sales' ? 'Print the Sales Invoice (give to customer)' : mode === 'purchase' ? 'Print the Purchase Invoice (internal filing)' : 'Print the Sales Invoice (customer) or Purchase Invoice (filing)'} — Link No stamped.</div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <PeriodBar branch={branch} compact defaultPreset="all" onChange={setRange} />
@@ -144,138 +143,46 @@ export function ModuleRegister({ branch, mode = 'both' }) {
         <div style={{ maxHeight: '72vh', overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr>
-              <th style={{ ...th, width: 26 }} />
               <th style={th}>Booking No</th><th style={th}>Link No</th><th style={th}>Date</th>
               {showMod && <th style={th}>Module</th>}
-              {showSale && <th style={th}>Customer</th>}
-              {showPur && <th style={th}>Supplier</th>}
-              {showSale && <th style={{ ...th, ...num }}>Sale</th>}
-              {showPur && <th style={{ ...th, ...num }}>Purchase</th>}
-              {showGP && <th style={{ ...th, ...num }}>GP</th>}
+              <th style={th}>Customer</th>
+              <th style={th}>Service / Vendor</th>
+              {showSale && <th style={{ ...th, ...num }}>Sale (incl GST)</th>}
+              {showSale && <th style={{ ...th, ...num }}>Sale GST</th>}
+              {showPur && <th style={{ ...th, ...num }}>Purchase (incl GST)</th>}
+              {showPur && <th style={{ ...th, ...num }}>Purchase GST</th>}
+              <th style={{ ...th, ...num }}>Gross Profit</th>
+              {showSale && <th style={th}>Sales Invoice</th>}
+              {showPur && <th style={th}>Purchase Invoice</th>}
               <th style={{ ...th, textAlign: 'center' }}>Invoice</th>
             </tr></thead>
             <tbody>
               {isLoading && <tr><td colSpan={colSpan} style={{ ...td, textAlign: 'center', color: C.dim, padding: 22 }}>Loading…</td></tr>}
               {!isLoading && rows.length === 0 && <tr><td colSpan={colSpan} style={{ ...td, textAlign: 'center', color: C.dim, padding: 22 }}>{needle ? `No deals match “${q.trim()}”.` : `No approved ${mod === 'ALL' ? '' : (spec.name || mod) + ' '}deals. Create one in SO/PO/GP Voucher → approve it.`}</td></tr>}
-              {rows.map((b, i) => {
-                const isOpen = open.has(b.id);
-                return (
-                  <React.Fragment key={b.id}>
-                    <tr style={{ background: isOpen ? '#eef4ff' : (i % 2 ? '#fafbff' : '#fff'), cursor: 'pointer' }} onClick={() => toggle(b.id)}>
-                      <td style={{ ...td, textAlign: 'center', color: C.blue, fontWeight: 700 }}>{isOpen ? '▾' : '▸'}</td>
-                      <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700 }}>{b.bookingNo}</td>
-                      <td style={{ ...td, fontFamily: 'monospace', color: C.blue }}>{b.linkNo || '—'}</td>
-                      <td style={{ ...td, color: C.dim, whiteSpace: 'nowrap' }}>{b.date}</td>
-                      {showMod && <td style={{ ...td, whiteSpace: 'nowrap' }}>{(VSPECS[b.module]?.icon || '') + ' ' + (VSPECS[b.module]?.name || b.module)}</td>}
-                      {showSale && <td style={{ ...td }}>{b.customer?.name || '—'}</td>}
-                      {showPur && <td style={{ ...td }}>{b.supplier?.name || '—'}</td>}
-                      {showSale && <td style={{ ...td, ...num }}>{fmt(b.so?.total)}</td>}
-                      {showPur && <td style={{ ...td, ...num }}>{fmt(b.po?.total)}</td>}
-                      {showGP && <td style={{ ...td, ...num, fontWeight: 700, color: C.green }}>{fmt(b.gp?.total)}</td>}
-                      <td style={{ ...td, textAlign: 'center', whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
-                        {showSale && <button onClick={() => print(b, 'sale')} style={ibtn('#fff', C.blue)}>🧾 Sales Invoice</button>}
-                        {showPur && <button onClick={() => print(b, 'purchase')} style={ibtn('#fff', C.dark)}>📄 Purchase Invoice</button>}
-                      </td>
-                    </tr>
-                    {isOpen && (
-                      <tr>
-                        <td colSpan={colSpan} style={{ padding: 0, background: '#f7f9ff', borderBottom: `2px solid ${C.border}` }}>
-                          <BookingDetail b={b} fmt={fmt} mode={mode} />
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
+              {rows.map((b, i) => (
+                <tr key={b.id} style={{ background: i % 2 ? '#fafbff' : '#fff' }}>
+                  <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700 }}>{b.bookingNo}</td>
+                  <td style={{ ...td, fontFamily: 'monospace', color: C.blue }}>{b.linkNo || '—'}</td>
+                  <td style={{ ...td, color: C.dim, whiteSpace: 'nowrap' }}>{b.date}</td>
+                  {showMod && <td style={{ ...td, whiteSpace: 'nowrap' }}>{(VSPECS[b.module]?.icon || '') + ' ' + (VSPECS[b.module]?.name || b.module)}</td>}
+                  <td style={{ ...td }}>{b.customer?.name || '—'}</td>
+                  <td style={{ ...td }}>{b.noSupplier ? '—' : (b.supplier?.name || '—')}</td>
+                  {showSale && <td style={{ ...td, ...num }}>{fmt(b.so?.total)}</td>}
+                  {showSale && <td style={{ ...td, ...num, color: '#854F0B' }}>{fmt(b.so?.gst)}</td>}
+                  {showPur && <td style={{ ...td, ...num }}>{b.noSupplier ? '—' : fmt(b.po?.total)}</td>}
+                  {showPur && <td style={{ ...td, ...num, color: '#854F0B' }}>{b.noSupplier ? '—' : fmt(b.po?.gst)}</td>}
+                  <td style={{ ...td, ...num, fontWeight: 700, color: C.green }}>{fmt(b.gp?.total)} <span style={{ fontWeight: 600, color: C.dim }}>({b.gp?.pct ?? 0}%)</span></td>
+                  {showSale && <td style={{ ...td, fontFamily: 'monospace', fontSize: 11, color: C.dim }}>{b.saleVno || '—'}</td>}
+                  {showPur && <td style={{ ...td, fontFamily: 'monospace', fontSize: 11, color: C.dim }}>{b.noSupplier ? '—' : (b.purchaseVno || '—')}</td>}
+                  <td style={{ ...td, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    {showSale && <button onClick={() => print(b, 'sale')} style={ibtn('#fff', C.blue)}>🧾 Sales Invoice</button>}
+                    {showPur && !b.noSupplier && <button onClick={() => print(b, 'purchase')} style={ibtn('#fff', C.dark)}>📄 Purchase Invoice</button>}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Full SO/PO detail for one booking — every captured line + sectors ─────────
-function BookingDetail({ b, fmt, mode }) {
-  const spec = VSPECS[b.module] || { idCols: [], fareCols: [] };
-  const idRefs = (spec.idCols || []).slice(2); // module ref fields (Country/Passport, Hotel/Conf, …)
-  const cols = [
-    { label: 'Passenger / Name', get: (l) => `${l.fn || ''} ${l.sn || ''}`.trim() || '—' },
-    ...idRefs.map((c) => ({ label: c.label, get: (l) => l[c.key] || '—' })),
-    ...(spec.fareCols || []).map((c) => ({ label: c.label, money: true, get: (l) => l[c.key] })),
-    { label: 'Sup. Svc', money: true, get: (l) => l.psvc },
-    { label: 'Markup', money: true, get: (l) => l.markup },
-    { label: 'Service', money: true, get: (l) => l.ssvc },
-  ];
-  const lines = b.rows || [];
-  const dth = { padding: '6px 10px', background: '#e7ecf7', color: C.dark, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, textAlign: 'left', whiteSpace: 'nowrap', borderBottom: `1px solid ${C.border}` };
-  const dtd = { padding: '6px 10px', borderBottom: '1px solid #eef0f5', fontSize: 12 };
-  const dnum = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
-  const chip = (label, val, color) => (
-    <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 6, padding: '5px 10px' }}>
-      <div style={{ fontSize: 9, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
-      <div style={{ fontSize: 12.5, fontWeight: 700, color: color || C.dark }}>{val}</div>
-    </div>
-  );
-  const showSale = mode !== 'purchase', showPur = mode !== 'sales';
-  return (
-    <div style={{ padding: '12px 16px' }}>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-        {spec.headerLabel && chip(spec.headerLabel, b.headerRef || '—')}
-        {b.packageType && chip('Package Type', b.packageType)}
-        {chip('Customer', b.customer?.name || '—')}
-        {!b.noSupplier && chip('Supplier', b.supplier?.name || '—')}
-        {showSale && chip('Sale (incl GST)', fmt(b.so?.total), C.blue)}
-        {showSale && (b.so?.gst > 0) && chip('Sale GST', fmt(b.so?.gst))}
-        {showSale && (b.so?.tcs > 0) && chip('TCS', fmt(b.so?.tcs))}
-        {showPur && !b.noSupplier && chip('Purchase (incl GST)', fmt(b.po?.total), C.dark)}
-        {showPur && !b.noSupplier && (b.po?.gst > 0) && chip('Purchase GST', fmt(b.po?.gst))}
-        {chip('Gross Profit', `${fmt(b.gp?.total)} (${b.gp?.pct ?? 0}%)`, C.green)}
-        {b.saleVno && chip('Sales Invoice', b.saleVno)}
-        {b.purchaseVno && chip('Purchase Invoice', b.purchaseVno)}
-      </div>
-      {b.remarks ? <div style={{ fontSize: 11.5, color: C.dim, marginBottom: 10 }}><b>Remarks:</b> {b.remarks}</div> : null}
-      <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>
-            <th style={dth}>#</th>
-            {cols.map((c) => <th key={c.label} style={{ ...dth, ...(c.money ? dnum : {}) }}>{c.label}</th>)}
-            {showSale && <th style={{ ...dth, ...dnum }}>Sale</th>}
-            {showPur && <th style={{ ...dth, ...dnum }}>Purchase</th>}
-            <th style={{ ...dth, ...dnum }}>GP</th>
-          </tr></thead>
-          <tbody>
-            {lines.length === 0 && <tr><td colSpan={cols.length + 4} style={{ ...dtd, textAlign: 'center', color: C.dim, padding: 16 }}>No line detail captured on this booking.</td></tr>}
-            {lines.map((l, li) => {
-              const c = (() => { try { return lineCalc(spec, l); } catch { return {}; } })();
-              return (
-                <React.Fragment key={li}>
-                  <tr style={{ background: li % 2 ? '#fafbff' : '#fff' }}>
-                    <td style={{ ...dtd, color: C.dim }}>{li + 1}</td>
-                    {cols.map((col) => <td key={col.label} style={{ ...dtd, ...(col.money ? dnum : {}) }}>{col.money ? fmt(col.get(l)) : col.get(l)}</td>)}
-                    {showSale && <td style={{ ...dtd, ...dnum }}>{fmt(c.finalSales)}</td>}
-                    {showPur && <td style={{ ...dtd, ...dnum }}>{fmt(c.finalPurchase)}</td>}
-                    <td style={{ ...dtd, ...dnum, fontWeight: 700, color: C.green }}>{fmt(c.gp)}</td>
-                  </tr>
-                  {spec.sectors && Array.isArray(l.sectors) && l.sectors.length > 0 && (
-                    <tr>
-                      <td />
-                      <td colSpan={cols.length + 3} style={{ padding: '0 10px 8px 10px', background: li % 2 ? '#fafbff' : '#fff' }}>
-                        <div style={{ fontSize: 8.5, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.3, margin: '4px 0 3px' }}>▣ Sectors</div>
-                        <table style={{ borderCollapse: 'collapse' }}>
-                          <thead><tr>{(spec.sectorCols || []).map((sc) => <th key={sc.key} style={{ ...dth, background: '#f3f4f8', fontSize: 8.5, padding: '3px 8px' }}>{sc.label}</th>)}</tr></thead>
-                          <tbody>{l.sectors.map((s, si) => (
-                            <tr key={si}>{(spec.sectorCols || []).map((sc) => <td key={sc.key} style={{ ...dtd, padding: '3px 8px', fontSize: 11, color: sc.kind === 'pnr' ? C.gold : '#3A3A3A', fontWeight: sc.kind ? 700 : 400 }}>{s[sc.key] || '—'}</td>)}</tr>
-                          ))}</tbody>
-                        </table>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </tbody>
-        </table>
       </div>
     </div>
   );

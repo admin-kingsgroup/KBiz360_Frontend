@@ -3,7 +3,7 @@
 // captured line + flight sectors); Sales/Purchase Register searches the posted
 // voucher (header + line labels + line meta). A passenger name typed in either
 // box must surface its deal.
-import { bookingHaystack, voucherHaystack } from '../core/registerSearch';
+import { bookingHaystack, voucherHaystack, filterBookingsForRegister } from '../core/registerSearch';
 
 // A realistic approved Flight SO/PO booking as returned by /api/booking-orders.
 const flightBooking = {
@@ -56,6 +56,32 @@ const salesVoucher = {
     { label: 'Output GST', meta: {} },
   ],
 };
+
+describe('filterBookingsForRegister — single-line module register rows', () => {
+  const data = [
+    { id: '1', module: 'SF', status: 'approved', date: '2026-01-10', bookingNo: 'BKG1', customer: { name: 'Alpha Co' } },
+    { id: '2', module: 'SH', status: 'approved', date: '2026-02-15', bookingNo: 'BKG2', customer: { name: 'Beta Co' } },
+    { id: '3', module: 'SF', status: 'pending',  date: '2026-01-20', bookingNo: 'BKG3', customer: { name: 'Gamma Co' } }, // not approved
+    { id: '4', module: 'SM', status: 'posted',   date: '2026-03-01', bookingNo: 'BKG4', customer: { name: 'Delta Co' } },
+  ];
+
+  test('only approved/posted bookings are listed (pending excluded)', () => {
+    expect(filterBookingsForRegister(data, {}).map((b) => b.id)).toEqual(['1', '2', '4']);
+  });
+  test('module filter narrows to one module', () => {
+    expect(filterBookingsForRegister(data, { mod: 'SF' }).map((b) => b.id)).toEqual(['1']); // BKG3 is pending
+  });
+  test('date window is inclusive on both ends', () => {
+    expect(filterBookingsForRegister(data, { from: '2026-02-01', to: '2026-02-28' }).map((b) => b.id)).toEqual(['2']);
+  });
+  test('needle searches the booking haystack (customer name)', () => {
+    expect(filterBookingsForRegister(data, { needle: 'delta' }).map((b) => b.id)).toEqual(['4']);
+  });
+  test('empty/undefined data is handled', () => {
+    expect(filterBookingsForRegister(undefined, {})).toEqual([]);
+    expect(filterBookingsForRegister([], { mod: 'SF' })).toEqual([]);
+  });
+});
 
 describe('Sales/Purchase register — voucher search (SO/PO meta)', () => {
   test('finds by passenger name held in line meta', () => {

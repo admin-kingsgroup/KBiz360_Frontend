@@ -22,6 +22,19 @@ export function bookingHaystack(b) {
   return parts.filter((x) => x != null && x !== '').join('  ').toLowerCase();
 }
 
+// Module register (Sales/Purchase/S&P) — pick approved/posted bookings for the
+// chosen module + date window + free-text needle. Pure so it's unit-testable.
+export function filterBookingsForRegister(data, { mod = 'ALL', from, to, needle } = {}) {
+  const n = String(needle || '').trim().toLowerCase();
+  return (data || [])
+    .filter((b) =>
+      (mod === 'ALL' || b.module === mod) &&
+      (b.status === 'approved' || b.status === 'posted') &&
+      (!from || (b.date || '') >= from) &&
+      (!to || (b.date || '') <= to))
+    .filter((b) => !n || bookingHaystack(b).includes(n));
+}
+
 // Global search — a per-file GP bill (/api/accounting/gp-bills) flattened to the
 // searchable fields shown in the results table.
 export function gpBillHaystack(b) {
