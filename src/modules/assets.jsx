@@ -7,8 +7,10 @@ import React, { useState } from 'react';
 import { Plus, Printer } from 'lucide-react';
 import { Line } from 'recharts';
 import { fmt } from '../core/format';
-import { ACM_REASON_CODES, FIXED_ASSETS_DATA, _ACM_LIST } from '../core/helpers';
+import { ACM_REASON_CODES, FIXED_ASSETS_DATA } from '../core/helpers';
 import { useAssetCategories } from '../core/useReference';
+import { useAdmMemos, useCreateAdmMemo, useAcceptAdmMemo, useRejectAdmMemo, useDisputeAdmMemo } from '../core/useAdmMemos';
+import { toast } from '../core/ux/toast';
 import { BRANCH_CODES, branchCurrencies, branchMainCurrency } from '../core/data';
 import { useMobile } from '../core/hooks';
 import { useModalEsc } from '../core/ux/useModalEsc';
@@ -20,36 +22,48 @@ export function AcmRegister({branch}){
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
 
-  const [acms,setAcms]=useState(_ACM_LIST);
+  // Live DB-backed register (/api/adm-memos?kind=acm). Accept spawns a PENDING
+  // gated ACM voucher into the approval queue (source: 'acm-register').
+  const memosQ=useAdmMemos("acm",branch);
+  const createM=useCreateAdmMemo();
+  const acceptM=useAcceptAdmMemo();
+  const rejectM=useRejectAdmMemo();
+  const disputeM=useDisputeAdmMemo();
+  const acms=(memosQ.data||[]).map(m=>({...m,id:m.memoNo,iataNum:m.iataNum||"",bspCreditDate:m.bspDebitDate||""}));
+
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [statusFilter,setStatusFilter]=useState("All");
   const [search,setSearch]=useState("");
   const [form,setForm]=useState({airline:"Air India",airlineCode:"AI",ticketNo:"",
-    reasonCode:"RC",amount:0,currency:"INR",branch:"BOM",remarks:""});
+    reasonCode:"RC",amount:0,currency:"INR",branch:brCode||"BOM",remarks:""});
 
   const filtered=acms.filter(a=>(
-    (!brCode||a.branch===brCode)&&
     (statusFilter==="All"||a.status===statusFilter)&&
-    (!search||a.id.toLowerCase().includes(search.toLowerCase())||
-     a.airline.toLowerCase().includes(search.toLowerCase()))
+    (!search||(a.id||"").toLowerCase().includes(search.toLowerCase())||
+     (a.airline||"").toLowerCase().includes(search.toLowerCase()))
   ));
 
-  const STATUSES=["All","Received","Applied","Settled"];
-  const STATUS_CLR={Received:"#185FA5",Applied:"#854F0B",Settled:"#27500A"};
-  const STATUS_BG ={Received:"#E6F1FB",Applied:"#FAEEDA",Settled:"#EAF3DE"};
+  // Backend lifecycle: Received → Disputed → Accepted (spawns voucher) / Rejected.
+  const STATUSES=["All","Received","Disputed","Accepted","Rejected"];
+  const STATUS_CLR={Received:"#185FA5",Disputed:"#A32D2D",Accepted:"#27500A",Rejected:"#5a6691"};
+  const STATUS_BG ={Received:"#E6F1FB",Disputed:"#FCEBEB",Accepted:"#EAF3DE",Rejected:"#f3f4f8"};
 
-  const totPending =filtered.filter(a=>a.status!=="Settled").reduce((s,a)=>s+a.amount,0);
-  const totSettled =filtered.filter(a=>a.status==="Settled").reduce((s,a)=>s+a.amount,0);
+  const totPending =filtered.filter(a=>!["Accepted","Rejected"].includes(a.status)).reduce((s,a)=>s+(a.amount||0),0);
+  const totAccepted=filtered.filter(a=>a.status==="Accepted").reduce((s,a)=>s+(a.amount||0),0);
   const f=n=>cur+Number(Math.round(n)).toLocaleString("en-IN");
 
   const addAcm=()=>{
-    const id=`ACM-${form.airlineCode}-2026-${String(acms.length+1).padStart(4,"0")}`;
-    const creditDate=new Date(Date.now()+31*86400000).toISOString().slice(0,10);
-    setAcms(a=>[{...form,id,date:"2026-05-19",bspCreditDate:creditDate,status:"Received",passenger:""},...a]);
-    setModal(false);
+    createM.mutate({kind:"acm",...form,branch:form.branch},{
+      onSuccess:()=>{setModal(false);toast("ACM recorded");},
+      onError:(e)=>toast("Could not record — "+e.message,"error"),
+    });
   };
 
-  const updateStatus=(id,status)=>setAcms(a=>a.map(x=>x.id===id?{...x,status}:x));
+  const acceptAcm=(m)=>acceptM.mutate({id:m.id},{
+    onSuccess:(r)=>toast(`ACM accepted — voucher ${(r&&(r.voucherVno||(r.voucher&&r.voucher.vno)))||""} created (pending approval)`),
+    onError:(e)=>toast("Could not accept — "+e.message,"error"),
+  });
+  const rejectAcm=(m)=>rejectM.mutate({id:m.id},{onSuccess:()=>toast("ACM rejected"),onError:(e)=>toast(e.message,"error")});
 
   return (
     <div style={{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
@@ -84,7 +98,7 @@ export function AcmRegister({branch}){
         {[
           {l:"Total ACMs",         v:String(filtered.length),   c:"#185FA5",bg:"#E6F1FB"},
           {l:"Pending Credit",     v:f(totPending),             c:"#854F0B",bg:"#FAEEDA"},
-          {l:"Credited (BSP)",     v:f(totSettled),             c:"#27500A",bg:"#EAF3DE"},
+          {l:"Accepted (posted)",  v:f(totAccepted),            c:"#27500A",bg:"#EAF3DE"},
           {l:"ADM Reversals",      v:String(acms.filter(a=>a.reasonCode==="AR").length),c:"#1D9E75",bg:"#EAF3DE"},
           {l:"Incentive Credits",  v:String(acms.filter(a=>["IC","CA"].includes(a.reasonCode)).length),c:"#185FA5",bg:"#E6F1FB"},
         ].map((k,i)=>(
@@ -136,9 +150,13 @@ export function AcmRegister({branch}){
                       </span>
                     </td>
                     <td style={{padding:"8px 10px"}}>
-                      <div style={{display:"flex",gap:4}}>
-                        {a.status==="Received"&&<button onClick={()=>updateStatus(a.id,"Applied")} style={{...btnGh,padding:"2px 7px",fontSize:9}}>Apply</button>}
-                        {a.status==="Applied"&&<button onClick={()=>updateStatus(a.id,"Settled")} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#27500A"}}>Settle</button>}
+                      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                        {["Received","Disputed"].includes(a.status)&&(
+                          <button onClick={()=>acceptAcm(a)} disabled={acceptM.isPending} title="Accept → create a pending ACM voucher" style={{...btnG,padding:"2px 7px",fontSize:9,background:"#27500A",whiteSpace:"nowrap"}}>Accept → Voucher</button>
+                        )}
+                        {a.status==="Received"&&<button onClick={()=>disputeM.mutate({id:a.id,note:"Query raised on credit"},{onSuccess:()=>toast("Query raised")})} style={{...btnGh,padding:"2px 7px",fontSize:9}}>Query</button>}
+                        {a.status==="Disputed"&&<button onClick={()=>rejectAcm(a)} style={{...btnGh,padding:"2px 7px",fontSize:9}}>Reject</button>}
+                        {a.status==="Accepted"&&a.voucherVno&&<span style={{fontSize:9,color:"#27500A",fontWeight:700}}>→ {a.voucherVno}</span>}
                       </div>
                     </td>
                   </tr>

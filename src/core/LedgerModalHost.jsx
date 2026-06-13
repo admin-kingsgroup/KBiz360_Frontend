@@ -14,6 +14,7 @@
 import React, { useEffect, useState } from 'react';
 import { LedgerAccountView } from './ledgerUI';
 import { pushModal } from './ux/modalStore';
+import { useDock } from './ux/dock';
 import { VoucherEditor } from '../modules/accountingLive';
 import { bc } from './styles';
 
@@ -43,17 +44,32 @@ export function LedgerModalHost({ branch: shellBranch }) {
     return () => pop();
   }, [job, voucher]);
 
+  const dock = useDock();
+
   if (!job) return null;
   const branch = shellBranch;                    // live global branch — single source of truth
+  const branchCode = typeof shellBranch === 'string' ? shellBranch : (shellBranch && shellBranch.code) || '';
   const cur = bc(branch).cur;
   const close = () => { setVoucher(null); setJob(null); };
+
+  // Minimize: park this ledger (pinned to the CURRENT branch) and hide the
+  // overlay. Restoring re-opens it from the ContextBar tray and re-fetches.
+  const minimize = () => {
+    if (voucher && !window.confirm('A voucher is open. Minimize and discard the open voucher view?')) return;
+    dock.park({ kind: 'ledger', label: job.name, branch: branchCode, payload: { name: job.name, from: job.from, to: job.to } });
+    setVoucher(null); setJob(null);
+  };
+  const iconBtn = { background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 20, lineHeight: 1, padding: '0 2px' };
 
   return (
     <div onMouseDown={close} style={{ position: 'fixed', inset: 0, background: 'rgba(17,17,17,0.55)', zIndex: 8800, display: 'flex', flexDirection: 'column', padding: '1.4vh 1.2vw' }}>
       <div onMouseDown={(e) => e.stopPropagation()} style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: 10, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,.4)', minHeight: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '9px 16px', borderBottom: '1px solid #DEDBD4', background: '#FDFAF4' }}>
           <strong style={{ fontSize: 13.5, color: DARK, letterSpacing: '.3px' }}>📒 Ledger — {job.name}</strong>
-          <button onClick={close} title="Close (Esc)" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 20, lineHeight: 1 }}>✕</button>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button onClick={minimize} title="Minimize to bar" aria-label="Minimize to bar" style={{ ...iconBtn, fontSize: 18 }}>▁</button>
+            <button onClick={close} title="Close (Esc)" aria-label="Close" style={iconBtn}>✕</button>
+          </span>
         </div>
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           <LedgerAccountView

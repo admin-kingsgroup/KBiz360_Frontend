@@ -20,14 +20,17 @@ import { openLedgerModal } from '../core/LedgerModalHost';
 const DARK = '#0d1326', DIM = '#5a6691', LINE = '#e1e3ec';
 const money = (n) => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
-const fyDefault = () => { const d = new Date(); const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; return { from: `${y}-04-01`, to: d.toISOString().slice(0, 10) }; };
+// Open by default (inception → today): a Balance Sheet must accumulate every
+// posting up to the as-at date, so an FY-bound `from` would drop prior-year
+// movement. The PeriodBar (defaultPreset="all") refines `from` to inception.
+const openDefault = () => ({ from: '2000-01-01', to: new Date().toISOString().slice(0, 10) });
 const dmy = (s) => { const d = new Date(s); return Number.isNaN(d.getTime()) ? s : `${d.getDate()}-${d.toLocaleString('en', { month: 'short' })}-${String(d.getFullYear()).slice(-2)}`; };
 const dateInp = { padding: '5px 8px', borderRadius: 6, border: '1px solid #2a3450', background: '#1a2238', color: '#cfd8e8', fontSize: 11 };
 const backBtn = { display: 'inline-flex', alignItems: 'center', gap: 3, background: '#fff', border: '1px solid ' + LINE, borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 600, color: DARK, cursor: 'pointer' };
 
 export function BalanceSheetTallyLive({ branch }) {
   const cur = bc(branch).cur;
-  const [range, setRange] = useState(fyDefault);
+  const [range, setRange] = useState(openDefault);
   const [showZero, setShowZero] = useState(false);
   const [stack, setStack] = useState([{ kind: 'bs' }]);
   const top = stack[stack.length - 1];
@@ -65,7 +68,7 @@ export function BalanceSheetTallyLive({ branch }) {
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#cfd6ea', fontSize: 11, cursor: 'pointer', userSelect: 'none' }} title="Show every ledger in the chart, including those with a zero balance / no entries">
             <input type="checkbox" checked={showZero} onChange={(e) => setShowZero(e.target.checked)} /> Show zero-balance accounts
           </label>
-          <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => setRange({ from: r.from, to: r.to })} />
+          <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setRange({ from: r.from, to: r.to })} />
         </div>
       </div>
 

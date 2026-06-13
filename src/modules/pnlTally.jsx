@@ -18,7 +18,10 @@ import { LedgerActions } from '../core/ledgerActions';
 const DARK = '#0d1326', DIM = '#5a6691', LINE = '#e1e3ec', HEAD = '#1c3a5e';
 const money = (n) => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
-const fyDefault = () => { const d = new Date(); const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; return { from: `${y}-04-01`, to: d.toISOString().slice(0, 10) }; };
+// Open by default (inception → today): the books may have no postings in the
+// current FY yet, so an FY-bound default would render an empty statement. The
+// PeriodBar (defaultPreset="all") refines `from` to the real inception on mount.
+const openDefault = () => ({ from: '2000-01-01', to: new Date().toISOString().slice(0, 10) });
 const dmy = (s) => { const d = new Date(s); return Number.isNaN(d.getTime()) ? s : `${d.getDate()}-${d.toLocaleString('en', { month: 'short' })}-${String(d.getFullYear()).slice(-2)}`; };
 
 const th = { padding: '7px 12px', textAlign: 'left', fontSize: 10.5, fontWeight: 700, color: '#cfd8e8', whiteSpace: 'nowrap' };
@@ -515,7 +518,7 @@ export function VoucherView({ id, cur }) {
 /* ── Main: drill-stack container ── */
 export function PnLTallyLive({ branch }) {
   const cur = bc(branch).cur;
-  const [range, setRange] = useState(fyDefault);
+  const [range, setRange] = useState(openDefault);
   const [showZero, setShowZero] = useState(false);
   const [stack, setStack] = useState([{ kind: 'pl' }]);
   const top = stack[stack.length - 1];
@@ -554,7 +557,7 @@ export function PnLTallyLive({ branch }) {
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#cfd6ea', fontSize: 11, cursor: 'pointer', userSelect: 'none' }} title="Show every ledger in the chart, including those with a zero balance / no entries">
             <input type="checkbox" checked={showZero} onChange={(e) => setShowZero(e.target.checked)} /> Show zero-balance accounts
           </label>
-          <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => setRange({ from: r.from, to: r.to })} />
+          <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setRange({ from: r.from, to: r.to })} />
         </div>
       </div>
 

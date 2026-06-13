@@ -28,7 +28,7 @@ import { CustomerMasterTabbed, SupplierMasterTabbed } from './modules/mastersPar
 import { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } from './modules/reports';
 import { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } from './modules/settings';
 import { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } from './modules/taxation';
-import { AdmRegister, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
+import { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
 import { SoPoGpVoucherEntry } from './modules/bookingOrder';
 import { UnifiedApprovals } from './modules/voucherApprovals';
 import { ModuleRegister } from './modules/moduleRegister';
@@ -59,6 +59,7 @@ import { ContextBar } from './shell/ContextBar';
 import { LedgerSwitcher } from './shell/LedgerSwitcher';
 import { LedgerModalHost } from './core/LedgerModalHost';
 import { ShortcutHelp } from './shell/ShortcutHelp';
+import { DockProvider } from './core/ux/dock';
 
 export default function KB360App(){
   /* ── Restore the session from localStorage so a refresh keeps the user
@@ -132,7 +133,11 @@ export default function KB360App(){
 
   /* ── Sign out: clear the stored JWT + user so the next session must log in ── */
   const setUser = (u) => {
-    if(!u){ try{ localStorage.removeItem("kb360-token"); localStorage.removeItem("kb360-user"); }catch{} }
+    if(!u){
+      try{ localStorage.removeItem("kb360-token"); localStorage.removeItem("kb360-user"); }catch{}
+      // Drop any minimized/parked (branch-scoped) items so they never leak to the next session.
+      try{ window.dispatchEvent(new CustomEvent("kbiz:logout")); }catch{ /* ignore */ }
+    }
     setCurrentUser(u);
   };
 
@@ -320,6 +325,8 @@ export default function KB360App(){
     if(/^\/purchase-expense\/(pending|approved|rejected|deleted)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;
     if(route==="/finance/refund")     return <RefundVoucher branch={branch}/>;
     if(route==="/finance/reissue")    return <ReissueVoucher branch={branch}/>;
+    if(route==="/finance/adm-voucher") return <AdmVoucher branch={branch}/>;
+    if(route==="/finance/acm-voucher") return <AcmVoucher branch={branch}/>;
     if(route==="/contra")             return <ContraVoucher branch={branch}/>;
     if(route==="/bank-reco")          return <BankReco/>;
     if(route==="/journal")            return <JournalEntry branch={branch}/>;
@@ -458,6 +465,7 @@ export default function KB360App(){
 
   return (
     <PrefsProvider enabled={!!currentUser}>
+    <DockProvider>
     <HotkeysProvider>
     <NavContext.Provider value={navValue}>
     <ReferenceProvider>
@@ -470,8 +478,8 @@ export default function KB360App(){
         {/* SAP Fiori-style horizontal navigation */}
         <TopNav branch={branch} setBranch={setBranch} currentUser={currentUser} switchUser={switchUser}
           route={route} setRoute={navigate}/>
-        {/* App-wide Back / Forward / breadcrumb / Recents — works on every screen */}
-        <ContextBar/>
+        {/* App-wide Back / Forward / breadcrumb / Recents / minimized items — works on every screen */}
+        <ContextBar branch={branch}/>
       </div>
 
       {/* Body */}
@@ -505,6 +513,7 @@ export default function KB360App(){
     </ReferenceProvider>
     </NavContext.Provider>
     </HotkeysProvider>
+    </DockProvider>
     </PrefsProvider>
   );
 }

@@ -91,6 +91,8 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Purchase Expense Voucher", href:"/purchase-expense"},
     {label:"Refund (against Sale)", href:"/finance/refund"},
     {label:"Reissue (against Sale)", href:"/finance/reissue"},
+    {label:"ADM Voucher (Agent Debit Memo)", href:"/finance/adm-voucher"},
+    {label:"ACM Voucher (Agent Credit Memo)", href:"/finance/acm-voucher"},
   ]},
   {label:"Registers & Outstanding", children:[
     {label:"Module Sales Register", href:"/finance/module-sales-register"},

@@ -11,6 +11,7 @@ export const SHORTCUTS = [
   ['Alt + ←  /  Alt + →', 'Back / forward through history'],
   ['Ctrl / ⌘ + L', 'Quick-switch ledger'],
   ['Ctrl / ⌘ + K', 'Global search'],
+  ['Ctrl / ⌘ + 1…9', 'Restore a minimized item from the bar'],
   ['Enter', 'In a form: next field (last field saves)'],
   ['Ctrl / ⌘ + Enter', 'Save the current form'],
   ['?', 'Show this shortcut help'],

@@ -10,6 +10,8 @@ import { Area, Line } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from '../core/business-logic';
 import { ACTIVE_CURRENCIES, ADM_DATA, BRANCHES, BRANCH_CODES, GP_BILLS, PURCHASE_REGISTRY, SALE_TO_PURCH_MOD, branchCurrencies, branchMainCurrency, genVNo } from '../core/data';
 import { useAdmReasonCodes, useLedgerRegistry } from '../core/useReference';
+import { useAdmMemos, useCreateAdmMemo, useDisputeAdmMemo, useAcceptAdmMemo, useRejectAdmMemo } from '../core/useAdmMemos';
+import { toast } from '../core/ux/toast';
 import { useLedgerStatement, useCreateVoucher, useOpenBills, useSalesRegister, usePurchaseRegister } from '../core/useAccounting';
 import { LedgerActions } from '../core/ledgerActions';
 import { openLedgerModal } from '../core/LedgerModalHost';
@@ -1523,9 +1525,16 @@ function InvoicePaxPanel({inv,cur,label="Invoice",selectable=false,selected,onTo
   );
 }
 
-export function RefundVoucher({branch}){ return <RefundReissueVoucher branch={branch} kind="refund"/>; }
-export function ReissueVoucher({branch}){ return <RefundReissueVoucher branch={branch} kind="reissue"/>; }
+// Refund / Reissue / ADM / ACM CREATE now render through the unified VoucherShell
+// (Option C) — they are gated voucher categories that enter PENDING and post on
+// approval, exactly like Receipt/Payment/Credit-Note. The legacy auto-posting
+// RefundReissueVoucher below is retained for reference only (no longer routed).
+export function RefundVoucher({branch}){ return <VoucherShell category="refund" mode="create" branch={branch} />; }
+export function ReissueVoucher({branch}){ return <VoucherShell category="reissue" mode="create" branch={branch} />; }
+export function AdmVoucher({branch}){ return <VoucherShell category="adm" mode="create" branch={branch} />; }
+export function AcmVoucher({branch}){ return <VoucherShell category="acm" mode="create" branch={branch} />; }
 
+// eslint-disable-next-line no-unused-vars
 function RefundReissueVoucher({branch,kind}){
   const isRefund=kind==="refund";
   const mob=useMobile();
@@ -2958,48 +2967,57 @@ export function AdmRegister({branch}){
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
 
-  const [adms,setAdms]=useState(_ADM_LIST);
+  // Live DB-backed register (/api/adm-memos?kind=adm). Accept spawns a PENDING
+  // gated ADM voucher into the approval queue (source: 'adm-register').
+  const memosQ=useAdmMemos("adm",branch);
+  const createM=useCreateAdmMemo();
+  const disputeM=useDisputeAdmMemo();
+  const acceptM=useAcceptAdmMemo();
+  const rejectM=useRejectAdmMemo();
+  const adms=(memosQ.data||[]).map(m=>({...m,id:m.memoNo,iataNum:m.iataNum||""}));
+
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [disputeModal,setDisputeModal]=useState(null);
+  const [disputeNote,setDisputeNote]=useState("");
   const [statusFilter,setStatusFilter]=useState("All");
   const [search,setSearch]=useState("");
   const [form,setForm]=useState({airline:"Air India",airlineCode:"AI",ticketNo:"",passenger:"",
-    sector:"",reasonCode:"FD",amount:0,currency:"INR",branch:"BOM",consultant:"",remarks:""});
+    sector:"",reasonCode:"FD",amount:0,currency:"INR",branch:brCode||"BOM",consultant:"",remarks:""});
 
   const TODAY=todayISO();
-  const daysLeft=(deadline)=>Math.ceil((new Date(deadline)-new Date(TODAY))/(1000*60*60*24));
+  const daysLeft=(deadline)=>deadline?Math.ceil((new Date(deadline)-new Date(TODAY))/(1000*60*60*24)):0;
 
   const filtered=adms.filter(a=>(
-    (!brCode||a.branch===brCode)&&
     (statusFilter==="All"||a.status===statusFilter)&&
-    (!search||a.id.toLowerCase().includes(search.toLowerCase())||
-     a.airline.toLowerCase().includes(search.toLowerCase())||
-     a.passenger.toLowerCase().includes(search.toLowerCase())||
-     a.ticketNo.includes(search))
+    (!search||(a.id||"").toLowerCase().includes(search.toLowerCase())||
+     (a.airline||"").toLowerCase().includes(search.toLowerCase())||
+     (a.passenger||"").toLowerCase().includes(search.toLowerCase())||
+     (a.ticketNo||"").includes(search))
   ));
 
-  const STATUSES=["All","Received","Under Review","Disputed","Accepted","Settled","Waived"];
-  const STATUS_CLR={Received:"#185FA5","Under Review":"#854F0B",Disputed:"#A32D2D",
-    Accepted:"#A32D2D",Settled:"#27500A",Waived:"#1D9E75"};
-  const STATUS_BG={Received:"#E6F1FB","Under Review":"#FAEEDA",Disputed:"#FCEBEB",
-    Accepted:"#FCEBEB",Settled:"#EAF3DE",Waived:"#EAF3DE"};
+  // Backend dispute lifecycle: Received → Disputed → Accepted (spawns voucher) / Rejected.
+  const STATUSES=["All","Received","Disputed","Accepted","Rejected"];
+  const STATUS_CLR={Received:"#185FA5",Disputed:"#A32D2D",Accepted:"#27500A",Rejected:"#5a6691"};
+  const STATUS_BG={Received:"#E6F1FB",Disputed:"#FCEBEB",Accepted:"#EAF3DE",Rejected:"#f3f4f8"};
 
-  const totPending=filtered.filter(a=>!["Settled","Waived"].includes(a.status))
-    .reduce((s,a)=>s+a.amount,0);
-  const totSettled=filtered.filter(a=>a.status==="Settled").reduce((s,a)=>s+a.amount,0);
-  const overdue   =filtered.filter(a=>!["Settled","Waived","Disputed"].includes(a.status)&&daysLeft(a.responseDeadline)<0);
+  const totPending=filtered.filter(a=>!["Accepted","Rejected"].includes(a.status))
+    .reduce((s,a)=>s+(a.amount||0),0);
+  const totAccepted=filtered.filter(a=>a.status==="Accepted").reduce((s,a)=>s+(a.amount||0),0);
+  const overdue   =filtered.filter(a=>!["Accepted","Rejected","Disputed"].includes(a.status)&&a.responseDeadline&&daysLeft(a.responseDeadline)<0);
   const f=n=>cur+Number(Math.round(n)).toLocaleString("en-IN");
 
   const addAdm=()=>{
-    const id=`ADM-${form.airlineCode}-2026-${String(adms.length+1).padStart(4,"0")}`;
-    const date=TODAY;
-    const deadline=new Date(Date.now()+30*86400000).toISOString().slice(0,10);
-    const bspDebit=new Date(Date.now()+31*86400000).toISOString().slice(0,10);
-    setAdms(a=>[{...form,id,date,responseDeadline:deadline,bspDebitDate:bspDebit,status:"Received",disputeNote:""},...a]);
-    setModal(false);
+    createM.mutate({kind:"adm",...form,branch:form.branch},{
+      onSuccess:()=>{setModal(false); toast("ADM recorded");},
+      onError:(e)=>toast("Could not record — "+e.message,"error"),
+    });
   };
 
-  const updateStatus=(id,status)=>setAdms(a=>a.map(x=>x.id===id?{...x,status}:x));
+  const acceptAdm=(m)=>acceptM.mutate({id:m.id},{
+    onSuccess:(r)=>toast(`ADM accepted — voucher ${(r&&(r.voucherVno||(r.voucher&&r.voucher.vno)))||""} created (pending approval)`),
+    onError:(e)=>toast("Could not accept — "+e.message,"error"),
+  });
+  const rejectAdm=(m)=>rejectM.mutate({id:m.id},{onSuccess:()=>toast("ADM rejected"),onError:(e)=>toast(e.message,"error")});
 
   return (
     <div style={{padding:"12px 10px",maxWidth:1360,margin:"0 auto"}}>
@@ -3036,7 +3054,7 @@ export function AdmRegister({branch}){
         {[
           {l:"Total ADMs",        v:String(filtered.length),              c:"#185FA5",bg:"#E6F1FB"},
           {l:"Pending / Disputed",v:f(totPending),                        c:"#A32D2D",bg:"#FCEBEB"},
-          {l:"Settled (BSP debit)",v:f(totSettled),                       c:"#27500A",bg:"#EAF3DE"},
+          {l:"Accepted (posted)", v:f(totAccepted),                       c:"#27500A",bg:"#EAF3DE"},
           {l:"Overdue (>deadline)",v:String(overdue.length),              c:overdue.length>0?"#7B1F1F":"#27500A",bg:overdue.length>0?"#FCEBEB":"#EAF3DE"},
           {l:"Under Dispute",      v:String(adms.filter(a=>a.status==="Disputed").length),c:"#854F0B",bg:"#FAEEDA"},
         ].map((k,i)=>(
@@ -3074,8 +3092,8 @@ export function AdmRegister({branch}){
             <tbody>
               {filtered.map((a,i)=>{
                 const dl=daysLeft(a.responseDeadline);
-                const isOverdue=dl<0&&!["Settled","Waived","Disputed"].includes(a.status);
-                const isUrgent=dl>=0&&dl<=7&&!["Settled","Waived","Disputed"].includes(a.status);
+                const isOverdue=dl<0&&!["Accepted","Rejected","Disputed"].includes(a.status);
+                const isUrgent=dl>=0&&dl<=7&&!["Accepted","Rejected","Disputed"].includes(a.status);
                 const rc=ADM_REASON_CODES[a.reasonCode]||{label:a.reasonCode,desc:""};
                 return (
                   <tr key={a.id} style={{borderBottom:"1px solid #f3f4f8",
@@ -3098,8 +3116,8 @@ export function AdmRegister({branch}){
                     <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,fontVariantNumeric:"tabular-nums",
                       color:"#A32D2D",fontSize:13}}>{a.currency}{Number(a.amount).toLocaleString()}</td>
                     <td style={{padding:"8px 10px"}}>
-                      {["Settled","Waived"].includes(a.status)
-                        ?<p style={{margin:0,fontSize:10,color:"#27500A"}}>✔ {a.bspDebitDate}</p>
+                      {["Accepted","Rejected"].includes(a.status)
+                        ?<p style={{margin:0,fontSize:10,color:"#27500A"}}>{a.status==="Accepted"?`✔ ${a.voucherVno||"posted"}`:"—"}</p>
                         :<div>
                           <p style={{margin:0,fontSize:10,fontWeight:700,color:isOverdue?"#A32D2D":isUrgent?"#854F0B":"#384677"}}>
                             {isOverdue?`${Math.abs(dl)} days OVERDUE`:isUrgent?`${dl} days left`:`${dl} days`}
@@ -3116,14 +3134,14 @@ export function AdmRegister({branch}){
                     </td>
                     <td style={{padding:"8px 10px"}}>
                       <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                        {a.status==="Received"&&<button onClick={()=>updateStatus(a.id,"Under Review")} style={{...btnGh,padding:"2px 7px",fontSize:9,whiteSpace:"nowrap"}}>Review</button>}
-                        {["Received","Under Review"].includes(a.status)&&(
-                          <button onClick={()=>setDisputeModal(a)} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#A32D2D",whiteSpace:"nowrap"}}>Dispute</button>
+                        {["Received","Disputed"].includes(a.status)&&(
+                          <button onClick={()=>{setDisputeNote("");setDisputeModal(a);}} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#A32D2D",whiteSpace:"nowrap"}}>Dispute</button>
                         )}
-                        {["Received","Under Review"].includes(a.status)&&(
-                          <button onClick={()=>updateStatus(a.id,"Accepted")} style={{...btnGh,padding:"2px 7px",fontSize:9,whiteSpace:"nowrap"}}>Accept</button>
+                        {["Received","Disputed"].includes(a.status)&&(
+                          <button onClick={()=>acceptAdm(a)} disabled={acceptM.isPending} title="Accept → create a pending ADM voucher" style={{...btnG,padding:"2px 7px",fontSize:9,background:"#27500A",whiteSpace:"nowrap"}}>Accept → Voucher</button>
                         )}
-                        {a.status==="Accepted"&&<button onClick={()=>updateStatus(a.id,"Settled")} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#27500A",whiteSpace:"nowrap"}}>Mark Settled</button>}
+                        {a.status==="Disputed"&&<button onClick={()=>rejectAdm(a)} style={{...btnGh,padding:"2px 7px",fontSize:9,whiteSpace:"nowrap"}}>Reject</button>}
+                        {a.status==="Accepted"&&a.voucherVno&&<span style={{fontSize:9,color:"#27500A",fontWeight:700}}>→ {a.voucherVno}</span>}
                       </div>
                     </td>
                   </tr>
@@ -3205,7 +3223,7 @@ export function AdmRegister({branch}){
                 <b>Reason raised:</b> {ADM_REASON_CODES[disputeModal.reasonCode]?.label} — {disputeModal.remarks}
               </div>
               <FL label="Dispute grounds (detailed explanation)">
-                <textarea rows={4} style={{...inp,resize:"vertical"}}
+                <textarea rows={4} value={disputeNote} onChange={e=>setDisputeNote(e.target.value)} style={{...inp,resize:"vertical"}}
                   placeholder="e.g. Fare was correctly issued as per published fare BOM-DXB Y class dated 05-Mar-2026. Attaching fare quote from Amadeus GDS and booking confirmation. Commission per our PLACI Level 4 agreement dated 01-Apr-2025 signed by Area Manager..."/>
               </FL>
               <FL label="Documents attached">
@@ -3218,8 +3236,10 @@ export function AdmRegister({branch}){
             <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setDisputeModal(null)} style={btnGh}>Cancel</button>
               <button onClick={()=>{
-                setAdms(a=>a.map(x=>x.id===disputeModal.id?{...x,status:"Disputed",disputeNote:"Dispute filed via BSP Link — awaiting airline response"}:x));
-                setDisputeModal(null);
+                disputeM.mutate({id:disputeModal.id,note:disputeNote||"Dispute filed via BSP Link — awaiting airline response"},{
+                  onSuccess:()=>{setDisputeModal(null);toast("Dispute filed");},
+                  onError:(e)=>toast("Could not file dispute — "+e.message,"error"),
+                });
               }} style={{...btnG,background:"#A32D2D"}}>📨 File Dispute</button>
             </div>
           </div>

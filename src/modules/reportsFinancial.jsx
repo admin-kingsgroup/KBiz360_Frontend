@@ -501,7 +501,7 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
   const cur = curOf(branch);
   const mobile = useMobile();
   const saved = useMemo(loadSavedPeriod, []);
-  const [mode, setMode] = useState(saved.mode || 'cfy');                // all|today|week|mtd|qtd|cfy|lfy|month|quarter|custom (ytd kept for back-compat)
+  const [mode, setMode] = useState(saved.mode || 'all');                // all|today|week|mtd|qtd|cfy|lfy|month|quarter|custom (ytd kept for back-compat)
   const [fy, setFy] = useState(saved.fy || CUR_FY.label);
   const [compare, setCompare] = useState(saved.compare ?? true);
   const [custom, setCustom] = useState(saved.custom || { from: CUR_FY.startISO, to: todayISO() });

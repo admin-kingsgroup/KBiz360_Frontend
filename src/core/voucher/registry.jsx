@@ -5,7 +5,15 @@ import { ReceiptPaymentFields } from './fields/ReceiptPaymentFields';
 import { ContraFields } from './fields/ContraFields';
 import { PurchaseExpenseFields } from './fields/PurchaseExpenseFields';
 import { NoteFields } from './fields/NoteFields';
+import { RefundReissueFields } from './fields/RefundReissueFields';
+import { AdmAcmFields } from './fields/AdmAcmFields';
 import { r2, allocSummary, pxpTotals } from './ui';
+
+// Recover a saved income line's amount (Service Charge / Markup) for the edit form.
+const lineAmt = (v, ledger) => {
+  const l = (v.lines || []).find((x) => x.ledger === ledger);
+  return l ? (l.amt ?? '') : '';
+};
 
 /**
  * Voucher category registry (Option C).
@@ -199,11 +207,138 @@ function makeNote(kind) {
   };
 }
 
+/**
+ * Refund (RF) / Reissue (RI) — two-party, raised against a sales invoice. The
+ * supplier (airline) leg is supplierAmt; our retained service charge + markup
+ * post as income; the customer figure (`total`) is derived so the voucher always
+ * balances. Gated → enters PENDING and posts on approval. See posting.builder.
+ */
+function makeRefundReissue(kind) {
+  const isRefund = kind === 'refund';
+  return {
+    type: isRefund ? 'RF' : 'RI',
+    label: isRefund ? 'Refund Voucher' : 'Reissue Voucher',
+    icon: isRefund ? '↩️' : '🔁',
+    explain: isRefund
+      ? (<><b style={{ color: '#A07828' }}>Refund:</b> cancellation of a sale. The <b>supplier/airline (Creditor) is Debited</b> with the refund receivable; we retain a service charge + markup (income), and the <b>customer (Debtor) is Credited</b> with the balance refunded.</>)
+      : (<><b style={{ color: '#A07828' }}>Reissue:</b> amendment of a sale. The <b>customer (Debtor) is Debited</b> with the total billed; the <b>supplier/airline (Creditor) is Credited</b> with the fee + fare difference; our service charge + markup are retained as income.</>),
+
+    initial: () => ({ date: todayISO(), againstInvoice: '', gstMode: 'intra', party: '', counterParty: '', supplierAmt: '', serviceCharge: '', markup: '', gstPct: 18, supplierSvc: '', supplierGst: '', remarks: '' }),
+
+    fromVoucher: (v) => ({
+      date: v.date || '', againstInvoice: v.againstInvoice || v.linkNo || '', gstMode: v.gstMode || 'intra',
+      party: v.party || '', counterParty: v.counterParty || '', supplierAmt: v.supplierAmt ?? '',
+      serviceCharge: lineAmt(v, 'Service Charge Income'), markup: lineAmt(v, 'Markup Income'),
+      gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18,
+      supplierSvc: v.supplierSvc ?? '', supplierGst: v.supplierGst ?? '', remarks: v.remarks || '',
+    }),
+
+    toBody: (s, ctx) => {
+      const supplierAmt = r2(+s.supplierAmt || 0);
+      const svc = r2(+s.serviceCharge || 0), markup = r2(+s.markup || 0);
+      const ourIncome = r2(svc + markup);
+      const taxAmt = r2(ourIncome * (+s.gstPct || 0) / 100);
+      const supSvc = r2(+s.supplierSvc || 0), supGst = r2(+s.supplierGst || 0);
+      const total = isRefund
+        ? r2(supplierAmt + supSvc + supGst - ourIncome - taxAmt)
+        : r2(supplierAmt - supSvc - supGst + ourIncome + taxAmt);
+      const lines = [];
+      if (svc > 0) lines.push({ ledger: 'Service Charge Income', amt: svc, desc: 'Service charge' });
+      if (markup > 0) lines.push({ ledger: 'Markup Income', amt: markup, desc: 'Markup' });
+      return {
+        type: isRefund ? 'RF' : 'RI', category: kind, branch: ctx.branchCode, date: s.date,
+        party: s.party, partyType: 'customer',
+        counterParty: s.counterParty, counterPartyGroup: 'Sundry Creditors',
+        supplierAmt, supplierSvc: supSvc, supplierGst: supGst,
+        lines, subtotal: ourIncome, taxAmt, gstMode: s.gstMode, gstPct: +s.gstPct || 0, total,
+        againstInvoice: s.againstInvoice, linkNo: s.againstInvoice,
+        remarks: s.remarks || `Being ${kind}${s.againstInvoice ? ` against ${s.againstInvoice}` : ''}`,
+        status: 'saved',
+      };
+    },
+
+    validate: (s) => {
+      const supplierAmt = +s.supplierAmt || 0;
+      let hint = '';
+      if (!s.againstInvoice) hint = '(Reference invoice)';
+      else if (!s.party) hint = '(Pick customer)';
+      else if (!s.counterParty) hint = '(Pick supplier/airline)';
+      else if (supplierAmt <= 0) hint = '(Enter supplier amount)';
+      return { ok: !!s.againstInvoice && !!s.party && !!s.counterParty && supplierAmt > 0, hint };
+    },
+
+    fields: (props) => <RefundReissueFields {...props} kind={kind} />,
+  };
+}
+
+/**
+ * ADM (Agent Debit Memo) / ACM (Agent Credit Memo) — independent BSP memos. The
+ * "Pass on" toggle flips the posting: absorb (single-party vs the BSP/airline) or
+ * pass-to-customer (two-party, ADM ≈ reissue / ACM ≈ refund). Gated → PENDING.
+ */
+function makeAdmAcm(kind) {
+  const isAdm = kind === 'adm';
+  return {
+    type: isAdm ? 'ADM' : 'ACM',
+    label: isAdm ? 'ADM Voucher' : 'ACM Voucher',
+    icon: isAdm ? '📉' : '📈',
+    explain: isAdm
+      ? (<><b style={{ color: '#A07828' }}>ADM (Agent Debit Memo):</b> the airline debits the agency via BSP. <b>Absorb</b> → booked as ADM Charges (cost) vs the airline; <b>Pass to customer</b> → re-billed like a reissue.</>)
+      : (<><b style={{ color: '#A07828' }}>ACM (Agent Credit Memo):</b> the airline credits the agency via BSP. <b>Absorb</b> → booked as ACM Recovery (income) vs the airline; <b>Pass to customer</b> → credited back like a refund.</>),
+
+    initial: () => ({ date: todayISO(), againstInvoice: '', reasonCode: '', counterParty: '', amount: '', passOn: false, party: '', serviceCharge: '', markup: '', gstPct: 18, gstMode: 'intra', remarks: '' }),
+
+    fromVoucher: (v) => ({
+      date: v.date || '', againstInvoice: v.againstInvoice || '', reasonCode: v.reasonCode || '',
+      counterParty: v.counterParty || '', amount: v.supplierAmt ?? v.subtotal ?? '',
+      passOn: !!v.passOn, party: v.party || '',
+      serviceCharge: lineAmt(v, 'Service Charge Income'), markup: lineAmt(v, 'Markup Income'),
+      gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18, gstMode: v.gstMode || 'intra', remarks: v.remarks || '',
+    }),
+
+    toBody: (s, ctx) => {
+      const amount = r2(+s.amount || 0);
+      const passOn = !!s.passOn;
+      const base = {
+        type: isAdm ? 'ADM' : 'ACM', category: kind, branch: ctx.branchCode, date: s.date,
+        passOn, reasonCode: s.reasonCode || '',
+        counterParty: s.counterParty, counterPartyGroup: 'Sundry Creditors', againstInvoice: s.againstInvoice || '',
+        remarks: s.remarks || `Being ${isAdm ? 'Agent Debit' : 'Agent Credit'} Memo${s.reasonCode ? ` (${s.reasonCode})` : ''}`,
+        status: 'saved',
+      };
+      if (!passOn) return { ...base, party: '', gstMode: '', gstPct: 0, subtotal: amount, taxAmt: 0, supplierAmt: amount, total: amount };
+      const svc = r2(+s.serviceCharge || 0), markup = r2(+s.markup || 0);
+      const ourIncome = r2(svc + markup);
+      const taxAmt = r2(ourIncome * (+s.gstPct || 0) / 100);
+      const lines = [];
+      if (svc > 0) lines.push({ ledger: 'Service Charge Income', amt: svc, desc: 'Service charge' });
+      if (markup > 0) lines.push({ ledger: 'Markup Income', amt: markup, desc: 'Markup' });
+      const total = isAdm ? r2(amount + ourIncome + taxAmt) : r2(amount - ourIncome - taxAmt);
+      return { ...base, party: s.party, partyType: 'customer', gstMode: s.gstMode, gstPct: +s.gstPct || 0, supplierAmt: amount, subtotal: ourIncome, taxAmt, lines, total };
+    },
+
+    validate: (s) => {
+      const amount = +s.amount || 0;
+      let hint = '';
+      if (!s.counterParty) hint = '(Pick airline/BSP)';
+      else if (amount <= 0) hint = '(Enter amount)';
+      else if (s.passOn && !s.party) hint = '(Pick customer)';
+      return { ok: !!s.counterParty && amount > 0 && (!s.passOn || !!s.party), hint };
+    },
+
+    fields: (props) => <AdmAcmFields {...props} kind={kind} />,
+  };
+}
+
 export const VOUCHER_REGISTRY = {
   receipt: makeRcptPmt('customer'),
   payment: makeRcptPmt('supplier'),
   'credit-note': makeNote('credit'),
   'debit-note': makeNote('debit'),
+  refund: makeRefundReissue('refund'),
+  reissue: makeRefundReissue('reissue'),
+  adm: makeAdmAcm('adm'),
+  acm: makeAdmAcm('acm'),
 
   contra: {
     type: 'CV',

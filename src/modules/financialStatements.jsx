@@ -231,7 +231,7 @@ export function ProfitAndLossUnified({ branch }) {
     <div style={wrap}>
       <div style={bar}>
         <StmtSwitcher value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic'], ['vertical', '▤ Vertical'], ['tally', '𝚺 Tally'], ['tkf', '◆ TKF']]} />
-        {view === 'tkf' && <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => setTkfPeriod({ from: r.from, to: r.to })} />}
+        {view === 'tkf' && <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setTkfPeriod({ from: r.from, to: r.to })} />}
       </div>
       {view === 'tally' ? <PnLTallyLive branch={branch} />
         : view === 'tkf' ? <TkfPnL branch={branch} from={tkfPeriod.from} to={tkfPeriod.to} />
@@ -247,7 +247,7 @@ export function BalanceSheetUnified({ branch }) {
     <div style={wrap}>
       <div style={bar}>
         <StmtSwitcher value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic'], ['vertical', '▤ Vertical'], ['tally', '𝚺 Tally'], ['tkf', '◆ TKF'], ['schedule3', '§ Schedule III'], ['consolidated', '⛁ Consolidated']]} />
-        {view === 'tkf' && <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => setTkfTo(r.to)} />}
+        {view === 'tkf' && <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setTkfTo(r.to)} />}
       </div>
       {view === 'tally' ? <BalanceSheetTallyLive branch={branch} />
         : view === 'tkf' ? <TkfBS branch={branch} to={tkfTo} />

@@ -5,12 +5,60 @@ jest.mock('../fields/ReceiptPaymentFields', () => ({ ReceiptPaymentFields: () =>
 jest.mock('../fields/ContraFields', () => ({ ContraFields: () => null }));
 jest.mock('../fields/PurchaseExpenseFields', () => ({ PurchaseExpenseFields: () => null }));
 jest.mock('../fields/NoteFields', () => ({ NoteFields: () => null }));
+jest.mock('../fields/RefundReissueFields', () => ({ RefundReissueFields: () => null }));
+jest.mock('../fields/AdmAcmFields', () => ({ AdmAcmFields: () => null }));
 
 const { VOUCHER_REGISTRY } = require('../registry');
 const RC = VOUCHER_REGISTRY.receipt;
 const PM = VOUCHER_REGISTRY.payment;
 const CV = VOUCHER_REGISTRY.contra;
 const ctx = { branchCode: 'BOM' };
+
+describe('refund / reissue / adm / acm — registered & gated payloads', () => {
+  test.concurrent('all four categories are registered', async () => {
+    ['refund', 'reissue', 'adm', 'acm'].forEach((c) => expect(VOUCHER_REGISTRY[c]).toBeTruthy());
+  });
+
+  test.concurrent('refund toBody: customer refund = supplier − our charges − GST', async () => {
+    const b = VOUCHER_REGISTRY.refund.toBody({ date: '2026-06-13', againstInvoice: 'SF/1', gstMode: 'intra', party: 'ABC', counterParty: 'Air India', supplierAmt: 48000, serviceCharge: 2000, markup: 500, gstPct: 18, supplierSvc: 0, supplierGst: 0 }, ctx);
+    expect(b.category).toBe('refund');
+    expect(b.total).toBe(48000 - 2500 - 450); // 45050
+    expect(b.lines).toHaveLength(2);
+  });
+
+  test.concurrent('reissue toBody: customer bill = supplier + our charges + GST', async () => {
+    const b = VOUCHER_REGISTRY.reissue.toBody({ date: '2026-06-13', againstInvoice: 'SF/1', gstMode: 'intra', party: 'ABC', counterParty: 'Air India', supplierAmt: 3000, serviceCharge: 1000, markup: 0, gstPct: 18, supplierSvc: 0, supplierGst: 0 }, ctx);
+    expect(b.category).toBe('reissue');
+    expect(b.total).toBe(3000 + 1000 + 180);
+  });
+
+  test.concurrent('adm absorb toBody: single-party, no customer leg', async () => {
+    const b = VOUCHER_REGISTRY.adm.toBody({ date: '2026-06-13', counterParty: 'Air India', amount: 1000, passOn: false, reasonCode: 'FD' }, ctx);
+    expect(b).toMatchObject({ type: 'ADM', category: 'adm', passOn: false, party: '', supplierAmt: 1000, total: 1000 });
+  });
+
+  test.concurrent('adm pass-on toBody: customer billed = memo + charges + GST', async () => {
+    const b = VOUCHER_REGISTRY.adm.toBody({ date: '2026-06-13', counterParty: 'Air India', amount: 1000, passOn: true, party: 'ABC', serviceCharge: 200, markup: 0, gstPct: 18, gstMode: 'intra' }, ctx);
+    expect(b.passOn).toBe(true);
+    expect(b.total).toBe(1000 + 200 + 36);
+  });
+
+  test.concurrent('acm pass-on toBody: customer credited = memo − charges − GST', async () => {
+    const b = VOUCHER_REGISTRY.acm.toBody({ date: '2026-06-13', counterParty: 'Air India', amount: 1500, passOn: true, party: 'ABC', serviceCharge: 200, markup: 0, gstPct: 18, gstMode: 'intra' }, ctx);
+    expect(b.category).toBe('acm');
+    expect(b.total).toBe(1500 - 200 - 36);
+  });
+
+  test.concurrent('refund validate requires invoice + both parties + amount', async () => {
+    expect(VOUCHER_REGISTRY.refund.validate({ againstInvoice: '', party: '', counterParty: '', supplierAmt: 0 }).ok).toBe(false);
+    expect(VOUCHER_REGISTRY.refund.validate({ againstInvoice: 'SF/1', party: 'ABC', counterParty: 'AI', supplierAmt: 100 }).ok).toBe(true);
+  });
+
+  test.concurrent('adm pass-on validate requires a customer', async () => {
+    expect(VOUCHER_REGISTRY.adm.validate({ counterParty: 'AI', amount: 100, passOn: true, party: '' }).ok).toBe(false);
+    expect(VOUCHER_REGISTRY.adm.validate({ counterParty: 'AI', amount: 100, passOn: false }).ok).toBe(true);
+  });
+});
 
 describe('fromVoucher — edit-display recovery from explicit lines', () => {
   test.concurrent('receipt recovers party/bank/amount when fields are blank', async () => {
