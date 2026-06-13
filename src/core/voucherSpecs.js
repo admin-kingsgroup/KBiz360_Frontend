@@ -222,7 +222,7 @@ export function lineCalc(spec, l) {
 // po/so carry { lineTotal (net, ex tax), serviceCharge, gst, tcs, total, lines }.
 // gp = sales net − purchase net (= net markup + service charge). The per-line
 // `lines` detail is preserved for the read-only voucher view + voucher meta.
-export function bookingTotals(spec, lines, { packageType = '' } = {}) {
+export function bookingTotals(spec, lines, { packageType = '', noSupplier = false } = {}) {
   const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, total: 0, lines: [] };
   const so = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, total: 0, lines: [] };
   // Per-component ledger heads (ex-GST). Every SO/PO field posts to its OWN ledger
@@ -281,6 +281,14 @@ export function bookingTotals(spec, lines, { packageType = '' } = {}) {
   };
   so.heads = finalise(sH, order, saleNet);
   po.heads = finalise(pH, order.filter((k) => k !== 'markup' && k !== 'ssvc'), costNet);
+  // No-supplier (Misc): a sale with no purchase leg — the entire sale net is profit.
+  // Zero the cost side so nothing posts to Purchase Accounts and GP = 100% margin.
+  if (noSupplier) {
+    ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'total'].forEach((k) => { po[k] = 0; });
+    po.lines = []; po.heads = [];
+    const pct0 = so.total > 0 ? r2((saleNet / so.total) * 100) : 0;
+    return { po, so, gp: { total: saleNet, pct: pct0, saleNet, costNet: 0 } };
+  }
   const total = r2(saleNet - costNet);
   const pct = so.total > 0 ? r2((total / so.total) * 100) : 0;
   return { po, so, gp: { total, pct, saleNet, costNet } };

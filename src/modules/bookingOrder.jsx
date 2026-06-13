@@ -71,6 +71,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const [supplier, setSupplier] = useState(editing
     ? { name: editBooking.supplier?.name || '', gstin: editBooking.supplier?.gstin || '', address: editBooking.supplier?.address || '', email: editBooking.supplier?.email || '', contact: editBooking.supplier?.contact || '', ledgerGroup: editBooking.supplier?.ledgerGroup || '' }
     : { name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' });
+  // No-supplier mode (Misc only): a sale with no purchase leg — full sale value is
+  // income. Hides the Purchase Order + supplier fields and posts only the sale.
+  const [noSupplier, setNoSupplier] = useState(editing ? !!editBooking.noSupplier : false);
   const [gstMode, setGstMode] = useState(editing ? (editBooking.gstMode || 'intra') : 'intra');
   const [packageType, setPackageType] = useState(editing ? (editBooking.packageType || 'Domestic') : 'Domestic');
   const [remarks, setRemarks] = useState(editing ? (editBooking.remarks || '') : '');
@@ -80,9 +83,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   // Switching module reloads the seed grid for that module — never while editing
   // (the module is locked to the existing voucher so its lines aren't wiped).
-  useEffect(() => { if (editing) return; setLines([blankLine(VSPECS[moduleCode])]); setResult(null); setError(''); }, [moduleCode]);
+  useEffect(() => { if (editing) return; setLines([blankLine(VSPECS[moduleCode])]); setNoSupplier(false); setResult(null); setError(''); }, [moduleCode]);
 
-  const totals = useMemo(() => bookingTotals(spec, lines, { packageType }), [spec, lines, packageType]);
+  // No-supplier is only offered on Miscellaneous (sell-without-buy: seats / extra
+  // services). Any other module always has a supplier (cost) leg.
+  const isNoSupp = moduleCode === 'SM' && noSupplier;
+  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp }), [spec, lines, packageType, isNoSupp]);
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
 
   const setLine = (i, key, val, numeric) =>
@@ -99,7 +105,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // and the supplier's Creditor ledger (payable).
   const hasCustLedger = !!(customer.ledgerName || '').trim();
   const hasSuppLedger = !!supplier.name.trim();
-  const canSave = !!brCode && !saving && totals.po.total > 0 && totals.so.total > 0 && hasSuppLedger && customer.name.trim() && hasCustLedger;
+  // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
+  const canSave = !!brCode && !saving && totals.so.total > 0 && customer.name.trim() && hasCustLedger
+    && (isNoSupp || (totals.po.total > 0 && hasSuppLedger));
 
   const save = async (thenApprove = false) => {
     setError(''); setSaving(true);
@@ -109,9 +117,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         return { fn: l.fn, sn: l.sn, finalSales: c.finalSales, salesGST: c.salesGST, finalPurchase: c.finalPurchase, gstPur: c.gstPur, gp: c.gp, gpPct: c.gpPct };
       });
       const payload = {
-        module: moduleCode, branch: brCode, date,
+        module: moduleCode, branch: brCode, date, noSupplier: isNoSupp,
         customer: { name: customer.name, gstin: customer.gstin, address: customer.address, email: customer.email, contact: customer.contact, group: customer.group, ledgerName: customer.ledgerName || customer.name, ledgerGroup: customer.ledgerGroup || customer.group },
-        supplier: { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup },
+        supplier: isNoSupp ? { name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }
+          : { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup },
         gstMode, packageType: hasPackage ? packageType : '',
         headerRef, rows: lines.map((l) => syncLineRefs(spec, l)),
         po: totals.po, so: totals.so,
@@ -131,12 +140,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Ctrl/Cmd+Enter saves from anywhere on this (large, multi-grid) entry screen.
   useHotkey('mod+enter', () => { if (canSave) save(false); }, [canSave]);
 
-  const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' }); setSupplier({ name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }); setResult(null); setError(''); };
+  const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' }); setSupplier({ name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }); setNoSupplier(false); setResult(null); setError(''); };
 
   if (result) {
     const approved = result._approved;
+    const noSupp = !!result.noSupplier;
     const fields = [['Booking No', result.bookingNo], ['Link No', result.linkNo], ['Module', VSPECS[result.module]?.name || result.module], ['Status', (result.status || 'pending').toUpperCase()]];
-    if (approved) { fields.push(['Sales invoice', result.saleVno || '—'], ['Purchase invoice', result.purchaseVno || '—']); }
+    if (approved) { fields.push(['Sales invoice', result.saleVno || '—']); if (!noSupp) fields.push(['Purchase invoice', result.purchaseVno || '—']); }
     else { fields.push(['Sales (incl GST)', cur + ' ' + fmt(result.so?.total)], ['Gross Profit', cur + ' ' + fmt(result.gp?.total) + ` (${result.gp?.pct ?? 0}%)`]); }
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
@@ -147,8 +157,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           </h2>
           <p style={{ margin: '0 0 18px', fontSize: 12.5, color: '#5a6691' }}>
             {approved
-              ? <>The linked <b>Sales &amp; Purchase invoices</b> were generated and posted to the books, tied by the Link No.</>
-              : <>It has <b>no effect on the books yet</b>. Approve it under <b>Pending</b> to post the linked Sales &amp; Purchase invoices.</>}
+              ? (noSupp
+                  ? <>The <b>Sales invoice</b> was generated and posted to the books — no purchase leg (the full sale value is income).</>
+                  : <>The linked <b>Sales &amp; Purchase invoices</b> were generated and posted to the books, tied by the Link No.</>)
+              : <>It has <b>no effect on the books yet</b>. Approve it under <b>Pending</b> to post {noSupp ? <>the <b>Sales invoice</b> (no purchase leg)</> : <>the linked Sales &amp; Purchase invoices</>}.</>}
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, textAlign: 'left' }}>
             {fields.map(([k, v]) => (
@@ -245,6 +257,28 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         </div>
       </div>
 
+      {/* Misc: with / without supplier. "Without" = we sell but don't buy (extra
+          seats / services) → no purchase leg, the full sale value is income. */}
+      {moduleCode === 'SM' && (
+        <div style={{ ...card, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: DARK, textTransform: 'uppercase', letterSpacing: '.3px' }}>Supplier</span>
+          <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden' }}>
+            {[['with', 'With supplier (cost + margin)'], ['without', 'Without supplier (pure income)']].map(([v, l]) => {
+              const active = (v === 'without') === noSupplier;
+              return (
+                <button key={v} type="button" onClick={() => setNoSupplier(v === 'without')}
+                  style={{ padding: '6px 14px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: active ? GOLD : '#fff', color: active ? '#fff' : '#5a6691' }}>{l}</button>
+              );
+            })}
+          </div>
+          <span style={{ fontSize: 10.5, color: '#9A9A9A', fontStyle: 'italic' }}>
+            {noSupplier
+              ? 'No purchase leg — the full sale value is income (Sales — Other Services). Gross Profit = 100%.'
+              : 'A linked Purchase invoice posts the supplier cost; Gross Profit = sale − cost.'}
+          </span>
+        </div>
+      )}
+
       {!brCode && (
         <div style={{ ...card, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#A32D2D', fontSize: 12, marginBottom: 14 }}>
           Select a specific branch (not “All branches”) from the top bar to create a voucher.
@@ -278,22 +312,22 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {!customer.name.trim() && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — type the end customer's name for the invoice</span>}
             </FL>
           )}
-          <FL label="Supplier ledger (Pay to) *">
+          {!isNoSupp && <FL label="Supplier ledger (Pay to) *">
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
               onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
             {!hasSuppLedger && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — pick the Creditor ledger to post & pay against</span>}
-          </FL>
-          <FL label="Supplier sub-group (auto)"><input value={supplier.ledgerGroup} readOnly placeholder="picks with the supplier" style={{ ...inp, background: '#faf7ef', color: '#5a6691' }} /></FL>
+          </FL>}
+          {!isNoSupp && <FL label="Supplier sub-group (auto)"><input value={supplier.ledgerGroup} readOnly placeholder="picks with the supplier" style={{ ...inp, background: '#faf7ef', color: '#5a6691' }} /></FL>}
           <FL label="GST mode"><select value={gstMode} onChange={(e) => setGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
           {hasPackage && <FL label="Package type"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={inp}><option>Domestic</option><option>International</option></select></FL>}
           <FL label="Customer GSTIN"><input value={customer.gstin} onChange={(e) => setCustomer({ ...customer, gstin: e.target.value })} placeholder="GSTIN" style={inp} /></FL>
           <FL label="Customer Address"><input value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} placeholder="Billing address (for invoice)" style={inp} /></FL>
           <FL label="Customer Email"><input value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} placeholder="email" style={inp} /></FL>
           <FL label="Customer Contact"><input value={customer.contact} onChange={(e) => setCustomer({ ...customer, contact: e.target.value })} placeholder="phone" style={inp} /></FL>
-          <FL label="Supplier GSTIN"><input value={supplier.gstin} onChange={(e) => setSupplier({ ...supplier, gstin: e.target.value })} placeholder="GSTIN" style={inp} /></FL>
-          <FL label="Supplier Address"><input value={supplier.address} onChange={(e) => setSupplier({ ...supplier, address: e.target.value })} placeholder="address" style={inp} /></FL>
-          <FL label="Supplier Email"><input value={supplier.email} onChange={(e) => setSupplier({ ...supplier, email: e.target.value })} placeholder="email" style={inp} /></FL>
-          <FL label="Supplier Contact"><input value={supplier.contact} onChange={(e) => setSupplier({ ...supplier, contact: e.target.value })} placeholder="phone" style={inp} /></FL>
+          {!isNoSupp && <FL label="Supplier GSTIN"><input value={supplier.gstin} onChange={(e) => setSupplier({ ...supplier, gstin: e.target.value })} placeholder="GSTIN" style={inp} /></FL>}
+          {!isNoSupp && <FL label="Supplier Address"><input value={supplier.address} onChange={(e) => setSupplier({ ...supplier, address: e.target.value })} placeholder="address" style={inp} /></FL>}
+          {!isNoSupp && <FL label="Supplier Email"><input value={supplier.email} onChange={(e) => setSupplier({ ...supplier, email: e.target.value })} placeholder="email" style={inp} /></FL>}
+          {!isNoSupp && <FL label="Supplier Contact"><input value={supplier.contact} onChange={(e) => setSupplier({ ...supplier, contact: e.target.value })} placeholder="phone" style={inp} /></FL>}
         </div>
       </div>
 
@@ -327,7 +361,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                           : <input value={l[col.key] ?? ''} onChange={(e) => setLine(i, col.key, e.target.value)} style={{ ...cellTxt, color: col.kind === 'pnr' ? GOLD : DARK }} />}
                       </td>
                     ))}
-                    {spec.fareCols.map((col) => <td key={col.key} style={tdAuto}>{fmt(l[col.key])}</td>)}
+                    {spec.fareCols.map((col) => (isNoSupp
+                      ? <td key={col.key} style={{ padding: 3 }}><input type="number" min="0" value={l[col.key]} onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>
+                      : <td key={col.key} style={tdAuto}>{fmt(l[col.key])}</td>))}
                     <td style={{ padding: 3 }}><input type="number" min="0" value={l.markup} onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>
                     {!pkg && <td style={{ padding: 3 }}><input type="number" min="0" value={l.ssvc} onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
                     {!pkg && <td style={tdAuto}>{fmt(c.gstSvc)}</td>}
@@ -354,7 +390,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <button onClick={addLine} style={{ ...btnGh, marginTop: 8, padding: '6px 12px', fontSize: 11 }}><Plus size={12} /> Add line</button>
       </Section>
 
-      {/* ② Purchase Order */}
+      {/* ② Purchase Order — hidden in no-supplier mode (there's no cost leg). */}
+      {!isNoSupp && (
       <Section n="2" name="Purchase Order" sub="what you pay the airline / supplier" accent={CR}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
@@ -398,6 +435,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           </table>
         </div>
       </Section>
+      )}
 
       {/* ③ Gross Profit */}
       <Section n="3" name="Gross Profit" sub="GP = net sales − net purchase · % on final sales value" accent={DR}>
@@ -723,7 +761,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                     {onInvoice && (b.status === 'approved' || b.status === 'posted') && (
                       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                         <button onClick={() => onInvoice(b, 'sale')} style={{ ...btnGh, padding: '4px 10px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}>🧾 Sales Invoice</button>
-                        <button onClick={() => onInvoice(b, 'purchase')} style={{ ...btnGh, padding: '4px 10px', fontSize: 10.5 }}>📄 Purchase Invoice</button>
+                        {!b.noSupplier && <button onClick={() => onInvoice(b, 'purchase')} style={{ ...btnGh, padding: '4px 10px', fontSize: 10.5 }}>📄 Purchase Invoice</button>}
                       </div>
                     )}
                     <JournalView id={b.id} cur={cur} />
@@ -780,7 +818,9 @@ export function PendingBookings({ branch, setRoute }) {
     setBusyId(b.id); setMsg('');
     try {
       const res = await apiPost('/api/booking-orders/' + b.id + '/approve');
-      setMsg(`✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno} under Link ${res.linkNo}.`);
+      setMsg(res.noSupplier
+        ? `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} (no purchase leg) under Link ${res.linkNo}.`
+        : `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno} under Link ${res.linkNo}.`);
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
     } catch (e) { setMsg('⚠ ' + (e.message || 'Approve failed')); }
     finally { setBusyId(null); }
@@ -931,7 +971,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
 
   const onApprove = async (b) => {
     setBusyId(b.id); setMsg('');
-    try { const res = await apiPost('/api/booking-orders/' + b.id + '/approve'); setMsg(`✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno}.`); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }
+    try { const res = await apiPost('/api/booking-orders/' + b.id + '/approve'); setMsg(res.noSupplier ? `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} (no purchase leg).` : `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno}.`); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Approve failed')); } finally { setBusyId(null); }
   };
   const onCancel = async (b) => {

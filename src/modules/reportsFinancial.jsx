@@ -28,6 +28,7 @@ import { exportToExcel } from '../core/exportExcel';
 import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../core/dates';
 import { VoucherEditor } from './accountingLive';
 import { useMobile } from '../core/hooks';
+import { moduleDetailRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail } from '../core/pnlDetail';
 import { openPrintPreview } from '../core/PrintPreview';
 import { LedgerActions } from '../core/ledgerActions';
 import { openLedgerModal } from '../core/LedgerModalHost';
@@ -524,6 +525,7 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
 
   const [openMod, setOpenMod] = useState({});
   const [openSub, setOpenSub] = useState({});
+  const [openHead, setOpenHead] = useState({});   // Section A: ledger → component drill per module
   const [openExp, setOpenExp] = useState({});
   const [openBucket, setOpenBucket] = useState({});
   const [drillFile, setDrillFile] = useState(null);
@@ -623,6 +625,8 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
                             <td style={{ ...num, fontWeight: 700, color: gpColor(m.gpPct) }}>{pctTxt(m.gpPct)}</td>
                             <td style={{ ...num, color: SAP.sec }}>{pctTxt(m.pctOfSales)}</td>
                           </tr>
+                          {/* ledger composition — captured fares (Base Fare, K3, Taxes …) */}
+                          {open && <FioriLedgerRows m={m} openHead={openHead} setOpenHead={setOpenHead} />}
                           {/* multi-leaf modules (Flights/Holiday) → sub-centre rows → files */}
                           {open && m.hasSubs && (m.subs || []).map((s) => {
                             const sk = `${m.key}|${s.code}`;
@@ -808,6 +812,53 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
   );
 }
 
+/* ── Section A ledger composition — under an open module, the GL Sales/Purchase
+   ledgers each booking line posts to, and the fare/charge components captured on
+   the entry (Base Fare, K3, Taxes …). Sales ledgers show their amount in the
+   Sales column, Purchase ledgers in the COGS column; click a ledger to reveal
+   its components. Same six columns as the module table (colSpan-aware). */
+function FioriLedgerRows({ m, openHead, setOpenHead }) {
+  const rows = [];
+  for (const side of ['sales', 'cogs']) {
+    const heads = (m.heads && m.heads[side]) || [];
+    for (const h of heads) {
+      const hk = `${m.key}:${side}:${h.ledger}`;
+      const comps = h.components || [];
+      const hasComps = comps.length > 0;
+      const ho = !!openHead[hk];
+      const salesCol = side === 'sales';
+      rows.push(
+        <tr key={hk} onClick={hasComps ? () => setOpenHead((s) => ({ ...s, [hk]: !s[hk] })) : undefined}
+          style={{ background: '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: hasComps ? 'pointer' : 'default' }}>
+          <td style={{ padding: '5px 16px 5px 62px', color: SAP.text, fontWeight: 600 }}>
+            {hasComps ? <Toggle open={ho} /> : <span style={{ display: 'inline-block', width: 21 }} />}{h.ledger}
+          </td>
+          <td style={num}>{salesCol ? inr(h.amount) : ''}</td>
+          <td style={num}>{salesCol ? '' : inr(h.amount)}</td>
+          <td style={num} /><td style={num} /><td style={num} />
+        </tr>
+      );
+      if (ho) comps.forEach((c, i) => rows.push(
+        <tr key={`${hk}|${i}`} style={{ background: SAP.rowAlt, borderBottom: `1px solid ${SAP.borderLt}` }}>
+          <td style={{ padding: '4px 16px 4px 88px', color: SAP.sec, fontStyle: 'italic', fontSize: 12 }}>{c.label}</td>
+          <td style={{ ...num, color: SAP.sec, fontSize: 12 }}>{salesCol ? inr(c.amount) : ''}</td>
+          <td style={{ ...num, color: SAP.sec, fontSize: 12 }}>{salesCol ? '' : inr(c.amount)}</td>
+          <td style={num} /><td style={num} /><td style={num} />
+        </tr>
+      ));
+    }
+  }
+  if (!rows.length) return null;
+  return (
+    <>
+      <tr style={{ background: '#f6f9ff' }}>
+        <td colSpan={6} style={{ padding: '3px 16px 3px 62px', fontSize: 10.5, fontWeight: 700, color: SAP.blue, letterSpacing: 0.3 }}>LEDGER COMPOSITION · captured fares</td>
+      </tr>
+      {rows}
+    </>
+  );
+}
+
 /* ── Indirect Expenses: Detailed (full Fixed/Variable tree) ⇄ Summary (totals) ── */
 function ExpDetailToggle({ view, setView }) {
   return (
@@ -857,16 +908,31 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   const indIncome = d.bridge?.indirectIncome || 0;
   const grossProfit = d.bridge?.grossProfit ?? d.totals.gp;
 
-  // Expand / Collapse all — every bucket + sub-group key in the indirect tree.
+  // Expand / Collapse all — every bucket + sub-group key in the indirect tree,
+  // PLUS every module + its GL ledgers on both trading sides (so "Expand all"
+  // now also drills the Trading A/c modules → ledger → fare components).
   const allKeys = [];
   buckets.forEach((b) => { allKeys.push('b:' + b.name); (b.groups || []).forEach((g) => allKeys.push('g:' + b.name + '/' + g.name)); });
+  allKeys.push(...moduleExpandKeys(modules));
   const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
   const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
+
+  // A module row + (when expanded) its GL ledger rows → fare/charge components.
+  // The caret toggles the inline drill; the row's "›" still opens the voucher
+  // drill popup. Modules with no captured ledger detail stay non-expandable.
+  const moduleBlock = (m, side) => {
+    const amount = side === 'cogs' ? m.cogs : m.sales;
+    const hasDetail = moduleHasDetail(m, side);
+    const ekey = moduleDetailKey(m, side);
+    const open = hasDetail && isOpen(ekey, false);
+    const row = { label: m.name, amount, sub: true, module: m, icon: m.icon, expandable: hasDetail, ekey, open };
+    return open ? [row, ...moduleDetailRows(m, side, isOpen)] : [row];
+  };
 
   // Trading account — Purchases/COGS (Dr) vs Sales (Cr); both sides total Nett Sales.
   const tradeLeft = [
     { label: 'Purchase Accounts (COGS)', amount: d.totals.cogs, group: true },
-    ...modules.map((m) => ({ label: m.name, amount: m.cogs, sub: true, module: m, icon: m.icon })),
+    ...modules.flatMap((m) => moduleBlock(m, 'cogs')),
     { label: 'Gross Profit c/d', amount: grossProfit, result: true },
   ];
   // Supplier incentive is direct income → credited in the Trading A/c so COGS +
@@ -874,7 +940,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   const incentive = d.totals.incentive || 0;
   const tradeRight = [
     { label: 'Sales Accounts', amount: d.totals.sales, group: true },
-    ...modules.map((m) => ({ label: m.name, amount: m.sales, sub: true, module: m, icon: m.icon })),
+    ...modules.flatMap((m) => moduleBlock(m, 'sales')),
     ...(incentive > 0 ? [{ label: 'Supplier Incentive (Direct Income)', amount: incentive }] : []),
   ];
   const tradeTotal = d.totals.sales + incentive;
@@ -907,10 +973,13 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   const plTotal = grossProfit + indIncome;
 
   const nett = d.totals.sales;
+  const toggle = (r) => setOpenSub((s) => ({ ...s, [r.ekey]: !r.open }));
+  // Row click → drill (module → files popup, ledger → its postings). The caret
+  // (rendered separately) toggles the inline expand without drilling.
   const onRowClick = (r) => {
     if (r.module) setDrillModule(r.module);
     else if (r.ledger) setDrillLedger(r.ledger);
-    else if (r.expandable) setOpenSub((s) => ({ ...s, [r.ekey]: !r.open }));
+    else if (r.expandable) toggle(r);
   };
 
   const Cell = ({ r, side }) => {
@@ -918,18 +987,20 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     if (!r) return (<><td style={{ ...mono, ...sep }} /><td style={{ ...mono }} /></>);
     const clickable = !!(r.module || r.ledger || r.expandable);
     const bold = !!(r.group || r.bucket || r.sub || r.result);              // groups & sub-groups bold
-    const color = r.result ? TALLY.green : (r.group || r.bucket || r.sub) ? TALLY.head : '#1a1a1a';
-    const pad = r.leaf ? 46 : r.sub ? 32 : r.bucket ? 22 : 12;
+    const color = r.component ? '#6a6a6a'
+      : r.result ? TALLY.green
+        : (r.group || r.bucket || r.sub) ? TALLY.head : '#1a1a1a';
+    const pad = r.component ? 58 : r.ledgerHead ? 42 : r.leaf ? 46 : r.sub ? 32 : r.bucket ? 22 : 12;
     return (
       <>
         <td onClick={clickable ? () => onRowClick(r) : undefined}
           className={clickable ? 'cl-drill' : undefined}
-          style={{ padding: '2px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...sep, ...mono }}>
-          {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}
+          style={{ padding: '2px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...sep, ...mono }}>
+          {r.expandable ? <span onClick={(e) => { e.stopPropagation(); toggle(r); }} style={{ color: TALLY.gold, marginRight: 4, cursor: 'pointer' }}>{r.open ? '▾' : '▸'}</span> : null}
           {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{(r.module || r.ledger) ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
         <td onClick={clickable ? () => onRowClick(r) : undefined}
-          style={{ padding: '2px 12px', textAlign: 'right', color, fontWeight: bold ? 700 : 400, cursor: clickable ? 'pointer' : 'default', ...mono }}>{inr(r.amount)}</td>
+          style={{ padding: '2px 12px', textAlign: 'right', color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', cursor: clickable ? 'pointer' : 'default', ...mono }}>{inr(r.amount)}</td>
       </>
     );
   };
@@ -994,7 +1065,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
         <span>Nett Sales : {inr(nett)}</span>
       </div>
       <div style={{ background: '#d4d4d4', color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: '1px solid #b0b0b0', ...mono }}>
-        <span>Tap a sub-group (▸) to expand its ledgers · tap a ledger → its entries (with narration) → voucher → edit</span>
+        <span>Tap ▸ on a module to reveal its ledgers → captured fares (Base Fare, K3, Taxes…) · or a sub-group to expand its ledgers · tap a name → its entries → voucher → edit</span>
         <span>KBiz360 · live double-entry</span>
       </div>
       {drillModule && <ModuleVoucherDrill module={drillModule} cur={cur} mobile={mobile} onClose={() => setDrillModule(null)} />}
@@ -1041,32 +1112,44 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     })];
   });
 
+  const toggle = (r) => setOpenSub((s) => ({ ...s, [r.ekey]: !r.open }));
   const onRowClick = (r) => {
     if (r.module) setDrillModule(r.module);
     else if (r.ledger) setDrillLedger(r.ledger);
-    else if (r.expandable) setOpenSub((s) => ({ ...s, [r.ekey]: !r.open }));
+    else if (r.expandable) toggle(r);
   };
 
-  // allKeys for expand/collapse all (buckets + sub-groups).
+  // A module row + (when expanded) its GL ledger rows → fare/charge components.
+  const moduleBlock = (m, side) => {
+    const amount = side === 'cogs' ? m.cogs : m.sales;
+    const hasDetail = moduleHasDetail(m, side);
+    const ekey = moduleDetailKey(m, side);
+    const open = hasDetail && isOpen(ekey, false);
+    const row = { label: m.name, amount, sub: true, module: m, icon: m.icon, expandable: hasDetail, ekey, open };
+    return open ? [row, ...moduleDetailRows(m, side, isOpen)] : [row];
+  };
+
+  // allKeys for expand/collapse all (buckets + sub-groups + module/ledger drill).
   const allKeys = [];
   buckets.forEach((b) => { allKeys.push('b:' + b.name); (b.groups || []).forEach((g) => allKeys.push('g:' + b.name + '/' + g.name)); });
+  allKeys.push(...moduleExpandKeys(modules));
   const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
   const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
 
   const Row = ({ r, neg }) => {
     const clickable = !!(r.module || r.ledger || r.expandable);
     const bold = !!(r.group || r.bucket || r.sub || r.result);
-    const color = r.result ? TALLY.green : (r.group || r.bucket || r.sub) ? TALLY.head : '#1a1a1a';
-    const pad = r.leaf ? 50 : r.sub ? 34 : r.bucket ? 24 : 14;
+    const color = r.component ? '#6a6a6a' : r.result ? TALLY.green : (r.group || r.bucket || r.sub) ? TALLY.head : '#1a1a1a';
+    const pad = r.component ? 64 : r.ledgerHead ? 46 : r.leaf ? 50 : r.sub ? 34 : r.bucket ? 24 : 14;
     const amt = neg ? -Math.abs(r.amount) : r.amount;
     return (
       <tr style={{ borderBottom: '1px solid #f4f4f4' }}>
         <td onClick={clickable ? () => onRowClick(r) : undefined} className={clickable ? 'cl-drill' : undefined}
-          style={{ padding: '3px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
-          {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}
+          style={{ padding: '3px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
+          {r.expandable ? <span onClick={(e) => { e.stopPropagation(); toggle(r); }} style={{ color: TALLY.gold, marginRight: 4, cursor: 'pointer' }}>{r.open ? '▾' : '▸'}</span> : null}
           {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{(r.module || r.ledger) ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
-        <td style={{ padding: '3px 12px', textAlign: 'right', color, fontWeight: bold ? 700 : 400, ...mono }}>{inr(amt)}</td>
+        <td style={{ padding: '3px 12px', textAlign: 'right', color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', ...mono }}>{inr(amt)}</td>
       </tr>
     );
   };
@@ -1102,12 +1185,12 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
         <tbody>
           <Head txt="Income" />
           <Row r={{ label: 'Revenue from Operations (Sales)', amount: d.totals.sales, group: true }} />
-          {modules.map((m, i) => <Row key={'s' + i} r={{ label: m.name, amount: m.sales, sub: true, module: m, icon: m.icon }} />)}
+          {modules.flatMap((m) => moduleBlock(m, 'sales')).map((r, i) => <Row key={'s' + i} r={r} />)}
           {incentive > 0 && <Row r={{ label: 'Supplier Incentive (Direct Income)', amount: incentive }} />}
           <Sub txt="Total Revenue (Trading)" val={revenueTrading} />
           <Head txt="Less: Cost of Sales (COGS)" />
           <Row r={{ label: 'Purchase Accounts (COGS)', amount: d.totals.cogs, group: true }} neg />
-          {modules.map((m, i) => <Row key={'c' + i} r={{ label: m.name, amount: m.cogs, sub: true, module: m, icon: m.icon }} neg />)}
+          {modules.flatMap((m) => moduleBlock(m, 'cogs')).map((r, i) => <Row key={'c' + i} r={r} neg />)}
           <Sub txt="Total Cost of Sales" val={d.totals.cogs} neg />
           <Result txt="Gross Profit" val={grossProfit} />
           {indIncome > 0 && <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome }} />}

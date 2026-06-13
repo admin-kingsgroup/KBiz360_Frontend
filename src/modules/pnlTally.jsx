@@ -26,7 +26,7 @@ const tdName = { padding: '5px 12px', fontSize: 12, color: DARK };
 const tdNum = { padding: '5px 12px', fontSize: 12, textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 
 /* ── One column of a section (Debit OR Credit) with inner (item) + outer (group) amounts ── */
-export function PLSide({ lines, total, periodLabel, onPick, title = 'Particulars' }) {
+export function PLSide({ lines, total, periodLabel, onPick, title = 'Particulars', branch, from, to }) {
   return (
     <div style={{ flex: 1, minWidth: 360 }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -36,7 +36,7 @@ export function PLSide({ lines, total, periodLabel, onPick, title = 'Particulars
           <th style={{ ...th, textAlign: 'right' }}>{periodLabel}</th>
         </tr></thead>
         <tbody>
-          {lines.map((l, i) => <PLLines key={i} line={l} onPick={onPick} />)}
+          {lines.map((l, i) => <PLLines key={i} line={l} onPick={onPick} branch={branch} from={from} to={to} />)}
         </tbody>
         <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
           <td style={{ ...tdName, fontWeight: 800 }}>Total</td>
@@ -48,8 +48,39 @@ export function PLSide({ lines, total, periodLabel, onPick, title = 'Particulars
   );
 }
 
-/* A group header row (outer total + bold, clickable) followed by its indented items. */
-function PLLines({ line, onPick }) {
+/* Captured fare/charge components for ONE ledger, rendered inline (indented) in
+   the 3-column P&L layout. On-demand fetch of the same /ledger-components feed the
+   drill uses, so an expanded ledger shows Base Fare / K3 / Taxes … without leaving
+   the page. Falls back to a note when a ledger carries no component meta. */
+function LedgerComponentsInline({ name, branch, from, to }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['ledger-components', name, brCodeOf(branch), from, to],
+    queryFn: () => apiGet('/api/accounting/ledger-components/' + encodeURIComponent(name), { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from, to }),
+  });
+  const note = (txt) => (<tr><td colSpan={3} style={{ ...tdName, paddingLeft: 54, color: DIM, fontSize: 11, fontStyle: 'italic' }}>{txt}</td></tr>);
+  if (isLoading) return note('Loading components…');
+  const rows = (data && data.rows) || [];
+  if (!rows.length) return note('No captured fare components.');
+  return (
+    <>
+      {rows.map((r, i) => (
+        <tr key={i} style={{ background: '#fafbff' }}>
+          <td style={{ ...tdName, paddingLeft: 54, color: DIM, fontSize: 11.5, fontStyle: 'italic' }}>{r.label}</td>
+          <td style={{ ...tdNum, color: DIM, fontSize: 11.5 }}>{money(r.amount)}</td>
+          <td />
+        </tr>
+      ))}
+    </>
+  );
+}
+
+/* A group header row (outer total + bold, clickable) followed by its indented items.
+   A caret on the group reveals its ledgers INLINE (default collapsed, so the Tally
+   look is unchanged until you ask for it); each ledger in turn expands to the fare
+   components captured on the entry. Clicking a name still drills the stack. */
+function PLLines({ line, onPick, branch, from, to }) {
+  const [openLedgers, setOpenLedgers] = useState(false);
+  const [openComp, setOpenComp] = useState({});
   const drillable = line.isGroup || line.ledger || (!line.isGroup && !!line.name);
   if (line.isCarry || line.isResult) {
     return (
@@ -57,21 +88,29 @@ function PLLines({ line, onPick }) {
         <td /><td style={{ ...tdNum, fontWeight: 700, fontStyle: 'italic' }}>{money(line.amount)}</td></tr>
     );
   }
+  const items = line.items || [];
+  const subGroups = items.filter((it) => it.isGroup);
+  const ledgers = items.filter((it) => !it.isGroup && (it.ledger || it.name));
+  const canExpand = line.isGroup && ledgers.length > 0;
   return (
     <>
       <tr onClick={() => drillable && onPick(line)} style={{ cursor: drillable ? 'pointer' : 'default', background: line.isGroup ? '#fcfdff' : '#fff' }}
         onMouseEnter={(e) => drillable && (e.currentTarget.style.background = '#eef4ff')}
         onMouseLeave={(e) => (e.currentTarget.style.background = line.isGroup ? '#fcfdff' : '#fff')}>
         <td style={{ ...tdName, fontWeight: line.isGroup ? 700 : 400, color: line.isGroup ? DARK : '#1f3a8a', paddingLeft: line.isGroup ? 12 : 26 }}>
+          {canExpand && (
+            <span onClick={(e) => { e.stopPropagation(); setOpenLedgers((o) => !o); }}
+              style={{ cursor: 'pointer', color: '#9aa6c4', fontWeight: 700, marginRight: 5, display: 'inline-block', width: 10 }}
+              title={openLedgers ? 'Hide ledgers' : 'Show ledgers → captured fares'}>{openLedgers ? '▾' : '▸'}</span>
+          )}
           {line.name}{line.isGroup && <ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9aa6c4' }} />}
         </td>
         <td style={tdNum}>{line.isGroup ? '' : money(line.amount)}</td>
         <td style={{ ...tdNum, fontWeight: 700 }}>{line.isGroup ? money(line.amount) : ''}</td>
       </tr>
-      {/* Tally shows ONLY the sub-group breakup inline. Ledgers stay hidden under
-          their head until you drill into that group / sub-group. */}
-      {line.isGroup && (line.items || []).filter((it) => it.isGroup).map((it, j) => (
-        <tr key={j} onClick={() => onPick(it)} style={{ cursor: 'pointer' }}
+      {/* Sub-group breakup stays inline (drills on click), exactly as Tally does. */}
+      {line.isGroup && subGroups.map((it, j) => (
+        <tr key={'g' + j} onClick={() => onPick(it)} style={{ cursor: 'pointer' }}
           onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
           <td style={{ ...tdName, paddingLeft: 30, color: DARK, fontWeight: 600 }}>
@@ -81,6 +120,28 @@ function PLLines({ line, onPick }) {
           <td />
         </tr>
       ))}
+      {/* NEW: ledger leaves inline (caret-revealed) → each expands to its fare components. */}
+      {openLedgers && ledgers.map((it, j) => {
+        const led = it.ledger || it.name;
+        const co = !!openComp[led];
+        return (
+          <React.Fragment key={'l' + j}>
+            <tr style={{ background: '#fff' }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}>
+              <td style={{ ...tdName, paddingLeft: 38, color: '#1f3a8a' }}>
+                <span onClick={(e) => { e.stopPropagation(); setOpenComp((s) => ({ ...s, [led]: !s[led] })); }}
+                  style={{ cursor: 'pointer', color: '#9aa6c4', fontWeight: 700, marginRight: 5, display: 'inline-block', width: 10 }}
+                  title={co ? 'Hide components' : 'Show captured fares'}>{co ? '▾' : '▸'}</span>
+                <span onClick={() => openLedgerModal(led)} style={{ cursor: 'pointer' }} title="Open ledger account">{it.name}</span>
+              </td>
+              <td style={tdNum}>{money(it.amount)}</td>
+              <td />
+            </tr>
+            {co && <LedgerComponentsInline name={led} branch={branch} from={from} to={to} />}
+          </React.Fragment>
+        );
+      })}
     </>
   );
 }
@@ -515,18 +576,18 @@ export function PnLTallyLive({ branch }) {
           <div style={{ overflowX: 'auto' }}>
             {/* Trading account */}
             <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid ' + DARK }}>
-              <PLSide lines={pl.trading.debit} total={pl.trading.total} periodLabel={periodLabel} onPick={pick} />
+              <PLSide lines={pl.trading.debit} total={pl.trading.total} periodLabel={periodLabel} onPick={pick} branch={branch} from={range.from} to={range.to} />
               <div style={{ width: 1, background: LINE }} />
-              <PLSide lines={pl.trading.credit} total={pl.trading.total} periodLabel={periodLabel} onPick={pick} />
+              <PLSide lines={pl.trading.credit} total={pl.trading.total} periodLabel={periodLabel} onPick={pick} branch={branch} from={range.from} to={range.to} />
             </div>
             {/* P&L account */}
             <div style={{ display: 'flex', gap: 0 }}>
-              <PLSide lines={pl.pl.debit} total={pl.pl.total} periodLabel={periodLabel} onPick={pick} />
+              <PLSide lines={pl.pl.debit} total={pl.pl.total} periodLabel={periodLabel} onPick={pick} branch={branch} from={range.from} to={range.to} />
               <div style={{ width: 1, background: LINE }} />
-              <PLSide lines={pl.pl.credit} total={pl.pl.total} periodLabel={periodLabel} onPick={pick} />
+              <PLSide lines={pl.pl.credit} total={pl.pl.total} periodLabel={periodLabel} onPick={pick} branch={branch} from={range.from} to={range.to} />
             </div>
             <div style={{ padding: '8px 16px', background: '#f7f8fb', fontSize: 11.5, color: DIM, borderTop: '1px solid ' + LINE }}>
-              {pl.grossResult}: <b style={{ color: DARK }}>{cur} {money(pl.grossProfit)}</b> &nbsp;·&nbsp; {pl.result}: <b style={{ color: pl.netProfit >= 0 ? '#27500A' : '#9B2C2C' }}>{cur} {money(Math.abs(pl.netProfit))}</b> &nbsp;· click any group / ledger to drill down.
+              {pl.grossResult}: <b style={{ color: DARK }}>{cur} {money(pl.grossProfit)}</b> &nbsp;·&nbsp; {pl.result}: <b style={{ color: pl.netProfit >= 0 ? '#27500A' : '#9B2C2C' }}>{cur} {money(Math.abs(pl.netProfit))}</b> &nbsp;· tap ▸ to reveal a group’s ledgers → captured fares inline, or click any name to drill down.
             </div>
           </div>
         )}

@@ -115,12 +115,23 @@ function TkfPnL({ branch, from, to }) {
     ? d.indirect.buckets
     : [{ name: 'Indirect Expenses', amount: d.indirect?.expense || 0, groups: d.indirect?.groups || [] }];
 
+  // Each module, then the GL ledgers it posts to (clickable → ledger modal) and
+  // the fare/charge components captured on the entry (Base Fare, K3, Taxes …).
+  // TKF is a full printed statement, so the ledger-wise detail renders inline.
+  const moduleStmtRows = (m, side) => {
+    const rows = [{ label: m.name, amount: side === 'sales' ? m.sales : m.cogs }];
+    for (const h of ((m.heads && m.heads[side]) || [])) {
+      rows.push({ label: h.ledger, amount: h.amount, ledger: h.ledger, indent: 1 });
+      for (const c of (h.components || [])) rows.push({ label: c.label, amount: c.amount, indent: 2 });
+    }
+    return rows;
+  };
   const incomeRows = [
-    ...(d.modules || []).map((m) => ({ label: m.name, amount: m.sales })),
+    ...(d.modules || []).flatMap((m) => moduleStmtRows(m, 'sales')),
     { label: 'Total Revenue (Sales)', amount: d.totals.sales, subtotal: true },
   ];
   const cogsRows = [
-    ...(d.modules || []).map((m) => ({ label: m.name, amount: m.cogs })),
+    ...(d.modules || []).flatMap((m) => moduleStmtRows(m, 'cogs')),
     { label: 'Total Direct Cost (COGS)', amount: d.totals.cogs, subtotal: true },
     { label: 'GROSS PROFIT', amount: d.totals.gp, subtotal: true, bold: true },
   ];
