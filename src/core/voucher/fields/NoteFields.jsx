@@ -1,8 +1,8 @@
 import React from 'react';
 import { FL, inp } from '../../styles';
 import { VPlaceOfSupply } from '../../../modules/transactions';
-import { GST_SLABS } from '../../taxSections';
 import { LedgerPicker } from '../LedgerPicker';
+import { useVoucherRef } from '../useVoucherRef';
 import { money2, r2 } from '../ui';
 
 /**
@@ -15,6 +15,10 @@ export function NoteFields({ state, setState, ctx, kind, reasons }) {
   const { branch, cur } = ctx;
   const isCredit = kind === 'credit';
   const patch = (p) => setState((s) => ({ ...s, ...p }));
+  const ref = useVoucherRef();
+  const GST_SLABS = ref.gstSlabs;
+  // Reasons: live config (per kind) wins, else the registry-passed fallback list.
+  const reasonList = (ref.noteReasons && ref.noteReasons[kind]) || reasons || [];
 
   const taxable = r2(+state.taxable || 0);
   const gstAmt = r2(taxable * (+state.gstPct || 0) / 100);
@@ -36,7 +40,7 @@ export function NoteFields({ state, setState, ctx, kind, reasons }) {
         <FL label={isCredit ? 'Credit To (Customer / Debtor)' : 'Debit To (Supplier / Creditor)'}>
           <LedgerPicker branch={branch} value={state.party} onChange={(v) => patch({ party: v })} filter={(l) => l.type === (isCredit ? 'Debtor' : 'Creditor')} placeholder={isCredit ? 'Select customer / debtor...' : 'Select supplier / creditor...'} />
         </FL>
-        <FL label="Reason"><select value={state.reason} onChange={(e) => patch({ reason: e.target.value })} style={inp}>{(reasons || []).map((r) => <option key={r}>{r}</option>)}</select></FL>
+        <FL label="Reason"><select value={state.reason} onChange={(e) => patch({ reason: e.target.value })} style={inp}>{reasonList.map((r) => <option key={r}>{r}</option>)}</select></FL>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>

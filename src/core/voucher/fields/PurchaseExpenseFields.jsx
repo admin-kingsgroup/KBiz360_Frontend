@@ -2,8 +2,8 @@ import React, { useRef } from 'react';
 import { Plus } from 'lucide-react';
 import { FL, inp, btnGh, card } from '../../styles';
 import { VPlaceOfSupply } from '../../../modules/transactions';
-import { TDS_SECTIONS, GST_SLABS } from '../../taxSections';
 import { LedgerPicker } from '../LedgerPicker';
+import { useVoucherRef } from '../useVoucherRef';
 import { V_DR, V_CR, DARK, DIM, money2, pxpTotals, r2 } from '../ui';
 
 /**
@@ -17,6 +17,7 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
   const idRef = useRef(1000);
   const lines = state.lines || [];
   const patch = (p) => setState((s) => ({ ...s, ...p }));
+  const { tdsSections: TDS_SECTIONS, gstSlabs: GST_SLABS } = useVoucherRef();
 
   const updLine = (i, k, v) => setState((s) => ({ ...s, lines: s.lines.map((l, j) => (j === i ? { ...l, [k]: v } : l)) }));
   const addLine = () => setState((s) => ({ ...s, lines: [...s.lines, { _k: idRef.current++, ledger: '', drCr: 'Dr', amt: '', desc: '' }] }));

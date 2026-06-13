@@ -3,9 +3,8 @@ import { FL, inp, btnGh } from '../../styles';
 import { useOpenBills } from '../../useAccounting';
 import { useLedgerRegistry } from '../../useReference';
 import { BillAllocPanel } from '../../../modules/transactions';
-import { PMT_MODES_V } from '../../helpers';
-import { TDS_SECTIONS } from '../../taxSections';
 import { LedgerPicker } from '../LedgerPicker';
+import { useVoucherRef } from '../useVoucherRef';
 import { allocSummary, money2, GREEN, RED } from '../ui';
 
 /**
@@ -19,6 +18,7 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
   const isReceipt = side === 'customer';
   const accent = isReceipt ? GREEN : RED;
   const patch = (p) => setState((s) => ({ ...s, ...p }));
+  const { tdsSections: TDS_SECTIONS, paymentModes: PMT_MODES_V } = useVoucherRef();
 
   // The "other side" can be ANY ledger (customer, supplier, expense, loan, tax…).
   // Bill-wise allocation + TDS apply ONLY when it's a true party ledger:
