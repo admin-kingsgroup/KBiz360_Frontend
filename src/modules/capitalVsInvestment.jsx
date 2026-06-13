@@ -120,6 +120,8 @@ export function CapitalVsInvestmentLive({ branch }) {
   const good = (t.gpYield || 0) >= hurdle;
   const flowComp = t.flowComposition || 0;
   const reconciles = Math.abs(flowComp - (t.inflowCapital || 0)) < 1;
+  // No capital/GP posted → show an empty state rather than a misleading verdict on zeros.
+  const hasData = Math.abs(t.capitalInvested || 0) > 0.5 || Math.abs(t.grossProfit || 0) > 0.5 || Math.abs(t.inflowCapital || 0) > 0.5 || Math.abs(t.grossRevenue || 0) > 0.5;
 
   return (
     <div className="cvi">
@@ -138,7 +140,7 @@ export function CapitalVsInvestmentLive({ branch }) {
               <input type="number" min="0" step="0.5" value={hurdle} onChange={(e) => setHurdle(Number(e.target.value) || 0)}
                 title="Cost-of-capital benchmark used for the GP-yield verdict" style={{ width: 58, padding: '4px 7px', borderRadius: 4, border: '1px solid #555', background: '#1e1e1e', color: '#fff', fontSize: 11, fontWeight: 700 }} />
             </label>
-            <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => setRange({ from: r.from, to: r.to })} />
+            <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setRange({ from: r.from, to: r.to })} />
           </div>
         </div>
 
@@ -150,8 +152,11 @@ export function CapitalVsInvestmentLive({ branch }) {
 
         {isLoading && <div className="state">Loading live capital analysis…</div>}
         {error && <div className="state" style={{ color: '#9B2C2C' }}>Couldn’t load: {String(error.message || error)}</div>}
+        {!isLoading && !error && data && !hasData && (
+          <div className="state">No capital or gross-profit postings for this period. Record vouchers to populate the capital-vs-investment analysis.</div>
+        )}
 
-        {!isLoading && !error && data && (<>
+        {!isLoading && !error && data && hasData && (<>
           <div className="kpis">
             <div className="kpi"><div className="k">Capital Invested</div><div className="v">{cr(t.capitalInvested)}</div><div className="s">capital employed</div></div>
             <div className="kpi block"><div className="k">Capital Blocked</div><div className="v">{cr(t.capitalBlocked)}</div><div className="s">{(t.blockedPct || 0).toFixed(1)}% of capital</div></div>

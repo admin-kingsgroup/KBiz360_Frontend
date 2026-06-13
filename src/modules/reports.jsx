@@ -33,10 +33,26 @@ export function RptShell({title,subtitle,children,filters}){
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           {filters}
-          <button style={{...btnG,display:"flex",alignItems:"center",gap:5}}><Download size={13}/> Export</button>
+          <button onClick={()=>window.print()} style={{...btnG,display:"flex",alignItems:"center",gap:5}}><Download size={13}/> Export</button>
         </div>
       </div>
       {children}
+    </div>
+  );
+}
+
+/* Honest placeholder for report screens that have no live backend yet. Shown
+   instead of hardcoded/fabricated demo figures, so the books are never
+   misrepresented. The original prototype body is retained below each as a
+   dead `_*_legacy` function for future wiring. */
+export function NotWired({title,note}){
+  return (
+    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+      <div style={{background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"46px 22px",textAlign:"center"}}>
+        <div style={{fontSize:38,marginBottom:10}}>🚧</div>
+        <h2 style={{margin:"0 0 8px",fontSize:16,fontWeight:800,color:"#0d1326"}}>{title}</h2>
+        <p style={{margin:"0 auto",fontSize:12,color:"#5a6691",maxWidth:480,lineHeight:1.55}}>{note}</p>
+      </div>
     </div>
   );
 }
@@ -196,7 +212,7 @@ export function ReportBranch(){
   if(q.isLoading) return <RptShell title="Branch Comparison" subtitle="All branches · live double-entry"><div style={{...card,textAlign:"center",color:"#5a6691",fontSize:12.5,padding:"40px 14px"}}>Loading live data…</div></RptShell>;
   if(!hasData) return <RptShell title="Branch Comparison" subtitle="All branches · live double-entry"><div style={{...card,textAlign:"center",padding:"44px 14px"}}><div style={{fontSize:34,marginBottom:8}}>📭</div><h3 style={{margin:"0 0 6px",fontSize:15,color:"#0d1326"}}>No transactions found</h3><p style={{margin:0,fontSize:12,color:"#5a6691"}}>Branch revenue and gross profit appear here once sale/purchase vouchers are posted.</p></div></RptShell>;
   return (
-    <RptShell title="Branch Comparison" subtitle="FY 2026-27 (Apr–May) · All branches">
+    <RptShell title="Branch Comparison" subtitle="All branches · live from the books">
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:14}}>
         {BR_D.map((b,i)=>(
           <div key={i} style={{background:"#f9fafb",border:"1px solid #e1e3ec",borderTop:"3px solid "+b.color,borderRadius:10,padding:"11px 13px"}}>
@@ -255,6 +271,9 @@ export function ReportBranch(){
 /* ── PACKAGE P&L ─────────────────────────────────────────── */
 
 export function ReportPackagePnL(){
+  return <NotWired title="Package P&L" note="File-wise package profitability isn't connected to a live source yet. Once tour packages are linked to their booking files, real P&L per file will appear here."/>;
+}
+function _ReportPackagePnL_legacy(){
   const [q,setQ]=useState("");
   const rows=PKG_D.filter(r=>!q||r.cust.toLowerCase().includes(q.toLowerCase())||r.pkg.toLowerCase().includes(q.toLowerCase())||r.file.toLowerCase().includes(q.toLowerCase()));
   return (
@@ -1115,8 +1134,8 @@ export function ReportCommission({branch}){
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:36,height:36,borderRadius:9,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>💼</div>
           <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Commission Income Register</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Override commission from airlines, insurers, hotels · TDS 194H on payout</p>
+            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Commission Income (estimated)</h2>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Revenue is live from the books; commission is estimated at standard rates (Insurance 15%, Flight 2%, Holiday 3%, other 1%) with TDS 194H @5% — not actual booked commission.</p>
           </div>
         </div>
         <ReportDateBar value={range} onChange={setRange} branch={branch}/>
@@ -1799,7 +1818,7 @@ export function ConsultantReport({branch}){
 
       {view==="trend"&&(
         <div style={{...card}}>
-          <p style={{margin:"0 0 14px",fontSize:12,fontWeight:700,color:"#0d1326"}}>GP Trend — Mar/Apr/May 2026 (Top 5 Consultants)</p>
+          <p style={{margin:"0 0 14px",fontSize:12,fontWeight:700,color:"#0d1326"}}>GP Trend — recent months (Top 5 Consultants)</p>
           {trendData.map((c,ci)=>(
             <div key={c.name} style={{marginBottom:16}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
@@ -2159,7 +2178,10 @@ export function DestinationIntelligence({branch}){
 
 /* ── PACKAGE P&L BY TOUR CODE ────────────────────────────────── */
 
-export function IntercompanyBilling({branch}){
+export function IntercompanyBilling(){
+  return <NotWired title="Intercompany Billing" note="Cross-branch billing isn't wired to live data yet. Once the inter-branch billing voucher flow is connected, real IC transactions and markup will appear here — no sample entries are shown in the meantime."/>;
+}
+function _IntercompanyBilling_legacy({branch}){
   const mob=useMobile();
   const [tab,setTab]=useState("list"); // list | new
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
@@ -2520,7 +2542,10 @@ export function ScheduleIIIBS({branch,setRoute}){
 }
 
 
-export function VarianceAnalysis({branch,setRoute}){
+export function VarianceAnalysis(){
+  return <NotWired title="Variance Analysis" note="Actual-vs-Budget-vs-Forecast variance needs budget and forecast figures that aren't configured yet. Once they're entered, actuals will be compared live from the double-entry books — no sample numbers are shown in the meantime."/>;
+}
+function _VarianceAnalysis_legacy({branch,setRoute}){
   const mob=useMobile();
   const cfg=bc(branch);
   const cur=cfg.cur;
@@ -2610,6 +2635,9 @@ export function VarianceAnalysis({branch,setRoute}){
 
 
 export function ReportViewerTabbed(){
+  return <NotWired title="Report Viewer" note="This tabbed report viewer is a layout preview and isn't connected to live data, filters, scheduling or sharing yet."/>;
+}
+function _ReportViewerTabbed_legacy(){
   const [tab,setTab]=useState("view");
   const tabs=[{id:"view",label:"1. View"},{id:"filter",label:"2. Filter"},{id:"group",label:"3. Group By"},{id:"sort",label:"4. Sort"},{id:"compare",label:"5. Compare"},{id:"format",label:"6. Format"},{id:"export",label:"7. Export"},{id:"schedule",label:"8. Schedule"},{id:"share",label:"9. Share"}];
   return TAB_Page("Profit & Loss Statement — May 2026", "Generic 9-tab Report Viewer · applies to any report in the system",
@@ -2739,6 +2767,9 @@ export function ReportViewerTabbed(){
 
 
 export function CustomReportBuilder(){
+  return <NotWired title="Custom Report Builder" note="The custom report builder isn't connected to a live query engine yet, so it can't run against the books. It will be enabled once the report-builder service is available."/>;
+}
+function _CustomReportBuilder_legacy(){
   const [selected,setSelected]=useState(["Branch","Revenue","GP","GP %","Bookings"]);
   const [filters,setFilters]=useState([
     {id:1,field:"Period (Month)",op:"=",val:"May 2026"},
@@ -2863,6 +2894,9 @@ export function CustomReportBuilder(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function SavedReportViews(){
+  return <NotWired title="Saved Report Views" note="Saved report views aren't available yet — there's no saved-views service connected to store or run them."/>;
+}
+function _SavedReportViews_legacy(){
   const [filter,setFilter]=useState("ALL");
   const types=["ALL","Profitability","Financial","Operational","Compliance"];
   const filtered=filter==="ALL"?SAVED_VIEWS_DATA:SAVED_VIEWS_DATA.filter(v=>v.type===filter);
@@ -2920,6 +2954,9 @@ export function SavedReportViews(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function ScheduledReports(){
+  return <NotWired title="Scheduled Reports" note="Scheduled report delivery isn't available yet — no scheduling or email service is connected. Email/recipient counts are not shown until it's live."/>;
+}
+function _ScheduledReports_legacy(){
   const [schedules,setSchedules]=useState(SCHEDULED_REPORTS_DATA);
   const toggleStatus=id=>setSchedules(s=>s.map(r=>r.id===id?{...r,status:r.status==="Active"?"Paused":"Active"}:r));
   const activeCount=schedules.filter(s=>s.status==="Active").length;
@@ -2997,6 +3034,9 @@ export function ScheduledReports(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function ReportsMetaDemo(){
+  return <NotWired title="Report Meta Features" note="This screen demonstrates report meta-features (comparatives, sparklines, drill-downs) and isn't wired to live data."/>;
+}
+function _ReportsMetaDemo_legacy(){
   const [showComparative,setShowComparative]=useState(true);
   const [showSparklines,setShowSparklines]=useState(true);
   const [drillData,setDrillData]=useState(null);

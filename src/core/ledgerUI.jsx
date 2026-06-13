@@ -213,7 +213,7 @@ export function LedgerAccountView({
           </div>
           <span className="spacer" />
           {showPeriodBranchHint(branch)}
-          {showPeriod && <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => setPeriod({ from: r.from, to: r.to })} />}
+          {showPeriod && <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setPeriod({ from: r.from, to: r.to })} />}
           <div className="printbtns">
             <button onClick={() => printNow()} title="Print / Save as PDF">🖨 Print</button>
           </div>

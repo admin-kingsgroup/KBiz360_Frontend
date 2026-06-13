@@ -1,32 +1,41 @@
 /* ════════════════════════════════════════════════════════════════════
    SHELL/GLOBALSEARCH.JSX
-   Auto-generated from KBiz360_v2.jsx · 86 lines · 1 declarations
+   Global search across LIVE vouchers. Pulls the same per-file GP list the
+   GP Report uses (/api/accounting/gp-bills, all branches · inception→today)
+   and filters it client-side by voucher no / client / destination / airline
+   / supplier / consultant. No seed data — empty in, empty out.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
-import { BRANCHES, GP_BILLS } from '../core/data';
+import { BRANCHES } from '../core/data';
+import { ALL_TIME_FROM, todayISO } from '../core/dates';
+import { apiGet } from '../core/api';
 import { btnGh, card, inp } from '../core/styles';
 
 export function GlobalSearch({setRoute}){
   const [q,setQ]=useState("");
-  const [results,setResults]=useState([]);
   const MOD_ROUTES={Flight:"/sales/flight",Holiday:"/sales/holiday",Hotel:"/sales/hotel",
     Car:"/sales/car",Visa:"/sales/visa",Insurance:"/sales/insurance",Misc:"/sales/misc"};
 
-  useEffect(()=>{
-    if(!q||q.length<2){setResults([]);return;}
-    const lower=q.toLowerCase();
-    const hits=GP_BILLS.filter(b=>
-      b.id.toLowerCase().includes(lower)||
-      b.client.toLowerCase().includes(lower)||
-      b.dest.toLowerCase().includes(lower)||
-      b.supplier.toLowerCase().includes(lower)||
-      b.consultant.toLowerCase().includes(lower)||
-      b.airline.toLowerCase().includes(lower)
-    ).slice(0,20).map(b=>({...b,gp:b.sell-b.cost,gpPct:+((b.sell-b.cost)/b.sell*100).toFixed(1)}));
-    setResults(hits);
-  },[q]);
+  // Live GP bills across every branch, inception → today (so prior-FY data is
+  // searchable too). Cached; one fetch backs every keystroke.
+  const { data: bills = [], isLoading } = useQuery({
+    queryKey: ['accounting', 'gp-bills', 'global-search'],
+    queryFn: () => apiGet('/api/accounting/gp-bills', { from: ALL_TIME_FROM, to: todayISO() }),
+    staleTime: 60_000,
+  });
+
+  const results = useMemo(() => {
+    if (!q || q.length < 2) return [];
+    const lower = q.toLowerCase();
+    const has = (v) => String(v || '').toLowerCase().includes(lower);
+    return (bills || [])
+      .filter((b) => has(b.id) || has(b.client) || has(b.dest) || has(b.supplier) || has(b.consultant) || has(b.airline))
+      .slice(0, 50)
+      .map((b) => { const gp = (b.sell || 0) - (b.cost || 0); return { ...b, gp, gpPct: b.sell ? +((gp / b.sell) * 100).toFixed(1) : 0 }; });
+  }, [q, bills]);
 
   const cfg2=b=>BRANCHES.find(x=>x.code===b)||{cur:"₹"};
 
@@ -42,7 +51,8 @@ export function GlobalSearch({setRoute}){
       <input autoFocus value={q} onChange={e=>setQ(e.target.value)}
         placeholder="Type voucher number, client name, destination, airline..."
         style={{...inp,width:"100%",fontSize:14,padding:"12px 16px",marginBottom:12}}/>
-      {q.length>=2&&results.length===0&&<p style={{textAlign:"center",color:"#5a6691",padding:"24px"}}>No results for "{q}"</p>}
+      {q.length>=2&&isLoading&&<p style={{textAlign:"center",color:"#5a6691",padding:"24px"}}>Searching…</p>}
+      {q.length>=2&&!isLoading&&results.length===0&&<p style={{textAlign:"center",color:"#5a6691",padding:"24px"}}>No results for "{q}"</p>}
       {results.length>0&&(
         <div style={{...card,padding:0,overflow:"hidden"}}>
           <div style={{padding:"8px 14px",background:"#f3f4f8",fontSize:10,color:"#5a6691",fontWeight:600}}>{results.length} result{results.length!==1?"s":""} for "{q}"</div>
@@ -55,7 +65,7 @@ export function GlobalSearch({setRoute}){
             <tbody>{results.map((r,i)=>{
               const bc2=cfg2(r.branch);
               return (
-                <tr key={r.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa",cursor:"pointer"}}
+                <tr key={r.id+'_'+i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa",cursor:"pointer"}}
                   onMouseEnter={e=>e.currentTarget.style.background="#f0f4ff"}
                   onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#fff":"#fafafa"}
                   onClick={()=>setRoute(MOD_ROUTES[r.mod]||"/sales/flight")}>
@@ -79,7 +89,7 @@ export function GlobalSearch({setRoute}){
       {!q&&(
         <div style={{...card,padding:"24px",textAlign:"center"}}>
           <p style={{margin:"0 0 8px",fontSize:14,color:"#5a6691"}}>🔍 Start typing to search</p>
-          <p style={{margin:0,fontSize:11,color:"#bfc3d6"}}>Searches across {GP_BILLS.length}+ vouchers — voucher numbers, clients, destinations, airlines, consultants</p>
+          <p style={{margin:0,fontSize:11,color:"#bfc3d6"}}>Searches across {bills.length} live voucher file{bills.length!==1?"s":""} — voucher numbers, clients, destinations, airlines, consultants</p>
         </div>
       )}
     </div>

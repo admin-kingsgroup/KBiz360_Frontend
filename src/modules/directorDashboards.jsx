@@ -72,14 +72,14 @@ const td = { padding: '7px 12px', borderBottom: '1px solid #f2f4f8', fontSize: 1
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 
 // usePeriod — holds the active range; the PeriodBar inside Toolbar drives setRange.
-function usePeriod(def = 'cfy') {
+function usePeriod(def = 'all') {
   const [range, setRange] = useState(() => periodRange(def, {}));
   return { range, setRange, def };
 }
 
 // ── 1) Executive Overview ─────────────────────────────────────────────────────
 export function ExecutiveOverview({ branch }) {
-  const p = usePeriod('mtd'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const pl = useProfitAndLoss(branch, range).data || {};
   const mpl = useModulePL(branch, range).data || {};
@@ -157,7 +157,7 @@ function deltaPct(cur, prev) { cur = Number(cur) || 0; prev = Number(prev) || 0;
 
 // ── 2) Profitability (P&L) ────────────────────────────────────────────────────
 export function ProfitabilityDash({ branch }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const pl = useProfitAndLoss(branch, range).data || {};
   const mpl = useModulePL(branch, range).data || {};
@@ -195,7 +195,7 @@ export function ProfitabilityDash({ branch }) {
 
 // ── 3) Cash & Liquidity ───────────────────────────────────────────────────────
 export function CashLiquidityDash({ branch }) {
-  const p = usePeriod('mtd'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const trial = useTrialBalance(branch, range).data || {};
   const rows = (trial.rows || []).filter((r) => /cash|bank/i.test(r.group || ''));
@@ -226,7 +226,7 @@ export function CashLiquidityDash({ branch }) {
 
 // ── 4) Receivables & Payables ─────────────────────────────────────────────────
 export function ReceivablesPayablesDash({ branch }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const age = useAgeing(branch).data || {};
   const ar = age.receivables || { rows: [], totals: {} }, ap = age.payables || { rows: [], totals: {} };
@@ -258,7 +258,7 @@ export function ReceivablesPayablesDash({ branch }) {
 
 // ── 5) Branch Performance ─────────────────────────────────────────────────────
 export function BranchPerformanceDash() {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const q = useQueries({
     queries: BRANCHES.map((b) => ({
       queryKey: ['accounting', 'module-pl', b.code, range.from, range.to],
@@ -318,7 +318,7 @@ const topBy = (rows, keyFn, valFn, n = 10) => {
 
 // ── 6) Balance Sheet ──────────────────────────────────────────────────────────
 export function BalanceSheetDash({ branch }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const bs = useBalanceSheet(branch, { to: range.to }).data || {};
   const assets = bs.assets || [], liabs = bs.liabilities || [];
@@ -342,7 +342,7 @@ export function BalanceSheetDash({ branch }) {
 
 // ── 7) Module / Product GP ────────────────────────────────────────────────────
 export function ModuleGpDash({ branch }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, range).data || {};
   const mods = mpl.modules || [], t = mpl.totals || {};
@@ -371,7 +371,7 @@ export function ModuleGpDash({ branch }) {
 
 // ── 8) Sales & Bookings ───────────────────────────────────────────────────────
 export function SalesBookingsDash({ branch }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, range).data || {};
   const igp = useInvoiceGP(branch, range).data || {};
@@ -397,7 +397,7 @@ export function SalesBookingsDash({ branch }) {
 
 // ── 9) Supplier / Purchase ────────────────────────────────────────────────────
 export function SupplierPurchaseDash({ branch }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, range).data || {};
   const igp = useInvoiceGP(branch, range).data || {};
@@ -423,7 +423,7 @@ export function SupplierPurchaseDash({ branch }) {
 
 // ── 10) Tax & Compliance ──────────────────────────────────────────────────────
 export function TaxComplianceDash({ branch }) {
-  const p = usePeriod('mtd'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const tax = useTaxSummary(branch, range).data || {};
   return (
@@ -445,7 +445,7 @@ export function TaxComplianceDash({ branch }) {
 
 // ── 11) Expenses ──────────────────────────────────────────────────────────────
 export function ExpensesDash({ branch }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const pl = useProfitAndLoss(branch, range).data || {};
   const total = pl?.indirect?.debitTotal || 0;
@@ -514,7 +514,7 @@ const stLabel = (s) => ({ met: '✓ Met', warn: '⚠ Near', short: '✗ Short', 
 
 // ── 13/14/15) Sales / GP / Collections vs Target ──────────────────────────────
 export function VsTargetDash({ branch, metric = 'sales' }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const d = useTargetsVsActual(branch, metric, { ...range, fy: fyStr() }).data || {};
   const t = d.totals || {}, rows = d.rows || [];
@@ -547,7 +547,7 @@ export function VsTargetDash({ branch, metric = 'sales' }) {
 
 // ── 16) Budget vs Expense ─────────────────────────────────────────────────────
 export function BudgetVsExpenseDash({ branch }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const d = useBudgetVsActual(branch, { ...range, fy: fyStr() }).data || {};
   const t = d.totals || {}, rows = d.rows || [];

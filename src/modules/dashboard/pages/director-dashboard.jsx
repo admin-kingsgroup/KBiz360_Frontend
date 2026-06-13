@@ -36,7 +36,7 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
 
   // Live owner widgets (GP-by-module, balance sheet, ageing, cash) — respect period + scope.
   const branchArg = scope && scope !== 'ALL' ? { code: scope } : 'ALL';
-  const [period, setPeriod] = React.useState(() => periodRange('cfy', { branch: branchArg }));
+  const [period, setPeriod] = React.useState(() => periodRange('all', { branch: branchArg }));
   const dates = period; // { from, to, label }
   const { data, totalCashInr, isLoading } = useDirectorDashboard({ scope, from: period.from, to: period.to });
   const mpl = useModulePL(branchArg, dates).data || {};
@@ -61,7 +61,7 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
 
   const Controls = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '4px 0 14px' }}>
-      <PeriodBar branch={branchArg} defaultPreset="cfy" onChange={setPeriod} />
+      <PeriodBar branch={branchArg} defaultPreset="all" onChange={setPeriod} />
       <select value={scope} onChange={(e) => setScope(e.target.value)} style={{ padding: '7px 10px', fontSize: 12, fontWeight: 700, border: `1px solid ${C.border}`, borderRadius: 6, background: '#fff', color: C.dark }}>
         <option value="ALL">All branches</option>
         {BRANCHES.filter((b) => b.code).map((b) => <option key={b.code} value={b.code}>{b.code} — {b.city}</option>)}

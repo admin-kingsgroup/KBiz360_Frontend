@@ -39,7 +39,7 @@ export function PLSide({ lines, total, periodLabel, onPick, title = 'Particulars
           <th style={{ ...th, textAlign: 'right' }}>{periodLabel}</th>
         </tr></thead>
         <tbody>
-          {lines.map((l, i) => <PLLines key={i} line={l} onPick={onPick} branch={branch} from={from} to={to} />)}
+          {(lines || []).map((l, i) => <PLLines key={i} line={l} onPick={onPick} branch={branch} from={from} to={to} />)}
         </tbody>
         <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
           <td style={{ ...tdName, fontWeight: 800 }}>Total</td>

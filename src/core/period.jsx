@@ -65,7 +65,7 @@ const C = { dark: '#0d1326', gold: '#d4a437', dim: '#5a6691', border: '#d6dbe6' 
 
 // Drop-in selector. Owns preset + custom dates; calls onChange({from,to,label,preset})
 // whenever the effective range changes (incl. on mount). Date inputs stay editable.
-export function PeriodBar({ branch, defaultPreset = 'cfy', onChange, compact = false }) {
+export function PeriodBar({ branch, defaultPreset = 'all', onChange, compact = false }) {
   const [preset, setPreset] = useState(defaultPreset);
   const [custom, setCustom] = useState(null); // { from, to } when user edits dates
   const inc = useInception(branch).data?.from;

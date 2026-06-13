@@ -242,7 +242,7 @@ export function BankReco({branch}){
             {bankLedgers.length===0&&<option value="">{ledgersLoading?"Loading banks…":"No bank ledgers"}</option>}
             {bankLedgers.map(b=><option key={b.code||b.name} value={b.name}>{b.name}{b.currency&&b.currency!=="INR"?` (${b.currency})`:""}</option>)}
           </select>
-          <PeriodBar branch={branch} compact defaultPreset="mtd" onChange={(r)=>{setFrom(r.from);setTo(r.to);}}/>
+          <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r)=>{setFrom(r.from);setTo(r.to);}}/>
           <button onClick={runAutoMatch} disabled={!ledger||autoMut.isPending} style={{...btnG,fontSize:11,opacity:(!ledger||autoMut.isPending)?0.6:1}}><RefreshCw size={12}/> {autoMut.isPending?"Matching…":"Auto-match"}</button>
           <button onClick={()=>setShowImport(s=>!s)} disabled={!ledger} style={{...btnGh,fontSize:11,opacity:!ledger?0.6:1}}><Upload size={12}/> Import</button>
           <button onClick={exportRecon} disabled={!ledger} style={{...btnGh,fontSize:11,opacity:!ledger?0.6:1}}><Download size={12}/> Export</button>
@@ -657,7 +657,7 @@ export function LedgerAc({branch}){
           <select value={ledger} onChange={e=>setLedger(e.target.value)} style={{...inp,width:200,minHeight:32,fontSize:11}}>
             {LEDGERS.map(l=><option key={l}>{l}</option>)}
           </select>
-          <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r)=>{setDateFrom(r.from);setDateTo(r.to);}}/>
+          <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r)=>{setDateFrom(r.from);setDateTo(r.to);}}/>
         </div>
       </div>
       <div style={{...card,padding:0,overflow:"hidden"}}>

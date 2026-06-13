@@ -203,7 +203,7 @@ export function RPT_InterbranchElim() {
           <p style={{ margin: '3px 0 0', fontSize: 12, color: '#5a6691' }}>Group consolidation · Inter-Branch Sundry Debtors ⇄ Sundry Creditors · reconciled & auto-eliminated</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <PeriodBar branch="ALL" defaultPreset="cfy" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
+          <PeriodBar branch="ALL" defaultPreset="all" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
           <button onClick={() => window.print()} style={xBtn}>📄 PDF</button>
           <button onClick={() => window.print()} style={xBtn}>🖨 Print</button>
           <button onClick={doExcel} style={xBtn}>📊 Excel</button>

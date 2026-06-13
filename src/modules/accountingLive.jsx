@@ -94,7 +94,7 @@ const daysAgoISO = (n) => { const t = new Date(); return isoDate(new Date(t.getF
 // Defaults are owned by each caller (most seed `monthStartISO()`→`todayISO()`).
 // Uniform period selector (All/Today/Week/MTD/QTD/LFY/CFY + dates, per-branch FY).
 export function DateRange({ from, to, setFrom, setTo, branch }) {
-  return <PeriodBar branch={branch} compact defaultPreset="mtd" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />;
+  return <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />;
 }
 
 function Banner({ tone = 'info', children }) {
@@ -278,7 +278,7 @@ const weekStartISO = () => { const t = new Date(); const back = (t.getDay() + 6)
 // This Week · This Month · This Quarter · YTD · Current FY · All) — used by the
 // Cash Book and other primary Finance books.
 function RangeBar({ from, to, setFrom, setTo, onChange, full, branch }) {
-  return <PeriodBar branch={branch} compact defaultPreset="today" onChange={(r) => { setFrom(r.from); setTo(r.to); onChange && onChange(); }} />;
+  return <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => { setFrom(r.from); setTo(r.to); onChange && onChange(); }} />;
 }
 
 // Search box — filters the current report by any free text (narration, ledger,
@@ -1097,7 +1097,7 @@ export function ReportPnLLive({ branch }) {
       title="Profit & Loss Account"
       sub={`${branchLabel(branch)}${from || to ? ` · ${from || '…'} → ${to || '…'}` : ' · all periods'}`}
       right={<>
-        <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
+        <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
       </>}
     >
       <State q={q} empty={!d}>

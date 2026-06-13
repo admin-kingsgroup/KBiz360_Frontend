@@ -27,7 +27,7 @@ import { PeriodBar } from '../core/period';
 import { BRANCHES } from '../core/data';
 import { fmtINR } from '../core/format';
 import { openLedgerModal } from '../core/LedgerModalHost';
-import { CUR_FY, CUR_QUARTER, CUR_MONTH, todayISO, fmtDate, monthLabel, fyQuarterOf } from '../core/dates';
+import { CUR_FY, CUR_QUARTER, CUR_MONTH, ALL_TIME_FROM, todayISO, fmtDate, monthLabel, fyQuarterOf } from '../core/dates';
 import { cardStyle } from '../core/helpers';
 import { RPT_thStyle, RPT_tdStyle } from '../core/styles';
 import { exportToExcel } from '../core/exportExcel';
@@ -106,8 +106,8 @@ const TABS = [
 ];
 
 export function SalesGpAnalytics({ branch }) {
-  const [preset, setPreset] = useState('ytd');
-  const [from, setFrom] = useState(CUR_FY.startISO);   // default: FY start → today
+  const [preset, setPreset] = useState('all');
+  const [from, setFrom] = useState(ALL_TIME_FROM);     // default: inception → today (data may sit in a prior FY)
   const [to, setTo]     = useState(todayISO());
   const [tab, setTab]   = useState('category');
   const [view, setView] = useState('summary');          // summary | detailed
@@ -253,7 +253,7 @@ export function SalesGpAnalytics({ branch }) {
 
       {/* time filters */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-        <PeriodBar branch={branch} defaultPreset="cfy" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
+        <PeriodBar branch={branch} defaultPreset="all" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
         <span style={{ width: 1, height: 22, background: '#e1e3ec' }} />
         <button onClick={() => setView('summary')} style={tBtn(view === 'summary')}>Summary</button>
         <button onClick={() => setView('detailed')} style={tBtn(view === 'detailed')}>Detailed</button>
