@@ -617,6 +617,11 @@ function JournalView({ id, cur }) {
   if (!data) return null;
   return (
     <div>
+      {data.balanced === false && (
+        <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#A32D2D', fontSize: 11.5, fontWeight: 700 }}>
+          ⚠ This booking is out of balance (Debit ≠ Credit) and <b>cannot be approved</b>. Fix the SO/PO figures (Edit) so each side balances before approving.
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 10, fontSize: 11.5, color: '#5a6691' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'monospace', fontWeight: 700, color: BLUE }}><Link2 size={13} /> {data.linkNo}</span>
         <span>Gross Profit: <b style={{ color: DR }}>{cur} {fmt(data.gp?.total)}</b> ({data.gp?.pct ?? 0}%)</span>
