@@ -44,17 +44,16 @@ const tfTd = { borderTop: '1.5px solid ' + DARK, padding: '8px 6px', fontWeight:
 /* ════════════════════════════════════════════════════════════════════════════
    SO / PO / GP Voucher entry
    ════════════════════════════════════════════════════════════════════════════ */
-// Load a saved booking row into the Edit grid. Drop ONLY the purchase (input) GST
-// override (psvcGst) for non-package modules so opening Edit RECOMPUTES the input
-// GST from the current premium/fare + supplier service — this is the field that was
-// being mis-entered (e.g. insurance premium at the wrong %). Sale-side overrides
-// (svcGst/mkGst, i.e. service & markup output GST) are KEPT: recomputing them would
-// change the output-GST/markup treatment, which is a deliberate per-booking figure,
-// not a calculation bug. Holiday package keeps its manual psvcGst too.
+// Load a saved booking row into the Edit grid. For non-package modules every GST
+// cell (input GST, service GST, markup GST) is auto-computed and read-only, so drop
+// psvcGst / svcGst / mkGst on load → opening Edit RECOMPUTES all GST from the current
+// premium/fare, supplier service, service charge and markup (markup is GST-inclusive
+// at the module rate). This keeps GST always correct and prevents a suppressed
+// (e.g. 0) markup GST being carried forward. Holiday package keeps its manual GST.
 function loadLineForEdit(spec, row) {
   const line = normalizeLine(spec, row);
   if (spec && spec.model === 'package') return line;
-  const { psvcGst, ...rest } = line;
+  const { psvcGst, svcGst, mkGst, ...rest } = line;
   return rest;
 }
 
