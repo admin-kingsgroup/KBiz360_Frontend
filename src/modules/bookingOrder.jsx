@@ -17,6 +17,7 @@ import { PeriodBar, periodRange } from '../core/period';
 import { openPrintPreview } from '../core/PrintPreview';
 import { buildBookingInvoice } from '../core/invoiceHtml';
 import { apiGet, apiPost, apiPut } from '../core/api';
+import { AuditTrail } from '../core/AuditTrail';
 import { useLedgerRegistry } from '../core/useReference';
 import { useHotkey } from '../core/ux/hotkeys';
 import { toast } from '../core/ux/toast';
@@ -123,6 +124,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     && (isNoSupp || (totals.po.total > 0 && hasSuppLedger));
 
   const save = async (thenApprove = false) => {
+    // Editing an existing booking requires a reason (saved to the audit trail).
+    let editReason = '';
+    if (editing) {
+      editReason = window.prompt('Reason for editing this SO/PO/GP voucher? (required — saved to the audit trail)') || '';
+      if (!editReason.trim()) { setError('Edit cancelled — a reason is required.'); return; }
+    }
     setError(''); setSaving(true);
     try {
       const gpLines = lines.map((l) => {
@@ -130,6 +137,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         return { fn: l.fn, sn: l.sn, finalSales: c.finalSales, salesGST: c.salesGST, finalPurchase: c.finalPurchase, gstPur: c.gstPur, gp: c.gp, gpPct: c.gpPct };
       });
       const payload = {
+        ...(editing ? { editReason } : {}),
         module: moduleCode, branch: brCode, date, noSupplier: isNoSupp,
         customer: { name: customer.name, gstin: customer.gstin, address: customer.address, email: customer.email, contact: customer.contact, group: customer.group, ledgerName: customer.ledgerName || customer.name, ledgerGroup: customer.ledgerGroup || customer.group },
         supplier: isNoSupp ? { name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }
@@ -979,8 +987,11 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   const canDelete = isAdminRole(currentUser);
   const inRange = (dt) => (!range.from || dt >= range.from) && (!range.to || dt <= range.to);
 
+  // Bookings edited ≥ once (cross-cuts status) — its own source for the Edited tab.
+  const editedQ = useQuery({ queryKey: ['booking-edited', brCode], queryFn: () => apiGet('/api/booking-orders/edited', { branch: brCode === 'ALL' ? '' : brCode }) });
+  const editedRows = (editedQ.data || []).filter((r) => inRange(r.date || ''));
   const bucket = (b) => (b.status === 'posted' ? 'approved' : b.status);
-  const counts = { pending: 0, approved: 0, rejected: 0, deleted: 0 };
+  const counts = { pending: 0, approved: 0, rejected: 0, deleted: 0, edited: editedRows.length };
   data.forEach((b) => { if (counts[bucket(b)] !== undefined && inRange(b.date || '')) counts[bucket(b)]++; });
   const rows = data.filter((b) => bucket(b) === status && inRange(b.date || ''));
   const allIds = rows.map((b) => b.id);
@@ -1032,7 +1043,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
         <button onClick={() => setRoute && setRoute('/bookings/new')} style={btnG}><Plus size={14} /> New voucher</button>
       </div>
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 10 }}>
-        <div style={{ display: 'flex', borderBottom: '1px solid #e1e3ec', flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}</div>
+        <div style={{ display: 'flex', borderBottom: '1px solid #e1e3ec', flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}</div>
       </div>
       {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, padding: '8px 12px', color: msg.startsWith('⚠') ? '#A32D2D' : '#27500A', background: msg.startsWith('⚠') ? '#FCEBEB' : '#EAF3DE', border: '1px solid ' + (msg.startsWith('⚠') ? '#F7C1C1' : '#cde3b6') }}>{msg}</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -1044,7 +1055,54 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
           </span>
         )}
       </div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={setEditing} onDelete={onDelete} canDelete={canDelete} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: buildBookingInvoice(b, side, branch, master) }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
+      {status === 'edited'
+        ? <EditedBookingsList rows={editedRows} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
+        : <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={setEditing} onDelete={onDelete} canDelete={canDelete} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: buildBookingInvoice(b, side, branch, master) }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />}
+    </div>
+  );
+}
+
+// The "Edited" tab body for SO/PO/GP — one row per booking edited ≥ once, expanding
+// to its full audit timeline (who/when/why + field-level changes + full snapshot) and
+// the live JV. Cross-cuts status: an approved booking that was later edited shows here.
+function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
+  const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#5a6691', textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: '2px solid #e1e3ec', whiteSpace: 'nowrap' };
+  const td = { padding: '7px 10px', borderBottom: '1px solid #f4f6fa', fontSize: 12, whiteSpace: 'nowrap' };
+  if (isLoading) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#8b94b3' }}>Loading edited bookings…</div>;
+  if (!rows.length) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#8b94b3' }}>No edited bookings in this period.</div>;
+  const fmtAt = (s) => { const d = new Date(s); return isNaN(d) ? (s || '—') : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  return (
+    <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr>{['', 'Booking No', 'Link No', 'Module', 'Customer', 'Sale', 'Status', 'Edits', 'Last edited', 'Last reason'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+        <tbody>
+          {rows.map((r) => {
+            const isOpen = open === 'edit:' + r.id;
+            return (
+              <React.Fragment key={r.id}>
+                <tr onClick={() => setOpen(isOpen ? null : 'edit:' + r.id)} style={{ cursor: 'pointer', background: isOpen ? '#fbfcfe' : '#fff' }}>
+                  <td style={{ ...td, color: GOLD, fontWeight: 800 }}>{isOpen ? '▾' : '▸'}</td>
+                  <td style={{ ...td, fontWeight: 700, color: BLUE }}>{r.bookingNo}</td>
+                  <td style={{ ...td, fontFamily: 'monospace', color: '#5a6691' }}>{r.linkNo || '—'}</td>
+                  <td style={td}>{r.module}</td>
+                  <td style={{ ...td, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.customer || '—'}</td>
+                  <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{cur} {Math.round(r.saleTotal || 0).toLocaleString('en-IN')}</td>
+                  <td style={td}><span style={{ fontSize: 10.5, fontWeight: 700, color: '#5a6691', textTransform: 'capitalize' }}>{r.status}</span></td>
+                  <td style={{ ...td, textAlign: 'center' }}><span style={{ fontSize: 10.5, fontWeight: 800, padding: '2px 8px', borderRadius: 20, background: '#FFF6D6', color: '#8a6d12' }}>{r.edits}{r.preAudit ? '*' : ''}</span></td>
+                  <td style={td}>{r.lastBy || 'unknown'} · {fmtAt(r.lastAt)}</td>
+                  <td style={{ ...td, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', color: '#5a6691' }} title={r.lastReason || ''}>{r.lastReason || (r.preAudit ? '— pre-audit —' : '—')}</td>
+                </tr>
+                {isOpen && (
+                  <tr><td colSpan={10} style={{ padding: 12, background: '#f7f8fb', borderBottom: '1px solid #e1e3ec' }}>
+                    <div style={{ fontWeight: 800, fontSize: 12, color: DARK, marginBottom: 8 }}>Audit trail — {r.bookingNo}</div>
+                    <AuditTrail entityType="booking" entityId={r.id} />
+                  </td></tr>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

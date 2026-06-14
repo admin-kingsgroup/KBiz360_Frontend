@@ -4,6 +4,9 @@
 // here as PENDING and hit the books only when approved.
 // Single nested sheet: Group › Sub-group › Ledger › Entry (collapsible).
 import React, { useMemo, useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { apiGet } from '../core/api';
+import { AuditTrail } from '../core/AuditTrail';
 import { VoucherView } from './pnlTally';
 import { openPrintWindow } from '../core/voucher-print';
 import { useModalEsc } from '../core/ux/useModalEsc';
@@ -58,7 +61,14 @@ export function VoucherApprovals({ branch }) {
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
   const q = useVoucherApprovals(branch, status, { from: range.from, to: range.to });
   const d = q.data || {};
-  const counts = d.counts || { pending: { n: 0, amount: 0 }, approved: { n: 0, amount: 0 }, rejected: { n: 0, amount: 0 }, deleted: { n: 0, amount: 0 } };
+  // Vouchers edited ≥ once (cross-cuts status) — its own source for the Edited tab.
+  const brCode = (bc(branch) || {}).code || (typeof branch === 'string' ? branch : '') || '';
+  const editedQ = useQuery({ queryKey: ['voucher-edited', brCode], queryFn: () => apiGet('/api/vouchers/edited', { branch: brCode === 'ALL' ? '' : brCode }) });
+  const editedRows = editedQ.data || [];
+  const counts = {
+    ...(d.counts || { pending: { n: 0, amount: 0 }, approved: { n: 0, amount: 0 }, rejected: { n: 0, amount: 0 }, deleted: { n: 0, amount: 0 } }),
+    edited: { n: editedRows.length, amount: editedRows.reduce((s, r) => s + (r.total || 0), 0) },
+  };
   const entries = d.entries || [];
   const approve = useApproveVoucher();
   const reject = useRejectVoucher();
@@ -277,9 +287,9 @@ export function VoucherApprovals({ branch }) {
 
       <div style={{ ...card, marginBottom: 12 }}>
         <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
-          {tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}
+          {tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}
         </div>
-        <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: '#fafbfe', alignItems: 'center', flexWrap: 'wrap' }}>
+        {status !== 'edited' && <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: '#fafbfe', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden' }}>
             {[['entry', 'Entry wise'], ['voucher', 'Voucher Type wise'], ['tree', 'Group-Subgroup-Ledger-Entry']].map(([v, l]) => (
               <button key={v} onClick={() => setView(v)} style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: view === v ? C.blue : '#fff', color: view === v ? '#fff' : C.dim }}>{l}</button>
@@ -296,9 +306,12 @@ export function VoucherApprovals({ branch }) {
             </>}
           </span>
           {q.isFetching && <span style={{ fontSize: 11, color: C.dim }}>updating…</span>}
-        </div>
+        </div>}
       </div>
 
+      {status === 'edited' ? (
+        <EditedVouchersList rows={editedRows} isLoading={editedQ.isLoading} open={open} setOpen={setOpen} setViewId={setViewId} />
+      ) : (
       <div style={{ ...card }}>
         {q.isLoading ? <div style={{ padding: 28, textAlign: 'center', color: C.dim }}>Loading…</div> : (
           <div style={{ maxHeight: '72vh', overflow: 'auto', fontSize: 12.5 }}>
@@ -381,6 +394,7 @@ export function VoucherApprovals({ branch }) {
           </div>
         )}
       </div>
+      )}
       {(approve.isError || reject.isError || approveAll.isError) && <div style={{ marginTop: 8, color: C.red, fontSize: 12 }}>⚠ {(approve.error || reject.error || approveAll.error)?.message}</div>}
 
       {viewId && (
@@ -394,6 +408,10 @@ export function VoucherApprovals({ branch }) {
               </span>
             </div>
             <div ref={viewRef}><VoucherView id={viewId} cur={cur} /></div>
+            <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}` }}>
+              <div style={{ fontWeight: 800, fontSize: 12, color: C.dark, marginBottom: 8 }}>Audit Trail</div>
+              <AuditTrail entityType="voucher" entityId={viewId} />
+            </div>
           </div>
         </div>
       )}
@@ -415,9 +433,53 @@ export function VoucherApprovals({ branch }) {
   );
 }
 
+// The "Edited" tab body for Vouchers — one row per voucher edited ≥ once, expanding
+// to its full audit timeline (who/when/why + field-level changes + full snapshot).
+// Cross-cuts status: an approved voucher later edited shows here. Click the Vch No to
+// open the full formatted voucher view (which also shows the trail).
+function EditedVouchersList({ rows, isLoading, open, setOpen, setViewId }) {
+  const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: `2px solid ${C.border}`, whiteSpace: 'nowrap' };
+  const td = { padding: '7px 10px', borderBottom: '1px solid #f4f6fa', fontSize: 12, whiteSpace: 'nowrap' };
+  if (isLoading) return <div style={{ ...card, padding: 24, textAlign: 'center', color: C.dim }}>Loading edited vouchers…</div>;
+  if (!rows.length) return <div style={{ ...card, padding: 24, textAlign: 'center', color: C.dim }}>No edited vouchers.</div>;
+  const fmtAt = (s) => { const dd = new Date(s); return isNaN(dd) ? (s || '—') : dd.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  return (
+    <div style={{ ...card }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr>{['', 'Vch No', 'Type', 'Party', 'Total', 'Status', 'Edits', 'Last edited', 'Last reason'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+        <tbody>
+          {rows.map((r) => {
+            const isOpen = open['edit:' + r.id];
+            return (
+              <React.Fragment key={r.id}>
+                <tr style={{ background: isOpen ? '#fbfcfe' : '#fff' }}>
+                  <td onClick={() => setOpen((s) => ({ ...s, ['edit:' + r.id]: !s['edit:' + r.id] }))} style={{ ...td, color: C.gold, fontWeight: 800, cursor: 'pointer' }}>{isOpen ? '▾' : '▸'}</td>
+                  <td onClick={() => setViewId(r.id)} title="View full voucher" style={{ ...td, fontWeight: 700, color: C.blue, cursor: 'pointer', textDecoration: 'underline' }}>{r.vno}</td>
+                  <td style={td}>{VCH[r.category] || r.type}</td>
+                  <td style={{ ...td, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.party || '—'}</td>
+                  <td style={{ ...num, ...td }}>{money(r.total)}</td>
+                  <td style={{ ...td, textTransform: 'capitalize', color: C.dim, fontWeight: 700, fontSize: 10.5 }}>{r.status}</td>
+                  <td style={{ ...td, textAlign: 'center' }}><span style={{ fontSize: 10.5, fontWeight: 800, padding: '2px 8px', borderRadius: 20, background: '#FFF6D6', color: '#8a6d12' }}>{r.edits}{r.preAudit ? '*' : ''}</span></td>
+                  <td style={td}>{r.lastBy || 'unknown'} · {fmtAt(r.lastAt)}</td>
+                  <td style={{ ...td, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', color: C.dim }} title={r.lastReason || ''}>{r.lastReason || (r.preAudit ? '— pre-audit —' : '—')}</td>
+                </tr>
+                {isOpen && (
+                  <tr><td colSpan={9} style={{ padding: 12, background: '#f7f8fb', borderBottom: `1px solid ${C.border}` }}>
+                    <AuditTrail entityType="voucher" entityId={r.id} />
+                  </td></tr>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ─── Unified Approvals ────────────────────────────────────────────────────────
 // One screen for ALL approvals: a top toggle switches between SO/PO/GP bookings
-// and Vouchers; each shows Pending · Approved · Rejected · Deleted.
+// and Vouchers; each shows Pending · Approved · Rejected · Deleted · Edited.
 export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain = 'sopogp' }) {
   // Opened from an Alert deep-link targeting a voucher → start on the Vouchers tab.
   const navFocus = useNavFocusStore((s) => s.focus);

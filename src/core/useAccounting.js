@@ -468,7 +468,18 @@ export function useCreateVoucher() {
 export function useUpdateVoucher() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }) => apiPut(`/api/vouchers/${id}`, body),
+    // An edit reason is mandatory (saved to the audit trail). If the caller didn't
+    // supply one, prompt for it here so EVERY voucher-edit path is covered centrally.
+    mutationFn: ({ id, body }) => {
+      let editReason = body.editReason;
+      if (!editReason || !String(editReason).trim()) {
+        editReason = typeof window !== 'undefined' ? window.prompt('Reason for editing this voucher? (required — saved to the audit trail)') : '';
+        if (editReason == null || !String(editReason).trim()) {
+          return Promise.reject(new Error('Edit cancelled — a reason is required.'));
+        }
+      }
+      return apiPut(`/api/vouchers/${id}`, { ...body, editReason });
+    },
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: ['accounting'] });
       qc.invalidateQueries({ queryKey: ['vouchers'] });
