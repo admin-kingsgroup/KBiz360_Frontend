@@ -622,6 +622,18 @@ function JournalView({ id, cur }) {
           ⚠ This booking is out of balance (Debit ≠ Credit) and <b>cannot be approved</b>. Fix the SO/PO figures (Edit) so each side balances before approving.
         </div>
       )}
+      {Array.isArray(data.errors) && data.errors.length > 0 && (
+        <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#A32D2D', fontSize: 11.5, fontWeight: 700 }}>
+          ⚠ Verification failed — <b>cannot be approved</b>:
+          <ul style={{ margin: '4px 0 0 18px', fontWeight: 600 }}>{data.errors.map((m, i) => <li key={i}>{m}</li>)}</ul>
+        </div>
+      )}
+      {Array.isArray(data.warnings) && data.warnings.length > 0 && (
+        <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#FFF7E6', border: '1px solid #F0C36D', color: '#9a6a00', fontSize: 11.5, fontWeight: 700 }}>
+          ⚠ Please review:
+          <ul style={{ margin: '4px 0 0 18px', fontWeight: 600 }}>{data.warnings.map((m, i) => <li key={i}>{m}</li>)}</ul>
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 10, fontSize: 11.5, color: '#5a6691' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'monospace', fontWeight: 700, color: BLUE }}><Link2 size={13} /> {data.linkNo}</span>
         <span>Gross Profit: <b style={{ color: DR }}>{cur} {fmt(data.gp?.total)}</b> ({data.gp?.pct ?? 0}%)</span>
@@ -722,7 +734,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
               <React.Fragment key={b.id}>
                 <tr onClick={() => setOpen(isOpen ? null : b.id)} style={{ borderBottom: '1px solid #f0f2f7', cursor: 'pointer', background: isOpen ? '#faf7ef' : '#fff' }}>
                   <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{mode === 'pending' && onToggleSel && <input type="checkbox" checked={!!(sel && sel.has(b.id))} onChange={() => onToggleSel(b.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} />}{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
-                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}</td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}{b.validation?.hasErrors ? <span title={(b.validation.errors || []).join(' · ')} style={{ marginLeft: 6, color: '#A32D2D', fontWeight: 800 }}>⚠</span> : b.validation?.hasWarnings ? <span title={(b.validation.warnings || []).join(' · ')} style={{ marginLeft: 6, color: '#9a6a00', fontWeight: 800 }}>⚠</span> : null}</td>
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: BLUE, fontSize: 11.5 }}>{b.linkNo}</td>
                   <td style={{ padding: '8px 12px', fontSize: 12 }}>{sp ? sp.icon + ' ' + sp.name : b.module}</td>
                   {mode === 'approved' || mode === 'deleted' ? (
@@ -745,7 +757,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                     {mode === 'pending' ? (
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button disabled={busyId === b.id} onClick={() => onEdit(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit</button>
-                        <button disabled={busyId === b.id} onClick={() => onApprove(b)} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: DR }}>
+                        <button disabled={busyId === b.id || !!b.validation?.hasErrors} onClick={() => onApprove(b)} title={b.validation?.hasErrors ? 'Verification failed — ' + (b.validation.errors || []).join(' · ') : ''} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: b.validation?.hasErrors ? '#cfd6e4' : DR, cursor: b.validation?.hasErrors ? 'not-allowed' : 'pointer' }}>
                           {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve
                         </button>
                         <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><XCircle size={12} /> Reject</button>

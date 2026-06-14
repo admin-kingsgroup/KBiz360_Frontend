@@ -158,11 +158,15 @@ export function VoucherApprovals({ branch }) {
   const flatTd = { padding: '6px 10px', borderBottom: '1px solid #f4f6fa', whiteSpace: 'nowrap', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis' };
   const ABTN = (col, filled) => ({ padding: '3px 9px', background: filled ? col : '#fff', color: filled ? '#fff' : col, border: filled ? 'none' : `1px solid ${col}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 });
   const ckbox = (e) => (status === 'pending' ? <input type="checkbox" checked={sel.has(e.id)} onChange={() => toggleSel(e.id)} onClick={(ev) => ev.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} /> : null);
+  // Combined blocking alert (preview build error + verification-gate errors) and the
+  // soft warnings, for the narration cell + the Approve tooltip.
+  const alertOf = (e) => [e.error, ...((e.errors) || [])].filter(Boolean).join(' · ');
+  const warnOf = (e) => ((e.warnings) || []).filter(Boolean).join(' · ');
   const actionCell = (e) => (
     status === 'pending' ? (
       <>
         <button onClick={() => setEditId(e.id)} disabled={busy} style={ABTN(C.blue)}>Edit</button>
-        <button onClick={() => doApprove(e.id)} disabled={busy || !e.postable} title={e.postable ? '' : 'Fix the error (Edit) before approving'} style={{ ...ABTN(C.green, true), background: e.postable ? C.green : '#cfd6e4', cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
+        <button onClick={() => doApprove(e.id)} disabled={busy || !e.postable} title={e.postable ? '' : (alertOf(e) || 'Fix the error (Edit) before approving')} style={{ ...ABTN(C.green, true), background: e.postable ? C.green : '#cfd6e4', cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
         <button onClick={() => doReject(e.id)} disabled={busy} style={ABTN(C.red)}>Reject</button>
       </>
     ) : status === 'approved' ? (
@@ -184,7 +188,9 @@ export function VoucherApprovals({ branch }) {
       <td style={{ ...flatTd, color: C.red, fontWeight: 600 }} title={x.crLedger}>{x.crLedger}</td>
       <td style={{ ...flatTd, textAlign: 'right', color: C.blue }}>{x.drAmt ? money(x.drAmt) : ''}</td>
       <td style={{ ...flatTd, textAlign: 'right', color: C.red }}>{x.crAmt ? money(x.crAmt) : ''}</td>
-      <td style={{ ...flatTd, color: e.error ? C.red : C.dim, fontStyle: 'italic' }} title={e.error || e.narration || ''}>{e.error ? `⚠ ${e.error}` : (e.narration || '—')}</td>
+      {(() => { const al = alertOf(e), wn = warnOf(e); return (
+        <td style={{ ...flatTd, color: al ? C.red : wn ? '#9a6a00' : C.dim, fontStyle: 'italic' }} title={al || wn || e.narration || ''}>{al ? `⚠ ${al}` : wn ? `⚠ ${wn}` : (e.narration || '—')}</td>
+      ); })()}
       <td style={{ ...flatTd, textAlign: 'center' }}>{actionCell(e)}</td>
     </tr>
   ); };
@@ -237,7 +243,7 @@ export function VoucherApprovals({ branch }) {
               <td style={{ ...flatTd, color: C.dim }} title={p.subGroup || p.group}>{p.subGroup || p.group}</td>
               <td style={{ ...flatTd, textAlign: 'right', color: C.blue }}>{p.debit ? money(p.debit) : ''}</td>
               <td style={{ ...flatTd, textAlign: 'right', color: C.red }}>{p.credit ? money(p.credit) : ''}</td>
-              <td style={{ ...flatTd, color: C.dim, fontStyle: 'italic' }} title={p.narration || e.narration || ''}>{p.narration || (li === 0 ? (e.error ? `⚠ ${e.error}` : e.narration) : '') || ''}</td>
+              <td style={{ ...flatTd, color: (li === 0 && alertOf(e)) ? C.red : C.dim, fontStyle: 'italic' }} title={p.narration || (li === 0 ? (alertOf(e) || warnOf(e)) : '') || e.narration || ''}>{p.narration || (li === 0 ? (alertOf(e) ? `⚠ ${alertOf(e)}` : warnOf(e) ? `⚠ ${warnOf(e)}` : e.narration) : '') || ''}</td>
               <td style={{ ...flatTd, textAlign: 'center' }}>{li === 0 ? actionCell(e) : ''}</td>
             </tr>
           ));

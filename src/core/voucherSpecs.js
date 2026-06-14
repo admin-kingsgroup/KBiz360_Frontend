@@ -38,6 +38,7 @@ export function tcsApplies(spec, packageType) {
 export const VSPECS = {
   SF: {
     code: 'SF', name: 'Flight', icon: '✈', headerLabel: 'Sector / Airline',
+    tax: { kind: 'service', rate: 18 },
     // Flight bookings capture travel detail PER SECTOR (a passenger's ticket can
     // span several segments). Sectors are entered on the Purchase grid and shown
     // LOCKED on the Sales grid. Fares stay PER PASSENGER (one ticket = one fare),
@@ -62,6 +63,7 @@ export const VSPECS = {
     // Tour-operator package model: 5% GST on the gross package value (no service
     // charge), + 2% TCS u/s 206C(1G) on International packages.
     model: 'package', gstRate: PKG_GST,
+    tax: { kind: 'holiday', rate: 5, tcsRate: 2 },
     tcs: { rate: 2, intlOnly: true },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
@@ -74,6 +76,7 @@ export const VSPECS = {
   },
   SHT: {
     code: 'SHT', name: 'Hotel', icon: '🏨', headerLabel: 'Hotel / City',
+    tax: { kind: 'service', rate: 18 },
     idCols: [
       { key: 'fn', label: 'Guest First' }, { key: 'sn', label: 'Surname' },
       { key: 'htl', label: 'Hotel', kind: 'tkt' }, { key: 'conf', label: 'Conf. No', kind: 'pnr' },
@@ -85,6 +88,7 @@ export const VSPECS = {
   },
   SV: {
     code: 'SV', name: 'Visa', icon: '🛂', headerLabel: 'Country / Embassy',
+    tax: { kind: 'service', rate: 18 },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'country', label: 'Country', kind: 'tkt' }, { key: 'pp', label: 'Passport', kind: 'pnr' },
@@ -96,6 +100,7 @@ export const VSPECS = {
   },
   SI: {
     code: 'SI', name: 'Insurance', icon: '🛡', headerLabel: 'Plan / Insurer',
+    tax: { kind: 'all', rate: 18 },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'plan', label: 'Plan', kind: 'tkt' }, { key: 'pol', label: 'Policy No', kind: 'pnr' },
@@ -107,6 +112,7 @@ export const VSPECS = {
   },
   SC: {
     code: 'SC', name: 'Car Rental', icon: '🚗', headerLabel: 'Route / Vendor',
+    tax: { kind: 'all', rate: 5 },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'veh', label: 'Vehicle', kind: 'tkt' }, { key: 'route', label: 'Route', kind: 'pnr' },
@@ -118,6 +124,7 @@ export const VSPECS = {
   },
   SM: {
     code: 'SM', name: 'Miscellaneous', icon: '📦', headerLabel: 'Service / Vendor',
+    tax: { kind: 'perRow' },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'svc', label: 'Service', kind: 'tkt' }, { key: 'ref', label: 'Ref No', kind: 'pnr' },
@@ -173,14 +180,25 @@ const ovr = (v) => { if (v === undefined || v === null || v === '') return null;
 export const fareSum = (spec, l) => r2(spec.fareCols.reduce((s, c) => s + num(l[c.key]), 0));
 export const gstSvc = (l) => { const o = ovr(l.svcGst);  return r2(o !== null ? o : num(l.ssvc) * GST_RATE); };       // GST on agency service charge
 export const gstMk  = (l) => { const o = ovr(l.mkGst);   return r2(o !== null ? o : num(l.markup) * GST_RATE / (1 + GST_RATE)); }; // GST embedded in GST-incl markup
-export const gstPur = (l) => { const o = ovr(l.psvcGst); return r2(o !== null ? o : num(l.psvc) * GST_RATE); };       // input GST on supplier service
+// Input GST honours the module tax rule (mirrors backend voucherSpecs.gstPur). An
+// override wins; else 'all' modules (Insurance / Car) tax the WHOLE cost (fare +
+// supplier service), 'service' modules tax only the supplier service. Fixes insurance
+// premiums that used to auto-compute 0 GST (psvc-only) instead of rate × premium.
+const moduleRate = (spec) => ((spec && spec.tax && spec.tax.rate != null) ? num(spec.tax.rate) / 100 : GST_RATE);
+export const gstPur = (spec, l) => {
+  const o = ovr(l.psvcGst);
+  if (o !== null) return r2(o);
+  const rate = moduleRate(spec);
+  if (spec && spec.tax && spec.tax.kind === 'all') return r2((fareSum(spec, l) + num(l.psvc)) * rate);
+  return r2(num(l.psvc) * rate);
+};
 
-export const finalPurchase = (spec, l) => r2(fareSum(spec, l) + num(l.psvc) + gstPur(l));
+export const finalPurchase = (spec, l) => r2(fareSum(spec, l) + num(l.psvc) + gstPur(spec, l));
 // Supplier service is NOT passed through to the customer (it's an agency cost), so
 // the sale excludes psvc — that's what makes it reduce GP.
 export const finalSales = (spec, l) => r2(fareSum(spec, l) + num(l.markup) + num(l.ssvc) + gstSvc(l));
 export const salesGST = (l) => r2(gstSvc(l) + gstMk(l));
-export const gpOf = (spec, l) => r2((finalSales(spec, l) - salesGST(l)) - (finalPurchase(spec, l) - gstPur(l)));
+export const gpOf = (spec, l) => r2((finalSales(spec, l) - salesGST(l)) - (finalPurchase(spec, l) - gstPur(spec, l)));
 export const gpPctOf = (spec, l) => { const fs = finalSales(spec, l); return fs > 0 ? r2((gpOf(spec, l) / fs) * 100) : 0; };
 
 // Holiday "package" model (tour-operator): no service charge; Supplier Service GST
@@ -212,7 +230,7 @@ export function lineCalc(spec, l) {
   if (isPkg(spec)) return lineCalcPackage(spec, l);
   return {
     pass: r2(fareSum(spec, l)),
-    gstSvc: gstSvc(l), gstMk: gstMk(l), gstPur: gstPur(l),
+    gstSvc: gstSvc(l), gstMk: gstMk(l), gstPur: gstPur(spec, l),
     finalSales: finalSales(spec, l), finalPurchase: finalPurchase(spec, l),
     salesGST: salesGST(l), gp: gpOf(spec, l), gpPct: gpPctOf(spec, l),
   };
