@@ -622,16 +622,10 @@ function JournalView({ id, cur }) {
           ⚠ This booking is out of balance (Debit ≠ Credit) and <b>cannot be approved</b>. Fix the SO/PO figures (Edit) so each side balances before approving.
         </div>
       )}
-      {Array.isArray(data.errors) && data.errors.length > 0 && (
+      {data.status !== 'approved' && data.status !== 'posted' && Array.isArray(data.errors) && data.errors.length > 0 && (
         <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#A32D2D', fontSize: 11.5, fontWeight: 700 }}>
-          ⚠ Verification failed — <b>cannot be approved</b>:
+          ⚠ Verification failed — <b>cannot be approved</b>. Fix and re-check before approving:
           <ul style={{ margin: '4px 0 0 18px', fontWeight: 600 }}>{data.errors.map((m, i) => <li key={i}>{m}</li>)}</ul>
-        </div>
-      )}
-      {Array.isArray(data.warnings) && data.warnings.length > 0 && (
-        <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#FFF7E6', border: '1px solid #F0C36D', color: '#9a6a00', fontSize: 11.5, fontWeight: 700 }}>
-          ⚠ Please review:
-          <ul style={{ margin: '4px 0 0 18px', fontWeight: 600 }}>{data.warnings.map((m, i) => <li key={i}>{m}</li>)}</ul>
         </div>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 10, fontSize: 11.5, color: '#5a6691' }}>
@@ -734,7 +728,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
               <React.Fragment key={b.id}>
                 <tr onClick={() => setOpen(isOpen ? null : b.id)} style={{ borderBottom: '1px solid #f0f2f7', cursor: 'pointer', background: isOpen ? '#faf7ef' : '#fff' }}>
                   <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{mode === 'pending' && onToggleSel && <input type="checkbox" checked={!!(sel && sel.has(b.id))} onChange={() => onToggleSel(b.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} />}{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
-                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}{b.validation?.hasErrors ? <span title={(b.validation.errors || []).join(' · ')} style={{ marginLeft: 6, color: '#A32D2D', fontWeight: 800 }}>⚠</span> : b.validation?.hasWarnings ? <span title={(b.validation.warnings || []).join(' · ')} style={{ marginLeft: 6, color: '#9a6a00', fontWeight: 800 }}>⚠</span> : null}</td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}{mode === 'pending' && b.validation?.hasErrors ? <span title={(b.validation.errors || []).join(' · ')} style={{ marginLeft: 6, color: '#A32D2D', fontWeight: 800 }}>⚠</span> : null}</td>
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: BLUE, fontSize: 11.5 }}>{b.linkNo}</td>
                   <td style={{ padding: '8px 12px', fontSize: 12 }}>{sp ? sp.icon + ' ' + sp.name : b.module}</td>
                   {mode === 'approved' || mode === 'deleted' ? (
