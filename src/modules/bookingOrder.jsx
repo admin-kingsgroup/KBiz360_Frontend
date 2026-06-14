@@ -44,6 +44,19 @@ const tfTd = { borderTop: '1.5px solid ' + DARK, padding: '8px 6px', fontWeight:
 /* ════════════════════════════════════════════════════════════════════════════
    SO / PO / GP Voucher entry
    ════════════════════════════════════════════════════════════════════════════ */
+// Load a saved booking row into the Edit grid. For every module whose purchase
+// (input) GST is AUTO (all except the Holiday package model, where it's a manual
+// supplier-billed figure), drop the saved psvcGst override so opening Edit
+// RECOMPUTES the input GST from the current premium/fare + supplier service
+// instead of carrying a stale value forward. Sale-side overrides (svcGst/mkGst)
+// are deliberately kept, so the markup/output-GST treatment is unchanged.
+function loadLineForEdit(spec, row) {
+  const line = normalizeLine(spec, row);
+  if (spec && spec.model === 'package') return line;
+  const { psvcGst, ...rest } = line;
+  return rest;
+}
+
 export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null }) {
   const qc = useQueryClient();
   const editing = !!editBooking;
@@ -59,7 +72,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     if (editing) {
       const sp = VSPECS[initModule];
       const rows = Array.isArray(editBooking.rows) ? editBooking.rows : [];
-      return rows.length ? rows.map((r) => normalizeLine(sp, r)) : [blankLine(sp)];
+      return rows.length ? rows.map((r) => loadLineForEdit(sp, r)) : [blankLine(sp)];
     }
     return [blankLine(VSPECS.SF)];   // start blank — no demo rows
   });
