@@ -1,24 +1,69 @@
-// React Query hooks that fetch Sales / Purchase voucher data from the KBiz
-// Books backend, which reads them LIVE from the shared CRM database:
+// React Query hooks that feed the live Sales / Purchase REGISTERS — the
+// purchase-linking picker on the sale-entry form and the BSP settlement report.
 //
-//   Sales    ← CRM TaxInvoice.passengers   (GET /api/crm/sales-tickets?branch=)
-//   Purchase ← CRM Supplier rows           (GET /api/crm/purchases?module=&branch=)
+// These now read the ERP's OWN vouchers (GET /api/vouchers), NOT the CRM bridge.
+// The Sales (S*) and Purchase (P*) legs spawned when an SO/PO/GP booking is
+// approved — plus any manually-entered sale/purchase vouchers — live in the ERP
+// `vouchers` collection under category 'sale' / 'purchase'. We adapt each voucher
+// DTO into the SALES_TICKETS / PURCHASE_REGISTRY shapes the registers expect.
 //
-// The backend reshapes CRM documents into the exact SALES_TICKETS /
-// PURCHASE_REGISTRY shapes, scoped to the caller's tenant (from the JWT).
+//   Sales    ← GET /api/vouchers?category=sale&type=<module>&branch=
+//   Purchase ← GET /api/vouchers?category=purchase&type=<module>&branch=
 //
-// There is NO demo-data fallback: the ERP shows only real data — whatever the
-// CRM holds plus anything entered manually in KBiz. Empty in, empty out.
+// (Previously these read GET /api/crm/sales-tickets and /api/crm/purchases over
+// the shared CRM database; that bridge has been removed — the ERP is the single
+// source of truth for its own books.)
 
 import { useQuery } from '@tanstack/react-query';
 import { apiGet, getAuthToken } from './api';
 
+const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
+
+// One ERP sale voucher → a sales-ticket register row (header-level). The full
+// per-passenger fare breakup, when needed, rides on the voucher's lines/pax.
+export function toSaleRow(v) {
+  return {
+    branch:     v.branch || '',
+    vno:        v.vno || '',
+    date:       v.date || '',
+    customer:   v.billTo || v.party || '',
+    saleAmt:    num(v.total),
+    costCenter: v.costCenter || '',
+    linkNo:     v.linkNo || '',
+  };
+}
+
+// One ERP purchase voucher → a purchase-registry row (used to link a sale to its
+// purchase for GP, and by the BSP settlement math).
+export function toPurchaseRow(v, module) {
+  return {
+    vno:      v.vno || '',
+    branch:   v.branch || '',
+    date:     v.date || '',
+    supplier: v.billTo || v.party || '',
+    ref:      v.againstInvoice || v.linkNo || '',
+    desc:     v.remarks || '',
+    amt:      num(v.total),
+    incentive:    0,
+    incentiveGst: 0,
+    incentiveTds: 0,
+    // Payment status is tracked via allocations, not a flag on the voucher; GP
+    // linking is independent of whether the bill is paid, so every purchase is
+    // available to link.
+    settled:  false,
+    module:   module || v.type || '',
+  };
+}
+
 export function useSalesVouchers({ type, branch } = {}) {
   return useQuery({
-    // Sale tickets are flight-ticket level; the backend filters by branch.
-    // `type` stays in the key only to mirror the caller's signature.
-    queryKey: ['crm', 'sales-tickets', type || 'all', branch || 'all'],
-    queryFn:  () => apiGet('/api/crm/sales-tickets', { branch }),
+    queryKey: ['vouchers', 'sales', type || 'all', branch || 'all'],
+    queryFn: async () => {
+      const params = { category: 'sale', branch };
+      if (type) params.type = type;            // module code (SF/SH/…) = the sale voucher type
+      const rows = await apiGet('/api/vouchers', params);
+      return (rows || []).map(toSaleRow);
+    },
     enabled:  !!getAuthToken(),
     staleTime: 30_000,
   });
@@ -26,16 +71,20 @@ export function useSalesVouchers({ type, branch } = {}) {
 
 export function usePurchaseVouchers({ type, branch } = {}) {
   return useQuery({
-    queryKey: ['crm', 'purchases', type || 'all', branch || 'all'],
-    // `module` (PF/PH/PHT/PC/PV/PI/PM) maps to the CRM supplier_type backend-side.
-    queryFn:  () => apiGet('/api/crm/purchases', { module: type, branch }),
+    queryKey: ['vouchers', 'purchases', type || 'all', branch || 'all'],
+    queryFn: async () => {
+      const params = { category: 'purchase', branch };
+      if (type) params.type = type;            // purchase module code (PF/PH/…) = the purchase voucher type
+      const rows = await apiGet('/api/vouchers', params);
+      return (rows || []).map((v) => toPurchaseRow(v, type));
+    },
     enabled:  !!getAuthToken(),
     staleTime: 30_000,
   });
 }
 
-// Live purchase registry for the given module + branch. Returns [] until the
-// CRM (or manual entry) has data — no demo rows.
+// Live purchase registry for the given module + branch. Returns [] until there
+// is real data (an approved SO/PO/GP purchase leg or a manual entry).
 export function useLivePurchaseRegistry(purchType, branchCode) {
   const q = usePurchaseVouchers({ type: purchType, branch: branchCode });
   return q.data || [];

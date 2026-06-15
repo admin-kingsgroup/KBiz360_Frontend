@@ -16,6 +16,7 @@ import { bc } from './styles';
 import { PeriodBar } from './period';
 import { useLedgerStatement, useOpenBills, useLedgerSplit, useLedgerComponents, branchCode } from './useAccounting';
 import { openPrintPreview } from './PrintPreview';
+import { CONSOLIDATED_LABEL } from './data';
 import {
   esc, fmt, fmtB, dmy, vtLabel, billwiseSide, isBillwiseLedger,
   mapLedger, mapBills, groupByBranch, branchSeg, AGE_BUCKETS, AGE_COLORS, ageingOf,
@@ -449,7 +450,7 @@ function BreakdownBody({ title, rows, loading, maxHeight, hint }) {
 /* ════════════════════════════════════════════════════════════════════════
    PRINT / PDF — same markup + same CSS as the screen, so paper == screen.
    ════════════════════════════════════════════════════════════════════════ */
-function branchLabelOf(branch) { return (!branch || branch === 'ALL') ? 'All branches' : (branch.code || branch); }
+function branchLabelOf(branch) { return (!branch || branch === 'ALL') ? CONSOLIDATED_LABEL : (branch.code || branch); }
 
 // A read-only chip echoing the branch chosen in the top-right global selector —
 // the ledger always shows that branch's data only (consolidated = TK HO Group).
@@ -458,7 +459,7 @@ function showPeriodBranchHint(branch) {
   return (
     <span className="brchip" title="Branch is set by the top-right selector. Consolidated (TK HO Group) shows all branches.">
       <span className="bk">{isAll ? 'Group' : 'Branch'}</span>
-      <span className="bv">{isAll ? 'TK HO — All branches' : branchLabelOf(branch)}</span>
+      <span className="bv">{isAll ? CONSOLIDATED_LABEL : branchLabelOf(branch)}</span>
     </span>
   );
 }

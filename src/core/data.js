@@ -26,6 +26,11 @@ function vDate(){
    ─────────────────────────────────────────────────────────────────── */
 export { BRANCHES, BRANCH_CODES, CURRENCY_META, FX_RATES, ACTIVE_CURRENCIES, VAT_RATE };
 
+/* The ONE display label for the consolidated, all-branch view (branch === 'ALL').
+   Imported by every screen that shows the current scope so the wording can never
+   drift between modules. The underlying selector value stays the string 'ALL'. */
+export const CONSOLIDATED_LABEL = 'Travkings Group (All Branches)';
+
 const _branchObj=(b)=> (b && typeof b==="object") ? b
   : BRANCHES.find(x=>x.code===b) || null;
 
@@ -221,7 +226,7 @@ export const HR_EMPLOYEES_DATA=[];
 
 export const HR_DEPTS=["All","Operations","Sales","Accounts","IT","HR & Admin"];
 
-export const HR_BRANCHES_F=["All","BOM","AMD","NBO","DAR","FBM"];
+export const HR_BRANCHES_F=["All","TKHO","BOM","AMD","NBO","DAR","FBM"];
 
 /* ── Employee Master ──────────────────────────────────────────── */
 

@@ -9,7 +9,7 @@ import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, use
 import { branchCode } from '../core/useAccounting';
 import { PeriodBar } from '../core/period';
 import { exportToCSV } from '../core/business-logic';
-import { BRANCH_CODES, CASH, EXP_ACTUALS, FX_RATES, GP_BILLS, LOAN_REGISTER } from '../core/data';
+import { BRANCH_CODES, CASH, EXP_ACTUALS, FX_RATES, GP_BILLS, LOAN_REGISTER, CONSOLIDATED_LABEL } from '../core/data';
 import { fmt, fmtINR } from '../core/format';
 import { CUR_MONTH, MONTH_OPTIONS, FY_MONTHS, monthLabel, todayISO, fmtDate, CUR_FY, rangeNote } from '../core/dates';
 import { BANK_ACCOUNTS_DATA, GratuityRegister, INVESTMENT_DATA, INVESTMENT_SECTIONS, RECO_QUEUE_DATA, _ADVANCES, cardStyle } from '../core/helpers';
@@ -234,7 +234,7 @@ export function BankReco({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🏦</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Bank Reconciliation</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{code||"All branches"} · Book (ledger) vs Bank statement · auto &amp; manual matching</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{code||CONSOLIDATED_LABEL} · Book (ledger) vs Bank statement · auto &amp; manual matching</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
@@ -774,7 +774,7 @@ export function TrialBalance({branch}){
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Trial Balance</h2>
           <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>
-            {brCode||"Travkings Group"} · YTD to {monthLabel(period)} · Dr = Cr = {cur}{Number(Math.round(totDr)).toLocaleString()}
+            {brCode||CONSOLIDATED_LABEL} · YTD to {monthLabel(period)} · Dr = Cr = {cur}{Number(Math.round(totDr)).toLocaleString()}
           </p>
           <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 FY {CUR_FY.label} year-to-date · {fmtDate(CUR_FY.startISO)} → end of {monthLabel(period)} · use selector to change</p>
         </div>

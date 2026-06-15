@@ -8,7 +8,7 @@ import { Download, Printer, Save, Search } from 'lucide-react';
 import { Bar, Legend, Line } from 'recharts';
 import { exportToCSV } from '../core/business-logic';
 import { exportToExcel } from '../core/exportExcel';
-import { ACTIVE_CURRENCIES, BRANCHES, BRANCH_CODES, CURRENCY_META, MODULE_ICONS } from '../core/data';
+import { ACTIVE_CURRENCIES, BRANCHES, BRANCH_CODES, CURRENCY_META, MODULE_ICONS, CONSOLIDATED_LABEL } from '../core/data';
 import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../core/useReference';
 import { useBalanceSheet, useGpBills, useModulePL, useAgeing, useTaxSummary, useLedgerStatement, useBudgetVsActual } from '../core/useAccounting';
 import { fmt, fmtINR } from '../core/format';
@@ -132,7 +132,7 @@ export function ReportCF({branch}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Cash Flow Statement</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Indirect method · {monthLabel(period)} · {brCode||"All branches"} · live double-entry</p>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Indirect method · {monthLabel(period)} · {brCode||CONSOLIDATED_LABEL} · live double-entry</p>
         </div>
         <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
           {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
@@ -542,7 +542,7 @@ export function ReportGP({branch,setRoute}){
         flexWrap:"wrap",gap:8,marginBottom:12}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326",letterSpacing:"-0.02em"}}>
-            GP Reports — {branch==="ALL"?"Travkings Group":branch?.code+" "+branch?.city}
+            GP Reports — {branch==="ALL"?CONSOLIDATED_LABEL:branch?.code+" "+branch?.city}
           </h2>
           <p style={{margin:"3px 0 0",fontSize:10.5,color:"#5a6691"}}>
             {bills.length} bookings · {cur}{f(totSell)} revenue · {totGPPct}% GP
@@ -949,7 +949,7 @@ export function ReportExpenseBgt({branch,setRoute}){
           <div style={{width:36,height:36,borderRadius:9,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>💰</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Expense BGT vs Actual</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{isAll?`Travkings Group`:brCode} · {viewLabel}</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{isAll?CONSOLIDATED_LABEL:brCode} · {viewLabel}</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
@@ -1277,7 +1277,7 @@ export function MisReport({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"linear-gradient(135deg,#0d1326,#185FA5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"#d4a437",fontWeight:800}}>MIS</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Management Information System</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{PERIODS.find(p=>p.v===period)?.l} · {brCode||"Travkings Group"} · Monday Morning Report</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{PERIODS.find(p=>p.v===period)?.l} · {brCode||CONSOLIDATED_LABEL} · Monday Morning Report</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -2655,7 +2655,7 @@ function _ReportViewerTabbed_legacy(){
           <FL label="Period"><select style={inpStd}><option>Today</option><option>This Week</option><option selected>This Month</option><option>This Quarter</option><option>YTD</option><option>Custom...</option></select></FL>
           <FL label="Date From"><input type="date" defaultValue="2026-05-01" style={inpStd}/></FL>
           <FL label="Date To"><input type="date" defaultValue="2026-05-31" style={inpStd}/></FL>
-          <FL label="Branch"><select multiple size={4} style={{...inpStd,height:90}}><option>All Branches</option><option>BOM</option><option>AMD</option></select></FL>
+          <FL label="Branch"><select multiple size={4} style={{...inpStd,height:90}}><option>All Branches</option><option>TKHO</option><option>BOM</option><option>AMD</option></select></FL>
           <FL label="Customer Type"><select style={inpStd}><option>All</option><option>Corporate Premium</option><option>Corporate Standard</option><option>Individual</option><option>Travel Agent</option></select></FL>
           <FL label="Product Line"><select style={inpStd}><option>All</option><option>Flight</option><option>Holiday</option><option>Hotel</option><option>Visa</option><option>Insurance</option></select></FL>
           <FL label="Cost Center"><select style={inpStd}><option>All</option><option>TK-OPS</option><option>TK-MKT</option></select></FL>
@@ -3177,7 +3177,7 @@ export function RPT_TaxSummary({ branch }) {
   const regime = d?.regime || (cfg.taxType === 'VAT' ? 'VAT' : 'GST');
   const isVat = regime === 'VAT';
   const f = (n) => cur + ' ' + Number(Math.round(n || 0)).toLocaleString('en-IN');
-  const brLabel = (!branch || branch === 'ALL') ? 'All branches' : (branch.code || branch);
+  const brLabel = (!branch || branch === 'ALL') ? CONSOLIDATED_LABEL : (branch.code || branch);
 
   const out = d?.output || { total: 0, lines: [] };
   const inp = d?.input || { total: 0, lines: [] };

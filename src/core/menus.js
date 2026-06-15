@@ -129,7 +129,6 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Investment Register", href:"/finance/investments"},
   ]},
   {label:"Tools & Calculators", children:[
-    {label:"Payment Verification", href:"/finance/verification"},
     {label:"Bank Balance Dashboard", href:"/finance/bank-balance"},
     {label:"Reconciliation Queue", href:"/finance/reco-queue"},
     {label:"TDS Auto-Calculator", href:"/finance/tds-calculator"},
@@ -383,7 +382,7 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
 
 export function getMenu(branch, currentUser){
   const isAll   = branch==="ALL";
-  const isIndia = !isAll && branch?.code && ["BOM","AMD"].includes(branch.code);
+  const isIndia = !isAll && branch?.code && ["TKHO","BOM","AMD"].includes(branch.code);
   const taxSection = isAll ? TAX_ALL : isIndia ? TAX_INDIA : TAX_AFRICA;
   // Map each top-level menu label to its PERM_MODULES group name
   const MENU_TO_GROUP = {

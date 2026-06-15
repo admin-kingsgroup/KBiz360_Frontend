@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { btnG, btnGh } from '../../../../core/styles';
 import { useMobile } from '../../../../core/hooks';
 import { CUR_MONTH_LABEL } from '../../../../core/dates';
+import { CONSOLIDATED_LABEL } from '../../../../core/data';
 
 export function BranchHeader({ branch, branchCode, isIndia, bookingsCount, onNavigate }) {
   const mob = useMobile();
@@ -19,7 +20,7 @@ export function BranchHeader({ branch, branchCode, isIndia, bookingsCount, onNav
     >
       <div>
         <h2 style={{ margin: 0, fontSize: mob ? 16 : 20, fontWeight: 800, color: '#0d1326' }}>
-          {branch === 'ALL' ? 'Group Dashboard' : 'Branch Dashboard'} — {branchCode || 'Travkings Group'}
+          {branch === 'ALL' ? 'Group Dashboard' : 'Branch Dashboard'} — {branchCode || CONSOLIDATED_LABEL}
         </h2>
         <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#5a6691' }}>
           {CUR_MONTH_LABEL} · Live data from {bookingsCount} bookings · {isIndia ? 'GST Regime' : 'VAT Regime'}

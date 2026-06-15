@@ -10,7 +10,7 @@ import { AlertTriangle, ChevronDown, ChevronRight, Download, Lock, Plus, Printer
 import { Cell } from 'recharts';
 import { exportToCSV } from './business-logic';
 import { exportToExcel } from './exportExcel';
-import { ADM_DATA, CASH, FY_TARGETS_DATA, GP_BILLS, HR_EMPLOYEES_DATA, NOTIFICATIONS_DATA, SUBAGENTS, _EXP_BGT_LISTENERS, _EXP_BUDGETS } from './data';
+import { ADM_DATA, CASH, CONSOLIDATED_LABEL, FY_TARGETS_DATA, GP_BILLS, HR_EMPLOYEES_DATA, NOTIFICATIONS_DATA, SUBAGENTS, _EXP_BGT_LISTENERS, _EXP_BUDGETS } from './data';
 import { useLedgerRegistry } from './useReference';
 import { useGpBills } from './useAccounting';
 import { fmt, fmtINR } from './format';
@@ -981,7 +981,7 @@ export function BudgetPlanning({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📊</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Budget vs Actual</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{fy} · {MONTHS}/12 months elapsed · {brCode||"Travkings Group"}</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{fy} · {MONTHS}/12 months elapsed · {brCode||CONSOLIDATED_LABEL}</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -1634,7 +1634,7 @@ export const cardStyle={background:"#fff",border:"1px solid #e1e3ec",borderRadiu
 
 export function DashboardRouter({branch,setRoute,currentUser}){
   const role = currentUser?.role || "Super Admin";
-  if(role==="Director" || role==="Super Admin") return <DirectorDashboard currentUser={currentUser} setRoute={setRoute}/>;
+  if(role==="Director" || role==="Super Admin") return <DirectorDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;
   if(role==="Senior Finance Manager")          return <SrFmDashboard currentUser={currentUser} setRoute={setRoute}/>;
   if(role==="Sr. Accounts Executive")          return <SrAeDashboard currentUser={currentUser} setRoute={setRoute}/>;
   if(role==="Accounts Executive")              return <AcctsExecDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;

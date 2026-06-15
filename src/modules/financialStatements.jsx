@@ -22,9 +22,10 @@ import { ReportPnLLive, ReportBSLive } from './reportsFinancial';
 import { PnLTallyLive } from './pnlTally';
 import { BalanceSheetTallyLive } from './balanceSheetTally';
 import { ScheduleIIIBS, ConsolidatedBS } from './reports';
+import { CONSOLIDATED_LABEL } from '../core/data';
 
 const GOLD = '#A07828', DARK = '#111111', DIM = '#6A6A6A';
-const branchLabelOf = (b) => (!b || b === 'ALL' ? 'TK HO — All branches' : (b.code || b));
+const branchLabelOf = (b) => (!b || b === 'ALL' ? CONSOLIDATED_LABEL : (b.code || b));
 const fmt = (n) => (n ? Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
 const fmtB = (n) => Math.abs(Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dmy = (s) => (s ? String(s).slice(0, 10).split('-').reverse().join('-') : '');

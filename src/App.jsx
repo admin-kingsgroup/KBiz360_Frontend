@@ -42,7 +42,6 @@ import { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } from './mo
 import { ProfitAndLossUnified, BalanceSheetUnified } from './modules/financialStatements';
 import { NotesToFinancials } from './modules/reportsNotes';
 import { CostCenterMasterLive } from './modules/costCentersLive';
-import { PaymentVerificationLive } from './modules/paymentVerification';
 import { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, GroupsMaster, SubGroupsMaster, LedgersMaster } from './modules/mastersLive';
 import { DataImportPage } from './modules/dataImport';
 import { GlobalSearch } from './shell/GlobalSearch';
@@ -338,7 +337,6 @@ export default function KB360App(){
     if(route==="/contra")             return <ContraVoucher branch={branch}/>;
     if(route==="/bank-reco")          return <BankReco/>;
     if(route==="/journal")            return <JournalEntry branch={branch}/>;
-    if(route==="/finance/verification") return <PaymentVerificationLive/>;
     if(route==="/import")               return <DataImportPage currentUser={currentUser}/>;
     if(route==="/day-book")           return <DayBookLive branch={branch}/>;
     if(route==="/finance/cash-book")  return <CashBookLive branch={branch}/>;

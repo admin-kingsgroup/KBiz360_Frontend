@@ -15,7 +15,7 @@ import { useMasterList } from '../core/useMasters';
 import { branchCode } from '../core/useAccounting';
 import { FocusBanner } from '../core/ux/FocusBanner';
 import { useNavFocusStore } from '../core/ux/navFocus';
-import { BRANCH_CODES } from '../core/data';
+import { BRANCH_CODES, CONSOLIDATED_LABEL } from '../core/data';
 
 const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5', GREEN = '#27500A', GOLD = '#A07828', GREY = '#7b86a8';
 const TALLY_ORDER = [
@@ -223,7 +223,7 @@ export function AccountsTreeView({ branch }) {
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
           Branch view
           <select value={branchView} onChange={(e) => setBranchView(e.target.value)} style={{ padding: '6px 9px', borderRadius: 6, border: '1px solid #d6dbe6', fontSize: 12, minWidth: 150 }}>
-            <option value="ALL">All branches (consolidated)</option>
+            <option value="ALL">{CONSOLIDATED_LABEL}</option>
             {BRANCH_CODES.map((b) => <option key={b} value={b}>{b} + Common</option>)}
           </select>
         </label>

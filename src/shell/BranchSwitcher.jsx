@@ -4,14 +4,14 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
-import { BRANCHES } from '../core/data';
+import { BRANCHES, CONSOLIDATED_LABEL } from '../core/data';
 import { Dashboard } from '../modules/dashboard';
 
 export function BranchSwitcher({branch,setBranch,currentUser,light}){
   const [open,setOpen]=useState(false);
   const isAll=branch==="ALL";
   const brFlag=isAll?"🌐":branch?.flag||"🇮🇳";
-  const brLabel=isAll?"Travkings Group":(branch?.code||"BOM")+(branch?.city?" — "+branch.city:"");
+  const brLabel=isAll?CONSOLIDATED_LABEL:(branch?.code||"BOM")+(branch?.city?" — "+branch.city:"");
   const brTagLabel=isAll?"Consolidated":(branch?.isHO?"Main Branch":"Branch");
 
   // Fiori Light vs Dark colors
@@ -54,7 +54,7 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
             // TKHO) even if their stored list is stale; others are filtered to theirs.
             const allowed = (isFull || !userBranches) ? BRANCHES : BRANCHES.filter(b=>userBranches.includes(b.code));
             const includeAll = isFull && allowed.length>1;
-            const list = includeAll ? [...allowed,{code:"ALL",city:"Travkings Group",country:"Consolidated",flag:"🌐",currency:"INR",tax:"MULTI"}] : allowed;
+            const list = includeAll ? [...allowed,{code:"ALL",city:CONSOLIDATED_LABEL,country:"Consolidated",flag:"🌐",currency:"INR",tax:"MULTI"}] : allowed;
             return list;
           })().map(b=>{
             const sel=branch==="ALL"?b.code==="ALL":branch?.code===b.code;
@@ -72,7 +72,7 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
                 <div>
                   <p style={{margin:0,fontSize:11.5,fontWeight:sel?700:400,
                     color:optColor}}>
-                    {b.code==="ALL"?"Travkings Group":b.code+(b.city?" — "+b.city:"")}
+                    {b.code==="ALL"?CONSOLIDATED_LABEL:b.code+(b.city?" — "+b.city:"")}
                   </p>
                   <p style={{margin:0,fontSize:9.5,color:"#64748b"}}>
                     {b.code==="ALL"?"Consolidated":b.isHO?"Main Branch":"Branch"} · {b.currency||b.cur} · {b.tax||b.taxType||""}

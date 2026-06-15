@@ -5,6 +5,7 @@ import { KPICard, WidgetCard } from '../../../core/styles';
 import { fmtINR } from '../../../core/format';
 import { CUR_FY } from '../../../core/dates';
 import { useDirectorDashboard } from '../hooks/use-director-dashboard';
+import { directorScope, scopeBranchArg } from './director-dashboard.scope';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
 import { useDashboardStore } from '../store/dashboard.store';
 import { PeriodBar, periodRange } from '../../../core/period';
@@ -25,17 +26,16 @@ const td = { padding: '6px 10px', fontSize: 12, borderBottom: '1px solid #f3f4f8
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 const m0 = (n) => fmtINR(Math.round(Number(n) || 0));
 
-export function DirectorDashboardPage({ currentUser, setRoute }) {
+export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
   const { navigate } = useDashboardActions(setRoute);
-  const scope = useDashboardStore((s) => s.scope);
-  const setScope = useDashboardStore((s) => s.setScope);
+  const scope = directorScope(branch);
   const compare = useDashboardStore((s) => s.compareLastYear);
   const setCompare = useDashboardStore((s) => s.setCompareLastYear);
   const pinned = useDashboardStore((s) => s.pinnedWidgets);
   const togglePin = useDashboardStore((s) => s.togglePinnedWidget);
 
   // Live owner widgets (GP-by-module, balance sheet, ageing, cash) — respect period + scope.
-  const branchArg = scope && scope !== 'ALL' ? { code: scope } : 'ALL';
+  const branchArg = scopeBranchArg(scope);
   const [period, setPeriod] = React.useState(() => periodRange('all', { branch: branchArg }));
   const dates = period; // { from, to, label }
   const { data, totalCashInr, isLoading } = useDirectorDashboard({ scope, from: period.from, to: period.to });
@@ -62,10 +62,9 @@ export function DirectorDashboardPage({ currentUser, setRoute }) {
   const Controls = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '4px 0 14px' }}>
       <PeriodBar branch={branchArg} defaultPreset="all" onChange={setPeriod} />
-      <select value={scope} onChange={(e) => setScope(e.target.value)} style={{ padding: '7px 10px', fontSize: 12, fontWeight: 700, border: `1px solid ${C.border}`, borderRadius: 6, background: '#fff', color: C.dark }}>
-        <option value="ALL">All branches</option>
-        {BRANCHES.filter((b) => b.code).map((b) => <option key={b.code} value={b.code}>{b.code} — {b.city}</option>)}
-      </select>
+      <span style={{ fontSize: 11, fontWeight: 700, color: C.dim, padding: '7px 0' }}>
+        Scope: {scope === 'ALL' ? 'All branches (Consolidated)' : scope} — set via the branch selector (top-right)
+      </span>
     </div>
   );
 

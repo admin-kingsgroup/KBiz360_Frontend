@@ -517,7 +517,7 @@ export function HOAssetProcurement(){
         <div style={{...cardStyle,marginBottom:14,borderTop:"3px solid #d4a437"}}>
           <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>New Asset Procurement Request</p>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:10}}>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Requesting Branch</label><select style={inp}><option>BOM</option><option>AMD</option></select></div>
+            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Requesting Branch</label><select style={inp}><option>TKHO</option><option>BOM</option><option>AMD</option></select></div>
             <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Category</label><select style={inp}><option>IT Equipment</option><option>Furniture</option><option>Software</option><option>Vehicle</option><option>Capex / Renovation</option><option>Equipment</option></select></div>
             <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Estimated Amount (₹)</label><input type="number" placeholder="0" style={{...inp,fontFamily:"monospace",fontWeight:700}}/></div>
             <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Priority</label><select style={inp}><option>Normal</option><option>High</option><option>Urgent</option></select></div>
@@ -881,7 +881,7 @@ export function StatutoryFilingRegister(){
 export function PeriodLockControl(){
   const [periods,setPeriods]=useState(PERIOD_LOCK_STATE);
   const months=["2026-01","2026-02","2026-03","2026-04","2026-05"];
-  const branches=["BOM","AMD"];
+  const branches=["TKHO","BOM","AMD"];
   const cycle=(branch,month)=>{
     const cur=periods[branch][month];
     const next={open:"soft",soft:"hard",hard:"open"}[cur];

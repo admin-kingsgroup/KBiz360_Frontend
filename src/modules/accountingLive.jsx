@@ -25,6 +25,7 @@ import { pushModal } from '../core/ux/modalStore';
 import { toast } from '../core/ux/toast';
 import { CUR_QUARTER, CUR_FY } from '../core/dates';
 import { PeriodBar } from '../core/period';
+import { CONSOLIDATED_LABEL } from '../core/data';
 import {
   useTrialBalance, useProfitAndLoss, useBalanceSheet, useDayBook,
   useLedgerStatement, useLedgerGroups, useChartOfAccounts, useGroupTree,
@@ -38,7 +39,7 @@ import { hasRegistry } from '../core/voucher/registry';
 const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691', BLUE = '#185FA5', RED = '#A32D2D', GREEN = '#27500A';
 const curOf = (branch) => bc(branch).cur;
 const money = (cur, n) => { const v = Math.round(Number(n) || 0); return v ? cur + v.toLocaleString('en-IN') : '—'; };
-const branchLabel = (branch) => (!branch || branch === 'ALL' ? 'All branches' : (branch.code || branch));
+const branchLabel = (branch) => (!branch || branch === 'ALL' ? CONSOLIDATED_LABEL : (branch.code || branch));
 
 /* ── shared chrome ──────────────────────────────────────────────────── */
 function Page({ title, sub, right, children, wide }) {

@@ -17,6 +17,7 @@ import { VoucherEditor } from './accountingLive';
 import { BookingApprovals } from './bookingOrder';
 import { bc } from '../core/styles';
 import { PeriodBar, periodRange } from '../core/period';
+import { CONSOLIDATED_LABEL } from '../core/data';
 
 // Full rupee amount with Indian grouping — NO Cr/L abbreviation.
 const money = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
@@ -25,7 +26,7 @@ const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', g
 const VCH = { payment: 'Payment', receipt: 'Receipt', contra: 'Contra', journal: 'Journal', 'credit-note': 'Credit Note', 'debit-note': 'Debit Note', 'purchase-expense': 'Purchase Expense' };
 const card = { background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' };
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
-const branchLabel = (b) => (!b || b === 'ALL' ? 'All branches' : (b.code || b));
+const branchLabel = (b) => (!b || b === 'ALL' ? CONSOLIDATED_LABEL : (b.code || b));
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 // Dates arrive mixed (ISO "2026-01-07" and "07-01-2026") — normalise to "07 Jan 2026".
 const fmtDate = (s) => {

@@ -13,6 +13,7 @@ import {
   useTaxSummary, useTrialBalance, useVoucherApprovals, useYearOverYear,
   useBudgetVsActual, useTargetsVsActual, useSalesTargets, useSaveTargets,
 } from '../core/useAccounting';
+import { CONSOLIDATED_LABEL } from '../core/data';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#1f7a3d', amber: '#b8860b', dim: '#5a6691', border: '#e1e3ec', bg: '#f3f4f8' };
 const BRANCHES = [
@@ -40,7 +41,7 @@ function Toolbar({ title, sub, branch, p }) {
       </div>
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <PeriodBar branch={branch} defaultPreset={p && p.def} onChange={p && p.setRange} />
-        <span style={{ fontSize: 11, fontWeight: 700, color: C.blue, background: '#E6F1FB', padding: '4px 9px', borderRadius: 5 }}>{branch === 'ALL' || !branch ? 'All branches' : (branch.code || branch)}</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: C.blue, background: '#E6F1FB', padding: '4px 9px', borderRadius: 5 }}>{branch === 'ALL' || !branch ? CONSOLIDATED_LABEL : (branch.code || branch)}</span>
       </div>
     </div>
   );

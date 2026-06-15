@@ -13,7 +13,7 @@
 /* ── Minimal bootstrap fallbacks (replaced by API data on hydration) ── */
 const FALLBACK_CURRENCY = { INR: { symbol: '₹', name: 'Indian Rupee', toINR: 1 } };
 const FALLBACK_BRANCHES = [
-  { code: 'TKHO', city: 'Head Office',   country: 'India',    flag: '🇮🇳', currency: 'INR', currencies: ['INR'],        isHO: true  },
+  { code: 'TKHO', city: 'Mumbai',        country: 'India',    flag: '🇮🇳', currency: 'INR', currencies: ['INR']                     },
   { code: 'BOM',  city: 'Mumbai',        country: 'India',    flag: '🇮🇳', currency: 'INR', currencies: ['INR']                     },
   { code: 'AMD',  city: 'Ahmedabad',     country: 'India',    flag: '🇮🇳', currency: 'INR', currencies: ['INR']                     },
   { code: 'NBO',  city: 'Nairobi',       country: 'Kenya',    flag: '🇰🇪', currency: 'USD', currencies: ['USD', 'KES']              },

@@ -1665,7 +1665,7 @@ export function EmployeeMasterTabbed(){
           <FL label="Date of Birth"><input type="date" defaultValue="1985-03-22" style={inpStd}/></FL>
           <FL label="Designation"><input defaultValue="Senior Finance Manager (CFO-equivalent)" style={inpStd}/></FL>
           <FL label="Department"><select style={inpStd}><option>Finance</option><option>Operations</option><option>HR</option><option>IT</option></select></FL>
-          <FL label="Branch"><select style={inpStd}><option>BOM</option><option>AMD</option></select></FL>
+          <FL label="Branch"><select style={inpStd}><option>TKHO</option><option>BOM</option><option>AMD</option></select></FL>
           <FL label="Date of Joining"><input type="date" defaultValue="2017-06-01" style={inpStd}/></FL>
           <FL label="Years of Service"><input defaultValue="9 years" readOnly style={{...inpStd,background:"#fafbfd"}}/></FL>
           <FL label="Reporting To"><select style={inpStd}><option value="">— Select —</option></select></FL>

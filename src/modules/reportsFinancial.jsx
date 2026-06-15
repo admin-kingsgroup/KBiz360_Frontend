@@ -33,6 +33,7 @@ import { openPrintPreview } from '../core/PrintPreview';
 import { LedgerActions } from '../core/ledgerActions';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { pushModal } from '../core/ux/modalStore';
+import { CONSOLIDATED_LABEL } from '../core/data';
 
 /* ── palette (SAP Fiori) ─────────────────────────────────────────────── */
 const SAP = {
@@ -48,7 +49,7 @@ const TALLY = { head: '#14396b', titlebar: '#dbe7f5', gold: '#b8860b', green: '#
 
 /* ── number/format helpers ───────────────────────────────────────────── */
 const curOf = (branch) => bc(branch).cur;
-const branchLabel = (branch) => (!branch || branch === 'ALL' ? 'All branches' : (branch.code || branch));
+const branchLabel = (branch) => (!branch || branch === 'ALL' ? CONSOLIDATED_LABEL : (branch.code || branch));
 const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : '—'; };
 const paren = (n) => { const v = Math.round(Number(n) || 0); return v ? `(${v.toLocaleString('en-IN')})` : '—'; };
 const compact = (cur, n) => {

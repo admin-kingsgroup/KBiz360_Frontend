@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, ArrowLeft, Calendar, Check, ChevronDown, Clock, Download, Plus, Printer, Save, Search } from 'lucide-react';
 import { Area, Line } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from '../core/business-logic';
-import { ACTIVE_CURRENCIES, ADM_DATA, BRANCHES, BRANCH_CODES, GP_BILLS, PURCHASE_REGISTRY, SALE_TO_PURCH_MOD, branchCurrencies, branchMainCurrency, genVNo } from '../core/data';
+import { ACTIVE_CURRENCIES, ADM_DATA, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL, GP_BILLS, PURCHASE_REGISTRY, SALE_TO_PURCH_MOD, branchCurrencies, branchMainCurrency, genVNo } from '../core/data';
 import { useAdmReasonCodes, useLedgerRegistry } from '../core/useReference';
 import { useAdmMemos, useCreateAdmMemo, useDisputeAdmMemo, useAcceptAdmMemo, useRejectAdmMemo } from '../core/useAdmMemos';
 import { toast } from '../core/ux/toast';
@@ -2626,7 +2626,7 @@ export function UnmatchedTickets({branch,setRoute}){
           <h1 style={{margin:"3px 0 0",fontSize:mob?16:21,fontWeight:700,
             color:"#0d1326",letterSpacing:"-0.02em"}}>Unmatched Flight Tickets</h1>
           <p style={{margin:"2px 0 0",fontSize:11,color:"#5a6691"}}>
-            Sales vouchers raised but no purchase entry found · {branch==="ALL"?"All branches":branch?.code+" — "+branch?.city}
+            Sales vouchers raised but no purchase entry found · {branch==="ALL"?CONSOLIDATED_LABEL:branch?.code+" — "+branch?.city}
           </p>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -4464,7 +4464,7 @@ export function MultiCurrencyVoucher(){
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,marginBottom:18,paddingBottom:14,borderBottom:"1px solid #f0f2f7"}}>
           <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Voucher Type</label><select style={{...inp,width:"100%"}}><option>Sales Voucher</option><option>Mixed Purchase-Sale</option></select></div>
           <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Date</label><input type="date" defaultValue={todayISO()} style={{...inp,width:"100%"}}/></div>
-          <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Branch</label><select style={{...inp,width:"100%"}}><option>BOM</option><option>AMD</option></select></div>
+          <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Branch</label><select style={{...inp,width:"100%"}}><option>TKHO</option><option>BOM</option><option>AMD</option></select></div>
         </div>
 
         {/* Revenue side */}

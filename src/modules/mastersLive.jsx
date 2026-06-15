@@ -10,7 +10,7 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, X, Download } from 'lucide-react';
 import { card, inp } from '../core/styles';
-import { ACTIVE_CURRENCIES, BRANCH_CODES } from '../core/data';
+import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../core/data';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
 import { SourceBadge } from '../core/LedgerLabel';
 import { branchCode } from '../core/useAccounting';
@@ -471,7 +471,7 @@ export const GroupsMaster = ({ branch }) => {
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
             Branch
             <select value={branchView} onChange={(e) => setBranchView(e.target.value)} style={{ ...inp, fontSize: 12, padding: '7px 9px', width: 'auto', minWidth: 130 }}>
-              <option value="ALL">All branches (consolidated)</option>
+              <option value="ALL">{CONSOLIDATED_LABEL}</option>
               {BRANCH_CODES.map((b) => <option key={b} value={b}>{b} + Common</option>)}
             </select>
           </label>

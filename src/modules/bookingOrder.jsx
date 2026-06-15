@@ -844,8 +844,10 @@ export function PendingBookings({ branch, setRoute }) {
   const [editing, setEditing] = useState(null);
   const [groupBy, setGroupBy] = useState('none');
   const [sel, setSel] = useState(() => new Set());
+  const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
+  const inRange = (dt) => (!range.from || dt >= range.from) && (!range.to || dt <= range.to);
 
-  const rows = data.filter((b) => b.status === 'pending');
+  const rows = data.filter((b) => b.status === 'pending' && inRange(b.date || ''));
   const allIds = rows.map((b) => b.id);
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));

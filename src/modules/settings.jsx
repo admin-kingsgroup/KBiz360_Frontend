@@ -8,7 +8,7 @@ import { AlertTriangle, Download, Lock, Plus, Save, Search, Settings, User, User
 import { Line } from 'recharts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { exportToCSV } from '../core/business-logic';
-import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES } from '../core/data';
+import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../core/data';
 import { apiPost, apiPut, apiDelete } from '../core/api';
 import { useUsersAdmin, useRoles, useCompanyProfiles, useApprovalRules } from '../core/useReference';
 import { useModalEsc } from '../core/ux/useModalEsc';
@@ -688,7 +688,7 @@ export function SettingsUsers(){
                   color:editPerms.branches.length===5?"#fff":"#384677",
                   border:`2px solid ${editPerms.branches.length===5?"#A32D2D":"#e1e3ec"}`}}
                   onClick={()=>setEditPerms(ep=>({...ep,branches:ep.branches.length===5?[]:ALL_BRANCHES}))}>
-                  🌐 Travkings Group
+                  🌐 {CONSOLIDATED_LABEL}
                 </label>
               </div>
             </div>
