@@ -28,7 +28,7 @@ import { exportToExcel } from '../core/exportExcel';
 import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../core/dates';
 import { VoucherEditor } from './accountingLive';
 import { useMobile } from '../core/hooks';
-import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail, stripLeafPrefix } from '../core/pnlDetail';
+import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail, stripLeafPrefix, moduleSideRows } from '../core/pnlDetail';
 import { openPrintPreview } from '../core/PrintPreview';
 import { LedgerActions } from '../core/ledgerActions';
 import { openLedgerModal } from '../core/LedgerModalHost';
@@ -805,6 +805,9 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
           {d && view === 'vertical' && (
             <VerticalPnL d={d} cur={cur} mobile={mobile} branch={branch} to={period.to} tax={tax} pat={pat} periodTxt={classicPeriod} />
           )}
+          {d && view === 'drill' && (
+            <DrillPnL d={d} cur={cur} branch={branch} periodTxt={classicPeriod} />
+          )}
         </StateBox>
         )}
       </div>
@@ -839,7 +842,12 @@ function FioriLedgerRows({ m, heads: headsProp, keyBase, stripPrefix, openHead, 
         <tr key={hk} onClick={hasComps ? () => setOpenHead((s) => ({ ...s, [hk]: !s[hk] })) : undefined}
           style={{ background: '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: hasComps ? 'pointer' : 'default' }}>
           <td style={{ padding: '5px 16px 5px 62px', color: SAP.text, fontWeight: 600 }}>
-            {hasComps ? <Toggle open={ho} /> : <span style={{ display: 'inline-block', width: 21 }} />}{ledgerLabel(h.ledger)}
+            {hasComps ? <Toggle open={ho} /> : <span style={{ display: 'inline-block', width: 21 }} />}
+            <span onClick={(e) => { e.stopPropagation(); openLedgerModal(h.ledger, { invoiceToRegister: true }); }}
+              style={{ cursor: 'pointer', color: SAP.blue, textDecoration: 'underline' }}
+              title="Open Ledger Account — an invoice inside opens its Sales/Purchase Register">
+              {ledgerLabel(h.ledger)}<span style={{ fontWeight: 700 }}> ›</span>
+            </span>
           </td>
           <td style={num}>{salesCol ? inr(h.amount) : ''}</td>
           <td style={num}>{salesCol ? '' : inr(h.amount)}</td>
@@ -882,7 +890,7 @@ function ExpDetailToggle({ view, setView }) {
 function PnlViewSwitcher({ view, setView }) {
   return (
     <div style={{ display: 'inline-flex', background: '#fff', border: `1px solid ${SAP.border}`, borderRadius: 6, overflow: 'hidden' }}>
-      {[['fiori', '▪ SAP Fiori'], ['classic', '▭ Tally Classic'], ['vertical', '▤ Vertical']].map(([id, label]) => (
+      {[['fiori', '▪ SAP Fiori'], ['classic', '▭ Tally Classic'], ['vertical', '▤ Vertical'], ['drill', '⊞ Drill']].map(([id, label]) => (
         <button key={id} onClick={() => setView(id)} style={{ padding: '7px 14px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: view === id ? SAP.blue : '#fff', color: view === id ? '#fff' : SAP.sec }}>{label}</button>
       ))}
     </div>
@@ -901,7 +909,6 @@ const azByName = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'en', 
 // its postings → voucher → edit. Same live data & editor as the Fiori view.
 function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   const [drillModule, setDrillModule] = useState(null);
-  const [drillLedger, setDrillLedger] = useState(null);
   // Collapsible indirect tree: Fixed/Variable buckets default expanded; sub-groups
   // default collapsed (click a sub-group to reveal its ledgers).
   const [openSub, setOpenSub] = useState({});
@@ -986,7 +993,9 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   // (rendered separately) toggles the inline expand without drilling.
   const onRowClick = (r) => {
     if (r.module) setDrillModule(r.module);
-    else if (r.ledger) setDrillLedger(r.ledger);
+    // A GL ledger leaf → its full Ledger Account; a sale/purchase invoice inside
+    // then opens the Sales/Purchase Register (invoiceToRegister).
+    else if (r.ledger) openLedgerModal(r.ledger, { invoiceToRegister: true });
     else if (r.expandable) toggle(r);
   };
 
@@ -1077,7 +1086,6 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
         <span>KBiz360 · live double-entry</span>
       </div>
       {drillModule && <ModuleVoucherDrill module={drillModule} cur={cur} mobile={mobile} onClose={() => setDrillModule(null)} />}
-      {drillLedger && <LedgerVoucherDrill ledger={drillLedger} branch={branch} to={to} cur={cur} mobile={mobile} onClose={() => setDrillLedger(null)} />}
     </div>
   );
 }
@@ -1089,7 +1097,6 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
    Fully drillable (module / ledger / sub-group) exactly like Classic. */
 function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   const [drillModule, setDrillModule] = useState(null);
-  const [drillLedger, setDrillLedger] = useState(null);
   const [openSub, setOpenSub] = useState({});
   const isOpen = (key, defOpen) => (openSub[key] === undefined ? defOpen : openSub[key]);
   const mono = { fontFamily: "'Courier New', Courier, monospace" };
@@ -1123,7 +1130,9 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   const toggle = (r) => setOpenSub((s) => ({ ...s, [r.ekey]: !r.open }));
   const onRowClick = (r) => {
     if (r.module) setDrillModule(r.module);
-    else if (r.ledger) setDrillLedger(r.ledger);
+    // A GL ledger leaf → its full Ledger Account; a sale/purchase invoice inside
+    // then opens the Sales/Purchase Register (invoiceToRegister).
+    else if (r.ledger) openLedgerModal(r.ledger, { invoiceToRegister: true });
     else if (r.expandable) toggle(r);
   };
 
@@ -1215,7 +1224,119 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
         <span>Nett Sales : {inr(nett)}</span>
       </div>
       {drillModule && <ModuleVoucherDrill module={drillModule} cur={cur} mobile={mobile} onClose={() => setDrillModule(null)} />}
-      {drillLedger && <LedgerVoucherDrill ledger={drillLedger} branch={branch} to={to} cur={cur} mobile={mobile} onClose={() => setDrillLedger(null)} />}
+    </div>
+  );
+}
+
+/* ── Drill (stepped-tree) P&L view ────────────────────────────────────────────
+   The hierarchy the user asked for, each level stepped into its OWN column:
+     SALES / PURCHASE ACCOUNTS → Module → Int'l/Domestic → GL Ledger → Component
+   Shown for BOTH sides and ALL modules. Clicking a GL ledger (Base Fare, Taxes,
+   Land Package, Sales Return …) opens its full Ledger Account; inside that, a
+   sale invoice opens the Sales Register and a purchase invoice the Purchase
+   Register (wired via openLedgerModal's `invoiceToRegister`). Reuses the same
+   modulePL data + pnlDetail helpers as Classic/Vertical, so the drill is identical. */
+function DrillPnL({ d, cur, branch, periodTxt }) {
+  const [openSub, setOpenSub] = useState({});
+  const isOpen = (key, defOpen) => (openSub[key] === undefined ? defOpen : openSub[key]);
+  const mono = { fontFamily: "'Courier New', Courier, monospace" };
+  const company = (branch && branch !== 'ALL') ? (branch.code || branch) : 'All Branches — Consolidated';
+  const modules = [...(d.modules || [])].sort((a, b) => azByName(a.name, b.name));
+  const grossProfit = d.bridge?.grossProfit ?? d.totals.gp;
+
+  const allKeys = moduleExpandKeys(modules);
+  const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
+  const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
+  const toggle = (r) => setOpenSub((s) => ({ ...s, [r.ekey]: !isOpen(r.ekey, false) }));
+  // Row click: a GL ledger leaf → its Ledger Account (invoices inside route to the
+  // Sales/Purchase Register); anything else expandable → toggle inline.
+  const onRowClick = (r) => {
+    if (r.ledgerHead && r.ledger) openLedgerModal(r.ledger, { invoiceToRegister: true });
+    else if (r.expandable) toggle(r);
+  };
+
+  // One stepped row — its label sits in the column for its depth (0..3), amount
+  // always in the last column. A caret (when expandable) toggles without drilling.
+  const LABEL_COLS = 4;
+  const Row = ({ r, neg }) => {
+    const lvl = r.level || 0;
+    const isLedger = !!(r.ledgerHead && r.ledger);
+    const clickable = isLedger || r.expandable;
+    const bold = lvl === 0 || r.costCentre;
+    const color = r.component ? '#6a6a6a' : (lvl === 0 || r.costCentre) ? TALLY.head : isLedger ? '#1f3a8a' : '#1a1a1a';
+    const amt = neg ? -Math.abs(r.amount) : r.amount;
+    return (
+      <tr style={{ borderBottom: '1px solid #f5f5f5' }}>
+        {Array.from({ length: LABEL_COLS }).map((_, c) => (
+          <td key={c} onClick={c === lvl && clickable ? () => onRowClick(r) : undefined}
+            className={c === lvl && clickable ? 'cl-drill' : undefined}
+            style={{ padding: '3px 8px', whiteSpace: 'nowrap', cursor: c === lvl && clickable ? 'pointer' : 'default', ...mono }}>
+            {c === lvl && (
+              <span style={{ color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 11.5 : 12.5, fontStyle: r.component ? 'italic' : 'normal' }}>
+                {r.expandable ? <span onClick={(e) => { e.stopPropagation(); toggle(r); }} style={{ color: TALLY.gold, marginRight: 4, cursor: 'pointer' }}>{isOpen(r.ekey, false) ? '▾' : '▸'}</span> : null}
+                {r.icon ? <span style={{ marginRight: 4 }}>{r.icon}</span> : null}
+                {r.component ? '• ' : ''}{r.label}
+                {isLedger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
+              </span>
+            )}
+          </td>
+        ))}
+        <td style={{ padding: '3px 12px', textAlign: 'right', color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 11.5 : 12.5, ...mono }}>{inr(amt)}</td>
+      </tr>
+    );
+  };
+  const GroupHead = ({ txt, val, neg }) => (
+    <tr style={{ background: '#f0f4fa', borderBottom: `2px solid ${TALLY.head}`, borderTop: `2px solid ${TALLY.head}` }}>
+      <td colSpan={LABEL_COLS} style={{ padding: '7px 10px', fontWeight: 800, color: TALLY.head, letterSpacing: 0.4, textTransform: 'uppercase', ...mono }}>{txt}</td>
+      <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 800, color: TALLY.head, ...mono }}>{inr(neg ? -Math.abs(val) : val)}</td>
+    </tr>
+  );
+  const Result = ({ txt, val }) => (
+    <tr style={{ borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}>
+      <td colSpan={LABEL_COLS} style={{ padding: '8px 10px', fontWeight: 800, color: TALLY.head, ...mono }}>{txt}</td>
+      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: TALLY.green, ...mono }}>{inr(val)}</td>
+    </tr>
+  );
+
+  const salesRows = moduleSideRows(modules, 'sales', isOpen);
+  const cogsRows = moduleSideRows(modules, 'cogs', isOpen);
+
+  return (
+    <div className="tally-print-doc" style={{ background: '#fff', border: '1px solid #b0b0b0', borderRadius: 4, overflow: 'hidden', margin: 12, ...mono }}>
+      <style>{`.cl-drill:hover{background:#eef4fb;text-decoration:underline}
+@media print { @page { size: A4 portrait; margin: 8mm; }
+  body * { visibility: hidden !important; }
+  .tally-print-doc, .tally-print-doc * { visibility: visible !important; }
+  .tally-print-doc { position: absolute !important; left: 0; top: 0; width: 100% !important; margin: 0 !important; border: none !important; }
+  .tally-print-doc .cl-noprint { display: none !important; } }`}</style>
+      <div style={{ background: TALLY.titlebar, color: TALLY.head, padding: '5px 12px', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #a9c2e0' }}>
+        <span>KBiz360 Books — {company}</span><span style={{ color: TALLY.gold }}>Profit &amp; Loss A/c · Drill</span>
+      </div>
+      <div style={{ textAlign: 'center', padding: '10px 8px 8px', borderBottom: `2px solid ${TALLY.head}` }}>
+        <div style={{ color: TALLY.head, fontSize: 16, fontWeight: 700 }}>{company}</div>
+        <div style={{ fontSize: 13 }}>Profit &amp; Loss A/c — drill (Group → Module → Int'l/Domestic → Ledger → Component)</div>
+        <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{periodTxt}</div>
+      </div>
+      {allKeys.length > 0 && (
+        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #e3e9f2', background: '#fafbfe' }}>
+          <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
+          <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
+        </div>
+      )}
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, maxWidth: 920, margin: '0 auto', ...mono }}>
+        <colgroup><col style={{ width: 28 }} /><col style={{ width: 200 }} /><col style={{ width: 220 }} /><col /><col style={{ width: 130 }} /></colgroup>
+        <tbody>
+          <GroupHead txt="Sales Accounts" val={d.totals.sales} />
+          {salesRows.map((r, i) => <Row key={'s' + i} r={r} />)}
+          <GroupHead txt="Purchase Accounts (COGS)" val={d.totals.cogs} neg />
+          {cogsRows.map((r, i) => <Row key={'c' + i} r={r} neg />)}
+          <Result txt="Gross Profit (Sales − COGS)" val={grossProfit} />
+        </tbody>
+      </table>
+      <div style={{ background: '#d4d4d4', color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: '1px solid #b0b0b0', ...mono }}>
+        <span>Tap ▸ to step in (Module → Int'l/Domestic → Ledger → fares) · click a ledger (›) → its Ledger Account → an invoice opens the Sales / Purchase Register</span>
+        <span>KBiz360 · live double-entry</span>
+      </div>
     </div>
   );
 }

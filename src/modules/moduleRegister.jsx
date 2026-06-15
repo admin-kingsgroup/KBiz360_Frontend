@@ -9,6 +9,7 @@ import { apiGet } from '../core/api';
 import { branchCode } from '../core/useAccounting';
 import { VSPECS } from '../core/voucherSpecs';
 import { filterBookingsForRegister, bookingTravelDetail } from '../core/registerSearch';
+import { consumePendingRegisterSearch } from '../core/registerNav';
 import { companyProfile } from '../core/referenceCache';
 import { bc } from '../core/styles';
 import { PeriodBar, periodRange } from '../core/period';
@@ -81,7 +82,9 @@ function useBookingsReg(brCode) {
 // mode: 'sales' (Sales Invoice only) · 'purchase' (Purchase Invoice only) · 'both'
 export function ModuleRegister({ branch, mode = 'both' }) {
   const [mod, setMod] = useState('ALL');
-  const [q, setQ] = useState('');
+  // Seed the search when opened from a drill (P&L Ledger Account → invoice), so the
+  // register lands on that one booking; normal navigation starts blank.
+  const [q, setQ] = useState(() => consumePendingRegisterSearch() || '');
   const brCode = branchCode(branch) || 'ALL';
   const { data = [], isLoading } = useBookingsReg(brCode);
   const spec = VSPECS[mod] || {};

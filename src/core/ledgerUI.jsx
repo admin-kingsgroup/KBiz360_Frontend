@@ -148,7 +148,7 @@ export const LEDGER_CSS = `
    ════════════════════════════════════════════════════════════════════════ */
 export function LedgerAccountView({
   name, branch, from: fromProp, to: toProp,
-  showPeriod = true, onPickVoucher, maxHeight = 'calc(100vh - 320px)',
+  showPeriod = true, onPickVoucher, onPickInvoice, maxHeight = 'calc(100vh - 320px)',
 }) {
   // Branch is controlled SOLELY by the top-right global selector (the `branch`
   // prop). BOM selected ⇒ only BOM data; consolidated (TK HO Group) ⇒ all
@@ -229,7 +229,7 @@ export function LedgerAccountView({
         </div>
 
         {q.isLoading && <div className="loading">Loading ledger…</div>}
-        {!q.isLoading && view === 'ledger' && d && <LedgerBody d={d} cur={cur} segmented={!hasBranch} showNarr={showNarr} showDetail={showDetail} onPickVoucher={onPickVoucher} maxHeight={maxHeight} />}
+        {!q.isLoading && view === 'ledger' && d && <LedgerBody d={d} cur={cur} segmented={!hasBranch} showNarr={showNarr} showDetail={showDetail} onPickVoucher={onPickVoucher} onPickInvoice={onPickInvoice} maxHeight={maxHeight} />}
         {!q.isLoading && view === 'bill' && (
           <BillwiseBody side={side} bills={bills} loading={bw.isLoading} hasBranch={hasBranch} group={group} name={name} maxHeight={maxHeight} />
         )}
@@ -241,7 +241,7 @@ export function LedgerAccountView({
 }
 
 /* ── Ledger (T-account) body ─────────────────────────────────────────────── */
-function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, maxHeight }) {
+function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, onPickInvoice, maxHeight }) {
   const opSigned = d.opening.side === 'Dr' ? d.opening.amt : -d.opening.amt;
   let bal = opSigned;
   const closing = d.closing;
@@ -269,9 +269,11 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, ma
       </td>
       <td className="l"><span className="vt">{r.vt}</span></td>
       <td className="l vno">
-        {r.voucherId && onPickVoucher
-          ? <span className="vlink" onClick={() => onPickVoucher({ id: r.voucherId, vno: r.vno })} title="Open voucher">{r.vno}</span>
-          : r.vno}
+        {r.voucherId && onPickInvoice && /sale|purchase/i.test(r.category || '')
+          ? <span className="vlink" onClick={() => onPickInvoice({ id: r.voucherId, vno: r.vno, category: r.category })} title={/purchase/i.test(r.category) ? 'Open in Purchase Register' : 'Open in Sales Register'}>{r.vno}</span>
+          : r.voucherId && onPickVoucher
+            ? <span className="vlink" onClick={() => onPickVoucher({ id: r.voucherId, vno: r.vno })} title="Open voucher">{r.vno}</span>
+            : r.vno}
       </td>
       <td className="num drc">{fmt(r.dr)}</td>
       <td className="num crc">{fmt(r.cr)}</td>

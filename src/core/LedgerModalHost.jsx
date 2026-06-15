@@ -16,6 +16,7 @@ import { LedgerAccountView } from './ledgerUI';
 import { pushModal } from './ux/modalStore';
 import { useDock } from './ux/dock';
 import { VoucherEditor } from '../modules/accountingLive';
+import { openModuleRegister } from './registerNav';
 import { bc } from './styles';
 
 const DARK = '#111111', DIM = '#6A6A6A';
@@ -23,17 +24,20 @@ const DARK = '#111111', DIM = '#6A6A6A';
 // Fire from anywhere to open the maximised ledger. The branch is ALWAYS taken
 // from the top-right global selector (shell) — never passed/overridden here, so
 // no branch data is ever mixed. `from`/`to` are optional period hints.
-export function openLedgerModal(name, { from, to } = {}) {
+// `invoiceToRegister`: when true, clicking a sale/purchase invoice inside the
+// statement opens the Sales/Purchase Register (instead of the voucher editor) —
+// used by the P&L drill so a ledger → invoice lands on its register.
+export function openLedgerModal(name, { from, to, invoiceToRegister } = {}) {
   if (!name) return;
-  try { window.dispatchEvent(new CustomEvent('kb:ledger-modal', { detail: { name, from, to } })); } catch { /* ignore */ }
+  try { window.dispatchEvent(new CustomEvent('kb:ledger-modal', { detail: { name, from, to, invoiceToRegister: !!invoiceToRegister } })); } catch { /* ignore */ }
 }
 
 export function LedgerModalHost({ branch: shellBranch }) {
-  const [job, setJob] = useState(null);          // { name, from, to }
+  const [job, setJob] = useState(null);          // { name, from, to, invoiceToRegister }
   const [voucher, setVoucher] = useState(null);  // { id, vno }
 
   useEffect(() => {
-    const onOpen = (e) => { const d = e.detail || {}; if (d.name) setJob({ name: d.name, from: d.from || '', to: d.to || '' }); };
+    const onOpen = (e) => { const d = e.detail || {}; if (d.name) setJob({ name: d.name, from: d.from || '', to: d.to || '', invoiceToRegister: !!d.invoiceToRegister }); };
     window.addEventListener('kb:ledger-modal', onOpen);
     return () => window.removeEventListener('kb:ledger-modal', onOpen);
   }, []);
@@ -80,6 +84,9 @@ export function LedgerModalHost({ branch: shellBranch }) {
             cur={cur}
             showPeriod
             onPickVoucher={setVoucher}
+            onPickInvoice={job.invoiceToRegister
+              ? (inv) => { close(); openModuleRegister(inv.category, inv.vno); }
+              : undefined}
             maxHeight="calc(100vh - 360px)"
           />
         </div>

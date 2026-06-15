@@ -2,6 +2,7 @@
 import {
   moduleDetailRows, moduleExpandKeys, moduleHasDetail, moduleDetailKey, ledgerDetailKey,
   moduleHasSubs, moduleSubDetailRows, moduleDrillRows, subDetailKey, subLedgerDetailKey, stripLeafPrefix,
+  moduleSideRows,
 } from '../pnlDetail';
 
 const flights = {
@@ -194,6 +195,42 @@ describe('moduleSubDetailRows label stripping', () => {
     const head = rows.find((r) => r.ledgerHead);
     expect(head.label).toBe('Base Fare');     // prefix stripped for display
     expect(head.ledger).toBe('IT-Base Fare'); // drill-through keeps the real ledger
+  });
+});
+
+describe('moduleSideRows (stepped tree)', () => {
+  test('collapsed → one module row per active module, level 0, no drill rows', () => {
+    const rows = moduleSideRows([flights, hotelsNoComps, bare], 'sales', opener(new Set()));
+    // bare (Misc, 0 sales, no heads) is skipped; Flights + Hotels remain
+    expect(rows.map((r) => r.label)).toEqual(['Flights', 'Hotels']);
+    expect(rows.every((r) => r.kind === 'module' && r.level === 0)).toBe(true);
+    expect(rows[0]).toMatchObject({ amount: 15000, expandable: true, open: false });
+  });
+
+  test('a module with an amount but no detail is still shown (non-expandable)', () => {
+    const unspec = { key: 'Unspecified', name: 'Unspecified', sales: -6000, cogs: 0, heads: { sales: [], cogs: [] } };
+    const rows = moduleSideRows([unspec], 'sales', opener(new Set()));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: 'module', amount: -6000, expandable: false });
+  });
+
+  test('open single-leaf module → module(0) → ledger(2) → component(3) levels', () => {
+    const lkey = ledgerDetailKey(flights, 'sales', 'Sales — Air Tickets');
+    const rows = moduleSideRows([flights], 'sales', opener(new Set([moduleDetailKey(flights, 'sales'), lkey])));
+    expect(rows.map((r) => r.level)).toEqual([0, 2, 3, 3]); // module, ledger, 2 components
+    expect(rows[1]).toMatchObject({ ledgerHead: true, level: 2 });
+    expect(rows[2]).toMatchObject({ component: true, level: 3 });
+  });
+
+  test('open multi-leaf module → module(0) → sub-centre(1) levels', () => {
+    const rows = moduleSideRows([flightsSubs], 'sales', opener(new Set([moduleDetailKey(flightsSubs, 'sales')])));
+    expect(rows[0].level).toBe(0);
+    expect(rows.slice(1).filter((r) => r.costCentre).every((r) => r.level === 1)).toBe(true);
+  });
+
+  test('empty / undefined module list → []', () => {
+    expect(moduleSideRows([], 'sales', opener(new Set()))).toEqual([]);
+    expect(moduleSideRows(undefined, 'cogs', opener(new Set()))).toEqual([]);
   });
 });
 

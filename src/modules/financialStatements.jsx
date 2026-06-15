@@ -79,7 +79,7 @@ function TkfStatement({ title, badge, branch, period, kpis = [], sections, resul
                     <tr key={ri} className={r.subtotal ? 'brsub' : undefined}>
                       <td className="l part" style={{ paddingLeft: 10 + (r.indent || 0) * 16, fontWeight: r.subtotal || r.bold ? 800 : (r.ledger ? 400 : 600) }}>
                         {r.ledger
-                          ? <span className="vlink" onClick={() => openLedgerModal(r.ledger)} title="Open ledger account">{r.label}</span>
+                          ? <span className="vlink" onClick={() => openLedgerModal(r.ledger, { invoiceToRegister: true })} title="Open Ledger Account — an invoice inside opens its Sales/Purchase Register">{r.label}</span>
                           : r.label}
                       </td>
                       <td className="num">{fmt(r.amount)}</td>
@@ -230,7 +230,7 @@ export function ProfitAndLossUnified({ branch }) {
   return (
     <div style={wrap}>
       <div style={bar}>
-        <StmtSwitcher value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic'], ['vertical', '▤ Vertical'], ['tally', '𝚺 Tally'], ['tkf', '◆ TKF']]} />
+        <StmtSwitcher value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic'], ['vertical', '▤ Vertical'], ['drill', '⊞ Drill'], ['tally', '𝚺 Tally'], ['tkf', '◆ TKF']]} />
         {view === 'tkf' && <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setTkfPeriod({ from: r.from, to: r.to })} />}
       </div>
       {view === 'tally' ? <PnLTallyLive branch={branch} />

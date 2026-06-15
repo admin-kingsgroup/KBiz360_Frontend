@@ -125,6 +125,35 @@ export function moduleDrillRows(m, side, isOpen, keyPrefix = '') {
 }
 
 /**
+ * Stepped-tree rows for ONE side ('sales' | 'cogs') of every module — a module
+ * row (level 0) followed, when open, by its drill rows (sub-centre = 1, GL ledger
+ * = 2, fare component = 3). Modules with no amount AND no detail on this side are
+ * skipped. Each row carries a numeric `level` so a renderer can place it in its
+ * own stepped column (Module → Int'l/Domestic → Ledger → Component). Reuses
+ * moduleDrillRows so the drill matches the Classic/Vertical views exactly.
+ *   module row → { kind:'module', level:0, label, icon, amount, expandable, ekey, open }
+ *   drill rows → the moduleDrillRows descriptor + { level }
+ */
+export function moduleSideRows(modules, side, isOpen, keyPrefix = '') {
+  const out = [];
+  for (const m of (modules || [])) {
+    const amount = side === 'cogs' ? m.cogs : m.sales;
+    const hasDetail = moduleHasDetail(m, side);
+    if (!amount && !hasDetail) continue;
+    const ekey = moduleDetailKey(m, side, keyPrefix);
+    const open = hasDetail && isOpen(ekey, false);
+    out.push({ kind: 'module', level: 0, label: m.name, icon: m.icon, amount, expandable: hasDetail, ekey, open });
+    if (open) {
+      for (const r of moduleDrillRows(m, side, isOpen, keyPrefix)) {
+        const level = r.component ? 3 : r.costCentre ? 1 : 2; // ledgerHead & any leaf → 2
+        out.push({ ...r, level });
+      }
+    }
+  }
+  return out;
+}
+
+/**
  * Every expand key (module + each sub-centre + each ledger, for the requested
  * sides) across a module list — feed this to "Expand all" so it opens the entire
  * drill, and to "Collapse all" (mapped to false) to close it.

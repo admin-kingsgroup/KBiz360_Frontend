@@ -111,6 +111,14 @@ export default function KB360App(){
   /* Persist the current route so it survives a page refresh. */
   useEffect(()=>{ try{ localStorage.setItem("kb360-route", route); }catch{ /* ignore */ } },[route]);
 
+  /* Open the Sales/Purchase Register from anywhere (e.g. the P&L drill's Ledger
+     Account → invoice). The needle is read by ModuleRegister on mount. */
+  useEffect(()=>{
+    const onOpenRegister=(e)=>{ const r=e.detail&&e.detail.route; if(r) navigate(r); };
+    window.addEventListener("kb:open-register", onOpenRegister);
+    return ()=>window.removeEventListener("kb:open-register", onOpenRegister);
+  },[]);
+
   /* ── Permission helpers ──────────────────────────────────────────
      OPEN ACCESS: every ERP user can see all branches and all modules.
      (Module-level access gating is intentionally disabled.) */
