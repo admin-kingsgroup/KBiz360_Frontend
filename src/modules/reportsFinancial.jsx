@@ -987,7 +987,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   // Indirect Income → group → ledger (drillable), mirroring the expense tree.
   const incomeTreeRows = [...incomeGroups].sort((a, b) => azByName(a.name, b.name)).flatMap((g) => {
     const gk = 'ig:' + g.name;
-    const gOpen = isOpen(gk, false); // group default collapsed → click to reveal ledgers
+    const gOpen = isOpen(gk, true); // shallow tree → default expanded so ledgers are one click from their account
     const ghead = { label: g.name, amount: g.amount, sub: true, expandable: true, ekey: gk, open: gOpen };
     if (!gOpen) return [ghead];
     return [ghead, ...[...(g.ledgers || [])].sort((x, y) => azByName(x.name, y.name)).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))];
@@ -1001,7 +1001,8 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     : allIncomeLedgers.length === 1
       ? [{ label: 'Indirect Income', amount: indIncome, ledger: allIncomeLedgers[0].name, leaf: true }]
       : incomeGroups.length
-        ? [{ label: 'Indirect Income', amount: indIncome, group: true }, ...incomeTreeRows]
+        // Expandable group line(s) → click to reveal each income ledger (its own account).
+        ? incomeTreeRows
         : [{ label: 'Indirect Income', amount: indIncome, ledger: 'Indirect Income', leaf: true }];
   const plRight = [
     { label: 'Gross Profit b/d', amount: grossProfit, result: true },
@@ -1139,7 +1140,7 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   // Indirect-income tree (group → ledger) — every ledger row clickable → its account.
   const incomeRows = incomeGroups.flatMap((g) => {
     const gk = 'ig:' + g.name;
-    const gOpen = isOpen(gk, false);
+    const gOpen = isOpen(gk, true); // shallow tree → default expanded so ledgers are one click from their account
     const ghead = { label: g.name, amount: g.amount, sub: true, expandable: true, ekey: gk, open: gOpen };
     if (!gOpen) return [ghead];
     return [ghead, ...(g.ledgers || []).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))];
@@ -1252,7 +1253,6 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
             : incomeGroups.length
               ? <>
                   <Head txt="Add: Other Income (Indirect Income)" />
-                  <Row r={{ label: 'Indirect Income', amount: indIncome, group: true }} />
                   {incomeRows.map((r, i) => <Row key={'ii' + i} r={r} />)}
                 </>
               : <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome, ledger: 'Indirect Income', leaf: true }} />)}
