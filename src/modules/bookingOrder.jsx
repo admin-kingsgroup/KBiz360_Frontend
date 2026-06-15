@@ -22,7 +22,7 @@ import { useLedgerRegistry } from '../core/useReference';
 import { useHotkey } from '../core/ux/hotkeys';
 import { toast } from '../core/ux/toast';
 import {
-  VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc, isVatBranch,
+  VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc, isVatBranch, rowsFromSnapshots,
 } from '../core/voucherSpecs.js';
 
 const GOLD = '#A07828', DARK = '#0d1326', DR = '#1B6B4C', CR = '#9B2C2C', BLUE = '#185FA5';
@@ -62,23 +62,9 @@ function loadLineForEdit(spec, row) {
 // grid. Bulk-imported / migrated bookings (e.g. Tally summaries) often carry only
 // the so/po/gp totals with an EMPTY `rows`, which used to open Edit as a blank grid
 // — every figure the user had on the voucher "disappeared". Reconstruct each line
-// from the so/po snapshots instead: so.lines carry the fares + markup + service
-// charge, po.lines carry the supplier service. GST is dropped (loadLineForEdit) and
-// recomputed from the rebuilt fares on save, so totals stay correct. Falls back to a
-// single blank line only when there is genuinely no per-line detail anywhere.
-export function rowsFromSnapshots(booking) {
-  const soL = (booking && booking.so && Array.isArray(booking.so.lines)) ? booking.so.lines : [];
-  const poL = (booking && booking.po && Array.isArray(booking.po.lines)) ? booking.po.lines : [];
-  const n = Math.max(soL.length, poL.length);
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const s = soL[i] || {}, p = poL[i] || {};
-    // so line: { ...ids, ...fares, markup, ssvc, … }; po line: { …, psvc }.
-    out.push({ ...p, ...s, psvc: num(p.psvc), markup: num(s.markup), ssvc: num(s.ssvc) });
-  }
-  return out;
-}
-
+// from the so/po snapshots instead (rowsFromSnapshots). GST is dropped
+// (loadLineForEdit) and recomputed from the rebuilt fares on save, so totals stay
+// correct. Falls back to a single blank line only when there is no per-line detail.
 export function rowsForEdit(spec, booking) {
   const rows = (booking && Array.isArray(booking.rows)) ? booking.rows : [];
   if (rows.length) return rows.map((r) => loadLineForEdit(spec, r));

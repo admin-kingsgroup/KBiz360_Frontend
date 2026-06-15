@@ -173,6 +173,26 @@ export function syncLineRefs(spec, line) {
 
 export const seedLines = (spec) => (spec.seed || []).map((s) => ({ ...blankLine(spec), ...s }));
 
+// Rebuild the per-line entry grid from a booking's so/po snapshots. Bulk-imported /
+// migrated bookings (e.g. Tally summaries) can carry the so/po/gp totals with an
+// EMPTY `rows` grid — opening Edit then showed a blank form (every figure on the
+// voucher appeared to vanish). The snapshots still hold per-line detail: so.lines
+// carry the fares + markup + service charge, po.lines carry the supplier service.
+// Zip them back into editable rows; GST is recomputed from these fares on save.
+// Returns [] when there is no per-line detail in either snapshot.
+export function rowsFromSnapshots(booking) {
+  const soL = (booking && booking.so && Array.isArray(booking.so.lines)) ? booking.so.lines : [];
+  const poL = (booking && booking.po && Array.isArray(booking.po.lines)) ? booking.po.lines : [];
+  const n = Math.max(soL.length, poL.length);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const s = soL[i] || {}, p = poL[i] || {};
+    // so line: { ...ids, ...fares, markup, ssvc, … }; po line carries psvc.
+    out.push({ ...p, ...s, psvc: num(p.psvc), markup: num(s.markup), ssvc: num(s.ssvc) });
+  }
+  return out;
+}
+
 // ── Per-line money math (the GST-inclusive engine) ───────────────────────────
 // Each GST honours an explicit per-line override (l.svcGst / l.mkGst / l.psvcGst,
 // e.g. from a bulk import) and otherwise auto-computes; blank/missing → auto.
@@ -302,8 +322,9 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
   ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'total'].forEach((k) => { po[k] = r2(po[k]); so[k] = r2(so[k]); });
   // TCS u/s 206C(1G) — collected from the customer on the sale value (incl GST),
   // on top of the invoice. It's a Balance-Sheet liability, NOT income, so it never
-  // enters the net and the GP is unchanged.
-  if (tcsApplies(spec, packageType)) {
+  // enters the net and the GP is unchanged. India-only — never on Africa/VAT
+  // branches (and moot under Without-VAT).
+  if (!ctx.noVat && !isVatBranch(ctx.branch) && tcsApplies(spec, packageType)) {
     so.tcs = r2(so.total * spec.tcs.rate / 100);
     so.total = r2(so.total + so.tcs);
   }
