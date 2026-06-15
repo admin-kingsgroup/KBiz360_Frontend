@@ -22,7 +22,7 @@ import { useLedgerRegistry } from '../core/useReference';
 import { useHotkey } from '../core/ux/hotkeys';
 import { toast } from '../core/ux/toast';
 import {
-  VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc,
+  VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc, isVatBranch,
 } from '../core/voucherSpecs.js';
 
 const GOLD = '#A07828', DARK = '#0d1326', DR = '#1B6B4C', CR = '#9B2C2C', BLUE = '#185FA5';
@@ -88,6 +88,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // No-supplier mode (Misc only): a sale with no purchase leg — full sale value is
   // income. Hides the Purchase Order + supplier fields and posts only the sale.
   const [noSupplier, setNoSupplier] = useState(editing ? !!editBooking.noSupplier : false);
+  // Without-VAT mode (Africa/VAT branches only): zero-rate the booking tax (e.g.
+  // international air). Ignored on India branches (they always follow module GST).
+  const [noVat, setNoVat] = useState(editing ? !!editBooking.noVat : false);
   // GST mode is set per leg: place of supply can differ (in-state sale → intra,
   // out-of-state supplier purchase → inter). Default sale=intra; on edit, prefer the
   // leg's own stored mode, falling back to the legacy booking-level gstMode.
@@ -109,7 +112,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // No-supplier is only offered on Miscellaneous (sell-without-buy: seats / extra
   // services). Any other module always has a supplier (cost) leg.
   const isNoSupp = moduleCode === 'SM' && noSupplier;
-  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp }), [spec, lines, packageType, isNoSupp]);
+  // "Without VAT" is offered only on Africa/VAT branches; India ignores it.
+  const isVatBr = isVatBranch(brCode);
+  const effNoVat = isVatBr && noVat;
+  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat }), [spec, lines, packageType, isNoSupp, brCode, effNoVat]);
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
 
   const setLine = (i, key, val, numeric) =>
@@ -144,12 +150,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     setError(''); setSaving(true);
     try {
       const gpLines = lines.map((l) => {
-        const c = lineCalc(spec, l);
+        const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
         return { fn: l.fn, sn: l.sn, finalSales: c.finalSales, salesGST: c.salesGST, finalPurchase: c.finalPurchase, gstPur: c.gstPur, gp: c.gp, gpPct: c.gpPct };
       });
       const payload = {
         ...(editing ? { editReason } : {}),
-        module: moduleCode, branch: brCode, date, noSupplier: isNoSupp,
+        module: moduleCode, branch: brCode, date, noSupplier: isNoSupp, noVat: effNoVat,
         customer: { name: customer.name, gstin: customer.gstin, address: customer.address, email: customer.email, contact: customer.contact, group: customer.group, ledgerName: customer.ledgerName || customer.name, ledgerGroup: customer.ledgerGroup || customer.group },
         supplier: isNoSupp ? { name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }
           : { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup },
@@ -307,6 +313,29 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             {noSupplier
               ? 'No purchase leg — the full sale value is income (Sales — Other Services). Gross Profit = 100%.'
               : 'A linked Purchase invoice posts the supplier cost; Gross Profit = sale − cost.'}
+          </span>
+        </div>
+      )}
+
+      {/* Africa/VAT branches: VAT applies at the branch rate by default, OR tick
+          "Without VAT" to zero-rate this booking (e.g. international air). India
+          branches always follow the per-module GST rule, so this is hidden there. */}
+      {isVatBr && (
+        <div style={{ ...card, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: DARK, textTransform: 'uppercase', letterSpacing: '.3px' }}>VAT</span>
+          <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden' }}>
+            {[['with', 'With VAT'], ['without', 'Without VAT']].map(([v, l]) => {
+              const active = (v === 'without') === noVat;
+              return (
+                <button key={v} type="button" onClick={() => setNoVat(v === 'without')}
+                  style={{ padding: '6px 14px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: active ? GOLD : '#fff', color: active ? '#fff' : '#5a6691' }}>{l}</button>
+              );
+            })}
+          </div>
+          <span style={{ fontSize: 10.5, color: '#9A9A9A', fontStyle: 'italic' }}>
+            {noVat
+              ? 'No VAT calculated on this booking (zero-rated).'
+              : `VAT charged at the branch rate on the service charge / margin.`}
           </span>
         </div>
       )}

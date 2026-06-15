@@ -178,20 +178,30 @@ export const seedLines = (spec) => (spec.seed || []).map((s) => ({ ...blankLine(
 // e.g. from a bulk import) and otherwise auto-computes; blank/missing → auto.
 const ovr = (v) => { if (v === undefined || v === null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
 export const fareSum = (spec, l) => r2(spec.fareCols.reduce((s, c) => s + num(l[c.key]), 0));
-export const gstSvc = (l) => { const o = ovr(l.svcGst);  return r2(o !== null ? o : num(l.ssvc) * GST_RATE); };       // GST on agency service charge
-export const gstMk  = (l) => { const o = ovr(l.mkGst);   return r2(o !== null ? o : num(l.markup) * GST_RATE / (1 + GST_RATE)); }; // GST embedded in GST-incl markup
+export const gstSvc = (l, rate = GST_RATE) => { const o = ovr(l.svcGst);  return r2(o !== null ? o : num(l.ssvc) * rate); };       // GST on agency service charge
+export const gstMk  = (l, rate = GST_RATE) => { const o = ovr(l.mkGst);   return r2(o !== null ? o : num(l.markup) * rate / (1 + rate)); }; // GST embedded in GST-incl markup
 // Input GST honours the module tax rule (mirrors backend voucherSpecs.gstPur). An
 // override wins; else 'all' modules (Insurance / Car) tax the WHOLE cost (fare +
 // supplier service), 'service' modules tax only the supplier service. Fixes insurance
 // premiums that used to auto-compute 0 GST (psvc-only) instead of rate × premium.
 const moduleRate = (spec) => ((spec && spec.tax && spec.tax.rate != null) ? num(spec.tax.rate) / 100 : GST_RATE);
-export const gstPur = (spec, l) => {
+export const gstPur = (spec, l, rate = moduleRate(spec)) => {
   const o = ovr(l.psvcGst);
   if (o !== null) return r2(o);
-  const rate = moduleRate(spec);
   if (spec && spec.tax && spec.tax.kind === 'all') return r2((fareSum(spec, l) + num(l.psvc)) * rate);
   return r2(num(l.psvc) * rate);
 };
+
+// Booking tax context (mirrors backend voucherSpecs). India → per-module rule.
+// Africa (VAT) branches → branch VAT rate; noVat → tax forced to 0. Default = India.
+const VAT_RATE = { NBO: 16, DAR: 18, FBM: 16 };
+const isVatBranch = (b) => ['NBO', 'DAR', 'FBM'].includes(String(b || '').toUpperCase());
+const vatRateOf = (b) => num(VAT_RATE[String(b || '').toUpperCase()]) / 100;
+export const isTaxable = (ctx) => !(ctx && ctx.noVat);
+const svcRateOf = (ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); return GST_RATE; };
+const purRateOf = (spec, ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); return moduleRate(spec); };
+const pkgRateOf = (spec, ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); return spec.gstRate || PKG_GST; };
+export { isVatBranch };
 
 export const finalPurchase = (spec, l) => r2(fareSum(spec, l) + num(l.psvc) + gstPur(spec, l));
 // Supplier service is NOT passed through to the customer (it's an agency cost), so
@@ -209,8 +219,8 @@ export const gpPctOf = (spec, l) => { const fs = finalSales(spec, l); return fs 
 // re-taxed inside the base (the old double-count that made GST ~5.41%). TCS (Intl)
 // added at booking level on (taxable + GST). Cost = Land + Supplier Service +
 // Supplier Service GST (no ITC). GP = Markup (net) only.
-export function lineCalcPackage(spec, l) {
-  const rate = spec.gstRate || PKG_GST;
+export function lineCalcPackage(spec, l, ctx) {
+  const rate = pkgRateOf(spec, ctx);
   const land = num(l.base);
   const psvc = num(l.psvc);
   const psvcGst = num(l.psvcGst);          // Supplier Service GST — entered
@@ -228,13 +238,24 @@ export function lineCalcPackage(spec, l) {
 }
 
 // All computed figures for one line — handy for the read-only voucher view.
-export function lineCalc(spec, l) {
-  if (isPkg(spec)) return lineCalcPackage(spec, l);
+// `ctx` = { branch, noVat }: India → per-module rule (default); Africa/VAT → branch
+// VAT rate; noVat → tax 0. Backward compatible when ctx is omitted.
+export function lineCalc(spec, l, ctx) {
+  if (isPkg(spec)) return lineCalcPackage(spec, l, ctx);
+  const taxable = isTaxable(ctx);
+  const sr = svcRateOf(ctx), pr = purRateOf(spec, ctx);
+  const gSvc = taxable ? gstSvc(l, sr) : 0;
+  const gMk  = taxable ? gstMk(l, sr) : 0;
+  const gPur = taxable ? gstPur(spec, l, pr) : 0;
+  const fSales = r2(fareSum(spec, l) + num(l.markup) + num(l.ssvc) + gSvc);
+  const fPur   = r2(fareSum(spec, l) + num(l.psvc) + gPur);
+  const sGST = r2(gSvc + gMk);
+  const gp = r2((fSales - sGST) - (fPur - gPur));
   return {
     pass: r2(fareSum(spec, l)),
-    gstSvc: gstSvc(l), gstMk: gstMk(l), gstPur: gstPur(spec, l),
-    finalSales: finalSales(spec, l), finalPurchase: finalPurchase(spec, l),
-    salesGST: salesGST(l), gp: gpOf(spec, l), gpPct: gpPctOf(spec, l),
+    gstSvc: gSvc, gstMk: gMk, gstPur: gPur,
+    finalSales: fSales, finalPurchase: fPur,
+    salesGST: sGST, gp, gpPct: fSales > 0 ? r2((gp / fSales) * 100) : 0,
   };
 }
 
@@ -242,7 +263,8 @@ export function lineCalc(spec, l) {
 // po/so carry { lineTotal (net, ex tax), serviceCharge, gst, tcs, total, lines }.
 // gp = sales net − purchase net (= net markup + service charge). The per-line
 // `lines` detail is preserved for the read-only voucher view + voucher meta.
-export function bookingTotals(spec, lines, { packageType = '', noSupplier = false } = {}) {
+export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false } = {}) {
+  const ctx = { branch, noVat: !!noVat };
   const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, total: 0, lines: [] };
   const so = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, total: 0, lines: [] };
   // Per-component ledger heads (ex-GST). Every SO/PO field posts to its OWN ledger
@@ -251,7 +273,7 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
   const sH = {}, pH = {};
   const addH = (bag, key, label, amt) => { (bag[key] || (bag[key] = { key, label, amt: 0 })).amt += num(amt); };
   (lines || []).forEach((l) => {
-    const c = lineCalc(spec, l);
+    const c = lineCalc(spec, l, ctx);
     const id = {}; spec.idCols.forEach((col) => { id[col.key] = l[col.key]; });
     const fares = {}; spec.fareCols.forEach((col) => { fares[col.key] = num(l[col.key]); });
     po.lineTotal += r2(c.finalPurchase - c.gstPur);

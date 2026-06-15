@@ -86,8 +86,9 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Payment Voucher", href:"/payments"},
     {label:"Contra Entry", href:"/contra"},
     {label:"Journal Entry", href:"/journal"},
-    {label:"Credit Note", href:"/finance/credit-note"},
-    {label:"Debit Note", href:"/finance/debit-note"},
+    // Credit Note / Debit Note entry removed — the business does not raise notes
+    // (cancellations go through Refund/Reissue). The routes & registry are retained
+    // so any historical note still renders read-only in the approval queue.
     {label:"Purchase Expense Voucher", href:"/purchase-expense"},
     {label:"Refund (against Sale)", href:"/finance/refund"},
     {label:"Reissue (against Sale)", href:"/finance/reissue"},
