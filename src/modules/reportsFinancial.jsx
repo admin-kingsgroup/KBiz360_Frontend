@@ -992,11 +992,12 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   // Row click → drill (module → files popup, ledger → its postings). The caret
   // (rendered separately) toggles the inline expand without drilling.
   const onRowClick = (r) => {
-    if (r.module) setDrillModule(r.module);
-    // A GL ledger leaf → its full Ledger Account; a sale/purchase invoice inside
-    // then opens the Sales/Purchase Register (invoiceToRegister).
-    else if (r.ledger) openLedgerModal(r.ledger, { invoiceToRegister: true });
+    // A GL ledger leaf → its full Ledger Account (a sale/purchase invoice inside
+    // then opens the Sales/Purchase Register). Modules & sub-centres expand inline
+    // on click — same as the Drill view; the module's "›" still opens its files.
+    if (r.ledger) openLedgerModal(r.ledger, { invoiceToRegister: true });
     else if (r.expandable) toggle(r);
+    else if (r.module) setDrillModule(r.module);
   };
 
   const Cell = ({ r, side }) => {
@@ -1014,7 +1015,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
           className={clickable ? 'cl-drill' : undefined}
           style={{ padding: '2px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...sep, ...mono }}>
           {r.expandable ? <span onClick={(e) => { e.stopPropagation(); toggle(r); }} style={{ color: TALLY.gold, marginRight: 4, cursor: 'pointer' }}>{r.open ? '▾' : '▸'}</span> : null}
-          {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{(r.module || r.ledger) ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
+          {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{r.module ? <span onClick={(e) => { e.stopPropagation(); setDrillModule(r.module); }} style={{ color: TALLY.gold, fontWeight: 700, cursor: 'pointer' }} title="Show booking files → vouchers"> ›</span> : r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
         <td onClick={clickable ? () => onRowClick(r) : undefined}
           style={{ padding: '2px 12px', textAlign: 'right', color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', cursor: clickable ? 'pointer' : 'default', ...mono }}>{inr(r.amount)}</td>
@@ -1129,11 +1130,12 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
 
   const toggle = (r) => setOpenSub((s) => ({ ...s, [r.ekey]: !r.open }));
   const onRowClick = (r) => {
-    if (r.module) setDrillModule(r.module);
-    // A GL ledger leaf → its full Ledger Account; a sale/purchase invoice inside
-    // then opens the Sales/Purchase Register (invoiceToRegister).
-    else if (r.ledger) openLedgerModal(r.ledger, { invoiceToRegister: true });
+    // A GL ledger leaf → its full Ledger Account (a sale/purchase invoice inside
+    // then opens the Sales/Purchase Register). Modules & sub-centres expand inline
+    // on click — same as the Drill view; the module's "›" still opens its files.
+    if (r.ledger) openLedgerModal(r.ledger, { invoiceToRegister: true });
     else if (r.expandable) toggle(r);
+    else if (r.module) setDrillModule(r.module);
   };
 
   // A module row + (when expanded) its GL ledger rows → fare/charge components.
@@ -1164,7 +1166,7 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
         <td onClick={clickable ? () => onRowClick(r) : undefined} className={clickable ? 'cl-drill' : undefined}
           style={{ padding: '3px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
           {r.expandable ? <span onClick={(e) => { e.stopPropagation(); toggle(r); }} style={{ color: TALLY.gold, marginRight: 4, cursor: 'pointer' }}>{r.open ? '▾' : '▸'}</span> : null}
-          {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{(r.module || r.ledger) ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
+          {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{r.module ? <span onClick={(e) => { e.stopPropagation(); setDrillModule(r.module); }} style={{ color: TALLY.gold, fontWeight: 700, cursor: 'pointer' }} title="Show booking files → vouchers"> ›</span> : r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
         <td style={{ padding: '3px 12px', textAlign: 'right', color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', ...mono }}>{inr(amt)}</td>
       </tr>
