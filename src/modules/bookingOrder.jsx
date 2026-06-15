@@ -58,6 +58,35 @@ function loadLineForEdit(spec, row) {
   return rest;
 }
 
+// Rebuild the entry grid for an existing booking. Prefer the full per-line `rows`
+// grid. Bulk-imported / migrated bookings (e.g. Tally summaries) often carry only
+// the so/po/gp totals with an EMPTY `rows`, which used to open Edit as a blank grid
+// — every figure the user had on the voucher "disappeared". Reconstruct each line
+// from the so/po snapshots instead: so.lines carry the fares + markup + service
+// charge, po.lines carry the supplier service. GST is dropped (loadLineForEdit) and
+// recomputed from the rebuilt fares on save, so totals stay correct. Falls back to a
+// single blank line only when there is genuinely no per-line detail anywhere.
+export function rowsFromSnapshots(booking) {
+  const soL = (booking && booking.so && Array.isArray(booking.so.lines)) ? booking.so.lines : [];
+  const poL = (booking && booking.po && Array.isArray(booking.po.lines)) ? booking.po.lines : [];
+  const n = Math.max(soL.length, poL.length);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const s = soL[i] || {}, p = poL[i] || {};
+    // so line: { ...ids, ...fares, markup, ssvc, … }; po line: { …, psvc }.
+    out.push({ ...p, ...s, psvc: num(p.psvc), markup: num(s.markup), ssvc: num(s.ssvc) });
+  }
+  return out;
+}
+
+export function rowsForEdit(spec, booking) {
+  const rows = (booking && Array.isArray(booking.rows)) ? booking.rows : [];
+  if (rows.length) return rows.map((r) => loadLineForEdit(spec, r));
+  const rebuilt = rowsFromSnapshots(booking);
+  if (rebuilt.length) return rebuilt.map((r) => loadLineForEdit(spec, r));
+  return [blankLine(spec)];
+}
+
 export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null }) {
   const qc = useQueryClient();
   const editing = !!editBooking;
@@ -70,11 +99,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const spec = VSPECS[moduleCode];
 
   const [lines, setLines] = useState(() => {
-    if (editing) {
-      const sp = VSPECS[initModule];
-      const rows = Array.isArray(editBooking.rows) ? editBooking.rows : [];
-      return rows.length ? rows.map((r) => loadLineForEdit(sp, r)) : [blankLine(sp)];
-    }
+    if (editing) return rowsForEdit(VSPECS[initModule], editBooking);
     return [blankLine(VSPECS.SF)];   // start blank — no demo rows
   });
   const [date, setDate] = useState(editing ? (editBooking.date || today()) : today());
@@ -347,9 +372,15 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       )}
 
       {editing && !(Array.isArray(editBooking.rows) && editBooking.rows.length) && (
-        <div style={{ ...card, background: '#FFF7E6', border: '1px solid #F0C36D', color: '#7a5b12', fontSize: 12, marginBottom: 14 }}>
-          ⓘ This voucher was bulk-imported without per-line detail. Re-enter the line(s) below — <b>saving recomputes the totals</b> from what you enter here.
-        </div>
+        rowsFromSnapshots(editBooking).length ? (
+          <div style={{ ...card, background: '#EAF1FB', border: '1px solid #B9D6F2', color: '#185FA5', fontSize: 12, marginBottom: 14 }}>
+            ⓘ This voucher was bulk-imported without the full per-line grid. The line(s) below were <b>rebuilt from the saved Sale / Purchase figures</b> — please verify them; <b>saving recomputes the totals &amp; GST</b> from what's shown here.
+          </div>
+        ) : (
+          <div style={{ ...card, background: '#FFF7E6', border: '1px solid #F0C36D', color: '#7a5b12', fontSize: 12, marginBottom: 14 }}>
+            ⓘ This voucher was bulk-imported without per-line detail. Re-enter the line(s) below — <b>saving recomputes the totals</b> from what you enter here.
+          </div>
+        )
       )}
 
       {/* Header fields */}
