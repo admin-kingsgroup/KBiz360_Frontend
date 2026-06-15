@@ -605,7 +605,7 @@ export const LedgersMaster = ({ branch }) => {
     <>
       <MasterCrud title="Ledgers" subtitle={`Chart of Accounts — ledger accounts (live)${branchView !== 'ALL' ? ` · ${branchView} + shared` : ''}`}
         resource="ledgers"
-        params={branchView !== 'ALL' ? { branch: branchView } : {}}
+        params={branchView !== 'ALL' ? { branch: branchView, includeInactive: 'true' } : { includeInactive: 'true' }}
         toolbar={toolbar}
         note="Set Group to the parent Tally group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. Shared heads (income / expense / tax) should use Branch = ALL so every branch sees one copy; keep Branch-specific parties under their own branch."
         fields={[
