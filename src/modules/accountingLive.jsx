@@ -754,8 +754,10 @@ function Crumb({ items }) {
 export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   const vq = useVoucher(voucherId);
   const upd = useUpdateVoucher();
-  const ccq = useCostCenters();
   const v = vq.data;
+  // Cost centres are branch-wise — only offer THIS voucher's branch's centres
+  // (e.g. BOM-FLT-INT), never another branch's, so the tag can't be mismatched.
+  const ccq = useCostCenters(v && v.branch);
   const chart = useChartOfAccounts(v && v.branch);
   const ledgerNames = (chart.data || []).map((l) => l.name).filter(Boolean);
   const [form, setForm] = useState(null);
