@@ -453,6 +453,10 @@ function voucherPrefix(v) {
 
 export function VoucherView({ id, cur }) {
   const { data, isLoading } = useQuery({ queryKey: ['voucher', id], queryFn: () => apiGet('/api/vouchers/' + id) });
+  // JV ledger postings — which ledgers this voucher debits/credits (actual journal
+  // once posted, else the would-be entry). Shown for every status so an approver
+  // sees the full accounting impact when opening a voucher from the Approval queue.
+  const { data: jv } = useQuery({ queryKey: ['voucher-journal', id], queryFn: () => apiGet('/api/vouchers/' + id + '/journal'), enabled: !!id });
   if (isLoading) return <div style={{ padding: 20, color: DIM, fontSize: 12 }}>Loading voucher…</div>;
   const v = data || {};
   const prefix = voucherPrefix(v);
@@ -516,6 +520,73 @@ export function VoucherView({ id, cur }) {
           </div>
           {v.remarks && <div style={{ marginTop: 8, fontSize: 11.5, color: DIM }}>Narration: <b style={{ color: DARK }}>{v.remarks}</b></div>}
         </div>
+      )}
+
+      <JVPostings jv={jv} />
+    </div>
+  );
+}
+
+/* ── Journal Entry (JV) — the ledger postings (Dr/Cr) behind a voucher ──────────
+   Tally accounting-voucher format: debit ledgers first, then credit ledgers ("To
+   …"). Shows the ACTUAL posted journal when the voucher is approved, else the
+   would-be entry — so an approver opening any voucher (pending / approved /
+   rejected / deleted / edited) sees exactly which ledgers it affects. */
+function JVPostings({ jv }) {
+  const rows = jv && Array.isArray(jv.postings) ? jv.postings : [];
+  // Debits first, then credits — the conventional Tally voucher reading order.
+  const ordered = [...rows].sort((a, b) => ((b.debit || 0) > 0 ? 1 : 0) - ((a.debit || 0) > 0 ? 1 : 0));
+  const DR = '#185FA5', CR = '#A32D2D';
+  const badge = jv && jv.posted
+    ? { t: '● Posted to books', bg: '#E7F3E7', c: '#27500A' }
+    : jv && jv.status === 'deleted'
+      ? { t: '⟲ Reversed out of books (view-only)', bg: '#FBEAEA', c: '#A32D2D' }
+      : jv && jv.status === 'rejected'
+        ? { t: '✗ Not posted (rejected)', bg: '#FBEAEA', c: '#A32D2D' }
+        : { t: '○ Would-be entry — posts on approval', bg: '#FFF6D6', c: '#8a6d12' };
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 12.5, fontWeight: 800, color: DARK }}>Journal Entry · Ledger Postings</div>
+        {jv && <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: badge.bg, color: badge.c }}>{badge.t}</span>}
+      </div>
+      {!jv ? (
+        <div style={{ padding: 12, fontSize: 11.5, color: DIM, background: '#f7f8fb', borderRadius: 8, border: '1px solid ' + LINE }}>Loading ledger postings…</div>
+      ) : ordered.length === 0 ? (
+        <div style={{ padding: 12, fontSize: 11.5, color: DIM, background: '#f7f8fb', borderRadius: 8, border: '1px solid ' + LINE }}>
+          No ledger postings could be built for this voucher.{jv.error ? ` — ${jv.error}` : ''}
+        </div>
+      ) : (
+        <>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr style={{ background: HEAD }}>
+              <th style={th}>Particulars (Ledger)</th>
+              <th style={{ ...th, textAlign: 'right' }}>Debit</th>
+              <th style={{ ...th, textAlign: 'right' }}>Credit</th>
+            </tr></thead>
+            <tbody>{ordered.map((p, i) => {
+              const isCr = (p.credit || 0) > 0;
+              return (
+                <tr key={i} style={{ borderBottom: '1px solid #f0f2f7' }}>
+                  <td style={tdName}>
+                    <div style={{ fontWeight: 600, color: DARK, paddingLeft: isCr ? 18 : 0 }}>
+                      {isCr ? <span style={{ color: DIM, fontWeight: 700 }}>To </span> : null}{p.ledger}
+                    </div>
+                    {(p.subGroup || p.group) && <div style={{ fontSize: 10, color: DIM, paddingLeft: isCr ? 18 : 0 }}>{p.subGroup || p.group}</div>}
+                  </td>
+                  <td style={{ ...tdNum, color: DR, fontWeight: 600 }}>{p.debit ? money(p.debit) : ''}</td>
+                  <td style={{ ...tdNum, color: CR, fontWeight: 600 }}>{p.credit ? money(p.credit) : ''}</td>
+                </tr>
+              );
+            })}</tbody>
+            <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
+              <td style={{ ...tdName, fontWeight: 800 }}>Total</td>
+              <td style={{ ...tdNum, fontWeight: 800, color: DR }}>{money(jv.totalDebit)}</td>
+              <td style={{ ...tdNum, fontWeight: 800, color: CR }}>{money(jv.totalCredit)}</td>
+            </tr></tfoot>
+          </table>
+          {!jv.balanced && <div style={{ marginTop: 6, fontSize: 11, color: '#9a6a00' }}>⚠ This entry does not balance (Debit ≠ Credit){jv.error ? ` — ${jv.error}` : ''}.</div>}
+        </>
       )}
     </div>
   );
