@@ -85,6 +85,33 @@ describe('fromVoucher — edit-display recovery from explicit lines', () => {
   });
 });
 
+describe('credit / debit note — taxable recovery on edit', () => {
+  const CN = VOUCHER_REGISTRY['credit-note'];
+  const DN = VOUCHER_REGISTRY['debit-note'];
+  test.concurrent('normal note: taxable = stored subtotal', async () => {
+    const s = CN.fromVoucher({ party: 'ABC', subtotal: 1000, taxAmt: 180, total: 1180 });
+    expect(s.taxable).toBe(1000);
+    expect(s.party).toBe('ABC');
+  });
+  test.concurrent('migrated note with only a total: taxable recovered = total − gst − tcs', async () => {
+    const s = CN.fromVoucher({ party: 'ABC', subtotal: 0, taxAmt: 180, tcsAmt: 0, total: 1180 });
+    expect(s.taxable).toBe(1000); // not blank → Save no longer zeroes the note
+  });
+  test.concurrent('debit note total-only recovery (incl TCS carve-out)', async () => {
+    const s = DN.fromVoucher({ party: 'XYZ', subtotal: 0, taxAmt: 90, tcsAmt: 10, total: 600 });
+    expect(s.taxable).toBe(500);
+  });
+  test.concurrent('blank note (no figures at all) stays blank', async () => {
+    const s = CN.fromVoucher({ party: '' }); // no subtotal/total/tax fields
+    expect(s.taxable).toBe('');
+  });
+  test.concurrent('round-trips: recovered taxable rebuilds the same total', async () => {
+    const s = CN.fromVoucher({ party: 'ABC', subtotal: 0, taxAmt: 180, total: 1180, gstPct: 18 });
+    const b = CN.toBody({ ...s }, ctx);
+    expect(b.total).toBeCloseTo(1180, 2);
+  });
+});
+
 describe('toBody — Option A party vs non-party branch', () => {
   test.concurrent('expense payment → explicit Dr expense / Cr bank, blank party', async () => {
     const b = PM.toBody({ party: 'Office Rent', otherType: 'Expense', bankRef: 'ICICI', amount: 50000, alloc: {} }, ctx);

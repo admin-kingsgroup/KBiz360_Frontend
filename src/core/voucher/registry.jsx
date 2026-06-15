@@ -176,11 +176,19 @@ function makeNote(kind) {
 
     initial: () => ({ date: todayISO(), againstInvoice: '', gstMode: 'intra', party: '', reason: reasons[0], taxable: '', gstPct: 18, tcs: '', remarks: '' }),
 
-    fromVoucher: (v) => ({
-      date: v.date || '', againstInvoice: v.againstInvoice || v.linkNo || '', gstMode: v.gstMode || 'intra',
-      party: v.party || '', reason: (v.lines && v.lines[0] && v.lines[0].desc) || reasons[0],
-      taxable: v.subtotal ?? '', gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18, tcs: v.tcsAmt || '', remarks: v.remarks || '',
-    }),
+    fromVoucher: (v) => {
+      // Taxable base = stored subtotal. A migrated/imported note that carried only a
+      // grand `total` (no subtotal) would otherwise seed 0 → the edit form looks
+      // blank and Save would zero the note. Recover the base from total − GST − TCS
+      // so the figures survive the round-trip.
+      let taxable = +v.subtotal || 0;
+      if (taxable <= 0) { const d = r2((+v.total || 0) - (+v.taxAmt || 0) - (+v.tcsAmt || 0)); if (d > 0) taxable = d; }
+      return {
+        date: v.date || '', againstInvoice: v.againstInvoice || v.linkNo || '', gstMode: v.gstMode || 'intra',
+        party: v.party || '', reason: (v.lines && v.lines[0] && v.lines[0].desc) || reasons[0],
+        taxable: taxable > 0 ? taxable : (v.subtotal ?? ''), gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18, tcs: v.tcsAmt || '', remarks: v.remarks || '',
+      };
+    },
 
     toBody: (s, ctx) => {
       const taxable = r2(+s.taxable || 0);

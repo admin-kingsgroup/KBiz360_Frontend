@@ -156,7 +156,16 @@ function TkfPnL({ branch, from, to }) {
   });
   expRows.push({ label: 'Total Indirect Expenses', amount: d.indirect?.expense || 0, subtotal: true });
   const otherRows = [];
-  if (d.bridge?.indirectIncome) otherRows.push({ label: 'Indirect Income', amount: d.bridge.indirectIncome });
+  const incomeGroups = d.indirect?.incomeGroups || [];
+  if (incomeGroups.length) {
+    incomeGroups.forEach((g) => {
+      otherRows.push({ label: g.name, amount: g.amount, bold: true });
+      (g.ledgers || []).forEach((l) => otherRows.push({ label: l.name, amount: l.amount, ledger: l.name, indent: 1 }));
+    });
+    otherRows.push({ label: 'Total Indirect Income', amount: d.indirect?.income || d.bridge?.indirectIncome || 0, subtotal: true });
+  } else if (d.bridge?.indirectIncome) {
+    otherRows.push({ label: 'Indirect Income', amount: d.bridge.indirectIncome });
+  }
 
   const sections = [
     { title: 'Income', rows: incomeRows },

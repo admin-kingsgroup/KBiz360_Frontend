@@ -922,13 +922,15 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     ? d.indirect.buckets
     : (groups.length ? [{ name: 'Indirect Expenses', amount: d.indirect.expense, groups }] : []);
   const indIncome = d.bridge?.indirectIncome || 0;
+  const incomeGroups = d.indirect?.incomeGroups || []; // indirect-income groups → ledgers (drillable)
   const grossProfit = d.bridge?.grossProfit ?? d.totals.gp;
 
   // Expand / Collapse all — every bucket + sub-group key in the indirect tree,
-  // PLUS every module + its GL ledgers on both trading sides (so "Expand all"
-  // now also drills the Trading A/c modules → ledger → fare components).
+  // PLUS every indirect-income group, PLUS every module + its GL ledgers on both
+  // trading sides (so "Expand all" also drills modules → ledger → fare components).
   const allKeys = [];
   buckets.forEach((b) => { allKeys.push('b:' + b.name); (b.groups || []).forEach((g) => allKeys.push('g:' + b.name + '/' + g.name)); });
+  incomeGroups.forEach((g) => allKeys.push('ig:' + g.name));
   allKeys.push(...moduleExpandKeys(modules));
   const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
   const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
@@ -982,9 +984,21 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     ...(tax > 0 ? [{ label: 'Provision for Tax @ 25.17% (est.)', amount: tax }] : []),
     { label: 'Net Profit (to Capital A/c)', amount: pat, result: true },
   ];
+  // Indirect Income → group → ledger (drillable), mirroring the expense tree.
+  const incomeTreeRows = [...incomeGroups].sort((a, b) => azByName(a.name, b.name)).flatMap((g) => {
+    const gk = 'ig:' + g.name;
+    const gOpen = isOpen(gk, false); // group default collapsed → click to reveal ledgers
+    const ghead = { label: g.name, amount: g.amount, sub: true, expandable: true, ekey: gk, open: gOpen };
+    if (!gOpen) return [ghead];
+    return [ghead, ...[...(g.ledgers || [])].sort((x, y) => azByName(x.name, y.name)).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))];
+  });
   const plRight = [
     { label: 'Gross Profit b/d', amount: grossProfit, result: true },
-    ...(indIncome > 0 ? [{ label: 'Indirect Income', amount: indIncome }] : []),
+    ...(indIncome > 0
+      ? (incomeGroups.length
+        ? [{ label: 'Indirect Income', amount: indIncome, group: true }, ...incomeTreeRows]
+        : [{ label: 'Indirect Income', amount: indIncome }])
+      : []),
   ];
   const plTotal = grossProfit + indIncome;
 
@@ -1109,10 +1123,20 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     ? d.indirect.buckets
     : (groups.length ? [{ name: 'Indirect Expenses', amount: d.indirect.expense, groups }] : []);
   const indIncome = d.bridge?.indirectIncome || 0;
+  const incomeGroups = d.indirect?.incomeGroups || []; // indirect-income groups → ledgers (drillable)
   const grossProfit = d.bridge?.grossProfit ?? d.totals.gp;
   const incentive = d.totals.incentive || 0;
   const revenueTrading = d.totals.sales + incentive;
   const nett = d.totals.sales;
+
+  // Indirect-income tree (group → ledger) — every ledger row clickable → its account.
+  const incomeRows = incomeGroups.flatMap((g) => {
+    const gk = 'ig:' + g.name;
+    const gOpen = isOpen(gk, false);
+    const ghead = { label: g.name, amount: g.amount, sub: true, expandable: true, ekey: gk, open: gOpen };
+    if (!gOpen) return [ghead];
+    return [ghead, ...(g.ledgers || []).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))];
+  });
 
   // Indirect-expense tree (bucket → sub-group → ledger) — identical to ClassicPnL.
   const expenseRows = buckets.flatMap((b) => {
@@ -1152,6 +1176,7 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
   // allKeys for expand/collapse all (buckets + sub-groups + module/ledger drill).
   const allKeys = [];
   buckets.forEach((b) => { allKeys.push('b:' + b.name); (b.groups || []).forEach((g) => allKeys.push('g:' + b.name + '/' + g.name)); });
+  incomeGroups.forEach((g) => allKeys.push('ig:' + g.name));
   allKeys.push(...moduleExpandKeys(modules));
   const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
   const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
@@ -1213,7 +1238,13 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
           {modules.flatMap((m) => moduleBlock(m, 'cogs')).map((r, i) => <Row key={'c' + i} r={r} neg />)}
           <Sub txt="Total Cost of Sales" val={d.totals.cogs} neg />
           <Result txt="Gross Profit" val={grossProfit} />
-          {indIncome > 0 && <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome }} />}
+          {indIncome > 0 && (incomeGroups.length
+            ? <>
+                <Head txt="Add: Other Income (Indirect Income)" />
+                <Row r={{ label: 'Indirect Income', amount: indIncome, group: true }} />
+                {incomeRows.map((r, i) => <Row key={'ii' + i} r={r} />)}
+              </>
+            : <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome }} />)}
           <Head txt="Less: Indirect Expenses" />
           <Row r={{ label: 'Indirect Expenses', amount: d.indirect.expense, group: true }} neg />
           {expenseRows.map((r, i) => <Row key={'e' + i} r={r} neg />)}
