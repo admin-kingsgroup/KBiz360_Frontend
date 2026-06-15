@@ -1,14 +1,13 @@
 // Live audit trail for a voucher or SO/PO/GP booking — the full lifecycle timeline
 // (created · edited · approved · rejected · deleted · cancelled) with who, when, why,
-// the field-by-field change list, and the complete record snapshot at each edit.
-// Used inside the Edited tab and the voucher/booking detail views.
+// and — for an edit — a PLAIN-LANGUAGE "what was there → what it changed to" list plus
+// a friendly summary of the whole record at that point (raw data behind a toggle).
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from './api';
 
 const C = { dark: '#0d1326', blue: '#185FA5', red: '#A32D2D', green: '#27500A', gold: '#d4a437', dim: '#5a6691', border: '#e1e3ec' };
 
-// Per-action badge styling for the timeline.
 const ACTION = {
   create:  { label: 'Created',  bg: '#EAF3DE', fg: '#27500A' },
   edit:    { label: 'Edited',   bg: '#FFF6D6', fg: '#8a6d12' },
@@ -18,35 +17,138 @@ const ACTION = {
   cancel:  { label: 'Cancelled', bg: '#f0f1f5', fg: '#5a6691' },
 };
 
-// Humanise a schema field name for the change table (so/po → SO/PO, taxAmt → Tax Amt…).
-const FIELD_LABEL = { so: 'Sales (SO)', po: 'Purchase (PO)', gp: 'Gross Profit', taxAmt: 'GST / Tax', tcsAmt: 'TCS', tdsAmt: 'TDS', vno: 'Voucher No', linkNo: 'Link No', costCenter: 'Cost Centre' };
+// Plain-English label for a stored field name.
+const FIELD_LABEL = {
+  so: 'Sales side', po: 'Purchase side', gp: 'Gross Profit', taxAmt: 'GST / Tax', tcsAmt: 'TCS', tdsAmt: 'TDS',
+  vno: 'Voucher No', bookingNo: 'Booking No', linkNo: 'Link No', costCenter: 'Cost Centre', gstMode: 'GST mode',
+  party: 'Party', billTo: 'Bill To', partyGroup: 'Party group', customer: 'Customer', supplier: 'Supplier',
+  remarks: 'Remarks', date: 'Date', branch: 'Branch', module: 'Module', status: 'Status', total: 'Total',
+  subtotal: 'Subtotal', lines: 'Line items', rows: 'Line items', markupPct: 'Markup %', consultant: 'Consultant',
+  noSupplier: 'No-supplier deal', packageType: 'Package type', saleVno: 'Sale invoice', purchaseVno: 'Purchase invoice',
+  approvedBy: 'Approved by', deletedBy: 'Deleted by', rejectedReason: 'Rejected reason', supplierAmt: 'Supplier amount',
+  amount: 'Amount', counterParty: 'Counter-party', consultantName: 'Consultant', headerRef: 'Reference',
+};
 const labelOf = (f) => FIELD_LABEL[f] || f.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+
+// Field names that hold money → render with ₹ and Indian grouping.
+const MONEY = new Set(['total', 'subtotal', 'taxAmt', 'tcsAmt', 'tdsAmt', 'amount', 'supplierAmt', 'saleTotal', 'purchaseTotal', 'incentiveAmt', 'incentiveGst', 'incentiveTds', 'onAccount']);
+const money = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
 
 const fmtAt = (s) => {
   if (!s) return '';
   const d = new Date(s);
-  if (isNaN(d)) return String(s);
-  return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return isNaN(d) ? String(s) : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
-const isPrimitive = (v) => v == null || typeof v !== 'object';
-const short = (v) => {
-  if (v == null || v === '') return '—';
-  if (isPrimitive(v)) return String(v);
-  try { const s = JSON.stringify(v); return s.length > 120 ? s.slice(0, 117) + '…' : s; } catch { return String(v); }
+// Short one-line summary of a money side ({ total, gst, tcs }) for so/po.
+const sideSummary = (v) => {
+  if (!v || typeof v !== 'object') return '—';
+  const parts = [money(v.total)];
+  if (Number(v.gst)) parts.push(`incl GST ${money(v.gst)}`);
+  if (Number(v.tcs)) parts.push(`TCS ${money(v.tcs)}`);
+  return parts.join(' · ');
 };
 
-// One field's value — primitives inline; objects/arrays as a collapsible JSON block.
-function ValueCell({ v, color }) {
-  const [open, setOpen] = useState(false);
-  if (isPrimitive(v)) return <span style={{ color: color || C.dark, fontWeight: 600 }}>{v == null || v === '' ? '—' : String(v)}</span>;
+// Render one value (old or new) in plain language for the change table.
+function ValueView({ field, value }) {
+  const [raw, setRaw] = useState(false);
+  if (value == null || value === '') return <span style={{ color: C.dim }}>—</span>;
+
+  // Money + plain scalars.
+  if (typeof value !== 'object') {
+    if (MONEY.has(field)) return <span style={{ fontWeight: 700 }}>{money(value)}</span>;
+    if (typeof value === 'boolean') return <span>{value ? 'Yes' : 'No'}</span>;
+    return <span style={{ fontWeight: 600 }}>{String(value)}</span>;
+  }
+
+  // Known nested shapes → friendly one-liners.
+  if (field === 'customer' || field === 'supplier') {
+    const name = value.name || '—';
+    const led = value.ledgerName && value.ledgerName !== value.name ? ` · ledger: ${value.ledgerName}` : '';
+    return <span style={{ fontWeight: 600 }}>{name}{led}</span>;
+  }
+  if (field === 'so' || field === 'po') return <span style={{ fontWeight: 600 }}>{sideSummary(value)}</span>;
+  if (field === 'gp') return <span style={{ fontWeight: 600 }}>{money(value.total)} {value.pct != null ? `(${value.pct}%)` : ''}</span>;
+
+  // Arrays of line items → a readable mini list.
+  if (Array.isArray(value)) {
+    if (!value.length) return <span style={{ color: C.dim }}>none</span>;
+    return (
+      <div>
+        <span style={{ fontWeight: 600 }}>{value.length} item{value.length === 1 ? '' : 's'}</span>
+        <ul style={{ margin: '3px 0 0', paddingLeft: 16 }}>
+          {value.slice(0, 12).map((l, i) => {
+            const name = l.ledger || l.desc || l.fn || l.name || `Item ${i + 1}`;
+            const amt = l.amt != null ? l.amt : (l.total != null ? l.total : l.finalSales);
+            const dc = l.drCr ? ` (${l.drCr})` : '';
+            return <li key={i} style={{ fontSize: 11 }}>{name}{dc}{amt != null ? ` — ${money(amt)}` : ''}</li>;
+          })}
+          {value.length > 12 && <li style={{ fontSize: 11, color: C.dim }}>…and {value.length - 12} more</li>}
+        </ul>
+      </div>
+    );
+  }
+
+  // Any other object → a compact key list, with a raw toggle for the curious.
   return (
     <span>
-      <button onClick={() => setOpen((o) => !o)} style={{ background: 'none', border: 'none', color: C.blue, cursor: 'pointer', fontSize: 11, padding: 0, textDecoration: 'underline' }}>
-        {open ? 'hide' : 'view'} {Array.isArray(v) ? `[${v.length}]` : '{…}'}
+      <button onClick={() => setRaw((r) => !r)} style={{ background: 'none', border: 'none', color: C.blue, cursor: 'pointer', fontSize: 11, padding: 0, textDecoration: 'underline' }}>
+        {raw ? 'hide details' : 'view details'}
       </button>
-      {open && <pre style={{ margin: '4px 0 0', padding: 8, background: '#f7f8fb', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 10.5, maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{JSON.stringify(v, null, 2)}</pre>}
+      {raw && <pre style={{ margin: '4px 0 0', padding: 8, background: '#f7f8fb', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 10.5, maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{JSON.stringify(value, null, 2)}</pre>}
     </span>
+  );
+}
+
+// A friendly read-only summary of a whole record snapshot (booking or voucher).
+function RecordSummary({ record }) {
+  const [raw, setRaw] = useState(false);
+  if (!record) return null;
+  const isBooking = !!(record.bookingNo || record.so || record.po);
+  const rows = isBooking
+    ? [
+      ['Booking No', record.bookingNo], ['Link No', record.linkNo], ['Branch', record.branch],
+      ['Module', record.module], ['Date', record.date], ['Status', record.status],
+      ['Customer', record.customer?.name], ['Supplier', record.noSupplier ? '— (no supplier)' : record.supplier?.name],
+      ['Sales', record.so ? sideSummary(record.so) : null], ['Purchase', record.po ? sideSummary(record.po) : null],
+      ['Gross Profit', record.gp ? `${money(record.gp.total)} (${record.gp.pct ?? 0}%)` : null],
+      ['Remarks', record.remarks],
+    ]
+    : [
+      ['Voucher No', record.vno], ['Type', record.type], ['Category', record.category], ['Branch', record.branch],
+      ['Date', record.date], ['Status', record.status], ['Party', record.party || record.billTo],
+      ['Total', money(record.total)], ['GST / Tax', Number(record.taxAmt) ? money(record.taxAmt) : null],
+      ['TCS', Number(record.tcsAmt) ? money(record.tcsAmt) : null], ['TDS', Number(record.tdsAmt) ? money(record.tdsAmt) : null],
+      ['Remarks', record.remarks],
+    ];
+  const shown = rows.filter(([, v]) => v != null && v !== '');
+  return (
+    <div style={{ marginTop: 6 }}>
+      <table style={{ borderCollapse: 'collapse', fontSize: 11.5 }}>
+        <tbody>
+          {shown.map(([k, v]) => (
+            <tr key={k}>
+              <td style={{ padding: '2px 12px 2px 0', color: C.dim, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{k}</td>
+              <td style={{ padding: '2px 0', color: C.dark, fontWeight: 600 }}>{v}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {Array.isArray(record.lines) && record.lines.length > 0 && (
+        <div style={{ marginTop: 6 }}>
+          <div style={{ color: C.dim, fontSize: 11 }}>Line items</div>
+          <ul style={{ margin: '3px 0 0', paddingLeft: 16 }}>
+            {record.lines.map((l, i) => (
+              <li key={i} style={{ fontSize: 11 }}>{l.ledger || l.desc || `Item ${i + 1}`}{l.drCr ? ` (${l.drCr})` : ''}{l.amt != null ? ` — ${money(l.amt)}` : ''}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <button onClick={() => setRaw((r) => !r)} style={{ marginTop: 6, background: 'none', border: 'none', color: C.blue, cursor: 'pointer', fontSize: 10.5, padding: 0, textDecoration: 'underline' }}>
+        {raw ? 'Hide raw data' : 'Show raw data'}
+      </button>
+      {raw && <pre style={{ margin: '6px 0 0', padding: 10, background: '#f7f8fb', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 10.5, maxHeight: 320, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{JSON.stringify(record, null, 2)}</pre>}
+    </div>
   );
 }
 
@@ -65,28 +167,31 @@ function EventCard({ ev }) {
       {ev.reason && <div style={{ fontSize: 11.5, color: C.dark, marginTop: 6 }}><b style={{ color: C.dim }}>Why:</b> {ev.reason}</div>}
       {ev.action === 'edit' && (
         changes.length ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8, fontSize: 11.5 }}>
-            <thead><tr>
-              {['Field', 'From', 'To'].map((h) => <th key={h} style={{ textAlign: 'left', padding: '4px 8px', color: C.dim, fontSize: 10, textTransform: 'uppercase', borderBottom: `1px solid ${C.border}` }}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {changes.map((c, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}>
-                  <td style={{ padding: '4px 8px', fontWeight: 600, color: C.dark, verticalAlign: 'top' }}>{labelOf(c.field)}</td>
-                  <td style={{ padding: '4px 8px', verticalAlign: 'top' }}><ValueCell v={c.from} color={C.red} /></td>
-                  <td style={{ padding: '4px 8px', verticalAlign: 'top' }}><ValueCell v={c.to} color={C.green} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : <div style={{ fontSize: 11, color: C.dim, marginTop: 6, fontStyle: 'italic' }}>Change details not captured.</div>
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 11, color: C.dim, marginBottom: 4 }}>What changed</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+              <thead><tr>
+                {['Field', 'Was', 'Changed to'].map((h) => <th key={h} style={{ textAlign: 'left', padding: '4px 8px', color: C.dim, fontSize: 10, textTransform: 'uppercase', borderBottom: `1px solid ${C.border}` }}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {changes.map((c, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}>
+                    <td style={{ padding: '5px 8px', fontWeight: 600, color: C.dark, verticalAlign: 'top', whiteSpace: 'nowrap' }}>{labelOf(c.field)}</td>
+                    <td style={{ padding: '5px 8px', verticalAlign: 'top', color: C.red }}><ValueView field={c.field} value={c.from} /></td>
+                    <td style={{ padding: '5px 8px', verticalAlign: 'top', color: C.green }}><ValueView field={c.field} value={c.to} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <div style={{ fontSize: 11, color: C.dim, marginTop: 6, fontStyle: 'italic' }}>Change details not captured (this edit predates the audit log).</div>
       )}
       {(ev.snapshotAfter || ev.snapshotBefore) && (
-        <div style={{ marginTop: 6 }}>
+        <div style={{ marginTop: 8 }}>
           <button onClick={() => setShowSnap((s) => !s)} style={{ background: 'none', border: 'none', color: C.blue, cursor: 'pointer', fontSize: 11, padding: 0, textDecoration: 'underline' }}>
-            {showSnap ? 'Hide' : 'View'} full record at this point
+            {showSnap ? 'Hide full details' : 'View full details at this point'}
           </button>
-          {showSnap && <pre style={{ margin: '6px 0 0', padding: 10, background: '#f7f8fb', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 10.5, maxHeight: 320, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{JSON.stringify(ev.snapshotAfter || ev.snapshotBefore, null, 2)}</pre>}
+          {showSnap && <RecordSummary record={ev.snapshotAfter || ev.snapshotBefore} />}
         </div>
       )}
     </div>
@@ -112,5 +217,3 @@ export function AuditTrail({ entityType, entityId }) {
     </div>
   );
 }
-
-export { short as auditShortValue };
