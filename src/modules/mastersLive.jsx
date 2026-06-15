@@ -12,6 +12,7 @@ import { Plus, Pencil, Trash2, X, Download } from 'lucide-react';
 import { card, inp } from '../core/styles';
 import { ACTIVE_CURRENCIES, BRANCH_CODES } from '../core/data';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
+import { SourceBadge } from '../core/LedgerLabel';
 import { branchCode } from '../core/useAccounting';
 import { apiPost } from '../core/api';
 import { exportToExcel } from '../core/exportExcel';
@@ -514,6 +515,8 @@ export const GroupsMaster = ({ branch }) => {
                         {isLedger && v && (branchView === 'ALL' || r.branchTag === 'ALL') && (
                           <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, marginLeft: 6, background: r.branchTag === 'ALL' ? '#eef1f6' : '#e7f0fb', color: r.branchTag === 'ALL' ? DIM : BLUE }}>{r.branchTag === 'ALL' ? 'Common' : r.branchTag}</span>
                         )}
+                        {isLedger && v && r.ledgerNode && r.ledgerNode.locked && <span title="Locked — super-admin only" style={{ marginLeft: 4, fontSize: 10 }}>🔒</span>}
+                        {isLedger && v && r.ledgerNode && r.ledgerNode.source && <SourceBadge source={r.ledgerNode.source} />}
                         {!c.lock && node && (
                           <button onClick={() => openEdit(c.kind, node)} title={`Edit ${c.label}`} style={pencilBtn}><Pencil size={13} /></button>
                         )}

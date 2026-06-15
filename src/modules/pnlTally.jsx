@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, ChevronLeft, X } from 'lucide-react';
 import { apiGet } from '../core/api';
 import { openLedgerModal } from '../core/LedgerModalHost';
+import { useLedgerMeta, SourceBadge } from '../core/LedgerLabel';
 import { bc } from '../core/styles.jsx';
 import { PeriodBar } from '../core/period';
 import { LedgerActions } from '../core/ledgerActions';
@@ -84,6 +85,8 @@ function LedgerComponentsInline({ name, branch, from, to }) {
 function PLLines({ line, onPick, branch, from, to }) {
   const [openLedgers, setOpenLedgers] = useState(false);
   const [openComp, setOpenComp] = useState({});
+  const metaOf = useLedgerMeta();
+  const badge = (nm) => { const m = metaOf(nm); return m ? <>{m.locked && <span title="Locked — super-admin only" style={{ marginLeft: 4 }}>🔒</span>}<SourceBadge source={m.source} compact /></> : null; };
   const drillable = line.isGroup || line.ledger || (!line.isGroup && !!line.name);
   if (line.isCarry || line.isResult) {
     return (
@@ -137,6 +140,7 @@ function PLLines({ line, onPick, branch, from, to }) {
                   style={{ cursor: 'pointer', color: '#9aa6c4', fontWeight: 700, marginRight: 5, display: 'inline-block', width: 10 }}
                   title={co ? 'Hide components' : 'Show captured fares'}>{co ? '▾' : '▸'}</span>
                 <span onClick={() => openLedgerModal(led)} style={{ cursor: 'pointer' }} title="Open ledger account">{it.name}</span>
+                {badge(it.name)}
               </td>
               <td style={tdNum}>{money(it.amount)}</td>
               <td />
@@ -152,6 +156,7 @@ function PLLines({ line, onPick, branch, from, to }) {
 /* ── View 2/3: Group Summary (a node's children, Closing Dr | Cr) ── */
 export function GroupSummary({ frame, onPick }) {
   const items = frame.items || [];
+  const metaOf = useLedgerMeta();
   const grand = items.reduce((s, i) => s + (i.side === 'Cr' ? i.amount : -i.amount), 0);
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -169,6 +174,7 @@ export function GroupSummary({ frame, onPick }) {
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
               <td style={{ ...tdName, fontWeight: it.isGroup ? 700 : 400, color: it.isGroup ? DARK : '#1f3a8a' }}>
                 {it.name}{it.isGroup && <ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9aa6c4' }} />}
+                {!it.isGroup && (() => { const m = metaOf(it.name); return m ? <>{m.locked && <span title="Locked — super-admin only" style={{ marginLeft: 4 }}>🔒</span>}<SourceBadge source={m.source} compact /></> : null; })()}
               </td>
               <td style={tdNum}>{it.side === 'Dr' ? money(it.amount) : ''}</td>
               <td style={tdNum}>{it.side === 'Cr' ? money(it.amount) : ''}</td>
