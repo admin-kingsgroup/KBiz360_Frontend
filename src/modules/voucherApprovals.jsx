@@ -12,7 +12,7 @@ import { openPrintWindow } from '../core/voucher-print';
 import { useModalEsc } from '../core/ux/useModalEsc';
 import { FocusBanner } from '../core/ux/FocusBanner';
 import { useNavFocusStore } from '../core/ux/navFocus';
-import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useApproveMany, useApproveAll } from '../core/useAccounting';
+import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useApproveMany, useApproveAll, branchCode } from '../core/useAccounting';
 import { VoucherEditor } from './accountingLive';
 import { BookingApprovals } from './bookingOrder';
 import { bc } from '../core/styles';
@@ -62,8 +62,10 @@ export function VoucherApprovals({ branch }) {
   const q = useVoucherApprovals(branch, status, { from: range.from, to: range.to });
   const d = q.data || {};
   // Vouchers edited ≥ once (cross-cuts status) — its own source for the Edited tab.
-  const brCode = (bc(branch) || {}).code || (typeof branch === 'string' ? branch : '') || '';
-  const editedQ = useQuery({ queryKey: ['voucher-edited', brCode], queryFn: () => apiGet('/api/vouchers/edited', { branch: brCode === 'ALL' ? '' : brCode }) });
+  // Uses the SAME branch resolution as every other voucher query (branchCode →
+  // undefined for "ALL", which apiGet omits → all branches).
+  const brCode = branchCode(branch);
+  const editedQ = useQuery({ queryKey: ['voucher-edited', brCode || 'all'], queryFn: () => apiGet('/api/vouchers/edited', brCode ? { branch: brCode } : {}) });
   const editedRows = editedQ.data || [];
   const counts = {
     ...(d.counts || { pending: { n: 0, amount: 0 }, approved: { n: 0, amount: 0 }, rejected: { n: 0, amount: 0 }, deleted: { n: 0, amount: 0 } }),

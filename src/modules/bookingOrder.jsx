@@ -89,7 +89,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // income. Hides the Purchase Order + supplier fields and posts only the sale.
   const [noSupplier, setNoSupplier] = useState(editing ? !!editBooking.noSupplier : false);
   const [gstMode, setGstMode] = useState(editing ? (editBooking.gstMode || 'intra') : 'intra');
-  const [packageType, setPackageType] = useState(editing ? (editBooking.packageType || 'Domestic') : 'Domestic');
+  // No silent default — the user MUST consciously pick International vs Domestic
+  // (that choice IS the cost centre). A blank leaves it untagged: it still saves as
+  // Pending but the approval gate refuses to post it until it's tagged.
+  const [packageType, setPackageType] = useState(editing ? (editBooking.packageType || '') : '');
   const [remarks, setRemarks] = useState(editing ? (editBooking.remarks || '') : '');
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
@@ -122,6 +125,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
   const canSave = !!brCode && !saving && totals.so.total > 0 && customer.name.trim() && hasCustLedger
     && (isNoSupp || (totals.po.total > 0 && hasSuppLedger));
+  // Flights / Holiday can be SAVED untagged (it parks as Pending), but it cannot be
+  // approved/posted until International vs Domestic is chosen — mirrors the backend gate.
+  const isTagged = !hasPackage || !!packageType;
+  const canApprove = canSave && isTagged;
 
   const save = async (thenApprove = false) => {
     // Editing an existing booking requires a reason (saved to the audit trail).
@@ -340,7 +347,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           </FL>}
           {!isNoSupp && <FL label="Supplier sub-group (auto)"><input value={supplier.ledgerGroup} readOnly placeholder="picks with the supplier" style={{ ...inp, background: '#faf7ef', color: '#5a6691' }} /></FL>}
           <FL label="GST mode"><select value={gstMode} onChange={(e) => setGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
-          {hasPackage && <FL label="Package type"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={inp}><option>Domestic</option><option>International</option></select></FL>}
+          {hasPackage && <FL label="Package type *"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={{ ...inp, ...(packageType ? {} : { borderColor: '#A32D2D' }) }}><option value="">— Select International / Domestic —</option><option value="Domestic">Domestic</option><option value="International">International</option></select>
+            {!packageType && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — sets the cost centre (Int'l/Domestic GP). Must be picked before approving.</span>}
+          </FL>}
           <FL label="Customer GSTIN"><input value={customer.gstin} onChange={(e) => setCustomer({ ...customer, gstin: e.target.value })} placeholder="GSTIN" style={inp} /></FL>
           <FL label="Customer Address"><input value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} placeholder="Billing address (for invoice)" style={inp} /></FL>
           <FL label="Customer Email"><input value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} placeholder="email" style={inp} /></FL>
@@ -517,8 +526,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (editing ? 'Save changes' : 'Save voucher (Pending)')}
         </button>
         {editing && (
-          <button disabled={!canSave} onClick={() => save(true)}
-            style={{ ...btnG, background: canSave ? DR : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7 }}>
+          <button disabled={!canApprove} onClick={() => save(true)}
+            title={!isTagged ? 'Pick International or Domestic first — it sets the cost centre.' : ''}
+            style={{ ...btnG, background: canApprove ? DR : '#9ca3af', cursor: canApprove ? 'pointer' : 'not-allowed', opacity: canApprove ? 1 : 0.7 }}>
             {saving ? <RefreshCw size={14} className="spin" /> : <CheckCircle2 size={14} />} Save &amp; Approve
           </button>
         )}

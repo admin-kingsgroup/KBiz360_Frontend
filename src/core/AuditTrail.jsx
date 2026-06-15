@@ -102,7 +102,6 @@ function ValueView({ field, value }) {
 
 // A friendly read-only summary of a whole record snapshot (booking or voucher).
 function RecordSummary({ record }) {
-  const [raw, setRaw] = useState(false);
   if (!record) return null;
   const isBooking = !!(record.bookingNo || record.so || record.po);
   const rows = isBooking
@@ -144,10 +143,6 @@ function RecordSummary({ record }) {
           </ul>
         </div>
       )}
-      <button onClick={() => setRaw((r) => !r)} style={{ marginTop: 6, background: 'none', border: 'none', color: C.blue, cursor: 'pointer', fontSize: 10.5, padding: 0, textDecoration: 'underline' }}>
-        {raw ? 'Hide raw data' : 'Show raw data'}
-      </button>
-      {raw && <pre style={{ margin: '6px 0 0', padding: 10, background: '#f7f8fb', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 10.5, maxHeight: 320, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{JSON.stringify(record, null, 2)}</pre>}
     </div>
   );
 }
