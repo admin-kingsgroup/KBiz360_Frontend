@@ -992,13 +992,20 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     if (!gOpen) return [ghead];
     return [ghead, ...[...(g.ledgers || [])].sort((x, y) => azByName(x.name, y.name)).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))];
   });
+  const allIncomeLedgers = incomeGroups.flatMap((g) => g.ledgers || []);
+  // The "Indirect Income" line must itself open the income ledger account. When the
+  // whole indirect income is one ledger, the single line opens it directly; with
+  // several ledgers it becomes a drill header (expand → click any ledger). If the
+  // backend hasn't sent the income tree yet, still make the line clickable.
+  const incomeBlock = indIncome <= 0 ? []
+    : allIncomeLedgers.length === 1
+      ? [{ label: 'Indirect Income', amount: indIncome, ledger: allIncomeLedgers[0].name, leaf: true }]
+      : incomeGroups.length
+        ? [{ label: 'Indirect Income', amount: indIncome, group: true }, ...incomeTreeRows]
+        : [{ label: 'Indirect Income', amount: indIncome, ledger: 'Indirect Income', leaf: true }];
   const plRight = [
     { label: 'Gross Profit b/d', amount: grossProfit, result: true },
-    ...(indIncome > 0
-      ? (incomeGroups.length
-        ? [{ label: 'Indirect Income', amount: indIncome, group: true }, ...incomeTreeRows]
-        : [{ label: 'Indirect Income', amount: indIncome }])
-      : []),
+    ...incomeBlock,
   ];
   const plTotal = grossProfit + indIncome;
 
@@ -1137,6 +1144,8 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     if (!gOpen) return [ghead];
     return [ghead, ...(g.ledgers || []).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))];
   });
+  const allIncomeLedgers = incomeGroups.flatMap((g) => g.ledgers || []);
+  const oneIncomeLedger = allIncomeLedgers.length === 1; // the "Indirect Income" line opens it directly
 
   // Indirect-expense tree (bucket → sub-group → ledger) — identical to ClassicPnL.
   const expenseRows = buckets.flatMap((b) => {
@@ -1238,13 +1247,15 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
           {modules.flatMap((m) => moduleBlock(m, 'cogs')).map((r, i) => <Row key={'c' + i} r={r} neg />)}
           <Sub txt="Total Cost of Sales" val={d.totals.cogs} neg />
           <Result txt="Gross Profit" val={grossProfit} />
-          {indIncome > 0 && (incomeGroups.length
-            ? <>
-                <Head txt="Add: Other Income (Indirect Income)" />
-                <Row r={{ label: 'Indirect Income', amount: indIncome, group: true }} />
-                {incomeRows.map((r, i) => <Row key={'ii' + i} r={r} />)}
-              </>
-            : <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome }} />)}
+          {indIncome > 0 && (oneIncomeLedger
+            ? <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome, ledger: allIncomeLedgers[0].name, leaf: true }} />
+            : incomeGroups.length
+              ? <>
+                  <Head txt="Add: Other Income (Indirect Income)" />
+                  <Row r={{ label: 'Indirect Income', amount: indIncome, group: true }} />
+                  {incomeRows.map((r, i) => <Row key={'ii' + i} r={r} />)}
+                </>
+              : <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome, ledger: 'Indirect Income', leaf: true }} />)}
           <Head txt="Less: Indirect Expenses" />
           <Row r={{ label: 'Indirect Expenses', amount: d.indirect.expense, group: true }} neg />
           {expenseRows.map((r, i) => <Row key={'e' + i} r={r} neg />)}

@@ -157,14 +157,19 @@ function TkfPnL({ branch, from, to }) {
   expRows.push({ label: 'Total Indirect Expenses', amount: d.indirect?.expense || 0, subtotal: true });
   const otherRows = [];
   const incomeGroups = d.indirect?.incomeGroups || [];
-  if (incomeGroups.length) {
+  const allIncomeLedgers = incomeGroups.flatMap((g) => g.ledgers || []);
+  const indIncomeTotal = d.indirect?.income || d.bridge?.indirectIncome || 0;
+  if (allIncomeLedgers.length === 1) {
+    // One income ledger → the "Indirect Income" line opens it directly.
+    otherRows.push({ label: 'Indirect Income', amount: indIncomeTotal, ledger: allIncomeLedgers[0].name });
+  } else if (incomeGroups.length) {
     incomeGroups.forEach((g) => {
       otherRows.push({ label: g.name, amount: g.amount, bold: true });
       (g.ledgers || []).forEach((l) => otherRows.push({ label: l.name, amount: l.amount, ledger: l.name, indent: 1 }));
     });
-    otherRows.push({ label: 'Total Indirect Income', amount: d.indirect?.income || d.bridge?.indirectIncome || 0, subtotal: true });
+    otherRows.push({ label: 'Total Indirect Income', amount: indIncomeTotal, subtotal: true });
   } else if (d.bridge?.indirectIncome) {
-    otherRows.push({ label: 'Indirect Income', amount: d.bridge.indirectIncome });
+    otherRows.push({ label: 'Indirect Income', amount: d.bridge.indirectIncome, ledger: 'Indirect Income' });
   }
 
   const sections = [
