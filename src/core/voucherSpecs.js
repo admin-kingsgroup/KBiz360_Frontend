@@ -61,10 +61,10 @@ export const VSPECS = {
   SH: {
     code: 'SH', name: 'Holiday Package', icon: '🌴', headerLabel: 'Destination / Package',
     // Tour-operator package model: 5% GST on the gross package value (no service
-    // charge), + 2% TCS u/s 206C(1G) on International packages.
+    // charge), + 5% TCS u/s 206C(1G) on International packages.
     model: 'package', gstRate: PKG_GST,
-    tax: { kind: 'holiday', rate: 5, tcsRate: 2 },
-    tcs: { rate: 2, intlOnly: true },
+    tax: { kind: 'holiday', rate: 5, tcsRate: 5 },
+    tcs: { rate: 5, intlOnly: true },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'pkg', label: 'Package', kind: 'tkt' }, { key: 'ref', label: 'Ref', kind: 'pnr' },
@@ -202,24 +202,26 @@ export const gpOf = (spec, l) => r2((finalSales(spec, l) - salesGST(l)) - (final
 export const gpPctOf = (spec, l) => { const fs = finalSales(spec, l); return fs > 0 ? r2((gpOf(spec, l) / fs) * 100) : 0; };
 
 // Holiday "package" model (tour-operator): no service charge; Supplier Service GST
-// is entered; Markup is net with GST auto @5%. Actual Sales Price (ASP) =
-// Land + Supplier Service + Supplier Service GST + Markup + Markup GST; output GST
-// = 5% × ASP; TCS (Intl) added at booking level on (ASP + GST). Cost = Land +
-// Supplier Service + Supplier Service GST (no ITC). GP = Markup (net) only.
+// is entered; Markup is the net agency margin. Tour-operator 5% scheme (no ITC):
+// a SINGLE 5% output GST on the full package consideration (taxable) =
+// Land + Supplier Service + Supplier Service GST + Markup. The markup is taxed ONCE
+// here as part of the taxable value — NOT booked as a separate markup GST AND
+// re-taxed inside the base (the old double-count that made GST ~5.41%). TCS (Intl)
+// added at booking level on (taxable + GST). Cost = Land + Supplier Service +
+// Supplier Service GST (no ITC). GP = Markup (net) only.
 export function lineCalcPackage(spec, l) {
   const rate = spec.gstRate || PKG_GST;
   const land = num(l.base);
   const psvc = num(l.psvc);
   const psvcGst = num(l.psvcGst);          // Supplier Service GST — entered
   const markup = num(l.markup);            // net markup (agency margin = GP)
-  const markupGst = r2(markup * rate);     // Markup GST — auto @5%
-  const asp = r2(land + psvc + psvcGst + markup + markupGst);
-  const outGst = r2(asp * rate);           // 5% output GST on ASP
-  const finalSales = r2(asp + outGst);     // TCS added at booking level
+  const taxable = r2(land + psvc + psvcGst + markup); // full package consideration
+  const outGst = r2(taxable * rate);       // single 5% output GST
+  const finalSales = r2(taxable + outGst); // TCS added at booking level
   const finalPurchase = r2(land + psvc + psvcGst); // cost (no recoverable ITC)
-  const salesGST = r2(markupGst + outGst);
+  const salesGST = outGst;
   return {
-    pass: land, gstSvc: 0, gstMk: markupGst, gstPur: 0, psvcGst, markup, asp, outGst,
+    pass: land, gstSvc: 0, gstMk: r2(markup * rate), gstPur: 0, psvcGst, markup, asp: taxable, outGst,
     finalSales, finalPurchase, salesGST, gp: markup,
     gpPct: finalSales > 0 ? r2((markup / finalSales) * 100) : 0,
   };
