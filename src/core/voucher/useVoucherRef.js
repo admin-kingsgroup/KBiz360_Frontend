@@ -4,9 +4,12 @@ import { PMT_MODES_V } from '../helpers';
 
 // Bundled fallback for the credit/debit-note reason lists (used only until the
 // backend app-config key 'voucherRef' loads, or if it's absent).
+// Cancellation / refund of a sale or purchase is handled ONLY by the Refund (RF) /
+// Reissue (RI) vouchers (full reversal of the original booking). Credit / Debit Notes
+// are for OTHER adjustments — discounts, rate differences, corrections.
 const NOTE_REASONS = {
-  credit: ['Ticket Cancellation / Refund', 'Fare Correction', 'Sales Return', 'Discount Allowed', 'Rate Difference'],
-  debit: ['Ticket Cancellation by Airline', 'Purchase Return', 'Rate Difference', 'Overcharge Correction', 'Discount Received'],
+  credit: ['Fare Correction', 'Discount Allowed', 'Rate Difference', 'Other Adjustment'],
+  debit: ['Rate Difference', 'Overcharge Correction', 'Discount Received', 'Other Adjustment'],
 };
 
 /**

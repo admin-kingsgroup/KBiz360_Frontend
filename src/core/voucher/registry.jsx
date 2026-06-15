@@ -160,9 +160,12 @@ function makeRcptPmt(side) {
 function makeNote(kind) {
   const isCredit = kind === 'credit';
   const baseLedger = isCredit ? 'Sales Return' : 'Purchase Return';
+  // Cancellation / refund of a sale or purchase is handled ONLY by the Refund (RF) /
+  // Reissue (RI) vouchers — which fully reverse the original booking. Credit / Debit
+  // Notes are for OTHER adjustments (discounts, rate differences, corrections).
   const reasons = isCredit
-    ? ['Ticket Cancellation / Refund', 'Fare Correction', 'Sales Return', 'Discount Allowed', 'Rate Difference']
-    : ['Ticket Cancellation by Airline', 'Purchase Return', 'Rate Difference', 'Overcharge Correction', 'Discount Received'];
+    ? ['Fare Correction', 'Discount Allowed', 'Rate Difference', 'Other Adjustment']
+    : ['Rate Difference', 'Overcharge Correction', 'Discount Received', 'Other Adjustment'];
   return {
     type: isCredit ? 'SCN' : 'SDN',
     label: isCredit ? 'Credit Note' : 'Debit Note',
@@ -220,13 +223,13 @@ function makeRefundReissue(kind) {
     label: isRefund ? 'Refund Voucher' : 'Reissue Voucher',
     icon: isRefund ? '↩️' : '🔁',
     explain: isRefund
-      ? (<><b style={{ color: '#A07828' }}>Refund:</b> cancellation of a sale. The <b>supplier/airline (Creditor) is Debited</b> with the refund receivable; we retain a service charge + markup (income), and the <b>customer (Debtor) is Credited</b> with the balance refunded.</>)
+      ? (<><b style={{ color: '#A07828' }}>Refund:</b> cancellation of a sale — the <b>original sale and its purchase are reversed in full</b> (Base Fare / taxes on both Sales &amp; Purchase unwind). We then retain a cancellation service charge + markup (income) and absorb the airline's cancellation fee; the <b>customer is refunded the net balance</b>. Link the related Purchase invoice so the supplier side also reverses.</>)
       : (<><b style={{ color: '#A07828' }}>Reissue:</b> amendment of a sale. The <b>customer (Debtor) is Debited</b> with the total billed; the <b>supplier/airline (Creditor) is Credited</b> with the fee + fare difference; our service charge + markup are retained as income.</>),
 
-    initial: () => ({ date: todayISO(), againstInvoice: '', gstMode: 'intra', party: '', counterParty: '', supplierAmt: '', serviceCharge: '', markup: '', gstPct: 18, supplierSvc: '', supplierGst: '', remarks: '' }),
+    initial: () => ({ date: todayISO(), againstInvoice: '', againstPurchase: '', gstMode: 'intra', party: '', counterParty: '', supplierAmt: '', serviceCharge: '', markup: '', gstPct: 18, supplierSvc: '', supplierGst: '', remarks: '' }),
 
     fromVoucher: (v) => ({
-      date: v.date || '', againstInvoice: v.againstInvoice || v.linkNo || '', gstMode: v.gstMode || 'intra',
+      date: v.date || '', againstInvoice: v.againstInvoice || v.linkNo || '', againstPurchase: v.againstPurchase || '', gstMode: v.gstMode || 'intra',
       party: v.party || '', counterParty: v.counterParty || '', supplierAmt: v.supplierAmt ?? '',
       serviceCharge: lineAmt(v, 'Service Charge Income'), markup: lineAmt(v, 'Markup Income'),
       gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18,
@@ -251,7 +254,7 @@ function makeRefundReissue(kind) {
         counterParty: s.counterParty, counterPartyGroup: 'Sundry Creditors',
         supplierAmt, supplierSvc: supSvc, supplierGst: supGst,
         lines, subtotal: ourIncome, taxAmt, gstMode: s.gstMode, gstPct: +s.gstPct || 0, total,
-        againstInvoice: s.againstInvoice, linkNo: s.againstInvoice,
+        againstInvoice: s.againstInvoice, againstPurchase: s.againstPurchase || '', linkNo: s.againstInvoice,
         remarks: s.remarks || `Being ${kind}${s.againstInvoice ? ` against ${s.againstInvoice}` : ''}`,
         status: 'saved',
       };
