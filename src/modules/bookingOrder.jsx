@@ -88,7 +88,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // No-supplier mode (Misc only): a sale with no purchase leg — full sale value is
   // income. Hides the Purchase Order + supplier fields and posts only the sale.
   const [noSupplier, setNoSupplier] = useState(editing ? !!editBooking.noSupplier : false);
-  const [gstMode, setGstMode] = useState(editing ? (editBooking.gstMode || 'intra') : 'intra');
+  // GST mode is set per leg: place of supply can differ (in-state sale → intra,
+  // out-of-state supplier purchase → inter). Default sale=intra; on edit, prefer the
+  // leg's own stored mode, falling back to the legacy booking-level gstMode.
+  const [saleGstMode, setSaleGstMode] = useState(editing ? (editBooking.so?.gstMode || editBooking.gstMode || 'intra') : 'intra');
+  const [purGstMode, setPurGstMode] = useState(editing ? (editBooking.po?.gstMode || editBooking.gstMode || 'intra') : 'intra');
   // No silent default — the user MUST consciously pick International vs Domestic
   // (that choice IS the cost centre). A blank leaves it untagged: it still saves as
   // Pending but the approval gate refuses to post it until it's tagged.
@@ -149,9 +153,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         customer: { name: customer.name, gstin: customer.gstin, address: customer.address, email: customer.email, contact: customer.contact, group: customer.group, ledgerName: customer.ledgerName || customer.name, ledgerGroup: customer.ledgerGroup || customer.group },
         supplier: isNoSupp ? { name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }
           : { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup },
-        gstMode, packageType: hasPackage ? packageType : '',
+        gstMode: saleGstMode, packageType: hasPackage ? packageType : '',
         headerRef, rows: lines.map((l) => syncLineRefs(spec, l)),
-        po: totals.po, so: totals.so,
+        po: { ...totals.po, gstMode: purGstMode }, so: { ...totals.so, gstMode: saleGstMode },
         gp: { lines: gpLines, total: totals.gp.total, pct: totals.gp.pct },
         remarks,
       };
@@ -346,7 +350,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             {!hasSuppLedger && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — pick the Creditor ledger to post & pay against</span>}
           </FL>}
           {!isNoSupp && <FL label="Supplier sub-group (auto)"><input value={supplier.ledgerGroup} readOnly placeholder="picks with the supplier" style={{ ...inp, background: '#faf7ef', color: '#5a6691' }} /></FL>}
-          <FL label="GST mode"><select value={gstMode} onChange={(e) => setGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
+          <FL label="Sale GST mode"><select value={saleGstMode} onChange={(e) => setSaleGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
+          {!isNoSupp && <FL label="Purchase GST mode"><select value={purGstMode} onChange={(e) => setPurGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>}
           {hasPackage && <FL label="Package type *"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={{ ...inp, ...(packageType ? {} : { borderColor: '#A32D2D' }) }}><option value="">— Select International / Domestic —</option><option value="Domestic">Domestic</option><option value="International">International</option></select>
             {!packageType && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — sets the cost centre (Int'l/Domestic GP). Must be picked before approving.</span>}
           </FL>}
