@@ -15,7 +15,7 @@
 // No demo-data fallback — empty in, empty out (same contract as useVouchers).
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPut, apiPost, getAuthToken } from './api';
+import { apiGet, apiPut, apiPost, apiDelete, getAuthToken } from './api';
 
 // The shell passes `branch` as either the string "ALL" or a branch object.
 // The backend treats a missing/ALL branch as "all branches".
@@ -324,14 +324,43 @@ export function useBackfillCostCenters() {
   });
 }
 
-// Seeded, read-only cost-centre catalogue (7 modules + Int'l/Domestic sub-centres
-// for Flights & Holiday). GET /api/cost-centers → { costCenters, modules }.
-export function useCostCenters() {
+// Branch-wise cost-centre catalogue (each branch carries its own copy of the
+// standard set + any Super-Admin custom centres). GET /api/cost-centers?branch=…
+// → { costCenters, modules }. Pass includeInactive to also load deactivated ones
+// (the master screen), else only active centres are returned.
+export function useCostCenters(branch, { includeInactive = false } = {}) {
+  const params = new URLSearchParams();
+  if (branch && branch !== 'ALL') params.set('branch', branch);
+  if (includeInactive) params.set('includeInactive', 'true');
+  const qs = params.toString();
   return useQuery({
-    queryKey: ['cost-centers'],
-    queryFn: () => apiGet('/api/cost-centers'),
+    queryKey: ['cost-centers', branch || 'ALL', includeInactive],
+    queryFn: () => apiGet(`/api/cost-centers${qs ? '?' + qs : ''}`),
     enabled: enabled(),
-    staleTime: 5 * 60_000, // seeded & immutable
+    staleTime: 60_000,
+  });
+}
+
+// Super-Admin cost-centre management (custom add / edit / deactivate / delete).
+export function useCreateCostCenter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => apiPost('/api/cost-centers', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cost-centers'] }),
+  });
+}
+export function useUpdateCostCenter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }) => apiPut(`/api/cost-centers/${id}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cost-centers'] }),
+  });
+}
+export function useDeleteCostCenter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => apiDelete(`/api/cost-centers/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cost-centers'] }),
   });
 }
 

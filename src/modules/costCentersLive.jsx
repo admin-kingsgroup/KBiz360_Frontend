@@ -1,36 +1,50 @@
 /* ════════════════════════════════════════════════════════════════════
    MODULES/COST-CENTERS-LIVE.JSX
 
-   Cost Centre Master — the FIXED, seeded cost centres used for module-wise
-   Gross Profit on sales & purchase: the 7 product modules, with Int'l /
-   Domestic sub-centres for Flights & Holiday Packages.
+   Cost Centre Master — BRANCH-WISE cost centres for module-wise Gross Profit
+   on sales & purchase. Every branch carries its own copy of the standard set
+   (e.g. BOM-FLT-INT, AMD-HOT …); Super Admin may add CUSTOM cost centres per
+   branch and rename / deactivate / delete them.
 
-   Seeded server-side and immutable — there is no add / edit / delete. This
-   screen is VIEW-ONLY and restricted to Super Admin.
+   • Standard centres (system) can be renamed, reordered and deactivated, but
+     never hard-deleted (their code is referenced by historical vouchers).
+   • Custom centres are fully editable and deletable.
+   Restricted to Super Admin.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useState } from 'react';
-import { useCostCenters, useBackfillCostCenters } from '../core/useAccounting';
+import React, { useState, useMemo } from 'react';
+import { useCostCenters, useCreateCostCenter, useUpdateCostCenter, useDeleteCostCenter, useBackfillCostCenters } from '../core/useAccounting';
+import { useBranches } from '../core/useReference';
 import { exportToExcel } from '../core/exportExcel';
 
-const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691', GREEN = '#27500A';
+const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691', GREEN = '#27500A', RED = '#A32D2D';
 const isSuperAdmin = (u) => /super\s*admin/i.test(u?.role || '');
+const inp = { padding: '7px 10px', border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 12.5, outline: 'none' };
+const btn = (bg, fg) => ({ padding: '6px 12px', background: bg, color: fg, border: 'none', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' });
 
 export function CostCenterMasterLive({ currentUser }) {
-  const q = useCostCenters();
+  const branchesQ = useBranches();
+  const branches = branchesQ.data || [];
+  const [branch, setBranch] = useState('');
+  // Default to the user's branch, else the first available branch.
+  const activeBranch = branch || currentUser?.branch || branches[0]?.code || '';
+
+  const q = useCostCenters(activeBranch, { includeInactive: true });
+  const createCc = useCreateCostCenter();
+  const updateCc = useUpdateCostCenter();
+  const deleteCc = useDeleteCostCenter();
   const backfill = useBackfillCostCenters();
-  const [bfMsg, setBfMsg] = useState('');
+
+  const [form, setForm] = useState({ name: '', module: 'Miscellaneous', code: '' });
+  const [showAdd, setShowAdd] = useState(false);
+  const [msg, setMsg] = useState(null); // { ok, text }
+
   const data = q.data || {};
   const centers = data.costCenters || [];
   const modules = data.modules || [];
+  const moduleKeys = useMemo(() => (modules.length ? modules.map((m) => m.key) : ['Flights', 'Holiday Packages', 'Hotels', 'Visa Services', 'Car Rental', 'Travel Insurance', 'Miscellaneous']), [modules]);
 
-  const runBackfill = () => {
-    setBfMsg('');
-    backfill.mutate(undefined, {
-      onSuccess: (d) => setBfMsg(`✓ Re-tagged ${d.updated} of ${d.scanned} untagged voucher(s).`),
-      onError: (e) => setBfMsg(`⚠ ${e.message}`),
-    });
-  };
+  const flash = (ok, text) => { setMsg({ ok, text }); setTimeout(() => setMsg(null), 4000); };
 
   if (!isSuperAdmin(currentUser)) {
     return (
@@ -38,50 +52,103 @@ export function CostCenterMasterLive({ currentUser }) {
         <div style={{ fontSize: 34, marginBottom: 6 }}>🔒</div>
         <h2 style={{ margin: 0, color: DARK, fontSize: 17 }}>Cost Centre Master — restricted</h2>
         <p style={{ color: DIM, fontSize: 12.5, marginTop: 8 }}>
-          These cost centres are seeded and view-only. Access is limited to <b>Super Admin</b>.
+          Branch-wise cost centres. Management is limited to <b>Super Admin</b>.
           {currentUser?.role && <> Your role is <b>{currentUser.role}</b>.</>}
         </p>
       </div>
     );
   }
 
-  // Group leaves under their module, in the seeded module order.
-  const byModule = modules.map((m) => ({ ...m, leaves: centers.filter((c) => c.module === m.key) }));
+  const add = () => {
+    if (!form.name.trim()) { flash(false, 'Enter a cost-centre name.'); return; }
+    createCc.mutate({ branch: activeBranch, name: form.name.trim(), module: form.module, code: form.code.trim() || undefined }, {
+      onSuccess: (cc) => { flash(true, `Added ${cc.code}.`); setForm({ name: '', module: 'Miscellaneous', code: '' }); setShowAdd(false); },
+      onError: (e) => flash(false, e.message || 'Could not add cost centre'),
+    });
+  };
+  const rename = (cc) => {
+    const name = window.prompt(`Rename cost centre ${cc.code}:`, cc.name);
+    if (name == null || !name.trim() || name.trim() === cc.name) return;
+    updateCc.mutate({ id: cc._id, name: name.trim() }, { onSuccess: () => flash(true, `Renamed ${cc.code}.`), onError: (e) => flash(false, e.message) });
+  };
+  const toggleActive = (cc) => updateCc.mutate({ id: cc._id, active: !cc.active }, {
+    onSuccess: () => flash(true, `${cc.code} ${cc.active ? 'deactivated' : 'reactivated'}.`), onError: (e) => flash(false, e.message),
+  });
+  const del = (cc) => {
+    if (!window.confirm(`Delete custom cost centre ${cc.code}? This cannot be undone.`)) return;
+    deleteCc.mutate(cc._id, { onSuccess: () => flash(true, `Deleted ${cc.code}.`), onError: (e) => flash(false, e.message) });
+  };
+  const runBackfill = () => backfill.mutate(undefined, {
+    onSuccess: (d) => flash(true, `Re-tagged ${d.updated} of ${d.scanned} untagged voucher(s).`),
+    onError: (e) => flash(false, e.message),
+  });
 
-  const exportSheet = () => exportToExcel('cost-centres',
-    [{ key: 'code', label: 'Code' }, { key: 'name', label: 'Cost Centre' }, { key: 'module', label: 'Module' }, { key: 'appliesTo', label: 'Applies To' }, { key: 'status', label: 'Status' }],
-    centers.map((c) => ({ code: c.code, name: c.name, module: c.module, appliesTo: 'Sales & Purchase', status: 'Active' })));
+  // Group by module (standard module order first, then any custom modules).
+  const orderedModules = [...new Set([...moduleKeys, ...centers.map((c) => c.module)])];
+  const byModule = orderedModules
+    .map((key) => ({ key, meta: modules.find((m) => m.key === key), leaves: centers.filter((c) => c.module === key).sort((a, b) => (a.order || 0) - (b.order || 0) || a.code.localeCompare(b.code)) }))
+    .filter((g) => g.leaves.length);
+
+  const exportSheet = () => exportToExcel(`cost-centres-${activeBranch}`,
+    [{ key: 'code', label: 'Code' }, { key: 'name', label: 'Cost Centre' }, { key: 'module', label: 'Module' }, { key: 'branch', label: 'Branch' }, { key: 'kind', label: 'Type' }, { key: 'status', label: 'Status' }],
+    centers.map((c) => ({ code: c.code, name: c.name, module: c.module, branch: c.branch, kind: c.system ? 'Standard' : 'Custom', status: c.active ? 'Active' : 'Inactive' })));
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto', padding: '12px 10px' }}>
+    <div style={{ maxWidth: 1040, margin: '0 auto', padding: '12px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>Cost Centre Master</h2>
-          <p style={{ margin: '3px 0 0', fontSize: 11, color: DIM }}>Fixed cost centres for module-wise Gross Profit on sales &amp; purchase · seeded &amp; immutable</p>
+          <p style={{ margin: '3px 0 0', fontSize: 11, color: DIM }}>Branch-wise cost centres for module-wise Gross Profit · standard set + your custom centres</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ padding: '4px 10px', background: '#eef4ec', color: GREEN, border: '1px solid #cfe3c4', borderRadius: 14, fontSize: 11, fontWeight: 700 }}>🔒 Seeded · View only</span>
-          <span style={{ padding: '4px 10px', background: '#fff7e6', color: '#8a6300', border: '1px solid #f0dca6', borderRadius: 14, fontSize: 11, fontWeight: 700 }}>{centers.length} cost centres</span>
-          <button onClick={exportSheet} disabled={centers.length === 0} title="Export to Excel"
-            style={{ padding: '6px 12px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: centers.length === 0 ? 'not-allowed' : 'pointer', opacity: centers.length === 0 ? 0.5 : 1 }}>📤 Export</button>
-          <button onClick={runBackfill} disabled={backfill.isPending}
-            style={{ padding: '6px 12px', background: DARK, color: GOLD, border: 'none', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: backfill.isPending ? 'wait' : 'pointer' }}
-            title="Re-derive the cost centre for already-imported vouchers from their saved Ticket Type / Service Type / Country">
-            {backfill.isPending ? 'Re-tagging…' : '↻ Re-tag existing vouchers'}
+          <label style={{ fontSize: 11, fontWeight: 700, color: DIM }}>Branch&nbsp;
+            <select value={activeBranch} onChange={(e) => setBranch(e.target.value)} style={{ ...inp, padding: '5px 8px' }}>
+              {branches.map((b) => <option key={b.code} value={b.code}>{b.code}{b.city ? ` — ${b.city}` : ''}</option>)}
+            </select>
+          </label>
+          <span style={{ padding: '4px 10px', background: '#fff7e6', color: '#8a6300', border: '1px solid #f0dca6', borderRadius: 14, fontSize: 11, fontWeight: 700 }}>{centers.length} centres</span>
+          <button onClick={() => setShowAdd((s) => !s)} style={btn(GOLD, DARK)}>＋ Add cost centre</button>
+          <button onClick={exportSheet} disabled={!centers.length} style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', cursor: centers.length ? 'pointer' : 'not-allowed', opacity: centers.length ? 1 : 0.5 }}>📤 Export</button>
+          <button onClick={runBackfill} disabled={backfill.isPending} style={btn(DARK, GOLD)} title="Re-derive cost centres for already-imported vouchers from their saved Ticket Type / Service Type / Country">
+            {backfill.isPending ? 'Re-tagging…' : '↻ Re-tag vouchers'}
           </button>
         </div>
       </div>
-      {bfMsg && <div style={{ marginBottom: 12, padding: '8px 14px', borderRadius: 8, background: bfMsg[0] === '✓' ? '#eef4ec' : '#FCEBEB', color: bfMsg[0] === '✓' ? GREEN : '#A32D2D', fontSize: 12, fontWeight: 600 }}>{bfMsg}</div>}
+
+      {msg && <div style={{ marginBottom: 12, padding: '8px 14px', borderRadius: 8, background: msg.ok ? '#eef4ec' : '#FCEBEB', color: msg.ok ? GREEN : RED, fontSize: 12, fontWeight: 600 }}>{msg.ok ? '✓ ' : '⚠ '}{msg.text}</div>}
+
+      {showAdd && (
+        <div style={{ marginBottom: 14, padding: 14, background: '#fff', border: '1px solid #e1e3ec', borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Cost-centre name *</label>
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Safari Packages" style={{ ...inp, width: 220 }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Module</label>
+            <select value={form.module} onChange={(e) => setForm({ ...form, module: e.target.value })} style={{ ...inp, width: 180 }}>
+              {moduleKeys.map((k) => <option key={k} value={k}>{k}</option>)}
+              <option value="Custom">Custom</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Code (optional)</label>
+            <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="auto from name" style={{ ...inp, width: 150, fontFamily: 'monospace' }} />
+          </div>
+          <span style={{ fontSize: 10.5, color: DIM, alignSelf: 'center' }}>Will be created for <b>{activeBranch}</b> as <code style={{ color: DARK }}>{activeBranch}-…</code></span>
+          <button onClick={add} disabled={createCc.isPending} style={btn(GREEN, '#fff')}>{createCc.isPending ? 'Saving…' : 'Save'}</button>
+          <button onClick={() => setShowAdd(false)} style={{ ...btn('#fff', DIM), border: '1px solid #d6dbe6' }}>Cancel</button>
+        </div>
+      )}
 
       {q.isLoading && <div style={{ padding: 28, textAlign: 'center', color: DIM, background: '#fff', border: '1px solid #e1e3ec', borderRadius: 10 }}>Loading…</div>}
-      {q.isError && <div style={{ padding: 16, color: '#A32D2D', background: '#FCEBEB', border: '1px solid #f3c9c9', borderRadius: 10, fontSize: 12, fontWeight: 600 }}>⚠ {q.error?.message || 'Failed to load cost centres'}</div>}
+      {q.isError && <div style={{ padding: 16, color: RED, background: '#FCEBEB', border: '1px solid #f3c9c9', borderRadius: 10, fontSize: 12, fontWeight: 600 }}>⚠ {q.error?.message || 'Failed to load cost centres'}</div>}
 
       {!q.isLoading && !q.isError && (
         <div style={{ background: '#fff', border: '1px solid #e1e3ec', borderRadius: 10, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
               <tr style={{ background: DARK }}>
-                {['Code', 'Cost Centre', 'Module', 'Applies To', 'Status'].map((h, i) => (
+                {['Code', 'Cost Centre', 'Module', 'Type', 'Status', 'Actions'].map((h, i) => (
                   <th key={h} style={{ padding: '9px 14px', textAlign: i > 2 ? 'center' : 'left', color: GOLD, fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{h}</th>
                 ))}
               </tr>
@@ -90,35 +157,43 @@ export function CostCenterMasterLive({ currentUser }) {
               {byModule.map((m) => (
                 <React.Fragment key={m.key}>
                   <tr style={{ background: '#f3f6fb', borderTop: '1px solid #e1e3ec' }}>
-                    <td colSpan={5} style={{ padding: '7px 14px', fontWeight: 700, color: DARK }}>
-                      <span style={{ marginRight: 7 }}>{m.icon}</span>{m.key}
-                      {m.hasSubs ? <span style={{ marginLeft: 8, fontSize: 9.5, fontWeight: 700, color: '#185FA5', background: '#e6f1fb', border: '1px solid #c3ddf5', borderRadius: 5, padding: '1px 6px' }}>INT'L / DOMESTIC</span>
-                        : <span style={{ marginLeft: 8, fontSize: 9.5, fontWeight: 700, color: DIM, background: '#f0f1f5', border: '1px solid #e1e3ec', borderRadius: 5, padding: '1px 6px' }}>SINGLE</span>}
+                    <td colSpan={6} style={{ padding: '7px 14px', fontWeight: 700, color: DARK }}>
+                      <span style={{ marginRight: 7 }}>{m.meta?.icon || '•'}</span>{m.key}
+                      {m.meta?.hasSubs && <span style={{ marginLeft: 8, fontSize: 9.5, fontWeight: 700, color: '#185FA5', background: '#e6f1fb', border: '1px solid #c3ddf5', borderRadius: 5, padding: '1px 6px' }}>INT'L / DOMESTIC</span>}
                     </td>
                   </tr>
                   {m.leaves.map((c) => (
-                    <tr key={c.code} style={{ borderTop: '1px solid #f0f2f7' }}>
+                    <tr key={c._id || c.code} style={{ borderTop: '1px solid #f0f2f7', opacity: c.active ? 1 : 0.55 }}>
                       <td style={{ padding: '8px 14px', fontFamily: 'monospace', fontWeight: 700, color: DARK }}>{c.code}</td>
                       <td style={{ padding: '8px 14px 8px 28px', color: DARK }}>{c.name}</td>
                       <td style={{ padding: '8px 14px', color: DIM }}>{c.module}</td>
-                      <td style={{ padding: '8px 14px', textAlign: 'center', color: DIM }}>Sales &amp; Purchase</td>
                       <td style={{ padding: '8px 14px', textAlign: 'center' }}>
-                        <span style={{ padding: '2px 8px', background: '#eef4ec', color: GREEN, borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>● Active</span>
+                        {c.system
+                          ? <span style={{ padding: '2px 8px', background: '#eef2fb', color: '#3a4d80', borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>Standard</span>
+                          : <span style={{ padding: '2px 8px', background: '#fff3e0', color: '#8a5300', borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>Custom</span>}
+                      </td>
+                      <td style={{ padding: '8px 14px', textAlign: 'center' }}>
+                        <span style={{ padding: '2px 8px', background: c.active ? '#eef4ec' : '#f0f1f5', color: c.active ? GREEN : DIM, borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>● {c.active ? 'Active' : 'Inactive'}</span>
+                      </td>
+                      <td style={{ padding: '6px 14px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <button onClick={() => rename(c)} title="Rename" style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', padding: '3px 8px', marginRight: 5 }}>✎</button>
+                        <button onClick={() => toggleActive(c)} title={c.active ? 'Deactivate' : 'Reactivate'} style={{ ...btn('#fff', c.active ? RED : GREEN), border: '1px solid #d6dbe6', padding: '3px 8px', marginRight: 5 }}>{c.active ? '⏻' : '✓'}</button>
+                        {!c.system && <button onClick={() => del(c)} title="Delete custom cost centre" style={{ ...btn('#fff', RED), border: '1px solid #f3c9c9', padding: '3px 8px' }}>🗑</button>}
                       </td>
                     </tr>
                   ))}
                 </React.Fragment>
               ))}
+              {!byModule.length && <tr><td colSpan={6} style={{ padding: 22, textAlign: 'center', color: DIM }}>No cost centres for {activeBranch} yet.</td></tr>}
             </tbody>
           </table>
         </div>
       )}
 
       <p style={{ fontSize: 10.5, color: DIM, marginTop: 12, lineHeight: 1.6 }}>
-        These cost centres are fixed and cannot be added, edited or deleted. Hotels, Visa, Car Rental, Insurance and
-        Miscellaneous are tagged automatically from the voucher type. Flights and Holiday are split into International /
-        Domestic from the CRM billing push; until a voucher is tagged it rolls up under that module's “Unspecified” line
-        in the Profit &amp; Loss report.
+        Each branch has its own cost centres (e.g. <code>{activeBranch}-FLT-INT</code>). Standard centres can be renamed or
+        deactivated but not deleted — their code is referenced by posted vouchers. Hotels, Visa, Car Rental, Insurance and
+        Miscellaneous are tagged automatically from the voucher type; Flights and Holiday are split International / Domestic.
       </p>
     </div>
   );
