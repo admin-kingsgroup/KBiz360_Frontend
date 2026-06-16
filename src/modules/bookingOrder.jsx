@@ -135,19 +135,17 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const delLine = (i) => setLines(lines.length > 1 ? lines.filter((_, idx) => idx !== i) : [blankLine(spec)]);
 
   // Switch the active module. For a NEW voucher the effect on `moduleCode` swaps the
-  // seed grid. While EDITING the line grid can't carry over — each module has its own
-  // fare/passenger columns — so changing the module resets the grid to one blank line
-  // for the new module (customer, supplier, dates & remarks are kept). The backend
-  // accepts the new module on Save and re-prefixes the spawned vouchers on approval.
+  // seed grid. While EDITING the entered details are KEPT — each existing row is
+  // re-shaped onto the new module's columns (shared fields like markup / service charge
+  // / supplier service and any same-named fare/id columns carry over; the new module's
+  // own fields default in). Customer, supplier, dates, tags & remarks are untouched.
+  // The backend accepts the new module on Save and re-prefixes the spawned vouchers.
   const changeModule = (code) => {
     if (code === moduleCode) return;
     if (!editing) { setModuleCode(code); return; }
     const m = VSPECS[code];
-    if (!window.confirm(`Change this voucher from ${spec.name} to ${m.name}?\n\nThe line items will be cleared and re-entered for ${m.name} — each module has its own fare columns. Customer, supplier and dates are kept.`)) return;
+    setLines((prev) => prev.map((l) => normalizeLine(m, { ...blankLine(m), ...l })));
     setModuleCode(code);
-    setLines([blankLine(m)]);
-    setNoSupplier(false);
-    if (code !== 'SF' && code !== 'SH') setPackageType('');  // only Flight/Holiday tag Domestic/International
     setResult(null); setError('');
   };
 
@@ -305,7 +303,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {VMODULE_LIST.map((m) => (
               <button key={m.code} onClick={() => changeModule(m.code)}
-                title={editing && m.code !== moduleCode ? `Switch this voucher to ${m.name} — clears the line items` : ''}
+                title={editing && m.code !== moduleCode ? `Switch this voucher to ${m.name} — the entered details are kept` : ''}
                 style={{ padding: '5px 11px', borderRadius: 999, border: '1px solid ' + (moduleCode === m.code ? GOLD : '#2a3450'), background: moduleCode === m.code ? GOLD : 'transparent', color: moduleCode === m.code ? '#fff' : '#8b94b3', fontSize: 10.5, fontWeight: 700, cursor: m.code === moduleCode ? 'default' : 'pointer' }}>
                 {m.icon} {m.name}
               </button>
