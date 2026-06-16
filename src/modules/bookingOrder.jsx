@@ -840,7 +840,10 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                       </div>
                     ) : mode === 'approved' ? (
                       canDelete
-                        ? <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><Trash2 size={12} /> Delete</button>
+                        ? <div style={{ display: 'flex', gap: 6 }}>
+                            {onEdit && <button disabled={busyId === b.id} onClick={() => onEdit(b)} title="Edit — reverses the posted Sales/Purchase out of the books and returns this to Pending for re-approval" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit</button>}
+                            <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><Trash2 size={12} /> Delete</button>
+                          </div>
                         : <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>admin only</span>
                     ) : mode === 'deleted' ? (
                       <span style={{ fontSize: 11, color: '#8b94b3' }} title={b.deletedReason || ''}>{b.deletedBy || '—'}{b.deletedReason ? ` · ${b.deletedReason}` : ''}</span>
@@ -1072,6 +1075,14 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
     try { const res = await apiPost('/api/booking-orders/' + b.id + '/approve'); setMsg(res.noSupplier ? `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} (no purchase leg).` : `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno}.`); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Approve failed')); } finally { setBusyId(null); }
   };
+  // Open the editor. Editing an already-approved booking reverses its posted Sales/
+  // Purchase out of the books and returns it to Pending for re-approval — warn first.
+  const onEdit = (b) => {
+    if (b.status === 'approved' || b.status === 'posted') {
+      if (!window.confirm(`Edit approved booking ${b.bookingNo}?\nIts posted Sales (${b.saleVno})${b.noSupplier ? '' : ` & Purchase (${b.purchaseVno})`} will be reversed out of the books and the booking returns to Pending for re-approval.`)) return;
+    }
+    setEditing(b);
+  };
   const onCancel = async (b) => {
     const reason = window.prompt(`Reject voucher ${b.bookingNo}? Marked Rejected (no books impact). Optional reason:`, ''); if (reason === null) return;
     setBusyId(b.id);
@@ -1120,7 +1131,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
       </div>
       {status === 'edited'
         ? <EditedBookingsList rows={editedRows} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
-        : <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={setEditing} onDelete={onDelete} canDelete={canDelete} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: buildBookingInvoice(b, side, branch, master) }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />}
+        : <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: buildBookingInvoice(b, side, branch, master) }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />}
     </div>
   );
 }

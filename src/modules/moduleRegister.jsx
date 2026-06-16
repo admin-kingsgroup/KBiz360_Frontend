@@ -15,6 +15,7 @@ import { bc } from '../core/styles';
 import { PeriodBar, periodRange } from '../core/period';
 import { openPrintPreview } from '../core/PrintPreview';
 import { buildBookingInvoice } from '../core/invoiceHtml';
+import { useReportExport } from '../core/reportExportContext';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
@@ -105,6 +106,41 @@ export function ModuleRegister({ branch, mode = 'both' }) {
   };
   const showSale = mode !== 'purchase', showPur = mode !== 'sales';
   const heading = mode === 'sales' ? 'Module Sales Register' : mode === 'purchase' ? 'Module Purchase Register' : 'Module Sales & Purchase Register';
+
+  // Feed the global Tally Export / Print / PDF bar real, balanced vouchers built
+  // from the visible bookings (party Dr, sales/purchase + GST on the other side).
+  const tallyVouchers = useMemo(() => {
+    const out = [];
+    const n = (x) => Math.round(Number(x) || 0);
+    for (const b of rows) {
+      if (showSale && b.so && n(b.so.total)) {
+        const cust = b.customer?.ledgerName || b.customer?.name || 'Sundry Debtors';
+        const gst = n(b.so.gst); const net = n(b.so.total) - gst;
+        out.push({
+          date: b.date, vno: b.saleVno || b.bookingNo, vchType: 'Sales', narration: `${b.bookingNo} · ${b.linkNo || ''}`.trim(),
+          entries: [
+            { ledger: cust, amount: n(b.so.total), drCr: 'Dr' },
+            { ledger: `Sales - ${VSPECS[b.module]?.name || b.module}`, amount: net, drCr: 'Cr' },
+            ...(gst ? [{ ledger: 'Output GST', amount: gst, drCr: 'Cr' }] : []),
+          ],
+        });
+      }
+      if (showPur && !b.noSupplier && b.po && n(b.po.total)) {
+        const sup = b.supplier?.ledgerName || b.supplier?.name || 'Sundry Creditors';
+        const gst = n(b.po.gst); const net = n(b.po.total) - gst;
+        out.push({
+          date: b.date, vno: b.purchaseVno || b.bookingNo, vchType: 'Purchase', narration: `${b.bookingNo} · ${b.linkNo || ''}`.trim(),
+          entries: [
+            { ledger: `Purchase - ${VSPECS[b.module]?.name || b.module}`, amount: net, drCr: 'Dr' },
+            ...(gst ? [{ ledger: 'Input GST', amount: gst, drCr: 'Dr' }] : []),
+            { ledger: sup, amount: n(b.po.total), drCr: 'Cr' },
+          ],
+        });
+      }
+    }
+    return out;
+  }, [rows, showSale, showPur]);
+  useReportExport({ title: heading, kind: 'vouchers', rows: tallyVouchers, recommend: 'landscape' }, [tallyVouchers, heading]);
   const showMod = mod === 'ALL';
   // every datum is now a column on the single row → colSpan for loading/empty spans
   const colSpan = 3 /* bkg·link·date */ + (showMod ? 1 : 0) + 2 /* customer·supplier */

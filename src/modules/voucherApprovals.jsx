@@ -183,7 +183,10 @@ export function VoucherApprovals({ branch }) {
         <button onClick={() => doReject(e.id)} disabled={busy} style={ABTN(C.red)}>Reject</button>
       </>
     ) : status === 'approved' ? (
-      <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={ABTN(C.red)}>Delete</button>
+      <>
+        <button onClick={() => setEditId(e.id)} disabled={busy} title="Edit — un-posts this voucher and returns it to Pending for re-approval" style={ABTN(C.blue)}>Edit</button>
+        <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={ABTN(C.red)}>Delete</button>
+      </>
     ) : status === 'deleted' ? (
       <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
     ) : <span style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected</span>
@@ -374,7 +377,10 @@ export function VoucherApprovals({ branch }) {
                                               <button onClick={() => doReject(e.id)} disabled={busy} style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Reject</button>
                                             </>
                                           ) : status === 'approved' ? (
-                                            <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Delete</button>
+                                            <>
+                                              <button onClick={() => setEditId(e.id)} disabled={busy} title="Edit — un-posts this voucher and returns it to Pending for re-approval" style={{ padding: '3px 9px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Edit</button>
+                                              <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Delete</button>
+                                            </>
                                           ) : status === 'deleted' ? (
                                             <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
                                           ) : <span style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected</span>}

@@ -18,6 +18,7 @@ import { card, inp, bc } from '../core/styles';
 import { exportToExcel, vouchersToSheet } from '../core/exportExcel';
 import { voucherHaystack } from '../core/registerSearch';
 import { openPrintPreview } from '../core/PrintPreview';
+import { useReportExport } from '../core/reportExportContext';
 import { LedgerAccountView } from '../core/ledgerUI';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { usePrefs } from '../core/prefs';
@@ -479,6 +480,12 @@ export function TrialBalanceLive({ branch }) {
   const sub = `${branchLabel(branch)} · ${filtered.length} ledgers · Closing Dr ${money(cur, T.clDr)} / Cr ${money(cur, T.clCr)}`;
   const exportNow = () => filtered.length && exportToExcel(`trial-balance-${branchLabel(branch)}`, expColumns, expRows);
   const printNow = () => filtered.length && openReportPrint('Trial Balance', sub, expColumns, printRows, totalRow);
+  // Feed the global Tally Export bar each ledger's closing balance (Dr/Cr → sign).
+  const tallyLedgers = useMemo(() => filtered.map((r) => {
+    const dr = Math.round(r.closingDebit || 0), crv = Math.round(r.closingCredit || 0);
+    return { name: r.ledger, parent: r.group, amount: dr >= crv ? dr : crv, drCr: dr >= crv ? 'Dr' : 'Cr' };
+  }), [filtered]);
+  useReportExport({ title: 'Trial Balance', kind: 'ledgers', rows: tallyLedgers, recommend: 'portrait' }, [tallyLedgers]);
 
   // group-header bookkeeping while rendering the page slice
   let lastGroup = null;
@@ -1239,6 +1246,24 @@ export function RegisterLive({ branch, initial = 'sales' }) {
     if (!rows.length) return;
     exportToExcel(`${tab}-register-${product === 'all' ? 'all' : product}-${branchLabel(branch)}`, sheet.columns, sheet.rows);
   };
+  // Feed the global Tally Export bar balanced Sales/Purchase vouchers.
+  const tallyVouchers = useMemo(() => rows.map((v) => {
+    const total = Math.round(v.total || 0), gst = Math.round(v.taxAmt || 0), net = Math.round(v.subtotal || (total - gst));
+    const party = v.party || (tab === 'sales' ? 'Sundry Debtors' : 'Sundry Creditors');
+    const base = { date: v.date, vno: v.vno, narration: v.linkNo ? `Link ${v.linkNo}` : '' };
+    return tab === 'sales'
+      ? { ...base, vchType: 'Sales', entries: [
+          { ledger: party, amount: total, drCr: 'Dr' },
+          { ledger: 'Sales Account', amount: net, drCr: 'Cr' },
+          ...(gst ? [{ ledger: 'Output GST', amount: gst, drCr: 'Cr' }] : []),
+        ] }
+      : { ...base, vchType: 'Purchase', entries: [
+          { ledger: 'Purchase Account', amount: net, drCr: 'Dr' },
+          ...(gst ? [{ ledger: 'Input GST', amount: gst, drCr: 'Dr' }] : []),
+          { ledger: party, amount: total, drCr: 'Cr' },
+        ] };
+  }), [rows, tab]);
+  useReportExport({ title: tab === 'sales' ? 'Sales Register' : 'Purchase Register', kind: 'vouchers', rows: tallyVouchers, recommend: 'landscape' }, [tallyVouchers, tab]);
   const Tab = ({ id, label }) => (
     <button onClick={() => setTab(id)} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: tab === id ? DARK : '#fff', color: tab === id ? GOLD : DIM, borderColor: tab === id ? DARK : '#e1e3ec' }}>{label}</button>
   );

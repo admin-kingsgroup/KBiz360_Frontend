@@ -50,6 +50,7 @@ import { SideNav } from './shell/SideNav';
 import { TopNav } from './shell/TopNav';
 import { TopBar } from './shell/TopBar';
 import { PrintPreviewHost } from './core/PrintPreview';
+import { ReportActionBar } from './core/ReportActionBar';
 import { PrefsProvider } from './core/prefs';
 import { HotkeysProvider } from './core/ux/hotkeys';
 import { NavContext } from './core/ux/nav';
@@ -493,6 +494,9 @@ export default function KB360App(){
 
         {/* Main */}
         <main style={{flex:1,overflowY:"auto",minWidth:0,background:"#f3f4f8"}}>
+          {/* App-wide Tally Export / Print / PDF toolbar — shown on every report,
+              finance, tax & register screen. Excluded from the printout itself. */}
+          <ReportActionBar route={route} branch={branch}/>
           <ErrorBoundary resetKey={route}>
             {/* Sales & Purchase are edit-only: new entries come via bulk Data Import (old-data upload).
                 The 14 product entry forms stay reachable for reviewing/editing existing vouchers. */}
