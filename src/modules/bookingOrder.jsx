@@ -134,6 +134,23 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const addLine = () => setLines([...lines, blankLine(spec)]);
   const delLine = (i) => setLines(lines.length > 1 ? lines.filter((_, idx) => idx !== i) : [blankLine(spec)]);
 
+  // Switch the active module. For a NEW voucher the effect on `moduleCode` swaps the
+  // seed grid. While EDITING the line grid can't carry over — each module has its own
+  // fare/passenger columns — so changing the module resets the grid to one blank line
+  // for the new module (customer, supplier, dates & remarks are kept). The backend
+  // accepts the new module on Save and re-prefixes the spawned vouchers on approval.
+  const changeModule = (code) => {
+    if (code === moduleCode) return;
+    if (!editing) { setModuleCode(code); return; }
+    const m = VSPECS[code];
+    if (!window.confirm(`Change this voucher from ${spec.name} to ${m.name}?\n\nThe line items will be cleared and re-entered for ${m.name} — each module has its own fare columns. Customer, supplier and dates are kept.`)) return;
+    setModuleCode(code);
+    setLines([blankLine(m)]);
+    setNoSupplier(false);
+    if (code !== 'SF' && code !== 'SH') setPackageType('');  // only Flight/Holiday tag Domestic/International
+    setResult(null); setError('');
+  };
+
   // ── Sectors (Flight): per-sector travel detail, entered on the Purchase grid ──
   const setSec = (li, si, key, val) => setLines(lines.map((l, i) => (i === li ? { ...l, sectors: (l.sectors || []).map((s, j) => (j === si ? { ...s, [key]: val } : s)) } : l)));
   const addSec = (li) => setLines(lines.map((l, i) => (i === li ? { ...l, sectors: [...(l.sectors || []), blankSector()] } : l)));
@@ -281,15 +298,15 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : 'SO / PO / GP VOUCHER'}</p>
             <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#8b94b3' }}>
               {editing
-                ? <>Fix any data-entry mistake, then <b style={{ color: GOLD }}>Save</b> or <b style={{ color: GOLD }}>Save &amp; Approve</b> · {brCode} · still Pending until approved</>
+                ? <>Fix any data-entry mistake — or switch the <b style={{ color: GOLD }}>module</b> if it was booked wrong — then <b style={{ color: GOLD }}>Save</b> or <b style={{ color: GOLD }}>Save &amp; Approve</b> · {brCode} · still Pending until approved</>
                 : <>Enter cost + markup → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {VMODULE_LIST.map((m) => (
-              <button key={m.code} disabled={editing && m.code !== moduleCode} onClick={() => { if (!editing) setModuleCode(m.code); }}
-                title={editing ? 'Module is locked while editing' : ''}
-                style={{ padding: '5px 11px', borderRadius: 999, border: '1px solid ' + (moduleCode === m.code ? GOLD : '#2a3450'), background: moduleCode === m.code ? GOLD : 'transparent', color: moduleCode === m.code ? '#fff' : '#8b94b3', fontSize: 10.5, fontWeight: 700, cursor: editing ? (m.code === moduleCode ? 'default' : 'not-allowed') : 'pointer', opacity: editing && m.code !== moduleCode ? 0.35 : 1 }}>
+              <button key={m.code} onClick={() => changeModule(m.code)}
+                title={editing && m.code !== moduleCode ? `Switch this voucher to ${m.name} — clears the line items` : ''}
+                style={{ padding: '5px 11px', borderRadius: 999, border: '1px solid ' + (moduleCode === m.code ? GOLD : '#2a3450'), background: moduleCode === m.code ? GOLD : 'transparent', color: moduleCode === m.code ? '#fff' : '#8b94b3', fontSize: 10.5, fontWeight: 700, cursor: m.code === moduleCode ? 'default' : 'pointer' }}>
                 {m.icon} {m.name}
               </button>
             ))}
