@@ -4,7 +4,8 @@
    See PROJECT_CONTEXT.md for full architecture.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
 import { apiPost } from './core/api';
@@ -20,7 +21,12 @@ import { SalesGpAnalytics } from './modules/salesGpAnalytics';
 import { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } from './modules/assets';
 import { Dashboard, AlertsDashboard } from './modules/dashboard';
 import { DirectorDash, TargetsMaster } from './modules/directorDashboards';
-import { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose } from './modules/finance';
+import { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose, financeRoutes } from './modules/finance';
+
+/* Declarative route tables from migrated feature modules. The host renders
+   these via react-router FIRST; any route not listed falls through to the
+   legacy string-router in Page(). Append more tables here as modules migrate. */
+const MIGRATED_FEATURE_ROUTES = [...financeRoutes];
 import { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } from './modules/ho-control';
 import { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrExpenses, HrLeave, HrPayroll, HrPayslips, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } from './modules/hr';
 import { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, TourCodeMaster, VendorAdvances, VendorTermsMaster } from './modules/masters';
@@ -28,7 +34,7 @@ import { CustomerMasterTabbed, SupplierMasterTabbed } from './modules/mastersPar
 import { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } from './modules/reports';
 import { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } from './modules/settings';
 import { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } from './modules/taxation';
-import { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesCreditNote, SalesDebitNote, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
+import { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
 import { SoPoGpVoucherEntry } from './modules/bookingOrder';
 import { UnifiedApprovals } from './modules/voucherApprovals';
 import { ModuleRegister } from './modules/moduleRegister';
@@ -49,6 +55,7 @@ import { Placeholder } from './shell/Placeholder';
 import { SideNav } from './shell/SideNav';
 import { TopNav } from './shell/TopNav';
 import { TopBar } from './shell/TopBar';
+import { AppShell } from './shell/AppShell';
 import { PrintPreviewHost } from './core/PrintPreview';
 import { ReportActionBar } from './core/ReportActionBar';
 import { PrefsProvider } from './core/prefs';
@@ -84,32 +91,45 @@ export default function KB360App(){
     }
     return BRANCHES.find(x => !x.isHO) || BRANCHES[0];
   });
-  /* ── Route: restore the last visited page so a refresh keeps you where you
-     were (only when signed in; logged-out always lands on the login screen). */
-  /* ── Route + in-app history stack. A single linear stack with a cursor gives
-     real Back/Forward (Esc, Alt+←/→, the ContextBar arrows) instead of always
-     bouncing to the dashboard. The current route survives a refresh. ── */
-  const [hist,setHist]=useState(()=>{
-    let init="/dashboard";
-    try { if(localStorage.getItem("kb360-token")) init=localStorage.getItem("kb360-route")||"/dashboard"; }
-    catch { /* ignore */ }
-    return { stack:[init], idx:0 };
-  });
-  const route=hist.stack[hist.idx];
+  /* ── Route + history, bridged onto react-router-dom ──────────────────────
+     The URL is now the single source of truth: deep links resolve, and the
+     browser's native Back/Forward (plus Esc, Alt+←/→ and the ContextBar arrows)
+     drive history. We still expose the SAME { route, navigate, goBack,
+     goForward, canBack, canForward } shape on NavContext, so the hundreds of
+     existing consumers keep working with zero changes. `canForward` is
+     reconstructed from react-router's history index (window.history.state.idx)
+     versus the furthest index reached this session — faithfully matching the
+     old linear-stack-with-cursor behaviour. ── */
+  const rrNavigate = useNavigate();
+  const { pathname } = useLocation();
+  const route = pathname;
+  const histIdx = (typeof window !== 'undefined' && window.history.state && typeof window.history.state.idx === 'number')
+    ? window.history.state.idx : 0;
+  const maxIdxRef = useRef(histIdx);
+  if (histIdx > maxIdxRef.current) maxIdxRef.current = histIdx;
   const [currentUser,setCurrentUser]=useState(restoredUser);  // null → LoginScreen shows on app load
   const mob=useMobile();
-  const navigate=(r)=>setHist(h=>{
-    if(!r || r===h.stack[h.idx]) return h;                 // ignore no-op re-navigation
-    const stack=h.stack.slice(0,h.idx+1); stack.push(r);
-    const capped=stack.slice(-50);                          // bound memory
-    return { stack:capped, idx:capped.length-1 };
-  });
-  const goBack=()=>setHist(h=>h.idx>0?{...h,idx:h.idx-1}:h);
-  const goForward=()=>setHist(h=>h.idx<h.stack.length-1?{...h,idx:h.idx+1}:h);
-  const navValue={ route, navigate, goBack, goForward, canBack:hist.idx>0, canForward:hist.idx<hist.stack.length-1 };
+  const navigate = useCallback((r)=>{ if(r && r!==window.location.pathname) rrNavigate(r); }, [rrNavigate]);
+  const goBack = useCallback(()=>rrNavigate(-1), [rrNavigate]);
+  const goForward = useCallback(()=>rrNavigate(1), [rrNavigate]);
+  const navValue={ route, navigate, goBack, goForward, canBack:histIdx>0, canForward:histIdx<maxIdxRef.current };
 
-  /* Persist the current route so it survives a page refresh. */
+  /* Persist the current route so a refresh / re-open returns you here. */
   useEffect(()=>{ try{ localStorage.setItem("kb360-route", route); }catch{ /* ignore */ } },[route]);
+
+  /* On first load only, restore the last route: if we opened at the index path
+     with a live session and a saved route, jump there once (replace, so it
+     doesn't add a Back entry). Logged-out users see the LoginScreen overlay. */
+  const restoredRouteRef = useRef(false);
+  useEffect(()=>{
+    if(restoredRouteRef.current) return;
+    restoredRouteRef.current = true;
+    let saved = "/dashboard";
+    try { if(localStorage.getItem("kb360-token")) saved = localStorage.getItem("kb360-route") || "/dashboard"; }
+    catch { /* ignore */ }
+    if((pathname === "/" || pathname === "") && saved && saved !== "/") rrNavigate(saved, { replace:true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
 
   /* Open the Sales/Purchase Register from anywhere (e.g. the P&L drill's Ledger
      Account → invoice). The needle is read by ModuleRegister on mount. */
@@ -212,6 +232,14 @@ export default function KB360App(){
         </div>
       );
     }
+
+    /* ── Migrated feature routes (incremental react-router-dom adoption) ──────
+       Migrated modules render from their declarative route tables; anything not
+       listed falls through to the legacy string-router below. Same role-gating
+       applies (the routeModule check above already ran). ── */
+    const migratedHit = MIGRATED_FEATURE_ROUTES.find(r => r.path === route);
+    if(migratedHit){ const El = migratedHit.Element; return <El branch={branch} setRoute={navigate} currentUser={currentUser}/>; }
+
             /* Format / Import / Export Centers — components were never built; the
        real working screens are Data Import (/import), BSP/GDS imports and
        Tally XML Export, all under Admin ▸ Import / Export Data. Routes removed
@@ -325,7 +353,6 @@ export default function KB360App(){
     if(route==="/finance/module-sales-register")    return <ModuleRegister branch={branch} mode="sales"/>;
     if(route==="/finance/module-purchase-register") return <ModuleRegister branch={branch} mode="purchase"/>;
     if(route==="/finance/module-register" || route==="/finance/module-sp-register") return <ModuleRegister branch={branch} mode="both"/>;
-    if(route==="/finance/credit-note" || route==="/sales/credit-note")  return <SalesCreditNote branch={branch} setRoute={navigate}/>;
     if(route==="/receipts")           return <ReceiptVoucher branch={branch}/>;
     if(route==="/payments")           return <PaymentVoucher branch={branch}/>;
     if(route==="/purchase-expense")          return <PurchaseExpenseVoucher branch={branch} setRoute={navigate}/>;
@@ -364,7 +391,6 @@ export default function KB360App(){
     if(route==="/reports/sales-gp-analytics") return <SalesGpAnalytics branch={branch}/>;
     if(route==="/reports/branch")     return <ReportBranch/>;
     if(route==="/reports/pkg")        return <ReportPackagePnL/>;
-    if(route==="/finance/debit-note" || route==="/sales/debit-note")     return <SalesDebitNote branch={branch} setRoute={navigate}/>;
     if(route==="/sales/cancellation")   return <SalesCancellation branch={branch} setRoute={navigate}/>;
     if(route==="/purchase/refunds")     return <PurchaseRefunds branch={branch} setRoute={navigate}/>;
     if(route==="/purchase/adm")          return <AdmRegister branch={branch}/>;
@@ -476,42 +502,34 @@ export default function KB360App(){
     <HotkeysProvider>
     <NavContext.Provider value={navValue}>
     <ReferenceProvider>
-    <div style={{display:"flex",flexDirection:"column",height:"100vh",
-      overflow:"hidden",fontFamily:"system-ui,sans-serif",background:"#f3f4f8"}}>
-
-      {/* Top bar + nav — chrome, excluded from printouts (see index.css @media print) */}
-      <div className="noprint">
-        <TopBar setRoute={navigate} currentUser={currentUser} setCurrentUser={setUser} branch={branch}/>
-        {/* SAP Fiori-style horizontal navigation */}
-        <TopNav branch={branch} setBranch={setBranch} currentUser={currentUser} switchUser={switchUser}
-          route={route} setRoute={navigate}/>
-        {/* App-wide Back / Forward / breadcrumb / Recents / minimized items — works on every screen */}
-        <ContextBar branch={branch}/>
-      </div>
-
-      {/* Body */}
-      <div style={{display:"flex",flex:1,overflow:"hidden",minHeight:0}}>
-
-        {/* Main */}
-        <main style={{flex:1,overflowY:"auto",minWidth:0,background:"#f3f4f8"}}>
-          {/* App-wide Tally Export / Print / PDF toolbar — shown on every report,
-              finance, tax & register screen. Excluded from the printout itself. */}
-          <ReportActionBar route={route} branch={branch}/>
-          <ErrorBoundary resetKey={route}>
-            {/* Sales & Purchase are edit-only: new entries come via bulk Data Import (old-data upload).
-                The 14 product entry forms stay reachable for reviewing/editing existing vouchers. */}
-            {/^\/(sales|purchase)\/(flight|holiday|hotel|visa|car|insurance|misc)$/.test(route) && (
-              <div style={{margin:"10px 10px 0",padding:"10px 14px",borderRadius:8,background:"#FFF7E6",
-                border:"1px solid #F0C36D",color:"#7a5b12",fontSize:12,fontWeight:600,lineHeight:1.5}}>
-                🔒 <b>Edit-only.</b> New Sales / Purchase entries are added in bulk via{" "}
-                <a onClick={()=>navigate("/import")} style={{color:"#0070f2",cursor:"pointer",textDecoration:"underline"}}>Data Import</a>{" "}
-                (upload old data with the template). Use this form to review or edit existing entries only.
-              </div>
-            )}
-            <Page/>
-          </ErrorBoundary>
-        </main>
-      </div>
+    <>
+      {/* Enterprise layout: collapsible sidebar + sticky app-bar (company + FY
+          selectors, search, notifications, profile). Replaces TopBar + TopNav
+          (retained in ./shell for reversibility). ContextBar (breadcrumb /
+          back-forward) is pinned above the scrolling content via subBar. */}
+      <AppShell
+        branch={branch} setBranch={setBranch}
+        route={route} setRoute={navigate}
+        currentUser={currentUser} setCurrentUser={setUser}
+        subBar={<ContextBar branch={branch}/>}
+      >
+        {/* App-wide Tally Export / Print / PDF toolbar — shown on every report,
+            finance, tax & register screen. Excluded from the printout itself. */}
+        <ReportActionBar route={route} branch={branch}/>
+        <ErrorBoundary resetKey={route}>
+          {/* Sales & Purchase are edit-only: new entries come via bulk Data Import (old-data upload).
+              The 14 product entry forms stay reachable for reviewing/editing existing vouchers. */}
+          {/^\/(sales|purchase)\/(flight|holiday|hotel|visa|car|insurance|misc)$/.test(route) && (
+            <div style={{margin:"10px 10px 0",padding:"10px 14px",borderRadius:8,background:"#FFF7E6",
+              border:"1px solid #F0C36D",color:"#7a5b12",fontSize:12,fontWeight:600,lineHeight:1.5}}>
+              🔒 <b>Edit-only.</b> New Sales / Purchase entries are added in bulk via{" "}
+              <a onClick={()=>navigate("/import")} style={{color:"#0070f2",cursor:"pointer",textDecoration:"underline"}}>Data Import</a>{" "}
+              (upload old data with the template). Use this form to review or edit existing entries only.
+            </div>
+          )}
+          <Page/>
+        </ErrorBoundary>
+      </AppShell>
 
       {/* Global overlays / hosts (mounted once) */}
       <PrintPreviewHost/>
@@ -519,7 +537,7 @@ export default function KB360App(){
       <LedgerSwitcher branch={branch}/>
       <LedgerModalHost branch={branch}/>
       <ShortcutHelp/>
-    </div>
+    </>
     </ReferenceProvider>
     </NavContext.Provider>
     </HotkeysProvider>

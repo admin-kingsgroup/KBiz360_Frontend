@@ -1255,20 +1255,6 @@ export function SalesMisc({branch,setRoute}){
 }
 
 
-/* ── SALES: CREDIT NOTES ─────────────────────────────────── */
-
-// Credit/Debit Note CREATE render through the unified VoucherShell (Option C),
-// sharing one form with the ledger-account edit screen.
-export function SalesCreditNote({ branch }) {
-  return <VoucherShell category="credit-note" mode="create" branch={branch} />;
-}
-
-/* Credit Note (sales return — reduce what a customer owes) and Debit Note
-   (purchase return — reduce what we owe a supplier) share one form; `kind` flips
-   the party side, the base ledger and the GST direction. Follows the HTML notes:
-   Place of Supply switches CGST+SGST ↔ IGST; income/expense + GST are reversed and
-
-
 /* ════════════════════════════════════════════════════════════════
    REFUND & REISSUE  (against a sales invoice)   /finance/refund · /finance/reissue
    Mirrors the provided Travkings HTML mockups — a module strip (Flights / Holidays /
@@ -2819,10 +2805,6 @@ export function UnmatchedTickets({branch,setRoute}){
    EXPENSE BUDGET SYSTEM — Constants & Store
    ════════════════════════════════════════════════════════════════ */
 
-
-export function SalesDebitNote({ branch }) {
-  return <VoucherShell category="debit-note" mode="create" branch={branch} />;
-}
 
 /* ════════════════════════════════════════════════════════════════
    CANCELLATION WORKFLOW  /sales/cancellation

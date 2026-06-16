@@ -1238,7 +1238,9 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   const needle = search.trim().toLowerCase();
   const rows = useMemo(() => allRows
     .filter((v) => product === 'all' || productOf(v) === product)
-    .filter((v) => dateInRange(v.date, from, to))
+    // While a search term is active, ignore the date window so a match is found
+    // regardless of period (otherwise the default month silently hides older vouchers).
+    .filter((v) => !!needle || dateInRange(v.date, from, to))
     .filter((v) => !needle || voucherHaystack(v).includes(needle)), [allRows, product, from, to, needle]);
   const sum = (k) => rows.reduce((s, v) => s + (v[k] || 0), 0);
   const sheet = useMemo(() => vouchersToSheet(rows), [rows]);
@@ -1271,7 +1273,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
     <Page
       wide={view === 'detailed'}
       title={tab === 'sales' ? 'Sales Register' : 'Purchase Register'}
-      sub={`${branchLabel(branch)} · ${rows.length} vouchers · Total ${money(cur, sum('total'))} · ${view === 'detailed' ? 'every Tally column shown — scroll right' : 'click a row for full detail'}`}
+      sub={`${branchLabel(branch)} · ${rows.length} vouchers · Total ${money(cur, sum('total'))} · ${needle ? 'searching all dates' : (view === 'detailed' ? 'every Tally column shown — scroll right' : 'click a row for full detail')}`}
       right={<>
         <Tab id="sales" label="Sales" /><Tab id="purchase" label="Purchase" />
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Search passenger / party / ticket / link no / voucher…"

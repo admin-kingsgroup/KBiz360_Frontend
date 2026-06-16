@@ -5,24 +5,24 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { AlertTriangle, Download, Lock, Plus, Printer, Save, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
-import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement } from '../core/useBankReco';
-import { branchCode } from '../core/useAccounting';
-import { PeriodBar } from '../core/period';
-import { exportToCSV } from '../core/business-logic';
-import { BRANCH_CODES, CASH, EXP_ACTUALS, FX_RATES, GP_BILLS, LOAN_REGISTER, CONSOLIDATED_LABEL } from '../core/data';
-import { fmt, fmtINR } from '../core/format';
-import { CUR_MONTH, MONTH_OPTIONS, FY_MONTHS, monthLabel, todayISO, fmtDate, CUR_FY, rangeNote } from '../core/dates';
-import { BANK_ACCOUNTS_DATA, GratuityRegister, INVESTMENT_DATA, INVESTMENT_SECTIONS, RECO_QUEUE_DATA, _ADVANCES, cardStyle } from '../core/helpers';
-import { useMobile } from '../core/hooks';
-import { useChartOfAccounts, useTrialBalance } from '../core/useAccounting';
-import { useCrud, useAdvances } from '../core/useRegisters';
-import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp } from '../core/styles';
-import { Dashboard } from './dashboard';
-import { PfEsiChallan } from './hr';
-import { ForexReport } from './reports';
-import { EWayBill, Form26AS } from './taxation';
-import { RecurringVouchers } from './transactions';
-import { PHASE2_Page } from '../shell/PHASE2_Page';
+import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement } from '../../core/useBankReco';
+import { branchCode } from '../../core/useAccounting';
+import { PeriodBar } from '../../core/period';
+import { exportToCSV } from '../../core/business-logic';
+import { BRANCH_CODES, CASH, EXP_ACTUALS, FX_RATES, GP_BILLS, LOAN_REGISTER, CONSOLIDATED_LABEL } from '../../core/data';
+import { fmt, fmtINR } from '../../core/format';
+import { CUR_MONTH, MONTH_OPTIONS, FY_MONTHS, monthLabel, todayISO, fmtDate, CUR_FY, rangeNote } from '../../core/dates';
+import { BANK_ACCOUNTS_DATA, GratuityRegister, INVESTMENT_DATA, INVESTMENT_SECTIONS, RECO_QUEUE_DATA, _ADVANCES, cardStyle } from '../../core/helpers';
+import { useMobile } from '../../core/hooks';
+import { useChartOfAccounts, useTrialBalance } from '../../core/useAccounting';
+import { useCrud, useAdvances } from '../../core/useRegisters';
+import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp } from '../../core/styles';
+import { Dashboard } from '../dashboard';
+import { PfEsiChallan } from '../hr';
+import { ForexReport } from '../reports';
+import { EWayBill, Form26AS } from '../taxation';
+import { RecurringVouchers } from '../transactions';
+import { PHASE2_Page } from '../../shell/PHASE2_Page';
 
 /* ════════════════════════════════════════════════════════════════════
    BANK RECONCILIATION  —  live book (ledger) vs imported bank statement.
@@ -699,7 +699,9 @@ export function LedgerAc({branch}){
   );
 }
 
-export function TrialBalance({branch}){
+// SUPERSEDED — migrated to pages/trial-balance.jsx (live /api/accounting/trial-balance
+// via use-trial-balance + DataTable). Kept only until the legacy callers are gone.
+export function TrialBalanceLegacy({branch}){
   const mob=useMobile();
   const cfg=bc(branch);
   const cur=cfg.cur;
@@ -1176,7 +1178,7 @@ export function YearEndClose({branch}){
 
 // Single source of truth lives in core/taxSections; re-exported here for the
 // existing importers of this module.
-export { TDS_SECTIONS } from '../core/taxSections';
+export { TDS_SECTIONS } from '../../core/taxSections';
 
 export function LoanEmiRegister({branch}){
   const cur=bc(branch).cur;

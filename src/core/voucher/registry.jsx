@@ -4,7 +4,6 @@ import { JournalFields } from './fields/JournalFields';
 import { ReceiptPaymentFields } from './fields/ReceiptPaymentFields';
 import { ContraFields } from './fields/ContraFields';
 import { PurchaseExpenseFields } from './fields/PurchaseExpenseFields';
-import { NoteFields } from './fields/NoteFields';
 import { RefundReissueFields } from './fields/RefundReissueFields';
 import { AdmAcmFields } from './fields/AdmAcmFields';
 import { r2, allocSummary, pxpTotals } from './ui';
@@ -153,72 +152,6 @@ function makeRcptPmt(side) {
 }
 
 /**
- * Credit Note (sales return) / Debit Note (purchase return) — `kind` flips the
- * party side, base return ledger and GST direction. Stored with a single return
- * line + taxAmt/gstMode/tcsAmt; the backend reverses income/expense + GST + TCS.
- */
-function makeNote(kind) {
-  const isCredit = kind === 'credit';
-  const baseLedger = isCredit ? 'Sales Return' : 'Purchase Return';
-  // Cancellation / refund of a sale or purchase is handled ONLY by the Refund (RF) /
-  // Reissue (RI) vouchers — which fully reverse the original booking. Credit / Debit
-  // Notes are for OTHER adjustments (discounts, rate differences, corrections).
-  const reasons = isCredit
-    ? ['Fare Correction', 'Discount Allowed', 'Rate Difference', 'Other Adjustment']
-    : ['Rate Difference', 'Overcharge Correction', 'Discount Received', 'Other Adjustment'];
-  return {
-    type: isCredit ? 'SCN' : 'SDN',
-    label: isCredit ? 'Credit Note' : 'Debit Note',
-    icon: isCredit ? '📋' : '📈',
-    explain: isCredit
-      ? (<><b style={{ color: '#A07828' }}>Credit Note:</b> issued to a <b>customer</b> to reduce what they owe. The income &amp; output GST are <b>Debited</b> (reversed); the customer is <b>Credited</b>.</>)
-      : (<><b style={{ color: '#A07828' }}>Debit Note:</b> issued to a <b>supplier</b> to reduce what you owe. The supplier is <b>Debited</b>; the purchase &amp; input GST are <b>Credited</b> (reversed).</>),
-
-    initial: () => ({ date: todayISO(), againstInvoice: '', gstMode: 'intra', party: '', reason: reasons[0], taxable: '', gstPct: 18, tcs: '', remarks: '' }),
-
-    fromVoucher: (v) => {
-      // Taxable base = stored subtotal. A migrated/imported note that carried only a
-      // grand `total` (no subtotal) would otherwise seed 0 → the edit form looks
-      // blank and Save would zero the note. Recover the base from total − GST − TCS
-      // so the figures survive the round-trip.
-      let taxable = +v.subtotal || 0;
-      if (taxable <= 0) { const d = r2((+v.total || 0) - (+v.taxAmt || 0) - (+v.tcsAmt || 0)); if (d > 0) taxable = d; }
-      return {
-        date: v.date || '', againstInvoice: v.againstInvoice || v.linkNo || '', gstMode: v.gstMode || 'intra',
-        party: v.party || '', reason: (v.lines && v.lines[0] && v.lines[0].desc) || reasons[0],
-        taxable: taxable > 0 ? taxable : (v.subtotal ?? ''), gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18, tcs: v.tcsAmt || '', remarks: v.remarks || '',
-      };
-    },
-
-    toBody: (s, ctx) => {
-      const taxable = r2(+s.taxable || 0);
-      const gstAmt = r2(taxable * (+s.gstPct || 0) / 100);
-      const tcs = r2(+s.tcs || 0);
-      const total = r2(taxable + gstAmt + tcs);
-      return {
-        type: isCredit ? 'SCN' : 'SDN', category: isCredit ? 'credit-note' : 'debit-note', branch: ctx.branchCode, date: s.date,
-        party: s.party, partyType: isCredit ? 'customer' : 'supplier',
-        lines: [{ ledger: baseLedger, amt: taxable, desc: s.reason }],
-        subtotal: taxable, taxAmt: gstAmt, gstMode: s.gstMode, gstPct: +s.gstPct || 0, tcsAmt: tcs, total,
-        againstInvoice: s.againstInvoice, linkNo: s.againstInvoice,
-        remarks: s.remarks || `Being ${isCredit ? 'credit' : 'debit'} note — ${s.reason}${s.againstInvoice ? ` vs ${s.againstInvoice}` : ''}`,
-        status: 'saved',
-      };
-    },
-
-    validate: (s) => {
-      const taxable = +s.taxable || 0;
-      let hint = '';
-      if (!s.party) hint = `(Pick ${isCredit ? 'Customer' : 'Supplier'})`;
-      else if (taxable <= 0) hint = '(Enter Amount)';
-      return { ok: !!s.party && taxable > 0, hint };
-    },
-
-    fields: (props) => <NoteFields {...props} kind={kind} reasons={reasons} />,
-  };
-}
-
-/**
  * Refund (RF) / Reissue (RI) — two-party, raised against a sales invoice. The
  * supplier (airline) leg is supplierAmt; our retained service charge + markup
  * post as income; the customer figure (`total`) is derived so the voucher always
@@ -344,8 +277,6 @@ function makeAdmAcm(kind) {
 export const VOUCHER_REGISTRY = {
   receipt: makeRcptPmt('customer'),
   payment: makeRcptPmt('supplier'),
-  'credit-note': makeNote('credit'),
-  'debit-note': makeNote('debit'),
   refund: makeRefundReissue('refund'),
   reissue: makeRefundReissue('reissue'),
   adm: makeAdmAcm('adm'),

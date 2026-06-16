@@ -14,6 +14,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, CornerDownLeft, ArrowRight, X } from 'lucide-react';
 import { getMenu } from '../core/menus';
 import { useMobile } from '../core/hooks';
@@ -74,6 +75,10 @@ export function ModuleSearch({ branch, currentUser, setRoute }) {
   const [active, setActive] = useState(0);     // highlighted result index
   const wrapRef = useRef(null);
   const inputRef = useRef(null);
+  // The dropdown is portaled to <body> (to escape the app-bar's stacking context),
+  // so it's positioned with a fixed rect measured from the search box.
+  const [pos, setPos] = useState(null);
+  const place = () => { const el = wrapRef.current; if (!el) return; const r = el.getBoundingClientRect(); setPos({ top: r.bottom + 6, left: r.left, width: r.width }); };
 
   /* Build (and cache) the searchable page index from the permission-filtered menu. */
   const index = useMemo(
@@ -95,12 +100,26 @@ export function ModuleSearch({ branch, currentUser, setRoute }) {
 
   useEffect(() => setActive(0), [q]);
 
-  /* Close on outside click. */
+  /* Close on outside click (the dropdown lives in a body portal, so exclude it too). */
   useEffect(() => {
-    const onDoc = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    const onDoc = (e) => {
+      if (wrapRef.current && wrapRef.current.contains(e.target)) return;
+      if (e.target.closest && e.target.closest('[data-modsearch]')) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
   }, []);
+
+  /* Keep the portaled dropdown aligned under the search box while it's open. */
+  useEffect(() => {
+    if (!open) return;
+    place();
+    const onReflow = () => place();
+    window.addEventListener('resize', onReflow);
+    window.addEventListener('scroll', onReflow, true);
+    return () => { window.removeEventListener('resize', onReflow); window.removeEventListener('scroll', onReflow, true); };
+  }, [open, q]);
 
   /* Cmd/Ctrl+K (or "/") focuses the search from anywhere. */
   useEffect(() => {
@@ -197,11 +216,11 @@ export function ModuleSearch({ branch, currentUser, setRoute }) {
           style={{ background: 'transparent', border: 'none', color: '#5a6691', cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center', borderRadius: 4 }}>
           <Search size={18} />
         </button>
-        {open && (
+        {open && createPortal(
           <>
-            <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.35)', zIndex: 600 }} />
-            <div style={{
-              position: 'fixed', top: 8, left: 8, right: 8, zIndex: 601, background: '#fff', borderRadius: 12,
+            <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.35)', zIndex: 99998 }} />
+            <div data-modsearch style={{
+              position: 'fixed', top: 8, left: 8, right: 8, zIndex: 99999, background: '#fff', borderRadius: 12,
               boxShadow: '0 24px 48px rgba(0,0,0,0.18)', overflow: 'hidden',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid #eef1f6' }}>
@@ -215,7 +234,8 @@ export function ModuleSearch({ branch, currentUser, setRoute }) {
               </div>
               {ResultsList}
             </div>
-          </>
+          </>,
+          document.body
         )}
       </div>
     );
@@ -242,14 +262,15 @@ export function ModuleSearch({ branch, currentUser, setRoute }) {
           : <kbd style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, color: DIM, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, padding: '1px 5px' }}>⌘K</kbd>}
       </div>
 
-      {open && q.trim() && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 600,
+      {open && q.trim() && pos && createPortal(
+        <div data-modsearch style={{
+          position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 99999,
           background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
           boxShadow: '0 20px 40px rgba(0,0,0,0.12)', overflow: 'hidden',
         }}>
           {ResultsList}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

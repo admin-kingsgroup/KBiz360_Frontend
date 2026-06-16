@@ -18,6 +18,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';
+import { Search, X } from 'lucide-react';
 import { isoDate, todayISO } from './dates';
 import { inp } from './styles';
 import { periodRange } from './period';
@@ -67,6 +68,36 @@ export function toQueryParams({ from, to } = {}) {
   if (from) p.startDate = from;
   if (to) p.endDate = to;
   return p;
+}
+
+/** Free-text search box shared by report pages. Controlled — the parent owns the
+ *  string and uses it to filter the rendered rows (so a search shows matches only).
+ *  `matchRow(haystackParts, needle)` is the companion helper for the filtering side. */
+export function ReportSearch({ value, onChange, placeholder = 'Search…', width = 230 }) {
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+      <Search size={13} style={{ position: 'absolute', left: 9, color: '#94a3b8', pointerEvents: 'none' }} />
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ ...inp, width, minHeight: 32, fontSize: 11, paddingLeft: 28, paddingRight: value ? 26 : 10 }}
+      />
+      {value && (
+        <button type="button" onClick={() => onChange('')} title="Clear search"
+          style={{ position: 'absolute', right: 5, border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}>
+          <X size={13} />
+        </button>
+      )}
+    </span>
+  );
+}
+
+/** Build a lower-cased haystack from a row's fields and test it against a (already
+ *  lower-cased, trimmed) needle. Empty needle → always matches. */
+export function matchNeedle(parts, needle) {
+  if (!needle) return true;
+  return parts.filter((x) => x != null && x !== '').join('  ').toLowerCase().includes(needle);
 }
 
 export function ReportDateBar({ value, onChange, branch }) {

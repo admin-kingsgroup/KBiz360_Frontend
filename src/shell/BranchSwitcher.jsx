@@ -3,12 +3,41 @@
    Auto-generated from KBiz360_v2.jsx · 61 lines · 1 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { BRANCHES, CONSOLIDATED_LABEL } from '../core/data';
 import { Dashboard } from '../modules/dashboard';
 
 export function BranchSwitcher({branch,setBranch,currentUser,light}){
   const [open,setOpen]=useState(false);
+  const triggerRef=useRef(null);
+  const [pos,setPos]=useState(null);
+  // Measure the trigger so the menu can be portaled to <body> and shown on top of
+  // EVERYTHING. The app-bar that hosts this switcher sets its own stacking context
+  // (z-40 + backdrop-blur), which otherwise traps the dropdown beneath page content
+  // no matter how high its local z-index is. A portal + fixed positioning escapes it.
+  const place=()=>{ const el=triggerRef.current; if(!el) return; const r=el.getBoundingClientRect(); setPos({top:r.bottom+4,left:r.left,width:r.width}); };
+  useEffect(()=>{
+    if(!open) return;
+    place();
+    const onPointer=(e)=>{
+      if(triggerRef.current&&triggerRef.current.contains(e.target)) return;
+      if(e.target.closest&&e.target.closest('[data-branch-menu]')) return;
+      setOpen(false);
+    };
+    const onKey=(e)=>{ if(e.key==='Escape') setOpen(false); };
+    const reflow=()=>place();
+    document.addEventListener('mousedown',onPointer);
+    document.addEventListener('keydown',onKey);
+    window.addEventListener('resize',reflow);
+    window.addEventListener('scroll',reflow,true);
+    return ()=>{
+      document.removeEventListener('mousedown',onPointer);
+      document.removeEventListener('keydown',onKey);
+      window.removeEventListener('resize',reflow);
+      window.removeEventListener('scroll',reflow,true);
+    };
+  },[open]);
   const isAll=branch==="ALL";
   const brFlag=isAll?"🌐":branch?.flag||"🇮🇳";
   const brLabel=isAll?CONSOLIDATED_LABEL:(branch?.code||"BOM")+(branch?.city?" — "+branch.city:"");
@@ -26,8 +55,8 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
   const itemBorder = light ? "1px solid #f1f5f9" : "1px solid #1a2340";
 
   return (
-    <div style={{position:"relative"}}>
-      <div onClick={()=>setOpen(o=>!o)}
+    <div ref={triggerRef} style={{position:"relative"}}>
+      <div onClick={()=>{ place(); setOpen(o=>!o); }}
         style={{display:"flex",alignItems:"center",gap:8,padding:"7.5px 10px",
           borderRadius:6,background:bgColor,cursor:"pointer",
           border:"1px solid "+borderColor,transition:"all 0.15s ease-in-out"}}
@@ -42,10 +71,10 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
         </div>
         <span style={{color:caretColor,fontSize:11}}>▾</span>
       </div>
-      {open&&(
-        <div style={{position:"absolute",top:"100%",left:0,right:0,marginTop:4,
+      {open&&pos&&createPortal(
+        <div data-branch-menu style={{position:"fixed",top:pos.top,left:pos.left,width:pos.width,
           background:panelBg,border:"1px solid "+panelBorder,borderRadius:6,
-          zIndex:400,overflow:"hidden",boxShadow:panelShadow}}>
+          zIndex:99999,overflow:"hidden",boxShadow:panelShadow}}>
           {(()=>{
             const FULL_SCOPE=["Super Admin","Director","Senior Finance Manager","Sr. Accounts Executive"];
             const userBranches = Array.isArray(currentUser?.branches) ? currentUser.branches : null;
@@ -82,7 +111,8 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
               </div>
             );
           })}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

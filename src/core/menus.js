@@ -99,6 +99,10 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Module Sales Register", href:"/finance/module-sales-register"},
     {label:"Module Purchase Register", href:"/finance/module-purchase-register"},
     {label:"Module Sales & Purchase Register", href:"/finance/module-register"},
+    {label:"Receipt Register", href:"/finance/receipt-register"},
+    {label:"Payment Register", href:"/finance/payment-register"},
+    {label:"Contra Register", href:"/finance/contra-register"},
+    {label:"Journal Register", href:"/finance/journal-register"},
     {label:"Outstanding & On-Account (Bill Settlement)", href:"/finance/outstanding"},
   ]},
   {label:"Books", children:[
@@ -106,6 +110,7 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Cash Book", href:"/finance/cash-book"},
     {label:"Ledger Account", href:"/ledger"},
     {label:"Trial Balance", href:"/trial-balance"},
+    {label:"Trial Balance ✨ (new)", href:"/finance/trial-balance"},
     {label:"Bank Reconciliation", href:"/bank-reco"},
   ]},
   {label:"BSP & Airline Memos", children:[

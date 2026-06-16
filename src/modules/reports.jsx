@@ -14,7 +14,7 @@ import { useBalanceSheet, useGpBills, useModulePL, useAgeing, useTaxSummary, use
 import { fmt, fmtINR } from '../core/format';
 import { CUR_MONTH, CUR_FY, MONTH_OPTIONS, PERIOD_OPTIONS, FY_MONTHS, FY_YTD_MONTHS, ALL_TIME_FROM, todayISO, fmtDate, rangeNote, monthLabel, prevMonthKey, presetRange, fyQuarterKey } from '../core/dates';
 import { periodRange } from '../core/period';
-import { ReportDateBar, resolveReportRange, priorYearRange } from '../core/reportDateBar';
+import { ReportDateBar, ReportSearch, matchNeedle, resolveReportRange, priorYearRange } from '../core/reportDateBar';
 import { BUILDER_FIELD_CATALOG, DEMO_REPORT_DATA, DrillModal, ExportDropdown, GRP_COLORS, PKG_D, PKG_SC, PackagePnL, SAVED_VIEWS_DATA, SCHEDULED_REPORTS_DATA, Sparkline, TAB_Page, cardStyle, tabPanel } from '../core/helpers';
 import { useBgtRefresh, useMobile } from '../core/hooks';
 import { B, FL, KpiCard, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../core/styles';
@@ -1123,9 +1123,13 @@ export function ReportCommission({branch}){
     return Object.values(suppMap).sort((a,b2)=>b2.commission-a.commission);
   },[bills]);
 
-  const totComm=rows.reduce((s,r)=>s+r.commission,0);
-  const totRev =rows.reduce((s,r)=>s+r.revenue,0);
-  const tds    =rows.filter(r=>r.commission>15000).reduce((s,r)=>s+Math.round(r.commission*0.05),0);
+  const [search,setSearch]=useState('');
+  const needle=search.trim().toLowerCase();
+  const filtered=useMemo(()=>rows.filter(r=>matchNeedle([r.supplier,r.mod],needle)),[rows,needle]);
+
+  const totComm=filtered.reduce((s,r)=>s+r.commission,0);
+  const totRev =filtered.reduce((s,r)=>s+r.revenue,0);
+  const tds    =filtered.filter(r=>r.commission>15000).reduce((s,r)=>s+Math.round(r.commission*0.05),0);
   const f=n=>cur+Number(Math.round(n)).toLocaleString("en-IN");
 
   return (
@@ -1138,7 +1142,10 @@ export function ReportCommission({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Revenue is live from the books; commission is estimated at standard rates (Insurance 15%, Flight 2%, Holiday 3%, other 1%) with TDS 194H @5% — not actual booked commission.</p>
           </div>
         </div>
-        <ReportDateBar value={range} onChange={setRange} branch={branch}/>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <ReportSearch value={search} onChange={setSearch} placeholder="Supplier / module…"/>
+          <ReportDateBar value={range} onChange={setRange} branch={branch}/>
+        </div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>
         {[
@@ -1160,7 +1167,7 @@ export function ReportCommission({branch}){
               <th key={i} style={{padding:"9px 12px",textAlign:i>=3?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
-          <tbody>{rows.map((r,i)=>{
+          <tbody>{filtered.map((r,i)=>{
             const tdsAmt=r.commission>15000?Math.round(r.commission*0.05):0;
             return (
               <tr key={r.supplier} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
@@ -1176,7 +1183,7 @@ export function ReportCommission({branch}){
             );
           })}</tbody>
           <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
-            <td colSpan={5} style={{padding:"9px 12px",fontWeight:700,color:"#d4a437",fontSize:12}}>TOTAL — {rows.length} principals</td>
+            <td colSpan={5} style={{padding:"9px 12px",fontWeight:700,color:"#d4a437",fontSize:12}}>TOTAL — {filtered.length} principals</td>
             <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totComm)}</td>
             <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:"#F7C1C1",fontVariantNumeric:"tabular-nums"}}>{f(tds)}</td>
             <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(totComm-tds)}</td>
@@ -1724,9 +1731,13 @@ export function ConsultantReport({branch}){
     }));
   },[bills]);
 
-  const totRev=stats.reduce((s,c)=>s+c.rev,0);
-  const totGP =stats.reduce((s,c)=>s+c.gp,0);
-  const totBks=stats.reduce((s,c)=>s+c.bks,0);
+  const [search,setSearch]=useState('');
+  const needle=search.trim().toLowerCase();
+  const filtered=useMemo(()=>stats.filter(c=>matchNeedle([c.name,c.topMod],needle)),[stats,needle]);
+
+  const totRev=filtered.reduce((s,c)=>s+c.rev,0);
+  const totGP =filtered.reduce((s,c)=>s+c.gp,0);
+  const totBks=filtered.reduce((s,c)=>s+c.bks,0);
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
   const RANK_CLR=["#FFD700","#C0C0C0","#CD7F32"];
   const MOD_CLR={Flight:"#378ADD",Holiday:"#1D9E75",Hotel:"#BA7517",Visa:"#D4537E",Car:"#7F77DD",Insurance:"#5F9EA0",Misc:"#888"};
@@ -1738,10 +1749,11 @@ export function ConsultantReport({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🏆</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Consultant Productivity</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{stats.length} consultants · {totBks} bookings · Total GP {f(totGP)}</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{filtered.length} consultants · {totBks} bookings · Total GP {f(totGP)}</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <ReportSearch value={search} onChange={setSearch} placeholder="Consultant / module…"/>
           <ReportDateBar value={range} onChange={setRange} branch={branch}/>
           <button onClick={()=>setView("table")} style={{padding:"7px 14px",border:"none",cursor:"pointer",fontWeight:view==="table"?700:500,background:view==="table"?"#fff":"transparent",borderRadius:6}}>📊 Table</button><button onClick={()=>setView("trend")} style={{padding:"7px 14px",border:"none",cursor:"pointer",fontWeight:view==="trend"?700:500,background:view==="trend"?"#fff":"transparent",borderRadius:6}}>📈 Trend</button>
           <button onClick={()=>exportToCSV(stats,["name","rev","cost","gp","gpPct","bks","avgTicket","topMod"],"consultants.csv")} style={{...btnGh,fontSize:11}}><Download size={12}/> CSV</button>
@@ -1751,10 +1763,10 @@ export function ConsultantReport({branch}){
       {/* Summary KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
         {[
-          {l:"Consultants",v:String(stats.length),c:"#384677",bg:"#f3f4f8"},
+          {l:"Consultants",v:String(filtered.length),c:"#384677",bg:"#f3f4f8"},
           {l:"Total Revenue",v:f(totRev),c:"#185FA5",bg:"#E6F1FB"},
           {l:"Total GP",v:f(totGP),c:"#27500A",bg:"#EAF3DE"},
-          {l:"Avg GP/Consultant",v:stats.length>0?f(Math.round(totGP/stats.length)):"—",c:"#1D9E75",bg:"#EAF3DE"},
+          {l:"Avg GP/Consultant",v:filtered.length>0?f(Math.round(totGP/filtered.length)):"—",c:"#1D9E75",bg:"#EAF3DE"},
           {l:"Avg Ticket Value",v:totBks>0?f(Math.round(totRev/totBks)):"—",c:"#854F0B",bg:"#FAEEDA"},
           {l:"Total Bookings",v:String(totBks),c:"#384677",bg:"#f3f4f8"},
         ].map((k,i)=>(
@@ -1773,9 +1785,9 @@ export function ConsultantReport({branch}){
                 <th key={i} style={{padding:"9px 11px",textAlign:i>=2&&i<=8?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{stats.length===0&&(
-              <tr><td colSpan={10} style={{padding:"26px 11px",textAlign:"center",color:"#5a6691",fontSize:12}}>No bookings in this date range. Widen the range (try “All”) or check that sale vouchers are posted for this branch.</td></tr>
-            )}{stats.map((c,i)=>{
+            <tbody>{filtered.length===0&&(
+              <tr><td colSpan={10} style={{padding:"26px 11px",textAlign:"center",color:"#5a6691",fontSize:12}}>{needle?`No consultant matches “${search}”.`:"No bookings in this date range. Widen the range (try “All”) or check that sale vouchers are posted for this branch."}</td></tr>
+            )}{filtered.map((c,i)=>{
               const prev=prevMap[c.name];
               const gpDelta=prev?c.gp-prev.gp:null;
               return(
@@ -1806,7 +1818,7 @@ export function ConsultantReport({branch}){
             <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
               <td colSpan={2} style={{padding:"9px 11px",fontWeight:700,color:"#d4a437",fontSize:12}}>TOTAL</td>
               <td style={{padding:"9px 11px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(totRev)}</td>
-              <td style={{padding:"9px 11px",textAlign:"right",color:"#F7C1C1",fontVariantNumeric:"tabular-nums"}}>{f(stats.reduce((s,c)=>s+c.cost,0))}</td>
+              <td style={{padding:"9px 11px",textAlign:"right",color:"#F7C1C1",fontVariantNumeric:"tabular-nums"}}>{f(filtered.reduce((s,c)=>s+c.cost,0))}</td>
               <td style={{padding:"9px 11px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totGP)}</td>
               <td style={{padding:"9px 11px",textAlign:"right",fontWeight:700,color:totRev>0?"#5ab84b":"#8b94b3"}}>{totRev>0?+(totGP/totRev*100).toFixed(1):0}%</td>
               <td style={{padding:"9px 11px",textAlign:"right",fontWeight:700,color:"#fff"}}>{totBks}</td>
@@ -1819,7 +1831,7 @@ export function ConsultantReport({branch}){
       {view==="trend"&&(
         <div style={{...card}}>
           <p style={{margin:"0 0 14px",fontSize:12,fontWeight:700,color:"#0d1326"}}>GP Trend — recent months (Top 5 Consultants)</p>
-          {trendData.map((c,ci)=>(
+          {trendData.filter(c=>matchNeedle([c.name],needle)).map((c,ci)=>(
             <div key={c.name} style={{marginBottom:16}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                 <span style={{fontWeight:700,fontSize:11,color:"#0d1326"}}>{c.name}</span>
@@ -1858,6 +1870,8 @@ export function ClientStatement({branch}){
   const [client,setClient]=useState("");
   const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
   const [showModal,setShowModal]=useState(false);
+  const [search,setSearch]=useState('');
+  const needle=search.trim().toLowerCase();
   // Live per-file GP — used ONLY to populate the client selector (the set of parties
   // that have sales). The statement itself is the party's real account ledger.
   const q=useGpBills(branch,{});
@@ -1878,6 +1892,7 @@ export function ClientStatement({branch}){
     dr:p.debit||0,cr:p.credit||0,
     bal:p.balanceSide==="Cr"?-(p.balance||0):(p.balance||0),
   }));
+  const filteredTxns=txnsWithBal.filter(t=>matchNeedle([t.date,t.type,t.ref,t.desc],needle));
   const totDr=stmt?.totalDebit||0;
   const totCr=stmt?.totalCredit||0;
   const outstanding=stmt?(stmt.closingSide==="Cr"?-(stmt.closingBalance||0):(stmt.closingBalance||0)):0;
@@ -1904,7 +1919,8 @@ export function ClientStatement({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{client||'Select a client'} · {rangeLabel}</p>
           </div>
         </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <ReportSearch value={search} onChange={setSearch} placeholder="Ref / type / description…"/>
           <select value={client} onChange={e=>setClient(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
             <option value="">— Select client —</option>
             {clients.map(c=><option key={c}>{c}</option>)}
@@ -1937,7 +1953,7 @@ export function ClientStatement({branch}){
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <div style={{padding:"10px 14px",background:"#f3f4f8",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <p style={{margin:0,fontSize:11,fontWeight:700,color:"#0d1326"}}>Account Ledger — {client}</p>
-          <p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{txnsWithBal.length} transactions</p>
+          <p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{filteredTxns.length} transactions</p>
         </div>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5,minWidth:700}}>
@@ -1950,9 +1966,9 @@ export function ClientStatement({branch}){
                 <tr><td colSpan={7} style={{padding:"22px 12px",textAlign:"center",color:"#5a6691",fontSize:11.5}}>Select a client to view their live account statement.</td></tr>
               ):stmtQ.isLoading?(
                 <tr><td colSpan={7} style={{padding:"22px 12px",textAlign:"center",color:"#5a6691",fontSize:11.5}}>Loading statement…</td></tr>
-              ):txnsWithBal.length===0?(
-                <tr><td colSpan={7} style={{padding:"22px 12px",textAlign:"center",color:"#5a6691",fontSize:11.5}}>No posted transactions for {client} in this period.</td></tr>
-              ):txnsWithBal.map((t,i)=>(
+              ):filteredTxns.length===0?(
+                <tr><td colSpan={7} style={{padding:"22px 12px",textAlign:"center",color:"#5a6691",fontSize:11.5}}>{needle?`No transactions match “${search}”.`:`No posted transactions for ${client} in this period.`}</td></tr>
+              ):filteredTxns.map((t,i)=>(
               <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:t.type==="Receipt"?"#f0fff4":i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"7px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{t.date}</td>
                 <td style={{padding:"7px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:t.type==="Invoice"?"#E6F1FB":"#EAF3DE",color:t.type==="Invoice"?"#185FA5":"#27500A"}}>{t.type}</span></td>
@@ -1982,10 +1998,12 @@ export function ForexReport({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?null:branch?.code;
   const [period,setPeriod]=useState(CUR_MONTH);
+  const [search,setSearch]=useState('');
+  const needle=search.trim().toLowerCase();
   const PERIODS=PERIOD_OPTIONS;
   /* India-only / INR base — no foreign-currency settlements. */
   const FOREX_DATA=[];
-  const filtered=FOREX_DATA.filter(r=>r.date.startsWith(period)||period==="YTD");
+  const filtered=FOREX_DATA.filter(r=>(r.date.startsWith(period)||period==="YTD")&&matchNeedle([r.date,r.ccy,r.type,r.party,r.status],needle));
   const realized=filtered.filter(r=>r.status==="Settled");
   const totalGain=realized.reduce((s,r)=>s+r.gain,0);
   const totalUnreal=filtered.filter(r=>r.status==="Unsettled").length;
@@ -2002,7 +2020,8 @@ export function ForexReport({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Foreign currency settlements · Realized + Unrealized</p>
           </div>
         </div>
-        <div style={{display:"flex",gap:8}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <ReportSearch value={search} onChange={setSearch} placeholder="Party / currency / type…"/>
           <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
             {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
           </select>
@@ -2093,8 +2112,12 @@ export function DestinationIntelligence({branch}){
     avgTicket:d.bks>0?Math.round(d.rev/d.bks):0,
   })).sort((a,b)=>b.gp-a.gp);
 
-  const maxGP=Math.max(...destRows.map(d=>d.gp),1);
-  const totRev=destRows.reduce((s,d)=>s+d.rev,0);
+  const [search,setSearch]=useState('');
+  const needle=search.trim().toLowerCase();
+  const filtered=useMemo(()=>destRows.filter(d=>matchNeedle([d.dest,d.topMod],needle)),[destRows,needle]);
+
+  const maxGP=Math.max(...filtered.map(d=>d.gp),1);
+  const totRev=filtered.reduce((s,d)=>s+d.rev,0);
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
   const DEST_EMOJIS={Dubai:"🇦🇪",Bali:"🇮🇩",Singapore:"🇸🇬",Maldives:"🇲🇻",Bangkok:"🇹🇭",Europe:"🌍",London:"🇬🇧",Paris:"🇫🇷","Masai Mara":"🇰🇪","Nairobi":"🇰🇪"};
 
@@ -2105,15 +2128,18 @@ export function DestinationIntelligence({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🗺</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Destination Intelligence</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{destRows.length} destinations · {bills.length} bookings · Revenue & GP breakdown</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{filtered.length} destinations · {bills.length} bookings · Revenue & GP breakdown</p>
           </div>
         </div>
-        <ReportDateBar value={range} onChange={setRange} branch={branch}/>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <ReportSearch value={search} onChange={setSearch} placeholder="Destination / module…"/>
+          <ReportDateBar value={range} onChange={setRange} branch={branch}/>
+        </div>
       </div>
 
       {/* Destination cards */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:12,marginBottom:14}}>
-        {destRows.slice(0,6).map((d,i)=>(
+        {filtered.slice(0,6).map((d,i)=>(
           <div key={d.dest} style={{...card,borderTop:`3px solid ${i<3?"#d4a437":"#e1e3ec"}`,padding:"12px 14px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -2157,7 +2183,7 @@ export function DestinationIntelligence({branch}){
               <th key={i} style={{padding:"8px 12px",textAlign:i>=2?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>{h}</th>
             ))}
           </tr></thead>
-          <tbody>{destRows.map((d,i)=>(
+          <tbody>{filtered.map((d,i)=>(
             <tr key={d.dest} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
               <td style={{padding:"7px 12px",fontWeight:i<3?800:400,color:i<3?"#d4a437":"#5a6691",textAlign:"right"}}>{i+1}</td>
               <td style={{padding:"7px 12px",fontWeight:600,color:"#0d1326"}}>{DEST_EMOJIS[d.dest]||"🌍"} {d.dest}</td>

@@ -16,7 +16,7 @@ import { ACM_DATA, APPROVAL_LIMITS_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, 
 import { useMobile } from '../core/hooks';
 import { useGpBills } from '../core/useAccounting';
 import { useModalEsc } from '../core/ux/useModalEsc';
-import { ReportDateBar, resolveReportRange } from '../core/reportDateBar';
+import { ReportDateBar, ReportSearch, matchNeedle, resolveReportRange } from '../core/reportDateBar';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../core/styles';
 import { PHASE2_Page } from '../shell/PHASE2_Page';
 import { TopBar } from '../shell/TopBar';
@@ -123,6 +123,8 @@ export function Supplier360({branch}){
 
   const ALL_SUPPLIERS=[...new Set(BILLS.filter(b=>b.supplier).map(b=>b.supplier))].sort((a,b)=>a.localeCompare(b));
   const [supplier,setSupplier]=useState('');
+  const [search,setSearch]=useState('');
+  const needle=search.trim().toLowerCase();
   const selSupplier=(supplier&&ALL_SUPPLIERS.includes(supplier))?supplier:(ALL_SUPPLIERS[0]||'');
 
   const suppBills=BILLS.filter(b=>b.supplier===selSupplier);
@@ -133,6 +135,11 @@ export function Supplier360({branch}){
   const outstanding=Math.round(totCost*0.20);
   const mods=[...new Set(suppBills.map(b=>b.mod).filter(Boolean))];
   const branches=[...new Set(suppBills.map(b=>b.branch).filter(Boolean))];
+  // Purchase-history search: newest first, then filtered by the free-text needle.
+  // No needle → top 10 (as before); with a needle → every matching booking.
+  const histBills=suppBills.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const filteredHist=histBills.filter(b=>matchNeedle([b.id,b.date,b.mod,b.dest],needle));
+  const displayHist=needle?filteredHist:filteredHist.slice(0,10);
 
   /* ADMs/ACMs for this supplier (no live memo source yet → graceful empty). */
   const suppADMs=ADM_DATA.filter(a=>selSupplier&&(a.airline===selSupplier||a.airline.includes(selSupplier.split(" ")[0])));
@@ -150,6 +157,7 @@ export function Supplier360({branch}){
           </div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <ReportSearch value={search} onChange={setSearch} placeholder="Voucher / module / destination…"/>
           <ReportDateBar value={range} onChange={setRange} branch={branch}/>
           <select value={selSupplier} onChange={e=>setSupplier(e.target.value)} disabled={!ALL_SUPPLIERS.length} style={{...inp,width:220,minHeight:32,fontSize:11,opacity:ALL_SUPPLIERS.length?1:0.6}}>
             {ALL_SUPPLIERS.length
@@ -208,7 +216,7 @@ export function Supplier360({branch}){
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:12}}>
         {/* Purchase history */}
         <div>
-          <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Purchase History ({suppBills.length} bookings)</p>
+          <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Purchase History ({needle?filteredHist.length:suppBills.length} bookings)</p>
           <div style={{...card,padding:0,overflow:"hidden"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
               <thead><tr style={{background:"#0d1326"}}>
@@ -216,7 +224,7 @@ export function Supplier360({branch}){
                   <th key={i} style={{padding:"8px 10px",textAlign:i>=4?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr></thead>
-              <tbody>{suppBills.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,10).map((b,i)=>{
+              <tbody>{displayHist.map((b,i)=>{
                 const gp=b.sell-b.cost;const gpPct2=b.sell>0?+(gp/b.sell*100).toFixed(1):0;
                 return (
                   <tr key={b.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>

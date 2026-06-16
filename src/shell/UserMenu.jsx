@@ -4,6 +4,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, Lock, LogOut, Menu, Settings, User } from 'lucide-react';
 import { Icon } from '../core/styles';
 
@@ -46,12 +47,12 @@ export function UserMenu({currentUser, setCurrentUser, setRoute}){
           {initials}
         </div>
       </div>
-      {open && (
+      {open && createPortal(
         <>
           <div onClick={()=>setOpen(false)}
-            style={{position:"fixed",inset:0,zIndex:599}}/>
-          <div style={{position:"absolute",top:54,right:12,
-            background:"#fff",borderRadius:8,minWidth:240,zIndex:600,
+            style={{position:"fixed",inset:0,zIndex:99998}}/>
+          <div style={{position:"fixed",top:54,right:12,
+            background:"#fff",borderRadius:8,minWidth:240,zIndex:99999,
             boxShadow:"0 8px 24px rgba(0,0,0,0.25)",
             border:"1px solid #e1e3ec",overflow:"hidden"}}>
             {/* Profile header */}
@@ -105,7 +106,8 @@ export function UserMenu({currentUser, setCurrentUser, setRoute}){
               KBiz360 v1.0 · THE BUSINESS ENGINE
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   );
