@@ -233,11 +233,15 @@ const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
 
 // Voucher type → product bucket (for the register's product filter).
 const PRODUCT = {
-  SF: 'Tickets', PF: 'Tickets', SHT: 'Hotel', PHT: 'Hotel', SH: 'Holiday', PH: 'Holiday',
+  SF: 'Flight', PF: 'Flight', SHT: 'Hotel', PHT: 'Hotel', SH: 'Holiday', PH: 'Holiday',
   SV: 'Visa', PV: 'Visa', SI: 'Insurance', PI: 'Insurance', SC: 'Car', PC: 'Car', SM: 'Misc', PM: 'Misc',
   SCN: 'Credit Note', SDN: 'Debit Note', RF: 'Refund', RI: 'Reissue',
 };
 const productOf = (v) => PRODUCT[v.type] || v.type;
+// The module filter ALWAYS offers this full set (even when the current period/branch
+// has no rows for a module), so every module is selectable — the list is not limited
+// to what happens to be loaded. Extra values found in the data are appended.
+const MODULE_ORDER = ['Flight', 'Hotel', 'Holiday', 'Visa', 'Insurance', 'Car', 'Misc', 'Refund', 'Reissue'];
 
 // International vs Domestic for a register row. Prefer the joined booking's
 // packageType; else infer from the posted component-head ledger prefixes (IT- =
@@ -1514,7 +1518,11 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   // RF/RI vouchers (their cost reversal lives in the one combined voucher). They show
   // labelled 'Refund'/'Reissue' in the Sales/Purchase Type column — never as a sale.
   const allRows = useMemo(() => [...(q.data || []), ...(refReissue.data || [])], [q.data, refReissue.data]);
-  const products = useMemo(() => [...new Set(allRows.map(productOf))].sort(), [allRows]);
+  const products = useMemo(() => {
+    const present = new Set(allRows.map(productOf).filter(Boolean));
+    const extras = [...present].filter((p) => !MODULE_ORDER.includes(p)).sort();
+    return [...MODULE_ORDER, ...extras]; // always selectable, plus anything else in the data
+  }, [allRows]);
   const needle = search.trim().toLowerCase();
   const rows = useMemo(() => allRows
     .filter((v) => product === 'all' || productOf(v) === product)

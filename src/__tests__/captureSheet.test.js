@@ -33,7 +33,7 @@ describe('buildCaptureSheet — register capture columns & row refs', () => {
     expect(keys.indexOf('intDom')).toBe(keys.indexOf('clientType') - 1);
     expect(sheet.columns.find((c) => c.key === 'salesType').label).toBe('Sales Type');
     expect(sheet.columns.find((c) => c.key === 'intDom').label).toBe('INT / DOM');
-    expect(sheet.rows[0].salesType).toBe('Tickets'); // productOf(SF)
+    expect(sheet.rows[0].salesType).toBe('Flight'); // productOf(SF)
     expect(sheet.rows[0].intDom).toBe('INT');         // IT- ledger prefix
   });
 
