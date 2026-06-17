@@ -137,7 +137,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const emptyRow = `<tr><td class="l" colSpan="${isSale ? 6 : 8}" style="text-align:center;color:#9A9A9A;padding:16px">No line detail captured for this booking.</td></tr>`;
 
   // summary from the booked snapshot (ties to the books)
-  const subTotal = r2(snap.lineTotal || 0), service = r2(snap.serviceCharge || 0), gst = r2(snap.gst || 0), tcs = r2(snap.tcs || 0), incentive = r2(snap.incentive || 0), tds = r2(snap.tds || 0), net = r2(snap.total || (subTotal + service + gst + tcs));
+  const subTotal = r2(snap.lineTotal || 0), service = r2(snap.serviceCharge || 0), gst = r2(snap.gst || 0), tcs = r2(snap.tcs || 0), incentive = r2(snap.incentiveAmt || 0), tds = r2(snap.incentiveTds || 0), net = r2(snap.total || (subTotal + service + gst + tcs));
   const inter = booking.gstMode === 'inter';
   const half = r2(gst / 2);
   const gstRows = inter
@@ -151,11 +151,11 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     ${gst ? gstRows : ''}${tcsRow}
     <div class="net"><span class="k">NET TOTAL (${esc(cur)})</span><span class="v">${cur}${n2(net)}</span></div>`
     : `
-    <div class="r"><span class="k">Sub Total (Fares + Svc)</span><span class="v">${cur}${n2(subTotal + incentive)}</span></div>
+    <div class="r"><span class="k">Sub Total (Fares + Svc)</span><span class="v">${cur}${n2(subTotal)}</span></div>
     ${incentive ? `<div class="r" style="color:#A32D2D"><span class="k">Supplier Incentive</span><span class="v">-${cur}${n2(incentive)}</span></div>` : ''}
     ${gst ? gstRows : ''}
     ${tds ? `<div class="r" style="color:#A07828"><span class="k">TDS (2%)</span><span class="v">${cur}${n2(tds)}</span></div>` : ''}
-    <div class="net"><span class="k">NET COST (${esc(cur)})</span><span class="v">${cur}${n2(net)}</span></div>`;
+    <div class="net"><span class="k">NET COST (${esc(cur)})</span><span class="v">${cur}${n2(r2(net - incentive + tds))}</span></div>`;
 
   // bank (sales) from company-profile
   const bank = (prof.banks || []).find((b) => b.primary) || (prof.banks || [])[0] || {};

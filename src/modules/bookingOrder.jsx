@@ -588,8 +588,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
               <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
               <td style={tfTd}>{pkg ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
-              <td style={tfTd}>{fmt(totals.po.incentive)}</td>
-              <td style={tfTd}>{fmt(totals.po.tds)}</td>
+              <td style={tfTd}>{fmt(totals.po.incentiveAmt)}</td>
+              <td style={tfTd}>{fmt(totals.po.incentiveTds)}</td>
               <td style={tfTd}>{fmt(totals.po.total)}</td>
             </tr></tfoot>
           </table>
@@ -636,7 +636,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               <td style={{ ...tfTd, textAlign: 'left' }} colSpan={2}>TOTAL</td>
               <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd}>{fmt(totals.so.gst + totals.so.otherTaxesGst)}</td>
               <td style={tfTd}>{fmt(totals.po.total)}</td><td style={tfTd}>{fmt(totals.po.gst)}</td>
-              <td style={tfTd}>{fmt(totals.po.incentive)}</td><td style={tfTd}>{fmt(totals.po.tds)}</td>
+              <td style={tfTd}>{fmt(totals.po.incentiveAmt)}</td><td style={tfTd}>{fmt(totals.po.incentiveTds)}</td>
               <td style={{ ...tfTd, color: DR }}>{fmt(totals.gp.total)}</td><td style={{ ...tfTd, color: GOLD }}>{totals.gp.pct.toFixed(2)}%</td>
             </tr></tfoot>
           </table>

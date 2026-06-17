@@ -23,40 +23,26 @@ describe('bookingTotals — Supplier Incentive and TDS', () => {
 
     const { po, so, gp } = bookingTotals(SF, lines, { noSupplier: false, branch: 'BOM' });
 
-    // Fares = 10000
-    // psvc = 1000
-    // gstPur = 1000 * 18% = 180
-    // incentive = 2000
-    // tds = 2000 * 2% = 40
-    // finalPurchase = 10000 + 1000 + 180 - 2000 + 40 = 9220
-    expect(po.total).toBe(9220);
-    expect(po.incentive).toBe(2000);
-    expect(po.tds).toBe(40);
+    // GROSS convention (mirrors the backend): the commission + 2% TDS are carried
+    // separately on po.incentiveAmt / po.incentiveTds and post via the engine's
+    // incentivePostings — NOT baked into the cost. So:
+    //   po.total = fares 10000 + psvc 1000 + gstPur 180 = 11180  (GROSS, ex-commission)
+    expect(po.total).toBe(11180);
+    expect(po.incentiveAmt).toBe(2000);
+    expect(po.incentiveTds).toBe(40);          // 2000 × 2%
+    expect(po.incentiveGst).toBe(0);           // trade-discount policy
     expect(po.gst).toBe(180);
 
-    // Sales side
-    // Fares = 10000
-    // markup = 1500
-    // ssvc = 500
-    // gstSvc = 500 * 18% = 90
-    // gstMk = 1500 * 18 / 118 = 228.81
-    // finalSales = 10000 + 1500 + 500 + 90 = 12090
+    // Sales side unchanged: finalSales = 10000 + 1500 + 500 + 90 = 12090
     expect(so.total).toBe(12090);
 
-    // Net Sales = 12090 - gstSvc - gstMk = 12090 - 90 - 228.81 = 11771.19
-    // Net Cost = po.total - gstPur - tds = 9220 - 180 - 40 = 9000
-    // (Fares + psvc - incentive = 10000 + 1000 - 2000 = 9000)
-    // GP = Net Sales - Net Cost = 11771.19 - 9000 = 2771.19
-    expect(gp.costNet).toBe(9000);
+    // GP credits the commission: Net Sales 11771.19 − (Fares+psvc − incentive = 9000)
+    expect(gp.costNet).toBe(9000);             // cost net of the commission credit
     expect(gp.total).toBeCloseTo(2771.19, 2);
 
-    // Verify heads
-    const incHead = po.heads.find((h) => h.label === 'Supplier Incentive');
-    expect(incHead).toBeTruthy();
-    expect(incHead.amt).toBe(-2000);
-
-    const tdsHead = po.heads.find((h) => h.label === 'TDS Receivable');
-    expect(tdsHead).toBeTruthy();
-    expect(tdsHead.amt).toBe(40);
+    // The commission/TDS are NOT cost heads anymore — heads are gross cost only.
+    expect(po.heads.find((h) => h.label === 'Supplier Incentive')).toBeFalsy();
+    expect(po.heads.find((h) => h.label === 'TDS Receivable')).toBeFalsy();
+    expect(po.heads.reduce((s, h) => s + h.amt, 0)).toBeCloseTo(11000, 2); // base 10000 + psvc 1000
   });
 });
