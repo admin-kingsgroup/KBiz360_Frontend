@@ -19,6 +19,7 @@ import { exportToExcel, vouchersToSheet } from '../core/exportExcel';
 import { voucherHaystack, bookingTravelDetail } from '../core/registerSearch';
 import { isVatBranch } from '../core/voucherSpecs';
 import { openPrintPreview } from '../core/PrintPreview';
+import { buildBookingInvoice } from '../core/invoiceHtml';
 import { useReportExport } from '../core/reportExportContext';
 import { LedgerAccountView } from '../core/ledgerUI';
 import { openLedgerModal } from '../core/LedgerModalHost';
@@ -1275,7 +1276,7 @@ function captureTravel(v, booking) {
 // suffixes the tax-head labels to match the posted ledger names (e.g. "CGST Output
 // [BOM]"). `linkIndex` cross-references the sale ↔ purchase invoice numbers, and
 // `bookingByLink` joins each invoice to its booking for the travel detail.
-function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink }) {
+export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink, showType }) {
   const isSale = tab !== 'purchase';
   const taxWord = isSale ? 'Output' : 'Input';
   const sfx = tag ? ` [${tag}]` : '';
@@ -1301,6 +1302,9 @@ function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink }) {
   col('saleVno', 'Sales Invoice No');
   col('purVno', 'Purchase Invoice No');
   if (!tag) col('branch', 'Branch');
+  // When viewing All modules together, surface which module each row belongs to —
+  // shown immediately before Client/Vendor Type so the mixed list stays readable.
+  if (showType) col('salesType', isSale ? 'Sales Type' : 'Purchase Type');
   col('clientType', isSale ? 'Client Type' : 'Vendor Type');
   col('clientLedger', isSale ? 'Client Ledger' : 'Vendor Ledger');
   col('pax', 'Pax Details');
@@ -1318,6 +1322,8 @@ function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink }) {
   }
   if (isSale && anyTcs) col('tcs', 'TCS', true);
   if (!isSale && anyTds) col('tds', 'TDS', true);
+  // Per-row printable invoice (Sales Invoice / Purchase Invoice) at the far end.
+  col('invoice', isSale ? 'Sales Invoice' : 'Purchase Invoice');
 
   // 3) One row per voucher — pivot the lines into their head columns.
   const rows = list.map((v) => {
@@ -1327,10 +1333,13 @@ function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink }) {
     const g = splitGst(v.taxAmt, v.gstMode, v.branch);
     const og = splitGst(v.otherTaxesGst, v.gstMode, v.branch);
     const row = {
+      _v: v,             // back-reference: Final Invoice Value → open this voucher's JV
+      _booking: booking, // back-reference: print the Sales / Purchase invoice for this row
       linkNo: link || '—',
       saleVno: isSale ? v.vno : (linkIndex.saleByLink[link] || ''),
       purVno: isSale ? (linkIndex.purByLink[link] || '') : v.vno,
       branch: v.branch || '',
+      salesType: productOf(v),
       clientType: v.partyGroup || '',
       clientLedger: v.party || v.billTo || '',
       pax: tv.passengers || '', pnr: tv.pnrs || '', ticket: tv.tickets || '',
@@ -1357,7 +1366,7 @@ function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink }) {
 // footer. Numeric columns (flagged `num`) right-align, Indian-group, and sum in the
 // footer; text columns (Link No, Pax, PNR …) stay left-aligned. A mirrored top
 // scrollbar keeps sideways scrolling reachable on long lists.
-function CaptureTable({ columns, rows, totals }) {
+function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
   const topRef = React.useRef(null);
   const bodyRef = React.useRef(null);
   const [scrollW, setScrollW] = useState(0);
@@ -1386,11 +1395,32 @@ function CaptureTable({ columns, rows, totals }) {
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} style={rowBg(i)}>
-                {columns.map((c) => (
-                  <td key={c.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: mono(c.key) ? BLUE : DARK, textAlign: c.num ? 'right' : 'left', fontVariantNumeric: c.num ? 'tabular-nums' : 'normal', ...(mono(c.key) ? { fontFamily: 'monospace', fontSize: 10 } : null) }}>
-                    {c.num ? cellNum(r[c.key]) : (r[c.key] || '—')}
-                  </td>
-                ))}
+                {columns.map((c) => {
+                  // Final Invoice / Bill Value → green + clickable, opens the voucher's JV.
+                  if (c.key === 'finalValue') {
+                    return (
+                      <td key={c.key} onClick={() => onOpenJV && r._v && onOpenJV(r._v)} title="Open journal voucher (JV)"
+                        style={{ padding: '7px 12px', whiteSpace: 'nowrap', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: GREEN, fontWeight: 800, cursor: onOpenJV && r._v ? 'pointer' : 'default', textDecoration: onOpenJV && r._v ? 'underline' : 'none' }}>
+                        {cellNum(r[c.key])}
+                      </td>
+                    );
+                  }
+                  // Trailing per-row printable invoice button.
+                  if (c.key === 'invoice') {
+                    return (
+                      <td key={c.key} style={{ padding: '6px 12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                        {r._booking
+                          ? <button onClick={() => onPrintInvoice && onPrintInvoice(r)} style={{ padding: '4px 9px', fontSize: 10, fontWeight: 700, border: `1px solid ${BLUE}`, color: BLUE, background: '#fff', borderRadius: 5, cursor: 'pointer' }}>🧾 {c.label}</button>
+                          : <span style={{ color: DIM }}>—</span>}
+                      </td>
+                    );
+                  }
+                  return (
+                    <td key={c.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: mono(c.key) ? BLUE : DARK, textAlign: c.num ? 'right' : 'left', fontVariantNumeric: c.num ? 'tabular-nums' : 'normal', ...(mono(c.key) ? { fontFamily: 'monospace', fontSize: 10 } : null) }}>
+                      {c.num ? cellNum(r[c.key]) : (r[c.key] || '—')}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
@@ -1411,7 +1441,9 @@ function CaptureTable({ columns, rows, totals }) {
 
 export function RegisterLive({ branch, initial = 'sales' }) {
   const cur = curOf(branch);
-  const [tab, setTab] = useState(initial === 'purchase' ? 'purchase' : 'sales'); // sales | purchase
+  // Locked per menu: the Sales Register shows ONLY sales, the Purchase Register ONLY
+  // purchase — no cross-tab toggle (so each register is its own dataset).
+  const tab = initial === 'purchase' ? 'purchase' : 'sales';
   const [view, setView] = useState('capture'); // capture (SO/PO/GP horizontal) | summary | detailed
   const [product, setProduct] = useState('all');
   const [search, setSearch] = useState('');
@@ -1454,17 +1486,30 @@ export function RegisterLive({ branch, initial = 'sales' }) {
     return m;
   }, [bookingsQ.data]);
   const brTag = (!branch || branch === 'ALL') ? '' : (branch.code || branch);
+  const showType = product === 'all'; // All modules → add the Sales/Purchase Type column
   const captureSheet = useMemo(
-    () => buildCaptureSheet(rows, { tab, tag: brTag, linkIndex, bookingByLink }),
-    [rows, tab, brTag, linkIndex, bookingByLink],
+    () => buildCaptureSheet(rows, { tab, tag: brTag, linkIndex, bookingByLink, showType }),
+    [rows, tab, brTag, linkIndex, bookingByLink, showType],
   );
+  // Final Invoice Value → open the voucher's journal (JV). Per-row Invoice → print PDF.
+  const openJV = (v) => { if (v) setDetail(v); };
+  const printInvoice = (r) => {
+    const b = r && r._booking;
+    if (!b) return;
+    openPrintPreview({
+      title: `${tab === 'sales' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo || b.linkNo || ''}`,
+      recommend: 'portrait',
+      html: buildBookingInvoice(b, tab === 'sales' ? 'sale' : 'purchase', branch),
+    });
+  };
 
   const exportNow = () => {
     if (!rows.length) return;
     const name = `${tab}-register-${product === 'all' ? 'all' : product}-${branchLabel(branch)}`;
     if (view === 'capture') {
+      const cols = captureSheet.columns.filter((c) => c.key !== 'invoice'); // button column, no data to export
       const totalRow = { ...captureSheet.totals, linkNo: `TOTAL · ${captureSheet.rows.length}` };
-      exportToExcel(name, captureSheet.columns, [...captureSheet.rows, totalRow]);
+      exportToExcel(name, cols, [...captureSheet.rows, totalRow]);
     } else {
       exportToExcel(name, sheet.columns, sheet.rows);
     }
@@ -1487,9 +1532,6 @@ export function RegisterLive({ branch, initial = 'sales' }) {
         ] };
   }), [rows, tab]);
   useReportExport({ title: tab === 'sales' ? 'Sales Register' : 'Purchase Register', kind: 'vouchers', rows: tallyVouchers, recommend: 'landscape' }, [tallyVouchers, tab]);
-  const Tab = ({ id, label }) => (
-    <button onClick={() => setTab(id)} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: tab === id ? DARK : '#fff', color: tab === id ? GOLD : DIM, borderColor: tab === id ? DARK : '#e1e3ec' }}>{label}</button>
-  );
   const subHint = view === 'capture' ? 'every SO/PO/GP figure, module-wise — scroll right'
     : view === 'detailed' ? 'every Tally column shown — scroll right'
       : 'click a row for full detail';
@@ -1499,7 +1541,6 @@ export function RegisterLive({ branch, initial = 'sales' }) {
       title={tab === 'sales' ? 'Sales Register' : 'Purchase Register'}
       sub={`${branchLabel(branch)} · ${rows.length} vouchers · Total ${money(cur, sum('total'))} · ${needle ? 'searching all dates' : subHint}`}
       right={<>
-        <Tab id="sales" label="Sales" /><Tab id="purchase" label="Purchase" />
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Search passenger / party / ticket / link no / voucher…"
           style={{ ...inp, width: 280, minHeight: 32, fontSize: 11 }} />
         <select value={product} onChange={(e) => setProduct(e.target.value)} title="Filter the register by module" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer' }}>
@@ -1513,7 +1554,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
     >
       <State q={q} empty={rows.length === 0}>
         {view === 'capture' ? (
-          <CaptureTable columns={captureSheet.columns} rows={captureSheet.rows} totals={captureSheet.totals} />
+          <CaptureTable columns={captureSheet.columns} rows={captureSheet.rows} totals={captureSheet.totals} onOpenJV={openJV} onPrintInvoice={printInvoice} />
         ) : view === 'detailed' ? (
           <DetailedTable columns={sheet.columns} rows={sheet.rows} />
         ) : (
