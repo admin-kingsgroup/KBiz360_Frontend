@@ -216,9 +216,10 @@ function makeRefundReissue(kind) {
 }
 
 /**
- * ADM (Agent Debit Memo) / ACM (Agent Credit Memo) — independent BSP memos. The
- * "Pass on" toggle flips the posting: absorb (single-party vs the BSP/airline) or
- * pass-to-customer (two-party, ADM ≈ reissue / ACM ≈ refund). Gated → PENDING.
+ * ADM (Agent Debit Memo) / ACM (Agent Credit Memo) — independent BSP memos. BSP-only
+ * with NO markup and NO Sales/customer involvement: always single-party vs the
+ * BSP/airline creditor, posting straight to Direct Expenses (ADM = a cost; ACM = a
+ * contra credit). Optional GST on the memo is input/output credit. Gated → PENDING.
  */
 function makeAdmAcm(kind) {
   const isAdm = kind === 'adm';
@@ -227,47 +228,39 @@ function makeAdmAcm(kind) {
     label: isAdm ? 'ADM Voucher' : 'ACM Voucher',
     icon: isAdm ? '📉' : '📈',
     explain: isAdm
-      ? (<><b style={{ color: '#A07828' }}>ADM (Agent Debit Memo):</b> the airline debits the agency via BSP. <b>Absorb</b> → booked as ADM Charges (cost) vs the airline; <b>Pass to customer</b> → re-billed like a reissue.</>)
-      : (<><b style={{ color: '#A07828' }}>ACM (Agent Credit Memo):</b> the airline credits the agency via BSP. <b>Absorb</b> → booked as ACM Recovery (income) vs the airline; <b>Pass to customer</b> → credited back like a refund.</>),
+      ? (<><b style={{ color: '#A07828' }}>ADM (Agent Debit Memo):</b> the airline debits the agency via BSP. Booked as <b>ADM Charges (Direct Expenses)</b> vs the airline — BSP-only, no markup, no customer.</>)
+      : (<><b style={{ color: '#A07828' }}>ACM (Agent Credit Memo):</b> the airline credits the agency via BSP. Booked as <b>ACM Recovery (Direct Expenses, contra)</b> vs the airline — BSP-only, no markup, no customer.</>),
 
-    initial: () => ({ date: todayISO(), againstInvoice: '', reasonCode: '', counterParty: '', amount: '', passOn: false, party: '', serviceCharge: '', markup: '', gstPct: 18, gstMode: 'intra', remarks: '' }),
+    initial: () => ({ date: todayISO(), againstInvoice: '', reasonCode: '', counterParty: '', amount: '', gstPct: 0, gstMode: 'intra', remarks: '' }),
 
     fromVoucher: (v) => ({
       date: v.date || '', againstInvoice: v.againstInvoice || '', reasonCode: v.reasonCode || '',
       counterParty: v.counterParty || '', amount: v.supplierAmt ?? v.subtotal ?? '',
-      passOn: !!v.passOn, party: v.party || '',
-      serviceCharge: lineAmt(v, 'Service Charge Income'), markup: lineAmt(v, 'Markup Income'),
-      gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18, gstMode: v.gstMode || 'intra', remarks: v.remarks || '',
+      gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 0, gstMode: v.gstMode || 'intra', remarks: v.remarks || '',
     }),
 
+    // ADM/ACM are BSP-only with no markup / no customer — always the absorb shape.
+    // The airline memo posts to Direct Expenses (admLines/acmLines) vs the BSP creditor;
+    // optional GST on the memo is input (ADM) / output (ACM) credit. total = amount + GST.
     toBody: (s, ctx) => {
       const amount = r2(+s.amount || 0);
-      const passOn = !!s.passOn;
-      const base = {
+      const gstPct = +s.gstPct || 0;
+      const taxAmt = r2(amount * gstPct / 100);
+      return {
         type: isAdm ? 'ADM' : 'ACM', category: kind, branch: ctx.branchCode, date: s.date,
-        passOn, reasonCode: s.reasonCode || '',
+        reasonCode: s.reasonCode || '',
         counterParty: s.counterParty, counterPartyGroup: 'Sundry Creditors', againstInvoice: s.againstInvoice || '',
+        gstMode: taxAmt > 0 ? s.gstMode : '', gstPct,
+        subtotal: amount, taxAmt, supplierAmt: amount, total: r2(amount + taxAmt),
         remarks: s.remarks || `Being ${isAdm ? 'Agent Debit' : 'Agent Credit'} Memo${s.reasonCode ? ` (${s.reasonCode})` : ''}`,
         status: 'saved',
       };
-      if (!passOn) return { ...base, party: '', gstMode: '', gstPct: 0, subtotal: amount, taxAmt: 0, supplierAmt: amount, total: amount };
-      const svc = r2(+s.serviceCharge || 0), markup = r2(+s.markup || 0);
-      const ourIncome = r2(svc + markup);
-      const taxAmt = r2(ourIncome * (+s.gstPct || 0) / 100);
-      const lines = [];
-      if (svc > 0) lines.push({ ledger: 'Service Charge Income', amt: svc, desc: 'Service charge' });
-      if (markup > 0) lines.push({ ledger: 'Markup Income', amt: markup, desc: 'Markup' });
-      const total = isAdm ? r2(amount + ourIncome + taxAmt) : r2(amount - ourIncome - taxAmt);
-      return { ...base, party: s.party, partyType: 'customer', gstMode: s.gstMode, gstPct: +s.gstPct || 0, supplierAmt: amount, subtotal: ourIncome, taxAmt, lines, total };
     },
 
     validate: (s) => {
       const amount = +s.amount || 0;
-      let hint = '';
-      if (!s.counterParty) hint = '(Pick airline/BSP)';
-      else if (amount <= 0) hint = '(Enter amount)';
-      else if (s.passOn && !s.party) hint = '(Pick customer)';
-      return { ok: !!s.counterParty && amount > 0 && (!s.passOn || !!s.party), hint };
+      const hint = !s.counterParty ? '(Pick airline/BSP)' : amount <= 0 ? '(Enter amount)' : '';
+      return { ok: !!s.counterParty && amount > 0, hint };
     },
 
     fields: (props) => <AdmAcmFields {...props} kind={kind} />,

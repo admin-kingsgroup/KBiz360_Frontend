@@ -50,7 +50,7 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
     {label:"Tour Codes", href:"/masters/tour-codes"},
     {label:"Project / Tour Code Master", href:"/masters/projects"},
     {label:"Seat Inventory", href:"/masters/seats"},
-    {label:"Markup Rates", href:"/masters/markup"},
+    {label:"Other Taxes Rates", href:"/masters/markup"},
   ]},
   {label:"HR Master", children:[
     {label:"Employee Master", href:"/hr/employees"},

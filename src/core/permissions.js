@@ -29,7 +29,7 @@ export const PERM_MODULES=[
     {id:"subagents",    label:"Sub-Agents"},
     {id:"forex",        label:"Forex Rates"},
     {id:"passports",    label:"Passport Register"},
-    {id:"markup",       label:"Markup Rates"},
+    {id:"markup",       label:"Other Taxes Rates"},
     {id:"vendorterms",  label:"Vendor Terms"},
     {id:"taxcodes",     label:"Tax / SAC Codes"},
   ]},

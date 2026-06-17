@@ -31,21 +31,17 @@ describe('refund / reissue / adm / acm — registered & gated payloads', () => {
     expect(b.total).toBe(3000 + 1000 + 180);
   });
 
-  test.concurrent('adm absorb toBody: single-party, no customer leg', async () => {
-    const b = VOUCHER_REGISTRY.adm.toBody({ date: '2026-06-13', counterParty: 'Air India', amount: 1000, passOn: false, reasonCode: 'FD' }, ctx);
-    expect(b).toMatchObject({ type: 'ADM', category: 'adm', passOn: false, party: '', supplierAmt: 1000, total: 1000 });
+  test.concurrent('adm toBody: BSP-only, no customer/markup, total = amount + GST', async () => {
+    const b = VOUCHER_REGISTRY.adm.toBody({ date: '2026-06-13', counterParty: 'Air India', amount: 1000, gstPct: 18, gstMode: 'intra', reasonCode: 'FD' }, ctx);
+    expect(b).toMatchObject({ type: 'ADM', category: 'adm', counterParty: 'Air India', supplierAmt: 1000, taxAmt: 180, total: 1180 });
+    expect(b.party).toBeUndefined();   // no customer leg
+    expect(b.lines).toBeUndefined();   // no markup/service income lines
   });
 
-  test.concurrent('adm pass-on toBody: customer billed = memo + charges + GST', async () => {
-    const b = VOUCHER_REGISTRY.adm.toBody({ date: '2026-06-13', counterParty: 'Air India', amount: 1000, passOn: true, party: 'ABC', serviceCharge: 200, markup: 0, gstPct: 18, gstMode: 'intra' }, ctx);
-    expect(b.passOn).toBe(true);
-    expect(b.total).toBe(1000 + 200 + 36);
-  });
-
-  test.concurrent('acm pass-on toBody: customer credited = memo − charges − GST', async () => {
-    const b = VOUCHER_REGISTRY.acm.toBody({ date: '2026-06-13', counterParty: 'Air India', amount: 1500, passOn: true, party: 'ABC', serviceCharge: 200, markup: 0, gstPct: 18, gstMode: 'intra' }, ctx);
-    expect(b.category).toBe('acm');
-    expect(b.total).toBe(1500 - 200 - 36);
+  test.concurrent('acm toBody: BSP-only, no customer/markup, total = amount + GST', async () => {
+    const b = VOUCHER_REGISTRY.acm.toBody({ date: '2026-06-13', counterParty: 'Air India', amount: 1500, gstPct: 0 }, ctx);
+    expect(b).toMatchObject({ type: 'ACM', category: 'acm', supplierAmt: 1500, taxAmt: 0, total: 1500 });
+    expect(b.party).toBeUndefined();
   });
 
   test.concurrent('refund validate requires invoice + both parties + amount', async () => {
@@ -53,9 +49,9 @@ describe('refund / reissue / adm / acm — registered & gated payloads', () => {
     expect(VOUCHER_REGISTRY.refund.validate({ againstInvoice: 'SF/1', party: 'ABC', counterParty: 'AI', supplierAmt: 100 }).ok).toBe(true);
   });
 
-  test.concurrent('adm pass-on validate requires a customer', async () => {
-    expect(VOUCHER_REGISTRY.adm.validate({ counterParty: 'AI', amount: 100, passOn: true, party: '' }).ok).toBe(false);
-    expect(VOUCHER_REGISTRY.adm.validate({ counterParty: 'AI', amount: 100, passOn: false }).ok).toBe(true);
+  test.concurrent('adm validate needs only airline + amount (no customer)', async () => {
+    expect(VOUCHER_REGISTRY.adm.validate({ counterParty: '', amount: 100 }).ok).toBe(false);
+    expect(VOUCHER_REGISTRY.adm.validate({ counterParty: 'AI', amount: 100 }).ok).toBe(true);
   });
 });
 

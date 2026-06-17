@@ -16,7 +16,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { card, inp, bc } from '../core/styles';
 import { exportToExcel, vouchersToSheet } from '../core/exportExcel';
-import { voucherHaystack } from '../core/registerSearch';
+import { voucherHaystack, bookingTravelDetail } from '../core/registerSearch';
+import { isVatBranch } from '../core/voucherSpecs';
 import { openPrintPreview } from '../core/PrintPreview';
 import { useReportExport } from '../core/reportExportContext';
 import { LedgerAccountView } from '../core/ledgerUI';
@@ -30,7 +31,7 @@ import { CONSOLIDATED_LABEL } from '../core/data';
 import {
   useTrialBalance, useProfitAndLoss, useBalanceSheet, useDayBook,
   useLedgerStatement, useLedgerGroups, useChartOfAccounts, useGroupTree,
-  useSalesRegister, usePurchaseRegister, useInvoiceGP,
+  useSalesRegister, usePurchaseRegister, useInvoiceGP, useBookingOrders,
   useVoucher, useUpdateVoucher, useCostCenters, useVoucherPreview,
 } from '../core/useAccounting';
 import { LedgerVouchers } from './pnlTally.jsx';
@@ -1220,10 +1221,198 @@ function VoucherDetail({ voucher, cur, onClose }) {
   );
 }
 
+/* ════════════════════ SALES / PURCHASE REGISTER ════════════════════ */
+// "SO/PO/GP Capture" view — a wide, horizontal register that lays out every figure
+// captured on the booking at SO/PO/GP time, ONE LINE PER INVOICE:
+//   SPG/Link No · Sales Inv · Purchase Inv · Client Type · Client Ledger · Pax ·
+//   PNR · Ticket No · Final Invoice Value · each component head (IT-Base Fare /
+//   IT-K3-Taxes / IT-Taxes / IT-Other Taxes / IT-Service Charges …) · CGST/SGST/IGST
+//   Output · Other Taxes CGST/SGST Output · TCS.
+// The component-head columns are derived dynamically from the posted voucher lines —
+// their ledger names ARE "IT-Base Fare" etc. — so the SAME layout auto-adapts to
+// every module (Flight/Hotel/Visa/…), Domestic (DT-) or International (IT-), and the
+// Purchase Register mirrors it (heads carry the [Pur] suffix; GST shows as Input).
+// (`r2` — round to 2dp — is defined once above and reused here.)
+const numOf = (n) => { const v = Number(n); return Number.isFinite(v) ? v : 0; };
+
+// Split a GST amount into the heads that actually post: VAT branches → one VAT leg;
+// inter-state → IGST; otherwise CGST + SGST halves (paise kept balanced — mirrors the
+// backend posting builder's gstPostings()).
+function splitGst(amt, gstMode, brCode) {
+  const a = r2(amt);
+  if (!a) return { cgst: 0, sgst: 0, igst: 0, vat: 0 };
+  if (isVatBranch(brCode)) return { cgst: 0, sgst: 0, igst: 0, vat: a };
+  if (gstMode === 'inter') return { cgst: 0, sgst: 0, igst: a, vat: 0 };
+  const half = r2(a / 2);
+  return { cgst: half, sgst: r2(a - half), igst: 0, vat: 0 };
+}
+
+// Rank a component-head ledger so the head columns sit in a natural reading order
+// (fares → K3 → taxes → other taxes → service charge → supplier service), regardless
+// of the DT-/IT- prefix or the [Pur] suffix. Tested in order so "Other Taxes" and
+// "K3-Taxes" don't collide with the generic "Taxes" match.
+const HEAD_RANK = [
+  [/base\s*fare/i, 0], [/land/i, 1], [/room|basic|visa\s*fee|premium|fare/i, 2],
+  [/k3/i, 3], [/other\s*tax/i, 5], [/service\s*charge/i, 6], [/supplier\s*service/i, 7],
+  [/tax/i, 4], [/incentive/i, 8], [/tds/i, 9],
+];
+const headRank = (ledger) => { for (const [re, rk] of HEAD_RANK) if (re.test(ledger)) return rk; return 50; };
+
+// Flatten one voucher's passenger / ticket / PNR detail. Prefer the joined booking
+// (booking-spawned voucher lines are aggregate heads with NO pax); else fall back to
+// the voucher's own per-line pax (CRM / imported invoices carry it on the lines).
+function captureTravel(v, booking) {
+  if (booking) return bookingTravelDetail(booking);
+  const names = [], tkts = [], pnrs = [];
+  const push = (arr, x) => { const s = String(x == null ? '' : x).trim(); if (s && !arr.includes(s)) arr.push(s); };
+  for (const p of (v.pax || [])) { push(names, p.name); push(tkts, p.ticket); push(pnrs, p.pnr); }
+  for (const ln of (v.lines || [])) { push(names, ln.passenger); push(tkts, ln.ticket); push(pnrs, ln.pnr); }
+  return { passengers: names.join(', '), tickets: tkts.join(', '), pnrs: pnrs.join(', ') };
+}
+
+// Build the wide "capture" sheet ({columns, rows, totals}) for the Sales/Purchase
+// Register. `tab` = 'sales' | 'purchase'. `tag` (branch code, or '' for All-Branch)
+// suffixes the tax-head labels to match the posted ledger names (e.g. "CGST Output
+// [BOM]"). `linkIndex` cross-references the sale ↔ purchase invoice numbers, and
+// `bookingByLink` joins each invoice to its booking for the travel detail.
+function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink }) {
+  const isSale = tab !== 'purchase';
+  const taxWord = isSale ? 'Output' : 'Input';
+  const sfx = tag ? ` [${tag}]` : '';
+  const list = vouchers || [];
+
+  // 1) Dynamic component-head columns = the union of every voucher line's ledger.
+  const headSet = new Set();
+  let anyInter = false, anyVat = false, anyIndia = false, anyOther = false, anyTcs = false, anyTds = false;
+  for (const v of list) {
+    for (const ln of (v.lines || [])) { if (ln && ln.ledger) headSet.add(ln.ledger); }
+    if (isVatBranch(v.branch)) anyVat = true; else anyIndia = true;
+    if (v.gstMode === 'inter') anyInter = true;
+    if (numOf(v.otherTaxesGst) > 0) anyOther = true;
+    if (numOf(v.tcsAmt) > 0) anyTcs = true;
+    if (numOf(v.tdsAmt) > 0) anyTds = true;
+  }
+  const headLedgers = [...headSet].sort((a, b) => (headRank(a) - headRank(b)) || a.localeCompare(b));
+
+  // 2) Assemble columns: fixed lead → component heads → taxes → final value.
+  const columns = [];
+  const col = (key, label, isNum) => columns.push({ key, label, num: !!isNum });
+  col('linkNo', 'SPG / Link No');
+  col('saleVno', 'Sales Invoice No');
+  col('purVno', 'Purchase Invoice No');
+  if (!tag) col('branch', 'Branch');
+  col('clientType', isSale ? 'Client Type' : 'Vendor Type');
+  col('clientLedger', isSale ? 'Client Ledger' : 'Vendor Ledger');
+  col('pax', 'Pax Details');
+  col('pnr', 'PNR');
+  col('ticket', 'Ticket No');
+  col('finalValue', isSale ? 'Final Invoice Value' : 'Final Bill Value', true);
+  for (const lg of headLedgers) col(`head:${lg}`, lg, true);
+  if (anyIndia) { col('cgst', `CGST ${taxWord}${sfx}`, true); col('sgst', `SGST ${taxWord}${sfx}`, true); }
+  if (anyInter) col('igst', `IGST ${taxWord}${sfx}`, true);
+  if (anyVat) col('vat', `VAT ${taxWord}${sfx}`, true);
+  if (isSale && anyOther) {
+    if (anyIndia) { col('ocgst', `Other Taxes CGST Output${sfx}`, true); col('osgst', `Other Taxes SGST Output${sfx}`, true); }
+    if (anyInter) col('oigst', `Other Taxes IGST Output${sfx}`, true);
+    if (anyVat) col('ovat', `Other Taxes VAT Output${sfx}`, true);
+  }
+  if (isSale && anyTcs) col('tcs', 'TCS', true);
+  if (!isSale && anyTds) col('tds', 'TDS', true);
+
+  // 3) One row per voucher — pivot the lines into their head columns.
+  const rows = list.map((v) => {
+    const link = v.linkNo || '';
+    const booking = (link && bookingByLink[link]) || null;
+    const tv = captureTravel(v, booking);
+    const g = splitGst(v.taxAmt, v.gstMode, v.branch);
+    const og = splitGst(v.otherTaxesGst, v.gstMode, v.branch);
+    const row = {
+      linkNo: link || '—',
+      saleVno: isSale ? v.vno : (linkIndex.saleByLink[link] || ''),
+      purVno: isSale ? (linkIndex.purByLink[link] || '') : v.vno,
+      branch: v.branch || '',
+      clientType: v.partyGroup || '',
+      clientLedger: v.party || v.billTo || '',
+      pax: tv.passengers || '', pnr: tv.pnrs || '', ticket: tv.tickets || '',
+      finalValue: r2(v.total),
+      cgst: g.cgst, sgst: g.sgst, igst: g.igst, vat: g.vat,
+      ocgst: og.cgst, osgst: og.sgst, oigst: og.igst, ovat: og.vat,
+      tcs: r2(v.tcsAmt), tds: r2(v.tdsAmt),
+    };
+    for (const ln of (v.lines || [])) {
+      if (!ln || !ln.ledger) continue;
+      const k = `head:${ln.ledger}`;
+      row[k] = r2(numOf(row[k]) + numOf(ln.amt));
+    }
+    return row;
+  });
+
+  // 4) Footer column totals for every numeric column.
+  const totals = {};
+  for (const c of columns) if (c.num) totals[c.key] = r2(rows.reduce((s, r) => s + numOf(r[c.key]), 0));
+  return { columns, rows, totals };
+}
+
+// Wide, horizontally-scrollable register table — sticky header AND sticky totals
+// footer. Numeric columns (flagged `num`) right-align, Indian-group, and sum in the
+// footer; text columns (Link No, Pax, PNR …) stay left-aligned. A mirrored top
+// scrollbar keeps sideways scrolling reachable on long lists.
+function CaptureTable({ columns, rows, totals }) {
+  const topRef = React.useRef(null);
+  const bodyRef = React.useRef(null);
+  const [scrollW, setScrollW] = useState(0);
+  useEffect(() => {
+    const measure = () => { if (bodyRef.current) setScrollW(bodyRef.current.scrollWidth); };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [columns, rows]);
+  const fromTop = () => { if (bodyRef.current && topRef.current) bodyRef.current.scrollLeft = topRef.current.scrollLeft; };
+  const fromBody = () => { if (bodyRef.current && topRef.current) topRef.current.scrollLeft = bodyRef.current.scrollLeft; };
+  const cellNum = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : '—'; };
+  const mono = (k) => k === 'linkNo' || k === 'saleVno' || k === 'purVno';
+  return (
+    <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+      <div ref={topRef} onScroll={fromTop} style={{ overflowX: 'auto', overflowY: 'hidden', height: 14, borderBottom: '1px solid #eef1f6' }}>
+        <div style={{ width: scrollW || '100%', height: 1 }} />
+      </div>
+      <div ref={bodyRef} onScroll={fromBody} className="kb-sticky" style={{ '--stick-head': DARK, '--stick-foot': DARK, maxHeight: 'calc(100vh - 230px)', overflow: 'auto' }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: 11, minWidth: '100%' }}>
+          <thead><tr>
+            {columns.map((c) => (
+              <th key={c.key} style={{ padding: '8px 12px', textAlign: c.num ? 'right' : 'left', color: GOLD, fontWeight: 700, fontSize: 9.5, whiteSpace: 'nowrap', position: 'sticky', top: 0, background: DARK, zIndex: 1 }}>{c.label}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} style={rowBg(i)}>
+                {columns.map((c) => (
+                  <td key={c.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: mono(c.key) ? BLUE : DARK, textAlign: c.num ? 'right' : 'left', fontVariantNumeric: c.num ? 'tabular-nums' : 'normal', ...(mono(c.key) ? { fontFamily: 'monospace', fontSize: 10 } : null) }}>
+                    {c.num ? cellNum(r[c.key]) : (r[c.key] || '—')}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+          {totals && rows.length > 0 && (
+            <tfoot><tr>
+              {columns.map((c, idx) => (
+                <td key={c.key} style={{ padding: '8px 12px', whiteSpace: 'nowrap', textAlign: c.num ? 'right' : 'left', fontWeight: 800, color: c.num ? '#fff' : GOLD, background: DARK, position: 'sticky', bottom: 0, fontVariantNumeric: c.num ? 'tabular-nums' : 'normal' }}>
+                  {c.num ? cellNum(totals[c.key]) : (idx === 0 ? `TOTAL · ${rows.length}` : '')}
+                </td>
+              ))}
+            </tr></tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function RegisterLive({ branch, initial = 'sales' }) {
   const cur = curOf(branch);
   const [tab, setTab] = useState(initial === 'purchase' ? 'purchase' : 'sales'); // sales | purchase
-  const [view, setView] = useState('summary'); // summary | detailed
+  const [view, setView] = useState('capture'); // capture (SO/PO/GP horizontal) | summary | detailed
   const [product, setProduct] = useState('all');
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState(monthStartISO);
@@ -1232,6 +1421,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   // Fetch all (date filtering is done client-side because Tally dates are mixed-format strings).
   const sales = useSalesRegister(branch);
   const purch = usePurchaseRegister(branch);
+  const bookingsQ = useBookingOrders(branch); // joins each invoice → its SO/PO/GP for Pax/PNR/Ticket
   const q = tab === 'sales' ? sales : purch;
   const allRows = q.data || [];
   const products = useMemo(() => [...new Set(allRows.map(productOf))].sort(), [allRows]);
@@ -1244,9 +1434,40 @@ export function RegisterLive({ branch, initial = 'sales' }) {
     .filter((v) => !needle || voucherHaystack(v).includes(needle)), [allRows, product, from, to, needle]);
   const sum = (k) => rows.reduce((s, v) => s + (v[k] || 0), 0);
   const sheet = useMemo(() => vouchersToSheet(rows), [rows]);
+
+  // Sale ↔ purchase invoice numbers share a booking's Link No — index both sides so
+  // the capture row can show its counterpart invoice. Booking index (by Link No,
+  // approved/posted preferred) supplies the per-passenger travel detail.
+  const linkIndex = useMemo(() => {
+    const saleByLink = {}, purByLink = {};
+    for (const v of (sales.data || [])) if (v.linkNo) saleByLink[v.linkNo] = v.vno;
+    for (const v of (purch.data || [])) if (v.linkNo) purByLink[v.linkNo] = v.vno;
+    return { saleByLink, purByLink };
+  }, [sales.data, purch.data]);
+  const bookingByLink = useMemo(() => {
+    const m = {};
+    for (const b of (bookingsQ.data || [])) {
+      if (!b || !b.linkNo) continue;
+      const isApproved = b.status === 'approved' || b.status === 'posted';
+      if (!m[b.linkNo] || isApproved) m[b.linkNo] = b;
+    }
+    return m;
+  }, [bookingsQ.data]);
+  const brTag = (!branch || branch === 'ALL') ? '' : (branch.code || branch);
+  const captureSheet = useMemo(
+    () => buildCaptureSheet(rows, { tab, tag: brTag, linkIndex, bookingByLink }),
+    [rows, tab, brTag, linkIndex, bookingByLink],
+  );
+
   const exportNow = () => {
     if (!rows.length) return;
-    exportToExcel(`${tab}-register-${product === 'all' ? 'all' : product}-${branchLabel(branch)}`, sheet.columns, sheet.rows);
+    const name = `${tab}-register-${product === 'all' ? 'all' : product}-${branchLabel(branch)}`;
+    if (view === 'capture') {
+      const totalRow = { ...captureSheet.totals, linkNo: `TOTAL · ${captureSheet.rows.length}` };
+      exportToExcel(name, captureSheet.columns, [...captureSheet.rows, totalRow]);
+    } else {
+      exportToExcel(name, sheet.columns, sheet.rows);
+    }
   };
   // Feed the global Tally Export bar balanced Sales/Purchase vouchers.
   const tallyVouchers = useMemo(() => rows.map((v) => {
@@ -1269,26 +1490,31 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   const Tab = ({ id, label }) => (
     <button onClick={() => setTab(id)} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: tab === id ? DARK : '#fff', color: tab === id ? GOLD : DIM, borderColor: tab === id ? DARK : '#e1e3ec' }}>{label}</button>
   );
+  const subHint = view === 'capture' ? 'every SO/PO/GP figure, module-wise — scroll right'
+    : view === 'detailed' ? 'every Tally column shown — scroll right'
+      : 'click a row for full detail';
   return (
     <Page
-      wide={view === 'detailed'}
+      wide={view !== 'summary'}
       title={tab === 'sales' ? 'Sales Register' : 'Purchase Register'}
-      sub={`${branchLabel(branch)} · ${rows.length} vouchers · Total ${money(cur, sum('total'))} · ${needle ? 'searching all dates' : (view === 'detailed' ? 'every Tally column shown — scroll right' : 'click a row for full detail')}`}
+      sub={`${branchLabel(branch)} · ${rows.length} vouchers · Total ${money(cur, sum('total'))} · ${needle ? 'searching all dates' : subHint}`}
       right={<>
         <Tab id="sales" label="Sales" /><Tab id="purchase" label="Purchase" />
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Search passenger / party / ticket / link no / voucher…"
           style={{ ...inp, width: 280, minHeight: 32, fontSize: 11 }} />
-        <select value={product} onChange={(e) => setProduct(e.target.value)} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer' }}>
-          <option value="all">All products</option>
+        <select value={product} onChange={(e) => setProduct(e.target.value)} title="Filter the register by module" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer' }}>
+          <option value="all">All modules</option>
           {products.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
-        <ViewToggle view={view} setView={setView} />
+        <ModeToggle view={view} setView={setView} modes={[{ id: 'capture', label: 'SO/PO/GP Capture' }, { id: 'summary', label: 'Summary' }, { id: 'detailed', label: 'All Columns' }]} />
         <DateRange from={from} to={to} setFrom={setFrom} setTo={setTo} branch={branch} />
         <ExportBtn onClick={exportNow} disabled={!rows.length} />
       </>}
     >
       <State q={q} empty={rows.length === 0}>
-        {view === 'detailed' ? (
+        {view === 'capture' ? (
+          <CaptureTable columns={captureSheet.columns} rows={captureSheet.rows} totals={captureSheet.totals} />
+        ) : view === 'detailed' ? (
           <DetailedTable columns={sheet.columns} rows={sheet.rows} />
         ) : (
           <Table>

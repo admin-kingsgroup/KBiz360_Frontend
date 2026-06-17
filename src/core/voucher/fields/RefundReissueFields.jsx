@@ -10,7 +10,7 @@ import { money2, r2 } from '../ui';
  * `kind` ('refund' | 'reissue') flips the customer/supplier direction:
  *   refund  → supplier (airline) refunds us; we refund the balance to the customer.
  *   reissue → supplier charges a fee + fare difference; we bill the customer.
- * Our retained service charge + markup post as Indirect Income; any charge the
+ * Our retained service charge + Other Taxes (margin) post as income; any charge the
  * supplier levies on us posts as our own cost. The customer figure is derived so
  * the voucher always balances (see posting.builder refundLines/reissueLines).
  */
@@ -56,7 +56,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
           <input type="number" value={state.supplierAmt} onChange={(e) => patch({ supplierAmt: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right', fontWeight: 700 }} />
         </FL>
         <FL label={`Our service charge (${cur})`}><input type="number" value={state.serviceCharge} onChange={(e) => patch({ serviceCharge: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
-        <FL label={`Our markup (${cur})`}><input type="number" value={state.markup} onChange={(e) => patch({ markup: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+        <FL label={`Our Other Taxes (${cur})`}><input type="number" value={state.markup} onChange={(e) => patch({ markup: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>

@@ -23,7 +23,7 @@ const FIELD_LABEL = {
   vno: 'Voucher No', bookingNo: 'Booking No', linkNo: 'Link No', costCenter: 'Cost Centre', gstMode: 'GST mode',
   party: 'Party', billTo: 'Bill To', partyGroup: 'Party group', customer: 'Customer', supplier: 'Supplier',
   remarks: 'Remarks', date: 'Date', branch: 'Branch', module: 'Module', status: 'Status', total: 'Total',
-  subtotal: 'Subtotal', lines: 'Line items', rows: 'Line items', markupPct: 'Markup %', consultant: 'Consultant',
+  subtotal: 'Subtotal', lines: 'Line items', rows: 'Line items', markupPct: 'Other Taxes %', consultant: 'Consultant',
   noSupplier: 'No-supplier deal', packageType: 'Package type', saleVno: 'Sale invoice', purchaseVno: 'Purchase invoice',
   approvedBy: 'Approved by', deletedBy: 'Deleted by', rejectedReason: 'Rejected reason', supplierAmt: 'Supplier amount',
   amount: 'Amount', counterParty: 'Counter-party', consultantName: 'Consultant', headerRef: 'Reference',

@@ -291,24 +291,24 @@ export function MarkupRateSheet({branch}){
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📐</div>
           <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Markup / Net Rate Sheet</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Per-client markup rules · GP floor alerts · All modules</p>
+            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Other Taxes / Net Rate Sheet</h2>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Per-client Other Taxes rules · GP floor alerts · All modules</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <HExportBtn name="markup-rules" rows={rules} columns={[{key:"id",label:"ID"},{key:"client",label:"Client / Segment"},{key:"type",label:"Type"},{key:"module",label:"Module"},{key:"markupType",label:"Markup Type"},{key:"value",label:"Markup Value"},{key:"floor",label:"GP Floor %"},{key:"note",label:"Notes"}]}/>
+          <HExportBtn name="other-taxes-rules" rows={rules} columns={[{key:"id",label:"ID"},{key:"client",label:"Client / Segment"},{key:"type",label:"Type"},{key:"module",label:"Module"},{key:"markupType",label:"Other Taxes Type"},{key:"value",label:"Other Taxes Value"},{key:"floor",label:"GP Floor %"},{key:"note",label:"Notes"}]}/>
           <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Add Rule</button>
         </div>
       </div>
 
       {alertCount>0&&<div style={{marginBottom:12,padding:"10px 14px",borderRadius:9,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:10.5,color:"#A32D2D",fontWeight:600,display:"flex",gap:8}}>
-        <AlertTriangle size={14}/> {alertCount} markup rule{alertCount>1?"s":""} below the GP floor — review pricing immediately
+        <AlertTriangle size={14}/> {alertCount} Other Taxes rule{alertCount>1?"s":""} below the GP floor — review pricing immediately
       </div>}
 
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#0d1326"}}>
-            {["ID","Client / Segment","Type","Module","Markup Type","Markup","GP Floor","Alert","Notes",""].map((h,i)=>(
+            {["ID","Client / Segment","Type","Module","Other Taxes Type","Other Taxes","GP Floor","Alert","Notes",""].map((h,i)=>(
               <th key={i} style={{padding:"9px 12px",textAlign:i>=5&&i<=6?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
@@ -332,7 +332,7 @@ export function MarkupRateSheet({branch}){
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:460,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
             <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
-              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Add Markup Rule</p>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Add Other Taxes Rule</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
             </div>
             <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
@@ -342,10 +342,10 @@ export function MarkupRateSheet({branch}){
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <FL label="Module"><select value={form.module} onChange={e=>setForm(f=>({...f,module:e.target.value}))} style={inp}>{["ALL","Flight","Holiday","Hotel","Car","Visa","Insurance","Misc"].map(m=><option key={m}>{m}</option>)}</select></FL>
-                <FL label="Markup type"><select value={form.markupType} onChange={e=>setForm(f=>({...f,markupType:e.target.value}))} style={inp}><option>Percentage</option><option>Fixed Fee</option></select></FL>
+                <FL label="Other Taxes type"><select value={form.markupType} onChange={e=>setForm(f=>({...f,markupType:e.target.value}))} style={inp}><option>Percentage</option><option>Fixed Fee</option></select></FL>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <FL label={form.markupType==="Percentage"?"Markup %":"Fixed fee (₹)"}><input type="number" value={form.value} onChange={e=>setForm(f=>({...f,value:+e.target.value}))} style={inp}/></FL>
+                <FL label={form.markupType==="Percentage"?"Other Taxes %":"Fixed fee (₹)"}><input type="number" value={form.value} onChange={e=>setForm(f=>({...f,value:+e.target.value}))} style={inp}/></FL>
                 <FL label="GP floor % (0 = no floor)"><input type="number" value={form.floor} onChange={e=>setForm(f=>({...f,floor:+e.target.value}))} style={inp}/></FL>
               </div>
               <FL label="Note"><input value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} style={inp}/></FL>

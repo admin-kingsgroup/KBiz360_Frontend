@@ -147,8 +147,9 @@ export function blankSector() {
 export function blankLine(spec) {
   const l = {};
   spec.idCols.forEach((c) => { l[c.key] = ''; });
-  spec.fareCols.forEach((c) => { l[c.key] = 0; });
-  l.psvc = 0; l.markup = 0; l.ssvc = 0; l.psvcGst = 0;
+  spec.fareCols.forEach((c) => { l[c.key] = ''; });
+  l.psvc = ''; l.markup = ''; l.ssvc = ''; l.psvcGst = '';
+  l.incentive = ''; l.tds = '';
   if (spec.sectors) l.sectors = [blankSector()];
   return l;
 }
@@ -187,8 +188,8 @@ export function rowsFromSnapshots(booking) {
   const out = [];
   for (let i = 0; i < n; i++) {
     const s = soL[i] || {}, p = poL[i] || {};
-    // so line: { ...ids, ...fares, markup, ssvc, … }; po line carries psvc.
-    out.push({ ...p, ...s, psvc: num(p.psvc), markup: num(s.markup), ssvc: num(s.ssvc) });
+    // so line: { ...ids, ...fares, markup, ssvc, … }; po line carries psvc, incentive, tds.
+    out.push({ ...p, ...s, psvc: num(p.psvc), markup: num(s.markup), ssvc: num(s.ssvc), incentive: num(p.incentive), tds: num(p.tds) });
   }
   return out;
 }
@@ -223,12 +224,12 @@ const purRateOf = (spec, ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && is
 const pkgRateOf = (spec, ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); return spec.gstRate || PKG_GST; };
 export { isVatBranch };
 
-export const finalPurchase = (spec, l) => r2(fareSum(spec, l) + num(l.psvc) + gstPur(spec, l));
+export const finalPurchase = (spec, l) => r2(fareSum(spec, l) + num(l.psvc) + gstPur(spec, l) - num(l.incentive) + r2(num(l.incentive) * 0.02));
 // Supplier service is NOT passed through to the customer (it's an agency cost), so
 // the sale excludes psvc — that's what makes it reduce GP.
 export const finalSales = (spec, l) => r2(fareSum(spec, l) + num(l.markup) + num(l.ssvc) + gstSvc(l));
 export const salesGST = (l) => r2(gstSvc(l) + gstMk(l));
-export const gpOf = (spec, l) => r2((finalSales(spec, l) - salesGST(l)) - (finalPurchase(spec, l) - gstPur(spec, l)));
+export const gpOf = (spec, l) => r2((finalSales(spec, l) - salesGST(l)) - (finalPurchase(spec, l) - gstPur(spec, l) - r2(num(l.incentive) * 0.02)));
 export const gpPctOf = (spec, l) => { const fs = finalSales(spec, l); return fs > 0 ? r2((gpOf(spec, l) / fs) * 100) : 0; };
 
 // Holiday "package" model (tour-operator): no service charge; Supplier Service GST
@@ -245,15 +246,18 @@ export function lineCalcPackage(spec, l, ctx) {
   const psvc = num(l.psvc);
   const psvcGst = num(l.psvcGst);          // Supplier Service GST — entered
   const markup = num(l.markup);            // net markup (agency margin = GP)
+  const incentive = num(l.incentive);
+  const tds = r2(incentive * 0.02);
   const taxable = r2(land + psvc + psvcGst + markup); // full package consideration
   const outGst = r2(taxable * rate);       // single 5% output GST
   const finalSales = r2(taxable + outGst); // TCS added at booking level
-  const finalPurchase = r2(land + psvc + psvcGst); // cost (no recoverable ITC)
+  const finalPurchase = r2(land + psvc + psvcGst - incentive + tds); // cost (no recoverable ITC)
   const salesGST = outGst;
   return {
     pass: land, gstSvc: 0, gstMk: r2(markup * rate), gstPur: 0, psvcGst, markup, asp: taxable, outGst,
-    finalSales, finalPurchase, salesGST, gp: markup,
-    gpPct: finalSales > 0 ? r2((markup / finalSales) * 100) : 0,
+    incentive, tds,
+    finalSales, finalPurchase, salesGST, gp: r2(markup + incentive),
+    gpPct: finalSales > 0 ? r2(((markup + incentive) / finalSales) * 100) : 0,
   };
 }
 
@@ -267,13 +271,16 @@ export function lineCalc(spec, l, ctx) {
   const gSvc = taxable ? gstSvc(l, sr) : 0;
   const gMk  = taxable ? gstMk(l, sr) : 0;
   const gPur = taxable ? gstPur(spec, l, pr) : 0;
+  const incentive = num(l.incentive);
+  const tds = r2(incentive * 0.02);
   const fSales = r2(fareSum(spec, l) + num(l.markup) + num(l.ssvc) + gSvc);
-  const fPur   = r2(fareSum(spec, l) + num(l.psvc) + gPur);
+  const fPur   = r2(fareSum(spec, l) + num(l.psvc) + gPur - incentive + tds);
   const sGST = r2(gSvc + gMk);
-  const gp = r2((fSales - sGST) - (fPur - gPur));
+  const gp = r2((fSales - sGST) - (fPur - gPur - tds));
   return {
     pass: r2(fareSum(spec, l)),
     gstSvc: gSvc, gstMk: gMk, gstPur: gPur,
+    incentive, tds,
     finalSales: fSales, finalPurchase: fPur,
     salesGST: sGST, gp, gpPct: fSales > 0 ? r2((gp / fSales) * 100) : 0,
   };
@@ -285,8 +292,11 @@ export function lineCalc(spec, l, ctx) {
 // `lines` detail is preserved for the read-only voucher view + voucher meta.
 export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false } = {}) {
   const ctx = { branch, noVat: !!noVat };
-  const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, total: 0, lines: [] };
-  const so = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, total: 0, lines: [] };
+  const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, tds: 0, incentive: 0, total: 0, lines: [] };
+  // `otherTaxesGst` = GST carved out of the Other Taxes margin (GST-inclusive, so the
+  // customer total is unchanged); kept OUT of `gst` so it posts to the dedicated
+  // per-branch "Other Taxes [C/S/I]GST Output" ledgers, separate from the regular GST.
+  const so = { lineTotal: 0, serviceCharge: 0, gst: 0, otherTaxesGst: 0, tcs: 0, total: 0, lines: [] };
   // Per-component ledger heads (ex-GST). Every SO/PO field posts to its OWN ledger
   // under the Sales / Purchase group — pass-through fares + supplier service mirror
   // on both sides; Markup & Service Charge are sale-only (their GST → Output GST).
@@ -296,13 +306,18 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     const c = lineCalc(spec, l, ctx);
     const id = {}; spec.idCols.forEach((col) => { id[col.key] = l[col.key]; });
     const fares = {}; spec.fareCols.forEach((col) => { fares[col.key] = num(l[col.key]); });
-    po.lineTotal += r2(c.finalPurchase - c.gstPur);
+    po.lineTotal += r2(c.finalPurchase - c.gstPur - c.tds);
     po.serviceCharge += num(l.psvc);
-    po.gst += c.gstPur; po.total += c.finalPurchase;
-    po.lines.push({ ...id, ...fares, psvc: num(l.psvc), gst: c.gstPur, total: c.finalPurchase });
+    po.gst += c.gstPur;
+    po.tds += c.tds;
+    po.incentive += c.incentive;
+    po.total += c.finalPurchase;
+    po.lines.push({ ...id, ...fares, psvc: num(l.psvc), incentive: num(l.incentive), tds: c.tds, gst: c.gstPur, total: c.finalPurchase });
     so.lineTotal += r2(c.finalSales - c.salesGST);
     so.serviceCharge += num(l.ssvc);
-    so.gst += c.salesGST; so.total += c.finalSales;
+    so.gst += r2(c.salesGST - c.gstMk);   // regular output GST (fares / service charge)
+    so.otherTaxesGst += c.gstMk;          // GST on the Other Taxes margin → separate ledgers
+    so.total += c.finalSales;
     so.lines.push({ ...id, ...fares, pass: c.pass, markup: num(l.markup), ssvc: num(l.ssvc), gstMk: c.gstMk, gstSvc: c.gstSvc, gst: c.salesGST, total: c.finalSales });
     // heads — pass-through fares (sale = purchase). Package model: Land + Supplier
     // Service + Supplier Service GST are pass-through (both sides), Markup is sale-only
@@ -312,14 +327,24 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     if (isPkg(spec)) {
       addH(sH, 'psvc', 'Supplier Service', num(l.psvc)); addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
       addH(sH, 'psvcGst', 'Supplier Service GST', num(l.psvcGst)); addH(pH, 'psvcGst', 'Supplier Service GST', num(l.psvcGst));
-      addH(sH, 'markup', 'Markup', num(l.markup));
+      addH(sH, 'markup', 'Other Taxes', num(l.markup));
+      if (num(l.incentive) > 0) {
+        addH(pH, 'incentive', 'Supplier Incentive', -num(l.incentive));
+        addH(pH, 'tds', 'TDS Receivable', num(c.tds));
+      }
     } else {
       addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
-      addH(sH, 'markup', 'Markup', r2(num(l.markup) - c.gstMk));
+      addH(sH, 'markup', 'Other Taxes', r2(num(l.markup) - c.gstMk));
       addH(sH, 'ssvc', 'Service Charge', num(l.ssvc));
+      if (num(l.incentive) > 0) {
+        addH(pH, 'incentive', 'Supplier Incentive', -num(l.incentive));
+        addH(pH, 'tds', 'TDS Receivable', num(c.tds));
+      }
     }
   });
-  ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'total'].forEach((k) => { po[k] = r2(po[k]); so[k] = r2(so[k]); });
+  ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'tds', 'incentive', 'total'].forEach((k) => { po[k] = r2(po[k]); });
+  ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'total'].forEach((k) => { so[k] = r2(so[k]); });
+  so.otherTaxesGst = r2(so.otherTaxesGst);
   // TCS u/s 206C(1G) — collected from the customer on the sale value (incl GST),
   // on top of the invoice. It's a Balance-Sheet liability, NOT income, so it never
   // enters the net and the GP is unchanged. India-only — never on Africa/VAT
@@ -328,8 +353,8 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     so.tcs = r2(so.total * spec.tcs.rate / 100);
     so.total = r2(so.total + so.tcs);
   }
-  const saleNet = r2(so.total - so.gst - so.tcs);
-  const costNet = r2(po.total - po.gst - po.tcs);
+  const saleNet = r2(so.total - so.gst - so.otherTaxesGst - so.tcs);
+  const costNet = r2(po.total - po.gst - po.tds);
   // Finalise the head lists in display order, drop zero heads, and snap each list
   // to sum EXACTLY to its net (adjust the largest head) so the JV always balances.
   const order = isPkg(spec)
@@ -343,11 +368,12 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     return heads;
   };
   so.heads = finalise(sH, order, saleNet);
-  po.heads = finalise(pH, order.filter((k) => k !== 'markup' && k !== 'ssvc'), costNet);
+  const poOrder = [...order.filter((k) => k !== 'markup' && k !== 'ssvc'), 'incentive', 'tds'];
+  po.heads = finalise(pH, poOrder, costNet);
   // No-supplier (Misc): a sale with no purchase leg — the entire sale net is profit.
   // Zero the cost side so nothing posts to Purchase Accounts and GP = 100% margin.
   if (noSupplier) {
-    ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'total'].forEach((k) => { po[k] = 0; });
+    ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'tds', 'incentive', 'total'].forEach((k) => { po[k] = 0; });
     po.lines = []; po.heads = [];
     const pct0 = so.total > 0 ? r2((saleNet / so.total) * 100) : 0;
     return { po, so, gp: { total: saleNet, pct: pct0, saleNet, costNet: 0 } };

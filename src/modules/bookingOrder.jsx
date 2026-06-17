@@ -24,23 +24,29 @@ import { toast } from '../core/ux/toast';
 import {
   VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc, isVatBranch, rowsFromSnapshots,
 } from '../core/voucherSpecs.js';
+import { RefundReissueFields } from '../core/voucher/fields/RefundReissueFields';
 
 const GOLD = '#A07828', DARK = '#0d1326', DR = '#1B6B4C', CR = '#9B2C2C', BLUE = '#185FA5';
+// Reversal modules (Refund / Reissue) act on an existing sale — picked from the same
+// module bar as Flight/Hotel, but they open the reversal entry (ReversalEntry) instead
+// of the fare grid and spawn one RF/RI voucher on approval.
+const REVERSAL_CHIPS = [{ code: 'RF', name: 'Refund', icon: '↩️' }, { code: 'RI', name: 'Reissue', icon: '🔁' }];
+const isReversalModule = (m) => m === 'RF' || m === 'RI';
 const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || 'BOM'));
 const today = () => new Date().toISOString().slice(0, 10);
 const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 
 /* shared cell styles */
-const thM = { padding: '7px 6px', fontSize: 9, fontWeight: 700, letterSpacing: '.3px', color: '#27500A', textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #cfe6d8', background: '#f4faf6' };
-const thA = { padding: '7px 6px', fontSize: 9, fontWeight: 700, letterSpacing: '.3px', color: GOLD, textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #d9c79a', background: '#f7f2e6' };
+const thM = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: '#334155', textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #e2e8f0', background: '#f8fafc' };
+const thA = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: GOLD, textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #f2e6cc', background: '#fdfbfa' };
 const thL = { textAlign: 'left' };
-const tdC = { padding: '3px 6px', fontSize: 11.5, textAlign: 'right', borderBottom: '1px solid #eef0f5', fontVariantNumeric: 'tabular-nums' };
+const tdC = { padding: '6px 8px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #e2e8f0', fontVariantNumeric: 'tabular-nums', verticalAlign: 'middle' };
 const tdAuto = { ...tdC, background: '#faf7ef', color: '#5a6691', fontWeight: 600 };
 const tdTot = { ...tdC, fontWeight: 800, color: DARK };
-const cellInp = { width: 78, padding: '5px 6px', fontSize: 11.5, textAlign: 'right', border: '1px solid #e1e3ec', borderRadius: 3, background: '#fff', fontFamily: 'inherit' };
-const cellTxt = { width: 90, padding: '5px 6px', fontSize: 11.5, textAlign: 'left', border: '1px solid #e1e3ec', borderRadius: 3, background: '#fff', fontFamily: 'inherit', fontWeight: 600 };
-const tfTd = { borderTop: '1.5px solid ' + DARK, padding: '8px 6px', fontWeight: 800, fontSize: 11.5, background: '#f7f8fb', textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
+const cellInp = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'right', border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s' };
+const cellTxt = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'left', border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', fontFamily: 'inherit', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' };
+const tfTd = { borderTop: '2px solid ' + DARK, padding: '10px 8px', fontWeight: 800, fontSize: 12, background: '#f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: DARK };
 
 /* ════════════════════════════════════════════════════════════════════════════
    SO / PO / GP Voucher entry
@@ -73,19 +79,23 @@ export function rowsForEdit(spec, booking) {
   return [blankLine(spec)];
 }
 
-export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null }) {
+export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null, initialModule = null }) {
   const qc = useQueryClient();
   const editing = !!editBooking;
   // Editing keeps the booking's own branch; a fresh voucher uses the top-bar branch.
   const brCode = editing ? (editBooking.branch || brCodeOf(branch)) : brCodeOf(branch);
   const cur = bc(editing ? { code: editBooking.branch } : branch).cur;
 
-  const initModule = (editing && VSPECS[editBooking.module]) ? editBooking.module : 'SF';
+  const initModule = (editing && (VSPECS[editBooking.module] || isReversalModule(editBooking.module))) ? editBooking.module
+    : (initialModule && (VSPECS[initialModule] || isReversalModule(initialModule))) ? initialModule : 'SF';
   const [moduleCode, setModuleCode] = useState(initModule);
-  const spec = VSPECS[moduleCode];
+  // RF/RI are reversal modules with no fare-grid spec — fall back to SF so the
+  // (unused) fare-grid hooks below stay safe; the reversal entry is rendered via an
+  // early return before any of the fare-grid UI shows.
+  const spec = VSPECS[moduleCode] || VSPECS.SF;
 
   const [lines, setLines] = useState(() => {
-    if (editing) return rowsForEdit(VSPECS[initModule], editBooking);
+    if (editing) return rowsForEdit(VSPECS[initModule] || VSPECS.SF, editBooking);
     return [blankLine(VSPECS.SF)];   // start blank — no demo rows
   });
   const [date, setDate] = useState(editing ? (editBooking.date || today()) : today());
@@ -96,6 +106,26 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const [supplier, setSupplier] = useState(editing
     ? { name: editBooking.supplier?.name || '', gstin: editBooking.supplier?.gstin || '', address: editBooking.supplier?.address || '', email: editBooking.supplier?.email || '', contact: editBooking.supplier?.contact || '', ledgerGroup: editBooking.supplier?.ledgerGroup || '' }
     : { name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' });
+
+  const [clientType, setClientType] = useState(editing ? (editBooking.customer?.ledgerGroup || '') : '');
+  const reg = useLedgerRegistry(branch).data || [];
+  const clientTypes = useMemo(() => {
+    const set = new Set();
+    reg.forEach((l) => {
+      if (l.type === 'Debtor' && l.group && l.group.trim().toLowerCase() === 'sundry debtors') {
+        const sg = l.subGroup;
+        if (sg) set.add(sg);
+      }
+    });
+    return Array.from(set).sort();
+  }, [reg]);
+
+  const handleClientTypeChange = (ct) => {
+    setClientType(ct);
+    if (ct && customer.ledgerGroup && customer.ledgerGroup !== ct) {
+      setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' });
+    }
+  };
   // No-supplier mode (Misc only): a sale with no purchase leg — full sale value is
   // income. Hides the Purchase Order + supplier fields and posts only the sale.
   const [noSupplier, setNoSupplier] = useState(editing ? !!editBooking.noSupplier : false);
@@ -128,6 +158,15 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const effNoVat = isVatBr && noVat;
   const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat }), [spec, lines, packageType, isNoSupp, brCode, effNoVat]);
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
+  const getGstRate = () => {
+    if (effNoVat) return 0;
+    if (isVatBr) {
+      return brCode === 'NBO' ? 16 : brCode === 'DAR' ? 18 : brCode === 'FBM' ? 16 : 18;
+    }
+    if (spec.model === 'package') return spec.gstRate ? spec.gstRate * 100 : 5;
+    return spec.tax && spec.tax.rate != null ? spec.tax.rate : 18;
+  };
+  const activeRate = getGstRate();
 
   const setLine = (i, key, val, numeric) =>
     setLines(lines.map((l, idx) => (idx === i ? { ...l, [key]: numeric ? (val === '' ? '' : Number(val)) : val } : l)));
@@ -142,6 +181,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // The backend accepts the new module on Save and re-prefixes the spawned vouchers.
   const changeModule = (code) => {
     if (code === moduleCode) return;
+    // Reversal modules (RF/RI) have no fare grid to reshape — just switch; the entry
+    // form swaps to the reversal UI (early return below).
+    if (isReversalModule(code) || isReversalModule(moduleCode)) { setModuleCode(code); setResult(null); setError(''); return; }
     if (!editing) { setModuleCode(code); return; }
     const m = VSPECS[code];
     setLines((prev) => prev.map((l) => normalizeLine(m, { ...blankLine(m), ...l })));
@@ -204,7 +246,15 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Ctrl/Cmd+Enter saves from anywhere on this (large, multi-grid) entry screen.
   useHotkey('mod+enter', () => { if (canSave) save(false); }, [canSave]);
 
-  const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' }); setSupplier({ name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }); setNoSupplier(false); setResult(null); setError(''); };
+  // Reversal modules (Refund / Reissue) render a dedicated entry instead of the fare
+  // grid — same module bar, but the original-invoice link + supplier-refund + retained
+  // Other Taxes inputs, spawning ONE RF/RI voucher on approval (reuses the proven
+  // reversal posting). All hooks above have run, so this early return is safe.
+  if (isReversalModule(moduleCode)) {
+    return <ReversalEntry moduleCode={moduleCode} changeModule={changeModule} brCode={brCode} cur={cur} editing={editing} editBooking={editBooking} qc={qc} />;
+  }
+
+  const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' }); setSupplier({ name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }); setNoSupplier(false); setResult(null); setError(''); setClientType(''); };
 
   if (result) {
     const approved = result._approved;
@@ -254,7 +304,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const isB2C = /b2c/i.test(customer.ledgerGroup || '');
   // Column counts for the full-width sectors sub-row (Flight only).
   const soCols = spec.idCols.length + spec.fareCols.length + 1 + (pkg ? 0 : 1) + (pkg ? 0 : 1) + 1 + 1 + 1;
-  const poCols = 2 + refKeys.length + spec.fareCols.length + 3;
+  const poCols = 2 + refKeys.length + spec.fareCols.length + 5;
 
   // Sectors sub-table for a passenger line — editable on the Purchase grid,
   // read-only ("fetched & locked") on the Sales grid.
@@ -297,11 +347,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#8b94b3' }}>
               {editing
                 ? <>Fix any data-entry mistake — or switch the <b style={{ color: GOLD }}>module</b> if it was booked wrong — then <b style={{ color: GOLD }}>Save</b> or <b style={{ color: GOLD }}>Save &amp; Approve</b> · {brCode} · still Pending until approved</>
-                : <>Enter cost + markup → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
+                : <>Enter cost + Other Taxes → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {VMODULE_LIST.map((m) => (
+            {[...VMODULE_LIST, ...REVERSAL_CHIPS].map((m) => (
               <button key={m.code} onClick={() => changeModule(m.code)}
                 title={editing && m.code !== moduleCode ? `Switch this voucher to ${m.name} — the entered details are kept` : ''}
                 style={{ padding: '5px 11px', borderRadius: 999, border: '1px solid ' + (moduleCode === m.code ? GOLD : '#2a3450'), background: moduleCode === m.code ? GOLD : 'transparent', color: moduleCode === m.code ? '#fff' : '#8b94b3', fontSize: 10.5, fontWeight: 700, cursor: m.code === moduleCode ? 'default' : 'pointer' }}>
@@ -387,17 +437,30 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* Header fields */}
       <div style={{ ...card, marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
-          <FL label="Booking date"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></FL>
-          <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
-          <FL label="Post receivable to (Debtor ledger) *">
-            <PartyPicker branch={branch} kind="customer" value={{ name: customer.ledgerName, group: customer.ledgerGroup }}
-              onChange={(v) => setCustomer((c) => {
-                const b2c = /b2c/i.test(v.group || '');
-                // B2B/B2E: the ledger IS the customer → Bill-To = ledger name.
-                // B2C (pooled per-staff ledger): keep the free-typed end-customer name.
-                return { ...c, ledgerName: v.name, ledgerGroup: v.group, group: v.group, name: b2c ? c.name : v.name };
-              })} />
-            {!hasCustLedger && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — pick the Debtor ledger to post & follow for payment</span>}
+          <FL label="SPG Date"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></FL>
+          <FL label="Client Type">
+            <select value={clientType} onChange={(e) => handleClientTypeChange(e.target.value)} style={inp}>
+              <option value="">— All Client Types —</option>
+              {clientTypes.map((ct) => (
+                <option key={ct} value={ct}>{ct}</option>
+              ))}
+            </select>
+          </FL>
+          {spec.headerLabel && spec.headerLabel !== 'Sector / Airline' && (
+            <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
+          )}
+          <FL label="Client Ledger *">
+            <PartyPicker branch={branch} kind="customer" value={{ name: customer.ledgerName, group: customer.ledgerGroup }} subGroupFilter={clientType}
+              onChange={(v) => {
+                setCustomer((c) => {
+                  const b2c = /b2c/i.test(v.group || '');
+                  // B2B/B2E: the ledger IS the customer → Bill-To = ledger name.
+                  // B2C (pooled per-staff ledger): keep the free-typed end-customer name.
+                  return { ...c, ledgerName: v.name, ledgerGroup: v.group, group: v.group, name: b2c ? c.name : v.name };
+                });
+                if (v.group) setClientType(v.group);
+              }} />
+            {!hasCustLedger && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — pick the Client Ledger to post & follow for payment</span>}
           </FL>
           {isB2C && (
             <FL label="Customer (Bill to) — free text *">
@@ -405,25 +468,16 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {!customer.name.trim() && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — type the end customer's name for the invoice</span>}
             </FL>
           )}
+          <FL label="Sale GST mode"><select value={saleGstMode} onChange={(e) => setSaleGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
           {!isNoSupp && <FL label="Supplier ledger (Pay to) *">
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
               onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
             {!hasSuppLedger && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — pick the Creditor ledger to post & pay against</span>}
           </FL>}
-          {!isNoSupp && <FL label="Supplier sub-group (auto)"><input value={supplier.ledgerGroup} readOnly placeholder="picks with the supplier" style={{ ...inp, background: '#faf7ef', color: '#5a6691' }} /></FL>}
-          <FL label="Sale GST mode"><select value={saleGstMode} onChange={(e) => setSaleGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
           {!isNoSupp && <FL label="Purchase GST mode"><select value={purGstMode} onChange={(e) => setPurGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>}
           {hasPackage && <FL label="Package type *"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={{ ...inp, ...(packageType ? {} : { borderColor: '#A32D2D' }) }}><option value="">— Select International / Domestic —</option><option value="Domestic">Domestic</option><option value="International">International</option></select>
             {!packageType && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — sets the cost centre (Int'l/Domestic GP). Must be picked before approving.</span>}
           </FL>}
-          <FL label="Customer GSTIN"><input value={customer.gstin} onChange={(e) => setCustomer({ ...customer, gstin: e.target.value })} placeholder="GSTIN" style={inp} /></FL>
-          <FL label="Customer Address"><input value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} placeholder="Billing address (for invoice)" style={inp} /></FL>
-          <FL label="Customer Email"><input value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} placeholder="email" style={inp} /></FL>
-          <FL label="Customer Contact"><input value={customer.contact} onChange={(e) => setCustomer({ ...customer, contact: e.target.value })} placeholder="phone" style={inp} /></FL>
-          {!isNoSupp && <FL label="Supplier GSTIN"><input value={supplier.gstin} onChange={(e) => setSupplier({ ...supplier, gstin: e.target.value })} placeholder="GSTIN" style={inp} /></FL>}
-          {!isNoSupp && <FL label="Supplier Address"><input value={supplier.address} onChange={(e) => setSupplier({ ...supplier, address: e.target.value })} placeholder="address" style={inp} /></FL>}
-          {!isNoSupp && <FL label="Supplier Email"><input value={supplier.email} onChange={(e) => setSupplier({ ...supplier, email: e.target.value })} placeholder="email" style={inp} /></FL>}
-          {!isNoSupp && <FL label="Supplier Contact"><input value={supplier.contact} onChange={(e) => setSupplier({ ...supplier, contact: e.target.value })} placeholder="phone" style={inp} /></FL>}
         </div>
       </div>
 
@@ -431,18 +485,18 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', padding: '8px 14px', marginBottom: 12, background: '#FDFAF4', border: '1px solid #eee3cf', borderRadius: 8, flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#fff', border: '1px solid #C49A3C' }} /> Manual — you enter</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#faf7ef', border: '1px dashed #9A9A9A' }} /> Auto — calculated</span>
-        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · {pkg ? 'Holiday package: 5% GST on (Land + Supplier Service + Supplier Service GST + Markup + Markup GST); Intl adds 2% TCS' : 'markup is GST-inclusive (GST = markup × 18 ÷ 118)'}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · {pkg ? 'Holiday package: 5% GST on (Land + Supplier Service + Supplier Service GST + Other Taxes); Intl adds 2% TCS' : 'Other Taxes is GST-inclusive (GST = Other Taxes × 18 ÷ 118), posted to separate GST ledgers'}</span>
       </div>
 
       {/* ① Sales Order */}
-      <Section n="1" name="Sales Order" sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · markup is GST-inclusive'} accent={BLUE}>
+      <Section n="1" name="Sales Order" sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · Other Taxes is GST-inclusive'} accent={BLUE}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
-            <thead><tr>
-              {spec.idCols.map((c) => <th key={c.key} style={{ ...thM, ...thL }}>{c.label}</th>)}
-              {spec.fareCols.map((c) => <th key={c.key} style={thA}>{c.label}</th>)}
-              <th style={thM}>Markup</th>{!pkg && <th style={thM}>Service Chg</th>}
-              {!pkg && <th style={thA}>GST/Service</th>}<th style={thA}>GST/Markup{pkg ? ' (5%)' : ''}</th><th style={thA}>Total</th><th style={thA}></th>
+            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+              {spec.idCols.map((c) => <th key={c.key} style={{ ...thM, ...thL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
+              {spec.fareCols.map((c) => <th key={c.key} style={{ ...thA, width: 95 }}>{c.label}</th>)}
+              <th style={{ ...thM, width: 95 }}>Other Taxes</th>{!pkg && <th style={{ ...thM, width: 95 }}>Service Chg</th>}
+              {!pkg && <th style={{ ...thA, width: 95 }}>GST/Service ({activeRate}%)</th>}<th style={{ ...thA, width: 95 }}>GST/Other Taxes ({pkg ? 5 : activeRate}%)</th><th style={{ ...thA, width: 110 }}>Total</th><th style={{ ...thA, width: 45 }}></th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -451,21 +505,21 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                   <React.Fragment key={i}>
                   <tr>
                     {spec.idCols.map((col) => (
-                      <td key={col.key} style={{ ...tdC, textAlign: 'left', padding: 3 }}>
+                      <td key={col.key} style={{ ...tdC, textAlign: 'left', padding: 3, width: col.key === 'fn' || col.key === 'sn' ? 140 : 120 }}>
                         {spec.sectors
                           ? <span style={{ fontSize: 11.5, fontWeight: 600, color: DARK }}>{l[col.key] || '—'}</span>
                           : <input value={l[col.key] ?? ''} onChange={(e) => setLine(i, col.key, e.target.value)} style={{ ...cellTxt, color: col.kind === 'pnr' ? GOLD : DARK }} />}
                       </td>
                     ))}
                     {spec.fareCols.map((col) => (isNoSupp
-                      ? <td key={col.key} style={{ padding: 3 }}><input type="number" min="0" value={l[col.key]} onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>
-                      : <td key={col.key} style={tdAuto}>{fmt(l[col.key])}</td>))}
-                    <td style={{ padding: 3 }}><input type="number" min="0" value={l.markup} onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>
-                    {!pkg && <td style={{ padding: 3 }}><input type="number" min="0" value={l.ssvc} onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
-                    {!pkg && <td style={tdAuto}>{fmt(c.gstSvc)}</td>}
-                    <td style={tdAuto}>{fmt(c.gstMk)}</td>
-                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef' }}>{fmt(c.finalSales)}</td>
-                    <td style={{ ...tdC, textAlign: 'center', background: '#faf7ef' }}><button onClick={() => delLine(i)} title="Remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={13} /></button></td>
+                      ? <td key={col.key} style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>
+                      : <td key={col.key} style={{ ...tdAuto, width: 95 }}>{fmt(l[col.key])}</td>))}
+                    <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.markup ?? ''} placeholder="0" onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>
+                    {!pkg && <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.ssvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
+                    {!pkg && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstSvc)}</td>}
+                    <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstMk)}</td>
+                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef', width: 110 }}>{fmt(c.finalSales)}</td>
+                    <td style={{ ...tdC, textAlign: 'center', background: '#faf7ef', padding: 3, width: 45 }}><button onClick={() => delLine(i)} title="Remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={13} /></button></td>
                   </tr>
                   {spec.sectors && sectorBlock(l, i, true, soCols)}
                   </React.Fragment>
@@ -478,7 +532,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
               <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>
               {!pkg && <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
-              <td style={tfTd} colSpan={pkg ? 1 : 2}>{fmt(totals.so.gst)} GST</td>
+              <td style={tfTd} colSpan={pkg ? 1 : 2}>{fmt(totals.so.gst + totals.so.otherTaxesGst)} GST</td>
               <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd} />
             </tr></tfoot>
           </table>
@@ -488,15 +542,21 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {/* ② Purchase Order — hidden in no-supplier mode (there's no cost leg). */}
       {!isNoSupp && (
-      <Section n="2" name="Purchase Order" sub="what you pay the airline / supplier" accent={CR}>
+      <Section n="2" name="Purchase Order" sub="what you pay the airline / supplier · supplier incentive is automatically subtracted, 2% TDS is added" accent={CR}>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
-            <thead><tr>
-              <th style={{ ...thM, ...thL }}>{spec.idCols[0].label}</th>
-              <th style={{ ...thM, ...thL }}>{spec.idCols[1].label}</th>
-              {refKeys.map((c) => <th key={c.key} style={{ ...thA, ...thL }}>{c.label}</th>)}
-              {spec.fareCols.map((c) => <th key={c.key} style={thM}>{c.label}</th>)}
-              <th style={thM}>Supplier Service</th><th style={pkg ? thM : thA}>{pkg ? 'Supplier Service GST' : 'GST'}</th><th style={thA}>Total</th>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
+            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+              <th style={{ ...thM, ...thL, width: 140 }}>{spec.idCols[0].label}</th>
+              <th style={{ ...thM, ...thL, width: 140 }}>{spec.idCols[1].label}</th>
+              {refKeys.map((c) => <th key={c.key} style={{ ...thA, ...thL, width: 120 }}>{c.label}</th>)}
+              {spec.fareCols.map((c) => <th key={c.key} style={{ ...thM, width: 95 }}>{c.label}</th>)}
+              <th style={{ ...thM, width: 95 }}>Supplier Service</th>
+              {pkg
+                ? <th style={{ ...thM, width: 95 }}>Supplier Service GST (18%)</th>
+                : <th style={{ ...thA, width: 95 }}>GST ({activeRate}%)</th>}
+              <th style={{ ...thM, width: 100 }}>Supplier Incentive</th>
+              <th style={{ ...thA, width: 85 }}>TDS (2%)</th>
+              <th style={{ ...thA, width: 110 }}>Total</th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -504,15 +564,17 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 return (
                   <React.Fragment key={i}>
                   <tr>
-                    <td style={{ ...tdC, textAlign: 'left', padding: 3 }}><input value={l.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} style={cellTxt} /></td>
-                    <td style={{ ...tdC, textAlign: 'left', padding: 3 }}><input value={l.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} style={cellTxt} /></td>
-                    {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A' }}>{l[col.key] || '—'}</td>)}
-                    {spec.fareCols.map((col) => <td key={col.key} style={{ padding: 3 }}><input type="number" min="0" value={l[col.key]} onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
-                    <td style={{ padding: 3 }}><input type="number" min="0" value={l.psvc} onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} /></td>
+                    <td style={{ ...tdC, textAlign: 'left', padding: 3, width: 140 }}><input value={l.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} style={cellTxt} /></td>
+                    <td style={{ ...tdC, textAlign: 'left', padding: 3, width: 140 }}><input value={l.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} style={cellTxt} /></td>
+                    {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A', width: 120 }}>{l[col.key] || '—'}</td>)}
+                    {spec.fareCols.map((col) => <td key={col.key} style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
+                    <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} /></td>
                     {pkg
-                      ? <td style={{ padding: 3 }}><input type="number" min="0" value={l.psvcGst} onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} /></td>
-                      : <td style={tdAuto}>{fmt(c.gstPur)}</td>}
-                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef' }}>{fmt(c.finalPurchase)}</td>
+                      ? <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} /></td>
+                      : <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstPur)}</td>}
+                    <td style={{ padding: 3, width: 100 }}><input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} /></td>
+                    <td style={{ ...tdAuto, width: 85 }}>{fmt(c.tds)}</td>
+                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef', width: 110 }}>{fmt(c.finalPurchase)}</td>
                   </tr>
                   {spec.sectors && sectorBlock(l, i, false, poCols)}
                   </React.Fragment>
@@ -526,6 +588,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
               <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
               <td style={tfTd}>{pkg ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
+              <td style={tfTd}>{fmt(totals.po.incentive)}</td>
+              <td style={tfTd}>{fmt(totals.po.tds)}</td>
               <td style={tfTd}>{fmt(totals.po.total)}</td>
             </tr></tfoot>
           </table>
@@ -547,29 +611,32 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         )}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
-            <thead><tr>
-              <th style={{ ...thA, ...thL }}>First Name</th><th style={{ ...thA, ...thL }}>Surname</th>
-              <th style={thA}>Final Sales</th><th style={thA}>Sales GST</th><th style={thA}>Final Purchase</th><th style={thA}>Purchase GST</th>
-              <th style={thA}>Gross Profit</th><th style={thA}>GP %</th>
+            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+              <th style={{ ...thA, ...thL, width: 140 }}>First Name</th><th style={{ ...thA, ...thL, width: 140 }}>Surname</th>
+              <th style={{ ...thA, width: 110 }}>Final Sales</th><th style={{ ...thA, width: 95 }}>Sales GST ({activeRate}%)</th><th style={{ ...thA, width: 110 }}>Final Purchase</th><th style={{ ...thA, width: 95 }}>Purchase GST ({pkg ? 18 : activeRate}%)</th>
+              <th style={{ ...thA, width: 95 }}>Incentive</th><th style={{ ...thA, width: 80 }}>TDS (2%)</th>
+              <th style={{ ...thA, width: 110 }}>Gross Profit</th><th style={{ ...thA, width: 80 }}>GP %</th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
                 const c = lineCalc(spec, l);
                 return (
                   <tr key={i}>
-                    <td style={{ ...tdAuto, textAlign: 'left' }}>{l.fn || '—'}</td><td style={{ ...tdAuto, textAlign: 'left' }}>{l.sn || ''}</td>
-                    <td style={tdAuto}>{fmt(c.finalSales)}</td><td style={tdAuto}>{fmt(c.salesGST)}</td>
-                    <td style={tdAuto}>{fmt(c.finalPurchase)}</td><td style={tdAuto}>{fmt(c.gstPur)}</td>
-                    <td style={{ ...tdAuto, fontWeight: 800, color: DR }}>{fmt(c.gp)}</td>
-                    <td style={{ ...tdAuto, fontWeight: 800, color: GOLD }}>{c.gpPct.toFixed(2)}%</td>
+                    <td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.fn || '—'}</td><td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.sn || ''}</td>
+                    <td style={{ ...tdAuto, width: 110 }}>{fmt(c.finalSales)}</td><td style={{ ...tdAuto, width: 95 }}>{fmt(c.salesGST)}</td>
+                    <td style={{ ...tdAuto, width: 110 }}>{fmt(c.finalPurchase)}</td><td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstPur)}</td>
+                    <td style={{ ...tdAuto, width: 95 }}>{fmt(c.incentive)}</td><td style={{ ...tdAuto, width: 80 }}>{fmt(c.tds)}</td>
+                    <td style={{ ...tdAuto, fontWeight: 800, color: DR, width: 110 }}>{fmt(c.gp)}</td>
+                    <td style={{ ...tdAuto, fontWeight: 800, color: GOLD, width: 80 }}>{c.gpPct.toFixed(2)}%</td>
                   </tr>
                 );
               })}
             </tbody>
             <tfoot><tr>
               <td style={{ ...tfTd, textAlign: 'left' }} colSpan={2}>TOTAL</td>
-              <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd}>{fmt(totals.so.gst)}</td>
+              <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd}>{fmt(totals.so.gst + totals.so.otherTaxesGst)}</td>
               <td style={tfTd}>{fmt(totals.po.total)}</td><td style={tfTd}>{fmt(totals.po.gst)}</td>
+              <td style={tfTd}>{fmt(totals.po.incentive)}</td><td style={tfTd}>{fmt(totals.po.tds)}</td>
               <td style={{ ...tfTd, color: DR }}>{fmt(totals.gp.total)}</td><td style={{ ...tfTd, color: GOLD }}>{totals.gp.pct.toFixed(2)}%</td>
             </tr></tfoot>
           </table>
@@ -598,6 +665,112 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             {saving ? <RefreshCw size={14} className="spin" /> : <CheckCircle2 size={14} />} Save &amp; Approve
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Refund / Reissue entry (reversal modules) ────────────────────────────────
+// Picked from the SO/PO/GP module bar; references the original sale invoice and, on
+// approval, spawns ONE RF/RI voucher posted via the proven reversal engine. Reuses
+// the RefundReissueFields body; maps its margin input → the booking's Other Taxes.
+function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBooking, qc }) {
+  const kind = moduleCode === 'RF' ? 'refund' : 'reissue';
+  const [state, setState] = useState(() => {
+    const r = (editing && editBooking && editBooking.reversal) || {};
+    return {
+      date: (editing && editBooking.date) || today(),
+      againstInvoice: (editing && (editBooking.againstInvoice || r.againstInvoice)) || '',
+      againstPurchase: (editing && (editBooking.againstPurchase || r.againstPurchase)) || '',
+      gstMode: r.gstMode || (editing && editBooking.gstMode) || 'intra',
+      party: (editing && (editBooking.customer?.ledgerName || editBooking.customer?.name)) || '',
+      counterParty: r.counterParty || (editing && editBooking.supplier?.ledgerName) || '',
+      supplierAmt: r.supplierAmt ?? '', serviceCharge: r.serviceCharge ?? '',
+      markup: r.otherTaxes ?? '', gstPct: r.gstPct || 18,
+      supplierSvc: r.supplierSvc ?? '', supplierGst: r.supplierGst ?? '',
+      remarks: (editing && editBooking.remarks) || '',
+    };
+  });
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+
+  const ready = !!brCode && !!state.againstInvoice && !!state.party && !!state.counterParty && (+state.supplierAmt > 0) && !saving;
+
+  const save = async (thenApprove = false) => {
+    setError(''); setSaving(true);
+    try {
+      const reversal = {
+        counterParty: state.counterParty, counterPartyGroup: 'Sundry Creditors',
+        supplierAmt: +state.supplierAmt || 0, serviceCharge: +state.serviceCharge || 0,
+        otherTaxes: +state.markup || 0, gstPct: +state.gstPct || 18, gstMode: state.gstMode,
+        supplierSvc: +state.supplierSvc || 0, supplierGst: +state.supplierGst || 0,
+        againstInvoice: state.againstInvoice, againstPurchase: state.againstPurchase || '',
+      };
+      const payload = {
+        module: moduleCode, branch: brCode, date: state.date, gstMode: state.gstMode,
+        customer: { name: state.party, ledgerName: state.party },
+        supplier: { name: state.counterParty, ledgerName: state.counterParty },
+        againstInvoice: state.againstInvoice, againstPurchase: state.againstPurchase || '',
+        reversal, remarks: state.remarks,
+      };
+      let booking = editing
+        ? await apiPut('/api/booking-orders/' + editBooking.id, { ...payload, editReason: 'Edit ' + kind })
+        : await apiPost('/api/booking-orders', payload);
+      if (thenApprove) booking = await apiPost('/api/booking-orders/' + booking.id + '/approve');
+      setResult({ ...booking, _approved: thenApprove });
+      qc.invalidateQueries({ queryKey: ['booking-orders'] });
+      toast(thenApprove ? `Voucher ${booking.bookingNo || ''} approved & posted` : `Voucher ${booking.bookingNo || ''} saved — pending approval`);
+    } catch (e) { setError(e.message || 'Failed to save'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
+    finally { setSaving(false); }
+  };
+
+  if (result) {
+    const approved = result._approved;
+    const fields = [['Booking No', result.bookingNo], ['Link No', result.linkNo], ['Type', kind === 'refund' ? 'Refund (RF)' : 'Reissue (RI)'], ['Status', (result.status || 'pending').toUpperCase()]];
+    if (approved) fields.push(['Voucher', result.saleVno || '—']);
+    return (
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
+        <div style={{ ...card, textAlign: 'center', padding: 28 }}>
+          <div style={{ width: 54, height: 54, borderRadius: '50%', background: approved ? '#EAF3DE' : '#FEF6E6', color: approved ? '#27500A' : GOLD, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>{approved ? <Check size={28} /> : <Clock size={28} />}</div>
+          <h2 style={{ margin: '0 0 4px', fontSize: 18, color: DARK }}>{approved ? `${kind === 'refund' ? 'Refund' : 'Reissue'} approved & posted` : `${kind === 'refund' ? 'Refund' : 'Reissue'} saved — Pending approval`}</h2>
+          <p style={{ margin: '0 0 18px', fontSize: 12.5, color: '#5a6691' }}>{approved ? <>The original sale is <b>reversed in full</b> and the {kind} voucher posted to the books.</> : <>No books impact yet — approve it under <b>Pending</b> to post.</>}</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, textAlign: 'left' }}>
+            {fields.map(([k, v]) => (<div key={k} style={{ padding: '8px 12px', background: '#f6f7fb', borderRadius: 8 }}><div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.6px', color: '#9aa2c0', textTransform: 'uppercase' }}>{k}</div><div style={{ fontSize: 13, fontWeight: 700, color: DARK }}>{v}</div></div>))}
+          </div>
+          <button onClick={() => { setResult(null); setState((s) => ({ ...s, againstInvoice: '', supplierAmt: '', serviceCharge: '', markup: '' })); }} style={{ ...btnG, marginTop: 18 }}>New {kind}</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px 90px' }}>
+      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
+        <div style={{ padding: '14px 18px', background: DARK, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{kind === 'refund' ? 'REFUND VOUCHER' : 'REISSUE VOUCHER'}</p>
+            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#8b94b3' }}>Reverses the linked original sale + retained charges → one <b style={{ color: GOLD }}>Pending</b> {kind} voucher · {brCode || 'select a branch'}</p>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {[...VMODULE_LIST, ...REVERSAL_CHIPS].map((m) => (
+              <button key={m.code} onClick={() => changeModule(m.code)}
+                style={{ padding: '5px 11px', borderRadius: 999, border: '1px solid ' + (moduleCode === m.code ? GOLD : '#2a3450'), background: moduleCode === m.code ? GOLD : 'transparent', color: moduleCode === m.code ? '#fff' : '#8b94b3', fontSize: 10.5, fontWeight: 700, cursor: m.code === moduleCode ? 'default' : 'pointer' }}>
+                {m.icon} {m.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ ...card, padding: 18 }}>
+        <RefundReissueFields state={state} setState={setState} ctx={{ branch: brCode, cur }} kind={kind} />
+        {error && <p style={{ margin: '8px 0 0', fontSize: 12, color: CR, fontWeight: 600 }}>⚠ {error}</p>}
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <button disabled={!ready} onClick={() => save(false)} style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Save size={14} /> Save (Pending)</button>
+          <button disabled={!ready} onClick={() => save(true)} style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Check size={14} /> Save &amp; Approve</button>
+        </div>
+        {!ready && <p style={{ margin: '8px 0 0', fontSize: 10.5, color: '#9aa2c0' }}>Need: original invoice, customer, supplier/airline &amp; a supplier amount &gt; 0.</p>}
       </div>
     </div>
   );
@@ -633,17 +806,17 @@ function GpCard({ k, v, color, pct }) {
 // Sundry Creditors) so a fresh party still works — the posting auto-creates its
 // ledger on approval.
 const subGroupOf = (l) => (l && (l.subGroup || l.group)) || '';
-function PartyPicker({ branch, kind, value, onChange }) {
+function PartyPicker({ branch, kind, value, onChange, subGroupFilter }) {
   const wantType = kind === 'customer' ? 'Debtor' : 'Creditor';
   const defaultGroup = kind === 'customer' ? 'Sundry Debtors' : 'Sundry Creditors';
   const reg = useLedgerRegistry(branch).data || [];
-  const list = reg.filter((l) => l.type === wantType);
+  const list = reg.filter((l) => l.type === wantType && (!subGroupFilter || subGroupOf(l) === subGroupFilter));
   const [open, setOpen] = useState(false);
   const q = value.name || '';
   const matches = list.filter((l) => !q || l.name.toLowerCase().includes(q.toLowerCase())).slice(0, 12);
   const setName = (v) => {
     const exact = list.find((l) => l.name.trim().toLowerCase() === v.trim().toLowerCase());
-    onChange({ name: v, group: exact ? subGroupOf(exact) : defaultGroup });
+    onChange({ name: v, group: exact ? subGroupOf(exact) : (subGroupFilter || defaultGroup) });
   };
   const pick = (l) => { onChange({ name: l.name, group: subGroupOf(l) || defaultGroup }); setOpen(false); };
   return (

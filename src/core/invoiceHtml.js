@@ -112,6 +112,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   // per-line breakdown
   const fareRows = rows.map((p) => {
     const base = Number(p.base) || 0, k3 = Number(p.k3) || 0, tax = Number(p.tax) || 0, markup = Number(p.markup) || 0, psvc = Number(p.psvc) || 0;
+    const incentive = Number(p.incentive) || 0, tds = Number(p.tds) || 0;
     const pax = [p.fn, p.sn].filter(Boolean).join(' ');
     // Flight bookings carry per-sector travel detail; list each sector under the
     // passenger. Other modules keep the single TKT/PNR line.
@@ -126,26 +127,35 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     const desc = `<td class="l desc"><div class="nm">${esc(headerRef || 'Booking')}</div><div class="sub">${idline}</div>${secLines}</td>`;
     if (isSale) {
       const totalFare = base + k3 + tax + markup;
-      return `<tr>${desc}<td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax + markup)}</td><td class="tf">${cur}${n2(totalFare)}</td></tr>`;
+      // Taxes (YQ/YR) = the pass-through fare taxes; Other Taxes = the agency margin
+      // (hidden income), shown as its own column per the customer-facing layout.
+      return `<tr>${desc}<td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td>${n2(markup)}</td><td class="tf">${cur}${n2(totalFare)}</td></tr>`;
     }
-    const totalCost = base + k3 + tax + psvc;
-    return `<tr>${desc}<td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td>${n2(psvc)}</td><td class="tf">${cur}${n2(totalCost)}</td></tr>`;
+    const totalCost = base + k3 + tax + psvc - incentive + tds;
+    return `<tr>${desc}<td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td>${n2(psvc)}</td><td>${n2(incentive)}</td><td>${n2(tds)}</td><td class="tf">${cur}${n2(totalCost)}</td></tr>`;
   }).join('');
-  const emptyRow = `<tr><td class="l" colSpan="${isSale ? 5 : 6}" style="text-align:center;color:#9A9A9A;padding:16px">No line detail captured for this booking.</td></tr>`;
+  const emptyRow = `<tr><td class="l" colSpan="${isSale ? 6 : 8}" style="text-align:center;color:#9A9A9A;padding:16px">No line detail captured for this booking.</td></tr>`;
 
   // summary from the booked snapshot (ties to the books)
-  const subTotal = r2(snap.lineTotal || 0), service = r2(snap.serviceCharge || 0), gst = r2(snap.gst || 0), tcs = r2(snap.tcs || 0), net = r2(snap.total || (subTotal + service + gst + tcs));
+  const subTotal = r2(snap.lineTotal || 0), service = r2(snap.serviceCharge || 0), gst = r2(snap.gst || 0), tcs = r2(snap.tcs || 0), incentive = r2(snap.incentive || 0), tds = r2(snap.tds || 0), net = r2(snap.total || (subTotal + service + gst + tcs));
   const inter = booking.gstMode === 'inter';
   const half = r2(gst / 2);
   const gstRows = inter
     ? `<div class="r"><span class="k">IGST</span><span class="v">${cur}${n2(gst)}</span></div>`
     : `<div class="r"><span class="k">CGST</span><span class="v">${cur}${n2(half)}</span></div><div class="r"><span class="k">SGST</span><span class="v">${cur}${n2(r2(gst - half))}</span></div>`;
   const tcsRow = tcs ? `<div class="r"><span class="k">TCS</span><span class="v">${cur}${n2(tcs)}</span></div>` : '';
-  const sumtbl = `
-    <div class="r"><span class="k">${isSale ? 'Sub Total' : 'Sub Total (Fares)'}</span><span class="v">${cur}${n2(subTotal)}</span></div>
-    ${service ? `<div class="r"><span class="k">${isSale ? 'Service Charges' : 'Supplier Service'}</span><span class="v">${cur}${n2(service)}</span></div>` : ''}
+  const sumtbl = isSale
+    ? `
+    <div class="r"><span class="k">Sub Total</span><span class="v">${cur}${n2(subTotal)}</span></div>
+    ${service ? `<div class="r"><span class="k">Service Charges</span><span class="v">${cur}${n2(service)}</span></div>` : ''}
     ${gst ? gstRows : ''}${tcsRow}
-    <div class="net"><span class="k">${isSale ? 'NET TOTAL' : 'NET COST'} (${esc(cur)})</span><span class="v">${cur}${n2(net)}</span></div>`;
+    <div class="net"><span class="k">NET TOTAL (${esc(cur)})</span><span class="v">${cur}${n2(net)}</span></div>`
+    : `
+    <div class="r"><span class="k">Sub Total (Fares + Svc)</span><span class="v">${cur}${n2(subTotal + incentive)}</span></div>
+    ${incentive ? `<div class="r" style="color:#A32D2D"><span class="k">Supplier Incentive</span><span class="v">-${cur}${n2(incentive)}</span></div>` : ''}
+    ${gst ? gstRows : ''}
+    ${tds ? `<div class="r" style="color:#A07828"><span class="k">TDS (2%)</span><span class="v">${cur}${n2(tds)}</span></div>` : ''}
+    <div class="net"><span class="k">NET COST (${esc(cur)})</span><span class="v">${cur}${n2(net)}</span></div>`;
 
   // bank (sales) from company-profile
   const bank = (prof.banks || []).find((b) => b.primary) || (prof.banks || [])[0] || {};
@@ -154,8 +164,8 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     : `<div class="lab2">Settlement</div><div class="pay">Payable to supplier per agreed credit terms.<br>Input GST credit claimed against supplier GSTIN.<br>Link No referenced for invoice-wise GP.</div>`;
 
   const headCols = isSale
-    ? `<th class="l">Description</th><th>Basic Fare</th><th>K3 Tax</th><th>Other Taxes</th><th>Total Fare</th>`
-    : `<th class="l">Description</th><th>Basic Fare</th><th>K3 Tax</th><th>Other Taxes</th><th>Supplier Svc</th><th>Total Cost</th>`;
+    ? `<th class="l">Description</th><th>Basic Fare</th><th>K3 Tax</th><th>Taxes (YQ/YR)</th><th>Other Taxes</th><th>Total Fare</th>`
+    : `<th class="l">Description</th><th>Basic Fare</th><th>K3 Tax</th><th>Taxes (YQ/YR)</th><th>Supplier Svc</th><th>Incentive</th><th>TDS (2%)</th><th>Total Cost</th>`;
 
   const sheet = `<div class="iv"><div class="sheet">
     <div class="title">${isSale ? 'INVOICE' : 'PURCHASE INVOICE'}</div><div class="title-rule"></div>

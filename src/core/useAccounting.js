@@ -526,3 +526,17 @@ export function usePurchaseRegister(branch, { from, to } = {}) {
     staleTime: 30_000,
   });
 }
+
+// Approved SO/PO/GP bookings — used by the Sales/Purchase Register to join each
+// posted invoice back to its booking for the per-passenger Pax / PNR / Ticket
+// detail (booking-spawned voucher lines are aggregate heads, so the travel detail
+// lives only on the booking's `rows`). Keyed by linkNo on the consumer side.
+export function useBookingOrders(branch) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['booking-orders', code || 'all'],
+    queryFn: () => apiGet('/api/booking-orders', { branch: code }),
+    enabled: enabled(),
+    staleTime: 60_000,
+  });
+}

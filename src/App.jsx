@@ -358,8 +358,11 @@ export default function KB360App(){
     if(route==="/purchase-expense")          return <PurchaseExpenseVoucher branch={branch} setRoute={navigate}/>;
     // Purchase-Expense pending/approved/etc. now live in the unified Voucher Approvals queue.
     if(/^\/purchase-expense\/(pending|approved|rejected|deleted)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;
-    if(route==="/finance/refund")     return <RefundVoucher branch={branch}/>;
-    if(route==="/finance/reissue")    return <ReissueVoucher branch={branch}/>;
+    // Refund / Reissue are now SO/PO/GP reversal modules — these routes open the
+    // booking entry with the module preselected (the standalone RefundVoucher/
+    // ReissueVoucher are retired; old links land on the new flow).
+    if(route==="/finance/refund")     return <SoPoGpVoucherEntry branch={branch} setRoute={navigate} initialModule="RF"/>;
+    if(route==="/finance/reissue")    return <SoPoGpVoucherEntry branch={branch} setRoute={navigate} initialModule="RI"/>;
     if(route==="/finance/adm-voucher") return <AdmVoucher branch={branch}/>;
     if(route==="/finance/acm-voucher") return <AcmVoucher branch={branch}/>;
     if(route==="/contra")             return <ContraVoucher branch={branch}/>;
