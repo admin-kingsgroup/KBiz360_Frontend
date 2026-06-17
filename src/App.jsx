@@ -102,7 +102,10 @@ export default function KB360App(){
      old linear-stack-with-cursor behaviour. ── */
   const rrNavigate = useNavigate();
   const { pathname } = useLocation();
-  const route = pathname;
+  // Normalise trailing slash(es): some hosts serve "/dashboard/" (live) while
+  // dev serves "/dashboard". Every route check below matches the no-slash form,
+  // so a trailing slash would fall through to <Placeholder>. Keep root "/" intact.
+  const route = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
   const histIdx = (typeof window !== 'undefined' && window.history.state && typeof window.history.state.idx === 'number')
     ? window.history.state.idx : 0;
   const maxIdxRef = useRef(histIdx);
