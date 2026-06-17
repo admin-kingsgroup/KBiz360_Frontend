@@ -32,7 +32,7 @@ import { CONSOLIDATED_LABEL } from '../core/data';
 import {
   useTrialBalance, useProfitAndLoss, useBalanceSheet, useDayBook,
   useLedgerStatement, useLedgerGroups, useChartOfAccounts, useGroupTree,
-  useSalesRegister, usePurchaseRegister, useInvoiceGP, useBookingOrders,
+  useSalesRegister, usePurchaseRegister, useRefundReissue, useInvoiceGP, useBookingOrders,
   useVoucher, useUpdateVoucher, useCostCenters, useVoucherPreview,
 } from '../core/useAccounting';
 import { LedgerVouchers } from './pnlTally.jsx';
@@ -132,15 +132,25 @@ function ExportBtn({ onClick, disabled, label = 'Export to Excel' }) {
 
 // Reusable per-voucher detail: header chips + every line's full meta breakup
 // (base fare, K3, taxes, service charge, CGST/SGST/IGST, markup, TCS …).
-function VoucherLines({ voucher: v, cur }) {
+export function VoucherLines({ voucher: v, cur }) {
+  // Full-JV preview: the SAME engine the edit screen uses, so the popup shows the
+  // COMPLETE balanced journal (party Dr, every component head, GST, TCS/TDS) for both
+  // Sales and Purchase — not just the captured component lines. The hook must run
+  // unconditionally (rules of hooks); it's gated to a real voucher with a category.
+  const pv = useVoucherPreview(v && v.category ? v : null).data || {};
   if (!v) return null;
+  // The shared `money` renders 0 as '—'; the JV must show a real ₹0 on the empty side
+  // so EVERY ledger is visible with an explicit amount.
+  const money0 = (n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
   const F = ({ label, val }) => (
     <div style={{ minWidth: 110 }}>
       <div style={{ fontSize: 9, color: DIM, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{label}</div>
       <div style={{ fontSize: 12, color: DARK, fontWeight: 600 }}>{val || '—'}</div>
     </div>
   );
+  const jvTh = { textAlign: 'left', padding: '5px 8px', color: DIM, fontSize: 10, whiteSpace: 'nowrap' };
   const lockedByBooking = v.locked && v.source === 'booking';
+  const postings = pv.postings || [];
   return (
     <>
       {lockedByBooking && (
@@ -154,27 +164,56 @@ function VoucherLines({ voucher: v, cur }) {
         <F label="Link No" val={v.linkNo} /><F label="Taxable" val={money(cur, v.subtotal)} />
         <F label="GST" val={money(cur, v.taxAmt)} /><F label="Total" val={money(cur, v.total)} />
       </div>
-      {(v.lines || []).map((ln, i) => {
-        const meta = ln.meta && typeof ln.meta === 'object' ? ln.meta : {};
-        const entries = Object.entries(meta).filter(([, val]) => val !== '' && val != null);
-        return (
-          <div key={i} style={{ ...card, padding: 12, marginBottom: 10, boxShadow: 'none', border: '1px solid #eef1f6' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: entries.length ? 8 : 0 }}>
-              <span style={{ fontWeight: 700, color: DARK, fontSize: 12.5 }}>{ln.ledger || `Line ${i + 1}`}</span>
-              <span style={{ fontWeight: 700, color: BLUE, fontVariantNumeric: 'tabular-nums' }}>{money(cur, ln.amt)}</span>
-            </div>
-            {entries.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '4px 14px' }}>
-                {entries.map(([k, val]) => (
-                  <div key={k} style={{ fontSize: 11 }}>
-                    <span style={{ color: DIM }}>{k}: </span><span style={{ color: DARK, fontWeight: 600 }}>{String(val)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+      {postings.length > 0 ? (
+        // Full journal — every ledger, both sides; a zero side shows ₹0 (dimmed), never hidden.
+        <div style={{ ...card, padding: 10, marginBottom: 10, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Full Journal Entry — every ledger this hits</div>
+            {typeof pv.balanced === 'boolean' && <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.balanced ? '✓ Balanced' : `✗ Out by ${money0(pv.diff)}`}</span>}
           </div>
-        );
-      })}
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+            <thead><tr><th style={jvTh}>Ledger</th><th style={jvTh}>Group</th><th style={{ ...jvTh, textAlign: 'right' }}>Debit</th><th style={{ ...jvTh, textAlign: 'right' }}>Credit</th></tr></thead>
+            <tbody>
+              {postings.map((p, i) => {
+                const zeroD = !(Number(p.debit) > 0), zeroC = !(Number(p.credit) > 0);
+                return (
+                  <tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}>
+                    <td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td>
+                    <td style={{ padding: '5px 8px', color: DIM }}>{p.group || '—'}</td>
+                    <td style={{ padding: '5px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: zeroD ? '#9aa3bd' : BLUE }}>{money0(p.debit)}</td>
+                    <td style={{ padding: '5px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: zeroC ? '#9aa3bd' : RED }}>{money0(p.credit)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money0(pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money0(pv.totalCredit)}</td></tr></tfoot>
+          </table>
+        </div>
+      ) : (
+        // Fallback when the preview is unavailable: the captured component-head lines.
+        // Skip object-valued meta so internal detail never renders as "[object Object]".
+        (v.lines || []).map((ln, i) => {
+          const meta = ln.meta && typeof ln.meta === 'object' ? ln.meta : {};
+          const entries = Object.entries(meta).filter(([, val]) => val !== '' && val != null && typeof val !== 'object');
+          return (
+            <div key={i} style={{ ...card, padding: 12, marginBottom: 10, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: entries.length ? 8 : 0 }}>
+                <span style={{ fontWeight: 700, color: DARK, fontSize: 12.5 }}>{ln.ledger || `Line ${i + 1}`}</span>
+                <span style={{ fontWeight: 700, color: BLUE, fontVariantNumeric: 'tabular-nums' }}>{money0(ln.amt)}</span>
+              </div>
+              {entries.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '4px 14px' }}>
+                  {entries.map(([k, val]) => (
+                    <div key={k} style={{ fontSize: 11 }}>
+                      <span style={{ color: DIM }}>{k}: </span><span style={{ color: DARK, fontWeight: 600 }}>{String(val)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
       {v.remarks && <div style={{ fontSize: 11, color: DIM }}>Remarks: {v.remarks}</div>}
     </>
   );
@@ -196,9 +235,22 @@ const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
 const PRODUCT = {
   SF: 'Tickets', PF: 'Tickets', SHT: 'Hotel', PHT: 'Hotel', SH: 'Holiday', PH: 'Holiday',
   SV: 'Visa', PV: 'Visa', SI: 'Insurance', PI: 'Insurance', SC: 'Car', PC: 'Car', SM: 'Misc', PM: 'Misc',
-  SCN: 'Credit Note', SDN: 'Debit Note',
+  SCN: 'Credit Note', SDN: 'Debit Note', RF: 'Refund', RI: 'Reissue',
 };
 const productOf = (v) => PRODUCT[v.type] || v.type;
+
+// International vs Domestic for a register row. Prefer the joined booking's
+// packageType; else infer from the posted component-head ledger prefixes (IT- =
+// International, DT- = Domestic). Blank when the module carries no INT/DOM split.
+const intDomOf = (v, booking) => {
+  const pt = booking?.packageType || '';
+  if (/int/i.test(pt)) return 'INT';
+  if (/dom/i.test(pt)) return 'DOM';
+  const ld = (v.lines || []).map((l) => l.ledger || '').join(' ');
+  if (/(^|\s)IT-|International/i.test(ld)) return 'INT';
+  if (/(^|\s)DT-|Domestic/i.test(ld)) return 'DOM';
+  return '';
+};
 
 // Format a cell: numeric strings/numbers get Indian grouping + right align;
 // everything else (PNR, ticket no, dates, names) stays left-aligned text.
@@ -1305,6 +1357,7 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
   // When viewing All modules together, surface which module each row belongs to —
   // shown immediately before Client/Vendor Type so the mixed list stays readable.
   if (showType) col('salesType', isSale ? 'Sales Type' : 'Purchase Type');
+  if (showType) col('intDom', 'INT / DOM'); // International vs Domestic, beside Sales Type
   col('clientType', isSale ? 'Client Type' : 'Vendor Type');
   col('clientLedger', isSale ? 'Client Ledger' : 'Vendor Ledger');
   col('pax', 'Pax Details');
@@ -1340,6 +1393,7 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
       purVno: isSale ? (linkIndex.purByLink[link] || '') : v.vno,
       branch: v.branch || '',
       salesType: productOf(v),
+      intDom: intDomOf(v, booking),
       clientType: v.partyGroup || '',
       clientLedger: v.party || v.billTo || '',
       pax: tv.passengers || '', pnr: tv.pnrs || '', ticket: tv.tickets || '',
@@ -1453,9 +1507,13 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   // Fetch all (date filtering is done client-side because Tally dates are mixed-format strings).
   const sales = useSalesRegister(branch);
   const purch = usePurchaseRegister(branch);
+  const refReissue = useRefundReissue(branch); // RF/RI folded into BOTH registers' All-modules view
   const bookingsQ = useBookingOrders(branch); // joins each invoice → its SO/PO/GP for Pax/PNR/Ticket
   const q = tab === 'sales' ? sales : purch;
-  const allRows = q.data || [];
+  // Sales register = sale + reissue + refund; Purchase register = purchase + the same
+  // RF/RI vouchers (their cost reversal lives in the one combined voucher). They show
+  // labelled 'Refund'/'Reissue' in the Sales/Purchase Type column — never as a sale.
+  const allRows = useMemo(() => [...(q.data || []), ...(refReissue.data || [])], [q.data, refReissue.data]);
   const products = useMemo(() => [...new Set(allRows.map(productOf))].sort(), [allRows]);
   const needle = search.trim().toLowerCase();
   const rows = useMemo(() => allRows
@@ -1514,8 +1572,10 @@ export function RegisterLive({ branch, initial = 'sales' }) {
       exportToExcel(name, sheet.columns, sheet.rows);
     }
   };
-  // Feed the global Tally Export bar balanced Sales/Purchase vouchers.
-  const tallyVouchers = useMemo(() => rows.map((v) => {
+  // Feed the global Tally Export bar balanced Sales/Purchase vouchers. Only true
+  // sale/purchase rows go to Tally — refund/reissue are shown in the register view
+  // but excluded here so they can't export as a mis-typed Sales/Purchase voucher.
+  const tallyVouchers = useMemo(() => rows.filter((v) => v.category === (tab === 'sales' ? 'sale' : 'purchase')).map((v) => {
     const total = Math.round(v.total || 0), gst = Math.round(v.taxAmt || 0), net = Math.round(v.subtotal || (total - gst));
     const party = v.party || (tab === 'sales' ? 'Sundry Debtors' : 'Sundry Creditors');
     const base = { date: v.date, vno: v.vno, narration: v.linkNo ? `Link ${v.linkNo}` : '' };

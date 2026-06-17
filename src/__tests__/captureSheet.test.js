@@ -18,24 +18,41 @@ const bookingByLink = { LK1: booking };
 const saleVoucher = {
   vno: 'SF1', type: 'SF', branch: 'BOM', linkNo: 'LK1', gstMode: 'intra',
   total: 1180, taxAmt: 180, partyGroup: 'B2B', party: 'ACME',
-  lines: [{ ledger: 'IT-Base Fare', amt: 1000 }],
+  lines: [{ ledger: 'IT-Base Fare', amt: 1000 }], // IT- prefix → International
 };
 const keyset = (sheet) => sheet.columns.map((c) => c.key);
 
 describe('buildCaptureSheet — register capture columns & row refs', () => {
-  test('All modules: a Sales Type column sits immediately before Client Type', () => {
+  test('All modules: Sales Type then INT/DOM sit (in order) before Client Type', () => {
     const sheet = buildCaptureSheet([saleVoucher], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: true });
     const keys = keyset(sheet);
     expect(keys).toContain('salesType');
-    expect(keys.indexOf('salesType')).toBe(keys.indexOf('clientType') - 1); // directly before
-    const typeCol = sheet.columns.find((c) => c.key === 'salesType');
-    expect(typeCol.label).toBe('Sales Type');
+    expect(keys).toContain('intDom');
+    // order: salesType → intDom → clientType
+    expect(keys.indexOf('salesType')).toBe(keys.indexOf('intDom') - 1);
+    expect(keys.indexOf('intDom')).toBe(keys.indexOf('clientType') - 1);
+    expect(sheet.columns.find((c) => c.key === 'salesType').label).toBe('Sales Type');
+    expect(sheet.columns.find((c) => c.key === 'intDom').label).toBe('INT / DOM');
     expect(sheet.rows[0].salesType).toBe('Tickets'); // productOf(SF)
+    expect(sheet.rows[0].intDom).toBe('INT');         // IT- ledger prefix
   });
 
-  test('Single module (showType false): no Sales Type column', () => {
+  test('INT/DOM follows the booking packageType when present (Domestic)', () => {
+    const dom = { ...booking, packageType: 'Domestic' };
+    const sheet = buildCaptureSheet([saleVoucher], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink: { LK1: dom }, showType: true });
+    expect(sheet.rows[0].intDom).toBe('DOM');
+  });
+
+  test('Single module (showType false): no Sales Type / INT-DOM columns', () => {
     const sheet = buildCaptureSheet([saleVoucher], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: false });
     expect(keyset(sheet)).not.toContain('salesType');
+    expect(keyset(sheet)).not.toContain('intDom');
+  });
+
+  test('Refund (RF) / Reissue (RI) vouchers label as Refund / Reissue in the type column', () => {
+    const rf = { ...saleVoucher, vno: 'RF1', type: 'RF' };
+    const sheet = buildCaptureSheet([rf], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: true });
+    expect(sheet.rows[0].salesType).toBe('Refund');
   });
 
   test('Final Invoice Value column exists and each row back-references its voucher (for the JV) and booking (for the invoice)', () => {

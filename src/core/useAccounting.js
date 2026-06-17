@@ -527,6 +527,22 @@ export function usePurchaseRegister(branch, { from, to } = {}) {
   });
 }
 
+// Refund (RF) + Reissue (RI) vouchers — each is ONE combined voucher that fully
+// reverses its linked sale + cost. Folded into BOTH the Sales and Purchase Register
+// "All modules" view so the registers show the complete customer/cost activity.
+export function useRefundReissue(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['vouchers', 'refund-reissue', code || 'all', from || '', to || ''],
+    queryFn: () => Promise.all([
+      apiGet('/api/vouchers', { branch: code, category: 'refund', from, to }),
+      apiGet('/api/vouchers', { branch: code, category: 'reissue', from, to }),
+    ]).then(([rf, ri]) => [...(rf || []), ...(ri || [])]),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 // Approved SO/PO/GP bookings — used by the Sales/Purchase Register to join each
 // posted invoice back to its booking for the per-passenger Pax / PNR / Ticket
 // detail (booking-spawned voucher lines are aggregate heads, so the travel detail
