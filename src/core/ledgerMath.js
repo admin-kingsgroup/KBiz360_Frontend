@@ -33,7 +33,7 @@ export function mapLedger(d) {
     name: d.ledger, group: d.group, code: d.code,
     opening: { amt: d.openingBalance || 0, side: d.openingSide || 'Dr' },
     rows: (d.lines || []).map((e) => ({
-      date: e.date, vno: e.vno, voucherId: e.voucherId, branch: e.branch || '', category: e.category || e.type || '',
+      date: e.date, vno: e.vno, tallyRef: e.sourceRef || '', voucherId: e.voucherId, branch: e.branch || '', category: e.category || e.type || '',
       part: (e.particulars && e.particulars[0] && e.particulars[0].ledger) || e.party || vtLabel(e.category),
       toBy: e.debit > 0 ? 'To' : 'By',
       vt: vtLabel(e.category || e.type),

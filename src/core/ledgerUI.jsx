@@ -275,6 +275,7 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
           : r.voucherId && onPickVoucher
             ? <span className="vlink" onClick={() => onPickVoucher({ id: r.voucherId, vno: r.vno })} title="Open voucher">{r.vno}</span>
             : r.vno}
+        {r.tallyRef && <div className="narr" title="Tally Ref">Tally: {r.tallyRef}</div>}
       </td>
       <td className="num drc">{fmt(r.dr)}</td>
       <td className="num crc">{fmt(r.cr)}</td>

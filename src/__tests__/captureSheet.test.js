@@ -11,7 +11,7 @@ jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 
 import { buildCaptureSheet } from '../modules/accountingLive.jsx';
 
-const linkIndex = { saleByLink: { LK1: 'SF1' }, purByLink: { LK1: 'PF1' } };
+const linkIndex = { saleByLink: { LK1: 'SF1' }, purByLink: { LK1: 'PF1' }, saleRefByLink: { LK1: 'IS/01' }, purRefByLink: { LK1: 'IP/01' } };
 const booking = { linkNo: 'LK1', bookingNo: 'BKG1', so: { total: 1000 }, customer: { name: 'ACME' } };
 const bookingByLink = { LK1: booking };
 
@@ -74,6 +74,30 @@ describe('buildCaptureSheet — register capture columns & row refs', () => {
     const pur = buildCaptureSheet([purVoucher], { tab: 'purchase', tag: 'BOM', linkIndex, bookingByLink, showType: true });
     expect(pur.columns.find((c) => c.key === 'saleDate').label).toBe('Purchase Date');
     expect(pur.rows[0].saleDate).toBe('16-Mar-26');
+  });
+
+  test('Tally Ref columns sit beside each invoice no and carry sourceRef (sale + purchase)', () => {
+    // Sale tab: own sourceRef → saleTallyRef; linked purchase's → purTallyRef.
+    const sale = buildCaptureSheet([{ ...saleVoucher, sourceRef: 'IS/01' }], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: true });
+    const keys = keyset(sale);
+    expect(keys.indexOf('saleTallyRef')).toBe(keys.indexOf('saleVno') + 1);
+    expect(keys.indexOf('purTallyRef')).toBe(keys.indexOf('purVno') + 1);
+    expect(sale.columns.find((c) => c.key === 'saleTallyRef').label).toBe('Sales Tally Ref');
+    expect(sale.columns.find((c) => c.key === 'purTallyRef').label).toBe('Purchase Tally Ref');
+    expect(sale.rows[0].saleTallyRef).toBe('IS/01');           // own voucher
+    expect(sale.rows[0].purTallyRef).toBe('IP/01');            // linked purchase
+
+    // Purchase tab: own sourceRef → purTallyRef; linked sale's → saleTallyRef.
+    const pur = buildCaptureSheet([{ ...saleVoucher, vno: 'PF1', type: 'PF', sourceRef: 'IP/01' }], { tab: 'purchase', tag: 'BOM', linkIndex, bookingByLink, showType: true });
+    expect(pur.rows[0].purTallyRef).toBe('IP/01');             // own voucher
+    expect(pur.rows[0].saleTallyRef).toBe('IS/01');            // linked sale
+  });
+
+  test('Booking No column is present and carries the booking number', () => {
+    const sheet = buildCaptureSheet([saleVoucher], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: true });
+    expect(keyset(sheet)).toContain('bookingNo');
+    expect(sheet.columns.find((c) => c.key === 'bookingNo').label).toBe('Booking No');
+    expect(sheet.rows[0].bookingNo).toBe('BKG1');
   });
 
   test('Invoice column is the LAST column and labelled per side', () => {

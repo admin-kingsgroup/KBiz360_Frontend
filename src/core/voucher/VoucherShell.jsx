@@ -29,7 +29,11 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   const editId = isEdit ? (voucherId || voucher?.id || voucher?._id) : undefined;
   const ctx = { branch: isEdit ? (voucher?.branch || branch) : branch, branchCode, cur, editId };
 
-  const [state, setState] = useState(() => (isEdit && voucher ? desc.fromVoucher(voucher, ctx) : desc.initial(ctx)));
+  const [state, setState] = useState(() => {
+    const s = isEdit && voucher ? desc.fromVoucher(voucher, ctx) : desc.initial(ctx);
+    // Free-text Tally Ref (original Tally voucher no) — shared across every voucher type.
+    return { ...s, sourceRef: s.sourceRef != null ? s.sourceRef : ((isEdit && voucher && voucher.sourceRef) || '') };
+  });
   const [done, setDone] = useState(false);
   const [err, setErr] = useState('');
 
@@ -38,7 +42,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   const saving = createMut.isPending || updateMut.isPending;
 
   // Live, backend-computed journal — identical engine for create and edit.
-  const previewBody = { ...desc.toBody(state, ctx) };
+  const previewBody = { ...desc.toBody(state, ctx), sourceRef: state.sourceRef || '' };
   const pv = useVoucherPreview(previewBody).data || {};
 
   const val = desc.validate(state);
@@ -53,7 +57,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   const save = () => {
     if (!canSave) return;
     setErr('');
-    const base = desc.toBody(state, ctx);
+    const base = { ...desc.toBody(state, ctx), sourceRef: state.sourceRef || '' };
     const ok = (vno) => { setDone(true); toast(`${desc.label} saved${vno ? ` — ${vno}` : ''}`); };
     const fail = (e) => { setErr(e.message); toast(`Could not save — ${e.message}`, 'error'); };
     if (isEdit) {
@@ -144,6 +148,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   const formInner = (
     <>
       {desc.fields({ state, setState, ctx })}
+      <FL label="Tally Ref"><input value={state.sourceRef || ''} onChange={(e) => setState((s) => ({ ...s, sourceRef: e.target.value }))} style={{ ...inp, maxWidth: 200 }} placeholder="original Tally voucher no (optional)" /></FL>
       {journalTable}
       {!branchCode && !isEdit && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#FAEEDA', fontSize: 10.5, color: '#854F0B', fontWeight: 600, textAlign: 'center', margin: '10px 0' }}>Select a specific branch (not “All”) to post this voucher.</div>}
       {err && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#FCEBEB', fontSize: 11, color: RED, fontWeight: 600, margin: '10px 0' }}>! {err}</div>}

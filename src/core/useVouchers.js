@@ -30,6 +30,7 @@ export function toSaleRow(v) {
     saleAmt:    num(v.total),
     costCenter: v.costCenter || '',
     linkNo:     v.linkNo || '',
+    tallyRef:   v.sourceRef || '',
   };
 }
 
@@ -42,6 +43,7 @@ export function toPurchaseRow(v, module) {
     date:     v.date || '',
     supplier: v.billTo || v.party || '',
     ref:      v.againstInvoice || v.linkNo || '',
+    tallyRef: v.sourceRef || '',
     desc:     v.remarks || '',
     amt:      num(v.total),
     incentive:    0,

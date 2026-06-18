@@ -58,6 +58,7 @@ export function toVoucherRegisterRow(v = {}) {
   return {
     id: v.id,
     vno: v.vno || '—',
+    tallyRef: v.sourceRef || '',   // original Tally voucher no (migrated entries)
     date: v.date || '',
     branch: v.branch || '',
     account: v.party || v.billTo || v.counterParty || firstLedger || '—',

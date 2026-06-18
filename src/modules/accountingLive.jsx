@@ -656,7 +656,7 @@ export function DayBookLive({ branch }) {
   }, [sorted]);
 
   const postingRows = useMemo(() => sorted.flatMap((j) => (j.postings || []).map((p) => ({
-    dateKey: dayKey(j.date), date: j.date, vno: j.vno, voucherId: j.voucherId, type: j.type, category: j.category, branch: j.branch || '',
+    dateKey: dayKey(j.date), date: j.date, vno: j.vno, tallyRef: j.sourceRef || '', voucherId: j.voucherId, type: j.type, category: j.category, branch: j.branch || '',
     ledger: p.ledger, group: p.group, debit: p.debit, credit: p.credit,
     narration: p.narration || j.narration || '', party: j.party || '',
   }))), [sorted]);
@@ -666,8 +666,8 @@ export function DayBookLive({ branch }) {
   const pageRows = useMemo(() => postingRows.slice(page * pageSize, page * pageSize + pageSize), [postingRows, page, pageSize]);
 
   const expColumns = view === 'minimal'
-    ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'ledger', label: 'Ledger' }, { key: 'debit', label: `Debit (${cur})`, num: true }, { key: 'credit', label: `Credit (${cur})`, num: true }]
-    : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'type', label: 'Type' }, { key: 'category', label: 'Category' }, { key: 'branch', label: 'Branch' }, { key: 'ledger', label: 'Ledger' }, { key: 'group', label: 'Group' }, { key: 'debit', label: `Debit (${cur})`, num: true }, { key: 'credit', label: `Credit (${cur})`, num: true }, { key: 'narration', label: 'Narration' }];
+    ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'tallyRef', label: 'Tally Ref' }, { key: 'ledger', label: 'Ledger' }, { key: 'debit', label: `Debit (${cur})`, num: true }, { key: 'credit', label: `Credit (${cur})`, num: true }]
+    : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'tallyRef', label: 'Tally Ref' }, { key: 'type', label: 'Type' }, { key: 'category', label: 'Category' }, { key: 'branch', label: 'Branch' }, { key: 'ledger', label: 'Ledger' }, { key: 'group', label: 'Group' }, { key: 'debit', label: `Debit (${cur})`, num: true }, { key: 'credit', label: `Credit (${cur})`, num: true }, { key: 'narration', label: 'Narration' }];
   const printRows = postingRows.map((r) => ({ ...r, debit: nfmt(r.debit), credit: nfmt(r.credit) }));
   const totalRow = { date: 'TOTAL', vno: `${sorted.length} vouchers`, debit: nfmt(gDr), credit: nfmt(gCr) };
   const sub = `${branchLabel(branch)} · ${sorted.length} vouchers · ${postingRows.length} lines · Dr ${money(cur, gDr)} = Cr ${money(cur, gCr)}`;
@@ -1354,10 +1354,13 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
   // 2) Assemble columns: fixed lead → component heads → taxes → final value.
   const columns = [];
   const col = (key, label, isNum) => columns.push({ key, label, num: !!isNum });
+  col('bookingNo', 'Booking No');
   col('linkNo', 'SPG / Link No');
   col('saleDate', isSale ? 'Sale Date' : 'Purchase Date');
   col('saleVno', 'Sales Invoice No');
+  col('saleTallyRef', 'Sales Tally Ref');
   col('purVno', 'Purchase Invoice No');
+  col('purTallyRef', 'Purchase Tally Ref');
   if (!tag) col('branch', 'Branch');
   // When viewing All modules together, surface which module each row belongs to —
   // shown immediately before Client/Vendor Type so the mixed list stays readable.
@@ -1393,9 +1396,12 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
     const row = {
       _v: v,             // back-reference: Final Invoice Value → open this voucher's JV
       _booking: booking, // back-reference: print the Sales / Purchase invoice for this row
+      bookingNo: (booking && booking.bookingNo) || '—',
       linkNo: link || '—',
       saleVno: isSale ? v.vno : (linkIndex.saleByLink[link] || ''),
+      saleTallyRef: isSale ? (v.sourceRef || '') : ((linkIndex.saleRefByLink || {})[link] || ''),
       purVno: isSale ? (linkIndex.purByLink[link] || '') : v.vno,
+      purTallyRef: isSale ? ((linkIndex.purRefByLink || {})[link] || '') : (v.sourceRef || ''),
       saleDate: v.date || '',
       branch: v.branch || '',
       salesType: productOf(v),
@@ -1539,10 +1545,10 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   // the capture row can show its counterpart invoice. Booking index (by Link No,
   // approved/posted preferred) supplies the per-passenger travel detail.
   const linkIndex = useMemo(() => {
-    const saleByLink = {}, purByLink = {};
-    for (const v of (sales.data || [])) if (v.linkNo) saleByLink[v.linkNo] = v.vno;
-    for (const v of (purch.data || [])) if (v.linkNo) purByLink[v.linkNo] = v.vno;
-    return { saleByLink, purByLink };
+    const saleByLink = {}, purByLink = {}, saleRefByLink = {}, purRefByLink = {};
+    for (const v of (sales.data || [])) if (v.linkNo) { saleByLink[v.linkNo] = v.vno; saleRefByLink[v.linkNo] = v.sourceRef || ''; }
+    for (const v of (purch.data || [])) if (v.linkNo) { purByLink[v.linkNo] = v.vno; purRefByLink[v.linkNo] = v.sourceRef || ''; }
+    return { saleByLink, purByLink, saleRefByLink, purRefByLink };
   }, [sales.data, purch.data]);
   const bookingByLink = useMemo(() => {
     const m = {};

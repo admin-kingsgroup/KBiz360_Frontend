@@ -143,6 +143,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Pending but the approval gate refuses to post it until it's tagged.
   const [packageType, setPackageType] = useState(editing ? (editBooking.packageType || '') : '');
   const [remarks, setRemarks] = useState(editing ? (editBooking.remarks || '') : '');
+  // Free-text Tally references (optional) → flow to the spawned Sale / Purchase voucher sourceRef.
+  const [saleTallyRef, setSaleTallyRef] = useState(editing ? (editBooking.saleTallyRef || '') : '');
+  const [purTallyRef, setPurTallyRef] = useState(editing ? (editBooking.purTallyRef || '') : '');
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -233,7 +236,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         headerRef, rows: lines.map((l) => syncLineRefs(spec, l)),
         po: { ...totals.po, gstMode: purGstMode }, so: { ...totals.so, gstMode: saleGstMode },
         gp: { lines: gpLines, total: totals.gp.total, pct: totals.gp.pct },
-        remarks,
+        remarks, saleTallyRef, purTallyRef,
       };
       let booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, payload)
@@ -653,6 +656,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           {editing ? <><Pencil size={12} /> Editing a pending voucher — “Save &amp; Approve” fixes it and posts the books in one step.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
         </span>
         <FL label="Remarks"><input value={remarks} onChange={(e) => setRemarks(e.target.value)} style={{ ...inp, width: 220 }} placeholder="optional" /></FL>
+        <FL label="Sales Tally Ref"><input value={saleTallyRef} onChange={(e) => setSaleTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>
+        {!isNoSupp && <FL label="Purchase Tally Ref"><input value={purTallyRef} onChange={(e) => setPurTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>}
         {editing && (
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} style={btnGh}><XCircle size={14} /> Cancel</button>
         )}
@@ -966,12 +971,12 @@ const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
 function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, onInvoice, busyId, sel, onToggleSel }) {
   const cols = mode === 'approved'
-    ? ['', 'Booking No', 'Booking Date', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
+    ? ['', 'Booking No', 'Booking Date', 'Link No', 'Tally Ref', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
     : mode === 'rejected'
       ? ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Date', 'Reason']
       : mode === 'deleted'
         ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Deleted', 'By']
-        : ['', 'Booking No', 'Booking Date', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Actions'];
+        : ['', 'Booking No', 'Booking Date', 'Link No', 'Tally Ref', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Actions'];
   // The four money columns drive both header right-alignment and the group-summary
   // colSpans; derive their start from the header so adding lead columns can't misalign them.
   const numStart = cols.indexOf('Sale');
@@ -1006,6 +1011,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}{mode === 'pending' && b.validation?.hasErrors ? <span title={(b.validation.errors || []).join(' · ')} style={{ marginLeft: 6, color: '#A32D2D', fontWeight: 800 }}>⚠</span> : null}</td>
                   {(mode === 'approved' || mode === 'pending') && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5a6691' }}>{b.date || '—'}</td>}
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: BLUE, fontSize: 11.5 }}>{b.linkNo}</td>
+                  {(mode === 'pending' || mode === 'approved') && <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, color: '#5a6691', whiteSpace: 'nowrap' }} title="Sales / Purchase Tally Ref">{(b.saleTallyRef || '—')}{b.purTallyRef ? ' / ' + b.purTallyRef : ''}</td>}
                   <td style={{ padding: '8px 12px', fontSize: 12 }}>{sp ? sp.icon + ' ' + sp.name : b.module}</td>
                   {mode === 'approved' || mode === 'deleted' ? (
                     <>
@@ -1033,12 +1039,13 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                         <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><XCircle size={12} /> Reject</button>
                       </div>
                     ) : mode === 'approved' ? (
-                      canDelete
-                        ? <div style={{ display: 'flex', gap: 6 }}>
-                            {onEdit && <button disabled={busyId === b.id} onClick={() => onEdit(b)} title="Edit — reverses the posted Sales/Purchase out of the books and returns this to Pending for re-approval" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit</button>}
-                            <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><Trash2 size={12} /> Delete</button>
-                          </div>
-                        : <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>admin only</span>
+                      // Edit is open to everyone (it un-posts the booking → Pending → re-approve);
+                      // Delete is admin-only (Super Admin / Director).
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {onEdit && <button disabled={busyId === b.id} onClick={() => onEdit(b)} title="Edit — reverses the posted Sales/Purchase out of the books and returns this to Pending for re-approval" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit</button>}
+                        {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><Trash2 size={12} /> Delete</button>}
+                        {!onEdit && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
+                      </div>
                     ) : mode === 'deleted' ? (
                       <span style={{ fontSize: 11, color: '#8b94b3' }} title={b.deletedReason || ''}>{b.deletedBy || '—'}{b.deletedReason ? ` · ${b.deletedReason}` : ''}</span>
                     ) : (

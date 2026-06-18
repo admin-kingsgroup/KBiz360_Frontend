@@ -44,6 +44,7 @@ export function VoucherRegisterPage({ branch, category, title }) {
 
   const columns = useMemo(() => [
     { key: 'vno', header: 'Voucher No', sticky: 'left', width: '12rem', hideable: false, render: (r) => <span className="font-semibold text-navy">{r.vno}</span> },
+    { key: 'tallyRef', header: 'Tally Ref', width: '9rem', className: 'text-ink-muted', render: (r, v) => v || '—' },
     { key: 'date', header: 'Date', width: '7rem', render: (r, v) => (v ? fmtDate(v) : '—') },
     { key: 'branch', header: 'Branch', width: '6rem', className: 'text-ink-muted' },
     { key: 'account', header: 'Account / Party', width: '16rem' },
