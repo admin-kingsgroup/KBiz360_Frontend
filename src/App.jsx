@@ -44,6 +44,7 @@ import { PnLTallyLive } from './modules/pnlTally';
 import { BalanceSheetTallyLive } from './modules/balanceSheetTally';
 import { CapitalVsInvestmentLive } from './modules/capitalVsInvestment';
 import { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, AccountsChartLive, InvoiceGPLive } from './modules/accountingLive';
+import { DashboardAccountant, NetAgeing, CollectionsFollowup, SupplierReco, SuspenseClearing, MonthEndChecklist } from './modules/accountantWorkspace';
 import { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } from './modules/reportsFinancial';
 import { ProfitAndLossUnified, BalanceSheetUnified } from './modules/financialStatements';
 import { NotesToFinancials } from './modules/reportsNotes';
@@ -338,6 +339,13 @@ export default function KB360App(){
     if(route==="/masters/doc-types")      return <DocumentTypeMaster/>;
     if(route==="/masters/approval-limits")return <ApprovalLimitsMaster/>;
     if(route==="/masters/numbering")      return <NumberingSeriesMaster branch={branch}/>;
+    // ── Accounts — branch accountant workspace (new screens) ──
+    if(route==="/accounts/dashboard")     return <DashboardAccountant branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/net-ageing")    return <NetAgeing branch={branch}/>;
+    if(route==="/accounts/collections")   return <CollectionsFollowup branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/supplier-reco") return <SupplierReco branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/suspense")      return <SuspenseClearing branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/month-end")     return <MonthEndChecklist branch={branch} setRoute={navigate}/>;
     if(route==="/dashboard")          return <DashboardRouter branch={branch} setRoute={navigate} currentUser={currentUser}/>;
     if(route==="/dashboard/alerts")   return <AlertsDashboard branch={branch} setRoute={navigate}/>;
     if(route==="/dashboards/capital") return <CapitalVsInvestmentLive branch={branch}/>; // Capital vs Investment (live from BS + P&L)
