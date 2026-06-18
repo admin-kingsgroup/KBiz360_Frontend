@@ -48,7 +48,11 @@ const drCrOf = (e) => {
   return { drLedger: name(dr), crLedger: name(cr), drAmt: dr.reduce((s, p) => s + (p.debit || 0), 0), crAmt: cr.reduce((s, p) => s + (p.credit || 0), 0) };
 };
 
-export function VoucherApprovals({ branch }) {
+export function VoucherApprovals({ branch, currentUser }) {
+  // Deleting a voucher is admin-only (Super Admin / Director). A Branch Accountant
+  // can EDIT (which returns it to Pending for re-approval) but never delete — so the
+  // Delete button is hidden for non-admins (the backend also 403s the delete).
+  const isAdmin = /super.?admin|director/i.test(currentUser?.role || '');
   const [status, setStatus] = useState('pending');
   const [open, setOpen] = useState({});
   const [sel, setSel] = useState(() => new Set()); // selected voucher ids (multi-approve)
@@ -185,7 +189,7 @@ export function VoucherApprovals({ branch }) {
     ) : status === 'approved' ? (
       <>
         <button onClick={() => setEditId(e.id)} disabled={busy} title="Edit — un-posts this voucher and returns it to Pending for re-approval" style={ABTN(C.blue)}>Edit</button>
-        <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={ABTN(C.red)}>Delete</button>
+        {isAdmin && <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={ABTN(C.red)}>Delete</button>}
       </>
     ) : status === 'deleted' ? (
       <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
@@ -379,7 +383,7 @@ export function VoucherApprovals({ branch }) {
                                           ) : status === 'approved' ? (
                                             <>
                                               <button onClick={() => setEditId(e.id)} disabled={busy} title="Edit — un-posts this voucher and returns it to Pending for re-approval" style={{ padding: '3px 9px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Edit</button>
-                                              <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Delete</button>
+                                              {isAdmin && <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Delete</button>}
                                             </>
                                           ) : status === 'deleted' ? (
                                             <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
@@ -505,7 +509,7 @@ export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain 
       </div>
       {domain === 'sopogp'
         ? <BookingApprovals branch={branch} setRoute={setRoute} currentUser={currentUser} />
-        : <VoucherApprovals branch={branch} />}
+        : <VoucherApprovals branch={branch} currentUser={currentUser} />}
     </div>
   );
 }
