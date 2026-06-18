@@ -105,13 +105,30 @@ export default function KB360App(){
     return null;
   })();
 
-  /* ── Branch: restore the user's first allowed *operating* branch. We skip the
-     Head-Office (isHO) branch as a default because HO holds no transactional data
-     (vouchers are posted at the operating branches), so defaulting to it would
-     blank every branch-scoped dashboard/report. HO stays selectable in the
-     switcher; it's just never the implicit default. ── */
+  /* ── Branch: restore the last-selected branch so a refresh keeps you where you
+     were (e.g. on BOM instead of snapping back to the default). The chosen branch
+     code is persisted under 'kb360-branch' on every switch (see effect below).
+     We only honour a saved branch the current user may actually see — "ALL" is
+     limited to full-scope roles, and a specific branch must be in the user's
+     allowed list (full-scope users see all). If the saved value is missing or no
+     longer permitted, we fall back to the user's first allowed *operating*
+     branch. We skip the Head-Office (isHO) branch as a default because HO holds
+     no transactional data (vouchers are posted at the operating branches), so
+     defaulting to it would blank every branch-scoped dashboard/report. HO stays
+     selectable in the switcher; it's just never the implicit default. ── */
   const [branch,setBranch]=useState(()=>{
     const codes = restoredUser?.branches;
+    const FULL_SCOPE=["Super Admin","Director","Senior Finance Manager","Sr. Accounts Executive"];
+    const isFull = !restoredUser || FULL_SCOPE.includes(restoredUser?.role);
+    try{
+      const saved = localStorage.getItem("kb360-branch");
+      if(saved==="ALL"){
+        if(isFull) return "ALL";
+      }else if(saved){
+        const b = BRANCHES.find(x => x.code===saved);
+        if(b && (isFull || !Array.isArray(codes) || codes.includes(b.code))) return b;
+      }
+    }catch{ /* ignore */ }
     if(Array.isArray(codes) && codes.length){
       const b = BRANCHES.find(x => codes.includes(x.code) && !x.isHO)
             ||  BRANCHES.find(x => codes.includes(x.code));
@@ -147,6 +164,9 @@ export default function KB360App(){
 
   /* Persist the current route so a refresh / re-open returns you here. */
   useEffect(()=>{ try{ localStorage.setItem("kb360-route", route); }catch{ /* ignore */ } },[route]);
+
+  /* Persist the selected branch so a refresh keeps you on it (restored above). */
+  useEffect(()=>{ try{ localStorage.setItem("kb360-branch", branch==="ALL"?"ALL":(branch?.code||"")); }catch{ /* ignore */ } },[branch]);
 
   /* On first load only, restore the last route: if we opened at the index path
      with a live session and a saved route, jump there once (replace, so it
