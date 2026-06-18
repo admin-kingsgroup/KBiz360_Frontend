@@ -493,7 +493,7 @@ export function VoucherView({ id, cur }) {
   return (
     <div style={{ padding: 14 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid ' + LINE }}>
-        {[['Voucher', v.vno], ['Date', dmy(v.date)], [v.category === 'purchase' ? 'Supplier' : 'Party', v.party], ['Type', `${v.type} · ${v.category}`], ['Link No', v.linkNo], ['Total', cur + ' ' + money(v.total)]].map(([k, val]) => (
+        {[['Voucher', v.vno], ['Tally Ref', v.sourceRef], ['Date', dmy(v.date)], [v.category === 'purchase' ? 'Supplier' : 'Party', v.party], ['Type', `${v.type} · ${v.category}`], ['Link No', v.linkNo], ['Total', cur + ' ' + money(v.total)]].map(([k, val]) => (
           <div key={k}><div style={{ fontSize: 9, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>{k}</div><div style={{ fontSize: 12.5, fontWeight: 600, color: DARK }}>{val || '—'}</div></div>
         ))}
       </div>

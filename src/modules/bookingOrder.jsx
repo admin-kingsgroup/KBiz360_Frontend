@@ -142,6 +142,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Pending but the approval gate refuses to post it until it's tagged.
   const [packageType, setPackageType] = useState(editing ? (editBooking.packageType || '') : '');
   const [remarks, setRemarks] = useState(editing ? (editBooking.remarks || '') : '');
+  // Free-text Tally references (optional) → flow to the spawned Sale / Purchase voucher sourceRef.
+  const [saleTallyRef, setSaleTallyRef] = useState(editing ? (editBooking.saleTallyRef || '') : '');
+  const [purTallyRef, setPurTallyRef] = useState(editing ? (editBooking.purTallyRef || '') : '');
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -231,7 +234,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         headerRef, rows: lines.map((l) => syncLineRefs(spec, l)),
         po: { ...totals.po, gstMode: purGstMode }, so: { ...totals.so, gstMode: saleGstMode },
         gp: { lines: gpLines, total: totals.gp.total, pct: totals.gp.pct },
-        remarks,
+        remarks, saleTallyRef, purTallyRef,
       };
       let booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, payload)
@@ -651,6 +654,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           {editing ? <><Pencil size={12} /> Editing a pending voucher — “Save &amp; Approve” fixes it and posts the books in one step.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
         </span>
         <FL label="Remarks"><input value={remarks} onChange={(e) => setRemarks(e.target.value)} style={{ ...inp, width: 220 }} placeholder="optional" /></FL>
+        <FL label="Sales Tally Ref"><input value={saleTallyRef} onChange={(e) => setSaleTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>
+        {!isNoSupp && <FL label="Purchase Tally Ref"><input value={purTallyRef} onChange={(e) => setPurTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>}
         {editing && (
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} style={btnGh}><XCircle size={14} /> Cancel</button>
         )}
