@@ -556,3 +556,22 @@ export function useBookingOrders(branch) {
     staleTime: 60_000,
   });
 }
+
+// Generic key/value config read — backed by /api/app-config/:key. A missing key
+// (first use) 404s; we swallow it and return {} so callers get a clean empty state.
+// Used by the Month-End checklist to persist its manual ticks per branch × month.
+export function useConfigValue(key) {
+  return useQuery({
+    queryKey: ['app-config', key],
+    queryFn: () => apiGet(`/api/app-config/${encodeURIComponent(key)}`).then((d) => (d && d.value) || {}).catch(() => ({})),
+    enabled: enabled() && !!key,
+    staleTime: 10_000,
+  });
+}
+export function useSaveConfigValue() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, value, description }) => apiPut(`/api/app-config/${encodeURIComponent(key)}`, { value, description }),
+    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ['app-config', vars.key] }),
+  });
+}

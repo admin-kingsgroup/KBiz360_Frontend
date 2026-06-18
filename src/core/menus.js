@@ -494,9 +494,12 @@ export function getMenu(branch, currentUser){
   // Dashboard pill; everyone else keeps the single Dashboard link.
   const role = currentUser?.role || 'Super Admin';
   const isDir = role === 'Director' || role === 'Super Admin';
+  const isAccountant = /accountant/i.test(role || ''); // "Branch Accountant" et al.
   const top = isDir ? [MENU_DASHBOARDS, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
   // 8 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · Admin
-  const menus = [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
+  let menus = [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
+  // Accountant role → lead with the Accounts workspace (their operate-from-here tab).
+  if (isAccountant) menus = [MENU_ACCOUNTS, ...menus.filter((m) => m !== MENU_ACCOUNTS)];
   return menus;
 }
 

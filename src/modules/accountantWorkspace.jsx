@@ -4,12 +4,12 @@
 // balance, tax) — these screens compose & focus that data; they post nothing new.
 // Branch-scoped via the top-right selector (the `branch` prop), exactly like every
 // other live screen. Cards/links jump into the existing working screens via setRoute.
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { card } from '../core/styles';
 import { bc } from '../core/styles';
 import {
   branchCode, useAgeing, useTaxSummary, useTrialBalance, useVoucherApprovals,
-  useBookingOrders, useSalesRegister, usePurchaseRegister,
+  useBookingOrders, useSalesRegister, usePurchaseRegister, useConfigValue, useSaveConfigValue,
 } from '../core/useAccounting';
 import {
   Wallet, Landmark, CheckSquare, TrendingUp, TrendingDown, ReceiptText, AlertTriangle,
@@ -30,9 +30,10 @@ export function ymOf(d) {
 const thisYM = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 
 // Cash / Bank closing balance from the trial-balance rows (Dr − Cr over the matched
-// group). Pure so it can be unit-tested without the network.
+// GROUP only). Matching the group — not the ledger — avoids pulling in look-alike
+// ledgers like "Bank Charges" (an expense) into the bank balance. Pure → unit-testable.
 export function groupBalance(rows, re) {
-  return (rows || []).filter((r) => re.test(String(r.group || '') + ' ' + String(r.ledger || '')))
+  return (rows || []).filter((r) => re.test(String(r.group || '')))
     .reduce((s, r) => s + ((Number(r.closingDebit ?? r.debit) || 0) - (Number(r.closingCredit ?? r.credit) || 0)), 0);
 }
 
@@ -64,6 +65,7 @@ export function DashboardAccountant({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const go = (r) => setRoute && setRoute(r);
   const age = useAgeing(branch).data || {};
+  const tax = useTaxSummary(branch).data || {};
   const tb = useTrialBalance(branch).data?.rows || [];
   const bookings = useBookingOrders(branch).data || [];
   const pendVouchers = useVoucherApprovals(branch, 'pending').data || [];
@@ -81,6 +83,7 @@ export function DashboardAccountant({ branch, setRoute }) {
   const pay = age.payables?.totals || {};
   const recOverdue = (rec.d30 || 0) + (rec.d60 || 0) + (rec.d90 || 0);
   const payOverdue = (pay.d30 || 0) + (pay.d60 || 0) + (pay.d90 || 0);
+  const netGst = (typeof tax.netPayable === 'number') ? tax.netPayable : null; // ≥0 payable · <0 refundable
 
   const Tile = ({ icon, label, value, sub, tone = C.dark, onClick }) => (
     <div onClick={onClick} style={{ ...card, padding: 14, cursor: onClick ? 'pointer' : 'default', minWidth: 200, flex: '1 1 200px', borderLeft: `4px solid ${tone}` }}>
@@ -117,7 +120,7 @@ export function DashboardAccountant({ branch, setRoute }) {
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <Tile icon={<TrendingUp size={13} />} label="Sales (this month)" value={money(cur, sumTot(sales.filter(inMonth)))} sub="Open Sales Register" tone={C.green} onClick={() => go('/reports/sreg')} />
         <Tile icon={<TrendingDown size={13} />} label="Purchase (this month)" value={money(cur, sumTot(purch.filter(inMonth)))} sub="Open Purchase Register" tone={C.amber} onClick={() => go('/reports/preg')} />
-        <Tile icon={<ReceiptText size={13} />} label="GST / VAT" value="View" sub="Open tax summary" tone={C.blue} onClick={() => go('/reports/tax-summary')} />
+        <Tile icon={<ReceiptText size={13} />} label="GST / VAT" value={netGst == null ? 'View' : money(cur, Math.abs(netGst))} sub={netGst == null ? 'Open tax summary' : `${netGst >= 0 ? 'net payable' : 'refundable'} · open tax summary`} tone={netGst != null && netGst > 0 ? C.amber : C.blue} onClick={() => go('/reports/tax-summary')} />
         <Tile icon={<ReceiptText size={13} />} label="Invoice-wise GP" value="View" sub="Open GP report" tone={C.dark} onClick={() => go('/reports/invoice-gp')} />
       </div>
     </Shell>
@@ -277,7 +280,23 @@ export function MonthEndChecklist({ branch, setRoute }) {
   const pendVouchers = useVoucherApprovals(branch, 'pending').data || [];
   const tbData = useTrialBalance(branch).data || {};
   const tb = tbData.rows || [];
+
+  // Manual ticks persist per branch × month in the generic app-config store, so they
+  // survive reloads and are shared across the branch's accountants.
+  const period = thisYM();
+  const cfgKey = `month-end:${branchCode(branch) || 'ALL'}:${period}`;
+  const savedQ = useConfigValue(cfgKey);
+  const saver = useSaveConfigValue();
   const [manual, setManual] = useState({});
+  // Hydrate from the saved ticks. Key the effect on the STRINGIFIED value (a stable
+  // primitive) so a new-but-equal object reference can't trigger a re-render loop.
+  const savedJson = JSON.stringify(savedQ.data || {});
+  useEffect(() => { setManual(JSON.parse(savedJson)); }, [savedJson]);
+  const toggleManual = (k) => setManual((m) => {
+    const next = { ...m, [k]: !m[k] };
+    saver.mutate({ key: cfgKey, value: next, description: `Month-end checklist ${period}` });
+    return next;
+  });
 
   const pendCount = bookings.filter((b) => b.status === 'pending').length + pendVouchers.length;
   const suspenseCount = bookings.filter((b) => b.status === 'pending' && b.validation?.hasErrors).length;
@@ -304,7 +323,7 @@ export function MonthEndChecklist({ branch, setRoute }) {
           const ok = it.manualOnly ? !!manual[it.key] : it.auto;
           return (
             <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderTop: i ? '1px solid #f0f2f7' : 'none' }}>
-              <span onClick={() => it.manualOnly && setManual((m) => ({ ...m, [it.key]: !m[it.key] }))}
+              <span onClick={() => it.manualOnly && toggleManual(it.key)}
                 style={{ width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? 'pointer' : 'default', background: ok ? C.green : (it.manualOnly ? '#c7ccdb' : C.amber) }}>
                 {ok ? '✓' : (it.manualOnly ? '' : '!')}
               </span>
@@ -317,7 +336,7 @@ export function MonthEndChecklist({ branch, setRoute }) {
           );
         })}
       </div>
-      <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>Auto-checks (post · suspense · trial balance) reflect live data. Manual ticks are for this session — persisting them is a small backend follow-on.</div>
+      <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>Auto-checks (post · suspense · trial balance) reflect live data. Manual ticks are saved per branch &amp; month{saver.isPending ? ' · saving…' : ''}.</div>
     </Shell>
   );
 }

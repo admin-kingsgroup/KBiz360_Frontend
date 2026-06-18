@@ -159,8 +159,9 @@ export default function KB360App(){
         if(allowed) setBranch(allowed);
       }
     }
-    // Redirect to dashboard on user switch (since current route may be forbidden)
-    navigate("/dashboard");
+    // Redirect on user switch (current route may be forbidden). Accountants land on
+    // their own workspace dashboard; everyone else on the general dashboard.
+    navigate(/accountant/i.test(newUser?.role || '') ? "/accounts/dashboard" : "/dashboard");
   };
 
   /* ── Sign out: clear the stored JWT + user so the next session must log in ── */
