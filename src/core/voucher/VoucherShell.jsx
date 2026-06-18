@@ -7,6 +7,7 @@ import { DARK, DIM, BLUE, RED, GREEN, money, brCodeOf, escHtml } from './ui';
 import { useFormKeys } from '../ux/forms';
 import { toast } from '../ux/toast';
 import { Kbd } from '../ux/widgets.jsx';
+import { isViewOnly } from '../api';
 
 /**
  * Unified voucher form (Option C).
@@ -41,7 +42,10 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   const pv = useVoucherPreview(previewBody).data || {};
 
   const val = desc.validate(state);
-  const canSave = val.ok && !!branchCode && !saving;
+  // View-only accounts can open and review vouchers but never post them; the
+  // backend also rejects the write, so this just pre-disables the button.
+  const viewOnly = isViewOnly();
+  const canSave = val.ok && !!branchCode && !saving && !viewOnly;
 
   const dismiss = () => (onClose || onBack || (() => {}))();
   const reset = () => { setState(desc.initial(ctx)); setDone(false); setErr(''); };
@@ -143,10 +147,11 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
       {journalTable}
       {!branchCode && !isEdit && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#FAEEDA', fontSize: 10.5, color: '#854F0B', fontWeight: 600, textAlign: 'center', margin: '10px 0' }}>Select a specific branch (not “All”) to post this voucher.</div>}
       {err && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#FCEBEB', fontSize: 11, color: RED, fontWeight: 600, margin: '10px 0' }}>! {err}</div>}
+      {viewOnly && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#FAEEDA', fontSize: 10.5, color: '#854F0B', fontWeight: 600, textAlign: 'center', margin: '10px 0' }}>View only — this account can review vouchers but cannot post them.</div>}
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
         {!isEdit && <button onClick={reset} style={btnGh}>Reset</button>}
         {isEdit && <button onClick={dismiss} style={btnGh}>Back</button>}
-        <button onClick={save} disabled={!canSave} title="Save (Ctrl/Cmd+Enter)" style={{ ...btnG, background: canSave ? '#185FA5' : '#bfc3d6', opacity: canSave ? 1 : 0.6, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+        <button onClick={save} disabled={!canSave} title={viewOnly ? 'View only — changes are not allowed' : 'Save (Ctrl/Cmd+Enter)'} style={{ ...btnG, background: canSave ? '#185FA5' : '#bfc3d6', opacity: canSave ? 1 : 0.6, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           {desc.icon} Save Voucher {saving ? '…' : val.hint} {!saving && <Kbd>⌃↵</Kbd>}
         </button>
       </div>

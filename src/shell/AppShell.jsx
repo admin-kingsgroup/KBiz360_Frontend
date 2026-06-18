@@ -21,7 +21,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, X, ChevronDown, Bell, Printer } from 'lucide-react';
+import { Menu, X, ChevronDown, Bell, Printer, Eye } from 'lucide-react';
 import { KBIZ_LOGO } from '../core/brand';
 import { getMenu } from '../core/menus';
 import { useNotifRefresh } from '../core/hooks';
@@ -413,6 +413,12 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
           (overflow-hidden) and the inner <main> never gets a bounded height to
           scroll within — the page becomes unscrollable. */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {currentUser?.viewOnly && (
+          <div className="noprint flex shrink-0 items-center justify-center gap-2 border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-[11.5px] font-semibold text-amber-800">
+            <Eye size={13} />
+            View only — you can browse and open records, but changes are disabled for this account.
+          </div>
+        )}
         {subBar && <div className="noprint shrink-0">{subBar}</div>}
         <main className="min-h-0 flex-1 overflow-y-auto bg-surface-alt">{children}</main>
       </div>

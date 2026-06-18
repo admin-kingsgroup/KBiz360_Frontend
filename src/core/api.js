@@ -26,6 +26,17 @@ const BASE = import.meta.env.VITE_KBIZ_API_BASE || 'http://localhost:9090';
 // into CRM can navigate to KBiz Books and the same JWT authorises them.
 const TOKEN_KEY = import.meta.env.VITE_AUTH_TOKEN_KEY || 'kb360-token';
 
+// The logged-in user (incl. the `viewOnly` flag) is mirrored in localStorage by
+// LoginScreen/App. Deep components (e.g. VoucherShell) read this to pre-disable
+// write actions without prop-drilling currentUser everywhere.
+const USER_KEY = 'kb360-user';
+export function isViewOnly() {
+  try {
+    const u = JSON.parse(localStorage.getItem(USER_KEY) || 'null');
+    return !!(u && u.viewOnly);
+  } catch { return false; }
+}
+
 export function getAuthToken() {
   // Order: real SSO token (localStorage) → dev token → 'open' placeholder.
   // The 'open' placeholder is non-empty so the data hooks (enabled: !!token) still
@@ -88,6 +99,11 @@ client.interceptors.response.use(
     if (res) {
       const msg = errMessage(res.data);
       handleAuthFailure(res.status, msg);
+      // Backend blocked a write for a view-only user → friendly toast (the button
+      // may not have been pre-disabled, so this is the universal safety net).
+      if (res.status === 403 && ((res.data && res.data.viewOnly === true) || /view-only/i.test(msg))) {
+        try { window.dispatchEvent(new CustomEvent('kb:toast', { detail: { id: `vo-${Date.now()}`, msg: 'View only — changes are not allowed.', kind: 'error', ttl: 3200 } })); } catch { /* ignore */ }
+      }
       return Promise.reject(new Error(msg || `API ${res.status}: ${res.statusText || 'Request failed'}`));
     }
     // No response → network/timeout/CORS. Surface axios's own message.

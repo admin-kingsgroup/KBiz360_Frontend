@@ -506,11 +506,16 @@ export function getMenu(branch, currentUser){
   const role = currentUser?.role || 'Super Admin';
   const isDir = role === 'Director' || role === 'Super Admin';
   const isAccountant = /accountant/i.test(role || ''); // "Branch Accountant" et al.
+  // Branch Accountant → a single, self-contained workspace: the Accounts pill ONLY.
+  // It already bundles their Dashboard, Daily-Entry vouchers, Approve & Post,
+  // Sales/Purchase + Receivables/Payables + Cash/Bank registers, Books & Scrutiny,
+  // quick-create Masters, Tax & Statutory, Period Close and Branch MIS — so there's
+  // no need for the Finance/Reports/Taxation/Masters/Admin pills. Branch scope is
+  // enforced by the top-right switcher (limited to their stored branches).
+  if (isAccountant) return [MENU_ACCOUNTS];
   const top = isDir ? [MENU_DASHBOARDS, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
   // 8 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · Admin
-  let menus = [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
-  // Accountant role → lead with the Accounts workspace (their operate-from-here tab).
-  if (isAccountant) menus = [MENU_ACCOUNTS, ...menus.filter((m) => m !== MENU_ACCOUNTS)];
+  const menus = [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
   return menus;
 }
 
