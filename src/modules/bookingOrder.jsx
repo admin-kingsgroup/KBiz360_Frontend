@@ -588,8 +588,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
               <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
               <td style={tfTd}>{pkg ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
-              <td style={tfTd}>{fmt(totals.po.incentive)}</td>
-              <td style={tfTd}>{fmt(totals.po.tds)}</td>
+              <td style={tfTd}>{fmt(totals.po.incentiveAmt)}</td>
+              <td style={tfTd}>{fmt(totals.po.incentiveTds)}</td>
               <td style={tfTd}>{fmt(totals.po.total)}</td>
             </tr></tfoot>
           </table>
@@ -636,7 +636,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               <td style={{ ...tfTd, textAlign: 'left' }} colSpan={2}>TOTAL</td>
               <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd}>{fmt(totals.so.gst + totals.so.otherTaxesGst)}</td>
               <td style={tfTd}>{fmt(totals.po.total)}</td><td style={tfTd}>{fmt(totals.po.gst)}</td>
-              <td style={tfTd}>{fmt(totals.po.incentive)}</td><td style={tfTd}>{fmt(totals.po.tds)}</td>
+              <td style={tfTd}>{fmt(totals.po.incentiveAmt)}</td><td style={tfTd}>{fmt(totals.po.incentiveTds)}</td>
               <td style={{ ...tfTd, color: DR }}>{fmt(totals.gp.total)}</td><td style={{ ...tfTd, color: GOLD }}>{totals.gp.pct.toFixed(2)}%</td>
             </tr></tfoot>
           </table>
@@ -1121,7 +1121,7 @@ export function PendingBookings({ branch, setRoute }) {
   };
   const onApproveSelected = async () => {
     if (!sel.size || !window.confirm(`Approve ${sel.size} selected voucher(s)? Each posts its linked Sales + Purchase.`)) return;
-    setBusyId('bulk'); setMsg('');
+    setBusyId('bulk'); setMsg(`⏳ Approving ${sel.size} voucher(s)… please wait.`);
     try {
       const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] });
       setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`);
@@ -1146,7 +1146,7 @@ export function PendingBookings({ branch, setRoute }) {
         {rows.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
-            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={onApproveSelected} style={{ ...btnG, padding: '5px 13px', fontSize: 11.5, background: DR }}>{busyId === 'bulk' ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve selected ({sel.size})</button>}
+            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={onApproveSelected} style={{ ...btnG, padding: '5px 13px', fontSize: 11.5, background: DR }}>{busyId === 'bulk' ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} {busyId === 'bulk' ? 'Approving…' : `Approve selected (${sel.size})`}</button>}
           </span>
         )}
       </div>
@@ -1286,7 +1286,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   };
   const onApproveSelected = async () => {
     if (!sel.size || !window.confirm(`Approve ${sel.size} selected voucher(s)? Each posts its linked Sales + Purchase.`)) return;
-    setBusyId('bulk'); setMsg('');
+    setBusyId('bulk'); setMsg(`⏳ Approving ${sel.size} voucher(s)… please wait.`);
     try { const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] }); setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`); setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Bulk approve failed')); } finally { setBusyId(null); }
   };
@@ -1313,7 +1313,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
         {status === 'pending' && rows.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
-            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={onApproveSelected} style={{ ...btnG, padding: '5px 13px', fontSize: 11.5, background: DR }}>{busyId === 'bulk' ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve selected ({sel.size})</button>}
+            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={onApproveSelected} style={{ ...btnG, padding: '5px 13px', fontSize: 11.5, background: DR }}>{busyId === 'bulk' ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} {busyId === 'bulk' ? 'Approving…' : `Approve selected (${sel.size})`}</button>}
           </span>
         )}
       </div>

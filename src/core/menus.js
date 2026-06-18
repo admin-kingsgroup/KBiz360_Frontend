@@ -3,7 +3,7 @@
    Auto-generated from KBiz360_v2.jsx · 361 lines · 11 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import { BarChart2, Calendar, CheckSquare, Database, Download, LayoutDashboard, Lock, Settings, ShoppingCart, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
+import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, LayoutDashboard, Lock, Settings, ShoppingCart, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { PERM_MODULES } from './permissions';
 import { getRole } from './referenceCache';
@@ -285,6 +285,99 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
   ]}
 ]};
 
+/* ── ACCOUNTS — branch accountant workspace ──────────────────── */
+// One operate-from-here pill for the branch accountant. Branch-scoped via the
+// top-right selector. Every item below REUSES an existing route — no new screens.
+// The 6 planned new screens (Dashboard Accountant, Collections, Supplier Reco, Net
+// Ageing, Month-End, Suspense) are kept commented until built, so there are NO dead
+// links. Uncomment each line as its screen ships.
+export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
+  {label:"Dashboard Accountant", href:"/accounts/dashboard"},
+  {label:"Daily Entry", children:[
+    {label:"Receipt Voucher",          href:"/receipts"},
+    {label:"Payment Voucher",          href:"/payments"},
+    {label:"Contra Entry",             href:"/contra"},
+    {label:"Journal Entry",            href:"/journal"},
+    {label:"Purchase Expense Voucher", href:"/purchase-expense"},
+    {label:"Refund (against Sale)",    href:"/finance/refund"},
+    {label:"Reissue (against Sale)",   href:"/finance/reissue"},
+    {label:"ADM Voucher",              href:"/finance/adm-voucher"},
+    {label:"ACM Voucher",              href:"/finance/acm-voucher"},
+    {divider:true, label:"Booking entry (operations)"},
+    {label:"SO/PO/GP Voucher",         href:"/bookings/new"},
+  ]},
+  {label:"Approve & Post", href:"/transactions/approvals"},
+  {label:"Sales & Purchase", children:[
+    {label:"Sales Register",            href:"/reports/sreg"},
+    {label:"Purchase Register",         href:"/reports/preg"},
+    {label:"Module Sales Register",     href:"/finance/module-sales-register"},
+    {label:"Module Purchase Register",  href:"/finance/module-purchase-register"},
+    {label:"Invoice-wise GP (Link No)", href:"/reports/invoice-gp"},
+    {label:"Sales & GP Analytics",      href:"/reports/sales-gp-analytics"},
+  ]},
+  {label:"Receivables & Collections", children:[
+    {label:"Debtors (Receivables) Ageing",      href:"/reports/rec"},
+    {label:"Outstanding & On-Account (Settle)", href:"/finance/outstanding"},
+    {label:"Client Statement",                  href:"/reports/client-statement"},
+    {label:"Receipt Register",                  href:"/finance/receipt-register"},
+    {label:"Collections Follow-up",             href:"/accounts/collections"},
+  ]},
+  {label:"Payables & Suppliers", children:[
+    {label:"Creditors (Payables) Ageing", href:"/reports/pay"},
+    {label:"Vendor Advances",             href:"/accounting/vendor-advances"},
+    {label:"Payment Register",            href:"/finance/payment-register"},
+    {label:"Supplier Reconciliation",        href:"/accounts/supplier-reco"},
+    {label:"Net Ageing (Debtors+Creditors)", href:"/accounts/net-ageing"},
+  ]},
+  {label:"Cash & Bank", children:[
+    {label:"Cash Book",            href:"/finance/cash-book"},
+    {label:"Bank Balances",        href:"/finance/bank-balance"},
+    {label:"Bank Reconciliation",  href:"/bank-reco"},
+    {label:"Contra Register",      href:"/finance/contra-register"},
+    {label:"Reconciliation Queue", href:"/finance/reco-queue"},
+  ]},
+  {label:"Books & Scrutiny", children:[
+    {label:"Day Book",         href:"/day-book"},
+    {label:"Ledger Account",   href:"/ledger"},
+    {label:"Trial Balance",    href:"/finance/trial-balance"},
+    {label:"Journal Register", href:"/finance/journal-register"},
+    {label:"Audit Trail",      href:"/reports/audit-trail"},
+  ]},
+  // Self-serve master creation so the accountant can clear suspense (create a missing
+  // ledger) without leaving the workspace. Same screens as the main Masters tab. Cost
+  // Centres are intentionally NOT here — their writes are Super-Admin only (branch-wise
+  // master), so they'd 403 for a Branch Accountant.
+  {label:"Masters (quick create)", children:[
+    {label:"Ledgers (Create · Chart of Accounts)", href:"/masters/ledgers"},
+    {label:"Groups & Sub-Groups (Create)",         href:"/masters/subgroups"},
+    {label:"Bank Accounts",                        href:"/masters/bank-accounts"},
+  ]},
+  {label:"Tax & Statutory", children:[
+    {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
+    {label:"TDS Auto-Calculator",        href:"/finance/tds-calculator"},
+    {label:"Statutory Dues Calendar",    href:"/reports/statutory-dues"},
+    {label:"Tax Filing Status Board",    href:"/reports/tax-board"},
+  ]},
+  {label:"BSP & Airline", children:[
+    {label:"BSP Summary",             href:"/purchase/bsp-summary"},
+    {label:"BSP Statement Import",    href:"/purchase/bsp-import"},
+    {label:"Ticket Control Register", href:"/purchase/ticket-control"},
+    {label:"ADM — Agent Debit Memos", href:"/purchase/adm"},
+    {label:"ACM — Agent Credit Memos",href:"/purchase/acm"},
+  ]},
+  {label:"Period Close", children:[
+    {label:"Month-End Checklist / Day-Close", href:"/accounts/month-end"},
+    {label:"Suspense / Unspecified Clearing", href:"/accounts/suspense"},
+    {label:"Recurring Vouchers", href:"/accounting/recurring"},
+    {label:"Year-End Close (HO)", href:"/accounting/year-close"},
+  ]},
+  {label:"Branch MIS", children:[
+    {label:"Profit & Loss",         href:"/reports/pnl"},
+    {label:"Balance Sheet",         href:"/reports/bs"},
+    {label:"Cash Position Summary", href:"/reports/cash-position"},
+  ]},
+]};
+
 /* ── FINAL MENU ASSEMBLY ─────────────────────────────────────── */
 
 export const MENU_TRANSACTIONS = {label:"Transactions", icon:ShoppingCart, children:[
@@ -412,9 +505,12 @@ export function getMenu(branch, currentUser){
   // Dashboard pill; everyone else keeps the single Dashboard link.
   const role = currentUser?.role || 'Super Admin';
   const isDir = role === 'Director' || role === 'Super Admin';
+  const isAccountant = /accountant/i.test(role || ''); // "Branch Accountant" et al.
   const top = isDir ? [MENU_DASHBOARDS, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
-  // 7 pills: Dashboard(s) · Finance · Approvals · Reports · Taxation · Masters · Admin
-  const menus = [...top, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
+  // 8 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · Admin
+  let menus = [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
+  // Accountant role → lead with the Accounts workspace (their operate-from-here tab).
+  if (isAccountant) menus = [MENU_ACCOUNTS, ...menus.filter((m) => m !== MENU_ACCOUNTS)];
   return menus;
 }
 

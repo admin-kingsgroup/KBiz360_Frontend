@@ -19,6 +19,7 @@ import { exportToExcel, vouchersToSheet } from '../core/exportExcel';
 import { voucherHaystack, bookingTravelDetail } from '../core/registerSearch';
 import { isVatBranch } from '../core/voucherSpecs';
 import { openPrintPreview } from '../core/PrintPreview';
+import { buildBookingInvoice } from '../core/invoiceHtml';
 import { useReportExport } from '../core/reportExportContext';
 import { LedgerAccountView } from '../core/ledgerUI';
 import { openLedgerModal } from '../core/LedgerModalHost';
@@ -31,7 +32,7 @@ import { CONSOLIDATED_LABEL } from '../core/data';
 import {
   useTrialBalance, useProfitAndLoss, useBalanceSheet, useDayBook,
   useLedgerStatement, useLedgerGroups, useChartOfAccounts, useGroupTree,
-  useSalesRegister, usePurchaseRegister, useInvoiceGP, useBookingOrders,
+  useSalesRegister, usePurchaseRegister, useRefundReissue, useInvoiceGP, useBookingOrders,
   useVoucher, useUpdateVoucher, useCostCenters, useVoucherPreview,
 } from '../core/useAccounting';
 import { LedgerVouchers } from './pnlTally.jsx';
@@ -131,15 +132,25 @@ function ExportBtn({ onClick, disabled, label = 'Export to Excel' }) {
 
 // Reusable per-voucher detail: header chips + every line's full meta breakup
 // (base fare, K3, taxes, service charge, CGST/SGST/IGST, markup, TCS …).
-function VoucherLines({ voucher: v, cur }) {
+export function VoucherLines({ voucher: v, cur }) {
+  // Full-JV preview: the SAME engine the edit screen uses, so the popup shows the
+  // COMPLETE balanced journal (party Dr, every component head, GST, TCS/TDS) for both
+  // Sales and Purchase — not just the captured component lines. The hook must run
+  // unconditionally (rules of hooks); it's gated to a real voucher with a category.
+  const pv = useVoucherPreview(v && v.category ? v : null).data || {};
   if (!v) return null;
+  // The shared `money` renders 0 as '—'; the JV must show a real ₹0 on the empty side
+  // so EVERY ledger is visible with an explicit amount.
+  const money0 = (n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
   const F = ({ label, val }) => (
     <div style={{ minWidth: 110 }}>
       <div style={{ fontSize: 9, color: DIM, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{label}</div>
       <div style={{ fontSize: 12, color: DARK, fontWeight: 600 }}>{val || '—'}</div>
     </div>
   );
+  const jvTh = { textAlign: 'left', padding: '5px 8px', color: DIM, fontSize: 10, whiteSpace: 'nowrap' };
   const lockedByBooking = v.locked && v.source === 'booking';
+  const postings = pv.postings || [];
   return (
     <>
       {lockedByBooking && (
@@ -153,27 +164,56 @@ function VoucherLines({ voucher: v, cur }) {
         <F label="Link No" val={v.linkNo} /><F label="Taxable" val={money(cur, v.subtotal)} />
         <F label="GST" val={money(cur, v.taxAmt)} /><F label="Total" val={money(cur, v.total)} />
       </div>
-      {(v.lines || []).map((ln, i) => {
-        const meta = ln.meta && typeof ln.meta === 'object' ? ln.meta : {};
-        const entries = Object.entries(meta).filter(([, val]) => val !== '' && val != null);
-        return (
-          <div key={i} style={{ ...card, padding: 12, marginBottom: 10, boxShadow: 'none', border: '1px solid #eef1f6' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: entries.length ? 8 : 0 }}>
-              <span style={{ fontWeight: 700, color: DARK, fontSize: 12.5 }}>{ln.ledger || `Line ${i + 1}`}</span>
-              <span style={{ fontWeight: 700, color: BLUE, fontVariantNumeric: 'tabular-nums' }}>{money(cur, ln.amt)}</span>
-            </div>
-            {entries.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '4px 14px' }}>
-                {entries.map(([k, val]) => (
-                  <div key={k} style={{ fontSize: 11 }}>
-                    <span style={{ color: DIM }}>{k}: </span><span style={{ color: DARK, fontWeight: 600 }}>{String(val)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+      {postings.length > 0 ? (
+        // Full journal — every ledger, both sides; a zero side shows ₹0 (dimmed), never hidden.
+        <div style={{ ...card, padding: 10, marginBottom: 10, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Full Journal Entry — every ledger this hits</div>
+            {typeof pv.balanced === 'boolean' && <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.balanced ? '✓ Balanced' : `✗ Out by ${money0(pv.diff)}`}</span>}
           </div>
-        );
-      })}
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+            <thead><tr><th style={jvTh}>Ledger</th><th style={jvTh}>Group</th><th style={{ ...jvTh, textAlign: 'right' }}>Debit</th><th style={{ ...jvTh, textAlign: 'right' }}>Credit</th></tr></thead>
+            <tbody>
+              {postings.map((p, i) => {
+                const zeroD = !(Number(p.debit) > 0), zeroC = !(Number(p.credit) > 0);
+                return (
+                  <tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}>
+                    <td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td>
+                    <td style={{ padding: '5px 8px', color: DIM }}>{p.group || '—'}</td>
+                    <td style={{ padding: '5px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: zeroD ? '#9aa3bd' : BLUE }}>{money0(p.debit)}</td>
+                    <td style={{ padding: '5px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: zeroC ? '#9aa3bd' : RED }}>{money0(p.credit)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money0(pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money0(pv.totalCredit)}</td></tr></tfoot>
+          </table>
+        </div>
+      ) : (
+        // Fallback when the preview is unavailable: the captured component-head lines.
+        // Skip object-valued meta so internal detail never renders as "[object Object]".
+        (v.lines || []).map((ln, i) => {
+          const meta = ln.meta && typeof ln.meta === 'object' ? ln.meta : {};
+          const entries = Object.entries(meta).filter(([, val]) => val !== '' && val != null && typeof val !== 'object');
+          return (
+            <div key={i} style={{ ...card, padding: 12, marginBottom: 10, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: entries.length ? 8 : 0 }}>
+                <span style={{ fontWeight: 700, color: DARK, fontSize: 12.5 }}>{ln.ledger || `Line ${i + 1}`}</span>
+                <span style={{ fontWeight: 700, color: BLUE, fontVariantNumeric: 'tabular-nums' }}>{money0(ln.amt)}</span>
+              </div>
+              {entries.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '4px 14px' }}>
+                  {entries.map(([k, val]) => (
+                    <div key={k} style={{ fontSize: 11 }}>
+                      <span style={{ color: DIM }}>{k}: </span><span style={{ color: DARK, fontWeight: 600 }}>{String(val)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
       {v.remarks && <div style={{ fontSize: 11, color: DIM }}>Remarks: {v.remarks}</div>}
     </>
   );
@@ -193,11 +233,28 @@ const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
 
 // Voucher type → product bucket (for the register's product filter).
 const PRODUCT = {
-  SF: 'Tickets', PF: 'Tickets', SHT: 'Hotel', PHT: 'Hotel', SH: 'Holiday', PH: 'Holiday',
+  SF: 'Flight', PF: 'Flight', SHT: 'Hotel', PHT: 'Hotel', SH: 'Holiday', PH: 'Holiday',
   SV: 'Visa', PV: 'Visa', SI: 'Insurance', PI: 'Insurance', SC: 'Car', PC: 'Car', SM: 'Misc', PM: 'Misc',
-  SCN: 'Credit Note', SDN: 'Debit Note',
+  SCN: 'Credit Note', SDN: 'Debit Note', RF: 'Refund', RI: 'Reissue',
 };
 const productOf = (v) => PRODUCT[v.type] || v.type;
+// The module filter ALWAYS offers this full set (even when the current period/branch
+// has no rows for a module), so every module is selectable — the list is not limited
+// to what happens to be loaded. Extra values found in the data are appended.
+const MODULE_ORDER = ['Flight', 'Hotel', 'Holiday', 'Visa', 'Insurance', 'Car', 'Misc', 'Refund', 'Reissue'];
+
+// International vs Domestic for a register row. Prefer the joined booking's
+// packageType; else infer from the posted component-head ledger prefixes (IT- =
+// International, DT- = Domestic). Blank when the module carries no INT/DOM split.
+const intDomOf = (v, booking) => {
+  const pt = booking?.packageType || '';
+  if (/int/i.test(pt)) return 'INT';
+  if (/dom/i.test(pt)) return 'DOM';
+  const ld = (v.lines || []).map((l) => l.ledger || '').join(' ');
+  if (/(^|\s)IT-|International/i.test(ld)) return 'INT';
+  if (/(^|\s)DT-|Domestic/i.test(ld)) return 'DOM';
+  return '';
+};
 
 // Format a cell: numeric strings/numbers get Indian grouping + right align;
 // everything else (PNR, ticket no, dates, names) stays left-aligned text.
@@ -1275,7 +1332,7 @@ function captureTravel(v, booking) {
 // suffixes the tax-head labels to match the posted ledger names (e.g. "CGST Output
 // [BOM]"). `linkIndex` cross-references the sale ↔ purchase invoice numbers, and
 // `bookingByLink` joins each invoice to its booking for the travel detail.
-function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink }) {
+export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink, showType }) {
   const isSale = tab !== 'purchase';
   const taxWord = isSale ? 'Output' : 'Input';
   const sfx = tag ? ` [${tag}]` : '';
@@ -1301,6 +1358,10 @@ function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink }) {
   col('saleVno', 'Sales Invoice No');
   col('purVno', 'Purchase Invoice No');
   if (!tag) col('branch', 'Branch');
+  // When viewing All modules together, surface which module each row belongs to —
+  // shown immediately before Client/Vendor Type so the mixed list stays readable.
+  if (showType) col('salesType', isSale ? 'Sales Type' : 'Purchase Type');
+  if (showType) col('intDom', 'INT / DOM'); // International vs Domestic, beside Sales Type
   col('clientType', isSale ? 'Client Type' : 'Vendor Type');
   col('clientLedger', isSale ? 'Client Ledger' : 'Vendor Ledger');
   col('pax', 'Pax Details');
@@ -1318,6 +1379,8 @@ function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink }) {
   }
   if (isSale && anyTcs) col('tcs', 'TCS', true);
   if (!isSale && anyTds) col('tds', 'TDS', true);
+  // Per-row printable invoice (Sales Invoice / Purchase Invoice) at the far end.
+  col('invoice', isSale ? 'Sales Invoice' : 'Purchase Invoice');
 
   // 3) One row per voucher — pivot the lines into their head columns.
   const rows = list.map((v) => {
@@ -1327,10 +1390,14 @@ function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink }) {
     const g = splitGst(v.taxAmt, v.gstMode, v.branch);
     const og = splitGst(v.otherTaxesGst, v.gstMode, v.branch);
     const row = {
+      _v: v,             // back-reference: Final Invoice Value → open this voucher's JV
+      _booking: booking, // back-reference: print the Sales / Purchase invoice for this row
       linkNo: link || '—',
       saleVno: isSale ? v.vno : (linkIndex.saleByLink[link] || ''),
       purVno: isSale ? (linkIndex.purByLink[link] || '') : v.vno,
       branch: v.branch || '',
+      salesType: productOf(v),
+      intDom: intDomOf(v, booking),
       clientType: v.partyGroup || '',
       clientLedger: v.party || v.billTo || '',
       pax: tv.passengers || '', pnr: tv.pnrs || '', ticket: tv.tickets || '',
@@ -1357,7 +1424,7 @@ function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink }) {
 // footer. Numeric columns (flagged `num`) right-align, Indian-group, and sum in the
 // footer; text columns (Link No, Pax, PNR …) stay left-aligned. A mirrored top
 // scrollbar keeps sideways scrolling reachable on long lists.
-function CaptureTable({ columns, rows, totals }) {
+function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
   const topRef = React.useRef(null);
   const bodyRef = React.useRef(null);
   const [scrollW, setScrollW] = useState(0);
@@ -1386,11 +1453,32 @@ function CaptureTable({ columns, rows, totals }) {
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} style={rowBg(i)}>
-                {columns.map((c) => (
-                  <td key={c.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: mono(c.key) ? BLUE : DARK, textAlign: c.num ? 'right' : 'left', fontVariantNumeric: c.num ? 'tabular-nums' : 'normal', ...(mono(c.key) ? { fontFamily: 'monospace', fontSize: 10 } : null) }}>
-                    {c.num ? cellNum(r[c.key]) : (r[c.key] || '—')}
-                  </td>
-                ))}
+                {columns.map((c) => {
+                  // Final Invoice / Bill Value → green + clickable, opens the voucher's JV.
+                  if (c.key === 'finalValue') {
+                    return (
+                      <td key={c.key} onClick={() => onOpenJV && r._v && onOpenJV(r._v)} title="Open journal voucher (JV)"
+                        style={{ padding: '7px 12px', whiteSpace: 'nowrap', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: GREEN, fontWeight: 800, cursor: onOpenJV && r._v ? 'pointer' : 'default', textDecoration: onOpenJV && r._v ? 'underline' : 'none' }}>
+                        {cellNum(r[c.key])}
+                      </td>
+                    );
+                  }
+                  // Trailing per-row printable invoice button.
+                  if (c.key === 'invoice') {
+                    return (
+                      <td key={c.key} style={{ padding: '6px 12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                        {r._booking
+                          ? <button onClick={() => onPrintInvoice && onPrintInvoice(r)} style={{ padding: '4px 9px', fontSize: 10, fontWeight: 700, border: `1px solid ${BLUE}`, color: BLUE, background: '#fff', borderRadius: 5, cursor: 'pointer' }}>🧾 {c.label}</button>
+                          : <span style={{ color: DIM }}>—</span>}
+                      </td>
+                    );
+                  }
+                  return (
+                    <td key={c.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: mono(c.key) ? BLUE : DARK, textAlign: c.num ? 'right' : 'left', fontVariantNumeric: c.num ? 'tabular-nums' : 'normal', ...(mono(c.key) ? { fontFamily: 'monospace', fontSize: 10 } : null) }}>
+                      {c.num ? cellNum(r[c.key]) : (r[c.key] || '—')}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
@@ -1411,7 +1499,9 @@ function CaptureTable({ columns, rows, totals }) {
 
 export function RegisterLive({ branch, initial = 'sales' }) {
   const cur = curOf(branch);
-  const [tab, setTab] = useState(initial === 'purchase' ? 'purchase' : 'sales'); // sales | purchase
+  // Locked per menu: the Sales Register shows ONLY sales, the Purchase Register ONLY
+  // purchase — no cross-tab toggle (so each register is its own dataset).
+  const tab = initial === 'purchase' ? 'purchase' : 'sales';
   const [view, setView] = useState('capture'); // capture (SO/PO/GP horizontal) | summary | detailed
   const [product, setProduct] = useState('all');
   const [search, setSearch] = useState('');
@@ -1421,10 +1511,18 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   // Fetch all (date filtering is done client-side because Tally dates are mixed-format strings).
   const sales = useSalesRegister(branch);
   const purch = usePurchaseRegister(branch);
+  const refReissue = useRefundReissue(branch); // RF/RI folded into BOTH registers' All-modules view
   const bookingsQ = useBookingOrders(branch); // joins each invoice → its SO/PO/GP for Pax/PNR/Ticket
   const q = tab === 'sales' ? sales : purch;
-  const allRows = q.data || [];
-  const products = useMemo(() => [...new Set(allRows.map(productOf))].sort(), [allRows]);
+  // Sales register = sale + reissue + refund; Purchase register = purchase + the same
+  // RF/RI vouchers (their cost reversal lives in the one combined voucher). They show
+  // labelled 'Refund'/'Reissue' in the Sales/Purchase Type column — never as a sale.
+  const allRows = useMemo(() => [...(q.data || []), ...(refReissue.data || [])], [q.data, refReissue.data]);
+  const products = useMemo(() => {
+    const present = new Set(allRows.map(productOf).filter(Boolean));
+    const extras = [...present].filter((p) => !MODULE_ORDER.includes(p)).sort();
+    return [...MODULE_ORDER, ...extras]; // always selectable, plus anything else in the data
+  }, [allRows]);
   const needle = search.trim().toLowerCase();
   const rows = useMemo(() => allRows
     .filter((v) => product === 'all' || productOf(v) === product)
@@ -1454,23 +1552,38 @@ export function RegisterLive({ branch, initial = 'sales' }) {
     return m;
   }, [bookingsQ.data]);
   const brTag = (!branch || branch === 'ALL') ? '' : (branch.code || branch);
+  const showType = product === 'all'; // All modules → add the Sales/Purchase Type column
   const captureSheet = useMemo(
-    () => buildCaptureSheet(rows, { tab, tag: brTag, linkIndex, bookingByLink }),
-    [rows, tab, brTag, linkIndex, bookingByLink],
+    () => buildCaptureSheet(rows, { tab, tag: brTag, linkIndex, bookingByLink, showType }),
+    [rows, tab, brTag, linkIndex, bookingByLink, showType],
   );
+  // Final Invoice Value → open the voucher's journal (JV). Per-row Invoice → print PDF.
+  const openJV = (v) => { if (v) setDetail(v); };
+  const printInvoice = (r) => {
+    const b = r && r._booking;
+    if (!b) return;
+    openPrintPreview({
+      title: `${tab === 'sales' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo || b.linkNo || ''}`,
+      recommend: 'portrait',
+      html: buildBookingInvoice(b, tab === 'sales' ? 'sale' : 'purchase', branch),
+    });
+  };
 
   const exportNow = () => {
     if (!rows.length) return;
     const name = `${tab}-register-${product === 'all' ? 'all' : product}-${branchLabel(branch)}`;
     if (view === 'capture') {
+      const cols = captureSheet.columns.filter((c) => c.key !== 'invoice'); // button column, no data to export
       const totalRow = { ...captureSheet.totals, linkNo: `TOTAL · ${captureSheet.rows.length}` };
-      exportToExcel(name, captureSheet.columns, [...captureSheet.rows, totalRow]);
+      exportToExcel(name, cols, [...captureSheet.rows, totalRow]);
     } else {
       exportToExcel(name, sheet.columns, sheet.rows);
     }
   };
-  // Feed the global Tally Export bar balanced Sales/Purchase vouchers.
-  const tallyVouchers = useMemo(() => rows.map((v) => {
+  // Feed the global Tally Export bar balanced Sales/Purchase vouchers. Only true
+  // sale/purchase rows go to Tally — refund/reissue are shown in the register view
+  // but excluded here so they can't export as a mis-typed Sales/Purchase voucher.
+  const tallyVouchers = useMemo(() => rows.filter((v) => v.category === (tab === 'sales' ? 'sale' : 'purchase')).map((v) => {
     const total = Math.round(v.total || 0), gst = Math.round(v.taxAmt || 0), net = Math.round(v.subtotal || (total - gst));
     const party = v.party || (tab === 'sales' ? 'Sundry Debtors' : 'Sundry Creditors');
     const base = { date: v.date, vno: v.vno, narration: v.linkNo ? `Link ${v.linkNo}` : '' };
@@ -1487,9 +1600,6 @@ export function RegisterLive({ branch, initial = 'sales' }) {
         ] };
   }), [rows, tab]);
   useReportExport({ title: tab === 'sales' ? 'Sales Register' : 'Purchase Register', kind: 'vouchers', rows: tallyVouchers, recommend: 'landscape' }, [tallyVouchers, tab]);
-  const Tab = ({ id, label }) => (
-    <button onClick={() => setTab(id)} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: tab === id ? DARK : '#fff', color: tab === id ? GOLD : DIM, borderColor: tab === id ? DARK : '#e1e3ec' }}>{label}</button>
-  );
   const subHint = view === 'capture' ? 'every SO/PO/GP figure, module-wise — scroll right'
     : view === 'detailed' ? 'every Tally column shown — scroll right'
       : 'click a row for full detail';
@@ -1499,7 +1609,6 @@ export function RegisterLive({ branch, initial = 'sales' }) {
       title={tab === 'sales' ? 'Sales Register' : 'Purchase Register'}
       sub={`${branchLabel(branch)} · ${rows.length} vouchers · Total ${money(cur, sum('total'))} · ${needle ? 'searching all dates' : subHint}`}
       right={<>
-        <Tab id="sales" label="Sales" /><Tab id="purchase" label="Purchase" />
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Search passenger / party / ticket / link no / voucher…"
           style={{ ...inp, width: 280, minHeight: 32, fontSize: 11 }} />
         <select value={product} onChange={(e) => setProduct(e.target.value)} title="Filter the register by module" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer' }}>
@@ -1513,7 +1622,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
     >
       <State q={q} empty={rows.length === 0}>
         {view === 'capture' ? (
-          <CaptureTable columns={captureSheet.columns} rows={captureSheet.rows} totals={captureSheet.totals} />
+          <CaptureTable columns={captureSheet.columns} rows={captureSheet.rows} totals={captureSheet.totals} onOpenJV={openJV} onPrintInvoice={printInvoice} />
         ) : view === 'detailed' ? (
           <DetailedTable columns={sheet.columns} rows={sheet.rows} />
         ) : (

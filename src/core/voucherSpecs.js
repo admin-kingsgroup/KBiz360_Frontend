@@ -251,7 +251,7 @@ export function lineCalcPackage(spec, l, ctx) {
   const taxable = r2(land + psvc + psvcGst + markup); // full package consideration
   const outGst = r2(taxable * rate);       // single 5% output GST
   const finalSales = r2(taxable + outGst); // TCS added at booking level
-  const finalPurchase = r2(land + psvc + psvcGst - incentive + tds); // cost (no recoverable ITC)
+  const finalPurchase = r2(land + psvc + psvcGst); // GROSS cost; incentive netted via incentivePostings on post
   const salesGST = outGst;
   return {
     pass: land, gstSvc: 0, gstMk: r2(markup * rate), gstPur: 0, psvcGst, markup, asp: taxable, outGst,
@@ -274,9 +274,11 @@ export function lineCalc(spec, l, ctx) {
   const incentive = num(l.incentive);
   const tds = r2(incentive * 0.02);
   const fSales = r2(fareSum(spec, l) + num(l.markup) + num(l.ssvc) + gSvc);
-  const fPur   = r2(fareSum(spec, l) + num(l.psvc) + gPur - incentive + tds);
+  const fPur   = r2(fareSum(spec, l) + num(l.psvc) + gPur); // GROSS cost; incentive netted via incentivePostings on post
   const sGST = r2(gSvc + gMk);
-  const gp = r2((fSales - sGST) - (fPur - gPur - tds));
+  // GP credits the commission (income, netted off the payable); the 2% TDS is a
+  // balance-sheet withholding asset, not income, so it never affects GP.
+  const gp = r2((fSales - sGST) - (fPur - gPur - incentive));
   return {
     pass: r2(fareSum(spec, l)),
     gstSvc: gSvc, gstMk: gMk, gstPur: gPur,
@@ -292,7 +294,7 @@ export function lineCalc(spec, l, ctx) {
 // `lines` detail is preserved for the read-only voucher view + voucher meta.
 export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false } = {}) {
   const ctx = { branch, noVat: !!noVat };
-  const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, tds: 0, incentive: 0, total: 0, lines: [] };
+  const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, incentiveAmt: 0, incentiveGst: 0, incentiveTds: 0, total: 0, lines: [] };
   // `otherTaxesGst` = GST carved out of the Other Taxes margin (GST-inclusive, so the
   // customer total is unchanged); kept OUT of `gst` so it posts to the dedicated
   // per-branch "Other Taxes [C/S/I]GST Output" ledgers, separate from the regular GST.
@@ -306,11 +308,11 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     const c = lineCalc(spec, l, ctx);
     const id = {}; spec.idCols.forEach((col) => { id[col.key] = l[col.key]; });
     const fares = {}; spec.fareCols.forEach((col) => { fares[col.key] = num(l[col.key]); });
-    po.lineTotal += r2(c.finalPurchase - c.gstPur - c.tds);
+    po.lineTotal += r2(c.finalPurchase - c.gstPur);
     po.serviceCharge += num(l.psvc);
     po.gst += c.gstPur;
-    po.tds += c.tds;
-    po.incentive += c.incentive;
+    po.incentiveAmt += c.incentive;
+    po.incentiveTds += c.tds;
     po.total += c.finalPurchase;
     po.lines.push({ ...id, ...fares, psvc: num(l.psvc), incentive: num(l.incentive), tds: c.tds, gst: c.gstPur, total: c.finalPurchase });
     so.lineTotal += r2(c.finalSales - c.salesGST);
@@ -328,21 +330,16 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
       addH(sH, 'psvc', 'Supplier Service', num(l.psvc)); addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
       addH(sH, 'psvcGst', 'Supplier Service GST', num(l.psvcGst)); addH(pH, 'psvcGst', 'Supplier Service GST', num(l.psvcGst));
       addH(sH, 'markup', 'Other Taxes', num(l.markup));
-      if (num(l.incentive) > 0) {
-        addH(pH, 'incentive', 'Supplier Incentive', -num(l.incentive));
-        addH(pH, 'tds', 'TDS Receivable', num(c.tds));
-      }
     } else {
       addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
       addH(sH, 'markup', 'Other Taxes', r2(num(l.markup) - c.gstMk));
       addH(sH, 'ssvc', 'Service Charge', num(l.ssvc));
-      if (num(l.incentive) > 0) {
-        addH(pH, 'incentive', 'Supplier Incentive', -num(l.incentive));
-        addH(pH, 'tds', 'TDS Receivable', num(c.tds));
-      }
     }
+    // NOTE: supplier incentive + 2% TDS are NOT posted as cost heads — they ride on
+    // po.incentiveAmt / po.incentiveTds and post via the engine's incentivePostings
+    // (Cr Commission/Incentive Received, Dr TDS Receivable, supplier payable netted).
   });
-  ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'tds', 'incentive', 'total'].forEach((k) => { po[k] = r2(po[k]); });
+  ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'incentiveAmt', 'incentiveGst', 'incentiveTds', 'total'].forEach((k) => { po[k] = r2(po[k]); });
   ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'total'].forEach((k) => { so[k] = r2(so[k]); });
   so.otherTaxesGst = r2(so.otherTaxesGst);
   // TCS u/s 206C(1G) — collected from the customer on the sale value (incl GST),
@@ -354,7 +351,7 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     so.total = r2(so.total + so.tcs);
   }
   const saleNet = r2(so.total - so.gst - so.otherTaxesGst - so.tcs);
-  const costNet = r2(po.total - po.gst - po.tds);
+  const costNet = r2(po.total - po.gst - po.tcs);
   // Finalise the head lists in display order, drop zero heads, and snap each list
   // to sum EXACTLY to its net (adjust the largest head) so the JV always balances.
   const order = isPkg(spec)
@@ -368,17 +365,20 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     return heads;
   };
   so.heads = finalise(sH, order, saleNet);
-  const poOrder = [...order.filter((k) => k !== 'markup' && k !== 'ssvc'), 'incentive', 'tds'];
+  const poOrder = order.filter((k) => k !== 'markup' && k !== 'ssvc');
   po.heads = finalise(pH, poOrder, costNet);
   // No-supplier (Misc): a sale with no purchase leg — the entire sale net is profit.
   // Zero the cost side so nothing posts to Purchase Accounts and GP = 100% margin.
   if (noSupplier) {
-    ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'tds', 'incentive', 'total'].forEach((k) => { po[k] = 0; });
+    ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'incentiveAmt', 'incentiveGst', 'incentiveTds', 'total'].forEach((k) => { po[k] = 0; });
     po.lines = []; po.heads = [];
     const pct0 = so.total > 0 ? r2((saleNet / so.total) * 100) : 0;
     return { po, so, gp: { total: saleNet, pct: pct0, saleNet, costNet: 0 } };
   }
-  const total = r2(saleNet - costNet);
+  // Commission (our income, netted off the payable) ADDS to GP → off the cost; the 2%
+  // TDS is a balance-sheet asset, not income, so it never affects GP. Mirrors backend.
+  const costNetForGp = r2(costNet - po.incentiveAmt);
+  const total = r2(saleNet - costNetForGp);
   const pct = so.total > 0 ? r2((total / so.total) * 100) : 0;
-  return { po, so, gp: { total, pct, saleNet, costNet } };
+  return { po, so, gp: { total, pct, saleNet, costNet: costNetForGp } };
 }

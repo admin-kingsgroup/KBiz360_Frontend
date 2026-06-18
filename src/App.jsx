@@ -60,6 +60,7 @@ const { PnLTallyLive } = lazyModule(() => import('./modules/pnlTally'));
 const { BalanceSheetTallyLive } = lazyModule(() => import('./modules/balanceSheetTally'));
 const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/capitalVsInvestment'));
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, AccountsChartLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
+const { DashboardAccountant, NetAgeing, CollectionsFollowup, SupplierReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
 const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('./modules/financialStatements'));
 const { NotesToFinancials } = lazyModule(() => import('./modules/reportsNotes'));
@@ -129,7 +130,10 @@ export default function KB360App(){
      old linear-stack-with-cursor behaviour. ── */
   const rrNavigate = useNavigate();
   const { pathname } = useLocation();
-  const route = pathname;
+  // Normalise trailing slash(es): some hosts serve "/dashboard/" (live) while
+  // dev serves "/dashboard". Every route check below matches the no-slash form,
+  // so a trailing slash would fall through to <Placeholder>. Keep root "/" intact.
+  const route = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
   const histIdx = (typeof window !== 'undefined' && window.history.state && typeof window.history.state.idx === 'number')
     ? window.history.state.idx : 0;
   const maxIdxRef = useRef(histIdx);
@@ -182,8 +186,9 @@ export default function KB360App(){
         if(allowed) setBranch(allowed);
       }
     }
-    // Redirect to dashboard on user switch (since current route may be forbidden)
-    navigate("/dashboard");
+    // Redirect on user switch (current route may be forbidden). Accountants land on
+    // their own workspace dashboard; everyone else on the general dashboard.
+    navigate(/accountant/i.test(newUser?.role || '') ? "/accounts/dashboard" : "/dashboard");
   };
 
   /* ── Sign out: clear the stored JWT + user so the next session must log in ── */
@@ -362,6 +367,13 @@ export default function KB360App(){
     if(route==="/masters/doc-types")      return <DocumentTypeMaster/>;
     if(route==="/masters/approval-limits")return <ApprovalLimitsMaster/>;
     if(route==="/masters/numbering")      return <NumberingSeriesMaster branch={branch}/>;
+    // ── Accounts — branch accountant workspace (new screens) ──
+    if(route==="/accounts/dashboard")     return <DashboardAccountant branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/net-ageing")    return <NetAgeing branch={branch}/>;
+    if(route==="/accounts/collections")   return <CollectionsFollowup branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/supplier-reco") return <SupplierReco branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/suspense")      return <SuspenseClearing branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/month-end")     return <MonthEndChecklist branch={branch} setRoute={navigate}/>;
     if(route==="/dashboard")          return <DashboardRouter branch={branch} setRoute={navigate} currentUser={currentUser}/>;
     if(route==="/dashboard/alerts")   return <AlertsDashboard branch={branch} setRoute={navigate}/>;
     if(route==="/dashboards/capital") return <CapitalVsInvestmentLive branch={branch}/>; // Capital vs Investment (live from BS + P&L)
