@@ -34,10 +34,10 @@ const CSS = `
   .iv .title{text-align:center;font-size:30px;font-weight:800;letter-spacing:2px}
   .iv .title-rule{height:1px;background:var(--gold);margin:9px 0 22px}
   .iv .tophead{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
-  .iv .logo-wrap{display:flex;align-items:center;gap:12px}
-  .iv .crest{width:48px;height:55px;flex-shrink:0}
-  .iv .lg{font-size:27px;font-weight:800;letter-spacing:4px;line-height:1}
-  .iv .sb{font-size:8px;font-weight:700;letter-spacing:3.5px;color:var(--ink3);margin-top:3px}
+  .iv .brandcol{display:flex;flex-direction:column;align-items:flex-start}
+  .iv .tk-logo{height:104px;width:auto;display:block;image-rendering:-webkit-optimize-contrast}
+  .iv .titlebar{position:relative;display:flex;align-items:center;justify-content:center}
+  .iv .iata-badge{position:absolute;right:0;top:50%;transform:translateY(-50%);height:26px;width:auto;display:block}
   .iv .inv-meta{text-align:right;min-width:260px}
   .iv .inv-meta .row{display:flex;justify-content:flex-end;gap:18px;align-items:baseline;padding:3px 0}
   .iv .inv-meta .k{font-size:9px;letter-spacing:1px;color:var(--ink4);text-transform:uppercase}
@@ -55,12 +55,16 @@ const CSS = `
   .iv table{width:100%;border-collapse:collapse}
   .iv thead th{font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;text-align:right;padding:8px;background:var(--bg-lt);border-top:2px solid var(--dark);border-bottom:2px solid var(--dark)}
   .iv thead th.l{text-align:left}
-  .iv tbody td{padding:9px 8px;border-bottom:1px solid var(--rule);font-size:11.5px;text-align:right;vertical-align:top}
+  .iv tbody td{padding:12px 8px;border-bottom:1px solid var(--rule);font-size:11.5px;text-align:right;vertical-align:top}
   .iv tbody td.l{text-align:left}
-  .iv .desc .nm{font-size:12px;font-weight:800}
-  .iv .desc .sub{font-size:9.5px;color:var(--ink4);line-height:1.5;margin-top:2px}
+  .iv .desc .nm{font-size:12.5px;font-weight:800;line-height:1.35;margin-bottom:5px}
+  .iv .desc .sub{font-size:10px;line-height:1.6}
+  .iv .desc .idl{color:var(--ink2)}
+  .iv .desc .secs{margin-top:6px;display:flex;flex-direction:column;gap:4px}
+  .iv .desc .sub.sec{color:var(--ink4);padding-left:12px;position:relative;white-space:nowrap;font-size:9px}
+  .iv .desc .sub.sec::before{content:"›";position:absolute;left:0;color:var(--gold);font-weight:700}
   .iv td.tf{font-weight:800}
-  .iv .summary{display:flex;justify-content:flex-end;margin-top:4px}
+  .iv .summary{display:flex;justify-content:flex-end;margin-top:14px}
   .iv .sumtbl{width:360px}
   .iv .sumtbl .r{display:flex;justify-content:space-between;padding:8px 4px;font-size:12px;border-bottom:1px solid var(--rule)}
   .iv .sumtbl .r .k{color:var(--ink2)} .iv .sumtbl .r .v{font-weight:800}
@@ -81,8 +85,6 @@ const CSS = `
   .iv .terms{margin-top:20px;font-size:9px;color:var(--ink4);line-height:1.7;border-top:1px solid var(--rule);padding-top:11px}
   @media print{@page{size:A4 portrait;margin:9mm} .iv .sheet{padding:0;max-width:100%} .iv *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
 
-const CREST = `<svg class="crest" viewBox="0 0 52 60" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 19 L26 14 L43 19 L43 36 Q43 49 26 55 Q9 49 9 36 Z" stroke="#A07828" stroke-width="1.6" fill="#FDFAF4"/><path d="M18 33 l8 -9 l8 9 M26 24 l0 15" stroke="#A07828" stroke-width="1.6" fill="none"/></svg>`;
-
 const partyBlock = (lab, p, cur) => `<div class="party"><div class="lab">${esc(lab)}</div><div class="nm">${esc(p.name || '—')}</div><div class="ln">${[p.address, p.gstin ? `GSTIN : ${esc(p.gstin)}` : '', p.email ? `Email : ${esc(p.email)}` : '', p.contact ? `Contact : ${esc(p.contact)}` : ''].filter(Boolean).map(esc).join('<br>')}</div></div>`;
 
 // side: 'sale' | 'purchase'. `master` = the resolved customer/supplier master record
@@ -92,18 +94,35 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const prof = companyProfile(branch?.code || booking.branch || 'BOM') || {};
   const cur = prof.cur_sym || (bc(branch) || {}).cur || '₹';
   const company = { name: prof.entity || 'Travkings Tours & Travels Pvt. Ltd.', address: prof.operAddr || '', gstin: prof.gstin || '', email: prof.email || '', contact: prof.phone || '' };
+  // Brand logo + IATA accreditation badge live in /public, referenced by ABSOLUTE URL
+  // so they also resolve inside the print-preview iframe (doc.write'd, no base href).
+  const assetBase = (typeof window !== 'undefined' && window.location ? window.location.origin : '') + '/';
+  const TK_LOGO = assetBase + 'travkings-logo.png';
+  const IATA_LOGO = assetBase + 'iata-logo.png';
   const raw = isSale ? (booking.customer || {}) : (booking.supplier || {});
   const m = master || {};
   const mAddr = m.address || [m.city, m.country].filter(Boolean).join(', ');
+  const snap = (isSale ? booking.so : booking.po) || {};
+  const rows = Array.isArray(booking.rows) ? booking.rows : [];
+
+  // Bill-To name. For a pooled B2C debtor ledger (e.g. "B2C Ref Farhan") the ledger
+  // is NOT the real customer — the passenger is — so bill the first passenger by name
+  // (the first line that carries one). B2B/B2E clients ARE the ledger, so they are
+  // left exactly as-is. Purchase invoices (Supplier party) are never remapped.
+  const isB2C = isSale && /b2c/i.test(raw.ledgerGroup || raw.group || '');
+  const firstPax = rows.map((p) => [p.fn, p.sn].filter(Boolean).join(' ').trim()).find(Boolean) || '';
+  const freeName = raw.name && raw.name !== raw.ledgerName ? raw.name : ''; // a real, typed end-customer name
+  const billToName = isB2C
+    ? (firstPax || freeName || m.name || raw.ledgerName || raw.name || '')
+    : (raw.name || m.name || '');
+
   const party = {
-    name: raw.name || m.name || '',
+    name: billToName || '',
     gstin: raw.gstin || m.gstin || '',
     address: raw.address || mAddr || '',
     email: raw.email || m.email || '',
     contact: raw.contact || m.contact || m.phone || '',
   };
-  const snap = (isSale ? booking.so : booking.po) || {};
-  const rows = Array.isArray(booking.rows) ? booking.rows : [];
   const headerRef = booking.headerRef || '';
   const vno = isSale ? (booking.saleVno || '') : (booking.purchaseVno || '');
   const psCode = (party.gstin || prof.gstin || '').slice(0, 2);
@@ -118,13 +137,17 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     // passenger. Other modules keep the single TKT/PNR line.
     const secs = Array.isArray(p.sectors) ? p.sectors.filter((s) => s && (s.sector || s.airline || s.flightNo || s.ticketNo || s.pnr || s.travelDate)) : [];
     const secLines = secs.map((s) => {
-      const parts = [s.sector, s.airline, s.flightNo, s.ticketNo ? `TKT ${s.ticketNo}` : '', s.pnr ? `PNR ${s.pnr}` : '', s.travelDate].filter(Boolean).map(esc).join(' &nbsp;·&nbsp; ');
-      return parts ? `<div class="sub">${parts}</div>` : '';
+      const parts = [s.sector, s.airline, s.flightNo, s.ticketNo ? `TKT ${s.ticketNo}` : '', s.pnr ? `PNR ${s.pnr}` : '', s.travelDate].filter(Boolean).map(esc).join(' · ');
+      return parts ? `<div class="sub sec">${parts}</div>` : '';
     }).join('');
     const idline = secs.length
       ? (pax ? `PAX: ${esc(pax)}` : '')
       : [pax ? `PAX: ${esc(pax)}` : '', (p.tkt || p.pkg || p.htl) ? `TKT: ${esc(p.tkt || p.pkg || p.htl)}` : '', (p.pnr || p.ref || p.conf) ? `PNR: ${esc(p.pnr || p.ref || p.conf)}` : ''].filter(Boolean).join(' &nbsp;|&nbsp; ');
-    const desc = `<td class="l desc"><div class="nm">${esc(headerRef || 'Booking')}</div><div class="sub">${idline}</div>${secLines}</td>`;
+    // Only render the id-line / sectors when present (an empty div used to leave a
+    // stray gap). Sectors get their own spaced container for clean separation.
+    const idHtml = idline ? `<div class="sub idl">${idline}</div>` : '';
+    const secHtml = secLines ? `<div class="secs">${secLines}</div>` : '';
+    const desc = `<td class="l desc"><div class="nm">${esc(headerRef || 'Booking')}</div>${idHtml}${secHtml}</td>`;
     if (isSale) {
       const totalFare = base + k3 + tax + markup;
       // Taxes (YQ/YR) = the pass-through fare taxes; Other Taxes = the agency margin
@@ -168,9 +191,11 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     : `<th class="l">Description</th><th>Basic Fare</th><th>K3 Tax</th><th>Taxes (YQ/YR)</th><th>Supplier Svc</th><th>Incentive</th><th>TDS (2%)</th><th>Total Cost</th>`;
 
   const sheet = `<div class="iv"><div class="sheet">
-    <div class="title">${isSale ? 'INVOICE' : 'PURCHASE INVOICE'}</div><div class="title-rule"></div>
+    <div class="titlebar"><div class="title">${isSale ? 'INVOICE' : 'PURCHASE INVOICE'}</div><img class="iata-badge" src="${IATA_LOGO}" alt="IATA Accredited Agent" /></div><div class="title-rule"></div>
     <div class="tophead">
-      <div class="logo-wrap">${CREST}<div><div class="lg">TRAVKINGS</div><div class="sb">TOURS &amp; TRAVELS PVT. LTD.</div></div></div>
+      <div class="brandcol">
+        <img class="tk-logo" src="${TK_LOGO}" alt="${esc(company.name)}" />
+      </div>
       <div class="inv-meta">
         <div class="row firstline"><span class="k">${isSale ? 'Invoice No.' : 'Purchase Inv No.'}</span><span class="v big">${esc(vno || '(on approval)')}</span></div>
         <div class="row"><span class="k">Date</span><span class="v">${esc(booking.date || '')}</span></div>

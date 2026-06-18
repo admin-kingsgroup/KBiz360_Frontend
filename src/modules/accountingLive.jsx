@@ -404,7 +404,7 @@ function openReportPrint(title, sub, columns, rows, totalRow) {
   const body = rows.map((r) => '<tr>' + columns.map((c) => cell(c, r[c.key])).join('') + '</tr>').join('');
   const foot = totalRow ? '<tfoot><tr>' + columns.map((c) => cell(c, totalRow[c.key])).join('') + '</tr></tfoot>' : '';
   const win = window.open('', '_blank', 'width=1100,height=800');
-  if (!win) { alert('Please allow pop-ups to Print / Save as PDF.'); return; }
+  if (!win) { toast('Please allow pop-ups to Print / Save as PDF.', 'error'); return; }
   win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
   <style>
     *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#222;padding:14px;margin:0}
@@ -1156,7 +1156,7 @@ function TAccount({ leftHead = 'Particulars', rightHead = 'Particulars', left, r
           <td style={{ padding: '9px 14px', ...num, color: DARK, fontWeight: row.bold ? 700 : 400 }}>{row.amount != null ? money(cur, row.amount) : ''}</td></>)
     : (<><td style={{ padding: '9px 14px' }} /><td style={{ padding: '9px 14px' }} /></>);
   return (
-    <div className="kb-sticky" style={{ ...card, padding: 0, '--stick-head': DARK, '--stick-foot': DARK }}>
+    <div className="kb-sticky" style={{ ...card, padding: 0, overflowX: 'auto', '--stick-head': DARK, '--stick-foot': DARK }}>
       <table style={{ width: '100%', minWidth: 520, borderCollapse: 'collapse', fontSize: 11.5, tableLayout: 'fixed' }}>
         <thead><tr style={headRow}>
           <Th>{leftHead}</Th><Th right>Amount</Th><Th>{rightHead}</Th><Th right>Amount</Th>
@@ -1448,14 +1448,14 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
       <div ref={bodyRef} onScroll={fromBody} className="kb-sticky" style={{ '--stick-head': DARK, '--stick-foot': DARK, maxHeight: 'calc(100vh - 230px)', overflow: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', fontSize: 11, minWidth: '100%' }}>
           <thead><tr>
-            {columns.map((c) => (
-              <th key={c.key} style={{ padding: '8px 12px', textAlign: c.num ? 'right' : 'left', color: GOLD, fontWeight: 700, fontSize: 9.5, whiteSpace: 'nowrap', position: 'sticky', top: 0, background: DARK, zIndex: 1 }}>{c.label}</th>
+            {columns.map((c, ci) => (
+              <th key={c.key} style={{ padding: '8px 12px', textAlign: c.num ? 'right' : 'left', color: GOLD, fontWeight: 700, fontSize: 9.5, whiteSpace: 'nowrap', position: 'sticky', top: 0, background: DARK, zIndex: ci === 0 ? 3 : 2, ...(ci === 0 ? { left: 0, boxShadow: '6px 0 8px -6px rgba(13,19,38,0.45)' } : null) }}>{c.label}</th>
             ))}
           </tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} style={rowBg(i)}>
-                {columns.map((c) => {
+                {columns.map((c, ci) => {
                   // Final Invoice / Bill Value → green + clickable, opens the voucher's JV.
                   if (c.key === 'finalValue') {
                     return (
@@ -1476,7 +1476,7 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
                     );
                   }
                   return (
-                    <td key={c.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: mono(c.key) ? BLUE : DARK, textAlign: c.num ? 'right' : 'left', fontVariantNumeric: c.num ? 'tabular-nums' : 'normal', ...(mono(c.key) ? { fontFamily: 'monospace', fontSize: 10 } : null) }}>
+                    <td key={c.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: mono(c.key) ? BLUE : DARK, textAlign: c.num ? 'right' : 'left', fontVariantNumeric: c.num ? 'tabular-nums' : 'normal', ...(mono(c.key) ? { fontFamily: 'monospace', fontSize: 10 } : null), ...(ci === 0 ? { position: 'sticky', left: 0, zIndex: 1, background: i % 2 === 0 ? '#fff' : '#fafafa', boxShadow: '6px 0 8px -6px rgba(13,19,38,0.12)' } : null) }}>
                       {c.num ? cellNum(r[c.key]) : (r[c.key] || '—')}
                     </td>
                   );
@@ -1487,7 +1487,7 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
           {totals && rows.length > 0 && (
             <tfoot><tr>
               {columns.map((c, idx) => (
-                <td key={c.key} style={{ padding: '8px 12px', whiteSpace: 'nowrap', textAlign: c.num ? 'right' : 'left', fontWeight: 800, color: c.num ? '#fff' : GOLD, background: DARK, position: 'sticky', bottom: 0, fontVariantNumeric: c.num ? 'tabular-nums' : 'normal' }}>
+                <td key={c.key} style={{ padding: '8px 12px', whiteSpace: 'nowrap', textAlign: c.num ? 'right' : 'left', fontWeight: 800, color: c.num ? '#fff' : GOLD, background: DARK, position: 'sticky', bottom: 0, zIndex: idx === 0 ? 3 : 2, ...(idx === 0 ? { left: 0, boxShadow: '6px 0 8px -6px rgba(13,19,38,0.45)' } : null), fontVariantNumeric: c.num ? 'tabular-nums' : 'normal' }}>
                   {c.num ? cellNum(totals[c.key]) : (idx === 0 ? `TOTAL · ${rows.length}` : '')}
                 </td>
               ))}

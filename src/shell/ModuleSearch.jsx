@@ -226,9 +226,9 @@ export function ModuleSearch({ branch, currentUser, setRoute }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid #eef1f6' }}>
                 <Search size={16} style={{ color: DIM }} />
                 <input ref={inputRef} autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown}
-                  placeholder="Search any module or page…"
+                  placeholder="Search any module or page…" aria-label="Search modules and pages"
                   style={{ flex: 1, border: 'none', outline: 'none', fontSize: 15, color: DARK, background: 'transparent' }} />
-                <button onClick={() => setOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: DIM, display: 'flex' }}>
+                <button type="button" onClick={() => setOpen(false)} aria-label="Close search" title="Close (Esc)" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: DIM, display: 'flex' }}>
                   <X size={18} />
                 </button>
               </div>

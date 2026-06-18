@@ -79,6 +79,7 @@ import { PrefsProvider } from './core/prefs';
 import { HotkeysProvider } from './core/ux/hotkeys';
 import { NavContext } from './core/ux/nav';
 import { ToastHost } from './core/ux/toast';
+import { ConfirmHost } from './core/ux/confirm';
 import { ContextBar } from './shell/ContextBar';
 import { LedgerSwitcher } from './shell/LedgerSwitcher';
 import { LedgerModalHost } from './core/LedgerModalHost';
@@ -599,6 +600,7 @@ export default function KB360App(){
       {/* Global overlays / hosts (mounted once) */}
       <PrintPreviewHost/>
       <ToastHost/>
+      <ConfirmHost/>
       <LedgerSwitcher branch={branch}/>
       <LedgerModalHost branch={branch}/>
       <ShortcutHelp/>

@@ -15,6 +15,7 @@
 // No demo-data fallback — empty in, empty out (same contract as useVouchers).
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { confirmDialog } from './ux/confirm';
 import { apiGet, apiPut, apiPost, apiDelete, getAuthToken } from './api';
 
 // The shell passes `branch` as either the string "ALL" or a branch object.
@@ -499,13 +500,12 @@ export function useUpdateVoucher() {
   return useMutation({
     // An edit reason is mandatory (saved to the audit trail). If the caller didn't
     // supply one, prompt for it here so EVERY voucher-edit path is covered centrally.
-    mutationFn: ({ id, body }) => {
+    mutationFn: async ({ id, body }) => {
       let editReason = body.editReason;
       if (!editReason || !String(editReason).trim()) {
-        editReason = typeof window !== 'undefined' ? window.prompt('Reason for editing this voucher? (required — saved to the audit trail)') : '';
-        if (editReason == null || !String(editReason).trim()) {
-          return Promise.reject(new Error('Edit cancelled — a reason is required.'));
-        }
+        const { confirmed, reason } = await confirmDialog({ title: 'Save changes to this voucher?', message: 'Editing reverts it to Pending for re-approval.', reasonRequired: true, reasonLabel: 'Reason for editing (saved to the audit trail)', confirmLabel: 'Save changes' });
+        if (!confirmed) throw new Error('Edit cancelled — a reason is required.');
+        editReason = reason;
       }
       return apiPut(`/api/vouchers/${id}`, { ...body, editReason });
     },

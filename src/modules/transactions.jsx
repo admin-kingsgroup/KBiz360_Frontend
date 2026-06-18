@@ -824,7 +824,7 @@ export function SalesCar({branch,setRoute}){
     <VWrap title="Sales Voucher — Car Rentals" icon="🚗" vNo={vNo} branch={branch} type="sales" saleMod="SC" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} name="" gstin={partyGstin} onGstinChange={setPartyGstin}/>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec",overflowX:"auto"}}>
         <p style={{margin:"0 0 8px",fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Vehicle &amp; hire details</p>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:820}}>
           <thead><tr>
@@ -1071,7 +1071,7 @@ export function SalesHotel({branch,setRoute}){
 export function SalesInsurance({branch,setRoute}){
   const vNo=useVNo(branch,"SI");
   const [rows,setRows]=useState([{id:1,name:"",pp:"",dest:"",basic:0,otherTax:0,svc:0}]);
-  const [partyGstin,setPartyGstin]=useState("24AABCM8765G1Z2");
+  const [partyGstin,setPartyGstin]=useState("27AABCM8765G1Z2"); // 27 = Maharashtra (office state) → intra-state by default, like sibling vouchers
   const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
   const add=()=>setRows(rs=>[...rs,{id:Date.now(),name:"",pp:"",dest:"",basic:0,otherTax:0,svc:0}]);
@@ -1126,16 +1126,20 @@ export function SalesInsurance({branch,setRoute}){
       <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
           <FL label={bc(branch).cur+"Taxable value"}><input value={fmt(taxable)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          {intra
-            ?<>
-              <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-              <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-            </>
-            :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
+          {!isGST
+            ?<FL label={"VAT "+(bc(branch).vatRate||18)+"% "+bc(branch).cur}><input value={fmt(gstFull)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+            :intra
+              ?<>
+                <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+                <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              </>
+              :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
           <FL label="Invoice total ₹"><input value={fmt(total)} readOnly style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#185FA5"}}/></FL>
         </div>
         <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
-          GST 18% on (Basic + Other tax + Service charge). SAC 997131 — Life &amp; non-life insurance. {intra?"Intra-state (27): split as CGST 9% + SGST 9%.":"Inter-state (state ≠ 27): IGST 18%."}
+          {isGST
+            ?<>GST 18% on (Basic + Other tax + Service charge). SAC 997131 — Life &amp; non-life insurance. {intra?"Intra-state (27): split as CGST 9% + SGST 9%.":"Inter-state (state ≠ 27): IGST 18%."}</>
+            :<>VAT {(bc(branch).vatRate||18)}% on (Basic + Other tax + Service charge).</>}
         </div>
       </div>
       <VNarr def="Being travel insurance premium — 2 pax, Bali destination.">
@@ -1798,7 +1802,7 @@ function RefundReissueVoucher({branch,kind}){
         {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this voucher.</div>}
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={reset} style={btnGh}>Reset</button>
-          <button onClick={doSave} disabled={!canPost} style={{...btnG,background:canPost?accent:"#bfc3d6",opacity:canPost?1:0.55}}>
+          <button onClick={doSave} disabled={!canPost || post.isPending} style={{...btnG,background:(canPost&&!post.isPending)?accent:"#bfc3d6",opacity:(canPost&&!post.isPending)?1:0.55}}>
             {isRefund?"💳":"🔄"} Save {title} {post.isPending?"…":!selInv?"(Pick Sales Invoice)":!selPur?"(Pick Purchase Invoice)":chargesExceed?"(Charges Exceed Refund)":!amountsOk?"(Enter Amounts)":""}
           </button>
         </div>
@@ -2321,7 +2325,7 @@ export function PurchaseCar({branch,setRoute}){
     <VWrap title="Purchase Voucher — Car Rentals" icon="🚗" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} label="Supplier / Transport Co." name={row.vendor} gstin={partyGstin} onGstinChange={setPartyGstin}/>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec",overflowX:"auto"}}>
         <p style={{margin:"0 0 8px",fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Vehicle hire details</p>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
@@ -3076,7 +3080,7 @@ export function AdmRegister({branch}){
                 const dl=daysLeft(a.responseDeadline);
                 const isOverdue=dl<0&&!["Accepted","Rejected","Disputed"].includes(a.status);
                 const isUrgent=dl>=0&&dl<=7&&!["Accepted","Rejected","Disputed"].includes(a.status);
-                const rc=ADM_REASON_CODES[a.reasonCode]||{label:a.reasonCode,desc:""};
+                const rc=ADM_REASON_CODES[a.reasonCode]||{code:a.reasonCode,label:a.reasonCode,desc:""};
                 return (
                   <tr key={a.id} style={{borderBottom:"1px solid #f3f4f8",
                     background:isOverdue?"#fff5f5":isUrgent?"#fffaf0":i%2===0?"#fff":"#fafafa"}}>
@@ -3217,12 +3221,12 @@ export function AdmRegister({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setDisputeModal(null)} style={btnGh}>Cancel</button>
-              <button onClick={()=>{
+              <button disabled={disputeM.isPending} onClick={()=>{
                 disputeM.mutate({id:disputeModal.id,note:disputeNote||"Dispute filed via BSP Link — awaiting airline response"},{
                   onSuccess:()=>{setDisputeModal(null);toast("Dispute filed");},
                   onError:(e)=>toast("Could not file dispute — "+e.message,"error"),
                 });
-              }} style={{...btnG,background:"#A32D2D"}}>📨 File Dispute</button>
+              }} style={{...btnG,background:"#A32D2D",opacity:disputeM.isPending?0.6:1,cursor:disputeM.isPending?"not-allowed":"pointer"}}>{disputeM.isPending?"📨 Filing…":"📨 File Dispute"}</button>
             </div>
           </div>
         </div>

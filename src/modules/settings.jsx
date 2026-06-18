@@ -8,6 +8,7 @@ import { AlertTriangle, Download, Lock, Plus, Save, Search, Settings, User, User
 import { Line } from 'recharts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { exportToCSV } from '../core/business-logic';
+import { toast } from '../core/ux/toast';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../core/data';
 import { apiPost, apiPut, apiDelete } from '../core/api';
 import { useUsersAdmin, useRoles, useCompanyProfiles, useApprovalRules } from '../core/useReference';
@@ -935,11 +936,13 @@ export function SettingsUsers(){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setNewUserModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={()=>{
-                createUserMut.mutate({...newUserForm,active:true});  // persists to /api/auth/users
-                setNewUserModal(false);
-                setNewUserForm({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"]});
-              }} style={btnG}>Add User</button>
+              <button disabled={createUserMut.isPending} onClick={()=>{
+                if(!newUserForm.name.trim()||!newUserForm.email.trim()){ toast("Name and email are required","error"); return; }
+                createUserMut.mutate({...newUserForm,active:true},{  // persists to /api/auth/users
+                  onSuccess:()=>{ setNewUserModal(false); setNewUserForm({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"]}); toast(`User ${newUserForm.name} created`); },
+                  onError:(e)=>toast(e?.message||"Could not create user","error"),
+                });
+              }} style={{...btnG,opacity:createUserMut.isPending?0.6:1,cursor:createUserMut.isPending?"not-allowed":"pointer"}}>{createUserMut.isPending?"Adding…":"Add User"}</button>
             </div>
           </div>
         </div>

@@ -12,6 +12,7 @@
 // into the editable voucher; saving refreshes the statement live.
 // ───────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useState, Suspense } from 'react';
+import { confirmDialog } from './ux/confirm';
 import { LedgerAccountView } from './ledgerUI';
 import { pushModal } from './ux/modalStore';
 import { useDock } from './ux/dock';
@@ -64,8 +65,11 @@ export function LedgerModalHost({ branch: shellBranch }) {
 
   // Minimize: park this ledger (pinned to the CURRENT branch) and hide the
   // overlay. Restoring re-opens it from the ContextBar tray and re-fetches.
-  const minimize = () => {
-    if (voucher && !window.confirm('A voucher is open. Minimize and discard the open voucher view?')) return;
+  const minimize = async () => {
+    if (voucher) {
+      const { confirmed } = await confirmDialog({ title: 'Minimize this ledger?', message: 'A voucher is open — minimizing discards the open voucher view.', confirmLabel: 'Minimize' });
+      if (!confirmed) return;
+    }
     dock.park({ kind: 'ledger', label: job.name, branch: branchCode, payload: { name: job.name, from: job.from, to: job.to } });
     setVoucher(null); setJob(null);
   };

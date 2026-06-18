@@ -10,6 +10,8 @@ import { AuditTrail } from '../core/AuditTrail';
 import { VoucherView } from './pnlTally';
 import { openPrintWindow } from '../core/voucher-print';
 import { useModalEsc } from '../core/ux/useModalEsc';
+import { confirmDialog } from '../core/ux/confirm';
+import { toast } from '../core/ux/toast';
 import { FocusBanner } from '../core/ux/FocusBanner';
 import { useNavFocusStore } from '../core/ux/navFocus';
 import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useApproveMany, useApproveAll, branchCode } from '../core/useAccounting';
@@ -103,11 +105,24 @@ export function VoucherApprovals({ branch, currentUser }) {
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
 
-  const doApprove = (id) => approve.mutate({ id, approver: 'admin' });
-  const doReject = (id) => { const reason = window.prompt('Reason for rejection?'); if (reason !== null) reject.mutate({ id, by: 'admin', reason }); };
-  const doDelete = (id) => { const reason = window.prompt('Delete this voucher? It will be reversed out of the books and kept view-only (number not reusable). Reason:'); if (reason !== null) del.mutate({ id, by: 'admin', reason }); };
-  const doApproveSelected = () => { if (sel.size && window.confirm(`Approve ${sel.size} selected voucher(s)? They will post to the books.`)) approveMany.mutate({ ids: [...sel], approver: 'admin' }, { onSuccess: () => setSel(new Set()) }); };
-  const doApproveAll = () => { if (window.confirm(`Approve all ${counts.pending.n} pending vouchers for ${branchLabel(branch)}? They will post to the books.`)) approveAll.mutate({ branch, approver: 'admin' }); };
+  const doApprove = (id) => approve.mutate({ id, approver: 'admin' }, { onSuccess: () => toast('Voucher approved & posted'), onError: (e) => toast(e?.message || 'Approve failed', 'error') });
+  const doReject = async (id) => {
+    const { confirmed, reason } = await confirmDialog({ title: 'Reject voucher?', message: 'It will be marked Rejected (no books impact).', danger: true, reasonRequired: true, reasonLabel: 'Reason for rejection', confirmLabel: 'Reject' });
+    if (confirmed) reject.mutate({ id, by: 'admin', reason }, { onSuccess: () => toast('Voucher rejected'), onError: (e) => toast(e?.message || 'Reject failed', 'error') });
+  };
+  const doDelete = async (id) => {
+    const { confirmed, reason } = await confirmDialog({ title: 'Delete voucher?', message: 'It will be reversed out of the books and kept view-only — its number can never be reused.', danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
+    if (confirmed) del.mutate({ id, by: 'admin', reason }, { onSuccess: () => toast('Voucher deleted & reversed'), onError: (e) => toast(e?.message || 'Delete failed', 'error') });
+  };
+  const doApproveSelected = async () => {
+    if (!sel.size) return;
+    const { confirmed } = await confirmDialog({ title: `Approve ${sel.size} voucher(s)?`, message: 'They will post to the books.', confirmLabel: 'Approve' });
+    if (confirmed) approveMany.mutate({ ids: [...sel], approver: 'admin' }, { onSuccess: () => { setSel(new Set()); toast(`Approved ${sel.size} voucher(s)`); }, onError: (e) => toast(e?.message || 'Approve failed', 'error') });
+  };
+  const doApproveAll = async () => {
+    const { confirmed } = await confirmDialog({ title: `Approve all ${counts.pending.n} pending vouchers?`, message: `For ${branchLabel(branch)}. They will post to the books.`, confirmLabel: 'Approve all' });
+    if (confirmed) approveAll.mutate({ branch, approver: 'admin' }, { onSuccess: () => toast('All pending vouchers approved'), onError: (e) => toast(e?.message || 'Approve failed', 'error') });
+  };
 
   // Build the nested tree: Group › Sub-group › Ledger › Entries (one row per
   // posting leg, so a voucher appears under each ledger it touches).
@@ -457,8 +472,8 @@ function EditedVouchersList({ rows, isLoading, open, setOpen, setViewId }) {
   if (!rows.length) return <div style={{ ...card, padding: 24, textAlign: 'center', color: C.dim }}>No edited vouchers.</div>;
   const fmtAt = (s) => { const dd = new Date(s); return isNaN(dd) ? (s || '—') : dd.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
   return (
-    <div style={{ ...card }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+    <div style={{ ...card, overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
         <thead><tr>{['', 'Vch No', 'Type', 'Party', 'Total', 'Status', 'Edits', 'Last edited', 'Last reason'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
         <tbody>
           {rows.map((r) => {

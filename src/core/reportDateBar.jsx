@@ -57,7 +57,16 @@ export function resolveReportRange(mode, branch) {
 /** The comparison window exactly 12 months before the selected range. */
 export function priorYearRange({ from, to } = {}) {
   if (!from || !to) return { from: '', to: '' };
-  const shift = (iso) => { const d = new Date(iso); if (isNaN(d.getTime())) return iso; d.setFullYear(d.getFullYear() - 1); return isoDate(d); };
+  // Shift a YYYY-MM-DD back one year by components — NOT new Date(iso)+setFullYear,
+  // which (a) parses as UTC and can drift a day in some timezones and (b) overflows
+  // Feb-29 to Mar-1. Clamp the day to the prior year's month length (Feb-29 → Feb-28).
+  const shift = (iso) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
+    if (!m) return iso;
+    const y = Number(m[1]) - 1, mo = Number(m[2]);
+    const day = Math.min(Number(m[3]), new Date(y, mo, 0).getDate());
+    return `${y}-${String(mo).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
   return { from: shift(from), to: shift(to) };
 }
 

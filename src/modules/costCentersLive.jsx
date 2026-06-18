@@ -13,6 +13,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useMemo } from 'react';
+import { confirmDialog } from '../core/ux/confirm';
 import { useCostCenters, useCreateCostCenter, useUpdateCostCenter, useDeleteCostCenter, useBackfillCostCenters } from '../core/useAccounting';
 import { useBranches } from '../core/useReference';
 import { exportToExcel } from '../core/exportExcel';
@@ -66,16 +67,18 @@ export function CostCenterMasterLive({ currentUser }) {
       onError: (e) => flash(false, e.message || 'Could not add cost centre'),
     });
   };
-  const rename = (cc) => {
-    const name = window.prompt(`Rename cost centre ${cc.code}:`, cc.name);
-    if (name == null || !name.trim() || name.trim() === cc.name) return;
-    updateCc.mutate({ id: cc._id, name: name.trim() }, { onSuccess: () => flash(true, `Renamed ${cc.code}.`), onError: (e) => flash(false, e.message) });
+  const rename = async (cc) => {
+    const { confirmed, reason } = await confirmDialog({ title: `Rename cost centre ${cc.code}`, reasonRequired: true, reasonLabel: 'New name', reasonDefault: cc.name, confirmLabel: 'Rename' });
+    const name = reason.trim();
+    if (!confirmed || !name || name === cc.name) return;
+    updateCc.mutate({ id: cc._id, name }, { onSuccess: () => flash(true, `Renamed ${cc.code}.`), onError: (e) => flash(false, e.message) });
   };
   const toggleActive = (cc) => updateCc.mutate({ id: cc._id, active: !cc.active }, {
     onSuccess: () => flash(true, `${cc.code} ${cc.active ? 'deactivated' : 'reactivated'}.`), onError: (e) => flash(false, e.message),
   });
-  const del = (cc) => {
-    if (!window.confirm(`Delete custom cost centre ${cc.code}? This cannot be undone.`)) return;
+  const del = async (cc) => {
+    const { confirmed } = await confirmDialog({ title: `Delete cost centre ${cc.code}?`, message: 'This cannot be undone.', danger: true, confirmLabel: 'Delete' });
+    if (!confirmed) return;
     deleteCc.mutate(cc._id, { onSuccess: () => flash(true, `Deleted ${cc.code}.`), onError: (e) => flash(false, e.message) });
   };
   const runBackfill = () => backfill.mutate(undefined, {

@@ -31,6 +31,12 @@ export function nowLabel(d = new Date()) {
 /* "04-Jun-2026" — for displaying a stored ISO date */
 export function fmtDate(iso) {
   if (!iso) return '—';
+  // Read a YYYY-MM-DD (optionally with a time suffix) by its calendar components.
+  // NOT via new Date('YYYY-MM-DD'): that parses as UTC midnight and then renders one
+  // day EARLIER in any timezone behind UTC (e.g. FY start 2026-04-01 → "31-Mar-2026"
+  // for a user in the Americas). Component parsing is timezone-independent.
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
+  if (m) return `${m[3]}-${MON[Number(m[2]) - 1]}-${m[1]}`;
   const d = new Date(iso); if (isNaN(d.getTime())) return String(iso);
   return `${pad(d.getDate())}-${MON[d.getMonth()]}-${d.getFullYear()}`;
 }

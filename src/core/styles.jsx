@@ -416,7 +416,7 @@ export function ARow({label,onAdd,children}){
 }
 
 
-export function DBtn({fn}){return <td style={{padding:"4px 7px",textAlign:"center"}}><button onClick={fn} style={{background:"transparent",border:"none",color:"#8b94b3",cursor:"pointer",padding:3}}><Trash2 size={13}/></button></td>;}
+export function DBtn({fn,label="Delete row"}){return <td style={{padding:"4px 7px",textAlign:"center"}}><button type="button" onClick={fn} aria-label={label} title={label} style={{background:"transparent",border:"none",color:"#8b94b3",cursor:"pointer",padding:3}}><Trash2 size={13}/></button></td>;}
 
 /* ── SALES: HOLIDAY PACKAGES ─────────────────────────────── */
 

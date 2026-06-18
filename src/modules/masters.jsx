@@ -4,6 +4,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect } from 'react';
+import { confirmDialog } from '../core/ux/confirm';
 import { AlertTriangle, Check, Download, Pencil, Plus, Save, Search, Settings, Trash2 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ACTIVE_CURRENCIES, ADM_DATA, BRANCH_CODES, CASH, CUSTOMERS, FOREX_RATES_DATA, GP_BILLS, SUBAGENTS } from '../core/data';
@@ -61,7 +62,7 @@ export function MastersForex(){
           <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Add Rate</button>
         </div>
       </div>
-      <div style={{...card,padding:0,overflow:"hidden"}}>
+      <div style={{...card,padding:0,overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#0d1326"}}>
             {["Date","From Currency","To Currency","Exchange Rate","Source","Implied (1 INR)"].map((h,i)=>(
@@ -217,7 +218,7 @@ export function Supplier360({branch}){
         {/* Purchase history */}
         <div>
           <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Purchase History ({needle?filteredHist.length:suppBills.length} bookings)</p>
-          <div style={{...card,padding:0,overflow:"hidden"}}>
+          <div style={{...card,padding:0,overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
               <thead><tr style={{background:"#0d1326"}}>
                 {["Voucher No.","Date","Module","Destination","Cost","GP","GP%"].map((h,i)=>(
@@ -449,7 +450,7 @@ export function VendorTermsMaster({branch}){
           <AlertTriangle size={14}/> Overdue payments — process immediately to avoid supplier suspension
         </div>
       )}
-      <div style={{...card,padding:0,overflow:"hidden"}}>
+      <div style={{...card,padding:0,overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#0d1326"}}>
             {["Supplier","Type","Terms","Amount Due","TDS Section","TDS to Hold","Net Pay","Due Date","Days","Status","Pay"].map((h,i)=>(
@@ -583,7 +584,7 @@ export function ChartOfAccounts(){
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(350px,1fr))",gap:12}}>
         {filtered.map(g=>(
-          <div key={g.id} style={{...card,padding:0,overflow:"hidden"}}>
+          <div key={g.id} style={{...card,padding:0,overflowX:"auto"}}>
             <div style={{padding:"10px 14px",background:TYPE_BG[g.type],borderBottom:"1px solid "+TYPE_CLR[g.type]+"30",
               display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
@@ -654,7 +655,7 @@ export function MastersLedgers(){
           <Plus size={13}/> New Ledger
         </button>
       ]}>
-      <div style={{...card,padding:0,overflow:"hidden"}}>
+      <div style={{...card,padding:0,overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#0d1326"}}>
             {["Ledger Name","Group","Nature","Opening Balance","Currency","Status",""].map((h,i)=>(
@@ -844,7 +845,7 @@ export function MastersCustomers(){
       </div>
 
       {/* Table */}
-      <div style={{...card,padding:0,overflow:"hidden",marginBottom:4}}>
+      <div style={{...card,padding:0,overflowX:"auto",marginBottom:4}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead>
             <tr style={{background:"#0d1326"}}>
@@ -1105,7 +1106,7 @@ export function MastersSuppliers(){
           <Plus size={13}/> New Supplier
         </button>
       ]}>
-      <div style={{...card,padding:0,overflow:"hidden"}}>
+      <div style={{...card,padding:0,overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#0d1326"}}>
             {["Supplier Name","Type","GSTIN","Currency","TDS Section","Commission",""].map((h,i)=>(
@@ -1177,7 +1178,7 @@ export function MastersAirlines(){
           <Plus size={13}/> New Airline
         </button>
       ]}>
-      <div style={{...card,padding:0,overflow:"hidden"}}>
+      <div style={{...card,padding:0,overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#0d1326"}}>
             {["IATA","Airline Name","Country","Type","Hub","BSP","Alliance","GDS","Comm %",""].map((h,i)=>(
@@ -1270,7 +1271,7 @@ export function MastersHotels(){
         </button>
       ]}>
       {tab==="hotels"?(
-        <div style={{...card,padding:0,overflow:"hidden"}}>
+        <div style={{...card,padding:0,overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#0d1326"}}>
               {["Hotel Name","City","Stars","GST Slab","Rack Rate","Chain","Contract",""].map((h,i)=>(
@@ -1309,7 +1310,7 @@ export function MastersHotels(){
           </table>
         </div>
       ):(
-        <div style={{...card,padding:0,overflow:"hidden"}}>
+        <div style={{...card,padding:0,overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#0d1326"}}>
               {["DMC Name","Country","Speciality","Currency","Commission","Contract",""].map((h,i)=>(
@@ -1398,7 +1399,7 @@ export function MastersTaxRates(){
     if(__new) gstMut.create.mutate(body,{onSuccess:()=>setEditing(null),onError});
     else gstMut.update.mutate({id,body},{onSuccess:()=>setEditing(null),onError});
   };
-  const delHsn=(r)=>{ if(window.confirm(`Delete HSN/SAC "${r.code} — ${r.service}"?`)) gstMut.remove.mutate(r.id); };
+  const delHsn=async(r)=>{ const{confirmed}=await confirmDialog({title:`Delete HSN/SAC "${r.code} — ${r.service}"?`,danger:true,confirmLabel:'Delete'}); if(confirmed) gstMut.remove.mutate(r.id); };
   const savingHsn=gstMut.create.isPending||gstMut.update.isPending;
   const gstRates=[
     {id:1, sac:"996421",service:"Flight Tickets — Domestic",       module:"Flight",  basis:"Service charge only",rate:18,itc:"Yes",tcs:"No"},
@@ -1449,7 +1450,7 @@ export function MastersTaxRates(){
           : <ExportBtn key="x" name="africa-vat" rows={afVat} columns={[{key:"country",label:"Country"},{key:"rate",label:"Rate"}]}/>,
       ]}>
       {tab==="gst"&&(
-        <div style={{...card,padding:0,overflow:"hidden"}}>
+        <div style={{...card,padding:0,overflowX:"auto"}}>
           {gstQ.isLoading&&<div style={{padding:24,textAlign:"center",color:"#5a6691",fontSize:12}}>Loading HSN/SAC codes…</div>}
           {gstQ.isError&&<div style={{padding:16,color:"#A32D2D",fontSize:12,fontWeight:600}}>⚠ {gstQ.error?.message||"Failed to load"} — is the backend running and are you logged in?</div>}
           {!gstQ.isLoading&&!gstQ.isError&&(
@@ -1494,7 +1495,7 @@ export function MastersTaxRates(){
         </div>
       )}
       {tab==="tcstds"&&(
-        <div style={{...card,padding:0,overflow:"hidden"}}>
+        <div style={{...card,padding:0,overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#0d1326"}}>
               {["Section","Nature","Rate","Threshold","When it applies"].map((h,i)=>(
@@ -1519,7 +1520,7 @@ export function MastersTaxRates(){
         </div>
       )}
       {tab==="vat"&&(
-        <div style={{...card,padding:0,overflow:"hidden"}}>
+        <div style={{...card,padding:0,overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#1D5C1D"}}>
               {["Branch","VAT Rate","Authority","Tax ID","Return Deadline","Input Credit","WHT — Services"].map((h,i)=>(
@@ -1737,7 +1738,7 @@ export function VendorAdvances({branch,setRoute}){
         ))}
       </div>
 
-      <div style={{...card,padding:0,overflow:"hidden"}}>
+      <div style={{...card,padding:0,overflowX:"auto"}}>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
             <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
@@ -2698,7 +2699,7 @@ export function PassportManager({branch}){
         ))}
       </div>
 
-      <div style={{...card,padding:0,overflow:"hidden"}}>
+      <div style={{...card,padding:0,overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#0d1326"}}>
             {["Person","Client","Passport No.","Nationality","Issued","Expiry","Days Left","Visas in Passport","Branch","Status"].map((h,i)=>(

@@ -68,7 +68,9 @@ function errMessage(data) {
   if (typeof data === 'string') {
     try { return JSON.parse(data).message || data; } catch { return data; }
   }
-  if (typeof data === 'object') return data.message || JSON.stringify(data);
+  // Prefer a human message; never dump the raw JSON payload (it leaks internal shape
+  // and reads as gibberish in a toast). Fall back to a generic line.
+  if (typeof data === 'object') return data.message || data.error || 'Request failed.';
   return String(data);
 }
 

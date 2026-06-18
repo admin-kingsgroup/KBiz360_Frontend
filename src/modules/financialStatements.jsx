@@ -212,8 +212,12 @@ function TkfBS({ branch, to }) {
     });
     return rows;
   };
+  // The backend already injects the Profit & Loss A/c into d.liabilities (a net
+  // profit, Cr) or d.assets (a net loss, Dr) and folds it into d.totalLiabilities /
+  // d.totalAssets — so sideRows() renders it once on the correct side. Do NOT add it
+  // again here, or a profit double-counts on Liabilities and a loss shows as a bogus
+  // negative liability (the statement stops footing).
   const liabRows = sideRows(d.liabilities);
-  if (d.netProfit) liabRows.push({ label: 'Profit & Loss A/c (Net Profit)', amount: d.netProfit, bold: true });
   liabRows.push({ label: 'TOTAL LIABILITIES', amount: d.totalLiabilities, subtotal: true });
   const assetRows = sideRows(d.assets);
   assetRows.push({ label: 'TOTAL ASSETS', amount: d.totalAssets, subtotal: true });

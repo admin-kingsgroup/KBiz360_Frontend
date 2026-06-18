@@ -4,6 +4,8 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { confirmDialog } from '../../core/ux/confirm';
+import { toast } from '../../core/ux/toast';
 import { AlertTriangle, Download, Lock, Plus, Printer, Save, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
 import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement } from '../../core/useBankReco';
 import { branchCode } from '../../core/useAccounting';
@@ -517,7 +519,7 @@ function ImportPanel({ledger,code,from,to,onClose,importMut,clearMut}){
 
       <div style={{display:"flex",gap:8,marginTop:10,alignItems:"center"}}>
         <button onClick={doImport} disabled={!valid.length||mapping.date==null||importMut.isPending} style={{...btnG,fontSize:11,opacity:(!valid.length||mapping.date==null||importMut.isPending)?0.5:1}}><Upload size={12}/> {importMut.isPending?"Importing…":`Import ${valid.length} lines`}</button>
-        <button onClick={()=>{ if(window.confirm(`Delete ALL statement lines for ${ledger} between ${from} and ${to}? This cannot be undone.`)) clearMut.mutate({ledger,from,to}); }} disabled={clearMut.isPending} style={{...btnGh,fontSize:11,color:"#A32D2D"}}><Trash2 size={12}/> Clear period</button>
+        <button onClick={async()=>{ const{confirmed}=await confirmDialog({title:'Clear all statement lines?',message:`Delete ALL statement lines for ${ledger} between ${from} and ${to}? This cannot be undone.`,danger:true,confirmLabel:'Clear period'}); if(confirmed) clearMut.mutate({ledger,from,to}); }} disabled={clearMut.isPending} style={{...btnGh,fontSize:11,color:"#A32D2D"}}><Trash2 size={12}/> Clear period</button>
         {importMut.isSuccess&&importMut.data&&<span style={{fontSize:10.5,color:"#27500A"}}>✔ {importMut.data.inserted} imported{importMut.data.skipped?`, ${importMut.data.skipped} skipped (blank/duplicate)`:""}.</span>}
         {(importMut.isError||clearMut.isError)&&<span style={{fontSize:10.5,color:"#A32D2D"}}>{String(importMut.error?.message||clearMut.error?.message||"Failed")}</span>}
       </div>
@@ -1161,7 +1163,7 @@ export function YearEndClose({branch}){
               <input type="checkbox" id="confirm-lock" style={{cursor:"pointer",accentColor:"#A32D2D"}}/>
               <span style={{fontSize:11,fontWeight:600,color:"#A32D2D"}}>I confirm that all accounts for FY {FY} are complete and I want to lock the financial year</span>
             </label>
-            <button onClick={()=>alert("FY "+FY+" locked. New vouchers will use FY "+NEW_FY+" numbering.")} style={{...btnG,background:"#A32D2D",fontSize:12}}>🔒 Lock FY {FY} and Open {NEW_FY}</button>
+            <button onClick={()=>toast("FY "+FY+" locked. New vouchers will use FY "+NEW_FY+" numbering.")} style={{...btnG,background:"#A32D2D",fontSize:12}}>🔒 Lock FY {FY} and Open {NEW_FY}</button>
           </div>
         )}
 

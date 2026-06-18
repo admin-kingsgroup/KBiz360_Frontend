@@ -19,6 +19,7 @@ import { exportToExcel } from '../core/exportExcel';
 import { pushModal } from '../core/ux/modalStore';
 import { useFormKeys } from '../core/ux/forms';
 import { toast } from '../core/ux/toast';
+import { confirmDialog } from '../core/ux/confirm';
 import { Kbd } from '../core/ux/widgets.jsx';
 
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
@@ -125,8 +126,9 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
     else update.mutate({ id, body }, { onSuccess, onError });
   };
 
-  const del = (r) => {
-    if (!window.confirm(`Delete "${r.name}"?`)) return;
+  const del = async (r) => {
+    const { confirmed } = await confirmDialog({ title: `Delete "${r.name}"?`, message: 'This cannot be undone.', danger: true, confirmLabel: 'Delete' });
+    if (!confirmed) return;
     remove.mutate(r.id, { onSuccess: () => toast(`${r.name || 'Record'} deleted`), onError: (e) => toast(`Could not delete — ${e.message}`, 'error') });
   };
 

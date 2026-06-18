@@ -75,7 +75,19 @@ export function vouchersToSheet(vouchers, lead = []) {
       const m = ln.meta && typeof ln.meta === 'object' ? ln.meta : {};
       for (const k of Object.keys(m)) {
         const rk = `meta:${k}`;
-        if (row[rk] == null || row[rk] === '') row[rk] = m[k];
+        const val = m[k];
+        const prev = row[rk];
+        // A voucher can have several lines (e.g. one per passenger) carrying the SAME
+        // meta key. Collapsing to one row per voucher must not drop the others: sum
+        // numeric meta (Base Fare, K3…) and join distinct text meta (Ticket No, PNR…)
+        // instead of keeping only the first value.
+        if (typeof val === 'number') {
+          row[rk] = (typeof prev === 'number' ? prev : 0) + val;
+        } else if (prev == null || prev === '') {
+          row[rk] = val;
+        } else if (val != null && val !== '' && !String(prev).split(', ').includes(String(val))) {
+          row[rk] = `${prev}, ${val}`;
+        }
       }
     }
     return row;

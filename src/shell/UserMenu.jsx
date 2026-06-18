@@ -4,6 +4,8 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
+import { confirmDialog } from '../core/ux/confirm';
+import { toast } from '../core/ux/toast';
 import { createPortal } from 'react-dom';
 import { Bell, Lock, LogOut, Menu, Settings, User } from 'lucide-react';
 import { Icon } from '../core/styleTokens';
@@ -25,11 +27,10 @@ export function UserMenu({currentUser, setCurrentUser, setRoute}){
   };
   const ringColor = roleColor[currentUser.role] || "#d4a437";
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     setOpen(false);
-    if(window.confirm("Sign out of KBiz360?")) {
-      setCurrentUser(null);
-    }
+    const { confirmed } = await confirmDialog({ title: "Sign out of KBiz360?", confirmLabel: "Sign out", danger: true });
+    if (confirmed) setCurrentUser(null);
   };
 
   return (
@@ -125,7 +126,7 @@ export function UserMenu({currentUser, setCurrentUser, setRoute}){
               <MenuItem icon={User} label="My Profile" onClick={()=>{setOpen(false);setRoute&&setRoute("/settings/profile");}}/>
               <MenuItem icon={Bell} label="My Notifications" onClick={()=>{setOpen(false);setRoute&&setRoute("/dashboard");}}/>
               <MenuItem icon={Settings} label="Preferences" onClick={()=>{setOpen(false);setRoute&&setRoute("/settings/preferences");}}/>
-              <MenuItem icon={Lock} label="Change Password" onClick={()=>{setOpen(false);alert("Password change form would open here");}}/>
+              <MenuItem icon={Lock} label="Change Password" onClick={()=>{setOpen(false);toast("Password change isn't available yet.","info");}}/>
               <div style={{height:1,background:"#f1f5f9",margin:"6px 0"}}/>
               <MenuItem icon={LogOut} label="Sign Out" onClick={handleSignOut} danger={true}/>
             </div>

@@ -21,6 +21,7 @@ import { AuditTrail } from '../core/AuditTrail';
 import { useLedgerRegistry } from '../core/useReference';
 import { useHotkey } from '../core/ux/hotkeys';
 import { toast } from '../core/ux/toast';
+import { confirmDialog } from '../core/ux/confirm';
 import {
   VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc, isVatBranch, rowsFromSnapshots,
 } from '../core/voucherSpecs.js';
@@ -212,8 +213,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     // Editing an existing booking requires a reason (saved to the audit trail).
     let editReason = '';
     if (editing) {
-      editReason = window.prompt('Reason for editing this SO/PO/GP voucher? (required — saved to the audit trail)') || '';
-      if (!editReason.trim()) { setError('Edit cancelled — a reason is required.'); return; }
+      const { confirmed, reason } = await confirmDialog({ title: 'Save changes to this voucher?', message: 'Editing reverses any posted entry and returns it to Pending for re-approval.', reasonRequired: true, reasonLabel: 'Reason for editing (saved to the audit trail)', confirmLabel: 'Save changes' });
+      if (!confirmed) return; // cancelled — nothing saved
+      editReason = reason;
     }
     setError(''); setSaving(true);
     try {
@@ -338,7 +340,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   );
 
   return (
-    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px 90px' }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
       {/* Header */}
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
         <div style={{ padding: '14px 18px', background: DARK, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
@@ -745,7 +747,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
   }
 
   return (
-    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px 90px' }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
         <div style={{ padding: '14px 18px', background: DARK, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
@@ -974,8 +976,8 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
   // colSpans; derive their start from the header so adding lead columns can't misalign them.
   const numStart = cols.indexOf('Sale');
   return (
-    <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+    <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1080 }}>
         <thead><tr style={{ background: '#f3f4f8' }}>
           {cols.map((h, i) => <th key={i} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#5a6691', textTransform: 'uppercase', textAlign: i >= numStart && i <= numStart + 3 ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>)}
         </tr></thead>
@@ -1116,15 +1118,17 @@ export function PendingBookings({ branch, setRoute }) {
     finally { setBusyId(null); }
   };
   const onCancel = async (b) => {
-    const reason = window.prompt(`Reject voucher ${b.bookingNo}? It will be marked Rejected (no books impact). Optional reason:`, '');
-    if (reason === null) return; // user dismissed the prompt
+    const { confirmed, reason } = await confirmDialog({ title: `Reject voucher ${b.bookingNo}?`, message: 'It will be marked Rejected (no books impact).', danger: true, reasonRequired: true, reasonLabel: 'Reason for rejection', confirmLabel: 'Reject' });
+    if (!confirmed) return;
     setBusyId(b.id);
     try { await apiPost('/api/booking-orders/' + b.id + '/reject', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); setMsg(`✓ Rejected ${b.bookingNo}.`); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Reject failed')); }
     finally { setBusyId(null); }
   };
   const onApproveSelected = async () => {
-    if (!sel.size || !window.confirm(`Approve ${sel.size} selected voucher(s)? Each posts its linked Sales + Purchase.`)) return;
+    if (!sel.size) return;
+    const { confirmed } = await confirmDialog({ title: `Approve ${sel.size} selected voucher(s)?`, message: 'Each posts its linked Sales + Purchase.', confirmLabel: 'Approve' });
+    if (!confirmed) return;
     setBusyId('bulk'); setMsg(`⏳ Approving ${sel.size} voucher(s)… please wait.`);
     try {
       const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] });
@@ -1135,7 +1139,7 @@ export function PendingBookings({ branch, setRoute }) {
   };
 
   return (
-    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px' }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><Clock size={18} style={{ color: GOLD }} /> Pending Approval</h2>
@@ -1178,16 +1182,16 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
   // never reused.
   const onDelete = async (b) => {
     if (!canDelete) return;
-    const reason = window.prompt(`Delete approved booking ${b.bookingNo}?\n\nIts Sales (${b.saleVno}) & Purchase (${b.purchaseVno}) invoices will be reversed out of the books. The record stays view-only under Deleted and its numbers can never be reused.\n\nOptional reason:`, '');
-    if (reason === null) return;
+    const { confirmed, reason } = await confirmDialog({ title: `Delete approved booking ${b.bookingNo}?`, message: `Its Sales (${b.saleVno}) & Purchase (${b.purchaseVno}) invoices will be reversed out of the books. The record stays view-only under Deleted and its numbers can never be reused.`, danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
+    if (!confirmed) return;
     setBusyId(b.id);
-    try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); }
-    catch (e) { window.alert(e.message || 'Delete failed'); }
+    try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); toast(`Deleted ${b.bookingNo} & reversed out of the books`); }
+    catch (e) { toast(e.message || 'Delete failed', 'error'); }
     finally { setBusyId(null); }
   };
 
   return (
-    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px' }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><FileCheck2 size={18} style={{ color: DR }} /> Approved &amp; Posted</h2>
@@ -1210,7 +1214,7 @@ export function DeletedBookings({ branch, setRoute }) {
   const rows = data.filter((b) => b.status === 'deleted');
 
   return (
-    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px' }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><Trash2 size={18} style={{ color: '#A32D2D' }} /> Deleted</h2>
@@ -1269,27 +1273,32 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   };
   // Open the editor. Editing an already-approved booking reverses its posted Sales/
   // Purchase out of the books and returns it to Pending for re-approval — warn first.
-  const onEdit = (b) => {
+  const onEdit = async (b) => {
     if (b.status === 'approved' || b.status === 'posted') {
-      if (!window.confirm(`Edit approved booking ${b.bookingNo}?\nIts posted Sales (${b.saleVno})${b.noSupplier ? '' : ` & Purchase (${b.purchaseVno})`} will be reversed out of the books and the booking returns to Pending for re-approval.`)) return;
+      const { confirmed } = await confirmDialog({ title: `Edit approved booking ${b.bookingNo}?`, message: `Its posted Sales (${b.saleVno})${b.noSupplier ? '' : ` & Purchase (${b.purchaseVno})`} will be reversed out of the books and the booking returns to Pending for re-approval.`, danger: true, confirmLabel: 'Edit & reverse' });
+      if (!confirmed) return;
     }
     setEditing(b);
   };
   const onCancel = async (b) => {
-    const reason = window.prompt(`Reject voucher ${b.bookingNo}? Marked Rejected (no books impact). Optional reason:`, ''); if (reason === null) return;
+    const { confirmed, reason } = await confirmDialog({ title: `Reject voucher ${b.bookingNo}?`, message: 'Marked Rejected (no books impact).', danger: true, reasonRequired: true, reasonLabel: 'Reason for rejection', confirmLabel: 'Reject' });
+    if (!confirmed) return;
     setBusyId(b.id);
     try { await apiPost('/api/booking-orders/' + b.id + '/reject', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); setMsg(`✓ Rejected ${b.bookingNo}.`); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Reject failed')); } finally { setBusyId(null); }
   };
   const onDelete = async (b) => {
     if (!canDelete) return;
-    const reason = window.prompt(`Delete approved booking ${b.bookingNo}?\nIts Sales (${b.saleVno}) & Purchase (${b.purchaseVno}) are reversed out of the books; kept view-only under Deleted, numbers never reused.\nReason:`, ''); if (reason === null) return;
+    const { confirmed, reason } = await confirmDialog({ title: `Delete approved booking ${b.bookingNo}?`, message: `Its Sales (${b.saleVno}) & Purchase (${b.purchaseVno}) are reversed out of the books; kept view-only under Deleted, numbers never reused.`, danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
+    if (!confirmed) return;
     setBusyId(b.id);
     try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); setMsg(`✓ Deleted ${b.bookingNo}.`); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Delete failed')); } finally { setBusyId(null); }
   };
   const onApproveSelected = async () => {
-    if (!sel.size || !window.confirm(`Approve ${sel.size} selected voucher(s)? Each posts its linked Sales + Purchase.`)) return;
+    if (!sel.size) return;
+    const { confirmed } = await confirmDialog({ title: `Approve ${sel.size} selected voucher(s)?`, message: 'Each posts its linked Sales + Purchase.', confirmLabel: 'Approve' });
+    if (!confirmed) return;
     setBusyId('bulk'); setMsg(`⏳ Approving ${sel.size} voucher(s)… please wait.`);
     try { const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] }); setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`); setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Bulk approve failed')); } finally { setBusyId(null); }
@@ -1300,7 +1309,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   );
 
   return (
-    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px' }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, color: DARK }}>SO/PO/GP Approvals</h2>
@@ -1338,8 +1347,8 @@ function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
   if (!rows.length) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#8b94b3' }}>No edited bookings in this period.</div>;
   const fmtAt = (s) => { const d = new Date(s); return isNaN(d) ? (s || '—') : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
   return (
-    <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+    <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
         <thead><tr>{['', 'Booking No', 'Link No', 'Module', 'Customer', 'Sale', 'Status', 'Edits', 'Last edited', 'Last reason'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
         <tbody>
           {rows.map((r) => {
@@ -1383,7 +1392,7 @@ export function RejectedBookings({ branch, setRoute }) {
   const rows = data.filter((b) => b.status === 'rejected');
 
   return (
-    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 10px' }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><XCircle size={18} style={{ color: '#A32D2D' }} /> Rejected</h2>

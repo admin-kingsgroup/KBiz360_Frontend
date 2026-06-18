@@ -545,7 +545,9 @@ export function ReportGP({branch,setRoute}){
             GP Reports — {branch==="ALL"?CONSOLIDATED_LABEL:branch?.code+" "+branch?.city}
           </h2>
           <p style={{margin:"3px 0 0",fontSize:10.5,color:"#5a6691"}}>
-            {bills.length} bookings · {cur}{f(totSell)} revenue · {totGPPct}% GP
+            {gpQuery.isLoading ? 'Loading live books…'
+              : gpQuery.error ? 'Could not load data'
+              : `${bills.length} bookings · ${cur}${f(totSell)} revenue · ${totGPPct}% GP`}
           </p>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>

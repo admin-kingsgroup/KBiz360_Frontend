@@ -401,12 +401,12 @@ function EntityCard({ spec, onUpload, onPreview, onViewExisting, state, subgroup
             <Eye size={13} /> {state?.previewing ? 'Loading…' : 'View existing'}
           </button>
         )}
-        <label htmlFor={previewId} style={btn('#fff', DARK, true)} title="Preview the rows in your file (with full details + JV for vouchers) before importing">
+        <label htmlFor={previewId} style={{ ...btn('#fff', DARK, true), ...((state?.previewing || state?.busy) ? { pointerEvents: 'none', opacity: 0.6 } : {}) }} title="Preview the rows in your file (with full details + JV for vouchers) before importing">
           <Eye size={13} /> {state?.previewing ? 'Reading…' : 'Preview upload'}
         </label>
         <input id={previewId} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onPreview(spec, f); e.target.value = ''; }} />
-        <label htmlFor={inputId} style={btn(BLUE, '#fff')}>
+        <label htmlFor={inputId} style={{ ...btn(BLUE, '#fff'), ...((state?.busy || state?.previewing) ? { pointerEvents: 'none', opacity: 0.6 } : {}) }}>
           <Upload size={13} /> {state?.busy ? 'Uploading…' : 'Upload CSV'}
         </label>
         <input id={inputId} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
