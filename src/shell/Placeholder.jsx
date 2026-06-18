@@ -6,7 +6,7 @@
 import React from 'react';
 import { ArrowLeft, Wrench } from 'lucide-react';
 import { ROUTE_TITLES } from '../core/data';
-import { btnG, card } from '../core/styles';
+import { btnG, card } from '../core/styleTokens';
 
 export function Placeholder({route,setRoute}){
   const title=ROUTE_TITLES[route]||route;

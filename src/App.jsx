@@ -4,52 +4,68 @@
    See PROJECT_CONTEXT.md for full architecture.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
 import { apiPost } from './core/api';
 import { ErrorBoundary } from './shell/ErrorBoundary';
 import { BRANCHES } from './core/data';
-import { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, GratuityRegister, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, TdsCertRegister, TrainingRecords, UxPreferences } from './core/helpers';
 import { useMobile } from './core/hooks';
 import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
-import { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RPT_CashPosition, RPT_CurrencyExposure, RPT_CustomerLTV, RPT_LeaveUtilization, RPT_StatutoryDues, RPT_TaxFilingBoard, RPT_YieldConsultant, RPT_YieldDestination, RPT_YieldSupplier, RPT_YoY } from './core/styles';
-import { RPT_InterbranchElim } from './modules/interbranch';
-import { SalesGpAnalytics } from './modules/salesGpAnalytics';
-import { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } from './modules/assets';
-import { Dashboard, AlertsDashboard } from './modules/dashboard';
-import { DirectorDash, TargetsMaster } from './modules/directorDashboards';
-import { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose, financeRoutes } from './modules/finance';
+import { lazyModule } from './core/lazyModule';
+
+/* ── Route-level code-splitting ───────────────────────────────────────────
+   Every page component below is loaded via lazyModule() → one dynamic
+   import() per feature file → Vite emits one chunk per module that downloads
+   only when a screen in it is first opened. The destructures keep the exact
+   names Page() already uses, so the giant route table needs zero changes.
+   Infrastructure that renders on every screen (shell, providers, hosts) stays
+   eagerly imported above/below. Components render inside <Suspense> (see render).
+   ── */
+const { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, GratuityRegister, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, TdsCertRegister, TrainingRecords, UxPreferences } = lazyModule(() => import('./core/helpers'));
+const { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RPT_CashPosition, RPT_CurrencyExposure, RPT_CustomerLTV, RPT_LeaveUtilization, RPT_StatutoryDues, RPT_TaxFilingBoard, RPT_YieldConsultant, RPT_YieldDestination, RPT_YieldSupplier, RPT_YoY } = lazyModule(() => import('./core/styles'));
+const { RPT_InterbranchElim } = lazyModule(() => import('./modules/interbranch'));
+const { SalesGpAnalytics } = lazyModule(() => import('./modules/salesGpAnalytics'));
+const { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } = lazyModule(() => import('./modules/assets'));
+const { Dashboard, AlertsDashboard } = lazyModule(() => import('./modules/dashboard'));
+const { DirectorDash, TargetsMaster } = lazyModule(() => import('./modules/directorDashboards'));
+const { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose } = lazyModule(() => import('./modules/finance'));
+
+/* financeRoutes is plain DATA (a route table) needed synchronously at module
+   load, so it's imported directly from ./modules/finance/routes — NOT through
+   the finance barrel — to avoid dragging the whole finance feature (incl. the
+   ~140 KB legacy.jsx) into the initial bundle. */
+import { financeRoutes } from './modules/finance/routes';
 
 /* Declarative route tables from migrated feature modules. The host renders
    these via react-router FIRST; any route not listed falls through to the
    legacy string-router in Page(). Append more tables here as modules migrate. */
 const MIGRATED_FEATURE_ROUTES = [...financeRoutes];
-import { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } from './modules/ho-control';
-import { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrExpenses, HrLeave, HrPayroll, HrPayslips, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } from './modules/hr';
-import { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, TourCodeMaster, VendorAdvances, VendorTermsMaster } from './modules/masters';
-import { CustomerMasterTabbed, SupplierMasterTabbed } from './modules/mastersParties';
-import { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } from './modules/reports';
-import { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } from './modules/settings';
-import { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } from './modules/taxation';
-import { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } from './modules/transactions';
-import { SoPoGpVoucherEntry } from './modules/bookingOrder';
-import { UnifiedApprovals } from './modules/voucherApprovals';
-import { ModuleRegister } from './modules/moduleRegister';
-import { OutstandingOnAccount } from './modules/outstanding';
-import { AccountsTreeView } from './modules/chartBuilder';
-import { PnLTallyLive } from './modules/pnlTally';
-import { BalanceSheetTallyLive } from './modules/balanceSheetTally';
-import { CapitalVsInvestmentLive } from './modules/capitalVsInvestment';
-import { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, AccountsChartLive, InvoiceGPLive } from './modules/accountingLive';
-import { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } from './modules/reportsFinancial';
-import { ProfitAndLossUnified, BalanceSheetUnified } from './modules/financialStatements';
-import { NotesToFinancials } from './modules/reportsNotes';
-import { CostCenterMasterLive } from './modules/costCentersLive';
-import { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, GroupsMaster, SubGroupsMaster, LedgersMaster } from './modules/mastersLive';
-import { DataImportPage } from './modules/dataImport';
+const { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
+const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrExpenses, HrLeave, HrPayroll, HrPayslips, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
+const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
+const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/mastersParties'));
+const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } = lazyModule(() => import('./modules/reports'));
+const { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } = lazyModule(() => import('./modules/settings'));
+const { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } = lazyModule(() => import('./modules/taxation'));
+const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
+const { SoPoGpVoucherEntry } = lazyModule(() => import('./modules/bookingOrder'));
+const { UnifiedApprovals } = lazyModule(() => import('./modules/voucherApprovals'));
+const { ModuleRegister } = lazyModule(() => import('./modules/moduleRegister'));
+const { OutstandingOnAccount } = lazyModule(() => import('./modules/outstanding'));
+const { AccountsTreeView } = lazyModule(() => import('./modules/chartBuilder'));
+const { PnLTallyLive } = lazyModule(() => import('./modules/pnlTally'));
+const { BalanceSheetTallyLive } = lazyModule(() => import('./modules/balanceSheetTally'));
+const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/capitalVsInvestment'));
+const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, AccountsChartLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
+const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
+const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('./modules/financialStatements'));
+const { NotesToFinancials } = lazyModule(() => import('./modules/reportsNotes'));
+const { CostCenterMasterLive } = lazyModule(() => import('./modules/costCentersLive'));
+const { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, GroupsMaster, SubGroupsMaster, LedgersMaster } = lazyModule(() => import('./modules/mastersLive'));
+const { DataImportPage } = lazyModule(() => import('./modules/dataImport'));
 import { GlobalSearch } from './shell/GlobalSearch';
 import { Placeholder } from './shell/Placeholder';
 import { SideNav } from './shell/SideNav';
@@ -67,6 +83,17 @@ import { LedgerSwitcher } from './shell/LedgerSwitcher';
 import { LedgerModalHost } from './core/LedgerModalHost';
 import { ShortcutHelp } from './shell/ShortcutHelp';
 import { DockProvider } from './core/ux/dock';
+
+/* Shown by <Suspense> while a lazily-loaded route chunk downloads. Branded,
+   lightweight, and motion-reduced-aware (styles in index.css). */
+function RouteFallback(){
+  return (
+    <div className="kb-route-fallback" role="status" aria-live="polite">
+      <div className="kb-route-spinner" aria-hidden="true"/>
+      <span>Loading…</span>
+    </div>
+  );
+}
 
 export default function KB360App(){
   /* ── Restore the session from localStorage so a refresh keeps the user
@@ -530,7 +557,10 @@ export default function KB360App(){
               (upload old data with the template). Use this form to review or edit existing entries only.
             </div>
           )}
-          <Page/>
+          {/* Suspense catches the lazy() page chunks while they download. */}
+          <Suspense fallback={<RouteFallback/>}>
+            <Page/>
+          </Suspense>
         </ErrorBoundary>
       </AppShell>
 

@@ -10,6 +10,7 @@ import { TodayVouchersTable } from '../components/tables/TodayVouchersTable';
 import { BankReconStatusPanel } from '../components/shared/BankReconStatusPanel';
 import { CloseChecklist } from '../components/shared/CloseChecklist';
 import { TopVendorsOverdueTable } from '../components/tables/TopVendorsOverdueTable';
+import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 
 export function SrAeDashboardPage({ currentUser, setRoute }) {
   const { data, todayTotal, todayValue, isLoading } = useSrAeDashboard();
@@ -18,7 +19,7 @@ export function SrAeDashboardPage({ currentUser, setRoute }) {
   const setPeriod = useDashboardStore((s) => s.setPeriod);
 
   if (isLoading || !data) {
-    return <div style={{ padding: '24px', color: '#5a6691', fontSize: 12 }}>Loading senior accounts dashboard…</div>;
+    return <DashboardSkeleton title="Senior Accounts Executive Dashboard" numKpis={4} columns={2} hasCharts={false} />;
   }
 
   const { todayVouchers, reconStatus, topSuppliers } = data;

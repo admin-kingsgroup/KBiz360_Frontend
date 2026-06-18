@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { Save, Settings, User } from 'lucide-react';
 import { _EXP_BGT_LISTENERS, _SAVE_LISTENERS, genVNo } from './data';
-import { _NOTIF_LISTENERS } from './helpers';
+import { _NOTIF_LISTENERS } from './notifStore';
 
 // VNO is auto-assigned by the server on save (sequential per branch × type, no
 // duplicates). The form shows "Auto" so the displayed number always matches reality.

@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Lock, LogOut, Menu, Settings, User } from 'lucide-react';
-import { Icon } from '../core/styles';
+import { Icon } from '../core/styleTokens';
 
 export function UserMenu({currentUser, setCurrentUser, setRoute}){
   const [open, setOpen] = useState(false);

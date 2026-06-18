@@ -3,7 +3,7 @@
    Auto-generated from KBiz360_v2.jsx · 1176 lines · 44 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, Suspense } from 'react';
 import { Calendar, ChevronRight, Clock, Download, Plus, Save, Search, Trash2, TrendingDown, TrendingUp, User } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from './business-logic';
@@ -17,8 +17,18 @@ import { useGpBills, useProfitAndLoss, useYieldByDestination, useCustomerLtv, us
 import { ReportDateBar, resolveReportRange } from './reportDateBar';
 import { triggerSaveRefresh, useMobile } from './hooks';
 import { openPrintWindow } from './voucher-print';
-import { PurchaseLinkField } from '../modules/transactions';
-import { UserSwitcher } from '../shell/UserSwitcher';
+/* PurchaseLinkField is lazy-loaded (used only inside the sales voucher form),
+   so styles.jsx no longer STATICALLY imports the transactions feature —
+   completing the break of the styles ↔ feature-modules cycle. The old
+   UserSwitcher import was dead (referenced only in a comment) and is removed. */
+const PurchaseLinkField = React.lazy(() =>
+  import('../modules/transactions').then(m => ({ default: m.PurchaseLinkField })));
+/* Lightweight UI tokens were moved to ./styleTokens so eager shell/core files
+   can import them WITHOUT pulling this (recharts-heavy) file. Import for local
+   use here AND re-export under the original names so lazy './styles' consumers
+   keep working unchanged. */
+import { B, bc, bcfmt, inp, card, btnG, btnGh, Icon, FL, KpiCard, RPT_thStyle, RPT_tdStyle } from './styleTokens';
+export { B, bc, bcfmt, inp, card, btnG, btnGh, Icon, FL, KpiCard, RPT_thStyle, RPT_tdStyle };
 
 /* ── Per-branch config — now DB-backed ──────────────────────────────
    The per-branch config (currency symbol, tax type, GST rates, place-of-supply
@@ -26,17 +36,7 @@ import { UserSwitcher } from '../shell/UserSwitcher';
    bookings / customers / alerts. The demo data is gone (screens read live data);
    the config now comes from /api/company-profile via the synchronous reference
    cache. `B` is a Proxy so legacy `B[code].cur` / `bc(branch)` keep working. */
-export const B = new Proxy({}, {
-  get: (_t, code) => branchCfg(code === "ALL" ? "ALL" : String(code)),
-  has: () => true,
-});
-
-/* Helper — get branch config */
-
-export function bc(branch){return branch==="ALL"?B.ALL:B[branch?.code]||B.BOM;}
-/* Helper — format amount with branch currency */
-
-export function bcfmt(branch,n){const b=bc(branch);return b.cur+Number(n).toLocaleString("en-IN",{maximumFractionDigits:0});}
+/* B, bc, bcfmt moved to ./styleTokens (imported + re-exported at top). */
 
 /* ── Voucher number generator ───────────────────────────────────────
    Pattern: BRANCH/DDYY/MODULE + SEQ
@@ -60,30 +60,7 @@ export function vDate(){
 
 /* Branch-module running counters — persists within React session */
 
-export const inp={
-  width:"100%",padding:"7px 10px",border:"1px solid #e1e3ec",
-  borderRadius:7,fontSize:11.5,outline:"none",
-  boxSizing:"border-box",background:"#fff",
-};
-
-export const card={
-  background:"#fff",border:"1px solid #e1e3ec",
-  borderRadius:12,padding:"14px 16px",
-};
-
-export const btnG={
-  display:"flex",alignItems:"center",justifyContent:"center",gap:6,
-  padding:"8px 18px",background:"#0d1326",color:"#fff",
-  border:"none",borderRadius:8,fontSize:12,fontWeight:700,
-  cursor:"pointer",whiteSpace:"nowrap",
-};
-
-export const btnGh={
-  display:"flex",alignItems:"center",justifyContent:"center",gap:6,
-  padding:"7px 16px",background:"transparent",color:"#0d1326",
-  border:"1px solid #e1e3ec",borderRadius:8,fontSize:12,fontWeight:600,
-  cursor:"pointer",whiteSpace:"nowrap",
-};
+/* inp, card, btnG, btnGh moved to ./styleTokens (re-exported at top). */
 
 /* Module icons */
 
@@ -94,19 +71,7 @@ export const ST={
   Confirmed:{bg:"#E6F1FB",color:"#185FA5"},
 };
 
-/* Form-field label wrapper */
-
-export function FL({label,children}){
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <label style={{fontSize:10,color:"#5a6691",fontWeight:600,
-        letterSpacing:"0.4px",textTransform:"uppercase"}}>
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
+/* FL moved to ./styleTokens (re-exported at top). */
 
 /* Salesperson — read-only, comes from CRM (SALESPEOPLE in data.js).
    Shown on every sale/purchase voucher so the booking can be matched
@@ -284,13 +249,15 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
         <div ref={printRef}>
           {/* ── Purchase Link — inline, first field in every sales voucher ── */}
           {type==="sales"&&(
-            <PurchaseLinkField
-              branch={branch}
-              saleMod={saleMod}
-              saleAmt={saleAmt||0}
-              selected={linkedPurch}
-              onSelect={setLinkedPurch}
-            />
+            <Suspense fallback={null}>
+              <PurchaseLinkField
+                branch={branch}
+                saleMod={saleMod}
+                saleAmt={saleAmt||0}
+                selected={linkedPurch}
+                onSelect={setLinkedPurch}
+              />
+            </Suspense>
           )}
           {children}
         </div>
@@ -488,71 +455,14 @@ export function AgeTable({data}){
 
 /* ── RECEIVABLES AGEING ──────────────────────────────────── */
 
-export function Icon({children,bg="#E6F1FB",c="#185FA5",size=36}){
-  return (
-    <div style={{width:size,height:size,borderRadius:Math.round(size*0.25),
-      background:bg,color:c,display:"flex",alignItems:"center",
-      justifyContent:"center",flexShrink:0,fontSize:size*0.45}}>
-      {children}
-    </div>
-  );
-}
+/* Icon moved to ./styleTokens (re-exported at top). */
 
 
 /* ═══════════════════════════════════════════════════════════════
    TOPBAR
    ═══════════════════════════════════════════════════════════════ */
 
-export function KpiCard({label,value,subtitle,trend,Icon,accent="neutral",onClick}){
-  const mob=useMobile();
-  const [pressed,setPressed]=useState(false);
-  const ac={
-    info:   {bg:"#E6F1FB",c:"#185FA5",b:"#B5D4F4"},
-    success:{bg:"#EAF3DE",c:"#3B6D11",b:"#C0DD97"},
-    warning:{bg:"#FAEEDA",c:"#854F0B",b:"#FAC775"},
-    danger: {bg:"#FCEBEB",c:"#A32D2D",b:"#F7C1C1"},
-    neutral:{bg:"#f3f4f8",c:"#384677",b:"#e1e3ec"},
-  }[accent]||{bg:"#f3f4f8",c:"#384677",b:"#e1e3ec"};
-  const clickable=!!onClick;
-  return (
-    <div onClick={onClick}
-      onMouseDown={()=>clickable&&setPressed(true)}
-      onMouseUp={()=>setPressed(false)}
-      onTouchStart={()=>clickable&&setPressed(true)}
-      onTouchEnd={()=>setPressed(false)}
-      style={{background:pressed?"#f0f4ff":"#fff",border:`1px solid ${ac.b}`,
-        borderRadius:10,padding:mob?"10px 12px":"12px 14px",
-        borderTop:`3px solid ${ac.c}`,display:"flex",flexDirection:"column",gap:4,
-        minWidth:0,overflow:"hidden",cursor:clickable?"pointer":"default",
-        transform:pressed?"scale(0.97)":"scale(1)",
-        transition:"transform 0.12s,background 0.12s",userSelect:"none",
-        WebkitTapHighlightColor:"transparent"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <p style={{margin:0,fontSize:mob?9:9.5,fontWeight:700,color:ac.c,
-          textTransform:"uppercase",letterSpacing:"0.5px"}}>{label}</p>
-        <div style={{display:"flex",alignItems:"center",gap:5}}>
-          <div style={{width:mob?26:30,height:mob?26:30,borderRadius:8,
-            background:ac.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {Icon&&<Icon size={mob?13:15} style={{color:ac.c}}/>}
-          </div>
-          {clickable&&<ChevronRight size={12} style={{color:ac.c,opacity:0.6}}/>}
-        </div>
-      </div>
-      <p style={{margin:0,fontSize:mob?19:22,fontWeight:800,color:"#0d1326",
-        letterSpacing:"-0.02em",lineHeight:1.1,fontVariantNumeric:"tabular-nums"}}>{value}</p>
-      <div style={{display:"flex",alignItems:"center",gap:5}}>
-        {trend!=null&&(
-          <span style={{display:"flex",alignItems:"center",gap:2,fontSize:mob?9.5:10.5,
-            fontWeight:600,color:trend>=0?"#27500A":"#A32D2D"}}>
-            {trend>=0?<TrendingUp size={10}/>:<TrendingDown size={10}/>}
-            {trend>=0?"+":""}{trend}%
-          </span>
-        )}
-        <p style={{margin:0,fontSize:mob?9:10,color:"#5a6691"}}>{subtitle}</p>
-      </div>
-    </div>
-  );
-}
+/* KpiCard moved to ./styleTokens (re-exported at top). */
 
 /* ── UserSwitcher (demo simulator — switch viewing identity) ── */
 
@@ -607,9 +517,7 @@ export function RPT_Page({title,subtitle,toolbar,children}){
 }
 
 
-export const RPT_thStyle={padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#5a6691",borderBottom:"1px solid #e1e3ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase",background:"#f7f8fb"};
-
-export const RPT_tdStyle={padding:"8px 12px",fontSize:12,color:"#0d1326",borderBottom:"1px solid #f0f2f7"};
+/* RPT_thStyle, RPT_tdStyle moved to ./styleTokens (re-exported at top). */
 
 /* ── Seed data ────────────────────────────────────────────────────── */
 

@@ -20,7 +20,7 @@
 import React from 'react';
 import { Search, X } from 'lucide-react';
 import { isoDate, todayISO } from './dates';
-import { inp } from './styles';
+import { inp } from './styleTokens';
 import { periodRange } from './period';
 
 // FY (Apr–Mar) start year for a given date: Jan–Mar belongs to the prior FY.

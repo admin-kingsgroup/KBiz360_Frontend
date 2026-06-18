@@ -5,9 +5,9 @@
 
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Menu, Search, User } from 'lucide-react';
-import { TRow } from '../core/helpers';
+import { TRow } from '../core/ui';
 import { getMenu } from '../core/menus';
-import { bc } from '../core/styles';
+import { bc } from '../core/styleTokens';
 import { BranchSwitcher } from './BranchSwitcher';
 import { UserSwitcher } from './UserSwitcher';
 
@@ -19,7 +19,7 @@ export function SideNav({branch,setBranch,route,setRoute,onClose,currentUser,swi
   const go=href=>{setRoute(href);if(onClose)onClose();};
 
   return (
-    <div style={{display:"flex",flexDirection:"column",height:"100%",
+    <div className="kb-sidenav" style={{display:"flex",flexDirection:"column",height:"100%",
       background:"#0d1326",overflow:"hidden"}}>
       {/* User + Branch switchers */}
       <div style={{padding:"10px 12px",borderBottom:"1px solid #1a2340",flexShrink:0}}>

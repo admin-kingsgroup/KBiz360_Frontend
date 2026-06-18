@@ -12,7 +12,7 @@
 // No static data — empty in, empty out.
 // ───────────────────────────────────────────────────────────────────────────
 import React, { useMemo, useState } from 'react';
-import { bc } from './styles';
+import { bc } from './styleTokens';
 import { PeriodBar } from './period';
 import { useLedgerStatement, useOpenBills, useLedgerSplit, useLedgerComponents, branchCode } from './useAccounting';
 import { openPrintPreview } from './PrintPreview';

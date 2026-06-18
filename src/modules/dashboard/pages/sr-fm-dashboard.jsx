@@ -15,6 +15,7 @@ import { VarianceFlagsPanel } from '../components/shared/VarianceFlagsPanel';
 // GSTR_FILING_STATUS lives in the taxation module and is shared across both
 // modules until a dedicated taxation feature service exists.
 import { GSTR_FILING_STATUS } from '../../taxation';
+import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 
 export function SrFmDashboardPage({ currentUser, setRoute }) {
   const { data, isLoading } = useSrFmDashboard();
@@ -23,7 +24,7 @@ export function SrFmDashboardPage({ currentUser, setRoute }) {
   const setPeriod = useDashboardStore((s) => s.setPeriod);
 
   if (isLoading || !data) {
-    return <div style={{ padding: '24px', color: '#5a6691', fontSize: 12 }}>Loading finance manager dashboard…</div>;
+    return <DashboardSkeleton title="Senior Finance Manager Dashboard" numKpis={5} columns={3} hasCharts={true} />;
   }
 
   const { cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags } = data;

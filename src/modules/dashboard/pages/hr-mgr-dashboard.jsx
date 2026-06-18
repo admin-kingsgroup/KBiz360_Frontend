@@ -7,6 +7,7 @@ import { useDashboardActions } from '../hooks/use-dashboard-actions';
 import { useDashboardStore } from '../store/dashboard.store';
 import { BirthdaysPanel } from '../components/shared/BirthdaysPanel';
 import { AnniversariesPanel } from '../components/shared/AnniversariesPanel';
+import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 
 export function HrMgrDashboardPage({ currentUser, setRoute }) {
   const { data: stats, isLoading } = useHrMgrDashboard();
@@ -15,7 +16,7 @@ export function HrMgrDashboardPage({ currentUser, setRoute }) {
   const setPeriod = useDashboardStore((s) => s.setPeriod);
 
   if (isLoading || !stats) {
-    return <div style={{ padding: '24px', color: '#5a6691', fontSize: 12 }}>Loading HR dashboard…</div>;
+    return <DashboardSkeleton title="HR Manager Dashboard" numKpis={5} columns={2} hasCharts={false} />;
   }
 
   const [payrollLabel, payrollDelta = ''] = (stats.payrollStatus || '').split(' — ');

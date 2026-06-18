@@ -7,9 +7,9 @@ import React, { useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { getUnreadCount } from '../core/business-logic';
 import { ADM_DATA } from '../core/data';
-import { _NOTIFS, _PASSPORTS, _TDS_ENTRIES, _VENDOR_TERMS, markAllRead, markNotifRead } from '../core/helpers';
+import { _NOTIFS, _PASSPORTS, _TDS_ENTRIES, _VENDOR_TERMS, markAllRead, markNotifRead } from '../core/notifStore';
 import { useMobile, useNotifRefresh } from '../core/hooks';
-import { btnG, btnGh, card } from '../core/styles';
+import { btnG, btnGh, card } from '../core/styleTokens';
 
 export function NotifPanel({onClose,setRoute}){
   useNotifRefresh();

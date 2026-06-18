@@ -92,7 +92,7 @@ export function DataTable({
   initialSort = null,
   pageSize = 0,
   showColumnToggle = false,
-  showDensityToggle = false,
+  showDensityToggle = true,
   onExport,                       // custom export handler; overrides built-in Excel
   exportName,                     // string → shows an "Excel" button (core/exportExcel)
   printTitle,                     // string → shows a "Print" button (full dataset → A4 preview)
@@ -108,12 +108,25 @@ export function DataTable({
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const [hidden, setHidden] = useState(() => new Set());
-  const [denseState, setDenseState] = useState(denseProp);
   const [colMenuOpen, setColMenuOpen] = useState(false);
+  const [denseState, setDenseState] = useState(() => {
+    const saved = localStorage.getItem('kbiz360_table_density');
+    if (saved) return saved === 'compact';
+    return denseProp;
+  });
 
   const dense = denseState;
   const padY = dense ? 'py-1.5' : 'py-2.5';
   const padX = 'px-3.5';
+  const tableFontSize = dense ? 'text-[11px]' : 'text-xs';
+
+  const handleToggleDensity = () => {
+    setDenseState((d) => {
+      const next = !d;
+      localStorage.setItem('kbiz360_table_density', next ? 'compact' : 'comfortable');
+      return next;
+    });
+  };
 
   // Apply sticky-first-column + visibility.
   const effColumns = useMemo(() => {
@@ -213,7 +226,7 @@ export function DataTable({
             )}
             {showDensityToggle && (
               <button
-                onClick={() => setDenseState((d) => !d)}
+                onClick={handleToggleDensity}
                 title={dense ? 'Comfortable rows' : 'Compact rows'}
                 aria-label="Toggle row density"
                 className="inline-flex h-8 items-center gap-1.5 rounded-md border border-surface-border px-2.5 text-xs font-medium text-ink-muted transition hover:bg-surface-alt"
@@ -280,7 +293,7 @@ export function DataTable({
 
       {/* Scroll viewport — bounded height; thead/tfoot stick within it */}
       <div className="w-full overflow-auto" style={{ maxHeight }}>
-        <table className="w-full border-collapse text-xs" style={{ minWidth }}>
+        <table className={cn('w-full border-collapse', tableFontSize)} style={{ minWidth }}>
           <thead>
             <tr className="bg-navy">
               {effColumns.map((col) => {

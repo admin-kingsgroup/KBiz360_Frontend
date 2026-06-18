@@ -19,6 +19,8 @@ import { useModulePL, useBalanceSheet, useAgeing, useTaxSummary, useTrialBalance
 import { useQueries } from '@tanstack/react-query';
 import { apiGet } from '../../../core/api';
 
+import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+
 const RANGE_SHORT = { month: 'This Month', quarter: 'This Quarter', ytd: 'YTD', all: 'All Time' };
 const C = { dark: '#0d1326', dim: '#5a6691', green: '#1f7a3d', red: '#A32D2D', gold: '#854F0B', border: '#e7e9f0' };
 const th = { padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', borderBottom: `1px solid ${C.border}` };
@@ -69,13 +71,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
   );
 
   if (isLoading || !data) {
-    return (
-      <div style={{ padding: 18, maxWidth: 1400, margin: '0 auto' }}>
-        <DashboardHeader title="Director Dashboard" subtitle="Whole-company owner view" user={currentUser} onExport={() => window.print()} />
-        {Controls}
-        <div style={{ padding: '24px', color: C.dim, fontSize: 12 }}>Loading director dashboard…</div>
-      </div>
-    );
+    return <DashboardSkeleton title="Director Dashboard" numKpis={12} />;
   }
 
   const { revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers } = data;

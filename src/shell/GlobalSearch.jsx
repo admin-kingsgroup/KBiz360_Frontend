@@ -13,7 +13,7 @@ import { BRANCHES } from '../core/data';
 import { ALL_TIME_FROM, todayISO } from '../core/dates';
 import { apiGet } from '../core/api';
 import { filterGpBills } from '../core/registerSearch';
-import { btnGh, card, inp } from '../core/styles';
+import { btnGh, card, inp } from '../core/styleTokens';
 
 export function GlobalSearch({setRoute}){
   const [q,setQ]=useState("");

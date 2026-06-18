@@ -4,7 +4,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import { MODULE_ICONS, PURCHASE_REGISTRY, _MOD_KEY, _UNLINKED_SALES } from './data';
-import { _NOTIFS } from './helpers';
+import { _NOTIFS } from './notifStore';
 
 export function getAvailablePurchases(modType,branch){
   const brCode=branch==="ALL"?null:branch?.code;

@@ -5,6 +5,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { lazyModule } from './lazyModule';
 import { useModalEsc } from './ux/useModalEsc';
 import { AlertTriangle, ChevronDown, ChevronRight, Download, Lock, Plus, Printer, Save, Search, Settings, User } from 'lucide-react';
 import { Cell } from 'recharts';
@@ -16,12 +17,26 @@ import { useGpBills } from './useAccounting';
 import { fmt, fmtINR } from './format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS, PERIOD_OPTIONS as MONTH_PERIOD_OPTIONS, FY_YTD_MONTHS } from './dates';
 import { useMobile } from './hooks';
-import { B, FL, KpiCard, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, vDate } from './styles';
-import { AcctsExecDashboard, Dashboard, DirectorDashboard, HrMgrDashboard, SrAeDashboard, SrFmDashboard } from '../modules/dashboard';
-import { VendorTermsMaster } from '../modules/masters';
-import { IntercompanyBilling } from '../modules/reports';
-import { EWayBill } from '../modules/taxation';
-import { ContraVoucher, PaymentVoucher, ReceiptVoucher } from '../modules/transactions';
+/* Import style primitives from the lightweight token module (NOT ./styles) so
+   helpers no longer depends on styles.jsx — breaking the styles↔helpers cycle
+   that was forcing both (and recharts) into the initial bundle. vDate was an
+   unused import here and is dropped. */
+import { B, FL, KpiCard, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp } from './styleTokens';
+/* Shared notification + demo-record state and the TRow primitive were moved
+   to ./notifStore and ./ui (so eager modules don't pull helpers). Import them
+   for this file's own use AND re-export under the original names so the many
+   existing './helpers' consumers keep working unchanged. */
+import { _NOTIFS, _NOTIF_LISTENERS, triggerNotifRefresh, markNotifRead, markAllRead, _PASSPORTS, _VENDOR_TERMS, _TDS_ENTRIES } from './notifStore';
+import { TRow } from './ui';
+export { _NOTIFS, _NOTIF_LISTENERS, triggerNotifRefresh, markNotifRead, markAllRead, _PASSPORTS, _VENDOR_TERMS, _TDS_ENTRIES, TRow };
+/* Dashboards render lazily inside DashboardRouter (under App's <Suspense>), so
+   helpers no longer STATICALLY imports the dashboard feature. This is the
+   keystone that breaks the helpers ↔ feature-modules ↔ styles dependency cycle
+   and lets recharts + styles + helpers defer out of the initial bundle.
+   (VendorTermsMaster / IntercompanyBilling / EWayBill / ContraVoucher /
+   PaymentVoucher / ReceiptVoucher were dead imports — referenced only in
+   "see rebuilt version below" comments — and are removed.) */
+const { AcctsExecDashboard, Dashboard, DirectorDashboard, HrMgrDashboard, SrAeDashboard, SrFmDashboard } = lazyModule(() => import('../modules/dashboard'));
 
 export const VTH=({c,r})=><th style={{textAlign:r?"right":"left",padding:"6px 8px",fontWeight:500,color:"#5a6691",fontSize:10.5,whiteSpace:"nowrap",background:"#f3f4f8"}}>{c}</th>;
 
@@ -104,21 +119,10 @@ export const SUB_AGENTS_DATA=[];
 
 export const _PROFORMAS=[];
 
-/* ── Notifications data ─── */
-
-export const _NOTIFS=[...NOTIFICATIONS_DATA];
-
-export const _NOTIF_LISTENERS=new Set();
-
-export function triggerNotifRefresh(){_NOTIF_LISTENERS.forEach(fn=>fn());}
-
-export function markNotifRead(id){
-  const n=_NOTIFS.find(n=>n.id===id);
-  if(n)n.read=true;
-  triggerNotifRefresh();
-}
-
-export function markAllRead(){_NOTIFS.forEach(n=>n.read=true);triggerNotifRefresh();}
+/* Notifications + demo registers (_NOTIFS, _PASSPORTS, _VENDOR_TERMS,
+   _TDS_ENTRIES, markNotifRead, …) moved to ./notifStore and re-exported at the
+   top of this file so eager modules don't drag helpers (+ recharts) into the
+   initial bundle. TRow moved to ./ui. */
 
 export const ACM_REASON_CODES={
   RC:{code:"RC",label:"Refund Credit",         desc:"Credit for refunded ticket through BSP"},
@@ -268,7 +272,7 @@ export function UxPreferences(){
 export const _ADVANCES=[];
 
 
-export const _PASSPORTS=[];
+/* _PASSPORTS now lives in ./notifStore (re-exported at top). */
 
 
 export const _TICKET_CTRL=[];
@@ -366,7 +370,7 @@ export function MarkupRateSheet({branch}){
 
 /* ── ITEM 10: VENDOR PAYMENT TERMS  /masters/vendor-terms ─────── */
 
-export const _VENDOR_TERMS=[];
+/* _VENDOR_TERMS now lives in ./notifStore (re-exported at top). */
 
 /* VendorTermsMaster — see rebuilt version below */
 
@@ -666,7 +670,7 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}
    Dr Bank / Cash  |  Cr Debtor (with TDS deduction)
    ════════════════════════════════════════════════════════════════ */
 
-export const _TDS_ENTRIES=[];
+/* _TDS_ENTRIES now lives in ./notifStore (re-exported at top). */
 
 export const _TCS_ENTRIES=[];
 
@@ -725,15 +729,7 @@ export function MstrModal({title,onClose,children}){
    1. CHART OF ACCOUNTS
    ════════════════════════════════════════════════════════════════ */
 
-export function TRow({l,v}){
-  return (
-    <div style={{display:"flex",justifyContent:"space-between",
-      fontSize:11.5,padding:"3px 0",borderBottom:"1px solid #f3f4f8"}}>
-      <span style={{color:"#5a6691"}}>{l}</span>
-      <span style={{fontVariantNumeric:"tabular-nums"}}>{v}</span>
-    </div>
-  );
-}
+/* TRow moved to ./ui (re-exported at top). */
 
 /* ── Chip ── */
 

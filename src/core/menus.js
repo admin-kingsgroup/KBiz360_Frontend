@@ -5,10 +5,12 @@
 
 import { BarChart2, Calendar, CheckSquare, Database, Download, LayoutDashboard, Lock, Settings, ShoppingCart, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
-import { Recruitment } from './helpers';
 import { PERM_MODULES } from './permissions';
 import { getRole } from './referenceCache';
-import { Dashboard } from '../modules/dashboard';
+/* (Removed dead imports of Recruitment from './helpers' and Dashboard from
+   '../modules/dashboard' — only their string labels/hrefs are used in the menu
+   tree, never the component values. Dropping them also keeps the menu out of
+   the helpers + dashboard feature chunks.) */
 
 // Organised on Tally's master taxonomy: Accounts Info · Statutory Info ·
 // Parties (which in Tally are just ledgers) · Inventory & Catalog · Utilities.

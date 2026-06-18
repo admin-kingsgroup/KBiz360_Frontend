@@ -9,6 +9,8 @@ import { PostShortcutTiles } from '../components/shared/PostShortcutTiles';
 import { RecentActivityFeed } from '../components/shared/RecentActivityFeed';
 import { AgeingBuckets } from '../components/shared/AgeingBuckets';
 
+import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+
 export function AcctsExecDashboardPage({ currentUser, setRoute /*, branch */ }) {
   const ownBranch = currentUser?.branches?.[0] || 'BOM';
   const { data, branchData, isLoading } = useAcctsExecDashboard(ownBranch);
@@ -17,7 +19,7 @@ export function AcctsExecDashboardPage({ currentUser, setRoute /*, branch */ }) 
   const setPeriod = useDashboardStore((s) => s.setPeriod);
 
   if (isLoading || !data) {
-    return <div style={{ padding: '24px', color: '#5a6691', fontSize: 12 }}>Loading accounts executive dashboard…</div>;
+    return <DashboardSkeleton title="Accounts Executive Dashboard" numKpis={4} columns={2} />;
   }
 
   const { recentActivity, arAgeing } = data;

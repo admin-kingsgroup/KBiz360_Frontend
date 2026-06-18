@@ -1,7 +1,7 @@
 // ─── Final-print invoice renderer (Sales + Purchase) ─────────────────────────
 // Builds the Travkings invoice HTML (matching invoice-templates/*.html) from a
 // LIVE approved booking. Used by Module Registers + SO/PO/GP Approvals.
-import { bc } from './styles';
+import { bc } from './styleTokens';
 import { companyProfile } from './referenceCache';
 
 const GST_STATES = {

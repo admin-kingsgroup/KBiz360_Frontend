@@ -6,7 +6,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { BRANCHES, CONSOLIDATED_LABEL } from '../core/data';
-import { Dashboard } from '../modules/dashboard';
+/* (Removed dead `import { Dashboard } from '../modules/dashboard'` — only a
+   comment referenced it. This shell component is eager, so the import was
+   dragging the whole dashboard feature + recharts into the initial bundle.) */
 
 export function BranchSwitcher({branch,setBranch,currentUser,light}){
   const [open,setOpen]=useState(false);

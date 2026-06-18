@@ -11,6 +11,7 @@ import { ActionItemsPanel } from '../components/shared/ActionItemsPanel';
 import { UpcomingTravelPanel } from '../components/shared/UpcomingTravelPanel';
 import { QuickStatsCard } from '../components/cards/QuickStatsCard';
 import { QuickCreateBar } from '../components/shared/QuickCreateBar';
+import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 
 export function BranchDashboardPage({ branch, setRoute }) {
   const mob = useMobile();
@@ -18,7 +19,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
   const { navigate } = useDashboardActions(setRoute);
 
   if (isLoading || !data) {
-    return <div style={{ padding: '24px', color: '#5a6691', fontSize: 12 }}>Loading dashboard…</div>;
+    return <DashboardSkeleton title="Branch Dashboard" numKpis={4} />;
   }
 
   const { kpis, gpByModule, topConsultants, actionItems, upcomingTravel, billsYtd } = data;

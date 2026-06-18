@@ -112,6 +112,32 @@ button {
   .noprint, .no-print, .np, .cl-noprint { display: none !important; }
 }
 
+/* ─── Route-level lazy-load fallback (Suspense) ─── */
+@keyframes kb-spin { to { transform: rotate(360deg); } }
+.kb-route-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 60vh;
+  color: #5a6691;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.kb-route-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid #e1e3ec;
+  border-top-color: #d4a437;       /* gold accent */
+  animation: kb-spin 0.7s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kb-route-spinner { animation-duration: 2s; }
+}
+
 /* Remove up/down spin buttons from number inputs */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
@@ -120,5 +146,125 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+/* ─── Micro-interactions & Visual Transitions ─── */
+
+/* General transitions for all interactive elements */
+button,
+a,
+input,
+select,
+textarea,
+.kbiz-card,
+[role="button"] {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Button click animations (Active State) */
+button:active:not(:disabled),
+.kbiz-btn-primary:active:not(:disabled),
+.kbiz-btn-accent:active:not(:disabled) {
+  transform: scale(0.96) !important;
+}
+
+/* Hover effects for inline-styled buttons based on background colors */
+
+/* Navy Buttons (style btnG) */
+button[style*="#0d1326"],
+button[style*="rgb(13, 19, 38)"] {
+  background-color: #0d1326;
+}
+button[style*="#0d1326"]:hover,
+button[style*="rgb(13, 19, 38)"]:hover {
+  background-color: #1e293b !important;
+  box-shadow: 0 4px 12px rgba(13, 19, 38, 0.15);
+}
+
+/* Gold Accent Buttons */
+button[style*="#d4a437"],
+button[style*="rgb(212, 164, 55)"] {
+  background-color: #d4a437;
+}
+button[style*="#d4a437"]:hover,
+button[style*="rgb(212, 164, 55)"]:hover {
+  background-color: #c2932e !important;
+  box-shadow: 0 4px 12px rgba(212, 164, 55, 0.2);
+}
+
+/* Green Buttons */
+button[style*="#27500A"],
+button[style*="rgb(39, 80, 10)"] {
+  background-color: #27500a;
+}
+button[style*="#27500A"]:hover,
+button[style*="rgb(39, 80, 10)"]:hover {
+  background-color: #1e3f07 !important;
+  box-shadow: 0 4px 12px rgba(39, 80, 10, 0.15);
+}
+
+/* Blue Buttons */
+button[style*="#185FA5"],
+button[style*="rgb(24, 95, 165)"] {
+  background-color: #185fa5;
+}
+button[style*="#185FA5"]:hover,
+button[style*="rgb(24, 95, 165)"]:hover {
+  background-color: #134d85 !important;
+  box-shadow: 0 4px 12px rgba(24, 95, 165, 0.15);
+}
+
+/* Ghost Buttons (style btnGh) */
+button[style*="background: transparent"][style*="color: #0d1326"],
+button[style*="background:transparent"][style*="color:#0d1326"],
+button[style*="background: transparent"][style*="color: rgb(13, 19, 38)"],
+button[style*="background:transparent"][style*="color:rgb(13, 19, 38)"] {
+  background-color: transparent;
+}
+button[style*="background: transparent"][style*="color: #0d1326"]:hover,
+button[style*="background:transparent"][style*="color:#0d1326"]:hover,
+button[style*="background: transparent"][style*="color: rgb(13, 19, 38)"]:hover,
+button[style*="background:transparent"][style*="color:rgb(13, 19, 38)"]:hover {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Input / Control Focus States */
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #d4a437 !important;
+  box-shadow: 0 0 0 2px rgba(212, 164, 55, 0.25) !important;
+  outline: none;
+}
+
+/* Clickable Cards (e.g., KPICard) Hover Effects */
+div[style*="cursor: pointer"]:hover,
+div[style*="cursor:pointer"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px -5px rgba(13, 19, 38, 0.08) !important;
+}
+div[style*="cursor: pointer"]:active,
+div[style*="cursor:pointer"]:active {
+  transform: translateY(0px) scale(0.99);
+}
+
+/* SideNav Menu Item Hover / Active States */
+.kb-sidenav [onClick] {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.kb-sidenav [onClick]:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+.kb-sidenav [onClick]:active {
+  transform: scale(0.98);
+}
+.kb-sidenav [onClick]:hover span {
+  color: #fff !important;
+}
+/* Ensure active item label retains its color on hover */
+.kb-sidenav [onClick][style*="rgba(212,164,55,0.12)"]:hover span,
+.kb-sidenav [onClick][style*="rgba(212,164,55,0.1)"]:hover span {
+  color: #d4a437 !important;
 }
 

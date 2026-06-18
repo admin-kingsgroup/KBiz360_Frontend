@@ -11,13 +11,19 @@
 // size, and prints through the same template. Clicking a voucher number drills
 // into the editable voucher; saving refreshes the statement live.
 // ───────────────────────────────────────────────────────────────────────────
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { LedgerAccountView } from './ledgerUI';
 import { pushModal } from './ux/modalStore';
 import { useDock } from './ux/dock';
-import { VoucherEditor } from '../modules/accountingLive';
 import { openModuleRegister } from './registerNav';
-import { bc } from './styles';
+import { bc } from './styleTokens';
+
+/* VoucherEditor lives in the 2000-line accountingLive module. It's only needed
+   when the user drills into a voucher from the ledger modal, so load it lazily —
+   this keeps accountingLive (and the styles/recharts it pulls) OUT of the
+   initial bundle even though this host is mounted eagerly by App. */
+const VoucherEditor = React.lazy(() =>
+  import('../modules/accountingLive').then(m => ({ default: m.VoucherEditor })));
 
 const DARK = '#111111', DIM = '#6A6A6A';
 
@@ -99,7 +105,9 @@ export function LedgerModalHost({ branch: shellBranch }) {
               <strong style={{ fontSize: 13, color: '#0d1326' }}>{job.name} · {voucher.vno}</strong>
               <button onClick={() => setVoucher(null)} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18 }}>✕</button>
             </div>
-            <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} onClose={() => setVoucher(null)} />
+            <Suspense fallback={<div style={{ padding: 24, color: DIM, fontSize: 13 }}>Loading voucher…</div>}>
+              <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} onClose={() => setVoucher(null)} />
+            </Suspense>
           </div>
         </div>
       )}
