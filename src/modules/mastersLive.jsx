@@ -26,6 +26,11 @@ import { Kbd } from '../core/ux/widgets.jsx';
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
 const btn = (bg, fg) => ({ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: bg, color: fg });
 
+// Ledger list filter: empty group → all; group set → match the ledger's parent group;
+// sub-group set → also match its sub-group. Pure so the Ledgers screen can unit-test it.
+export const ledgerMatchesFilter = (r, group, subGroup) =>
+  (!group || r.group === group) && (!subGroup || r.subGroup === subGroup);
+
 const blankFromFields = (fields) => fields.reduce((o, f) => {
   o[f.key] = f.type === 'bool' ? (f.default ?? false) : f.type === 'tags' ? [] : f.type === 'number' ? (f.default ?? 0) : (f.default ?? '');
   return o;
@@ -633,44 +638,57 @@ export const LedgersMaster = ({ branch }) => {
     const c = branchCode(branch);
     return (!c || c === 'ALL') ? 'BOM' : c;
   });
-  const [groupView, setGroupView] = useState('ALL'); // filter the listing by Tally/ERP group
   const branchOptions = ['ALL', ...BRANCH_CODES];
-  // Group dropdown options: live group names (28 Tally + custom) once loaded,
-  // else the fixed 28-group skeleton so the filter is usable immediately.
-  const groupFilterOptions = groupOptions.length ? groupOptions : TALLY_GROUP_NAMES;
 
   // A party ledger = one whose Group (or Sub-Group) is Sundry Debtors / Creditors.
   // The GSTIN / credit-terms / contact / bank fields apply only to these.
   const isParty = (form) => /sundry\s+(debtors|creditors)/i.test(`${form?.group || ''} ${form?.subGroup || ''}`);
 
+  // Group + cascading Sub-Group LIST filters (default = show all). Pick a main group
+  // (e.g. Sundry Debtors) → the list narrows to ledgers under it; a Sub-Group dropdown
+  // then appears (its custom sub-groups) to narrow further. Main groups = the system
+  // Tally parents; the ledger's own `group` is that parent, `subGroup` the custom one.
+  const [groupFilter, setGroupFilter] = useState('');
+  const [subGroupFilter, setSubGroupFilter] = useState('');
+  const sysGroups = groups.filter((g) => g.system).map((g) => g.name);
+  const mainGroupOptions = sysGroups.length ? sysGroups : TALLY_GROUP_NAMES;
+  const subFilterOptions = groupFilter ? subGroupsUnder(groupFilter) : [];
+  const ledgerRowFilter = (r) => ledgerMatchesFilter(r, groupFilter, subGroupFilter);
+
+  const selWrap = { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM };
+  const selStyle = { ...inp, fontSize: 12, padding: '7px 9px', width: 'auto', minWidth: 120 };
   const toolbar = (
     <>
-      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
-        Branch
-        <select value={branchView} onChange={(e) => setBranchView(e.target.value)}
-          style={{ ...inp, fontSize: 12, padding: '7px 9px', width: 'auto', minWidth: 120 }}>
+      <label style={selWrap}>Branch
+        <select value={branchView} onChange={(e) => setBranchView(e.target.value)} style={selStyle}>
           <option value="ALL">All branches</option>
           {BRANCH_CODES.map((b) => <option key={b} value={b}>{b}</option>)}
         </select>
       </label>
-      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
-        Group
-        <select value={groupView} onChange={(e) => setGroupView(e.target.value)}
-          style={{ ...inp, fontSize: 12, padding: '7px 9px', width: 'auto', minWidth: 150 }}>
-          <option value="ALL">All groups</option>
-          {groupFilterOptions.map((g) => <option key={g} value={g}>{g}</option>)}
+      <label style={selWrap}>Group
+        <select value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setSubGroupFilter(''); }} style={selStyle}>
+          <option value="">All groups</option>
+          {mainGroupOptions.map((g) => <option key={g} value={g}>{g}</option>)}
         </select>
       </label>
+      {groupFilter && (
+        <label style={selWrap}>Sub-Group
+          <select value={subGroupFilter} onChange={(e) => setSubGroupFilter(e.target.value)} style={selStyle}>
+            <option value="">All sub-groups</option>
+            {subFilterOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </label>
+      )}
     </>
   );
 
   return (
     <>
-      <MasterCrud title="Ledgers" subtitle={`Chart of Accounts — ledger accounts (live)${branchView !== 'ALL' ? ` · ${branchView} + shared` : ''}${groupView !== 'ALL' ? ` · ${groupView}` : ''}`}
+      <MasterCrud title="Ledgers" subtitle={`Chart of Accounts — ledger accounts (live)${branchView !== 'ALL' ? ` · ${branchView} + shared` : ''}`}
         resource="ledgers"
         params={branchView !== 'ALL' ? { branch: branchView, includeInactive: 'true' } : { includeInactive: 'true' }}
         toolbar={toolbar}
-        rowFilter={groupView !== 'ALL' ? (r) => r.group === groupView : undefined}
+        rowFilter={ledgerRowFilter}
         note="Set Group to the parent Tally group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. All ledgers are owned by the BOM branch."
         fields={[
           { key: 'code', label: 'Code', type: 'text', required: true },

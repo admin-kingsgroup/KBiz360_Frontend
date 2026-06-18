@@ -758,6 +758,12 @@ export function LedgerAcLive({ branch }) {
   // Selection priority: explicit pick → last-opened (per-user pref) → first ledger.
   const selected = name || prefs.lastLedger || ledgers[0]?.name || '';
   const pickLedger = (n) => { setName(n); if (n) setPref('lastLedger', n); };
+  // Group + cascading Sub-Group filter to narrow the (long) ledger dropdown.
+  const [groupFilter, setGroupFilter] = useState('');
+  const [subGroupFilter, setSubGroupFilter] = useState('');
+  const allGroups = useMemo(() => [...new Set(ledgers.map((l) => l.group).filter(Boolean))].sort(), [ledgers]);
+  const subOptions = useMemo(() => (groupFilter ? [...new Set(ledgers.filter((l) => l.group === groupFilter).map((l) => l.subGroup).filter(Boolean))].sort() : []), [ledgers, groupFilter]);
+  const pickable = useMemo(() => ledgers.filter((l) => (!groupFilter || l.group === groupFilter) && (!subGroupFilter || l.subGroup === subGroupFilter)), [ledgers, groupFilter, subGroupFilter]);
   // "Open ledger" from any screen (legacy in-page event) switches the ledger live.
   useEffect(() => {
     const onOpen = (e) => { const n = e.detail?.name; if (n) { setName(n); setPref('lastLedger', n); } };
@@ -774,9 +780,19 @@ export function LedgerAcLive({ branch }) {
       sub={selected}
       wide
       right={<>
+        <select value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setSubGroupFilter(''); }} title="Filter ledgers by group" style={{ ...inp, width: 'auto', minWidth: 130, minHeight: 32, fontSize: 11 }}>
+          <option value="">All groups</option>
+          {allGroups.map((g) => <option key={g} value={g}>{g}</option>)}
+        </select>
+        {groupFilter && (
+          <select value={subGroupFilter} onChange={(e) => setSubGroupFilter(e.target.value)} title="Filter by sub-group" style={{ ...inp, width: 'auto', minWidth: 130, minHeight: 32, fontSize: 11 }}>
+            <option value="">All sub-groups</option>
+            {subOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
         <select value={selected} onChange={(e) => pickLedger(e.target.value)} style={{ ...inp, width: 240, minHeight: 32, fontSize: 11 }}>
-          {ledgers.length === 0 && <option>Loading…</option>}
-          {ledgers.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
+          {pickable.length === 0 && <option value="">{ledgers.length ? 'No ledgers in this group' : 'Loading…'}</option>}
+          {pickable.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
         </select>
       </>}
     >
@@ -1915,17 +1931,42 @@ export function ChartOfAccountsLive({ branch }) {
   const cur = curOf(branch);
   const q = useChartOfAccounts(branch);
   const ledgers = q.data || [];
-  const groups = useMemo(() => [...new Set(ledgers.map((l) => l.group))].sort(), [ledgers]);
+  // Group + cascading Sub-Group filter — pick a main group (e.g. Sundry Debtors) to
+  // show only its ledgers, then a Sub-Group under it. Data-driven from the chart.
+  const [groupFilter, setGroupFilter] = useState('');
+  const [subGroupFilter, setSubGroupFilter] = useState('');
+  const allGroups = useMemo(() => [...new Set(ledgers.map((l) => l.group).filter(Boolean))].sort(), [ledgers]);
+  const subOptions = useMemo(() => (groupFilter ? [...new Set(ledgers.filter((l) => l.group === groupFilter).map((l) => l.subGroup).filter(Boolean))].sort() : []), [ledgers, groupFilter]);
+  const shown = useMemo(() => ledgers.filter((l) => (!groupFilter || l.group === groupFilter) && (!subGroupFilter || l.subGroup === subGroupFilter)), [ledgers, groupFilter, subGroupFilter]);
+  const groups = useMemo(() => [...new Set(shown.map((l) => l.group))].sort(), [shown]);
+  const selWrap = { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM };
+  const selStyle = { ...inp, fontSize: 12, padding: '7px 9px', width: 'auto', minWidth: 120 };
   return (
-    <Page title="Chart of Accounts" sub={`${branchLabel(branch)} · ${ledgers.length} ledgers across ${groups.length} groups`}
-      right={<button onClick={() => exportToExcel(`chart-of-accounts-${branchLabel(branch)}`, [{ key: 'group', label: 'Group' }, { key: 'code', label: 'Code' }, { key: 'name', label: 'Ledger' }, { key: 'nature', label: 'Nature' }, { key: 'statement', label: 'Statement' }, { key: 'openingBalance', label: 'Opening Balance' }, { key: 'drCr', label: 'Dr/Cr' }], ledgers)} disabled={ledgers.length === 0} title="Export to Excel"
-        style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: ledgers.length === 0 ? 'not-allowed' : 'pointer', opacity: ledgers.length === 0 ? 0.5 : 1 }}>📤 Export</button>}>
+    <Page title="Chart of Accounts" sub={`${branchLabel(branch)} · ${shown.length}${shown.length !== ledgers.length ? ` of ${ledgers.length}` : ''} ledgers across ${groups.length} groups`}
+      right={<>
+        <label style={selWrap}>Group
+          <select value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setSubGroupFilter(''); }} style={selStyle}>
+            <option value="">All groups</option>
+            {allGroups.map((g) => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </label>
+        {groupFilter && (
+          <label style={selWrap}>Sub-Group
+            <select value={subGroupFilter} onChange={(e) => setSubGroupFilter(e.target.value)} style={selStyle}>
+              <option value="">All sub-groups</option>
+              {subOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+        )}
+        <button onClick={() => exportToExcel(`chart-of-accounts-${branchLabel(branch)}`, [{ key: 'group', label: 'Group' }, { key: 'code', label: 'Code' }, { key: 'name', label: 'Ledger' }, { key: 'nature', label: 'Nature' }, { key: 'statement', label: 'Statement' }, { key: 'openingBalance', label: 'Opening Balance' }, { key: 'drCr', label: 'Dr/Cr' }], shown)} disabled={shown.length === 0} title="Export to Excel"
+          style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: shown.length === 0 ? 'not-allowed' : 'pointer', opacity: shown.length === 0 ? 0.5 : 1 }}>📤 Export</button>
+      </>}>
       <State q={q} empty={ledgers.length === 0}>
         <Table>
           <thead><tr style={headRow}><Th>Group</Th><Th>Code</Th><Th>Ledger</Th><Th>Nature</Th><Th>Statement</Th><Th right>Opening</Th></tr></thead>
           <tbody>
             {groups.map((grp) => {
-              const gl = ledgers.filter((l) => l.group === grp);
+              const gl = shown.filter((l) => l.group === grp);
               return gl.map((l, i) => (
                 <tr key={l.id || l.code} style={rowBg(i)}>
                   {i === 0 && <td rowSpan={gl.length} style={{ padding: '9px 14px', fontWeight: 700, color: DARK, borderRight: '2px solid #e1e3ec', verticalAlign: 'top', fontSize: 10.5, background: '#f9fafb' }}>{grp}</td>}
