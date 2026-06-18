@@ -92,40 +92,90 @@ function Leaf({ node, route, go }) {
   );
 }
 
+/* A prominent top-level quick action — a section's title-less leaf (e.g. "Dashboard
+   Accountant", "Approve & Post"). Rendered as a pill in a featured row above the
+   grouped columns, rather than floating in an empty-headed column of its own. */
+function FeaturedAction({ node, route, go }) {
+  if (!node || node.divider) return null;
+  const active = route === node.href;
+  return (
+    <button
+      type="button"
+      onClick={() => go(node.href)}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'group/fa inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50',
+        active
+          ? 'border-navy/15 bg-navy/5 text-navy'
+          : 'border-surface-border bg-surface-alt text-ink-muted hover:border-navy/15 hover:bg-navy/5 hover:text-navy',
+      )}
+    >
+      <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full transition', active ? 'bg-gold' : 'bg-gold/40 group-hover/fa:bg-gold')} />
+      <span className="whitespace-nowrap">{node.label}</span>
+    </button>
+  );
+}
+
 /* Premium multi-column dropdown panel — PORTALED to <body> so it floats above all
    page content. The app-bar sets its own stacking + backdrop-blur context, which
    would otherwise trap an in-header dropdown beneath higher-z page elements. It is
-   positioned (fixed) under its trigger via the measured anchor rect. */
+   positioned (fixed) under its trigger via the measured anchor rect.
+
+   Layout: title-less leaves become a featured action row; the remaining titled
+   groups flow into a BALANCED CSS-column masonry (each group is break-inside-avoid)
+   so uneven group heights pack tightly instead of leaving ragged grid-row gaps. */
 function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave }) {
   if (!anchor) return null;
   const cols = buildColumns(item.children);
-  const vw = typeof window !== 'undefined' ? window.innerWidth : 0;
-  const style = { position: 'fixed', top: anchor.bottom, zIndex: 99999, paddingTop: 8 };
-  if (align === 'right') style.right = Math.max(8, vw - anchor.right);
-  else style.left = anchor.left;
+
+  // Split orphan quick-action leaves from the grouped (titled) columns.
+  const featured = [];
+  const groups = [];
+  for (const c of cols) {
+    if (c.title) groups.push(c);
+    else featured.push(...c.items);
+  }
+
+  // Balanced, contained sizing. Pick a column count from the group count, capped at
+  // 5 and by what the viewport can actually fit, then derive a fixed panel width.
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+  const COL_W = 220, COL_GAP = 24, PAD = 16;
+  const fitCols = Math.max(1, Math.floor((vw - 16 - 2 * PAD + COL_GAP) / (COL_W + COL_GAP)));
+  const colCount = Math.max(1, Math.min(groups.length || 1, 5, fitCols));
+  const panelW = Math.min(colCount * COL_W + (colCount - 1) * COL_GAP + 2 * PAD, vw - 16);
+
+  // Anchor under the trigger (right-edge for right-aligned items), then clamp fully
+  // on-screen so a wide panel near the viewport edge never overflows.
+  let left = align === 'right' ? anchor.right - panelW : anchor.left;
+  left = Math.max(8, Math.min(left, vw - panelW - 8));
+  const style = { position: 'fixed', top: anchor.bottom, left, zIndex: 99999, paddingTop: 8 };
+
   return createPortal(
     <div role="menu" data-mega-menu style={style} onMouseEnter={onEnter} onMouseLeave={onLeave}>
       <div
-        className="grid gap-x-5 gap-y-1 rounded-2xl border border-black/5 bg-white/95 p-4 shadow-[0_24px_60px_-12px_rgba(13,19,38,0.25)] backdrop-blur-xl"
-        style={{
-          gridTemplateColumns: `repeat(${Math.min(cols.length || 1, 4)}, minmax(180px, 1fr))`,
-          maxWidth: 'min(92vw, 820px)',
-          maxHeight: '72vh',
-          overflowY: 'auto',
-        }}
+        className="rounded-2xl border border-black/5 bg-white/95 p-4 shadow-[0_24px_60px_-12px_rgba(13,19,38,0.25)] backdrop-blur-xl"
+        style={{ width: panelW, maxHeight: '74vh', overflowY: 'auto' }}
       >
-        {cols.map((col, ci) => (
-          <div key={ci} className="min-w-0">
-            {col.title && (
-              <div className="mb-1 border-b border-surface-border px-2.5 pb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-[#0070f2]">
-                {col.title}
-              </div>
-            )}
-            <div className="space-y-0.5">
-              {col.items.map((c, i) => <Leaf key={i} node={c} route={route} go={go} />)}
-            </div>
+        {featured.length > 0 && (
+          <div className="mb-3.5 flex flex-wrap gap-2 border-b border-surface-border pb-3.5">
+            {featured.map((node, i) => <FeaturedAction key={i} node={node} route={route} go={go} />)}
           </div>
-        ))}
+        )}
+        {groups.length > 0 && (
+          <div style={{ columnCount: colCount, columnGap: COL_GAP }}>
+            {groups.map((col, ci) => (
+              <div key={ci} className="mb-4" style={{ breakInside: 'avoid' }}>
+                <div className="mb-1.5 border-b border-surface-border px-2.5 pb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-[#0070f2]">
+                  {col.title}
+                </div>
+                <div className="space-y-0.5">
+                  {col.items.map((c, i) => <Leaf key={i} node={c} route={route} go={go} />)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>,
     document.body,
