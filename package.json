@@ -12,7 +12,9 @@
     "preview": "vite preview --port 4173",
     "lint": "echo 'Linting skipped (configure eslint as needed)'",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "rebuild": "npm install && npm run build",
+    "redeploy": "npm install && npm run build && npm run preview"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.51.1",
