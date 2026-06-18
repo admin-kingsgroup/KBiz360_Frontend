@@ -30,6 +30,8 @@ jest.mock('../core/useAccounting', () => ({
   usePurchaseRegister: () => ({ data: [] }),
   useConfigValue: () => ({ data: {} }),
   useSaveConfigValue: () => ({ mutate: jest.fn(), isPending: false }),
+  useOutstanding: () => ({ data: { onAccountReceipts: [{ party: 'ACME', onAccount: 300 }] } }),
+  useDayBook: () => ({ data: [{ category: 'receipt', totalDebit: 1200 }, { category: 'payment', totalDebit: 400 }] }),
 }));
 
 import React from 'react';
@@ -68,10 +70,21 @@ describe('accountant workspace — screens render', () => {
     expect(screen.queryByText('Globe')).toBeNull();          // zero — excluded
   });
 
-  test('Dashboard shows live cash, bank and net GST', () => {
+  test('Dashboard cockpit: cash/bank/GST, ageing buckets, net position, top lists, today, compliance', () => {
     render(<DashboardAccountant branch={{ code: 'BOM' }} setRoute={() => {}} />);
-    expect(screen.getByText('₹5,000')).toBeInTheDocument();   // cash (Cash-in-Hand)
+    // money
+    expect(screen.getByText('₹5,000')).toBeInTheDocument();   // cash
     expect(screen.getByText('₹90,000')).toBeInTheDocument();  // bank (Bank Account only, not Bank Charges)
+    expect(screen.getByText('₹1,200')).toBeInTheDocument();   // collected today (receipt)
+    // ageing buckets + net position (1700 − 800 = 900)
+    expect(screen.getByText('Debtors (Receivable)')).toBeInTheDocument();
+    expect(screen.getByText('Creditors (Payable)')).toBeInTheDocument();
+    expect(screen.getByText('Net Position')).toBeInTheDocument();
+    expect(screen.getByText('₹900')).toBeInTheDocument();
+    // worklist + top lists + compliance + GST
+    expect(screen.getByText('Top overdue debtors — chase')).toBeInTheDocument();
+    expect(screen.getByText('Month-End Progress')).toBeInTheDocument();
+    expect(screen.getByText('TDS Payable')).toBeInTheDocument();
     expect(screen.getByText('₹1,500')).toBeInTheDocument();   // GST netPayable
   });
 
