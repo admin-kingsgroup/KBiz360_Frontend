@@ -969,12 +969,12 @@ const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
 function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, onInvoice, busyId, sel, onToggleSel }) {
   const cols = mode === 'approved'
-    ? ['', 'Booking No', 'Booking Date', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
+    ? ['', 'Booking No', 'Booking Date', 'Link No', 'Tally Ref', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
     : mode === 'rejected'
       ? ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Date', 'Reason']
       : mode === 'deleted'
         ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Deleted', 'By']
-        : ['', 'Booking No', 'Booking Date', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Actions'];
+        : ['', 'Booking No', 'Booking Date', 'Link No', 'Tally Ref', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Actions'];
   // The four money columns drive both header right-alignment and the group-summary
   // colSpans; derive their start from the header so adding lead columns can't misalign them.
   const numStart = cols.indexOf('Sale');
@@ -1009,6 +1009,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}{mode === 'pending' && b.validation?.hasErrors ? <span title={(b.validation.errors || []).join(' · ')} style={{ marginLeft: 6, color: '#A32D2D', fontWeight: 800 }}>⚠</span> : null}</td>
                   {(mode === 'approved' || mode === 'pending') && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5a6691' }}>{b.date || '—'}</td>}
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: BLUE, fontSize: 11.5 }}>{b.linkNo}</td>
+                  {(mode === 'pending' || mode === 'approved') && <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, color: '#5a6691', whiteSpace: 'nowrap' }} title="Sales / Purchase Tally Ref">{(b.saleTallyRef || '—')}{b.purTallyRef ? ' / ' + b.purTallyRef : ''}</td>}
                   <td style={{ padding: '8px 12px', fontSize: 12 }}>{sp ? sp.icon + ' ' + sp.name : b.module}</td>
                   {mode === 'approved' || mode === 'deleted' ? (
                     <>

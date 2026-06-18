@@ -1354,6 +1354,7 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
   // 2) Assemble columns: fixed lead → component heads → taxes → final value.
   const columns = [];
   const col = (key, label, isNum) => columns.push({ key, label, num: !!isNum });
+  col('bookingNo', 'Booking No');
   col('linkNo', 'SPG / Link No');
   col('saleDate', isSale ? 'Sale Date' : 'Purchase Date');
   col('saleVno', 'Sales Invoice No');
@@ -1395,6 +1396,7 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
     const row = {
       _v: v,             // back-reference: Final Invoice Value → open this voucher's JV
       _booking: booking, // back-reference: print the Sales / Purchase invoice for this row
+      bookingNo: (booking && booking.bookingNo) || '—',
       linkNo: link || '—',
       saleVno: isSale ? v.vno : (linkIndex.saleByLink[link] || ''),
       saleTallyRef: isSale ? (v.sourceRef || '') : ((linkIndex.saleRefByLink || {})[link] || ''),

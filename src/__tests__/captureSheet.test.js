@@ -93,6 +93,13 @@ describe('buildCaptureSheet — register capture columns & row refs', () => {
     expect(pur.rows[0].saleTallyRef).toBe('IS/01');            // linked sale
   });
 
+  test('Booking No column is present and carries the booking number', () => {
+    const sheet = buildCaptureSheet([saleVoucher], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: true });
+    expect(keyset(sheet)).toContain('bookingNo');
+    expect(sheet.columns.find((c) => c.key === 'bookingNo').label).toBe('Booking No');
+    expect(sheet.rows[0].bookingNo).toBe('BKG1');
+  });
+
   test('Invoice column is the LAST column and labelled per side', () => {
     const sale = buildCaptureSheet([saleVoucher], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: true });
     const lastSale = sale.columns[sale.columns.length - 1];
