@@ -1027,12 +1027,13 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                         <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><XCircle size={12} /> Reject</button>
                       </div>
                     ) : mode === 'approved' ? (
-                      canDelete
-                        ? <div style={{ display: 'flex', gap: 6 }}>
-                            {onEdit && <button disabled={busyId === b.id} onClick={() => onEdit(b)} title="Edit — reverses the posted Sales/Purchase out of the books and returns this to Pending for re-approval" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit</button>}
-                            <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><Trash2 size={12} /> Delete</button>
-                          </div>
-                        : <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>admin only</span>
+                      // Edit is open to everyone (it un-posts the booking → Pending → re-approve);
+                      // Delete is admin-only (Super Admin / Director).
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {onEdit && <button disabled={busyId === b.id} onClick={() => onEdit(b)} title="Edit — reverses the posted Sales/Purchase out of the books and returns this to Pending for re-approval" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit</button>}
+                        {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><Trash2 size={12} /> Delete</button>}
+                        {!onEdit && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
+                      </div>
                     ) : mode === 'deleted' ? (
                       <span style={{ fontSize: 11, color: '#8b94b3' }} title={b.deletedReason || ''}>{b.deletedBy || '—'}{b.deletedReason ? ` · ${b.deletedReason}` : ''}</span>
                     ) : (
