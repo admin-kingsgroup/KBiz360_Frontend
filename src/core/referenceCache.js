@@ -29,6 +29,7 @@ const FALLBACK_ROLES = { 'Super Admin': { name: 'Super Admin', branches: 'ALL', 
 let _currency = { ...FALLBACK_CURRENCY };
 let _branchCfg = {};   // code → config (mapped from company-profile)
 let _profiles = {};    // code → full company-profile doc (legal/bank/address)
+let _hsnByModule = {}; // lowercased module name → HSN/SAC code (from Tax · HSN-SAC master)
 let _roles = { ...FALLBACK_ROLES };
 let _permModules = [];
 let _permActions = ['view', 'create', 'edit', 'delete', 'approve', 'print', 'export'];
@@ -134,6 +135,21 @@ export function branchCfg(code) {
 }
 // Full company-profile doc (legal/bank/address) for printed documents, etc.
 export function companyProfile(code) { return _profiles[code] || _profiles.BOM || {}; }
+
+// HSN/SAC master (Masters › Tax & Currency › Tax / HSN-SAC Codes), keyed by module
+// name. A module can hold several codes across rate slabs — we keep the first active
+// code per module for the printed invoice's HSN/SAC column.
+export function setHsnCodes(list) {
+  const map = {};
+  (list || []).forEach((h) => {
+    if (h && h.module && h.code && h.active !== false) {
+      const k = String(h.module).toLowerCase().trim();
+      if (!map[k]) map[k] = String(h.code);
+    }
+  });
+  if (Object.keys(map).length) _hsnByModule = map;
+}
+export function hsnSacFor(moduleName) { return _hsnByModule[String(moduleName || '').toLowerCase().trim()] || ''; }
 
 /* ── Roles / permissions ── */
 export function setRoles(arr) {

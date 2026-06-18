@@ -7,6 +7,7 @@ import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, Layou
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { PERM_MODULES } from './permissions';
 import { getRole } from './referenceCache';
+import { isPageAccessAdmin } from './pageCatalog';
 /* (Removed dead imports of Recruitment from './helpers' and Dashboard from
    '../modules/dashboard' — only their string labels/hrefs are used in the menu
    tree, never the component values. Dropping them also keeps the menu out of
@@ -81,65 +82,33 @@ export const MENU_ASSETS={label:"Assets",icon:Wrench,children:[
 
 /* ── FINANCE ─────────────────────────────────────────────────── */
 
+// NOTE: every item that also appears under the ACCOUNTS pill (MENU_ACCOUNTS)
+// has been removed here to avoid duplication — the Accounts workspace owns all
+// daily vouchers, the per-type registers, the day/cash books, BSP memos, etc.
+// Finance now keeps ONLY the items that are NOT in Accounts (combined module
+// register, classic Trial Balance, GDS import, cancellations/refunds, period-end
+// accruals & targets, and the calculator/entry-helper tools).
 export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
-  {label:"Voucher Entry", children:[
-    {label:"SO/PO/GP Voucher", href:"/bookings/new"},
-    {label:"Receipt Voucher", href:"/receipts"},
-    {label:"Payment Voucher", href:"/payments"},
-    {label:"Contra Entry", href:"/contra"},
-    {label:"Journal Entry", href:"/journal"},
-    // Credit Note / Debit Note entry removed — the business does not raise notes
-    // (cancellations go through Refund/Reissue). The routes & registry are retained
-    // so any historical note still renders read-only in the approval queue.
-    {label:"Purchase Expense Voucher", href:"/purchase-expense"},
-    {label:"Refund (against Sale)", href:"/finance/refund"},
-    {label:"Reissue (against Sale)", href:"/finance/reissue"},
-    {label:"ADM Voucher (Agent Debit Memo)", href:"/finance/adm-voucher"},
-    {label:"ACM Voucher (Agent Credit Memo)", href:"/finance/acm-voucher"},
-  ]},
   {label:"Registers & Outstanding", children:[
-    {label:"Module Sales Register", href:"/finance/module-sales-register"},
-    {label:"Module Purchase Register", href:"/finance/module-purchase-register"},
     {label:"Module Sales & Purchase Register", href:"/finance/module-register"},
-    {label:"Receipt Register", href:"/finance/receipt-register"},
-    {label:"Payment Register", href:"/finance/payment-register"},
-    {label:"Contra Register", href:"/finance/contra-register"},
-    {label:"Journal Register", href:"/finance/journal-register"},
-    {label:"Outstanding & On-Account (Bill Settlement)", href:"/finance/outstanding"},
   ]},
   {label:"Books", children:[
-    {label:"Day Book", href:"/day-book"},
-    {label:"Cash Book", href:"/finance/cash-book"},
-    {label:"Ledger Account", href:"/ledger"},
     {label:"Trial Balance", href:"/trial-balance"},
-    {label:"Trial Balance ✨ (new)", href:"/finance/trial-balance"},
-    {label:"Bank Reconciliation", href:"/bank-reco"},
   ]},
   {label:"BSP & Airline Memos", children:[
-    {label:"BSP Summary", href:"/purchase/bsp-summary"},
-    {label:"BSP Statement Import", href:"/purchase/bsp-import"},
-    {label:"Ticket Control Register", href:"/purchase/ticket-control"},
     {label:"GDS / PNR Import", href:"/purchase/gds-import"},
-    {label:"ADM — Agent Debit Memos", href:"/purchase/adm"},
-    {label:"ACM — Agent Credit Memos", href:"/purchase/acm"},
     {label:"Sales Cancellations", href:"/sales/cancellation"},
     {label:"Purchase Refunds", href:"/purchase/refunds"},
   ]},
   {label:"Period-End, Targets & Accruals", children:[
-    {label:"Year-End Close", href:"/accounting/year-close"},
-    {label:"Recurring Vouchers", href:"/accounting/recurring"},
     {label:"Intercompany", href:"/accounting/intercompany"},
     {label:"FX Revaluation", href:"/accounting/fx-revaluation"},
     {label:"Sales Targets", href:"/finance/targets"},
     {label:"Expense Budget", href:"/expense/budget"},
-    {label:"Vendor Advances", href:"/accounting/vendor-advances"},
     {label:"Loan / EMI Register", href:"/accounting/loans"},
     {label:"Investment Register", href:"/finance/investments"},
   ]},
   {label:"Tools & Calculators", children:[
-    {label:"Bank Balance Dashboard", href:"/finance/bank-balance"},
-    {label:"Reconciliation Queue", href:"/finance/reco-queue"},
-    {label:"TDS Auto-Calculator", href:"/finance/tds-calculator"},
     {label:"Interest Calculator", href:"/finance/interest-calc"},
     {label:"Loan Amortization Schedule", href:"/finance/loan-amort"},
     {divider:true, label:"Entry helpers"},
@@ -258,6 +227,7 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
   {label:"Organization", children:[
     {label:"Branches", href:"/settings/branches"},
     {label:"Users & Roles", href:"/settings/users"},
+    {label:"Page Visibility Control", href:"/settings/page-access"},
   ]},
   {label:"Compliance & Workflow", children:[
     {label:"Period Locking", href:"/settings/period-lock"},
@@ -424,7 +394,7 @@ export const MENU_APPROVALS = {label:"Approvals", icon:CheckSquare, href:"/trans
 
 export const MENU_COMMON_TOP = [
   {label:"Dashboard",   icon:LayoutDashboard, href:"/dashboard"},
-  MENU_FINANCE,        // entry hub (SO/PO/GP + all vouchers + module registers + books)
+  MENU_FINANCE,        // finance-only items not duplicated in the Accounts pill (combined register, period-end, tools)
   MENU_APPROVALS,
 ];
 
@@ -481,6 +451,57 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
   ]},
 ]};
 
+/* ── Per-user page visibility ─────────────────────────────────────────
+   Settings → Page Visibility Control stores, per user, a deny-list of menu
+   hrefs (currentUser.hidden). The helpers below strip those nodes from the
+   menu the user receives — so a toggled-off page/report simply isn't in the
+   nav. App.jsx applies the same deny-list as a route guard for direct URLs. */
+
+// Drop dividers that no longer precede a real (non-divider) sibling — otherwise
+// pruning a column's only links would leave a dangling section header.
+function cleanDividers(children){
+  const out=[];
+  for(let i=0;i<children.length;i++){
+    const c=children[i];
+    if(!c) continue;
+    if(c.divider){
+      let following=false;
+      for(let j=i+1;j<children.length;j++){
+        if(!children[j]) continue;
+        if(children[j].divider) break;
+        following=true; break;
+      }
+      if(following) out.push(c);
+    } else out.push(c);
+  }
+  return out;
+}
+
+// Recursively remove hidden leaves; then drop any pure container left with no
+// navigable leaf. A node that is itself navigable (has its own href) survives.
+function pruneNode(node, hiddenSet){
+  if(!node || node.divider) return node || null;
+  if(node.href && hiddenSet.has(node.href)) return null;
+  if(node.children){
+    const kids=cleanDividers(node.children.map(c=>pruneNode(c,hiddenSet)).filter(Boolean));
+    const hasLeaf=kids.some(k=>k && (k.href || (k.children && k.children.length)));
+    if(!hasLeaf && !node.href) return null;
+    return {...node, children:kids};
+  }
+  return node;
+}
+
+function applyHidden(menus, currentUser){
+  const hidden=new Set(Array.isArray(currentUser?.hidden)?currentUser.hidden:[]);
+  hidden.delete('/dashboard'); // landing page is never hideable (avoids lockout)
+  // The visibility-control link is admin-only: hide it from everyone else, and
+  // make sure the admin always keeps it (even if it slipped into their list).
+  if(isPageAccessAdmin(currentUser)) hidden.delete('/settings/page-access');
+  else hidden.add('/settings/page-access');
+  if(!hidden.size) return menus;
+  return menus.map(m=>pruneNode(m,hidden)).filter(Boolean);
+}
+
 export function getMenu(branch, currentUser){
   const isAll   = branch==="ALL";
   const isIndia = !isAll && branch?.code && ["TKHO","BOM","AMD"].includes(branch.code);
@@ -512,11 +533,12 @@ export function getMenu(branch, currentUser){
   // quick-create Masters, Tax & Statutory, Period Close and Branch MIS — so there's
   // no need for the Finance/Reports/Taxation/Masters/Admin pills. Branch scope is
   // enforced by the top-right switcher (limited to their stored branches).
-  if (isAccountant) return [MENU_ACCOUNTS];
+  if (isAccountant) return applyHidden([MENU_ACCOUNTS], currentUser);
   const top = isDir ? [MENU_DASHBOARDS, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
   // 8 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · Admin
   const menus = [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
-  return menus;
+  // Strip each user's hidden pages/reports (Settings → Page Visibility Control).
+  return applyHidden(menus, currentUser);
 }
 
 

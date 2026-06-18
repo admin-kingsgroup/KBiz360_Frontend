@@ -8,7 +8,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, X, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Download, Printer } from 'lucide-react';
 import { card, inp } from '../core/styles';
 import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../core/data';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
@@ -16,6 +16,7 @@ import { SourceBadge } from '../core/LedgerLabel';
 import { branchCode } from '../core/useAccounting';
 import { apiPost } from '../core/api';
 import { exportToExcel } from '../core/exportExcel';
+import { openPrintPreview } from '../core/PrintPreview';
 import { pushModal } from '../core/ux/modalStore';
 import { useFormKeys } from '../core/ux/forms';
 import { toast } from '../core/ux/toast';
@@ -67,8 +68,13 @@ function FieldInput({ field, value, onChange, form }) {
 function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   const [form, setForm] = useState(record);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  // `show` / `required` may be a fn(form) so fields can react to other values (e.g.
+  // party-only fields that appear & become mandatory when Group = Sundry Debtors).
+  const isShown = (f) => (typeof f.show === 'function' ? f.show(form) : true);
+  const isReq = (f) => (typeof f.required === 'function' ? f.required(form) : !!f.required);
   const editable = fields.filter((f) => f.input !== false); // table-only fields (e.g. derived) aren't edited
-  const missing = editable.filter((f) => f.required && (form[f.key] === '' || form[f.key] == null));
+  const visible = editable.filter(isShown);
+  const missing = visible.filter((f) => isReq(f) && (form[f.key] === '' || form[f.key] == null));
   const submit = () => { if (!saving && !missing.length) onSave(form); };
   useEffect(() => pushModal(onClose), []); // Esc closes
   // Enter advances fields; Enter on the last field (or Ctrl/Cmd+Enter) saves; Esc cancels.
@@ -81,9 +87,9 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM }}><X size={18} /></button>
         </div>
         <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {editable.map((f) => (
+          {visible.map((f) => (
             <div key={f.key}>
-              {f.type !== 'bool' && <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: DIM, marginBottom: 4 }}>{f.label}{f.required && <span style={{ color: RED }}> *</span>}</label>}
+              {f.type !== 'bool' && <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: DIM, marginBottom: 4 }}>{f.label}{isReq(f) && <span style={{ color: RED }}> *</span>}</label>}
               <FieldInput field={f} value={form[f.key]} onChange={(v) => set(f.key, v)} form={form} />
             </div>
           ))}
@@ -150,6 +156,35 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
     exportToExcel(resource, columns, data);
   };
 
+  // Print the CURRENT (filtered) listing through the unified A4 preview. Builds a
+  // clean HTML table from the visible columns/rows — bool→Yes/No, number→grouped,
+  // tags→comma-joined — so the printout matches what's on screen (incl. any
+  // toolbar filters, since `rows` is already filtered). Wide grids default to
+  // landscape so columns don't get squeezed.
+  const printList = () => {
+    const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    const txt = (r, f) => {
+      const v = r[f.key];
+      if (f.type === 'bool') return v ? 'Yes' : 'No';
+      if (f.type === 'tags') return Array.isArray(v) ? v.join(', ') : (v || '');
+      if (f.type === 'number') return v ? Number(v).toLocaleString('en-IN') : '0';
+      return v ?? '';
+    };
+    const head = cols.map((f) => `<th style="text-align:${f.type === 'number' ? 'right' : 'left'};padding:6px 9px;border-bottom:2px solid #0d1326;font-size:9pt;text-transform:uppercase;letter-spacing:.4px;color:#0d1326;white-space:nowrap">${esc(f.label)}</th>`).join('');
+    const body = rows.map((r, i) => `<tr style="background:${i % 2 ? '#f7f8fb' : '#fff'}">${cols.map((f) => `<td style="text-align:${f.type === 'number' ? 'right' : 'left'};padding:5px 9px;border-bottom:1px solid #e5e9f0;font-size:9pt;color:#222">${esc(txt(r, f))}</td>`).join('')}</tr>`).join('');
+    const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#222">
+      <div style="margin-bottom:10px">
+        <div style="font-size:16pt;font-weight:800;color:#0d1326">${esc(title)}</div>
+        <div style="font-size:9.5pt;color:#5a6691;margin-top:2px">${esc(subtitle || '')} · ${rows.length} record${rows.length === 1 ? '' : 's'}</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>${head}</tr></thead>
+        <tbody>${body || `<tr><td style="padding:14px;color:#5a6691;font-size:9.5pt">No records.</td></tr>`}</tbody>
+      </table>
+    </div>`;
+    openPrintPreview({ title, recommend: cols.length > 5 ? 'landscape' : 'portrait', html });
+  };
+
   const cell = (r, f) => {
     const v = r[f.key];
     if (f.type === 'bool') return v ? <span style={{ color: GREEN, fontWeight: 700 }}>✓</span> : <span style={{ color: '#c2c8d6' }}>—</span>;
@@ -170,6 +205,10 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
           <button onClick={exportSheet} disabled={rows.length === 0} title="Export all records to Excel"
             style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', opacity: rows.length === 0 ? 0.5 : 1, cursor: rows.length === 0 ? 'not-allowed' : 'pointer' }}>
             <Download size={14} /> Export Excel
+          </button>
+          <button onClick={printList} disabled={rows.length === 0} title="Print the current list"
+            style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', opacity: rows.length === 0 ? 0.5 : 1, cursor: rows.length === 0 ? 'not-allowed' : 'pointer' }}>
+            <Printer size={14} /> Print
           </button>
           {!readOnly && <button onClick={openNew} style={btn(BLUE, '#fff')}><Plus size={14} /> New</button>}
         </div>
@@ -587,40 +626,74 @@ export const LedgersMaster = ({ branch }) => {
     return out.sort();
   };
 
-  // Branch view filter: a branch chart = its own ledgers + the org-wide 'ALL'
-  // (shared) ledgers; see ledgers.service.getAll.
-  const [branchView, setBranchView] = useState(branchCode(branch) || 'ALL'); // default to the current branch
+  // Branch view filter. Single-branch (BOM) operation: the whole chart is owned by
+  // BOM, so default to BOM (the selected branch when one is picked; BOM when the top
+  // bar is on "All branches"/unset) rather than the org-wide "All branches" view.
+  const [branchView, setBranchView] = useState(() => {
+    const c = branchCode(branch);
+    return (!c || c === 'ALL') ? 'BOM' : c;
+  });
+  const [groupView, setGroupView] = useState('ALL'); // filter the listing by Tally/ERP group
   const branchOptions = ['ALL', ...BRANCH_CODES];
+  // Group dropdown options: live group names (28 Tally + custom) once loaded,
+  // else the fixed 28-group skeleton so the filter is usable immediately.
+  const groupFilterOptions = groupOptions.length ? groupOptions : TALLY_GROUP_NAMES;
+
+  // A party ledger = one whose Group (or Sub-Group) is Sundry Debtors / Creditors.
+  // The GSTIN / credit-terms / contact / bank fields apply only to these.
+  const isParty = (form) => /sundry\s+(debtors|creditors)/i.test(`${form?.group || ''} ${form?.subGroup || ''}`);
 
   const toolbar = (
-    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
-      Branch
-      <select value={branchView} onChange={(e) => setBranchView(e.target.value)}
-        style={{ ...inp, fontSize: 12, padding: '7px 9px', width: 'auto', minWidth: 120 }}>
-        <option value="ALL">All branches</option>
-        {BRANCH_CODES.map((b) => <option key={b} value={b}>{b}</option>)}
-      </select>
-    </label>
+    <>
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
+        Branch
+        <select value={branchView} onChange={(e) => setBranchView(e.target.value)}
+          style={{ ...inp, fontSize: 12, padding: '7px 9px', width: 'auto', minWidth: 120 }}>
+          <option value="ALL">All branches</option>
+          {BRANCH_CODES.map((b) => <option key={b} value={b}>{b}</option>)}
+        </select>
+      </label>
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
+        Group
+        <select value={groupView} onChange={(e) => setGroupView(e.target.value)}
+          style={{ ...inp, fontSize: 12, padding: '7px 9px', width: 'auto', minWidth: 150 }}>
+          <option value="ALL">All groups</option>
+          {groupFilterOptions.map((g) => <option key={g} value={g}>{g}</option>)}
+        </select>
+      </label>
+    </>
   );
 
   return (
     <>
-      <MasterCrud title="Ledgers" subtitle={`Chart of Accounts — ledger accounts (live)${branchView !== 'ALL' ? ` · ${branchView} + shared` : ''}`}
+      <MasterCrud title="Ledgers" subtitle={`Chart of Accounts — ledger accounts (live)${branchView !== 'ALL' ? ` · ${branchView} + shared` : ''}${groupView !== 'ALL' ? ` · ${groupView}` : ''}`}
         resource="ledgers"
         params={branchView !== 'ALL' ? { branch: branchView, includeInactive: 'true' } : { includeInactive: 'true' }}
         toolbar={toolbar}
-        note="Set Group to the parent Tally group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. Shared heads (income / expense / tax) should use Branch = ALL so every branch sees one copy; keep Branch-specific parties under their own branch."
+        rowFilter={groupView !== 'ALL' ? (r) => r.group === groupView : undefined}
+        note="Set Group to the parent Tally group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. All ledgers are owned by the BOM branch."
         fields={[
           { key: 'code', label: 'Code', type: 'text', required: true },
           { key: 'name', label: 'Ledger Name', type: 'text', required: true },
           { key: 'group', label: 'Group', type: 'select', options: groupOptions.length ? groupOptions : TALLY_GROUP_NAMES, required: true },
           { key: 'subGroup', label: 'Sub-Group', type: 'select', table: false, emptyLabel: '— None —',
             options: (form) => { const subs = subGroupsUnder(form.group); return form.subGroup && !subs.includes(form.subGroup) ? [form.subGroup, ...subs] : subs; } },
-          { key: 'branch', label: 'Branch', type: 'select', options: branchOptions, default: 'ALL' },
+          { key: 'branch', label: 'Branch', type: 'select', options: branchOptions, default: 'BOM' },
           { key: 'currency', label: 'Currency', type: 'select', options: ACTIVE_CURRENCIES, default: 'INR' },
           { key: 'openingBalance', label: 'Opening Balance', type: 'number', default: 0 },
           { key: 'drCr', label: 'Dr/Cr', type: 'select', options: ['Dr', 'Cr'], default: 'Dr' },
           { key: 'active', label: 'Active', type: 'bool', default: true },
+          // Party (Sundry Debtors / Creditors) details — only shown & validated when
+          // the ledger's Group is a party group. Credit days & limit are mandatory.
+          { key: 'gstin', label: 'GSTIN', type: 'text', table: false, show: isParty, placeholder: '27AAMCT1096J1ZU' },
+          { key: 'creditDays', label: 'Credit Days', type: 'number', table: false, show: isParty, required: isParty, default: '' },
+          { key: 'creditLimit', label: 'Credit Limit', type: 'number', table: false, show: isParty, required: isParty, default: '' },
+          { key: 'contactName', label: 'Contact Name', type: 'text', table: false, show: isParty },
+          { key: 'contactNumber', label: 'Contact Number', type: 'text', table: false, show: isParty },
+          { key: 'email', label: 'Email', type: 'text', table: false, show: isParty, placeholder: 'name@example.com' },
+          { key: 'bankName', label: 'Bank Name', type: 'text', table: false, show: isParty },
+          { key: 'bankAcNo', label: 'Bank A/c No.', type: 'text', table: false, show: isParty },
+          { key: 'bankIfsc', label: 'Bank IFSC', type: 'text', table: false, show: isParty },
         ]} />
     </>
   );

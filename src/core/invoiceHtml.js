@@ -2,7 +2,13 @@
 // Builds the Travkings invoice HTML (matching invoice-templates/*.html) from a
 // LIVE approved booking. Used by Module Registers + SO/PO/GP Approvals.
 import { bc } from './styleTokens';
-import { companyProfile } from './referenceCache';
+import { companyProfile, hsnSacFor } from './referenceCache';
+
+// Booking module code → HSN/SAC master module name (the master is keyed by name).
+const MODULE_NAME = {
+  SF: 'Flight', RF: 'Flight', RI: 'Flight', SH: 'Hotel', SHT: 'Holiday', HP: 'Holiday',
+  SC: 'Car', SV: 'Visa', SI: 'Insurance', SM: 'Misc', MS: 'Misc',
+};
 
 const GST_STATES = {
   '01': 'Jammu & Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh', '05': 'Uttarakhand',
@@ -12,6 +18,40 @@ const GST_STATES = {
   '24': 'Gujarat', '27': 'Maharashtra', '29': 'Karnataka', '30': 'Goa', '32': 'Kerala', '33': 'Tamil Nadu',
   '34': 'Puducherry', '36': 'Telangana', '37': 'Andhra Pradesh', '38': 'Ladakh',
 };
+// SAC (Service Accounting Code) per booking module — used ONLY as a fallback when the
+// live HSN/SAC master (Masters › Tax & Currency › Tax / HSN-SAC Codes) hasn't loaded.
+const SAC_BY_MODULE = {
+  SF: '996421', RF: '996421', RI: '996421',       // air ticketing / refund / reissue
+  SH: '996311',                                    // hotel accommodation
+  SHT: '998555', HP: '998555',                     // holiday / tour package
+  SC: '996601', SV: '998212', SI: '997131',        // car rental / visa / travel insurance
+  SM: '998599', MS: '998599',                      // misc travel arrangement
+};
+
+// Seeded issuer (Issued By) + bank fallback for the India GST branches. The invoice's
+// issuer/bank/place-of-supply all read from the live company-profile cache; when that
+// cache is empty at print time (profiles not yet hydrated, or the collection unseeded
+// after a data reset) these keep the printed invoice complete. Live DB values always
+// win field-by-field (see the merge in buildBookingInvoice).
+const ISSUER_FALLBACK = {
+  BOM: {
+    entity: 'Travkings Tours & Travels', gstin: '27AAMCT1096J1ZU', state: 'Maharashtra', stateCode: '27',
+    operAddr: 'Venus Tower, B 603, Veera Desai Rd, Azad Nagar 2, Mhada Colony, Jeevan Nagar, Andheri West, Mumbai, Maharashtra 400053',
+    phone: '+91 88280 06599', email: 'accounts.bom@travkings.com', cur_sym: '₹',
+    authSignatory: 'Afshin Dhanani', authDesignation: 'Founder & Director',
+    banks: [
+      { bankName: 'ICICI Bank', acName: 'Travkings Tours & Travels Private Limited', branch: 'Versova Link Road Branch, Andheri West', acNo: '333805003566', ifsc: 'ICIC0003338', swift: 'ICICINBBCTS', type: 'Current', primary: true },
+    ],
+  },
+  AMD: {
+    entity: 'Travkings Tours & Travels', gstin: '24AABCT1234H1Z2', state: 'Gujarat', stateCode: '24',
+    operAddr: '202, Shapath IV, SG Highway, Ahmedabad 380 054',
+    phone: '+91 79 4000 5678', email: 'ahmedabad@travkings.com', cur_sym: '₹',
+    authSignatory: 'Afshin Dhanani', authDesignation: 'Founder & Director',
+    banks: [{ bankName: 'ICICI Bank', branch: 'CG Road', acNo: '987654321098', ifsc: 'ICIC0005678', type: 'Current', primary: true }],
+  },
+};
+
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const n2 = (n) => (Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -91,9 +131,25 @@ const partyBlock = (lab, p, cur) => `<div class="party"><div class="lab">${esc(l
 // (optional) — used to back-fill blank party fields on older bookings.
 export function buildBookingInvoice(booking = {}, side = 'sale', branch, master = {}) {
   const isSale = side === 'sale';
-  const prof = companyProfile(branch?.code || booking.branch || 'BOM') || {};
+  const code = String(branch?.code || booking.branch || 'BOM').toUpperCase();
+  // Prefer the live company-profile, but fall back to the seeded issuer/bank constants
+  // field-by-field, so the Issued-By block, Place of Supply and Bank details always
+  // render even when the profile cache is empty at print time.
+  const live = companyProfile(code) || {};
+  const fb = ISSUER_FALLBACK[code] || {};
+  const pv = (k) => (live[k] != null && live[k] !== '' ? live[k] : fb[k]);
+  const prof = {
+    ...fb, ...live,
+    entity: pv('entity'), operAddr: pv('operAddr'), gstin: pv('gstin'), email: pv('email'), phone: pv('phone'),
+    state: pv('state'), stateCode: pv('stateCode'), cur_sym: pv('cur_sym'),
+    authSignatory: pv('authSignatory'), authDesignation: pv('authDesignation'),
+    banks: (Array.isArray(live.banks) && live.banks.length) ? live.banks : (fb.banks || []),
+  };
   const cur = prof.cur_sym || (bc(branch) || {}).cur || '₹';
   const company = { name: prof.entity || 'Travkings Tours & Travels Pvt. Ltd.', address: prof.operAddr || '', gstin: prof.gstin || '', email: prof.email || '', contact: prof.phone || '' };
+  // HSN/SAC for the booked travel service — fetched from the live HSN/SAC master by
+  // module, falling back to the built-in map (then a generic SAC) if it hasn't loaded.
+  const sac = hsnSacFor(MODULE_NAME[booking.module] || '') || SAC_BY_MODULE[booking.module] || '998599';
   // Brand logo + IATA accreditation badge live in /public, referenced by ABSOLUTE URL
   // so they also resolve inside the print-preview iframe (doc.write'd, no base href).
   const assetBase = (typeof window !== 'undefined' && window.location ? window.location.origin : '') + '/';
@@ -152,12 +208,12 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
       const totalFare = base + k3 + tax + markup;
       // Taxes (YQ/YR) = the pass-through fare taxes; Other Taxes = the agency margin
       // (hidden income), shown as its own column per the customer-facing layout.
-      return `<tr>${desc}<td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td>${n2(markup)}</td><td class="tf">${cur}${n2(totalFare)}</td></tr>`;
+      return `<tr>${desc}<td class="l">${esc(sac)}</td><td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td>${n2(markup)}</td><td class="tf">${cur}${n2(totalFare)}</td></tr>`;
     }
     const totalCost = base + k3 + tax + psvc - incentive + tds;
-    return `<tr>${desc}<td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td>${n2(psvc)}</td><td>${n2(incentive)}</td><td>${n2(tds)}</td><td class="tf">${cur}${n2(totalCost)}</td></tr>`;
+    return `<tr>${desc}<td class="l">${esc(sac)}</td><td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td>${n2(psvc)}</td><td>${n2(incentive)}</td><td>${n2(tds)}</td><td class="tf">${cur}${n2(totalCost)}</td></tr>`;
   }).join('');
-  const emptyRow = `<tr><td class="l" colSpan="${isSale ? 6 : 8}" style="text-align:center;color:#9A9A9A;padding:16px">No line detail captured for this booking.</td></tr>`;
+  const emptyRow = `<tr><td class="l" colSpan="${isSale ? 7 : 9}" style="text-align:center;color:#9A9A9A;padding:16px">No line detail captured for this booking.</td></tr>`;
 
   // summary from the booked snapshot (ties to the books)
   const subTotal = r2(snap.lineTotal || 0), service = r2(snap.serviceCharge || 0), gst = r2(snap.gst || 0), tcs = r2(snap.tcs || 0), incentive = r2(snap.incentiveAmt || 0), tds = r2(snap.incentiveTds || 0), net = r2(snap.total || (subTotal + service + gst + tcs));
@@ -182,13 +238,21 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
 
   // bank (sales) from company-profile
   const bank = (prof.banks || []).find((b) => b.primary) || (prof.banks || [])[0] || {};
+  const bankLines = [
+    bank.bankName ? `Bank: ${esc(bank.bankName)}` : '',
+    bank.acName ? `A/c Name: ${esc(bank.acName)}` : '',
+    bank.acNo ? `A/c No: ${esc(bank.acNo)}` : '',
+    bank.ifsc ? `IFSC: ${esc(bank.ifsc)}` : '',
+    bank.swift ? `SWIFT: ${esc(bank.swift)}` : '',
+    bank.branch ? `Branch: ${esc(bank.branch)}` : '',
+  ].filter(Boolean).join('<br>') || 'Bank details on file.';
   const payBlock = isSale
-    ? `<div class="lab2">Payment Details</div><div class="pay">${[bank.bankName ? `Bank: ${esc(bank.bankName)}` : '', bank.acNo ? `A/c: ${esc(bank.acNo)}` : '', bank.ifsc ? `IFSC: ${esc(bank.ifsc)}` : '', bank.swift ? `SWIFT: ${esc(bank.swift)}` : '', bank.branch ? `Branch: ${esc(bank.branch)}` : ''].filter(Boolean).join('<br>') || 'Bank details on file.'}</div>`
+    ? `<div class="lab2">Bank Details</div><div class="pay">${bankLines}</div>`
     : `<div class="lab2">Settlement</div><div class="pay">Payable to supplier per agreed credit terms.<br>Input GST credit claimed against supplier GSTIN.<br>Link No referenced for invoice-wise GP.</div>`;
 
   const headCols = isSale
-    ? `<th class="l">Description</th><th>Basic Fare</th><th>K3 Tax</th><th>Taxes (YQ/YR)</th><th>Other Taxes</th><th>Total Fare</th>`
-    : `<th class="l">Description</th><th>Basic Fare</th><th>K3 Tax</th><th>Taxes (YQ/YR)</th><th>Supplier Svc</th><th>Incentive</th><th>TDS (2%)</th><th>Total Cost</th>`;
+    ? `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Basic Fare</th><th>K3 Tax</th><th>Taxes (YQ/YR)</th><th>Other Taxes</th><th>Total Fare</th>`
+    : `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Basic Fare</th><th>K3 Tax</th><th>Taxes (YQ/YR)</th><th>Supplier Svc</th><th>Incentive</th><th>TDS (2%)</th><th>Total Cost</th>`;
 
   const sheet = `<div class="iv"><div class="sheet">
     <div class="titlebar"><div class="title">${isSale ? 'INVOICE' : 'PURCHASE INVOICE'}</div><img class="iata-badge" src="${IATA_LOGO}" alt="IATA Accredited Agent" /></div><div class="title-rule"></div>

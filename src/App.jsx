@@ -10,7 +10,7 @@ import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
 import { apiPost } from './core/api';
 import { ErrorBoundary } from './shell/ErrorBoundary';
-import { BRANCHES } from './core/data';
+import { pickBranchForUser } from './core/branchScope';
 import { useMobile } from './core/hooks';
 import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
@@ -49,6 +49,7 @@ const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccoun
 const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/mastersParties'));
 const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } = lazyModule(() => import('./modules/reports'));
 const { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } = lazyModule(() => import('./modules/settings'));
+const { PageAccessControl } = lazyModule(() => import('./modules/pageAccess'));
 const { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } = lazyModule(() => import('./modules/taxation'));
 const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
 const { SoPoGpVoucherEntry } = lazyModule(() => import('./modules/bookingOrder'));
@@ -117,26 +118,7 @@ export default function KB360App(){
      no transactional data (vouchers are posted at the operating branches), so
      defaulting to it would blank every branch-scoped dashboard/report. HO stays
      selectable in the switcher; it's just never the implicit default. ── */
-  const [branch,setBranch]=useState(()=>{
-    const codes = restoredUser?.branches;
-    const FULL_SCOPE=["Super Admin","Director","Senior Finance Manager","Sr. Accounts Executive"];
-    const isFull = !restoredUser || FULL_SCOPE.includes(restoredUser?.role);
-    try{
-      const saved = localStorage.getItem("kb360-branch");
-      if(saved==="ALL"){
-        if(isFull) return "ALL";
-      }else if(saved){
-        const b = BRANCHES.find(x => x.code===saved);
-        if(b && (isFull || !Array.isArray(codes) || codes.includes(b.code))) return b;
-      }
-    }catch{ /* ignore */ }
-    if(Array.isArray(codes) && codes.length){
-      const b = BRANCHES.find(x => codes.includes(x.code) && !x.isHO)
-            ||  BRANCHES.find(x => codes.includes(x.code));
-      if(b) return b;
-    }
-    return BRANCHES.find(x => !x.isHO) || BRANCHES[0];
-  });
+  const [branch,setBranch]=useState(()=>pickBranchForUser(restoredUser));
   /* ── Route + history, bridged onto react-router-dom ──────────────────────
      The URL is now the single source of truth: deep links resolve, and the
      browser's native Back/Forward (plus Esc, Alt+←/→ and the ContextBar arrows)
@@ -192,21 +174,18 @@ export default function KB360App(){
   },[]);
 
   /* ── Permission helpers ──────────────────────────────────────────
-     OPEN ACCESS: every ERP user can see all branches and all modules.
+     OPEN ACCESS: every ERP user can see all modules.
      (Module-level access gating is intentionally disabled.) */
-  const canSeeAllBranches = () => true;
   const canAccessModule = () => true;
 
-  /* ── Switch user (demo simulator) — auto-corrects branch ───── */
+  /* ── Sign in / switch user ─────────────────────────────────────────
+     Re-scope the branch to one THIS user may actually access (same picker the
+     refresh-time initializer uses). This is the fix for "some pages show failed
+     to fetch until I refresh": login left the branch at a stale/out-of-scope
+     value, which the server-side branch scoping then rejected with 403s. */
   const switchUser = (newUser) => {
     setCurrentUser(newUser);
-    // If new user is branch-restricted, ensure current branch is allowed
-    if(!canSeeAllBranches(newUser)){
-      if(branch==="ALL" || !newUser.branches.includes(branch?.code)){
-        const allowed = BRANCHES.find(b => newUser.branches.includes(b.code));
-        if(allowed) setBranch(allowed);
-      }
-    }
+    setBranch(pickBranchForUser(newUser));
     // Redirect on user switch (current route may be forbidden). Accountants land on
     // their own workspace dashboard; everyone else on the general dashboard.
     navigate(/accountant/i.test(newUser?.role || '') ? "/accounts/dashboard" : "/dashboard");
@@ -229,13 +208,35 @@ export default function KB360App(){
     if(!currentUser) return;
     let alive=true;
     const renew=async()=>{
-      try{ const r=await apiPost("/api/auth/refresh"); if(alive && r && r.token){ try{ localStorage.setItem("kb360-token", r.token); }catch{ /* ignore */ } } }
+      try{
+        const r=await apiPost("/api/auth/refresh");
+        if(!alive || !r || !r.token) return;
+        try{ localStorage.setItem("kb360-token", r.token); }catch{ /* ignore */ }
+        // Pick up live changes to the page-visibility deny-list (Settings → Page
+        // Visibility Control) without forcing a re-login. Only re-render when the
+        // hidden set actually changed, so this renew loop never re-triggers itself.
+        if(r.user){
+          setCurrentUser(prev=>{
+            if(!prev) return prev;
+            const next=Array.isArray(r.user.hidden)?r.user.hidden:[];
+            const prevH=Array.isArray(prev.hidden)?prev.hidden:[];
+            const same=prevH.length===next.length && prevH.every(k=>next.includes(k));
+            if(same) return prev;
+            const merged={...prev, hidden:next};
+            try{ localStorage.setItem("kb360-user", JSON.stringify(merged)); }catch{ /* ignore */ }
+            return merged;
+          });
+        }
+      }
       catch{ /* a dead session is handled by the auth-expired listener */ }
     };
     renew();
     const id=setInterval(renew, 10*60*1000);
     return ()=>{ alive=false; clearInterval(id); };
-  },[currentUser]);
+  // Keyed on identity (not the whole object) so updating `hidden` above doesn't
+  // tear down/recreate the renew interval.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[currentUser?.email, currentUser?.id]);
 
   /* ── Any API call that 401s / 403s (expired or invalid token) signs the user
      out and lands them on the login screen — instead of showing broken data. */
@@ -246,6 +247,31 @@ export default function KB360App(){
   },[]);
 
   function Page(){
+    /* ── Per-user page visibility (Settings → Page Visibility Control) ────────
+       A route on the user's `hidden` deny-list isn't rendered, even via a direct
+       URL — it's removed from their nav too (see getMenu). The landing dashboard
+       and the visibility-control page itself are never blocked here (the latter
+       gates non-admins inside its own component). ── */
+    const hiddenPages = Array.isArray(currentUser?.hidden) ? currentUser.hidden : [];
+    if(route!=="/dashboard" && route!=="/settings/page-access" && hiddenPages.includes(route)){
+      return (
+        <div style={{padding:30,maxWidth:560,margin:"40px auto",
+          background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",textAlign:"center"}}>
+          <div style={{fontSize:42,marginBottom:14}}>🚫</div>
+          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Page not available</h2>
+          <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>
+            This page has been hidden for your account by the administrator.
+            Contact <b>afshin.dhanani@kingsgroupco.com</b> if you need access.
+          </p>
+          <button onClick={()=>navigate("/dashboard")}
+            style={{background:"#0d1326",color:"#fff",border:"none",
+              padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>
+            ← Back to Dashboard
+          </button>
+        </div>
+      );
+    }
+
     // Route → module mapping (URL prefix-based)
     const routeModule = (() => {
       if(route==="/dashboard") return null; // always allowed
@@ -550,6 +576,7 @@ export default function KB360App(){
         if(route==="/approvals")                       return <PendingApprovals branch={branch} setRoute={navigate}/>;
         if(route==="/settings/banking-api")            return <BankingApiSettings branch={branch} setRoute={navigate}/>;
         if(route==="/settings/gsp-irp")                return <GspIrpSettings branch={branch} setRoute={navigate}/>;
+        if(route==="/settings/page-access")            return <PageAccessControl currentUser={currentUser} setRoute={navigate}/>;
     return <Placeholder route={route} setRoute={navigate}/>;
   }
 
