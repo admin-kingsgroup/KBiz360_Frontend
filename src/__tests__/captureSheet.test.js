@@ -63,6 +63,19 @@ describe('buildCaptureSheet — register capture columns & row refs', () => {
     expect(sheet.rows[0]._booking).toBe(booking);
   });
 
+  test('Sale Date column carries the voucher date (labelled per side)', () => {
+    const dated = { ...saleVoucher, date: '16-Mar-26' };
+    const sale = buildCaptureSheet([dated], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: true });
+    expect(keyset(sale)).toContain('saleDate');
+    expect(sale.columns.find((c) => c.key === 'saleDate').label).toBe('Sale Date');
+    expect(sale.rows[0].saleDate).toBe('16-Mar-26');
+
+    const purVoucher = { ...dated, vno: 'PF1', type: 'PF' };
+    const pur = buildCaptureSheet([purVoucher], { tab: 'purchase', tag: 'BOM', linkIndex, bookingByLink, showType: true });
+    expect(pur.columns.find((c) => c.key === 'saleDate').label).toBe('Purchase Date');
+    expect(pur.rows[0].saleDate).toBe('16-Mar-26');
+  });
+
   test('Invoice column is the LAST column and labelled per side', () => {
     const sale = buildCaptureSheet([saleVoucher], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: true });
     const lastSale = sale.columns[sale.columns.length - 1];

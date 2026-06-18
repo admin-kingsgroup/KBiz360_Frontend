@@ -1355,6 +1355,7 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
   const columns = [];
   const col = (key, label, isNum) => columns.push({ key, label, num: !!isNum });
   col('linkNo', 'SPG / Link No');
+  col('saleDate', isSale ? 'Sale Date' : 'Purchase Date');
   col('saleVno', 'Sales Invoice No');
   col('purVno', 'Purchase Invoice No');
   if (!tag) col('branch', 'Branch');
@@ -1395,6 +1396,7 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
       linkNo: link || '—',
       saleVno: isSale ? v.vno : (linkIndex.saleByLink[link] || ''),
       purVno: isSale ? (linkIndex.purByLink[link] || '') : v.vno,
+      saleDate: v.date || '',
       branch: v.branch || '',
       salesType: productOf(v),
       intDom: intDomOf(v, booking),
