@@ -34,7 +34,7 @@ jest.mock('../core/useAccounting', () => ({
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { ymOf, groupBalance, NetAgeing, CollectionsFollowup, DashboardAccountant, MonthEndChecklist } from '../modules/accountantWorkspace';
+import { ymOf, groupBalance, NetAgeing, CollectionsFollowup, DashboardAccountant, MonthEndChecklist, SuspenseClearing } from '../modules/accountantWorkspace';
 
 describe('accountant workspace — pure helpers', () => {
   test('ymOf handles ISO and DD/MM/YYYY', () => {
@@ -80,5 +80,11 @@ describe('accountant workspace — screens render', () => {
     expect(screen.getByText('Trial Balance balanced (Dr = Cr)')).toBeInTheDocument();
     expect(screen.getByText('Suspense cleared')).toBeInTheDocument();
     expect(screen.getByText('Bank reconciliation done')).toBeInTheDocument(); // manual item present
+  });
+
+  test('Suspense screen offers a Create Ledger action for a stuck item', () => {
+    render(<SuspenseClearing branch={{ code: 'BOM' }} setRoute={() => {}} />);
+    expect(screen.getByText('BKG1')).toBeInTheDocument();            // the stuck booking
+    expect(screen.getByText('Create Ledger')).toBeInTheDocument();   // self-serve ledger creation
   });
 });

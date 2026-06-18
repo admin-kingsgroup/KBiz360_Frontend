@@ -341,6 +341,15 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Journal Register", href:"/finance/journal-register"},
     {label:"Audit Trail",      href:"/reports/audit-trail"},
   ]},
+  // Self-serve master creation so the accountant can clear suspense (create a missing
+  // ledger) without leaving the workspace. Same screens as the main Masters tab. Cost
+  // Centres are intentionally NOT here — their writes are Super-Admin only (branch-wise
+  // master), so they'd 403 for a Branch Accountant.
+  {label:"Masters (quick create)", children:[
+    {label:"Ledgers (Create · Chart of Accounts)", href:"/masters/ledgers"},
+    {label:"Groups & Sub-Groups (Create)",         href:"/masters/subgroups"},
+    {label:"Bank Accounts",                        href:"/masters/bank-accounts"},
+  ]},
   {label:"Tax & Statutory", children:[
     {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
     {label:"TDS Auto-Calculator",        href:"/finance/tds-calculator"},

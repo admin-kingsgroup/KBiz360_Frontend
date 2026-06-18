@@ -64,15 +64,19 @@ const aBtn = (bg) => ({ padding: '5px 11px', fontSize: 11, fontWeight: 700, bord
 export function DashboardAccountant({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const go = (r) => setRoute && setRoute(r);
+  const ym = thisYM();
+  const monthFrom = `${ym}-01`;
+  const monthTo = new Date().toISOString().slice(0, 10);
   const age = useAgeing(branch).data || {};
-  const tax = useTaxSummary(branch).data || {};
-  const tb = useTrialBalance(branch).data?.rows || [];
+  // GST is a PERIODIC return — scope it to the current month so the tile shows what's
+  // payable now, not the all-time cumulative net (a bare call returns inception-to-date).
+  const tax = useTaxSummary(branch, { from: monthFrom, to: monthTo }).data || {};
+  const tb = useTrialBalance(branch).data?.rows || []; // bare = cumulative closing = current balance (correct for cash/bank)
   const bookings = useBookingOrders(branch).data || [];
   const pendVouchers = useVoucherApprovals(branch, 'pending').data || [];
   const sales = useSalesRegister(branch).data || [];
   const purch = usePurchaseRegister(branch).data || [];
 
-  const ym = thisYM();
   const inMonth = (v) => ymOf(v.date) === ym;
   const sumTot = (arr) => arr.reduce((s, v) => s + (Number(v.total) || 0), 0);
   const pendBookings = bookings.filter((b) => b.status === 'pending');
@@ -120,7 +124,7 @@ export function DashboardAccountant({ branch, setRoute }) {
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <Tile icon={<TrendingUp size={13} />} label="Sales (this month)" value={money(cur, sumTot(sales.filter(inMonth)))} sub="Open Sales Register" tone={C.green} onClick={() => go('/reports/sreg')} />
         <Tile icon={<TrendingDown size={13} />} label="Purchase (this month)" value={money(cur, sumTot(purch.filter(inMonth)))} sub="Open Purchase Register" tone={C.amber} onClick={() => go('/reports/preg')} />
-        <Tile icon={<ReceiptText size={13} />} label="GST / VAT" value={netGst == null ? 'View' : money(cur, Math.abs(netGst))} sub={netGst == null ? 'Open tax summary' : `${netGst >= 0 ? 'net payable' : 'refundable'} · open tax summary`} tone={netGst != null && netGst > 0 ? C.amber : C.blue} onClick={() => go('/reports/tax-summary')} />
+        <Tile icon={<ReceiptText size={13} />} label="GST / VAT (this month)" value={netGst == null ? 'View' : money(cur, Math.abs(netGst))} sub={netGst == null ? 'Open tax summary' : `${netGst >= 0 ? 'net payable' : 'refundable'} · open tax summary`} tone={netGst != null && netGst > 0 ? C.amber : C.blue} onClick={() => go('/reports/tax-summary')} />
         <Tile icon={<ReceiptText size={13} />} label="Invoice-wise GP" value="View" sub="Open GP report" tone={C.dark} onClick={() => go('/reports/invoice-gp')} />
       </div>
     </Shell>
@@ -263,7 +267,10 @@ export function SuspenseClearing({ branch, setRoute }) {
               <td style={{ ...td }}>{s.branch}</td>
               <td style={{ ...td }}>{s.kind}</td>
               <td style={{ ...td, color: C.red }}>{s.issue}</td>
-              <td style={{ ...td, textAlign: 'center' }}><button onClick={() => setRoute && setRoute('/transactions/approvals')} style={aBtn(C.blue)}>Open & Fix</button></td>
+              <td style={{ ...td, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                <button onClick={() => setRoute && setRoute('/masters/ledgers')} style={{ ...aBtn(C.green), marginRight: 5 }}>Create Ledger</button>
+                <button onClick={() => setRoute && setRoute('/transactions/approvals')} style={aBtn(C.blue)}>Open &amp; Fix</button>
+              </td>
             </tr>
           ))}
         </tbody>
