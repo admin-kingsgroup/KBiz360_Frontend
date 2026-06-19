@@ -27,6 +27,8 @@ function useMemoMutation(fn, { touchVouchers = false } = {}) {
       if (touchVouchers) {
         qc.invalidateQueries({ queryKey: ['vouchers'] });
         qc.invalidateQueries({ queryKey: ['accounting'] });
+        qc.invalidateQueries({ queryKey: ['groups'] });
+        qc.invalidateQueries({ queryKey: ['finance'] }); // migrated finance registers + Trial Balance
       }
     },
   });

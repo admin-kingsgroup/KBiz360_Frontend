@@ -26,6 +26,7 @@ import {
   VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc, isVatBranch, rowsFromSnapshots,
 } from '../../core/voucherSpecs.js';
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
+import { invalidateBooks } from '../../core/useAccounting';
 
 const GOLD = '#A07828', DARK = '#0d1326', DR = '#1B6B4C', CR = '#9B2C2C', BLUE = '#185FA5';
 // Reversal modules (Refund / Reissue) act on an existing sale — picked from the same
@@ -247,6 +248,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       if (thenApprove) booking = await apiPost('/api/booking-orders/' + booking.id + '/approve');
       setResult({ ...booking, _approved: thenApprove, _edited: editing });
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
+      if (thenApprove || editing) invalidateBooks(qc); // posting/editing changes the books → refresh every books cache
       toast(thenApprove ? `Voucher ${booking.bookingNo || ''} approved & posted` : `Voucher ${booking.bookingNo || ''} saved — pending approval`);
     } catch (e) { setError(e.message || 'Failed to save voucher'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
     finally { setSaving(false); }
@@ -730,6 +732,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       if (thenApprove) booking = await apiPost('/api/booking-orders/' + booking.id + '/approve');
       setResult({ ...booking, _approved: thenApprove });
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
+      if (thenApprove || editing) invalidateBooks(qc); // posting/editing changes the books → refresh every books cache
       toast(thenApprove ? `Voucher ${booking.bookingNo || ''} approved & posted` : `Voucher ${booking.bookingNo || ''} saved — pending approval`);
     } catch (e) { setError(e.message || 'Failed to save'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
     finally { setSaving(false); }
@@ -1124,6 +1127,7 @@ export function PendingBookings({ branch, setRoute }) {
         ? `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} (no purchase leg) under Link ${res.linkNo}.`
         : `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno} under Link ${res.linkNo}.`);
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
+      invalidateBooks(qc); // posting spawns Sale+Purchase journals → refresh every books cache
     } catch (e) { setMsg('⚠ ' + (e.message || 'Approve failed')); }
     finally { setBusyId(null); }
   };
@@ -1144,6 +1148,7 @@ export function PendingBookings({ branch, setRoute }) {
       const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] });
       setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`);
       setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] });
+      invalidateBooks(qc); // each posting spawns Sale+Purchase journals → refresh every books cache
     } catch (e) { setMsg('⚠ ' + (e.message || 'Bulk approve failed')); }
     finally { setBusyId(null); }
   };
@@ -1195,7 +1200,7 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
     const { confirmed, reason } = await confirmDialog({ title: `Delete approved booking ${b.bookingNo}?`, message: `Its Sales (${b.saleVno}) & Purchase (${b.purchaseVno}) invoices will be reversed out of the books. The record stays view-only under Deleted and its numbers can never be reused.`, danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
     if (!confirmed) return;
     setBusyId(b.id);
-    try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); toast(`Deleted ${b.bookingNo} & reversed out of the books`); }
+    try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); setOpen(null); toast(`Deleted ${b.bookingNo} & reversed out of the books`); }
     catch (e) { toast(e.message || 'Delete failed', 'error'); }
     finally { setBusyId(null); }
   };
@@ -1278,7 +1283,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
 
   const onApprove = async (b) => {
     setBusyId(b.id); setMsg('');
-    try { const res = await apiPost('/api/booking-orders/' + b.id + '/approve'); setMsg(res.noSupplier ? `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} (no purchase leg).` : `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno}.`); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }
+    try { const res = await apiPost('/api/booking-orders/' + b.id + '/approve'); setMsg(res.noSupplier ? `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} (no purchase leg).` : `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno}.`); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Approve failed')); } finally { setBusyId(null); }
   };
   // Open the editor. Editing an already-approved booking reverses its posted Sales/
@@ -1302,7 +1307,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
     const { confirmed, reason } = await confirmDialog({ title: `Delete approved booking ${b.bookingNo}?`, message: `Its Sales (${b.saleVno}) & Purchase (${b.purchaseVno}) are reversed out of the books; kept view-only under Deleted, numbers never reused.`, danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
     if (!confirmed) return;
     setBusyId(b.id);
-    try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); setMsg(`✓ Deleted ${b.bookingNo}.`); }
+    try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); setOpen(null); setMsg(`✓ Deleted ${b.bookingNo}.`); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Delete failed')); } finally { setBusyId(null); }
   };
   const onApproveSelected = async () => {
@@ -1310,7 +1315,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
     const { confirmed } = await confirmDialog({ title: `Approve ${sel.size} selected voucher(s)?`, message: 'Each posts its linked Sales + Purchase.', confirmLabel: 'Approve' });
     if (!confirmed) return;
     setBusyId('bulk'); setMsg(`⏳ Approving ${sel.size} voucher(s)… please wait.`);
-    try { const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] }); setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`); setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }
+    try { const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] }); setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`); setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Bulk approve failed')); } finally { setBusyId(null); }
   };
 

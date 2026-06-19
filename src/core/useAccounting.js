@@ -27,6 +27,24 @@ export function branchCode(branch) {
 
 const enabled = () => !!getAuthToken();
 
+// Any voucher change (create / edit / approve / reject / delete / settle) re-posts
+// the books, so EVERY server-state cache that reflects the books must be refreshed.
+// There are TWO separate query roots that read the books:
+//   • 'accounting' — legacy reports (Trial Balance, P&L, Balance Sheet, Day Book,
+//                    Ledger statement) + 'vouchers' lists + 'groups' tree.
+//   • 'finance'    — the migrated finance feature (/finance/trial-balance and the
+//                    Receipt/Payment/Contra/Journal registers, keyed ['finance', …]).
+// The 'finance' root was NOT being invalidated, so a deleted/edited voucher kept
+// showing in the finance registers & Trial Balance until its staleTime lapsed —
+// the "deleted voucher still in the ledger, ledger not refreshing" bug. Invalidate
+// every root here so no voucher screen can go stale after a books change.
+export function invalidateBooks(qc) {
+  qc.invalidateQueries({ queryKey: ['vouchers'] });
+  qc.invalidateQueries({ queryKey: ['accounting'] });
+  qc.invalidateQueries({ queryKey: ['groups'] });
+  qc.invalidateQueries({ queryKey: ['finance'] });
+}
+
 export function useTrialBalance(branch, { from, to } = {}) {
   const code = branchCode(branch);
   return useQuery({
@@ -187,28 +205,28 @@ export function useApproveVoucher() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, approver }) => apiPost(`/api/vouchers/${id}/approve`, { approver }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['groups'] }); },
+    onSuccess: () => invalidateBooks(qc),
   });
 }
 export function useRejectVoucher() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, by, reason }) => apiPost(`/api/vouchers/${id}/reject`, { by, reason }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); },
+    onSuccess: () => invalidateBooks(qc),
   });
 }
 export function useDeleteVoucher() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, by, reason }) => apiPost(`/api/vouchers/${id}/delete`, { by, reason }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['groups'] }); },
+    onSuccess: () => invalidateBooks(qc),
   });
 }
 export function useApproveMany() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ ids, approver }) => apiPost('/api/vouchers/approve-many', { ids, approver }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['groups'] }); },
+    onSuccess: () => invalidateBooks(qc),
   });
 }
 export function useApproveAll() {
@@ -219,7 +237,7 @@ export function useApproveAll() {
       const qs = new URLSearchParams({ ...(code ? { branch: code } : {}), ...(category ? { category } : {}) }).toString();
       return apiPost(`/api/vouchers/approve-all${qs ? '?' + qs : ''}`, { approver });
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['groups'] }); },
+    onSuccess: () => invalidateBooks(qc),
   });
 }
 
@@ -422,10 +440,7 @@ export function useSettleAdvance() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, allocations }) => apiPut(`/api/vouchers/${id}/settle`, { allocations }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['vouchers'] });
-      qc.invalidateQueries({ queryKey: ['accounting'] });
-    },
+    onSuccess: () => invalidateBooks(qc),
   });
 }
 
@@ -485,10 +500,7 @@ export function useCreateVoucher() {
     // VNO is ALWAYS auto-assigned server-side (atomic per branch×type → no duplicates).
     // Never trust a client-built number — blank it so accounting.create() mints it.
     mutationFn: (body) => apiPost('/api/vouchers', { ...body, vno: '' }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['accounting'] });
-      qc.invalidateQueries({ queryKey: ['vouchers'] });
-    },
+    onSuccess: () => invalidateBooks(qc),
   });
 }
 
@@ -510,8 +522,7 @@ export function useUpdateVoucher() {
       return apiPut(`/api/vouchers/${id}`, { ...body, editReason });
     },
     onSuccess: (_d, { id }) => {
-      qc.invalidateQueries({ queryKey: ['accounting'] });
-      qc.invalidateQueries({ queryKey: ['vouchers'] });
+      invalidateBooks(qc);
       qc.invalidateQueries({ queryKey: ['voucher', id] });
     },
   });
