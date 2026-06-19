@@ -411,12 +411,21 @@ export const VOUCHER_REGISTRY = {
 
     validate: (s) => {
       const t = pxpTotals(s);
-      const lines = (s.lines || []).filter((l) => l.ledger && (+l.amt || 0) !== 0);
+      const all = s.lines || [];
+      const lines = all.filter((l) => l.ledger && (+l.amt || 0) !== 0);
+      const amtNoLedger = all.some((l) => !l.ledger && (+l.amt || 0) !== 0);
+      const ledgerNoAmt = all.some((l) => l.ledger && (+l.amt || 0) === 0);
+      // Value test = the GROSS DEBIT (expense/asset legs + input GST). This stays
+      // positive even when a credit line (discount/income received) shrinks the taxable
+      // base or TDS/rounding pushes `taxable = Dr − Cr` to ≤ 0 — so a balanced, valued
+      // voucher (the supplier leg balances it) is never wrongly locked on Save.
+      const grossDr = r2(t.drSum + t.gstAmt);
       let hint = '';
       if (!s.party) hint = '(Pick Supplier)';
-      else if (!lines.length) hint = '(Add expense lines)';
-      else if (t.total <= 0) hint = '(Enter amount)';
-      return { ok: !!s.party && lines.length > 0 && lines.every((l) => l.ledger) && t.total > 0, hint };
+      else if (!lines.length) hint = amtNoLedger ? '(Pick a ledger on each line)' : ledgerNoAmt ? '(Enter an amount)' : '(Add expense lines)';
+      else if (amtNoLedger) hint = '(Pick a ledger on each line)';
+      else if (grossDr <= 0) hint = '(Enter an amount)';
+      return { ok: !!s.party && lines.length > 0 && !amtNoLedger && grossDr > 0, hint };
     },
 
     fields: (props) => <PurchaseExpenseFields {...props} />,
@@ -443,7 +452,7 @@ export const VOUCHER_REGISTRY = {
     initial: () => ({
       date: todayISO(), billNo: '', party: '',
       gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 0, gstManual: false,
-      remarks: '', lines: [{ _k: 1, ledger: '', drCr: 'Dr', amt: '', desc: '' }, { _k: 2, ledger: '', drCr: 'Cr', amt: '', desc: '' }],
+      remarks: '', lines: [{ _k: 1, ledger: '', drCr: 'Cr', amt: '', desc: '' }, { _k: 2, ledger: '', drCr: 'Dr', amt: '', desc: '' }],
     }),
 
     fromVoucher: (v) => ({
@@ -452,7 +461,7 @@ export const VOUCHER_REGISTRY = {
       gstMode: v.gstMode || 'intra', gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18, gstAmt: +v.taxAmt || 0,
       gstManual: true,  // preserve the saved GST amount exactly (no auto-recompute on edit)
       remarks: v.remarks || '',
-      lines: (v.lines && v.lines.length ? v.lines : [{ ledger: '', drCr: 'Dr', amt: '', desc: '' }, { ledger: '', drCr: 'Cr', amt: '', desc: '' }])
+      lines: (v.lines && v.lines.length ? v.lines : [{ ledger: '', drCr: 'Cr', amt: '', desc: '' }, { ledger: '', drCr: 'Dr', amt: '', desc: '' }])
         .map((l, i) => ({ _k: i + 1, ledger: l.ledger || '', drCr: l.drCr === 'Dr' ? 'Dr' : 'Cr', amt: l.amt ?? '', desc: l.desc || '' })),
     }),
 
@@ -473,8 +482,13 @@ export const VOUCHER_REGISTRY = {
 
     validate: (s) => {
       const t = dnTotals(s);
-      const lines = (s.lines || []).filter((l) => l.ledger && (+l.amt || 0) !== 0);
-      const allLedgered = lines.length > 0 && lines.every((l) => l.ledger);
+      const all = s.lines || [];
+      // A line "counts" only when it has BOTH a ledger and a non-zero amount. Track the
+      // partially-filled rows so the hint tells the user exactly what's missing instead
+      // of a vague "add lines" (the cause of the can't-save confusion).
+      const lines = all.filter((l) => l.ledger && (+l.amt || 0) !== 0);
+      const ledgerNoAmt = all.some((l) => l.ledger && (+l.amt || 0) === 0);
+      const amtNoLedger = all.some((l) => !l.ledger && (+l.amt || 0) !== 0);
       // Full Dr/Cr of the lines + reversed input GST (Cr). With a supplier party the
       // creditor leg absorbs any imbalance (so the entry always balances); without a
       // party the Dr/Cr lines must balance on their own — a journal-style entry.
@@ -483,11 +497,17 @@ export const VOUCHER_REGISTRY = {
       const selfBalanced = Math.abs(r2(crTotal - drTotal)) < 0.01;
       const gross = Math.max(crTotal, drTotal);
       let hint = '';
-      if (!lines.length) hint = '(Add lines)';
-      else if (!allLedgered) hint = '(Pick ledger on every line)';
-      else if (gross <= 0) hint = '(Enter amount)';
+      if (!lines.length) {
+        if (amtNoLedger) hint = '(Pick a ledger on each line)';
+        else if (ledgerNoAmt) hint = '(Enter an amount)';
+        else hint = '(Add a line — ledger + amount)';
+      } else if (amtNoLedger) hint = '(Pick a ledger on each line)';
+      else if (gross <= 0) hint = '(Enter an amount)';
       else if (!s.party && !selfBalanced) hint = '(Pick Supplier or balance Dr = Cr)';
-      return { ok: allLedgered && gross > 0 && (!!s.party || selfBalanced), hint };
+      // Every priced line must have a ledger; need value; and either a party absorbs
+      // the balance or the lines self-balance.
+      const ok = lines.length > 0 && !amtNoLedger && gross > 0 && (!!s.party || selfBalanced);
+      return { ok, hint };
     },
 
     fields: (props) => <DebitNoteFields {...props} />,

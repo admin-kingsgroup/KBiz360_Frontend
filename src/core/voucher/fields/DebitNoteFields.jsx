@@ -124,7 +124,23 @@ export function DebitNoteFields({ state, setState, ctx }) {
               <FL label="GST amount"><input type="number" value={state.gstAmt || ''} onChange={(e) => patch({ gstAmt: +e.target.value || 0, gstManual: true })} style={inp} /></FL>
               <button onClick={autoGst} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
             </div>
-            {t.gstAmt > 0 && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#185FA5' }}>{state.gstMode === 'inter' ? <>IGST <b>{money2(cur, igst)}</b></> : <>CGST <b>{money2(cur, cgst)}</b> · SGST <b>{money2(cur, sgst)}</b></>} · Debit Note total <b>{money2(cur, t.total)}</b></p>}
+            {/* Tax components — always shown per Place of Supply: intra → CGST + SGST,
+                inter → IGST. The columns switch live when the Place of Supply toggles. */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              {(state.gstMode === 'inter'
+                ? [['IGST', igst]]
+                : [['CGST', cgst], ['SGST', sgst]]
+              ).map(([lab, val]) => (
+                <div key={lab} style={{ flex: '1 1 90px', minWidth: 90, padding: '6px 10px', borderRadius: 7, background: '#fff', border: '1px solid #B9D6F2' }}>
+                  <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: '0.5px', color: '#5a6691', textTransform: 'uppercase' }}>{lab}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#185FA5' }}>{money2(cur, val)}</div>
+                </div>
+              ))}
+              <div style={{ flex: '1 1 120px', minWidth: 120, padding: '6px 10px', borderRadius: 7, background: '#185FA5', border: '1px solid #185FA5' }}>
+                <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: '0.5px', color: '#cfe0f3', textTransform: 'uppercase' }}>Debit Note Total</div>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff' }}>{money2(cur, t.total)}</div>
+              </div>
+            </div>
           </>
         )}
       </div>

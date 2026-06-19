@@ -14,6 +14,42 @@ const PM = VOUCHER_REGISTRY.payment;
 const CV = VOUCHER_REGISTRY.contra;
 const ctx = { branchCode: 'BOM' };
 
+describe('purchase-expense — Save not blocked on a balanced/valued entry', () => {
+  const PXP = VOUCHER_REGISTRY['purchase-expense'];
+
+  test.concurrent('recruitment-charges entry (expense + GST + TDS) is savable', async () => {
+    // Mirrors the reported case: HR Consultancy 39,984 (Dr) · 18% GST · 10% TDS, supplier "Job Search".
+    const s = {
+      party: 'Job Search', gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 7198,
+      tdsSection: '194J', tdsAmt: 3999,
+      lines: [{ ledger: 'HR Consultancy Expenses', drCr: 'Dr', amt: 39984 }],
+    };
+    expect(PXP.validate(s).ok).toBe(true);   // balanced + valued → must save
+  });
+
+  test.concurrent('a discount/income Cr line that exceeds the net does NOT lock Save', async () => {
+    // taxable = 1000 − 1200 = −200 (≤ 0 under the old check) but the entry still has a
+    // real expense debit + GST, so it must remain savable.
+    const s = {
+      party: 'Vendor', gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 180,
+      tdsSection: 'None', tdsAmt: 0,
+      lines: [{ ledger: 'Office Rent', drCr: 'Dr', amt: 1000 }, { ledger: 'Discount Received', drCr: 'Cr', amt: 1200 }],
+    };
+    expect(PXP.validate(s).ok).toBe(true);
+  });
+
+  test.concurrent('a line with an amount but no ledger blocks with a precise hint', async () => {
+    const s = { party: 'Vendor', gstApplicable: false, lines: [{ ledger: '', drCr: 'Dr', amt: 5000 }] };
+    const v = PXP.validate(s);
+    expect(v.ok).toBe(false);
+    expect(v.hint).toMatch(/ledger/i);
+  });
+
+  test.concurrent('no party still blocks (supplier required)', async () => {
+    expect(PXP.validate({ party: '', lines: [{ ledger: 'Office Rent', drCr: 'Dr', amt: 1000 }], gstApplicable: false }).ok).toBe(false);
+  });
+});
+
 describe('refund / reissue / adm / acm — registered & gated payloads', () => {
   test.concurrent('all four categories are registered', async () => {
     ['refund', 'reissue', 'adm', 'acm'].forEach((c) => expect(VOUCHER_REGISTRY[c]).toBeTruthy());
@@ -102,6 +138,37 @@ describe('debit-note — purchase return registered & gated payload', () => {
     expect(DN.validate({ party: 'Air India', lines: [], gstApplicable: false }).ok).toBe(false);
     expect(DN.validate({ party: 'Air India', lines: [{ ledger: '', amt: 1000 }], gstApplicable: false }).ok).toBe(false);
     expect(DN.validate({ party: 'Air India', lines: [{ ledger: 'Purchase', amt: 1000 }], gstApplicable: false }).ok).toBe(true);
+  });
+
+  test.concurrent('validate: precise hints for partially-filled lines (the can\'t-save case)', async () => {
+    // Ledger picked but no amount → tell them to enter an amount (not vague "add lines").
+    const noAmt = DN.validate({ party: 'Air India', gstApplicable: false, lines: [{ ledger: 'Purchase — Air Ticket', drCr: 'Cr', amt: '' }] });
+    expect(noAmt.ok).toBe(false);
+    expect(noAmt.hint).toMatch(/amount/i);
+    // Amount typed but no ledger → tell them to pick a ledger.
+    const noLed = DN.validate({ party: 'Air India', gstApplicable: false, lines: [{ ledger: '', drCr: 'Cr', amt: 1000 }] });
+    expect(noLed.ok).toBe(false);
+    expect(noLed.hint).toMatch(/ledger/i);
+    // Both blank → generic add-a-line guidance.
+    const blank = DN.validate({ party: 'Air India', gstApplicable: false, lines: [{ ledger: '', drCr: 'Cr', amt: '' }] });
+    expect(blank.ok).toBe(false);
+    expect(blank.hint).toMatch(/add a line/i);
+  });
+
+  test.concurrent('validate: expense/GST on Dr with supplier auto-balancing on Cr is savable (reported case)', async () => {
+    // The reported screenshot: HR Consultancy 39,984 + CGST 3,599 + SGST 3,599 on Dr,
+    // TDS Payable 3,999 on Cr, supplier "Job Search" absorbs the −43,183 balance. The
+    // old check (subtotal = Cr − Dr ≤ 0) locked Save; the gross-value check passes it.
+    const v = DN.validate({
+      party: 'Job Search', gstApplicable: false,
+      lines: [
+        { ledger: 'HR Consultancy Expenses', drCr: 'Dr', amt: 39984 },
+        { ledger: 'CGST Input [BOM]', drCr: 'Dr', amt: 3599 },
+        { ledger: 'SGST Input [BOM]', drCr: 'Dr', amt: 3599 },
+        { ledger: 'TDS Payable [BOM]', drCr: 'Cr', amt: 3999 },
+      ],
+    });
+    expect(v.ok).toBe(true);
   });
 
   test.concurrent('validate: a self-balanced Dr/Cr entry saves with NO party (journal-style)', async () => {
