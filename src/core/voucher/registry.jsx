@@ -455,20 +455,20 @@ export const VOUCHER_REGISTRY = {
 
     initial: () => ({
       date: todayISO(), billNo: '', party: '',
-      gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 0, gstManual: false,
       remarks: '', lines: [{ _k: 1, ledger: '', drCr: 'Cr', amt: '', desc: '' }, { _k: 2, ledger: '', drCr: 'Dr', amt: '', desc: '' }],
     }),
 
     fromVoucher: (v) => ({
       date: v.date || '', billNo: v.billNo || v.againstInvoice || '', party: v.party || '',
-      gstApplicable: (+v.taxAmt || 0) > 0 || !!v.gstMode,
-      gstMode: v.gstMode || 'intra', gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18, gstAmt: +v.taxAmt || 0,
-      gstManual: true,  // preserve the saved GST amount exactly (no auto-recompute on edit)
       remarks: v.remarks || '',
       lines: (v.lines && v.lines.length ? v.lines : [{ ledger: '', drCr: 'Cr', amt: '', desc: '' }, { ledger: '', drCr: 'Dr', amt: '', desc: '' }])
         .map((l, i) => ({ _k: i + 1, ledger: l.ledger || '', drCr: l.drCr === 'Dr' ? 'Dr' : 'Cr', amt: l.amt ?? '', desc: l.desc || '' })),
     }),
 
+    // The line grid is the complete itemisation: input GST is reversed by entering the
+    // CGST/SGST/IGST Input ledgers as lines, so we NEVER emit a separate taxAmt — that
+    // add-on used to post a second GST leg on top of the tax lines (double-count). The
+    // supplier leg balances to the net of the lines (= total).
     toBody: (s, ctx) => {
       const t = dnTotals(s);
       const lines = (s.lines || [])
@@ -477,8 +477,7 @@ export const VOUCHER_REGISTRY = {
       return {
         type: 'DN', category: 'debit-note', branch: ctx.branchCode, date: s.date,
         party: s.party, partyType: 'supplier', billNo: s.billNo, againstInvoice: s.billNo,
-        lines, subtotal: t.subtotal, taxAmt: t.gstAmt, gstMode: s.gstApplicable ? s.gstMode : '',
-        gstPct: s.gstApplicable ? (+s.gstPct || 0) : 0, total: t.total,
+        lines, subtotal: t.subtotal, taxAmt: 0, gstMode: '', gstPct: 0, total: t.subtotal,
         remarks: s.remarks || `Being purchase return to ${s.party}${s.billNo ? ` against ${s.billNo}` : ''}`,
         status: 'saved',
       };
@@ -493,11 +492,12 @@ export const VOUCHER_REGISTRY = {
       const lines = all.filter((l) => l.ledger && (+l.amt || 0) !== 0);
       const ledgerNoAmt = all.some((l) => l.ledger && (+l.amt || 0) === 0);
       const amtNoLedger = all.some((l) => !l.ledger && (+l.amt || 0) !== 0);
-      // Full Dr/Cr of the lines + reversed input GST (Cr). With a supplier party the
-      // creditor leg absorbs any imbalance (so the entry always balances); without a
-      // party the Dr/Cr lines must balance on their own — a journal-style entry.
-      const crTotal = r2(t.crSum + t.gstAmt);  // Cr returns + GST reversed
-      const drTotal = r2(t.drSum);             // Dr charges / adjustments
+      // Full Dr/Cr of the lines (input GST is reversed via its own Cr lines). With a
+      // supplier party the creditor leg absorbs any imbalance (so the entry always
+      // balances); without a party the Dr/Cr lines must balance on their own — a
+      // journal-style entry.
+      const crTotal = r2(t.crSum);  // Cr returns + input GST reversed (all as lines)
+      const drTotal = r2(t.drSum);  // Dr charges / TDS / adjustments
       const selfBalanced = Math.abs(r2(crTotal - drTotal)) < 0.01;
       const gross = Math.max(crTotal, drTotal);
       let hint = '';

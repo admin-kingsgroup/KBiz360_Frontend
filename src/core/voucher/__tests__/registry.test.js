@@ -108,24 +108,50 @@ describe('debit-note — purchase return registered & gated payload', () => {
       .forEach((c) => expect(VOUCHER_REGISTRY[c].closeOnSave).toBeFalsy());
   });
 
-  test.concurrent('toBody: supplier party + return lines + GST, total = subtotal + GST', async () => {
+  test.concurrent('toBody: supplier party + return lines, total = net of lines (input GST is a Cr line)', async () => {
+    // Input GST is reversed by entering CGST/SGST Input as their own Cr lines — the
+    // supplier Dr leg = the net of all lines. There is NO separate GST add-on.
     const b = DN.toBody({
       date: '2026-06-19', party: 'Air India', billNo: 'PI/BOM/26/0042',
-      gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 1800,
-      lines: [{ ledger: 'Purchase — Air Ticket', amt: 10000, desc: 'cancelled PNR' }],
+      lines: [
+        { ledger: 'Purchase — Air Ticket', amt: 10000, drCr: 'Cr', desc: 'cancelled PNR' },
+        { ledger: 'CGST Input [BOM]', amt: 900, drCr: 'Cr' },
+        { ledger: 'SGST Input [BOM]', amt: 900, drCr: 'Cr' },
+      ],
     }, ctx);
     expect(b).toMatchObject({ type: 'DN', category: 'debit-note', party: 'Air India', partyType: 'supplier' });
-    expect(b.subtotal).toBe(10000);
-    expect(b.taxAmt).toBe(1800);
-    expect(b.total).toBe(11800);               // Dr supplier = Cr purchase + input GST
-    expect(b.lines).toHaveLength(1);
+    expect(b.subtotal).toBe(11800);
+    expect(b.taxAmt).toBe(0);                   // never a separate GST leg
+    expect(b.total).toBe(11800);               // Dr supplier = Σ Cr lines
+    expect(b.lines).toHaveLength(3);
     expect(b.againstInvoice).toBe('PI/BOM/26/0042');
   });
 
-  test.concurrent('toBody: GST unticked → no tax, total = subtotal, gstMode cleared', async () => {
+  test.concurrent('toBody: GST is NEVER double-counted — stray gstApplicable/gstAmt in state is ignored', async () => {
+    // Regression for the reported double-count: even if legacy GST state leaks in, the
+    // body must carry taxAmt 0 (so the backend posts no extra CGST/SGST on top of the
+    // tax lines) and total = the net of the lines, not net + phantom GST.
     const b = DN.toBody({
-      date: '2026-06-19', party: 'Hotel Co', gstApplicable: false, gstMode: 'intra', gstAmt: 999,
-      lines: [{ ledger: 'Purchase — Hotel', amt: 5000 }],
+      date: '2026-06-19', party: 'Job Search',
+      gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 7772.76,
+      lines: [
+        { ledger: 'HR Consultancy Expenses', amt: 39983.90, drCr: 'Cr' },
+        { ledger: 'CGST Input [BOM]', amt: 3598.55, drCr: 'Cr' },
+        { ledger: 'SGST Input [BOM]', amt: 3598.55, drCr: 'Cr' },
+        { ledger: 'TDS Payable [BOM]', amt: 3999, drCr: 'Dr' },
+      ],
+    }, ctx);
+    expect(b.taxAmt).toBe(0);
+    expect(b.gstMode).toBe('');
+    expect(b.gstPct).toBe(0);
+    expect(b.subtotal).toBe(43182);            // 47181 Cr − 3999 Dr
+    expect(b.total).toBe(43182);               // NOT 50,954.76
+  });
+
+  test.concurrent('toBody: total = net of lines regardless of any GST state', async () => {
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Hotel Co',
+      lines: [{ ledger: 'Purchase — Hotel', amt: 5000, drCr: 'Cr' }],
     }, ctx);
     expect(b.taxAmt).toBe(0);
     expect(b.total).toBe(5000);
@@ -223,17 +249,21 @@ describe('debit-note — purchase return registered & gated payload', () => {
   test.concurrent('fromVoucher round-trips a saved debit note for the edit form', async () => {
     const b = DN.toBody({
       date: '2026-06-19', party: 'Air India', billNo: 'PI/1',
-      gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 1800,
-      lines: [{ ledger: 'Purchase — Air Ticket', amt: 10000, desc: 'rtn' }],
+      lines: [
+        { ledger: 'Purchase — Air Ticket', amt: 10000, drCr: 'Cr', desc: 'rtn' },
+        { ledger: 'CGST Input [BOM]', amt: 900, drCr: 'Cr' },
+        { ledger: 'SGST Input [BOM]', amt: 900, drCr: 'Cr' },
+      ],
     }, ctx);
     const s = DN.fromVoucher(b);
     expect(s.party).toBe('Air India');
-    expect(s.gstApplicable).toBe(true);
-    expect(s.gstAmt).toBe(1800);
-    expect(s.lines).toHaveLength(1);
+    expect(s.lines).toHaveLength(3);
     expect(s.lines[0].ledger).toBe('Purchase — Air Ticket');
+    // input GST is carried back as ordinary Cr lines, not a separate GST add-on
+    expect(s.lines[1].ledger).toBe('CGST Input [BOM]');
     // re-serialising the recovered state reproduces the same total (idempotent edit)
     expect(DN.toBody(s, ctx).total).toBe(11800);
+    expect(DN.toBody(s, ctx).taxAmt).toBe(0);
   });
 });
 

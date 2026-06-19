@@ -1,30 +1,30 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { Plus } from 'lucide-react';
 import { FL, inp, btnGh, card } from '../../styles';
-import { VPlaceOfSupply } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
-import { useVoucherRef } from '../useVoucherRef';
-import { V_DR, V_CR, DARK, DIM, money2, dnTotals, r2 } from '../ui';
+import { V_DR, V_CR, DARK, DIM, money2, dnTotals } from '../ui';
 
 /**
  * Debit-Note body — a PURCHASE RETURN to a supplier (goods/services sent back, or
  * a supplier over-billing reversed). It is the mirror of a purchase:
  *   Supplier A/c (Sundry Creditor)  Dr   net        (we owe the supplier less)
  *   To Purchase ledger(s)           Cr   Σ returns  (cost reversed — default side)
- *   Charge/adjustment ledger(s)     Dr   Σ Dr lines (a charge the supplier retains)
- *   To Input CGST/SGST or IGST      Cr   gstAmt     (input credit reversed)
- * Like a journal/purchase voucher, every line carries a per-line Dr/Cr toggle
- * (defaulting to Cr = cost reversed); the backend's debitNoteLines posts each line
- * on its own side and debits the supplier with the balancing net. GST is
- * amount-canonical (the % just auto-fills an editable amount), so edit round-trips
- * exactly. The shell renders the live JV effect below the form.
+ *   To Input CGST/SGST or IGST      Cr   Σ tax lines (input credit reversed)
+ *   Charge/adjustment ledger(s)     Dr   Σ Dr lines (a charge / tax retained)
+ * The line grid is the COMPLETE itemisation — like a journal, every leg (the
+ * purchase ledgers, the input CGST/SGST/IGST being reversed, any TDS/charge) is
+ * entered as its own line with a per-line Dr/Cr toggle (defaulting to Cr = cost
+ * reversed). The backend's debitNoteLines posts each line on its own side and
+ * debits/credits the supplier with the balancing net. There is deliberately NO
+ * separate "auto GST" add-on: GST is reversed by entering the CGST/SGST/IGST Input
+ * ledgers as lines, so it can never be double-counted on top of those lines. The
+ * shell renders the live JV effect below the form.
  */
 export function DebitNoteFields({ state, setState, ctx }) {
   const { branch, cur } = ctx;
   const idRef = useRef(1000);
   const lines = state.lines || [];
   const patch = (p) => setState((s) => ({ ...s, ...p }));
-  const { gstSlabs: GST_SLABS } = useVoucherRef();
 
   const updLine = (i, k, v) => setState((s) => ({ ...s, lines: s.lines.map((l, j) => (j === i ? { ...l, [k]: v } : l)) }));
   const addLine = () => setState((s) => ({ ...s, lines: [...s.lines, { _k: idRef.current++, ledger: '', drCr: 'Cr', amt: '', desc: '' }] }));
@@ -34,34 +34,20 @@ export function DebitNoteFields({ state, setState, ctx }) {
   });
 
   const t = dnTotals(state);
-  // GST auto-calculates from the taxable value × rate so the CGST/SGST or IGST split
-  // appears automatically once GST is applicable — the Place-of-Supply toggle then
-  // shows the correct components per state (intra → CGST+SGST, inter → IGST). The
-  // amount stays editable: typing a custom value (gstManual) stops auto-recompute.
-  useEffect(() => {
-    if (!state.gstApplicable || state.gstManual) return;
-    const want = r2(t.subtotal * (+state.gstPct || 0) / 100);
-    if (r2(+state.gstAmt || 0) !== want) patch({ gstAmt: want });
-  }, [state.gstApplicable, state.gstManual, state.gstPct, t.subtotal]); // eslint-disable-line react-hooks/exhaustive-deps
-  const autoGst = () => patch({ gstAmt: r2(t.subtotal * (+state.gstPct || 0) / 100), gstManual: false });
-  const cgst = state.gstMode === 'inter' ? 0 : r2(t.gstAmt / 2);
-  const sgst = state.gstMode === 'inter' ? 0 : r2(t.gstAmt - cgst);
-  const igst = state.gstMode === 'inter' ? t.gstAmt : 0;
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
         <FL label="Voucher date"><input type="date" value={state.date || ''} onChange={(e) => patch({ date: e.target.value })} style={inp} /></FL>
         <FL label="Against purchase bill (optional)"><input value={state.billNo || ''} onChange={(e) => patch({ billNo: e.target.value })} style={inp} placeholder="PI/BOM/2026/0042" /></FL>
-        {state.gstApplicable ? <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} /> : <div />}
       </div>
 
       <FL label="Supplier / Vendor (party ledger — Dr, balancing leg · optional if Dr = Cr)">
         <LedgerPicker branch={branch} value={state.party} onChange={(v) => patch({ party: v })} filter={(l) => l.type === 'Creditor'} placeholder="Sundry Creditors / Supplier..." />
       </FL>
 
-      {/* Purchase-return lines — Cr (default) reverses cost · Dr books a retained charge */}
-      <p style={{ margin: '14px 0 6px', fontSize: 9, fontWeight: 700, color: '#A07828', textTransform: 'uppercase', letterSpacing: '1px' }}>Purchase Ledgers Returned (Cr) · Charges / Adjustments (Dr)</p>
+      {/* Purchase-return lines — Cr (default) reverses cost / input GST · Dr books a retained charge or TDS */}
+      <p style={{ margin: '14px 0 6px', fontSize: 9, fontWeight: 700, color: '#A07828', textTransform: 'uppercase', letterSpacing: '1px' }}>Purchase Ledgers &amp; Input GST Returned (Cr) · Charges / TDS (Dr)</p>
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 12 }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
@@ -111,38 +97,14 @@ export function DebitNoteFields({ state, setState, ctx }) {
         </div>
       </div>
 
-      {/* GST (input credit reversed) */}
-      <div style={{ padding: '10px 12px', borderRadius: 9, background: '#E6F1FB', border: '1px solid #B9D6F2', marginBottom: 10 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: state.gstApplicable ? 8 : 0 }}>
-          <input type="checkbox" checked={!!state.gstApplicable} onChange={(e) => patch({ gstApplicable: e.target.checked })} style={{ cursor: 'pointer', accentColor: '#185FA5' }} />
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#185FA5' }}>GST applicable (input credit reversed)</span>
-        </label>
-        {state.gstApplicable && (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'end' }}>
-              <FL label="GST rate"><select value={state.gstPct} onChange={(e) => patch({ gstPct: +e.target.value, gstManual: false })} style={inp}>{GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}</select></FL>
-              <FL label="GST amount"><input type="number" value={state.gstAmt || ''} onChange={(e) => patch({ gstAmt: +e.target.value || 0, gstManual: true })} style={inp} /></FL>
-              <button onClick={autoGst} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
-            </div>
-            {/* Tax components — always shown per Place of Supply: intra → CGST + SGST,
-                inter → IGST. The columns switch live when the Place of Supply toggles. */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-              {(state.gstMode === 'inter'
-                ? [['IGST', igst]]
-                : [['CGST', cgst], ['SGST', sgst]]
-              ).map(([lab, val]) => (
-                <div key={lab} style={{ flex: '1 1 90px', minWidth: 90, padding: '6px 10px', borderRadius: 7, background: '#fff', border: '1px solid #B9D6F2' }}>
-                  <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: '0.5px', color: '#5a6691', textTransform: 'uppercase' }}>{lab}</div>
-                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#185FA5' }}>{money2(cur, val)}</div>
-                </div>
-              ))}
-              <div style={{ flex: '1 1 120px', minWidth: 120, padding: '6px 10px', borderRadius: 7, background: '#185FA5', border: '1px solid #185FA5' }}>
-                <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: '0.5px', color: '#cfe0f3', textTransform: 'uppercase' }}>Debit Note Total</div>
-                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff' }}>{money2(cur, t.total)}</div>
-              </div>
-            </div>
-          </>
-        )}
+      {/* Debit Note total — the supplier leg balances to the net of the lines above.
+          Input GST is reversed by entering the CGST/SGST/IGST Input ledgers as lines,
+          so there is no separate GST add-on that could double-count on top of them. */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+        <div style={{ flex: '0 0 220px', padding: '8px 12px', borderRadius: 9, background: '#185FA5', border: '1px solid #185FA5' }}>
+          <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: '0.5px', color: '#cfe0f3', textTransform: 'uppercase' }}>Debit Note Total {t.subtotal < 0 ? '(supplier credited)' : ''}</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{money2(cur, Math.abs(t.subtotal))}</div>
+        </div>
       </div>
 
       <FL label="Narration"><textarea value={state.remarks || ''} onChange={(e) => patch({ remarks: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder={state.party ? `Being purchase return to ${state.party}` : 'Accounting narration...'} /></FL>
