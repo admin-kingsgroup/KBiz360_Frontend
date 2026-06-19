@@ -4,6 +4,7 @@ jest.mock('../fields/JournalFields', () => ({ JournalFields: () => null }));
 jest.mock('../fields/ReceiptPaymentFields', () => ({ ReceiptPaymentFields: () => null }));
 jest.mock('../fields/ContraFields', () => ({ ContraFields: () => null }));
 jest.mock('../fields/PurchaseExpenseFields', () => ({ PurchaseExpenseFields: () => null }));
+jest.mock('../fields/DebitNoteFields', () => ({ DebitNoteFields: () => null }));
 jest.mock('../fields/RefundReissueFields', () => ({ RefundReissueFields: () => null }));
 jest.mock('../fields/AdmAcmFields', () => ({ AdmAcmFields: () => null }));
 
@@ -52,6 +53,71 @@ describe('refund / reissue / adm / acm — registered & gated payloads', () => {
   test.concurrent('adm validate needs only airline + amount (no customer)', async () => {
     expect(VOUCHER_REGISTRY.adm.validate({ counterParty: '', amount: 100 }).ok).toBe(false);
     expect(VOUCHER_REGISTRY.adm.validate({ counterParty: 'AI', amount: 100 }).ok).toBe(true);
+  });
+});
+
+describe('debit-note — purchase return registered & gated payload', () => {
+  const DN = VOUCHER_REGISTRY['debit-note'];
+
+  test.concurrent('debit-note is registered with type DN', async () => {
+    expect(DN).toBeTruthy();
+    expect(DN.type).toBe('DN');
+  });
+
+  test.concurrent('toBody: supplier party + return lines + GST, total = subtotal + GST', async () => {
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Air India', billNo: 'PI/BOM/26/0042',
+      gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 1800,
+      lines: [{ ledger: 'Purchase — Air Ticket', amt: 10000, desc: 'cancelled PNR' }],
+    }, ctx);
+    expect(b).toMatchObject({ type: 'DN', category: 'debit-note', party: 'Air India', partyType: 'supplier' });
+    expect(b.subtotal).toBe(10000);
+    expect(b.taxAmt).toBe(1800);
+    expect(b.total).toBe(11800);               // Dr supplier = Cr purchase + input GST
+    expect(b.lines).toHaveLength(1);
+    expect(b.againstInvoice).toBe('PI/BOM/26/0042');
+  });
+
+  test.concurrent('toBody: GST unticked → no tax, total = subtotal, gstMode cleared', async () => {
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Hotel Co', gstApplicable: false, gstMode: 'intra', gstAmt: 999,
+      lines: [{ ledger: 'Purchase — Hotel', amt: 5000 }],
+    }, ctx);
+    expect(b.taxAmt).toBe(0);
+    expect(b.total).toBe(5000);
+    expect(b.gstMode).toBe('');
+  });
+
+  test.concurrent('toBody: zero-amount / blank-ledger lines are dropped', async () => {
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Air India', gstApplicable: false,
+      lines: [{ ledger: 'Purchase — Air Ticket', amt: 8000 }, { ledger: '', amt: 500 }, { ledger: 'X', amt: 0 }],
+    }, ctx);
+    expect(b.lines).toHaveLength(1);
+    expect(b.total).toBe(8000);
+  });
+
+  test.concurrent('validate: needs supplier + at least one priced line', async () => {
+    expect(DN.validate({ party: '', lines: [{ ledger: 'Purchase', amt: 1000 }], gstApplicable: false }).ok).toBe(false);
+    expect(DN.validate({ party: 'Air India', lines: [], gstApplicable: false }).ok).toBe(false);
+    expect(DN.validate({ party: 'Air India', lines: [{ ledger: '', amt: 1000 }], gstApplicable: false }).ok).toBe(false);
+    expect(DN.validate({ party: 'Air India', lines: [{ ledger: 'Purchase', amt: 1000 }], gstApplicable: false }).ok).toBe(true);
+  });
+
+  test.concurrent('fromVoucher round-trips a saved debit note for the edit form', async () => {
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Air India', billNo: 'PI/1',
+      gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 1800,
+      lines: [{ ledger: 'Purchase — Air Ticket', amt: 10000, desc: 'rtn' }],
+    }, ctx);
+    const s = DN.fromVoucher(b);
+    expect(s.party).toBe('Air India');
+    expect(s.gstApplicable).toBe(true);
+    expect(s.gstAmt).toBe(1800);
+    expect(s.lines).toHaveLength(1);
+    expect(s.lines[0].ledger).toBe('Purchase — Air Ticket');
+    // re-serialising the recovered state reproduces the same total (idempotent edit)
+    expect(DN.toBody(s, ctx).total).toBe(11800);
   });
 });
 

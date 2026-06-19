@@ -3854,6 +3854,13 @@ export function PurchaseExpenseVoucher({ branch }) {
   return <VoucherShell category="purchase-expense" mode="create" branch={branch} />;
 }
 
+// Debit Note CREATE — a purchase return to a supplier. Renders through the unified
+// VoucherShell (category 'debit-note', type DN); GATED → enters the approval queue
+// and posts the reversal journal (Dr supplier / Cr purchase + input GST) on approval.
+export function DebitNoteVoucher({ branch }) {
+  return <VoucherShell category="debit-note" mode="create" branch={branch} />;
+}
+
 /* ══════════════════════════════════════════════════════════════════
    PRIORITY 2 — MASTERS + TAX + REPORTS
    Chart of Accounts · Ledgers · Sub-Agents · Tax/SAC

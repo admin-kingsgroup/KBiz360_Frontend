@@ -269,6 +269,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Contra Entry",             href:"/contra"},
     {label:"Journal Entry",            href:"/journal"},
     {label:"Purchase Expense Voucher", href:"/purchase-expense"},
+    {label:"Debit Note (Purchase Return)", href:"/debit-note"},
     {label:"Refund (against Sale)",    href:"/finance/refund"},
     {label:"Reissue (against Sale)",   href:"/finance/reissue"},
     {label:"ADM Voucher",              href:"/finance/adm-voucher"},

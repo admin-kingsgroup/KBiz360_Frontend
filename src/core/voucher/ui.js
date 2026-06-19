@@ -50,3 +50,16 @@ export function pxpTotals(s) {
   const total = r2(taxable + gstAmt);
   return { drSum, crSum, taxable, gstAmt, tds, total };
 }
+
+// Debit-Note totals — a purchase return. Every line is a return (Purchase Cr), so
+// the returned value is simply the sum of the line amounts; the (reversed) input
+// GST sits on top. Amount-canonical, so the form round-trips on edit exactly.
+//   subtotal = Σ returned purchase lines · gstAmt = input GST reversed
+//   total    = subtotal + gstAmt   (the amount we debit back to the supplier)
+export function dnTotals(s) {
+  const lines = (s.lines || []).filter((l) => l.ledger && (+l.amt || 0) !== 0);
+  const subtotal = r2(lines.reduce((a, l) => a + (+l.amt || 0), 0));
+  const gstAmt = s.gstApplicable ? r2(+s.gstAmt || 0) : 0;
+  const total = r2(subtotal + gstAmt);
+  return { subtotal, gstAmt, total };
+}

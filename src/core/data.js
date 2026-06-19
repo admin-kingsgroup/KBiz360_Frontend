@@ -297,6 +297,7 @@ export const ROUTE_TITLES={
   "/contra":               "Contra Voucher",
   "/bank-reco":            "Bank Reconciliation",
   "/journal":              "Journal Entry",
+  "/debit-note":           "Debit Note",
   "/finance/credit-note":  "Credit Note",
   "/finance/debit-note":   "Debit Note",
   "/day-book":             "Day Book",

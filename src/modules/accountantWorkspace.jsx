@@ -117,8 +117,10 @@ export function DashboardAccountant({ branch, setRoute }) {
   const tb = useTrialBalance(branch).data?.rows || []; // bare = cumulative closing = current balance
   const bookings = useBookingOrders(branch).data || [];
   const pendVouchers = useVoucherApprovals(branch, 'pending').data || [];
-  const sales = useSalesRegister(branch).data || [];
-  const purch = usePurchaseRegister(branch).data || [];
+  // Dashboard only shows THIS MONTH's sales/purchase totals, so scope the register
+  // queries to the current month instead of pulling the whole branch history.
+  const sales = useSalesRegister(branch, { from: monthFrom, to: today }).data || [];
+  const purch = usePurchaseRegister(branch, { from: monthFrom, to: today }).data || [];
   const out = useOutstanding(branch).data || {};
   const day = useDayBook(branch, { from: today, to: today }).data || [];
   const savedTicks = useConfigValue(`month-end:${branchCode(branch) || 'ALL'}:${ym}`).data || {};
