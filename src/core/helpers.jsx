@@ -13,6 +13,7 @@ import { exportToCSV } from './business-logic';
 import { exportToExcel } from './exportExcel';
 import { ADM_DATA, CASH, CONSOLIDATED_LABEL, FY_TARGETS_DATA, GP_BILLS, HR_EMPLOYEES_DATA, NOTIFICATIONS_DATA, SUBAGENTS, _EXP_BGT_LISTENERS, _EXP_BUDGETS } from './data';
 import { useLedgerRegistry } from './useReference';
+import { pickLedgers } from './ledgerPick';
 import { useGpBills } from './useAccounting';
 import { fmt, fmtINR } from './format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS, PERIOD_OPTIONS as MONTH_PERIOD_OPTIONS, FY_YTD_MONTHS } from './dates';
@@ -611,11 +612,7 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}
   const ref=useRef(null);
   const menuRef=useRef(null);
   const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];   // live chart of accounts (/api/ledgers), branch-scoped
-  const filtered=LEDGER_REGISTRY.filter(l=>{
-    const matchQ=!q||l.name.toLowerCase().includes(q.toLowerCase())||l.group.toLowerCase().includes(q.toLowerCase());
-    const matchFilter=!filter||filter(l);
-    return matchQ&&matchFilter;
-  }).slice(0,12);
+  const {matches,shown:filtered}=pickLedgers(LEDGER_REGISTRY,q,filter);
   const selected=LEDGER_REGISTRY.find(l=>l.id===value);
   const place=()=>{ if(ref.current) setRect(ref.current.getBoundingClientRect()); };
   const openMenu=()=>{ place(); setQ(""); setOpen(true); };
@@ -648,7 +645,9 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}
         {filtered.length===0&&<div style={{padding:"10px 12px",fontSize:11,color:"#5a6691"}}>No ledger found</div>}
       </div>
       <div style={{padding:"6px 10px",borderTop:"1px solid #f3f4f8",fontSize:9.5,color:"#5a6691"}}>
-        {LEDGER_REGISTRY.length} ledgers · Type to filter
+        {matches.length>filtered.length
+          ? `Showing ${filtered.length} of ${matches.length} matches · Type to narrow`
+          : `${LEDGER_REGISTRY.length} ledgers · Type to filter`}
       </div>
     </div>, document.body);
   return (

@@ -669,8 +669,11 @@ export function SettingsUsers(){
             </p>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setEditPerms(null)} style={btnGh}>Cancel</button>
+              {/* Persist only what the backend stores: a user's permissions are driven by
+                  their ROLE (granular perms/special come from the role template) plus the
+                  branch scope. perms/special are UI-derived from the role and not stored. */}
               <button onClick={()=>updateUserMut.mutate(
-                {id:editPerms.userId,body:{role:editPerms.userRole,perms:editPerms.perms,special:editPerms.special,branches:editPerms.branches}},
+                {id:editPerms.userId,body:{role:editPerms.userRole,branches:editPerms.branches}},
                 {onSuccess:()=>setEditPerms(null)}
               )} style={{...btnG,background:"#27500A"}}>💾 Save Permissions</button>
             </div>
