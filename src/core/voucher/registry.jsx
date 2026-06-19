@@ -443,7 +443,7 @@ export const VOUCHER_REGISTRY = {
     initial: () => ({
       date: todayISO(), billNo: '', party: '',
       gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 0,
-      remarks: '', lines: [{ _k: 1, ledger: '', drCr: 'Cr', amt: '', desc: '' }],
+      remarks: '', lines: [{ _k: 1, ledger: '', drCr: 'Dr', amt: '', desc: '' }, { _k: 2, ledger: '', drCr: 'Cr', amt: '', desc: '' }],
     }),
 
     fromVoucher: (v) => ({
@@ -451,7 +451,7 @@ export const VOUCHER_REGISTRY = {
       gstApplicable: (+v.taxAmt || 0) > 0 || !!v.gstMode,
       gstMode: v.gstMode || 'intra', gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18, gstAmt: +v.taxAmt || 0,
       remarks: v.remarks || '',
-      lines: (v.lines && v.lines.length ? v.lines : [{ ledger: '', drCr: 'Cr', amt: '', desc: '' }])
+      lines: (v.lines && v.lines.length ? v.lines : [{ ledger: '', drCr: 'Dr', amt: '', desc: '' }, { ledger: '', drCr: 'Cr', amt: '', desc: '' }])
         .map((l, i) => ({ _k: i + 1, ledger: l.ledger || '', drCr: l.drCr === 'Dr' ? 'Dr' : 'Cr', amt: l.amt ?? '', desc: l.desc || '' })),
     }),
 
