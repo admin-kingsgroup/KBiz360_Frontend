@@ -163,16 +163,26 @@ export function OutstandingOnAccount({ branch }) {
         <>
           <ResponsiveGrid min="220px" gap="md" className="mb-4">
             {KPIS.map((c) => (
-              <button
+              // NOTE: the colour hex must NEVER sit on the <button>'s own inline
+              // style — global rules in index.css (button[style*="#185FA5"] etc.)
+              // would then paint the whole card that colour and bury the text.
+              // So the active ring lives on this wrapper div, and the brand colour
+              // only appears on the child stripe/amount (descendants are unaffected).
+              <div
                 key={c.k}
-                onClick={() => setTab(c.k)}
-                style={{ borderLeftColor: c.color, boxShadow: tab === c.k ? `0 0 0 2px ${c.color}55` : undefined }}
-                className="rounded-brand border border-l-4 border-surface-border bg-surface p-3.5 text-left transition hover:shadow-sm"
+                className="rounded-brand"
+                style={tab === c.k ? { boxShadow: `0 0 0 2px ${c.color}55` } : undefined}
               >
-                <div className="text-[10.5px] font-bold uppercase tracking-wide text-ink-muted">{c.label}</div>
-                <div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: c.color }}>{money(cur, c.amt)}</div>
-                <div className="mt-0.5 text-[11px] text-ink-muted">{c.n} item{c.n === 1 ? '' : 's'}</div>
-              </button>
+                <button
+                  onClick={() => setTab(c.k)}
+                  className="relative h-full w-full overflow-hidden rounded-brand border border-surface-border bg-surface p-3.5 pl-4 text-left transition hover:shadow-sm"
+                >
+                  <span aria-hidden className="absolute left-0 top-0 h-full w-1.5" style={{ backgroundColor: c.color }} />
+                  <div className="text-[10.5px] font-bold uppercase tracking-wide text-ink-muted">{c.label}</div>
+                  <div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: c.color }}>{money(cur, c.amt)}</div>
+                  <div className="mt-0.5 text-[11px] text-ink-muted">{c.n} item{c.n === 1 ? '' : 's'}</div>
+                </button>
+              </div>
             ))}
           </ResponsiveGrid>
 
