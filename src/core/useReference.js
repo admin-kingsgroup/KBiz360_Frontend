@@ -5,6 +5,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiGet, getAuthToken } from './api';
+import { ledgerType } from './ledgerClassify';
 
 const REF = 5 * 60_000;        // 5 min — reference masters
 const LONG = 30 * 60_000;      // 30 min — near-static (currencies, roles meta)
@@ -44,28 +45,13 @@ const branchCodeOf = (b) => (!b || b === 'ALL') ? undefined : (b.code || b);
 // the voucher pickers filter on, from the chart group + accounting nature.
 // NOTE: the API `nature` is asset|liability|income|expense and `drCr` is the
 // natural side (Dr/Cr) — neither is the 'Cr'/'Dr' token the old code tested, so
-// every non-bank ledger used to collapse to 'Ledger'. We classify by group name
-// and sub-group first (most specific), then fall back to nature.
+// every non-bank ledger used to collapse to 'Ledger'. The classification rule
+// lives in ./ledgerClassify (pure + unit-tested); see ledgerType() for why the
+// bank/cash name fallback is gated on nature.
 function mapLedger(l) {
-  const g = (l.group || '').toLowerCase();
-  const n = (l.name || '').toLowerCase();
-  const sub = (l.subGroup || '').toLowerCase();
-  let type;
-  if (/bank/.test(g) || /bank/.test(n)) type = 'Bank';
-  else if (/cash/.test(g) || /cash/.test(n)) type = 'Cash';
-  else if (/creditor/.test(g) || /supplier/.test(g) || /supplier/.test(sub)) type = 'Creditor';
-  else if (/debtor/.test(g) || /debtor/.test(sub)) type = 'Debtor';
-  else if (/tax/.test(g)) type = 'Tax';
-  else if (/capital/.test(g)) type = 'Capital';
-  else if (l.nature === 'expense') type = 'Expense';
-  else if (l.nature === 'asset') type = 'Asset';
-  else if (l.nature === 'liability') type = 'Liability';
-  else if (l.nature === 'income') type = 'Income';
-  else if (l.drCr === 'Cr') type = 'Creditor';
-  else type = 'Ledger';
   return {
     id: l.id, code: l.code, name: l.name, group: l.group, subGroup: l.subGroup || '',
-    nature: l.nature, statement: l.statement, drCr: l.drCr, type, branch: l.branch, currency: l.currency,
+    nature: l.nature, statement: l.statement, drCr: l.drCr, type: ledgerType(l), branch: l.branch, currency: l.currency,
   };
 }
 export const useLedgerRegistry = (branch) => useQuery({

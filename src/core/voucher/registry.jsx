@@ -424,23 +424,26 @@ export const VOUCHER_REGISTRY = {
 
   /**
    * Debit Note (DN) — a PURCHASE RETURN to a supplier (the mirror of a purchase):
-   *   Dr Supplier (Sundry Creditor)   total      (we owe the supplier less)
-   *   Cr Purchase ledger(s)           subtotal   (cost reversed)
-   *   Cr Input CGST/SGST or IGST      gstAmt      (input credit reversed)
-   * Every line is a return (no per-line Dr/Cr); the backend's debitNoteLines
-   * credits each line and debits the supplier with the balancing net. GATED →
-   * enters PENDING and posts on approval. See posting.builder.debitNoteLines.
+   *   Dr Supplier (Sundry Creditor)   net        (we owe the supplier less)
+   *   Cr Purchase ledger(s)           Σ returns  (cost reversed — default side)
+   *   Dr Charge/adjustment ledger(s)  Σ Dr lines (an added charge the supplier keeps)
+   *   Cr Input CGST/SGST or IGST      gstAmt     (input credit reversed)
+   * Like a journal/purchase voucher, every line carries a per-line Dr/Cr toggle
+   * (defaulting to Cr = cost reversed); the backend's debitNoteLines posts each line
+   * on its own side and makes the supplier the balancing leg, and the shell shows the
+   * live JV effect. GATED → enters PENDING and posts on approval. See
+   * posting.builder.debitNoteLines.
    */
   'debit-note': {
     type: 'DN',
     label: 'Debit Note',
     icon: '🔻',
-    explain: (<><b style={{ color: '#A07828' }}>Debit Note:</b> a <b>purchase return</b> to a supplier (goods/services sent back, or a supplier over-billing reversed). The <b>supplier (Sundry Creditors) is Debited</b> — we owe them less — and the <b>Purchase ledger(s) and input GST are Credited</b> (the cost is reversed). For cancelling a <b>sale</b>, use Refund / Reissue instead.</>),
+    explain: (<><b style={{ color: '#A07828' }}>Debit Note:</b> a <b>purchase return</b> to a supplier (goods/services sent back, or a supplier over-billing reversed). The <b>supplier (Sundry Creditors) is Debited</b> — we owe them less — and the <b>Purchase ledger(s) and input GST are Credited</b> (the cost is reversed). Each line has a <b>Dr/Cr</b> toggle: returns are <b>Cr</b> by default, switch a line to <b>Dr</b> to book a charge the supplier retains. For cancelling a <b>sale</b>, use Refund / Reissue instead.</>),
 
     initial: () => ({
       date: todayISO(), billNo: '', party: '',
       gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 0,
-      remarks: '', lines: [{ _k: 1, ledger: '', amt: '', desc: '' }],
+      remarks: '', lines: [{ _k: 1, ledger: '', drCr: 'Cr', amt: '', desc: '' }],
     }),
 
     fromVoucher: (v) => ({
@@ -448,15 +451,15 @@ export const VOUCHER_REGISTRY = {
       gstApplicable: (+v.taxAmt || 0) > 0 || !!v.gstMode,
       gstMode: v.gstMode || 'intra', gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18, gstAmt: +v.taxAmt || 0,
       remarks: v.remarks || '',
-      lines: (v.lines && v.lines.length ? v.lines : [{ ledger: '', amt: '', desc: '' }])
-        .map((l, i) => ({ _k: i + 1, ledger: l.ledger || '', amt: l.amt ?? '', desc: l.desc || '' })),
+      lines: (v.lines && v.lines.length ? v.lines : [{ ledger: '', drCr: 'Cr', amt: '', desc: '' }])
+        .map((l, i) => ({ _k: i + 1, ledger: l.ledger || '', drCr: l.drCr === 'Dr' ? 'Dr' : 'Cr', amt: l.amt ?? '', desc: l.desc || '' })),
     }),
 
     toBody: (s, ctx) => {
       const t = dnTotals(s);
       const lines = (s.lines || [])
         .filter((l) => l.ledger && (+l.amt || 0) !== 0)
-        .map((l) => ({ ledger: l.ledger, amt: +l.amt || 0, desc: l.desc || '' }));
+        .map((l) => ({ ledger: l.ledger, amt: +l.amt || 0, drCr: l.drCr === 'Dr' ? 'Dr' : 'Cr', desc: l.desc || '' }));
       return {
         type: 'DN', category: 'debit-note', branch: ctx.branchCode, date: s.date,
         party: s.party, partyType: 'supplier', billNo: s.billNo, againstInvoice: s.billNo,

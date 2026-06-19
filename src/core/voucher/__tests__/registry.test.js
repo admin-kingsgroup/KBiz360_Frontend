@@ -104,6 +104,30 @@ describe('debit-note — purchase return registered & gated payload', () => {
     expect(DN.validate({ party: 'Air India', lines: [{ ledger: 'Purchase', amt: 1000 }], gstApplicable: false }).ok).toBe(true);
   });
 
+  test.concurrent('toBody: per-line Dr/Cr — Dr line nets against Cr returns; lines carry drCr', async () => {
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Air India', gstApplicable: false,
+      lines: [
+        { ledger: 'Purchase — Air Ticket', drCr: 'Cr', amt: 10000 },
+        { ledger: 'Cancellation Charges', drCr: 'Dr', amt: 200 },
+      ],
+    }, ctx);
+    expect(b.subtotal).toBe(9800);                 // 10,000 returned − 200 charge
+    expect(b.total).toBe(9800);
+    expect(b.lines).toHaveLength(2);
+    expect(b.lines.find((l) => l.ledger === 'Cancellation Charges').drCr).toBe('Dr');
+    expect(b.lines.find((l) => l.ledger === 'Purchase — Air Ticket').drCr).toBe('Cr');
+  });
+
+  test.concurrent('toBody: a line with no drCr defaults to Cr (legacy return)', async () => {
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Air India', gstApplicable: false,
+      lines: [{ ledger: 'Purchase — Air Ticket', amt: 7000 }],
+    }, ctx);
+    expect(b.lines[0].drCr).toBe('Cr');
+    expect(b.subtotal).toBe(7000);
+  });
+
   test.concurrent('fromVoucher round-trips a saved debit note for the edit form', async () => {
     const b = DN.toBody({
       date: '2026-06-19', party: 'Air India', billNo: 'PI/1',

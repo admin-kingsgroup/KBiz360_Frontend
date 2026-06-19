@@ -53,12 +53,32 @@ describe('pickLedgers — Payment Voucher "Paid to" dropdown', () => {
     expect(pickLedgers(CHART, 'salaries', notBankCash).matches.map((l) => l.name)).toEqual(['Salaries & Wages']);
   });
 
-  test('caps the rendered slice but keeps the full match count for the footer hint', () => {
-    const many = Array.from({ length: 75 }, (_, i) => ({ id: `l${i}`, name: `Ledger ${i}`, group: 'Sundry Creditors', type: 'Creditor' }));
-    const { matches, shown } = pickLedgers(many, '', notBankCash);
-    expect(matches.length).toBe(75);
+  test('renders the entire realistic chart without truncation (cap is a safety bound, not a top-N)', () => {
+    // Mirror production: parties hold the low codes, non-party heads sit deep.
+    // 110 creditors + 29 debtors push assets/tax/capital well past the old caps.
+    const chart = [
+      ...Array.from({ length: 110 }, (_, i) => ({ id: `cr${i}`, name: `Supplier ${i}`, group: 'Sundry Creditors', type: 'Creditor' })),
+      ...Array.from({ length: 29 }, (_, i) => ({ id: `dr${i}`, name: `Customer ${i}`, group: 'Sundry Debtors', type: 'Debtor' })),
+      ...Array.from({ length: 79 }, (_, i) => ({ id: `ex${i}`, name: `Expense ${i}`, group: 'Indirect Expenses', type: 'Expense' })),
+      ...Array.from({ length: 54 }, (_, i) => ({ id: `as${i}`, name: `Asset ${i}`, group: 'Fixed Assets', type: 'Asset' })),
+      { id: 'tax1', name: 'GST Payable', group: 'Duties & Taxes', type: 'Tax' },
+      { id: 'cap1', name: 'Owner Capital', group: 'Capital Account', type: 'Capital' },
+    ];
+    const { matches, shown } = pickLedgers(chart, '', notBankCash);
+    expect(matches.length).toBe(chart.length);
+    expect(shown.length).toBe(chart.length); // nothing truncated for a real-sized chart
+    const names = shown.map((l) => l.name);
+    // Account classes that previously fell past index 50 must now be present.
+    expect(names).toContain('Asset 53');   // ~index 192
+    expect(names).toContain('GST Payable'); // deepest tax
+    expect(names).toContain('Owner Capital'); // very last
+  });
+
+  test('only the safety cap bounds an extreme chart', () => {
+    const huge = Array.from({ length: LEDGER_PICKER_CAP + 50 }, (_, i) => ({ id: `l${i}`, name: `Ledger ${i}`, group: 'Sundry Creditors', type: 'Creditor' }));
+    const { matches, shown } = pickLedgers(huge, '', notBankCash);
+    expect(matches.length).toBe(LEDGER_PICKER_CAP + 50);
     expect(shown.length).toBe(LEDGER_PICKER_CAP);
-    expect(shown.length).toBeGreaterThan(12); // strictly better than the old cap
   });
 
   test('no filter + no query returns the whole chart (capped)', () => {

@@ -4,18 +4,20 @@ import { FL, inp, btnGh, card } from '../../styles';
 import { VPlaceOfSupply } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
 import { useVoucherRef } from '../useVoucherRef';
-import { DARK, DIM, money2, dnTotals, r2 } from '../ui';
+import { V_DR, V_CR, DARK, DIM, money2, dnTotals, r2 } from '../ui';
 
 /**
  * Debit-Note body — a PURCHASE RETURN to a supplier (goods/services sent back, or
  * a supplier over-billing reversed). It is the mirror of a purchase:
- *   Supplier A/c (Sundry Creditor)  Dr   total      (we owe the supplier less)
- *   To Purchase ledger(s)           Cr   subtotal   (cost reversed)
+ *   Supplier A/c (Sundry Creditor)  Dr   net        (we owe the supplier less)
+ *   To Purchase ledger(s)           Cr   Σ returns  (cost reversed — default side)
+ *   Charge/adjustment ledger(s)     Dr   Σ Dr lines (a charge the supplier retains)
  *   To Input CGST/SGST or IGST      Cr   gstAmt     (input credit reversed)
- * Every line is a return, so it carries no per-line Dr/Cr toggle — the backend's
- * debitNoteLines credits each line and debits the supplier with the balancing net.
- * GST is amount-canonical (the % just auto-fills an editable amount), so edit
- * round-trips exactly.
+ * Like a journal/purchase voucher, every line carries a per-line Dr/Cr toggle
+ * (defaulting to Cr = cost reversed); the backend's debitNoteLines posts each line
+ * on its own side and debits the supplier with the balancing net. GST is
+ * amount-canonical (the % just auto-fills an editable amount), so edit round-trips
+ * exactly. The shell renders the live JV effect below the form.
  */
 export function DebitNoteFields({ state, setState, ctx }) {
   const { branch, cur } = ctx;
@@ -25,10 +27,10 @@ export function DebitNoteFields({ state, setState, ctx }) {
   const { gstSlabs: GST_SLABS } = useVoucherRef();
 
   const updLine = (i, k, v) => setState((s) => ({ ...s, lines: s.lines.map((l, j) => (j === i ? { ...l, [k]: v } : l)) }));
-  const addLine = () => setState((s) => ({ ...s, lines: [...s.lines, { _k: idRef.current++, ledger: '', amt: '', desc: '' }] }));
+  const addLine = () => setState((s) => ({ ...s, lines: [...s.lines, { _k: idRef.current++, ledger: '', drCr: 'Cr', amt: '', desc: '' }] }));
   const delLine = (i) => setState((s) => {
     const next = s.lines.filter((_, j) => j !== i);
-    return { ...s, lines: next.length ? next : [{ _k: idRef.current++, ledger: '', amt: '', desc: '' }] };
+    return { ...s, lines: next.length ? next : [{ _k: idRef.current++, ledger: '', drCr: 'Cr', amt: '', desc: '' }] };
   });
 
   const t = dnTotals(state);
@@ -45,28 +47,36 @@ export function DebitNoteFields({ state, setState, ctx }) {
         {state.gstApplicable ? <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} /> : <div />}
       </div>
 
-      <FL label="Supplier / Vendor (party ledger — Dr)">
+      <FL label="Supplier / Vendor (party ledger — Dr, balancing leg)">
         <LedgerPicker branch={branch} value={state.party} onChange={(v) => patch({ party: v })} filter={(l) => l.type === 'Creditor'} placeholder="Sundry Creditors / Supplier..." />
       </FL>
 
-      {/* Purchase-return lines (all credited — cost reversed) */}
-      <p style={{ margin: '14px 0 6px', fontSize: 9, fontWeight: 700, color: '#A07828', textTransform: 'uppercase', letterSpacing: '1px' }}>Purchase Ledgers Returned (Cr) — cost reversed</p>
+      {/* Purchase-return lines — Cr (default) reverses cost · Dr books a retained charge */}
+      <p style={{ margin: '14px 0 6px', fontSize: 9, fontWeight: 700, color: '#A07828', textTransform: 'uppercase', letterSpacing: '1px' }}>Purchase Ledgers Returned (Cr) · Charges / Adjustments (Dr)</p>
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 12 }}>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
             <thead><tr style={{ background: DARK }}>
               <th style={{ padding: '8px 10px', textAlign: 'left', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 30 }}>#</th>
               <th style={{ padding: '8px 10px', textAlign: 'left', color: '#d4a437', fontWeight: 700, fontSize: 9.5 }}>Ledger</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 70 }}>Dr / Cr</th>
               <th style={{ padding: '8px 10px', textAlign: 'left', color: '#d4a437', fontWeight: 700, fontSize: 9.5 }}>Description</th>
               <th style={{ padding: '8px 10px', textAlign: 'right', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 130 }}>Amount ({cur})</th>
               <th style={{ width: 32 }} />
             </tr></thead>
             <tbody>
               {lines.map((l, i) => (
-                <tr key={l._k ?? i} style={{ borderBottom: '1px solid #f3f4f8', background: (+l.amt || 0) > 0 ? '#fdf3f3' : '#fff' }}>
+                <tr key={l._k ?? i} style={{ borderBottom: '1px solid #f3f4f8', background: l.drCr === 'Dr' ? '#f0fbf5' : ((+l.amt || 0) > 0 ? '#fdf3f3' : '#fff') }}>
                   <td style={{ padding: '4px 8px', textAlign: 'center', fontSize: 10.5, color: DIM }}>{i + 1}</td>
                   <td style={{ padding: '3px 6px', minWidth: 220 }}>
                     <LedgerPicker branch={branch} value={l.ledger} onChange={(v) => updLine(i, 'ledger', v)} placeholder="Purchase — Air Ticket / Hotel..." style={{ minHeight: 30, fontSize: 10.5 }} />
+                  </td>
+                  <td style={{ padding: '3px 6px' }}>
+                    <div style={{ display: 'flex', border: '1px solid #e1e3ec', borderRadius: 5, overflow: 'hidden', width: 60, margin: '0 auto' }}>
+                      {['Dr', 'Cr'].map((d) => (
+                        <button key={d} onClick={() => updLine(i, 'drCr', d)} style={{ flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 9.5, fontWeight: 800, padding: '6px 0', background: (l.drCr === 'Dr' ? 'Dr' : 'Cr') === d ? (d === 'Dr' ? V_DR : V_CR) : '#fff', color: (l.drCr === 'Dr' ? 'Dr' : 'Cr') === d ? '#fff' : '#9A9A9A' }}>{d.toUpperCase()}</button>
+                      ))}
+                    </div>
                   </td>
                   <td style={{ padding: '3px 6px' }}>
                     <input value={l.desc || ''} onChange={(e) => updLine(i, 'desc', e.target.value)} style={{ ...inp, minHeight: 30, fontSize: 10.5 }} placeholder="e.g. cancelled PNR refund" />
@@ -82,8 +92,8 @@ export function DebitNoteFields({ state, setState, ctx }) {
             </tbody>
             <tfoot>
               <tr style={{ background: '#f3f4f8', borderTop: '2px solid #e1e3ec' }}>
-                <td colSpan={2} style={{ padding: '8px 10px' }}><button onClick={addLine} style={{ ...btnGh, fontSize: 10.5, padding: '4px 12px' }}><Plus size={12} /> Add line</button></td>
-                <td style={{ padding: '8px 6px', textAlign: 'right', fontSize: 9, fontWeight: 700, color: DIM }}>RETURNED</td>
+                <td colSpan={3} style={{ padding: '8px 10px' }}><button onClick={addLine} style={{ ...btnGh, fontSize: 10.5, padding: '4px 12px' }}><Plus size={12} /> Add line</button></td>
+                <td style={{ padding: '8px 6px', textAlign: 'right', fontSize: 9, fontWeight: 700, color: DIM }}>RETURNED (NET)</td>
                 <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, fontSize: 13, color: DARK }}>{money2(cur, t.subtotal)}</td>
                 <td />
               </tr>
