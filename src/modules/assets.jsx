@@ -7,8 +7,9 @@ import React, { useState } from 'react';
 import { Plus, Printer } from 'lucide-react';
 import { Line } from 'recharts';
 import { fmt } from '../core/format';
-import { ACM_REASON_CODES, FIXED_ASSETS_DATA } from '../core/helpers';
+import { ACM_REASON_CODES } from '../core/helpers';
 import { useAssetCategories } from '../core/useReference';
+import { useMasterList } from '../core/useMasters';
 import { useAdmMemos, useCreateAdmMemo, useAcceptAdmMemo, useRejectAdmMemo, useDisputeAdmMemo } from '../core/useAdmMemos';
 import { toast } from '../core/ux/toast';
 import { BRANCH_CODES, branchCurrencies, branchMainCurrency } from '../core/data';
@@ -237,6 +238,7 @@ export function AcmRegister({branch}){
 export function FixedAssetRegister({branch,setRoute}){
   const mob=useMobile();
   const ASSET_CATEGORIES=useAssetCategories().data||[];   // DB-backed (/api/asset-categories)
+  const FIXED_ASSETS_DATA=(useMasterList("fixed-assets").data||[]).map(a=>({...a,id:a.assetId||a.id})); // live /api/fixed-assets
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
@@ -353,6 +355,7 @@ export function FixedAssetRegister({branch,setRoute}){
 export function AssetDepreciation({branch,setRoute}){
   const mob=useMobile();
   const ASSET_CATEGORIES=useAssetCategories().data||[];   // DB-backed (/api/asset-categories)
+  const FIXED_ASSETS_DATA=(useMasterList("fixed-assets").data||[]).map(a=>({...a,id:a.assetId||a.id})); // live /api/fixed-assets
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
@@ -513,6 +516,7 @@ export function AssetDisposal({branch,setRoute}){
 export function BlockOfAssets({branch,setRoute}){
   const mob=useMobile();
   const ASSET_CATEGORIES=useAssetCategories().data||[];   // DB-backed (/api/asset-categories)
+  const FIXED_ASSETS_DATA=(useMasterList("fixed-assets").data||[]).map(a=>({...a,id:a.assetId||a.id})); // live /api/fixed-assets
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;

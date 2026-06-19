@@ -8,7 +8,8 @@
 
 import React, { useState } from 'react';
 import { Plus, Download } from 'lucide-react';
-import { SUBAGENTS, ACTIVE_CURRENCIES } from '../../../core/data';
+import { ACTIVE_CURRENCIES } from '../../../core/data';
+import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { exportToExcel } from '../../../core/exportExcel';
 import { PageLayout } from '../../../shell/PageLayout';
 import { Modal, Button, Input, Select, FormField, ResponsiveGrid, StatusPill } from '../../../shell/primitives';
@@ -22,6 +23,10 @@ export function MastersSubAgents() {
   const [sel, setSel] = useState(null);
   const [form, setForm] = useState(blankForm);
   const setF = (o) => setForm((p) => ({ ...p, ...o }));
+  // Live sub-agent master (/api/sub-agents); Add persists via the create mutation.
+  const { data: SUBAGENTS = [] } = useMasterList('sub-agents');
+  const { create } = useMasterMutations('sub-agents');
+  const addSubAgent = () => create.mutate(form, { onSuccess: () => { setModal(false); setForm(blankForm); } });
 
   const KPIS = [
     { l: 'Sub-Agents', v: String(SUBAGENTS.length), c: '#384677' },
@@ -103,7 +108,7 @@ export function MastersSubAgents() {
 
       {modal && (
         <Modal title="Add Sub-Agent" maxWidth={600} onClose={() => setModal(false)}
-          footer={<><Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button><Button variant="primary" size="sm" onClick={() => setModal(false)}>Add Sub-Agent</Button></>}>
+          footer={<><Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button><Button variant="primary" size="sm" disabled={!form.name || create.isPending} onClick={addSubAgent}>{create.isPending ? 'Adding…' : 'Add Sub-Agent'}</Button></>}>
           <div className="flex flex-col gap-3 p-4">
             <div className="grid grid-cols-2 gap-3">
               <FormField label="Agency name"><Input value={form.name} onChange={(e) => setF({ name: e.target.value })} /></FormField>

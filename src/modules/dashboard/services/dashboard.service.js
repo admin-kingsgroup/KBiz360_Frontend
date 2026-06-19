@@ -74,8 +74,8 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
       api.getModulePL({ branchCode, from: dates.from, to: dates.to }), // live, period + scope driven
       api.getAgeingTotals(branchCode),
       api.getCashPosition(branchCode),
-      api.getArAgeingSummary(),
-      api.getApAgeingSummary(),
+      api.getArAgeingSummary(branchCode),  // branch-scoped: an all-scope Director who selects a
+      api.getApAgeingSummary(branchCode),  // branch isn't auto-coerced server-side — must pass it
       api.getBookingSummary(branchCode), // SO/PO/GP pipeline { pending, approved } (not date-bound — whole queue)
     ]);
 
@@ -132,11 +132,11 @@ export const loadSrAeDashboard = async () => {
   return { todayVouchers, reconStatus, topSuppliers };
 };
 
-export const loadAcctsExecDashboard = async () => {
+export const loadAcctsExecDashboard = async ({ branchCode } = {}) => {
   const [todayVouchers, recentActivity, arAgeing] = await Promise.all([
     api.getTodayVouchersByBranch(),
     api.getRecentActivity(),
-    api.getArAgeingSummary(),
+    api.getArAgeingSummary(branchCode),
   ]);
 
   return { todayVouchers, recentActivity, arAgeing };

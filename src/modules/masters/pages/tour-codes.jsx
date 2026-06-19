@@ -9,7 +9,7 @@
 import React, { useState } from 'react';
 import { Plus, Download, ClipboardList, Pencil } from 'lucide-react';
 import { exportToExcel } from '../../../core/exportExcel';
-import { TOUR_CODES_DATA } from '../../../core/helpers';
+import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { PageLayout } from '../../../shell/PageLayout';
 import { Modal, Button, Input, Select, FormField, ResponsiveGrid, StatusPill } from '../../../shell/primitives';
 
@@ -19,19 +19,27 @@ const MOD_ICONS = { Flight: '✈', Hotel: '🏨', Transfers: '🚐', Visa: '🛂
 const blankForm = { id: '', name: '', dest: '', nights: 4, days: 5, pax: 'FIT', base: 0, peak: 0, off: 0, gp: 12, active: true, tags: [], mods: ['Flight', 'Hotel'] };
 
 export function TourCodeMaster({ setRoute }) {
-  const [codes, setCodes] = useState(TOUR_CODES_DATA);
   const [modal, setModal] = useState(false);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState(blankForm);
   const setF = (f) => setForm((p) => ({ ...p, ...f }));
+  // Live tour-code master (/api/tour-codes). `code` is the package id; keep the mongo
+  // id (_mongoId) for the archive/restore toggle. Create persists via the mutation.
+  const { data = [] } = useMasterList('tour-codes');
+  const { create, update } = useMasterMutations('tour-codes');
+  const codes = (data || []).map((c) => ({ ...c, id: c.code, _mongoId: c.id }));
 
-  const filtered = codes.filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.dest.toLowerCase().includes(search.toLowerCase()) || c.id.toLowerCase().includes(search.toLowerCase()));
+  const filtered = codes.filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()) || (c.dest || '').toLowerCase().includes(search.toLowerCase()) || (c.id || '').toLowerCase().includes(search.toLowerCase()));
 
   const exportCodes = () => exportToExcel('tour-codes',
     [{ key: 'id', label: 'Package ID' }, { key: 'name', label: 'Package Name' }, { key: 'dest', label: 'Destination' }, { key: 'nights', label: 'Nights' }, { key: 'days', label: 'Days' }, { key: 'pax', label: 'Pax Type' }, { key: 'base', label: 'Base Price' }, { key: 'off', label: 'Off-peak Price' }, { key: 'peak', label: 'Peak Price' }, { key: 'gp', label: 'GP %' }],
     filtered);
 
-  const createPackage = () => { setCodes((cs) => [{ ...form, mods: ['Flight', 'Hotel', 'Transfers'], tags: [], active: true, updated: '2026-05-19' }, ...cs]); setModal(false); setForm(blankForm); };
+  const createPackage = () => {
+    const body = { code: form.id, name: form.name, dest: form.dest, nights: form.nights, days: form.days, pax: form.pax, base: form.base, peak: form.peak, off: form.off, gp: form.gp, mods: ['Flight', 'Hotel', 'Transfers'], tags: [], active: true };
+    create.mutate(body, { onSuccess: () => { setModal(false); setForm(blankForm); } });
+  };
+  const toggleArchive = (c) => update.mutate({ id: c._mongoId, body: { active: !c.active } });
 
   return (
     <PageLayout
@@ -78,7 +86,7 @@ export function TourCodeMaster({ setRoute }) {
               <div className="mt-2.5 flex gap-1.5">
                 <Button size="xs" variant="primary" icon={ClipboardList} className="flex-1" onClick={() => setRoute && setRoute('/sales/holiday')}>Use in Sale</Button>
                 <Button size="xs" variant="secondary" icon={Pencil}>Edit</Button>
-                <Button size="xs" variant="secondary" className={c.active ? 'text-maroon' : 'text-[#27500A]'} onClick={() => setCodes((cs) => cs.map((x) => x.id === c.id ? { ...x, active: !x.active } : x))}>{c.active ? 'Archive' : 'Restore'}</Button>
+                <Button size="xs" variant="secondary" className={c.active ? 'text-maroon' : 'text-[#27500A]'} onClick={() => toggleArchive(c)}>{c.active ? 'Archive' : 'Restore'}</Button>
               </div>
             </div>
           </div>
@@ -87,7 +95,7 @@ export function TourCodeMaster({ setRoute }) {
 
       {modal && (
         <Modal title="New Tour Code" onClose={() => setModal(false)}
-          footer={<><Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button><Button variant="primary" size="sm" onClick={createPackage}>Create Package</Button></>}>
+          footer={<><Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button><Button variant="primary" size="sm" disabled={!form.id || !form.name || create.isPending} onClick={createPackage}>{create.isPending ? 'Creating…' : 'Create Package'}</Button></>}>
           <div className="flex flex-col gap-3 p-4">
             <div className="grid grid-cols-2 gap-3">
               <FormField label="Tour code (unique ID)"><Input value={form.id} onChange={(e) => setF({ id: e.target.value.toUpperCase() })} className="font-mono" placeholder="DXB-4N-2P" /></FormField>

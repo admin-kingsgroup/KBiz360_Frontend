@@ -91,6 +91,10 @@ export const MENU_ASSETS={label:"Assets",icon:Wrench,children:[
 export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
   {label:"Registers & Outstanding", children:[
     {label:"Module Sales & Purchase Register", href:"/finance/module-register"},
+    {label:"Module Sales Register",     href:"/finance/module-sales-register"},
+    {label:"Module Purchase Register",  href:"/finance/module-purchase-register"},
+    {label:"Invoice-wise GP (Link No)", href:"/reports/invoice-gp"},
+    {label:"Sales & GP Analytics",      href:"/reports/sales-gp-analytics"},
   ]},
   {label:"Books", children:[
     {label:"Trial Balance", href:"/trial-balance"},
@@ -281,10 +285,8 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   {label:"Sales & Purchase", children:[
     {label:"Sales Register",            href:"/reports/sreg"},
     {label:"Purchase Register",         href:"/reports/preg"},
-    {label:"Module Sales Register",     href:"/finance/module-sales-register"},
-    {label:"Module Purchase Register",  href:"/finance/module-purchase-register"},
-    {label:"Invoice-wise GP (Link No)", href:"/reports/invoice-gp"},
-    {label:"Sales & GP Analytics",      href:"/reports/sales-gp-analytics"},
+    // Module Sales/Purchase Register, Invoice-wise GP and Sales & GP Analytics
+    // moved to the Finance pill (Finance ▸ Registers & Outstanding).
   ]},
   {label:"Receivables & Collections", children:[
     {label:"Debtors (Receivables) Ageing",      href:"/reports/rec"},

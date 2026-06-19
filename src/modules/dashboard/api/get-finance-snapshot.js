@@ -81,9 +81,11 @@ const BUCKET_META = [
   ['d60', '61–90 days', '#A32D2D'],
   ['d90', '90+ days', '#6b1010'],
 ];
-const ageingSide = async (sideKey) => {
+const ageingSide = async (sideKey, branchCode) => {
   try {
-    const d = await apiGet('/api/accounting/ageing');
+    // Branch-scope the ageing call (every sibling dashboard call passes branch); without
+    // it the AR/AP buckets show consolidated all-branch data mixed with branch KPIs.
+    const d = await apiGet('/api/accounting/ageing', { branch: branchCode });
     const sd = d && d[sideKey];
     if (!sd) return [];
     const rows = sd.rows || [], totals = sd.totals || {};
@@ -94,8 +96,8 @@ const ageingSide = async (sideKey) => {
     }));
   } catch { return []; }
 };
-export const getArAgeingSummary = async () => ageingSide('receivables');
-export const getApAgeingSummary = async () => ageingSide('payables');
+export const getArAgeingSummary = async (branchCode) => ageingSide('receivables', branchCode);
+export const getApAgeingSummary = async (branchCode) => ageingSide('payables', branchCode);
 
 // ── Phase 2 (need new backend endpoints) — still seed data for now ──────────
 export const getBankAccounts = async () => BANK_ACCOUNTS_DATA;
