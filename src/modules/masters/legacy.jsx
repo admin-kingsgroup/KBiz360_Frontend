@@ -38,15 +38,17 @@ export function ExportBtn({ name, columns, rows, label = "📤 Export" }) {
 }
 
 export function MastersForex(){
-  const [rates,setRates]=useState(FOREX_RATES_DATA);
+  // Live forex rates from /api/forex-rates (date/from/to/rate/source). Add Rate
+  // persists via the create mutation, so the table reflects the live collection.
+  const { data: rates = [] } = useMasterList('forex-rates');
+  const { create } = useMasterMutations('forex-rates');
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [form,setForm]=useState({from:"INR",to:"INR",rate:0,source:"Manual"});
   const CURRENCIES=ACTIVE_CURRENCIES;
 
   const save=()=>{
     const rec={...form,date:new Date().toISOString().slice(0,10)};
-    setRates(r=>[rec,...r]);
-    setModal(false);
+    create.mutate(rec,{ onSuccess:()=>setModal(false) });
   };
 
   return (

@@ -152,7 +152,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   // Switching module reloads the seed grid for that module — never while editing
   // (the module is locked to the existing voucher so its lines aren't wiped).
-  useEffect(() => { if (editing) return; setLines([blankLine(VSPECS[moduleCode])]); setNoSupplier(false); setResult(null); setError(''); }, [moduleCode]);
+  // Reversal modules (RF/RI) have no fare-grid spec, so there's no seed grid to load —
+  // skip the reset for them (the reversal UI is rendered via an early return and never
+  // touches `lines`). Resetting here would call blankLine(undefined) → idCols crash.
+  useEffect(() => { if (editing || !VSPECS[moduleCode]) return; setLines([blankLine(VSPECS[moduleCode])]); setNoSupplier(false); setResult(null); setError(''); }, [moduleCode]);
 
   // No-supplier is only offered on Miscellaneous (sell-without-buy: seats / extra
   // services). Any other module always has a supplier (cost) leg.
