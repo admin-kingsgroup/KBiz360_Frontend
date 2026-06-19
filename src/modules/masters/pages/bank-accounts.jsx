@@ -7,9 +7,9 @@
    navigation preserved via setRoute.
    ──────────────────────────────────────────────────────────────────── */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Upload, Plus } from 'lucide-react';
-import { BANK_ACCOUNTS_DATA } from '../../../core/helpers';
+import { useMasterList } from '../../../core/useMasters';
 import { BRANCH_CODES } from '../../../core/data';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
@@ -18,7 +18,25 @@ import { Input, Select, Button, StatusPill, ResponsiveGrid } from '../../../shel
 export function BankAccountMaster({ branch, setRoute }) {
   const [search, setSearch] = useState('');
   const [filterBranch, setFilterBranch] = useState(branch === 'ALL' ? 'ALL' : branch?.code || 'ALL');
-  const filtered = BANK_ACCOUNTS_DATA.filter((b) => {
+  // Bank accounts ARE ledgers under the Bank Accounts / Cash-in-Hand groups — fetch
+  // them live and map the ledger's bank fields onto the register's columns.
+  const { data: ledgers = [] } = useMasterList('ledgers');
+  const bankRows = useMemo(() => (ledgers || [])
+    .filter((l) => ['Bank Accounts', 'Cash-in-Hand'].includes(l.group))
+    .map((l) => ({
+      id: l._id || l.code,
+      branch: l.branch || '',
+      bank: l.bankName || l.name,
+      branchAddr: l.subGroup || '',
+      accountNo: l.bankAcNo || '',
+      ifsc: l.bankIfsc || '',
+      type: l.group === 'Cash-in-Hand' ? 'Cash' : 'Bank',
+      currency: l.currency || 'INR',
+      openingBal: Number(l.openingBalance) || 0,
+      limit: Number(l.creditLimit) || 0,
+      status: l.active === false ? 'Inactive' : 'Active',
+    })), [ledgers]);
+  const filtered = bankRows.filter((b) => {
     if (filterBranch !== 'ALL' && b.branch !== filterBranch) return false;
     const q = search.toLowerCase();
     if (q && !(b.bank.toLowerCase().includes(q) || b.accountNo.toLowerCase().includes(q) || b.ifsc.toLowerCase().includes(q))) return false;
