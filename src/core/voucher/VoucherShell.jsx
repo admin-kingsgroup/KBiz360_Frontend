@@ -58,7 +58,14 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
     if (!canSave) return;
     setErr('');
     const base = { ...desc.toBody(state, ctx), sourceRef: state.sourceRef || '' };
-    const ok = (vno) => { setDone(true); toast(`${desc.label} saved${vno ? ` — ${vno}` : ''}`); };
+    const ok = (vno) => {
+      toast(`${desc.label} saved${vno ? ` — ${vno}` : ''}`);
+      // Rapid-entry vouchers (e.g. Debit Note) close the saved-confirmation panel and
+      // drop straight back to a fresh blank voucher for the next entry (Tally-style);
+      // every other type still shows the Print / ＋ New Voucher panel.
+      if (!isEdit && desc.closeOnSave) reset();
+      else setDone(true);
+    };
     const fail = (e) => { setErr(e.message); toast(`Could not save — ${e.message}`, 'error'); };
     if (isEdit) {
       const body = { ...voucher, ...base, status: voucher.status || 'saved' };

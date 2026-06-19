@@ -100,6 +100,14 @@ describe('debit-note — purchase return registered & gated payload', () => {
     expect(DN.type).toBe('DN');
   });
 
+  test.concurrent('debit-note is rapid-entry: closeOnSave resets to a fresh voucher after save', async () => {
+    // The shell reads desc.closeOnSave to skip the Print/New panel and reset() to a
+    // blank voucher on a successful create. Other voucher types must NOT opt in.
+    expect(DN.closeOnSave).toBe(true);
+    ['receipt', 'payment', 'contra', 'journal', 'purchase-expense', 'refund', 'reissue', 'adm', 'acm']
+      .forEach((c) => expect(VOUCHER_REGISTRY[c].closeOnSave).toBeFalsy());
+  });
+
   test.concurrent('toBody: supplier party + return lines + GST, total = subtotal + GST', async () => {
     const b = DN.toBody({
       date: '2026-06-19', party: 'Air India', billNo: 'PI/BOM/26/0042',

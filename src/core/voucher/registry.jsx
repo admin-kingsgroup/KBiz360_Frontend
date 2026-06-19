@@ -447,6 +447,10 @@ export const VOUCHER_REGISTRY = {
     type: 'DN',
     label: 'Debit Note',
     icon: '🔻',
+    // Rapid-entry: after a successful save the form closes the confirmation panel and
+    // resets to a fresh blank voucher (the save is confirmed by the toast + vno) so the
+    // user can immediately enter the next purchase return. See VoucherShell.save().
+    closeOnSave: true,
     explain: (<><b style={{ color: '#A07828' }}>Debit Note:</b> a <b>purchase return</b> to a supplier (goods/services sent back, or a supplier over-billing reversed). The <b>supplier (Sundry Creditors) is Debited</b> — we owe them less — and the <b>Purchase ledger(s) and input GST are Credited</b> (the cost is reversed). Each line has a <b>Dr/Cr</b> toggle: returns are <b>Cr</b> by default, switch a line to <b>Dr</b> to book a charge the supplier retains. For cancelling a <b>sale</b>, use Refund / Reissue instead.</>),
 
     initial: () => ({
