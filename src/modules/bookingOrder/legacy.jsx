@@ -12,20 +12,20 @@ import {
   XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { inp, card, btnG, btnGh, FL, bc } from '../core/styles.jsx';
-import { PeriodBar, periodRange } from '../core/period';
-import { openPrintPreview } from '../core/PrintPreview';
-import { buildBookingInvoice } from '../core/invoiceHtml';
-import { apiGet, apiPost, apiPut } from '../core/api';
-import { AuditTrail } from '../core/AuditTrail';
-import { useLedgerRegistry } from '../core/useReference';
-import { useHotkey } from '../core/ux/hotkeys';
-import { toast } from '../core/ux/toast';
-import { confirmDialog } from '../core/ux/confirm';
+import { inp, card, btnG, btnGh, FL, bc } from '../../core/styles.jsx';
+import { PeriodBar, periodRange } from '../../core/period';
+import { openPrintPreview } from '../../core/PrintPreview';
+import { buildBookingInvoice } from '../../core/invoiceHtml';
+import { apiGet, apiPost, apiPut } from '../../core/api';
+import { AuditTrail } from '../../core/AuditTrail';
+import { useLedgerRegistry } from '../../core/useReference';
+import { useHotkey } from '../../core/ux/hotkeys';
+import { toast } from '../../core/ux/toast';
+import { confirmDialog } from '../../core/ux/confirm';
 import {
   VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc, isVatBranch, rowsFromSnapshots,
-} from '../core/voucherSpecs.js';
-import { RefundReissueFields } from '../core/voucher/fields/RefundReissueFields';
+} from '../../core/voucherSpecs.js';
+import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
 
 const GOLD = '#A07828', DARK = '#0d1326', DR = '#1B6B4C', CR = '#9B2C2C', BLUE = '#185FA5';
 // Reversal modules (Refund / Reissue) act on an existing sale — picked from the same

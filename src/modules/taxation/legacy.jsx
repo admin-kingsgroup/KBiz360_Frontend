@@ -5,16 +5,16 @@
 
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, Calendar, Download, Plus, Settings, Users } from 'lucide-react';
-import { useGpBills } from '../core/useAccounting';
-import { useTaxCalendar } from '../core/useReference';
-import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY, fyOptions, rangeNote } from '../core/dates';
-import { fmt, fmtINR } from '../core/format';
-import { FORM16A_DATA, _TCS_ENTRIES, _TDS_ENTRIES, cardStyle } from '../core/helpers';
-import { useMobile } from '../core/hooks';
-import { useModalEsc } from '../core/ux/useModalEsc';
-import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, tabBtnStyle } from '../core/styles';
-import { TDS_SECTIONS } from './finance';
-import { PHASE2_Page } from '../shell/PHASE2_Page';
+import { useGpBills } from '../../core/useAccounting';
+import { useTaxCalendar } from '../../core/useReference';
+import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY, fyOptions, rangeNote } from '../../core/dates';
+import { fmt, fmtINR } from '../../core/format';
+import { FORM16A_DATA, _TCS_ENTRIES, _TDS_ENTRIES, cardStyle } from '../../core/helpers';
+import { useMobile } from '../../core/hooks';
+import { useModalEsc } from '../../core/ux/useModalEsc';
+import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, tabBtnStyle } from '../../core/styles';
+import { TDS_SECTIONS } from '../finance';
+import { PHASE2_Page } from '../../shell/PHASE2_Page';
 
 export function TaxShell({title,subtitle,children,action}){
   return (

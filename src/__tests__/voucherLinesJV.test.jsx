@@ -20,7 +20,7 @@ jest.mock('../core/useAccounting', () => ({ useVoucherPreview: () => ({ data: PR
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { VoucherLines } from '../modules/accountingLive.jsx';
+import { VoucherLines } from '../modules/accountingLive';
 
 const voucher = {
   vno: 'AMD/0626/SF00056', type: 'SF', category: 'sale', branch: 'AMD', date: '2026-06-16',

@@ -79,7 +79,13 @@ function errMessage(data) {
 // (success or error). Without a timeout a single slow/hanging backend call (or a
 // dropped connection that never refuses) would leave that splash up forever. The
 // timeout turns a hang into an error → the query settles → the app renders.
-const client = axios.create({ baseURL: BASE, timeout: 20_000 });
+//
+// Set to 60s (was 20s): heavy consolidated reports (e.g. the module-wise P&L /
+// GP bills, which scan and transfer many vouchers) legitimately take 15-20s when
+// the API talks to a remote/throttled Mongo Atlas link — the old 20s ceiling cut
+// those off mid-flight and surfaced as a "page error". 60s is still a bounded
+// backstop against a truly hung backend, just generous enough for the big reports.
+const client = axios.create({ baseURL: BASE, timeout: 60_000 });
 
 // ── Request: attach the current auth token to every call ────────────────────
 client.interceptors.request.use((config) => {

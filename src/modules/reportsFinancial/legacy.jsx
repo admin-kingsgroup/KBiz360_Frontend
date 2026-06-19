@@ -20,20 +20,20 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { card, inp, bc } from '../core/styles';
-import { periodRange } from '../core/period';
-import { useModulePL, useBalanceSheet, useLedgerStatement, useAgeing, branchCode } from '../core/useAccounting';
-import { apiGet, getAuthToken } from '../core/api';
-import { exportToExcel } from '../core/exportExcel';
-import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../core/dates';
-import { VoucherEditor } from './accountingLive';
-import { useMobile } from '../core/hooks';
-import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail, stripLeafPrefix, moduleSideRows } from '../core/pnlDetail';
-import { openPrintPreview } from '../core/PrintPreview';
-import { LedgerActions } from '../core/ledgerActions';
-import { openLedgerModal } from '../core/LedgerModalHost';
-import { pushModal } from '../core/ux/modalStore';
-import { CONSOLIDATED_LABEL } from '../core/data';
+import { card, inp, bc } from '../../core/styles';
+import { periodRange } from '../../core/period';
+import { useModulePL, useBalanceSheet, useLedgerStatement, useAgeing, branchCode } from '../../core/useAccounting';
+import { apiGet, getAuthToken } from '../../core/api';
+import { exportToExcel } from '../../core/exportExcel';
+import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../../core/dates';
+import { VoucherEditor } from '../accountingLive';
+import { useMobile } from '../../core/hooks';
+import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail, stripLeafPrefix, moduleSideRows } from '../../core/pnlDetail';
+import { openPrintPreview } from '../../core/PrintPreview';
+import { LedgerActions } from '../../core/ledgerActions';
+import { openLedgerModal } from '../../core/LedgerModalHost';
+import { pushModal } from '../../core/ux/modalStore';
+import { CONSOLIDATED_LABEL } from '../../core/data';
 
 /* ── palette (SAP Fiori) ─────────────────────────────────────────────── */
 const SAP = {

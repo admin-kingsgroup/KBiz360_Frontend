@@ -6,16 +6,16 @@
 import React, { useState } from 'react';
 import { Check, Download, Lock, Plus, Save, Settings } from 'lucide-react';
 import { Legend, Line } from 'recharts';
-import { BRANCHES, EXP_ACTUALS, FX_RATES, GP_BILLS } from '../core/data';
-import { fmt, fmtINR } from '../core/format';
-import { ACTIVE_DELEGATIONS, AUDIT_QUEUE_DATA, AUTH_INITIAL_MASTER, AUTH_INITIAL_TXN, GROUP_BOOKINGS, GROUP_DASH_DATA, PERIOD_LOCK_DATA, PERIOD_LOCK_STATE, STATUTORY_FILINGS, cardStyle } from '../core/helpers';
-import { useMobile } from '../core/hooks';
-import { useModalEsc } from '../core/ux/useModalEsc';
-import { B, FL, RPT_tdStyle, RPT_thStyle, btnG, btnGh, card, inp, tabBtnStyle } from '../core/styles';
-import { CUR_MONTH, MONTH_OPTIONS, monthLabel, rangeNote } from '../core/dates';
-import { Dashboard } from './dashboard';
+import { BRANCHES, EXP_ACTUALS, FX_RATES, GP_BILLS } from '../../core/data';
+import { fmt, fmtINR } from '../../core/format';
+import { ACTIVE_DELEGATIONS, AUDIT_QUEUE_DATA, AUTH_INITIAL_MASTER, AUTH_INITIAL_TXN, GROUP_BOOKINGS, GROUP_DASH_DATA, PERIOD_LOCK_DATA, PERIOD_LOCK_STATE, STATUTORY_FILINGS, cardStyle } from '../../core/helpers';
+import { useMobile } from '../../core/hooks';
+import { useModalEsc } from '../../core/ux/useModalEsc';
+import { B, FL, RPT_tdStyle, RPT_thStyle, btnG, btnGh, card, inp, tabBtnStyle } from '../../core/styles';
+import { CUR_MONTH, MONTH_OPTIONS, monthLabel, rangeNote } from '../../core/dates';
+import { Dashboard } from '../dashboard';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { apiGet } from '../core/api';
+import { apiGet } from '../../core/api';
 
 // ── Live consolidated group data (all branches, INR-normalised) ──────────────
 // Replaces the old GROUP_DASH_DATA / GP_BILLS seed: per-branch P&L + invoice GP,
@@ -50,7 +50,7 @@ function useGroupLive(period) {
   const loading = pq.some((q) => q.isLoading) || tb.isLoading || ag.isLoading;
   return { rows, totals, cash, overdue, topCustomers, loading };
 }
-import { PHASE2_Page } from '../shell/PHASE2_Page';
+import { PHASE2_Page } from '../../shell/PHASE2_Page';
 
 export function GroupDashboard(){
   const mob=useMobile();

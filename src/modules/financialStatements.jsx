@@ -30,15 +30,20 @@ const fmt = (n) => (n ? Number(n).toLocaleString('en-IN', { minimumFractionDigit
 const fmtB = (n) => Math.abs(Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dmy = (s) => (s ? String(s).slice(0, 10).split('-').reverse().join('-') : '');
 
-/* ── shared view switcher (segmented, cream/gold) ────────────────────────── */
+/* ── shared view switcher (segmented, cream/gold) ──────────────────────────
+   The `.seg` control is inline-flex with overflow:hidden, so with 6-7 views it
+   would clip on a phone. The outer wrapper lets it scroll horizontally instead
+   (min-w-0 so it can shrink inside the flex toolbar). Theme is untouched. */
 function StmtSwitcher({ value, onChange, options }) {
   return (
-    <div className="kbled" style={{ display: 'inline-block' }}>
-      <style>{LEDGER_CSS}</style>
-      <div className="seg" style={{ borderColor: '#DEDBD4' }}>
-        {options.map(([id, label]) => (
-          <button key={id} className={value === id ? 'active' : ''} onClick={() => onChange(id)}>{label}</button>
-        ))}
+    <div className="min-w-0 max-w-full overflow-x-auto [scrollbar-width:thin]">
+      <div className="kbled" style={{ display: 'inline-block' }}>
+        <style>{LEDGER_CSS}</style>
+        <div className="seg" style={{ borderColor: '#DEDBD4' }}>
+          {options.map(([id, label]) => (
+            <button key={id} className={value === id ? 'active' : ''} onClick={() => onChange(id)}>{label}</button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -240,15 +245,15 @@ function TkfBS({ branch, to }) {
 /* ════════════════════════════════════════════════════════════════════════
    MERGED SCREENS — one P&L, one Balance Sheet, with a single switcher.
    ════════════════════════════════════════════════════════════════════════ */
-const wrap = { maxWidth: 1320, margin: '0 auto', padding: '10px 10px 40px' };
-const bar = { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '8px 4px 12px' };
+const WRAP_CLS = 'mx-auto max-w-[1320px] px-2.5 pb-10 pt-2.5 tablet:px-4';
+const BAR_CLS = 'flex flex-wrap items-center gap-3 px-1 pb-3 pt-2';
 
 export function ProfitAndLossUnified({ branch }) {
   const [view, setView] = useState('tkf');
   const [tkfPeriod, setTkfPeriod] = useState({ from: '', to: '' });
   return (
-    <div style={wrap}>
-      <div style={bar}>
+    <div className={WRAP_CLS}>
+      <div className={BAR_CLS}>
         <StmtSwitcher value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic'], ['vertical', '▤ Vertical'], ['drill', '⊞ Drill'], ['tally', '𝚺 Tally'], ['tkf', '◆ TKF']]} />
         {view === 'tkf' && <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setTkfPeriod({ from: r.from, to: r.to })} />}
       </div>
@@ -263,8 +268,8 @@ export function BalanceSheetUnified({ branch }) {
   const [view, setView] = useState('tkf');
   const [tkfTo, setTkfTo] = useState('');
   return (
-    <div style={wrap}>
-      <div style={bar}>
+    <div className={WRAP_CLS}>
+      <div className={BAR_CLS}>
         <StmtSwitcher value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic'], ['vertical', '▤ Vertical'], ['tally', '𝚺 Tally'], ['tkf', '◆ TKF'], ['schedule3', '§ Schedule III'], ['consolidated', '⛁ Consolidated']]} />
         {view === 'tkf' && <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setTkfTo(r.to)} />}
       </div>

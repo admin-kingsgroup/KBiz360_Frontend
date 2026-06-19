@@ -12,6 +12,9 @@
    This is a UI-personalisation layer. The hard security gates — role
    permissions, branch scope, view-only — remain enforced server-side and
    are configured under Users & Roles, not here.
+
+   UI: built on the shared responsive primitives (PageLayout, PageSection,
+   Button, StatusPill, Input). Business logic is unchanged.
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -21,10 +24,8 @@ import { apiPut } from '../core/api';
 import { useUsersAdmin } from '../core/useReference';
 import { toast } from '../core/ux/toast';
 import { buildPageCatalog, isPageAccessAdmin } from '../core/pageCatalog';
-import { useMobile } from '../core/hooks';
-import { card, btnG, btnGh, inp } from '../core/styles';
-
-const DARK = '#0d1326', GOLD = '#d4a437', GREEN = '#27963c', GREY = '#c4c9d6';
+import { PageLayout } from '../shell/PageLayout';
+import { PageSection, Button, StatusPill, Input, ResponsiveGrid, EmptyState } from '../shell/primitives';
 
 /* ── A small on/off switch. ON (green) = page is VISIBLE for the user. ── */
 function Switch({ on, onChange, disabled }) {
@@ -32,34 +33,26 @@ function Switch({ on, onChange, disabled }) {
     <button type="button" disabled={disabled} aria-pressed={on}
       onClick={() => !disabled && onChange(!on)}
       title={on ? 'Visible — click to hide' : 'Hidden — click to show'}
-      style={{
-        width: 40, height: 22, borderRadius: 999, border: 'none',
-        cursor: disabled ? 'default' : 'pointer', background: on ? GREEN : GREY,
-        position: 'relative', transition: 'background .15s', flexShrink: 0, opacity: disabled ? 0.5 : 1,
-      }}>
-      <span style={{
-        position: 'absolute', top: 2, left: on ? 20 : 2, width: 18, height: 18, borderRadius: '50%',
-        background: '#fff', transition: 'left .15s', boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
-      }} />
+      className={`relative h-[22px] w-10 shrink-0 rounded-full transition-colors ${on ? 'bg-[#27963c]' : 'bg-[#c4c9d6]'} ${disabled ? 'cursor-default opacity-50' : 'cursor-pointer'}`}>
+      <span className={`absolute top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow transition-[left] ${on ? 'left-5' : 'left-0.5'}`} />
     </button>
   );
 }
 
 export function PageAccessControl({ currentUser, setRoute }) {
-  const mob = useMobile();
-
   /* ── Access gate: only the visibility administrator opens this page. ── */
   if (!isPageAccessAdmin(currentUser)) {
     return (
-      <div style={{ padding: 30, maxWidth: 560, margin: '40px auto', background: '#fff', borderRadius: 10, border: '1px solid #e1e3ec', textAlign: 'center' }}>
-        <div style={{ fontSize: 42, marginBottom: 14 }}><Lock size={40} color="#A32D2D" /></div>
-        <h2 style={{ margin: '0 0 8px', color: DARK, fontSize: 20 }}>Restricted</h2>
-        <p style={{ margin: '0 0 20px', color: '#5a6691', fontSize: 13.5, lineHeight: 1.5 }}>
-          Only <b>afshin.dhanani@kingsgroupco.com</b> (or a Super Admin) can manage page visibility.
-        </p>
-        <button onClick={() => setRoute && setRoute('/dashboard')}
-          style={{ ...btnG, padding: '10px 22px' }}>← Back to Dashboard</button>
-      </div>
+      <PageLayout title="Page Visibility Control">
+        <PageSection className="mx-auto max-w-xl">
+          <EmptyState
+            icon={Lock}
+            title="Restricted"
+            hint="Only afshin.dhanani@kingsgroupco.com (or a Super Admin) can manage page visibility."
+            action={<Button variant="primary" onClick={() => setRoute && setRoute('/dashboard')}>← Back to Dashboard</Button>}
+          />
+        </PageSection>
+      </PageLayout>
     );
   }
 
@@ -154,137 +147,120 @@ export function PageAccessControl({ currentUser, setRoute }) {
   });
 
   return (
-    <div style={{ padding: mob ? 10 : 16, maxWidth: 1240, margin: '0 auto' }}>
-      {/* ── Banner ── */}
-      <div style={{ background: DARK, borderRadius: 12, padding: mob ? '14px 16px' : '18px 22px', marginBottom: 14, color: '#fff' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <ShieldCheck size={22} color={GOLD} />
-          <div>
-            <h1 style={{ margin: 0, fontSize: mob ? 17 : 20, fontWeight: 800, color: '#fff' }}>Page Visibility Control</h1>
-            <p style={{ margin: '3px 0 0', fontSize: 12, color: '#aeb6d0', lineHeight: 1.5 }}>
-              Choose which pages &amp; reports each user can see. Toggle <b style={{ color: GREEN }}>on</b> = visible,
-              toggle <b style={{ color: '#e58b8b' }}>off</b> = hidden from that user's menu and direct links.
-            </p>
-          </div>
-        </div>
+    <PageLayout
+      title="Page Visibility Control"
+      subtitle="Choose which pages & reports each user can see. Toggle on = visible, off = hidden from that user's menu and direct links."
+    >
+      {/* ── Branded intro banner ── */}
+      <div className="mb-4 flex items-start gap-2.5 rounded-brand bg-navy px-4 py-3.5 text-white tablet:px-5">
+        <ShieldCheck size={22} className="mt-0.5 shrink-0 text-gold" />
+        <p className="text-xs leading-relaxed text-[#aeb6d0]">
+          Toggle <b className="text-[#27963c]">on</b> to make a page visible, or <b className="text-[#e58b8b]">off</b> to hide it from that user's
+          menu and direct links. Dashboard is always available. Changes apply on the user's next sign-in (or within ~10 minutes).
+        </p>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: mob ? 'column' : 'row', gap: 14, alignItems: 'flex-start' }}>
+      <div className="flex flex-col items-start gap-3.5 desktop:flex-row">
         {/* ── Left: user picker ── */}
-        <div style={{ ...card, padding: 0, width: mob ? '100%' : 290, flexShrink: 0, overflow: 'hidden' }}>
-          <div style={{ padding: 12, borderBottom: '1px solid #eef0f6' }}>
-            <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 800, letterSpacing: '0.4px', color: '#5a6691', textTransform: 'uppercase' }}>Users ({users.length})</p>
-            <div style={{ position: 'relative' }}>
-              <Search size={13} style={{ position: 'absolute', left: 9, top: 9, color: '#8b94b3' }} />
-              <input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search users…"
-                style={{ ...inp, paddingLeft: 28, minHeight: 32, fontSize: 11.5 }} />
+        <PageSection padded={false} className="w-full shrink-0 overflow-hidden desktop:w-[290px]">
+          <div className="border-b border-surface-border p-3">
+            <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-ink-muted">Users ({users.length})</p>
+            <div className="relative">
+              <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-subtle" />
+              <Input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search users…" className="pl-8" />
             </div>
           </div>
-          <div style={{ maxHeight: mob ? 240 : 560, overflowY: 'auto' }}>
-            {!usersLive && <div style={{ padding: 16, fontSize: 12, color: '#8b94b3' }}>Loading users…</div>}
-            {usersLive && !filteredUsers.length && <div style={{ padding: 16, fontSize: 12, color: '#8b94b3' }}>No users match.</div>}
+          <div className="max-h-60 overflow-y-auto desktop:max-h-[560px]">
+            {!usersLive && <div className="p-4 text-xs text-ink-subtle">Loading users…</div>}
+            {usersLive && !filteredUsers.length && <div className="p-4 text-xs text-ink-subtle">No users match.</div>}
             {filteredUsers.map((u) => {
               const sel = u.id === selId;
               const nHidden = (Array.isArray(u.hidden) ? u.hidden : []).filter((k) => k !== '/dashboard' && k !== '/settings/page-access').length;
               return (
                 <button key={u.id} onClick={() => selectUser(u)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 9, width: '100%', textAlign: 'left',
-                    padding: '9px 12px', border: 'none', borderBottom: '1px solid #f3f4f8', cursor: 'pointer',
-                    background: sel ? '#eef4ff' : '#fff',
-                    borderLeft: sel ? '3px solid #0070f2' : '3px solid transparent',
-                  }}>
-                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: sel ? '#0070f2' : '#f0f2f8', color: sel ? '#fff' : '#5a6691', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>
+                  className={`flex w-full items-center gap-2.5 border-b border-surface-alt px-3 py-2.5 text-left transition ${sel ? 'border-l-[3px] border-l-[#0070f2] bg-[#eef4ff]' : 'border-l-[3px] border-l-transparent bg-surface hover:bg-surface-alt'}`}>
+                  <div className={`flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${sel ? 'bg-[#0070f2] text-white' : 'bg-surface-alt text-ink-muted'}`}>
                     {(u.name || u.email || '?').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
                   </div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 700, color: DARK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name || u.email}</div>
-                    <div style={{ fontSize: 10, color: '#8b94b3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.role}{u.active === false ? ' · inactive' : ''}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12.5px] font-bold text-navy">{u.name || u.email}</div>
+                    <div className="truncate text-[10px] text-ink-subtle">{u.role}{u.active === false ? ' · inactive' : ''}</div>
                   </div>
-                  {nHidden > 0 && (
-                    <span style={{ fontSize: 9.5, fontWeight: 800, padding: '2px 7px', borderRadius: 999, background: '#FBE9E9', color: '#A32D2D', flexShrink: 0 }}>{nHidden} hidden</span>
-                  )}
+                  {nHidden > 0 && <StatusPill tone="danger" size="sm">{nHidden} hidden</StatusPill>}
                 </button>
               );
             })}
           </div>
-        </div>
+        </PageSection>
 
         {/* ── Right: catalogue of pages/reports ── */}
-        <div style={{ flex: 1, minWidth: 0, width: mob ? '100%' : 'auto' }}>
+        <div className="w-full min-w-0 flex-1">
           {!selectedUser ? (
-            <div style={{ ...card, padding: 40, textAlign: 'center', color: '#8b94b3' }}>
-              <Eye size={34} style={{ opacity: 0.5 }} />
-              <p style={{ margin: '12px 0 0', fontSize: 13.5, fontWeight: 600 }}>Select a user on the left to manage what they can see.</p>
-            </div>
+            <PageSection>
+              <EmptyState icon={Eye} title="Select a user on the left to manage what they can see." />
+            </PageSection>
           ) : (
             <>
               {/* Sticky action bar */}
-              <div style={{ ...card, padding: 12, marginBottom: 12, position: 'sticky', top: 0, zIndex: 5 }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-                  <div style={{ flex: 1, minWidth: 180 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: DARK }}>{selectedUser.name || selectedUser.email}</div>
-                    <div style={{ fontSize: 11, color: '#5a6691' }}>
-                      {selectedUser.role} · sees <b style={{ color: GREEN }}>{totalPages - hiddenInCatalog}</b> of {totalPages} pages
-                      {hiddenInCatalog > 0 && <> · <b style={{ color: '#A32D2D' }}>{hiddenInCatalog} hidden</b></>}
+              <div className="sticky top-0 z-[5] mb-3 rounded-brand border border-surface-border bg-surface p-3 shadow-sm">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="min-w-[180px] flex-1">
+                    <div className="text-sm font-extrabold text-navy">{selectedUser.name || selectedUser.email}</div>
+                    <div className="text-[11px] text-ink-muted">
+                      {selectedUser.role} · sees <b className="text-[#27963c]">{totalPages - hiddenInCatalog}</b> of {totalPages} pages
+                      {hiddenInCatalog > 0 && <> · <b className="text-maroon">{hiddenInCatalog} hidden</b></>}
                     </div>
                   </div>
-                  <div style={{ position: 'relative', flex: mob ? '1 1 100%' : '0 0 200px' }}>
-                    <Search size={13} style={{ position: 'absolute', left: 9, top: 9, color: '#8b94b3' }} />
-                    <input value={pageSearch} onChange={(e) => setPageSearch(e.target.value)} placeholder="Filter pages…"
-                      style={{ ...inp, paddingLeft: 28, minHeight: 32, fontSize: 11.5 }} />
+                  <div className="relative flex-[1_1_100%] tablet:flex-[0_0_200px]">
+                    <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-subtle" />
+                    <Input value={pageSearch} onChange={(e) => setPageSearch(e.target.value)} placeholder="Filter pages…" className="pl-8" />
                   </div>
-                  <button onClick={showAll} style={{ ...btnGh, fontSize: 11, padding: '6px 10px' }}><Eye size={13} /> Show all</button>
-                  <button onClick={hideAll} style={{ ...btnGh, fontSize: 11, padding: '6px 10px', color: '#A32D2D' }}><EyeOff size={13} /> Hide all</button>
-                  <button onClick={resetDraft} disabled={!isDirty} style={{ ...btnGh, fontSize: 11, padding: '6px 10px', opacity: isDirty ? 1 : 0.5 }}><RotateCcw size={13} /> Reset</button>
-                  <button onClick={save} disabled={!isDirty || saveMut.isPending}
-                    style={{ ...btnG, fontSize: 11.5, padding: '7px 14px', opacity: (!isDirty || saveMut.isPending) ? 0.55 : 1 }}>
-                    <Save size={13} /> {saveMut.isPending ? 'Saving…' : 'Save changes'}
-                  </button>
+                  <Button size="sm" variant="secondary" icon={Eye} onClick={showAll}>Show all</Button>
+                  <Button size="sm" variant="secondary" icon={EyeOff} onClick={hideAll} className="text-maroon">Hide all</Button>
+                  <Button size="sm" variant="secondary" icon={RotateCcw} onClick={resetDraft} disabled={!isDirty}>Reset</Button>
+                  <Button size="sm" variant="primary" icon={Save} onClick={save} loading={saveMut.isPending} disabled={!isDirty || saveMut.isPending}>
+                    {saveMut.isPending ? 'Saving…' : 'Save changes'}
+                  </Button>
                 </div>
-                <p style={{ margin: '8px 0 0', fontSize: 10.5, color: '#8b94b3', lineHeight: 1.5 }}>
-                  Dashboard is always available and can't be hidden. Changes apply on the user's next sign-in (or within ~10 minutes).
-                </p>
               </div>
 
               {/* Sections */}
               {visibleCatalog.length === 0 && (
-                <div style={{ ...card, padding: 24, textAlign: 'center', color: '#8b94b3', fontSize: 12.5 }}>No pages match “{pageSearch}”.</div>
+                <PageSection><EmptyState icon={Search} title={`No pages match “${pageSearch}”.`} /></PageSection>
               )}
               {visibleCatalog.map((s) => {
                 const isCollapsed = collapsed.has(s.section) && !q;
                 const total = s.items.length;
                 const hiddenN = s.items.filter((i) => draft.has(i.key)).length;
-                const allOn = hiddenN === 0;
                 return (
-                  <div key={s.section} style={{ ...card, padding: 0, marginBottom: 10, overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#f7f8fb', borderBottom: isCollapsed ? 'none' : '1px solid #eef0f6' }}>
+                  <div key={s.section} className="mb-2.5 overflow-hidden rounded-brand border border-surface-border bg-surface shadow-sm">
+                    <div className={`flex items-center gap-2 bg-surface-alt px-3.5 py-2.5 ${isCollapsed ? '' : 'border-b border-surface-border'}`}>
                       <button onClick={() => toggleCollapse(s.section)} disabled={!!q}
-                        style={{ background: 'none', border: 'none', cursor: q ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 7, flex: 1, padding: 0 }}>
-                        {!q && (isCollapsed ? <ChevronRight size={15} color="#5a6691" /> : <ChevronDown size={15} color="#5a6691" />)}
-                        <span style={{ fontSize: 12.5, fontWeight: 800, color: DARK }}>{s.section}</span>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: hiddenN ? '#A32D2D' : '#27963c' }}>
+                        className={`flex flex-1 items-center gap-1.5 p-0 text-left ${q ? 'cursor-default' : 'cursor-pointer'}`}>
+                        {!q && (isCollapsed ? <ChevronRight size={15} className="text-ink-muted" /> : <ChevronDown size={15} className="text-ink-muted" />)}
+                        <span className="text-[12.5px] font-extrabold text-navy">{s.section}</span>
+                        <span className={`text-[10px] font-bold ${hiddenN ? 'text-maroon' : 'text-[#27963c]'}`}>
                           {hiddenN ? `${total - hiddenN}/${total} visible` : `all ${total} visible`}
                         </span>
                       </button>
-                      <button onClick={() => setSection(s, true)} style={{ ...btnGh, fontSize: 10, padding: '3px 8px' }}>Show all</button>
-                      <button onClick={() => setSection(s, false)} style={{ ...btnGh, fontSize: 10, padding: '3px 8px', color: '#A32D2D' }}>Hide all</button>
+                      <Button size="xs" variant="secondary" onClick={() => setSection(s, true)}>Show all</Button>
+                      <Button size="xs" variant="secondary" onClick={() => setSection(s, false)} className="text-maroon">Hide all</Button>
                     </div>
                     {!isCollapsed && (
-                      <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: 0 }}>
+                      <ResponsiveGrid min="300px" gap="none">
                         {s.items.map((it) => {
                           const on = isVisible(it.key);
                           return (
-                            <label key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: '1px solid #f5f6fa', cursor: 'pointer' }}>
+                            <label key={it.key} className="flex cursor-pointer items-center gap-2.5 border-b border-surface-alt px-3.5 py-2">
                               <Switch on={on} onChange={() => toggleOne(it.key)} />
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ fontSize: 12.5, fontWeight: 600, color: on ? DARK : '#9aa3bd', textDecoration: on ? 'none' : 'line-through' }}>{it.label}</div>
-                                <div style={{ fontSize: 10, color: '#aab2c8', fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.key}</div>
+                              <div className="min-w-0 flex-1">
+                                <div className={`text-[12.5px] font-semibold ${on ? 'text-navy' : 'text-ink-subtle line-through'}`}>{it.label}</div>
+                                <div className="truncate font-mono text-[10px] text-ink-subtle">{it.key}</div>
                               </div>
                             </label>
                           );
                         })}
-                      </div>
+                      </ResponsiveGrid>
                     )}
                   </div>
                 );
@@ -293,6 +269,6 @@ export function PageAccessControl({ currentUser, setRoute }) {
           )}
         </div>
       </div>
-    </div>
+    </PageLayout>
   );
 }

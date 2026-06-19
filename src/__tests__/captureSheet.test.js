@@ -9,7 +9,7 @@
 jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 
-import { buildCaptureSheet } from '../modules/accountingLive.jsx';
+import { buildCaptureSheet } from '../modules/accountingLive';
 
 const linkIndex = { saleByLink: { LK1: 'SF1' }, purByLink: { LK1: 'PF1' }, saleRefByLink: { LK1: 'IS/01' }, purRefByLink: { LK1: 'IP/01' } };
 const booking = { linkNo: 'LK1', bookingNo: 'BKG1', so: { total: 1000 }, customer: { name: 'ACME' } };

@@ -11,10 +11,10 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download, Upload, CheckCircle2, AlertTriangle, FileSpreadsheet, ShieldAlert, Eye, X } from 'lucide-react';
-import { card } from '../core/styles';
-import { apiPost, apiGet } from '../core/api';
-import { VSPECS } from '../core/voucherSpecs';
-import { useModalEsc } from '../core/ux/useModalEsc';
+import { card } from '../../core/styles';
+import { apiPost, apiGet } from '../../core/api';
+import { VSPECS } from '../../core/voucherSpecs';
+import { useModalEsc } from '../../core/ux/useModalEsc';
 
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
 
