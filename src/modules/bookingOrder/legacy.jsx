@@ -508,7 +508,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l);
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
                 return (
                   <React.Fragment key={i}>
                   <tr>
@@ -568,7 +568,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l);
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
                 return (
                   <React.Fragment key={i}>
                   <tr>
@@ -627,7 +627,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l);
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
                 return (
                   <tr key={i}>
                     <td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.fn || '—'}</td><td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.sn || ''}</td>

@@ -92,7 +92,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
         <KpiTile
           label="Bookings"
           value={String(kpis.bookings)}
-          sub={`${(kpis.revenue / Math.max(1, kpis.bookings) | 0).toLocaleString()} avg`}
+          sub={`${Math.round(kpis.revenue / Math.max(1, kpis.bookings)).toLocaleString()} avg`}
           icon="✈"
           color="#384677"
         />

@@ -569,13 +569,13 @@ export function HrPayroll({branch}){
   const [journalPosted,setJournalPosted]=useState(false);
   const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
 
-  const emps=HR_EMPLOYEES_DATA.filter(e=>e.branch===brCode&&e.active);
+  const emps=HR_EMPLOYEES_DATA.filter(e=>e.branch===brCode&&e.status==="Active");
 
   const payroll=useMemo(()=>emps.map(e=>{
-    const basic   =Math.round(e.salary*0.50);
-    const hra     =Math.round(e.salary*0.20);
-    const special =e.salary-basic-hra;
-    const gross   =e.salary;
+    const basic   =e.basic;
+    const hra     =e.hra;
+    const gross   =e.basic+e.hra+e.da+e.travel+e.medical;
+    const special =gross-basic-hra;
     // PF: 12% of Basic (both employee & employer)
     const empPF   =Math.round(basic*0.12);
     const empPFr  =Math.round(basic*0.12);  // employer
@@ -585,14 +585,14 @@ export function HrPayroll({branch}){
     const empESIr =esiElig?Math.round(gross*0.0325):0;
     // Professional Tax (Maharashtra)
     const profTax =gross>20000?200:gross>15000?150:gross>10000?100:0;
-    // LWP
-    const lwpDays =e.lwp||0;
+    // LWP — no loss-of-pay field on the employee master, default to 0
+    const lwpDays =e.lwpDays||0;
     const lwpDed  =Math.round(gross/26*lwpDays);
     // TDS on salary (simplified)
     const annualGross=(gross-empPF-profTax-lwpDed)*12;
     const tdsBase=annualGross>700000?annualGross-700000:0;
-    const tds=annualGross>700000?Math.round(tdsBase*0.20/12):
-      annualGross>500000?Math.round((annualGross-500000)*0.10/12+200000*0.05/12):
+    const tds=annualGross>700000?Math.round((tdsBase*0.20+200000*0.10+250000*0.05)/12):
+      annualGross>500000?Math.round((annualGross-500000)*0.10/12+250000*0.05/12):
       annualGross>250000?Math.round((annualGross-250000)*0.05/12):0;
     const net =gross-empPF-empESI-profTax-lwpDed-tds;
     return {...e,basic:basic,hra:hra,special:special,gross:gross,empPF:empPF,empPFr:empPFr,empESI:empESI,empESIr:empESIr,profTax:profTax,lwpDays:lwpDays,lwpDed:lwpDed,tds:tds,net:net};
@@ -1384,7 +1384,9 @@ export function PfEsiChallan({branch}){
   const emps=HR_EMPLOYEES_DATA.filter(e=>e.branch===brCode||brCode==="All");
   const gross=e=>e.basic+e.hra+e.da+e.travel+e.medical;
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
-  const DUE_DATE=month.replace(/-\d\d$/,"")+"-"+(parseInt(month.slice(5))+1).toString().padStart(2,"0")+"-15";
+  const dueYear=parseInt(month.slice(0,4),10), dueMonRaw=parseInt(month.slice(5),10)+1;
+  const dueYr=dueMonRaw>12?dueYear+1:dueYear, dueMon=dueMonRaw>12?1:dueMonRaw;
+  const DUE_DATE=dueYr+"-"+String(dueMon).padStart(2,"0")+"-15";
 
   // PF data
   const pfData=emps.map(e=>({
@@ -2070,7 +2072,12 @@ export function PerformanceReview(){
           </div>
         </div>
       )}
-      {tab==="history"&&(
+      {tab==="history"&&!prev&&(
+        <div style={cardStyle}>
+          <p style={{margin:0,fontSize:12,color:"#5a6691",textAlign:"center",padding:"24px 0"}}>No previous reviews on record yet.</p>
+        </div>
+      )}
+      {tab==="history"&&prev&&(
         <div style={cardStyle}>
           <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Previous Review — {prev.period}</p>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
@@ -2079,7 +2086,7 @@ export function PerformanceReview(){
           </div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>KPI</th><th style={{...RPT_thStyle,textAlign:"right"}}>Target</th><th style={{...RPT_thStyle,textAlign:"right"}}>Actual</th><th style={{...RPT_thStyle,textAlign:"right"}}>Score</th></tr></thead>
-            <tbody>{prev.kpis.map((k,i)=>(<tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>{k.kpi}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{k.target}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#22c55e"}}>{k.actual}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{k.score}</td></tr>))}</tbody>
+            <tbody>{(prev.kpis||[]).map((k,i)=>(<tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>{k.kpi}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{k.target}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#22c55e"}}>{k.actual}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{k.score}</td></tr>))}</tbody>
           </table>
           <div style={{marginTop:12,padding:12,background:"#fafbfd",borderRadius:6}}>
             <p style={{margin:"0 0 4px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Manager Comments</p>

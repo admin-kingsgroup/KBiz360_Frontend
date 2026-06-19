@@ -131,7 +131,7 @@ export function SettingsBranches(){
         <div style={{...card,padding:0,overflow:"hidden"}}>
           {/* Detail tabs */}
           <div style={{display:"flex",gap:0,background:"#f3f4f8",borderBottom:"1px solid #e1e3ec",overflowX:"auto"}}>
-            <button onClick={()=>setTab("overview")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="overview"?700:400,background:tab==="overview"?"#fff":"transparent",borderRadius:6}}>📋 Overview</button><button onClick={()=>setTab("identity")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="identity"?700:400,background:tab==="identity"?"#fff":"transparent",borderRadius:6}}>🏢 Identity & Tax</button><button onClick={()=>setTab("compliance")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="compliance"?700:400,background:tab==="compliance"?"#fff":"transparent",borderRadius:6}}>📋 Compliance</button><button onClick={()=>setTab("bank")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="bank"?700:400,background:tab==="bank"?"#fff":"transparent",borderRadius:6}}>🏦 Bank Details</button>
+            <button onClick={()=>setTab("overview")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="overview"?700:400,background:tab==="overview"?"#fff":"transparent",borderRadius:6}}>📋 Overview</button><button onClick={()=>setTab("identity")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="identity"?700:400,background:tab==="identity"?"#fff":"transparent",borderRadius:6}}>🏢 Identity & Tax</button><button onClick={()=>setTab("compliance")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="compliance"?700:400,background:tab==="compliance"?"#fff":"transparent",borderRadius:6}}>📋 Compliance</button><button onClick={()=>setTab("bank")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="bank"?700:400,background:tab==="bank"?"#fff":"transparent",borderRadius:6}}>🏦 Bank Details</button><button onClick={()=>setTab("vouchers")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="vouchers"?700:400,background:tab==="vouchers"?"#fff":"transparent",borderRadius:6}}>🔢 Voucher Series</button>
           </div>
 
           <div style={{padding:"16px 18px"}}>
@@ -253,13 +253,13 @@ export function SettingsBranches(){
               </div>
             )}
 
-            {tab==="banking"&&(
+            {tab==="bank"&&(
               <div>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
                   <p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>🏦 Bank Accounts — {selBranch.code}</p>
                   <button style={{...btnG,fontSize:11,padding:"5px 12px"}}><Plus size={12}/> Add Bank</button>
                 </div>
-                {selBranch.banks.map((bk,i)=>(
+                {(selBranch.banks||[]).map((bk,i)=>(
                   <div key={i} style={{...card,marginBottom:10,borderLeft:`4px solid ${bk.primary?"#d4a437":"#e1e3ec"}`}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -669,7 +669,10 @@ export function SettingsUsers(){
             </p>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setEditPerms(null)} style={btnGh}>Cancel</button>
-              <button onClick={()=>{setEditPerms(null);}} style={{...btnG,background:"#27500A"}}>💾 Save Permissions</button>
+              <button onClick={()=>updateUserMut.mutate(
+                {id:editPerms.userId,body:{role:editPerms.userRole,perms:editPerms.perms,special:editPerms.special,branches:editPerms.branches}},
+                {onSuccess:()=>setEditPerms(null)}
+              )} style={{...btnG,background:"#27500A"}}>💾 Save Permissions</button>
             </div>
           </div>
         </div>

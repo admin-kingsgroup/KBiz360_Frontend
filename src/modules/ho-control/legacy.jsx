@@ -37,17 +37,17 @@ function useGroupLive(period) {
     const exp = (p.indirect && p.indirect.debitTotal) || 0;
     const np = p.netProfit || 0;
     const rate = FX_RATES[b.currency] || 1;
-    return { code: b.code, flag: b.flag, city: b.city, cur: b.cur, rate, rev, cost, gp, exp, np, gpPct: rev > 0 ? +(gp / rev * 100).toFixed(1) : 0, books: ((inv.rows) || []).length, revINR: rev * rate, costINR: cost * rate, gpINR: gp * rate, npINR: np * rate };
+    return { code: b.code, flag: b.flag, city: b.city, cur: b.currency, rate, rev, cost, gp, exp, np, gpPct: rev > 0 ? +(gp / rev * 100).toFixed(1) : 0, books: ((inv.rows) || []).length, revINR: rev * rate, costINR: cost * rate, gpINR: gp * rate, npINR: np * rate };
   });
   const totals = rows.reduce((a, r) => ({ rev: a.rev + r.revINR, cost: a.cost + r.costINR, gp: a.gp + r.gpINR, np: a.np + r.npINR, books: a.books + r.books }), { rev: 0, cost: 0, gp: 0, np: 0, books: 0 });
   totals.gpPct = totals.rev > 0 ? +(totals.gp / totals.rev * 100).toFixed(1) : 0;
   const tbRows = (tb.data && tb.data.rows) || [];
   const cash = Math.round(tbRows.filter((r) => /bank|cash/i.test(r.group || '')).reduce((s, r) => s + ((r.closingDebit || 0) - (r.closingCredit || 0)), 0));
   const recv = (ag.data && ag.data.receivables) || { rows: [], totals: {} };
-  const overdue = { amount: Math.round(recv.totals.total || 0), count: (recv.rows || []).length, over90: Math.round(recv.totals.d90 || 0) };
+  const overdue = { amount: Math.round(recv?.totals?.total || 0), count: (recv.rows || []).length, over90: Math.round(recv?.totals?.d90 || 0) };
   const cmap = {}; ((invAll.data && invAll.data.rows) || []).forEach((r) => { cmap[r.party || '—'] = (cmap[r.party || '—'] || 0) + (r.sale || 0); });
   const topCustomers = Object.entries(cmap).map(([name, revenue]) => ({ name, revenue })).sort((a, b) => b.revenue - a.revenue).slice(0, 6);
-  const loading = pq.some((q) => q.isLoading) || tb.isLoading || ag.isLoading;
+  const loading = pq.some((q) => q.isLoading) || iq.some((q) => q.isLoading) || tb.isLoading || ag.isLoading || invAll.isLoading;
   return { rows, totals, cash, overdue, topCustomers, loading };
 }
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
@@ -89,6 +89,8 @@ export function GroupDashboard(){
           {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
         </select>
       </div>
+
+      {loading&&<div style={{margin:"0 0 12px",padding:"9px 14px",borderRadius:9,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:11,color:"#185FA5",fontWeight:600}}>⏳ Loading live group data…</div>}
 
       {/* Group KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10,marginBottom:16}}>
@@ -961,7 +963,7 @@ export function CentralAuditQueue(){
   const pending=AUDIT_QUEUE_DATA.filter(v=>v.status==="Pending Review").length;
   const flagged=AUDIT_QUEUE_DATA.filter(v=>v.status==="Flagged").length;
   const reviewed=AUDIT_QUEUE_DATA.filter(v=>v.status==="Reviewed").length;
-  const completion=Math.round((reviewed/(AUDIT_QUEUE_DATA.length))*100);
+  const completion=AUDIT_QUEUE_DATA.length?Math.round((reviewed/AUDIT_QUEUE_DATA.length)*100):0;
   const statusStyle={"Pending Review":{bg:"#fff3cd",color:"#856404"},"Reviewed":{bg:"#d4edda",color:"#155724"},"Flagged":{bg:"#f8d7da",color:"#721c24"}};
   const riskStyle={Low:{bg:"#d4edda",color:"#155724"},Medium:{bg:"#fff3cd",color:"#856404"},High:{bg:"#f8d7da",color:"#721c24"}};
   return(
@@ -983,9 +985,9 @@ export function CentralAuditQueue(){
           <span style={{fontSize:12,fontWeight:700,color:"#0d1326"}}>{reviewed}/{AUDIT_QUEUE_DATA.length} vouchers reviewed</span>
         </div>
         <div style={{height:14,background:"#f0f2f7",borderRadius:7,overflow:"hidden",display:"flex"}}>
-          <div style={{height:"100%",width:(reviewed/AUDIT_QUEUE_DATA.length*100)+"%",background:"#22c55e"}}/>
-          <div style={{height:"100%",width:(flagged/AUDIT_QUEUE_DATA.length*100)+"%",background:"#A32D2D"}}/>
-          <div style={{height:"100%",width:(pending/AUDIT_QUEUE_DATA.length*100)+"%",background:"#f97316"}}/>
+          <div style={{height:"100%",width:(AUDIT_QUEUE_DATA.length?reviewed/AUDIT_QUEUE_DATA.length*100:0)+"%",background:"#22c55e"}}/>
+          <div style={{height:"100%",width:(AUDIT_QUEUE_DATA.length?flagged/AUDIT_QUEUE_DATA.length*100:0)+"%",background:"#A32D2D"}}/>
+          <div style={{height:"100%",width:(AUDIT_QUEUE_DATA.length?pending/AUDIT_QUEUE_DATA.length*100:0)+"%",background:"#f97316"}}/>
         </div>
         <div style={{display:"flex",gap:14,marginTop:6,fontSize:10.5}}>
           <span><span style={{color:"#22c55e",fontWeight:700}}>■</span> Reviewed ({reviewed})</span>

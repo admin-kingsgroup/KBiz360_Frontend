@@ -6,7 +6,8 @@ export function BankReconStatusPanel({ rows }) {
   return (
     <>
       {rows.map((r) => {
-        const ratio = r.matched / (r.matched + r.unmatched);
+        const total = r.matched + r.unmatched;
+        const ratio = total > 0 ? r.matched / total : 0;
         return (
           <div key={r.bank} style={{ padding: '6px 0', borderBottom: '1px solid #f0f2f7' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>

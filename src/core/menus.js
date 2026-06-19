@@ -268,6 +268,7 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
 export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   {label:"Dashboard Accountant", href:"/accounts/dashboard"},
   {label:"Daily Entry", children:[
+    {label:"SO/PO/GP Voucher",         href:"/bookings/new"},
     {label:"Receipt Voucher",          href:"/receipts"},
     {label:"Payment Voucher",          href:"/payments"},
     {label:"Contra Entry",             href:"/contra"},
@@ -278,8 +279,6 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Reissue (against Sale)",   href:"/finance/reissue"},
     {label:"ADM Voucher",              href:"/finance/adm-voucher"},
     {label:"ACM Voucher",              href:"/finance/acm-voucher"},
-    {divider:true, label:"Booking entry (operations)"},
-    {label:"SO/PO/GP Voucher",         href:"/bookings/new"},
   ]},
   {label:"Approve & Post", href:"/transactions/approvals"},
   {label:"Sales & Purchase", children:[

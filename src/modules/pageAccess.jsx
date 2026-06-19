@@ -40,22 +40,6 @@ function Switch({ on, onChange, disabled }) {
 }
 
 export function PageAccessControl({ currentUser, setRoute }) {
-  /* ── Access gate: only the visibility administrator opens this page. ── */
-  if (!isPageAccessAdmin(currentUser)) {
-    return (
-      <PageLayout title="Page Visibility Control">
-        <PageSection className="mx-auto max-w-xl">
-          <EmptyState
-            icon={Lock}
-            title="Restricted"
-            hint="Only afshin.dhanani@kingsgroupco.com (or a Super Admin) can manage page visibility."
-            action={<Button variant="primary" onClick={() => setRoute && setRoute('/dashboard')}>← Back to Dashboard</Button>}
-          />
-        </PageSection>
-      </PageLayout>
-    );
-  }
-
   const usersLive = useUsersAdmin().data;
   const catalog = useMemo(() => buildPageCatalog(), []);
   const totalPages = useMemo(() => catalog.reduce((n, s) => n + s.items.length, 0), [catalog]);
@@ -140,6 +124,23 @@ export function PageAccessControl({ currentUser, setRoute }) {
       .map((s) => ({ ...s, items: s.items.filter((i) => i.label.toLowerCase().includes(q) || i.key.toLowerCase().includes(q)) }))
       .filter((s) => s.items.length);
   }, [catalog, q]);
+
+  /* ── Access gate: only the visibility administrator opens this page. All hooks
+       above run unconditionally (Rules of Hooks); the gate is checked after. ── */
+  if (!isPageAccessAdmin(currentUser)) {
+    return (
+      <PageLayout title="Page Visibility Control">
+        <PageSection className="mx-auto max-w-xl">
+          <EmptyState
+            icon={Lock}
+            title="Restricted"
+            hint="Only afshin.dhanani@kingsgroupco.com (or a Super Admin) can manage page visibility."
+            action={<Button variant="primary" onClick={() => setRoute && setRoute('/dashboard')}>← Back to Dashboard</Button>}
+          />
+        </PageSection>
+      </PageLayout>
+    );
+  }
 
   const filteredUsers = users.filter((u) => {
     const t = userSearch.trim().toLowerCase();

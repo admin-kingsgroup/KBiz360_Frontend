@@ -1,9 +1,9 @@
 /* ════════════════════════════════════════════════════════════════════
    Masters ▸ Tour Code / Package Master — reusable holiday package templates.
    ════════════════════════════════════════════════════════════════════
-   Migrated out of legacy.jsx. A card grid (not a table): create / archive /
-   use-in-sale logic is unchanged (local TOUR_CODES_DATA + setCodes). Cards →
-   ResponsiveGrid; the create dialog → the shared responsive Modal.
+   A card grid (not a table). Live via /api/tour-codes: the list reads from the
+   master, Create persists through the create mutation and Archive/Restore through
+   the update mutation. Cards → ResponsiveGrid; the create dialog → shared Modal.
    ──────────────────────────────────────────────────────────────────── */
 
 import React, { useState } from 'react';

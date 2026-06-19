@@ -41,7 +41,7 @@ export function TaxGstr1({branch}){
   const PERIODS=MONTH_OPTIONS;
 
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const bills=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period));
+  const bills=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
   const B2B_CLIENTS=[]; // TODO: derive B2B/B2C split from the customer master's GST-registration flag
 
   const b2b=bills.filter(b=>B2B_CLIENTS.includes(b.client));
@@ -131,9 +131,14 @@ export function TaxGstr3b({branch}){
   const PERIODS=MONTH_OPTIONS;
 
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const sales=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period));
-  const purch=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period));
-  const rcm=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&b.supplier.includes("BSP")); // GDS as RCM proxy
+  // NOTE (needs-confirmation): gp-bills returns ONE row per booking file carrying both the
+  // sale side (b.sell) and the supplier/purchase side (b.cost). There is no type/voucher-kind
+  // field to split sale vs purchase rows, so `sales` and `purch` are intentionally the same set;
+  // ITC below correctly draws from b.cost (purchase amount). If a dedicated purchase voucher
+  // source is added later, repoint `purch` to it.
+  const sales=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
+  const purch=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
+  const rcm=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period)&&(b.supplier||'').includes("BSP")); // GDS as RCM proxy
 
   const gstRate=mod=>mod==="Holiday"?5:18;
   const totOutward =sales.reduce((s,b)=>s+b.sell/(1+gstRate(b.mod)/100)*(gstRate(b.mod)/100),0);
@@ -221,12 +226,12 @@ export function TaxRcm({branch}){
   /* Identify RCM entries: overseas DMC purchases + GDS charges */
   const rcmEntries=useMemo(()=>{
     const OVERSEAS_SUPPLIERS=[]; // TODO: flag overseas suppliers in the supplier master
-    return GP.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&
-      OVERSEAS_SUPPLIERS.some(s=>b.supplier.includes(s.split(" ")[0]))).map(b=>{
+    return GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period)&&
+      OVERSEAS_SUPPLIERS.some(s=>(b.supplier||'').includes(s.split(" ")[0]))).map(b=>{
       const igst=Math.round(b.cost/(1+0.18)*0.18);
       return {date:b.date,party:b.supplier,desc:`${b.mod} — ${b.dest}`,taxable:Math.round(b.cost/(1+0.18)),igst,status:"Paid",vno:b.id};
     });
-  },[brCode,period]);
+  },[GP,brCode,period]);
 
   const tot=rcmEntries.reduce((s,r)=>s+r.igst,0);
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
@@ -288,7 +293,7 @@ export function TaxVat({branch}){
   const AFRICA_BRANCHES=[];
 
   const getBranchData=(brCode,rate)=>{
-    const bills=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period));
+    const bills=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
     const sales=bills.reduce((s,b)=>s+b.sell,0);
     const taxable=sales/(1+rate/100);
     const outputVAT=taxable*(rate/100);
@@ -345,6 +350,7 @@ export function TaxVat({branch}){
 }
 
 export function TaxEInvoice(){
+  const EINV_D=[]; // TODO: wire up live e-invoice / IRN rows; empty until the data source exists
   return (
     <TaxShell title="E-Invoice &amp; IRN Log" subtitle="Invoice Reference Numbers · May 2026">
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
@@ -488,7 +494,7 @@ export function GstrRecon({branch}){
 
   /* Simulate GSTR-2B data vs books */
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const bills=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&["BSP India","Emirates GSA","Bali Tours DMC"].includes(b.supplier));
+  const bills=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period)&&["BSP India","Emirates GSA","Bali Tours DMC"].includes(b.supplier));
   const recon=bills.map((b,i)=>{
     const itcBooks=Math.round(b.cost/(1+0.18)*0.18);
     const gstr2bAmt=i%3===1?Math.round(itcBooks*0.85):itcBooks; // simulate 1-in-3 mismatch
@@ -583,7 +589,7 @@ export function TallyExport({branch}){
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
 
   const generateXML=()=>{
-    const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period));
+    const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
     const totRev=bills.reduce((s,b)=>s+b.sell,0);
     const totCost=bills.reduce((s,b)=>s+b.cost,0);
 

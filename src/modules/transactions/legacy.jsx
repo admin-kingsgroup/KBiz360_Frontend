@@ -2118,7 +2118,7 @@ export function PurchaseHotelVoucher({branch,setRoute}){
   const vNo=useVNo(branch,"PHT");
   const [rows,setRows]=useState([{id:1,passenger:"",ci:"",co:"",rtype:"",meal:"CP",basic:0,taxes:0,otherTax:0}]);
   const [svc,setSvc]=useState(0);
-  const [partyGstin,setPartyGstin]=useState("24AABCH7890J1Z5");
+  const [partyGstin,setPartyGstin]=useState("27AABCH7890J1Z5");
   const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
   const add=()=>setRows(rs=>[...rs,{id:Date.now(),passenger:"",ci:"",co:"",rtype:"Deluxe",meal:"EP",basic:0,taxes:0,otherTax:0}]);
@@ -3285,9 +3285,11 @@ export function BspSummary({branch}){
   const commission=Math.round(ticketCost*0.02);
   const bspCharge =Math.round(ticketCost*0.0025);
 
-  // 4) ADM / ACM memos for the period (same store the ADM register uses).
-  const admList=_ADM_LIST.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&(!a.currency||a.currency===cur));
-  const acmList=_ACM_LIST.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&(!a.currency||a.currency===cur));
+  // 4) ADM / ACM memos for the period (same live store the ADM register uses).
+  const admMemos=useAdmMemos("adm",branch).data||[];
+  const acmMemos=useAdmMemos("acm",branch).data||[];
+  const admList=admMemos.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&(!a.currency||a.currency===cur));
+  const acmList=acmMemos.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&(!a.currency||a.currency===cur));
   const admTotal=admList.reduce((s,a)=>s+(Number(a.amount)||0),0);
   const acmTotal=acmList.reduce((s,a)=>s+(Number(a.amount)||0),0);
   const netBsp  =ticketCost-commission-bspCharge-admTotal+acmTotal;

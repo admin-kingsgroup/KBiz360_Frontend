@@ -46,7 +46,15 @@ export function MastersForex(){
   const [form,setForm]=useState({from:"INR",to:"INR",rate:0,source:"Manual"});
   const CURRENCIES=ACTIVE_CURRENCIES;
 
-  const save=()=>{
+  const save=async()=>{
+    if(+form.rate<=0){
+      await confirmDialog({title:"Invalid exchange rate",message:"Exchange rate must be greater than 0.",confirmLabel:"OK",cancelLabel:"Close"});
+      return;
+    }
+    if(form.from===form.to){
+      await confirmDialog({title:"Invalid currency pair",message:"From and To currency must differ (e.g. INR → INR is not a valid rate).",confirmLabel:"OK",cancelLabel:"Close"});
+      return;
+    }
     const rec={...form,date:new Date().toISOString().slice(0,10)};
     create.mutate(rec,{ onSuccess:()=>setModal(false) });
   };
@@ -84,7 +92,7 @@ export function MastersForex(){
               </td>
               <td style={{padding:"9px 14px",textAlign:"right",fontWeight:800,fontSize:15,fontVariantNumeric:"tabular-nums",color:"#0d1326"}}>{r.rate.toFixed(2)}</td>
               <td style={{padding:"9px 14px",fontSize:10.5,color:"#5a6691"}}>{r.source}</td>
-              <td style={{padding:"9px 14px",textAlign:"right",fontSize:10.5,color:"#5a6691",fontVariantNumeric:"tabular-nums"}}>1 {r.to} = {(1/r.rate).toFixed(4)} {r.from}</td>
+              <td style={{padding:"9px 14px",textAlign:"right",fontSize:10.5,color:"#5a6691",fontVariantNumeric:"tabular-nums"}}>1 {r.to} = {r.rate>0?(1/r.rate).toFixed(4):"—"} {r.from}</td>
             </tr>
           ))}</tbody>
         </table>
