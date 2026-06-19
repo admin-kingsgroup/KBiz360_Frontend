@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { FL, inp, btnGh, card } from '../../styles';
 import { VPlaceOfSupply } from '../../../modules/transactions';
@@ -34,7 +34,16 @@ export function DebitNoteFields({ state, setState, ctx }) {
   });
 
   const t = dnTotals(state);
-  const autoGst = () => patch({ gstAmt: r2(t.subtotal * (+state.gstPct || 0) / 100) });
+  // GST auto-calculates from the taxable value × rate so the CGST/SGST or IGST split
+  // appears automatically once GST is applicable — the Place-of-Supply toggle then
+  // shows the correct components per state (intra → CGST+SGST, inter → IGST). The
+  // amount stays editable: typing a custom value (gstManual) stops auto-recompute.
+  useEffect(() => {
+    if (!state.gstApplicable || state.gstManual) return;
+    const want = r2(t.subtotal * (+state.gstPct || 0) / 100);
+    if (r2(+state.gstAmt || 0) !== want) patch({ gstAmt: want });
+  }, [state.gstApplicable, state.gstManual, state.gstPct, t.subtotal]); // eslint-disable-line react-hooks/exhaustive-deps
+  const autoGst = () => patch({ gstAmt: r2(t.subtotal * (+state.gstPct || 0) / 100), gstManual: false });
   const cgst = state.gstMode === 'inter' ? 0 : r2(t.gstAmt / 2);
   const sgst = state.gstMode === 'inter' ? 0 : r2(t.gstAmt - cgst);
   const igst = state.gstMode === 'inter' ? t.gstAmt : 0;
@@ -47,7 +56,7 @@ export function DebitNoteFields({ state, setState, ctx }) {
         {state.gstApplicable ? <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} /> : <div />}
       </div>
 
-      <FL label="Supplier / Vendor (party ledger — Dr, balancing leg)">
+      <FL label="Supplier / Vendor (party ledger — Dr, balancing leg · optional if Dr = Cr)">
         <LedgerPicker branch={branch} value={state.party} onChange={(v) => patch({ party: v })} filter={(l) => l.type === 'Creditor'} placeholder="Sundry Creditors / Supplier..." />
       </FL>
 
@@ -111,8 +120,8 @@ export function DebitNoteFields({ state, setState, ctx }) {
         {state.gstApplicable && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'end' }}>
-              <FL label="GST rate"><select value={state.gstPct} onChange={(e) => patch({ gstPct: +e.target.value })} style={inp}>{GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}</select></FL>
-              <FL label="GST amount"><input type="number" value={state.gstAmt || ''} onChange={(e) => patch({ gstAmt: +e.target.value || 0 })} style={inp} /></FL>
+              <FL label="GST rate"><select value={state.gstPct} onChange={(e) => patch({ gstPct: +e.target.value, gstManual: false })} style={inp}>{GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}</select></FL>
+              <FL label="GST amount"><input type="number" value={state.gstAmt || ''} onChange={(e) => patch({ gstAmt: +e.target.value || 0, gstManual: true })} style={inp} /></FL>
               <button onClick={autoGst} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
             </div>
             {t.gstAmt > 0 && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#185FA5' }}>{state.gstMode === 'inter' ? <>IGST <b>{money2(cur, igst)}</b></> : <>CGST <b>{money2(cur, cgst)}</b> · SGST <b>{money2(cur, sgst)}</b></>} · Debit Note total <b>{money2(cur, t.total)}</b></p>}

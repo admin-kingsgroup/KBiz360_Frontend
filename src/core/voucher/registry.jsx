@@ -442,7 +442,7 @@ export const VOUCHER_REGISTRY = {
 
     initial: () => ({
       date: todayISO(), billNo: '', party: '',
-      gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 0,
+      gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 0, gstManual: false,
       remarks: '', lines: [{ _k: 1, ledger: '', drCr: 'Dr', amt: '', desc: '' }, { _k: 2, ledger: '', drCr: 'Cr', amt: '', desc: '' }],
     }),
 
@@ -450,6 +450,7 @@ export const VOUCHER_REGISTRY = {
       date: v.date || '', billNo: v.billNo || v.againstInvoice || '', party: v.party || '',
       gstApplicable: (+v.taxAmt || 0) > 0 || !!v.gstMode,
       gstMode: v.gstMode || 'intra', gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18, gstAmt: +v.taxAmt || 0,
+      gstManual: true,  // preserve the saved GST amount exactly (no auto-recompute on edit)
       remarks: v.remarks || '',
       lines: (v.lines && v.lines.length ? v.lines : [{ ledger: '', drCr: 'Dr', amt: '', desc: '' }, { ledger: '', drCr: 'Cr', amt: '', desc: '' }])
         .map((l, i) => ({ _k: i + 1, ledger: l.ledger || '', drCr: l.drCr === 'Dr' ? 'Dr' : 'Cr', amt: l.amt ?? '', desc: l.desc || '' })),
@@ -473,11 +474,20 @@ export const VOUCHER_REGISTRY = {
     validate: (s) => {
       const t = dnTotals(s);
       const lines = (s.lines || []).filter((l) => l.ledger && (+l.amt || 0) !== 0);
+      const allLedgered = lines.length > 0 && lines.every((l) => l.ledger);
+      // Full Dr/Cr of the lines + reversed input GST (Cr). With a supplier party the
+      // creditor leg absorbs any imbalance (so the entry always balances); without a
+      // party the Dr/Cr lines must balance on their own — a journal-style entry.
+      const crTotal = r2(t.crSum + t.gstAmt);  // Cr returns + GST reversed
+      const drTotal = r2(t.drSum);             // Dr charges / adjustments
+      const selfBalanced = Math.abs(r2(crTotal - drTotal)) < 0.01;
+      const gross = Math.max(crTotal, drTotal);
       let hint = '';
-      if (!s.party) hint = '(Pick Supplier)';
-      else if (!lines.length) hint = '(Add return lines)';
-      else if (t.total <= 0) hint = '(Enter amount)';
-      return { ok: !!s.party && lines.length > 0 && lines.every((l) => l.ledger) && t.total > 0, hint };
+      if (!lines.length) hint = '(Add lines)';
+      else if (!allLedgered) hint = '(Pick ledger on every line)';
+      else if (gross <= 0) hint = '(Enter amount)';
+      else if (!s.party && !selfBalanced) hint = '(Pick Supplier or balance Dr = Cr)';
+      return { ok: allLedgered && gross > 0 && (!!s.party || selfBalanced), hint };
     },
 
     fields: (props) => <DebitNoteFields {...props} />,

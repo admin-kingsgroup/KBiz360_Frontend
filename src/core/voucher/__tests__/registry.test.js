@@ -104,6 +104,23 @@ describe('debit-note — purchase return registered & gated payload', () => {
     expect(DN.validate({ party: 'Air India', lines: [{ ledger: 'Purchase', amt: 1000 }], gstApplicable: false }).ok).toBe(true);
   });
 
+  test.concurrent('validate: a self-balanced Dr/Cr entry saves with NO party (journal-style)', async () => {
+    const v = DN.validate({
+      party: '', gstApplicable: false,
+      lines: [{ ledger: 'Air India', drCr: 'Dr', amt: 1000 }, { ledger: 'Purchase — Air Ticket', drCr: 'Cr', amt: 1000 }],
+    });
+    expect(v.ok).toBe(true);          // Dr 1000 = Cr 1000, no balancing party needed
+  });
+
+  test.concurrent('validate: a two-line Dr/Cr entry that does NOT balance still needs a party', async () => {
+    const v = DN.validate({
+      party: '', gstApplicable: false,
+      lines: [{ ledger: 'Air India', drCr: 'Dr', amt: 800 }, { ledger: 'Purchase — Air Ticket', drCr: 'Cr', amt: 1000 }],
+    });
+    expect(v.ok).toBe(false);         // out by 200 → must pick a supplier to absorb it
+    expect(v.hint).toMatch(/Supplier|balance/i);
+  });
+
   test.concurrent('toBody: per-line Dr/Cr — Dr line nets against Cr returns; lines carry drCr', async () => {
     const b = DN.toBody({
       date: '2026-06-19', party: 'Air India', gstApplicable: false,
