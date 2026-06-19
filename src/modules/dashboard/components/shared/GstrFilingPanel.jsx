@@ -1,6 +1,9 @@
 import React from 'react';
 
 export function GstrFilingPanel({ rows }) {
+  if (!rows || rows.length === 0) {
+    return <p style={{ margin: 0, padding: '8px 0', fontSize: 10.5, color: '#5a6691' }}>No GST filing data available.</p>;
+  }
   return (
     <>
       {rows.map((g) => (

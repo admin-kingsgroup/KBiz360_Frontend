@@ -21,14 +21,6 @@ export const getActionItems = async () => {
     });
   }
 
-  items.push({
-    type: 'info',
-    icon: '💳',
-    text: 'BSP settlement due Monday — ₹2,14,000',
-    route: '/purchase/bsp-summary',
-    urgent: false,
-  });
-
   const expiringPassports = (_PASSPORTS || []).filter(
     (p) => p.expiry < PASSPORT_EXPIRY_THRESHOLD,
   );
@@ -41,14 +33,6 @@ export const getActionItems = async () => {
       urgent: true,
     });
   }
-
-  items.push({
-    type: 'info',
-    icon: '📋',
-    text: 'GSTR-1 due 11 Jun 2026 — prepare outward supplies',
-    route: '/tax/gstr1',
-    urgent: false,
-  });
 
   return items;
 };

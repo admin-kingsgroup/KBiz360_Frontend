@@ -6,7 +6,10 @@ export function ActionItemsPanel({ items, onItemClick }) {
   return (
     <div style={{ ...card }}>
       <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 700, color: '#0d1326' }}>⚡ Today&apos;s Action Items</p>
-      {items.map((a, i) => (
+      {(!items || items.length === 0) && (
+        <p style={{ margin: 0, padding: '8px 10px', fontSize: 10.5, color: '#5a6691' }}>Nothing needs attention right now.</p>
+      )}
+      {(items || []).map((a, i) => (
         <div
           key={i}
           onClick={() => a.route && onItemClick?.(a.route)}

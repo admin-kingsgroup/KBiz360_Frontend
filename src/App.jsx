@@ -145,8 +145,12 @@ export default function KB360App(){
   const goForward = useCallback(()=>rrNavigate(1), [rrNavigate]);
   const navValue={ route, navigate, goBack, goForward, canBack:histIdx>0, canForward:histIdx<maxIdxRef.current };
 
-  /* Persist the current route so a refresh / re-open returns you here. */
-  useEffect(()=>{ try{ localStorage.setItem("kb360-route", route); }catch{ /* ignore */ } },[route]);
+  /* Persist the current route so a refresh / re-open returns you here.
+     Never persist the bare root "/": it is the live host's entry URL, not a real
+     destination. Persisting it would clobber the saved route BEFORE the restore
+     effect below reads it (this effect runs first on mount), leaving the user
+     stranded on "/" → <Placeholder> on every live load. */
+  useEffect(()=>{ if(route==="/") return; try{ localStorage.setItem("kb360-route", route); }catch{ /* ignore */ } },[route]);
 
   /* Persist the selected branch so a refresh keeps you on it (restored above). */
   useEffect(()=>{ try{ localStorage.setItem("kb360-branch", branch==="ALL"?"ALL":(branch?.code||"")); }catch{ /* ignore */ } },[branch]);

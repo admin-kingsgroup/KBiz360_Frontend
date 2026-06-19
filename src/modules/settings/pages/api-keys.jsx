@@ -12,13 +12,9 @@ import { Button, StatusPill } from '../../../shell/primitives';
 
 const SVC_ICONS = { Amadeus: '✈', WhatsApp: '💬', 'IATA BSP': '📋', Email: '📧', 'GSTN IRP': '🏛', Custom: '⚙' };
 const STATUS_TONE = { Active: 'success', Testing: 'warning', Inactive: 'danger' };
-const SEED = [
-  { id: 1, name: 'Amadeus GDS', service: 'Amadeus', key: 'AMAD-XXXX-XXXX-XXXX', secret: '••••••••', env: 'Production', status: 'Active', lastTest: '2026-05-15 09:00' },
-  { id: 2, name: 'WhatsApp Business API', service: 'WhatsApp', key: 'WABA-XXXX-XXXX-XXXX', secret: '••••••••', env: 'Production', status: 'Active', lastTest: '2026-05-19 08:30' },
-  { id: 3, name: 'BSP Link India', service: 'IATA BSP', key: 'BSP-IN-XXXXXXXXXX', secret: '••••••••', env: 'Production', status: 'Active', lastTest: '2026-05-18 17:00' },
-  { id: 4, name: 'SMTP Email (Travkings)', service: 'Email', key: 'smtp.travkings.com', secret: '••••••••', env: 'Production', status: 'Active', lastTest: '2026-05-19 07:00' },
-  { id: 5, name: 'IRP E-Invoice API', service: 'GSTN IRP', key: 'IRP-XXXX-XXXX-XXXX', secret: '••••••••', env: 'Sandbox', status: 'Testing', lastTest: '2026-05-10' },
-];
+// No backend integration-credential store exists yet, so this starts EMPTY rather than
+// showing fabricated/sample keys. Wire to an /api integrations endpoint when available.
+const SEED = [];
 
 export function ApiKeySettings() {
   const [keys, setKeys] = useState(SEED);
@@ -34,6 +30,11 @@ export function ApiKeySettings() {
       </div>
 
       <div className="flex flex-col gap-2">
+        {keys.length === 0 && (
+          <div className="rounded-brand border border-dashed border-surface-border bg-surface px-4 py-8 text-center text-[11px] text-ink-muted">
+            No integrations configured yet. Use “Add Integration” to connect a GDS, WhatsApp, BSP, GSTN or email service.
+          </div>
+        )}
         {keys.map((k) => (
           <div key={k.id} className="flex flex-wrap items-center gap-3 rounded-brand border border-surface-border bg-surface px-4 py-3 shadow-sm">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-alt text-xl">{SVC_ICONS[k.service] || '🔑'}</div>

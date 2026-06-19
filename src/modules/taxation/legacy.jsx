@@ -1346,11 +1346,11 @@ export function Gstr2aReco({branch,setRoute}){
    ════════════════════════════════════════════════════════════════ */
 
 
-export const GSTR_FILING_STATUS = [
-  {entity:"Travkings — Head Office", gstin:"27AAACT1234A1ZF",gstr1:"Filed",   gstr3b:"Filed",  due:"2026-05-20"},
-  {entity:"Travkings — BOM",        gstin:"27AAACT5678B1ZG",gstr1:"Filed",   gstr3b:"Pending",due:"2026-05-20"},
-  {entity:"Travkings — AMD",        gstin:"24AAACT9012C1ZH",gstr1:"Pending", gstr3b:"Pending",due:"2026-05-20"},
-];
+// GST return-filing status per registered entity. There is no live backend feed for
+// actual GSTR-1/GSTR-3B filing status yet, so this is intentionally EMPTY rather than
+// showing fabricated GSTINs/statuses. Consumers (GstrFilingPanel, sr-fm-dashboard KPI)
+// render an honest empty state until a taxation filing service is wired up.
+export const GSTR_FILING_STATUS = [];
 
 
 export function Form16Generator(){
