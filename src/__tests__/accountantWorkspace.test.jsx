@@ -32,10 +32,17 @@ jest.mock('../core/useAccounting', () => ({
   useSaveConfigValue: () => ({ mutate: jest.fn(), isPending: false }),
   useOutstanding: () => ({ data: { onAccountReceipts: [{ party: 'ACME', onAccount: 300 }] } }),
   useDayBook: () => ({ data: [{ category: 'receipt', totalDebit: 1200 }, { category: 'payment', totalDebit: 400 }] }),
+  useAlerts: () => ({ data: { alerts: [] } }),
+}));
+// The redesigned dashboard also pulls the tax calendar and bank-reco summary.
+jest.mock('../core/useReference', () => ({ useTaxCalendar: () => ({ data: [] }) }));
+jest.mock('../core/useBankReco', () => ({
+  useBankLedgers: () => ({ data: [] }),
+  useBankReconSummary: () => ({ data: null }),
 }));
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ymOf, groupBalance, NetAgeing, CollectionsFollowup, DashboardAccountant, MonthEndChecklist, SuspenseClearing } from '../modules/accountantWorkspace';
 
 describe('accountant workspace — pure helpers', () => {
@@ -70,20 +77,23 @@ describe('accountant workspace — screens render', () => {
     expect(screen.queryByText('Globe')).toBeNull();          // zero — excluded
   });
 
-  test('Dashboard cockpit: cash/bank/GST, ageing buckets, net position, top lists, today, compliance', () => {
+  test('Dashboard cockpit: three workspace tabs (daily money · collections ageing · compliance)', () => {
     render(<DashboardAccountant branch={{ code: 'BOM' }} setRoute={() => {}} />);
-    // money
+    // Tab 1 — Daily Operations (default): money position + worklist
     expect(screen.getByText('₹5,000')).toBeInTheDocument();   // cash
     expect(screen.getByText('₹90,000')).toBeInTheDocument();  // bank (Bank Account only, not Bank Charges)
-    expect(screen.getByText('₹1,200')).toBeInTheDocument();   // collected today (receipt)
-    // ageing buckets + net position (1700 − 800 = 900)
+    expect(screen.getByText('Collected Today')).toBeInTheDocument();
+    expect(screen.getByText('Month-End Progress')).toBeInTheDocument();
+
+    // Tab 2 — Collections & Payables: ageing buckets + net working position (1700 − 800 = 900)
+    fireEvent.click(screen.getByText('2. Collections & Payables'));
     expect(screen.getByText('Debtors (Receivable)')).toBeInTheDocument();
     expect(screen.getByText('Creditors (Payable)')).toBeInTheDocument();
-    expect(screen.getByText('Net Position')).toBeInTheDocument();
+    expect(screen.getByText('Net Working Position')).toBeInTheDocument();
     expect(screen.getByText('₹900')).toBeInTheDocument();
-    // worklist + top lists + compliance + GST
-    expect(screen.getByText('Top overdue debtors — chase')).toBeInTheDocument();
-    expect(screen.getByText('Month-End Progress')).toBeInTheDocument();
+
+    // Tab 3 — Month-End & Compliance: statutory tiles + GST netPayable
+    fireEvent.click(screen.getByText('3. Month-End & Compliance'));
     expect(screen.getByText('TDS Payable')).toBeInTheDocument();
     expect(screen.getByText('₹1,500')).toBeInTheDocument();   // GST netPayable
   });

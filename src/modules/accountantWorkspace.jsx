@@ -10,11 +10,14 @@ import { bc } from '../core/styles';
 import {
   branchCode, useAgeing, useTaxSummary, useTrialBalance, useVoucherApprovals,
   useBookingOrders, useSalesRegister, usePurchaseRegister, useConfigValue, useSaveConfigValue,
-  useOutstanding, useDayBook,
+  useOutstanding, useDayBook, useAlerts,
 } from '../core/useAccounting';
+import { useTaxCalendar } from '../core/useReference';
+import { useBankLedgers, useBankReconSummary } from '../core/useBankReco';
 import {
   Wallet, Landmark, CheckSquare, TrendingUp, TrendingDown, ReceiptText, AlertTriangle,
-  ListChecks, ArrowRight, Plus, RefreshCw,
+  ListChecks, ArrowRight, Plus, RefreshCw, Calendar, History, AlertCircle, CheckCircle2,
+  Scale, Coins, CreditCard,
 } from 'lucide-react';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec', amber: '#854F0B' };
@@ -119,6 +122,27 @@ export function DashboardAccountant({ branch, setRoute }) {
   const out = useOutstanding(branch).data || {};
   const day = useDayBook(branch, { from: today, to: today }).data || [];
   const savedTicks = useConfigValue(`month-end:${branchCode(branch) || 'ALL'}:${ym}`).data || {};
+  
+  // Custom additions for dashboard
+  const { data: alertsRes } = useAlerts(branch);
+  const { data: bankLedgers } = useBankLedgers(branch);
+  const { data: taxEvents } = useTaxCalendar();
+
+  const [activeTab, setActiveTab] = useState('daily');
+  const [selectedBank, setSelectedBank] = useState('');
+
+  // Auto-select first bank ledger once loaded
+  useEffect(() => {
+    if (bankLedgers && bankLedgers.length > 0 && !selectedBank) {
+      setSelectedBank(bankLedgers[0].name);
+    }
+  }, [bankLedgers, selectedBank]);
+
+  const { data: recoSummary } = useBankReconSummary(selectedBank, branch, { from: monthFrom, to: today });
+
+  const savedNotes = useConfigValue(`followup-notes:${branchCode(branch) || 'ALL'}`).data || {};
+  const saveNoteMutation = useSaveConfigValue();
+  const [editingNotes, setEditingNotes] = useState({});
 
   const inMonth = (v) => ymOf(v.date) === ym;
   const sumTot = (arr) => arr.reduce((s, v) => s + (Number(v.total) || 0), 0);
@@ -151,69 +175,343 @@ export function DashboardAccountant({ branch, setRoute }) {
     + ['bankreco', 'debtors', 'cash'].filter((k) => savedTicks[k]).length;
   const qa = (label, route, bg = C.blue) => <button key={route} onClick={() => go(route)} style={aBtn(bg)}><Plus size={13} />{label}</button>;
 
+  // Checklist handler inside compliance tab
+  const period = thisYM();
+  const cfgKey = `month-end:${branchCode(branch) || 'ALL'}:${period}`;
+  const [manualChecklist, setManualChecklist] = useState({});
+  const savedChecklistJson = JSON.stringify(savedTicks || {});
+  useEffect(() => { setManualChecklist(JSON.parse(savedChecklistJson)); }, [savedChecklistJson]);
+
+  const toggleManualCheck = (k) => {
+    const next = { ...manualChecklist, [k]: !manualChecklist[k] };
+    setManualChecklist(next);
+    saveNoteMutation.mutate({ key: cfgKey, value: next, description: `Month-end checklist ${period}` });
+  };
+
+  const checklistItems = [
+    { key: 'post', auto: pendCount === 0, label: 'All vouchers approved & posted', detail: pendCount ? `${pendCount} still pending` : 'nothing pending', route: '/transactions/approvals' },
+    { key: 'suspense', auto: suspense.length === 0, label: 'Suspense cleared', detail: suspense.length ? `${suspense.length} stuck` : 'none', route: '/accounts/suspense' },
+    { key: 'tb', auto: tbBalanced, label: 'Trial Balance balanced (Dr = Cr)', detail: tbBalanced ? 'balanced' : `out by ${money(cur, Math.abs(tbDr - tbCr))}`, route: '/finance/trial-balance' },
+    { key: 'bankreco', manualOnly: true, label: 'Bank reconciliation done', detail: 'tick when reconciled', route: '/bank-reco' },
+    { key: 'debtors', manualOnly: true, label: 'Debtors & creditors reviewed', detail: 'tick when followed up', route: '/accounts/net-ageing' },
+    { key: 'cash', manualOnly: true, label: 'Cash counted vs Cash Book', detail: 'tick at day-close', route: '/finance/cash-book' },
+  ];
+  const checklistDone = checklistItems.filter((it) => it.manualOnly ? manualChecklist[it.key] : it.auto).length;
+
+  const tabStyle = (active) => ({
+    padding: '10px 18px',
+    cursor: 'pointer',
+    fontWeight: '700',
+    fontSize: '12.5px',
+    color: active ? C.gold : C.dim,
+    borderBottom: active ? `3px solid ${C.gold}` : '3px solid transparent',
+    background: active ? '#1a2238' : 'transparent',
+    borderTopLeftRadius: '6px',
+    borderTopRightRadius: '6px',
+    transition: 'all 0.2s ease',
+    marginRight: '6px',
+    border: 'none',
+    outline: 'none',
+  });
+
+  const alerts = alertsRes?.alerts || [];
+
   return (
     <Shell
-      title="Dashboard Accountant"
-      sub={`${brLabel(branch)} · your day at a glance${age.asOf ? ` · as on ${age.asOf}` : ''}`}
+      title="Branch Accountant Portal"
+      sub={`${brLabel(branch)} · workspace and accounts control${age.asOf ? ` · as on ${age.asOf}` : ''}`}
       right={<>{qa('Receipt', '/receipts')}{qa('Payment', '/payments', C.amber)}{qa('Contra', '/contra', '#6b21a8')}{qa('Journal', '/journal', C.dark)}{qa('Purchase Expense', '/purchase-expense', C.amber)}</>}
     >
-      <SecTitle>Money</SecTitle>
-      <Row>
-        <Tile icon={<Wallet size={13} />} label="Cash in Hand" value={money(cur, cash)} sub="Open Cash Book" tone={C.green} onClick={() => go('/finance/cash-book')} />
-        <Tile icon={<Landmark size={13} />} label={`Bank Balance${banks.length > 1 ? ` (${banks.length} a/c)` : ''}`} value={money(cur, bankTotal)} sub="Open bank balances" tone={C.blue} onClick={() => go('/finance/bank-balance')} />
-        <Tile icon={<TrendingUp size={13} />} label="Collected Today" value={money(cur, collectedToday)} sub="Receipts posted today" tone={C.green} onClick={() => go('/finance/receipt-register')} />
-        <Tile icon={<TrendingDown size={13} />} label="Paid Today" value={money(cur, paidToday)} sub="Payments posted today" tone={C.amber} onClick={() => go('/finance/payment-register')} />
-      </Row>
-      {banks.length > 1 && (
-        <div style={{ ...card, padding: '8px 12px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-          {banks.map((b, i) => <span key={i} style={{ fontSize: 11.5, color: C.dim }}>{b.name}: <b style={{ color: b.bal >= 0 ? C.dark : C.red }}>{money(cur, b.bal)}</b></span>)}
-        </div>
+      {/* Workspace Tabs Navigation */}
+      <div style={{ display: 'flex', borderBottom: `2px solid ${C.border}`, marginBottom: 16 }}>
+        <button onClick={() => setActiveTab('daily')} style={tabStyle(activeTab === 'daily')}>1. Daily Operations</button>
+        <button onClick={() => setActiveTab('collections')} style={tabStyle(activeTab === 'collections')}>2. Collections &amp; Payables</button>
+        <button onClick={() => setActiveTab('compliance')} style={tabStyle(activeTab === 'compliance')}>3. Month-End &amp; Compliance</button>
+      </div>
+
+      {/* TAB 1: DAILY OPERATIONS */}
+      {activeTab === 'daily' && (
+        <>
+          <SecTitle>Money Position</SecTitle>
+          <Row>
+            <Tile icon={<Wallet size={13} />} label="Cash in Hand" value={money(cur, cash)} sub="Open Cash Book" tone={C.green} onClick={() => go('/finance/cash-book')} />
+            <Tile icon={<Landmark size={13} />} label={`Bank Balance${banks.length > 1 ? ` (${banks.length} a/c)` : ''}`} value={money(cur, bankTotal)} sub="Open bank balances" tone={C.blue} onClick={() => go('/finance/bank-balance')} />
+            <Tile icon={<TrendingUp size={13} />} label="Collected Today" value={money(cur, collectedToday)} sub="Receipts posted today" tone={C.green} onClick={() => go('/finance/receipt-register')} />
+            <Tile icon={<TrendingDown size={13} />} label="Paid Today" value={money(cur, paidToday)} sub="Payments posted today" tone={C.amber} onClick={() => go('/finance/payment-register')} />
+          </Row>
+          {banks.length > 1 && (
+            <div style={{ ...card, padding: '8px 12px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+              {banks.map((b, i) => <span key={i} style={{ fontSize: 11.5, color: C.dim }}>{b.name}: <b style={{ color: b.bal >= 0 ? C.dark : C.red }}>{money(cur, b.bal)}</b></span>)}
+            </div>
+          )}
+
+          {/* New Bank Reconciliation summary card */}
+          <SecTitle>Bank Reconciliation status</SecTitle>
+          <div style={{ ...card, padding: 14, marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Landmark size={14} style={{ color: C.blue }} />
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: C.dark }}>Select Bank Ledger:</span>
+                {bankLedgers && bankLedgers.length > 0 ? (
+                  <select 
+                    value={selectedBank} 
+                    onChange={(e) => setSelectedBank(e.target.value)} 
+                    style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, outline: 'none', fontWeight: 600 }}
+                  >
+                    {bankLedgers.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
+                  </select>
+                ) : (
+                  <span style={{ fontSize: 11.5, color: C.dim }}>No bank accounts found in trial balance.</span>
+                )}
+              </div>
+              <button onClick={() => go('/bank-reco')} style={aBtn(C.blue)}>Open Bank Reco Matcher <ArrowRight size={12} /></button>
+            </div>
+
+            {recoSummary ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+                <div style={{ padding: '8px 10px', background: '#fafbff', border: `1px solid ${C.border}`, borderRadius: 6 }}>
+                  <div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>ERP Ledger Balance</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: C.dark, marginTop: 4 }}>{money(cur, recoSummary.bookBalance)}</div>
+                </div>
+                <div style={{ padding: '8px 10px', background: '#fafbff', border: `1px solid ${C.border}`, borderRadius: 6 }}>
+                  <div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>Statement Balance {recoSummary.bankBalanceDerived && <span style={{fontSize: 9, color: C.dim}}>(derived)</span>}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: C.dark, marginTop: 4 }}>{money(cur, recoSummary.bankBalance)}</div>
+                </div>
+                <div style={{ padding: '8px 10px', background: '#fafbff', border: `1px solid ${C.border}`, borderRadius: 6 }}>
+                  <div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>Unreconciled Difference</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: recoSummary.differenceAmount === 0 ? C.green : C.red, marginTop: 4 }}>{money(cur, recoSummary.differenceAmount)}</div>
+                </div>
+                <div style={{ padding: '8px 10px', background: '#fafbff', border: `1px solid ${C.border}`, borderRadius: 6 }}>
+                  <div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>Unmatched Lines</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: C.dark, marginTop: 4 }}>
+                    Books: <b style={{ color: recoSummary.counts.bookUnreconciled > 0 ? C.amber : C.green }}>{recoSummary.counts.bookUnreconciled}</b> | Stmt: <b style={{ color: recoSummary.counts.statementUnreconciled > 0 ? C.amber : C.green }}>{recoSummary.counts.statementUnreconciled}</b>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: C.dim, padding: '10px 0' }}>Select a bank account above to query statement reconciliation status.</div>
+            )}
+          </div>
+
+          <SecTitle>Worklist — needs action</SecTitle>
+          <Row>
+            <Tile icon={<CheckSquare size={13} />} label="Pending to Approve & Post" value={pendCount} sub="Open approvals" tone={C.amber} onClick={() => go('/transactions/approvals')} />
+            <Tile icon={<ReceiptText size={13} />} label="Unallocated Receipts" value={money(cur, onAcctSum)} sub={`${onAcct.length} on-account · settle bills`} tone={C.blue} onClick={() => go('/finance/outstanding')} />
+            <Tile icon={<AlertTriangle size={13} />} label="Suspense / To Fix" value={suspense.length} sub="Clear suspense" tone={C.red} onClick={() => go('/accounts/suspense')} />
+            <Tile icon={<ListChecks size={13} />} label="Month-End Progress" value={`${checklistDone}/6`} sub="Open close checklist" tone={checklistDone === 6 ? C.green : C.dark} onClick={() => setActiveTab('compliance')} />
+          </Row>
+
+          {/* Today's posted transactions book feed */}
+          <SecTitle>Posted Today ({day.length})</SecTitle>
+          <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+            {day.length === 0 ? (
+              <div style={{ padding: 18, textAlign: 'center', fontSize: 12.5, color: C.dim }}>No vouchers posted at {brLabel(branch)} today.</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: C.dark, color: C.gold }}>
+                    <th style={{ ...th, background: 'transparent' }}>Voucher No</th>
+                    <th style={{ ...th, background: 'transparent' }}>Type</th>
+                    <th style={{ ...th, background: 'transparent' }}>Party / Account</th>
+                    <th style={{ ...th, background: 'transparent', ...rnum }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {day.map((j, i) => (
+                    <tr key={i} style={{ background: i % 2 ? '#fafbff' : '#fff' }}>
+                      <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700 }}>{j.vno || 'Draft'}</td>
+                      <td style={{ ...td, textTransform: 'capitalize', color: j.category === 'receipt' ? C.green : (j.category === 'payment' ? C.amber : C.dark) }}>{j.category}</td>
+                      <td style={{ ...td }}>{j.party || j.narration || 'General Entry'}</td>
+                      <td style={{ ...td, ...rnum, fontWeight: 700 }}>{money(cur, j.totalDebit || j.totalCredit || j.total || 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
       )}
 
-      <SecTitle>Worklist — needs action</SecTitle>
-      <Row>
-        <Tile icon={<CheckSquare size={13} />} label="Pending to Approve & Post" value={pendCount} sub="Open approvals" tone={C.amber} onClick={() => go('/transactions/approvals')} />
-        <Tile icon={<ReceiptText size={13} />} label="Unallocated Receipts" value={money(cur, onAcctSum)} sub={`${onAcct.length} on-account · settle bills`} tone={C.blue} onClick={() => go('/finance/outstanding')} />
-        <Tile icon={<AlertTriangle size={13} />} label="Suspense / To Fix" value={suspense.length} sub="Clear suspense" tone={C.red} onClick={() => go('/accounts/suspense')} />
-        <Tile icon={<ListChecks size={13} />} label="Month-End Progress" value={`${meDone}/6`} sub="Open close checklist" tone={meDone === 6 ? C.green : C.dark} onClick={() => go('/accounts/month-end')} />
-      </Row>
+      {/* TAB 2: COLLECTIONS & PAYABLES */}
+      {activeTab === 'collections' && (
+        <>
+          <SecTitle>Ageing Position &amp; Net Capital ({age.asOf ? `as on ${age.asOf}` : 'live'})</SecTitle>
+          <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead><tr>
+                <th style={th}>Ageing</th><th style={{ ...th, ...rnum }}>0–30</th><th style={{ ...th, ...rnum }}>31–60</th><th style={{ ...th, ...rnum }}>61–90</th><th style={{ ...th, ...rnum }}>90+</th><th style={{ ...th, ...rnum }}>Total</th>
+              </tr></thead>
+              <tbody>
+                <AgeBucketRow label="Debtors (Receivable)" totals={rec} cur={cur} tone={C.blue} onClick={() => go('/reports/rec')} />
+                <AgeBucketRow label="Creditors (Payable)" totals={pay} cur={cur} tone={C.amber} onClick={() => go('/reports/pay')} />
+                <tr onClick={() => go('/accounts/net-ageing')} style={{ borderTop: `2px solid ${C.border}`, background: '#fafbff', cursor: 'pointer' }}>
+                  <td style={{ padding: '7px 10px', fontWeight: 800, color: C.dark }}>Net Working Position</td>
+                  <td colSpan={4} />
+                  <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: recNet >= 0 ? C.green : C.red, fontVariantNumeric: 'tabular-nums' }}>{money(cur, recNet)} <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-      <SecTitle>Ageing{age.asOf ? ` (as on ${age.asOf})` : ''}</SecTitle>
-      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 12 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-          <thead><tr>
-            <th style={th}>Ageing</th><th style={{ ...th, ...rnum }}>0–30</th><th style={{ ...th, ...rnum }}>31–60</th><th style={{ ...th, ...rnum }}>61–90</th><th style={{ ...th, ...rnum }}>90+</th><th style={{ ...th, ...rnum }}>Total</th>
-          </tr></thead>
-          <tbody>
-            <AgeBucketRow label="Debtors (Receivable)" totals={rec} cur={cur} tone={C.blue} onClick={() => go('/reports/rec')} />
-            <AgeBucketRow label="Creditors (Payable)" totals={pay} cur={cur} tone={C.amber} onClick={() => go('/reports/pay')} />
-            <tr onClick={() => go('/accounts/net-ageing')} style={{ borderTop: `2px solid ${C.border}`, background: '#fafbff', cursor: 'pointer' }}>
-              <td style={{ padding: '7px 10px', fontWeight: 800, color: C.dark }}>Net Position</td>
-              <td colSpan={4} />
-              <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: recNet >= 0 ? C.green : C.red, fontVariantNumeric: 'tabular-nums' }}>{money(cur, recNet)} <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <Row>
-        <MiniList title="Top overdue debtors — chase" rows={top5rec} cur={cur} valueKey="overdue" tone={C.red} actionLabel="Receipt" onAction={() => go('/receipts')} />
-        <MiniList title="Top creditors — to pay" rows={top5pay} cur={cur} valueKey="total" tone={C.amber} actionLabel="Pay" onAction={() => go('/payments')} />
-      </Row>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+            {/* Top overdue debtors collection board with INLINE notes */}
+            <div style={{ ...card, padding: 12, flex: '1 1 400px', minWidth: 320 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Top overdue debtors — collections followup</span>
+                <button onClick={() => go('/accounts/collections')} style={{ ...aBtn(C.blue), padding: '3px 8px', fontSize: 10 }}>View All Tracker</button>
+              </div>
+              {top5rec.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 10 }}>✓ No overdue debtors outstanding.</div>}
+              {top5rec.map((r, i) => (
+                <div key={i} style={{ padding: '8px 0', borderTop: i ? '1px solid #f3f4f8' : 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 12, color: C.dark, fontWeight: 700 }}>{r.party}</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: C.red }}>{money(cur, r.overdue)}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input 
+                      type="text" 
+                      value={editingNotes[r.party] !== undefined ? editingNotes[r.party] : (savedNotes[r.party] || '')}
+                      onChange={(e) => setEditingNotes({ ...editingNotes, [r.party]: e.target.value })}
+                      onBlur={() => {
+                        const val = editingNotes[r.party];
+                        if (val !== undefined && val !== (savedNotes[r.party] || '')) {
+                          const next = { ...savedNotes, [r.party]: val };
+                          saveNoteMutation.mutate({ key: `followup-notes:${branchCode(branch) || 'ALL'}`, value: next, description: `Save note for ${r.party}` });
+                        }
+                      }}
+                      placeholder="Add follow-up notes (auto-saves on focus out)..."
+                      style={{ flex: 1, padding: '4px 8px', fontSize: 11.5, borderRadius: 4, border: `1px solid ${C.border}`, outline: 'none' }}
+                    />
+                    <button onClick={() => go('/receipts')} style={{ ...aBtn(C.green), padding: '3px 8px', fontSize: 10 }}>Receipt</button>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-      <SecTitle>Compliance &amp; Health</SecTitle>
-      <Row>
-        <Tile icon={<ReceiptText size={13} />} label="GST / VAT (this month)" value={netGst == null ? 'View' : money(cur, Math.abs(netGst))} sub={`${netGst == null ? 'open tax summary' : (netGst >= 0 ? 'net payable' : 'refundable')} · due 20th`} tone={netGst != null && netGst > 0 ? C.amber : C.blue} onClick={() => go('/reports/tax-summary')} />
-        <Tile icon={<ReceiptText size={13} />} label="TDS Payable" value={money(cur, tds)} sub="due 7th · TDS calculator" tone={tds > 0 ? C.amber : C.blue} onClick={() => go('/finance/tds-calculator')} />
-        <Tile icon={<ReceiptText size={13} />} label="TCS Payable" value={money(cur, tcs)} sub="statutory dues calendar" tone={tcs > 0 ? C.amber : C.blue} onClick={() => go('/reports/statutory-dues')} />
-        <Tile icon={<CheckSquare size={13} />} label="Trial Balance" value={tbBalanced ? '✓ Balanced' : (tb.length ? '✗ Out' : '—')} sub={tb.length && !tbBalanced ? `out by ${money(cur, Math.abs(tbDr - tbCr))}` : 'open trial balance'} tone={tbBalanced ? C.green : (tb.length ? C.red : C.dim)} onClick={() => go('/finance/trial-balance')} />
-      </Row>
+            {/* Top creditors to reconcile and pay */}
+            <div style={{ ...card, padding: 12, flex: '1 1 350px', minWidth: 300 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Top creditors — reconcile &amp; pay</span>
+                <button onClick={() => go('/accounts/supplier-reco')} style={{ ...aBtn(C.amber), padding: '3px 8px', fontSize: 10 }}>Supplier Reco</button>
+              </div>
+              {top5pay.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 10 }}>✓ No outstanding bills to pay.</div>}
+              {top5pay.map((r, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: i ? '1px solid #f3f4f8' : 'none' }}>
+                  <span style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600 }}>{r.party}</span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{money(cur, r.total)}</span>
+                  <button onClick={() => go('/payments')} style={{ ...aBtn(C.amber), padding: '3px 8px', fontSize: 10 }}>Pay</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
-      <SecTitle>This month</SecTitle>
-      <Row>
-        <Tile icon={<TrendingUp size={13} />} label="Sales (this month)" value={money(cur, sumTot(sales.filter(inMonth)))} sub="Open Sales Register" tone={C.green} onClick={() => go('/reports/sreg')} />
-        <Tile icon={<TrendingDown size={13} />} label="Purchase (this month)" value={money(cur, sumTot(purch.filter(inMonth)))} sub="Open Purchase Register" tone={C.amber} onClick={() => go('/reports/preg')} />
-        <Tile icon={<ReceiptText size={13} />} label="Invoice-wise GP" value="View" sub="Open GP report" tone={C.dark} onClick={() => go('/reports/invoice-gp')} />
-      </Row>
+      {/* TAB 3: MONTH-END & COMPLIANCE */}
+      {activeTab === 'compliance' && (
+        <>
+          {/* New Live Self-Audit Warning Alerts */}
+          <SecTitle>Ledger Health &amp; Audit Integrity Alerts</SecTitle>
+          {alerts && alerts.length === 0 ? (
+            <div style={{ ...card, padding: '12px 14px', background: '#f0fdf4', borderLeft: `4px solid ${C.green}`, color: C.green, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <CheckCircle2 size={16} />
+              <span style={{ fontSize: 12.5, fontWeight: 700 }}>No audit exceptions found. Branch trial balance and ledger parameters are healthy!</span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+              {(alerts || []).slice(0, 5).map((a, i) => {
+                const isError = a.severity === 'error';
+                const isWarn = a.severity === 'warn';
+                const bg = isError ? '#fef2f2' : (isWarn ? '#fffbeb' : '#eff6ff');
+                const border = isError ? C.red : (isWarn ? C.amber : C.blue);
+                return (
+                  <div key={i} style={{ ...card, padding: '10px 12px', background: bg, borderLeft: `4px solid ${border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <AlertCircle size={16} style={{ color: border }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: C.dark }}>{a.title}</div>
+                      <div style={{ fontSize: 11.5, color: C.dim }}>{a.detail}</div>
+                    </div>
+                    {a.link && (
+                      <button onClick={() => go(a.link)} style={{ ...aBtn(border), padding: '4px 8px', fontSize: 10.5 }}>
+                        Fix Exception
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <SecTitle>Statutory compliance &amp; Balances</SecTitle>
+          <Row>
+            <Tile icon={<ReceiptText size={13} />} label="GST / VAT (this month)" value={netGst == null ? 'View' : money(cur, Math.abs(netGst))} sub={`${netGst == null ? 'open tax summary' : (netGst >= 0 ? 'net payable' : 'refundable')} · due 20th`} tone={netGst != null && netGst > 0 ? C.amber : C.blue} onClick={() => go('/reports/tax-summary')} />
+            <Tile icon={<ReceiptText size={13} />} label="TDS Payable" value={money(cur, tds)} sub="due 7th · TDS calculator" tone={tds > 0 ? C.amber : C.blue} onClick={() => go('/finance/tds-calculator')} />
+            <Tile icon={<ReceiptText size={13} />} label="TCS Payable" value={money(cur, tcs)} sub="statutory dues calendar" tone={tcs > 0 ? C.amber : C.blue} onClick={() => go('/reports/statutory-dues')} />
+            <Tile icon={<CheckSquare size={13} />} label="Trial Balance" value={tbBalanced ? '✓ Balanced' : (tb.length ? '✗ Out' : '—')} sub={tb.length && !tbBalanced ? `out by ${money(cur, Math.abs(tbDr - tbCr))}` : 'open trial balance'} tone={tbBalanced ? C.green : (tb.length ? C.red : C.dim)} onClick={() => go('/finance/trial-balance')} />
+          </Row>
+
+          {/* New tax events compliance list */}
+          {taxEvents && taxEvents.length > 0 && (
+            <>
+              <SecTitle>Upcoming Statutory Calendar Deadlines</SecTitle>
+              <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: C.dark, color: C.gold }}>
+                      <th style={{ ...th, background: 'transparent' }}>Due Date</th>
+                      <th style={{ ...th, background: 'transparent' }}>Tax Type</th>
+                      <th style={{ ...th, background: 'transparent' }}>Filing Event Description</th>
+                      <th style={{ ...th, background: 'transparent', ...rnum }}>Est. Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {taxEvents.filter(e => e.active).slice(0, 5).map((e, idx) => (
+                      <tr key={idx} style={{ background: idx % 2 ? '#fafbff' : '#fff' }}>
+                        <td style={{ ...td, fontWeight: 700 }}>{e.date}</td>
+                        <td style={{ ...td }}><span style={{ padding: '2px 6px', borderRadius: 4, background: '#f1f5f9', fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{e.type}</span></td>
+                        <td style={{ ...td }}>{e.title}</td>
+                        <td style={{ ...td, ...rnum, fontWeight: 700 }}>{e.amount ? money(cur, e.amount) : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          <SecTitle>Performance Metrics (This Month)</SecTitle>
+          <Row>
+            <Tile icon={<TrendingUp size={13} />} label="Sales (this month)" value={money(cur, sumTot(sales.filter(inMonth)))} sub="Open Sales Register" tone={C.green} onClick={() => go('/reports/sreg')} />
+            <Tile icon={<TrendingDown size={13} />} label="Purchase (this month)" value={money(cur, sumTot(purch.filter(inMonth)))} sub="Open Purchase Register" tone={C.amber} onClick={() => go('/reports/preg')} />
+            <Tile icon={<ReceiptText size={13} />} label="Invoice-wise GP" value="View" sub="Open GP report" tone={C.dark} onClick={() => go('/reports/invoice-gp')} />
+          </Row>
+
+          {/* Month-End Close progress checklist embedded */}
+          <SecTitle>Month-End Checklist / Close Verification</SecTitle>
+          <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f2f7', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafbff' }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: C.dark }}>Auto and manual checks for month closing ({period})</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: checklistDone === checklistItems.length ? C.green : C.amber }}>{checklistDone}/{checklistItems.length} tasks completed</span>
+            </div>
+            {checklistItems.map((it, i) => {
+              const ok = it.manualOnly ? !!manualChecklist[it.key] : it.auto;
+              return (
+                <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderTop: i ? '1px solid #f0f2f7' : 'none' }}>
+                  <span onClick={() => it.manualOnly && toggleManualCheck(it.key)}
+                    style={{ width: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? 'pointer' : 'default', background: ok ? C.green : (it.manualOnly ? '#c7ccdb' : C.amber), fontSize: 11 }}>
+                    {ok ? '✓' : (it.manualOnly ? '' : '!')}
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: C.dark }}>{it.label} {it.manualOnly && <span style={{ fontSize: 9.5, color: C.dim, fontWeight: 600 }}>(manual)</span>}</div>
+                    <div style={{ fontSize: 11, color: ok ? C.green : C.dim }}>{it.detail}</div>
+                  </div>
+                  <button onClick={() => go(it.route)} style={{ ...aBtn(C.blue), padding: '3px 8px', fontSize: 10 }}>Open Module</button>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </Shell>
   );
 }
