@@ -4,6 +4,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect } from 'react';
+import { todayISO } from '../../core/dates';
 import { confirmDialog } from '../../core/ux/confirm';
 import { AlertTriangle, Check, Download, Pencil, Plus, Save, Search, Settings, Trash2 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -146,7 +147,7 @@ export function VendorTermsMaster({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const [terms,setTerms]=useState([]);   // demo data removed — populate from live vendor terms
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
   const daysLeft=d=>Math.ceil((new Date(d)-new Date(TODAY))/(1000*60*60*24));
   const totDue=terms.filter(t=>daysLeft(t.dueDate)<=7).reduce((s,t)=>s+t.dueAmt,0);
   const totTds=terms.filter(t=>t.tds!=="None").reduce((s,t)=>s+Math.round(t.dueAmt*t.tdsRate/100),0);
@@ -1699,7 +1700,7 @@ export function PassportManager({branch}){
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [form,setForm]=useState({client:"",person:"",passport:"",nationality:"Indian",issued:"",expiry:"",branch:"BOM"});
   const [passports,setPassports]=useState(_PASSPORTS);
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
 
   const filtered=passports.filter(p=>(
     (!brCode||p.branch===brCode)&&

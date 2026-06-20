@@ -1263,7 +1263,8 @@ export function WorkingCapitalDashboard({branch,setRoute}){
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
       <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>💼 Working Capital Dashboard</h2>
-      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Receivables + Inventory − Payables · Cash conversion cycle · 6-month trend</p>
+      <p style={{margin:"4px 0 8px",fontSize:11.5,color:"#5a6691"}}>Receivables + Inventory − Payables · Cash conversion cycle · 6-month trend</p>
+      <div role="note" style={{margin:"0 0 14px",padding:"8px 12px",background:"#FAEEDA",border:"1px solid #f0d28a",borderRadius:8,fontSize:11.5,color:"#854F0B",fontWeight:600}}>⚠ Sample figures — this layout isn’t wired to your live books yet. Do not use for reporting or decisions.</div>
 
       <div style={{display:"grid",gridTemplateColumns:mob?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:14}}>
         <div style={{...card,borderTop:"3px solid #27500A"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Trade Receivables</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#27500A"}}>{cur+fmt(curr.ar)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>DSO {curr.dso} days</p></div>
@@ -1393,7 +1394,8 @@ export function CashFlowDirect({branch,setRoute}){
   return(
     <div style={{padding:"12px 10px",maxWidth:900,margin:"0 auto"}}>
       <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>💧 Cash Flow Statement — Direct Method</h2>
-      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>For the year ended 31 March 2026 · AS 3 / Ind AS 7 · RBI-preferred format</p>
+      <p style={{margin:"4px 0 8px",fontSize:11.5,color:"#5a6691"}}>AS 3 / Ind AS 7 · RBI-preferred format</p>
+      <div role="note" style={{margin:"0 0 14px",padding:"8px 12px",background:"#FAEEDA",border:"1px solid #f0d28a",borderRadius:8,fontSize:11.5,color:"#854F0B",fontWeight:600}}>⚠ Sample figures — this statement isn’t wired to your live books yet. Do not use for filing or decisions.</div>
 
       <Section title="A. Cash Flows from Operating Activities" rows={OPERATING} color="#185FA5"/>
       <Section title="B. Cash Flows from Investing Activities" rows={INVESTING} color="#854F0B"/>

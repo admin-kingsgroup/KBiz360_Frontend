@@ -1035,7 +1035,7 @@ export function BudgetPlanning({branch}){
 export function SeatInventory({branch}){
   const mob=useMobile();
   const [search,setSearch]=useState("");
-  const [date,setDate]=useState("2026-06-15");
+  const [date,setDate]=useState(todayISO());
   const SEATS=[
     {id:"SI001",flight:"AI-144",route:"BOM-DXB",date:"2026-06-15",aircraft:"B787",classConfig:[{cls:"Economy",total:250,held:18,sold:196,avail:36},{cls:"Business",total:30,held:2,sold:21,avail:7}],status:"Open",dep:"14:20"},
     {id:"SI002",flight:"EK-506",route:"BOM-DXB",date:"2026-06-15",aircraft:"A380",classConfig:[{cls:"Economy",total:420,held:22,sold:398,avail:0},{cls:"Business",total:58,held:3,sold:45,avail:10},{cls:"First",total:14,held:0,sold:12,avail:2}],status:"Near Full",dep:"03:30"},
@@ -1049,6 +1049,7 @@ export function SeatInventory({branch}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+      <div role="note" style={{margin:"0 0 12px",padding:"8px 12px",background:"#FAEEDA",border:"1px solid #f0d28a",borderRadius:8,fontSize:11.5,color:"#854F0B",fontWeight:600}}>⚠ Sample data — seat inventory isn’t wired to a live source yet.</div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>💺</div>

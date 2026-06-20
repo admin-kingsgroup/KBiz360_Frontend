@@ -4,6 +4,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect } from 'react';
+import { todayISO } from '../../core/dates';
 import { AlertTriangle, Download, Lock, Plus, Save, Search, Settings, User, Users } from 'lucide-react';
 import { Line } from 'recharts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -34,7 +35,7 @@ export function SettingsBranches(){
   const profilesLive=useCompanyProfiles().data;                 // DB-backed (/api/company-profile)
   const [branches,setBranches]=useState([]);
   useEffect(()=>{ if(profilesLive) setBranches(profilesLive); },[profilesLive]);
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
   const daysLeft=d=>d?Math.ceil((new Date(d)-new Date(TODAY))/(1000*60*60*24)):null;
 
   const TAX_CLR={GST:"#185FA5",VAT:"#27500A"};

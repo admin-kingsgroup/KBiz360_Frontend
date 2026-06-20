@@ -352,7 +352,19 @@ export const SuppliersMaster = () => (
 );
 
 /* ── Chart of Accounts: Groups & Ledgers (live, backend-connected) ───────── */
-// The 28 seeded Tally groups (parent options for custom groups/sub-groups).
+// The 28 fixed backbone groups are LOCKED & non-editable (system:true → the
+// backend rejects any edit/delete with 423, and /api/groups is read-only). They
+// are presented in two tiers:
+//   • Primary Group     — a system group with no parent          (16)
+//   • Primary Sub Group — a system group nested under a primary   (12)
+// Everything below (ERP Group / ERP Sub Group / Ledger) is the user's editable
+// custom chart. These helpers are the single source of truth for tier + lock.
+export const isPrimaryLocked = (g) => !!(g && g.system);
+export const primaryTier = (g) =>
+  isPrimaryLocked(g) ? (g.parent ? 'Primary Sub Group' : 'Primary Group') : '';
+
+// The 28 fixed Primary Groups + Primary Sub Groups (parent options for custom
+// groups/sub-groups; fallback list until /api/groups loads).
 const TALLY_GROUP_NAMES = [
   'Capital Account', 'Loans (Liability)', 'Bank OD Accounts', 'Secured Loans', 'Unsecured Loans',
   'Current Liabilities', 'Duties & Taxes', 'Provisions', 'Sundry Creditors',
@@ -460,7 +472,7 @@ export const GroupsMaster = ({ branch }) => {
   // ERP Sub Group nests under an existing custom sub-group. Both are subgroups.
   const GROUP_NEW_FIELDS = [
     { key: 'name', label: 'ERP Group Name', type: 'text', required: true },
-    { key: 'parent', label: 'Under (Tally group)', type: 'select', options: groups.filter((g) => g.system).map((g) => g.name), required: true },
+    { key: 'parent', label: 'Under (Primary Group / Primary Sub Group)', type: 'select', options: groups.filter((g) => g.system).map((g) => g.name), required: true },
     { key: 'active', label: 'Active', type: 'bool', default: true },
   ];
   const SUBGROUP_NEW_FIELDS = [
@@ -469,7 +481,9 @@ export const GroupsMaster = ({ branch }) => {
     { key: 'active', label: 'Active', type: 'bool', default: true },
   ];
 
-  const openEdit = (kind, node) => { if (!node) return; setErr(''); setEditing({ kind, fields: kind === 'ledger' ? LED_FIELDS : SUB_FIELDS, record: { ...node }, label: kind === 'ledger' ? 'Ledger' : 'Sub-Group' }); };
+  // Never open a locked Primary Group / Primary Sub Group for edit (defence in
+  // depth — the locked columns render no pencil, and the backend rejects with 423).
+  const openEdit = (kind, node) => { if (!node || isPrimaryLocked(node)) return; setErr(''); setEditing({ kind, fields: kind === 'ledger' ? LED_FIELDS : SUB_FIELDS, record: { ...node }, label: kind === 'ledger' ? 'Ledger' : 'Sub-Group' }); };
   const openNew = (what) => {
     setErr('');
     const fields = what === 'ledger' ? LED_FIELDS : what === 'group' ? GROUP_NEW_FIELDS : SUBGROUP_NEW_FIELDS;
@@ -493,8 +507,8 @@ export const GroupsMaster = ({ branch }) => {
 
   // ── Render — columns: 2 locked Tally + 3 editable ERP ──
   const COLS = [
-    { key: 'tallyParent', label: 'Tally Parent Group', lock: true },
-    { key: 'tallySub', label: 'Tally Sub Parent Group', lock: true },
+    { key: 'tallyParent', label: 'Primary Group', lock: true },
+    { key: 'tallySub', label: 'Primary Sub Group', lock: true },
     { key: 'erpGroup', label: 'ERP Group', kind: 'subgroup', node: 'groupNode' },
     { key: 'erpSub', label: 'ERP Sub Group', kind: 'subgroup', node: 'subGroupNode' },
     { key: 'ledgerName', label: 'ERP Ledger', kind: 'ledger', node: 'ledgerNode' },
@@ -511,7 +525,7 @@ export const GroupsMaster = ({ branch }) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>Chart of Accounts</h2>
-          <p style={{ margin: '2px 0 0', fontSize: 10.5, color: DIM }}>Tally Parent ▸ Tally Sub ▸ ERP Group ▸ ERP Sub Group ▸ ERP Ledger · {rows.length} rows · {subGroupCount} sub-groups · {ledgers.length} ledgers{branchView !== 'ALL' ? ` (${branchView} + Common)` : ''}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 10.5, color: DIM }}>Primary Group ▸ Primary Sub Group ▸ ERP Group ▸ ERP Sub Group ▸ ERP Ledger · {rows.length} rows · {subGroupCount} sub-groups · {ledgers.length} ledgers{branchView !== 'ALL' ? ` (${branchView} + Common)` : ''}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
@@ -535,7 +549,7 @@ export const GroupsMaster = ({ branch }) => {
         <button onClick={() => openNew('ledger')} style={btn(GREEN, '#fff')}><Plus size={14} /> ERP Ledger</button>
       </div>
       <div style={{ ...card, padding: '9px 13px', marginBottom: 12, fontSize: 11, color: DIM }}>
-        🔒 <b>Tally Parent / Sub Parent Group</b> are the fixed 28-group skeleton (read-only). The <b>ERP Group / Sub Group / Ledger</b> columns are your custom chart — click the <Pencil size={11} style={{ verticalAlign: 'middle', color: BLUE }} /> in a cell to edit that node. To add new ones, use Masters → Sub-Groups / Ledgers.
+        🔒 <b>Primary Group</b> (16) &amp; <b>Primary Sub Group</b> (12) are the fixed 28-group backbone — <b>locked &amp; non-editable</b>. The <b>ERP Group / Sub Group / Ledger</b> columns are your custom chart — click the <Pencil size={11} style={{ verticalAlign: 'middle', color: BLUE }} /> in a cell to edit that node. To add new ones, use Masters → Sub-Groups / Ledgers.
       </div>
 
       {loading && <div style={{ ...card, padding: 28, textAlign: 'center', color: DIM, fontSize: 12 }}>Loading chart…</div>}
@@ -593,12 +607,12 @@ export const SubGroupsMaster = () => {
   return (
     <MasterCrud title="Sub-Groups" subtitle="Custom Chart-of-Accounts sub-groups — nest under any group, to any depth"
       resource="subgroups"
-      note="Sub-groups are SHARED across all branches (they are not branch-scoped), so you create them once and every branch's chart uses them. Create a sub-group under one of the 28 fixed groups (or under another sub-group, to any depth). Nature & Statement (BS/PL) are inherited from the parent automatically. For the P&L Fixed/Variable split, just create real 'Fixed Expenses' and 'Variable Expenses' sub-groups under Indirect Expenses and nest your expense sub-groups under them — the P&L rolls up automatically from the hierarchy."
+      note="Sub-groups are SHARED across all branches (they are not branch-scoped), so you create them once and every branch's chart uses them. Create a sub-group under one of the 28 fixed Primary Groups / Primary Sub Groups (or under another sub-group, to any depth). Nature & Statement (BS/PL) are inherited from the parent automatically. For the P&L Fixed/Variable split, just create real 'Fixed Expenses' and 'Variable Expenses' sub-groups under Indirect Expenses and nest your expense sub-groups under them — the P&L rolls up automatically from the hierarchy."
       fields={[
         { key: 'name', label: 'Sub-Group Name', type: 'text', required: true },
-        // "Parent Group" always shows the 28-Tally root group. The editable "Nest
-        // under" select is the immediate parent (a 28 group OR another sub-group).
-        { key: 'rootGroup', label: 'Parent Group (Tally)', type: 'text', input: false },
+        // "Primary Group" always shows the fixed top-level root group. The editable
+        // "Nest under" select is the immediate parent (a fixed group OR another sub-group).
+        { key: 'rootGroup', label: 'Primary Group', type: 'text', input: false },
         { key: 'nestedUnder', label: 'Sub-group of', type: 'text', input: false },
         { key: 'parent', label: 'Nest under (parent group / sub-group)', type: 'select', options: parentOptions.length ? parentOptions : TALLY_GROUP_NAMES, required: true, table: false },
         { key: 'nature', label: 'Nature', type: 'text', input: false },
@@ -689,7 +703,7 @@ export const LedgersMaster = ({ branch }) => {
         params={branchView !== 'ALL' ? { branch: branchView, includeInactive: 'true' } : { includeInactive: 'true' }}
         toolbar={toolbar}
         rowFilter={ledgerRowFilter}
-        note="Set Group to the parent Tally group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. All ledgers are owned by the BOM branch."
+        note="Set Group to the Primary Group / Primary Sub Group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. All ledgers are owned by the BOM branch."
         fields={[
           { key: 'code', label: 'Code', type: 'text', required: true },
           { key: 'name', label: 'Ledger Name', type: 'text', required: true },

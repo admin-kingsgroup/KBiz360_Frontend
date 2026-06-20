@@ -12,6 +12,7 @@ import { useMobile, useNotifRefresh } from '../core/hooks';
 import { btnG, btnGh, card } from '../core/styleTokens';
 import { useFocusTrap } from '../core/ux/focus';
 import { pushModal } from '../core/ux/modalStore';
+import { todayISO } from '../core/dates';
 
 export function NotifPanel({onClose,setRoute}){
   useNotifRefresh();
@@ -75,7 +76,7 @@ export function NotifPanel({onClose,setRoute}){
 export function NotificationCentre({branch,setRoute}){
   const mob=useMobile();
   const brCode=branch==="ALL"?null:branch?.code;
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
   const [filter,setFilter]=useState("All");
   const [readIds,setReadIds]=useState(new Set());
   const go=r=>setRoute(r);
