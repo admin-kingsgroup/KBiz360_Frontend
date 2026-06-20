@@ -8,12 +8,12 @@ import { confirmDialog } from '../../core/ux/confirm';
 import { AlertTriangle, Check, Download, Pencil, Plus, Save, Search, Settings, Trash2 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ACTIVE_CURRENCIES, ADM_DATA, BRANCH_CODES, CASH, CUSTOMERS, FOREX_RATES_DATA, GP_BILLS, SUBAGENTS } from '../../core/data';
-import { useNumberingSeries } from '../../core/useReference';
+import { useNumberingSeries, useApprovalLimits } from '../../core/useReference';
 import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { apiPost, apiPut } from '../../core/api';
 import { fmt, fmtINR } from '../../core/format';
 import { exportToExcel } from '../../core/exportExcel';
-import { ACM_DATA, APPROVAL_LIMITS_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, _PASSPORTS, cardStyle, tabPanel } from '../../core/helpers';
+import { ACM_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, _PASSPORTS, cardStyle, tabPanel } from '../../core/helpers';
 // MstrShell / MstrModal modernized (responsive header + shared Modal) — same props.
 import { MstrShell, MstrModal } from './components/mstr';
 import { useMobile } from '../../core/hooks';
@@ -1178,8 +1178,10 @@ export function CostCenterMaster(){
 
 
 export function ApprovalLimitsMaster(){
+  // Live approval thresholds (GET /api/approval-limits). Was hardcoded APPROVAL_LIMITS_DATA.
+  const rows=useApprovalLimits().data||[];
   const groupByType={};
-  APPROVAL_LIMITS_DATA.forEach(a=>{
+  rows.forEach(a=>{
     if(!groupByType[a.voucherType])groupByType[a.voucherType]=[];
     groupByType[a.voucherType].push(a);
   });
@@ -1187,9 +1189,9 @@ export function ApprovalLimitsMaster(){
   return MASTER_PAGE("Approval Limits Master","Per-role × per-voucher-type thresholds. Defines automatic escalation in voucher workflow",
     <>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
-        <p style={{margin:0,fontSize:12,color:"#5a6691"}}>{APPROVAL_LIMITS_DATA.length} rules configured across {Object.keys(groupByType).length} voucher types</p>
+        <p style={{margin:0,fontSize:12,color:"#5a6691"}}>{rows.length} rules configured across {Object.keys(groupByType).length} voucher types</p>
         <div style={{flex:1}}/>
-        <ExportBtn name="approval-limits" label="📤 Export Matrix" rows={APPROVAL_LIMITS_DATA} columns={[{key:"voucherType",label:"Voucher Type"},{key:"role",label:"Approver Role"},{key:"minAmount",label:"From (>=)"},{key:"maxAmount",label:"To (<=)"},{key:"backup",label:"Backup Approver"}]}/>
+        <ExportBtn name="approval-limits" label="📤 Export Matrix" rows={rows} columns={[{key:"voucherType",label:"Voucher Type"},{key:"role",label:"Approver Role"},{key:"minAmount",label:"From (>=)"},{key:"maxAmount",label:"To (<=)"},{key:"backup",label:"Backup Approver"}]}/>
         <button style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Limit Rule</button>
       </div>
       {Object.entries(groupByType).map(([type,rules])=>(

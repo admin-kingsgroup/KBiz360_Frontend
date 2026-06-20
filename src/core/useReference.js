@@ -27,6 +27,11 @@ export const useExpenseBudgets  = (params = {}) => refQuery('expense-budgets', '
 export const useTaxCalendar     = () => refQuery('tax-calendar', '/api/tax-calendar', REF);
 export const useAssetCategories = () => refQuery('asset-categories', '/api/asset-categories', REF);
 export const useApprovalRules   = () => refQuery('approval-rules', '/api/approval-rules', REF, { select: (rows) => (rows || []).map((r) => ({ ...r, id: r.ruleId })) });
+export const useApprovalLimits  = () => refQuery('approval-limits', '/api/approval-limits', REF, { select: (rows) => (rows || []).map((r) => ({ ...r, id: r.alId })) });
+export const useDocumentTypes   = () => refQuery('document-types', '/api/document-types', REF, { select: (rows) => (rows || []).map((r) => ({ ...r, id: r.dtId })) });
+export const useEmailTemplates  = () => refQuery('email-templates', '/api/email-templates', REF, { select: (rows) => (rows || []).map((r) => ({ ...r, id: r.etId })) });
+export const useCustomFields    = () => refQuery('custom-fields', '/api/custom-fields', REF, { select: (rows) => (rows || []).map((r) => ({ ...r, id: r.cfId })) });
+export const useFieldAccess     = () => refQuery('field-access', '/api/field-access', REF);
 export const useAdmReasonCodes  = () => refQuery('adm-reason-codes', '/api/adm-reason-codes', REF, { select: (rows) => Object.fromEntries((rows || []).map((r) => [r.code, r])) });
 export const useNumberingSeries = () => refQuery('numbering-series', '/api/numbering-series', REF);
 export const useSalespeople     = () => refQuery('salespeople', '/api/salespeople', REF, { select: (rows) => (rows || []).map((s) => ({ ...s, id: s.spId })) });

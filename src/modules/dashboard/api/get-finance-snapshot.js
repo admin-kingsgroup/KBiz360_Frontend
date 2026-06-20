@@ -1,5 +1,4 @@
 import {
-  BANK_ACCOUNTS_DATA,
   BRANCH_PL_HEATMAP,
   PERIOD_CLOSE_DATA,
 } from '../../../core/helpers';
@@ -135,14 +134,36 @@ export const getReconStatus = async (branchCode) => {
   } catch { return []; }
 };
 
+// Bank balances — live: each Bank-group ledger's closing balance from the Trial
+// Balance (branch-scoped). Mapped to the BankBalancesPanel shape
+// { id, bank, branch, accountNo, currency, openingBal, limit }; openingBal carries
+// the live closing balance (Dr − Cr) so the "Banks Balance Total" KPI is real.
+export const getBankAccounts = async (branchCode) => {
+  try {
+    const d = await apiGet('/api/accounting/trial-balance', { branch: branchCode });
+    return (d?.rows || [])
+      .filter((r) => /bank|overdraft/i.test(r.group || ''))
+      .map((r) => ({
+        id: r.ledger,
+        bank: r.ledger,
+        branch: branchCode || 'All',
+        accountNo: '',
+        currency: '₹',
+        openingBal: Math.round((r.closingDebit || 0) - (r.closingCredit || 0)),
+        limit: 0,
+      }))
+      .sort((a, b) => b.openingBal - a.openingBal);
+  } catch { return []; }
+};
+
 // ── Still seed — genuinely need new/derivation backends (not yet wired) ──────
 // getCashForecast: the cashflow-forecast endpoint is a STORED-scenario CRUD, not a
 //   13-week derivation — needs a derive endpoint before it can go live here.
-// getBankAccounts/getBranchHeatmap/getPeriodClose: derive from Trial Balance /
-//   module-PL / period-lock respectively (P2.2/P2.3).
+// getBranchHeatmap: needs a branch × month P&L matrix endpoint (≈ branches×12
+//   module-PL calls is too heavy to derive client-side).
+// getPeriodClose: needs a period-lock / month-end status endpoint.
 // getFyTargets: superseded — the Director dashboard already renders live targets via
 //   useTargetsVsActual; this accessor is only a fallback and stays empty.
-export const getBankAccounts = async () => BANK_ACCOUNTS_DATA;
 export const getFyTargets = async () => FY_TARGETS_DATA;
 export const getBranchHeatmap = async () => BRANCH_PL_HEATMAP;
 export const getCashForecast = async () => CASH_FORECAST_13W;

@@ -5,7 +5,7 @@
 jest.mock('../../../core/api', () => ({ apiGet: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 
 import { apiGet } from '../../../core/api';
-import { getVarianceFlags, getReconStatus } from '../api/get-finance-snapshot';
+import { getVarianceFlags, getReconStatus, getBankAccounts } from '../api/get-finance-snapshot';
 
 afterEach(() => jest.clearAllMocks());
 
@@ -28,6 +28,25 @@ describe('getVarianceFlags — live budget-vs-actual', () => {
   test('returns [] on error (never blanks the dashboard)', async () => {
     apiGet.mockRejectedValueOnce(new Error('boom'));
     expect(await getVarianceFlags()).toEqual([]);
+  });
+});
+
+describe('getBankAccounts — live Trial Balance', () => {
+  test('keeps only bank/OD ledgers and maps closing balance to openingBal', async () => {
+    apiGet.mockResolvedValueOnce({ rows: [
+      { ledger: 'HDFC Bank', group: 'Bank Account', closingDebit: 900000, closingCredit: 0 },
+      { ledger: 'Cash', group: 'Cash-in-Hand', closingDebit: 50000, closingCredit: 0 }, // not a bank → dropped
+      { ledger: 'ICICI OD', group: 'Bank OD / Overdraft', closingDebit: 0, closingCredit: 200000 },
+    ] });
+    const out = await getBankAccounts('BOM');
+    expect(out).toHaveLength(2);
+    expect(out[0]).toMatchObject({ bank: 'HDFC Bank', openingBal: 900000, branch: 'BOM' });
+    expect(out[1]).toMatchObject({ bank: 'ICICI OD', openingBal: -200000 });
+  });
+
+  test('returns [] on error', async () => {
+    apiGet.mockRejectedValueOnce(new Error('boom'));
+    expect(await getBankAccounts()).toEqual([]);
   });
 });
 

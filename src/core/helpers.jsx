@@ -12,7 +12,7 @@ import { Cell } from 'recharts';
 import { exportToCSV } from './business-logic';
 import { exportToExcel } from './exportExcel';
 import { ADM_DATA, CASH, CONSOLIDATED_LABEL, FY_TARGETS_DATA, GP_BILLS, HR_EMPLOYEES_DATA, NOTIFICATIONS_DATA, SUBAGENTS, _EXP_BGT_LISTENERS, _EXP_BUDGETS } from './data';
-import { useLedgerRegistry } from './useReference';
+import { useLedgerRegistry, useDocumentTypes } from './useReference';
 import { pickLedgers } from './ledgerPick';
 import { useGpBills } from './useAccounting';
 import { fmt, fmtINR } from './format';
@@ -1462,42 +1462,10 @@ export const COST_CENTERS_DATA = [];
 export const PROJECTS_DATA = [];
 
 
-export const DOCUMENT_TYPES_DATA = [
-  {id:"DT-001",type:"Tax Invoice",                layout:"GST Standard",     header:"Travkings Tax Invoice",      footer:"Subject to Mumbai Jurisdiction", logo:"travkings-logo.png",numberingSeries:"TKHO/INV/{YY}/{####}",active:true},
-  {id:"DT-002",type:"Bill of Supply",             layout:"Non-GST Standard", header:"Travkings Bill of Supply",   footer:"Subject to Mumbai Jurisdiction", logo:"travkings-logo.png",numberingSeries:"TKHO/BOS/{YY}/{####}",active:true},
-  {id:"DT-003",type:"Receipt Voucher",            layout:"Voucher Standard", header:"Travkings Receipt Voucher",  footer:"Computer generated",             logo:"travkings-logo.png",numberingSeries:"{BR}/RV/{YY}/{####}",active:true},
-  {id:"DT-004",type:"Payment Voucher",            layout:"Voucher Standard", header:"Travkings Payment Voucher",  footer:"Computer generated",             logo:"travkings-logo.png",numberingSeries:"{BR}/PV/{YY}/{####}",active:true},
-  {id:"DT-005",type:"Credit Note",                layout:"Note Standard",    header:"Travkings Credit Note",      footer:"Subject to Mumbai Jurisdiction", logo:"travkings-logo.png",numberingSeries:"{BR}/CN/{YY}/{####}",active:true},
-  {id:"DT-006",type:"Debit Note",                 layout:"Note Standard",    header:"Travkings Debit Note",       footer:"Subject to Mumbai Jurisdiction", logo:"travkings-logo.png",numberingSeries:"{BR}/DN/{YY}/{####}",active:true},
-  {id:"DT-007",type:"Quotation / Estimate",       layout:"Quotation Standard",header:"Travkings Quotation",        footer:"Valid for 15 days",             logo:"travkings-logo.png",numberingSeries:"{BR}/QT/{YY}/{####}",active:true},
-  {id:"DT-008",type:"Visa Application Cover",     layout:"Letter Standard",  header:"Travkings — Authorised Travel Agent",footer:"For visa office use",      logo:"travkings-logo.png",numberingSeries:"{BR}/VA/{YY}/{####}",active:true},
-  {id:"DT-009",type:"Hotel Voucher",              layout:"Voucher Standard", header:"Travkings Hotel Voucher",    footer:"Show at check-in",               logo:"travkings-logo.png",numberingSeries:"{BR}/HV/{YY}/{####}",active:true},
-  {id:"DT-010",type:"Vehicle / Transfer Voucher", layout:"Voucher Standard", header:"Travkings Transfer Voucher", footer:"Show to driver at pickup",       logo:"travkings-logo.png",numberingSeries:"{BR}/TV/{YY}/{####}",active:true},
-];
+// DOCUMENT_TYPES_DATA moved to DB — fetch via useDocumentTypes() (/api/document-types).
 
 
-export const APPROVAL_LIMITS_DATA = [
-  /* Payment Voucher */
-  {id:"AL-001",role:"Accounts Executive",    voucherType:"Payment Voucher", minAmount:0,       maxAmount:50000,    backup:"Sr. Accounts Executive"},
-  {id:"AL-002",role:"Sr. Accounts Executive",voucherType:"Payment Voucher", minAmount:50001,   maxAmount:200000,   backup:"Senior Finance Manager"},
-  {id:"AL-003",role:"Senior Finance Manager",voucherType:"Payment Voucher", minAmount:200001,  maxAmount:2500000,  backup:"Director"},
-  {id:"AL-004",role:"Director",              voucherType:"Payment Voucher", minAmount:2500001, maxAmount:999999999,backup:"—"},
-  /* Journal Voucher */
-  {id:"AL-005",role:"Accounts Executive",    voucherType:"Journal Voucher", minAmount:0,       maxAmount:0,        backup:"Sr. Accounts Executive"},
-  {id:"AL-006",role:"Sr. Accounts Executive",voucherType:"Journal Voucher", minAmount:0,       maxAmount:100000,   backup:"Senior Finance Manager"},
-  {id:"AL-007",role:"Senior Finance Manager",voucherType:"Journal Voucher", minAmount:100001,  maxAmount:999999999,backup:"Director"},
-  /* Credit Note */
-  {id:"AL-008",role:"Sr. Accounts Executive",voucherType:"Credit Note",     minAmount:0,       maxAmount:25000,    backup:"Senior Finance Manager"},
-  {id:"AL-009",role:"Senior Finance Manager",voucherType:"Credit Note",     minAmount:25001,   maxAmount:500000,   backup:"Director"},
-  {id:"AL-010",role:"Director",              voucherType:"Credit Note",     minAmount:500001,  maxAmount:999999999,backup:"—"},
-  /* Cash Refund */
-  {id:"AL-011",role:"Sr. Accounts Executive",voucherType:"Cash Refund",     minAmount:0,       maxAmount:10000,    backup:"Senior Finance Manager"},
-  {id:"AL-012",role:"Senior Finance Manager",voucherType:"Cash Refund",     minAmount:10001,   maxAmount:200000,   backup:"Director"},
-  /* Forex Trade */
-  {id:"AL-013",role:"Senior Finance Manager",voucherType:"Forex Trade",     minAmount:0,       maxAmount:5000000,  backup:"Director"},
-  /* Period Lock */
-  {id:"AL-014",role:"Senior Finance Manager",voucherType:"Period Lock",     minAmount:0,       maxAmount:0,        backup:"Director"},
-];
+// APPROVAL_LIMITS_DATA moved to DB — fetch via useApprovalLimits() (/api/approval-limits).
 
 
 export const MASTER_PAGE = (title, subtitle, children) => (
@@ -1516,17 +1484,19 @@ export const MASTER_PAGE = (title, subtitle, children) => (
 
 
 export function DocumentTypeMaster(){
+  // Live print-template master (GET /api/document-types). Was hardcoded DOCUMENT_TYPES_DATA.
+  const rows = useDocumentTypes().data || [];
   return MASTER_PAGE("Document Type Master","Configurable templates for invoices, receipts, certificates — header, footer, logo, numbering",
     <>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
-        <p style={{margin:0,fontSize:12,color:"#5a6691"}}>10 document templates configured · {DOCUMENT_TYPES_DATA.filter(d=>d.active).length} active</p>
+        <p style={{margin:0,fontSize:12,color:"#5a6691"}}>{rows.length} document templates configured · {rows.filter(d=>d.active).length} active</p>
         <div style={{flex:1}}/>
         <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
-        <HExportBtn name="document-types" rows={DOCUMENT_TYPES_DATA} columns={[{key:"type",label:"Document Type"},{key:"layout",label:"Layout"},{key:"header",label:"Header"},{key:"footer",label:"Footer"},{key:"numberingSeries",label:"Numbering Series"},{key:"active",label:"Active"}]}/>
+        <HExportBtn name="document-types" rows={rows} columns={[{key:"type",label:"Document Type"},{key:"layout",label:"Layout"},{key:"header",label:"Header"},{key:"footer",label:"Footer"},{key:"numberingSeries",label:"Numbering Series"},{key:"active",label:"Active"}]}/>
         <button style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Document Type</button>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(360px,1fr))",gap:12}}>
-        {DOCUMENT_TYPES_DATA.map(d=>(
+        {rows.map(d=>(
           <div key={d.id} style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
               <p style={{margin:0,fontSize:13.5,fontWeight:700,color:"#0d1326"}}>{d.type}</p>
@@ -1854,34 +1824,13 @@ export const MY_CLAIMS_DATA = [];
 export const FORM16A_DATA = [];
 
 
-export const EMAIL_TEMPLATES_DATA = [
-  {id:"ET-001",name:"Booking Confirmation",trigger:"On booking creation",channel:"Email",subject:"Your booking is confirmed — {BookingRef}",body:"Dear {CustomerName},\n\nThank you for booking with Travkings. Your booking reference is {BookingRef}.\n\nTrip: {TripName}\nDates: {DepartureDate} — {ReturnDate}\nPassengers: {PaxCount}\n\nPlease find your detailed itinerary attached.\n\nRegards,\n{ConsultantName}\nTravkings Tours & Travels",active:true},
-  {id:"ET-002",name:"Payment Receipt",trigger:"On receipt voucher posting",channel:"Email",subject:"Payment received — {VoucherNo}",body:"Dear {CustomerName},\n\nWe acknowledge receipt of ₹{Amount} on {Date}. Voucher: {VoucherNo}.\n\nThank you.\nTravkings Accounts Team",active:true},
-  {id:"ET-003",name:"Invoice Reminder",trigger:"7 days before due date",channel:"Email",subject:"Reminder: Invoice {InvoiceNo} due on {DueDate}",body:"Dear {CustomerName},\n\nThis is a friendly reminder that invoice {InvoiceNo} for ₹{Amount} is due on {DueDate}.\n\nKindly arrange payment at the earliest.\n\nRegards,\nTravkings Accounts",active:true},
-  {id:"ET-004",name:"Visa Status Update (SMS)",trigger:"On visa approval",channel:"SMS",subject:"",body:"Travkings: Visa for {PassengerName} ({Country}) has been {VisaStatus}. Contact {BranchPhone} for details.",active:true},
-  {id:"ET-005",name:"Leave Approval (Email)",trigger:"On leave approval",channel:"Email",subject:"Leave approved — {LeaveType} {Dates}",body:"Dear {EmployeeName},\n\nYour leave request for {LeaveType} from {FromDate} to {ToDate} has been approved.\n\nRegards,\nHR Team",active:true},
-];
+// EMAIL_TEMPLATES_DATA moved to DB — fetch via useEmailTemplates() (/api/email-templates).
 
 
-export const CUSTOM_FIELDS_DATA = [
-  {id:"CF-001",master:"Customer",label:"Account Manager",type:"Dropdown",required:false,options:"",active:true},
-  {id:"CF-002",master:"Customer",label:"SLA Tier",type:"Dropdown",required:false,options:"Platinum,Gold,Silver,Standard",active:true},
-  {id:"CF-003",master:"Customer",label:"Procurement Code",type:"Text",required:false,options:"",active:true},
-  {id:"CF-004",master:"Customer",label:"Next Review Date",type:"Date",required:false,options:"",active:true},
-  {id:"CF-005",master:"Supplier",label:"Reliability Rating",type:"Number (1-5)",required:false,options:"",active:true},
-  {id:"CF-006",master:"Supplier",label:"Contract Expiry",type:"Date",required:false,options:"",active:true},
-  {id:"CF-007",master:"Employee",label:"Emergency Contact",type:"Text",required:true,options:"",active:true},
-  {id:"CF-008",master:"Employee",label:"Blood Group",type:"Dropdown",required:false,options:"A+,A-,B+,B-,O+,O-,AB+,AB-",active:true},
-];
+// CUSTOM_FIELDS_DATA moved to DB — fetch via useCustomFields() (/api/custom-fields).
 
 
-export const FIELD_ACCESS_DATA = [
-  {field:"Credit Limit",module:"Customer",roles:{SuperAdmin:"View+Edit",Director:"View+Edit","Senior Finance Manager":"View+Edit","Sr. Accounts Executive":"View Only","Accounts Executive":"Hidden","HR Manager":"Hidden"}},
-  {field:"Vendor PAN",module:"Supplier",roles:{SuperAdmin:"View+Edit",Director:"View+Edit","Senior Finance Manager":"View+Edit","Sr. Accounts Executive":"View+Edit","Accounts Executive":"Hidden","HR Manager":"Hidden"}},
-  {field:"Bank Account No.",module:"Customer/Supplier",roles:{SuperAdmin:"View+Edit",Director:"View","Senior Finance Manager":"View","Sr. Accounts Executive":"View","Accounts Executive":"Hidden","HR Manager":"Hidden"}},
-  {field:"Salary",module:"Employee",roles:{SuperAdmin:"View+Edit",Director:"View+Edit","Senior Finance Manager":"View+Edit","Sr. Accounts Executive":"Hidden","Accounts Executive":"Hidden","HR Manager":"View+Edit"}},
-  {field:"Cost Center",module:"Voucher",roles:{SuperAdmin:"View+Edit",Director:"View","Senior Finance Manager":"View+Edit","Sr. Accounts Executive":"View+Edit","Accounts Executive":"View+Edit","HR Manager":"Hidden"}},
-];
+// FIELD_ACCESS_DATA moved to DB — fetch via useFieldAccess() (/api/field-access).
 
 
 export const PERM_ROLES = ["Super Admin","Director","Senior Finance Manager","Sr. Accounts Executive","Accounts Executive","HR Manager"];

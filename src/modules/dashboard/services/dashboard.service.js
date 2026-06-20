@@ -70,7 +70,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
       api.getBranchHeatmap(),
       api.getTopCustomers(branchCode),
       api.getTopSuppliers(branchCode),
-      api.getBankAccounts(),
+      api.getBankAccounts(branchCode),
       api.getModulePL({ branchCode, from: dates.from, to: dates.to }), // live, period + scope driven
       api.getAgeingTotals(branchCode),
       api.getCashPosition(branchCode),

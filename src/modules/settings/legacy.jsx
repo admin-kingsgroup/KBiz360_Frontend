@@ -11,10 +11,10 @@ import { exportToCSV } from '../../core/business-logic';
 import { toast } from '../../core/ux/toast';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../core/data';
 import { apiPost, apiPut, apiDelete } from '../../core/api';
-import { useUsersAdmin, useRoles, useCompanyProfiles, useApprovalRules } from '../../core/useReference';
+import { useUsersAdmin, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../core/useReference';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { fmt } from '../../core/format';
-import { APPROVAL_LIMITS_DATA, CUSTOM_FIELDS_DATA, EMAIL_TEMPLATES_DATA, FIELD_ACCESS_DATA, PERM_ACTIONS, cardStyle } from '../../core/helpers';
+import { PERM_ACTIONS, cardStyle } from '../../core/helpers';
 import { useIsMob, useMobile } from '../../core/hooks';
 // Permission CATALOGUE (which modules/actions/toggles exist) stays in code as
 // app structure; the per-role GRANTS, users, company profiles and approval rules
@@ -941,9 +941,12 @@ export function DocTemplateEditor(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function EmailSMSTemplates(){
+  // Live email/SMS templates (GET /api/email-templates). Was hardcoded EMAIL_TEMPLATES_DATA.
+  const templates=useEmailTemplates().data||[];
   const [sel,setSel]=useState(0);
-  const [editBody,setEditBody]=useState(EMAIL_TEMPLATES_DATA[0].body);
-  const t=EMAIL_TEMPLATES_DATA[sel];
+  const [editBody,setEditBody]=useState("");
+  const t=templates[sel]||templates[0]||{name:"",body:"",channel:"Email",trigger:"",subject:"",active:true};
+  useEffect(()=>{ if(templates[sel]) setEditBody(templates[sel].body||""); },[sel,templates.length]);
   const tokens=["{CustomerName}","{BookingRef}","{TripName}","{Amount}","{DueDate}","{VoucherNo}","{ConsultantName}","{BranchPhone}","{InvoiceNo}","{Date}"];
   return(
     <PHASE2_Page title="Email / SMS Template Editor" subtitle="Customise communication templates · token substitution · channel-specific"
@@ -951,8 +954,8 @@ export function EmailSMSTemplates(){
       <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:14}}>
         {/* Template list */}
         <div style={cardStyle}>
-          <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Templates ({EMAIL_TEMPLATES_DATA.length})</p>
-          {EMAIL_TEMPLATES_DATA.map((tmpl,i)=>(
+          <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Templates ({templates.length})</p>
+          {templates.map((tmpl,i)=>(
             <div key={tmpl.id} onClick={()=>{setSel(i);setEditBody(tmpl.body);}} style={{padding:"9px 10px",border:sel===i?"2px solid #d4a437":"1px solid #e1e3ec",borderRadius:6,marginBottom:6,cursor:"pointer",background:sel===i?"#fff8e8":"#fff"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                 <p style={{margin:0,fontSize:11.5,fontWeight:700,color:"#0d1326"}}>{tmpl.name}</p>
@@ -994,7 +997,10 @@ export function EmailSMSTemplates(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function ApprovalMatrixBuilder(){
-  const [rules,setRules]=useState(APPROVAL_LIMITS_DATA);
+  // Live approval thresholds (GET /api/approval-limits). Was hardcoded APPROVAL_LIMITS_DATA.
+  const live=useApprovalLimits().data;
+  const [rules,setRules]=useState([]);
+  useEffect(()=>{ if(live) setRules(live); },[live]);
   const [form,setForm]=useState({role:"Accounts Executive",voucherType:"Payment Voucher",minAmount:0,maxAmount:50000,backup:"Sr. Accounts Executive"});
   const groupByType={};
   rules.forEach(r=>{if(!groupByType[r.voucherType])groupByType[r.voucherType]=[];groupByType[r.voucherType].push(r);});
@@ -1051,9 +1057,11 @@ export function ApprovalMatrixBuilder(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function CustomFieldsManager(){
+  // Live custom fields (GET /api/custom-fields). Was hardcoded CUSTOM_FIELDS_DATA.
+  const all=useCustomFields().data||[];
   const [master,setMaster]=useState("ALL");
   const masters=["ALL","Customer","Supplier","Employee"];
-  const filtered=master==="ALL"?CUSTOM_FIELDS_DATA:CUSTOM_FIELDS_DATA.filter(f=>f.master===master);
+  const filtered=master==="ALL"?all:all.filter(f=>f.master===master);
   return(
     <PHASE2_Page title="Custom Fields Manager" subtitle="Add fields to any master without code changes · applies across all branches"
       toolbar={<><select value={master} onChange={e=>setMaster(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{masters.map(m=><option key={m}>{m}</option>)}</select><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Add Field</button></>}>
@@ -1089,6 +1097,8 @@ export function CustomFieldsManager(){
 export function FieldAccessControl(){
   const accessColor={"View+Edit":"#22c55e","View Only":"#d4a437","Hidden":"#A32D2D"};
   const PERM_ROLES=(useRoles().data||[]).map(r=>r.name);   // DB-backed role names
+  // Live field-access rules (GET /api/field-access). Was hardcoded FIELD_ACCESS_DATA.
+  const accessRows=useFieldAccess().data||[];
   return(
     <PHASE2_Page title="Field-Level Access Control" subtitle="Control which fields each role can view or edit · per module · per field">
       <div style={cardStyle}>
@@ -1102,7 +1112,7 @@ export function FieldAccessControl(){
               </tr>
             </thead>
             <tbody>
-              {FIELD_ACCESS_DATA.map((row,i)=>(
+              {accessRows.map((row,i)=>(
                 <tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}>
                   <td style={{...RPT_tdStyle,fontWeight:700}}>{row.field}</td>
                   <td style={{...RPT_tdStyle,color:"#5a6691"}}>{row.module}</td>
