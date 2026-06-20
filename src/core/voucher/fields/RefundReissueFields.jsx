@@ -1,5 +1,6 @@
 import React from 'react';
 import { FL, inp } from '../../styles';
+import { todayISO } from '../../dates';
 import { VPlaceOfSupply } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
 import { useVoucherRef } from '../useVoucherRef';
@@ -36,7 +37,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
-        <FL label="Date"><input type="date" value={state.date || ''} onChange={(e) => patch({ date: e.target.value })} style={inp} /></FL>
+        <FL label="Date"><input type="date" max={todayISO()} value={state.date || ''} onChange={(e) => patch({ date: e.target.value })} style={inp} /></FL>
         <FL label="Against sales invoice"><input value={state.againstInvoice || ''} onChange={(e) => patch({ againstInvoice: e.target.value })} style={inp} placeholder="SF/BOM/26/0001" /></FL>
         <FL label="Related purchase invoice"><input value={state.againstPurchase || ''} onChange={(e) => patch({ againstPurchase: e.target.value })} style={inp} placeholder="PF/BOM/26/0001" /></FL>
         <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} />
