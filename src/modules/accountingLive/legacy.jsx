@@ -980,7 +980,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         <button onClick={onBack} style={{ ...inp, width: 'auto', minHeight: 34, fontSize: 11.5, cursor: 'pointer' }}>Back</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: 10 }}>
-        <div><div style={lab}>Date</div><input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} style={fld} /></div>
+        <div><div style={lab}>Date</div><input type="date" max={todayISO()} value={form.date} onChange={(e) => set('date', e.target.value)} style={fld} /></div>
         <div><div style={lab}>Branch</div><input value={form.branch} onChange={(e) => set('branch', e.target.value)} style={fld} /></div>
         <div><div style={lab}>{v.category === 'purchase' || v.category === 'purchase-expense' ? 'Supplier (party ledger)' : 'Customer / Party ledger'}</div><input list={dlId} value={form.party} onChange={(e) => set('party', e.target.value)} style={fld} /></div>
         <div><div style={lab}>Link No</div><input value={form.linkNo} onChange={(e) => set('linkNo', e.target.value)} style={fld} /></div>

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../../core/styles.jsx';
+import { todayISO } from '../../core/dates';
 import { PeriodBar, periodRange } from '../../core/period';
 import { openPrintPreview } from '../../core/PrintPreview';
 import { buildBookingInvoice } from '../../core/invoiceHtml';
@@ -480,7 +481,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* Header fields */}
       <div style={{ ...card, marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
-          <FL label="SPG Date"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></FL>
+          <FL label="SPG Date"><input type="date" max={todayISO()} value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></FL>
           <FL label="Client Type">
             <select value={clientType} onChange={(e) => handleClientTypeChange(e.target.value)} style={inp}>
               <option value="">— All Client Types —</option>
