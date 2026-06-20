@@ -18,6 +18,7 @@
 //     ?branch=&from= noise) — identical to the old URLSearchParams behaviour
 
 import axios from 'axios';
+import { errMessage } from './apiError';
 
 const BASE = import.meta.env.VITE_KBIZ_API_BASE || 'http://localhost:9090';
 
@@ -63,17 +64,6 @@ function handleAuthFailure(status, message) {
 // Pull the human message out of a {success,message} error body. axios may give us
 // the parsed object (JSON response) or a raw string — handle both, falling back
 // to the raw value.
-function errMessage(data) {
-  if (data == null) return '';
-  if (typeof data === 'string') {
-    try { return JSON.parse(data).message || data; } catch { return data; }
-  }
-  // Prefer a human message; never dump the raw JSON payload (it leaks internal shape
-  // and reads as gibberish in a toast). Fall back to a generic line.
-  if (typeof data === 'object') return data.message || data.error || 'Request failed.';
-  return String(data);
-}
-
 // A request timeout is essential: ReferenceProvider blocks the whole app behind
 // a "Loading KBiz360…" splash until its critical reference queries SETTLE
 // (success or error). Without a timeout a single slow/hanging backend call (or a
