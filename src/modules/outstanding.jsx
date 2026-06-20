@@ -101,20 +101,28 @@ function SettleModal({ adv, side, branch, cur, onClose }) {
   );
 }
 
-export function OutstandingOnAccount({ branch }) {
+// `side` scopes the screen to one party-side so it can be embedded as the
+// "Open Bills & On-Account" tab of Receivables / Payables:
+//   'customer' → only the AR tabs (unsettled sales bills + on-account receipts)
+//   'supplier' → only the AP tabs (unsettled purchase bills + on-account payments)
+//   undefined  → all four tabs (the standalone whole-book view)
+export function OutstandingOnAccount({ branch, side }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const q = useOutstanding(branch);
   const d = q.data || {};
   const t = d.totals || {};
-  const [tab, setTab] = useState('sales');
-  const [settleAdv, setSettleAdv] = useState(null); // { adv, side }
+  const showAR = side !== 'supplier';
+  const showAP = side !== 'customer';
 
-  const KPIS = [
-    { k: 'sales', label: 'Unsettled Sales Bills', amt: t.salesOutstanding, n: (d.salesBills || []).length, color: BLUE },
-    { k: 'purchase', label: 'Unsettled Purchase Bills', amt: t.purchaseOutstanding, n: (d.purchaseBills || []).length, color: RED },
-    { k: 'recAdv', label: 'On-Account Receipts', amt: t.onAccountReceipts, n: (d.onAccountReceipts || []).length, color: GREEN },
-    { k: 'payAdv', label: 'On-Account Payments', amt: t.onAccountPayments, n: (d.onAccountPayments || []).length, color: GOLD },
-  ];
+  const KPIS = useMemo(() => [
+    { k: 'sales', label: 'Unsettled Sales Bills', amt: t.salesOutstanding, n: (d.salesBills || []).length, color: BLUE, ar: true },
+    { k: 'recAdv', label: 'On-Account Receipts', amt: t.onAccountReceipts, n: (d.onAccountReceipts || []).length, color: GREEN, ar: true },
+    { k: 'purchase', label: 'Unsettled Purchase Bills', amt: t.purchaseOutstanding, n: (d.purchaseBills || []).length, color: RED, ap: true },
+    { k: 'payAdv', label: 'On-Account Payments', amt: t.onAccountPayments, n: (d.onAccountPayments || []).length, color: GOLD, ap: true },
+  ].filter((c) => (c.ar && showAR) || (c.ap && showAP)), [d, t, showAR, showAP]);
+
+  const [tab, setTab] = useState(showAP && !showAR ? 'purchase' : 'sales');
+  const [settleAdv, setSettleAdv] = useState(null); // { adv, side }
 
   const moneyCell = (r, v) => money(cur, v);
   const ageCell = (r, v) => <span style={{ color: ageColor(v) }} className="font-bold tabular-nums">{v}</span>;

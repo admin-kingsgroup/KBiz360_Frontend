@@ -162,8 +162,8 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
     {label:"Client Statement", href:"/reports/client-statement"},
   ]},
   {label:"Working Capital", children:[
-    {label:"Receivables Ageing", href:"/reports/rec"},
-    {label:"Payables Ageing", href:"/reports/pay"},
+    {label:"Receivables", href:"/reports/rec"},
+    {label:"Payables", href:"/reports/pay"},
     {label:"Cash Flow Forecast 90d", href:"/reports/cashflow-forecast"},
     {label:"Working Capital Dashboard", href:"/reports/working-capital"},
     {label:"Ratio Analysis", href:"/reports/ratios"},
@@ -288,14 +288,13 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     // moved to the Finance pill (Finance ▸ Registers & Outstanding).
   ]},
   {label:"Receivables & Collections", children:[
-    {label:"Debtors (Receivables) Ageing",      href:"/reports/rec"},
-    {label:"Outstanding & On-Account (Settle)", href:"/finance/outstanding"},
+    {label:"Receivables (Ageing + Settle)",     href:"/reports/rec"},
     {label:"Client Statement",                  href:"/reports/client-statement"},
     {label:"Receipt Register",                  href:"/finance/receipt-register"},
     {label:"Collections Follow-up",             href:"/accounts/collections"},
   ]},
   {label:"Payables & Suppliers", children:[
-    {label:"Creditors (Payables) Ageing", href:"/reports/pay"},
+    {label:"Payables (Ageing + Settle)",  href:"/reports/pay"},
     {label:"Vendor Advances",             href:"/accounting/vendor-advances"},
     {label:"Payment Register",            href:"/finance/payment-register"},
     {label:"Supplier Reconciliation",        href:"/accounts/supplier-reco"},
@@ -432,7 +431,6 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
     {label:"Balance Sheet", href:"/dashboards/balance-sheet"},
     {label:"Cash & Liquidity", href:"/dashboards/cash"},
     {label:"Receivables & Payables", href:"/dashboards/arap"},
-    {label:"Outstanding & On-Account", href:"/finance/outstanding"},
     {label:"Expenses", href:"/dashboards/expenses"},
     {label:"Tax & Compliance", href:"/dashboards/tax"},
   ]},

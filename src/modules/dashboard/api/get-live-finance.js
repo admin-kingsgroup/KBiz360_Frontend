@@ -69,9 +69,9 @@ export async function getReceivablesOutstanding(branchCode) {
 }
 
 // Unsettled receivable + payable in one ageing call — the dashboard "pending to
-// settle" tiles. Receivable = open sale bills net of receipts/credit-notes;
-// Payable = open purchase/expense bills net of payments/debit-notes. Same FIFO
-// engine the bill-wise allocation panel settles against.
+// settle" tiles. Receivable = gross open sale bills (reduced only by directed
+// allocations); Payable = gross open purchase/expense bills. Bill-wise / no FIFO,
+// the same source the bill-wise allocation panel settles against.
 export async function getAgeingTotals(branchCode) {
   try {
     const d = await apiGet('/api/accounting/ageing', { branch: branchCode });

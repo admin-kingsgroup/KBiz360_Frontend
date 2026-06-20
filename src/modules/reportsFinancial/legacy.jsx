@@ -27,6 +27,7 @@ import { apiGet, getAuthToken } from '../../core/api';
 import { exportToExcel } from '../../core/exportExcel';
 import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../../core/dates';
 import { VoucherEditor } from '../accountingLive';
+import { OutstandingOnAccount } from '../outstanding';
 import { useMobile } from '../../core/hooks';
 import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail, stripLeafPrefix, moduleSideRows } from '../../core/pnlDetail';
 import { openPrintPreview } from '../../core/PrintPreview';
@@ -1943,8 +1944,33 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
 }
 
 /* ════════════════════════ AR / AP AGEING (Phase 2, live) ═══════════════════ */
-export function ReceivablesLive({ branch }) { return <AgeingReport branch={branch} side="receivables" />; }
-export function PayablesLive({ branch }) { return <AgeingReport branch={branch} side="payables" />; }
+/* Receivables / Payables are now 2-tab workbenches sharing ONE bill-wise truth:
+ *   • Ageing                  → monitor: open bills bucketed by age + on-account
+ *   • Open Bills & On-Account  → act:     settle bills bill-wise (the Settle modal)
+ * Both read the same no-FIFO source, so the numbers always agree. The old combined
+ * /finance/outstanding screen is retired in favour of these side-scoped tabs.     */
+function ArApScreen({ branch, side }) {
+  const isRec = side === 'receivables';
+  const [tab, setTab] = useState('ageing'); // 'ageing' | 'settle'
+  const TABS = [['ageing', 'Ageing'], ['settle', 'Open Bills & On-Account ▸ Settle']];
+  const tabBtn = (active) => ({
+    padding: '8px 16px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+    border: `1px solid ${SAP.border}`, borderBottom: 'none', borderRadius: '8px 8px 0 0',
+    background: active ? SAP.blue : '#fff', color: active ? '#fff' : SAP.sec,
+  });
+  return (
+    <>
+      <div className="noprint" style={{ maxWidth: 1180, margin: '0 auto', padding: '8px 6px 0', display: 'flex', gap: 6 }}>
+        {TABS.map(([id, label]) => <button key={id} onClick={() => setTab(id)} style={tabBtn(tab === id)}>{label}</button>)}
+      </div>
+      {tab === 'ageing'
+        ? <AgeingReport branch={branch} side={side} />
+        : <OutstandingOnAccount branch={branch} side={isRec ? 'customer' : 'supplier'} />}
+    </>
+  );
+}
+export function ReceivablesLive({ branch }) { return <ArApScreen branch={branch} side="receivables" />; }
+export function PayablesLive({ branch }) { return <ArApScreen branch={branch} side="payables" />; }
 
 const BUCKETS = [['d0', '0–30'], ['d30', '31–60'], ['d60', '61–90'], ['d90', '90+']];
 const bucketColor = (k) => ({ d0: SAP.greenDk, d30: SAP.gold, d60: SAP.orange, d90: SAP.red }[k] || SAP.text);
@@ -1963,28 +1989,34 @@ function AgeingReport({ branch, side }) {
   const partyLabel = isRec ? 'Customer' : 'Supplier';
   const overdue = totals.d30 + totals.d60 + totals.d90;
   const share = (x) => (totals.total > 0 ? (x / totals.total) * 100 : 0);
+  // On-account advances are unapplied credits (no FIFO) — surfaced separately,
+  // never netted into the age buckets. Net = gross open bills − on-account.
+  const netTotal = totals.net != null ? totals.net : (totals.total - (totals.onAccount || 0));
+  const rowNet = (r) => (r.net != null ? r.net : (r.total - (r.onAccount || 0)));
 
   return (
     <Wrap>
       <FioriHead
         system="KBiz360 · Finance"
         title={isRec ? 'Accounts Receivable — Ageing' : 'Accounts Payable — Ageing'}
-        sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} incl. GST &nbsp;|&nbsp; as of {d?.asOf || '—'} &nbsp;|&nbsp; FIFO · live double-entry</>}
+        sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} incl. GST &nbsp;|&nbsp; as of {d?.asOf || '—'} &nbsp;|&nbsp; bill-wise · no FIFO · live double-entry</>}
       />
       <div style={{ background: SAP.pageBg, padding: 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
         <StateBox q={q} empty={!data || rows.length === 0}>
           <KpiGrid>
-            <Kpi tone="blue" label="Total Outstanding" value={compact(cur, totals.total)} sub={`${rows.length} ${partyLabel.toLowerCase()}s`} />
+            <Kpi tone="blue" label="Open Bills (gross)" value={compact(cur, totals.total)} sub={`${rows.length} ${partyLabel.toLowerCase()}s`} />
             <Kpi tone="green" label="Current (0–30)" value={compact(cur, totals.d0)} sub={pctTxt(share(totals.d0))} />
             <Kpi tone="orange" label="Overdue (>30 days)" value={compact(cur, overdue)} sub={pctTxt(share(overdue))} />
             <Kpi tone="red" label="Critical (90+ days)" value={compact(cur, totals.d90)} sub={pctTxt(share(totals.d90))} />
+            <Kpi tone="purple" label="On-Account (unapplied)" value={compact(cur, totals.onAccount || 0)} sub={`${isRec ? 'advances in' : 'advances out'} · settle bill-wise`} />
+            <Kpi tone="teal" label="Net Exposure" value={compact(cur, netTotal)} sub="open bills − on-account" />
           </KpiGrid>
 
           <FCard title={`${partyLabel}-wise Ageing`} sub="Tap a row to drill into the ledger and edit its vouchers"
             badge={<Badge bg={SAP.blueBg} c={SAP.blue} bd="#b8d6ff">{rows.length} {partyLabel.toLowerCase()}s</Badge>}>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                <thead><tr><Th w="30%">{partyLabel}</Th>{BUCKETS.map(([, lbl]) => <Th key={lbl} right>{lbl}</Th>)}<Th right>Total</Th></tr></thead>
+                <thead><tr><Th w="26%">{partyLabel}</Th>{BUCKETS.map(([, lbl]) => <Th key={lbl} right>{lbl}</Th>)}<Th right>Open Bills</Th><Th right>On-Account</Th><Th right>Net</Th></tr></thead>
                 <tbody>
                   {rows.map((r, i) => (
                     <tr key={r.party + i} onClick={() => openLedgerModal(r.party)}
@@ -1992,12 +2024,16 @@ function AgeingReport({ branch, side }) {
                       <td style={{ padding: '7px 16px', color: SAP.text, fontWeight: 600 }}>{r.party}<span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span></td>
                       {BUCKETS.map(([k]) => <td key={k} style={{ ...num, color: r[k] ? bucketColor(k) : SAP.label }}>{inr(r[k])}</td>)}
                       <td style={{ ...num, fontWeight: 700, color: SAP.text }}>{inr(r.total)}</td>
+                      <td style={{ ...num, color: r.onAccount ? SAP.purple : SAP.label }}>{inr(r.onAccount || 0)}</td>
+                      <td style={{ ...num, fontWeight: 700, color: SAP.text }}>{inr(rowNet(r))}</td>
                     </tr>
                   ))}
                   <tr style={{ background: SAP.shell, color: '#fff', fontWeight: 700, borderTop: `2px solid ${SAP.blue}` }}>
                     <td style={{ padding: '10px 16px' }}>TOTAL</td>
                     {BUCKETS.map(([k]) => <td key={k} style={num}>{inr(totals[k])}</td>)}
                     <td style={num}>{inr(totals.total)}</td>
+                    <td style={num}>{inr(totals.onAccount || 0)}</td>
+                    <td style={num}>{inr(netTotal)}</td>
                   </tr>
                 </tbody>
               </table>

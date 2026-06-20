@@ -5,7 +5,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useEffect, useState, useRef, useCallback, Suspense } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
 import { apiPost } from './core/api';
@@ -55,7 +55,6 @@ const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, B
 const { SoPoGpVoucherEntry } = lazyModule(() => import('./modules/bookingOrder'));
 const { UnifiedApprovals } = lazyModule(() => import('./modules/voucherApprovals'));
 const { ModuleRegister } = lazyModule(() => import('./modules/moduleRegister'));
-const { OutstandingOnAccount } = lazyModule(() => import('./modules/outstanding'));
 const { AccountsTreeView } = lazyModule(() => import('./modules/chartBuilder'));
 const { PnLTallyLive } = lazyModule(() => import('./modules/pnlTally'));
 const { BalanceSheetTallyLive } = lazyModule(() => import('./modules/balanceSheetTally'));
@@ -403,7 +402,9 @@ export default function KB360App(){
     if(route==="/finance/investments")   return <InvestmentRegister branch={branch}/>;
     if(route==="/finance/loan-amort")    return <LoanAmortization/>;
     if(route==="/finance/reco-queue")    return <ReconciliationQueue branch={branch} setRoute={navigate}/>;
-    if(route==="/finance/outstanding")   return <OutstandingOnAccount branch={branch}/>;
+    // Retired: the combined Outstanding & On-Account screen is now split into the
+    // Receivables / Payables 2-tab workbenches. Redirect old links to Receivables.
+    if(route==="/finance/outstanding")   return <Navigate to="/reports/rec" replace/>;
     if(route==="/finance/multi-currency")  return <MultiCurrencyVoucher/>;
     if(route==="/finance/comments-demo")   return <VoucherCommentsDemo/>;
     if(route==="/finance/print-preview")   return <PrintPreviewDemo/>;

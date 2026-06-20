@@ -322,7 +322,8 @@ export function useYearOverYear(branch, { from, to } = {}) {
   });
 }
 
-// AR / AP ageing (receivables & payables, FIFO, as-of today). GET /api/accounting/ageing.
+// AR / AP ageing (receivables & payables, bill-wise / no FIFO, as-of today). Each
+// party row carries age buckets + onAccount + net. GET /api/accounting/ageing.
 export function useAgeing(branch) {
   const code = branchCode(branch);
   return useQuery({

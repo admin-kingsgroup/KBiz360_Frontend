@@ -74,7 +74,7 @@ const topEntities = async (category, branchCode) => {
 export const getTopCustomers = async (branchCode) => topEntities('sale', branchCode);
 export const getTopSuppliers = async (branchCode) => topEntities('purchase', branchCode);
 
-// AR / AP ageing buckets (live, FIFO) → the shape AgeingBuckets renders.
+// AR / AP ageing buckets (live, bill-wise / no FIFO) → the shape AgeingBuckets renders.
 const BUCKET_META = [
   ['d0', '0–30 days', '#27500A'],
   ['d30', '31–60 days', '#854F0B'],
