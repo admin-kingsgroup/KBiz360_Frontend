@@ -237,7 +237,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const canSave = !!brCode && !saving && totals.so.total > 0 && customer.name.trim() && hasCustLedger
     && (isNoSupp || (totals.po.total > 0 && hasSuppLedger));
 
-  const save = async (thenApprove = false) => {
+  // Saving ALWAYS lands the booking in Pending — there is no save-and-approve from
+  // entry (for ANY user, Super Admin included). Approval happens only from the
+  // Pending queue, so every voucher's books impact passes the same review gate.
+  const save = async () => {
     // Editing an existing booking requires a reason (saved to the audit trail).
     let editReason = '';
     if (editing) {
@@ -263,20 +266,19 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         gp: { lines: gpLines, total: totals.gp.total, pct: totals.gp.pct },
         remarks, saleTallyRef, purTallyRef,
       };
-      let booking = editing
+      const booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, payload)
         : await apiPost('/api/booking-orders', payload);
-      if (thenApprove) booking = await apiPost('/api/booking-orders/' + booking.id + '/approve');
-      setResult({ ...booking, _approved: thenApprove, _edited: editing });
+      setResult({ ...booking, _approved: false, _edited: editing });
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
-      if (thenApprove || editing) invalidateBooks(qc); // posting/editing changes the books → refresh every books cache
-      toast(thenApprove ? `Voucher ${booking.bookingNo || ''} approved & posted` : `Voucher ${booking.bookingNo || ''} saved — pending approval`);
+      if (editing) invalidateBooks(qc); // an edit reverses the prior posting → refresh every books cache
+      toast(`Voucher ${booking.bookingNo || ''} saved — pending approval`);
     } catch (e) { setError(e.message || 'Failed to save voucher'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
     finally { setSaving(false); }
   };
   // Tally-style keys across the whole entry screen: Enter advances between data
   // fields (skipping action buttons), Enter on the last field / Ctrl+Cmd+Enter saves.
-  const formKeys = useFormKeys({ onSubmit: () => { if (canSave) save(false); } });
+  const formKeys = useFormKeys({ onSubmit: () => { if (canSave) save(); } });
 
   // Warn before leaving/refreshing with unsaved booking data (the form autosave
   // doesn't cover the multi-grid line state). Skipped once a save has succeeded.
@@ -697,7 +699,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         {editing && (
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} style={btnGh}><XCircle size={14} /> Cancel</button>
         )}
-        <button disabled={!canSave} onClick={() => save(false)}
+        <button disabled={!canSave} onClick={() => save()}
           style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7 }}>
           {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (editing ? 'Save changes (Pending)' : 'Save voucher (Pending)')}
         </button>
@@ -733,7 +735,9 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
 
   const ready = !!brCode && !!state.againstInvoice && !!state.party && !!state.counterParty && (+state.supplierAmt > 0) && !saving;
 
-  const save = async (thenApprove = false) => {
+  // Saving always lands the RF/RI booking in Pending — no save-and-approve from entry
+  // (any user). It posts only when approved from the Pending queue.
+  const save = async () => {
     setError(''); setSaving(true);
     try {
       const reversal = {
@@ -750,14 +754,13 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
         againstInvoice: state.againstInvoice, againstPurchase: state.againstPurchase || '',
         reversal, remarks: state.remarks,
       };
-      let booking = editing
+      const booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, { ...payload, editReason: 'Edit ' + kind })
         : await apiPost('/api/booking-orders', payload);
-      if (thenApprove) booking = await apiPost('/api/booking-orders/' + booking.id + '/approve');
-      setResult({ ...booking, _approved: thenApprove });
+      setResult({ ...booking, _approved: false });
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
-      if (thenApprove || editing) invalidateBooks(qc); // posting/editing changes the books → refresh every books cache
-      toast(thenApprove ? `Voucher ${booking.bookingNo || ''} approved & posted` : `Voucher ${booking.bookingNo || ''} saved — pending approval`);
+      if (editing) invalidateBooks(qc); // an edit reverses the prior posting → refresh every books cache
+      toast(`Voucher ${booking.bookingNo || ''} saved — pending approval`);
     } catch (e) { setError(e.message || 'Failed to save'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
     finally { setSaving(false); }
   };
@@ -804,7 +807,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
         <RefundReissueFields state={state} setState={setState} ctx={{ branch: brCode, cur }} kind={kind} />
         {error && <p style={{ margin: '8px 0 0', fontSize: 12, color: CR, fontWeight: 600 }}>⚠ {error}</p>}
         <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-          <button disabled={!ready} onClick={() => save(false)} style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Save size={14} /> Save (Pending)</button>
+          <button disabled={!ready} onClick={() => save()} style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Save size={14} /> Save (Pending)</button>
         </div>
         {!ready && <p style={{ margin: '8px 0 0', fontSize: 10.5, color: '#9aa2c0' }}>Need: original invoice, customer, supplier/airline &amp; a supplier amount &gt; 0.</p>}
       </div>
