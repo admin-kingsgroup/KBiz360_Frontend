@@ -13,6 +13,7 @@ import { FORM16A_DATA, _TCS_ENTRIES, _TDS_ENTRIES, cardStyle } from '../../core/
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { clickable } from '../../core/ux/clickable';
+import { listKeyNav } from '../../core/ux/listKeys';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, tabBtnStyle } from '../../core/styles';
 import { TDS_SECTIONS } from '../finance';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
@@ -1557,7 +1558,7 @@ export function Form16AGenerator(){
       toolbar={<><select value={selVendor} onChange={e=>setSelVendor(+e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{FORM16A_DATA.map((v,i)=><option key={i} value={i}>{v.vendor}</option>)}</select><button onClick={()=>openPrintPreview({ selector: 'main', title: 'Taxation', recommend: 'portrait' })} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download PDF</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 Send by Email</button></>}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:14}}>
         {/* Vendor list */}
-        <div style={cardStyle}>
+        <div style={cardStyle} onKeyDown={listKeyNav()}>
           <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Vendors — Q4 FY 2025-26</p>
           {FORM16A_DATA.map((v,i)=>(
             <div key={i} {...clickable(()=>setSelVendor(i),{role:'option'})} style={{padding:"10px",border:selVendor===i?"2px solid #d4a437":"1px solid #e1e3ec",borderRadius:6,marginBottom:6,cursor:"pointer",background:selVendor===i?"#fff8e8":"#fff"}}>

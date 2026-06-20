@@ -236,10 +236,6 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
   const canSave = !!brCode && !saving && totals.so.total > 0 && customer.name.trim() && hasCustLedger
     && (isNoSupp || (totals.po.total > 0 && hasSuppLedger));
-  // Flights / Holiday can be SAVED untagged (it parks as Pending), but it cannot be
-  // approved/posted until International vs Domestic is chosen — mirrors the backend gate.
-  const isTagged = !hasPackage || !!packageType;
-  const canApprove = canSave && isTagged;
 
   const save = async (thenApprove = false) => {
     // Editing an existing booking requires a reason (saved to the audit trail).
@@ -391,7 +387,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : 'SO / PO / GP VOUCHER'}</p>
             <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#8b94b3' }}>
               {editing
-                ? <>Fix any data-entry mistake — or switch the <b style={{ color: GOLD }}>module</b> if it was booked wrong — then <b style={{ color: GOLD }}>Save</b> or <b style={{ color: GOLD }}>Save &amp; Approve</b> · {brCode} · still Pending until approved</>
+                ? <>Fix any data-entry mistake — or switch the <b style={{ color: GOLD }}>module</b> if it was booked wrong — then <b style={{ color: GOLD }}>Save changes</b> · {brCode} · returns to Pending; approve it from the Pending queue</>
                 : <>Enter cost + Other Taxes → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
             </p>
           </div>
@@ -693,7 +689,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* Footer */}
       <div style={{ position: 'sticky', bottom: 0, background: '#f3f4f8', borderTop: '1px solid #e1e3ec', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, color: '#5a6691', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
-          {editing ? <><Pencil size={12} /> Editing a pending voucher — “Save &amp; Approve” fixes it and posts the books in one step.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
+          {editing ? <><Pencil size={12} /> Editing returns this voucher to Pending — approve it from the Pending queue to post the books.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
         </span>
         <FL label="Remarks"><input value={remarks} onChange={(e) => setRemarks(e.target.value)} style={{ ...inp, width: 220 }} placeholder="optional" /></FL>
         <FL label="Sales Tally Ref"><input value={saleTallyRef} onChange={(e) => setSaleTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>
@@ -703,15 +699,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         )}
         <button disabled={!canSave} onClick={() => save(false)}
           style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7 }}>
-          {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (editing ? 'Save changes' : 'Save voucher (Pending)')}
+          {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (editing ? 'Save changes (Pending)' : 'Save voucher (Pending)')}
         </button>
-        {editing && (
-          <button disabled={!canApprove} onClick={() => save(true)}
-            title={!isTagged ? 'Pick International or Domestic first — it sets the cost centre.' : ''}
-            style={{ ...btnG, background: canApprove ? DR : '#9ca3af', cursor: canApprove ? 'pointer' : 'not-allowed', opacity: canApprove ? 1 : 0.7 }}>
-            {saving ? <RefreshCw size={14} className="spin" /> : <CheckCircle2 size={14} />} Save &amp; Approve
-          </button>
-        )}
       </div>
     </div>
   );
@@ -816,7 +805,6 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
         {error && <p style={{ margin: '8px 0 0', fontSize: 12, color: CR, fontWeight: 600 }}>⚠ {error}</p>}
         <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
           <button disabled={!ready} onClick={() => save(false)} style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Save size={14} /> Save (Pending)</button>
-          <button disabled={!ready} onClick={() => save(true)} style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Check size={14} /> Save &amp; Approve</button>
         </div>
         {!ready && <p style={{ margin: '8px 0 0', fontSize: 10.5, color: '#9aa2c0' }}>Need: original invoice, customer, supplier/airline &amp; a supplier amount &gt; 0.</p>}
       </div>

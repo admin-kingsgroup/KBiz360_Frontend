@@ -11,6 +11,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { exportToCSV } from '../../core/business-logic';
 import { toast } from '../../core/ux/toast';
 import { clickable } from '../../core/ux/clickable';
+import { listKeyNav } from '../../core/ux/listKeys';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../core/data';
 import { apiPost, apiPut, apiDelete } from '../../core/api';
 import { useUsersAdmin, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../core/useReference';
@@ -955,7 +956,7 @@ export function EmailSMSTemplates(){
       toolbar={<><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Template</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>Send Test</button></>}>
       <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:14}}>
         {/* Template list */}
-        <div style={cardStyle}>
+        <div style={cardStyle} onKeyDown={listKeyNav()}>
           <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Templates ({templates.length})</p>
           {templates.map((tmpl,i)=>(
             <div key={tmpl.id} {...clickable(()=>{setSel(i);setEditBody(tmpl.body);},{role:'option'})} style={{padding:"9px 10px",border:sel===i?"2px solid #d4a437":"1px solid #e1e3ec",borderRadius:6,marginBottom:6,cursor:"pointer",background:sel===i?"#fff8e8":"#fff"}}>

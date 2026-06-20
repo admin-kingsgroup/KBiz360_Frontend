@@ -33,6 +33,7 @@ import { openPrintPreview } from '../../core/PrintPreview';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { clickable } from '../../core/ux/clickable';
+import { listKeyNav } from '../../core/ux/listKeys';
 
 /* ════════════════════════════════════════════════════════════════════
    FINANCE VOUCHER PERSISTENCE
@@ -376,7 +377,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
 
       {/* ── Dropdown panel ── */}
       {open&&(
-        <div style={{
+        <div onKeyDown={listKeyNav({ onEscape:()=>{setOpen(false);setSearch("");} })} style={{
           position:"absolute",top:"100%",left:0,right:0,
           background:"#fff",border:"1.5px solid #0d1326",
           borderTop:"none",borderRadius:"0 0 12px 12px",

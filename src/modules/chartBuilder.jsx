@@ -16,6 +16,7 @@ import { branchCode } from '../core/useAccounting';
 import { FocusBanner } from '../core/ux/FocusBanner';
 import { useNavFocusStore } from '../core/ux/navFocus';
 import { clickable } from '../core/ux/clickable';
+import { listKeyNav } from '../core/ux/listKeys';
 import { BRANCH_CODES, CONSOLIDATED_LABEL } from '../core/data';
 
 const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5', GREEN = '#27500A', GOLD = '#A07828', GREY = '#7b86a8';
@@ -173,7 +174,7 @@ export function AccountsTreeView({ branch }) {
   const col = (title, items, selVal, onPick, kind) => (
     <div style={{ flex: 1, minWidth: 180, border: '1px solid #e5e9f0', borderRadius: 8, background: '#fff', display: 'flex', flexDirection: 'column', maxHeight: '64vh' }}>
       <div style={{ padding: '8px 10px', fontSize: 10, fontWeight: 800, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, borderBottom: '1px solid #eef1f6', background: '#f7f8fb' }}>{title} <span style={{ color: '#9aa2c0' }}>({items.length})</span></div>
-      <div style={{ overflow: 'auto' }}>
+      <div style={{ overflow: 'auto' }} onKeyDown={onPick ? listKeyNav() : undefined}>
         {items.map((it) => (
           <div key={it.name || it.id} {...(onPick ? clickable(() => onPick(it), { role: 'option' }) : {})} style={{ padding: '6px 10px', fontSize: 12, cursor: onPick ? 'pointer' : 'default', background: selVal === (it.name) ? '#eef3fb' : 'transparent', borderBottom: '1px solid #f5f6fa', color: DARK, fontWeight: selVal === it.name ? 700 : 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span>{kind === 'ledger' ? <><span style={{ color: GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}</> : it.name}</span>

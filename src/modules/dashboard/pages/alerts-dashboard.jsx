@@ -3,6 +3,7 @@ import { RefreshCw, Check, Clock, ChevronRight, Search } from 'lucide-react';
 import { useAlerts, useSetAlertStatus } from '../../../core/useAccounting';
 import { setNavFocus } from '../../../core/ux/navFocus';
 import { clickable } from '../../../core/ux/clickable';
+import { listKeyNav } from '../../../core/ux/listKeys';
 import { card } from '../../../core/styles';
 
 const DARK = '#0d1326', DIM = '#5a6691', LINE = '#e1e3ec';
@@ -133,7 +134,7 @@ export function AlertsDashboard({ branch, setRoute }) {
                 </div>
                 <div style={{ fontSize: 11.5, color: '#384677', marginTop: 2 }}>{a.detail}</div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, position: 'relative' }} onKeyDown={listKeyNav({ onEscape: () => setRemindFor(null) })}>
                 {a.link && <button onClick={() => open(a)} title="Open & fix" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: '#185FA5', color: '#fff' }}>Open <ChevronRight size={13} /></button>}
                 {tab !== 'finished' && <button onClick={() => act(a, 'finished')} title="Mark finished" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid ' + LINE, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: '#fff', color: '#27500A' }}><Check size={13} /> Finish</button>}
                 {tab !== 'remind' && <button onClick={() => setRemindFor(remindFor === a.key ? null : a.key)} title="Remind later" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid ' + LINE, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: '#fff', color: '#B7791F' }}><Clock size={13} /> Remind</button>}
