@@ -103,6 +103,12 @@ export const TAX_INDIA = {label:"Taxation — GST", icon:FileText, _regime:"GST"
   {label:"GSTR-3B Auto-Prep", href:"/tax/gstr-3b-prep"},
   {label:"Form 16A Generator", href:"/tax/form-16a"},
   {label:"Tax Calendar & Reminders", href:"/tax/calendar"},
+  /* — Tax & Statutory (moved here from the Accounts pill) — */
+  {divider:true, label:"Tax & Statutory"},
+  {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
+  {label:"TDS Auto-Calculator",        href:"/finance/tds-calculator"},
+  {label:"Statutory Dues Calendar",    href:"/reports/statutory-dues"},
+  {label:"Tax Filing Status Board",    href:"/reports/tax-board"},
 ]};
 
 /* ── TAXATION — AFRICA VAT ───────────────────────────────────── */
@@ -113,6 +119,12 @@ export const TAX_AFRICA = {label:"Taxation — VAT", icon:FileText, _regime:"VAT
   {label:"Withholding Tax",           href:"/tax/tds"},
   {divider:true, label:"Compliance"},
   {label:"Compliance Calendar",       href:"/tax/calendar"},
+  /* — Tax & Statutory (moved here from the Accounts pill) — */
+  {divider:true, label:"Tax & Statutory"},
+  {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
+  {label:"TDS Auto-Calculator",        href:"/finance/tds-calculator"},
+  {label:"Statutory Dues Calendar",    href:"/reports/statutory-dues"},
+  {label:"Tax Filing Status Board",    href:"/reports/tax-board"},
 ]};
 
 /* ── TAXATION — TRAVKINGS GROUP ─────────────────────────────────── */
@@ -131,6 +143,12 @@ export const TAX_ALL = {label:"Taxation", icon:FileText, _regime:"ALL", children
   {label:"Withholding Tax (WHT)",     href:"/tax/tds"},
   {divider:true, label:"Travkings Group"},
   {label:"Compliance Calendar",       href:"/tax/calendar"},
+  /* — Tax & Statutory (moved here from the Accounts pill) — */
+  {divider:true, label:"Tax & Statutory"},
+  {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
+  {label:"TDS Auto-Calculator",        href:"/finance/tds-calculator"},
+  {label:"Statutory Dues Calendar",    href:"/reports/statutory-dues"},
+  {label:"Tax Filing Status Board",    href:"/reports/tax-board"},
 ]};
 
 /* ── REPORTS ─────────────────────────────────────────────────── */

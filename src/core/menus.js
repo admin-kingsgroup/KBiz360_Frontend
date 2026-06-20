@@ -323,12 +323,8 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Groups & Sub-Groups (Create)",         href:"/masters/subgroups"},
     {label:"Bank Accounts",                        href:"/masters/bank-accounts"},
   ]},
-  {label:"Tax & Statutory", children:[
-    {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
-    {label:"TDS Auto-Calculator",        href:"/finance/tds-calculator"},
-    {label:"Statutory Dues Calendar",    href:"/reports/statutory-dues"},
-    {label:"Tax Filing Status Board",    href:"/reports/tax-board"},
-  ]},
+  // Tax & Statutory moved to the Taxation header (see TAX_INDIA / TAX_AFRICA /
+  // TAX_ALL in core/data.js) — it no longer lives under the Accounts pill.
   {label:"BSP & Airline", children:[
     {label:"BSP Summary",             href:"/purchase/bsp-summary"},
     {label:"BSP Statement Import",    href:"/purchase/bsp-import"},
@@ -527,13 +523,14 @@ export function getMenu(branch, currentUser){
   const role = currentUser?.role || 'Super Admin';
   const isDir = role === 'Director' || role === 'Super Admin';
   const isAccountant = /accountant/i.test(role || ''); // "Branch Accountant" et al.
-  // Branch Accountant → a single, self-contained workspace: the Accounts pill ONLY.
-  // It already bundles their Dashboard, Daily-Entry vouchers, Approve & Post,
-  // Sales/Purchase + Receivables/Payables + Cash/Bank registers, Books & Scrutiny,
-  // quick-create Masters, Tax & Statutory, Period Close and Branch MIS — so there's
-  // no need for the Finance/Reports/Taxation/Masters/Admin pills. Branch scope is
-  // enforced by the top-right switcher (limited to their stored branches).
-  if (isAccountant) return applyHidden([MENU_ACCOUNTS], currentUser);
+  // Branch Accountant → their self-contained Accounts workspace PLUS the Taxation
+  // pill. The Accounts pill bundles their Dashboard, Daily-Entry vouchers, Approve
+  // & Post, Sales/Purchase + Receivables/Payables + Cash/Bank registers, Books &
+  // Scrutiny, quick-create Masters, Period Close and Branch MIS. Tax & Statutory now
+  // lives under the Taxation header (regime-aware: GST / VAT / consolidated), so the
+  // accountant gets that pill too. Branch scope is still enforced by the top-right
+  // switcher (limited to their stored branches).
+  if (isAccountant) return applyHidden([MENU_ACCOUNTS, taxSection], currentUser);
   const top = isDir ? [MENU_DASHBOARDS, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
   // 8 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · Admin
   const menus = [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];

@@ -2,8 +2,6 @@ import {
   BANK_ACCOUNTS_DATA,
   BRANCH_PL_HEATMAP,
   PERIOD_CLOSE_DATA,
-  RECON_STATUS_DATA,
-  VARIANCE_FLAGS_DATA,
 } from '../../../core/helpers';
 import {
   CASH_FORECAST_13W,
@@ -99,13 +97,53 @@ const ageingSide = async (sideKey, branchCode) => {
 export const getArAgeingSummary = async (branchCode) => ageingSide('receivables', branchCode);
 export const getApAgeingSummary = async (branchCode) => ageingSide('payables', branchCode);
 
-// ── Phase 2 (need new backend endpoints) — still seed data for now ──────────
+// ── LIVE (Phase 2 wiring) ───────────────────────────────────────────────────
+// Recent variance flags — live from indirect-expense budget vs actual. Over-budget
+// ledgers become the SR-FM "Recent Variance Flags" panel. Shape the widget needs:
+// { account, pct, variance, branch, date }.
+export const getVarianceFlags = async (branchCode) => {
+  try {
+    const d = await apiGet('/api/accounting/budget-vs-actual', { branch: branchCode });
+    const today = new Date().toISOString().slice(0, 10);
+    return (d?.rows || [])
+      .filter((r) => (r.actual || 0) > (r.budget || 0)) // only overruns are "flags"
+      .map((r) => {
+        const over = Math.round((r.actual || 0) - (r.budget || 0));
+        return { account: r.name, variance: over, pct: r.budget ? Math.round((over / r.budget) * 100) : 0, branch: branchCode || 'All', date: today };
+      })
+      .sort((a, b) => b.variance - a.variance);
+  } catch { return []; }
+};
+
+// Bank reconciliation status — live: one summary per active bank ledger, mapped to
+// the panel's { bank, status, matched, unmatched }. 'Clean' (green) when nothing is
+// unreconciled, 'Behind' (red) when there's an open backlog (see statusColor()).
+export const getReconStatus = async (branchCode) => {
+  try {
+    const ledgers = await apiGet('/api/bank-reconciliation/ledgers', { branch: branchCode });
+    const list = Array.isArray(ledgers) ? ledgers : [];
+    return await Promise.all(list.map(async (lg) => {
+      try {
+        const s = await apiGet('/api/bank-reconciliation/summary', { ledger: lg.name, branch: branchCode });
+        const c = s?.counts || {};
+        const matched = (c.statementReconciled || 0) + (c.statementPartial || 0);
+        const unmatched = (c.statementUnreconciled || 0) + (c.statementException || 0);
+        const status = unmatched > 0 ? 'Behind' : (matched > 0 ? 'Clean' : 'Pending');
+        return { bank: lg.name, status, matched, unmatched };
+      } catch { return { bank: lg.name, status: 'Pending', matched: 0, unmatched: 0 }; }
+    }));
+  } catch { return []; }
+};
+
+// ── Still seed — genuinely need new/derivation backends (not yet wired) ──────
+// getCashForecast: the cashflow-forecast endpoint is a STORED-scenario CRUD, not a
+//   13-week derivation — needs a derive endpoint before it can go live here.
+// getBankAccounts/getBranchHeatmap/getPeriodClose: derive from Trial Balance /
+//   module-PL / period-lock respectively (P2.2/P2.3).
+// getFyTargets: superseded — the Director dashboard already renders live targets via
+//   useTargetsVsActual; this accessor is only a fallback and stays empty.
 export const getBankAccounts = async () => BANK_ACCOUNTS_DATA;
 export const getFyTargets = async () => FY_TARGETS_DATA;
 export const getBranchHeatmap = async () => BRANCH_PL_HEATMAP;
-// Key Alerts are now derived live in the dashboard service (buildKeyAlerts) from
-// ageing + module P&L + concentration — no seed accessor needed.
 export const getCashForecast = async () => CASH_FORECAST_13W;
 export const getPeriodClose = async () => PERIOD_CLOSE_DATA;
-export const getReconStatus = async () => RECON_STATUS_DATA;
-export const getVarianceFlags = async () => VARIANCE_FLAGS_DATA;
