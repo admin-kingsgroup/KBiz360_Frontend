@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Plus } from 'lucide-react';
 import { FL, inp, btnGh, card } from '../../styles';
+import { todayISO } from '../../dates';
 import { VPlaceOfSupply } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
 import { useVoucherRef } from '../useVoucherRef';
@@ -41,7 +42,7 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
-        <FL label="Voucher date"><input type="date" value={state.date || ''} onChange={(e) => patch({ date: e.target.value })} style={inp} /></FL>
+        <FL label="Voucher date"><input type="date" max={todayISO()} value={state.date || ''} onChange={(e) => patch({ date: e.target.value })} style={inp} /></FL>
         <FL label="Bill / Invoice no."><input value={state.billNo || ''} onChange={(e) => patch({ billNo: e.target.value })} style={inp} placeholder="VEND-4471" /></FL>
         {state.gstApplicable ? <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} /> : <div />}
       </div>
