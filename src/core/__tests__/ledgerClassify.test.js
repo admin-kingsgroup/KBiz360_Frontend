@@ -74,6 +74,37 @@ describe('ledgerType — party ledgers nested under a custom sub-group (rootGrou
   });
 });
 
+describe('ledgerType — bank-charge ITC vendors (Option B / Purchase-Expense)', () => {
+  // The Purchase-Expense Supplier picker filters to type === 'Creditor'. A bank-
+  // charge vendor MUST classify as Creditor, NOT Bank. Naming it "ICICI Bank ..."
+  // would trip the (!isPL && /bank/.test(name)) fallback and hide it — hence the
+  // seed names the vendors "<Brand> Charges Payable" (no "bank" token).
+  const supplierVisible = (l) => ledgerType(l) === 'Creditor';
+
+  const vendors = [
+    'ICICI Charges Payable',
+    'HDFC Charges Payable',
+    'Kotak Mahindra Charges Payable',
+    'DCB Charges Payable',
+    'YES Charges Payable',
+  ];
+  test.each(vendors)('"%s" is a Creditor and shows in the Supplier picker', (name) => {
+    const l = { name, group: 'Sundry Creditors', subGroup: 'Supplier Others', nature: 'liability', drCr: 'Cr' };
+    expect(ledgerType(l)).toBe('Creditor');
+    expect(supplierVisible(l)).toBe(true);
+  });
+
+  test('regression: a vendor named with "Bank" would wrongly be Bank (why we renamed)', () => {
+    const bad = { name: 'ICICI Bank — Charges', group: 'Sundry Creditors', subGroup: 'Supplier Others', nature: 'liability', drCr: 'Cr' };
+    expect(ledgerType(bad)).toBe('Bank'); // misclassified -> excluded from Supplier picker
+  });
+
+  test('the branch-tagged Bank Charges expense head stays an Expense', () => {
+    const l = { name: 'Bank Charges Expenses', group: 'Variable Expenses', subGroup: 'Financial Expenses', nature: 'expense', drCr: 'Dr' };
+    expect(ledgerType(l)).toBe('Expense');
+  });
+});
+
 describe('ledgerType — other classes unaffected', () => {
   const cases = [
     [{ name: 'ABC Travels', group: 'Sundry Creditors', nature: 'liability', drCr: 'Cr' }, 'Creditor'],
