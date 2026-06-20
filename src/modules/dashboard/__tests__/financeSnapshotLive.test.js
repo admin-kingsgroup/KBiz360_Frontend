@@ -5,7 +5,7 @@
 jest.mock('../../../core/api', () => ({ apiGet: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 
 import { apiGet } from '../../../core/api';
-import { getVarianceFlags, getReconStatus, getBankAccounts } from '../api/get-finance-snapshot';
+import { getVarianceFlags, getReconStatus, getBankAccounts, getBranchHeatmap, getCashForecast } from '../api/get-finance-snapshot';
 
 afterEach(() => jest.clearAllMocks());
 
@@ -47,6 +47,30 @@ describe('getBankAccounts — live Trial Balance', () => {
   test('returns [] on error', async () => {
     apiGet.mockRejectedValueOnce(new Error('boom'));
     expect(await getBankAccounts()).toEqual([]);
+  });
+});
+
+describe('getBranchHeatmap — live branch × month GP', () => {
+  test('passes through the rows payload', async () => {
+    const rows = [{ branch: 'BOM', cells: [{ month: 'Apr', rev: 100, gp: 13 }] }];
+    apiGet.mockResolvedValueOnce({ fy: '2026-27', rows });
+    expect(await getBranchHeatmap('2026-27')).toEqual(rows);
+  });
+  test('returns [] on error', async () => {
+    apiGet.mockRejectedValueOnce(new Error('boom'));
+    expect(await getBranchHeatmap()).toEqual([]);
+  });
+});
+
+describe('getCashForecast — live 13-week projection', () => {
+  test('passes through the weekly rows', async () => {
+    const rows = [{ week: 'W1', inflow: 5000, outflow: 2000, closing: 103000 }];
+    apiGet.mockResolvedValueOnce({ opening: 100000, rows });
+    expect(await getCashForecast('BOM')).toEqual(rows);
+  });
+  test('returns [] on error', async () => {
+    apiGet.mockRejectedValueOnce(new Error('boom'));
+    expect(await getCashForecast()).toEqual([]);
   });
 });
 

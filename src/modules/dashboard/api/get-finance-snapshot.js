@@ -1,9 +1,7 @@
 import {
-  BRANCH_PL_HEATMAP,
   PERIOD_CLOSE_DATA,
 } from '../../../core/helpers';
 import {
-  CASH_FORECAST_13W,
   FY_TARGETS_DATA,
 } from '../../../core/data';
 import { apiGet } from '../../../core/api';
@@ -156,15 +154,28 @@ export const getBankAccounts = async (branchCode) => {
   } catch { return []; }
 };
 
-// ── Still seed — genuinely need new/derivation backends (not yet wired) ──────
-// getCashForecast: the cashflow-forecast endpoint is a STORED-scenario CRUD, not a
-//   13-week derivation — needs a derive endpoint before it can go live here.
-// getBranchHeatmap: needs a branch × month P&L matrix endpoint (≈ branches×12
-//   module-PL calls is too heavy to derive client-side).
-// getPeriodClose: needs a period-lock / month-end status endpoint.
+// Branch × month GP heatmap — live (GET /api/accounting/branch-heatmap). Each row
+// { branch, cells:[{month, rev, gp}] } drives the Director heatmap shading (GP%).
+export const getBranchHeatmap = async (fy) => {
+  try {
+    const d = await apiGet('/api/accounting/branch-heatmap', { fy });
+    return d?.rows || [];
+  } catch { return []; }
+};
+
+// 13-week cash-flow forecast — live (GET /api/accounting/cash-forecast). Returns
+// [{ week, inflow, outflow, closing }] derived from open AR/AP bills' due dates.
+export const getCashForecast = async (branchCode) => {
+  try {
+    const d = await apiGet('/api/accounting/cash-forecast', { branch: branchCode });
+    return d?.rows || [];
+  } catch { return []; }
+};
+
+// ── Still seed — genuinely need a new backend (not yet wired) ────────────────
+// getPeriodClose: needs a period-lock / month-end status subsystem (no source of
+//   truth exists yet) — left empty rather than fabricating a "Closed" status.
 // getFyTargets: superseded — the Director dashboard already renders live targets via
 //   useTargetsVsActual; this accessor is only a fallback and stays empty.
 export const getFyTargets = async () => FY_TARGETS_DATA;
-export const getBranchHeatmap = async () => BRANCH_PL_HEATMAP;
-export const getCashForecast = async () => CASH_FORECAST_13W;
 export const getPeriodClose = async () => PERIOD_CLOSE_DATA;
