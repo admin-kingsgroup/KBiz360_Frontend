@@ -39,12 +39,12 @@ export function TaxShell({title,subtitle,children,action}){
 
 export function TaxGstr1({branch}){
   const mob=useMobile();
-  const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
+  const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
 
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const bills=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
+  const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
   const B2B_CLIENTS=[]; // TODO: derive B2B/B2C split from the customer master's GST-registration flag
 
   const b2b=bills.filter(b=>B2B_CLIENTS.includes(b.client));
@@ -68,7 +68,7 @@ export function TaxGstr1({branch}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>GSTR-1 — Outward Supplies</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {monthLabel(period)} · Due: 11th of following month</p>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode||"All branches"} · {monthLabel(period)} · Due: 11th of following month</p>
           <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {rangeNote('month',{month:period})} · use the period selector to change</p>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -129,7 +129,7 @@ export function TaxGstr1({branch}){
 
 export function TaxGstr3b({branch}){
   const mob=useMobile();
-  const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
+  const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
 
@@ -139,9 +139,9 @@ export function TaxGstr3b({branch}){
   // field to split sale vs purchase rows, so `sales` and `purch` are intentionally the same set;
   // ITC below correctly draws from b.cost (purchase amount). If a dedicated purchase voucher
   // source is added later, repoint `purch` to it.
-  const sales=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
-  const purch=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
-  const rcm=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period)&&(b.supplier||'').includes("BSP")); // GDS as RCM proxy
+  const sales=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
+  const purch=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
+  const rcm=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&(b.supplier||'').includes("BSP")); // GDS as RCM proxy
 
   const gstRate=mod=>mod==="Holiday"?5:18;
   const totOutward =sales.reduce((s,b)=>s+b.sell/(1+gstRate(b.mod)/100)*(gstRate(b.mod)/100),0);
@@ -175,7 +175,7 @@ export function TaxGstr3b({branch}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>GSTR-3B — Monthly Summary</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {monthLabel(period)} · Due: 20th of following month</p>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode||"All branches"} · {monthLabel(period)} · Due: 20th of following month</p>
           <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {rangeNote('month',{month:period})} · use the period selector to change</p>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -221,7 +221,7 @@ export function TaxGstr3b({branch}){
 
 export function TaxRcm({branch}){
   const mob=useMobile();
-  const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
+  const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
@@ -229,7 +229,7 @@ export function TaxRcm({branch}){
   /* Identify RCM entries: overseas DMC purchases + GDS charges */
   const rcmEntries=useMemo(()=>{
     const OVERSEAS_SUPPLIERS=[]; // TODO: flag overseas suppliers in the supplier master
-    return GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period)&&
+    return GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&
       OVERSEAS_SUPPLIERS.some(s=>(b.supplier||'').includes(s.split(" ")[0]))).map(b=>{
       const igst=Math.round(b.cost/(1+0.18)*0.18);
       return {date:b.date,party:b.supplier,desc:`${b.mod} — ${b.dest}`,taxable:Math.round(b.cost/(1+0.18)),igst,status:"Paid",vno:b.id};
@@ -244,7 +244,7 @@ export function TaxRcm({branch}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>RCM Register — Reverse Charge</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {PERIODS.find(p=>p.v===period)?.l} · Pay in cash + claim ITC same month</p>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode||"All branches"} · {PERIODS.find(p=>p.v===period)?.l} · Pay in cash + claim ITC same month</p>
         </div>
         <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
           {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
@@ -296,7 +296,7 @@ export function TaxVat({branch}){
   const AFRICA_BRANCHES=[];
 
   const getBranchData=(brCode,rate)=>{
-    const bills=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
+    const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
     const sales=bills.reduce((s,b)=>s+b.sell,0);
     const taxable=sales/(1+rate/100);
     const outputVAT=taxable*(rate/100);
@@ -491,13 +491,13 @@ export function TaxCalendar(){
    ════════════════════════════════════════════════════════════════ */
 
 export function GstrRecon({branch}){
-  const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
+  const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
 
   /* Simulate GSTR-2B data vs books */
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const bills=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period)&&["BSP India","Emirates GSA","Bali Tours DMC"].includes(b.supplier));
+  const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&["BSP India","Emirates GSA","Bali Tours DMC"].includes(b.supplier));
   const recon=bills.map((b,i)=>{
     const itcBooks=Math.round(b.cost/(1+0.18)*0.18);
     const gstr2bAmt=i%3===1?Math.round(itcBooks*0.85):itcBooks; // simulate 1-in-3 mismatch
@@ -520,7 +520,7 @@ export function GstrRecon({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔄</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>GSTR-2B Reconciliation</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · ITC in books vs ITC available in GSTR-2B · {PERIODS.find(p=>p.v===period)?.l}</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode||"All branches"} ·ITC in books vs ITC available in GSTR-2B · {PERIODS.find(p=>p.v===period)?.l}</p>
           </div>
         </div>
         <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
@@ -694,7 +694,7 @@ export function TallyExport({branch}){
 
 export function TaxTdsTcs({branch}){
   const mob=useMobile();
-  const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
+  const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
   const [tab,setTab]=useState("tds"); // tds | tcs | challan
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
@@ -717,7 +717,7 @@ export function TaxTdsTcs({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📋</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>TDS / TCS Register</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {PERIODS.find(p=>p.v===period)?.l} · TDS due 7th · Form 26Q / 27EQ data</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode||"All branches"} · {PERIODS.find(p=>p.v===period)?.l} · TDS due 7th · Form 26Q / 27EQ data</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>

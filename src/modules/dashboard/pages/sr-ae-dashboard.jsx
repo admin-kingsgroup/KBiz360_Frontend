@@ -13,8 +13,9 @@ import { TopVendorsOverdueTable } from '../components/tables/TopVendorsOverdueTa
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 import { openPrintPreview } from '../../../core/PrintPreview';
 
-export function SrAeDashboardPage({ currentUser, setRoute }) {
-  const { data, todayTotal, todayValue, isLoading } = useSrAeDashboard();
+export function SrAeDashboardPage({ currentUser, setRoute, branch }) {
+  const branchCode = branch === 'ALL' ? null : branch?.code;
+  const { data, todayTotal, todayValue, isLoading } = useSrAeDashboard(branchCode);
   const { navigate } = useDashboardActions(setRoute);
   const period = useDashboardStore((s) => s.period);
   const setPeriod = useDashboardStore((s) => s.setPeriod);

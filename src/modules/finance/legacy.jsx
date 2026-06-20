@@ -873,7 +873,7 @@ export function CashFlowForecast({branch}){
   const blank={date:'',kind:'inflow',category:'',amount:''};
   const [f,setF]=useState(blank);
   const set=(k)=>(e)=>setF(s=>({...s,[k]:e.target.value}));
-  const add=()=>{ if(!f.date||!f.amount){return;} create.mutate({branch:brCode||'BOM',date:f.date,kind:f.kind,category:f.category,amount:Number(f.amount)||0},{onSuccess:()=>setF(blank)}); };
+  const add=()=>{ if(!brCode){ toast('Select a specific branch (not All) before adding.','error'); return; } if(!f.date||!f.amount){return;} create.mutate({branch:brCode,date:f.date,kind:f.kind,category:f.category,amount:Number(f.amount)||0},{onSuccess:()=>setF(blank)}); };
   const today=new Date(); today.setHours(0,0,0,0);
   const wk=(d)=>{ const dt=new Date(d); return Math.floor((dt-today)/(7*86400000)); };
   const weeks=Array.from({length:13},(_,i)=>({i,inflow:0,outflow:0}));
@@ -1193,7 +1193,7 @@ export function LoanEmiRegister({branch}){
   const blank={lender:'',type:'Term',purpose:'',principal:'',rate:'',tenure:'',emi:'',balance:'',nextDue:''};
   const [f,setF]=useState(blank);
   const set=(k)=>(e)=>setF(s=>({...s,[k]:e.target.value}));
-  const add=()=>{ if(!f.lender){return;} create.mutate({branch:brCode||'BOM',lender:f.lender,type:f.type,purpose:f.purpose,principal:Number(f.principal)||0,rate:Number(f.rate)||0,tenure:Number(f.tenure)||0,emi:Number(f.emi)||0,balance:Number(f.balance)||Number(f.principal)||0,nextDue:f.nextDue,status:'active'},{onSuccess:()=>setF(blank)}); };
+  const add=()=>{ if(!brCode){ toast('Select a specific branch (not All) before adding.','error'); return; } if(!f.lender){return;} create.mutate({branch:brCode,lender:f.lender,type:f.type,purpose:f.purpose,principal:Number(f.principal)||0,rate:Number(f.rate)||0,tenure:Number(f.tenure)||0,emi:Number(f.emi)||0,balance:Number(f.balance)||Number(f.principal)||0,nextDue:f.nextDue,status:'active'},{onSuccess:()=>setF(blank)}); };
   const totP=rows.reduce((s,l)=>s+(l.principal||0),0),totB=rows.reduce((s,l)=>s+(l.balance||0),0),totE=rows.reduce((s,l)=>s+(l.emi||0),0);
   const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
   const ip={...inp,minHeight:30,fontSize:11,width:"100%"};
@@ -1682,7 +1682,7 @@ export function InvestmentRegister({branch}){
   const blank={instrument:'',type:'FD',institution:'',amount:'',rate:'',maturityDate:'',maturityValue:'',status:'active'};
   const [f,setF]=useState(blank);
   const set=(k)=>(e)=>setF(s=>({...s,[k]:e.target.value}));
-  const add=()=>{ if(!f.instrument){return;} create.mutate({branch:brCode||'BOM',instrument:f.instrument,type:f.type,institution:f.institution,amount:Number(f.amount)||0,rate:Number(f.rate)||0,maturityDate:f.maturityDate,maturityValue:Number(f.maturityValue)||0,status:f.status},{onSuccess:()=>setF(blank)}); };
+  const add=()=>{ if(!brCode){ toast('Select a specific branch (not All) before adding.','error'); return; } if(!f.instrument){return;} create.mutate({branch:brCode,instrument:f.instrument,type:f.type,institution:f.institution,amount:Number(f.amount)||0,rate:Number(f.rate)||0,maturityDate:f.maturityDate,maturityValue:Number(f.maturityValue)||0,status:f.status},{onSuccess:()=>setF(blank)}); };
   const totA=rows.reduce((s,i)=>s+(i.amount||0),0),totM=rows.reduce((s,i)=>s+(i.maturityValue||0),0);
   const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
   const ip={...inp,minHeight:30,fontSize:11,width:"100%"};

@@ -12,8 +12,10 @@ import { AgeingBuckets } from '../components/shared/AgeingBuckets';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 import { openPrintPreview } from '../../../core/PrintPreview';
 
-export function AcctsExecDashboardPage({ currentUser, setRoute /*, branch */ }) {
-  const ownBranch = currentUser?.branches?.[0] || 'BOM';
+export function AcctsExecDashboardPage({ currentUser, setRoute, branch }) {
+  // Follow the active branch from the switcher; fall back to the user's own
+  // branch (an AE is single-branch). No hardcoded 'BOM' default.
+  const ownBranch = (branch && branch !== 'ALL' && branch.code) || currentUser?.branches?.[0] || null;
   const { data, branchData, isLoading } = useAcctsExecDashboard(ownBranch);
   const { navigate } = useDashboardActions(setRoute);
   const period = useDashboardStore((s) => s.period);

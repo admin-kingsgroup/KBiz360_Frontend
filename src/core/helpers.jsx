@@ -1605,8 +1605,8 @@ export const cardStyle={background:"#fff",border:"1px solid #e1e3ec",borderRadiu
 export function DashboardRouter({branch,setRoute,currentUser}){
   const role = currentUser?.role || "Super Admin";
   if(role==="Director" || role==="Super Admin") return <DirectorDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;
-  if(role==="Senior Finance Manager")          return <SrFmDashboard currentUser={currentUser} setRoute={setRoute}/>;
-  if(role==="Sr. Accounts Executive")          return <SrAeDashboard currentUser={currentUser} setRoute={setRoute}/>;
+  if(role==="Senior Finance Manager")          return <SrFmDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;
+  if(role==="Sr. Accounts Executive")          return <SrAeDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;
   if(role==="Accounts Executive")              return <AcctsExecDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;
   if(role==="HR Manager")                      return <HrMgrDashboard currentUser={currentUser} setRoute={setRoute}/>;
   /* Fallback to existing branch dashboard */

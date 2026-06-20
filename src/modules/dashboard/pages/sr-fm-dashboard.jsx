@@ -18,8 +18,9 @@ import { GSTR_FILING_STATUS } from '../../taxation';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 import { openPrintPreview } from '../../../core/PrintPreview';
 
-export function SrFmDashboardPage({ currentUser, setRoute }) {
-  const { data, isLoading } = useSrFmDashboard();
+export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
+  const branchCode = branch === 'ALL' ? null : branch?.code;
+  const { data, isLoading } = useSrFmDashboard(branchCode);
   const { navigate } = useDashboardActions(setRoute);
   const period = useDashboardStore((s) => s.period);
   const setPeriod = useDashboardStore((s) => s.setPeriod);

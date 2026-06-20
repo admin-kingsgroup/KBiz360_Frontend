@@ -108,25 +108,25 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
   };
 };
 
-export const loadSrFmDashboard = async () => {
+export const loadSrFmDashboard = async ({ branchCode } = {}) => {
   const [cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags] =
     await Promise.all([
-      api.getCashForecast(),
-      api.getBankAccounts(),
+      api.getCashForecast(branchCode),
+      api.getBankAccounts(branchCode),
       api.getPeriodClose(),
-      api.getArAgeingSummary(),
-      api.getApAgeingSummary(),
-      api.getVarianceFlags(),
+      api.getArAgeingSummary(branchCode),
+      api.getApAgeingSummary(branchCode),
+      api.getVarianceFlags(branchCode),
     ]);
 
   return { cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags };
 };
 
-export const loadSrAeDashboard = async () => {
+export const loadSrAeDashboard = async ({ branchCode } = {}) => {
   const [todayVouchers, reconStatus, topSuppliers] = await Promise.all([
     api.getTodayVouchersByBranch(),
-    api.getReconStatus(),
-    api.getTopSuppliers(),
+    api.getReconStatus(branchCode),
+    api.getTopSuppliers(branchCode),
   ]);
 
   return { todayVouchers, reconStatus, topSuppliers };

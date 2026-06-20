@@ -3,10 +3,10 @@ import { useMemo } from 'react';
 import { loadSrAeDashboard } from '../services/dashboard.service';
 import { sumVoucherTotals } from '../utils/transformers';
 
-export function useSrAeDashboard() {
+export function useSrAeDashboard(branchCode) {
   const query = useQuery({
-    queryKey: ['dashboard', 'sr-ae'],
-    queryFn: loadSrAeDashboard,
+    queryKey: ['dashboard', 'sr-ae', branchCode || 'all'],
+    queryFn: () => loadSrAeDashboard({ branchCode }),
   });
 
   const totals = useMemo(() => {
