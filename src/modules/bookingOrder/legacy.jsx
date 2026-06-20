@@ -1069,6 +1069,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                           {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve
                         </button>
                         <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><XCircle size={12} /> Reject</button>
+                        {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} title="Delete — remove from Pending, view-only (number not reusable)" style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: '#A32D2D' }}><Trash2 size={12} /> Delete</button>}
                       </div>
                     ) : mode === 'approved' ? (
                       // Edit is open to everyone (it un-posts the booking → Pending → re-approve);
@@ -1330,7 +1331,10 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   };
   const onDelete = async (b) => {
     if (!canDelete) return;
-    const { confirmed, reason } = await confirmDialog({ title: `Delete approved booking ${b.bookingNo}?`, message: `Its Sales (${b.saleVno}) & Purchase (${b.purchaseVno}) are reversed out of the books; kept view-only under Deleted, numbers never reused.`, danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
+    // A pending booking hasn't posted, so there's nothing to reverse — only the
+    // approved-tab delete unwinds the posted Sales/Purchase. Either way the number is burned.
+    const posted = b.status === 'approved' || b.status === 'posted';
+    const { confirmed, reason } = await confirmDialog({ title: `Delete ${posted ? 'approved ' : ''}booking ${b.bookingNo}?`, message: posted ? `Its Sales (${b.saleVno}) & Purchase (${b.purchaseVno}) are reversed out of the books; kept view-only under Deleted, numbers never reused.` : `It has no books impact; kept view-only under Deleted, numbers never reused.`, danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
     if (!confirmed) return;
     setBusyId(b.id);
     try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); setOpen(null); setMsg(`✓ Deleted ${b.bookingNo}.`); }

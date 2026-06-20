@@ -2,6 +2,7 @@ import {
   PERIOD_CLOSE_DATA,
 } from '../../../core/helpers';
 import { apiGet } from '../../../core/api';
+import { isBankRow } from '../../../core/ledgerKind';
 
 /**
  * Finance-snapshot data access.
@@ -137,7 +138,7 @@ export const getBankAccounts = async (branchCode) => {
   try {
     const d = await apiGet('/api/accounting/trial-balance', { branch: branchCode });
     return (d?.rows || [])
-      .filter((r) => /bank|overdraft/i.test(r.group || ''))
+      .filter((r) => isBankRow(r))
       .map((r) => ({
         id: r.ledger,
         bank: r.ledger,

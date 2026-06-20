@@ -21,6 +21,7 @@ import { apiGet } from '../../../core/api';
 
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 import { openPrintPreview } from '../../../core/PrintPreview';
+import { isLiquidRow } from '../../../core/ledgerKind';
 
 const RANGE_SHORT = { month: 'This Month', quarter: 'This Quarter', ytd: 'YTD', all: 'All Time' };
 const C = { dark: '#0d1326', dim: '#5a6691', green: '#1f7a3d', red: '#A32D2D', gold: '#854F0B', border: '#e7e9f0' };
@@ -87,7 +88,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
   const lT = liabs.reduce((s, a) => s + (a.amount || 0), 0);
   const balanced = Math.abs(aT - lT) < 1;
   const netWorth = liabs.filter((l) => /capital|reserve|profit|equity|surplus/i.test(l.group || l.name || '')).reduce((s, l) => s + (l.amount || 0), 0);
-  const bankRows = (trial.rows || []).filter((r) => /cash|bank/i.test(r.group || ''));
+  const bankRows = (trial.rows || []).filter(isLiquidRow);
   const bal = (r) => (r.closingDebit || 0) - (r.closingCredit || 0);
   const liquid = bankRows.reduce((s, r) => s + bal(r), 0) || fig.cash || totalCashInr;
   const arOverdue = age?.receivables?.totals?.d90 || 0;

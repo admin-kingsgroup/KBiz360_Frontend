@@ -112,8 +112,11 @@ export function VoucherApprovals({ branch, currentUser }) {
     if (confirmed) reject.mutate({ id, by: 'admin', reason }, { onSuccess: () => toast('Voucher rejected'), onError: (e) => toast(e?.message || 'Reject failed', 'error') });
   };
   const doDelete = async (id) => {
-    const { confirmed, reason } = await confirmDialog({ title: 'Delete voucher?', message: 'It will be reversed out of the books and kept view-only — its number can never be reused.', danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
-    if (confirmed) del.mutate({ id, by: 'admin', reason }, { onSuccess: () => toast('Voucher deleted & reversed'), onError: (e) => toast(e?.message || 'Delete failed', 'error') });
+    // A pending voucher hasn't posted, so there's nothing to reverse — only the
+    // approved-tab delete unwinds the books. Either way the number is burned.
+    const pending = status === 'pending';
+    const { confirmed, reason } = await confirmDialog({ title: 'Delete voucher?', message: pending ? 'It will be removed from Pending and kept view-only under Deleted — its number can never be reused.' : 'It will be reversed out of the books and kept view-only — its number can never be reused.', danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
+    if (confirmed) del.mutate({ id, by: 'admin', reason }, { onSuccess: () => toast(pending ? 'Voucher deleted' : 'Voucher deleted & reversed'), onError: (e) => toast(e?.message || 'Delete failed', 'error') });
   };
   const doApproveSelected = async () => {
     if (!sel.size) return;
@@ -201,6 +204,7 @@ export function VoucherApprovals({ branch, currentUser }) {
         <button onClick={() => setEditId(e.id)} disabled={busy} style={ABTN(C.blue)}>Edit</button>
         <button onClick={() => doApprove(e.id)} disabled={busy || !e.postable} title={e.postable ? '' : (alertOf(e) || 'Fix the error (Edit) before approving')} aria-label={e.postable ? undefined : `Approve disabled — ${alertOf(e) || 'fix the error (Edit) first'}`} style={{ ...ABTN(C.green, true), background: e.postable ? C.green : '#cfd6e4', cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
         <button onClick={() => doReject(e.id)} disabled={busy} style={ABTN(C.red)}>Reject</button>
+        {isAdmin && <button onClick={() => doDelete(e.id)} disabled={busy} title="Delete — remove from Pending, view-only (number not reusable)" style={ABTN(C.red, true)}>Delete</button>}
       </>
     ) : status === 'approved' ? (
       <>
@@ -394,7 +398,8 @@ export function VoucherApprovals({ branch, currentUser }) {
                                             <>
                                               <button onClick={() => setEditId(e.id)} disabled={busy} style={{ padding: '3px 9px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Edit</button>
                                               <button onClick={() => doApprove(e.id)} disabled={busy || !e.postable} title={e.postable ? '' : 'Fix the error (Edit) before approving'} style={{ padding: '3px 9px', background: e.postable ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: e.postable ? 'pointer' : 'not-allowed', marginRight: 5 }}>Approve</button>
-                                              <button onClick={() => doReject(e.id)} disabled={busy} style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Reject</button>
+                                              <button onClick={() => doReject(e.id)} disabled={busy} style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Reject</button>
+                                              {isAdmin && <button onClick={() => doDelete(e.id)} disabled={busy} title="Delete — remove from Pending, view-only (number not reusable)" style={{ padding: '3px 9px', background: C.red, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Delete</button>}
                                             </>
                                           ) : status === 'approved' ? (
                                             <>

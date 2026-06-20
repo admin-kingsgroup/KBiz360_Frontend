@@ -14,6 +14,8 @@ import {
   useBudgetVsActual, useTargetsVsActual, useSalesTargets, useSaveTargets,
 } from '../core/useAccounting';
 import { CONSOLIDATED_LABEL } from '../core/data';
+import { liquidityKind, isLiquidRow } from '../core/ledgerKind';
+import { openPrintPreview } from '../core/PrintPreview';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#1f7a3d', amber: '#b8860b', dim: '#5a6691', border: '#e1e3ec', bg: '#f3f4f8' };
 const BRANCHES = [
@@ -42,15 +44,21 @@ function Toolbar({ title, sub, branch, p }) {
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <PeriodBar branch={branch} defaultPreset={p && p.def} onChange={p && p.setRange} />
         <span style={{ fontSize: 11, fontWeight: 700, color: C.blue, background: '#E6F1FB', padding: '4px 9px', borderRadius: 5 }}>{branch === 'ALL' || !branch ? CONSOLIDATED_LABEL : (branch.code || branch)}</span>
+        <button onClick={() => openPrintPreview({ selector: 'main', title, recommend: 'portrait' })} title="Export / print this dashboard"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', fontSize: 11.5, fontWeight: 700, color: C.dark, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 6, cursor: 'pointer' }}>⎙ Export</button>
       </div>
     </div>
   );
 }
 
-function KPI({ label, value, sub, tone, delta }) {
+function KPI({ label, value, sub, tone, delta, onClick }) {
   const col = tone === 'bad' ? C.red : tone === 'good' ? C.green : C.dark;
+  const clickable = typeof onClick === 'function';
   return (
-    <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px', minWidth: 180, flex: '1 1 180px' }}>
+    <div onClick={onClick} role={clickable ? 'button' : undefined} tabIndex={clickable ? 0 : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+      title={clickable ? 'Open details →' : undefined}
+      style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px', minWidth: 180, flex: '1 1 180px', cursor: clickable ? 'pointer' : 'default' }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 900, color: col, marginTop: 4 }}>{value}</div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
@@ -79,7 +87,7 @@ function usePeriod(def = 'all') {
 }
 
 // ── 1) Executive Overview ─────────────────────────────────────────────────────
-export function ExecutiveOverview({ branch }) {
+export function ExecutiveOverview({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const plQ = useProfitAndLoss(branch, range); const pl = plQ.data || {};
@@ -100,7 +108,7 @@ export function ExecutiveOverview({ branch }) {
   const assetTotal = (bs.assets || []).reduce((s, a) => s + (a.amount || 0), 0);
   const liabTotal = (bs.liabilities || []).reduce((s, a) => s + (a.amount || 0), 0);
   const balanced = Math.abs(assetTotal - liabTotal) < 1;
-  const cash = (trial.rows || []).filter((r) => /cash|bank/i.test(r.group || '')).reduce((s, r) => s + ((r.closingDebit || 0) - (r.closingCredit || 0)), 0);
+  const cash = (trial.rows || []).filter(isLiquidRow).reduce((s, r) => s + ((r.closingDebit || 0) - (r.closingCredit || 0)), 0);
   const ar = age?.receivables?.totals?.total || 0, ap = age?.payables?.totals?.total || 0;
   const arOverdue = age?.receivables?.totals?.d90 || 0;
   const pend = appr?.counts?.pending?.n || 0, pendAmt = appr?.counts?.pending?.amount || 0;
@@ -128,14 +136,14 @@ export function ExecutiveOverview({ branch }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Executive Overview" sub={`Whole-company snapshot · ${range.label}`} branch={branch} p={p} />
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Revenue" value={money(cur, sales)} delta={dSales} />
-        <KPI label="Gross Profit" value={money(cur, gp)} sub={pct(sales ? (gp / sales) * 100 : 0) + ' margin'} tone={gp < 0 ? 'bad' : 'good'} />
-        <KPI label="Net Profit" value={money(cur, net)} tone={net < 0 ? 'bad' : 'good'} delta={dNet} />
-        <KPI label="Cash & Bank" value={money(cur, cash)} tone={cash < 0 ? 'bad' : undefined} />
-        <KPI label="Receivables" value={money(cur, ar)} sub={arOverdue ? `${money(cur, arOverdue)} overdue 90+` : 'current'} tone={arOverdue ? 'bad' : undefined} />
-        <KPI label="Payables" value={money(cur, ap)} />
-        <KPI label="GST/VAT Net" value={money(cur, tax?.netPayable || 0)} sub={(tax?.netPayable || 0) >= 0 ? 'payable' : 'refundable'} />
-        <KPI label="Pending Approvals" value={String(pend)} sub={money(cur, pendAmt)} tone={pend ? 'bad' : 'good'} />
+        <KPI label="Revenue" value={money(cur, sales)} delta={dSales} onClick={go && (() => go('/dashboards/sales'))} />
+        <KPI label="Gross Profit" value={money(cur, gp)} sub={pct(sales ? (gp / sales) * 100 : 0) + ' margin'} tone={gp < 0 ? 'bad' : 'good'} onClick={go && (() => go('/dashboards/module-gp'))} />
+        <KPI label="Net Profit" value={money(cur, net)} tone={net < 0 ? 'bad' : 'good'} delta={dNet} onClick={go && (() => go('/dashboards/profitability'))} />
+        <KPI label="Cash & Bank" value={money(cur, cash)} tone={cash < 0 ? 'bad' : undefined} onClick={go && (() => go('/dashboards/cash'))} />
+        <KPI label="Receivables" value={money(cur, ar)} sub={arOverdue ? `${money(cur, arOverdue)} overdue 90+` : 'current'} tone={arOverdue ? 'bad' : undefined} onClick={go && (() => go('/dashboards/arap'))} />
+        <KPI label="Payables" value={money(cur, ap)} onClick={go && (() => go('/dashboards/arap'))} />
+        <KPI label="GST/VAT Net" value={money(cur, tax?.netPayable || 0)} sub={(tax?.netPayable || 0) >= 0 ? 'payable' : 'refundable'} onClick={go && (() => go('/dashboards/tax'))} />
+        <KPI label="Pending Approvals" value={String(pend)} sub={money(cur, pendAmt)} tone={pend ? 'bad' : 'good'} onClick={go && (() => go('/dashboards/audit'))} />
       </div>
 
       <Card title="⚠ Attention Needed">
@@ -165,7 +173,7 @@ export function ExecutiveOverview({ branch }) {
 function deltaPct(cur, prev) { cur = Number(cur) || 0; prev = Number(prev) || 0; if (!prev) return null; return ((cur - prev) / Math.abs(prev)) * 100; }
 
 // ── 2) Profitability (P&L) ────────────────────────────────────────────────────
-export function ProfitabilityDash({ branch }) {
+export function ProfitabilityDash({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const pl = useProfitAndLoss(branch, range).data || {};
@@ -183,10 +191,10 @@ export function ProfitabilityDash({ branch }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Profitability (P&L)" sub={`Revenue → Net Profit · ${range.label}`} branch={branch} p={p} />
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Revenue" value={money(cur, sales)} />
-        <KPI label="Gross Profit" value={money(cur, gp)} sub={pct(sales ? gp / sales * 100 : 0)} tone={gp < 0 ? 'bad' : 'good'} />
-        <KPI label="Indirect Expenses" value={money(cur, indExp)} />
-        <KPI label="Net Profit" value={money(cur, net)} tone={net < 0 ? 'bad' : 'good'} sub={pct(sales ? net / sales * 100 : 0)} />
+        <KPI label="Revenue" value={money(cur, sales)} onClick={go && (() => go('/dashboards/sales'))} />
+        <KPI label="Gross Profit" value={money(cur, gp)} sub={pct(sales ? gp / sales * 100 : 0)} tone={gp < 0 ? 'bad' : 'good'} onClick={go && (() => go('/dashboards/module-gp'))} />
+        <KPI label="Indirect Expenses" value={money(cur, indExp)} onClick={go && (() => go('/dashboards/expenses'))} />
+        <KPI label="Net Profit" value={money(cur, net)} tone={net < 0 ? 'bad' : 'good'} sub={pct(sales ? net / sales * 100 : 0)} onClick={go && (() => go('/reports/pnl'))} />
       </div>
       <Card title="Profit Bridge">
         <div style={{ padding: '10px 16px' }}>
@@ -207,10 +215,10 @@ export function CashLiquidityDash({ branch }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const trial = useTrialBalance(branch, range).data || {};
-  const rows = (trial.rows || []).filter((r) => /cash|bank/i.test(r.group || ''));
+  const rows = (trial.rows || []).filter(isLiquidRow);
   const bal = (r) => (r.closingDebit || 0) - (r.closingCredit || 0); // closing balance (Dr +ve)
-  const cash = rows.filter((r) => /cash/i.test(r.group)).reduce((s, r) => s + bal(r), 0);
-  const bankRows = rows.filter((r) => /bank/i.test(r.group));
+  const cash = rows.filter((r) => liquidityKind(r) === 'cash').reduce((s, r) => s + bal(r), 0);
+  const bankRows = rows.filter((r) => liquidityKind(r) === 'bank');
   const bank = bankRows.reduce((s, r) => s + bal(r), 0);
   return (
     <div style={{ margin: 12 }}>
@@ -431,7 +439,7 @@ export function SupplierPurchaseDash({ branch }) {
 }
 
 // ── 10) Tax & Compliance ──────────────────────────────────────────────────────
-export function TaxComplianceDash({ branch }) {
+export function TaxComplianceDash({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const tax = useTaxSummary(branch, range).data || {};
@@ -439,10 +447,10 @@ export function TaxComplianceDash({ branch }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Tax & Compliance" sub={`GST / VAT position · ${range.label}`} branch={branch} p={p} />
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Output Tax" value={money(cur, tax.output?.total || 0)} />
-        <KPI label="Input Tax (ITC)" value={money(cur, tax.input?.total || 0)} />
-        <KPI label="Net Payable" value={money(cur, tax.netPayable || 0)} tone={(tax.netPayable || 0) > 0 ? 'bad' : 'good'} sub={(tax.netPayable || 0) >= 0 ? 'payable' : 'refundable'} />
-        <KPI label="TCS Payable" value={money(cur, tax.tcs?.payable || 0)} />
+        <KPI label="Output Tax" value={money(cur, tax.output?.total || 0)} onClick={go && (() => go('/tax/gstr-1-prep'))} />
+        <KPI label="Input Tax (ITC)" value={money(cur, tax.input?.total || 0)} onClick={go && (() => go('/tax/gstr-3b-prep'))} />
+        <KPI label="Net Payable" value={money(cur, tax.netPayable || 0)} tone={(tax.netPayable || 0) > 0 ? 'bad' : 'good'} sub={(tax.netPayable || 0) >= 0 ? 'payable' : 'refundable'} onClick={go && (() => go('/tax/gstr-3b-prep'))} />
+        <KPI label="TCS Payable" value={money(cur, tax.tcs?.payable || 0)} onClick={go && (() => go('/tax/tds'))} />
       </div>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <div style={{ flex: '1 1 320px' }}><ListTable title="Output Tax (on sales)" rows={(tax.output?.lines || []).map((l) => ({ name: l.ledger, amount: l.amount }))} cur={cur} right={<strong style={{ color: C.dark }}>{money(cur, tax.output?.total || 0)}</strong>} /></div>
@@ -633,9 +641,11 @@ export function TargetsMaster({ branch }) {
   );
 }
 
-// Router for the Director dropdown routes.
-export function DirectorDash({ which, branch }) {
-  if (which === 'profitability') return <ProfitabilityDash branch={branch} />;
+// Router for the Director dropdown routes. `setRoute` (App's navigate) lets the
+// KPI tiles drill into the matching register/report.
+export function DirectorDash({ which, branch, setRoute }) {
+  const go = (r) => setRoute && setRoute(r);
+  if (which === 'profitability') return <ProfitabilityDash branch={branch} go={go} />;
   if (which === 'cash') return <CashLiquidityDash branch={branch} />;
   if (which === 'arap') return <ReceivablesPayablesDash branch={branch} />;
   if (which === 'branch') return <BranchPerformanceDash />;
@@ -643,12 +653,12 @@ export function DirectorDash({ which, branch }) {
   if (which === 'module-gp') return <ModuleGpDash branch={branch} />;
   if (which === 'sales') return <SalesBookingsDash branch={branch} />;
   if (which === 'supplier') return <SupplierPurchaseDash branch={branch} />;
-  if (which === 'tax') return <TaxComplianceDash branch={branch} />;
+  if (which === 'tax') return <TaxComplianceDash branch={branch} go={go} />;
   if (which === 'expenses') return <ExpensesDash branch={branch} />;
   if (which === 'audit') return <ApprovalsAuditDash branch={branch} />;
   if (which === 'sales-target') return <VsTargetDash branch={branch} metric="sales" />;
   if (which === 'gp-target') return <VsTargetDash branch={branch} metric="gp" />;
   if (which === 'collections-target') return <VsTargetDash branch={branch} metric="collections" />;
   if (which === 'budget-expense') return <BudgetVsExpenseDash branch={branch} />;
-  return <ExecutiveOverview branch={branch} />;
+  return <ExecutiveOverview branch={branch} go={go} />;
 }
