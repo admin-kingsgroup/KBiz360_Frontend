@@ -83,7 +83,12 @@ export const TAX_INDIA = {label:"Taxation — GST", icon:FileText, _regime:"GST"
   {divider:true, label:"GST Returns"},
   {label:"GSTR-1  Outward Supplies", href:"/tax/gstr1"},
   {label:"GSTR-3B Summary Return",   href:"/tax/gstr3b"},
-  {label:"GSTR-2B Reconciliation",   href:"/tax/gstr2b"},
+  /* — Reconciliation — all GST recon screens gathered under one head (mirrors the
+     dedicated "Reconciliation" head under the Accounts pill for bank/supplier). — */
+  {divider:true, label:"Reconciliation"},
+  {label:"GSTR-2B Reconciliation (ITC)", href:"/tax/gstr2b"},
+  {label:"GSTR-2A Reconciliation",       href:"/tax/gstr2a"},
+  {label:"GSTR-9C — Audit Reco",         href:"/tax/gstr9c"},
   /* — TDS — */
   {divider:true, label:"TDS / TCS"},
   {label:"TDS & TCS Register",        href:"/tax/tds"},
@@ -95,9 +100,7 @@ export const TAX_INDIA = {label:"Taxation — GST", icon:FileText, _regime:"GST"
   {divider:true, label:"Compliance"},
   {label:"E-Invoice & IRN",           href:"/tax/einvoice"},
   {label:"Compliance Calendar",       href:"/tax/calendar"},
-  {label:"GSTR-9C — Audit Reco",    href:"/tax/gstr9c"},
   {label:"Tax Audit 3CD",           href:"/tax/audit-3cd"},
-  {label:"GSTR-2A Reconciliation",  href:"/tax/gstr2a"},
   {divider:true, label:"Auto-Prep Tools"},
   {label:"GSTR-1 Auto-Prep", href:"/tax/gstr-1-prep"},
   {label:"GSTR-3B Auto-Prep", href:"/tax/gstr-3b-prep"},

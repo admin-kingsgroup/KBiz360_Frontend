@@ -32,7 +32,9 @@ const EXTRA = {
   '/day-book': ['Finance', 'Books', 'Day Book'],
   '/finance/cash-book': ['Finance', 'Books', 'Cash Book'],
   '/trial-balance': ['Finance', 'Books', 'Trial Balance'],
-  '/bank-reco': ['Finance', 'Books', 'Bank Reconciliation'],
+  '/bank-reco': ['Accounts', 'Reconciliation', 'Bank Reconciliation'],
+  '/accounts/supplier-reco': ['Accounts', 'Reconciliation', 'Supplier Reconciliation'],
+  '/finance/reco-queue': ['Accounts', 'Reconciliation', 'Reconciliation Queue'],
   '/import': ['Admin', 'Import / Export', 'Data Import'],
   '/search': ['Search'],
 };

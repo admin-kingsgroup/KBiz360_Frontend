@@ -288,15 +288,23 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Vendor Advances",             href:"/accounting/vendor-advances"},
     {label:"Payment Register",            href:"/finance/payment-register"},
     {label:"Supplier 360 View",              href:"/reports/supplier-360"},
-    {label:"Supplier Reconciliation",        href:"/accounts/supplier-reco"},
     {label:"Net Ageing (Debtors+Creditors)", href:"/accounts/net-ageing"},
+    // Supplier Reconciliation moved to the dedicated "Reconciliation" head below.
   ]},
   {label:"Cash & Bank", children:[
     {label:"Cash Book",            href:"/finance/cash-book"},
     {label:"Bank Balances",        href:"/finance/bank-balance"},
-    {label:"Bank Reconciliation",  href:"/bank-reco"},
     {label:"Contra Register",      href:"/finance/contra-register"},
-    {label:"Reconciliation Queue", href:"/finance/reco-queue"},
+    // Bank Reconciliation + Reconciliation Queue moved to the "Reconciliation" head below.
+  ]},
+  // Dedicated Reconciliation head — gathers EVERY non-tax reconciliation screen in
+  // one place (was previously scattered across Cash & Bank + Payables). Tax/GST
+  // reconciliation (GSTR-2B/2A/9C) stays under the regime-aware Taxation pill so
+  // VAT (Africa) branches don't see GST-only links — see TAX_INDIA ▸ Reconciliation.
+  {label:"Reconciliation", children:[
+    {label:"Bank Reconciliation",      href:"/bank-reco"},
+    {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
+    {label:"Reconciliation Queue",     href:"/finance/reco-queue"},
   ]},
   {label:"Books & Scrutiny", children:[
     {label:"Statistics",       href:"/accounts/statistics"},
