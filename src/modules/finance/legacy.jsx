@@ -7,6 +7,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { confirmDialog } from '../../core/ux/confirm';
 import { toast } from '../../core/ux/toast';
 import { clickable } from '../../core/ux/clickable';
+import { SampleBanner } from '../../core/ux/SampleBanner';
 import { AlertTriangle, Download, Lock, Plus, Printer, Save, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
 import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement } from '../../core/useBankReco';
 import { branchCode } from '../../core/useAccounting';
@@ -1083,6 +1084,7 @@ export function YearEndClose({branch}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:900,margin:"0 auto"}}>
+      <SampleBanner note="year-end closing entries and carry-forward balances aren’t wired to live books yet." />
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
         <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📅</div>
         <div>

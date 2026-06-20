@@ -16,6 +16,7 @@ import { useLedgerStatement, useCreateVoucher, useOpenBills, useSalesRegister, u
 import { LedgerActions } from '../../core/ledgerActions';
 import { openLedgerModal } from '../../core/LedgerModalHost';
 import { useModalEsc } from '../../core/ux/useModalEsc';
+import { SampleBanner } from '../../core/ux/SampleBanner';
 import { useLivePurchaseRegistry, useLiveSalesTickets } from '../../core/useVouchers';
 import { fmt, fmtINR } from '../../core/format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS } from '../../core/dates';
@@ -2896,6 +2897,7 @@ export function PurchaseRefunds({branch}){
 
   return (
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+      <SampleBanner note="purchase refunds shown here are sample data, not live." />
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
         <div style={{width:36,height:36,borderRadius:9,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>💫</div>
         <div>

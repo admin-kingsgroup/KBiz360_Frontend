@@ -17,6 +17,7 @@ import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, tabBtnStyl
 import { TDS_SECTIONS } from '../finance';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { openPrintPreview } from '../../core/PrintPreview';
+import { SampleBanner } from '../../core/ux/SampleBanner';
 
 export function TaxShell({title,subtitle,children,action}){
   return (
@@ -975,6 +976,7 @@ export function EWayBill({branch}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+      <SampleBanner note="e-way bills shown here are sample data, not live." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📦</div>
@@ -1084,6 +1086,7 @@ export function Gstr9c({branch,setRoute}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+      <SampleBanner note="GSTR-9C books-vs-returns reconciliation isn’t wired to live data yet." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>📑 GSTR-9C — Audit Reconciliation</h2>
@@ -1193,6 +1196,7 @@ export function TaxAudit3CD({branch,setRoute}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+      <SampleBanner note="these cash-payment audit flags are sample data, not live." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>📋 Tax Audit Working Papers — Form 3CD</h2>
@@ -1290,6 +1294,7 @@ export function Gstr2aReco({branch,setRoute}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+      <SampleBanner note="GSTR-2A / 2B ITC matching isn’t wired to live data yet." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>🔁 GSTR-2A vs Purchase Register</h2>
@@ -1367,6 +1372,7 @@ export function Form16Generator(){
   return(
     <PHASE2_Page title="Form 16 Generator — India" subtitle="Annual salary certificate for income tax filing · generated from payroll data"
       toolbar={<><select value={selEmp} onChange={e=>setSelEmp(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{[].map(e=><option key={e}>{e}</option>)}</select><select value={fy} onChange={e=>setFy(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{fyOptions().map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select><button onClick={()=>openPrintPreview({ selector: 'main', title: 'Taxation', recommend: 'portrait' })} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download Form 16</button></>}>
+      <SampleBanner note="Form 16 figures are sample data, not an issued certificate." />
       <div style={{maxWidth:760,margin:"0 auto",background:"#fff",border:"2px solid #0d1326",borderRadius:6,overflow:"hidden",fontSize:12}}>
         {/* Header */}
         <div style={{padding:"12px 20px",background:"#0d1326",color:"#fff",textAlign:"center"}}>
@@ -1513,6 +1519,7 @@ export function GSTR3BPrep(){
   return(
     <PHASE2_Page title="GSTR-3B Auto-Prep" subtitle="Summary return auto-built from vouchers · April 2026 · 27AAACT1234A1ZF (Head Office)"
       toolbar={<><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download JSON</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 File on GST Portal</button></>}>
+      <SampleBanner note="this GSTR-3B summary is sample data, not a live return." />
       {/* Liability summary */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
         {[{l:"Outward Tax",v:fmtINR(d.outwardSupplies.igst+d.outwardSupplies.cgst+d.outwardSupplies.sgst),c:"#A32D2D"},{l:"ITC Available",v:fmtINR(d.itcAvailable.total),c:"#22c55e"},{l:"Net ITC Applied",v:fmtINR(d.netITC),c:"#d4a437"},{l:"Cash Payment",v:fmtINR(d.cashPayable),c:"#22c55e"}].map(k=>(

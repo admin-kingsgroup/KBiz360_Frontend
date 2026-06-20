@@ -386,6 +386,20 @@ export function useDeleteCostCenter() {
   });
 }
 
+// Tally-style Statistics: master counts (groups by tier, ledgers, cost centres,
+// voucher types, budgets, scenarios) + voucher counts by type × status. Branch-
+// aware. GET /api/accounting/statistics. Keyed under 'accounting' so it refreshes
+// whenever the books change (invalidateBooks).
+export function useStatistics(branch) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'statistics', code || 'all'],
+    queryFn: () => apiGet('/api/accounting/statistics', { branch: code }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 export function useChartOfAccounts(branch) {
   const code = branchCode(branch);
   return useQuery({

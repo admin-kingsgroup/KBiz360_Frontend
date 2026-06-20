@@ -65,6 +65,7 @@ const { PaymentRun } = lazyModule(() => import('./modules/paymentRun'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
 const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('./modules/financialStatements'));
 const { NotesToFinancials } = lazyModule(() => import('./modules/reportsNotes'));
+const { Statistics } = lazyModule(() => import('./modules/statistics'));
 const { CostCenterMasterLive } = lazyModule(() => import('./modules/costCentersLive'));
 const { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, GroupsMaster, SubGroupsMaster, LedgersMaster } = lazyModule(() => import('./modules/mastersLive'));
 const { DataImportPage } = lazyModule(() => import('./modules/dataImport'));
@@ -466,6 +467,7 @@ export default function KB360App(){
     if(route==="/journal")            return <JournalEntry branch={branch}/>;
     if(route==="/import")               return <DataImportPage currentUser={currentUser}/>;
     if(route==="/day-book")           return <DayBookLive branch={branch}/>;
+    if(route==="/accounts/statistics") return <Statistics branch={branch} setRoute={navigate}/>;
     if(route==="/finance/cash-book")  return <CashBookLive branch={branch}/>;
     if(route==="/ledger")             return <LedgerAcLive branch={branch}/>;
     if(route==="/trial-balance")      return <TrialBalanceLive branch={branch}/>;

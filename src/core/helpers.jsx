@@ -19,6 +19,7 @@ import { fmt, fmtINR } from './format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS, PERIOD_OPTIONS as MONTH_PERIOD_OPTIONS, FY_YTD_MONTHS } from './dates';
 import { useMobile } from './hooks';
 import { clickable } from './ux/clickable';
+import { SampleBanner } from './ux/SampleBanner';
 /* Import style primitives from the lightweight token module (NOT ./styles) so
    helpers no longer depends on styles.jsx — breaking the styles↔helpers cycle
    that was forcing both (and recharts) into the initial bundle. vDate was an
@@ -843,6 +844,7 @@ export function Recruitment({branch}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+      <SampleBanner note="recruitment postings are sample data, not live." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>👔</div>
@@ -972,6 +974,7 @@ export function BudgetPlanning({branch}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+      <SampleBanner note="budget figures and actuals are sample data, not live." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📊</div>

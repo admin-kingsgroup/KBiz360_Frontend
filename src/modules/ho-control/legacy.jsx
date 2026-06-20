@@ -796,7 +796,7 @@ export function GroupMonthlyDashboard(){
           ))}
         </div>
         <div style={cardStyle}>
-          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>5️⃣ Statutory Dues — Next 30 days</p>
+          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>5️⃣ Statutory Dues — Next 30 days <span style={{marginLeft:6,fontSize:9.5,fontWeight:700,padding:"1px 6px",borderRadius:4,background:"#FAEEDA",color:"#854F0B"}}>SAMPLE</span></p>
           {[
             {label:"GSTR-3B (Apr)",   due:"2026-05-20",amt:1579300},
             {label:"PF/ESI Challan",  due:"2026-05-31",amt:60700},
@@ -1414,7 +1414,7 @@ export function DelegationsManager(){
       subtitle="All vacation back-up & temporary authority delegations · explicit, time-bound, fully logged"
       toolbar={<button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Create Delegation</button>}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
-        {[{l:"Active Delegations",v:active,c:"#22c55e"},{l:"Completed (YTD)",v:2,c:"#5a6691"},{l:"Avg Duration",v:"6 days",c:"#3b82f6"},{l:"Pending Approval",v:0,c:"#f97316"}].map(k=>(
+        {[{l:"Active Delegations",v:active,c:"#22c55e"},{l:"Completed (YTD)",v:all.filter(d=>d.status==="Completed").length,c:"#5a6691"},{l:"Avg Duration",v:"—",c:"#3b82f6"},{l:"Pending Approval",v:all.filter(d=>d.status==="Pending Approval"||d.status==="Pending").length,c:"#f97316"}].map(k=>(
           <div key={k.l} style={{...cardStyle,borderTop:"3px solid "+k.c}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p><p style={{margin:"4px 0 0",fontSize:18,fontWeight:700,color:k.c}}>{k.v}</p></div>
         ))}
       </div>

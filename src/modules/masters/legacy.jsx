@@ -1651,7 +1651,7 @@ export function MasterChangeQueue(){
       subtitle="All master-data change requests requiring approval · vendor bank/PAN, credit limits, user permissions, CoA, etc."
       toolbar={<select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All statuses</option>{statuses.map(s=><option key={s}>{s}</option>)}</select>}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
-        {[{l:"Pending Approval",v:pending,c:"#f97316"},{l:"Approved (MTD)",v:approved,c:"#22c55e"},{l:"Rejected (MTD)",v:rejected,c:"#A32D2D"},{l:"High-Risk Pending",v:1,c:"#A32D2D"}].map(k=>(
+        {[{l:"Pending Approval",v:pending,c:"#f97316"},{l:"Approved (MTD)",v:approved,c:"#22c55e"},{l:"Rejected (MTD)",v:rejected,c:"#A32D2D"},{l:"High-Risk Pending",v:MASTER_CHANGE_QUEUE.filter(q=>q.status==="Pending Approval"&&/high/i.test(q.risk||q.riskLevel||q.priority||"")).length,c:"#A32D2D"}].map(k=>(
           <div key={k.l} style={{...cardStyle,borderTop:"3px solid "+k.c}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:k.c}}>{k.v}</p></div>
         ))}
       </div>

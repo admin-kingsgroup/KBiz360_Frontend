@@ -299,6 +299,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Reconciliation Queue", href:"/finance/reco-queue"},
   ]},
   {label:"Books & Scrutiny", children:[
+    {label:"Statistics",       href:"/accounts/statistics"},
     {label:"Day Book",         href:"/day-book"},
     {label:"Ledger Account",   href:"/ledger"},
     {label:"Trial Balance",    href:"/finance/trial-balance"},

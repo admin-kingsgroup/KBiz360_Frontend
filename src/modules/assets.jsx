@@ -16,6 +16,7 @@ import { BRANCH_CODES, branchCurrencies, branchMainCurrency } from '../core/data
 import { useMobile } from '../core/hooks';
 import { useModalEsc } from '../core/ux/useModalEsc';
 import { FL, bc, btnG, btnGh, card, inp } from '../core/styles';
+import { SampleBanner } from '../core/ux/SampleBanner';
 
 export function AcmRegister({branch}){
   const mob=useMobile();
@@ -472,6 +473,7 @@ export function AssetDisposal({branch,setRoute}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+      <SampleBanner note="asset disposals & capital gain/loss aren’t wired to live data yet." />
       <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>♻ Asset Disposal &amp; Transfer</h2>
       <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Sale · Scrap · Inter-branch transfer · Auto capital gain/loss calc</p>
 
