@@ -14,9 +14,27 @@ export function useMasterList(resource, params = {}) {
   });
 }
 
+// A few masters are ALSO read live under OTHER query roots, so invalidating only
+// ['master', resource] leaves those stale until their staleTime lapses (the
+// "new sub-group / ledger doesn't show up in the chart / picker / reports until
+// I refresh" bug). The Chart of Accounts (sub-groups + ledgers) is the big one:
+//   • sub-groups are stored as Groups → the groups list, the group TREE and the
+//     accounting group resolver all change.
+//   • a ledger feeds the chart list + ledger label cache (['ledgers'*]), the
+//     voucher pickers (['ref','ledger-registry']), the group tree (['groups',…])
+//     and — through its opening balance — every books report (['accounting',…]).
+// Map each such resource to the extra roots that must refetch on any mutation.
+export const MASTER_RELATED_ROOTS = {
+  subgroups: [['master', 'groups'], ['groups'], ['accounting', 'groups']],
+  ledgers:   [['ledgers'], ['ref', 'ledger-registry'], ['groups'], ['accounting']],
+};
+
 export function useMasterMutations(resource) {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['master', resource] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['master', resource] });
+    for (const key of MASTER_RELATED_ROOTS[resource] || []) qc.invalidateQueries({ queryKey: key });
+  };
   return {
     create: useMutation({ mutationFn: (body) => apiPost(`/api/${resource}`, body), onSuccess: invalidate }),
     update: useMutation({ mutationFn: ({ id, body }) => apiPut(`/api/${resource}/${id}`, body), onSuccess: invalidate }),

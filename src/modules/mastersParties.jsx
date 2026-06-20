@@ -25,6 +25,7 @@ import { FL, inpStd, tabBtnStyle } from '../core/styles';
 import { TAB_Page, tabPanel, cardStyle } from '../core/helpers';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { useHotkey } from '../core/ux/hotkeys';
+import { Combobox } from '../core/ux/Combobox';
 import { toast } from '../core/ux/toast';
 import { Kbd } from '../core/ux/widgets.jsx';
 
@@ -311,15 +312,18 @@ function PartyShell({ title, subtitle, m, tabs, tab, setTab, children }) {
 
   const selector = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
-      <label style={{ fontSize: 11, fontWeight: 700, color: DIM }}>Record</label>
-      <select
-        value={(current && current.id) || ''}
-        onChange={(e) => m.setSelectedId(e.target.value)}
-        style={{ ...inpStd, width: 'auto', minWidth: 280, fontWeight: 600 }}
-      >
-        {rows.length === 0 && <option value="">— no records —</option>}
-        {rows.map((r) => <option key={r.id} value={r.id}>{r.name}{r.branch ? ` · ${r.branch}` : ''}</option>)}
-      </select>
+      <label style={{ fontSize: 11, fontWeight: 700, color: DIM }} htmlFor="party-record-select">Record</label>
+      {/* Searchable picker — type-ahead over potentially long customer/supplier lists. */}
+      <div style={{ width: 300 }}>
+        <Combobox
+          id="party-record-select"
+          ariaLabel="Record"
+          value={(current && current.id) || ''}
+          options={rows.map((r) => ({ value: r.id, label: r.name, sublabel: r.branch ? `· ${r.branch}` : '' }))}
+          onChange={(id) => m.setSelectedId(id)}
+          placeholder={rows.length === 0 ? '— no records —' : 'Search records…'}
+        />
+      </div>
       <span style={{ fontSize: 11, color: DIM }}>{rows.length} record{rows.length === 1 ? '' : 's'}</span>
       {current && current.name && (
         <button type="button" onClick={() => openLedgerModal(current.name)} title="Open this party's ledger account (current branch)"

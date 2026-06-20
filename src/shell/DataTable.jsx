@@ -156,9 +156,15 @@ export function DataTable({
   }, [searched, sort, columns]);
 
   const total = sorted.length;
-  const pages = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+  // Virtualization-lite: callers that don't set a pageSize render every row. For
+  // very large result sets that means thousands of DOM nodes (jank). When a list
+  // crosses the threshold we auto-paginate so the DOM stays bounded — export and
+  // the totals footer still use the full `sorted` set, so numbers are unaffected.
+  const AUTO_PAGE_THRESHOLD = 300, AUTO_PAGE_SIZE = 100;
+  const effPageSize = pageSize > 0 ? pageSize : (total > AUTO_PAGE_THRESHOLD ? AUTO_PAGE_SIZE : 0);
+  const pages = effPageSize > 0 ? Math.max(1, Math.ceil(total / effPageSize)) : 1;
   const safePage = Math.min(page, pages - 1);
-  const visible = pageSize > 0 ? sorted.slice(safePage * pageSize, safePage * pageSize + pageSize) : sorted;
+  const visible = effPageSize > 0 ? sorted.slice(safePage * effPageSize, safePage * effPageSize + effPageSize) : sorted;
 
   const hasFooter = effColumns.some((c) => typeof c.footer === 'function');
 
@@ -439,9 +445,9 @@ export function DataTable({
         </table>
       </div>
 
-      {pageSize > 0 && !loading && !isError && total > pageSize && (
+      {effPageSize > 0 && !loading && !isError && total > effPageSize && (
         <div className="flex items-center justify-between gap-2 border-t border-surface-border px-4 py-2.5 text-xs text-ink-muted">
-          <span>{safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, total)} of {total}</span>
+          <span>{safePage * effPageSize + 1}–{Math.min((safePage + 1) * effPageSize, total)} of {total}</span>
           <div className="flex items-center gap-1">
             <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0}
               className="rounded-md border border-surface-border px-2.5 py-1 font-medium disabled:opacity-40 enabled:hover:bg-surface-alt">Prev</button>
