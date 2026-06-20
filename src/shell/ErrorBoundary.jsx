@@ -13,7 +13,7 @@ import { isChunkLoadError } from '../core/lazyModule';
 export class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { error: null };
+    this.state = { error: null, showDetails: false };
   }
 
   static getDerivedStateFromError(error) {
@@ -27,7 +27,7 @@ export class ErrorBoundary extends React.Component {
 
   componentDidUpdate(prev) {
     // Reset when the route changes so navigating away clears the error.
-    if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
+    if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null, showDetails: false });
   }
 
   render() {
@@ -45,9 +45,18 @@ export class ErrorBoundary extends React.Component {
               : 'The rest of the app still works — pick another item from the menu, or reload.'}
           </p>
           {!stale && (
-            <pre style={{ textAlign: 'left', background: '#fff', border: '1px solid #e1e3ec', borderRadius: 8, padding: 12, fontSize: 11, color: '#A32D2D', overflowX: 'auto', marginTop: 14 }}>
-              {String(this.state.error?.message || this.state.error)}
-            </pre>
+            <div style={{ marginTop: 14 }}>
+              <button
+                onClick={() => this.setState((s) => ({ showDetails: !s.showDetails }))}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5a6691', fontSize: 11.5, textDecoration: 'underline' }}>
+                {this.state.showDetails ? 'Hide technical details' : 'Show technical details'}
+              </button>
+              {this.state.showDetails && (
+                <pre style={{ textAlign: 'left', background: '#fff', border: '1px solid #e1e3ec', borderRadius: 8, padding: 12, fontSize: 11, color: '#A32D2D', overflowX: 'auto', marginTop: 10 }}>
+                  {String(this.state.error?.message || this.state.error)}
+                </pre>
+              )}
+            </div>
           )}
           <button
             onClick={() => (stale ? window.location.reload() : this.setState({ error: null }))}

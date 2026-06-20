@@ -194,7 +194,7 @@ export function AccountsTreeView({ branch }) {
   const sgNode = sgName ? nodes[sgName] : null;
   const sideView = () => (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-      {col('Parent Group (28)', roots, pgName, (it) => setSel({ pg: it.name, g: '', sg: '' }))}
+      {col(`Parent Group (${roots.length})`, roots, pgName, (it) => setSel({ pg: it.name, g: '', sg: '' }))}
       {col('Group', pgNode ? pgNode.children : [], gName, (it) => setSel((s) => ({ ...s, g: it.name, sg: '' })))}
       {col('Sub-Group', gNode ? gNode.children : [], sgName, (it) => setSel((s) => ({ ...s, sg: it.name })))}
       {col('Ledger', sgNode ? sgNode.ledgers : gNode ? gNode.ledgers : pgNode ? pgNode.ledgers : [], '', null, 'ledger')}
@@ -209,7 +209,7 @@ export function AccountsTreeView({ branch }) {
       <FocusBanner />
       <div style={{ marginBottom: 8 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK }}>Accounts Tree View</h2>
-        <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Parent Group (28) ▸ Group ▸ Sub-Group ▸ Ledger · View-only — create under <b>Masters ▸ Accounts Master</b>.</p>
+        <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Parent Group ▸ Group ▸ Sub-Group ▸ Ledger · View-only — create under <b>Masters ▸ Accounts Master</b>.</p>
       </div>
 
       {/* Scope legend — Groups/Sub-Groups are org-wide; only Ledgers carry a branch. */}
@@ -235,7 +235,7 @@ export function AccountsTreeView({ branch }) {
           </span>
         </span>
         <span style={{ marginLeft: 'auto', fontSize: 11, color: DIM }}>
-          28 parent groups · <b style={{ color: DARK }}>{subGroupCount}</b> sub-groups <span style={{ color: '#9aa2c0' }}>(org-wide)</span> · <b style={{ color: DARK }}>{display.length}</b> ledgers (<b style={{ color: GREY }}>{commonCount}</b> common + <b style={{ color: BLUE }}>{branchCount}</b> branch)
+          <b style={{ color: DARK }}>{roots.length}</b> parent groups · <b style={{ color: DARK }}>{subGroupCount}</b> sub-groups <span style={{ color: '#9aa2c0' }}>(org-wide)</span> · <b style={{ color: DARK }}>{display.length}</b> ledgers (<b style={{ color: GREY }}>{commonCount}</b> common + <b style={{ color: BLUE }}>{branchCount}</b> branch)
         </span>
       </div>
 

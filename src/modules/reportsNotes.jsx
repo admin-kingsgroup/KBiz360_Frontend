@@ -231,7 +231,7 @@ function DrillModal({ ledger, branch, to, cur, onClose }) {
 /* ── main report ──────────────────────────────────────────────────────── */
 export function NotesToFinancials({ branch }) {
   const cur = (bc(branch) && bc(branch).cur) || '₹';
-  const [range, setRange] = useState(() => periodRange('all', { branch }));
+  const [range, setRange] = useState(() => periodRange('cfy', { branch }));
   const [view, setView] = useState('summary');
   const [open, setOpen] = useState({});
   const [openG, setOpenG] = useState({});
@@ -268,7 +268,7 @@ export function NotesToFinancials({ branch }) {
           <p style={{ margin: '3px 0 0', fontSize: 12, color: MUTE }}><strong>{branchLabel(branch)}</strong> · {period.label} · auto-generated & reconciled to the live books · {cur} (excl. internal GST control)</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <PeriodBar branch={branch} compact defaultPreset="all" onChange={setRange} />
+          <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={setRange} />
           <div style={{ display: 'inline-flex', border: `1px solid ${LINE}`, borderRadius: 6, overflow: 'hidden' }}>
             {[['summary', 'Summary'], ['detailed', 'Detailed']].map(([id, l]) => (
               <button key={id} onClick={() => setView(id)} style={{ ...ctrl, border: 'none', borderRadius: 0, background: view === id ? INK : '#fff', color: view === id ? '#fff' : MUTE }}>{l}</button>

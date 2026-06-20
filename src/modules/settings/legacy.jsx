@@ -1008,8 +1008,8 @@ export function ApprovalMatrixBuilder(){
   const fmt=n=>n>=999999999?"Unlimited":"₹"+n.toLocaleString("en-IN");
   const inp={padding:"7px 8px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:11.5,width:"100%"};
   return(
-    <PHASE2_Page title="Approval Matrix Builder" subtitle="Drag-and-configure per-role, per-voucher-type thresholds · changes take effect immediately"
-      toolbar={<button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save & Publish</button>}>
+    <PHASE2_Page title="Approval Matrix Builder" subtitle="Preview — drag-and-configure per-role, per-voucher-type thresholds (server save not enabled on this screen yet)"
+      toolbar={<button disabled title="Saving the approval matrix isn’t available on this screen yet" style={{padding:"7px 14px",background:"#eef0f6",color:"#9aa3bd",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,fontWeight:700,cursor:"not-allowed"}}>💾 Save & Publish</button>}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:14}}>
         <div>
           {Object.entries(groupByType).map(([type,typeRules])=>(
@@ -1175,7 +1175,7 @@ export function BulkUserOperations(){
               <td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#e6e8f1",borderRadius:3,fontSize:10.5,fontWeight:600}}>{u.role}</span></td>
               <td style={{...RPT_tdStyle,fontSize:11}}>{Array.isArray(u.branches)?u.branches.join(", "):u.branches}</td>
               <td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:3,fontSize:10,fontWeight:700,background:u.active?"#d4edda":"#f8d7da",color:u.active?"#155724":"#721c24"}}>{u.active?"Active":"Inactive"}</span></td>
-              <td style={{...RPT_tdStyle,fontSize:11,color:"#5a6691"}}>2026-05-{10+u.id}</td>
+              <td style={{...RPT_tdStyle,fontSize:11,color:"#5a6691"}}>{u.lastLogin || u.last_login || '—'}</td>
             </tr>
           ))}</tbody>
         </table>

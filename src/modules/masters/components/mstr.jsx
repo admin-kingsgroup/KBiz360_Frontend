@@ -32,18 +32,28 @@ export function MstrShell({ title, icon, badge, badgeBg, badgeC, actions, childr
 }
 
 /* Master dialog on the shared Modal (Esc + backdrop close, internal scroll,
-   mobile-safe sizing). Footer preserves the original Cancel / Save buttons —
-   both close (the legacy forms did not persist; live masters own real saves). */
-export function MstrModal({ title, onClose, children }) {
+   mobile-safe sizing).
+   - Pass `onSave` for screens with real persistence → Cancel + Save (loading-aware).
+   - Omit `onSave` (legacy preview screens that never persisted) → the footer is
+     HONEST: a "not saved" note + a Close button, instead of a fake "Save" that
+     silently discarded the user's entries. */
+export function MstrModal({ title, onClose, onSave, saving, children }) {
   return (
     <Modal
       title={title}
       onClose={onClose}
       footer={
-        <>
-          <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" size="sm" onClick={onClose}>Save</Button>
-        </>
+        onSave ? (
+          <>
+            <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+            <Button variant="primary" size="sm" loading={saving} onClick={onSave}>Save</Button>
+          </>
+        ) : (
+          <>
+            <span className="mr-auto text-[11px] text-ink-subtle">Preview — entries here aren’t saved yet.</span>
+            <Button variant="secondary" size="sm" onClick={onClose}>Close</Button>
+          </>
+        )
       }
     >
       <div className="p-4">{children}</div>

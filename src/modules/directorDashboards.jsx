@@ -80,16 +80,20 @@ function usePeriod(def = 'all') {
 
 // ── 1) Executive Overview ─────────────────────────────────────────────────────
 export function ExecutiveOverview({ branch }) {
-  const p = usePeriod('all'); const range = p.range;
+  const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
-  const pl = useProfitAndLoss(branch, range).data || {};
-  const mpl = useModulePL(branch, range).data || {};
-  const bs = useBalanceSheet(branch, { to: range.to }).data || {};
+  const plQ = useProfitAndLoss(branch, range); const pl = plQ.data || {};
+  const mplQ = useModulePL(branch, range); const mpl = mplQ.data || {};
+  const bsQ = useBalanceSheet(branch, { to: range.to }); const bs = bsQ.data || {};
   const age = useAgeing(branch).data || {};
   const tax = useTaxSummary(branch, range).data || {};
   const trial = useTrialBalance(branch, range).data || {};
   const appr = useVoucherApprovals(branch, 'pending').data || {};
   const yoy = useYearOverYear(branch, range).data || {};
+  // Gate the "all clear" verdict on real data — otherwise a still-loading or
+  // failed board (all zeros) would falsely read as "books look healthy".
+  const coreLoading = plQ.isLoading || mplQ.isLoading || bsQ.isLoading;
+  const coreError = plQ.isError || mplQ.isError || bsQ.isError;
 
   const sales = mpl?.totals?.sales || 0, gp = mpl?.totals?.gp || 0;
   const net = pl?.netProfit || 0;
@@ -114,7 +118,11 @@ export function ExecutiveOverview({ branch }) {
   if (cash < 0) alerts.push(['bad', `Negative cash/bank balance: ${money(cur, cash)}`]);
   if (arOverdue > 0) alerts.push(['warn', `Receivables overdue 90+ days: ${money(cur, arOverdue)}`]);
   if (pend > 0) alerts.push(['warn', `${pend} approval(s) pending (${money(cur, pendAmt)}) — awaiting your sign-off`]);
-  if (!alerts.length) alerts.push(['good', 'No exceptions — books look healthy for this period.']);
+  if (!alerts.length) {
+    if (coreError) alerts.push(['bad', 'Couldn’t load some figures — this view may be incomplete. Try refreshing.']);
+    else if (coreLoading) alerts.push(['warn', 'Loading the latest figures…']);
+    else alerts.push(['good', 'No exceptions — books look healthy for this period.']);
+  }
 
   return (
     <div style={{ margin: 12 }}>
@@ -158,7 +166,7 @@ function deltaPct(cur, prev) { cur = Number(cur) || 0; prev = Number(prev) || 0;
 
 // ── 2) Profitability (P&L) ────────────────────────────────────────────────────
 export function ProfitabilityDash({ branch }) {
-  const p = usePeriod('all'); const range = p.range;
+  const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const pl = useProfitAndLoss(branch, range).data || {};
   const mpl = useModulePL(branch, range).data || {};
@@ -196,7 +204,7 @@ export function ProfitabilityDash({ branch }) {
 
 // ── 3) Cash & Liquidity ───────────────────────────────────────────────────────
 export function CashLiquidityDash({ branch }) {
-  const p = usePeriod('all'); const range = p.range;
+  const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const trial = useTrialBalance(branch, range).data || {};
   const rows = (trial.rows || []).filter((r) => /cash|bank/i.test(r.group || ''));
@@ -227,7 +235,7 @@ export function CashLiquidityDash({ branch }) {
 
 // ── 4) Receivables & Payables ─────────────────────────────────────────────────
 export function ReceivablesPayablesDash({ branch }) {
-  const p = usePeriod('all'); const range = p.range;
+  const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const age = useAgeing(branch).data || {};
   const ar = age.receivables || { rows: [], totals: {} }, ap = age.payables || { rows: [], totals: {} };
@@ -259,7 +267,7 @@ export function ReceivablesPayablesDash({ branch }) {
 
 // ── 5) Branch Performance ─────────────────────────────────────────────────────
 export function BranchPerformanceDash() {
-  const p = usePeriod('all'); const range = p.range;
+  const p = usePeriod('cfy'); const range = p.range;
   const q = useQueries({
     queries: BRANCHES.map((b) => ({
       queryKey: ['accounting', 'module-pl', b.code, range.from, range.to],
@@ -319,7 +327,7 @@ const topBy = (rows, keyFn, valFn, n = 10) => {
 
 // ── 6) Balance Sheet ──────────────────────────────────────────────────────────
 export function BalanceSheetDash({ branch }) {
-  const p = usePeriod('all'); const range = p.range;
+  const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const bs = useBalanceSheet(branch, { to: range.to }).data || {};
   const assets = bs.assets || [], liabs = bs.liabilities || [];
@@ -343,7 +351,7 @@ export function BalanceSheetDash({ branch }) {
 
 // ── 7) Module / Product GP ────────────────────────────────────────────────────
 export function ModuleGpDash({ branch }) {
-  const p = usePeriod('all'); const range = p.range;
+  const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, range).data || {};
   const mods = mpl.modules || [], t = mpl.totals || {};
@@ -372,7 +380,7 @@ export function ModuleGpDash({ branch }) {
 
 // ── 8) Sales & Bookings ───────────────────────────────────────────────────────
 export function SalesBookingsDash({ branch }) {
-  const p = usePeriod('all'); const range = p.range;
+  const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, range).data || {};
   const igp = useInvoiceGP(branch, range).data || {};
@@ -398,7 +406,7 @@ export function SalesBookingsDash({ branch }) {
 
 // ── 9) Supplier / Purchase ────────────────────────────────────────────────────
 export function SupplierPurchaseDash({ branch }) {
-  const p = usePeriod('all'); const range = p.range;
+  const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, range).data || {};
   const igp = useInvoiceGP(branch, range).data || {};
@@ -424,7 +432,7 @@ export function SupplierPurchaseDash({ branch }) {
 
 // ── 10) Tax & Compliance ──────────────────────────────────────────────────────
 export function TaxComplianceDash({ branch }) {
-  const p = usePeriod('all'); const range = p.range;
+  const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const tax = useTaxSummary(branch, range).data || {};
   return (
@@ -446,7 +454,7 @@ export function TaxComplianceDash({ branch }) {
 
 // ── 11) Expenses ──────────────────────────────────────────────────────────────
 export function ExpensesDash({ branch }) {
-  const p = usePeriod('all'); const range = p.range;
+  const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const pl = useProfitAndLoss(branch, range).data || {};
   const total = pl?.indirect?.debitTotal || 0;
@@ -515,7 +523,7 @@ const stLabel = (s) => ({ met: '✓ Met', warn: '⚠ Near', short: '✗ Short', 
 
 // ── 13/14/15) Sales / GP / Collections vs Target ──────────────────────────────
 export function VsTargetDash({ branch, metric = 'sales' }) {
-  const p = usePeriod('all'); const range = p.range;
+  const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const d = useTargetsVsActual(branch, metric, { ...range, fy: fyStr() }).data || {};
   const t = d.totals || {}, rows = d.rows || [];
@@ -548,7 +556,7 @@ export function VsTargetDash({ branch, metric = 'sales' }) {
 
 // ── 16) Budget vs Expense ─────────────────────────────────────────────────────
 export function BudgetVsExpenseDash({ branch }) {
-  const p = usePeriod('all'); const range = p.range;
+  const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const d = useBudgetVsActual(branch, { ...range, fy: fyStr() }).data || {};
   const t = d.totals || {}, rows = d.rows || [];

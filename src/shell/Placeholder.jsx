@@ -14,7 +14,7 @@ export function Placeholder({route,setRoute}){
     <div style={{...card,padding:"46px 32px",textAlign:"center"}}>
       <div style={{width:56,height:56,margin:"0 auto 16px",borderRadius:"50%",background:"#fdf8ec",color:"#b08319",display:"flex",alignItems:"center",justifyContent:"center"}}><Wrench size={26}/></div>
       <h2 style={{margin:0,fontSize:19,fontWeight:700,color:"#0d1326",letterSpacing:"-0.02em"}}>{title}</h2>
-      <p style={{margin:"10px auto 0",maxWidth:380,fontSize:13,color:"#5a6691",lineHeight:1.6}}>This module follows the same pattern as Sales — Flight Tickets. All 7 sales/purchase modules are in the Next.js project zip.</p>
+      <p style={{margin:"10px auto 0",maxWidth:380,fontSize:13,color:"#5a6691",lineHeight:1.6}}>This screen isn’t available yet. It’s on the roadmap — for now, use the related screens from the menu, or head back to your dashboard.</p>
       <button onClick={()=>setRoute("/dashboard")} style={{...btnG,marginTop:20,display:"inline-flex",alignItems:"center",gap:7}}><ArrowLeft size={14}/> Back to dashboard</button>
     </div>
   </div>;

@@ -901,7 +901,7 @@ export function HrPayslips({branch}){
       </div>
 
       {/* Payslip card */}
-      <div style={{...card,overflow:"hidden",boxShadow:"0 4px 24px rgba(0,0,0,0.1)"}}>
+      <div id="payslip-content" style={{...card,overflow:"hidden",boxShadow:"0 4px 24px rgba(0,0,0,0.1)"}}>
         {/* Header */}
         <div style={{background:"#0d1326",padding:"20px 24px",display:"flex",
           justifyContent:"space-between",alignItems:"center"}}>

@@ -125,8 +125,9 @@ export function ReportActionBar({ route, branch }) {
         )}
       </div>
 
-      <button onClick={print} title="Open the print preview" style={btn}>🖨 Print</button>
-      <button onClick={print} title="Open the preview, then Save as PDF" style={btn}>📄 PDF</button>
+      {/* One button — the print preview is also where you Save as PDF, so the two
+          separate Print / PDF buttons were the same action. */}
+      <button onClick={print} title="Open the print preview — print or Save as PDF from there" style={btn}>🖨 Print / Save as PDF</button>
     </div>
   );
 }

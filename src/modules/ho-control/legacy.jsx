@@ -443,7 +443,7 @@ export function BankingApiSettings({branch,setRoute}){
         <div style={{...card,borderTop:"3px solid #27500A"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Connected Banks</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#27500A"}}>{connected}</p></div>
         <div style={{...card,borderTop:"3px solid #854F0B"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Pending</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#854F0B"}}>{BANK_INTEGRATIONS.filter(b=>b.status==="Pending").length}</p></div>
         <div style={{...card,borderTop:"3px solid #5a6691"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Manual Only</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#5a6691"}}>{BANK_INTEGRATIONS.filter(b=>b.status==="Manual").length}</p></div>
-        <div style={{...card,borderTop:"3px solid #185FA5"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Live Balance Total</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#185FA5"}}>11.7M</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>Aggregated INR</p></div>
+        <div style={{...card,borderTop:"3px solid #185FA5"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Live Balance Total</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#185FA5"}} title="Live bank-balance aggregation isn’t wired on this screen yet">—</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>Aggregated INR</p></div>
       </div>
 
       <div style={{...card,padding:0,overflow:"hidden"}}>
@@ -601,7 +601,7 @@ export function HOVendorMasterLock(){
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
-        {[{l:"Locked Vendors",v:HO_LOCKED_VENDORS.length,c:"#0d1326"},{l:"Change Attempts (90d)",v:2,c:"#A32D2D"},{l:"Attempts Denied",v:2,c:"#22c55e"}].map(k=>(
+        {[{l:"Locked Vendors",v:HO_LOCKED_VENDORS.length,c:"#0d1326"},{l:"Change Attempts (90d)",v:"—",c:"#A32D2D"},{l:"Attempts Denied",v:"—",c:"#22c55e"}].map(k=>(
           <div key={k.l} style={{...cardStyle,borderTop:"3px solid "+k.c}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:k.c}}>{k.v}</p></div>
         ))}
       </div>
@@ -1107,9 +1107,9 @@ export function AuthorityConfigCenter(){
     <PHASE2_Page title="Authority Configuration Center"
       subtitle="Faiz Patel · Sr. Finance Manager · Configure approval limits · master-data permissions · branch isolation · time-based controls"
       toolbar={<>
-        {saved && <span style={{padding:"5px 12px",background:"#d4edda",color:"#155724",borderRadius:4,fontSize:11,fontWeight:700}}>✓ Saved · Effective immediately</span>}
+        {saved && <span style={{padding:"5px 12px",background:"#FAEEDA",color:"#854F0B",borderRadius:4,fontSize:11,fontWeight:700}} title="Server persistence for this screen isn’t wired yet — changes are held in this session only.">⚠ Captured in this session — not yet saved to the server</span>}
         <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Matrix</button>
-        <button onClick={()=>setSaved(true)} style={{padding:"7px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save All Changes</button>
+        <button onClick={()=>setSaved(true)} title="Holds your changes for this session — server save is not enabled on this screen yet" style={{padding:"7px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save All Changes</button>
       </>}>
 
       {/* Big policy callout */}
