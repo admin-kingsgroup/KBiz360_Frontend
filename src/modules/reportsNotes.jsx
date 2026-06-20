@@ -25,6 +25,7 @@ import { buildNotes } from './notesEngine';
 import { useModalEsc } from '../core/ux/useModalEsc';
 import { clickable } from '../core/ux/clickable';
 import { PeriodBar, periodRange } from '../core/period';
+import { openPrintPreview } from '../core/PrintPreview';
 
 const INK = '#0d1326', GOLD = '#d4a437', MUTE = '#5a6691', LINE = '#e1e3ec';
 const OK = '#1D9E75', WARN = '#A32D2D';
@@ -275,7 +276,7 @@ export function NotesToFinancials({ branch }) {
             ))}
           </div>
           <button onClick={doExcel} style={ctrl}>📊 Excel</button>
-          <button onClick={() => window.print()} style={ctrl}>🖨 Print / PDF</button>
+          <button onClick={() => openPrintPreview({ selector: 'main', title: 'Notes to Financial Statements', recommend: 'portrait' })} style={ctrl}>🖨 Print / PDF</button>
         </div>
       </div>
 

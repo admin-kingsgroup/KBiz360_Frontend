@@ -17,6 +17,7 @@ import { ReportSearch, ReportDateBar, resolveReportRange, matchNeedle } from '..
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { ResponsiveGrid, StatusPill, Button, Select } from '../../../shell/primitives';
+import { openPrintPreview } from '../../../core/PrintPreview';
 
 export function ClientStatement({ branch }) {
   const cur = bc(branch).cur;
@@ -86,7 +87,7 @@ export function ClientStatement({ branch }) {
       actions={
         <>
           <Button size="sm" variant="success" icon={MessageCircle} onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank', 'noopener')}>WhatsApp</Button>
-          <Button size="sm" variant="secondary" icon={Printer} onClick={() => window.print()}>Print</Button>
+          <Button size="sm" variant="secondary" icon={Printer} onClick={() => openPrintPreview({ selector: 'main', title: 'Client Statement', recommend: 'portrait' })}>Print</Button>
         </>
       }
       filters={

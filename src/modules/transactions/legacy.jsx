@@ -28,6 +28,7 @@ import { ChartOfAccounts, MastersLedgers, MastersSubAgents } from '../masters';
 import { ApiKeySettings } from '../settings';
 import { Form26AS } from '../taxation';
 import { NotificationCentre } from '../../shell/NotifPanel';
+import { openPrintPreview } from '../../core/PrintPreview';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { clickable } from '../../core/ux/clickable';
@@ -4340,7 +4341,7 @@ export function QuickPOS({branch,setRoute}){
             <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>Voucher No.</span><span style={{fontWeight:600}}>{vNo}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>Client</span><span style={{fontWeight:600}}>{client.name}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>Service</span><span style={{fontWeight:600}}>{service}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11}}><span style={{color:"#5a6691"}}>Branch</span><span style={{fontWeight:600}}>{bc(branch).voucherPrefix}</span></div>
           </div>
           <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>window.print()} style={{...btnG,flex:1}}><Printer size={13}/> Print Receipt</button>
+            <button onClick={()=>openPrintPreview({ selector:'main', title:`Receipt ${vNo}`, recommend:'portrait' })} style={{...btnG,flex:1}}><Printer size={13}/> Print Receipt</button>
             <button onClick={()=>setRoute(selSvc.route)} style={{...btnGh,flex:1}}>Full Invoice →</button>
             <button onClick={()=>{setStep(1);setClient({name:"",mobile:"",isExisting:false});setAmount(0);}} style={{...btnGh,flex:1}}>New Booking</button>
           </div>
@@ -4615,7 +4616,7 @@ export function PrintPreviewDemo(){
     <PHASE2_Page title="Print Preview Before Saving" subtitle="Review the formatted voucher before committing · matches the actual printout">
       <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
         <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>← Edit Voucher</button>
-        <button onClick={()=>window.print()} style={{padding:"7px 14px",background:"#fff",border:"1px solid #0d1326",color:"#0d1326",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>🖨 Print</button>
+        <button onClick={()=>openPrintPreview({ selector:'main', title:'Voucher', recommend:'portrait' })} style={{padding:"7px 14px",background:"#fff",border:"1px solid #0d1326",color:"#0d1326",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>🖨 Print</button>
         <button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>✓ Save & Post</button>
       </div>
 

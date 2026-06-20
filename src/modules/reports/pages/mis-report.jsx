@@ -10,6 +10,7 @@
    ──────────────────────────────────────────────────────────────────── */
 
 import React, { useState } from 'react';
+import { openPrintPreview } from '../../../core/PrintPreview';
 import { Download } from 'lucide-react';
 import { useGpBills, useModulePL, useAgeing } from '../../../core/useAccounting';
 import { bc } from '../../../core/styles';
@@ -85,7 +86,7 @@ export function MisReport({ branch }) {
     <PageLayout
       title="Management Information System"
       subtitle={`${periodLabel} · ${brCode || CONSOLIDATED_LABEL} · Monday Morning Report`}
-      actions={<Button size="sm" variant="primary" icon={Download} onClick={() => window.print()}>Export</Button>}
+      actions={<Button size="sm" variant="primary" icon={Download} onClick={() => openPrintPreview({ selector: 'main', title: 'MIS Report', recommend: 'portrait' })}>Export</Button>}
       filters={<Select value={period} onChange={(e) => setPeriod(e.target.value)} className="w-auto">{PERIODS.map((p) => <option key={p.v} value={p.v}>{p.l}</option>)}</Select>}
     >
       <ResponsiveGrid min="160px" gap="md" className="mb-3.5">

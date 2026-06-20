@@ -13,6 +13,7 @@ import React from 'react';
 import { Download, Construction } from 'lucide-react';
 import { PageLayout } from '../../../shell/PageLayout';
 import { PageSection, Button, EmptyState } from '../../../shell/primitives';
+import { openPrintPreview } from '../../../core/PrintPreview';
 
 /* Report page scaffold: breadcrumb + title + filters + an Export (print) action. */
 export function RptShell({ title, subtitle, children, filters }) {
@@ -22,7 +23,7 @@ export function RptShell({ title, subtitle, children, filters }) {
       subtitle={subtitle}
       filters={filters}
       actions={
-        <Button variant="primary" size="sm" icon={Download} onClick={() => window.print()}>
+        <Button variant="primary" size="sm" icon={Download} onClick={() => openPrintPreview({ selector: 'main', title: 'Report', recommend: 'portrait' })}>
           Export
         </Button>
       }

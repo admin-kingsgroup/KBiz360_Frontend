@@ -26,6 +26,7 @@ import { ForexReport } from '../reports';
 import { EWayBill, Form26AS } from '../taxation';
 import { RecurringVouchers } from '../transactions';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
+import { openPrintPreview } from '../../core/PrintPreview';
 
 /* ════════════════════════════════════════════════════════════════════
    BANK RECONCILIATION  —  live book (ledger) vs imported bank statement.
@@ -972,7 +973,7 @@ export function CashBookReport({branch}){
         </div>
         <div style={{display:"flex",gap:8}}>
           <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}/>
-          <button onClick={()=>window.print()} style={{...btnGh,fontSize:11}}><Printer size={12}/> Print</button>
+          <button onClick={()=>openPrintPreview({ selector: 'main', title: 'Finance', recommend: 'portrait' })} style={{...btnGh,fontSize:11}}><Printer size={12}/> Print</button>
           <button onClick={()=>exportToCSV(entries,["id","type","ref","narration","dr","cr"],"cashbook.csv")} style={{...btnGh,fontSize:11}}><Download size={12}/> CSV</button>
         </div>
       </div>

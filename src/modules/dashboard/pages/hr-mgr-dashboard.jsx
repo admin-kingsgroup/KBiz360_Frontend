@@ -8,6 +8,7 @@ import { useDashboardStore } from '../store/dashboard.store';
 import { BirthdaysPanel } from '../components/shared/BirthdaysPanel';
 import { AnniversariesPanel } from '../components/shared/AnniversariesPanel';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+import { openPrintPreview } from '../../../core/PrintPreview';
 
 export function HrMgrDashboardPage({ currentUser, setRoute }) {
   const { data: stats, isLoading } = useHrMgrDashboard();
@@ -29,7 +30,7 @@ export function HrMgrDashboardPage({ currentUser, setRoute }) {
         user={currentUser}
         period={period}
         setPeriod={setPeriod}
-        onExport={() => window.print()}
+        onExport={() => openPrintPreview({ selector: 'main', title: 'HR Manager Dashboard', recommend: 'portrait' })}
       />
 
       <div

@@ -16,18 +16,8 @@ import { isPageAccessAdmin } from './pageCatalog';
 // Organised on Tally's master taxonomy: Accounts Info · Statutory Info ·
 // Parties (which in Tally are just ledgers) · Inventory & Catalog · Utilities.
 export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
-  {label:"Accounts Master", children:[
-    {label:"Accounts Tree View (Parent ▸ Group ▸ Sub-Group ▸ Ledger)", href:"/masters/accounts-tree"},
-    {divider:true, label:"Create / Edit"},
-    {label:"Parent Groups (28 Tally · view)", href:"/masters/groups"},
-    {label:"Groups & Sub-Groups (Create)", href:"/masters/subgroups"},
-    {label:"Ledgers (Create · Chart of Accounts)", href:"/masters/ledgers"},
-    {label:"Bank Accounts", href:"/masters/bank-accounts"},
-    {label:"Cost Categories", href:"/masters/cost-categories"},
-    {label:"Cost Centres", href:"/masters/cost-centers"},
-    {label:"Budgets", href:"/masters/budgets"},
-    {label:"Scenarios", href:"/masters/scenarios"},
-  ]},
+  // Accounts Master (Chart of Accounts, Cost Centres, Budgets, Scenarios) lives
+  // under the ACCOUNTS header now — see MENU_ACCOUNTS ▸ "Accounts Master".
   {label:"Voucher Master", children:[
     {label:"Voucher Types", href:"/masters/voucher-types"},
     {label:"Numbering Series (🔒 auto)", href:"/masters/numbering"},
@@ -42,10 +32,9 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
     {label:"Sub-Agents", href:"/masters/sub-agents"},
     {label:"Vendor Credit Terms", href:"/masters/vendor-terms"},
   ]},
-  {label:"Tax & Currency Master", children:[
+  {label:"Tax Master", children:[
     {label:"Tax / HSN-SAC Codes", href:"/masters/tax"},
-    {label:"Currencies", href:"/masters/currency"},
-    {label:"Forex Rates", href:"/masters/forex"},
+    // Currencies & Forex Rates moved to ACCOUNTS ▸ Accounts Master ▸ Currency.
   ]},
   {label:"Inventory & Catalog Master", children:[
     {label:"Airlines & GDSs", href:"/masters/airlines"},
@@ -316,14 +305,26 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Journal Register", href:"/finance/journal-register"},
     {label:"Audit Trail",      href:"/reports/audit-trail"},
   ]},
-  // Self-serve master creation so the accountant can clear suspense (create a missing
-  // ledger) without leaving the workspace. Same screens as the main Masters tab. Cost
-  // Centres are intentionally NOT here — their writes are Super-Admin only (branch-wise
-  // master), so they'd 403 for a Branch Accountant.
-  {label:"Masters (quick create)", children:[
-    {label:"Ledgers (Create · Chart of Accounts)", href:"/masters/ledgers"},
-    {label:"Groups & Sub-Groups (Create)",         href:"/masters/subgroups"},
-    {label:"Bank Accounts",                        href:"/masters/bank-accounts"},
+  // Accounts Master — the Chart-of-Accounts masters now live under THIS Accounts
+  // header (moved out of the standalone Masters pill). Cost Centres are Super-Admin-
+  // only (branch-wise master) — their writes 403 for a Branch Accountant, who can
+  // still open the screen to view.
+  {label:"Accounts Master", children:[
+    {divider:true, label:"Chart of Accounts"},
+    {label:"Accounts Tree View (read-only)", href:"/masters/accounts-tree"},
+    {label:"Chart of Accounts (Groups ▸ Ledgers)", href:"/masters/groups"},
+    {label:"Groups & Sub-Groups (Create / Edit)", href:"/masters/subgroups"},
+    {label:"Ledgers (Create / Edit)", href:"/masters/ledgers"},
+    {label:"Bank Accounts", href:"/masters/bank-accounts"},
+    {divider:true, label:"Currency"},
+    {label:"Currencies", href:"/masters/currency"},
+    {label:"Forex Rates", href:"/masters/forex"},
+    {divider:true, label:"Costing"},
+    {label:"Cost Categories", href:"/masters/cost-categories"},
+    {label:"Cost Centres (🔒 Super-Admin)", href:"/masters/cost-centers"},
+    {divider:true, label:"Planning"},
+    {label:"Budgets", href:"/masters/budgets"},
+    {label:"Scenarios", href:"/masters/scenarios"},
   ]},
   // Tax & Statutory moved to the Taxation header (see TAX_INDIA / TAX_AFRICA /
   // TAX_ALL in core/data.js) — it no longer lives under the Accounts pill.

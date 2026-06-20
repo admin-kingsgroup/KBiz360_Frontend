@@ -209,7 +209,7 @@ export function AccountsTreeView({ branch }) {
       <FocusBanner />
       <div style={{ marginBottom: 8 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK }}>Accounts Tree View</h2>
-        <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Parent Group ▸ Group ▸ Sub-Group ▸ Ledger · View-only — create under <b>Masters ▸ Accounts Master</b>.</p>
+        <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Primary Group ▸ Primary Sub Group ▸ ERP Group ▸ ERP Sub Group ▸ Ledger · View-only — create under <b>Masters ▸ Accounts Master</b>.</p>
       </div>
 
       {/* Scope legend — Groups/Sub-Groups are org-wide; only Ledgers carry a branch. */}

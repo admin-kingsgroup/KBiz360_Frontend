@@ -10,6 +10,7 @@ import { RecentActivityFeed } from '../components/shared/RecentActivityFeed';
 import { AgeingBuckets } from '../components/shared/AgeingBuckets';
 
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+import { openPrintPreview } from '../../../core/PrintPreview';
 
 export function AcctsExecDashboardPage({ currentUser, setRoute /*, branch */ }) {
   const ownBranch = currentUser?.branches?.[0] || 'BOM';
@@ -32,7 +33,7 @@ export function AcctsExecDashboardPage({ currentUser, setRoute /*, branch */ }) 
         user={currentUser}
         period={period}
         setPeriod={setPeriod}
-        onExport={() => window.print()}
+        onExport={() => openPrintPreview({ selector: 'main', title: 'Accounts Executive Dashboard', recommend: 'portrait' })}
       />
 
       <PostShortcutTiles onNavigate={navigate} />

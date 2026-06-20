@@ -11,6 +11,7 @@ import { BankReconStatusPanel } from '../components/shared/BankReconStatusPanel'
 import { CloseChecklist } from '../components/shared/CloseChecklist';
 import { TopVendorsOverdueTable } from '../components/tables/TopVendorsOverdueTable';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+import { openPrintPreview } from '../../../core/PrintPreview';
 
 export function SrAeDashboardPage({ currentUser, setRoute }) {
   const { data, todayTotal, todayValue, isLoading } = useSrAeDashboard();
@@ -32,7 +33,7 @@ export function SrAeDashboardPage({ currentUser, setRoute }) {
         user={currentUser}
         period={period}
         setPeriod={setPeriod}
-        onExport={() => window.print()}
+        onExport={() => openPrintPreview({ selector: 'main', title: 'Senior Accounts Executive Dashboard', recommend: 'portrait' })}
       />
 
       <div

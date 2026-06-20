@@ -5,6 +5,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, BarChart2, Calendar, Check, Download, Lock, Plus, Save, Search, Settings, Users } from 'lucide-react';
+import { openPrintPreview } from '../../core/PrintPreview';
 import { Legend, Line } from 'recharts';
 import { BRANCHES, EMP_LOANS_DATA, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../../core/data';
 import { fmt, fmtINR } from '../../core/format';
@@ -1962,7 +1963,7 @@ export function MyPayslip(){
   const netPay=totalEarnings-totalDeductions;
   return(
     <PHASE2_Page title="My Payslip" subtitle="View and download your monthly salary statement"
-      toolbar={<><select value={selMonth} onChange={e=>setSelMonth(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{months.map(m=><option key={m}>{m}</option>)}</select><button onClick={()=>window.print()} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download PDF</button></>}>
+      toolbar={<><select value={selMonth} onChange={e=>setSelMonth(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{months.map(m=><option key={m}>{m}</option>)}</select><button onClick={()=>openPrintPreview({ selector:'main', title:'Payslip', recommend:'portrait' })} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download PDF</button></>}>
       <div style={{maxWidth:680,margin:"0 auto"}}>
         <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
           {/* Header */}

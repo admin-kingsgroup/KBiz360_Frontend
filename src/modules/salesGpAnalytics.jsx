@@ -35,6 +35,7 @@ import { exportToCSV } from '../core/business-logic';
 import { VoucherEditor } from './accountingLive';
 import { isInterBranch, brName } from './interbranch';
 import { clickable } from '../core/ux/clickable';
+import { openPrintPreview } from '../core/PrintPreview';
 
 /* ── service (product) from voucher type ── */
 const PRODUCT = {
@@ -245,8 +246,8 @@ export function SalesGpAnalytics({ branch }) {
           <p style={{ margin: '3px 0 0', fontSize: 12, color: '#5a6691' }}>Revenue · Cost · Gross Profit · GP% across B2C Meta · B2C Ref · B2B · B2E · Inter-Branch — live from the books</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <button onClick={() => window.print()} style={xBtn}>📄 PDF</button>
-          <button onClick={() => window.print()} style={xBtn}>🖨 Print</button>
+          <button onClick={() => openPrintPreview({ selector: 'main', title: 'Sales & GP Analytics', recommend: 'portrait' })} style={xBtn}>📄 PDF</button>
+          <button onClick={() => openPrintPreview({ selector: 'main', title: 'Sales & GP Analytics', recommend: 'portrait' })} style={xBtn}>🖨 Print</button>
           <button onClick={doExcel} style={xBtn}>📊 Excel</button>
           <button onClick={doCsv} style={xBtn}>📋 CSV</button>
         </div>

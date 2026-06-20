@@ -20,6 +20,7 @@ import { useQueries } from '@tanstack/react-query';
 import { apiGet } from '../../../core/api';
 
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+import { openPrintPreview } from '../../../core/PrintPreview';
 
 const RANGE_SHORT = { month: 'This Month', quarter: 'This Quarter', ytd: 'YTD', all: 'All Time' };
 const C = { dark: '#0d1326', dim: '#5a6691', green: '#1f7a3d', red: '#A32D2D', gold: '#854F0B', border: '#e7e9f0' };
@@ -94,7 +95,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
 
   return (
     <div style={{ padding: 18, maxWidth: 1400, margin: '0 auto' }}>
-      <DashboardHeader title="Director Dashboard" subtitle="Whole-company owner view" user={currentUser} onExport={() => window.print()} />
+      <DashboardHeader title="Director Dashboard" subtitle="Whole-company owner view" user={currentUser} onExport={() => openPrintPreview({ selector: 'main', title: 'Director Dashboard', recommend: 'portrait' })} />
       {Controls}
       <AlertsPanel branch={scope} onGo={navigate} />
 

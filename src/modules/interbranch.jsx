@@ -33,6 +33,7 @@ import { exportToCSV } from '../core/business-logic';
 import { VoucherEditor } from './accountingLive';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { clickable } from '../core/ux/clickable';
+import { openPrintPreview } from '../core/PrintPreview';
 
 /* ── inter-branch ledger detector ──────────────────────────────────────
    Only fires INSIDE the Sundry Debtors / Sundry Creditors groups (checked
@@ -205,8 +206,8 @@ export function RPT_InterbranchElim() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <PeriodBar branch="ALL" defaultPreset="all" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
-          <button onClick={() => window.print()} style={xBtn}>📄 PDF</button>
-          <button onClick={() => window.print()} style={xBtn}>🖨 Print</button>
+          <button onClick={() => openPrintPreview({ selector: 'main', title: 'Inter-Branch', recommend: 'portrait' })} style={xBtn}>📄 PDF</button>
+          <button onClick={() => openPrintPreview({ selector: 'main', title: 'Inter-Branch', recommend: 'portrait' })} style={xBtn}>🖨 Print</button>
           <button onClick={doExcel} style={xBtn}>📊 Excel</button>
           <button onClick={doCsv} style={xBtn}>📋 CSV</button>
         </div>
