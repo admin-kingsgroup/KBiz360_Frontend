@@ -56,6 +56,7 @@ const branchCodeOf = (b) => (!b || b === 'ALL') ? undefined : (b.code || b);
 function mapLedger(l) {
   return {
     id: l.id, code: l.code, name: l.name, group: l.group, subGroup: l.subGroup || '',
+    rootGroup: l.rootGroup || l.group, // primary group — feeds Debtor/Creditor classification for sub-grouped parties
     nature: l.nature, statement: l.statement, drCr: l.drCr, type: ledgerType(l), branch: l.branch, currency: l.currency,
   };
 }

@@ -15,11 +15,16 @@ export function ledgerType(l) {
   const g = (l.group || '').toLowerCase();
   const n = (l.name || '').toLowerCase();
   const sub = (l.subGroup || '').toLowerCase();
+  // Primary (root) group from the API — lets a party ledger nested under a custom
+  // sub-group (e.g. group "B2C Reference" → root "Sundry Debtors", or "Supplier
+  // Air Lines" → "Sundry Creditors") still resolve to Debtor/Creditor instead of
+  // collapsing to a bare Asset/Liability and vanishing from the party picker.
+  const root = (l.rootGroup || '').toLowerCase();
   const isPL = l.nature === 'expense' || l.nature === 'income';
   if (/bank/.test(g) || (!isPL && /bank/.test(n))) return 'Bank';
   if (/cash/.test(g) || (!isPL && /cash/.test(n))) return 'Cash';
-  if (/creditor/.test(g) || /supplier/.test(g) || /supplier/.test(sub)) return 'Creditor';
-  if (/debtor/.test(g) || /debtor/.test(sub)) return 'Debtor';
+  if (/creditor/.test(g) || /creditor/.test(root) || /supplier/.test(g) || /supplier/.test(sub)) return 'Creditor';
+  if (/debtor/.test(g) || /debtor/.test(root) || /debtor/.test(sub)) return 'Debtor';
   if (/tax/.test(g)) return 'Tax';
   if (/capital/.test(g)) return 'Capital';
   if (l.nature === 'expense') return 'Expense';

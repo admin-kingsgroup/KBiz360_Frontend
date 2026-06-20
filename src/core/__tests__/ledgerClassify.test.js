@@ -50,6 +50,30 @@ describe('ledgerType — real bank/cash accounts still classify correctly', () =
   });
 });
 
+describe('ledgerType — party ledgers nested under a custom sub-group (rootGroup)', () => {
+  // group is the sub-group (how the BS nests them); rootGroup is the primary.
+  test('a customer under "B2C Reference" is still a Debtor (via rootGroup)', () => {
+    const l = { name: 'Afshin M. Dhanani', group: 'B2C Reference', rootGroup: 'Sundry Debtors', subGroup: '', nature: 'asset', drCr: 'Dr' };
+    expect(ledgerType(l)).toBe('Debtor');
+  });
+  test('a customer under "B2C Meta" is still a Debtor', () => {
+    const l = { name: 'B2C Meta Asif Khan', group: 'B2C Meta', rootGroup: 'Sundry Debtors', nature: 'asset', drCr: 'Dr' };
+    expect(ledgerType(l)).toBe('Debtor');
+  });
+  test('a supplier under "Supplier Air Lines" stays a Creditor (name + rootGroup)', () => {
+    const l = { name: 'AIR FRANCE', group: 'Supplier Air Lines', rootGroup: 'Sundry Creditors', nature: 'liability', drCr: 'Cr' };
+    expect(ledgerType(l)).toBe('Creditor');
+  });
+  test('a debtor under "INTER BRANCH" (no debtor token in group) is rescued by rootGroup', () => {
+    const l = { name: 'TK-BOM - Car Rental A/c.', group: 'INTER BRANCH', rootGroup: 'Sundry Debtors', nature: 'asset', drCr: 'Dr' };
+    expect(ledgerType(l)).toBe('Debtor');
+  });
+  test('without rootGroup, a non-party asset is unaffected (no false Debtor)', () => {
+    const l = { name: 'Prepaid Expenses', group: 'Misc. Expenses (Asset)', nature: 'asset', drCr: 'Dr' };
+    expect(ledgerType(l)).toBe('Asset');
+  });
+});
+
 describe('ledgerType — other classes unaffected', () => {
   const cases = [
     [{ name: 'ABC Travels', group: 'Sundry Creditors', nature: 'liability', drCr: 'Cr' }, 'Creditor'],
