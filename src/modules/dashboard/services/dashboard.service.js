@@ -63,11 +63,12 @@ export const loadBranchDashboard = async ({ branchCode }) => {
 export const loadDirectorDashboard = async ({ range = 'month', branchCode, from, to } = {}) => {
   // Prefer explicit from/to (uniform 7-preset bar); fall back to the legacy range preset.
   const dates = (from != null || to != null) ? { from: from || '', to: to || '', label: 'Custom' } : api.rangeToDates(range);
-  const [revenueTrend, fyTargets, branchHeatmap, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, bookingSummary] =
+  // NOTE: FY targets and the branch heatmap are rendered LIVE by the page itself
+  // (useTargetsVsActual + per-branch module-pl), so we no longer fetch the seed
+  // getFyTargets() or getBranchHeatmap() here — they were unused round-trips.
+  const [revenueTrend, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, bookingSummary] =
     await Promise.all([
       api.getRevenueTrend(branchCode),
-      api.getFyTargets(),
-      api.getBranchHeatmap(),
       api.getTopCustomers(branchCode),
       api.getTopSuppliers(branchCode),
       api.getBankAccounts(branchCode),
@@ -86,7 +87,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
   });
 
   return {
-    revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers, bankAccounts,
+    revenueTrend, keyAlerts, topCustomers, topSuppliers, bankAccounts,
     pendingBookings: bookingSummary.pending,
     approvedBookings: bookingSummary.approved,
     rejectedBookings: bookingSummary.rejected,

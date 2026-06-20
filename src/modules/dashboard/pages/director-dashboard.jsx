@@ -75,7 +75,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
     return <DashboardSkeleton title="Director Dashboard" numKpis={12} />;
   }
 
-  const { revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers } = data;
+  const { revenueTrend, keyAlerts, topCustomers, topSuppliers } = data;
   const fig = data.figures || { revenue: 0, gp: 0, gpPct: 0, netProfit: 0, outstanding: 0, payable: 0, cash: 0 };
   const pb = data.pendingBookings || { count: 0, sales: 0, gp: 0 };
   const ab = data.approvedBookings || { count: 0, sales: 0, gp: 0 };

@@ -1,9 +1,6 @@
 import {
   PERIOD_CLOSE_DATA,
 } from '../../../core/helpers';
-import {
-  FY_TARGETS_DATA,
-} from '../../../core/data';
 import { apiGet } from '../../../core/api';
 
 /**
@@ -175,7 +172,6 @@ export const getCashForecast = async (branchCode) => {
 // ── Still seed — genuinely need a new backend (not yet wired) ────────────────
 // getPeriodClose: needs a period-lock / month-end status subsystem (no source of
 //   truth exists yet) — left empty rather than fabricating a "Closed" status.
-// getFyTargets: superseded — the Director dashboard already renders live targets via
-//   useTargetsVsActual; this accessor is only a fallback and stays empty.
-export const getFyTargets = async () => FY_TARGETS_DATA;
+// (getFyTargets was removed — the Director dashboard renders live targets via
+//  useTargetsVsActual, so the seed accessor had no remaining caller.)
 export const getPeriodClose = async () => PERIOD_CLOSE_DATA;
