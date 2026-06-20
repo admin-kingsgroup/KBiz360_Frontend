@@ -20,7 +20,8 @@ import { ResponsiveGrid, StatusPill, Button, Select } from '../../../shell/primi
 
 export function ClientStatement({ branch }) {
   const cur = bc(branch).cur;
-  const [client, setClient] = useState('');
+  // Allow deep-linking a client via ?party= (the "Statement" drill from Collections).
+  const [client, setClient] = useState(() => { try { return new URLSearchParams(window.location.search).get('party') || ''; } catch { return ''; } });
   const [range, setRange] = useState(() => ({ mode: 'all', ...resolveReportRange('all') }));
   const [search, setSearch] = useState('');
   const needle = search.trim().toLowerCase();

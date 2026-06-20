@@ -6,6 +6,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { confirmDialog } from '../../core/ux/confirm';
 import { toast } from '../../core/ux/toast';
+import { clickable } from '../../core/ux/clickable';
 import { AlertTriangle, Download, Lock, Plus, Printer, Save, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
 import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement } from '../../core/useBankReco';
 import { branchCode } from '../../core/useAccounting';
@@ -329,7 +330,7 @@ export function BankReco({branch}){
                       const sel=selBook?.bookKey===l.bookKey;
                       const net=l.debit-l.credit;
                       return (
-                        <tr key={l.bookKey} onClick={()=>{ if(l.reconciled) return; setSelBook(sel?null:{bookKey:l.bookKey,vno:l.vno,debit:l.debit,credit:l.credit}); }}
+                        <tr key={l.bookKey} {...(!l.reconciled ? clickable(()=>{ setSelBook(sel?null:{bookKey:l.bookKey,vno:l.vno,debit:l.debit,credit:l.credit}); }) : {})}
                           style={{borderBottom:"1px solid #f3f4f8",cursor:l.reconciled?"default":"pointer",background:sel?"#FFF4D6":l.reconciled?"#EAF3DE":i%2===0?"#fff":"#fafafa"}}>
                           <td style={{padding:"6px 9px",color:"#5a6691",fontSize:10,whiteSpace:"nowrap"}}>{fmtDate?fmtDate(l.date):l.date}</td>
                           <td style={{padding:"6px 9px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{l.vno}</td>
@@ -362,7 +363,7 @@ export function BankReco({branch}){
                       const ref=l.reference||l.chequeNo||l.utr||"";
                       const open=l.status==="unreconciled"||l.status==="exception";
                       return (
-                        <tr key={l.id} onClick={()=>{ if(!open) return; setSelStmt(sel?null:l); }}
+                        <tr key={l.id} {...(open ? clickable(()=>{ setSelStmt(sel?null:l); }) : {})}
                           style={{borderBottom:"1px solid #f3f4f8",cursor:open?"pointer":"default",background:sel?"#FFF4D6":l.status==="reconciled"?"#EAF3DE":l.status==="partial"?"#E6F1FB":l.status==="exception"?"#FCEBEB":i%2===0?"#fff":"#fafafa"}}>
                           <td style={{padding:"6px 9px",color:"#5a6691",fontSize:10,whiteSpace:"nowrap"}}>{fmtDate?fmtDate(l.date):l.date}</td>
                           {view!=="minimal"&&<td style={{padding:"6px 9px",fontFamily:"monospace",fontSize:9,color:"#185FA5",maxWidth:110,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={ref}>{ref}</td>}
@@ -1092,7 +1093,7 @@ export function YearEndClose({branch}){
       {/* Progress bar */}
       <div style={{marginBottom:16,display:"flex",gap:0}}>
         {steps.map((s,i)=>(
-          <div key={i} onClick={()=>setStep(i)} style={{flex:1,cursor:"pointer",textAlign:"center",padding:"8px 4px",borderBottom:`3px solid ${step===i?"#d4a437":i<step?"#27500A":"#e1e3ec"}`,background:step===i?"#f9fafb":"transparent"}}>
+          <div key={i} {...clickable(()=>setStep(i))} style={{flex:1,cursor:"pointer",textAlign:"center",padding:"8px 4px",borderBottom:`3px solid ${step===i?"#d4a437":i<step?"#27500A":"#e1e3ec"}`,background:step===i?"#f9fafb":"transparent"}}>
             <span style={{fontSize:16}}>{s.icon}</span>
             {!mob&&<p style={{margin:"2px 0 0",fontSize:9.5,fontWeight:step===i?700:400,color:step===i?"#0d1326":i<step?"#27500A":"#5a6691"}}>{s.title}</p>}
           </div>
@@ -1415,7 +1416,7 @@ export function CashFlowDirect({branch,setRoute}){
 export const TDS_SECTIONS_TABLE = [
   {section:"194A",description:"Interest (other than securities)",threshold:40000,rateWithPAN:10,rateWithoutPAN:20,category:"Interest"},
   {section:"194C",description:"Payment to contractors/sub-contractors",threshold:30000,rateWithPAN:1,rateWithoutPAN:20,rateCompany:2,category:"Contract"},
-  {section:"194H",description:"Commission or brokerage",threshold:15000,rateWithPAN:5,rateWithoutPAN:20,category:"Commission"},
+  {section:"194H",description:"Commission or brokerage",threshold:15000,rateWithPAN:2,rateWithoutPAN:20,category:"Commission"},
   {section:"194I(a)",description:"Rent — plant & machinery",threshold:240000,rateWithPAN:2,rateWithoutPAN:20,category:"Rent"},
   {section:"194I(b)",description:"Rent — land, building, furniture",threshold:240000,rateWithPAN:10,rateWithoutPAN:20,category:"Rent"},
   {section:"194J",description:"Fees for professional/technical services",threshold:30000,rateWithPAN:10,rateWithoutPAN:20,category:"Professional"},

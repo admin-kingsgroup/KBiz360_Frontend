@@ -12,6 +12,7 @@ import { fmt, fmtINR } from '../../core/format';
 import { FORM16A_DATA, _TCS_ENTRIES, _TDS_ENTRIES, cardStyle } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
+import { clickable } from '../../core/ux/clickable';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, tabBtnStyle } from '../../core/styles';
 import { TDS_SECTIONS } from '../finance';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
@@ -1551,7 +1552,7 @@ export function Form16AGenerator(){
         <div style={cardStyle}>
           <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Vendors — Q4 FY 2025-26</p>
           {FORM16A_DATA.map((v,i)=>(
-            <div key={i} onClick={()=>setSelVendor(i)} style={{padding:"10px",border:selVendor===i?"2px solid #d4a437":"1px solid #e1e3ec",borderRadius:6,marginBottom:6,cursor:"pointer",background:selVendor===i?"#fff8e8":"#fff"}}>
+            <div key={i} {...clickable(()=>setSelVendor(i),{role:'option'})} style={{padding:"10px",border:selVendor===i?"2px solid #d4a437":"1px solid #e1e3ec",borderRadius:6,marginBottom:6,cursor:"pointer",background:selVendor===i?"#fff8e8":"#fff"}}>
               <p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{v.vendor}</p>
               <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{v.section} · {fmtINR(v.tds)} TDS</p>
               <span style={{padding:"1px 7px",background:v.paid?"#d4edda":"#f8d7da",color:v.paid?"#155724":"#721c24",borderRadius:3,fontSize:9.5,fontWeight:700}}>{v.paid?"TDS Paid":"TDS Pending"}</span>

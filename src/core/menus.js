@@ -156,6 +156,7 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
     {label:"Purchase Register", href:"/reports/preg"},
     {label:"Consultant Report", href:"/reports/consultant"},
     {label:"Supplier 360 View", href:"/reports/supplier-360"},
+    {label:"Customer 360 View", href:"/reports/customer-360"},
     {label:"Destination Intel", href:"/reports/destination"},
     {label:"Forex Report", href:"/reports/forex"},
     {label:"Commission Income", href:"/reports/commission"},
@@ -295,6 +296,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   ]},
   {label:"Payables & Suppliers", children:[
     {label:"Payables (Ageing + Settle)",  href:"/reports/pay"},
+    {label:"Payment Run / Batch Pay",     href:"/accounts/payment-run"},
     {label:"Vendor Advances",             href:"/accounting/vendor-advances"},
     {label:"Payment Register",            href:"/finance/payment-register"},
     {label:"Supplier Reconciliation",        href:"/accounts/supplier-reco"},

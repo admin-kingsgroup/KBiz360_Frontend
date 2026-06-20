@@ -9,6 +9,7 @@ import { Line } from 'recharts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { exportToCSV } from '../../core/business-logic';
 import { toast } from '../../core/ux/toast';
+import { clickable } from '../../core/ux/clickable';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../core/data';
 import { apiPost, apiPut, apiDelete } from '../../core/api';
 import { useUsersAdmin, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../core/useReference';
@@ -59,7 +60,7 @@ export function SettingsBranches(){
   };
 
   const BranchCard=({b})=>(
-    <div onClick={()=>setSel(sel===b.code?null:b.code)} style={{
+    <div {...clickable(()=>setSel(sel===b.code?null:b.code))} style={{
       ...card,cursor:"pointer",padding:0,overflow:"hidden",
       border:sel===b.code?"2px solid #d4a437":"1px solid #e1e3ec",
       transform:sel===b.code?"translateY(-2px)":"none",
@@ -896,7 +897,7 @@ export function DocTemplateEditor(){
             </div>
             <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
               {["#0d1326","#d4a437","#A32D2D","#2F7A8E","#22c55e","#3b82f6"].map(c=>(
-                <div key={c} onClick={()=>setColor(c)} style={{width:24,height:24,borderRadius:"50%",background:c,cursor:"pointer",border:color===c?"2px solid #fff":"none",boxShadow:color===c?"0 0 0 2px "+c:"none"}}/>
+                <div key={c} {...clickable(()=>setColor(c))} style={{width:24,height:24,borderRadius:"50%",background:c,cursor:"pointer",border:color===c?"2px solid #fff":"none",boxShadow:color===c?"0 0 0 2px "+c:"none"}}/>
               ))}
             </div>
           </div>
@@ -956,7 +957,7 @@ export function EmailSMSTemplates(){
         <div style={cardStyle}>
           <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Templates ({templates.length})</p>
           {templates.map((tmpl,i)=>(
-            <div key={tmpl.id} onClick={()=>{setSel(i);setEditBody(tmpl.body);}} style={{padding:"9px 10px",border:sel===i?"2px solid #d4a437":"1px solid #e1e3ec",borderRadius:6,marginBottom:6,cursor:"pointer",background:sel===i?"#fff8e8":"#fff"}}>
+            <div key={tmpl.id} {...clickable(()=>{setSel(i);setEditBody(tmpl.body);},{role:'option'})} style={{padding:"9px 10px",border:sel===i?"2px solid #d4a437":"1px solid #e1e3ec",borderRadius:6,marginBottom:6,cursor:"pointer",background:sel===i?"#fff8e8":"#fff"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                 <p style={{margin:0,fontSize:11.5,fontWeight:700,color:"#0d1326"}}>{tmpl.name}</p>
                 <span style={{padding:"1px 6px",background:tmpl.channel==="SMS"?"#fff3cd":"#cfe2ff",color:tmpl.channel==="SMS"?"#856404":"#004085",borderRadius:3,fontSize:9.5,fontWeight:700}}>{tmpl.channel}</span>

@@ -322,13 +322,15 @@ export function useYearOverYear(branch, { from, to } = {}) {
   });
 }
 
-// AR / AP ageing (receivables & payables, bill-wise / no FIFO, as-of today). Each
-// party row carries age buckets + onAccount + net. GET /api/accounting/ageing.
-export function useAgeing(branch) {
+// AR / AP ageing (receivables & payables, bill-wise / no FIFO). Each party row
+// carries age buckets + onAccount + net. Optional `asOf` (YYYY-MM-DD) ages the
+// books as of that cut-off date instead of today. GET /api/accounting/ageing.
+export function useAgeing(branch, asOf) {
   const code = branchCode(branch);
+  const cut = asOf || '';
   return useQuery({
-    queryKey: ['accounting', 'ageing', code || 'all'],
-    queryFn: () => apiGet('/api/accounting/ageing', { branch: code }),
+    queryKey: ['accounting', 'ageing', code || 'all', cut || 'today'],
+    queryFn: () => apiGet('/api/accounting/ageing', { branch: code, ...(cut ? { asOf: cut } : {}) }),
     enabled: enabled(),
     staleTime: 30_000,
   });
@@ -432,6 +434,17 @@ export function useOutstanding(branch) {
     queryFn: () => apiGet('/api/vouchers/outstanding', { branch: code }),
     enabled: enabled(),
     staleTime: 20_000,
+  });
+}
+
+// Payment Run / Batch Pay — pay many selected supplier bills in one action. The
+// backend groups them per supplier into one PENDING payment voucher each (with the
+// bills as directed allocations), landing in the approval queue. POST /api/vouchers/payment-run.
+export function usePaymentRun() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => apiPost('/api/vouchers/payment-run', body),
+    onSuccess: () => invalidateBooks(qc),
   });
 }
 

@@ -18,6 +18,7 @@ import { PeriodBar } from '../core/period';
 import { useModulePL, useBalanceSheet } from '../core/useAccounting';
 import { LEDGER_CSS } from '../core/ledgerUI';
 import { openLedgerModal } from '../core/LedgerModalHost';
+import { clickable } from '../core/ux/clickable';
 import { ReportPnLLive, ReportBSLive } from './reportsFinancial';
 import { PnLTallyLive } from './pnlTally';
 import { BalanceSheetTallyLive } from './balanceSheetTally';
@@ -85,7 +86,7 @@ function TkfStatement({ title, badge, branch, period, kpis = [], sections, resul
                     <tr key={ri} className={r.subtotal ? 'brsub' : undefined}>
                       <td className="l part" style={{ paddingLeft: 10 + (r.indent || 0) * 16, fontWeight: r.subtotal || r.bold ? 800 : (r.ledger ? 400 : 600) }}>
                         {r.ledger
-                          ? <span className="vlink" onClick={() => openLedgerModal(r.ledger, { invoiceToRegister: true })} title="Open Ledger Account — an invoice inside opens its Sales/Purchase Register">{r.label}</span>
+                          ? <span className="vlink" {...clickable(() => openLedgerModal(r.ledger, { invoiceToRegister: true }))} title="Open Ledger Account — an invoice inside opens its Sales/Purchase Register">{r.label}</span>
                           : r.label}
                       </td>
                       <td className="num">{fmt(r.amount)}</td>

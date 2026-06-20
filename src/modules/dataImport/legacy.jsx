@@ -15,6 +15,7 @@ import { card } from '../../core/styles';
 import { apiPost, apiGet } from '../../core/api';
 import { VSPECS } from '../../core/voucherSpecs';
 import { useModalEsc } from '../../core/ux/useModalEsc';
+import { clickable } from '../../core/ux/clickable';
 
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
 
@@ -551,7 +552,7 @@ function PreviewModal({ spec, data, onClose }) {
               <tbody>
                 {rows.map((r) => (
                   <React.Fragment key={r.row}>
-                    <tr onClick={() => !r.error && setOpen(open === r.row ? null : r.row)} style={{ cursor: r.error ? 'default' : 'pointer', background: open === r.row ? '#faf9f5' : '#fff' }}>
+                    <tr {...(r.error ? {} : clickable(() => setOpen(open === r.row ? null : r.row)))} style={{ cursor: r.error ? 'default' : 'pointer', background: open === r.row ? '#faf9f5' : '#fff' }}>
                       <td style={td}>{r.row}</td>
                       <td style={{ ...td, fontWeight: 700, color: BLUE }}>{r.vno || '—'}</td>
                       <td style={td}>{r.error ? '—' : <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#eef4ff', color: BLUE }}>{r.type} · {r.category}</span>}</td>

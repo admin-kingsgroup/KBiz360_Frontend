@@ -16,6 +16,7 @@ import { CUR_MONTH, MONTH_OPTIONS, monthLabel, rangeNote } from '../../core/date
 import { Dashboard } from '../dashboard';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../core/api';
+import { clickable } from '../../core/ux/clickable';
 
 // ── Live consolidated group data (all branches, INR-normalised) ──────────────
 // Replaces the old GROUP_DASH_DATA / GP_BILLS seed: per-branch P&L + invoice GP,
@@ -259,7 +260,7 @@ export function GroupBookings({branch,setRoute}){
       {/* Group cards */}
       {!selGrp&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(350px,1fr))",gap:12,marginBottom:12}}>
         {groups.map(g=>(
-          <div key={g.id} onClick={()=>setSel(g.id)} style={{...card,cursor:"pointer",borderLeft:`4px solid ${STATUS_CLR[g.status]||"#384677"}`,transition:"transform 0.1s"}}
+          <div key={g.id} {...clickable(()=>setSel(g.id))} style={{...card,cursor:"pointer",borderLeft:`4px solid ${STATUS_CLR[g.status]||"#384677"}`,transition:"transform 0.1s"}}
             onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)"}}
             onMouseLeave={e=>{e.currentTarget.style.transform="none"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
@@ -919,7 +920,7 @@ export function PeriodLockControl(){
                   const bg=state==="open"?"#d4edda":state==="soft"?"#fff3cd":"#f8d7da";
                   const col=state==="open"?"#155724":state==="soft"?"#856404":"#721c24";
                   const lbl=state==="open"?"🟢 Open":state==="soft"?"🟡 Soft":"🔴 Hard";
-                  return(<td key={m} style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #f0f2f7",cursor:"pointer"}} onClick={()=>cycle(b,m)}>
+                  return(<td key={m} style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #f0f2f7",cursor:"pointer"}} {...clickable(()=>cycle(b,m))}>
                     <span style={{padding:"4px 12px",background:bg,color:col,borderRadius:4,fontSize:10.5,fontWeight:700,display:"inline-block",minWidth:70}}>{lbl}</span>
                   </td>);
                 })}

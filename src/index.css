@@ -29,6 +29,22 @@ button {
   touch-action: manipulation;
 }
 
+/* ─── Global keyboard focus ring (WS0 accessibility foundation) ───
+   A single visible focus indicator for KEYBOARD users on every interactive
+   element. :focus-visible only matches keyboard/programmatic focus, so mouse
+   clicks don't get an outline. Components that render their own ring use
+   Tailwind's `focus:outline-none focus-visible:ring-*`, whose `:focus`
+   outline:none wins by specificity — so there's no double ring. */
+:focus-visible {
+  outline: 2px solid #d4a437;
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+/* Opt-out hook for elements that manage their own focus styling. */
+.kb-focus-none:focus-visible {
+  outline: none;
+}
+
 /* ─── Component classes (use @apply for repeated patterns) ─── */
 @layer components {
   /* Standard card — replaces inline cardStyle */

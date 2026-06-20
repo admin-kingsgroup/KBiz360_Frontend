@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { RefreshCw, Check, Clock, ChevronRight, Search } from 'lucide-react';
 import { useAlerts, useSetAlertStatus } from '../../../core/useAccounting';
 import { setNavFocus } from '../../../core/ux/navFocus';
+import { clickable } from '../../../core/ux/clickable';
 import { card } from '../../../core/styles';
 
 const DARK = '#0d1326', DIM = '#5a6691', LINE = '#e1e3ec';
@@ -83,10 +84,10 @@ export function AlertsDashboard({ branch, setRoute }) {
 
       {/* severity chips */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-        <span onClick={() => setSev('all')} style={chip(sev === 'all', '#eef1f6', DARK)}>All {all.length}</span>
-        <span onClick={() => setSev('error')} style={chip(sev === 'error', SEV.error.bg, SEV.error.dot)}>🔴 {data.counts?.error || 0} Critical</span>
-        <span onClick={() => setSev('warn')} style={chip(sev === 'warn', SEV.warn.bg, SEV.warn.dot)}>🟠 {data.counts?.warn || 0} Warnings</span>
-        <span onClick={() => setSev('info')} style={chip(sev === 'info', SEV.info.bg, SEV.info.dot)}>🔵 {data.counts?.info || 0} To review</span>
+        <span {...clickable(() => setSev('all'))} style={chip(sev === 'all', '#eef1f6', DARK)}>All {all.length}</span>
+        <span {...clickable(() => setSev('error'))} style={chip(sev === 'error', SEV.error.bg, SEV.error.dot)}>🔴 {data.counts?.error || 0} Critical</span>
+        <span {...clickable(() => setSev('warn'))} style={chip(sev === 'warn', SEV.warn.bg, SEV.warn.dot)}>🟠 {data.counts?.warn || 0} Warnings</span>
+        <span {...clickable(() => setSev('info'))} style={chip(sev === 'info', SEV.info.bg, SEV.info.dot)}>🔵 {data.counts?.info || 0} To review</span>
       </div>
 
       {/* tabs */}
@@ -100,7 +101,7 @@ export function AlertsDashboard({ branch, setRoute }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {DOMAINS.map(([k, lab]) => (
-            <span key={k} onClick={() => setDomain(k)} style={chip(domain === k, '#eef1f6', DARK)}>{lab}</span>
+            <span key={k} {...clickable(() => setDomain(k))} style={chip(domain === k, '#eef1f6', DARK)}>{lab}</span>
           ))}
         </div>
         <div style={{ position: 'relative' }}>
@@ -140,7 +141,7 @@ export function AlertsDashboard({ branch, setRoute }) {
                 {remindFor === a.key && (
                   <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: '#fff', border: '1px solid ' + LINE, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 10, overflow: 'hidden', minWidth: 130 }}>
                     {REMIND_PRESETS.map(([lab, d]) => (
-                      <div key={d} onClick={() => act(a, 'remind', futureISO(d))} style={{ padding: '8px 12px', fontSize: 11.5, cursor: 'pointer', color: DARK }} onMouseEnter={(e) => e.currentTarget.style.background = '#f0f4ff'} onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}>{lab}</div>
+                      <div key={d} {...clickable(() => act(a, 'remind', futureISO(d)), { role: 'option' })} style={{ padding: '8px 12px', fontSize: 11.5, cursor: 'pointer', color: DARK }} onMouseEnter={(e) => e.currentTarget.style.background = '#f0f4ff'} onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}>{lab}</div>
                     ))}
                   </div>
                 )}

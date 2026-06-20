@@ -32,7 +32,7 @@ const GOLD = '#d4a437', DARK = '#0d1326', DIM = '#5a6691', RED = '#A32D2D', GREE
 const SUPPLIER_CATS = ['Airline', 'DMC', 'Hotel', 'Visa', 'Insurance', 'Car', 'Misc'];
 const GST_TREATMENTS = ['', 'Registered — Regular', 'Registered — Composition', 'Unregistered', 'SEZ', 'Overseas'];
 const MSME_STATUS = ['', 'Not Registered', 'Micro', 'Small', 'Medium'];
-const TDS_SECTIONS = ['', '194C @ 2%', '194J @ 10%', '194I @ 10%', '194H @ 5%', '194O @ 0.1%', 'None'];
+const TDS_SECTIONS = ['', '194C @ 2%', '194J @ 10%', '194I @ 10%', '194H @ 2%', '194O @ 0.1%', 'None'];
 const PAY_TERMS = ['', 'Advance', 'Net 15', 'Net 30', 'Net 45', 'Net 60', 'Net 90'];
 const SETTLE_CYCLES = ['', 'Weekly', 'Bi-Monthly (BSP)', 'Monthly', 'On Invoice'];
 const PAY_METHODS = ['', 'Bank Transfer', 'BSP NEFT', 'NEFT/RTGS', 'Cheque', 'UPI', 'Cash'];

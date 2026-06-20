@@ -3,23 +3,31 @@
    Auto-generated from KBiz360_v2.jsx · 149 lines · 2 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { getUnreadCount } from '../core/business-logic';
 import { ADM_DATA } from '../core/data';
 import { _NOTIFS, _PASSPORTS, _TDS_ENTRIES, _VENDOR_TERMS, markAllRead, markNotifRead } from '../core/notifStore';
 import { useMobile, useNotifRefresh } from '../core/hooks';
 import { btnG, btnGh, card } from '../core/styleTokens';
+import { useFocusTrap } from '../core/ux/focus';
+import { pushModal } from '../core/ux/modalStore';
 
 export function NotifPanel({onClose,setRoute}){
   useNotifRefresh();
+  const panelRef = useRef(null);
   const TYPE_CLR={info:"#185FA5",warning:"#854F0B",danger:"#A32D2D",success:"#27500A"};
   const TYPE_BG ={info:"#E6F1FB",warning:"#FAEEDA",danger:"#FCEBEB",success:"#EAF3DE"};
   const TYPE_ICON={info:"ℹ",warning:"⚠",danger:"🔴",success:"✔"};
   const unread=getUnreadCount();
+  // Esc closes (via the modal stack); focus moves into the panel and returns to
+  // the Bell trigger on close. top:60 clears the 64px app-bar.
+  React.useEffect(() => pushModal(onClose), [onClose]);
+  useFocusTrap(panelRef);
 
   return (
-    <div style={{position:"fixed",top:52,right:8,width:340,maxHeight:"calc(100vh - 70px)",overflowY:"auto",
+    <div ref={panelRef} role="dialog" aria-label="Notifications"
+      style={{position:"fixed",top:60,right:8,width:340,maxHeight:"calc(100vh - 78px)",overflowY:"auto",
       background:"#fff",borderRadius:12,boxShadow:"0 8px 32px rgba(0,0,0,0.18)",
       zIndex:600,border:"1px solid #e1e3ec"}}>
       <div style={{padding:"12px 14px",borderBottom:"1px solid #e1e3ec",position:"sticky",top:0,background:"#fff",
@@ -30,20 +38,20 @@ export function NotifPanel({onClose,setRoute}){
         </div>
         <div style={{display:"flex",gap:6}}>
           {unread>0&&<button onClick={markAllRead} style={{...btnGh,padding:"3px 9px",fontSize:10}}>Mark all read</button>}
-          <button onClick={onClose} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:18,color:"#5a6691"}}>✕</button>
+          <button onClick={onClose} aria-label="Close notifications" style={{background:"transparent",border:"none",cursor:"pointer",fontSize:18,color:"#5a6691"}}>✕</button>
         </div>
       </div>
       {_NOTIFS.map(n=>(
-        <div key={n.id} onClick={()=>{markNotifRead(n.id);if(n.route)setRoute(n.route);onClose();}}
-          style={{padding:"10px 14px",borderBottom:"1px solid #f3f4f8",cursor:"pointer",
-            background:n.read?"#fff":"#fafffe",
-            borderLeft:`3px solid ${n.read?"transparent":TYPE_CLR[n.type]||"#185FA5"}`}}
+        <button key={n.id} type="button" onClick={()=>{markNotifRead(n.id);if(n.route)setRoute(n.route);onClose();}}
+          style={{display:"block",width:"100%",textAlign:"left",padding:"10px 14px",borderBottom:"1px solid #f3f4f8",cursor:"pointer",
+            border:"none",borderLeft:`3px solid ${n.read?"transparent":TYPE_CLR[n.type]||"#185FA5"}`,
+            background:n.read?"#fff":"#fafffe"}}
           onMouseEnter={e=>e.currentTarget.style.background="#f0f4ff"}
           onMouseLeave={e=>e.currentTarget.style.background=n.read?"#fff":"#fafffe"}>
           <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
             <div style={{width:28,height:28,borderRadius:7,flexShrink:0,
               background:TYPE_BG[n.type]||"#f3f4f8",
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}} aria-hidden="true">
               {TYPE_ICON[n.type]||"ℹ"}
             </div>
             <div style={{flex:1,minWidth:0}}>
@@ -51,9 +59,9 @@ export function NotifPanel({onClose,setRoute}){
               <p style={{margin:"2px 0 0",fontSize:10,color:"#5a6691",lineHeight:1.4}}>{n.body}</p>
               <p style={{margin:"3px 0 0",fontSize:9,color:"#bfc3d6"}}>{n.ts}</p>
             </div>
-            {!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:TYPE_CLR[n.type]||"#185FA5",flexShrink:0,marginTop:3}}/>}
+            {!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:TYPE_CLR[n.type]||"#185FA5",flexShrink:0,marginTop:3}} aria-hidden="true"/>}
           </div>
-        </div>
+        </button>
       ))}
       {_NOTIFS.length===0&&<p style={{padding:"20px",textAlign:"center",color:"#bfc3d6",fontSize:11}}>No notifications</p>}
     </div>
@@ -131,8 +139,8 @@ export function NotificationCentre({branch,setRoute}){
 
       {filtered.length===0&&<div style={{...card,padding:"24px",textAlign:"center",color:"#27500A",fontSize:13}}>✔ All clear! No notifications</div>}
       {filtered.map(n=>(
-        <div key={n.id} onClick={()=>{setReadIds(s=>new Set([...s,n.id]));go(n.route);}}
-          style={{...card,marginBottom:8,cursor:"pointer",
+        <button key={n.id} type="button" onClick={()=>{setReadIds(s=>new Set([...s,n.id]));go(n.route);}}
+          style={{...card,display:"block",width:"100%",textAlign:"left",marginBottom:8,cursor:"pointer",
             background:readIds.has(n.id)?"#fafafa":"#fff",
             borderLeft:`4px solid ${PRIO_CLR[n.priority]||"#384677"}`,
             opacity:readIds.has(n.id)?0.7:1,transition:"all 0.15s"}}
@@ -151,10 +159,10 @@ export function NotificationCentre({branch,setRoute}){
             </div>
             <div style={{textAlign:"right",flexShrink:0}}>
               <p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>{n.time}</p>
-              <ChevronRight size={14} style={{color:"#bfc3d6",marginTop:4}}/>
+              <ChevronRight size={14} style={{color:"#bfc3d6",marginTop:4}} aria-hidden="true"/>
             </div>
           </div>
-        </div>
+        </button>
       ))}
     </div>
   );

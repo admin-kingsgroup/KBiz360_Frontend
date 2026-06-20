@@ -11,6 +11,7 @@ import { VoucherView } from './pnlTally';
 import { openPrintWindow } from '../core/voucher-print';
 import { useModalEsc } from '../core/ux/useModalEsc';
 import { confirmDialog } from '../core/ux/confirm';
+import { clickable } from '../core/ux/clickable';
 import { toast } from '../core/ux/toast';
 import { FocusBanner } from '../core/ux/FocusBanner';
 import { useNavFocusStore } from '../core/ux/navFocus';
@@ -198,7 +199,7 @@ export function VoucherApprovals({ branch, currentUser }) {
     status === 'pending' ? (
       <>
         <button onClick={() => setEditId(e.id)} disabled={busy} style={ABTN(C.blue)}>Edit</button>
-        <button onClick={() => doApprove(e.id)} disabled={busy || !e.postable} title={e.postable ? '' : (alertOf(e) || 'Fix the error (Edit) before approving')} style={{ ...ABTN(C.green, true), background: e.postable ? C.green : '#cfd6e4', cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
+        <button onClick={() => doApprove(e.id)} disabled={busy || !e.postable} title={e.postable ? '' : (alertOf(e) || 'Fix the error (Edit) before approving')} aria-label={e.postable ? undefined : `Approve disabled — ${alertOf(e) || 'fix the error (Edit) first'}`} style={{ ...ABTN(C.green, true), background: e.postable ? C.green : '#cfd6e4', cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
         <button onClick={() => doReject(e.id)} disabled={busy} style={ABTN(C.red)}>Reject</button>
       </>
     ) : status === 'approved' ? (
@@ -210,7 +211,7 @@ export function VoucherApprovals({ branch, currentUser }) {
       <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
     ) : <span style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected</span>
   );
-  const vnoCell = (e, show = true) => <td onClick={() => show && setViewId(e.id)} title={show ? 'View full voucher' : ''} style={{ ...flatTd, color: C.blue, fontWeight: 700, cursor: show ? 'pointer' : 'default', textDecoration: show ? 'underline' : 'none', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{show ? e.vno : ''}</td>;
+  const vnoCell = (e, show = true) => <td {...(show ? clickable(() => setViewId(e.id)) : {})} title={show ? 'View full voucher' : ''} style={{ ...flatTd, color: C.blue, fontWeight: 700, cursor: show ? 'pointer' : 'default', textDecoration: show ? 'underline' : 'none', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{show ? e.vno : ''}</td>;
 
   // A single voucher row + the shared header (used by the Voucher-Type-wise groups).
   const voucherRow = (e, i) => { const x = drCrOf(e); return (
@@ -249,7 +250,7 @@ export function VoucherApprovals({ branch, currentUser }) {
         const tk = 't:' + g.cat, tOpen = isOpen(tk, true);
         return (
           <div key={tk}>
-            <div onClick={() => toggle(tk, true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', cursor: 'pointer', fontWeight: 800, color: C.dark }}>
+            <div {...clickable(() => toggle(tk, true))} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', cursor: 'pointer', fontWeight: 800, color: C.dark }}>
               <Caret o={tOpen} /><span>{VCH[g.cat] || g.cat}</span>
               <span style={{ fontSize: 11, color: C.dim, fontWeight: 600 }}>· {g.rows.length} voucher{g.rows.length === 1 ? '' : 's'}</span>
               <span style={{ marginLeft: 'auto', ...num }}>{money(g.debit)} Dr · {money(g.credit)} Cr</span>
@@ -299,12 +300,12 @@ export function VoucherApprovals({ branch, currentUser }) {
         {status === 'pending' && counts.pending.n > 0 && (
           <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
             {sel.size > 0 && (
-              <button onClick={doApproveSelected} disabled={busy} style={{ padding: '8px 16px', background: C.blue, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12.5, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
-                ✓ Approve selected ({sel.size})
+              <button onClick={doApproveSelected} disabled={busy} aria-busy={busy || undefined} style={{ padding: '8px 16px', background: C.blue, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12.5, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+                {busy ? `⏳ Approving ${sel.size}…` : `✓ Approve selected (${sel.size})`}
               </button>
             )}
-            <button onClick={doApproveAll} disabled={busy} style={{ padding: '8px 16px', background: C.green, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12.5, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
-              ✓ Approve all {counts.pending.n} pending
+            <button onClick={doApproveAll} disabled={busy} aria-busy={busy || undefined} style={{ padding: '8px 16px', background: C.green, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12.5, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+              {busy ? `⏳ Approving ${counts.pending.n}…` : `✓ Approve all ${counts.pending.n} pending`}
             </button>
           </div>
         )}
@@ -347,7 +348,7 @@ export function VoucherApprovals({ branch, currentUser }) {
               const gk = 'g:' + g.name, gOpen = isOpen(gk, false);
               return (
                 <div key={gk}>
-                  <div onClick={() => toggle(gk, false)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', cursor: 'pointer', fontWeight: 800, color: C.dark }}>
+                  <div {...clickable(() => toggle(gk, false))} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', cursor: 'pointer', fontWeight: 800, color: C.dark }}>
                     <Caret o={gOpen} /><span style={{ textDecoration: 'underline' }}>{g.name}</span>
                     <span style={{ marginLeft: 'auto', ...num }}>{amt(g.debit, g.credit)}</span>
                   </div>
@@ -355,7 +356,7 @@ export function VoucherApprovals({ branch, currentUser }) {
                     const sk = 's:' + g.name + '/' + s.name, sOpen = isOpen(sk, false);
                     return (
                       <div key={sk}>
-                        <div onClick={() => toggle(sk, false)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 28px', background: '#f6f9fd', cursor: 'pointer', fontWeight: 700, color: '#1a3a6e' }}>
+                        <div {...clickable(() => toggle(sk, false))} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 28px', background: '#f6f9fd', cursor: 'pointer', fontWeight: 700, color: '#1a3a6e' }}>
                           <Caret o={sOpen} />{s.name}{s.name !== g.name ? <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 4, background: '#e7eef9', color: C.dim, fontWeight: 700 }}>sub-group</span> : null}
                           <span style={{ marginLeft: 'auto', ...num }}>{amt(s.debit, s.credit)}</span>
                         </div>
@@ -363,7 +364,7 @@ export function VoucherApprovals({ branch, currentUser }) {
                           const lk = 'l:' + g.name + '/' + s.name + '/' + l.name, lOpen = isOpen(lk, false);
                           return (
                             <div key={lk}>
-                              <div onClick={() => toggle(lk, false)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 46px', borderBottom: '1px solid #f0f2f7', cursor: 'pointer', fontWeight: 600, color: C.dark }}>
+                              <div {...clickable(() => toggle(lk, false))} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 46px', borderBottom: '1px solid #f0f2f7', cursor: 'pointer', fontWeight: 600, color: C.dark }}>
                                 <Caret o={lOpen} />{l.name}
                                 <span style={{ color: C.dim, fontWeight: 400, fontSize: 11 }}>· {l.entries.length} entr{l.entries.length === 1 ? 'y' : 'ies'}</span>
                                 <span style={{ marginLeft: 'auto', ...num }}>{amt(l.debit, l.credit)}</span>
@@ -381,7 +382,7 @@ export function VoucherApprovals({ branch, currentUser }) {
                                       return (
                                       <tr key={e.id + ':' + i} style={{ background: i % 2 ? '#fcfdff' : '#fff' }}>
                                         <td style={{ padding: '5px 8px 5px 44px', whiteSpace: 'nowrap', color: C.dim, borderBottom: '1px solid #f4f6fa' }}>{status === 'pending' && <input type="checkbox" checked={sel.has(e.id)} onChange={() => toggleSel(e.id)} onClick={(ev) => ev.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} />}{fmtDate(e.date)}</td>
-                                        <td onClick={() => setViewId(e.id)} title="View full voucher" style={{ padding: '5px 8px', color: C.blue, fontWeight: 700, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa', cursor: 'pointer', textDecoration: 'underline', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{e.vno}</td>
+                                        <td {...clickable(() => setViewId(e.id))} title="View full voucher" style={{ padding: '5px 8px', color: C.blue, fontWeight: 700, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa', cursor: 'pointer', textDecoration: 'underline', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{e.vno}</td>
                                         <td style={{ padding: '5px 8px', color: C.dim, whiteSpace: 'nowrap', borderBottom: '1px solid #f4f6fa' }}>{VCH[e.category] || e.type}</td>
                                         <td style={{ padding: '5px 8px', fontWeight: 600, color: C.blue, borderBottom: '1px solid #f4f6fa', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.drLedger}>{x.drLedger}</td>
                                         <td style={{ padding: '5px 8px', fontWeight: 600, color: C.red, borderBottom: '1px solid #f4f6fa', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.crLedger}>{x.crLedger}</td>
@@ -444,11 +445,11 @@ export function VoucherApprovals({ branch, currentUser }) {
         </div>
       )}
       {editId && (
-        <div onClick={() => setEditId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 900, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '5vh 12px' }}>
-          <div onClick={(ev) => ev.stopPropagation()} style={{ background: '#fff', width: 'min(720px, 96vw)', maxHeight: '90vh', overflowY: 'auto', borderRadius: 10, boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
+        <div onClick={async () => { const { confirmed } = await confirmDialog({ title: 'Discard changes to this voucher?', message: 'Any edits you have not saved will be lost.', confirmLabel: 'Discard', danger: true }); if (confirmed) setEditId(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 900, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '5vh 12px' }}>
+          <div role="dialog" aria-modal="true" aria-label="Edit voucher" onClick={(ev) => ev.stopPropagation()} style={{ background: '#fff', width: 'min(720px, 96vw)', maxHeight: '90vh', overflowY: 'auto', borderRadius: 10, boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, background: '#fff' }}>
               <strong style={{ color: C.dark }}>Edit Voucher — fix &amp; approve</strong>
-              <button onClick={() => setEditId(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: C.dim }}>✕</button>
+              <button onClick={() => setEditId(null)} aria-label="Close editor" style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: C.dim }}>✕</button>
             </div>
             <div style={{ padding: 4 }}>
               <VoucherEditor voucherId={editId} cur={cur} onBack={() => setEditId(null)} />
@@ -481,8 +482,8 @@ function EditedVouchersList({ rows, isLoading, open, setOpen, setViewId }) {
             return (
               <React.Fragment key={r.id}>
                 <tr style={{ background: isOpen ? '#fbfcfe' : '#fff' }}>
-                  <td onClick={() => setOpen((s) => ({ ...s, ['edit:' + r.id]: !s['edit:' + r.id] }))} style={{ ...td, color: C.gold, fontWeight: 800, cursor: 'pointer' }}>{isOpen ? '▾' : '▸'}</td>
-                  <td onClick={() => setViewId(r.id)} title="View full voucher" style={{ ...td, fontWeight: 700, color: C.blue, cursor: 'pointer', textDecoration: 'underline' }}>{r.vno}</td>
+                  <td {...clickable(() => setOpen((s) => ({ ...s, ['edit:' + r.id]: !s['edit:' + r.id] })))} style={{ ...td, color: C.gold, fontWeight: 800, cursor: 'pointer' }}>{isOpen ? '▾' : '▸'}</td>
+                  <td {...clickable(() => setViewId(r.id))} title="View full voucher" style={{ ...td, fontWeight: 700, color: C.blue, cursor: 'pointer', textDecoration: 'underline' }}>{r.vno}</td>
                   <td style={td}>{VCH[r.category] || r.type}</td>
                   <td style={{ ...td, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.party || '—'}</td>
                   <td style={{ ...num, ...td }}>{money(r.total)}</td>

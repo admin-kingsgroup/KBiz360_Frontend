@@ -23,6 +23,7 @@ import { ReportDateBar, ReportSearch, matchNeedle, resolveReportRange } from '..
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../../core/styles';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { TopBar } from '../../shell/TopBar';
+import { clickable } from '../../core/ux/clickable';
 
 // Shared "Export to Excel" toolbar button — wires a master's visible rows to the
 // dependency-free CSV exporter. Pass the rows array + {key,label} columns. The
@@ -518,7 +519,7 @@ export function MastersCustomers(){
           const active=tab===t;
           const outAmt=sets[t].data.reduce((s,d)=>s+d.out,0);
           return (
-            <div key={t} onClick={()=>{setTab(t);setSearch("");}}
+            <div key={t} {...clickable(()=>{setTab(t);setSearch("");})}
               style={{padding:"12px 14px",borderRadius:10,cursor:"pointer",
                 border:`2px solid ${active?c.color:"#e1e3ec"}`,
                 background:active?c.bg:"#fff",

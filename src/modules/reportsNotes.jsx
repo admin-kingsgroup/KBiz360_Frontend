@@ -23,6 +23,7 @@ import { VoucherEditor } from './accountingLive';
 import { exportToExcel } from '../core/exportExcel';
 import { buildNotes } from './notesEngine';
 import { useModalEsc } from '../core/ux/useModalEsc';
+import { clickable } from '../core/ux/clickable';
 import { PeriodBar, periodRange } from '../core/period';
 
 const INK = '#0d1326', GOLD = '#d4a437', MUTE = '#5a6691', LINE = '#e1e3ec';
@@ -115,7 +116,7 @@ function AgeingBlock({ ageing, cur, onDrill }) {
           <thead><tr><th style={RPT_thStyle}>Party</th>{AGE_BUCKETS.map(([, l]) => <th key={l} style={{ ...RPT_thStyle, textAlign: 'right' }}>{l}</th>)}<th style={{ ...RPT_thStyle, textAlign: 'right' }}>Total</th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={r.party + i} onClick={() => onDrill(r.party)} style={{ cursor: 'pointer' }}>
+              <tr key={r.party + i} {...clickable(() => onDrill(r.party))} style={{ cursor: 'pointer' }}>
                 <td style={{ ...RPT_tdStyle, fontWeight: 600 }}>{r.party} <span style={{ color: GOLD }}>›</span></td>
                 {AGE_BUCKETS.map(([k, , c]) => <td key={k} style={{ ...RPT_tdStyle, textAlign: 'right', color: r[k] ? c : '#b8bdd0' }}>{cell(r[k])}</td>)}
                 <td style={{ ...RPT_tdStyle, textAlign: 'right', fontWeight: 700 }}>{cell(r.total)}</td>
@@ -143,7 +144,7 @@ function NoteTable({ note, cur, openG, toggleG, detailed, onDrill }) {
     : note.kind === 'flow' ? [l.amount ?? l.closing] : [l.closing];
   const multi = note.groups.length > 1;
   const ledgerRow = (l, indent, sg) => (
-    <tr key={`${sg}-${l.ledger}`} onClick={() => onDrill(l.ledger)} style={{ cursor: 'pointer' }}>
+    <tr key={`${sg}-${l.ledger}`} {...clickable(() => onDrill(l.ledger))} style={{ cursor: 'pointer' }}>
       <td style={{ ...RPT_tdStyle, paddingLeft: indent }}>{l.ledger}{sg ? <span style={{ color: MUTE, fontSize: 10 }}> · {sg}</span> : null} <span style={{ color: GOLD }}>›</span></td>
       {vals(l).map((v, i) => <td key={i} style={{ ...RPT_tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{cell(v)}</td>)}
     </tr>
@@ -159,7 +160,7 @@ function NoteTable({ note, cur, openG, toggleG, detailed, onDrill }) {
             const span = (
               <React.Fragment key={gk}>
                 {multi && (
-                  <tr onClick={() => toggleG(gk)} style={{ background: '#f2f4fa', cursor: 'pointer', fontWeight: 700 }}>
+                  <tr {...clickable(() => toggleG(gk))} style={{ background: '#f2f4fa', cursor: 'pointer', fontWeight: 700 }}>
                     <td style={{ ...RPT_tdStyle, color: INK }}>{gOpen ? '▾' : '▸'} {g.group}</td>
                     {cols.map((c, i) => <td key={i} style={{ ...RPT_tdStyle, textAlign: 'right', color: INK }}>{i === cols.length - 1 ? cell(g.total) : ''}</td>)}
                   </tr>
@@ -208,7 +209,7 @@ function DrillModal({ ledger, branch, to, cur, onClose }) {
               {q.isError && <div style={{ padding: 14, color: WARN, fontSize: 12 }}>⚠ {q.error?.message}</div>}
               {!q.isLoading && !lines.length && <div style={{ padding: 20, textAlign: 'center', color: MUTE, fontSize: 12 }}>No postings for this period.</div>}
               {lines.map((ln, i) => (
-                <div key={i} onClick={() => ln.voucherId && setVid(ln.voucherId)} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '8px 10px', borderBottom: `1px solid ${LINE}`, cursor: ln.voucherId ? 'pointer' : 'default' }}>
+                <div key={i} {...clickable(() => ln.voucherId && setVid(ln.voucherId))} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '8px 10px', borderBottom: `1px solid ${LINE}`, cursor: ln.voucherId ? 'pointer' : 'default' }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ color: GOLD, fontWeight: 600, fontSize: 12 }}>{ln.vno} <span style={{ color: MUTE, fontWeight: 400 }}>· {fmtDate(ln.date)}</span></div>
                     <div style={{ fontSize: 11, color: MUTE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ln.narration || ln.party || ln.category}</div>
@@ -292,7 +293,7 @@ export function NotesToFinancials({ branch }) {
             const expanded = isOpen(n.no);
             return (
               <div key={n.no} style={{ ...card, marginBottom: 12, borderLeft: `3px solid ${n.section === 'Income' || n.section === 'Expenses' ? GOLD : INK}` }}>
-                <div onClick={() => setOpen((s) => ({ ...s, [n.no]: !s[n.no] }))} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+                <div {...clickable(() => setOpen((s) => ({ ...s, [n.no]: !s[n.no] })))} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
                   <span style={{ minWidth: 34, height: 34, borderRadius: '50%', background: INK, color: GOLD, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>{n.no}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: INK }}>{detailed ? '' : expanded ? '▾ ' : '▸ '}{n.title}</p>

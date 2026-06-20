@@ -39,7 +39,7 @@ const GST_DEFAULTS = [
 const TCS_TDS = [
   { section: '206C(1G)', nature: 'TCS', rate: '5%', threshold: 'Rs.7L/buyer/year', applicability: 'Overseas tour package collection from buyer' },
   { section: '194C', nature: 'TDS', rate: '1%/2%', threshold: 'Rs.30K/txn or Rs.1L/year', applicability: 'Car hire payments: 1% individual, 2% company' },
-  { section: '194H', nature: 'TDS', rate: '5%', threshold: 'Rs.15K/year', applicability: 'Commission paid to airlines/sub-agents' },
+  { section: '194H', nature: 'TDS', rate: '2%', threshold: 'Rs.15K/year', applicability: 'Commission paid to airlines/sub-agents' },
   { section: '194J', nature: 'TDS', rate: '10%', threshold: 'Rs.30K/year', applicability: 'Professional fees (CA, lawyer, consultant)' },
   { section: '194D', nature: 'TDS', rate: '5%', threshold: 'Rs.15K/year', applicability: 'Commission received from insurance company' },
   { section: '194I', nature: 'TDS', rate: '10%', threshold: 'Rs.2.4L/year', applicability: 'Office/premises rent payments' },

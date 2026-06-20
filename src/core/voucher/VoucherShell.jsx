@@ -80,6 +80,25 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   // Tally-style form keys: Enter advances fields, Ctrl/Cmd+Enter saves, Esc backs
   // out (edit mode). Datalist/ledger autocompletes keep native Enter (see useFormKeys).
   const formKeys = useFormKeys({ onSubmit: save, onCancel: isEdit ? dismiss : undefined });
+  const errRef = React.useRef(null);
+
+  // Move focus to the first field when the form opens — keyboard entry without a
+  // mouse click first. (Runs once; the post-save panel doesn't re-trigger it.)
+  React.useEffect(() => {
+    const el = formKeys.ref.current;
+    if (!el) return undefined;
+    const first = el.querySelector('input,select,textarea');
+    if (!first) return undefined;
+    const id = setTimeout(() => { try { first.focus(); } catch { /* ignore */ } }, 50);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // A save error can render below the fold on long forms — bring it into view so
+  // a failed save is never silent.
+  React.useEffect(() => {
+    if (err && errRef.current) { try { errRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch { /* ignore */ } }
+  }, [err]);
 
   const printEntry = () => {
     const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? cur + x.toLocaleString('en-IN') : ''; };
@@ -158,7 +177,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
       <FL label="Tally Ref"><input value={state.sourceRef || ''} onChange={(e) => setState((s) => ({ ...s, sourceRef: e.target.value }))} style={{ ...inp, maxWidth: 200 }} placeholder="original Tally voucher no (optional)" /></FL>
       {journalTable}
       {!branchCode && !isEdit && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#FAEEDA', fontSize: 10.5, color: '#854F0B', fontWeight: 600, textAlign: 'center', margin: '10px 0' }}>Select a specific branch (not “All”) to post this voucher.</div>}
-      {err && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#FCEBEB', fontSize: 11, color: RED, fontWeight: 600, margin: '10px 0' }}>! {err}</div>}
+      {err && <div ref={errRef} role="alert" style={{ padding: '8px 12px', borderRadius: 8, background: '#FCEBEB', fontSize: 11, color: RED, fontWeight: 600, margin: '10px 0' }}>! {err}</div>}
       {viewOnly && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#FAEEDA', fontSize: 10.5, color: '#854F0B', fontWeight: 600, textAlign: 'center', margin: '10px 0' }}>View only — this account can review vouchers but cannot post them.</div>}
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
         {!isEdit && <button onClick={reset} style={btnGh}>Reset</button>}

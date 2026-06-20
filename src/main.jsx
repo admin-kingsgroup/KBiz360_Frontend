@@ -1,6 +1,7 @@
 import './core/formPersistence.js';   // ← draft autosave to localStorage (load first)
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { installNumberWheelGuard } from './core/ux/numberGuard';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
@@ -25,6 +26,9 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Protect every <input type="number"> from silent wheel-scroll value changes.
+installNumberWheelGuard();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

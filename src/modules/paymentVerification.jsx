@@ -12,6 +12,7 @@ import React, { useMemo, useState } from 'react';
 import { CheckCircle2, XCircle, MessageSquare, FileImage, RefreshCw, Clock, Building2, Calendar } from 'lucide-react';
 import { card, inp } from '../core/styles';
 import { useFinanceQueue, usePaymentActions } from '../core/usePaymentVerification';
+import { confirmDialog } from '../core/ux/confirm';
 
 const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691', BLUE = '#185FA5', RED = '#A32D2D', GREEN = '#27500A';
 const inr = (n) => (n != null ? '₹' + Number(n).toLocaleString('en-IN') : '₹0');
@@ -39,7 +40,17 @@ function PaymentCard({ p, actions }) {
   const [err, setErr] = useState('');
   const busy = actions.verify.isPending || actions.reject.isPending || actions.clarify.isPending;
 
-  const doVerify = () => { setErr(''); actions.verify.mutate(p._id, { onError: (e) => setErr(e.message) }); };
+  const doVerify = async () => {
+    // Verifying generates a tax invoice and advances the CRM workflow — it can't be
+    // undone from here, so confirm first (Reject/Clarify already require input).
+    const { confirmed } = await confirmDialog({
+      title: 'Verify this payment?',
+      message: `Verifying ${p.payment_number || ''} (${inr(p.amount)}) generates the tax invoice and cannot be undone.`,
+      confirmLabel: 'Verify payment',
+    });
+    if (!confirmed) return;
+    setErr(''); actions.verify.mutate(p._id, { onError: (e) => setErr(e.message) });
+  };
   const doReject = () => {
     if (!reason) { setErr('Select a rejection reason'); return; }
     setErr(''); actions.reject.mutate({ id: p._id, reason, notes }, { onError: (e) => setErr(e.message) });

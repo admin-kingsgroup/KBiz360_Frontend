@@ -106,13 +106,16 @@ function SettleModal({ adv, side, branch, cur, onClose }) {
 //   'customer' → only the AR tabs (unsettled sales bills + on-account receipts)
 //   'supplier' → only the AP tabs (unsettled purchase bills + on-account payments)
 //   undefined  → all four tabs (the standalone whole-book view)
-export function OutstandingOnAccount({ branch, side }) {
+export function OutstandingOnAccount({ branch, side, initialTab, initialParty }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const q = useOutstanding(branch);
   const d = q.data || {};
   const t = d.totals || {};
   const showAR = side !== 'supplier';
   const showAP = side !== 'customer';
+  // When deep-linked from the "Adjust advance" shortcut on the Payables ageing,
+  // focus that supplier's on-account advances so the user can allocate straight away.
+  const [partyFocus, setPartyFocus] = useState(initialParty || '');
 
   const KPIS = useMemo(() => [
     { k: 'sales', label: 'Unsettled Sales Bills', amt: t.salesOutstanding, n: (d.salesBills || []).length, color: BLUE, ar: true },
@@ -121,7 +124,7 @@ export function OutstandingOnAccount({ branch, side }) {
     { k: 'payAdv', label: 'On-Account Payments', amt: t.onAccountPayments, n: (d.onAccountPayments || []).length, color: GOLD, ap: true },
   ].filter((c) => (c.ar && showAR) || (c.ap && showAP)), [d, t, showAR, showAP]);
 
-  const [tab, setTab] = useState(showAP && !showAR ? 'purchase' : 'sales');
+  const [tab, setTab] = useState(initialTab || (showAP && !showAR ? 'purchase' : 'sales'));
   const [settleAdv, setSettleAdv] = useState(null); // { adv, side }
 
   const moneyCell = (r, v) => money(cur, v);
@@ -152,12 +155,15 @@ export function OutstandingOnAccount({ branch, side }) {
   ];
 
   const active = useMemo(() => {
-    if (tab === 'sales') return { rows: d.salesBills || [], columns: billColumns('Customer'), empty: 'Nothing unsettled here. 🎉', name: 'unsettled-sales' };
-    if (tab === 'purchase') return { rows: d.purchaseBills || [], columns: billColumns('Supplier'), empty: 'Nothing unsettled here. 🎉', name: 'unsettled-purchase' };
-    if (tab === 'recAdv') return { rows: d.onAccountReceipts || [], columns: advColumns('Customer', 'customer'), empty: 'No on-account amounts awaiting settlement.', name: 'on-account-receipts' };
-    return { rows: d.onAccountPayments || [], columns: advColumns('Supplier', 'supplier'), empty: 'No on-account amounts awaiting settlement.', name: 'on-account-payments' };
+    let a;
+    if (tab === 'sales') a = { rows: d.salesBills || [], columns: billColumns('Customer'), empty: 'Nothing unsettled here. 🎉', name: 'unsettled-sales' };
+    else if (tab === 'purchase') a = { rows: d.purchaseBills || [], columns: billColumns('Supplier'), empty: 'Nothing unsettled here. 🎉', name: 'unsettled-purchase' };
+    else if (tab === 'recAdv') a = { rows: d.onAccountReceipts || [], columns: advColumns('Customer', 'customer'), empty: 'No on-account amounts awaiting settlement.', name: 'on-account-receipts' };
+    else a = { rows: d.onAccountPayments || [], columns: advColumns('Supplier', 'supplier'), empty: 'No on-account amounts awaiting settlement.', name: 'on-account-payments' };
+    if (partyFocus) a = { ...a, rows: a.rows.filter((r) => r.party === partyFocus) };
+    return a;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, d, cur]);
+  }, [tab, d, cur, partyFocus]);
 
   return (
     <PageLayout
@@ -169,6 +175,12 @@ export function OutstandingOnAccount({ branch, side }) {
 
       {!q.isLoading && !q.isError && (
         <>
+          {partyFocus && (
+            <div className="mb-3 flex items-center gap-2 text-[12px]">
+              <span className="rounded-full bg-[#FFF6E0] px-2.5 py-1 font-bold text-[#8a6d1a]">Focused on {partyFocus}</span>
+              <button className="text-[#185FA5] font-semibold underline" onClick={() => setPartyFocus('')}>show all parties</button>
+            </div>
+          )}
           <ResponsiveGrid min="220px" gap="md" className="mb-4">
             {KPIS.map((c) => (
               // NOTE: the colour hex must NEVER sit on the <button>'s own inline

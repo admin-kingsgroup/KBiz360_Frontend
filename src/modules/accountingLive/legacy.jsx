@@ -25,6 +25,7 @@ import { LedgerAccountView } from '../../core/ledgerUI';
 import { openLedgerModal } from '../../core/LedgerModalHost';
 import { usePrefs } from '../../core/prefs';
 import { pushModal } from '../../core/ux/modalStore';
+import { clickable } from '../../core/ux/clickable';
 import { toast } from '../../core/ux/toast';
 import { CUR_QUARTER, CUR_FY } from '../../core/dates';
 import { PeriodBar } from '../../core/period';
@@ -587,7 +588,7 @@ export function TrialBalanceLive({ branch }) {
                     </tr>
                   )}
                   <tr style={{ ...rowBg(i), cursor: 'pointer' }}
-                    onClick={() => setDrill(l.ledger)}
+                    {...clickable(() => setDrill(l.ledger))}
                     onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
                     <td style={{ padding: '8px 14px 8px 26px', color: BLUE, fontWeight: 600 }}>{l.ledger}{l.code ? <span style={{ color: '#b9bed4', fontSize: 9.5, marginLeft: 6 }}>{l.code}</span> : null} <span style={{ color: '#cfd3e0', fontSize: 10 }}>›</span></td>
@@ -713,7 +714,7 @@ export function DayBookLive({ branch }) {
                     </tr>
                   )}
                   <tr style={{ ...rowBg(i), cursor: r.voucherId ? 'pointer' : 'default' }}
-                    onClick={() => r.voucherId && setVoucher({ id: r.voucherId, vno: r.vno })}
+                    {...clickable(() => r.voucherId && setVoucher({ id: r.voucherId, vno: r.vno }))}
                     onMouseEnter={(e) => { if (r.voucherId) e.currentTarget.style.background = '#eff6ff'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
                     <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.date}</td>
@@ -1121,7 +1122,7 @@ function DrillDown({ branch, group, onClose }) {
               </div>
               {(stmt.data.lines || []).length === 0 && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>No entries.</div>}
               {(stmt.data.lines || []).map((ln, i) => (
-                <div key={i} style={tapRow} onClick={() => ln.voucherId && setVoucher({ id: ln.voucherId, vno: ln.vno })}>
+                <div key={i} style={tapRow} {...clickable(() => ln.voucherId && setVoucher({ id: ln.voucherId, vno: ln.vno }))}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 12, color: BLUE, fontWeight: 600 }}>{ln.vno} <span style={{ color: DIM, fontWeight: 400 }}>· {ln.date}</span></div>
                     <div style={{ fontSize: 10.5, color: DIM, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ln.narration || ln.party || ln.category}</div>
@@ -1147,7 +1148,7 @@ function DrillDown({ branch, group, onClose }) {
               const clDr = r.closingDebit != null ? r.closingDebit : r.debit;
               const clCr = r.closingCredit != null ? r.closingCredit : r.credit;
               return (
-                <div key={i} style={tapRow} onClick={() => setLedger(r.ledger)}>
+                <div key={i} style={tapRow} {...clickable(() => setLedger(r.ledger))}>
                   <span style={{ fontSize: 12.5, color: DARK, fontWeight: 600 }}>{r.ledger}</span>
                   <span style={{ fontSize: 12, fontWeight: 700, color: clDr ? BLUE : RED, whiteSpace: 'nowrap' }}>{money(cur, clDr || clCr)} {clDr ? 'Dr' : 'Cr'}</span>
                 </div>
@@ -1481,7 +1482,7 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
                   // Final Invoice / Bill Value → green + clickable, opens the voucher's JV.
                   if (c.key === 'finalValue') {
                     return (
-                      <td key={c.key} onClick={() => onOpenJV && r._v && onOpenJV(r._v)} title="Open journal voucher (JV)"
+                      <td key={c.key} {...clickable(() => onOpenJV && r._v && onOpenJV(r._v))} title="Open journal voucher (JV)"
                         style={{ padding: '7px 12px', whiteSpace: 'nowrap', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: GREEN, fontWeight: 800, cursor: onOpenJV && r._v ? 'pointer' : 'default', textDecoration: onOpenJV && r._v ? 'underline' : 'none' }}>
                         {cellNum(r[c.key])}
                       </td>
@@ -1657,7 +1658,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
             </tr></thead>
             <tbody>
               {rows.map((v, i) => (
-                <tr key={v.id || v.vno} style={{ ...rowBg(i), cursor: 'pointer' }} onClick={() => setDetail(v)}
+                <tr key={v.id || v.vno} style={{ ...rowBg(i), cursor: 'pointer' }} {...clickable(() => setDetail(v))}
                   onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
                   <td style={{ padding: '8px 12px', color: DIM, whiteSpace: 'nowrap' }}>{v.date}</td>
@@ -1835,7 +1836,7 @@ export function InvoiceGPLive({ branch }) {
               const isOpen = open === i;
               return (
                 <React.Fragment key={r.ref + '-' + i}>
-                  <tr style={{ ...rowBg(i), cursor: 'pointer', background: isOpen ? '#eef4ff' : rowBg(i).background }} onClick={() => setOpen(isOpen ? null : i)}>
+                  <tr style={{ ...rowBg(i), cursor: 'pointer', background: isOpen ? '#eef4ff' : rowBg(i).background }} {...clickable(() => setOpen(isOpen ? null : i))}>
                     <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10.5, color: r.linked ? '#6b21a8' : '#64748b', fontWeight: 700 }}>
                       <span style={{ color: DIM, marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{f.ref}
                     </td>
@@ -2043,7 +2044,7 @@ export function AccountsChartLive({ branch }) {
     const lc = countLedgers(node);
     return (
       <div>
-        <div onClick={() => setOpen((s) => ({ ...s, [key]: !opened }))}
+        <div {...clickable(() => setOpen((s) => ({ ...s, [key]: !opened })))}
           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: `7px 12px 7px ${12 + depth * 18}px`, background: isSystem ? '#eef3fb' : '#f6f9fd', borderTop: '1px solid #e4ebf5', cursor: 'pointer', fontWeight: isSystem ? 700 : 600, color: isSystem ? DARK : '#1a3a6e' }}>
           <span style={{ color: GOLD, width: 12 }}>{(kids.length || leds.length) ? (opened ? '▾' : '▸') : ''}</span>
           <span style={{ textDecoration: isSystem ? 'underline' : 'none' }}>{node.name}</span>
@@ -2056,7 +2057,7 @@ export function AccountsChartLive({ branch }) {
             {kids.map((c) => <Node key={c.id || c.name} node={c} depth={depth + 1} />)}
             {leds.map((l) => (
               <div key={l.id || l.code || l.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: `5px 12px 5px ${12 + (depth + 1) * 18 + 14}px`, borderBottom: '1px solid #f4f6fa', fontSize: 12 }}>
-                <span onClick={() => openLedgerModal(l.name)} title="Open ledger account" style={{ fontWeight: 600, color: BLUE, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>{l.name}</span>
+                <span {...clickable(() => openLedgerModal(l.name))} title="Open ledger account" style={{ fontWeight: 600, color: BLUE, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>{l.name}</span>
                 {l.code ? <span style={{ fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{l.code}</span> : null}
               </div>
             ))}
@@ -2108,7 +2109,7 @@ export function AccountsChartLive({ branch }) {
             <Col title="Ledgers" count={ledgers.length}>
               {ledgers.map((l, i) => (
                 <div key={l.id || l.code || l.name} style={{ padding: '7px 12px', ...rowBg(i), fontSize: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span onClick={() => openLedgerModal(l.name)} title="Open ledger account" style={{ fontWeight: 600, color: BLUE, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>{l.name}</span>{l.code ? <span style={{ fontFamily: 'monospace', fontSize: 9.5, color: BLUE }}>{l.code}</span> : null}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span {...clickable(() => openLedgerModal(l.name))} title="Open ledger account" style={{ fontWeight: 600, color: BLUE, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>{l.name}</span>{l.code ? <span style={{ fontFamily: 'monospace', fontSize: 9.5, color: BLUE }}>{l.code}</span> : null}</div>
                   <div style={{ color: DIM, fontSize: 10.5 }}>{l.topGroup}{l.subGroup ? ` › ${l.subGroup}` : ''}</div>
                 </div>
               ))}
@@ -2232,7 +2233,7 @@ export function CashBookLive({ branch }) {
               </tr>
             )}
             {pageRows.map((r, i) => (
-              <tr key={r.vno + '-' + i} title={r.voucherId ? 'Open voucher' : ''} onClick={() => r.voucherId && setVoucher({ id: r.voucherId, vno: r.vno })} style={{ ...rowBg(i), background: r.debit > 0 ? '#f4fbf4' : (i % 2 === 0 ? '#fff' : '#fafafa'), cursor: r.voucherId ? 'pointer' : 'default' }}>
+              <tr key={r.vno + '-' + i} title={r.voucherId ? 'Open voucher' : ''} {...clickable(() => r.voucherId && setVoucher({ id: r.voucherId, vno: r.vno }))} style={{ ...rowBg(i), background: r.debit > 0 ? '#f4fbf4' : (i % 2 === 0 ? '#fff' : '#fafafa'), cursor: r.voucherId ? 'pointer' : 'default' }}>
                 <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.date}</td>
                 <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE, whiteSpace: 'nowrap' }}>{r.vno}</td>
                 {view === 'detailed' && <td style={{ padding: '7px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: (TYPE_CLR[r.category] || '#384677') + '22', color: TYPE_CLR[r.category] || '#384677' }}>{r.category || '—'}</span></td>}

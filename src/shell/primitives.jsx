@@ -30,6 +30,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { X, Inbox, AlertTriangle, Loader2 } from 'lucide-react';
 import { pushModal } from '../core/ux/modalStore';
+import { useFocusTrap } from '../core/ux/focus';
 
 export const cn = (...xs) => xs.filter(Boolean).join(' ');
 
@@ -38,7 +39,7 @@ export const cn = (...xs) => xs.filter(Boolean).join(' ');
    ════════════════════════════════════════════════════════════════════ */
 
 const BTN_VARIANT = {
-  primary: 'bg-navy text-gold border border-transparent hover:bg-navy-light disabled:bg-ink-muted',
+  primary: 'bg-navy text-gold border border-transparent hover:bg-navy-light disabled:bg-ink-muted disabled:text-ink-subtle',
   accent:  'bg-gold text-navy border border-transparent hover:bg-gold-dark hover:text-white disabled:opacity-50',
   secondary: 'bg-surface text-navy border border-surface-border hover:bg-surface-alt hover:border-navy/20 disabled:opacity-50',
   ghost:   'bg-transparent text-ink-muted border border-transparent hover:bg-navy/5 hover:text-navy disabled:opacity-50',
@@ -72,6 +73,7 @@ export function Button({
     <button
       type={type}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={cn(
         'inline-flex items-center justify-center font-semibold whitespace-nowrap select-none transition',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50',
@@ -87,6 +89,8 @@ export function Button({
         ? <Loader2 size={iconSize} className="animate-spin" />
         : Icon && <Icon size={iconSize} className="shrink-0" />}
       {children && <span className="truncate">{children}</span>}
+      {/* Icon-only buttons in a loading state have no visible text — announce it. */}
+      {loading && !children && <span className="sr-only">Loading…</span>}
       {!loading && IconRight && <IconRight size={iconSize} className="shrink-0" />}
     </button>
   );
@@ -224,17 +228,32 @@ export function FilterBar({ className = '', children, scroll = false }) {
    ════════════════════════════════════════════════════════════════════ */
 
 export function FormField({ label, htmlFor, required, hint, error, className = '', children }) {
+  const reactId = React.useId();
+  const errorId = `${reactId}-err`;
+  const hintId = `${reactId}-hint`;
+  // Wire the message to the control so screen readers announce it, and flag the
+  // control invalid when there's an error. We only augment a single element
+  // child (the common case: one Input/Select/Textarea); fragments/arrays pass
+  // through untouched.
+  const describedBy = error ? errorId : hint ? hintId : undefined;
+  const control = React.isValidElement(children) && describedBy
+    ? React.cloneElement(children, {
+        'aria-describedby': [children.props['aria-describedby'], describedBy].filter(Boolean).join(' '),
+        'aria-invalid': error ? true : children.props['aria-invalid'],
+        invalid: error ? true : children.props.invalid,
+      })
+    : children;
   return (
     <div className={cn('flex min-w-0 flex-col gap-1', className)}>
       {label && (
-        <label htmlFor={htmlFor} className="text-[10.5px] font-semibold uppercase tracking-wide text-ink-muted">
+        <label htmlFor={htmlFor} className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
           {label}{required && <span className="ml-0.5 text-danger">*</span>}
         </label>
       )}
-      {children}
+      {control}
       {error
-        ? <p className="text-[11px] font-medium text-danger">{error}</p>
-        : hint && <p className="text-[11px] text-ink-subtle">{hint}</p>}
+        ? <p id={errorId} role="alert" className="text-[11px] font-medium text-danger">{error}</p>
+        : hint && <p id={hintId} className="text-[11px] text-ink-subtle">{hint}</p>}
     </div>
   );
 }
@@ -245,20 +264,22 @@ const CONTROL_BASE =
   'disabled:cursor-not-allowed disabled:bg-surface-alt disabled:text-ink-muted';
 const controlHeight = 'h-9 max-tablet:min-h-[44px]';
 
+// `invalid` drives both the red border AND `aria-invalid` so the error state is
+// not signalled by colour alone. An explicit aria-invalid in `rest` wins.
 export const Input = React.forwardRef(function Input({ invalid, className = '', ...rest }, ref) {
-  return <input ref={ref} className={cn(CONTROL_BASE, controlHeight, invalid ? 'border-danger' : 'border-surface-border', className)} {...rest} />;
+  return <input ref={ref} aria-invalid={invalid || undefined} className={cn(CONTROL_BASE, controlHeight, invalid ? 'border-danger' : 'border-surface-border', className)} {...rest} />;
 });
 
 export const Select = React.forwardRef(function Select({ invalid, className = '', children, ...rest }, ref) {
   return (
-    <select ref={ref} className={cn(CONTROL_BASE, controlHeight, 'pr-8', invalid ? 'border-danger' : 'border-surface-border', className)} {...rest}>
+    <select ref={ref} aria-invalid={invalid || undefined} className={cn(CONTROL_BASE, controlHeight, 'pr-8', invalid ? 'border-danger' : 'border-surface-border', className)} {...rest}>
       {children}
     </select>
   );
 });
 
 export const Textarea = React.forwardRef(function Textarea({ invalid, className = '', rows = 3, ...rest }, ref) {
-  return <textarea ref={ref} rows={rows} className={cn(CONTROL_BASE, 'py-2 leading-relaxed', invalid ? 'border-danger' : 'border-surface-border', className)} {...rest} />;
+  return <textarea ref={ref} aria-invalid={invalid || undefined} rows={rows} className={cn(CONTROL_BASE, 'py-2 leading-relaxed', invalid ? 'border-danger' : 'border-surface-border', className)} {...rest} />;
 });
 
 /* ════════════════════════════════════════════════════════════════════
@@ -310,11 +331,16 @@ const DRAWER_WIDTH = {
 };
 
 export function Drawer({ open = true, onClose, title, subtitle, footer, width = 'md', side = 'right', children }) {
+  const panelRef = React.useRef(null);
+  const titleId = React.useId();
   React.useEffect(() => {
     if (!open) return undefined;
     const pop = pushModal(onClose || (() => {}));
     return () => pop();
   }, [open, onClose]);
+  // Move focus into the drawer on open, trap Tab inside it, and restore focus
+  // to the opener on close. Esc is handled by the modal stack (pushModal) above.
+  useFocusTrap(panelRef, { active: open });
 
   if (!open) return null;
   const sideCls = side === 'left'
@@ -322,9 +348,10 @@ export function Drawer({ open = true, onClose, title, subtitle, footer, width = 
     : 'right-0 max-tablet:translate-x-0';
 
   return createPortal(
-    <div className="noprint fixed inset-0 z-[9000] flex" role="dialog" aria-modal="true">
+    <div className="noprint fixed inset-0 z-[9000] flex" role="dialog" aria-modal="true" aria-labelledby={title ? titleId : undefined}>
       <div className="absolute inset-0 bg-navy/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <aside
+        ref={panelRef}
         className={cn(
           'absolute inset-y-0 flex w-full max-w-full flex-col bg-surface shadow-brand-lg',
           DRAWER_WIDTH[width] || DRAWER_WIDTH.md,
@@ -333,7 +360,7 @@ export function Drawer({ open = true, onClose, title, subtitle, footer, width = 
       >
         <div className="flex items-start gap-3 border-b border-surface-border px-4 py-3">
           <div className="min-w-0 flex-1">
-            {title && <h2 className="truncate text-sm font-bold text-navy">{title}</h2>}
+            {title && <h2 id={titleId} className="truncate text-sm font-bold text-navy">{title}</h2>}
             {subtitle && <p className="mt-0.5 text-xs text-ink-muted">{subtitle}</p>}
           </div>
           <button
@@ -358,6 +385,8 @@ export function Drawer({ open = true, onClose, title, subtitle, footer, width = 
 }
 
 export { Modal } from '../core/ux/Modal';
+export { Menu } from '../core/ux/Menu';
+export { Combobox } from '../core/ux/Combobox';
 
 export default {
   Button, StatusPill, Badge, PageSection, ResponsiveGrid, Toolbar, FilterBar,

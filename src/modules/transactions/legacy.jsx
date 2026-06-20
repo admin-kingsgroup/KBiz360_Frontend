@@ -30,6 +30,7 @@ import { Form26AS } from '../taxation';
 import { NotificationCentre } from '../../shell/NotifPanel';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
+import { clickable } from '../../core/ux/clickable';
 
 /* ════════════════════════════════════════════════════════════════════
    FINANCE VOUCHER PERSISTENCE
@@ -453,7 +454,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
                 const pgC=previewGPPct!=null?(previewGPPct>=25?"#27500A":previewGPPct>=15?"#854F0B":"#A32D2D"):"#5a6691";
                 return (
                   <div key={i}
-                    onClick={()=>{onSelect(p);setOpen(false);setSearch("");}}
+                    {...clickable(()=>{onSelect(p);setOpen(false);setSearch("");}, { role:'option' })}
                     style={{
                       padding:"11px 16px",borderBottom:"1px solid #f3f4f8",
                       cursor:"pointer",transition:"background 0.1s",
@@ -1420,7 +1421,7 @@ function InvoiceSelect({invoices,value,onChange,cur,loading,placeholder,noun="sa
           const active=idx===activeIdx;
           return (
             <div key={inv.id} ref={el=>{ if(active&&el) el.scrollIntoView({block:"nearest"}); }}
-              onClick={()=>{onChange(inv.id);setOpen(false);}} onMouseEnter={()=>setActiveIdx(idx)}
+              {...clickable(()=>{onChange(inv.id);setOpen(false);}, { role:'option' })} onMouseEnter={()=>setActiveIdx(idx)}
               style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #f3f4f8",background:active?"#eaf0ff":"transparent"}}>
               <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"baseline"}}>
                 <span style={{fontFamily:"monospace",fontSize:10.5,fontWeight:700,color:"#185FA5"}}>{inv.vno}</span>
@@ -1441,7 +1442,7 @@ function InvoiceSelect({invoices,value,onChange,cur,loading,placeholder,noun="sa
     </div>, document.body);
   return (
     <div ref={ref} style={{position:"relative"}}>
-      <div onClick={()=>open?setOpen(false):openMenu()} style={{...inp,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:32,
+      <div {...clickable(()=>open?setOpen(false):openMenu())} style={{...inp,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:32,
         borderColor:selected?"#C0DD97":"#F7C1C1",background:selected?"#f8fff8":"#fffafa"}}>
         {selected
           ?<span style={{fontSize:11,color:"#0d1326",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><b style={{fontFamily:"monospace",color:"#185FA5"}}>{selected.vno}</b> · {selected.party||"—"} · {vf2(cur,selected.total)}</span>
@@ -3518,7 +3519,7 @@ export function TicketControlRegister({branch}){
 
       <div style={{display:"flex",gap:8,marginBottom:14,overflowX:"auto",paddingBottom:4}}>
         {STATUSES.slice(1).map(s=>(
-          <div key={s} onClick={()=>setFilter(f=>f===s?"All":s)}
+          <div key={s} {...clickable(()=>setFilter(f=>f===s?"All":s))}
             style={{flexShrink:0,padding:"7px 12px",borderRadius:8,cursor:"pointer",textAlign:"center",
               border:`2px solid ${filter===s?"#0d1326":"#e1e3ec"}`,
               background:filter===s?"#0d1326":STATUS_BG[s]||"#f3f4f8"}}>
@@ -4286,7 +4287,7 @@ export function QuickPOS({branch,setRoute}){
           <p style={{margin:"0 0 12px",fontSize:10.5,color:"#5a6691"}}>Client: <b>{client.name}</b></p>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
             {SERVICES.map(s=>(
-              <div key={s.name} onClick={()=>{setService(s.name);setAmount(s.suggestAmt);}}
+              <div key={s.name} {...clickable(()=>{setService(s.name);setAmount(s.suggestAmt);})}
                 style={{padding:"12px 10px",borderRadius:10,cursor:"pointer",textAlign:"center",border:`2px solid ${service===s.name?s.color:"#e1e3ec"}`,background:service===s.name?s.bg:"#fff",transition:"all 0.15s"}}>
                 <span style={{fontSize:22}}>{s.icon}</span>
                 <p style={{margin:"4px 0 0",fontSize:10.5,fontWeight:700,color:s.color}}>{s.name}</p>

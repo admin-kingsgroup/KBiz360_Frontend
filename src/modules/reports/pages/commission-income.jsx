@@ -3,7 +3,7 @@
    ════════════════════════════════════════════════════════════════════
    Migrated out of legacy.jsx. Math unchanged: revenue is live (useGpBills),
    commission is ESTIMATED at standard rates (Insurance 15 / Flight 2 /
-   Holiday 3 / other 1 %) with TDS 194H @5% over ₹15k. KPIs → ResponsiveGrid;
+   Holiday 3 / other 1 %) with TDS 194H @2% over ₹15k. KPIs → ResponsiveGrid;
    table → DataTable with totals footer, Excel export, mobile scroll.
    ──────────────────────────────────────────────────────────────────── */
 
@@ -41,7 +41,7 @@ export function ReportCommission({ branch }) {
   const needle = search.trim().toLowerCase();
   const filtered = useMemo(
     () => rows.filter((r) => matchNeedle([r.supplier, r.mod], needle))
-      .map((r) => { const tdsAmt = r.commission > 15000 ? Math.round(r.commission * 0.05) : 0; return { ...r, tdsAmt, net: r.commission - tdsAmt }; }),
+      .map((r) => { const tdsAmt = r.commission > 15000 ? Math.round(r.commission * 0.02) : 0; return { ...r, tdsAmt, net: r.commission - tdsAmt }; }),
     [rows, needle],
   );
 
@@ -52,7 +52,7 @@ export function ReportCommission({ branch }) {
   const KPIS = [
     { l: 'Total Commission', v: f(totComm), c: '#27500A' },
     { l: 'On Revenue', v: f(totRev), c: '#185FA5' },
-    { l: 'TDS 194H (5%)', v: f(tds), c: '#A32D2D' },
+    { l: 'TDS 194H (2%)', v: f(tds), c: '#A32D2D' },
     { l: 'Net Receivable', v: f(totComm - tds), c: '#1D9E75' },
   ];
 
@@ -70,7 +70,7 @@ export function ReportCommission({ branch }) {
   return (
     <RptShell
       title="Commission Income (estimated)"
-      subtitle="Revenue is live from the books; commission is estimated at standard rates (Insurance 15%, Flight 2%, Holiday 3%, other 1%) with TDS 194H @5% — not actual booked commission."
+      subtitle="Revenue is live from the books; commission is estimated at standard rates (Insurance 15%, Flight 2%, Holiday 3%, other 1%) with TDS 194H @2% — not actual booked commission."
       filters={<><ReportSearch value={search} onChange={setSearch} placeholder="Supplier / module…" /><ReportDateBar value={range} onChange={setRange} branch={branch} /></>}
     >
       <ResponsiveGrid min="140px" gap="md" className="mb-4">

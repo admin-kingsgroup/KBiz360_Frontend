@@ -23,6 +23,7 @@ import { useQueries } from '@tanstack/react-query';
 import { card, inp, bc } from '../../core/styles';
 import { periodRange } from '../../core/period';
 import { useModulePL, useBalanceSheet, useLedgerStatement, useAgeing, branchCode } from '../../core/useAccounting';
+import { computeNetAgeing } from './netAgeing';
 import { apiGet, getAuthToken } from '../../core/api';
 import { exportToExcel } from '../../core/exportExcel';
 import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../../core/dates';
@@ -34,6 +35,7 @@ import { openPrintPreview } from '../../core/PrintPreview';
 import { LedgerActions } from '../../core/ledgerActions';
 import { openLedgerModal } from '../../core/LedgerModalHost';
 import { pushModal } from '../../core/ux/modalStore';
+import { clickable as keyActivate } from '../../core/ux/clickable';
 import { CONSOLIDATED_LABEL } from '../../core/data';
 
 /* ── palette (SAP Fiori) ─────────────────────────────────────────────── */
@@ -138,7 +140,7 @@ function FileRows({ files, indent = 48, onPick }) {
   return (files || []).map((f, i) => {
     const drillable = !f.aggregate && (f.vouchers || []).length > 0;
     return (
-      <tr key={(f.ref || '') + i} onClick={() => drillable && onPick && onPick(f)}
+      <tr key={(f.ref || '') + i} {...keyActivate(() => drillable && onPick && onPick(f))}
         style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, fontStyle: f.aggregate ? 'italic' : 'normal', cursor: drillable ? 'pointer' : 'default' }}>
         <td style={{ padding: `5px 16px 5px ${indent}px`, color: SAP.text }}>{f.ref}{!f.aggregate && (f.customer || f.supplier) ? <span style={{ color: SAP.label }}> · {f.customer || f.supplier}</span> : null}{drillable ? <span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span> : null}</td>
         <td style={num}>{inr(f.sale)}</td>
@@ -181,7 +183,7 @@ function FileVoucherDrill({ file, cur, mobile, onClose }) {
         : (vouchers.length === 0
           ? <div style={{ padding: 24, textAlign: 'center', color: SAP.sec, fontSize: 12 }}>Aggregated row — open a specific sub-centre to reach individual vouchers.</div>
           : vouchers.map((vh) => (
-            <div key={vh.id} onClick={() => setVid(vh.id)} style={tapRow}>
+            <div key={vh.id} {...keyActivate(() => setVid(vh.id))} style={tapRow}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ color: SAP.blue, fontWeight: 600, fontSize: 12.5 }}>{vh.vno} <span style={{ color: SAP.label, fontWeight: 400 }}>· {vh.category} · {vh.date}</span></div>
                 <div style={{ fontSize: 11, color: SAP.sec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vh.party || '—'}</div>
@@ -210,7 +212,7 @@ function ModuleVoucherDrill({ module, cur, mobile, onClose }) {
         <VoucherEditor voucherId={vid} cur={cur} onBack={() => setVid(null)} onClose={onClose} />
       ) : file ? (
         (file.vouchers || []).map((vh) => (
-          <div key={vh.id} onClick={() => setVid(vh.id)} style={tapRow}>
+          <div key={vh.id} {...keyActivate(() => setVid(vh.id))} style={tapRow}>
             <div style={{ minWidth: 0 }}>
               <div style={{ color: SAP.blue, fontWeight: 600, fontSize: 12.5 }}>{vh.vno} <span style={{ color: SAP.label, fontWeight: 400 }}>· {vh.category} · {vh.date}</span></div>
               <div style={{ fontSize: 11, color: SAP.sec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vh.party || '—'}</div>
@@ -222,7 +224,7 @@ function ModuleVoucherDrill({ module, cur, mobile, onClose }) {
         <div style={{ padding: 24, textAlign: 'center', color: SAP.sec, fontSize: 12 }}>No editable vouchers under this module for the selected period.</div>
       ) : (
         files.map((f, i) => (
-          <div key={(f.ref || '') + i} onClick={() => setFile(f)} style={tapRow}>
+          <div key={(f.ref || '') + i} {...keyActivate(() => setFile(f))} style={tapRow}>
             <div style={{ minWidth: 0 }}>
               <div style={{ color: SAP.blue, fontWeight: 600, fontSize: 12.5 }}>{f.ref} <span style={{ color: SAP.label, fontWeight: 400 }}>· {(f.vouchers || []).length} vch</span></div>
               <div style={{ fontSize: 11, color: SAP.sec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.customer || f.supplier || '—'}</div>
@@ -618,7 +620,7 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
                       const tag = m.hasSubs ? `${(m.subs || []).length} sub · ${m.fileCount} files` : `${m.fileCount} files`;
                       return (
                         <React.Fragment key={m.key}>
-                          <tr onClick={() => setOpenMod((s) => ({ ...s, [m.key]: !s[m.key] }))}
+                          <tr {...keyActivate(() => setOpenMod((s) => ({ ...s, [m.key]: !s[m.key] })))}
                             style={{ background: SAP.grpBg, color: SAP.grpText, cursor: 'pointer', borderTop: '2px solid #b3ccf5' }}>
                             <td style={{ padding: '9px 16px', fontWeight: 700 }}><Toggle open={open} /><span style={{ marginRight: 6 }}>{m.icon}</span>{m.name}<span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 5, marginLeft: 8, background: '#fff', color: SAP.blue, border: '1px solid #b8d6ff' }}>{tag}</span></td>
                             <td style={{ ...num, fontWeight: 700 }}>{inr(m.sales)}</td>
@@ -635,7 +637,7 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
                             const so = !!openSub[sk];
                             return (
                               <React.Fragment key={s.code}>
-                                <tr onClick={() => setOpenSub((st) => ({ ...st, [sk]: !st[sk] }))}
+                                <tr {...keyActivate(() => setOpenSub((st) => ({ ...st, [sk]: !st[sk] })))}
                                   style={{ background: SAP.subBg, color: SAP.subText, cursor: 'pointer', borderBottom: `1px solid ${SAP.borderLt}` }}>
                                   <td style={{ padding: '6px 16px 6px 38px', fontWeight: 600 }}><Toggle open={so} />{s.name}<span style={{ fontSize: 9, color: SAP.label, marginLeft: 6 }}>· {s.fileCount} files</span></td>
                                   <td style={{ ...num, fontWeight: 600 }}>{inr(s.sales)}</td>
@@ -686,7 +688,7 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
                       return (
                         <React.Fragment key={b.name}>
                           {/* Fixed / Variable head row (= its total) */}
-                          <tr onClick={() => setOpenBucket((s) => ({ ...s, [b.name]: !(s[b.name] !== false) }))}
+                          <tr {...keyActivate(() => setOpenBucket((s) => ({ ...s, [b.name]: !(s[b.name] !== false) })))}
                             style={{ background: headBg, color: headColor, cursor: 'pointer', borderTop: `2px solid ${headColor}33` }}>
                             <td style={{ padding: '9px 16px', fontWeight: 800, letterSpacing: 0.2 }}>{expDetail === 'detailed' && <Toggle open={bOpen} />}{b.name}</td>
                             <td style={{ ...num, fontWeight: 800 }}>{inr(b.amount)}</td>
@@ -699,7 +701,7 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
                             const gOpen = openExp[gKey] !== false; // default expanded
                             return (
                               <React.Fragment key={gKey}>
-                                <tr onClick={() => setOpenExp((s) => ({ ...s, [gKey]: !(s[gKey] !== false) }))}
+                                <tr {...keyActivate(() => setOpenExp((s) => ({ ...s, [gKey]: !(s[gKey] !== false) })))}
                                   style={{ background: SAP.subBg, color: SAP.subText, cursor: 'pointer', borderBottom: `1px solid ${SAP.borderLt}` }}>
                                   <td style={{ padding: '7px 16px 7px 34px', fontWeight: 700 }}><Toggle open={gOpen} />{g.name}</td>
                                   <td style={{ ...num, fontWeight: 700, color: SAP.red }}>{inr(g.amount)}</td>
@@ -707,7 +709,7 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
                                   <td style={{ ...num, color: SAP.sec }}>{pctTxt(g.pctOfSales)}</td>
                                 </tr>
                                 {gOpen && (g.ledgers || []).map((l, i) => (
-                                  <tr key={i} onClick={() => setDrillLedger(l.name)}
+                                  <tr key={i} {...keyActivate(() => setDrillLedger(l.name))}
                                     style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: 'pointer' }}
                                     title="Drill to vouchers">
                                     <td style={{ padding: '5px 16px 5px 56px', color: SAP.text }}>{l.name}<span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span></td>
@@ -841,11 +843,11 @@ function FioriLedgerRows({ m, heads: headsProp, keyBase, stripPrefix, openHead, 
       const ho = !!openHead[hk];
       const salesCol = side === 'sales';
       rows.push(
-        <tr key={hk} onClick={hasComps ? () => setOpenHead((s) => ({ ...s, [hk]: !s[hk] })) : undefined}
+        <tr key={hk} {...(hasComps ? keyActivate(() => setOpenHead((s) => ({ ...s, [hk]: !s[hk] }))) : {})}
           style={{ background: '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: hasComps ? 'pointer' : 'default' }}>
           <td style={{ padding: '5px 16px 5px 62px', color: SAP.text, fontWeight: 600 }}>
             {hasComps ? <Toggle open={ho} /> : <span style={{ display: 'inline-block', width: 21 }} />}
-            <span onClick={(e) => { e.stopPropagation(); openLedgerModal(h.ledger, { invoiceToRegister: true }); }}
+            <span {...keyActivate((e) => { e.stopPropagation(); openLedgerModal(h.ledger, { invoiceToRegister: true }); })}
               style={{ cursor: 'pointer', color: SAP.blue, textDecoration: 'underline' }}
               title="Open Ledger Account — an invoice inside opens its Sales/Purchase Register">
               {ledgerLabel(h.ledger)}<span style={{ fontWeight: 700 }}> ›</span>
@@ -1035,13 +1037,13 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     const pad = r.component ? 58 : r.ledgerHead ? 42 : r.leaf ? 46 : r.costCentre ? 38 : r.sub ? 32 : r.bucket ? 22 : 12;
     return (
       <>
-        <td onClick={clickable ? () => onRowClick(r) : undefined}
+        <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})}
           className={clickable ? 'cl-drill' : undefined}
           style={{ padding: '2px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...sep, ...mono }}>
           {r.expandable ? <span onClick={(e) => { e.stopPropagation(); toggle(r); }} style={{ color: TALLY.gold, marginRight: 4, cursor: 'pointer' }}>{r.open ? '▾' : '▸'}</span> : null}
           {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{r.module ? <span onClick={(e) => { e.stopPropagation(); setDrillModule(r.module); }} style={{ color: TALLY.gold, fontWeight: 700, cursor: 'pointer' }} title="Show booking files → vouchers"> ›</span> : r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
-        <td onClick={clickable ? () => onRowClick(r) : undefined}
+        <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})}
           style={{ padding: '2px 12px', textAlign: 'right', color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', cursor: clickable ? 'pointer' : 'default', ...mono }}>{inr(r.amount)}</td>
       </>
     );
@@ -1200,7 +1202,7 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
     const amt = neg ? -Math.abs(r.amount) : r.amount;
     return (
       <tr style={{ borderBottom: '1px solid #f4f4f4' }}>
-        <td onClick={clickable ? () => onRowClick(r) : undefined} className={clickable ? 'cl-drill' : undefined}
+        <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})} className={clickable ? 'cl-drill' : undefined}
           style={{ padding: '3px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
           {r.expandable ? <span onClick={(e) => { e.stopPropagation(); toggle(r); }} style={{ color: TALLY.gold, marginRight: 4, cursor: 'pointer' }}>{r.open ? '▾' : '▸'}</span> : null}
           {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{r.module ? <span onClick={(e) => { e.stopPropagation(); setDrillModule(r.module); }} style={{ color: TALLY.gold, fontWeight: 700, cursor: 'pointer' }} title="Show booking files → vouchers"> ›</span> : r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
@@ -1314,7 +1316,7 @@ function DrillPnL({ d, cur, branch, periodTxt }) {
     return (
       <tr style={{ borderBottom: '1px solid #f5f5f5' }}>
         {Array.from({ length: LABEL_COLS }).map((_, c) => (
-          <td key={c} onClick={c === lvl && clickable ? () => onRowClick(r) : undefined}
+          <td key={c} {...(c === lvl && clickable ? keyActivate(() => onRowClick(r)) : {})}
             className={c === lvl && clickable ? 'cl-drill' : undefined}
             style={{ padding: '3px 8px', whiteSpace: 'nowrap', cursor: c === lvl && clickable ? 'pointer' : 'default', ...mono }}>
             {c === lvl && (
@@ -1670,7 +1672,7 @@ function splitSubGroups(ledgers) {
 // A single leaf-ledger row (tap → drill into its postings → voucher → edit).
 function bsLedgerRow(l, i, indent, onPickLedger, showPY) {
   return (
-    <tr key={`${indent}-${i}-${l.name}`} onClick={() => onPickLedger && onPickLedger(l.name)}
+    <tr key={`${indent}-${i}-${l.name}`} {...keyActivate(() => onPickLedger && onPickLedger(l.name))}
       style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: onPickLedger ? 'pointer' : 'default' }}>
       <td style={{ padding: `5px 16px 5px ${indent}px`, color: SAP.text }}>{l.name}{onPickLedger ? <span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span> : null}</td>
       <td style={num}>{inr(l.amount)}</td>
@@ -1702,7 +1704,7 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
               const rowColor = g.isResult ? SAP.greenDk : SAP.grpText;
               return (
                 <React.Fragment key={g.group + gi}>
-                  <tr onClick={() => hasChildren && setOpen((s) => ({ ...s, [g.group]: !s[g.group] }))}
+                  <tr {...keyActivate(() => hasChildren && setOpen((s) => ({ ...s, [g.group]: !s[g.group] })))}
                     style={{ background: rowBg, color: rowColor, cursor: hasChildren ? 'pointer' : 'default', borderTop: '2px solid #b3ccf5', fontWeight: 700 }}>
                     <td style={{ padding: '9px 16px' }}>{hasChildren ? <Toggle open={isOpen} /> : <span style={{ marginRight: 7 }}>{g.isResult ? '●' : '•'}</span>}{g.group}</td>
                     <td style={num}>{inr(g.amount)}</td>
@@ -1714,7 +1716,7 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
                     const so = !!openSub[sk];
                     return (
                       <React.Fragment key={sk}>
-                        <tr onClick={() => setOpenSub((s) => ({ ...s, [sk]: !s[sk] }))}
+                        <tr {...keyActivate(() => setOpenSub((s) => ({ ...s, [sk]: !s[sk] })))}
                           style={{ background: SAP.subBg, color: SAP.subText, cursor: 'pointer', borderBottom: `1px solid ${SAP.borderLt}`, fontWeight: 600 }}>
                           <td style={{ padding: '6px 16px 6px 38px' }}><Toggle open={so} />{sg.name}<span style={{ fontSize: 9, color: SAP.label, marginLeft: 6 }}>· {sg.ledgers.length} ledger{sg.ledgers.length > 1 ? 's' : ''}</span></td>
                           <td style={{ ...num, fontWeight: 600 }}>{inr(sg.amount)}</td>
@@ -1787,7 +1789,7 @@ function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
     const pad = r.group ? 12 : r.sub ? 28 : 44;
     return (
       <>
-        <td onClick={clickable ? () => onRowClick(r) : undefined} className={clickable ? 'cl-drill' : undefined}
+        <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})} className={clickable ? 'cl-drill' : undefined}
           style={{ padding: '2px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
           {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}{r.label}{r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
@@ -1878,7 +1880,7 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
     const pad = r.group ? 16 : r.sub ? 32 : 50;
     return (
       <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-        <td onClick={clickable ? () => onRowClick(r) : undefined} className={clickable ? 'cl-drill' : undefined}
+        <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})} className={clickable ? 'cl-drill' : undefined}
           style={{ padding: '3px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
           {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}{r.label}{r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
@@ -1949,10 +1951,17 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
  *   • Open Bills & On-Account  → act:     settle bills bill-wise (the Settle modal)
  * Both read the same no-FIFO source, so the numbers always agree. The old combined
  * /finance/outstanding screen is retired in favour of these side-scoped tabs.     */
-function ArApScreen({ branch, side }) {
+function ArApScreen({ branch, side, setRoute, initialTab }) {
   const isRec = side === 'receivables';
-  const [tab, setTab] = useState('ageing'); // 'ageing' | 'settle'
-  const TABS = [['ageing', 'Ageing'], ['settle', 'Open Bills & On-Account ▸ Settle']];
+  const [tab, setTab] = useState(initialTab || 'ageing'); // 'ageing' | 'settle' | 'net'
+  // "Adjust advance" deep-link from an ageing row: jump to the Settle tab focused on
+  // that party's on-account advances (supplier payments / customer receipts) so they
+  // can be allocated to an open bill. Works symmetrically on both AR and AP.
+  const [advFocus, setAdvFocus] = useState(''); // party whose advances to focus
+  const adjustAdvance = (party) => { setAdvFocus(party); setTab('settle'); };
+  // The "Net" tab is the same-party Debtors − Creditors view (replaces the old
+  // standalone Net Ageing screen). It's offered on both AR and AP workbenches.
+  const TABS = [['ageing', 'Ageing'], ['settle', 'Open Bills & On-Account ▸ Settle'], ['net', 'Net (Debtors − Creditors)']];
   const tabBtn = (active) => ({
     padding: '8px 16px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
     border: `1px solid ${SAP.border}`, borderBottom: 'none', borderRadius: '8px 8px 0 0',
@@ -1964,21 +1973,25 @@ function ArApScreen({ branch, side }) {
         {TABS.map(([id, label]) => <button key={id} onClick={() => setTab(id)} style={tabBtn(tab === id)}>{label}</button>)}
       </div>
       {tab === 'ageing'
-        ? <AgeingReport branch={branch} side={side} />
-        : <OutstandingOnAccount branch={branch} side={isRec ? 'customer' : 'supplier'} />}
+        ? <AgeingReport branch={branch} side={side} setRoute={setRoute} onAdjustAdvance={adjustAdvance} />
+        : tab === 'net'
+          ? <NetAgeingView branch={branch} setRoute={setRoute} />
+          : <OutstandingOnAccount branch={branch} side={isRec ? 'customer' : 'supplier'}
+              initialTab={advFocus ? (isRec ? 'recAdv' : 'payAdv') : undefined} initialParty={advFocus || undefined} />}
     </>
   );
 }
-export function ReceivablesLive({ branch }) { return <ArApScreen branch={branch} side="receivables" />; }
-export function PayablesLive({ branch }) { return <ArApScreen branch={branch} side="payables" />; }
+export function ReceivablesLive({ branch, setRoute, initialTab }) { return <ArApScreen branch={branch} side="receivables" setRoute={setRoute} initialTab={initialTab} />; }
+export function PayablesLive({ branch, setRoute, initialTab }) { return <ArApScreen branch={branch} side="payables" setRoute={setRoute} initialTab={initialTab} />; }
 
 const BUCKETS = [['d0', '0–30'], ['d30', '31–60'], ['d60', '61–90'], ['d90', '90+']];
 const bucketColor = (k) => ({ d0: SAP.greenDk, d30: SAP.gold, d60: SAP.orange, d90: SAP.red }[k] || SAP.text);
 
-function AgeingReport({ branch, side }) {
+function AgeingReport({ branch, side, setRoute, onAdjustAdvance }) {
   const cur = curOf(branch);
   const mobile = useMobile();
-  const q = useAgeing(branch);
+  const [asOf, setAsOf] = useState(''); // '' = today; otherwise YYYY-MM-DD cut-off
+  const q = useAgeing(branch, asOf);
   const d = q.data;
   const data = d ? d[side] : null;
   const rows = data?.rows || [];
@@ -2001,6 +2014,13 @@ function AgeingReport({ branch, side }) {
         title={isRec ? 'Accounts Receivable — Ageing' : 'Accounts Payable — Ageing'}
         sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} incl. GST &nbsp;|&nbsp; as of {d?.asOf || '—'} &nbsp;|&nbsp; bill-wise · no FIFO · live double-entry</>}
       />
+      <div className="noprint" style={{ maxWidth: 1180, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+        <span style={{ color: SAP.sec, fontWeight: 600 }}>Age as on</span>
+        <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)}
+          style={{ padding: '4px 8px', border: `1px solid ${SAP.border}`, borderRadius: 6, fontSize: 12 }} />
+        {asOf && <button onClick={() => setAsOf('')} style={{ padding: '4px 10px', border: `1px solid ${SAP.border}`, borderRadius: 6, background: '#fff', color: SAP.blue, fontWeight: 700, cursor: 'pointer' }}>Today</button>}
+        <span style={{ color: SAP.label }}>{asOf ? 'historic snapshot' : 'live · today'}</span>
+      </div>
       <div style={{ background: SAP.pageBg, padding: 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
         <StateBox q={q} empty={!data || rows.length === 0}>
           <KpiGrid>
@@ -2019,12 +2039,24 @@ function AgeingReport({ branch, side }) {
                 <thead><tr><Th w="26%">{partyLabel}</Th>{BUCKETS.map(([, lbl]) => <Th key={lbl} right>{lbl}</Th>)}<Th right>Open Bills</Th><Th right>On-Account</Th><Th right>Net</Th></tr></thead>
                 <tbody>
                   {rows.map((r, i) => (
-                    <tr key={r.party + i} onClick={() => openLedgerModal(r.party)}
+                    <tr key={r.party + i} {...keyActivate(() => openLedgerModal(r.party))}
                       style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: 'pointer' }}>
-                      <td style={{ padding: '7px 16px', color: SAP.text, fontWeight: 600 }}>{r.party}<span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span></td>
+                      <td style={{ padding: '7px 16px', color: SAP.text, fontWeight: 600 }}>{r.party}<span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span>
+                        {setRoute && (
+                          <button className="noprint" title={`Open ${partyLabel} 360° View`}
+                            onClick={(e) => { e.stopPropagation(); setRoute(`/reports/${isRec ? 'customer' : 'supplier'}-360?party=${encodeURIComponent(r.party)}`); }}
+                            style={{ marginLeft: 8, padding: '1px 7px', fontSize: 10.5, fontWeight: 700, border: `1px solid ${SAP.border}`, borderRadius: 10, background: SAP.blueBg, color: SAP.blue, cursor: 'pointer' }}>360°</button>
+                        )}
+                      </td>
                       {BUCKETS.map(([k]) => <td key={k} style={{ ...num, color: r[k] ? bucketColor(k) : SAP.label }}>{inr(r[k])}</td>)}
                       <td style={{ ...num, fontWeight: 700, color: SAP.text }}>{inr(r.total)}</td>
-                      <td style={{ ...num, color: r.onAccount ? SAP.purple : SAP.label }}>{inr(r.onAccount || 0)}</td>
+                      <td style={{ ...num, color: r.onAccount ? SAP.purple : SAP.label }}>{inr(r.onAccount || 0)}
+                        {onAdjustAdvance && r.onAccount > 0.01 && (
+                          <button className="noprint" title="Adjust this advance against an open bill"
+                            onClick={(e) => { e.stopPropagation(); onAdjustAdvance(r.party); }}
+                            style={{ marginLeft: 6, padding: '1px 6px', fontSize: 10, fontWeight: 700, border: `1px solid ${SAP.border}`, borderRadius: 9, background: '#fff', color: SAP.purple, cursor: 'pointer' }}>Adjust ▸</button>
+                        )}
+                      </td>
                       <td style={{ ...num, fontWeight: 700, color: SAP.text }}>{inr(rowNet(r))}</td>
                     </tr>
                   ))}
@@ -2041,6 +2073,63 @@ function AgeingReport({ branch, side }) {
           </FCard>
         </StateBox>
         {drillLedger && <LedgerVoucherDrill ledger={drillLedger} branch={branch} to="" cur={cur} mobile={mobile} onClose={() => setDrillLedger(null)} />}
+      </div>
+    </Wrap>
+  );
+}
+
+function NetAgeingView({ branch }) {
+  const cur = curOf(branch);
+  const [asOf, setAsOf] = useState('');
+  const q = useAgeing(branch, asOf);
+  const d = q.data;
+  const { rows, totals } = computeNetAgeing(d);
+  return (
+    <Wrap>
+      <FioriHead
+        system="KBiz360 · Finance"
+        title="Net Ageing — Debtors − Creditors (same party)"
+        sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} &nbsp;|&nbsp; as of {d?.asOf || '—'} &nbsp;|&nbsp; net of on-account · same-party only</>}
+      />
+      <div className="noprint" style={{ maxWidth: 1180, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+        <span style={{ color: SAP.sec, fontWeight: 600 }}>Age as on</span>
+        <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)}
+          style={{ padding: '4px 8px', border: `1px solid ${SAP.border}`, borderRadius: 6, fontSize: 12 }} />
+        {asOf && <button onClick={() => setAsOf('')} style={{ padding: '4px 10px', border: `1px solid ${SAP.border}`, borderRadius: 6, background: '#fff', color: SAP.blue, fontWeight: 700, cursor: 'pointer' }}>Today</button>}
+      </div>
+      <div style={{ background: SAP.pageBg, padding: 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+        <StateBox q={q} empty={!d || rows.length === 0}>
+          <KpiGrid>
+            <Kpi tone="green" label="Total Receivable" value={compact(cur, totals.receivable)} sub="net of advances in" />
+            <Kpi tone="orange" label="Total Payable" value={compact(cur, totals.payable)} sub="net of advances out" />
+            <Kpi tone={totals.net >= 0 ? 'blue' : 'red'} label="Net Position" value={compact(cur, totals.net)} sub={totals.net >= 0 ? 'net receivable' : 'net payable'} />
+          </KpiGrid>
+          <FCard title="Net exposure by party" sub="Tap a row to drill into the ledger · positive = they owe us, negative = we owe them"
+            badge={<Badge bg={SAP.blueBg} c={SAP.blue} bd="#b8d6ff">{rows.length} parties</Badge>}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <thead><tr><Th w="40%">Party</Th><Th right>Receivable</Th><Th right>Payable</Th><Th right>Net</Th></tr></thead>
+                <tbody>
+                  {rows.map((r, i) => (
+                    <tr key={r.party + i} {...keyActivate(() => openLedgerModal(r.party))}
+                      style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: 'pointer' }}>
+                      <td style={{ padding: '7px 16px', color: SAP.text, fontWeight: 600 }}>{r.party}<span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span></td>
+                      <td style={{ ...num, color: r.receivable ? SAP.greenDk : SAP.label }}>{inr(r.receivable)}</td>
+                      <td style={{ ...num, color: r.payable ? SAP.orange : SAP.label }}>{inr(r.payable)}</td>
+                      <td style={{ ...num, fontWeight: 700, color: r.net >= 0 ? SAP.greenDk : SAP.red }}>{inr(r.net)}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ background: SAP.shell, color: '#fff', fontWeight: 700, borderTop: `2px solid ${SAP.blue}` }}>
+                    <td style={{ padding: '10px 16px' }}>TOTAL</td>
+                    <td style={num}>{inr(totals.receivable)}</td>
+                    <td style={num}>{inr(totals.payable)}</td>
+                    <td style={num}>{inr(totals.net)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </FCard>
+        </StateBox>
       </div>
     </Wrap>
   );

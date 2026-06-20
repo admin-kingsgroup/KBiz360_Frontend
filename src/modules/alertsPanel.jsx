@@ -3,6 +3,7 @@
 // vouchers pending / unpostable, idle ledgers, masters missing credit terms.
 import React from 'react';
 import { useAlerts } from '../core/useAccounting';
+import { clickable } from '../core/ux/clickable';
 
 const DARK = '#0d1326', DIM = '#5a6691';
 const SEV = {
@@ -36,7 +37,7 @@ export function AlertsPanel({ branch, onGo, compact }) {
         {alerts.map((a, i) => {
           const s = SEV[a.severity] || SEV.info;
           return (
-            <div key={i} onClick={() => a.link && onGo && onGo(a.link)} style={{ background: s.bg, border: `1px solid ${s.bd}`, borderRadius: 8, padding: '8px 11px', cursor: a.link && onGo ? 'pointer' : 'default' }}>
+            <div key={i} {...(a.link && onGo ? clickable(() => onGo(a.link)) : {})} style={{ background: s.bg, border: `1px solid ${s.bd}`, borderRadius: 8, padding: '8px 11px', cursor: a.link && onGo ? 'pointer' : 'default' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 700, color: s.fg, fontSize: 12.5 }}>
                 <span>{s.icon}</span><span>{a.title}</span>
                 {a.link && onGo && <span style={{ marginLeft: 'auto', fontSize: 11, color: s.fg }}>→</span>}

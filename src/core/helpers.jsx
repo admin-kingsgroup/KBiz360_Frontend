@@ -18,6 +18,7 @@ import { useGpBills } from './useAccounting';
 import { fmt, fmtINR } from './format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS, PERIOD_OPTIONS as MONTH_PERIOD_OPTIONS, FY_YTD_MONTHS } from './dates';
 import { useMobile } from './hooks';
+import { clickable } from './ux/clickable';
 /* Import style primitives from the lightweight token module (NOT ./styles) so
    helpers no longer depends on styles.jsx — breaking the styles↔helpers cycle
    that was forcing both (and recharts) into the initial bundle. vDate was an
@@ -213,7 +214,7 @@ export function UxPreferences(){
             <p style={{margin:0,fontSize:12,color:"#384677"}}>Dark theme for low-light environments</p>
             <p style={{margin:"2px 0 0",fontSize:10,color:"#5a6691"}}>Currently: <b>{dark?"Dark":"Light"}</b></p>
           </div>
-          <div onClick={toggleDark} style={{width:48,height:26,borderRadius:13,background:dark?"#0d1326":"#e1e3ec",cursor:"pointer",
+          <div {...clickable(toggleDark)} style={{width:48,height:26,borderRadius:13,background:dark?"#0d1326":"#e1e3ec",cursor:"pointer",
             position:"relative",transition:"background 0.2s",border:`2px solid ${dark?"#d4a437":"#bfc3d6"}`}}>
             <div style={{position:"absolute",top:2,left:dark?22:2,width:18,height:18,borderRadius:"50%",
               background:dark?"#d4a437":"#fff",transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.3)"}}/>
@@ -634,7 +635,7 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}
           fontSize:11,outline:"none",boxSizing:"border-box"}}/>
       <div style={{maxHeight:220,overflowY:"auto"}}>
         {filtered.map(l=>(
-          <div key={l.id} onClick={()=>{onChange(l.id);setOpen(false);}}
+          <div key={l.id} {...clickable(()=>{onChange(l.id);setOpen(false);},{role:'option'})}
             style={{padding:"7px 12px",cursor:"pointer",display:"flex",justifyContent:"space-between",fontSize:11}}
             onMouseEnter={e=>e.currentTarget.style.background="#f0f4ff"}
             onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
@@ -652,7 +653,7 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}
     </div>, document.body);
   return (
     <div ref={ref} style={{position:"relative"}}>
-      <div onClick={()=>open?setOpen(false):openMenu()} style={{...inp,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:32,...style}}>
+      <div {...clickable(()=>open?setOpen(false):openMenu())} style={{...inp,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:32,...style}}>
         {selected
           ?<span style={{fontSize:11,color:"#0d1326",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected.name}</span>
           :<span style={{fontSize:11,color:"#bfc3d6"}}>{placeholder||"Select ledger..."}</span>

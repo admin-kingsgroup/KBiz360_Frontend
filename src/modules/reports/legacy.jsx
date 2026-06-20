@@ -26,6 +26,7 @@ import { PHASE2_Page } from '../../shell/PHASE2_Page';
 // responsive primitives). Imported here for the many in-file report screens that
 // use them; the barrel re-exports them so the public names are unchanged.
 import { RptShell, NotWired } from './components/scaffold';
+import { clickable } from '../../core/ux/clickable';
 
 
 // ReportBranch migrated → ./pages/branch-comparison.jsx (primitives + DataTable).
@@ -495,7 +496,7 @@ function _CustomReportBuilder_legacy(){
             <div key={cat}>
               <p style={{margin:0,padding:"6px 12px",fontSize:10,fontWeight:700,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.4px",background:"#f7f8fb"}}>{cat}</p>
               {fields.map(f=>(
-                <div key={f} onClick={()=>addField(f)} style={{padding:"7px 12px",fontSize:11.5,cursor:"pointer",color:selected.includes(f)?"#5a6691":"#0d1326",background:selected.includes(f)?"#f0f2f7":"#fff",borderBottom:"1px solid #f7f8fb",display:"flex",justifyContent:"space-between",alignItems:"center"}}
+                <div key={f} {...clickable(()=>addField(f))} style={{padding:"7px 12px",fontSize:11.5,cursor:"pointer",color:selected.includes(f)?"#5a6691":"#0d1326",background:selected.includes(f)?"#f0f2f7":"#fff",borderBottom:"1px solid #f7f8fb",display:"flex",justifyContent:"space-between",alignItems:"center"}}
                   onMouseEnter={e=>{if(!selected.includes(f))e.currentTarget.style.background="#fff8e8";}}
                   onMouseLeave={e=>{if(!selected.includes(f))e.currentTarget.style.background="#fff";}}>
                   {f}
@@ -514,10 +515,10 @@ function _CustomReportBuilder_legacy(){
             <div style={{padding:12,display:"flex",flexWrap:"wrap",gap:8,minHeight:52}}>
               {selected.map((f,i)=>(
                 <div key={f} style={{display:"flex",alignItems:"center",gap:4,padding:"5px 8px",background:"#0d1326",borderRadius:5,fontSize:11.5,color:"#fff",fontWeight:600}}>
-                  <span style={{cursor:"pointer",color:"#5a6691",fontSize:12}} onClick={()=>moveField(f,-1)}>◀</span>
+                  <span style={{cursor:"pointer",color:"#5a6691",fontSize:12}} {...clickable(()=>moveField(f,-1))}>◀</span>
                   <span>{f}</span>
-                  <span style={{cursor:"pointer",color:"#5a6691",fontSize:12}} onClick={()=>moveField(f,1)}>▶</span>
-                  <span onClick={()=>removeField(f)} style={{cursor:"pointer",color:"#f97316",marginLeft:4,fontSize:13,fontWeight:700}}>×</span>
+                  <span style={{cursor:"pointer",color:"#5a6691",fontSize:12}} {...clickable(()=>moveField(f,1))}>▶</span>
+                  <span {...clickable(()=>removeField(f))} style={{cursor:"pointer",color:"#f97316",marginLeft:4,fontSize:13,fontWeight:700}}>×</span>
                 </div>
               ))}
               {selected.length===0&&<p style={{margin:0,fontSize:11.5,color:"#5a6691"}}>Click fields from the catalog to add them here →</p>}
@@ -783,7 +784,7 @@ function _ReportsMetaDemo_legacy(){
                   <tr key={r.branch} style={{borderBottom:"1px solid #f0f2f7"}}>
                     <td style={{...RPT_tdStyle,fontWeight:700}}><span style={{padding:"2px 7px",background:"#0d1326",color:"#d4a437",borderRadius:3,fontSize:10.5,fontWeight:700}}>{r.branch}</span></td>
                     <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>
-                      <span onClick={()=>setDrillData({branch:r.branch,metric:"Revenue",value:r.cy_rev})}
+                      <span {...clickable(()=>setDrillData({branch:r.branch,metric:"Revenue",value:r.cy_rev}))}
                         style={{cursor:"pointer",color:"#0d1326",textDecoration:"underline",textDecorationStyle:"dotted",textDecorationColor:"#d4a437"}}>
                         {fmtINR(r.cy_rev)}
                       </span>
@@ -794,7 +795,7 @@ function _ReportsMetaDemo_legacy(){
                       <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:parseFloat(revPct)>=0?"#22c55e":"#A32D2D"}}>{revPct!=="—"?(revPct>=0?"+":"")+revPct+"%":"—"}</td>
                     </>}
                     <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>
-                      <span onClick={()=>setDrillData({branch:r.branch,metric:"Gross Profit",value:r.cy_gp})}
+                      <span {...clickable(()=>setDrillData({branch:r.branch,metric:"Gross Profit",value:r.cy_gp}))}
                         style={{cursor:"pointer",color:"#22c55e",textDecoration:"underline",textDecorationStyle:"dotted",textDecorationColor:"#22c55e"}}>
                         {fmtINR(r.cy_gp)}
                       </span>

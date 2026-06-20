@@ -13,6 +13,7 @@ import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { exportToExcel } from '../../../core/exportExcel';
 import { PageLayout } from '../../../shell/PageLayout';
 import { Modal, Button, Input, Select, FormField, ResponsiveGrid, StatusPill } from '../../../shell/primitives';
+import { clickable } from '../../../core/ux/clickable';
 
 const TYPE_TONE = { Retail: 'info', Corporate: 'warning', Local: 'success', Online: 'success' };
 const f = (n) => '₹' + Number(Math.round(n)).toLocaleString('en-IN');
@@ -69,7 +70,7 @@ export function MastersSubAgents() {
           const open = sel?.id === s.id;
           const tone = TYPE_TONE[s.type] || 'neutral';
           return (
-            <div key={s.id} onClick={() => setSel(open ? null : s)}
+            <div key={s.id} {...clickable(() => setSel(open ? null : s))}
               className={`cursor-pointer rounded-brand border border-t-[4px] bg-surface p-3.5 transition ${open ? 'shadow-brand' : 'border-surface-border shadow-sm hover:shadow'}`}
               style={{ borderTopColor: { info: '#185FA5', warning: '#854F0B', success: '#27500A', neutral: '#384677' }[tone] }}>
               <div className="mb-2.5 flex items-start justify-between">

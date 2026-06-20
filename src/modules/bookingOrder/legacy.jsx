@@ -19,7 +19,7 @@ import { buildBookingInvoice } from '../../core/invoiceHtml';
 import { apiGet, apiPost, apiPut } from '../../core/api';
 import { AuditTrail } from '../../core/AuditTrail';
 import { useLedgerRegistry } from '../../core/useReference';
-import { useHotkey } from '../../core/ux/hotkeys';
+import { useFormKeys } from '../../core/ux/forms';
 import { toast } from '../../core/ux/toast';
 import { confirmDialog } from '../../core/ux/confirm';
 import {
@@ -181,14 +181,39 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const addLine = () => setLines([...lines, blankLine(spec)]);
   const delLine = (i) => setLines(lines.length > 1 ? lines.filter((_, idx) => idx !== i) : [blankLine(spec)]);
 
+  // Has the user entered anything worth protecting? Used to confirm before a
+  // destructive module switch and to warn on navigate-away (unsaved guard).
+  const rowHasData = (l) => Object.keys(l || {}).some((k) => {
+    if (k === 'id') return false;
+    const v = l[k];
+    if (v == null || v === '' || typeof v === 'object') return false;
+    if (typeof v === 'number') return v !== 0;
+    return String(v).trim() !== '';
+  });
+  const isDirty = () => !!(
+    (customer.name || '').trim() || (supplier.name || '').trim() ||
+    (remarks || '').trim() || lines.some(rowHasData)
+  );
+
   // Switch the active module. For a NEW voucher the effect on `moduleCode` swaps the
   // seed grid. While EDITING the entered details are KEPT — each existing row is
   // re-shaped onto the new module's columns (shared fields like markup / service charge
   // / supplier service and any same-named fare/id columns carry over; the new module's
   // own fields default in). Customer, supplier, dates, tags & remarks are untouched.
   // The backend accepts the new module on Save and re-prefixes the spawned vouchers.
-  const changeModule = (code) => {
+  const changeModule = async (code) => {
     if (code === moduleCode) return;
+    // For a NEW voucher, switching type reseeds (and so WIPES) the grid — confirm
+    // first if the user has entered anything, so an accidental chip click can't
+    // silently discard a half-typed booking.
+    if (!editing && isDirty()) {
+      const { confirmed } = await confirmDialog({
+        title: 'Switch voucher type?',
+        message: 'This will clear the lines and details you have entered for this voucher.',
+        confirmLabel: 'Switch & clear', danger: true,
+      });
+      if (!confirmed) return;
+    }
     // Reversal modules (RF/RI) have no fare grid to reshape — just switch; the entry
     // form swaps to the reversal UI (early return below).
     if (isReversalModule(code) || isReversalModule(moduleCode)) { setModuleCode(code); setResult(null); setError(''); return; }
@@ -253,8 +278,18 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     } catch (e) { setError(e.message || 'Failed to save voucher'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
     finally { setSaving(false); }
   };
-  // Ctrl/Cmd+Enter saves from anywhere on this (large, multi-grid) entry screen.
-  useHotkey('mod+enter', () => { if (canSave) save(false); }, [canSave]);
+  // Tally-style keys across the whole entry screen: Enter advances between data
+  // fields (skipping action buttons), Enter on the last field / Ctrl+Cmd+Enter saves.
+  const formKeys = useFormKeys({ onSubmit: () => { if (canSave) save(false); } });
+
+  // Warn before leaving/refreshing with unsaved booking data (the form autosave
+  // doesn't cover the multi-grid line state). Skipped once a save has succeeded.
+  useEffect(() => {
+    const onBeforeUnload = (e) => { if (!result && isDirty()) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, customer, supplier, lines, remarks]);
 
   // Reversal modules (Refund / Reissue) render a dedicated entry instead of the fare
   // grid — same module bar, but the original-invoice link + supplier-refund + retained
@@ -348,7 +383,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   );
 
   return (
-    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
+    <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
       {/* Header */}
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
         <div style={{ padding: '14px 18px', background: DARK, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>

@@ -32,6 +32,8 @@ import { ModuleSearch } from './ModuleSearch';
 import { BranchSwitcher } from './BranchSwitcher';
 import { NotifPanel } from './NotifPanel';
 import { UserMenu } from './UserMenu';
+import { useFocusTrap, getFocusable } from '../core/ux/focus';
+import { pushModal } from '../core/ux/modalStore';
 
 const cn = (...xs) => xs.filter(Boolean).join(' ');
 
@@ -125,7 +127,27 @@ function FeaturedAction({ node, route, go }) {
    Layout: title-less leaves become a featured action row; the remaining titled
    groups flow into a BALANCED CSS-column masonry (each group is break-inside-avoid)
    so uneven group heights pack tightly instead of leaving ragged grid-row gaps. */
-function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave }) {
+function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave, autoFocus }) {
+  const panelRef = useRef(null);
+  // When opened via keyboard, move focus to the first link in the panel.
+  useEffect(() => {
+    if (!autoFocus) return;
+    const f = getFocusable(panelRef.current);
+    if (f[0]) { try { f[0].focus(); } catch { /* ignore */ } }
+  }, [autoFocus]);
+  // Arrow / Home / End roving across the panel's link buttons.
+  const onPanelKeyDown = (e) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+    const f = getFocusable(panelRef.current);
+    if (!f.length) return;
+    e.preventDefault();
+    const i = f.indexOf(document.activeElement);
+    const n = e.key === 'Home' ? 0
+      : e.key === 'End' ? f.length - 1
+      : e.key === 'ArrowDown' ? (i < 0 ? 0 : (i + 1) % f.length)
+      : (i <= 0 ? f.length - 1 : i - 1);
+    f[n].focus();
+  };
   if (!anchor) return null;
   const cols = buildColumns(item.children);
 
@@ -152,8 +174,12 @@ function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave }) {
   const style = { position: 'fixed', top: anchor.bottom, left, zIndex: 99999, paddingTop: 8 };
 
   return createPortal(
-    <div role="menu" data-mega-menu style={style} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+    // NOTE: this is a navigation panel of links, not an ARIA menu — its children
+    // are <button> links (Leaf/FeaturedAction), so we use a labelled group rather
+    // than role="menu" (which would require role="menuitem" children).
+    <div role="group" aria-label={`${item.label} menu`} data-mega-menu style={style} onMouseEnter={onEnter} onMouseLeave={onLeave} onKeyDown={onPanelKeyDown}>
       <div
+        ref={panelRef}
         className="rounded-2xl border border-black/5 bg-white/95 p-4 shadow-[0_24px_60px_-12px_rgba(13,19,38,0.25)] backdrop-blur-xl"
         style={{ width: panelW, maxHeight: '74vh', overflowY: 'auto' }}
       >
@@ -188,12 +214,13 @@ function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave }) {
 function DesktopNav({ menu, route, go }) {
   const [open, setOpen] = useState(null);
   const [anchor, setAnchor] = useState(null);
+  const [kbNav, setKbNav] = useState(false); // opened via keyboard → focus into panel
   const ref = useRef(null);
   const timer = useRef(null);
   const cancelClose = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } };
-  const scheduleClose = () => { cancelClose(); timer.current = setTimeout(() => setOpen(null), 140); };
+  const scheduleClose = () => { cancelClose(); timer.current = setTimeout(() => { setOpen(null); setKbNav(false); }, 140); };
   const openAt = (i, el) => { cancelClose(); setOpen(i); if (el) setAnchor(el.getBoundingClientRect()); };
-  const closeNow = () => { cancelClose(); setOpen(null); };
+  const closeNow = () => { cancelClose(); setOpen(null); setKbNav(false); };
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') closeNow(); };
@@ -227,7 +254,8 @@ function DesktopNav({ menu, route, go }) {
           <div key={i} className="relative" onMouseEnter={(e) => hasChildren && openAt(i, e.currentTarget)}>
             <button
               type="button"
-              onClick={(e) => (hasChildren ? (isOpen ? closeNow() : openAt(i, e.currentTarget.parentElement)) : go(item.href))}
+              onClick={(e) => { setKbNav(false); return hasChildren ? (isOpen ? closeNow() : openAt(i, e.currentTarget.parentElement)) : go(item.href); }}
+              onKeyDown={(e) => { if (hasChildren && e.key === 'ArrowDown') { e.preventDefault(); openAt(i, e.currentTarget.parentElement); setKbNav(true); } }}
               aria-haspopup={hasChildren ? 'true' : undefined}
               aria-expanded={hasChildren ? isOpen : undefined}
               className={cn(
@@ -246,7 +274,7 @@ function DesktopNav({ menu, route, go }) {
       })}
       {openItem && openItem.children && (
         <MegaPanel item={openItem} route={route} go={goClose} align={openAlign} anchor={anchor}
-          onEnter={cancelClose} onLeave={scheduleClose} />
+          onEnter={cancelClose} onLeave={scheduleClose} autoFocus={kbNav} />
       )}
     </nav>
   );
@@ -263,6 +291,7 @@ function MobileNode({ node, route, go, depth = 0 }) {
       <button
         type="button"
         onClick={() => go(node.href)}
+        aria-current={active ? 'page' : undefined}
         style={{ paddingLeft: 12 + depth * 14 }}
         className={cn('flex w-full items-center rounded-lg py-2.5 pr-3 text-left text-sm transition',
           active ? 'bg-navy/5 font-semibold text-navy' : 'font-medium text-ink-muted hover:bg-navy/5')}
@@ -309,6 +338,7 @@ function FySelector() {
 export function AppShell({ branch, setBranch, route, setRoute, currentUser, setCurrentUser, subBar, children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
+  const mobileDrawerRef = useRef(null);
   useNotifRefresh();
   const unread = getUnreadCount();
   const menu = useMemo(() => getMenu(branch, currentUser), [branch, currentUser]);
@@ -320,6 +350,11 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Mobile drawer: trap focus inside while open (returns focus to the hamburger
+  // on close) and let the global Esc handler close it via the modal stack.
+  useFocusTrap(mobileDrawerRef, { active: mobileOpen });
+  useEffect(() => { if (!mobileOpen) return undefined; return pushModal(() => setMobileOpen(false)); }, [mobileOpen]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-surface-alt">
@@ -355,7 +390,9 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
             <button
               type="button"
               onClick={() => setShowNotif((s) => !s)}
-              aria-label="Notifications"
+              aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+              aria-haspopup="dialog"
+              aria-expanded={showNotif}
               className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition hover:bg-navy/5 hover:text-[#0070f2] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
             >
               <Bell size={18} />
@@ -370,7 +407,7 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
           <div className="hidden desktop:block"><FySelector /></div>
           <div className="hidden w-[168px] desktop:block"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
 
-          <UserMenu currentUser={currentUser} setCurrentUser={setCurrentUser} setRoute={setRoute} />
+          <UserMenu currentUser={currentUser} setCurrentUser={setCurrentUser} setRoute={setRoute} onOpenNotifications={() => setShowNotif(true)} />
 
           {/* Hamburger (mobile/tablet) */}
           <button
@@ -388,7 +425,7 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
       {mobileOpen && (
         <>
           <div className="noprint fixed inset-0 z-50 bg-navy/40 backdrop-blur-sm desktop:hidden" onClick={() => setMobileOpen(false)} aria-hidden="true" />
-          <aside className="noprint fixed inset-y-0 right-0 z-50 flex w-[300px] max-w-[88vw] flex-col bg-white shadow-brand-lg desktop:hidden">
+          <aside ref={mobileDrawerRef} role="dialog" aria-modal="true" aria-label="Menu" className="noprint fixed inset-y-0 right-0 z-50 flex w-[300px] max-w-[88vw] flex-col bg-white shadow-brand-lg desktop:hidden">
             <div className="flex items-center justify-between border-b border-surface-border px-4 py-3">
               <span className="text-sm font-bold text-navy">Menu</span>
               <button type="button" onClick={() => setMobileOpen(false)} aria-label="Close menu" className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted hover:bg-navy/5"><X size={18} /></button>

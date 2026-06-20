@@ -357,6 +357,7 @@ export const ROUTE_TITLES={
   "/reports/consolidated-bs":"Consolidated Balance Sheet — Travkings Group",
   "/reports/cashflow-forecast":"Cash Flow Forecast — 90 Days",
   "/reports/supplier-360":   "Supplier 360° View",
+  "/reports/customer-360":   "Customer 360° View",
   "/reports/tally-export":   "Tally XML Export",
   "/masters/passports":      "Passport & Document Manager",
   "/masters/markup":         "Other Taxes / Net Rate Sheet",

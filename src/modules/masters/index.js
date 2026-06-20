@@ -27,3 +27,4 @@ export { BankAccountMaster } from './pages/bank-accounts';
 export { TourCodeMaster } from './pages/tour-codes';
 export { MastersSubAgents } from './pages/sub-agents';
 export { Supplier360 } from './pages/supplier-360';
+export { Customer360 } from './pages/customer-360';
