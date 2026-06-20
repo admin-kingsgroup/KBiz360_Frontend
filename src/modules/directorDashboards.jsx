@@ -342,8 +342,8 @@ export function BalanceSheetDash({ branch }) {
         <KPI label="Balanced" value={balanced ? '✓ Yes' : '✗ No'} tone={balanced ? 'good' : 'bad'} sub={balanced ? '' : money(cur, aT - lT) + ' diff'} />
       </div>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <div style={{ flex: '1 1 320px' }}><ListTable title="Liabilities & Capital" rows={[...liabs, { name: 'Total', amount: lT, bold: true }]} cur={cur} /></div>
-        <div style={{ flex: '1 1 320px' }}><ListTable title="Assets" rows={[...assets, { name: 'Total', amount: aT, bold: true }]} cur={cur} /></div>
+        <div style={{ flex: '1 1 320px' }}><ListTable title="Liabilities & Capital" rows={[...liabs.map((l) => ({ name: l.group, amount: l.amount })), { name: 'Total', amount: lT, bold: true }]} cur={cur} /></div>
+        <div style={{ flex: '1 1 320px' }}><ListTable title="Assets" rows={[...assets.map((a) => ({ name: a.group, amount: a.amount })), { name: 'Total', amount: aT, bold: true }]} cur={cur} /></div>
       </div>
     </div>
   );
@@ -456,12 +456,19 @@ export function TaxComplianceDash({ branch }) {
 export function ExpensesDash({ branch }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
-  const pl = useProfitAndLoss(branch, range).data || {};
-  const total = pl?.indirect?.debitTotal || 0;
-  // flatten expense heads from the indirect-expense group buckets
+  // Source indirect expenses from module-PL: it carries the full Indirect-Expense
+  // group → ledger tree, so we can show ledger-level heads. (P&L's indirect.debit
+  // rows are group-level only and keyed `group`, not `name`.)
+  const mpl = useModulePL(branch, range).data || {};
+  const ind = mpl.indirect || {};
+  const total = ind.expense || 0;
+  // Flatten to ledger-level expense heads; fall back to the group level if a build
+  // only carries the group rollup.
   const heads = [];
-  (pl?.indirect?.debit || []).forEach((g) => (g.items || []).forEach((it) => heads.push({ name: it.name, amount: it.amount })));
-  if (!heads.length) (pl?.indirect?.debit || []).forEach((g) => heads.push({ name: g.name, amount: g.amount }));
+  (ind.groups || []).forEach((g) => {
+    if ((g.ledgers || []).length) (g.ledgers || []).forEach((l) => heads.push({ name: l.name, amount: l.amount }));
+    else heads.push({ name: g.name, amount: g.amount });
+  });
   heads.sort((a, b) => (b.amount || 0) - (a.amount || 0));
   const maxv = Math.max(1, ...heads.map((h) => Math.abs(h.amount || 0)));
   return (

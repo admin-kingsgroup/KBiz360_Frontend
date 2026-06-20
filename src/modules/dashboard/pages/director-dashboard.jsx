@@ -86,7 +86,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
   const aT = assets.reduce((s, a) => s + (a.amount || 0), 0);
   const lT = liabs.reduce((s, a) => s + (a.amount || 0), 0);
   const balanced = Math.abs(aT - lT) < 1;
-  const netWorth = liabs.filter((l) => /capital|reserve|profit|equity|surplus/i.test(l.name || '')).reduce((s, l) => s + (l.amount || 0), 0);
+  const netWorth = liabs.filter((l) => /capital|reserve|profit|equity|surplus/i.test(l.group || l.name || '')).reduce((s, l) => s + (l.amount || 0), 0);
   const bankRows = (trial.rows || []).filter((r) => /cash|bank/i.test(r.group || ''));
   const bal = (r) => (r.closingDebit || 0) - (r.closingCredit || 0);
   const liquid = bankRows.reduce((s, r) => s + bal(r), 0) || fig.cash || totalCashInr;
