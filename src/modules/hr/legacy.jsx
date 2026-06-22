@@ -7,15 +7,17 @@ import React, { useMemo, useState } from 'react';
 import { AlertTriangle, BarChart2, Calendar, Check, Download, Lock, Plus, Save, Search, Settings, Users } from 'lucide-react';
 import { openPrintPreview } from '../../core/PrintPreview';
 import { Legend, Line } from 'recharts';
-import { BRANCHES, EMP_LOANS_DATA, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../../core/data';
+import { BRANCHES, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../../core/data';
 import { fmt, fmtINR } from '../../core/format';
-import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, _LEAVE_BALANCES, _REVISION_DUE, _SALARY_HISTORY, cardStyle, tabPanel } from '../../core/helpers';
+import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, _LEAVE_BALANCES, cardStyle, tabPanel } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../../core/useReference';
 import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { fromEmpDTO, toEmpPayload, BLANK_EMP } from './employeeMap';
-import { fromLeaveDTO, toLeavePayload, leaveDays } from './hrMaps';
+import { fromLeaveDTO, toLeavePayload, leaveDays, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from './hrMaps';
+import { buildRevisionDue } from './hrReports';
+import { todayISO } from '../../core/dates';
 import { toast } from '../../core/ux/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPut, getAuthToken } from '../../core/api';
@@ -400,6 +402,7 @@ export function HrEmployees({branch}){
                 <FL label="Mobile"><input value={form.mobile} onChange={e=>setF("mobile",e.target.value)} style={inp}/></FL>
                 <FL label="Email"><input value={form.email} onChange={e=>setF("email",e.target.value)} style={inp}/></FL>
                 <FL label="Status"><select value={form.status} onChange={e=>setF("status",e.target.value)} style={inp}><option>Active</option><option>Inactive</option></select></FL>
+                {form.status==="Inactive"&&<FL label="Exit date"><input type="date" value={form.exit} onChange={e=>setF("exit",e.target.value)} style={inp}/></FL>}
               </div>
 
               {/* Salary structure — editable */}
@@ -1361,11 +1364,35 @@ export function HrExpenses({branch}){
 
 export function SalaryRevision({branch}){
   const mob=useMobile();
-  const brCode=branch==="ALL"?null:branch?.code;
+  const brScope=branch==="ALL"?"":(branch?.code||"");
   const [tab,setTab]=useState("due"); // due | history
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
+  const [form,setForm]=useState(null);
 
-  const dueFiltered=_REVISION_DUE.filter(e=>!brCode||e.branch===brCode);
+  /* Live, branch-scoped employees + revision events. The "due" schedule and the
+     per-employee history are both derived from these. */
+  const emps=((useMasterList('employees', brScope?{branch:brScope}:{}).data)||[]).map(fromEmpDTO);
+  const revQ=useMasterList('salary-revisions', brScope?{branch:brScope}:{});
+  const revisions=((revQ.data)||[]).map(fromRevisionDTO);
+  const {create}=useMasterMutations('salary-revisions');
+
+  const dueFiltered=buildRevisionDue(emps,revisions,todayISO());
   const overdue=dueFiltered.filter(e=>e.status==="OVERDUE");
+
+  // Per-employee revision history, grouped from the live events.
+  const history=Object.values(revisions.reduce((acc,r)=>{
+    const g=acc[r.empId]||(acc[r.empId]={empId:r.empId,empName:r.empName,joined:(emps.find(e=>e.id===r.empId)?.joined)||"",revisions:[]});
+    g.revisions.push({date:r.date,basic:r.basic,incr:r.increment,pct:r.pct,reason:r.reason});
+    return acc;
+  },{})).map(h=>({...h,revisions:h.revisions.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)))}));
+
+  const openRevise=(e)=>{setForm({empId:e.empId,empName:e.empName,branch:e.branch,currentBasic:e.currentBasic,newBasic:e.currentBasic,reason:""});setModal(true);};
+  const saveRevision=()=>{
+    const newBasic=+form.newBasic||0, increment=Math.round(newBasic-(form.currentBasic||0));
+    const pct=form.currentBasic>0?+((increment/form.currentBasic)*100).toFixed(1):0;
+    create.mutate(toRevisionPayload({empId:form.empId,empName:form.empName,branch:form.branch,date:todayISO(),basic:newBasic,increment,pct,reason:form.reason}),
+      {onSuccess:()=>{toast("Revision recorded");setModal(false);},onError:e=>toast(e?.message||"Could not save revision","error")});
+  };
 
   return (
     <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
@@ -1413,7 +1440,7 @@ export function SalaryRevision({branch}){
                     </span>
                   </td>
                   <td style={{padding:"8px 12px",fontWeight:700,color:"#27500A"}}>+₹{suggested.toLocaleString()}/mo → ₹{(e.currentBasic+suggested).toLocaleString()}</td>
-                  <td style={{padding:"8px 12px"}}><button style={{...btnG,padding:"3px 10px",fontSize:9.5,background:"#27500A",whiteSpace:"nowrap"}}>Process Revision</button></td>
+                  <td style={{padding:"8px 12px"}}><button onClick={()=>openRevise(e)} style={{...btnG,padding:"3px 10px",fontSize:9.5,background:"#27500A",whiteSpace:"nowrap"}}>Process Revision</button></td>
                 </tr>
               );
             })}</tbody>
@@ -1423,7 +1450,8 @@ export function SalaryRevision({branch}){
 
       {tab==="history"&&(
         <div>
-          {_SALARY_HISTORY.filter(h=>!brCode||HR_EMPLOYEES_DATA.find(e=>e.id===h.empId&&e.branch===brCode)).map(h=>(
+          {history.length===0&&<div style={{...card,padding:"22px",textAlign:"center",color:"#8b94b3",fontSize:12}}>{revQ.isLoading?"Loading…":"No revisions recorded yet. Process one from the Due Reviews tab."}</div>}
+          {history.map(h=>(
             <div key={h.empId} style={{...card,marginBottom:12}}>
               <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#0d1326"}}>{h.empName} — Salary History (Joined: {h.joined})</p>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
@@ -1444,6 +1472,27 @@ export function SalaryRevision({branch}){
               </table>
             </div>
           ))}
+        </div>
+      )}
+
+      {modal&&form&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:440,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Process Revision — {form.empName}</p>
+              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
+            </div>
+            <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
+              <FL label="Current basic"><input value={"₹"+(form.currentBasic||0).toLocaleString()} disabled style={{...inp,background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="New basic"><input type="number" value={form.newBasic} onChange={e=>setForm(f=>({...f,newBasic:e.target.value}))} style={inp}/></FL>
+              <div style={{fontSize:11,color:"#27500A",fontWeight:700}}>Increment: +₹{Math.max(0,Math.round((+form.newBasic||0)-(form.currentBasic||0))).toLocaleString()} ({form.currentBasic>0?(((+form.newBasic||0)-form.currentBasic)/form.currentBasic*100).toFixed(1):0}%)</div>
+              <FL label="Reason"><input value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} placeholder="Annual review / promotion" style={inp}/></FL>
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+              <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
+              <button onClick={saveRevision} disabled={create.isPending} style={btnG}>{create.isPending?"Saving…":"Record Revision"}</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1657,10 +1706,20 @@ export function EmployeeAdvances({branch,setRoute}){
   const mob=useMobile();
   const cfg=bc(branch);
   const cur=cfg.cur;
-  const brCode=branch==="ALL"?null:branch?.code;
+  const brScope=branch==="ALL"?"":(branch?.code||"");
   const [filter,setFilter]=useState("Active");
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
+  const blankLoan={name:"",empCode:"",designation:"",branch:brScope||"BOM",type:"Salary Advance",principal:0,emi:0,emiCount:0,paid:0,disbursedDate:todayISO()};
+  const [form,setForm]=useState(blankLoan);
 
-  const all=EMP_LOANS_DATA.filter(l=>!brCode||l.branch===brCode);
+  /* Live, branch-scoped employee-loan register; outstanding is derived. */
+  const loansQ=useMasterList('employee-loans', brScope?{branch:brScope}:{});
+  const all=((loansQ.data)||[]).map(fromLoanDTO);
+  const {create}=useMasterMutations('employee-loans');
+  const disburse=()=>{
+    if(!form.name||!(+form.principal)){toast("Employee name and principal are required","error");return;}
+    create.mutate(toLoanPayload(form),{onSuccess:()=>{toast("Loan disbursed");setModal(false);setForm(blankLoan);},onError:e=>toast(e?.message||"Could not disburse","error")});
+  };
   const visible=filter==="Active"?all.filter(l=>l.outstanding>0):filter==="Closed"?all.filter(l=>l.outstanding===0):all;
 
   const totDisbursed=visible.reduce((s,l)=>s+l.principal,0);
@@ -1676,7 +1735,7 @@ export function EmployeeAdvances({branch,setRoute}){
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>👤 Employee Loans &amp; Salary Advances</h2>
           <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Loan disbursement · EMI deduction schedule · Auto-recovery from payroll</p>
         </div>
-        <button style={{padding:"7px 14px",border:"none",background:"#d4a437",color:"#0d1326",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer"}}>＋ Disburse Loan</button>
+        <button onClick={()=>{setForm(blankLoan);setModal(true);}} style={{padding:"7px 14px",border:"none",background:"#d4a437",color:"#0d1326",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer"}}>＋ Disburse Loan</button>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:mob?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:14}}>
@@ -1707,9 +1766,10 @@ export function EmployeeAdvances({branch,setRoute}){
               <th style={{padding:"9px 8px",textAlign:"center"}}>Status</th>
             </tr></thead>
             <tbody>
+              {visible.length===0&&(<tr><td colSpan={9} style={{padding:"18px 8px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>{loansQ.isLoading?"Loading…":"No loans for this filter. Use “Disburse Loan” to add one."}</td></tr>)}
               {visible.map((l,i)=>(
                 <tr key={l.id} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #e1e3ec"}}>
-                  <td style={{padding:"7px 8px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{l.id}</td>
+                  <td style={{padding:"7px 8px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{(l.id||"").slice(-6)}</td>
                   <td style={{padding:"7px 8px",fontWeight:600}}>{l.name}<div style={{fontSize:9.5,color:"#5a6691",fontWeight:400}}>{l.empCode} · {l.designation} · {l.branch}</div></td>
                   <td style={{padding:"7px 8px",textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:10,fontSize:9.5,fontWeight:700,background:l.type==="Salary Advance"?"#FAEEDA":l.type==="Education Loan"?"#E6F1FB":"#FCEBEB",color:l.type==="Salary Advance"?"#854F0B":l.type==="Education Loan"?"#185FA5":"#A32D2D"}}>{l.type}</span></td>
                   <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600}}>{cur+fmt(l.principal)}</td>
@@ -1737,6 +1797,33 @@ export function EmployeeAdvances({branch,setRoute}){
       <p style={{marginTop:12,fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>
         💡 EMI auto-deducted from monthly payroll · Interest on staff loans &lt; SBI lending rate is treated as perquisite (Sec 17(2))
       </p>
+
+      {modal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:520,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Disburse Employee Loan / Advance</p>
+              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
+            </div>
+            <div style={{padding:"16px 18px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <FL label="Employee name"><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} style={inp}/></FL>
+              <FL label="Employee code"><input value={form.empCode} onChange={e=>setForm(f=>({...f,empCode:e.target.value}))} style={inp}/></FL>
+              <FL label="Designation"><input value={form.designation} onChange={e=>setForm(f=>({...f,designation:e.target.value}))} style={inp}/></FL>
+              <FL label="Branch"><select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))} style={inp}>{BRANCHES.map(b=><option key={b.code} value={b.code}>{b.code}</option>)}</select></FL>
+              <FL label="Loan type"><select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} style={inp}>{["Salary Advance","Education Loan","Personal Loan"].map(t=><option key={t}>{t}</option>)}</select></FL>
+              <FL label="Principal"><input type="number" value={form.principal} onChange={e=>setForm(f=>({...f,principal:e.target.value}))} style={inp}/></FL>
+              <FL label="EMI amount"><input type="number" value={form.emi} onChange={e=>setForm(f=>({...f,emi:e.target.value}))} style={inp}/></FL>
+              <FL label="No. of EMIs"><input type="number" value={form.emiCount} onChange={e=>setForm(f=>({...f,emiCount:e.target.value}))} style={inp}/></FL>
+              <FL label="EMIs already paid"><input type="number" value={form.paid} onChange={e=>setForm(f=>({...f,paid:e.target.value}))} style={inp}/></FL>
+              <FL label="Disbursed on"><input type="date" value={form.disbursedDate} onChange={e=>setForm(f=>({...f,disbursedDate:e.target.value}))} style={inp}/></FL>
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+              <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
+              <button onClick={disburse} disabled={create.isPending} style={btnG}>{create.isPending?"Saving…":"Disburse"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

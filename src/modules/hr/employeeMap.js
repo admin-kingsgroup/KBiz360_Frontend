@@ -11,7 +11,7 @@ const NUM_FIELDS = ['basic', 'hra', 'da', 'travel', 'medical', 'pf', 'esi', 'tds
 
 export const BLANK_EMP = {
   _id: null, id: '', name: '', branch: '', dept: '', desig: '',
-  joined: '', dob: '', mobile: '', email: '', status: 'Active',
+  joined: '', exit: '', dob: '', mobile: '', email: '', status: 'Active',
   basic: 0, hra: 0, da: 0, travel: 0, medical: 0, pf: 0, esi: 0, tds: 0,
 };
 
@@ -20,7 +20,7 @@ export function fromEmpDTO(e = {}) {
   const row = {
     _id: e.id, id: e.empId, name: e.name || '', branch: e.branch || '',
     dept: e.department || '', desig: e.designation || '',
-    joined: e.joinDate || '', dob: e.dob || '', mobile: e.phone || '', email: e.email || '',
+    joined: e.joinDate || '', exit: e.exitDate || '', dob: e.dob || '', mobile: e.phone || '', email: e.email || '',
     status: e.status === 'inactive' ? 'Inactive' : 'Active',
   };
   for (const k of NUM_FIELDS) row[k] = +e[k] || 0;
@@ -32,7 +32,7 @@ export function toEmpPayload(f = {}) {
   const body = {
     empId: f.id, name: f.name, branch: f.branch,
     department: f.dept, designation: f.desig,
-    joinDate: f.joined, dob: f.dob, phone: f.mobile, email: f.email,
+    joinDate: f.joined, exitDate: f.exit, dob: f.dob, phone: f.mobile, email: f.email,
     status: f.status === 'Inactive' ? 'inactive' : 'active',
   };
   for (const k of NUM_FIELDS) body[k] = +f[k] || 0;

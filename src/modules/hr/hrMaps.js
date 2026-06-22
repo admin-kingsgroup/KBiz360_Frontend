@@ -80,3 +80,38 @@ export function toJobPayload(f = {}) {
     status: JOB_STATUS_CODE[f.status] || 'open',
   };
 }
+
+/* ── Employee loans / salary advances ───────────────────────────── */
+export function fromLoanDTO(l = {}) {
+  const principal = +l.principal || 0, emi = +l.emi || 0, paid = +l.paid || 0;
+  return {
+    id: l.id, name: l.name || '', empCode: l.empCode || '', designation: l.designation || '',
+    branch: l.branch || '', type: l.type || 'Salary Advance',
+    principal, emi, emiCount: +l.emiCount || 0, paid, disbursedDate: l.disbursedDate || '',
+    outstanding: Math.max(0, principal - paid * emi),   // derived, never stored
+  };
+}
+export function toLoanPayload(f = {}) {
+  return {
+    name: f.name || '', empCode: f.empCode || '', designation: f.designation || '',
+    branch: f.branch || '', type: f.type || 'Salary Advance',
+    principal: +f.principal || 0, emi: +f.emi || 0, emiCount: +f.emiCount || 0,
+    paid: +f.paid || 0, disbursedDate: f.disbursedDate || '',
+  };
+}
+
+/* ── Salary revision events ─────────────────────────────────────── */
+export function fromRevisionDTO(r = {}) {
+  return {
+    id: r.id, empId: r.empId || '', empName: r.empName || '', branch: r.branch || '',
+    date: r.date || '', basic: +r.basic || 0, increment: +r.increment || 0,
+    pct: +r.pct || 0, reason: r.reason || '',
+  };
+}
+export function toRevisionPayload(f = {}) {
+  return {
+    empId: f.empId || '', empName: f.empName || '', branch: f.branch || '',
+    date: f.date || '', basic: +f.basic || 0, increment: +f.increment || 0,
+    pct: +f.pct || 0, reason: f.reason || '',
+  };
+}

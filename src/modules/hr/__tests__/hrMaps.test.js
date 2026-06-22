@@ -1,4 +1,32 @@
-import { fromLeaveDTO, toLeavePayload, leaveDays, fromJobDTO, toJobPayload, JOB_NEXT_STATUS } from '../hrMaps';
+import { fromLeaveDTO, toLeavePayload, leaveDays, fromJobDTO, toJobPayload, JOB_NEXT_STATUS, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from '../hrMaps';
+
+describe('Employee loan ↔ /api/employee-loans wiring', () => {
+  const DTO = { id: 'L1', name: 'Aa', empCode: 'E1', designation: 'Ops', branch: 'BOM',
+    type: 'Salary Advance', principal: 50000, emi: 5000, emiCount: 10, paid: 3, disbursedDate: '2026-02-01' };
+
+  test('outstanding is derived (principal − paid×emi), never trusted from the wire', () => {
+    expect(fromLoanDTO(DTO).outstanding).toBe(35000);       // 50000 − 3×5000
+    expect(fromLoanDTO({ ...DTO, paid: 10 }).outstanding).toBe(0);
+    expect(fromLoanDTO({ ...DTO, paid: 99 }).outstanding).toBe(0); // floored at 0
+  });
+
+  test('toLoanPayload sends numeric fields and drops derived/system fields', () => {
+    const p = toLoanPayload({ ...fromLoanDTO(DTO), principal: '60000' });
+    expect(p.principal).toBe(60000);
+    expect(p).not.toHaveProperty('outstanding');
+    expect(p).not.toHaveProperty('id');
+  });
+});
+
+describe('Salary revision ↔ /api/salary-revisions wiring', () => {
+  const DTO = { id: 'R1', empId: 'E1', empName: 'Aa', branch: 'BOM', date: '2025-04-01', basic: 44000, increment: 4000, pct: 10, reason: 'review' };
+  test('round-trips with numeric coercion', () => {
+    const p = toRevisionPayload({ ...fromRevisionDTO(DTO), basic: '48000' });
+    expect(p).toMatchObject({ empId: 'E1', empName: 'Aa', branch: 'BOM', date: '2025-04-01', increment: 4000, pct: 10, reason: 'review' });
+    expect(p.basic).toBe(48000);
+    expect(p).not.toHaveProperty('id');
+  });
+});
 
 describe('Leave request ↔ /api/leave-requests wiring', () => {
   const DTO = {
