@@ -250,17 +250,14 @@ const WRAP_CLS = 'mx-auto max-w-[1320px] px-2.5 pb-10 pt-2.5 tablet:px-4';
 const BAR_CLS = 'flex flex-wrap items-center gap-3 px-1 pb-3 pt-2';
 
 export function ProfitAndLossUnified({ branch }) {
-  const [view, setView] = useState('tkf');
-  const [tkfPeriod, setTkfPeriod] = useState({ from: '', to: '' });
+  // Drill / Tally / TKF views removed — P&L keeps Fiori · Classic · Vertical.
+  const [view, setView] = useState('fiori');
   return (
     <div className={WRAP_CLS}>
       <div className={BAR_CLS}>
-        <StmtSwitcher value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic'], ['vertical', '▤ Vertical'], ['drill', '⊞ Drill'], ['tally', '𝚺 Tally'], ['tkf', '◆ TKF']]} />
-        {view === 'tkf' && <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setTkfPeriod({ from: r.from, to: r.to })} />}
+        <StmtSwitcher value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic'], ['vertical', '▤ Vertical']]} />
       </div>
-      {view === 'tally' ? <PnLTallyLive branch={branch} />
-        : view === 'tkf' ? <TkfPnL branch={branch} from={tkfPeriod.from} to={tkfPeriod.to} />
-          : <ReportPnLLive branch={branch} forceView={view} hideSwitcher />}
+      <ReportPnLLive branch={branch} forceView={view} hideSwitcher />
     </div>
   );
 }

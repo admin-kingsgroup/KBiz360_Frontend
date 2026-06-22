@@ -27,7 +27,7 @@ export const loadBranchDashboard = async ({ branchCode }) => {
     api.getAgeingTotals(branchCode),
     api.getSaleVouchers({ branchCode, ...p.month }),
     api.getActionItems(),
-    api.getUpcomingTravel({ limit: 5 }),
+    api.getUpcomingTravel({ limit: 5, branchCode }),
     api.getBookingSummary(branchCode), // SO/PO/GP pipeline { pending, approved } (whole queue, not date-bound)
   ]);
 

@@ -50,7 +50,7 @@ export function HrMgrDashboardPage({ currentUser, setRoute }) {
         />
         <KPICard
           label="Attendance %"
-          value={stats.attendancePct + '%'}
+          value={stats.attendancePct == null ? '—' : stats.attendancePct + '%'}
           delta={`${CUR_MONTH_LABEL} current`}
           color="#d4a437"
           onClick={() => navigate('/hr/attendance')}

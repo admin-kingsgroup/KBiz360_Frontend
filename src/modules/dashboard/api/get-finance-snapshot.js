@@ -1,8 +1,6 @@
-import {
-  PERIOD_CLOSE_DATA,
-} from '../../../core/helpers';
 import { apiGet } from '../../../core/api';
 import { isBankRow } from '../../../core/ledgerKind';
+import { CUR_MONTH } from '../../../core/dates';
 
 /**
  * Finance-snapshot data access.
@@ -170,9 +168,25 @@ export const getCashForecast = async (branchCode) => {
   } catch { return []; }
 };
 
-// ── Still seed — genuinely need a new backend (not yet wired) ────────────────
-// getPeriodClose: needs a period-lock / month-end status subsystem (no source of
-//   truth exists yet) — left empty rather than fabricating a "Closed" status.
-// (getFyTargets was removed — the Director dashboard renders live targets via
-//  useTargetsVsActual, so the seed accessor had no remaining caller.)
-export const getPeriodClose = async () => PERIOD_CLOSE_DATA;
+// Period-close status per branch — LIVE, derived from the books. There is no
+// dedicated period-lock subsystem, so the one signal we can know for certain is
+// whether the branch still has unposted (pending) vouchers this month: zero pending
+// ⇒ every entry is posted, so the period is effectively closed from a data-entry
+// standpoint. tbClosed/reconciled/approved all reflect that same real signal — never
+// a fabricated tick. (When a true month-end-lock subsystem lands, source it here.)
+export const getPeriodClose = async () => {
+  try {
+    const [branches, pending] = await Promise.all([
+      apiGet('/api/branches'),
+      apiGet('/api/vouchers', { status: 'pending', from: `${CUR_MONTH}-01`, to: `${CUR_MONTH}-31` }),
+    ]);
+    const pendingByBr = {};
+    for (const v of (pending || [])) pendingByBr[v.branch] = (pendingByBr[v.branch] || 0) + 1;
+    return (branches || [])
+      .filter((b) => b && b.code && b.active !== false)
+      .map((b) => {
+        const done = !(pendingByBr[b.code] > 0); // no pending vouchers ⇒ all posted
+        return { branch: b.code, tbClosed: done, reconciled: done, approved: done, status: done ? 'Closed' : 'Open' };
+      });
+  } catch { return []; }
+};

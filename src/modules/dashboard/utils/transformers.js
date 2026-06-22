@@ -152,3 +152,34 @@ export const computeTotalBankBalanceInr = (accounts) =>
 
 export const sumVoucherTotals = (vouchersByBranch, key) =>
   Object.values(vouchersByBranch).reduce((s, b) => s + b[key], 0);
+
+// Pure transforms for the LIVE voucher-activity feeds (get-voucher-activity.js).
+// Kept here (no I/O) so they are unit-testable without the Vite-only api client.
+
+// Tally today's receipt/payment/journal voucher counts per branch.
+// Shape: { [branch]: { receipt, payment, journal } } — only cash-book categories.
+export const tallyVouchersByBranch = (vouchers = []) => {
+  const out = {};
+  for (const v of vouchers || []) {
+    if (!v || !['receipt', 'payment', 'journal'].includes(v.category)) continue;
+    const br = v.branch || '—';
+    const row = out[br] || (out[br] = { receipt: 0, payment: 0, journal: 0 });
+    row[v.category] += 1;
+  }
+  return out;
+};
+
+// Map recent vouchers to the activity-feed shape { action, amount, vendor, ts }.
+export const vouchersToActivity = (vouchers = [], limit = 8) => {
+  const cap = (s) => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1);
+  return (vouchers || [])
+    .slice()
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+    .slice(0, limit)
+    .map((v) => ({
+      action: `${cap(v.category)} ${v.vno || ''}`.trim(),
+      amount: Number(v.total) || 0,
+      vendor: v.party || v.branch || '',
+      ts: v.date || '',
+    }));
+};
