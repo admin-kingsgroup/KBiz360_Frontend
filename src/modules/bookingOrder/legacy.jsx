@@ -102,6 +102,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     return [blankLine(VSPECS.SF)];   // start blank — no demo rows
   });
   const [date, setDate] = useState(editing ? (editBooking.date || today()) : today());
+  const [travelDate, setTravelDate] = useState(editing ? (editBooking.travelDate || '') : '');
   const [headerRef, setHeaderRef] = useState(editing ? (editBooking.headerRef || '') : '');
   const [customer, setCustomer] = useState(editing
     ? { name: editBooking.customer?.name || '', gstin: editBooking.customer?.gstin || '', address: editBooking.customer?.address || '', email: editBooking.customer?.email || '', contact: editBooking.customer?.contact || '', group: editBooking.customer?.group || '', ledgerName: editBooking.customer?.ledgerName || '', ledgerGroup: editBooking.customer?.ledgerGroup || '' }
@@ -257,7 +258,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       });
       const payload = {
         ...(editing ? { editReason } : {}),
-        module: moduleCode, branch: brCode, date, noSupplier: isNoSupp, noVat: effNoVat,
+        module: moduleCode, branch: brCode, date, travelDate, noSupplier: isNoSupp, noVat: effNoVat,
         customer: { name: customer.name, gstin: customer.gstin, address: customer.address, email: customer.email, contact: customer.contact, group: customer.group, ledgerName: customer.ledgerName || customer.name, ledgerGroup: customer.ledgerGroup || customer.group },
         supplier: isNoSupp ? { name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }
           : { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup },
@@ -482,6 +483,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       <div style={{ ...card, marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
           <FL label="SPG Date"><input type="date" max={todayISO()} value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></FL>
+          <FL label="Travel / Departure Date"><input type="date" value={travelDate} onChange={(e) => setTravelDate(e.target.value)} style={inp} title="When the customer travels — drives the Upcoming Travel dashboard" /></FL>
           <FL label="Client Type">
             <select value={clientType} onChange={(e) => handleClientTypeChange(e.target.value)} style={inp}>
               <option value="">— All Client Types —</option>

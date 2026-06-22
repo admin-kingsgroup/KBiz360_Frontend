@@ -1145,7 +1145,7 @@ export function InterBranchReco({ branch }) {
         </tbody>
       </Table>
       <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
-        Each pair compares branch A's "TK- B Branch" account against branch B's "TK- A Branch" account. They should be equal and opposite (net zero). A non-zero difference means one branch booked an inter-branch entry the other hasn't — post the missing leg to clear it.
+        Each pair compares branch A's "Travkings Tours and Travels B" ledger against branch B's "Travkings Tours and Travels A" ledger (sub-group <b>Inter Branch</b>). The selling branch books a debtor and the buying branch a creditor, so the two should be equal and opposite (net zero). A non-zero difference means one branch booked the deal and the other hasn't, or the amounts disagree — an agreement check, not an elimination.
       </div>
     </Shell>
   );

@@ -443,15 +443,16 @@ export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_HR, MENU_ASS
 // dropdown with the whole-company suite. Other roles keep the single Dashboard link.
 export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, children:[
   {label:"Overview", children:[
-    {label:"Executive Overview", href:"/dashboards/exec"},
+    {label:"My Dashboard", href:"/dashboard"},
     {label:"Alerts Dashboard", href:"/dashboard/alerts"},
     {label:"Capital vs Investment", href:"/dashboards/capital"},
-    {label:"My Dashboard", href:"/dashboard"},
   ]},
   {label:"Financials", children:[
     {label:"Profitability (P&L)", href:"/dashboards/profitability"},
+    {label:"YoY Growth", href:"/dashboards/yoy"},
     {label:"Balance Sheet", href:"/dashboards/balance-sheet"},
     {label:"Cash & Liquidity", href:"/dashboards/cash"},
+    {label:"Cash Forecast (13-week)", href:"/dashboards/cash-forecast"},
     {label:"Receivables & Payables", href:"/dashboards/arap"},
     {label:"Expenses", href:"/dashboards/expenses"},
     {label:"Tax & Compliance", href:"/dashboards/tax"},
@@ -459,6 +460,7 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
   {label:"Business", children:[
     {label:"Sales & Bookings", href:"/dashboards/sales"},
     {label:"Module / Product GP", href:"/dashboards/module-gp"},
+    {label:"Customer Value (LTV + ABC)", href:"/dashboards/customer-value"},
     {label:"Branch Performance", href:"/dashboards/branch"},
     {label:"Supplier / Purchase", href:"/dashboards/supplier"},
   ]},

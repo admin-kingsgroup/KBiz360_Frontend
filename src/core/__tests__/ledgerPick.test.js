@@ -33,11 +33,21 @@ describe('pickLedgers — Payment Voucher "Paid to" dropdown', () => {
     expect(names).toContain('Furniture & Fixtures');
   });
 
-  test('the old cap of 12 would have shown ONLY creditors (proves the bug)', () => {
+  test('orders the whole list A→Z by name (not by account code)', () => {
     const { matches } = pickLedgers(CHART, '', notBankCash);
-    const oldVisible = matches.slice(0, 12);
-    expect(oldVisible.every((l) => l.type === 'Creditor')).toBe(true);
-    expect(oldVisible.map((l) => l.name)).not.toContain('Salaries & Wages');
+    const names = matches.map((l) => l.name);
+    const azSorted = [...names].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    expect(names).toEqual(azSorted);
+    // Non-creditor heads (which sort early alphabetically) now appear before the
+    // bulk of "Supplier N" creditors, instead of being buried after them.
+    expect(names.indexOf('Furniture & Fixtures')).toBeLessThan(names.indexOf('Supplier 0'));
+    expect(names.indexOf('GST Payable')).toBeLessThan(names.indexOf('Supplier 0'));
+  });
+
+  test('numeric-aware A→Z order: "Supplier 2" precedes "Supplier 10"', () => {
+    const { matches } = pickLedgers(CHART, 'supplier', notBankCash);
+    const names = matches.map((l) => l.name);
+    expect(names.indexOf('Supplier 2')).toBeLessThan(names.indexOf('Supplier 10'));
   });
 
   test('still excludes Bank and Cash accounts', () => {

@@ -13,8 +13,11 @@ import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_D
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../../core/useReference';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiPut } from '../../core/api';
+import { useMasterList, useMasterMutations } from '../../core/useMasters';
+import { fromEmpDTO, toEmpPayload, BLANK_EMP } from './employeeMap';
+import { toast } from '../../core/ux/toast';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiPut, getAuthToken } from '../../core/api';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../../core/styles';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 
@@ -203,24 +206,53 @@ export function HrEmployees({branch}){
   const mob=useMobile();
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [selected,setSelected]=useState(null);
+  const [form,setForm]=useState(BLANK_EMP);
   const [search,setSearch]=useState("");
   const [deptFilter,setDeptFilter]=useState("All");
   const [brFilter,setBrFilter]=useState(branch==="ALL"?"All":branch?.code||"All");
-  const [emps,setEmps]=useState(HR_EMPLOYEES_DATA);
+
+  /* Live, branch-scoped employee master. ALL → every branch; a specific branch →
+     server-filtered to that branch (?branch=CODE). Re-scope when the top-bar
+     branch changes so the page never shows another branch's people. */
+  const brScope=branch==="ALL"?"":(branch?.code||"");
+  const empQ=useMasterList('employees', brScope?{branch:brScope}:{});
+  const emps=(empQ.data||[]).map(fromEmpDTO);
+  const {create,update,remove}=useMasterMutations('employees');
+  const saving=create.isPending||update.isPending;
+  React.useEffect(()=>{ setBrFilter(branch==="ALL"?"All":branch?.code||"All"); },[branch]);
+
+  const openNew=()=>{ setSelected(null); setForm({...BLANK_EMP,branch:brScope||"BOM"}); setModal(true); };
+  const openEdit=(e)=>{ setSelected(e); setForm(e); setModal(true); };
+  const closeModal=()=>{ setModal(false); setSelected(null); };
+  const setF=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const saveEmp=()=>{
+    if(!form.id||!form.name||!form.branch){ toast("Employee ID, name and branch are required","error"); return; }
+    const payload=toEmpPayload(form);
+    const opts={ onSuccess:()=>{ toast(selected?"Employee updated":"Employee added"); closeModal(); },
+      onError:(err)=>toast(err?.message||"Save failed","error") };
+    if(selected&&form._id) update.mutate({id:form._id,body:payload},opts);
+    else create.mutate(payload,opts);
+  };
+  const deleteEmp=()=>{
+    if(!form._id) return;
+    if(!window.confirm(`Delete ${form.name}? This cannot be undone.`)) return;
+    remove.mutate(form._id,{ onSuccess:()=>{ toast("Employee deleted"); closeModal(); },
+      onError:(err)=>toast(err?.message||"Delete failed","error") });
+  };
 
   const filtered=emps.filter(e=>(
     (deptFilter==="All"||e.dept===deptFilter)&&
     (brFilter==="All"||e.branch===brFilter)&&
     (!search||e.name.toLowerCase().includes(search.toLowerCase())||
-     e.id.toLowerCase().includes(search.toLowerCase())||
-     e.desig.toLowerCase().includes(search.toLowerCase()))
+     (e.id||"").toLowerCase().includes(search.toLowerCase())||
+     (e.desig||"").toLowerCase().includes(search.toLowerCase()))
   ));
 
   const DEPT_CLR={"Operations":"#185FA5","Sales":"#27500A","Accounts":"#854F0B","IT":"#384677","HR & Admin":"#A32D2D"};
   const brCfg=e=>BRANCHES.find(b=>b.code===e.branch)||{cur:"₹",curCode:"INR"};
 
-  const gross=e=>e.basic+e.hra+e.da+e.travel+e.medical;
-  const deductions=e=>e.pf+e.esi+e.tds;
+  const gross=e=>(+e.basic||0)+(+e.hra||0)+(+e.da||0)+(+e.travel||0)+(+e.medical||0);
+  const deductions=e=>(+e.pf||0)+(+e.esi||0)+(+e.tds||0);
   const net=e=>gross(e)-deductions(e);
 
   return (
@@ -234,7 +266,7 @@ export function HrEmployees({branch}){
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Employee Master</h2>
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>
-              {filtered.length} employees · All branches · {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}
+              {empQ.isLoading?"Loading…":`${filtered.length} employees`} · {branch==="ALL"?"All branches":(branch?.code||brScope||"—")} · {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}
             </p>
           </div>
         </div>
@@ -249,7 +281,7 @@ export function HrEmployees({branch}){
           </select>
           <input value={search} onChange={e=>setSearch(e.target.value)}
             placeholder="Search name, ID, designation..." style={{...inp,width:220,minHeight:32,fontSize:11}}/>
-          <button onClick={()=>{setSelected(null);setModal(true);}}
+          <button onClick={openNew}
             style={{...btnG,fontSize:11}}><Plus size={13}/> New Employee</button>
         </div>
       </div>
@@ -271,15 +303,19 @@ export function HrEmployees({branch}){
                 color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
-          <tbody>{filtered.map((e,i)=>{
+          <tbody>{filtered.length===0&&(
+            <tr><td colSpan={9} style={{padding:"22px 12px",textAlign:"center",color:"#8b94b3",fontSize:12}}>
+              {empQ.isLoading?"Loading employees…":empQ.isError?"Failed to load employees.":"No employees found for this branch. Use “New Employee” to add one."}
+            </td></tr>
+          )}{filtered.map((e,i)=>{
             const bc2=brCfg(e);
             const c=DEPT_CLR[e.dept]||"#384677";
             return (
-              <tr key={e.id} style={{borderBottom:"1px solid #f3f4f8",
+              <tr key={e._id||e.id} style={{borderBottom:"1px solid #f3f4f8",
                 background:i%2===0?"#fff":"#fafafa",cursor:"pointer"}}
                 onMouseEnter={ev=>ev.currentTarget.style.background="#f0f4ff"}
                 onMouseLeave={ev=>ev.currentTarget.style.background=i%2===0?"#fff":"#fafafa"}
-                onClick={()=>{setSelected(e);setModal(true);}}>
+                onClick={()=>openEdit(e)}>
                 <td style={{padding:"9px 12px",fontFamily:"monospace",fontSize:10.5,
                   fontWeight:700,color:"#185FA5"}}>{e.id}</td>
                 <td style={{padding:"9px 12px"}}>
@@ -318,7 +354,7 @@ export function HrEmployees({branch}){
                     color:e.status==="Active"?"#27500A":"#9ca3af"}}>{e.status}</span>
                 </td>
                 <td style={{padding:"9px 12px"}}>
-                  <button onClick={ev=>{ev.stopPropagation();setSelected(e);setModal(true);}}
+                  <button onClick={ev=>{ev.stopPropagation();openEdit(e);}}
                     style={{...btnGh,padding:"3px 10px",fontSize:10}}>Edit</button>
                 </td>
               </tr>
@@ -340,89 +376,72 @@ export function HrEmployees({branch}){
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#d4a437"}}>
                 {selected?`Edit — ${selected.name}`:"New Employee"}
               </p>
-              <button onClick={()=>{setModal(false);setSelected(null);}}
+              <button onClick={closeModal}
                 style={{background:"transparent",border:"none",cursor:"pointer",
                   fontSize:20,color:"#8b94b3"}}>✕</button>
             </div>
             <div style={{padding:"16px 18px"}}>
-              {selected&&(
-                <>
-                  {/* Basic info */}
-                  <p style={{margin:"0 0 10px",fontSize:11,fontWeight:700,color:"#0d1326",
-                    textTransform:"uppercase",letterSpacing:"0.5px"}}>Personal & Job Details</p>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-                    <FL label="Employee ID"><input defaultValue={selected.id} style={{...inp,fontFamily:"monospace"}}/></FL>
-                    <FL label="Full name"><input defaultValue={selected.name} style={inp}/></FL>
-                    <FL label="Branch"><select defaultValue={selected.branch} style={inp}>
-                      {BRANCHES.map(b=><option key={b.code}>{b.code}</option>)}</select></FL>
-                    <FL label="Department"><select defaultValue={selected.dept} style={inp}>
-                      {HR_DEPTS.filter(d=>d!=="All").map(d=><option key={d}>{d}</option>)}</select></FL>
-                    <FL label="Designation"><input defaultValue={selected.desig} style={inp}/></FL>
-                    <FL label="Date of joining"><input type="date" defaultValue={selected.joined} style={inp}/></FL>
-                    <FL label="Date of birth"><input type="date" defaultValue={selected.dob} style={inp}/></FL>
-                    <FL label="Mobile"><input defaultValue={selected.mobile} style={inp}/></FL>
-                    <FL label="Email" ><input defaultValue={selected.email} style={inp}/></FL>
-                    <FL label="Status"><select defaultValue={selected.status} style={inp}><option>Active</option><option>Inactive</option></select></FL>
-                  </div>
+              {/* Basic info */}
+              <p style={{margin:"0 0 10px",fontSize:11,fontWeight:700,color:"#0d1326",
+                textTransform:"uppercase",letterSpacing:"0.5px"}}>Personal & Job Details</p>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                <FL label="Employee ID"><input value={form.id} onChange={e=>setF("id",e.target.value)} placeholder="BOM-EMP-007" disabled={!!selected} style={{...inp,fontFamily:"monospace",...(selected?{background:"#f3f4f8",color:"#5a6691"}:{})}}/></FL>
+                <FL label="Full name"><input value={form.name} onChange={e=>setF("name",e.target.value)} style={inp}/></FL>
+                <FL label="Branch"><select value={form.branch} onChange={e=>setF("branch",e.target.value)} style={inp}>
+                  <option value="" disabled>Select branch…</option>
+                  {BRANCHES.map(b=><option key={b.code} value={b.code}>{b.code}</option>)}</select></FL>
+                <FL label="Department"><select value={form.dept} onChange={e=>setF("dept",e.target.value)} style={inp}>
+                  <option value="">—</option>
+                  {HR_DEPTS.filter(d=>d!=="All").map(d=><option key={d} value={d}>{d}</option>)}</select></FL>
+                <FL label="Designation"><input value={form.desig} onChange={e=>setF("desig",e.target.value)} style={inp}/></FL>
+                <FL label="Date of joining"><input type="date" value={form.joined} onChange={e=>setF("joined",e.target.value)} style={inp}/></FL>
+                <FL label="Date of birth"><input type="date" value={form.dob} onChange={e=>setF("dob",e.target.value)} style={inp}/></FL>
+                <FL label="Mobile"><input value={form.mobile} onChange={e=>setF("mobile",e.target.value)} style={inp}/></FL>
+                <FL label="Email"><input value={form.email} onChange={e=>setF("email",e.target.value)} style={inp}/></FL>
+                <FL label="Status"><select value={form.status} onChange={e=>setF("status",e.target.value)} style={inp}><option>Active</option><option>Inactive</option></select></FL>
+              </div>
 
-                  {/* Salary structure */}
-                  <p style={{margin:"0 0 10px",fontSize:11,fontWeight:700,color:"#0d1326",
-                    textTransform:"uppercase",letterSpacing:"0.5px"}}>Salary Structure</p>
-                  <div style={{...card,padding:"12px 14px",background:"#f9fafb",marginBottom:14}}>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:11}}>
-                      <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>Basic</span><span style={{fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{BRANCHES.find(b=>b.code===selected.branch)?.cur||"₹"}{selected.basic.toLocaleString()}</span></div>
-                        <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>HRA</span><span style={{fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{BRANCHES.find(b=>b.code===selected.branch)?.cur||"₹"}{selected.hra.toLocaleString()}</span></div>
-                        <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>DA</span><span style={{fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{BRANCHES.find(b=>b.code===selected.branch)?.cur||"₹"}{selected.da.toLocaleString()}</span></div>
-                        <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>Travel Allowance</span><span style={{fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{BRANCHES.find(b=>b.code===selected.branch)?.cur||"₹"}{selected.travel.toLocaleString()}</span></div>
-                        <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>Medical</span><span style={{fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{BRANCHES.find(b=>b.code===selected.branch)?.cur||"₹"}{selected.medical.toLocaleString()}</span></div>
-                      <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",
-                        borderTop:"2px solid #0d1326",gridColumn:"1/-1",fontWeight:800,fontSize:12}}>
-                        <span>Gross Salary</span>
-                        <span style={{color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>
-                          {BRANCHES.find(b=>b.code===selected.branch)?.cur||"₹"}{gross(selected).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                    <p style={{margin:"10px 0 6px",fontSize:11,fontWeight:700,color:"#A32D2D"}}>Deductions</p>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:11}}>
-                      <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>PF</span><span style={{fontWeight:600,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{BRANCHES.find(b=>b.code===selected.branch)?.cur||"₹"}{selected.pf.toLocaleString()}</span></div>
-                        <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>ESI</span><span style={{fontWeight:600,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{BRANCHES.find(b=>b.code===selected.branch)?.cur||"₹"}{selected.esi.toLocaleString()}</span></div>
-                        <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>TDS</span><span style={{fontWeight:600,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{BRANCHES.find(b=>b.code===selected.branch)?.cur||"₹"}{selected.tds.toLocaleString()}</span></div>
-                      <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",
-                        borderTop:"2px solid #A32D2D",gridColumn:"1/-1",fontWeight:800,fontSize:12}}>
-                        <span>Net Take-home</span>
-                        <span style={{color:"#27500A",fontVariantNumeric:"tabular-nums"}}>
-                          {BRANCHES.find(b=>b.code===selected.branch)?.cur||"₹"}{net(selected).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bank */}
-                  <p style={{margin:"0 0 10px",fontSize:11,fontWeight:700,color:"#0d1326",textTransform:"uppercase",letterSpacing:"0.5px"}}>Bank Details</p>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                    <FL label="Bank name"><input defaultValue={selected.bank} style={inp}/></FL>
-                    <FL label="Account number"><input defaultValue={selected.ac} style={{...inp,fontFamily:"monospace"}}/></FL>
-                  </div>
-                </>
-              )}
-              {!selected&&(
+              {/* Salary structure — editable */}
+              <p style={{margin:"0 0 10px",fontSize:11,fontWeight:700,color:"#0d1326",
+                textTransform:"uppercase",letterSpacing:"0.5px"}}>Salary Structure</p>
+              <div style={{...card,padding:"12px 14px",background:"#f9fafb",marginBottom:14}}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                  <FL label="Employee ID"><input placeholder="TK-BOM-006" style={{...inp,fontFamily:"monospace"}}/></FL>
-                  <FL label="Full name"><input style={inp}/></FL>
-                  <FL label="Branch"><select style={inp}>{BRANCHES.map(b=><option key={b.code}>{b.code}</option>)}</select></FL>
-                  <FL label="Department"><select style={inp}>{HR_DEPTS.filter(d=>d!=="All").map(d=><option key={d}>{d}</option>)}</select></FL>
-                  <FL label="Designation"><input style={inp}/></FL>
-                  <FL label="Date of joining"><input type="date" style={inp}/></FL>
-                  <FL label="Basic salary"><input type="number" style={inp}/></FL>
-                  <FL label="Mobile"><input style={inp}/></FL>
+                  {[["basic","Basic"],["hra","HRA"],["da","DA"],["travel","Travel Allowance"],["medical","Medical"]].map(([k,l])=>(
+                    <FL key={k} label={l}><input type="number" value={form[k]} onChange={e=>setF(k,e.target.value)} style={{...inp,textAlign:"right",fontVariantNumeric:"tabular-nums"}}/></FL>
+                  ))}
+                  <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",padding:"6px 0",
+                    borderTop:"2px solid #0d1326",gridColumn:"1/-1",fontWeight:800,fontSize:12}}>
+                    <span>Gross Salary</span>
+                    <span style={{color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>
+                      {BRANCHES.find(b=>b.code===form.branch)?.cur||"₹"}{gross(form).toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-              )}
+                <p style={{margin:"10px 0 6px",fontSize:11,fontWeight:700,color:"#A32D2D"}}>Deductions</p>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  {[["pf","PF"],["esi","ESI"],["tds","TDS"]].map(([k,l])=>(
+                    <FL key={k} label={l}><input type="number" value={form[k]} onChange={e=>setF(k,e.target.value)} style={{...inp,textAlign:"right",fontVariantNumeric:"tabular-nums"}}/></FL>
+                  ))}
+                  <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",padding:"6px 0",
+                    borderTop:"2px solid #A32D2D",gridColumn:"1/-1",fontWeight:800,fontSize:12}}>
+                    <span>Net Take-home</span>
+                    <span style={{color:"#27500A",fontVariantNumeric:"tabular-nums"}}>
+                      {BRANCHES.find(b=>b.code===form.branch)?.cur||"₹"}{net(form).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",
-              display:"flex",justifyContent:"flex-end",gap:8,position:"sticky",bottom:0,background:"#fff"}}>
-              <button onClick={()=>{setModal(false);setSelected(null);}} style={btnGh}>Cancel</button>
-              <button onClick={()=>{setModal(false);setSelected(null);}} style={btnG}>Save Employee</button>
+              display:"flex",justifyContent:"space-between",gap:8,position:"sticky",bottom:0,background:"#fff"}}>
+              <div>{selected&&(
+                <button onClick={deleteEmp} disabled={remove.isPending}
+                  style={{...btnGh,color:"#A32D2D",borderColor:"#A32D2D"}}>{remove.isPending?"Deleting…":"Delete"}</button>
+              )}</div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={closeModal} style={btnGh}>Cancel</button>
+                <button onClick={saveEmp} disabled={saving} style={btnG}>{saving?"Saving…":"Save Employee"}</button>
+              </div>
             </div>
           </div>
         </div>
@@ -435,37 +454,59 @@ export function HrEmployees({branch}){
 
 export function HrAttendance({branch}){
   const [month,setMonth]=useState("2026-05");
-  const [empFilter,setEmpFilter]=useState("All");
   const [brFilter,setBrFilter]=useState(branch==="ALL"?"All":branch?.code||"All");
+  const qc=useQueryClient();
 
   const MONTHS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
   const STATUS_CLR={P:{bg:"#EAF3DE",c:"#27500A",l:"Present"},A:{bg:"#FCEBEB",c:"#A32D2D",l:"Absent"},
     L:{bg:"#FAEEDA",c:"#854F0B",l:"Leave"},H:{bg:"#E6F1FB",c:"#185FA5",l:"Holiday"},
     WO:{bg:"#f3f4f8",c:"#5a6691",l:"Week Off"}};
+  // Click a cell to cycle through the statuses (then back to unmarked).
+  const CYCLE=["P","A","L","H","WO"];
 
   const getDaysInMonth=m=>{const [y,mo]=m.split("-").map(Number);return new Date(y,mo,0).getDate();};
   const getDay=d=>new Date(month+"-"+String(d).padStart(2,"0")).getDay();
 
-  const emps=HR_EMPLOYEES_DATA.filter(e=>
-    (brFilter==="All"||e.branch===brFilter)&&
-    (empFilter==="All"||e.id===empFilter)
-  ).slice(0,8);
+  React.useEffect(()=>{ setBrFilter(branch==="ALL"?"All":branch?.code||"All"); },[branch]);
+
+  /* Live, branch-scoped employee rows (from the now-live Employee Master) + the
+     live monthly attendance register. ALL → every branch. */
+  const brScope=branch==="ALL"?"":(branch?.code||"");
+  const emps=((useMasterList('employees', brScope?{branch:brScope}:{}).data)||[]).map(fromEmpDTO)
+    .filter(e=>(brFilter==="All"||e.branch===brFilter));
+  const attQ=useQuery({
+    queryKey:['attendance',brScope||'ALL',month],
+    queryFn:()=>apiGet('/api/attendance',{branch:brScope||'ALL',month}),
+    enabled:!!getAuthToken(),
+    staleTime:15_000,
+  });
+  // empId → days map ({ '1':'P', ... }) for this month.
+  const attByEmp=Object.fromEntries(((attQ.data?.data)||[]).map(r=>[r.empId,r.days||{}]));
+
+  const markMut=useMutation({
+    mutationFn:(body)=>apiPut('/api/attendance/mark',body),
+    onSuccess:()=>qc.invalidateQueries({queryKey:['attendance',brScope||'ALL',month]}),
+    onError:(err)=>toast(err?.message||"Could not save attendance","error"),
+  });
 
   const days=getDaysInMonth(month);
 
-  /* Generate deterministic attendance */
-  const getAtt=(empId,day)=>{
+  /* Live status for a cell: an explicit mark wins; otherwise weekends default to
+     Week Off and weekdays show unmarked ("—") — we never invent Present. */
+  const getAtt=(emp,day)=>{
+    const marked=attByEmp[emp.id]?.[String(day)];
+    if(marked) return marked;
     const dow=getDay(day);
-    if(dow===0) return "WO";
-    if(dow===6) return "WO";
-    const seed=(empId.charCodeAt(empId.length-1)+day)%10;
-    if(seed===0) return "A";
-    if(seed===1) return "L";
-    return "P";
+    return (dow===0||dow===6)?"WO":"";
+  };
+  const cycleCell=(emp,day)=>{
+    const cur=attByEmp[emp.id]?.[String(day)]||"";
+    const next=CYCLE[(CYCLE.indexOf(cur)+1)%(CYCLE.length+1)]||""; // …→WO→unmarked
+    markMut.mutate({branch:emp.branch,empId:emp.id,empName:emp.name,month,day,status:next});
   };
 
   const summary=emp=>{
-    const att=Array.from({length:days},(_,i)=>getAtt(emp.id,i+1));
+    const att=Array.from({length:days},(_,i)=>getAtt(emp,i+1));
     return {P:att.filter(a=>a==="P").length,A:att.filter(a=>a==="A").length,
             L:att.filter(a=>a==="L").length,WO:att.filter(a=>a==="WO").length,H:att.filter(a=>a==="H").length};
   };
@@ -479,7 +520,9 @@ export function HrAttendance({branch}){
             display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>📅</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Attendance Register</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{MONTHS.find(m2=>m2.v===month)?.l}</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>
+              {MONTHS.find(m2=>m2.v===month)?.l} · {branch==="ALL"?"All branches":(branch?.code||brScope||"—")} · {attQ.isLoading?"loading…":`${emps.length} employees`} · click a cell to mark
+            </p>
           </div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
@@ -524,7 +567,11 @@ export function HrAttendance({branch}){
               <th style={{padding:"9px 10px",color:"#d4a437",fontWeight:700,fontSize:9,textAlign:"center"}}>L</th>
             </tr>
           </thead>
-          <tbody>{emps.map((emp,ei)=>{
+          <tbody>{emps.length===0&&(
+            <tr><td colSpan={days+4} style={{padding:"20px 12px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>
+              {attQ.isLoading?"Loading…":"No employees for this branch — add them in Employee Master first."}
+            </td></tr>
+          )}{emps.map((emp,ei)=>{
             const s=summary(emp);
             return (
               <tr key={emp.id} style={{borderBottom:"1px solid #f3f4f8",
@@ -535,14 +582,16 @@ export function HrAttendance({branch}){
                   <p style={{margin:0,fontSize:9,color:"#5a6691"}}>{emp.branch} · {emp.dept}</p>
                 </td>
                 {Array.from({length:days},(_,i)=>{
-                  const att=getAtt(emp.id,i+1);
-                  const ac=STATUS_CLR[att];
+                  const att=getAtt(emp,i+1);
+                  const ac=STATUS_CLR[att]||{bg:"#fff",c:"#cbd2e0"};
                   return (
                     <td key={i} style={{padding:"4px 2px",textAlign:"center"}}>
-                      <span style={{display:"inline-block",width:20,height:20,borderRadius:4,
-                        lineHeight:"20px",fontSize:8.5,fontWeight:700,
+                      <span onClick={()=>cycleCell(emp,i+1)} title="Click to change"
+                        style={{display:"inline-block",width:20,height:20,borderRadius:4,
+                        lineHeight:"20px",fontSize:8.5,fontWeight:700,cursor:"pointer",
+                        border:att?"none":"1px dashed #e1e3ec",
                         background:ac.bg,color:ac.c}}>
-                        {att}
+                        {att||"·"}
                       </span>
                     </td>
                   );

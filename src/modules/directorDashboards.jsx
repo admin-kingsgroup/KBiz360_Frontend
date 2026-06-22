@@ -12,6 +12,7 @@ import {
   useProfitAndLoss, useModulePL, useBalanceSheet, useAgeing, useInvoiceGP,
   useTaxSummary, useTrialBalance, useVoucherApprovals, useYearOverYear,
   useBudgetVsActual, useTargetsVsActual, useSalesTargets, useSaveTargets,
+  useCashForecast, useCustomerLtv, useAbcAnalysis,
 } from '../core/useAccounting';
 import { CONSOLIDATED_LABEL } from '../core/data';
 import { liquidityKind, isLiquidRow } from '../core/ledgerKind';
@@ -34,7 +35,7 @@ const MOD_OPTS = [['', 'All modules'], ['SF', 'Flight'], ['SH', 'Holiday'], ['SH
 
 // ── shared UI bits ──────────────────────────────────────────────────────────────
 // Header with title + the uniform PeriodBar (driven via the usePeriod object `p`).
-function Toolbar({ title, sub, branch, p }) {
+function Toolbar({ title, sub, branch, p, hidePeriod }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
       <div>
@@ -42,7 +43,7 @@ function Toolbar({ title, sub, branch, p }) {
         {sub && <div style={{ fontSize: 12, color: C.dim }}>{sub}</div>}
       </div>
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <PeriodBar branch={branch} defaultPreset={p && p.def} onChange={p && p.setRange} />
+        {!hidePeriod && <PeriodBar branch={branch} defaultPreset={p && p.def} onChange={p && p.setRange} />}
         <span style={{ fontSize: 11, fontWeight: 700, color: C.blue, background: '#E6F1FB', padding: '4px 9px', borderRadius: 5 }}>{branch === 'ALL' || !branch ? CONSOLIDATED_LABEL : (branch.code || branch)}</span>
         <button onClick={() => openPrintPreview({ selector: 'main', title, recommend: 'portrait' })} title="Export / print this dashboard"
           style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', fontSize: 11.5, fontWeight: 700, color: C.dark, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 6, cursor: 'pointer' }}>⎙ Export</button>
@@ -284,7 +285,7 @@ export function BranchPerformanceDash() {
   });
   const rows = BRANCHES.map((b, i) => {
     const d = q[i].data || {};
-    return { code: b.code, cur: b.cur, sales: d?.totals?.sales || 0, cogs: d?.totals?.cogs || 0, gp: d?.totals?.gp || 0, net: d?.bridge?.netProfit ?? d?.totals?.gp ?? 0 };
+    return { code: b.code, cur: b.cur, sales: d?.totals?.sales || 0, cogs: d?.totals?.cogs || 0, gp: d?.totals?.gp || 0, net: d?.bridge?.netProfit ?? 0 };
   });
   const loading = q.some((x) => x.isLoading);
   return (
@@ -495,7 +496,6 @@ export function ExpensesDash({ branch }) {
 // ── 12) Approvals & Audit ─────────────────────────────────────────────────────
 export function ApprovalsAuditDash({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';
-  const p = usePeriod('all');
   const va = useVoucherApprovals(branch, 'pending').data || {};
   const counts = va.counts || {};
   const brCode = branch === 'ALL' || !branch ? '' : (branch.code || branch);
@@ -505,7 +505,7 @@ export function ApprovalsAuditDash({ branch }) {
   const entries = (va.entries || []).slice(0, 15);
   return (
     <div style={{ margin: 12 }}>
-      <Toolbar title="Approvals & Audit" sub="Control queue — vouchers + SO/PO/GP bookings" branch={branch} p={p} />
+      <Toolbar title="Approvals & Audit" sub="Live control queue — vouchers + SO/PO/GP bookings" branch={branch} hidePeriod />
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <KPI label="Vouchers Pending" value={String(counts.pending?.n || 0)} sub={money(cur, counts.pending?.amount || 0)} tone={(counts.pending?.n || 0) ? 'bad' : 'good'} />
         <KPI label="Bookings Pending" value={String(bCount('pending'))} tone={bCount('pending') ? 'bad' : 'good'} />
@@ -641,6 +641,168 @@ export function TargetsMaster({ branch }) {
   );
 }
 
+// ── 17) Cash Forecast (13-week) ───────────────────────────────────────────────
+// Forward liquidity projection from /api/accounting/cash-forecast: opening cash &
+// bank, then due-date-bucketed inflow/outflow over the next 13 weeks with a running
+// closing balance. The lowest projected closing is the liquidity risk to watch.
+export function CashForecastDash({ branch, go }) {
+  const p = usePeriod('all'); const range = p.range;       // period sets the opening cash cut-off (as-of date)
+  const cur = (bc(branch) || {}).cur || '₹';
+  const q = useCashForecast(branch, range); const d = q.data || {};
+  const rows = d.rows || [];
+  const opening = d.opening || 0;
+  const totalIn = rows.reduce((s, r) => s + (r.inflow || 0), 0);
+  const totalOut = rows.reduce((s, r) => s + (r.outflow || 0), 0);
+  const closing = rows.length ? rows[rows.length - 1].closing : opening;
+  const low = rows.reduce((m, r) => (r.closing < m.closing ? r : m), { closing: opening, week: 'now' });
+  const maxFlow = Math.max(1, ...rows.map((r) => Math.max(r.inflow || 0, r.outflow || 0)));
+  return (
+    <div style={{ margin: 12 }}>
+      <Toolbar title="Cash Forecast (13-week)" sub={`Projected liquidity from due-dated invoices · opening as of ${range.to}`} branch={branch} p={p} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <KPI label="Opening Cash & Bank" value={money(cur, opening)} tone={opening < 0 ? 'bad' : undefined} onClick={go && (() => go('/dashboards/cash'))} />
+        <KPI label="Expected Inflow (13w)" value={money(cur, totalIn)} tone="good" onClick={go && (() => go('/dashboards/arap'))} />
+        <KPI label="Expected Outflow (13w)" value={money(cur, totalOut)} onClick={go && (() => go('/dashboards/arap'))} />
+        <KPI label="Projected Closing" value={money(cur, closing)} tone={closing < 0 ? 'bad' : 'good'} />
+        <KPI label="Lowest Point" value={q.isLoading ? '…' : money(cur, low.closing)} sub={low.closing < 0 ? `cash gap at ${low.week}` : `at ${low.week}`} tone={low.closing < 0 ? 'bad' : undefined} />
+      </div>
+      <Card title="Weekly Projection">
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr><th style={th}>Week</th><th style={{ ...th }}>Flow</th><th style={{ ...th, ...num }}>Inflow</th><th style={{ ...th, ...num }}>Outflow</th><th style={{ ...th, ...num }}>Net</th><th style={{ ...th, ...num }}>Closing</th></tr></thead>
+          <tbody>
+            {rows.map((r) => {
+              const net = (r.inflow || 0) - (r.outflow || 0);
+              return (
+                <tr key={r.week}>
+                  <td style={{ ...td, fontWeight: 700 }}>{r.week}</td>
+                  <td style={{ ...td, width: 220 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ background: '#eaf4ee', borderRadius: 3, height: 7 }}><div style={{ width: `${(r.inflow || 0) / maxFlow * 100}%`, background: C.green, height: '100%', borderRadius: 3 }} /></div>
+                      <div style={{ background: '#fbecec', borderRadius: 3, height: 7 }}><div style={{ width: `${(r.outflow || 0) / maxFlow * 100}%`, background: C.red, height: '100%', borderRadius: 3 }} /></div>
+                    </div>
+                  </td>
+                  <td style={{ ...td, ...num, color: C.green }}>{money(cur, r.inflow)}</td>
+                  <td style={{ ...td, ...num, color: C.red }}>{money(cur, r.outflow)}</td>
+                  <td style={{ ...td, ...num, fontWeight: 700, color: net < 0 ? C.red : C.dark }}>{money(cur, net)}</td>
+                  <td style={{ ...td, ...num, fontWeight: 700, color: (r.closing || 0) < 0 ? C.red : C.dark }}>{money(cur, r.closing)}</td>
+                </tr>
+              );
+            })}
+            {!rows.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>{q.isLoading ? 'Building forecast…' : 'No open invoices to project.'}</td></tr>}
+          </tbody>
+        </table>
+        <div style={{ padding: '8px 14px', fontSize: 11, color: C.dim }}>Inflows = open sales due (by credit days), outflows = open purchases due. Overdue items land in W1; anything beyond 13 weeks rolls into W13.</div>
+      </Card>
+    </div>
+  );
+}
+
+// ── 18) YoY Growth ────────────────────────────────────────────────────────────
+// Year-over-year P&L from /api/accounting/yoy: the current window vs the SAME
+// window one year earlier (defaults to FY-to-date). Growth is good on Income lines,
+// bad on Cost lines — colour follows the line's `group`.
+export function YoYGrowthDash({ branch, go }) {
+  const p = usePeriod('cfy'); const range = p.range;
+  const cur = (bc(branch) || {}).cur || '₹';
+  const yq = useYearOverYear(branch, range); const d = yq.data || {};
+  const rows = d.rows || [];
+  const find = (q) => rows.find((r) => (r.line || '').toLowerCase().includes(q)) || { cy: 0, ly: 0, group: 'Income' };
+  const rev = find('revenue'), gpRow = find('gross profit'), netRow = find('net profit');
+  const growthTone = (r) => { const g = deltaPct(r.cy, r.ly); if (g == null) return undefined; const good = r.group === 'Costs' ? g < 0 : g >= 0; return good ? 'good' : 'bad'; };
+  const dlt = (r) => deltaPct(r.cy, r.ly);
+  return (
+    <div style={{ margin: 12 }}>
+      <Toolbar title="YoY Growth" sub={`${d.current?.label || 'This year'} vs ${d.prior?.label || 'last year'}`} branch={branch} p={p} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <KPI label="Revenue" value={money(cur, rev.cy)} sub={`prev ${money(cur, rev.ly)}`} delta={dlt(rev)} tone={growthTone(rev)} onClick={go && (() => go('/dashboards/sales'))} />
+        <KPI label="Gross Profit" value={money(cur, gpRow.cy)} sub={`prev ${money(cur, gpRow.ly)}`} delta={dlt(gpRow)} tone={growthTone(gpRow)} onClick={go && (() => go('/dashboards/module-gp'))} />
+        <KPI label="Net Profit" value={money(cur, netRow.cy)} sub={`prev ${money(cur, netRow.ly)}`} delta={dlt(netRow)} tone={growthTone(netRow)} onClick={go && (() => go('/dashboards/profitability'))} />
+      </div>
+      <Card title="P&L — This Year vs Last Year">
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr><th style={th}>Line</th><th style={{ ...th, ...num }}>{d.current?.label || 'Current'}</th><th style={{ ...th, ...num }}>{d.prior?.label || 'Prior'}</th><th style={{ ...th, ...num }}>Change</th><th style={{ ...th, ...num }}>Growth %</th></tr></thead>
+          <tbody>
+            {rows.map((r, i) => {
+              const change = (r.cy || 0) - (r.ly || 0);
+              const g = dlt(r); const tone = growthTone(r);
+              const col = tone === 'good' ? C.green : tone === 'bad' ? C.red : C.dim;
+              return (
+                <tr key={i}>
+                  <td style={{ ...td, fontWeight: r.bold ? 800 : 400 }}>{r.line}</td>
+                  <td style={{ ...td, ...num, fontWeight: r.bold ? 800 : 400 }}>{money(cur, r.cy)}</td>
+                  <td style={{ ...td, ...num, color: C.dim }}>{money(cur, r.ly)}</td>
+                  <td style={{ ...td, ...num, color: change >= 0 ? C.dark : C.red }}>{money(cur, change)}</td>
+                  <td style={{ ...td, ...num, fontWeight: 700, color: col }}>{g == null ? '—' : (g >= 0 ? '▲ ' : '▼ ') + pct(Math.abs(g))}</td>
+                </tr>
+              );
+            })}
+            {!rows.length && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>{yq.isLoading ? 'Loading comparison…' : 'No comparison data for this window.'}</td></tr>}
+          </tbody>
+        </table>
+        <div style={{ padding: '8px 14px', fontSize: 11, color: C.dim }}>Compared against the matching span of the previous financial year. On cost lines a fall (▼) is the favourable move.</div>
+      </Card>
+    </div>
+  );
+}
+
+// ── 19) Customer Value (LTV + ABC) ────────────────────────────────────────────
+// Who drives the business: lifetime value & recency per customer (/customer-ltv)
+// merged with the ABC/Pareto class (/abc-analysis?by=customer). A-class customers
+// are the ~top 80% of revenue — the relationships to protect.
+export function CustomerValueDash({ branch, go }) {
+  const p = usePeriod('cfy'); const range = p.range;
+  const cur = (bc(branch) || {}).cur || '₹';
+  const lq = useCustomerLtv(branch, range); const ltv = lq.data || {};
+  const abc = useAbcAnalysis(branch, { ...range, by: 'customer' }).data || {};
+  const classOf = useMemo(() => { const m = {}; (abc.rows || []).forEach((r) => { m[r.name] = r.class; }); return m; }, [abc]);
+  const rows = (ltv.rows || []).slice(0, 25).map((r) => ({ ...r, class: classOf[r.name] || '—' }));
+  const t = ltv.totals || {};
+  const cls = abc.classes || {};
+  const clsChip = (k, c) => (
+    <span key={k} style={{ fontSize: 11.5, color: C.dim }}>
+      Class {k}: <b style={{ color: c }}>{(cls[k]?.count || 0)}</b> cust · {money(cur, cls[k]?.value || 0)} ({(cls[k]?.share || 0).toFixed(0)}%)
+    </span>
+  );
+  const clsColor = (c) => (c === 'A' ? C.green : c === 'B' ? C.amber : c === 'C' ? C.dim : C.dim);
+  return (
+    <div style={{ margin: 12 }}>
+      <Toolbar title="Customer Value (LTV + ABC)" sub={`Who drives revenue · ${range.label} · top 25`} branch={branch} p={p} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <KPI label="Customers" value={String(t.customers || 0)} onClick={go && (() => go('/masters/customers'))} />
+        <KPI label="Total Revenue" value={money(cur, t.ltv || 0)} tone="good" onClick={go && (() => go('/dashboards/sales'))} />
+        <KPI label="Bookings" value={String(t.bookings || 0)} />
+        <KPI label="Avg per Customer" value={money(cur, (t.customers ? (t.ltv || 0) / t.customers : 0))} />
+      </div>
+      <Card title="ABC / Pareto split">
+        <div style={{ display: 'flex', gap: 16, padding: '10px 14px', flexWrap: 'wrap' }}>
+          {clsChip('A', C.green)}{clsChip('B', C.amber)}{clsChip('C', C.dim)}
+          <span style={{ fontSize: 11, color: C.dim, marginLeft: 'auto' }}>A = top ~80% of revenue · B = next ~15% · C = long tail</span>
+        </div>
+      </Card>
+      <Card title="Top Customers by Lifetime Value">
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr><th style={th}>Customer</th><th style={{ ...th }}>Class</th><th style={{ ...th, ...num }}>Revenue</th><th style={{ ...th, ...num }}>GP</th><th style={{ ...th, ...num }}>GP %</th><th style={{ ...th, ...num }}>Bookings</th><th style={{ ...th, ...num }}>Avg Basket</th><th style={{ ...th, ...num }}>Last Seen</th></tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td style={td}>{r.name}</td>
+                <td style={{ ...td, fontWeight: 800, color: clsColor(r.class) }}>{r.class}</td>
+                <td style={{ ...td, ...num, fontWeight: 700 }}>{money(cur, r.ltv)}</td>
+                <td style={{ ...td, ...num, color: (r.gp || 0) < 0 ? C.red : C.green }}>{money(cur, r.gp)}</td>
+                <td style={{ ...td, ...num }}>{pct(r.gpPct)}</td>
+                <td style={{ ...td, ...num }}>{r.totalBookings}</td>
+                <td style={{ ...td, ...num }}>{money(cur, r.avgBasket)}</td>
+                <td style={{ ...td, ...num, color: r.recencyDays > 180 ? C.red : C.dim }}>{r.recencyDays != null ? `${r.recencyDays}d ago` : '—'}</td>
+              </tr>
+            ))}
+            {!rows.length && <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>{lq.isLoading ? 'Loading customers…' : 'No customer activity for this period.'}</td></tr>}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
 // Router for the Director dropdown routes. `setRoute` (App's navigate) lets the
 // KPI tiles drill into the matching register/report.
 export function DirectorDash({ which, branch, setRoute }) {
@@ -660,5 +822,8 @@ export function DirectorDash({ which, branch, setRoute }) {
   if (which === 'gp-target') return <VsTargetDash branch={branch} metric="gp" />;
   if (which === 'collections-target') return <VsTargetDash branch={branch} metric="collections" />;
   if (which === 'budget-expense') return <BudgetVsExpenseDash branch={branch} />;
+  if (which === 'cash-forecast') return <CashForecastDash branch={branch} go={go} />;
+  if (which === 'yoy') return <YoYGrowthDash branch={branch} go={go} />;
+  if (which === 'customer-value') return <CustomerValueDash branch={branch} go={go} />;
   return <ExecutiveOverview branch={branch} go={go} />;
 }

@@ -319,7 +319,7 @@ function PartyShell({ title, subtitle, m, tabs, tab, setTab, children }) {
           id="party-record-select"
           ariaLabel="Record"
           value={(current && current.id) || ''}
-          options={rows.map((r) => ({ value: r.id, label: r.name, sublabel: r.branch ? `· ${r.branch}` : '' }))}
+          options={[...rows].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' })).map((r) => ({ value: r.id, label: r.name, sublabel: r.branch ? `· ${r.branch}` : '' }))}
           onChange={(id) => m.setSelectedId(id)}
           placeholder={rows.length === 0 ? '— no records —' : 'Search records…'}
         />

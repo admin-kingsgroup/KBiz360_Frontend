@@ -311,6 +311,17 @@ export function useAbcAnalysis(branch, { from, to, by = 'customer' } = {}) {
   });
 }
 
+// 13-week cash-flow forecast (due-date bucketed). GET /api/accounting/cash-forecast.
+export function useCashForecast(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'cash-forecast', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/cash-forecast', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 // Year-over-Year P&L: current window vs same window last year. GET /api/accounting/yoy.
 export function useYearOverYear(branch, { from, to } = {}) {
   const code = branchCode(branch);

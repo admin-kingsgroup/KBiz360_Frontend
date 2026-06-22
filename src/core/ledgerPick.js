@@ -17,14 +17,21 @@
 export const LEDGER_PICKER_CAP = 2000;
 
 // Filter a ledger registry by the search query and the caller's filter, then
-// cap the rendered slice. Returns { matches, shown }: `matches` = every ledger
-// passing query + filter, `shown` = the capped slice actually rendered.
+// sort A→Z by name and cap the rendered slice. Returns { matches, shown }:
+// `matches` = every ledger passing query + filter (A→Z), `shown` = the capped
+// slice actually rendered.
+//
+// A→Z ordering: the API returns ledgers by account code, which interleaves
+// account classes by their code ranges (creditors first, expenses/assets/tax
+// deep). For *browsing* a scrollable picker that is the wrong order — the user
+// scans by name. We sort by name (case-insensitive, numeric-aware so
+// "Account 2" precedes "Account 10") so every ledger dropdown reads A→Z.
 export function pickLedgers(registry, q, filter, cap = LEDGER_PICKER_CAP) {
   const needle = (q || '').toLowerCase();
   const matches = (registry || []).filter((l) => {
     const matchQ = !needle || l.name.toLowerCase().includes(needle) || (l.group || '').toLowerCase().includes(needle);
     const matchFilter = !filter || filter(l);
     return matchQ && matchFilter;
-  });
+  }).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }));
   return { matches, shown: matches.slice(0, cap) };
 }

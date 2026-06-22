@@ -1967,7 +1967,8 @@ export function ChartOfAccountsLive({ branch }) {
           <thead><tr style={headRow}><Th>Group</Th><Th>Code</Th><Th>Ledger</Th><Th>Nature</Th><Th>Statement</Th><Th right>Opening</Th></tr></thead>
           <tbody>
             {groups.map((grp) => {
-              const gl = shown.filter((l) => l.group === grp);
+              const gl = shown.filter((l) => l.group === grp)
+                .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }));
               return gl.map((l, i) => (
                 <tr key={l.id || l.code} style={rowBg(i)}>
                   {i === 0 && <td rowSpan={gl.length} style={{ padding: '9px 14px', fontWeight: 700, color: DARK, borderRight: '2px solid #e1e3ec', verticalAlign: 'top', fontSize: 10.5, background: '#f9fafb' }}>{grp}</td>}
