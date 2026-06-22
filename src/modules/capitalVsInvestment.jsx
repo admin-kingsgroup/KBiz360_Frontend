@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../core/api';
 import { PeriodBar } from '../core/period';
+import { bc } from '../core/styleTokens';
 
 const DEFAULT_HURDLE = 18; // initial cost-of-capital benchmark % — user-editable on screen
 const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
@@ -14,11 +15,22 @@ const fyDefault = () => { const d = new Date(); const y = d.getMonth() >= 3 ? d.
 const dmy = (s) => { const d = new Date(s); return Number.isNaN(d.getTime()) ? s : `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })} ${d.getFullYear()}`; };
 const fyLabel = (s) => { const d = new Date(s); const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; return `${y}–${String(y + 1).slice(-2)}`; };
 
-const inr = (n) => (n < 0 ? '-' : '') + '₹' + Math.abs(Math.round(Number(n) || 0)).toLocaleString('en-IN');
-const cr = (n) => { n = Number(n) || 0; const s = n < 0 ? '-' : ''; n = Math.abs(n);
+// Branch-aware money formatters. India branches keep ₹ + Indian grouping (Cr/L);
+// USD branches ($ — NBO/DAR/FBM) use en-US grouping and K/M/B short scale.
+const localeOf = (cur) => (cur === '$' ? 'en-US' : 'en-IN');
+const fmtAmt = (cur, n) => (n < 0 ? '-' : '') + (cur || '₹') + Math.abs(Math.round(Number(n) || 0)).toLocaleString(localeOf(cur));
+const fmtShort = (cur, n) => {
+  cur = cur || '₹'; n = Number(n) || 0; const s = n < 0 ? '-' : ''; n = Math.abs(n);
+  if (cur === '$') {
+    if (n >= 1e9) return s + '$' + (n / 1e9).toFixed(2) + ' B';
+    if (n >= 1e6) return s + '$' + (n / 1e6).toFixed(2) + ' M';
+    if (n >= 1e3) return s + '$' + (n / 1e3).toFixed(2) + ' K';
+    return s + '$' + Math.round(n).toLocaleString('en-US');
+  }
   if (n >= 1e7) return s + '₹' + (n / 1e7).toFixed(2) + ' Cr';
   if (n >= 1e5) return s + '₹' + (n / 1e5).toFixed(2) + ' L';
-  return s + '₹' + Math.round(n).toLocaleString('en-IN'); };
+  return s + '₹' + Math.round(n).toLocaleString('en-IN');
+};
 
 const CSS = `
 .cvi{--gold:#A07828;--gold-l:#C49A3C;--dark:#111;--ink:#1A1A1A;--ink2:#3A3A3A;--ink3:#6A6A6A;--ink4:#9A9A9A;--rule:#DEDBD4;--bg-lt:#F7F4EF;--paper:#FFF;--flow:#1B6B4C;--flow-l:#e7f3ec;--block:#B7791F;--cr:#9B2C2C;--bs:#2C5C8F;--bs-l:#e8f0f8;--pl:#7A4DA0;--pl-l:#f1ebf7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:var(--ink)}
@@ -87,7 +99,7 @@ const CSS = `
 @media(max-width:760px){.cvi .meta,.cvi .kpis,.cvi .perf{grid-template-columns:1fr 1fr}.cvi .formula{flex-wrap:wrap}}
 `;
 
-const SecTable = ({ groups, totalLabel, totalVal }) => (
+const SecTable = ({ groups, totalLabel, totalVal, fmt }) => (
   <table>
     <tbody>
       {(groups || []).map((g, gi) => (
@@ -96,13 +108,13 @@ const SecTable = ({ groups, totalLabel, totalVal }) => (
           {(g.ledgers || []).map((l, li) => (
             <tr className="led-row" key={li}>
               <td className="nm">{l.n}<span className={`tag ${g.src}`}>{g.src === 'pl' ? 'P&L' : 'BS'}</span></td>
-              <td className={`amt ${l.a < 0 ? 'neg' : ''}`}>{inr(l.a)}</td>
+              <td className={`amt ${l.a < 0 ? 'neg' : ''}`}>{fmt(l.a)}</td>
             </tr>
           ))}
-          <tr className="sub-row"><td className="nm">{g.grp} — subtotal</td><td className="amt">{inr(g.total)}</td></tr>
+          <tr className="sub-row"><td className="nm">{g.grp} — subtotal</td><td className="amt">{fmt(g.total)}</td></tr>
         </React.Fragment>
       ))}
-      {totalLabel && <tr className="tot-row"><td>{totalLabel}</td><td className="amt">{inr(totalVal)}</td></tr>}
+      {totalLabel && <tr className="tot-row"><td>{totalLabel}</td><td className="amt">{fmt(totalVal)}</td></tr>}
       {(!groups || !groups.length) && <tr><td colSpan={2} style={{ padding: 14, color: '#9A9A9A', fontSize: 12 }}>No ledgers in this bucket.</td></tr>}
     </tbody>
   </table>
@@ -111,6 +123,9 @@ const SecTable = ({ groups, totalLabel, totalVal }) => (
 export function CapitalVsInvestmentLive({ branch }) {
   const [range, setRange] = useState(fyDefault);
   const [hurdle, setHurdle] = useState(DEFAULT_HURDLE); // cost-of-capital % — editable
+  const cur = (bc(branch) || {}).cur || '₹';            // branch currency (₹ India · $ NBO/DAR/FBM)
+  const inr = (n) => fmtAmt(cur, n);                    // full amount in branch currency
+  const cr = (n) => fmtShort(cur, n);                   // short scale (Cr/L · K/M/B)
   const { data, isLoading, error } = useQuery({
     queryKey: ['capital-analysis', brCodeOf(branch), range.from, range.to],
     queryFn: () => apiGet('/api/accounting/capital-analysis', { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from: range.from, to: range.to }),
@@ -166,13 +181,13 @@ export function CapitalVsInvestmentLive({ branch }) {
 
           <div className="section seccap">
             <div className="sec-band"><span className="sec-num">1</span><span className="sec-name">Capital Invested</span><span className="sec-sub">Capital Account + Reserves &amp; Surplus + accumulated P&amp;L — from Balance Sheet</span></div>
-            <SecTable groups={data.capital} totalLabel="CAPITAL EMPLOYED" totalVal={t.capitalInvested} />
+            <SecTable groups={data.capital} totalLabel="CAPITAL EMPLOYED" totalVal={t.capitalInvested} fmt={inr} />
           </div>
           <div className="sec-divider" />
 
           <div className="section secblock">
             <div className="sec-band"><span className="sec-num block">2</span><span className="sec-name">Capital Blocked</span><span className="sec-sub">fixed &amp; slow assets — tied up, not circulating</span></div>
-            <SecTable groups={data.blocked} totalLabel="TOTAL BLOCKED" totalVal={t.capitalBlocked} />
+            <SecTable groups={data.blocked} totalLabel="TOTAL BLOCKED" totalVal={t.capitalBlocked} fmt={inr} />
           </div>
           <div className="sec-divider" />
 
@@ -186,13 +201,13 @@ export function CapitalVsInvestmentLive({ branch }) {
               <div className="cell res"><div className="k">In-Flow Capital</div><div className="v">{cr(t.inflowCapital)}</div></div>
             </div>
             <div className="reconcile">Composition of current-asset ledgers totals <b>{inr(flowComp)}</b> — {reconciles ? 'reconciles with the in-flow residual ✓' : `difference ${inr((t.inflowCapital || 0) - flowComp)} (funded by current liabilities)`}</div>
-            <SecTable groups={data.flow} totalLabel="COMPOSITION TOTAL (CURRENT ASSETS)" totalVal={flowComp} />
+            <SecTable groups={data.flow} totalLabel="COMPOSITION TOTAL (CURRENT ASSETS)" totalVal={flowComp} fmt={inr} />
           </div>
           <div className="sec-divider" />
 
           <div className="section secrev">
             <div className="sec-band"><span className="sec-num">4</span><span className="sec-name">Turnover &amp; GP Performance</span><span className="sec-sub">is the in-flow capital generating enough gross profit? — from P&amp;L</span></div>
-            <SecTable groups={data.revenue} totalLabel="GROSS PROFIT" totalVal={t.grossProfit} />
+            <SecTable groups={data.revenue} totalLabel="GROSS PROFIT" totalVal={t.grossProfit} fmt={inr} />
             <div className="perf">
               <div className="pcard"><div className="k">Flow Turnover</div><div className="v">{(t.flowTurnover || 0).toFixed(2)}×</div><div className="d">Revenue ÷ In-Flow Capital — times the working capital is recycled</div></div>
               <div className="pcard"><div className="k">GP Margin</div><div className="v">{(t.gpMargin || 0).toFixed(1)}%</div><div className="d">Gross Profit ÷ Revenue — margin earned on sales</div></div>
@@ -203,7 +218,7 @@ export function CapitalVsInvestmentLive({ branch }) {
               <div>
                 <div className="t">{good ? 'In-Flow capital IS generating enough gross profit' : 'In-Flow capital is NOT generating enough gross profit'}</div>
                 <div className="x">{good
-                  ? <>Every ₹1 of in-flow capital throws off <b>₹{((t.gpYield || 0) / 100).toFixed(2)}</b> of gross profit a year ({(t.gpYield || 0).toFixed(1)}% yield) — above the {hurdle}% cost-of-capital hurdle. Working capital is recycled {(t.flowTurnover || 0).toFixed(2)}× at a {(t.gpMargin || 0).toFixed(1)}% margin.</>
+                  ? <>Every {cur}1 of in-flow capital throws off <b>{cur}{((t.gpYield || 0) / 100).toFixed(2)}</b> of gross profit a year ({(t.gpYield || 0).toFixed(1)}% yield) — above the {hurdle}% cost-of-capital hurdle. Working capital is recycled {(t.flowTurnover || 0).toFixed(2)}× at a {(t.gpMargin || 0).toFixed(1)}% margin.</>
                   : <>In-flow capital yields only {(t.gpYield || 0).toFixed(1)}%, below the {hurdle}% cost-of-capital hurdle. Improve margin (currently {(t.gpMargin || 0).toFixed(1)}%) or recycle capital faster (currently {(t.flowTurnover || 0).toFixed(2)}×), or release blocked capital into flow.</>}
                 </div>
               </div>

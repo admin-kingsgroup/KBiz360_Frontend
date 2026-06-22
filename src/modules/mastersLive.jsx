@@ -63,6 +63,15 @@ function FieldInput({ field, value, onChange, form }) {
         placeholder="comma, separated, values" style={{ ...inp, fontSize: 12.5 }} />
     );
   }
+  // System-managed fields (e.g. a ledger's auto-generated code) are shown but not
+  // editable — render a greyed, read-only box with a hint when there's no value yet.
+  if (field.readOnly) {
+    return (
+      <input type="text" value={value || ''} readOnly disabled
+        placeholder={field.placeholder || ''}
+        style={{ ...inp, fontSize: 12.5, background: '#f3f4f8', color: '#6b7280', cursor: 'not-allowed' }} />
+    );
+  }
   return (
     <input type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
       value={value} onChange={(e) => onChange(field.type === 'number' ? Number(e.target.value) : e.target.value)}
@@ -457,7 +466,8 @@ export const GroupsMaster = ({ branch }) => {
     { key: 'active', label: 'Active', type: 'bool', default: true },
   ];
   const LED_FIELDS = [
-    { key: 'code', label: 'Code', type: 'text', required: true },
+    // Code is allocated by the server (<BRANCH>-MN-NNNN) — read-only, never typed.
+    { key: 'code', label: 'Code (auto-generated)', type: 'text', readOnly: true, placeholder: 'Assigned automatically on save' },
     { key: 'name', label: 'Ledger Name', type: 'text', required: true },
     { key: 'group', label: 'Group', type: 'select', options: parentOptions, required: true },
     { key: 'subGroup', label: 'Sub-Group', type: 'select', emptyLabel: '— None —',

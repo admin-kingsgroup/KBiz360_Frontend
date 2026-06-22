@@ -9,12 +9,13 @@ import { openPrintPreview } from '../../core/PrintPreview';
 import { Legend, Line } from 'recharts';
 import { BRANCHES, EMP_LOANS_DATA, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../../core/data';
 import { fmt, fmtINR } from '../../core/format';
-import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, _LEAVES, _LEAVE_BALANCES, _REVISION_DUE, _SALARY_HISTORY, cardStyle, tabPanel } from '../../core/helpers';
+import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, _LEAVE_BALANCES, _REVISION_DUE, _SALARY_HISTORY, cardStyle, tabPanel } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../../core/useReference';
 import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { fromEmpDTO, toEmpPayload, BLANK_EMP } from './employeeMap';
+import { fromLeaveDTO, toLeavePayload, leaveDays } from './hrMaps';
 import { toast } from '../../core/ux/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPut, getAuthToken } from '../../core/api';
@@ -480,8 +481,9 @@ export function HrAttendance({branch}){
     enabled:!!getAuthToken(),
     staleTime:15_000,
   });
-  // empId → days map ({ '1':'P', ... }) for this month.
-  const attByEmp=Object.fromEntries(((attQ.data?.data)||[]).map(r=>[r.empId,r.days||{}]));
+  // empId → days map ({ '1':'P', ... }) for this month. apiGet already unwraps
+  // the { success, data } envelope, so attQ.data is the rows array.
+  const attByEmp=Object.fromEntries(((attQ.data)||[]).map(r=>[r.empId,r.days||{}]));
 
   const markMut=useMutation({
     mutationFn:(body)=>apiPut('/api/attendance/mark',body),
@@ -615,11 +617,18 @@ export function HrPayroll({branch}){
   const brCode=branch==="ALL"?"BOM":branch?.code||"BOM";
   const [tab,setTab]=useState("register"); // register | pf-esi | bankfile | form16 | journal
   const [period,setPeriod]=useState("2026-05");
-  const [processed,setProcessed]=useState(false);
   const [journalPosted,setJournalPosted]=useState(false);
   const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
 
-  const emps=HR_EMPLOYEES_DATA.filter(e=>e.branch===brCode&&e.status==="Active");
+  /* Live active employees for this branch (from the now-live Employee Master). */
+  const empQ=useMasterList('employees', {branch:brCode});
+  const emps=(empQ.data||[]).map(fromEmpDTO).filter(e=>e.status==="Active");
+  /* Persisted payroll-run status for this branch × month (/api/payroll-runs). */
+  const runQ=useMasterList('payroll-runs', {branch:brCode, month:period});
+  const runDoc=((runQ.data)||[]).find(r=>r.month===period&&r.branch===brCode);
+  const {create:createRun,update:updateRun}=useMasterMutations('payroll-runs');
+  const processed=runDoc?.status==="Paid";
+  const runPending=createRun.isPending||updateRun.isPending;
 
   const payroll=useMemo(()=>emps.map(e=>{
     const basic   =e.basic;
@@ -646,7 +655,7 @@ export function HrPayroll({branch}){
       annualGross>250000?Math.round((annualGross-250000)*0.05/12):0;
     const net =gross-empPF-empESI-profTax-lwpDed-tds;
     return {...e,basic:basic,hra:hra,special:special,gross:gross,empPF:empPF,empPFr:empPFr,empESI:empESI,empESIr:empESIr,profTax:profTax,lwpDays:lwpDays,lwpDed:lwpDed,tds:tds,net:net};
-  }),[brCode,period]);
+  }),[emps]);
 
   const totals=useMemo(()=>({
     gross:  payroll.reduce((s,e)=>s+e.gross,0),
@@ -661,6 +670,17 @@ export function HrPayroll({branch}){
   }),[payroll]);
 
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
+
+  /* Persist the run for this branch × month (upsert): PUT if a row exists, else
+     POST. Stamps gross + headcount so the HR dashboard's Payroll-Status KPI reads
+     a real figure instead of a guess. */
+  const processPayroll=()=>{
+    const body={month:period,branch:brCode,status:"Paid",grossTotal:Math.round(totals.gross),
+      headcount:emps.length,runAt:new Date().toISOString().slice(0,10)};
+    const opts={onSuccess:()=>toast(`Payroll processed — ${brCode} ${period}`),onError:e=>toast(e?.message||"Could not process payroll","error")};
+    if(runDoc) updateRun.mutate({id:runDoc.id,body},opts);
+    else createRun.mutate(body,opts);
+  };
 
   /* ── PAYROLL JOURNAL ENTRIES ─────────────────────────── */
   const journalEntries=[
@@ -694,8 +714,8 @@ export function HrPayroll({branch}){
             {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
           </select>
           {!processed
-            ?<button onClick={()=>setProcessed(true)} style={{...btnG,fontSize:11,background:"#27500A"}}>⚙ Process Payroll</button>
-            :<span style={{padding:"6px 12px",borderRadius:9,background:"#EAF3DE",color:"#27500A",fontSize:11,fontWeight:700}}>✔ Processed</span>}
+            ?<button onClick={processPayroll} disabled={runPending||emps.length===0} style={{...btnG,fontSize:11,background:"#27500A"}}>{runPending?"Processing…":"⚙ Process Payroll"}</button>
+            :<span style={{padding:"6px 12px",borderRadius:9,background:"#EAF3DE",color:"#27500A",fontSize:11,fontWeight:700}}>✔ Processed{runDoc?.runAt?` · ${runDoc.runAt}`:""}</span>}
         </div>
       </div>
 
@@ -1077,26 +1097,34 @@ export function HrPayslips({branch}){
 
 export function HrLeave({branch}){
   const mob=useMobile();
-  const brCode=branch==="ALL"?null:branch?.code;
-  const [leaves,setLeaves]=useState(_LEAVES);
+  const brScope=branch==="ALL"?"":(branch?.code||"");
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
-  const [tab,setTab]=useState("requests"); // requests | calendar | balances
-  const [form,setForm]=useState({empId:"",empName:"",type:"Annual Leave",from:"",to:"",reason:""});
+  const [tab,setTab]=useState("requests"); // requests | balances
+  const [form,setForm]=useState({empId:"",empName:"",type:"Casual Leave",from:"",to:"",reason:""});
 
-  const filtered=leaves.filter(l=>!brCode||HR_EMPLOYEES_DATA.find(e=>e.id===l.empId&&e.branch===brCode));
+  /* Live, branch-scoped employees (for the apply dropdown + balances) and the
+     live leave-request register. */
+  const emps=((useMasterList('employees', brScope?{branch:brScope}:{}).data)||[]).map(fromEmpDTO);
+  const leaveQ=useMasterList('leave-requests', brScope?{branch:brScope}:{});
+  const filtered=((leaveQ.data)||[]).map(fromLeaveDTO);
+  const {create,update}=useMasterMutations('leave-requests');
+
   const pending =filtered.filter(l=>l.status==="Pending");
   const approved=filtered.filter(l=>l.status==="Approved");
-  const STATUS_CLR={Pending:"#854F0B",Approved:"#27500A",Rejected:"#A32D2D"};
-  const STATUS_BG ={Pending:"#FAEEDA",Approved:"#EAF3DE",Rejected:"#FCEBEB"};
-  const TYPE_ICON ={"Annual Leave":"🏖","Sick Leave":"🏥","Casual Leave":"🎯","LWP":"❌"};
+  const STATUS_CLR={Pending:"#854F0B",Approved:"#27500A",Rejected:"#A32D2D",Cancelled:"#5a6691"};
+  const STATUS_BG ={Pending:"#FAEEDA",Approved:"#EAF3DE",Rejected:"#FCEBEB",Cancelled:"#f3f4f8"};
+  const TYPE_ICON ={"Annual Leave":"🏖","Sick Leave":"🏥","Casual Leave":"🎯","LWP":"❌","Earned":"🏖","Unpaid":"❌","Casual":"🎯","Sick":"🏥"};
 
-  const approve=(id)=>setLeaves(ls=>ls.map(l=>l.id===id?{...l,status:"Approved",approvedBy:"Manager"}:l));
-  const reject =(id)=>setLeaves(ls=>ls.map(l=>l.id===id?{...l,status:"Rejected"}:l));
+  const approve=(l)=>update.mutate({id:l.id,body:toLeavePayload({...l,status:"Approved"})},{onError:e=>toast(e?.message||"Could not approve","error")});
+  const reject =(l)=>update.mutate({id:l.id,body:toLeavePayload({...l,status:"Rejected"})},{onError:e=>toast(e?.message||"Could not reject","error")});
 
   const submit=()=>{
-    const days=Math.ceil((new Date(form.to)-new Date(form.from))/(1000*60*60*24))+1;
-    setLeaves(ls=>[{...form,id:`LV${String(ls.length+1).padStart(3,"0")}`,days,status:"Pending",approvedBy:""},...ls]);
-    setModal(false);
+    if(!form.empName||!form.from||!form.to){toast("Employee, from and to dates are required","error");return;}
+    const days=leaveDays(form.from,form.to);
+    const emp=emps.find(e=>e.id===form.empId);
+    create.mutate(toLeavePayload({...form,branch:emp?.branch||brScope,days,status:"Pending"}),{
+      onSuccess:()=>{toast("Leave request submitted");setModal(false);setForm({empId:"",empName:"",type:"Casual Leave",from:"",to:"",reason:""});},
+      onError:e=>toast(e?.message||"Submit failed","error")});
   };
 
   return (
@@ -1129,9 +1157,13 @@ export function HrLeave({branch}){
                 <th key={i} style={{padding:"9px 12px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{filtered.map((l,i)=>(
+            <tbody>{filtered.length===0&&(
+              <tr><td colSpan={10} style={{padding:"20px 12px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>
+                {leaveQ.isLoading?"Loading…":"No leave requests for this branch yet. Use “Apply” to add one."}
+              </td></tr>
+            )}{filtered.map((l,i)=>(
               <tr key={l.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-                <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{l.id}</td>
+                <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{(l.id||"").slice(-6)}</td>
                 <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{l.empName}</td>
                 <td style={{padding:"8px 12px"}}><span style={{fontSize:10}}>{TYPE_ICON[l.type]||"📋"} {l.type}</span></td>
                 <td style={{padding:"8px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{l.from}</td>
@@ -1142,8 +1174,8 @@ export function HrLeave({branch}){
                 <td style={{padding:"8px 12px",color:"#5a6691",fontSize:10}}>{l.approvedBy||"—"}</td>
                 <td style={{padding:"8px 12px"}}>
                   {l.status==="Pending"&&<div style={{display:"flex",gap:4}}>
-                    <button onClick={()=>approve(l.id)} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#27500A"}}>✓ Approve</button>
-                    <button onClick={()=>reject(l.id)}  style={{...btnGh,padding:"2px 7px",fontSize:9,color:"#A32D2D"}}>✗ Reject</button>
+                    <button onClick={()=>approve(l)} disabled={update.isPending} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#27500A"}}>✓ Approve</button>
+                    <button onClick={()=>reject(l)}  disabled={update.isPending} style={{...btnGh,padding:"2px 7px",fontSize:9,color:"#A32D2D"}}>✗ Reject</button>
                   </div>}
                 </td>
               </tr>
@@ -1160,7 +1192,7 @@ export function HrLeave({branch}){
                 <th key={i} style={{padding:"9px 14px",textAlign:i>=2?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{HR_EMPLOYEES_DATA.filter(e=>!brCode||e.branch===brCode).map((e,i)=>{
+            <tbody>{emps.map((e,i)=>{
               const bal=_LEAVE_BALANCES[e.id]||{AL:18,SL:12,CL:6};
               return (
                 <tr key={e.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
@@ -1185,8 +1217,9 @@ export function HrLeave({branch}){
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
             </div>
             <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-              <FL label="Employee"><select value={form.empId} onChange={e=>{const emp=HR_EMPLOYEES_DATA.find(x=>x.id===e.target.value);setForm(f=>({...f,empId:e.target.value,empName:emp?.name||""}));}} style={inp}>
-                {HR_EMPLOYEES_DATA.filter(e=>!brCode||e.branch===brCode).map(e=><option key={e.id} value={e.id}>{e.name} ({e.branch})</option>)}
+              <FL label="Employee"><select value={form.empId} onChange={e=>{const emp=emps.find(x=>x.id===e.target.value);setForm(f=>({...f,empId:e.target.value,empName:emp?.name||""}));}} style={inp}>
+                <option value="">Select employee…</option>
+                {emps.map(e=><option key={e.id} value={e.id}>{e.name} ({e.branch})</option>)}
               </select></FL>
               <FL label="Leave type"><select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} style={inp}>
                 {["Annual Leave","Sick Leave","Casual Leave","LWP"].map(t=><option key={t}>{t}</option>)}
@@ -1199,7 +1232,7 @@ export function HrLeave({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={submit} style={btnG}>📨 Submit Request</button>
+              <button onClick={submit} disabled={create.isPending} style={btnG}>{create.isPending?"Submitting…":"📨 Submit Request"}</button>
             </div>
           </div>
         </div>

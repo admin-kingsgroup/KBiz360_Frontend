@@ -461,7 +461,7 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
     {label:"Sales & Bookings", href:"/dashboards/sales"},
     {label:"Module / Product GP", href:"/dashboards/module-gp"},
     {label:"Customer Value (LTV + ABC)", href:"/dashboards/customer-value"},
-    {label:"Branch Performance", href:"/dashboards/branch"},
+    {label:"Branch & Group Performance", href:"/dashboards/branch"},
     {label:"Supplier / Purchase", href:"/dashboards/supplier"},
   ]},
   {label:"Targets", children:[

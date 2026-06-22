@@ -14,15 +14,18 @@ import {
   useBudgetVsActual, useTargetsVsActual, useSalesTargets, useSaveTargets,
   useCashForecast, useCustomerLtv, useAbcAnalysis,
 } from '../core/useAccounting';
-import { CONSOLIDATED_LABEL } from '../core/data';
+import { CONSOLIDATED_LABEL, BRANCHES as LIVE_BRANCHES } from '../core/data';
 import { liquidityKind, isLiquidRow } from '../core/ledgerKind';
 import { openPrintPreview } from '../core/PrintPreview';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#1f7a3d', amber: '#b8860b', dim: '#5a6691', border: '#e1e3ec', bg: '#f3f4f8' };
-const BRANCHES = [
-  { code: 'BOM', cur: '₹' }, { code: 'AMD', cur: '₹' }, { code: 'TKHO', cur: '₹' },
-  { code: 'NBO', cur: '$' }, { code: 'DAR', cur: '$' }, { code: 'FBM', cur: '$' },
-];
+// Live branch list (code + currency symbol) from the company-config cache, so the
+// dashboards track whatever branches/currencies are configured in company profiles
+// rather than a hardcoded list. Read at render time — referenceCache mutates the
+// BRANCHES array in place once profiles load.
+const REGION = { '₹': 'India', '$': 'Africa' };
+const curSym = (b) => (b.cur ? b.cur : (b.currency === 'USD' || b.curCode === 'USD') ? '$' : '₹');
+const branchList = () => (LIVE_BRANCHES || []).filter((b) => b && b.code && b.code !== 'ALL').map((b) => ({ code: b.code, cur: curSym(b) }));
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const r0 = (n) => Math.round(Number(n) || 0);
@@ -274,34 +277,103 @@ export function ReceivablesPayablesDash({ branch }) {
   );
 }
 
-// ── 5) Branch Performance ─────────────────────────────────────────────────────
+// ── 5) Branch & Group Performance ─────────────────────────────────────────────
+// Per-branch P&L + capital in each branch's native currency, then a Group subtotal
+// per currency (the "combined" report) — respecting that branches in different
+// currencies can't be summed without forex.
 export function BranchPerformanceDash() {
   const p = usePeriod('cfy'); const range = p.range;
-  const q = useQueries({
-    queries: BRANCHES.map((b) => ({
+  const BR = branchList(); // live branches (code + currency)
+  // Two parallel fan-outs per branch: P&L (module-pl) and capital (capital-analysis).
+  const plQ = useQueries({
+    queries: BR.map((b) => ({
       queryKey: ['accounting', 'module-pl', b.code, range.from, range.to],
       queryFn: () => apiGet('/api/accounting/module-pl', { branch: b.code, from: range.from, to: range.to }),
     })),
   });
-  const rows = BRANCHES.map((b, i) => {
-    const d = q[i].data || {};
-    return { code: b.code, cur: b.cur, sales: d?.totals?.sales || 0, cogs: d?.totals?.cogs || 0, gp: d?.totals?.gp || 0, net: d?.bridge?.netProfit ?? 0 };
+  const capQ = useQueries({
+    queries: BR.map((b) => ({
+      queryKey: ['accounting', 'capital-analysis', b.code, range.from, range.to],
+      queryFn: () => apiGet('/api/accounting/capital-analysis', { branch: b.code, from: range.from, to: range.to }),
+    })),
   });
-  const loading = q.some((x) => x.isLoading);
+  const rowOf = (b, i) => {
+    const d = plQ[i].data || {}; const c = (capQ[i].data || {}).totals || {};
+    const sales = d?.totals?.sales || 0, gp = d?.totals?.gp || 0;
+    return {
+      code: b.code, cur: b.cur, sales, cogs: d?.totals?.cogs || 0, gp,
+      gpPct: sales ? gp / sales * 100 : 0, net: d?.bridge?.netProfit ?? 0,
+      capital: c.capitalInvested || 0, inflow: c.inflowCapital || 0,
+    };
+  };
+  const rows = BR.map(rowOf);
+  const loading = plQ.some((x) => x.isLoading) || capQ.some((x) => x.isLoading);
+
+  // Per-currency group subtotals (the consolidated "Group Report") — a Group report
+  // must subtotal WITHIN a currency and never add ₹ to $.
+  const curList = [...new Set(BR.map((b) => b.cur))];
+  const groups = curList.map((cur) => {
+    const grp = rows.filter((r) => r.cur === cur);
+    const sum = (k) => grp.reduce((s, r) => s + (r[k] || 0), 0);
+    const sales = sum('sales'), gp = sum('gp'), inflow = sum('inflow');
+    return {
+      cur, label: `${REGION[cur] ? REGION[cur] + ' ' : ''}Group (${cur})`, rows: grp,
+      sales, cogs: sum('cogs'), gp, gpPct: sales ? gp / sales * 100 : 0,
+      net: sum('net'), capital: sum('capital'), inflow, gpYield: inflow ? gp / inflow * 100 : 0,
+    };
+  });
+
+  const dataRow = (cur, r, bold) => {
+    const w = bold ? 800 : undefined;
+    return (<>
+      <td style={{ ...td, ...num, fontWeight: w }}>{money(cur, r.sales)}</td>
+      <td style={{ ...td, ...num, fontWeight: bold ? 800 : 700, color: r.gp < 0 ? C.red : C.green }}>{money(cur, r.gp)}</td>
+      <td style={{ ...td, ...num, fontWeight: w }}>{pct(r.gpPct)}</td>
+      <td style={{ ...td, ...num, fontWeight: bold ? 800 : 700, color: r.net < 0 ? C.red : C.dark }}>{money(cur, r.net)}</td>
+      <td style={{ ...td, ...num, fontWeight: w }}>{money(cur, r.capital)}</td>
+      <td style={{ ...td, ...num, fontWeight: w }}>{money(cur, r.inflow)}</td>
+    </>);
+  };
+
   return (
     <div style={{ margin: 12 }}>
-      <Toolbar title="Branch Performance" sub={`All branches compared · ${range.label} · native currency`} branch={'ALL'} p={p} />
-      <Card title="Per-branch Sales · GP · Net Profit">
+      <Toolbar title="Branch & Group Performance" sub={`Per-branch + currency-group totals · ${range.label} · native currency`} branch={'ALL'} p={p} />
+
+      {/* Group (combined) totals — one KPI per currency group, never mixed */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        {groups.map((g) => (
+          <KPI key={g.cur} label={`${g.label} · Net Profit`} value={money(g.cur, g.net)} tone={g.net < 0 ? 'bad' : 'good'}
+            sub={`Sales ${money(g.cur, g.sales)} · GP ${pct(g.gpPct)} · Capital ${money(g.cur, g.capital)}`} />
+        ))}
+      </div>
+
+      <Card title="Per-branch — Sales · GP · Net · Capital  (grouped & subtotalled by currency)">
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={th}>Branch</th><th style={{ ...th, ...num }}>Sales</th><th style={{ ...th, ...num }}>COGS</th><th style={{ ...th, ...num }}>Gross Profit</th><th style={{ ...th, ...num }}>GP %</th><th style={{ ...th, ...num }}>Net Profit</th></tr></thead>
+          <thead><tr>
+            <th style={th}>Branch</th><th style={{ ...th, ...num }}>Sales</th><th style={{ ...th, ...num }}>Gross Profit</th>
+            <th style={{ ...th, ...num }}>GP %</th><th style={{ ...th, ...num }}>Net Profit</th>
+            <th style={{ ...th, ...num }}>Capital Invested</th><th style={{ ...th, ...num }}>In-Flow Capital</th>
+          </tr></thead>
           <tbody>
-            {loading && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>Loading branches…</td></tr>}
-            {!loading && rows.map((r) => (
-              <tr key={r.code}><td style={{ ...td, fontWeight: 700 }}>{r.code} <span style={{ color: C.dim, fontWeight: 400 }}>{r.cur}</span></td><td style={{ ...td, ...num }}>{money(r.cur, r.sales)}</td><td style={{ ...td, ...num }}>{money(r.cur, r.cogs)}</td><td style={{ ...td, ...num, fontWeight: 700, color: r.gp < 0 ? C.red : C.green }}>{money(r.cur, r.gp)}</td><td style={{ ...td, ...num }}>{pct(r.sales ? r.gp / r.sales * 100 : 0)}</td><td style={{ ...td, ...num, fontWeight: 700, color: r.net < 0 ? C.red : C.dark }}>{money(r.cur, r.net)}</td></tr>
+            {loading && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>Loading branches…</td></tr>}
+            {!loading && groups.map((g) => (
+              <React.Fragment key={g.cur}>
+                <tr><td colSpan={7} style={{ ...td, background: C.bg, fontWeight: 800, color: C.dim, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>{g.label}</td></tr>
+                {g.rows.map((r) => (
+                  <tr key={r.code}>
+                    <td style={{ ...td, fontWeight: 700 }}>{r.code} <span style={{ color: C.dim, fontWeight: 400 }}>{r.cur}</span></td>
+                    {dataRow(r.cur, r, false)}
+                  </tr>
+                ))}
+                <tr style={{ background: '#fbfbfe' }}>
+                  <td style={{ ...td, fontWeight: 800 }}>{g.label} — subtotal</td>
+                  {dataRow(g.cur, g, true)}
+                </tr>
+              </React.Fragment>
             ))}
           </tbody>
         </table>
-        <div style={{ padding: '8px 14px', fontSize: 11, color: C.dim }}>Figures shown in each branch's native currency. A single FX-normalised company total is coming next (needs forex rates).</div>
+        <div style={{ padding: '8px 14px', fontSize: 11, color: C.dim }}>Group subtotals are combined <b>within each currency</b> — ₹ branches (India) and $ branches (Africa) are never added together. A single FX-normalised all-company total needs forex rates.</div>
       </Card>
     </div>
   );
@@ -620,7 +692,7 @@ export function TargetsMaster({ branch }) {
       <div style={{ fontSize: 18, fontWeight: 800, color: C.dark }}>Sales Targets</div>
       <div style={{ fontSize: 12, color: C.dim, marginBottom: 12 }}>Set whole-FY targets per module. The Director "vs Target" dashboards pro-rate these to the period and compare against actuals.</div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-        <select value={brCode} onChange={(e) => setBrCode(e.target.value)} style={sel}>{BRANCHES.map((b) => <option key={b.code} value={b.code}>{b.code}</option>)}</select>
+        <select value={brCode} onChange={(e) => setBrCode(e.target.value)} style={sel}>{branchList().map((b) => <option key={b.code} value={b.code}>{b.code}</option>)}</select>
         <input value={fy} onChange={(e) => setFy(e.target.value)} placeholder="FY e.g. 2026-27" style={{ ...sel, fontWeight: 400, width: 120 }} />
         <select value={metric} onChange={(e) => setMetric(e.target.value)} style={sel}><option value="sales">Sales</option><option value="gp">Gross Profit</option><option value="collections">Collections</option></select>
       </div>
