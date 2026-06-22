@@ -6,13 +6,16 @@
 // ───────────────────────────────────────────────────────────────────────────
 import {
   MENU_MASTERS, MENU_FINANCE, MENU_REPORTS, MENU_HR, MENU_SETTINGS, MENU_ASSETS,
-  MENU_HO_CONTROL, MENU_TRANSACTIONS, MENU_DASHBOARDS, MENU_IMPORT_EXPORT, MENU_APPROVALS,
+  MENU_HO_CONTROL, MENU_ACCOUNTS, MENU_DASHBOARDS, MENU_IMPORT_EXPORT, MENU_APPROVALS,
 } from './menus';
 import { TAX_ALL, TAX_INDIA, TAX_AFRICA } from './data';
 
+// MENU_ACCOUNTS is listed first so the account reports that now live ONLY under
+// the Accounts pill (P&L, BS, registers, ageing, audit trail…) get an
+// "Accounts ▸ …" breadcrumb instead of falling back to a humanized path.
 const ROOTS = [
-  MENU_DASHBOARDS, MENU_FINANCE, MENU_REPORTS, MENU_MASTERS, MENU_HR, MENU_SETTINGS,
-  MENU_ASSETS, MENU_HO_CONTROL, MENU_TRANSACTIONS, MENU_IMPORT_EXPORT, MENU_APPROVALS,
+  MENU_ACCOUNTS, MENU_DASHBOARDS, MENU_FINANCE, MENU_REPORTS, MENU_MASTERS, MENU_HR, MENU_SETTINGS,
+  MENU_ASSETS, MENU_HO_CONTROL, MENU_IMPORT_EXPORT, MENU_APPROVALS,
   TAX_ALL, TAX_INDIA, TAX_AFRICA,
 ].filter(Boolean);
 

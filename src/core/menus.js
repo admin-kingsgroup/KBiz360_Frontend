@@ -3,7 +3,7 @@
    Auto-generated from KBiz360_v2.jsx · 361 lines · 11 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, LayoutDashboard, Lock, Settings, ShoppingCart, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
+import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, LayoutDashboard, Lock, Settings, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { PERM_MODULES } from './permissions';
 import { getRole } from './referenceCache';
@@ -44,10 +44,8 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
     {label:"Seat Inventory", href:"/masters/seats"},
     {label:"Other Taxes Rates", href:"/masters/markup"},
   ]},
-  {label:"HR Master", children:[
-    {label:"Employee Master", href:"/hr/employees"},
-    {label:"Employee — 10-Tab View", href:"/hr/employee-tabs"},
-  ]},
+  // Employee Master + 10-Tab View now live under the dedicated HR pill
+  // (HR ▸ Employee Master) — removed here to avoid the duplicate entry point.
   {label:"Utilities", children:[
     {label:"Passport Register", href:"/masters/passports"},
     {label:"Document Type Master", href:"/masters/doc-types"},
@@ -115,19 +113,17 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
 /* ── TAXATION — INDIA GST ────────────────────────────────────── */
 
 export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
+  // P&L, Balance Sheet, Cash Position & Audit Trail are account reports — they
+  // live under the Accounts pill now (Accounts ▸ Branch MIS / Books & Scrutiny).
   {label:"Financial Statements", children:[
-    {label:"Profit & Loss", href:"/reports/pnl"},          // Fiori · Classic · Vertical · Tally · TKF
-    {label:"Balance Sheet", href:"/reports/bs"},            // + Schedule III · Consolidated as modes
     {label:"Cash Flow Statement", href:"/reports/cf"},
     {label:"Report Viewer (9-Tab View)", href:"/reports/viewer"},
-    {label:"Cash Position Summary", href:"/reports/cash-position"},
     {label:"Inter-branch Elimination", href:"/reports/interbranch"},
     {label:"Notes to Financial Statements", href:"/reports/fs-notes"},
-    {label:"Audit Trail Report", href:"/reports/audit-trail"},
   ]},
   {label:"Profitability & GP", children:[
-    {label:"Sales & GP Analytics", href:"/reports/sales-gp-analytics"},
-    {label:"Invoice-wise GP (by Link No)", href:"/reports/invoice-gp"},
+    // Sales & GP Analytics + Invoice-wise GP live in Finance ▸ Registers &
+    // Outstanding (kept there to avoid the duplicate entry point).
     {label:"GP Reports (Multi-view)", href:"/reports/gp"},
     {label:"Yield by Destination", href:"/reports/yield-destination"},
     {label:"Yield by Consultant", href:"/reports/yield-consultant"},
@@ -140,31 +136,29 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
     {label:"MIS One-Pager", href:"/reports/mis"},
     {label:"Group Dashboard", href:"/group-dashboard"},
   ]},
+  // Sales/Purchase Register + Client Statement are account reports — see
+  // Accounts ▸ Sales & Purchase / Receivables & Collections.
   {label:"Operational", children:[
-    {label:"Sales Register", href:"/reports/sreg"},
-    {label:"Purchase Register", href:"/reports/preg"},
     {label:"Consultant Report", href:"/reports/consultant"},
     {label:"Destination Intel", href:"/reports/destination"},
     {label:"Forex Report", href:"/reports/forex"},
     {label:"Commission Income", href:"/reports/commission"},
-    {label:"Client Statement", href:"/reports/client-statement"},
   ]},
+  // Receivables & Payables are account reports — see Accounts ▸ Receivables &
+  // Collections / Payables & Suppliers.
   {label:"Working Capital", children:[
-    {label:"Receivables", href:"/reports/rec"},
-    {label:"Payables", href:"/reports/pay"},
     {label:"Cash Flow Forecast 90d", href:"/reports/cashflow-forecast"},
     {label:"Working Capital Dashboard", href:"/reports/working-capital"},
     {label:"Ratio Analysis", href:"/reports/ratios"},
   ]},
   {label:"Compliance & Tax", children:[
     {label:"Variance Analysis", href:"/reports/variance"},
-    {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
-    {label:"Statutory Dues Calendar", href:"/reports/statutory-dues"},
-    {label:"Tax Filing Status Board", href:"/reports/tax-board"},
+    // GST/VAT Summary, Statutory Dues Calendar & Tax Filing Status Board are tax
+    // reports — they live under the regime-aware Taxation pill (see core/data.js).
     {label:"Currency Exposure", href:"/reports/fx-exposure"},
     {label:"Budget vs Actual", href:"/reports/budget"},
     {label:"Expense Budget vs Actual", href:"/reports/exp-bgt"},
-    {label:"Tally XML Export", href:"/reports/tally-export"},
+    // Tally XML Export lives under Admin ▸ Import / Export Data ▸ Export.
     {label:"Client Concentration Risk", href:"/reports/concentration"},
   ]},
   {label:"Report Tools", children:[
@@ -177,17 +171,19 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
 
 /* ── HR ──────────────────────────────────────────────────────── */
 
-export const MENU_HR = {label:"HR & Payroll", icon:Users, children:[
-  {label:"People", children:[
+// Dedicated HR Management pill — every HR master, operation, payroll item,
+// HR report and self-service screen in one header (pulled out of Admin and the
+// Masters/Reports pills so nothing HR is duplicated elsewhere).
+export const MENU_HR = {label:"HR", icon:Users, children:[
+  {label:"Employee Master", children:[
     {label:"Employee Master", href:"/hr/employees"},
     {label:"Employee (10-Tab View)", href:"/hr/employee-tabs"},
+  ]},
+  {label:"Operations", children:[
     {label:"Attendance", href:"/hr/attendance"},
     {label:"Leave Management", href:"/hr/leave"},
-    {label:"Leave Utilization Report", href:"/hr/leave-utilization"},
     {label:"Recruitment", href:"/hr/recruitment"},
     {label:"Training Records", href:"/hr/training"},
-    {label:"Attrition Report", href:"/hr/attrition"},
-    {label:"Birthday & Anniversary Calendar", href:"/hr/calendar"},
   ]},
   {label:"Payroll", children:[
     {label:"Salary Run", href:"/hr/payroll"},
@@ -199,6 +195,11 @@ export const MENU_HR = {label:"HR & Payroll", icon:Users, children:[
   {label:"Expense & Loans", children:[
     {label:"Expense Claims", href:"/hr/expenses"},
     {label:"Employee Loans & Advances", href:"/hr/loans-advances"},
+  ]},
+  {label:"HR Reports", children:[
+    {label:"Leave Utilization Report", href:"/hr/leave-utilization"},
+    {label:"Attrition Report", href:"/hr/attrition"},
+    {label:"Birthday & Anniversary Calendar", href:"/hr/calendar"},
   ]},
   {label:"Self-Service", children:[
     {label:"Employee Portal", href:"/hr/portal"},
@@ -268,7 +269,8 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"ADM Voucher",              href:"/finance/adm-voucher"},
     {label:"ACM Voucher",              href:"/finance/acm-voucher"},
   ]},
-  {label:"Approve & Post", href:"/transactions/approvals"},
+  // "Approve & Post" → the top-level Approvals pill (single home for
+  // /transactions/approvals); accountants get that pill too (see getMenu).
   {label:"Sales & Purchase", children:[
     {label:"Sales Register",            href:"/reports/sreg"},
     {label:"Purchase Register",         href:"/reports/preg"},
@@ -373,24 +375,9 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
 
 /* ── FINAL MENU ASSEMBLY ─────────────────────────────────────── */
 
-export const MENU_TRANSACTIONS = {label:"Transactions", icon:ShoppingCart, children:[
-  /* SO/PO/GP Voucher creation now lives under Finance ▸ Vouchers; all approvals
-     (SO/PO/GP + Vouchers) live in the top-level "Approvals" section. */
-  /* Standardized 8-tab Voucher Entry pattern */
-  {label:"Standardized Patterns", children:[
-    {label:"Voucher Entry (8-Tab View)", href:"/transactions/voucher-tabs"},
-  ]},
-  /* Per-module Sale/Purchase ENTRY retired — all 7 products are entered via SO/PO/GP
-     (Finance ▸ Vouchers ▸ SO/PO/GP Voucher) and VIEWED via Finance ▸ Module Register. */
-  {label:"Airline Memos", children:[
-    {label:"ADM — Agent Debit Memos", href:"/purchase/adm"},
-    {label:"ACM — Agent Credit Memos", href:"/purchase/acm"},
-  ]},
-  {label:"Cancellations & Refunds", children:[
-    {label:"Sales Cancellations", href:"/sales/cancellation"},
-    {label:"Purchase Refunds", href:"/purchase/refunds"},
-  ]},
-]};
+/* The old MENU_TRANSACTIONS pill was deleted: it was never assembled into
+   getMenu(), and every route it listed (voucher-tabs, ADM/ACM, sales
+   cancellation, purchase refunds) already lives under Finance / Accounts. */
 
 /* ── HO CONTROL CENTER ─────────────────────────────────────────── */
 
@@ -428,8 +415,8 @@ export const MENU_COMMON_TOP = [
 export const MENU_IMPORT_EXPORT = {label:"Import / Export Data", icon:Database, children:[
   {label:"Import", children:[
     {label:"Data Import — Vouchers, Accounts & Masters", href:"/import"},
-    {label:"BSP Statement Import", href:"/purchase/bsp-import"},
-    {label:"GDS / PNR Import", href:"/purchase/gds-import"},
+    // BSP Statement Import → Accounts ▸ BSP & Airline; GDS / PNR Import →
+    // Finance ▸ BSP & Airline Memos (kept where the work is done, not duplicated).
   ]},
   {label:"Export", children:[
     {label:"Tally XML Export", href:"/reports/tally-export"},
@@ -437,7 +424,8 @@ export const MENU_IMPORT_EXPORT = {label:"Import / Export Data", icon:Database, 
 ]};
 
 // Back-office sections grouped under one "Admin" header pill (cleaner top bar).
-export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_HR, MENU_ASSETS, MENU_HO_CONTROL, MENU_SETTINGS, MENU_IMPORT_EXPORT]};
+// HR now has its own top-level pill (MENU_HR) — no longer nested under Admin.
+export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_ASSETS, MENU_HO_CONTROL, MENU_SETTINGS, MENU_IMPORT_EXPORT]};
 
 // Director/Super-Admin only: the plain "Dashboard" pill becomes a "Dashboards"
 // dropdown with the whole-company suite. Other roles keep the single Dashboard link.
@@ -551,7 +539,7 @@ export function getMenu(branch, currentUser){
     "Taxation — GST":   "Taxation",
     "Taxation — VAT":   "Taxation",
     "Reports":          "Reports",
-    "HR & Payroll":     "HR & Payroll",
+    "HR":               "HR & Payroll",
     "Settings":         "Settings",
     "HO Control":       "Settings",
   };
@@ -568,10 +556,10 @@ export function getMenu(branch, currentUser){
   // lives under the Taxation header (regime-aware: GST / VAT / consolidated), so the
   // accountant gets that pill too. Branch scope is still enforced by the top-right
   // switcher (limited to their stored branches).
-  if (isAccountant) return applyHidden([accountsMenu, taxSection], currentUser);
+  if (isAccountant) return applyHidden([accountsMenu, MENU_APPROVALS, taxSection], currentUser);
   const top = isDir ? [MENU_DASHBOARDS, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
-  // 8 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · Admin
-  const menus = [...top, accountsMenu, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
+  // 9 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · HR · Admin
+  const menus = [...top, accountsMenu, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN];
   // Strip each user's hidden pages/reports (Settings → Page Visibility Control).
   return applyHidden(menus, currentUser);
 }

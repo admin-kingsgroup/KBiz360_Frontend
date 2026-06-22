@@ -14,6 +14,7 @@ import { useAdmMemos, useCreateAdmMemo, useDisputeAdmMemo, useAcceptAdmMemo, use
 import { toast } from '../../core/ux/toast';
 import { useLedgerStatement, useCreateVoucher, useOpenBills, useSalesRegister, usePurchaseRegister } from '../../core/useAccounting';
 import { LedgerActions } from '../../core/ledgerActions';
+import { contraLedgerName, lineNarration } from '../../core/cashBookRows';
 import { openLedgerModal } from '../../core/LedgerModalHost';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { SampleBanner } from '../../core/ux/SampleBanner';
@@ -3414,7 +3415,10 @@ export function BspSummary({branch}){
                     <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
                       <td style={{padding:"7px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{e.date}</td>
                       <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{e.vno}</td>
-                      <td style={{padding:"7px 12px",color:"#384677"}}>{e.narration||e.party||e.category}</td>
+                      <td style={{padding:"7px 12px",color:"#384677"}}>
+                        <span style={{fontWeight:600}}>{contraLedgerName(e)}</span>
+                        {lineNarration(e) && <div style={{marginTop:2,fontSize:10,color:"#8b93b3",fontStyle:"italic"}}>{lineNarration(e)}</div>}
+                      </td>
                       <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:e.debit>0?"#185FA5":"#bfc3d6"}}>{e.debit>0?f(e.debit):"—"}</td>
                       <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:e.credit>0?"#A32D2D":"#bfc3d6"}}>{e.credit>0?f(e.credit):"—"}</td>
                       <td style={{padding:"7px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:e.balanceSide==="Cr"?"#A32D2D":"#185FA5"}}>{f(Math.abs(e.balance))} {e.balanceSide}</td>

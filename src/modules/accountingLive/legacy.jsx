@@ -488,7 +488,7 @@ export function TrialBalanceLive({ branch }) {
   const [view, setView] = useState('detailed'); // detailed (4-col) | summary (closing only)
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(100);
+  const [pageSize, setPageSize] = useState(1000); // show the whole ledger by default; pager still kicks in past 1000
   const [drill, setDrill] = useState(null); // ledger name
   const q = useTrialBalance(branch, { from, to });
 
@@ -637,7 +637,7 @@ export function DayBookLive({ branch }) {
   const [view, setView] = useState('minimal'); // minimal | detailed
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(100);
+  const [pageSize, setPageSize] = useState(1000); // show the whole ledger by default; pager still kicks in past 1000
   const [voucher, setVoucher] = useState(null); // clicked Day Book line → voucher modal
   // Fetch all journals; date filtering is client-side (Tally dates are mixed-format strings).
   const q = useDayBook(branch);
@@ -2136,7 +2136,7 @@ export function CashBookLive({ branch }) {
   const [expandAll, setExpandAll] = useState(false); // show narration under each ledger name
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(100);
+  const [pageSize, setPageSize] = useState(1000); // show the whole ledger by default; pager still kicks in past 1000
   const [ledger, setLedger] = useState('');
   const [voucher, setVoucher] = useState(null); // { id, vno } — drill-down to the voucher
 
