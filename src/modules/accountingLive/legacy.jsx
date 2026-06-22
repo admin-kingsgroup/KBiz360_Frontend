@@ -26,6 +26,7 @@ import { openLedgerModal } from '../../core/LedgerModalHost';
 import { usePrefs } from '../../core/prefs';
 import { pushModal } from '../../core/ux/modalStore';
 import { clickable } from '../../core/ux/clickable';
+import { contraLedgerName, lineNarration } from '../../core/cashBookRows';
 import { toast } from '../../core/ux/toast';
 import { CUR_QUARTER, CUR_FY } from '../../core/dates';
 import { PeriodBar } from '../../core/period';
@@ -2132,6 +2133,7 @@ export function CashBookLive({ branch }) {
   const [from, setFrom] = useState(todayISO);
   const [to, setTo] = useState(todayISO);
   const [view, setView] = useState('detailed'); // detailed | minimal
+  const [expandAll, setExpandAll] = useState(false); // show narration under each ledger name
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(100);
@@ -2158,11 +2160,13 @@ export function CashBookLive({ branch }) {
   }, [allLines, masterOpen, from]);
 
   // In-range lines with a running balance carried from the period opening.
+  // "Particulars" is the contra ledger NAME; the narration shows under it on Expand all.
   const rowsFull = useMemo(() => {
     let run = periodOpen;
     return allLines.filter((ln) => dateInRange(ln.date, from, to)).map((ln) => {
       run = Math.round((run + (ln.debit || 0) - (ln.credit || 0)) * 100) / 100;
-      return { date: ln.date, vno: ln.vno, category: ln.category, voucherId: ln.voucherId, debit: ln.debit || 0, credit: ln.credit || 0, particulars: ln.narration || ln.party || ln.category || '', running: run };
+      const ledgerName = contraLedgerName(ln);
+      return { date: ln.date, vno: ln.vno, category: ln.category, voucherId: ln.voucherId, debit: ln.debit || 0, credit: ln.credit || 0, ledgerName, narration: lineNarration(ln), particulars: ledgerName, running: run };
     });
   }, [allLines, periodOpen, from, to]);
 
@@ -2171,12 +2175,12 @@ export function CashBookLive({ branch }) {
   const closing = Math.round(periodOpen + receipts - payments);
 
   const term = search.trim().toLowerCase();
-  const rowsShown = useMemo(() => (term ? rowsFull.filter((r) => `${r.vno} ${r.particulars} ${r.category}`.toLowerCase().includes(term)) : rowsFull), [rowsFull, term]);
+  const rowsShown = useMemo(() => (term ? rowsFull.filter((r) => `${r.vno} ${r.ledgerName} ${r.narration} ${r.category}`.toLowerCase().includes(term)) : rowsFull), [rowsFull, term]);
   const pageRows = useMemo(() => rowsShown.slice(page * pageSize, page * pageSize + pageSize), [rowsShown, page, pageSize]);
 
   const expColumns = view === 'minimal'
-    ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'particulars', label: 'Particulars' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }]
-    : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'category', label: 'Type' }, { key: 'particulars', label: 'Particulars' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }, { key: 'running', label: `Balance (${cur})`, num: true }];
+    ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'ledgerName', label: 'Ledger Name' }, { key: 'narration', label: 'Narration' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }]
+    : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'category', label: 'Type' }, { key: 'ledgerName', label: 'Ledger Name' }, { key: 'narration', label: 'Narration' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }, { key: 'running', label: `Balance (${cur})`, num: true }];
   const printRows = rowsFull.map((r) => ({ ...r, debit: nfmt(r.debit), credit: nfmt(r.credit), running: nfmt(r.running) }));
   const totalRow = { date: 'CLOSING', vno: '', particulars: '', debit: nfmt(receipts), credit: nfmt(payments), running: nfmt(closing) };
   const sub = `${selected || 'Cash account'} · ${branchLabel(branch)} · ${rowsFull.length} entries · Closing ${money(cur, closing)}`;
@@ -2202,7 +2206,14 @@ export function CashBookLive({ branch }) {
           {cashLedgers.length === 0 && <option value="">No cash ledger</option>}
           {cashLedgers.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
         </select>
-        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Particulars / voucher…" />
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Ledger / narration / voucher…" />
+        <button
+          onClick={() => setExpandAll((x) => !x)}
+          title={expandAll ? 'Hide narration under each ledger' : 'Show narration under each ledger'}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 32, padding: '0 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', borderRadius: 7, border: `1px solid ${expandAll ? BLUE : '#d3d8e4'}`, background: expandAll ? BLUE : '#fff', color: expandAll ? '#fff' : '#384677' }}
+        >
+          {expandAll ? '▾ Collapse all' : '▸ Expand all'}
+        </button>
         <ModeToggle view={view} setView={setView} modes={[{ id: 'detailed', label: 'Detailed' }, { id: 'minimal', label: 'Minimal' }]} />
         <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(0)} full branch={branch} />
         <ExportBtn onClick={exportNow} disabled={!rowsFull.length} />
@@ -2223,7 +2234,7 @@ export function CashBookLive({ branch }) {
           <thead><tr style={headRow}>
             <Th>Date</Th><Th>Voucher</Th>
             {view === 'detailed' && <Th>Type</Th>}
-            <Th>Particulars</Th><Th right>Receipt (Dr)</Th><Th right>Payment (Cr)</Th>
+            <Th>Ledger Name</Th><Th right>Receipt (Dr)</Th><Th right>Payment (Cr)</Th>
             {view === 'detailed' && <Th right>Balance</Th>}
           </tr></thead>
           <tbody>
@@ -2238,7 +2249,12 @@ export function CashBookLive({ branch }) {
                 <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.date}</td>
                 <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE, whiteSpace: 'nowrap' }}>{r.vno}</td>
                 {view === 'detailed' && <td style={{ padding: '7px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: (TYPE_CLR[r.category] || '#384677') + '22', color: TYPE_CLR[r.category] || '#384677' }}>{r.category || '—'}</span></td>}
-                <td style={{ padding: '7px 12px', maxWidth: 360 }}><NarrationCell text={r.particulars} /></td>
+                <td style={{ padding: '7px 12px', maxWidth: 360 }}>
+                  <span style={{ color: '#384677', fontWeight: 600 }}>{r.ledgerName || '—'}</span>
+                  {expandAll && r.narration && (
+                    <div style={{ marginTop: 2, fontSize: 10, color: DIM, fontStyle: 'italic', whiteSpace: 'normal' }}>{r.narration}</div>
+                  )}
+                </td>
                 <td style={{ padding: '7px 12px', ...num, fontWeight: 600, color: r.debit > 0 ? GREEN : '#dfe2ee' }}>{money(cur, r.debit)}</td>
                 <td style={{ padding: '7px 12px', ...num, fontWeight: 600, color: r.credit > 0 ? RED : '#dfe2ee' }}>{money(cur, r.credit)}</td>
                 {view === 'detailed' && <td style={{ padding: '7px 12px', ...num, fontWeight: 700, color: r.running >= 0 ? DARK : RED }}>{money(cur, Math.abs(r.running))} {r.running < 0 ? 'Cr' : ''}</td>}
