@@ -16,6 +16,7 @@ import { useLedgerRegistry, useDocumentTypes } from './useReference';
 import { useMasterList, useMasterMutations } from './useMasters';
 import { toast } from './ux/toast';
 import { fromJobDTO, toJobPayload, JOB_NEXT_STATUS } from '../modules/hr/hrMaps';
+import { fromEmpDTO } from '../modules/hr/employeeMap';
 import { pickLedgers } from './ledgerPick';
 import { useGpBills } from './useAccounting';
 import { fmt, fmtINR } from './format';
@@ -1167,8 +1168,10 @@ export function SeatInventory({branch}){
 
 export function GratuityRegister({branch}){
   const mob=useMobile();
-  const brCode=branch==="ALL"?null:branch?.code;
-  const emps=HR_EMPLOYEES_DATA.filter(e=>!brCode||e.branch===brCode);
+  const brScope=branch==="ALL"?"":(branch?.code||"");
+  /* Live, branch-scoped employees; gratuity provision is computed from Basic+DA
+     and length of service per the Payment of Gratuity Act. */
+  const emps=((useMasterList('employees', brScope?{branch:brScope}:{}).data)||[]).map(fromEmpDTO);
   const DOJ_TO_YEARS=doj=>{const d=new Date(doj);const n=new Date("2026-05-19");return+((n-d)/(365.25*86400000)).toFixed(2);};
   const GRATUITY=e=>{
     const yrs=DOJ_TO_YEARS(e.joined||"2021-04-01");

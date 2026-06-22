@@ -939,8 +939,17 @@ export function HrPayslips({branch}){
 
   const MONTHS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
 
-  const filtEmps=HR_EMPLOYEES_DATA.filter(e=>brFilter==="All"||e.branch===brFilter);
-  const emp=HR_EMPLOYEES_DATA.find(e=>e.id===empId)||HR_EMPLOYEES_DATA[0];
+  /* Live, branch-scoped employees from the Employee Master; the payslip itself is
+     computed from each employee's salary structure. */
+  const brScope=branch==="ALL"?"":(branch?.code||"");
+  const empsAll=((useMasterList('employees', brScope?{branch:brScope}:{}).data)||[]).map(fromEmpDTO);
+  const filtEmps=empsAll.filter(e=>brFilter==="All"||e.branch===brFilter);
+  const emp=empsAll.find(e=>e.id===empId)||filtEmps[0]||empsAll[0];
+  if(!emp) return (
+    <div style={{padding:"40px 16px",textAlign:"center",color:"#8b94b3",fontSize:13}}>
+      No employees for this branch yet — add them in <b>Employee Master</b> to generate payslips.
+    </div>
+  );
   const brCfg=BRANCHES.find(b=>b.code===emp.branch)||{cur:"₹",entity:"Travkings Tours & Travels"};
   const c=brCfg.cur;
   const gross=emp.basic+emp.hra+emp.da+emp.travel+emp.medical;
@@ -1464,7 +1473,9 @@ export function PfEsiChallan({branch}){
   const [month,setMonth]=useState("2026-05");
   const [tab,setTab]=useState("pf"); // pf | esi | pt
   const MONTHS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
-  const emps=HR_EMPLOYEES_DATA.filter(e=>e.branch===brCode||brCode==="All");
+  /* Live, branch-scoped employees; PF/ESI/PT challans are computed from each
+     employee's salary structure. */
+  const emps=((useMasterList('employees', {branch:brCode}).data)||[]).map(fromEmpDTO);
   const gross=e=>e.basic+e.hra+e.da+e.travel+e.medical;
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
   const dueYear=parseInt(month.slice(0,4),10), dueMonRaw=parseInt(month.slice(5),10)+1;
@@ -1472,8 +1483,8 @@ export function PfEsiChallan({branch}){
   const DUE_DATE=dueYr+"-"+String(dueMon).padStart(2,"0")+"-15";
 
   // PF data
-  const pfData=emps.map(e=>({
-    name:e.name,uan:"100"+String(HR_EMPLOYEES_DATA.indexOf(e)+123456789).slice(-9),
+  const pfData=emps.map((e,i)=>({
+    name:e.name,uan:"100"+String(i+123456789).slice(-9),
     basic:e.basic,empPF:Math.round(e.basic*0.12),emplPF:Math.round(e.basic*0.12),
     empEPS:Math.round(Math.min(e.basic,15000)*0.0833),emplEPS:Math.round(Math.min(e.basic,15000)*0.0833),
   }));
@@ -1484,8 +1495,8 @@ export function PfEsiChallan({branch}){
 
   // ESI data
   const esiEmps=emps.filter(e=>gross(e)<=21000);
-  const esiData=esiEmps.map(e=>({
-    name:e.name,esic:"31"+String(HR_EMPLOYEES_DATA.indexOf(e)+10000000).slice(-8),
+  const esiData=esiEmps.map((e,i)=>({
+    name:e.name,esic:"31"+String(i+10000000).slice(-8),
     gross:gross(e),empESI:Math.round(gross(e)*0.0075),emplESI:Math.round(gross(e)*0.0325),
   }));
   const totEmpESI=esiData.reduce((s,e)=>s+e.empESI,0);

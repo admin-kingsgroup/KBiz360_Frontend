@@ -10,6 +10,8 @@ import { getUnmatchedTickets, settlePurchaseEntry } from './business-logic';
 import { FX_RATES, HR_STATS_DATA, INTERBRANCH_ELIMINATIONS, LEAVE_UTILIZATION, PURCHASE_REGISTRY, TAX_FILING_BOARD, YIELD_BY_CONSULTANT, YIELD_BY_DESTINATION, YIELD_BY_SUPPLIER, YOY_PL } from './data';
 import { branchCfg } from './referenceCache';
 import { useSalespeople } from './useReference';
+import { useQuery } from '@tanstack/react-query';
+import { apiGet, getAuthToken } from './api';
 import { fmt, fmtINR } from './format';
 import { todayISO, nowLabel, CUR_FY } from './dates';
 import { openPrintPreview } from './PrintPreview';
@@ -925,13 +927,18 @@ export function RPT_LeaveUtilization(){
 /* 13. Birthday & Anniversary Calendar */
 
 export function RPT_BirthdayCalendar(){
+  /* Live from the employee master — the backend /stats endpoint derives upcoming
+     birthdays + work anniversaries from each employee's dob / joinDate, scoped to
+     the caller's branch(es). */
+  const statsQ=useQuery({queryKey:['employees','stats'],queryFn:()=>apiGet('/api/employees/stats'),enabled:!!getAuthToken(),staleTime:60_000});
+  const stats=statsQ.data||{birthdays:[],anniversaries:[]};
   return (
     <RPT_Page title="Birthday &amp; Anniversary Calendar" subtitle="Engagement events for HR &amp; team celebrations">
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326",marginBottom:12}}>🎂 Upcoming Birthdays</p>
-          {HR_STATS_DATA.birthdays.length===0&&<p style={{color:"#5a6691",fontSize:12}}>No birthdays in the next 7 days</p>}
-          {HR_STATS_DATA.birthdays.map(b=>(<div key={b.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #f0f2f7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#d4a437",display:"flex",alignItems:"center",justifyContent:"center",color:"#0d1326",fontSize:14,fontWeight:700}}>{b.name.substring(0,2).toUpperCase()}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{b.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{b.branch} · {b.date}</p></div><button style={{padding:"5px 12px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Send wish</button></div>))}
+          {(stats.birthdays||[]).length===0&&<p style={{color:"#5a6691",fontSize:12}}>{statsQ.isLoading?"Loading…":"No upcoming birthdays"}</p>}
+          {(stats.birthdays||[]).map(b=>(<div key={b.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #f0f2f7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#d4a437",display:"flex",alignItems:"center",justifyContent:"center",color:"#0d1326",fontSize:14,fontWeight:700}}>{b.name.substring(0,2).toUpperCase()}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{b.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{b.branch} · {b.date}</p></div><button style={{padding:"5px 12px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Send wish</button></div>))}
         </div>
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326",marginBottom:12}}>🎉 Work Anniversaries</p>
