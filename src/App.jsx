@@ -50,7 +50,7 @@ const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('
 const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } = lazyModule(() => import('./modules/reports'));
 const { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } = lazyModule(() => import('./modules/settings'));
 const { PageAccessControl } = lazyModule(() => import('./modules/pageAccess'));
-const { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } = lazyModule(() => import('./modules/taxation'));
+const { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxReco, TaxTdsTcs, TaxVat } = lazyModule(() => import('./modules/taxation'));
 const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, DebitNoteVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
 const { SoPoGpVoucherEntry } = lazyModule(() => import('./modules/bookingOrder'));
 const { UnifiedApprovals } = lazyModule(() => import('./modules/voucherApprovals'));
@@ -60,7 +60,7 @@ const { PnLTallyLive } = lazyModule(() => import('./modules/pnlTally'));
 const { BalanceSheetTallyLive } = lazyModule(() => import('./modules/balanceSheetTally'));
 const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/capitalVsInvestment'));
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, AccountsChartLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
-const { DashboardAccountant, CollectionsFollowup, SupplierReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
+const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { PaymentRun } = lazyModule(() => import('./modules/paymentRun'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
 const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('./modules/financialStatements'));
@@ -426,6 +426,9 @@ export default function KB360App(){
     if(route==="/accounts/net-ageing")    return <PayablesLive branch={branch} setRoute={navigate} initialTab="net"/>;
     if(route==="/accounts/collections")   return <CollectionsFollowup branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/supplier-reco") return <SupplierReco branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/client-reco")   return <ClientReco branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/interbranch-reco") return <InterBranchReco branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/tally-reco")    return <TallyReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/payment-run")   return <PaymentRun branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/suspense")      return <SuspenseClearing branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/month-end")     return <MonthEndChecklist branch={branch} setRoute={navigate}/>;
@@ -463,7 +466,7 @@ export default function KB360App(){
     if(route==="/finance/adm-voucher") return <AdmVoucher branch={branch}/>;
     if(route==="/finance/acm-voucher") return <AcmVoucher branch={branch}/>;
     if(route==="/contra")             return <ContraVoucher branch={branch}/>;
-    if(route==="/bank-reco")          return <BankReco/>;
+    if(route==="/bank-reco")          return <BankReco branch={branch}/>;
     if(route==="/journal")            return <JournalEntry branch={branch}/>;
     if(route==="/import")               return <DataImportPage currentUser={currentUser}/>;
     if(route==="/day-book")           return <DayBookLive branch={branch}/>;
@@ -519,6 +522,7 @@ export default function KB360App(){
     if(route==="/purchase/ticket-control")return <TicketControlRegister branch={branch}/>;
     if(route==="/purchase/bsp-import")    return <BspCsvImport branch={branch}/>;
     if(route==="/purchase/gds-import")    return <GdsPnrImport branch={branch} setRoute={navigate}/>;
+    if(route==="/tax/reconciliation")     return <TaxReco branch={branch}/>;
     if(route==="/tax/gstr2b")             return <GstrRecon branch={branch}/>;
     if(route==="/tax/tds-certs")          return <TdsCertRegister branch={branch}/>;
     if(route==="/hr/salary-revision")     return <SalaryRevision branch={branch}/>;

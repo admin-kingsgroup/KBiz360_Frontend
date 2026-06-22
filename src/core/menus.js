@@ -298,13 +298,27 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     // Bank Reconciliation + Reconciliation Queue moved to the "Reconciliation" head below.
   ]},
   // Dedicated Reconciliation head — gathers EVERY non-tax reconciliation screen in
-  // one place (was previously scattered across Cash & Bank + Payables). Tax/GST
-  // reconciliation (GSTR-2B/2A/9C) stays under the regime-aware Taxation pill so
-  // VAT (Africa) branches don't see GST-only links — see TAX_INDIA ▸ Reconciliation.
+  // one place (was previously scattered across Cash & Bank + Payables), split into
+  // Client · Bank · Supplier sections. Tax/GST reconciliation (GSTR-2B/2A/9C) stays
+  // under the regime-aware Taxation pill so VAT (Africa) branches don't see GST-only
+  // links — a pointer divider below sends India accountants there.
   {label:"Reconciliation", children:[
+    {divider:true, label:"Client"},
+    {label:"Client Reconciliation",    href:"/accounts/client-reco"},
+    {divider:true, label:"Bank"},
     {label:"Bank Reconciliation",      href:"/bank-reco"},
-    {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
     {label:"Reconciliation Queue",     href:"/finance/reco-queue"},
+    {divider:true, label:"Supplier"},
+    {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
+    {divider:true, label:"Inter-branch"},
+    {label:"Inter-branch Reconciliation", href:"/accounts/interbranch-reco"},
+    {divider:true, label:"Tally"},
+    {label:"Tally Reconciliation (ERP vs Tally)", href:"/accounts/tally-reco"},
+    {divider:true, label:"Tax (see Taxation pill)"},
+    {label:"Tax Reco (Returns vs Books)", href:"/tax/reconciliation"},
+    {label:"GSTR-2B Reconciliation",   href:"/tax/gstr2b"},
+    {label:"GSTR-2A Reconciliation",   href:"/tax/gstr2a"},
+    {label:"GSTR-9C — Audit Reco",     href:"/tax/gstr9c"},
   ]},
   {label:"Books & Scrutiny", children:[
     {label:"Statistics",       href:"/accounts/statistics"},
@@ -510,10 +524,20 @@ function applyHidden(menus, currentUser){
   return menus.map(m=>pruneNode(m,hidden)).filter(Boolean);
 }
 
+// The Accounts ▸ Reconciliation ▸ "Tax" pointer links to India GST recon screens
+// (GSTR-2B/2A/9C). On pure VAT (Africa) branches those screens don't apply, so we
+// prune them there — the regime-aware Taxation pill already shows the right thing.
+// India and the consolidated ("ALL") group view keep them.
+const GST_RECO_HREFS = new Set(['/tax/gstr2b', '/tax/gstr2a', '/tax/gstr9c']);
+function accountsMenuFor(showGstReco){
+  return showGstReco ? MENU_ACCOUNTS : pruneNode(MENU_ACCOUNTS, GST_RECO_HREFS);
+}
+
 export function getMenu(branch, currentUser){
   const isAll   = branch==="ALL";
   const isIndia = !isAll && branch?.code && ["TKHO","BOM","AMD"].includes(branch.code);
   const taxSection = isAll ? TAX_ALL : isIndia ? TAX_INDIA : TAX_AFRICA;
+  const accountsMenu = accountsMenuFor(isAll || isIndia);
   // Map each top-level menu label to its PERM_MODULES group name
   const MENU_TO_GROUP = {
     "Dashboard":        null,            // always visible
@@ -542,10 +566,10 @@ export function getMenu(branch, currentUser){
   // lives under the Taxation header (regime-aware: GST / VAT / consolidated), so the
   // accountant gets that pill too. Branch scope is still enforced by the top-right
   // switcher (limited to their stored branches).
-  if (isAccountant) return applyHidden([MENU_ACCOUNTS, taxSection], currentUser);
+  if (isAccountant) return applyHidden([accountsMenu, taxSection], currentUser);
   const top = isDir ? [MENU_DASHBOARDS, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
   // 8 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · Admin
-  const menus = [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
+  const menus = [...top, accountsMenu, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
   // Strip each user's hidden pages/reports (Settings → Page Visibility Control).
   return applyHidden(menus, currentUser);
 }

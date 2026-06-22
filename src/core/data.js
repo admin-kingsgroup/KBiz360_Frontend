@@ -89,6 +89,7 @@ export const TAX_INDIA = {label:"Taxation — GST", icon:FileText, _regime:"GST"
   {label:"GSTR-2B Reconciliation (ITC)", href:"/tax/gstr2b"},
   {label:"GSTR-2A Reconciliation",       href:"/tax/gstr2a"},
   {label:"GSTR-9C — Audit Reco",         href:"/tax/gstr9c"},
+  {label:"Tax Reco (3B/1/TDS vs Books)", href:"/tax/reconciliation"},
   /* — TDS — */
   {divider:true, label:"TDS / TCS"},
   {label:"TDS & TCS Register",        href:"/tax/tds"},
@@ -120,6 +121,8 @@ export const TAX_AFRICA = {label:"Taxation — VAT", icon:FileText, _regime:"VAT
   {divider:true, label:"VAT Returns"},
   {label:"VAT Return (Monthly)",      href:"/tax/vat"},
   {label:"Withholding Tax",           href:"/tax/tds"},
+  {divider:true, label:"Reconciliation"},
+  {label:"VAT Return vs Books",       href:"/tax/reconciliation"},
   {divider:true, label:"Compliance"},
   {label:"Compliance Calendar",       href:"/tax/calendar"},
   /* — Tax & Statutory (moved here from the Accounts pill) — */
@@ -137,6 +140,7 @@ export const TAX_ALL = {label:"Taxation", icon:FileText, _regime:"ALL", children
   {label:"GSTR-1",                    href:"/tax/gstr1"},
   {label:"GSTR-3B",                   href:"/tax/gstr3b"},
   {label:"GSTR-2B Recon",             href:"/tax/gstr2b"},
+  {label:"Tax Reco (3B/1/TDS/VAT vs Books)", href:"/tax/reconciliation"},
   {label:"TDS / TCS",                 href:"/tax/tds"},
   {label:"TDS Certificates (16A)",    href:"/tax/tds-certs"},
   {label:"RCM Register",              href:"/tax/rcm"},

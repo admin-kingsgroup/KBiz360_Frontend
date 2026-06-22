@@ -31,7 +31,7 @@ export function useSupplierStatement(supplier, branch, { from, to } = {}) {
   const code = branchCode(branch);
   return useQuery({
     queryKey: ['supplier-reco', 'statement', supplier || '', code || 'all', from || '', to || ''],
-    queryFn: () => apiGet('/api/supplier-reconciliation/statement', { supplier, from, to }),
+    queryFn: () => apiGet('/api/supplier-reconciliation/statement', { supplier, branch: code, from, to }),
     enabled: enabled() && !!supplier,
     staleTime: 15_000,
   });
@@ -41,7 +41,7 @@ export function useSupplierReconSummary(supplier, branch, { from, to } = {}) {
   const code = branchCode(branch);
   return useQuery({
     queryKey: ['supplier-reco', 'summary', supplier || '', code || 'all', from || '', to || ''],
-    queryFn: () => apiGet('/api/supplier-reconciliation/summary', { supplier, from, to }),
+    queryFn: () => apiGet('/api/supplier-reconciliation/summary', { supplier, branch: code, from, to }),
     enabled: enabled() && !!supplier,
     staleTime: 15_000,
   });
