@@ -50,9 +50,12 @@ const EMPTY_MPL = {
 };
 
 // Module-wise Sales / COGS / Gross Profit → Net Profit bridge for a period.
-export async function getModulePL({ branchCode, from, to } = {}) {
+// `summary: true` skips the per-booking file drill server-side (much faster on the
+// remote DB) — pass it only when the caller reads totals/bridge/indirect, NOT when
+// it needs per-module fileCount / files (e.g. the booking-count KPIs).
+export async function getModulePL({ branchCode, from, to, summary } = {}) {
   try {
-    return (await apiGet('/api/accounting/module-pl', { branch: branchCode, from, to })) || EMPTY_MPL;
+    return (await apiGet('/api/accounting/module-pl', { branch: branchCode, from, to, ...(summary ? { summary: 1 } : {}) })) || EMPTY_MPL;
   } catch {
     return EMPTY_MPL;
   }
@@ -100,7 +103,9 @@ export async function getCashPosition(branchCode) {
 // (the engine aggregates GP by cost-centre, not by consultant).
 export async function getSaleVouchers({ branchCode, from, to } = {}) {
   try {
-    return (await apiGet('/api/vouchers', { branch: branchCode, category: 'sale', from, to })) || [];
+    // Only consultant + subtotal are summed for the leaderboard → project to those
+    // (already period-bounded) so we don't pull full voucher docs with line payloads.
+    return (await apiGet('/api/vouchers', { branch: branchCode, category: 'sale', from, to, fields: 'consultant,subtotal' })) || [];
   } catch {
     return [];
   }

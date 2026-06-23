@@ -72,7 +72,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
       api.getTopCustomers(branchCode),
       api.getTopSuppliers(branchCode),
       api.getBankAccounts(branchCode),
-      api.getModulePL({ branchCode, from: dates.from, to: dates.to }), // live, period + scope driven
+      api.getModulePL({ branchCode, from: dates.from, to: dates.to, summary: true }), // live, period + scope driven (totals/bridge only → summary)
       api.getAgeingTotals(branchCode),
       api.getCashPosition(branchCode),
       api.getArAgeingSummary(branchCode),  // branch-scoped: an all-scope Director who selects a

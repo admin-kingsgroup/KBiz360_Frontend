@@ -7,9 +7,9 @@ export function BranchPlHeatmap({ rows }) {
       <table style={{ borderCollapse: 'collapse', fontSize: 10, width: '100%' }}>
         <thead>
           <tr>
-            <th style={{ padding: '4px 6px', textAlign: 'left', color: '#5a6691' }} />
+            <th style={{ padding: '4px 6px', textAlign: 'left', color: '#5b616e' }} />
             {rows[0].cells.map((c) => (
-              <th key={c.month} style={{ padding: '4px 3px', fontSize: 9, color: '#5a6691', fontWeight: 600 }}>
+              <th key={c.month} style={{ padding: '4px 3px', fontSize: 9, color: '#5b616e', fontWeight: 600 }}>
                 {c.month.substring(0, 3)}
               </th>
             ))}
@@ -18,7 +18,7 @@ export function BranchPlHeatmap({ rows }) {
         <tbody>
           {rows.map((row) => (
             <tr key={row.branch}>
-              <td style={{ padding: '4px 6px', fontWeight: 700, color: '#0d1326', fontSize: 10.5 }}>{row.branch}</td>
+              <td style={{ padding: '4px 6px', fontWeight: 700, color: '#14161a', fontSize: 10.5 }}>{row.branch}</td>
               {row.cells.map((c) => {
                 const pct = c.rev > 0 ? c.gp / c.rev : 0;
                 const intensity = Math.min(0.85, pct * 5);
@@ -34,7 +34,7 @@ export function BranchPlHeatmap({ rows }) {
                         justifyContent: 'center',
                         fontSize: 9,
                         fontWeight: 700,
-                        color: intensity > 0.4 ? '#0d1326' : '#5a6691',
+                        color: intensity > 0.4 ? '#14161a' : '#5b616e',
                         margin: 1,
                         borderRadius: 2,
                       }}

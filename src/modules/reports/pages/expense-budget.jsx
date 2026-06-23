@@ -17,15 +17,16 @@ import { useBudgetVsActual } from '../../../core/useAccounting';
 import { bc } from '../../../core/styles';
 import { BRANCHES, CONSOLIDATED_LABEL } from '../../../core/data';
 import { CUR_FY, CUR_MONTH } from '../../../core/dates';
+import { compactAmt } from '../../../core/format';
 import { GRP_COLORS } from '../../../core/helpers';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { ResponsiveGrid, StatusPill, Button, Select } from '../../../shell/primitives';
 
-const pctColor = (p) => (p === null ? '#bfc3d6' : p <= 80 ? '#27500A' : p <= 100 ? '#1D9E75' : p <= 120 ? '#854F0B' : '#A32D2D');
-const pctBg = (p) => (p === null ? '#f3f4f8' : p <= 100 ? '#EAF3DE' : p <= 120 ? '#FAEEDA' : '#FCEBEB');
+const pctColor = (p) => (p === null ? '#cbd0db' : p <= 80 ? '#16a34a' : p <= 100 ? '#3fb7a3' : p <= 120 ? '#d97706' : '#dc2626');
+const pctBg = (p) => (p === null ? '#f3f4f8' : p <= 100 ? '#e8f6ed' : p <= 120 ? '#fbeedb' : '#fbe9e9');
 const pctLabel = (p) => (p === null ? 'No budget' : p <= 80 ? 'Under budget' : p <= 100 ? 'On budget' : p <= 120 ? 'Slightly over' : 'Over budget');
-const vColor = (v) => (v >= 0 ? '#27500A' : '#A32D2D');
+const vColor = (v) => (v >= 0 ? '#16a34a' : '#dc2626');
 
 const Bar = ({ pct, h = 8 }) => (
   <div className="min-w-[50px] overflow-hidden rounded-full bg-surface-alt" style={{ height: h }}>
@@ -74,7 +75,9 @@ export function ReportExpenseBgt({ branch, setRoute }) {
   const totVar = totBgt - totAct;
   const totPct = totBgt > 0 ? +(totAct / totBgt * 100).toFixed(1) : null;
 
-  const f = (n) => (n >= 1000000 ? (n / 100000).toFixed(1) + 'L' : n >= 1000 ? (n / 1000).toFixed(0) + 'K' : n > 0 ? String(Math.round(n)) : '—');
+  // Canonical compact formatter (correct lakh/crore thresholds, branch-currency aware) —
+  // replaces a local one that mislabelled 1–10 lakh as "K".
+  const f = (n) => compactAmt(n, { currency: cur, dash: true });
   const ff = (n) => (n > 0 ? cur + Number(n).toLocaleString('en-IN') : '—');
 
   const allBranchSummary = isAll ? BRANCHES.map((b) => {
@@ -90,16 +93,16 @@ export function ReportExpenseBgt({ branch, setRoute }) {
   const viewLabel = view === 'mtd' ? `MTD — ${fyObj.months[fyObj.keys.indexOf(selMonth)] || selMonth}` : view === 'ytd' ? `YTD — ${ytdMonths.length} months to ${fyObj.months[fyObj.keys.indexOf(selMonth)] || selMonth}` : `Full Year — ${fyObj.l}`;
 
   const KPIS = [
-    { l: 'Budget', v: ff(totBgt), sub: viewLabel, c: '#185FA5' },
-    { l: 'Actual', v: ff(totAct), sub: 'expenses incurred', c: totAct > totBgt ? '#A32D2D' : '#27500A' },
+    { l: 'Budget', v: ff(totBgt), sub: viewLabel, c: '#2563eb' },
+    { l: 'Actual', v: ff(totAct), sub: 'expenses incurred', c: totAct > totBgt ? '#dc2626' : '#16a34a' },
     { l: 'Variance', v: (totVar >= 0 ? '+' : '') + ff(Math.abs(totVar)), sub: totVar >= 0 ? 'Under budget' : 'OVER BUDGET', c: vColor(totVar) },
     { l: 'Utilisation', v: totPct === null ? '—' : `${totPct}%`, sub: pctLabel(totPct), c: pctColor(totPct) },
-    { l: 'Over budget', v: `${rows.filter((r) => r.pct !== null && r.pct > 100).length} ledgers`, sub: 'review needed', c: '#A32D2D' },
+    { l: 'Over budget', v: `${rows.filter((r) => r.pct !== null && r.pct > 100).length} ledgers`, sub: 'review needed', c: '#dc2626' },
   ];
 
   const columns = [
     { key: 'name', header: 'Expense Ledger', hideable: false, className: 'font-semibold text-navy', render: (r, v) => <span className="inline-flex items-center gap-2"><span className="text-base">{r.icon}</span>{v}</span>, footerLabel: `TOTAL — ${brCode}` },
-    { key: 'group', header: 'Group', render: (r, v) => <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: (GRP_COLORS[v] || '#384677') + '22', color: GRP_COLORS[v] || '#384677' }}>{v}</span> },
+    { key: 'group', header: 'Group', render: (r, v) => <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: (GRP_COLORS[v] || '#2e323c') + '22', color: GRP_COLORS[v] || '#2e323c' }}>{v}</span> },
     { key: 'bgt', header: view === 'mtd' ? 'MTD Budget' : view === 'ytd' ? 'YTD Budget' : 'Annual Budget', num: true, className: 'text-ink-muted', render: (r, v) => (v > 0 ? ff(v) : <span className="text-[10px] text-ink-subtle">Not set</span>), footer: () => ff(totBgt) },
     { key: 'act', header: view === 'mtd' ? 'MTD Actual' : view === 'ytd' ? 'YTD Actual' : 'Annual Actual', num: true, className: 'font-bold', render: (r, v) => (v > 0 ? ff(v) : '—'), footer: () => ff(totAct) },
     { key: 'util', header: 'Utilisation', sortable: false, render: (r) => (r.bgt > 0 && r.act > 0 ? <Bar pct={r.pct} h={10} /> : null) },
@@ -151,10 +154,10 @@ export function ReportExpenseBgt({ branch, setRoute }) {
                 </div>
                 <div className="mb-2 grid grid-cols-2 gap-1 text-[10.5px]">
                   <div><p className="text-ink-muted">Budget</p><p className="font-bold text-role-hr">{bCur}{f(totB)}</p></div>
-                  <div><p className="text-ink-muted">Actual</p><p className="font-bold" style={{ color: totA == null ? '#bfc3d6' : totA > totB ? '#A32D2D' : '#27500A' }}>{totA == null ? '—' : bCur + f(totA)}</p></div>
+                  <div><p className="text-ink-muted">Actual</p><p className="font-bold" style={{ color: totA == null ? '#cbd0db' : totA > totB ? '#dc2626' : '#16a34a' }}>{totA == null ? '—' : bCur + f(totA)}</p></div>
                 </div>
                 <Bar pct={pct} h={8} />
-                <p className="mt-1.5 text-[9.5px] font-bold" style={{ color: v == null ? '#5a6691' : v >= 0 ? '#27500A' : '#A32D2D' }}>{v == null ? 'Open this branch for actuals' : `${v >= 0 ? 'Under' : 'Over'} by ${bCur}${f(Math.abs(v))}`}</p>
+                <p className="mt-1.5 text-[9.5px] font-bold" style={{ color: v == null ? '#5b616e' : v >= 0 ? '#16a34a' : '#dc2626' }}>{v == null ? 'Open this branch for actuals' : `${v >= 0 ? 'Under' : 'Over'} by ${bCur}${f(Math.abs(v))}`}</p>
               </button>
             ))}
           </ResponsiveGrid>
@@ -173,6 +176,8 @@ export function ReportExpenseBgt({ branch, setRoute }) {
 
       <DataTable
         className="mb-3"
+        loading={bvaQ.isLoading}
+        isError={bvaQ.isError}
         columns={columns}
         rows={rows}
         getRowKey={(r) => r.id}
@@ -193,12 +198,12 @@ export function ReportExpenseBgt({ branch, setRoute }) {
             const mPct = (mBgt > 0 && mAct != null) ? +(mAct / mBgt * 100).toFixed(0) : null;
             const isSelected = k === selMonth;
             return (
-              <button key={k} onClick={() => { setSelMonth(k); if (view === 'annual') setView('mtd'); }} style={{ background: isSelected ? '#0d1326' : pctBg(mPct) }}
+              <button key={k} onClick={() => { setSelMonth(k); if (view === 'annual') setView('mtd'); }} style={{ background: isSelected ? '#1a1c22' : pctBg(mPct) }}
                 className={`min-w-[58px] flex-1 rounded-lg border-2 px-1.5 py-2 text-center ${isSelected ? 'border-navy' : 'border-surface-border'}`}>
-                <p className="text-[9px] font-bold" style={{ color: isSelected ? '#d4a437' : '#384677' }}>{fyObj.months[ki]}</p>
+                <p className="text-[9px] font-bold" style={{ color: isSelected ? '#c2a04a' : '#2e323c' }}>{fyObj.months[ki]}</p>
                 <p className="my-1 text-base font-extrabold" style={{ color: isSelected ? '#fff' : pctColor(mPct) }}>{mPct !== null ? `${mPct}%` : '—'}</p>
                 <Bar pct={mPct} h={5} />
-                <p className="mt-1 text-[8px]" style={{ color: isSelected ? '#8b94b3' : '#bfc3d6' }}>{mAct != null && mAct > 0 ? cur + f(mAct) : 'no data'}</p>
+                <p className="mt-1 text-[8px]" style={{ color: isSelected ? '#9197a3' : '#cbd0db' }}>{mAct != null && mAct > 0 ? cur + f(mAct) : 'no data'}</p>
               </button>
             );
           })}

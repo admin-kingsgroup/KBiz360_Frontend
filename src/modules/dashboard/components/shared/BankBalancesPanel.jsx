@@ -13,7 +13,7 @@ export function BankBalancesPanel({ accounts, limit = 7 }) {
               style={{
                 margin: 0,
                 fontSize: 11,
-                color: '#0d1326',
+                color: '#14161a',
                 fontWeight: 600,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -22,15 +22,15 @@ export function BankBalancesPanel({ accounts, limit = 7 }) {
             >
               {b.bank}
             </p>
-            <p style={{ margin: 0, fontSize: 9.5, color: '#5a6691' }}>
+            <p style={{ margin: 0, fontSize: 9.5, color: '#5b616e' }}>
               {b.branch} · ...{(b.accountNo || '').slice(-6)}
             </p>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#0d1326', fontFamily: 'monospace' }}>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#14161a', fontFamily: 'monospace' }}>
               {b.currency} {(b.openingBal / 1000).toFixed(0)}K
             </p>
-            <p style={{ margin: 0, fontSize: 9, color: b.limit > 0 && b.openingBal / b.limit > 0.8 ? '#A32D2D' : '#5a6691' }}>
+            <p style={{ margin: 0, fontSize: 9, color: b.limit > 0 && b.openingBal / b.limit > 0.8 ? '#dc2626' : '#5b616e' }}>
               {b.limit > 0 ? Math.round((b.openingBal / b.limit) * 100) : 0}% of limit
             </p>
           </div>

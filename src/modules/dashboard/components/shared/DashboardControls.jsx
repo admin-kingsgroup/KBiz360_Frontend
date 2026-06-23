@@ -31,20 +31,20 @@ export function DashboardControls({ range, setRange, scope, setScope }) {
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         flexWrap: 'wrap', gap: 12, marginBottom: 14,
-        padding: '10px 14px', background: '#f7f8fb', border: '1px solid #e1e3ec', borderRadius: 8,
+        padding: '10px 14px', background: '#f4f5f7', border: '1px solid #e6e8ec', borderRadius: 8,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         {/* Period segmented control */}
-        <div style={{ display: 'flex', gap: 4, padding: 3, background: '#fff', borderRadius: 7, border: '1px solid #e1e3ec' }}>
+        <div style={{ display: 'flex', gap: 4, padding: 3, background: '#fff', borderRadius: 7, border: '1px solid #e6e8ec' }}>
           {RANGE_TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setRange(t.id)}
               style={{
                 padding: '6px 14px', border: 'none', borderRadius: 5, fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
-                background: range === t.id ? '#0d1326' : 'transparent',
-                color: range === t.id ? '#d4a437' : '#5a6691',
+                background: range === t.id ? '#14161a' : 'transparent',
+                color: range === t.id ? '#c2a04a' : '#5b616e',
               }}
             >
               {t.label}
@@ -58,7 +58,7 @@ export function DashboardControls({ range, setRange, scope, setScope }) {
           <select
             value={scope}
             onChange={(e) => setScope(e.target.value)}
-            style={{ padding: '6px 10px', fontSize: 11.5, fontWeight: 600, color: '#0d1326', background: '#fff', border: '1px solid #e1e3ec', borderRadius: 6, cursor: 'pointer', minHeight: 32 }}
+            style={{ padding: '6px 10px', fontSize: 11.5, fontWeight: 600, color: '#14161a', background: '#fff', border: '1px solid #e6e8ec', borderRadius: 6, cursor: 'pointer', minHeight: 32 }}
           >
             <option value="ALL">🌐 Group Company (All Branches)</option>
             {BRANCHES.map((b) => (
@@ -68,8 +68,8 @@ export function DashboardControls({ range, setRange, scope, setScope }) {
         </div>
       </div>
 
-      <div style={{ fontSize: 11, color: '#5a6691' }}>
-        Showing <strong style={{ color: '#0d1326' }}>{dates.label}</strong> · <strong style={{ color: '#0d1326' }}>{scopeLabel}</strong>
+      <div style={{ fontSize: 11, color: '#5b616e' }}>
+        Showing <strong style={{ color: '#14161a' }}>{dates.label}</strong> · <strong style={{ color: '#14161a' }}>{scopeLabel}</strong>
       </div>
     </div>
   );

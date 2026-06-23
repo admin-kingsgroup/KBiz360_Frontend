@@ -9,8 +9,8 @@
      Day Book · Ledger A/c · Trial Balance · Profit & Loss · Balance Sheet
      Sales / Purchase Register · 28 Tally Groups · Chart of Accounts
 
-   The look matches the existing Books reports (dark #0d1326 header, gold
-   #d4a437 accents). No demo data — empty in, empty out.
+   The look matches the existing Books reports (dark #1a1c22 header, gold
+   #c2a04a accents). No demo data — empty in, empty out.
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -40,29 +40,27 @@ import {
 import { LedgerVouchers } from '../pnlTally.jsx';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { hasRegistry } from '../../core/voucher/registry';
+import { PageLayout } from '../../shell/PageLayout';
+import { SkeletonTable } from '../../shell/primitives';
 
-const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691', BLUE = '#185FA5', RED = '#A32D2D', GREEN = '#27500A';
+const DARK = '#1a1c22', GOLD = '#c2a04a', DIM = '#5b616e', BLUE = '#2563eb', RED = '#dc2626', GREEN = '#16a34a';
 const curOf = (branch) => bc(branch).cur;
 const money = (cur, n) => { const v = Math.round(Number(n) || 0); return v ? cur + v.toLocaleString('en-IN') : '—'; };
 const branchLabel = (branch) => (!branch || branch === 'ALL' ? CONSOLIDATED_LABEL : (branch.code || branch));
 
 /* ── shared chrome ──────────────────────────────────────────────────── */
+// Premium page scaffold — uses the shared PageLayout (breadcrumb · title ·
+// wrapping actions · responsive padding) so every accounting screen matches the
+// rest of KBiz360 Pro. `wide` drops the max-width for the full-bleed registers.
 function Page({ title, sub, right, children, wide }) {
   return (
-    <div style={{ padding: wide ? '10px 8px' : '12px 10px', maxWidth: wide ? 'none' : 1200, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>{title}</h2>
-          {sub && <p style={{ margin: '2px 0 0', fontSize: 10.5, color: DIM }}>{sub}</p>}
-        </div>
-        {right && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{right}</div>}
-      </div>
+    <PageLayout title={title} subtitle={sub} actions={right} maxWidth={wide ? 'max-w-none' : 'mx-auto max-w-[1200px]'}>
       {children}
-    </div>
+    </PageLayout>
   );
 }
 
-const DateInput = (props) => <input type="date" {...props} style={{ ...inp, width: 140, minHeight: 32, fontSize: 11 }} />;
+const DateInput = (props) => <input type="date" {...props} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 140, minHeight: 32, fontSize: 11 }} />;
 
 // ── tolerant date handling ─────────────────────────────────────────────────
 // Tally-imported voucher dates arrive as mixed strings ("16-Mar-26",
@@ -105,27 +103,40 @@ export function DateRange({ from, to, setFrom, setTo, branch }) {
 
 function Banner({ tone = 'info', children }) {
   const T = {
-    ok: { bg: '#EAF3DE', bd: '#C0DD97', c: GREEN },
-    err: { bg: '#FCEBEB', bd: '#F7C1C1', c: RED },
-    info: { bg: '#E6F1FB', bd: '#BcdAF2', c: BLUE },
-  }[tone] || { bg: '#E6F1FB', bd: '#cfe0f5', c: BLUE };
+    ok: { bg: '#e8f6ed', bd: '#bfe6cd', c: GREEN },
+    err: { bg: '#fbe9e9', bd: '#f3c9c9', c: RED },
+    info: { bg: '#e8f0ff', bd: '#cfe0f8', c: BLUE },
+  }[tone] || { bg: '#e8f0ff', bd: '#cfe0f8', c: BLUE };
   return <div style={{ marginBottom: 10, padding: '8px 14px', borderRadius: 8, background: T.bg, border: `1px solid ${T.bd}`, fontSize: 10.5, color: T.c, fontWeight: 600 }}>{children}</div>;
 }
 
 function State({ q, empty, children }) {
-  if (q.isLoading) return <div style={{ ...card, padding: 28, textAlign: 'center', color: DIM, fontSize: 12 }}>Loading live data…</div>;
-  if (q.isError) return <Banner tone="err">⚠ {q.error?.message || 'Failed to load from backend'}</Banner>;
+  // Premium loading skeleton from the shared foundation (no card-in-card).
+  if (q.isLoading) return <SkeletonTable rows={8} cols={6} />;
+  if (q.isError) return (
+    <Banner tone="err">
+      <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+        ⚠ {q.error?.message || 'Failed to load from backend'}
+        {q.refetch && (
+          <button onClick={() => { toast('Retrying…', 'info'); q.refetch(); }} className="max-tablet:min-h-[44px]"
+            style={{ ...inp, width: 'auto', minHeight: 28, fontSize: 11, fontWeight: 700, cursor: 'pointer', color: RED, borderColor: RED, background: '#fff' }}>↻ Retry</button>
+        )}
+      </span>
+    </Banner>
+  );
   if (empty) return <div style={{ ...card, padding: 28, textAlign: 'center', color: DIM, fontSize: 12 }}>No data for this selection.</div>;
   return children;
 }
 
 // "Export to Excel" button — CSV that opens straight into Excel columns.
 function ExportBtn({ onClick, disabled, label = 'Export to Excel' }) {
+  // User-triggered action → confirm with a toast (and surface any failure).
+  const handle = () => { try { onClick && onClick(); toast('Downloading Excel export…', 'success'); } catch (e) { toast('Export failed: ' + (e?.message || e), 'error'); } };
   return (
-    <button onClick={onClick} disabled={disabled}
+    <button onClick={handle} disabled={disabled} className="max-tablet:min-h-[44px]"
       style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6,
         cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
-        background: '#15803d', color: '#fff', borderColor: '#15803d' }}
+        background: GREEN, color: '#fff', borderColor: GREEN }}
       title="Download all rows with the full bifurcation as a CSV that opens in Excel">
       ⬇ {label}
     </button>
@@ -156,7 +167,7 @@ export function VoucherLines({ voucher: v, cur }) {
   return (
     <>
       {lockedByBooking && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: '#FAEEDA', border: '1px solid #FAC775', color: '#854F0B', fontSize: 11.5, fontWeight: 600 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: '#fbeedb', border: '1px solid #f3d9a8', color: '#d97706', fontSize: 11.5, fontWeight: 600 }}>
           🔒 Locked — driven by booking <b>{v.bookingId}</b>. Edit it on the SO / PO / GP booking (this Sales/Purchase voucher is read-only).
         </div>
       )}
@@ -316,7 +327,7 @@ function DetailedTable({ columns, rows }) {
 // Small Summary/Detailed view switch.
 function ViewToggle({ view, setView }) {
   const B = ({ id, label }) => (
-    <button onClick={() => setView(id)} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === id ? DARK : '#fff', color: view === id ? GOLD : DIM, borderColor: view === id ? DARK : '#e1e3ec' }}>{label}</button>
+    <button onClick={() => setView(id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === id ? DARK : '#fff', color: view === id ? GOLD : DIM, borderColor: view === id ? DARK : '#e6e8ec' }}>{label}</button>
   );
   return <><B id="summary" label="Summary" /><B id="detailed" label="Detailed" /></>;
 }
@@ -324,7 +335,7 @@ function ViewToggle({ view, setView }) {
 // Two-mode view switch with custom labels (Detailed / Minimal).
 function ModeToggle({ view, setView, modes }) {
   return <>{modes.map((m) => (
-    <button key={m.id} onClick={() => setView(m.id)} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === m.id ? DARK : '#fff', color: view === m.id ? GOLD : DIM, borderColor: view === m.id ? DARK : '#e1e3ec' }}>{m.label}</button>
+    <button key={m.id} onClick={() => setView(m.id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === m.id ? DARK : '#fff', color: view === m.id ? GOLD : DIM, borderColor: view === m.id ? DARK : '#e6e8ec' }}>{m.label}</button>
   ))}</>;
 }
 
@@ -347,8 +358,9 @@ function RangeBar({ from, to, setFrom, setTo, onChange, full, branch }) {
 // voucher no, party). Controlled; clears the page back to 1 via onChange.
 function SearchInput({ value, onChange, placeholder = 'Search…' }) {
   return (
-    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+    <span className="max-tablet:w-full" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
       <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+        className="max-tablet:w-full max-tablet:min-h-[44px]"
         style={{ ...inp, width: 200, minHeight: 32, fontSize: 11, paddingRight: value ? 26 : 10 }} />
       {value && <button onClick={() => onChange('')} title="Clear" style={{ position: 'absolute', right: 6, background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 14, lineHeight: 1 }}>✕</button>}
     </span>
@@ -363,7 +375,7 @@ function Pagination({ total, page, setPage, pageSize, setPageSize, unit = 'rows'
   if (total <= PAGE_SIZES[0]) return null;
   const cur = Math.min(page, pages - 1);
   const Btn = ({ label, to, disabled }) => (
-    <button disabled={disabled} onClick={() => setPage(to)} style={{ ...inp, width: 'auto', minHeight: 30, fontSize: 11, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1, fontWeight: 700, color: DIM }}>{label}</button>
+    <button disabled={disabled} onClick={() => setPage(to)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 30, fontSize: 11, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1, fontWeight: 700, color: DIM }}>{label}</button>
   );
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap', marginTop: 10, fontSize: 11, color: DIM }}>
@@ -373,7 +385,7 @@ function Pagination({ total, page, setPage, pageSize, setPageSize, unit = 'rows'
       <span style={{ fontWeight: 700, color: DARK }}>Page {cur + 1} / {pages}</span>
       <Btn label="Next ›" to={cur + 1} disabled={cur >= pages - 1} />
       <Btn label="Last »" to={pages - 1} disabled={cur >= pages - 1} />
-      <select value={pageSize} onChange={(e) => { setPageSize(+e.target.value); setPage(0); }} style={{ ...inp, width: 'auto', minHeight: 30, fontSize: 11, cursor: 'pointer' }}>
+      <select value={pageSize} onChange={(e) => { setPageSize(+e.target.value); setPage(0); }} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 30, fontSize: 11, cursor: 'pointer' }}>
         {PAGE_SIZES.map((n) => <option key={n} value={n}>{n} / page</option>)}
       </select>
     </div>
@@ -383,11 +395,11 @@ function Pagination({ total, page, setPage, pageSize, setPageSize, unit = 'rows'
 // Narration cell with expand/collapse for long text.
 function NarrationCell({ text, clamp = 55 }) {
   const [open, setOpen] = useState(false);
-  if (!text) return <span style={{ color: '#cfd3e0' }}>—</span>;
+  if (!text) return <span style={{ color: '#9197a3' }}>—</span>;
   const long = String(text).length > clamp;
-  if (!long) return <span style={{ color: '#384677' }}>{text}</span>;
+  if (!long) return <span style={{ color: '#2e323c' }}>{text}</span>;
   return (
-    <span style={{ color: '#384677' }}>
+    <span style={{ color: '#2e323c' }}>
       {open ? text : String(text).slice(0, clamp) + '… '}
       <button onClick={() => setOpen((o) => !o)} style={{ background: 'none', border: 'none', color: BLUE, cursor: 'pointer', fontWeight: 700, fontSize: 10, padding: 0 }}>{open ? 'less' : 'more'}</button>
     </span>
@@ -424,15 +436,16 @@ function openReportPrint(title, sub, columns, rows, totalRow) {
   <table><thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot}</table>
   </body></html>`);
   win.document.close(); win.focus();
+  toast('Print view opened — choose your printer or Save as PDF.', 'info');
   setTimeout(() => { try { win.print(); } catch (e) { /* user can print manually */ } }, 400);
 }
 
 // "Print / PDF" toolbar button (mirrors ExportBtn styling).
 function PrintBtn({ onClick, disabled }) {
   return (
-    <button onClick={onClick} disabled={disabled}
+    <button onClick={onClick} disabled={disabled} className="max-tablet:min-h-[44px]"
       style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6,
-        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, background: '#fff', color: DARK, borderColor: '#d6dbe6' }}
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, background: '#fff', color: DARK, borderColor: '#e6e8ec' }}
       title="Open a print view — choose your printer or Save as PDF">🖨 Print / PDF</button>
   );
 }
@@ -449,11 +462,11 @@ function LedgerDrill({ branch, ledger, from, to, onClose }) {
     ...(voucher ? [{ label: voucher.vno }] : []),
   ];
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(960px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e6e8ec', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
           <Crumb items={crumbs} />
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
+          <button onClick={onClose} className="inline-flex items-center justify-center max-tablet:min-h-[44px] max-tablet:min-w-[44px]" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
         </div>
         {voucher
           ? <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} />
@@ -468,11 +481,11 @@ function VoucherModal({ branch, voucher, onClose }) {
   const cur = curOf(branch);
   useEffect(() => pushModal(onClose), []); // Esc closes
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(840px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e6e8ec', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
           <Crumb items={[{ label: voucher.vno }]} />
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
+          <button onClick={onClose} className="inline-flex items-center justify-center max-tablet:min-h-[44px] max-tablet:min-w-[44px]" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
         </div>
         <VoucherEditor voucherId={voucher.id} cur={cur} onBack={onClose} />
       </div>
@@ -592,15 +605,15 @@ export function TrialBalanceLive({ branch }) {
                     {...clickable(() => setDrill(l.ledger))}
                     onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
-                    <td style={{ padding: '8px 14px 8px 26px', color: BLUE, fontWeight: 600 }}>{l.ledger}{l.code ? <span style={{ color: '#b9bed4', fontSize: 9.5, marginLeft: 6 }}>{l.code}</span> : null} <span style={{ color: '#cfd3e0', fontSize: 10 }}>›</span></td>
+                    <td style={{ padding: '8px 14px 8px 26px', color: BLUE, fontWeight: 600 }}>{l.ledger}{l.code ? <span style={{ color: '#9197a3', fontSize: 9.5, marginLeft: 6 }}>{l.code}</span> : null} <span style={{ color: '#9197a3', fontSize: 10 }}>›</span></td>
                     {view === 'detailed' && <>
-                      <td style={{ padding: '8px 14px', ...num, color: l.openingDebit > 0 ? DARK : '#cfd3e0' }}>{money(cur, l.openingDebit)}</td>
-                      <td style={{ padding: '8px 14px', ...num, color: l.openingCredit > 0 ? DARK : '#cfd3e0' }}>{money(cur, l.openingCredit)}</td>
-                      <td style={{ padding: '8px 14px', ...num, color: l.debit > 0 ? BLUE : '#cfd3e0' }}>{money(cur, l.debit)}</td>
-                      <td style={{ padding: '8px 14px', ...num, color: l.credit > 0 ? RED : '#cfd3e0' }}>{money(cur, l.credit)}</td>
+                      <td style={{ padding: '8px 14px', ...num, color: l.openingDebit > 0 ? DARK : '#9197a3' }}>{money(cur, l.openingDebit)}</td>
+                      <td style={{ padding: '8px 14px', ...num, color: l.openingCredit > 0 ? DARK : '#9197a3' }}>{money(cur, l.openingCredit)}</td>
+                      <td style={{ padding: '8px 14px', ...num, color: l.debit > 0 ? BLUE : '#9197a3' }}>{money(cur, l.debit)}</td>
+                      <td style={{ padding: '8px 14px', ...num, color: l.credit > 0 ? RED : '#9197a3' }}>{money(cur, l.credit)}</td>
                     </>}
-                    <td style={{ padding: '8px 14px', ...num, fontWeight: 700, color: l.closingDebit > 0 ? DARK : '#cfd3e0' }}>{money(cur, l.closingDebit)}</td>
-                    <td style={{ padding: '8px 14px', ...num, fontWeight: 700, color: l.closingCredit > 0 ? DARK : '#cfd3e0' }}>{money(cur, l.closingCredit)}</td>
+                    <td style={{ padding: '8px 14px', ...num, fontWeight: 700, color: l.closingDebit > 0 ? DARK : '#9197a3' }}>{money(cur, l.closingDebit)}</td>
+                    <td style={{ padding: '8px 14px', ...num, fontWeight: 700, color: l.closingCredit > 0 ? DARK : '#9197a3' }}>{money(cur, l.closingCredit)}</td>
                   </tr>
                 </React.Fragment>
               );
@@ -626,7 +639,7 @@ export function TrialBalanceLive({ branch }) {
 }
 
 /* ════════════════════ DAY BOOK ═════════════════════════════════════ */
-const TYPE_CLR = { sale: BLUE, purchase: '#854F0B', receipt: GREEN, payment: RED, journal: '#384677', contra: '#6b21a8', 'credit-note': RED, 'debit-note': '#854F0B' };
+const TYPE_CLR = { sale: BLUE, purchase: '#d97706', receipt: GREEN, payment: RED, journal: '#2e323c', contra: '#6b21a8', 'credit-note': RED, 'debit-note': '#d97706' };
 // Normalise any date string to ISO for stable day-grouping (Tally dates vary).
 const dayKey = (d) => { const p = parseAnyDate(d); return p ? isoDate(p) : String(d || ''); };
 
@@ -639,8 +652,11 @@ export function DayBookLive({ branch }) {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(1000); // show the whole ledger by default; pager still kicks in past 1000
   const [voucher, setVoucher] = useState(null); // clicked Day Book line → voucher modal
-  // Fetch all journals; date filtering is client-side (Tally dates are mixed-format strings).
-  const q = useDayBook(branch);
+  // Fetch only the selected window server-side (journal dates are all ISO, so the
+  // {date:$gte..$lte} range is exact) — defaults to today, so the Day Book opens fast
+  // instead of pulling the whole journal. The client-side dateInRange below still
+  // refines/handles any odd date string within the window.
+  const q = useDayBook(branch, { from, to });
   const allJournals = q.data || [];
 
   const term = search.trim().toLowerCase();
@@ -721,10 +737,10 @@ export function DayBookLive({ branch }) {
                     <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.date}</td>
                     <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE, whiteSpace: 'nowrap' }}>{r.vno}</td>
                     {view === 'detailed' && <>
-                      <td style={{ padding: '7px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: (TYPE_CLR[r.category] || '#384677') + '22', color: TYPE_CLR[r.category] || '#384677' }}>{r.category}</span></td>
+                      <td style={{ padding: '7px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: (TYPE_CLR[r.category] || '#2e323c') + '22', color: TYPE_CLR[r.category] || '#2e323c' }}>{r.category}</span></td>
                       <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.branch || '—'}</td>
                     </>}
-                    <td style={{ padding: '7px 12px', color: '#0d1326', paddingLeft: r.debit > 0 ? 12 : 26 }}>{r.ledger}{view === 'detailed' && <span style={{ color: '#b9bed4', fontSize: 9.5, marginLeft: 6 }}>{r.group}</span>}</td>
+                    <td style={{ padding: '7px 12px', color: '#1a1c22', paddingLeft: r.debit > 0 ? 12 : 26 }}>{r.ledger}{view === 'detailed' && <span style={{ color: '#9197a3', fontSize: 9.5, marginLeft: 6 }}>{r.group}</span>}</td>
                     <td style={{ padding: '7px 12px', ...num, color: r.debit > 0 ? BLUE : '#dfe2ee' }}>{money(cur, r.debit)}</td>
                     <td style={{ padding: '7px 12px', ...num, color: r.credit > 0 ? RED : '#dfe2ee' }}>{money(cur, r.credit)}</td>
                     {view === 'detailed' && <td style={{ padding: '7px 12px', maxWidth: 320 }}><NarrationCell text={r.narration} /></td>}
@@ -782,17 +798,17 @@ export function LedgerAcLive({ branch }) {
       sub={selected}
       wide
       right={<>
-        <select value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setSubGroupFilter(''); }} title="Filter ledgers by group" style={{ ...inp, width: 'auto', minWidth: 130, minHeight: 32, fontSize: 11 }}>
+        <select value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setSubGroupFilter(''); }} title="Filter ledgers by group" className="max-tablet:min-h-[44px] max-tablet:flex-1" style={{ ...inp, width: 'auto', minWidth: 130, minHeight: 32, fontSize: 11 }}>
           <option value="">All groups</option>
           {allGroups.map((g) => <option key={g} value={g}>{g}</option>)}
         </select>
         {groupFilter && (
-          <select value={subGroupFilter} onChange={(e) => setSubGroupFilter(e.target.value)} title="Filter by sub-group" style={{ ...inp, width: 'auto', minWidth: 130, minHeight: 32, fontSize: 11 }}>
+          <select value={subGroupFilter} onChange={(e) => setSubGroupFilter(e.target.value)} title="Filter by sub-group" className="max-tablet:min-h-[44px] max-tablet:flex-1" style={{ ...inp, width: 'auto', minWidth: 130, minHeight: 32, fontSize: 11 }}>
             <option value="">All sub-groups</option>
             {subOptions.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         )}
-        <select value={selected} onChange={(e) => pickLedger(e.target.value)} style={{ ...inp, width: 240, minHeight: 32, fontSize: 11 }}>
+        <select value={selected} onChange={(e) => pickLedger(e.target.value)} className="max-tablet:min-h-[44px] max-tablet:w-full" style={{ ...inp, width: 240, minHeight: 32, fontSize: 11 }}>
           {pickable.length === 0 && <option value="">{ledgers.length ? 'No ledgers in this group' : 'Loading…'}</option>}
           {pickable.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
         </select>
@@ -802,9 +818,9 @@ export function LedgerAcLive({ branch }) {
         <LedgerAccountView name={selected} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} maxHeight="calc(100vh - 330px)" />
       </div>
       {voucher && (
-        <div onClick={closeVoucher} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
+        <div onClick={closeVoucher} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
           <div onClick={(ev) => ev.stopPropagation()} style={{ ...card, width: 'min(820px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e6e8ec', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <Crumb items={[{ label: selected || 'Ledger', onClick: closeVoucher }, { label: voucher.vno }]} />
               <button onClick={closeVoucher} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
             </div>
@@ -824,9 +840,9 @@ function Crumb({ items }) {
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, fontSize: 12, minWidth: 0 }}>
       {items.map((it, i) => (
         <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          {i > 0 && <span style={{ color: '#b9bed4' }}>▸</span>}
+          {i > 0 && <span style={{ color: '#9197a3' }}>▸</span>}
           {it.onClick
-            ? <button onClick={it.onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', color: BLUE, fontWeight: 600, padding: 0, fontSize: 12 }}>{it.label}</button>
+            ? <button onClick={it.onClick} className="inline-flex items-center max-tablet:min-h-[44px]" style={{ background: 'none', border: 'none', cursor: 'pointer', color: BLUE, fontWeight: 600, padding: 0, fontSize: 12 }}>{it.label}</button>
             : <span style={{ color: DARK, fontWeight: 700 }}>{it.label}</span>}
         </span>
       ))}
@@ -906,14 +922,14 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
       <td>${esc(p.ledger)}</td><td>${esc(p.group || '')}</td>
       <td class="r">${fmt(p.debit)}</td><td class="r">${fmt(p.credit)}</td></tr>`).join('');
     const html = `<style>
-      .ve{font-family:'Segoe UI',Arial,sans-serif;color:#0d1326}
+      .ve{font-family:'Segoe UI',Arial,sans-serif;color:#1a1c22}
       .ve h1{font-size:16px;margin:0 0 2px}
-      .ve .meta{font-size:10.5px;color:#5a6691;margin:0 0 4px}
+      .ve .meta{font-size:10.5px;color:#5b616e;margin:0 0 4px}
       .ve table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:8px}
-      .ve th{background:#0d1326;color:#d4a437;text-align:left;padding:6px 8px;font-size:9.5px}
+      .ve th{background:#1a1c22;color:#c2a04a;text-align:left;padding:6px 8px;font-size:9.5px}
       .ve th.r,.ve td.r{text-align:right}
       .ve td{padding:5px 8px;border-bottom:1px solid #eceef4}
-      .ve tfoot td{background:#f3f5f9;font-weight:800;border-top:2px solid #0d1326}
+      .ve tfoot td{background:#f3f5f9;font-weight:800;border-top:2px solid #1a1c22}
     </style>
     <div class="ve">
       <h1>Voucher — ${esc(v.vno)}</h1>
@@ -953,7 +969,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
           <button onClick={printEntry} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
-          <button onClick={dismiss} style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #d6dbe6', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
+          <button onClick={dismiss} style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #e6e8ec', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
         </div>
       </div>
     );
@@ -978,7 +994,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
       <datalist id={dlId}>{ledgerNames.map((n) => <option key={n} value={n} />)}</datalist>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <div style={{ fontWeight: 800, color: DARK, fontSize: 14 }}>{v.vno} <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>{v.type} - {v.category}</span></div>
-        <button onClick={onBack} style={{ ...inp, width: 'auto', minHeight: 34, fontSize: 11.5, cursor: 'pointer' }}>Back</button>
+        <button onClick={onBack} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 34, fontSize: 11.5, cursor: 'pointer' }}>Back</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: 10 }}>
         <div><div style={lab}>Date</div><input type="date" max={todayISO()} value={form.date} onChange={(e) => set('date', e.target.value)} style={fld} /></div>
@@ -1027,14 +1043,18 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
       <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #eef1f6' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Lines — pick ledger from Books (Dr / Cr)</div>
-          <button onClick={addLine} style={{ ...inp, width: 'auto', minHeight: 28, fontSize: 11, cursor: 'pointer' }}>+ Add line</button>
+          <button onClick={addLine} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 28, fontSize: 11, cursor: 'pointer' }}>+ Add line</button>
         </div>
+        {/* Line row: ledger | Dr/Cr | amount | delete.
+            Desktop keeps the compact 4-col layout; on ≤tablet the ledger takes a
+            full row and Dr/Cr · amount · delete wrap onto a second row so nothing
+            overflows at 375px. */}
         {form.lines.map((ln, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 120px 28px', gap: 8, marginBottom: 6, alignItems: 'center' }}>
-            <input list={dlId} value={ln.ledger} placeholder="Ledger (from Books)" onChange={(e) => setLine(i, 'ledger', e.target.value)} style={{ ...inp, fontSize: 12 }} />
-            <select value={ln.drCr || 'Dr'} onChange={(e) => setLine(i, 'drCr', e.target.value)} style={{ ...inp, fontSize: 12, cursor: 'pointer' }}><option value="Dr">Dr</option><option value="Cr">Cr</option></select>
-            <input type="number" value={ln.amt} placeholder="Amount" onChange={(e) => setLine(i, 'amt', e.target.value)} style={{ ...inp, fontSize: 12, textAlign: 'right' }} />
-            <button onClick={() => delLine(i)} title="Remove line" style={{ background: 'none', border: 'none', color: RED, cursor: 'pointer', fontWeight: 700 }}>x</button>
+          <div key={i} className="mb-1.5 grid items-center gap-2 max-tablet:grid-cols-[80px_1fr_44px] tablet:grid-cols-[1fr_80px_120px_28px]">
+            <input list={dlId} value={ln.ledger} placeholder="Ledger (from Books)" onChange={(e) => setLine(i, 'ledger', e.target.value)} className="max-tablet:col-span-3 max-tablet:min-h-[44px]" style={{ ...inp, fontSize: 12 }} />
+            <select value={ln.drCr || 'Dr'} onChange={(e) => setLine(i, 'drCr', e.target.value)} className="max-tablet:min-h-[44px]" style={{ ...inp, fontSize: 12, cursor: 'pointer' }}><option value="Dr">Dr</option><option value="Cr">Cr</option></select>
+            <input type="number" value={ln.amt} placeholder="Amount" onChange={(e) => setLine(i, 'amt', e.target.value)} className="max-tablet:min-h-[44px]" style={{ ...inp, fontSize: 12, textAlign: 'right' }} />
+            <button onClick={() => delLine(i)} title="Remove line" className="inline-flex items-center justify-center max-tablet:min-h-[44px] max-tablet:min-w-[44px]" style={{ background: 'none', border: 'none', color: RED, cursor: 'pointer', fontWeight: 700 }}>x</button>
           </div>
         ))}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 18, marginTop: 6, fontSize: 12 }}>
@@ -1050,7 +1070,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
           <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.error ? '⚠ ' + pv.error : pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
         </div>
         {pv.missing?.length > 0 && (
-          <div style={{ margin: '0 0 8px', padding: '6px 9px', borderRadius: 6, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#854F0B', fontSize: 11, fontWeight: 600 }}>
+          <div style={{ margin: '0 0 8px', padding: '6px 9px', borderRadius: 6, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#d97706', fontSize: 11, fontWeight: 600 }}>
             ⚠ Ledger not in Chart of Accounts: <b>{pv.missing.join(', ')}</b>. Create it in Masters first — this voucher cannot be approved and stays <b>pending</b>. No ledger/sub-group/group is auto-created.
           </div>
         )}
@@ -1104,11 +1124,11 @@ function DrillDown({ branch, group, onClose }) {
   ];
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(780px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e6e8ec', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
           <Crumb items={crumbs} />
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
+          <button onClick={onClose} className="inline-flex items-center justify-center max-tablet:min-h-[44px] max-tablet:min-w-[44px]" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
         </div>
 
         {voucher && <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} onClose={onClose} />}
@@ -1168,7 +1188,7 @@ function TAccount({ leftHead = 'Particulars', rightHead = 'Particulars', left, r
   const n = Math.max(left.length, right.length, 1);
   const Label = ({ row }) => (row.group && onPick)
     ? <button onClick={() => onPick(row.group)} title="Drill into group" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: BLUE, fontWeight: row.bold ? 700 : 600, fontSize: 11.5, textAlign: 'left' }}>{row.label} ›</button>
-    : <span style={{ color: '#384677', fontWeight: row.bold ? 700 : 400 }}>{row.label}</span>;
+    : <span style={{ color: '#2e323c', fontWeight: row.bold ? 700 : 400 }}>{row.label}</span>;
   const Cell = ({ row }) => row
     ? (<><td style={{ padding: '9px 14px' }}><Label row={row} /></td>
           <td style={{ padding: '9px 14px', ...num, color: DARK, fontWeight: row.bold ? 700 : 400 }}>{row.amount != null ? money(cur, row.amount) : ''}</td></>)
@@ -1284,7 +1304,7 @@ function VoucherDetail({ voucher, cur, onClose }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', zIndex: 700, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '6vh' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 660, maxWidth: '94vw', maxHeight: '84vh', overflowY: 'auto', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid #e6e8ec', position: 'sticky', top: 0, background: '#fff' }}>
           <div style={{ fontSize: 14.5, fontWeight: 800, color: DARK }}>{v.vno} <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>{v.type} · {v.category}</span></div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 16 }}>✕</button>
         </div>
@@ -1636,8 +1656,8 @@ export function RegisterLive({ branch, initial = 'sales' }) {
       sub={`${branchLabel(branch)} · ${rows.length} vouchers · Total ${money(cur, sum('total'))} · ${needle ? 'searching all dates' : subHint}`}
       right={<>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Search passenger / party / ticket / link no / voucher…"
-          style={{ ...inp, width: 280, minHeight: 32, fontSize: 11 }} />
-        <select value={product} onChange={(e) => setProduct(e.target.value)} title="Filter the register by module" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer' }}>
+          className="max-tablet:w-full max-tablet:min-h-[44px]" style={{ ...inp, width: 280, minHeight: 32, fontSize: 11 }} />
+        <select value={product} onChange={(e) => setProduct(e.target.value)} title="Filter the register by module" className="max-tablet:min-h-[44px] max-tablet:flex-1" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer' }}>
           <option value="all">All modules</option>
           {products.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
@@ -1667,11 +1687,11 @@ export function RegisterLive({ branch, initial = 'sales' }) {
                     {v.locked && v.source === 'booking' && <span title={`Locked — driven by booking ${v.bookingId}`} style={{ marginRight: 4 }}>🔒</span>}
                     {v.vno}
                   </td>
-                  <td style={{ padding: '8px 12px', color: '#384677' }}>{v.type}</td>
+                  <td style={{ padding: '8px 12px', color: '#2e323c' }}>{v.type}</td>
                   <td style={{ padding: '8px 12px', fontWeight: 600, color: DARK }}>{v.party || '—'}</td>
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, color: '#6b21a8' }}>{v.linkNo || '—'}</td>
                   <td style={{ padding: '8px 12px', ...num }}>{money(cur, v.subtotal)}</td>
-                  <td style={{ padding: '8px 12px', ...num, color: '#854F0B' }}>{money(cur, v.taxAmt)}</td>
+                  <td style={{ padding: '8px 12px', ...num, color: '#d97706' }}>{money(cur, v.taxAmt)}</td>
                   <td style={{ padding: '8px 12px', ...num, fontWeight: 700 }}>{money(cur, v.total)}</td>
                 </tr>
               ))}
@@ -1707,8 +1727,8 @@ export function InvoiceGPLive({ branch }) {
   const d = q.data;
   const allGpRows = d?.rows || [];
   const STATUS = {
-    matched: { c: GREEN, t: 'matched' }, 'no-cost': { c: '#854F0B', t: 'no cost' }, 'no-sale': { c: RED, t: 'no sale' },
-    'sale (no link)': { c: BLUE, t: 'sale · no link' }, 'purchase (no link)': { c: '#854F0B', t: 'purchase · no link' },
+    matched: { c: GREEN, t: 'matched' }, 'no-cost': { c: '#d97706', t: 'no cost' }, 'no-sale': { c: RED, t: 'no sale' },
+    'sale (no link)': { c: BLUE, t: 'sale · no link' }, 'purchase (no link)': { c: '#d97706', t: 'purchase · no link' },
   };
 
   // Index underlying vouchers by Link No and by voucher no.
@@ -1803,7 +1823,7 @@ export function InvoiceGPLive({ branch }) {
   const detailReady = !salesQ.isLoading && !purchQ.isLoading;
   const SideTag = ({ tone, children }) => (
     <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.5px', padding: '2px 8px', borderRadius: 4, marginBottom: 8, display: 'inline-block',
-      background: (tone === 'sale' ? BLUE : '#854F0B') + '18', color: tone === 'sale' ? BLUE : '#854F0B' }}>{children}</span>
+      background: (tone === 'sale' ? BLUE : '#d97706') + '18', color: tone === 'sale' ? BLUE : '#d97706' }}>{children}</span>
   );
 
   return (
@@ -1845,14 +1865,14 @@ export function InvoiceGPLive({ branch }) {
                     <td style={{ padding: '8px 12px', color: DARK }}>{f.customer}</td>
                     <td style={{ padding: '8px 12px', color: DARK }}>{f.supplier}</td>
                     <td style={{ padding: '8px 12px', ...num }}>{money(cur, r.sale)}</td>
-                    <td style={{ padding: '8px 12px', ...num, color: '#854F0B' }}>{money(cur, r.cost)}</td>
+                    <td style={{ padding: '8px 12px', ...num, color: '#d97706' }}>{money(cur, r.cost)}</td>
                     <td style={{ padding: '8px 12px', ...num, fontWeight: 700, color: r.gp >= 0 ? GREEN : RED }}>{money(cur, r.gp)}</td>
                     <td style={{ padding: '8px 12px', ...num, fontWeight: 700, color: r.gp >= 0 ? GREEN : RED }}>{r.gpPct}%</td>
                     <td style={{ padding: '8px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: s.c + '22', color: s.c }}>{s.t}</span></td>
                   </tr>
                   {isOpen && (
                     <tr>
-                      <td colSpan={9} style={{ padding: 0, background: '#f7f9fc', borderBottom: '2px solid #e1e3ec' }}>
+                      <td colSpan={9} style={{ padding: 0, background: '#f7f9fc', borderBottom: '2px solid #e6e8ec' }}>
                         <div style={{ padding: 16 }}>
                           <div style={{ fontSize: 11.5, fontWeight: 700, color: DARK, marginBottom: 12 }}>
                             File {f.ref} — Sale {money(cur, r.sale)} − Cost {money(cur, r.cost)} = GP <span style={{ color: r.gp >= 0 ? GREEN : RED }}>{money(cur, r.gp)}</span> ({r.gpPct}%)
@@ -1893,7 +1913,7 @@ export function InvoiceGPLive({ branch }) {
 export function LedgerGroupsLive() {
   const q = useLedgerGroups();
   const groups = q.data || [];
-  const NAT = { asset: BLUE, liability: RED, income: GREEN, expense: '#854F0B' };
+  const NAT = { asset: BLUE, liability: RED, income: GREEN, expense: '#d97706' };
   const Section = ({ title, list }) => (
     <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 12 }}>
       <div style={{ padding: '9px 14px', background: DARK, color: GOLD, fontWeight: 700, fontSize: 12 }}>{title} — {list.length} groups</div>
@@ -1906,7 +1926,7 @@ export function LedgerGroupsLive() {
               <td style={{ padding: '8px 14px', color: DIM }}>{g.id}</td>
               <td style={{ padding: '8px 14px', fontWeight: 600, color: DARK }}>{g.name}</td>
               <td style={{ padding: '8px 14px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: (NAT[g.nature] || DIM) + '22', color: NAT[g.nature] || DIM }}>{g.nature}</span></td>
-              <td style={{ padding: '8px 14px', color: '#384677' }}>{g.cls}</td>
+              <td style={{ padding: '8px 14px', color: '#2e323c' }}>{g.cls}</td>
               <td style={{ padding: '8px 14px', fontWeight: 700, color: g.naturalSide === 'Cr' ? RED : BLUE }}>{g.naturalSide}</td>
               <td style={{ padding: '8px 14px', color: DIM }}>{g.parent || '— primary —'}</td>
             </tr>
@@ -1919,7 +1939,7 @@ export function LedgerGroupsLive() {
   return (
     <Page title="Ledger Groups — Tally's 28 Pre-Defined Groups" sub="Every ledger belongs to one of these groups; the group fixes whether it lands in the Balance Sheet or P&L."
       right={<button onClick={() => exportToExcel('ledger-groups', [{ key: 'id', label: '#' }, { key: 'name', label: 'Group' }, { key: 'nature', label: 'Nature' }, { key: 'cls', label: 'Golden-Rule Class' }, { key: 'naturalSide', label: 'Natural Side' }, { key: 'statement', label: 'Statement' }, { key: 'parent', label: 'Under' }], groups)} disabled={groups.length === 0} title="Export to Excel"
-        style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: groups.length === 0 ? 'not-allowed' : 'pointer', opacity: groups.length === 0 ? 0.5 : 1 }}>📤 Export</button>}>
+        style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #e6e8ec', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: groups.length === 0 ? 'not-allowed' : 'pointer', opacity: groups.length === 0 ? 0.5 : 1 }}>📤 Export</button>}>
       <State q={q} empty={groups.length === 0}>
         <Section title="Balance Sheet" list={groups.filter((g) => g.statement === 'BS')} />
         <Section title="Profit & Loss Account" list={groups.filter((g) => g.statement === 'PL')} />
@@ -1947,21 +1967,21 @@ export function ChartOfAccountsLive({ branch }) {
     <Page title="Chart of Accounts" sub={`${branchLabel(branch)} · ${shown.length}${shown.length !== ledgers.length ? ` of ${ledgers.length}` : ''} ledgers across ${groups.length} groups`}
       right={<>
         <label style={selWrap}>Group
-          <select value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setSubGroupFilter(''); }} style={selStyle}>
+          <select value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setSubGroupFilter(''); }} className="max-tablet:min-h-[44px]" style={selStyle}>
             <option value="">All groups</option>
             {allGroups.map((g) => <option key={g} value={g}>{g}</option>)}
           </select>
         </label>
         {groupFilter && (
           <label style={selWrap}>Sub-Group
-            <select value={subGroupFilter} onChange={(e) => setSubGroupFilter(e.target.value)} style={selStyle}>
+            <select value={subGroupFilter} onChange={(e) => setSubGroupFilter(e.target.value)} className="max-tablet:min-h-[44px]" style={selStyle}>
               <option value="">All sub-groups</option>
               {subOptions.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </label>
         )}
         <button onClick={() => exportToExcel(`chart-of-accounts-${branchLabel(branch)}`, [{ key: 'group', label: 'Group' }, { key: 'code', label: 'Code' }, { key: 'name', label: 'Ledger' }, { key: 'nature', label: 'Nature' }, { key: 'statement', label: 'Statement' }, { key: 'openingBalance', label: 'Opening Balance' }, { key: 'drCr', label: 'Dr/Cr' }], shown)} disabled={shown.length === 0} title="Export to Excel"
-          style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: shown.length === 0 ? 'not-allowed' : 'pointer', opacity: shown.length === 0 ? 0.5 : 1 }}>📤 Export</button>
+          style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #e6e8ec', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: shown.length === 0 ? 'not-allowed' : 'pointer', opacity: shown.length === 0 ? 0.5 : 1 }}>📤 Export</button>
       </>}>
       <State q={q} empty={ledgers.length === 0}>
         <Table>
@@ -1972,12 +1992,12 @@ export function ChartOfAccountsLive({ branch }) {
                 .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }));
               return gl.map((l, i) => (
                 <tr key={l.id || l.code} style={rowBg(i)}>
-                  {i === 0 && <td rowSpan={gl.length} style={{ padding: '9px 14px', fontWeight: 700, color: DARK, borderRight: '2px solid #e1e3ec', verticalAlign: 'top', fontSize: 10.5, background: '#f9fafb' }}>{grp}</td>}
+                  {i === 0 && <td rowSpan={gl.length} style={{ padding: '9px 14px', fontWeight: 700, color: DARK, borderRight: '2px solid #e6e8ec', verticalAlign: 'top', fontSize: 10.5, background: '#f9fafb' }}>{grp}</td>}
                   <td style={{ padding: '9px 14px', fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{l.code}</td>
                   <td style={{ padding: '9px 14px', fontWeight: 600 }}>
                     <button onClick={() => openLedgerModal(l.name)} title="Open ledger account" style={{ background: 'none', border: 'none', padding: 0, color: BLUE, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2, fontSize: 'inherit' }}>{l.name}</button>
                   </td>
-                  <td style={{ padding: '9px 14px', color: '#384677' }}>{l.nature || '—'}</td>
+                  <td style={{ padding: '9px 14px', color: '#2e323c' }}>{l.nature || '—'}</td>
                   <td style={{ padding: '9px 14px', color: DIM }}>{l.statement === 'PL' ? 'P&L' : l.statement === 'BS' ? 'Balance Sheet' : '—'}</td>
                   <td style={{ padding: '9px 14px', ...num }}>{l.openingBalance ? `${money(cur, l.openingBalance)} ${l.drCr}` : '—'}</td>
                 </tr>
@@ -2028,7 +2048,7 @@ export function AccountsChartLive({ branch }) {
 
   const setAll = (v) => setOpen(Object.fromEntries(allKeys.map((k) => [k, v])));
   const stmtBadge = (s) => <span style={{ fontSize: 9.5, padding: '1px 6px', borderRadius: 999, fontWeight: 700, background: (s === 'PL' ? GREEN : BLUE) + '1e', color: s === 'PL' ? GREEN : BLUE }}>{s === 'PL' ? 'P&L' : s === 'BS' ? 'Balance Sheet' : '—'}</span>;
-  const seg = (active) => ({ padding: '5px 12px', fontSize: 11.5, fontWeight: 700, border: `1px solid ${active ? DARK : '#d6dbe6'}`, background: active ? DARK : '#fff', color: active ? GOLD : DIM, cursor: 'pointer' });
+  const seg = (active) => ({ padding: '5px 12px', fontSize: 11.5, fontWeight: 700, border: `1px solid ${active ? DARK : '#e6e8ec'}`, background: active ? DARK : '#fff', color: active ? GOLD : DIM, cursor: 'pointer' });
   const Col = ({ title, count, children }) => (
     <div style={{ ...card, padding: 0, overflow: 'hidden', flex: 1, minWidth: 220 }}>
       <div style={{ padding: '8px 12px', background: DARK, color: GOLD, fontWeight: 700, fontSize: 11.5 }}>{title} — {count}</div>
@@ -2077,7 +2097,7 @@ export function AccountsChartLive({ branch }) {
           <button onClick={() => setView('split')} style={seg(view === 'split')}>Side-by-side</button>
         </span>
         <button onClick={() => exportToExcel(`chart-of-accounts-${branchLabel(branch)}`, [{ key: 'topGroup', label: 'Group' }, { key: 'subGroup', label: 'Sub-Group' }, { key: 'code', label: 'Code' }, { key: 'name', label: 'Ledger' }], ledgers)} disabled={ledgers.length === 0}
-          style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: ledgers.length === 0 ? 'not-allowed' : 'pointer', opacity: ledgers.length === 0 ? 0.5 : 1 }}>📤 Export</button>
+          style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #e6e8ec', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: ledgers.length === 0 ? 'not-allowed' : 'pointer', opacity: ledgers.length === 0 ? 0.5 : 1 }}>📤 Export</button>
       </div>}>
       <State q={tq} empty={roots.length === 0}>
         {view === 'tree' ? (
@@ -2189,11 +2209,11 @@ export function CashBookLive({ branch }) {
 
   const colCount = view === 'detailed' ? 7 : 5;
   const summary = [
-    { l: 'Opening Balance', v: money(cur, Math.abs(periodOpen)) + (periodOpen < 0 ? ' Cr' : ''), c: BLUE, bg: '#E6F1FB' },
-    { l: 'Total Receipts (Dr)', v: money(cur, receipts), c: GREEN, bg: '#EAF3DE' },
-    { l: 'Total Payments (Cr)', v: money(cur, payments), c: RED, bg: '#FCEBEB' },
-    { l: 'Closing Balance', v: money(cur, Math.abs(closing)) + (closing < 0 ? ' Cr' : ''), c: closing >= 0 ? GREEN : RED, bg: closing >= 0 ? '#EAF3DE' : '#FCEBEB' },
-    { l: 'Entries', v: String(rowsFull.length), c: '#384677', bg: '#f3f4f8' },
+    { l: 'Opening Balance', v: money(cur, Math.abs(periodOpen)) + (periodOpen < 0 ? ' Cr' : ''), c: BLUE, bg: '#e8f0ff' },
+    { l: 'Total Receipts (Dr)', v: money(cur, receipts), c: GREEN, bg: '#e8f6ed' },
+    { l: 'Total Payments (Cr)', v: money(cur, payments), c: RED, bg: '#fbe9e9' },
+    { l: 'Closing Balance', v: money(cur, Math.abs(closing)) + (closing < 0 ? ' Cr' : ''), c: closing >= 0 ? GREEN : RED, bg: closing >= 0 ? '#e8f6ed' : '#fbe9e9' },
+    { l: 'Entries', v: String(rowsFull.length), c: '#2e323c', bg: '#f3f4f8' },
   ];
 
   return (
@@ -2202,7 +2222,7 @@ export function CashBookLive({ branch }) {
       title="Cash Book"
       sub={sub}
       right={<>
-        <select value={selected} onChange={(e) => { setLedger(e.target.value); setPage(0); }} style={{ ...inp, width: 200, minHeight: 32, fontSize: 11, cursor: 'pointer' }}>
+        <select value={selected} onChange={(e) => { setLedger(e.target.value); setPage(0); }} className="max-tablet:min-h-[44px] max-tablet:w-full" style={{ ...inp, width: 200, minHeight: 32, fontSize: 11, cursor: 'pointer' }}>
           {cashLedgers.length === 0 && <option value="">No cash ledger</option>}
           {cashLedgers.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
         </select>
@@ -2248,9 +2268,9 @@ export function CashBookLive({ branch }) {
               <tr key={r.vno + '-' + i} title={r.voucherId ? 'Open voucher' : ''} {...clickable(() => r.voucherId && setVoucher({ id: r.voucherId, vno: r.vno }))} style={{ ...rowBg(i), background: r.debit > 0 ? '#f4fbf4' : (i % 2 === 0 ? '#fff' : '#fafafa'), cursor: r.voucherId ? 'pointer' : 'default' }}>
                 <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.date}</td>
                 <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE, whiteSpace: 'nowrap' }}>{r.vno}</td>
-                {view === 'detailed' && <td style={{ padding: '7px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: (TYPE_CLR[r.category] || '#384677') + '22', color: TYPE_CLR[r.category] || '#384677' }}>{r.category || '—'}</span></td>}
+                {view === 'detailed' && <td style={{ padding: '7px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: (TYPE_CLR[r.category] || '#2e323c') + '22', color: TYPE_CLR[r.category] || '#2e323c' }}>{r.category || '—'}</span></td>}
                 <td style={{ padding: '7px 12px', maxWidth: 360 }}>
-                  <span style={{ color: '#384677', fontWeight: 600 }}>{r.ledgerName || '—'}</span>
+                  <span style={{ color: '#2e323c', fontWeight: 600 }}>{r.ledgerName || '—'}</span>
                   {expandAll && r.narration && (
                     <div style={{ marginTop: 2, fontSize: 10, color: DIM, fontStyle: 'italic', whiteSpace: 'normal' }}>{r.narration}</div>
                   )}
@@ -2264,7 +2284,7 @@ export function CashBookLive({ branch }) {
           <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
             <td colSpan={view === 'detailed' ? 4 : 3} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD, fontSize: 12 }}>CLOSING BALANCE</td>
             <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#5ab84b' }}>{money(cur, receipts)}</td>
-            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#F7C1C1' }}>{money(cur, payments)}</td>
+            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#f3c9c9' }}>{money(cur, payments)}</td>
             {view === 'detailed' && <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, Math.abs(closing))} {closing < 0 ? 'Cr' : 'Dr'}</td>}
           </tr></tfoot>
         </Table>
@@ -2272,9 +2292,9 @@ export function CashBookLive({ branch }) {
       </State>
       {closing < 0 && <Banner tone="err">⚠ Cash book shows a negative (credit) balance. Verify all entries — a physical cash count is required.</Banner>}
       {voucher && (
-        <div onClick={() => setVoucher(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
+        <div onClick={() => setVoucher(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(840px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e6e8ec', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <Crumb items={[{ label: selected || 'Cash Book', onClick: () => setVoucher(null) }, { label: voucher.vno }]} />
               <button onClick={() => setVoucher(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
             </div>

@@ -21,7 +21,8 @@ jest.mock('../core/useAccounting', () => ({
     { ledger: 'HDFC Bank', group: 'Bank Account', closingDebit: 90000, closingCredit: 0 },
     { ledger: 'Bank Charges', group: 'Indirect Expenses', closingDebit: 700, closingCredit: 0 }, // must NOT count as bank
   ] } }),
-  useVoucherApprovals: () => ({ data: [{ vno: 'V1' }] }),
+  // Real /api/vouchers/approvals shape: an object { counts, entries } — not a bare array.
+  useVoucherApprovals: () => ({ data: { counts: { pending: { n: 1, amount: 0 } }, entries: [{ vno: 'V1' }] } }),
   useBookingOrders: () => ({ data: [
     { bookingNo: 'BKG1', status: 'pending', module: 'SF', branch: 'BOM', validation: { hasErrors: true, errors: ['Ledger missing: X'] } },
     { bookingNo: 'BKG2', status: 'approved' },

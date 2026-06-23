@@ -19,7 +19,7 @@ import { Search, CornerDownLeft, ArrowRight, X } from 'lucide-react';
 import { getMenu } from '../core/menus';
 import { useMobile } from '../core/hooks';
 
-const BLUE = '#0070f2', TEXT = '#475569', DIM = '#94a3b8', DARK = '#0d1326';
+const BLUE = '#2563eb', TEXT = '#5b616e', DIM = '#9197a3', DARK = '#14161a';
 
 /* Walk the menu tree → flat list of every navigable leaf with its breadcrumb. */
 function flattenMenu(nodes, trail = []) {
@@ -60,7 +60,7 @@ function Highlight({ text, q }) {
   return (
     <>
       {text.slice(0, i)}
-      <mark style={{ background: 'rgba(0,112,242,0.16)', color: BLUE, fontWeight: 700, padding: 0, borderRadius: 2 }}>
+      <mark style={{ background: 'rgba(37,99,235,0.16)', color: BLUE, fontWeight: 700, padding: 0, borderRadius: 2 }}>
         {text.slice(i, i + q.length)}
       </mark>
       {text.slice(i + q.length)}
@@ -68,7 +68,7 @@ function Highlight({ text, q }) {
   );
 }
 
-export function ModuleSearch({ branch, currentUser, setRoute }) {
+export function ModuleSearch({ branch, currentUser, setRoute, bar = false }) {
   const mob = useMobile();
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);     // dropdown / overlay visibility
@@ -162,7 +162,7 @@ export function ModuleSearch({ branch, currentUser, setRoute }) {
             onMouseDown={(e) => { e.preventDefault(); go(r); }}
             style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 7,
-              cursor: 'pointer', background: sel ? 'rgba(0,112,242,0.08)' : 'transparent',
+              cursor: 'pointer', background: sel ? 'rgba(37,99,235,0.08)' : 'transparent',
             }}>
             <Search size={14} style={{ flexShrink: 0, color: sel ? BLUE : DIM }} />
             <div style={{ minWidth: 0, flex: 1 }}>
@@ -190,7 +190,7 @@ export function ModuleSearch({ branch, currentUser, setRoute }) {
       <div onMouseDown={(e) => { e.preventDefault(); setRoute('/search'); setQ(''); setOpen(false); }}
         style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '9px 11px', marginTop: 4,
-          borderTop: '1px solid #eef1f6', cursor: 'pointer', color: TEXT, fontSize: 11.5, fontWeight: 600,
+          borderTop: '1px solid #eef0f3', cursor: 'pointer', color: TEXT, fontSize: 11.5, fontWeight: 600,
         }}>
         <Search size={13} style={{ color: DIM }} />
         Search vouchers, clients &amp; records in Global Search
@@ -207,36 +207,60 @@ export function ModuleSearch({ branch, currentUser, setRoute }) {
     `}</style>
   );
 
+  /* Shared full-screen search overlay (used by the mobile icon AND the drawer bar). */
+  const mobileOverlay = open && createPortal(
+    <>
+      <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(20,22,26,0.35)', backdropFilter: 'blur(2px)', zIndex: 99998 }} />
+      <div data-modsearch style={{
+        position: 'fixed', top: 8, left: 8, right: 8, zIndex: 99999, background: '#fff', borderRadius: 14,
+        boxShadow: '0 24px 48px rgba(16,18,22,0.20)', overflow: 'hidden',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px 8px 12px', borderBottom: '1px solid #eef0f3' }}>
+          <Search size={16} style={{ flexShrink: 0, color: DIM }} />
+          <input ref={inputRef} autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown}
+            placeholder="Search modules & pages…" aria-label="Search modules and pages"
+            style={{ flex: 1, height: 44, border: 'none', outline: 'none', fontSize: 15, color: DARK, background: 'transparent' }} />
+          <button type="button" onClick={() => setOpen(false)} aria-label="Close search" title="Close (Esc)"
+            style={{ flexShrink: 0, background: 'transparent', border: 'none', cursor: 'pointer', color: DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 8 }}>
+            <X size={18} />
+          </button>
+        </div>
+        {ResultsList}
+      </div>
+    </>,
+    document.body
+  );
+
+  /* ── Bar mode (mobile drawer): full-width premium search control ── */
+  if (bar) {
+    return (
+      <div ref={wrapRef} style={{ width: '100%' }}>
+        {scrollStyles}
+        <button type="button" onClick={openSearch} aria-label="Search modules and pages"
+          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 44, padding: '0 12px',
+            background: '#f4f5f7', border: '1px solid #e6e8ec', borderRadius: 10, cursor: 'pointer',
+            transition: 'border-color .14s, box-shadow .14s' }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = BLUE; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)'; }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = '#e6e8ec'; e.currentTarget.style.boxShadow = 'none'; }}>
+          <Search size={17} style={{ flexShrink: 0, color: DIM }} />
+          <span style={{ flex: 1, textAlign: 'left', fontSize: 13.5, fontWeight: 500, color: DIM }}>Search modules &amp; pages…</span>
+          <kbd style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, color: DIM, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 4, padding: '2px 6px' }}>⌘K</kbd>
+        </button>
+        {mobileOverlay}
+      </div>
+    );
+  }
+
   /* ── Mobile: icon button → full-width overlay ─────────────────── */
   if (mob) {
     return (
       <div ref={wrapRef} style={{ display: 'flex', alignItems: 'center' }}>
         {scrollStyles}
-        <button onClick={openSearch} title="Search modules (⌘K)"
-          style={{ background: 'transparent', border: 'none', color: '#5a6691', cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center', borderRadius: 4 }}>
+        <button onClick={openSearch} aria-label="Search modules (⌘K)" title="Search modules (⌘K)"
+          style={{ background: 'transparent', border: 'none', color: '#5b616e', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 8 }}>
           <Search size={18} />
         </button>
-        {open && createPortal(
-          <>
-            <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.35)', zIndex: 99998 }} />
-            <div data-modsearch style={{
-              position: 'fixed', top: 8, left: 8, right: 8, zIndex: 99999, background: '#fff', borderRadius: 12,
-              boxShadow: '0 24px 48px rgba(0,0,0,0.18)', overflow: 'hidden',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid #eef1f6' }}>
-                <Search size={16} style={{ color: DIM }} />
-                <input ref={inputRef} autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown}
-                  placeholder="Search any module or page…" aria-label="Search modules and pages"
-                  style={{ flex: 1, border: 'none', outline: 'none', fontSize: 15, color: DARK, background: 'transparent' }} />
-                <button type="button" onClick={() => setOpen(false)} aria-label="Close search" title="Close (Esc)" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: DIM, display: 'flex' }}>
-                  <X size={18} />
-                </button>
-              </div>
-              {ResultsList}
-            </div>
-          </>,
-          document.body
-        )}
+        {mobileOverlay}
       </div>
     );
   }
@@ -247,8 +271,8 @@ export function ModuleSearch({ branch, currentUser, setRoute }) {
       {scrollStyles}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8, height: 34, padding: '0 12px',
-        background: open ? '#fff' : '#f3f4f8', border: `1px solid ${open ? BLUE : '#e2e8f0'}`,
-        borderRadius: 8, transition: 'all 0.15s ease', boxShadow: open ? '0 0 0 3px rgba(0,112,242,0.12)' : 'none',
+        background: open ? '#fff' : '#f4f5f7', border: `1px solid ${open ? BLUE : '#e6e8ec'}`,
+        borderRadius: 8, transition: 'all 0.15s ease', boxShadow: open ? '0 0 0 3px rgba(37,99,235,0.12)' : 'none',
       }}>
         <Search size={15} style={{ flexShrink: 0, color: open ? BLUE : DIM }} />
         <input ref={inputRef} value={q}
@@ -259,13 +283,13 @@ export function ModuleSearch({ branch, currentUser, setRoute }) {
           style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: DARK, minWidth: 0 }} />
         {q
           ? <X size={14} style={{ flexShrink: 0, color: DIM, cursor: 'pointer' }} onMouseDown={(e) => { e.preventDefault(); setQ(''); inputRef.current?.focus(); }} />
-          : <kbd style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, color: DIM, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, padding: '1px 5px' }}>⌘K</kbd>}
+          : <kbd style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, color: DIM, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 4, padding: '1px 5px' }}>⌘K</kbd>}
       </div>
 
       {open && q.trim() && pos && createPortal(
         <div data-modsearch style={{
           position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 99999,
-          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
+          background: '#fff', border: '1px solid #e6e8ec', borderRadius: 10,
           boxShadow: '0 20px 40px rgba(0,0,0,0.12)', overflow: 'hidden',
         }}>
           {ResultsList}

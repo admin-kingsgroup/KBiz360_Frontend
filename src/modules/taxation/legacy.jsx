@@ -235,7 +235,7 @@ export function TaxRcm({branch}){
       const igst=Math.round(b.cost/(1+0.18)*0.18);
       return {date:b.date,party:b.supplier,desc:`${b.mod} — ${b.dest}`,taxable:Math.round(b.cost/(1+0.18)),igst,status:"Paid",vno:b.id};
     });
-  },[GP,brCode,period]);
+  },[GP,brCode,period]); // GP must be a dep — else the register never recomputes once bills load
 
   const tot=rcmEntries.reduce((s,r)=>s+r.igst,0);
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
@@ -703,10 +703,10 @@ export function TaxTdsTcs({branch}){
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [form,setForm]=useState({payee:"",pan:"",section:"194C",nature:"",gross:0,date:""});
 
-  const tFiltered=tdsEntries.filter(t=>t.date.startsWith(period));
+  const tFiltered=tdsEntries.filter(t=>(t.date||'').startsWith(period));
   const totTds=tFiltered.reduce((s,t)=>s+t.tds,0);
   const totPending=tFiltered.filter(t=>t.status!=="Deposited").reduce((s,t)=>s+t.tds,0);
-  const totTcs=_TCS_ENTRIES.filter(t=>t.date.startsWith(period)).reduce((s,t)=>s+t.tcs,0);
+  const totTcs=_TCS_ENTRIES.filter(t=>(t.date||'').startsWith(period)).reduce((s,t)=>s+t.tcs,0);
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
 
   const markDeposited=(id)=>setTdsEntries(ts=>ts.map(t=>t.id===id?{...t,status:"Deposited",challanDate:"2026-05-"+new Date().getDate().toString().padStart(2,"0"),challanBsr:"0600115",challanSerial:String(Math.floor(Math.random()*90000)+10000)}:t));
@@ -806,7 +806,7 @@ export function TaxTdsTcs({branch}){
                 <th key={i} style={{padding:"8px 10px",textAlign:i>=5&&i<=7?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{_TCS_ENTRIES.filter(t=>t.date.startsWith(period)).map((t,i)=>(
+            <tbody>{_TCS_ENTRIES.filter(t=>(t.date||'').startsWith(period)).map((t,i)=>(
               <tr key={t.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"7px 10px",color:"#5a6691"}}>{t.date}</td>
                 <td style={{padding:"7px 10px",fontWeight:600,color:"#0d1326"}}>{t.collector}</td>

@@ -8,6 +8,7 @@ import { apiGet } from '../core/api';
 import { FocusBanner } from '../core/ux/FocusBanner';
 import { bc } from '../core/styles';
 import { PeriodBar, periodRange } from '../core/period';
+import { Button, Select, Input } from '../shell/primitives';
 import {
   useProfitAndLoss, useModulePL, useBalanceSheet, useAgeing, useInvoiceGP,
   useTaxSummary, useTrialBalance, useVoucherApprovals, useYearOverYear,
@@ -40,14 +41,14 @@ const MOD_OPTS = [['', 'All modules'], ['SF', 'Flight'], ['SH', 'Holiday'], ['SH
 // Header with title + the uniform PeriodBar (driven via the usePeriod object `p`).
 function Toolbar({ title, sub, branch, p, hidePeriod }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+    <div className="mb-3.5 flex flex-wrap items-center gap-3">
       <div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: C.dark }}>{title}</div>
-        {sub && <div style={{ fontSize: 12, color: C.dim }}>{sub}</div>}
+        <div className="text-lg font-extrabold text-ink">{title}</div>
+        {sub && <div className="text-xs text-ink-muted">{sub}</div>}
       </div>
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <div className="ml-auto flex flex-wrap items-center gap-2">
         {!hidePeriod && <PeriodBar branch={branch} defaultPreset={p && p.def} onChange={p && p.setRange} />}
-        <span style={{ fontSize: 11, fontWeight: 700, color: C.blue, background: '#E6F1FB', padding: '4px 9px', borderRadius: 5 }}>{branch === 'ALL' || !branch ? CONSOLIDATED_LABEL : (branch.code || branch)}</span>
+        <span className="rounded bg-info-soft px-2 py-1 text-[11px] font-bold text-info">{branch === 'ALL' || !branch ? CONSOLIDATED_LABEL : (branch.code || branch)}</span>
         <button onClick={() => openPrintPreview({ selector: 'main', title, recommend: 'portrait' })} title="Export / print this dashboard"
           style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', fontSize: 11.5, fontWeight: 700, color: C.dark, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 6, cursor: 'pointer' }}>⎙ Export</button>
       </div>
@@ -62,22 +63,23 @@ function KPI({ label, value, sub, tone, delta, onClick }) {
     <div onClick={onClick} role={clickable ? 'button' : undefined} tabIndex={clickable ? 0 : undefined}
       onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       title={clickable ? 'Open details →' : undefined}
-      style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px', minWidth: 180, flex: '1 1 180px', cursor: clickable ? 'pointer' : 'default' }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 900, color: col, marginTop: 4 }}>{value}</div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-        {sub && <span style={{ fontSize: 11, color: C.dim }}>{sub}</span>}
-        {delta != null && <span style={{ fontSize: 11, fontWeight: 700, color: delta >= 0 ? C.green : C.red }}>{delta >= 0 ? '▲' : '▼'} {pct(Math.abs(delta))}</span>}
+      className="min-w-[180px] flex-1 basis-[180px] rounded-brand border border-surface-border bg-surface p-4 shadow-sm"
+      style={{ cursor: clickable ? 'pointer' : 'default' }}>
+      <div className="text-[11px] font-bold uppercase tracking-wide text-ink-muted">{label}</div>
+      <div className="mt-1 text-[22px] font-black tabular-nums" style={{ color: col }}>{value}</div>
+      <div className="mt-0.5 flex justify-between">
+        {sub && <span className="text-[11px] text-ink-muted">{sub}</span>}
+        {delta != null && <span className="text-[11px] font-bold" style={{ color: delta >= 0 ? C.green : C.red }}>{delta >= 0 ? '▲' : '▼'} {pct(Math.abs(delta))}</span>}
       </div>
     </div>
   );
 }
 const Card = ({ title, children, right }) => (
-  <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginTop: 14 }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: `1px solid ${C.border}` }}>
-      <strong style={{ color: C.dark, fontSize: 13.5 }}>{title}</strong>{right}
+  <div className="mt-3.5 overflow-hidden rounded-brand border border-surface-border bg-surface shadow-card">
+    <div className="flex items-center justify-between border-b border-surface-border px-3.5 py-2.5">
+      <strong className="text-[13.5px] text-ink">{title}</strong>{right}
     </div>
-    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>{children}</div>
+    <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">{children}</div>
   </div>
 );
 const th = { padding: '8px 12px', background: C.bg, color: C.dim, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', textAlign: 'left', whiteSpace: 'nowrap' };
@@ -95,7 +97,7 @@ export function ExecutiveOverview({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const plQ = useProfitAndLoss(branch, range); const pl = plQ.data || {};
-  const mplQ = useModulePL(branch, range); const mpl = mplQ.data || {};
+  const mplQ = useModulePL(branch, { ...range, summary: true }); const mpl = mplQ.data || {};
   const bsQ = useBalanceSheet(branch, { to: range.to }); const bs = bsQ.data || {};
   const age = useAgeing(branch).data || {};
   const tax = useTaxSummary(branch, range).data || {};
@@ -181,7 +183,7 @@ export function ProfitabilityDash({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const pl = useProfitAndLoss(branch, range).data || {};
-  const mpl = useModulePL(branch, range).data || {};
+  const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
   const sales = mpl?.totals?.sales || 0, cogs = mpl?.totals?.cogs || 0, gp = pl?.grossProfit ?? (sales - cogs);
   const indExp = pl?.indirect?.debitTotal || 0, indInc = pl?.indirect?.creditTotal || 0, net = pl?.netProfit || 0;
   const bar = (label, val, base, col) => (
@@ -287,8 +289,8 @@ export function BranchPerformanceDash() {
   // Two parallel fan-outs per branch: P&L (module-pl) and capital (capital-analysis).
   const plQ = useQueries({
     queries: BR.map((b) => ({
-      queryKey: ['accounting', 'module-pl', b.code, range.from, range.to],
-      queryFn: () => apiGet('/api/accounting/module-pl', { branch: b.code, from: range.from, to: range.to }),
+      queryKey: ['accounting', 'module-pl', b.code, range.from, range.to, 'summary'],
+      queryFn: () => apiGet('/api/accounting/module-pl', { branch: b.code, from: range.from, to: range.to, summary: 1 }),
     })),
   });
   const capQ = useQueries({
@@ -434,7 +436,7 @@ export function BalanceSheetDash({ branch }) {
 export function ModuleGpDash({ branch }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
-  const mpl = useModulePL(branch, range).data || {};
+  const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
   const mods = mpl.modules || [], t = mpl.totals || {};
   const maxGp = Math.max(1, ...mods.map((m) => Math.abs(m.gp || 0)));
   return (
@@ -463,7 +465,7 @@ export function ModuleGpDash({ branch }) {
 export function SalesBookingsDash({ branch }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
-  const mpl = useModulePL(branch, range).data || {};
+  const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
   const igp = useInvoiceGP(branch, range).data || {};
   const rows = igp.rows || [], deals = rows.length;
   const sales = mpl?.totals?.sales || 0;
@@ -489,7 +491,7 @@ export function SalesBookingsDash({ branch }) {
 export function SupplierPurchaseDash({ branch }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
-  const mpl = useModulePL(branch, range).data || {};
+  const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
   const igp = useInvoiceGP(branch, range).data || {};
   const age = useAgeing(branch).data || {};
   const rows = igp.rows || [];
@@ -571,9 +573,11 @@ export function ApprovalsAuditDash({ branch }) {
   const va = useVoucherApprovals(branch, 'pending').data || {};
   const counts = va.counts || {};
   const brCode = branch === 'ALL' || !branch ? '' : (branch.code || branch);
-  const bq = useQuery({ queryKey: ['booking-orders', brCode || 'all'], queryFn: () => apiGet('/api/booking-orders', { branch: brCode }) });
-  const bookings = bq.data || [];
-  const bCount = (s) => bookings.filter((b) => (s === 'approved' ? (b.status === 'approved' || b.status === 'posted') : b.status === s)).length;
+  // Only per-status counts are needed → use the cheap summary aggregation, not the full
+  // booking list (which pulled every SO/PO/GP grid — ~15s).
+  const bq = useQuery({ queryKey: ['booking-orders', 'summary', brCode || 'all'], queryFn: () => apiGet('/api/booking-orders/summary', { branch: brCode }) });
+  const bsum = bq.data || {};
+  const bCount = (s) => (bsum[s]?.count || 0);
   const entries = (va.entries || []).slice(0, 15);
   return (
     <div style={{ margin: 12 }}>
@@ -685,30 +689,29 @@ export function TargetsMaster({ branch }) {
     const rows = MOD_OPTS.map(([mod]) => ({ month: 0, metric, module: mod, amount: Number(valOf(mod)) || 0 }));
     save.mutate({ branch: brCode, fy, rows }, { onSuccess: () => setDraft({}) });
   };
-  const sel = { padding: '7px 10px', fontSize: 13, fontWeight: 700, border: `1px solid ${C.border}`, borderRadius: 6, background: '#fff', color: C.dark };
   return (
     <div style={{ margin: 12, maxWidth: 720 }}>
       <FocusBanner />
-      <div style={{ fontSize: 18, fontWeight: 800, color: C.dark }}>Sales Targets</div>
-      <div style={{ fontSize: 12, color: C.dim, marginBottom: 12 }}>Set whole-FY targets per module. The Director "vs Target" dashboards pro-rate these to the period and compare against actuals.</div>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-        <select value={brCode} onChange={(e) => setBrCode(e.target.value)} style={sel}>{branchList().map((b) => <option key={b.code} value={b.code}>{b.code}</option>)}</select>
-        <input value={fy} onChange={(e) => setFy(e.target.value)} placeholder="FY e.g. 2026-27" style={{ ...sel, fontWeight: 400, width: 120 }} />
-        <select value={metric} onChange={(e) => setMetric(e.target.value)} style={sel}><option value="sales">Sales</option><option value="gp">Gross Profit</option><option value="collections">Collections</option></select>
+      <div className="text-lg font-extrabold text-ink">Sales Targets</div>
+      <div className="mb-3 text-xs text-ink-muted">Set whole-FY targets per module. The Director "vs Target" dashboards pro-rate these to the period and compare against actuals.</div>
+      <div className="mb-3 flex flex-wrap gap-2.5">
+        <div className="w-28"><Select value={brCode} onChange={(e) => setBrCode(e.target.value)} className="font-semibold">{branchList().map((b) => <option key={b.code} value={b.code}>{b.code}</option>)}</Select></div>
+        <div className="w-32"><Input value={fy} onChange={(e) => setFy(e.target.value)} placeholder="FY e.g. 2026-27" /></div>
+        <div className="w-40"><Select value={metric} onChange={(e) => setMetric(e.target.value)} className="font-semibold"><option value="sales">Sales</option><option value="gp">Gross Profit</option><option value="collections">Collections</option></Select></div>
       </div>
-      <Card title={`${metric === 'sales' ? 'Sales' : metric === 'gp' ? 'GP' : 'Collections'} target · ${brCode} · FY ${fy}`} right={<button onClick={onSave} disabled={save.isPending} style={{ padding: '6px 14px', background: C.dark, color: C.gold, border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>{save.isPending ? 'Saving…' : 'Save'}</button>}>
+      <Card title={`${metric === 'sales' ? 'Sales' : metric === 'gp' ? 'GP' : 'Collections'} target · ${brCode} · FY ${fy}`} right={<Button variant="accent" size="sm" loading={save.isPending} onClick={onSave}>Save</Button>}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr><th style={th}>Module</th><th style={{ ...th, ...num }}>Annual Target ({cur})</th></tr></thead>
           <tbody>
             {MOD_OPTS.map(([mod, label]) => (
               <tr key={mod || 'all'}><td style={{ ...td, fontWeight: mod === '' ? 700 : 400 }}>{label}{mod === '' ? ' (company)' : ''}</td>
-                <td style={{ ...td, ...num }}><input type="number" value={valOf(mod)} onChange={(e) => setDraft((d) => ({ ...d, [mod]: e.target.value }))} style={{ width: 160, padding: '5px 8px', textAlign: 'right', border: `1px solid ${C.border}`, borderRadius: 5 }} /></td></tr>
+                <td style={{ ...td, ...num }}><div className="ml-auto w-40"><Input type="number" value={valOf(mod)} onChange={(e) => setDraft((d) => ({ ...d, [mod]: e.target.value }))} className="text-right" /></div></td></tr>
             ))}
           </tbody>
         </table>
       </Card>
-      {save.isSuccess && <div style={{ color: C.green, fontSize: 12, marginTop: 8 }}>✓ Saved.</div>}
-      {metric === 'collections' && <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>Collections targets are company-wide — only the "All modules" row is used.</div>}
+      {save.isSuccess && <div className="mt-2 text-xs text-success">✓ Saved.</div>}
+      {metric === 'collections' && <div className="mt-2 text-[11px] text-ink-muted">Collections targets are company-wide — only the "All modules" row is used.</div>}
     </div>
   );
 }

@@ -59,23 +59,23 @@ export function ClientStatement({ branch }) {
   const balText = (v) => `${f(Math.abs(v))}${v > 0 ? ' Dr' : v < 0 ? ' Cr' : ''}`;
 
   const KPIS = [
-    { l: 'Total Invoiced', v: f(totDr), c: '#185FA5' },
-    { l: 'Total Received', v: f(totCr), c: '#27500A' },
-    { l: 'Outstanding', v: f(outstanding), c: outstanding > 0 ? '#A32D2D' : '#27500A' },
-    { l: '0–30 days', v: f(ageing.a0), c: '#27500A' },
-    { l: '31–60 days', v: f(ageing.a30), c: '#854F0B' },
-    { l: '61–90 days', v: f(ageing.a60), c: '#A32D2D' },
+    { l: 'Total Invoiced', v: f(totDr), c: '#2563eb' },
+    { l: 'Total Received', v: f(totCr), c: '#16a34a' },
+    { l: 'Outstanding', v: f(outstanding), c: outstanding > 0 ? '#dc2626' : '#16a34a' },
+    { l: '0–30 days', v: f(ageing.a0), c: '#16a34a' },
+    { l: '31–60 days', v: f(ageing.a30), c: '#d97706' },
+    { l: '61–90 days', v: f(ageing.a60), c: '#dc2626' },
     { l: '>90 days', v: f(ageing.a90), c: '#7B1F1F' },
   ];
 
   const columns = [
     { key: 'date', header: 'Date', className: 'whitespace-nowrap text-ink-muted' },
     { key: 'type', header: 'Type', render: (r, v) => <StatusPill tone={v === 'Invoice' ? 'info' : 'success'} size="sm">{v}</StatusPill> },
-    { key: 'ref', header: 'Reference', className: 'font-mono text-[10px] text-[#185FA5]' },
+    { key: 'ref', header: 'Reference', className: 'font-mono text-[10px] text-[#2563eb]' },
     { key: 'desc', header: 'Description', className: 'text-role-hr' },
     { key: 'dr', header: 'Dr', num: true, className: 'text-maroon', render: (r, v) => (v > 0 ? f(v) : '—'), footer: () => f(totDr) },
-    { key: 'cr', header: 'Cr', num: true, className: 'text-[#27500A]', render: (r, v) => (v > 0 ? f(v) : '—'), footer: () => f(totCr) },
-    { key: 'bal', header: 'Balance', num: true, render: (r, v) => <span className="font-bold" style={{ color: v > 0 ? '#A32D2D' : v < 0 ? '#27500A' : '#5a6691' }}>{balText(v)}</span>, footer: () => balText(outstanding), footerLabel: 'CLOSING' },
+    { key: 'cr', header: 'Cr', num: true, className: 'text-[#16a34a]', render: (r, v) => (v > 0 ? f(v) : '—'), footer: () => f(totCr) },
+    { key: 'bal', header: 'Balance', num: true, render: (r, v) => <span className="font-bold" style={{ color: v > 0 ? '#dc2626' : v < 0 ? '#16a34a' : '#5b616e' }}>{balText(v)}</span>, footer: () => balText(outstanding), footerLabel: 'CLOSING' },
   ];
 
   const waText = `Hi! Your account statement for ${rangeLabel} — Outstanding: ${f(outstanding)}. Please contact us to settle the balance.`;

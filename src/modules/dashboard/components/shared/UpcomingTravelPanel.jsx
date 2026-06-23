@@ -1,40 +1,33 @@
 import React from 'react';
-import { card, btnGh } from '../../../../core/styles';
+import { Button } from '../../../../shell/primitives';
 
 export function UpcomingTravelPanel({ bookings, onViewAll }) {
   return (
-    <div style={{ ...card }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0d1326' }}>✈ Upcoming Travel (14 days)</p>
-        <button onClick={onViewAll} style={{ ...btnGh, fontSize: 10, padding: '3px 10px' }}>
-          All →
-        </button>
+    <div className="rounded-brand border border-surface-border bg-surface p-4 shadow-card">
+      <div className="mb-2.5 flex items-center justify-between">
+        <p className="text-xs font-bold text-ink">✈ Upcoming Travel (14 days)</p>
+        <Button variant="ghost" size="xs" onClick={onViewAll}>All →</Button>
       </div>
       {bookings.length === 0 && (
-        <div style={{ padding: '14px', textAlign: 'center', color: '#5a6691', fontSize: 11 }}>
-          <div style={{ fontSize: 28, marginBottom: 6 }}>✈</div>
+        <div className="px-3.5 py-3.5 text-center text-[11px] text-ink-muted">
+          <div className="mb-1.5 text-[28px]">✈</div>
           No upcoming travel in next 14 days
         </div>
       )}
       {bookings.map((b, i) => (
         <div
           key={b.id || i}
-          style={{ padding: '8px 0', borderBottom: i < bookings.length - 1 ? '1px solid #f3f4f8' : 'none' }}
+          className="py-2"
+          style={{ borderBottom: i < bookings.length - 1 ? '1px solid #f4f5f7' : 'none' }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="flex items-center justify-between">
             <div>
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: '#0d1326' }}>
-                {b.client || b.clientName || 'Client'}
-              </p>
-              <p style={{ margin: '1px 0 0', fontSize: 10, color: '#5a6691' }}>
-                {b.destination || b.dest || 'Destination'} · {b.mod || 'Flight'}
-              </p>
+              <p className="text-[11px] font-semibold text-ink">{b.client || b.clientName || 'Client'}</p>
+              <p className="mt-px text-[10px] text-ink-muted">{b.destination || b.dest || 'Destination'} · {b.mod || 'Flight'}</p>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, color: '#185FA5' }}>
-                {b.travelDate || b.departure || '—'}
-              </p>
-              <p style={{ margin: 0, fontSize: 9.5, color: '#5a6691' }}>{b.pax || 1} pax</p>
+            <div className="text-right">
+              <p className="text-[10.5px] font-bold text-info">{b.travelDate || b.departure || '—'}</p>
+              <p className="text-[9.5px] text-ink-muted">{b.pax || 1} pax</p>
             </div>
           </div>
         </div>

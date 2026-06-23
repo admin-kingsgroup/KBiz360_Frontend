@@ -24,29 +24,30 @@ export const B = new Proxy({}, {
 export function bc(branch){ return branch==="ALL"?B.ALL:B[branch?.code]||B.BOM; }
 export function bcfmt(branch,n){ const b=bc(branch); return b.cur+Number(n).toLocaleString("en-IN",{maximumFractionDigits:0}); }
 
-/* ── Form / control style objects ── */
+/* ── Form / control style objects (KBiz360 Pro tokens) ── */
 export const inp={
-  width:"100%",padding:"7px 10px",border:"1px solid #e1e3ec",
-  borderRadius:7,fontSize:11.5,outline:"none",
+  width:"100%",padding:"8px 11px",border:"1px solid #e6e8ec",
+  borderRadius:8,fontSize:12,outline:"none",color:"#14161a",
   boxSizing:"border-box",background:"#fff",
 };
 
 export const card={
-  background:"#fff",border:"1px solid #e1e3ec",
+  background:"#fff",border:"1px solid #e6e8ec",
   borderRadius:12,padding:"14px 16px",
+  boxShadow:"0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)",
 };
 
 export const btnG={
-  display:"flex",alignItems:"center",justifyContent:"center",gap:6,
-  padding:"8px 18px",background:"#0d1326",color:"#fff",
-  border:"none",borderRadius:8,fontSize:12,fontWeight:700,
-  cursor:"pointer",whiteSpace:"nowrap",
+  display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,
+  padding:"8px 16px",background:"#1a1c22",color:"#fff",
+  border:"none",borderRadius:8,fontSize:12.5,fontWeight:600,
+  cursor:"pointer",whiteSpace:"nowrap",letterSpacing:"0.01em",
 };
 
 export const btnGh={
-  display:"flex",alignItems:"center",justifyContent:"center",gap:6,
-  padding:"7px 16px",background:"transparent",color:"#0d1326",
-  border:"1px solid #e1e3ec",borderRadius:8,fontSize:12,fontWeight:600,
+  display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,
+  padding:"7px 15px",background:"#fff",color:"#1a1c22",
+  border:"1px solid #e6e8ec",borderRadius:8,fontSize:12.5,fontWeight:600,
   cursor:"pointer",whiteSpace:"nowrap",
 };
 
@@ -75,20 +76,20 @@ export function FL({label,children}){
 }
 
 /* ── Report table cell styles ── */
-export const RPT_thStyle={padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#5a6691",borderBottom:"1px solid #e1e3ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase",background:"#f7f8fb"};
-export const RPT_tdStyle={padding:"8px 12px",fontSize:12,color:"#0d1326",borderBottom:"1px solid #f0f2f7"};
+export const RPT_thStyle={padding:"10px 12px",textAlign:"left",fontWeight:600,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase",background:"#f4f5f7"};
+export const RPT_tdStyle={padding:"8px 12px",fontSize:12,color:"#14161a",borderBottom:"1px solid #eef0f3"};
 
 /* ── KPI summary card ── */
 export function KpiCard({label,value,subtitle,trend,Icon,accent="neutral",onClick}){
   const mob=useMobile();
   const [pressed,setPressed]=useState(false);
   const ac={
-    info:   {bg:"#E6F1FB",c:"#185FA5",b:"#B5D4F4"},
-    success:{bg:"#EAF3DE",c:"#3B6D11",b:"#C0DD97"},
-    warning:{bg:"#FAEEDA",c:"#854F0B",b:"#FAC775"},
-    danger: {bg:"#FCEBEB",c:"#A32D2D",b:"#F7C1C1"},
-    neutral:{bg:"#f3f4f8",c:"#384677",b:"#e1e3ec"},
-  }[accent]||{bg:"#f3f4f8",c:"#384677",b:"#e1e3ec"};
+    info:   {bg:"#e8f0ff",c:"#2563eb",b:"#cfe0ff"},
+    success:{bg:"#e8f6ed",c:"#16a34a",b:"#bfe6cc"},
+    warning:{bg:"#fbeedb",c:"#b45309",b:"#f5d9a8"},
+    danger: {bg:"#fbe9e9",c:"#dc2626",b:"#f3c0c0"},
+    neutral:{bg:"#f4f5f7",c:"#5b616e",b:"#e6e8ec"},
+  }[accent]||{bg:"#f4f5f7",c:"#5b616e",b:"#e6e8ec"};
   const clickable=!!onClick;
   return (
     <div onClick={onClick}

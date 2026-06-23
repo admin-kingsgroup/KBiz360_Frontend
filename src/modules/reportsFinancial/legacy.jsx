@@ -33,6 +33,7 @@ import { useMobile } from '../../core/hooks';
 import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail, stripLeafPrefix, moduleSideRows } from '../../core/pnlDetail';
 import { openPrintPreview } from '../../core/PrintPreview';
 import { LedgerActions } from '../../core/ledgerActions';
+import { toast } from '../../core/ux/toast';
 import { openLedgerModal } from '../../core/LedgerModalHost';
 import { pushModal } from '../../core/ux/modalStore';
 import { clickable as keyActivate } from '../../core/ux/clickable';
@@ -42,7 +43,7 @@ import { CONSOLIDATED_LABEL } from '../../core/data';
 const SAP = {
   shell: '#1d2d3e', border: '#d9d9d9', borderLt: '#ededed',
   text: '#32363a', sec: '#6a6d70', label: '#8696a9',
-  blue: '#0070f2', blueBg: '#e8f3ff', green: '#188918', greenBg: '#f1fdf1', greenDk: '#0d6b0d',
+  blue: '#2563eb', blueBg: '#e8f0ff', green: '#16a34a', greenBg: '#e8f6ed', greenDk: '#15803d',
   red: '#bb0000', teal: '#04838f', purple: '#5c30a2', orange: '#e9730c', gold: '#c87b00',
   rowHover: '#f0f5ff', rowAlt: '#fafafa', headerBg: '#f0f3f4', pageBg: '#f5f6f7',
   grpBg: '#e8f0fb', grpText: '#0a2955', subBg: '#f3f7fc', subText: '#1a3a6e',
@@ -95,7 +96,7 @@ function FioriHead({ system, title, sub, right }) {
   );
 }
 function StateBox({ q, empty, children }) {
-  if (q.isLoading) return <div style={{ ...card, padding: 30, textAlign: 'center', color: SAP.sec, fontSize: 12, borderRadius: '0 0 8px 8px' }}>Loading live data…</div>;
+  if (q.isLoading) return <div style={{ ...card, padding: 16, borderRadius: '0 0 8px 8px' }}>{Array.from({ length: 8 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.09) }} />)}</div>;
   if (q.isError) return <div style={{ ...card, padding: 16, color: SAP.red, fontSize: 12, fontWeight: 600, borderRadius: '0 0 8px 8px' }}>⚠ {q.error?.message || 'Failed to load from backend'}</div>;
   if (empty) return <div style={{ ...card, padding: 30, textAlign: 'center', color: SAP.sec, fontSize: 12, borderRadius: '0 0 8px 8px' }}>No data for this selection.</div>;
   return children;
@@ -112,7 +113,7 @@ function Kpi({ tone, label, value, sub, trend }) {
     </div>
   );
 }
-const KpiGrid = ({ children }) => <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 14 }}>{children}</div>;
+const KpiGrid = ({ children }) => <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%,170px),1fr))', gap: 12, marginBottom: 14 }}>{children}</div>;
 function Trend({ cur, prev, invert }) {
   if (prev == null || !isFinite(prev) || prev === 0) return null;
   const p = ((cur - prev) / Math.abs(prev)) * 100, up = p >= 0, good = invert ? !up : up;
@@ -386,8 +387,8 @@ function PnlPeriodBar({ mode, setMode, fy, setFy, compare, setCompare, custom, s
       )}
       <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
         {showView && <PnlViewSwitcher view={view} setView={setView} />}
-        {canExport && <button onClick={onExport} style={toolBtn}>⬇ Excel</button>}
-        <button onClick={() => openPrintPreview({ selector: 'main', title: 'Profit & Loss', recommend: 'landscape' })} style={toolBtn}>🖨 Print / PDF</button>
+        {canExport && <button onClick={onExport} className="max-tablet:min-h-[44px]" style={toolBtn}>⬇ Excel</button>}
+        <button onClick={() => { toast('Opening print view…', 'info'); openPrintPreview({ selector: 'main', title: 'Profit & Loss', recommend: 'landscape' }); }} className="max-tablet:min-h-[44px]" style={toolBtn}>🖨 Print / PDF</button>
       </div>
     </div>
   );
@@ -447,7 +448,7 @@ function PnLMatrix({ branch, cur, fy, grain, onFocus }) {
       row.fytotal = m.pct ? +m.total.toFixed(2) : Math.round(m.total);
       return row;
     });
-    exportToExcel(`PnL_${grain}_FY${fy}`, columns, rows);
+    try { exportToExcel(`PnL_${grain}_FY${fy}`, columns, rows); toast('Downloading Excel export…', 'success'); } catch (e) { toast('Export failed: ' + (e?.message || e), 'error'); }
   };
 
   if (errored) return <div style={{ ...card, padding: 16, color: SAP.red, fontSize: 12, fontWeight: 600 }}>⚠ {errored.error?.message || 'Failed to load the period matrix'}</div>;
@@ -459,10 +460,10 @@ function PnLMatrix({ branch, cur, fy, grain, onFocus }) {
       badge={<Badge bg={SAP.blueBg} c={SAP.blue} bd="#b8d6ff">{cols.length} {grain === 'month' ? 'months' : 'quarters'}</Badge>}
     >
       <div style={{ padding: '8px 12px 0', display: 'flex', justifyContent: 'flex-end' }}>
-        <button onClick={doExport} style={toolBtn}>⬇ Excel</button>
+        <button onClick={doExport} className="max-tablet:min-h-[44px]" style={toolBtn}>⬇ Excel</button>
       </div>
       {loading ? (
-        <div style={{ padding: 30, textAlign: 'center', color: SAP.sec, fontSize: 12 }}>Loading {cols.length} periods…</div>
+        <div style={{ padding: 16 }}>{Array.from({ length: 8 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.09) }} />)}</div>
       ) : cols.length === 0 ? (
         <div style={{ padding: 30, textAlign: 'center', color: SAP.sec, fontSize: 12 }}>No periods in this financial year yet.</div>
       ) : (
@@ -505,7 +506,7 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
   const cur = curOf(branch);
   const mobile = useMobile();
   const saved = useMemo(loadSavedPeriod, []);
-  const [mode, setMode] = useState(saved.mode || 'all');                // all|today|week|mtd|qtd|cfy|lfy|month|quarter|custom (ytd kept for back-compat)
+  const [mode, setMode] = useState(saved.mode || 'cfy');                // all|today|week|mtd|qtd|cfy|lfy|month|quarter|custom (default CFY so the detailed P&L's per-booking file drill stays bounded/fast; widen to All as needed)
   const [fy, setFy] = useState(saved.fy || CUR_FY.label);
   const [compare, setCompare] = useState(saved.compare ?? true);
   const [custom, setCustom] = useState(saved.custom || { from: CUR_FY.startISO, to: todayISO() });
@@ -1583,7 +1584,7 @@ export function ReportBSLive({ branch, forceView, hideSwitcher }) {
     if (showPY) cols.push({ key: 'prev', label: `Previous ${prevLabel} (${cur})` }, { key: 'diff', label: `Difference (${cur})` }, { key: 'pct', label: '% Change' });
     exportToExcel(`Balance-Sheet_${branchLabel(branch)}_${to || 'latest'}`, cols, bsExportRows({ d, prev, prevMap, showPY, detail }));
   };
-  const doPrint = () => { if (d) openPrintPreview({ selector: 'main', title: 'Balance Sheet', recommend: 'landscape' }); };
+  const doPrint = () => { if (d) { toast('Opening print view…', 'info'); openPrintPreview({ selector: 'main', title: 'Balance Sheet', recommend: 'landscape' }); } };
   const expBtn = (dis) => ({ padding: '6px 11px', fontSize: 11, fontWeight: 600, border: '1px solid rgba(255,255,255,0.3)', borderRadius: 5, cursor: dis ? 'default' : 'pointer', background: 'rgba(255,255,255,0.1)', color: '#fff', opacity: dis ? 0.45 : 1 });
 
   return (

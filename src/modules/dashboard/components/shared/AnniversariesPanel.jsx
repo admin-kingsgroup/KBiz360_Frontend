@@ -25,8 +25,8 @@ export function AnniversariesPanel({ anniversaries }) {
             {a.years}
           </div>
           <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontSize: 12, color: '#0d1326', fontWeight: 600 }}>{a.name}</p>
-            <p style={{ margin: 0, fontSize: 10.5, color: '#5a6691' }}>
+            <p style={{ margin: 0, fontSize: 12, color: '#14161a', fontWeight: 600 }}>{a.name}</p>
+            <p style={{ margin: 0, fontSize: 10.5, color: '#5b616e' }}>
               {a.branch} · {a.years} year{a.years !== 1 ? 's' : ''} on {a.date}
             </p>
           </div>

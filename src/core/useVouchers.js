@@ -57,11 +57,17 @@ export function toPurchaseRow(v, module) {
   };
 }
 
+// The register rows (toSaleRow / toPurchaseRow) read only header fields — never
+// lines[]/meta — so ask the backend for just those columns (?fields=). This keeps the
+// heavy per-line fare payload off the wire (a sale register was ~16s of full docs vs
+// ~2.4s lean). The capture/pivot view, which DOES need lines, fetches separately.
+const REGISTER_FIELDS = 'branch,vno,date,billTo,party,total,costCenter,linkNo,sourceRef,againstInvoice,remarks,type';
+
 export function useSalesVouchers({ type, branch } = {}) {
   return useQuery({
     queryKey: ['vouchers', 'sales', type || 'all', branch || 'all'],
     queryFn: async () => {
-      const params = { category: 'sale', branch };
+      const params = { category: 'sale', branch, fields: REGISTER_FIELDS };
       if (type) params.type = type;            // module code (SF/SH/…) = the sale voucher type
       const rows = await apiGet('/api/vouchers', params);
       return (rows || []).map(toSaleRow);
@@ -75,7 +81,7 @@ export function usePurchaseVouchers({ type, branch } = {}) {
   return useQuery({
     queryKey: ['vouchers', 'purchases', type || 'all', branch || 'all'],
     queryFn: async () => {
-      const params = { category: 'purchase', branch };
+      const params = { category: 'purchase', branch, fields: REGISTER_FIELDS };
       if (type) params.type = type;            // purchase module code (PF/PH/…) = the purchase voucher type
       const rows = await apiGet('/api/vouchers', params);
       return (rows || []).map((v) => toPurchaseRow(v, type));

@@ -16,11 +16,12 @@ import { useGpBills, useModulePL, useAgeing } from '../../../core/useAccounting'
 import { bc } from '../../../core/styles';
 import { CUR_MONTH, MONTH_OPTIONS, ALL_TIME_FROM, todayISO, prevMonthKey } from '../../../core/dates';
 import { CONSOLIDATED_LABEL } from '../../../core/data';
+import { compactAmt } from '../../../core/format';
 import { PageLayout } from '../../../shell/PageLayout';
 import { PageSection, ResponsiveGrid, Button, Select } from '../../../shell/primitives';
 
-const achvStyle = (a) => (a >= 90 ? { background: '#EAF3DE', color: '#27500A' } : a >= 70 ? { background: '#FAEEDA', color: '#854F0B' } : { background: '#FCEBEB', color: '#A32D2D' });
-const growthStyle = (g) => (g >= 0 ? { background: '#EAF3DE', color: '#27500A' } : { background: '#FCEBEB', color: '#A32D2D' });
+const achvStyle = (a) => (a >= 90 ? { background: '#e8f6ed', color: '#16a34a' } : a >= 70 ? { background: '#fbeedb', color: '#d97706' } : { background: '#fbe9e9', color: '#dc2626' });
+const growthStyle = (g) => (g >= 0 ? { background: '#e8f6ed', color: '#16a34a' } : { background: '#fbe9e9', color: '#dc2626' });
 
 export function MisReport({ branch }) {
   const [period, setPeriod] = useState(CUR_MONTH);
@@ -65,13 +66,13 @@ export function MisReport({ branch }) {
   const trendData = trendMonths.map((m) => { const mb = GP_DATA.filter((b) => inBr(b) && String(b.date).startsWith(m)); const mr = mb.reduce((s, b) => s + (+b.sell || 0), 0); const mg = mb.reduce((s, b) => s + ((+b.sell || 0) - (+b.cost || 0)), 0); return { m, rev: mr, gp: mg, gpPct: mr > 0 ? +(mg / mr * 100).toFixed(1) : 0 }; });
   const maxRev = Math.max(...trendData.map((t) => t.rev), 1);
 
-  const f = (n) => (n >= 10000000 ? cur + (n / 10000000).toFixed(1) + 'Cr' : n >= 100000 ? cur + (n / 100000).toFixed(1) + 'L' : n >= 1000 ? cur + (n / 1000).toFixed(0) + 'K' : cur + n.toFixed(0));
+  const f = (n) => compactAmt(n, { currency: cur }); // canonical compact (branch currency)
   const pct = (val, total) => (total > 0 ? Math.round(val / total * 100) : 0);
   const periodLabel = PERIODS.find((p) => p.v === period)?.l;
 
   const KPI = ({ label, value, sub, growth, color }) => (
-    <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{ borderTopColor: color || '#185FA5' }}>
-      <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: color || '#185FA5' }}>{label}</p>
+    <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{ borderTopColor: color || '#2563eb' }}>
+      <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: color || '#2563eb' }}>{label}</p>
       <p className="mt-1 text-lg font-extrabold tabular-nums text-navy tablet:text-xl">{value}</p>
       {sub && <p className="text-[10px] text-ink-muted">{sub}</p>}
       {growth != null && (
@@ -90,11 +91,11 @@ export function MisReport({ branch }) {
       filters={<Select value={period} onChange={(e) => setPeriod(e.target.value)} className="w-auto">{PERIODS.map((p) => <option key={p.v} value={p.v}>{p.l}</option>)}</Select>}
     >
       <ResponsiveGrid min="160px" gap="md" className="mb-3.5">
-        <KPI label="Revenue" value={f(rev)} sub={`${bills.length} bookings`} growth={revGrowth} color="#185FA5" />
-        <KPI label="Gross Profit" value={f(gp)} sub={`GP% ${gpPct}%`} growth={gpGrowth} color="#27500A" />
-        <KPI label="Net Profit" value={f(netPft)} sub={`After expenses ${f(exp)}`} color={netPft > 0 ? '#1D9E75' : '#A32D2D'} />
-        <KPI label="GP%" value={`${gpPct}%`} sub={`Prev: ${prevRev > 0 ? +(prevGP / prevRev * 100).toFixed(1) : 0}%`} color={gpPct >= 12 ? '#27500A' : gpPct >= 8 ? '#854F0B' : '#A32D2D'} />
-        <KPI label="Bookings" value={String(bills.length)} sub={`Prev period: ${prev.length}`} color="#384677" />
+        <KPI label="Revenue" value={f(rev)} sub={`${bills.length} bookings`} growth={revGrowth} color="#2563eb" />
+        <KPI label="Gross Profit" value={f(gp)} sub={`GP% ${gpPct}%`} growth={gpGrowth} color="#16a34a" />
+        <KPI label="Net Profit" value={f(netPft)} sub={`After expenses ${f(exp)}`} color={netPft > 0 ? '#3fb7a3' : '#dc2626'} />
+        <KPI label="GP%" value={`${gpPct}%`} sub={`Prev: ${prevRev > 0 ? +(prevGP / prevRev * 100).toFixed(1) : 0}%`} color={gpPct >= 12 ? '#16a34a' : gpPct >= 8 ? '#d97706' : '#dc2626'} />
+        <KPI label="Bookings" value={String(bills.length)} sub={`Prev period: ${prev.length}`} color="#2e323c" />
       </ResponsiveGrid>
 
       <div className="mb-3 grid grid-cols-1 gap-3 desktop:grid-cols-[2fr_1fr]">
@@ -107,20 +108,20 @@ export function MisReport({ branch }) {
               const isCur = t.m === period;
               return (
                 <div key={t.m} className="flex flex-1 flex-col items-center gap-px">
-                  <p className="mb-0.5 text-center text-[8.5px] font-semibold" style={{ color: isCur ? '#185FA5' : '#5a6691' }}>{f(t.rev)}</p>
+                  <p className="mb-0.5 text-center text-[8.5px] font-semibold" style={{ color: isCur ? '#2563eb' : '#5b616e' }}>{f(t.rev)}</p>
                   <div className="flex h-[120px] w-full items-end gap-px">
-                    <div className="flex-1 rounded-t" style={{ height: barH, minHeight: 2, background: isCur ? '#185FA5' : '#B5D4F4' }} />
-                    <div className="flex-1 rounded-t" style={{ height: gpH, minHeight: 2, background: isCur ? '#27500A' : '#C0DD97' }} />
+                    <div className="flex-1 rounded-t" style={{ height: barH, minHeight: 2, background: isCur ? '#2563eb' : '#cfe0f8' }} />
+                    <div className="flex-1 rounded-t" style={{ height: gpH, minHeight: 2, background: isCur ? '#16a34a' : '#bfe6cd' }} />
                   </div>
-                  <p className="text-center text-[8px]" style={{ color: isCur ? '#0d1326' : '#5a6691', fontWeight: isCur ? 700 : 400 }}>{t.m.slice(5)}</p>
-                  <p className="text-[7.5px] text-[#854F0B]">{t.gpPct}%</p>
+                  <p className="text-center text-[8px]" style={{ color: isCur ? '#1a1c22' : '#5b616e', fontWeight: isCur ? 700 : 400 }}>{t.m.slice(5)}</p>
+                  <p className="text-[7.5px] text-[#d97706]">{t.gpPct}%</p>
                 </div>
               );
             })}
           </div>
           <div className="flex justify-center gap-3 text-[9.5px] text-ink-muted">
-            <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#185FA5]" />Revenue</span>
-            <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#27500A]" />GP</span>
+            <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#2563eb]" />Revenue</span>
+            <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#16a34a]" />GP</span>
           </div>
         </PageSection>
 
@@ -131,10 +132,10 @@ export function MisReport({ branch }) {
             <div key={name} className="border-b border-surface-alt py-2 last:border-0">
               <div className="mb-1 flex items-center justify-between">
                 <span className="flex items-center gap-1.5"><span className="text-sm">{['🥇', '🥈', '🥉'][i]}</span><span className="text-[11px] font-semibold text-navy">{name}</span></span>
-                <span className="text-[11px] font-bold text-[#27500A]">{f(dd.gp)}</span>
+                <span className="text-[11px] font-bold text-[#16a34a]">{f(dd.gp)}</span>
               </div>
               <div className="flex justify-between text-[9.5px] text-ink-muted"><span>{dd.bks} bookings · Rev {f(dd.rev)}</span><span>{pct(dd.rev, rev)}% of total</span></div>
-              <div className="mt-1 h-1 overflow-hidden rounded-full bg-surface-border"><div className="h-full rounded-full bg-[#27500A]" style={{ width: `${pct(dd.rev, rev)}%` }} /></div>
+              <div className="mt-1 h-1 overflow-hidden rounded-full bg-surface-border"><div className="h-full rounded-full bg-[#16a34a]" style={{ width: `${pct(dd.rev, rev)}%` }} /></div>
             </div>
           ))}
         </PageSection>
@@ -145,7 +146,7 @@ export function MisReport({ branch }) {
         <PageSection title="👥 Top Clients">
           {topClients.map(([name, dd]) => (
             <div key={name} className="border-b border-surface-alt py-1.5 last:border-0">
-              <div className="flex justify-between"><span className="text-[11px] font-semibold text-navy">{name}</span><span className="text-[11px] font-bold text-[#185FA5]">{f(dd.rev)}</span></div>
+              <div className="flex justify-between"><span className="text-[11px] font-semibold text-navy">{name}</span><span className="text-[11px] font-bold text-[#2563eb]">{f(dd.rev)}</span></div>
               <div className="mt-px text-[9.5px] text-ink-muted">GP: {f(dd.gp)} ({pct(dd.gp, gp)}% of total GP)</div>
             </div>
           ))}
@@ -157,19 +158,19 @@ export function MisReport({ branch }) {
           {overdueClients.slice(0, 4).map((c) => (
             <div key={c.client} className="flex justify-between border-b border-surface-alt py-1.5"><span className="text-[10.5px] text-navy">{c.client}</span><span className="text-[11px] font-bold text-maroon">{f(c.outstanding)}</span></div>
           ))}
-          {overdueClients.length === 0 && <p className="text-[11px] text-[#27500A]">✔ No overdue receivables</p>}
-          <div className="mt-2 rounded-lg bg-[#FCEBEB] px-2.5 py-1.5 text-[9.5px] font-semibold text-maroon">Total: {f(overdueClients.reduce((s, c) => s + c.outstanding, 0))}</div>
+          {overdueClients.length === 0 && <p className="text-[11px] text-[#16a34a]">✔ No overdue receivables</p>}
+          <div className="mt-2 rounded-lg bg-[#fbe9e9] px-2.5 py-1.5 text-[9.5px] font-semibold text-maroon">Total: {f(overdueClients.reduce((s, c) => s + c.outstanding, 0))}</div>
         </PageSection>
 
         {/* Action items */}
-        <PageSection title="📋 Action Items This Week" className="border-t-[3px] border-t-[#854F0B]">
+        <PageSection title="📋 Action Items This Week" className="border-t-[3px] border-t-[#d97706]">
           {[
             { icon: '💳', text: 'BSP payment due Monday — check BSP Summary', urgent: true },
             { icon: '📋', text: `GSTR-3B filing — ${period === '2026-05' ? '20 Jun 2026' : '20 May 2026'}`, urgent: false },
             { icon: '📞', text: `Follow up: ${overdueClients[0]?.client || '—'} overdue`, urgent: overdueClients.length > 0 },
             { icon: '👥', text: `${prev.length} bookings in pipeline from last month`, urgent: false },
           ].map((item, i) => (
-            <div key={i} className="flex items-start gap-1.5 border-b border-surface-alt py-1.5"><span>{item.icon}</span><span className="text-[10.5px] leading-snug" style={{ color: item.urgent ? '#A32D2D' : '#384677', fontWeight: item.urgent ? 600 : 400 }}>{item.text}</span></div>
+            <div key={i} className="flex items-start gap-1.5 border-b border-surface-alt py-1.5"><span>{item.icon}</span><span className="text-[10.5px] leading-snug" style={{ color: item.urgent ? '#dc2626' : '#2e323c', fontWeight: item.urgent ? 600 : 400 }}>{item.text}</span></div>
           ))}
         </PageSection>
       </ResponsiveGrid>

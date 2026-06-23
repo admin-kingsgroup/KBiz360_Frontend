@@ -25,7 +25,7 @@ import { BalanceSheetTallyLive } from './balanceSheetTally';
 import { ScheduleIIIBS, ConsolidatedBS } from './reports';
 import { CONSOLIDATED_LABEL } from '../core/data';
 
-const GOLD = '#A07828', DARK = '#111111', DIM = '#6A6A6A';
+const GOLD = '#A07828';
 const branchLabelOf = (b) => (!b || b === 'ALL' ? CONSOLIDATED_LABEL : (b.code || b));
 const fmt = (n) => (n ? Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
 const fmtB = (n) => Math.abs(Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -112,10 +112,13 @@ function TkfStatement({ title, badge, branch, period, kpis = [], sections, resul
 /* ── TKF Profit & Loss (vertical) ────────────────────────────────────────── */
 function TkfPnL({ branch, from, to }) {
   const cur = bc(branch).cur;
-  const q = useModulePL(branch, { from, to });
+  // The TKF statement reads only totals + indirect + per-module fare-component `heads`
+  // (never the per-booking file drill), so use the fast summary+heads mode — heads are
+  // computed server-side via aggregation instead of scanning every voucher.
+  const q = useModulePL(branch, { from, to, summary: true, withHeads: true });
   const d = q.data;
   const c = (n) => cur + fmt(n);
-  if (q.isLoading) return <div className="kbled"><style>{LEDGER_CSS}</style><div className="loading">Loading P&amp;L…</div></div>;
+  if (q.isLoading) return <div className="kbled"><style>{LEDGER_CSS}</style><div style={{ padding: 16 }}>{Array.from({ length: 9 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.08) }} />)}</div></div>;
   if (!d) return <div className="kbled"><style>{LEDGER_CSS}</style><div className="loading">No data for this period.</div></div>;
 
   const buckets = (Array.isArray(d.indirect?.buckets) && d.indirect.buckets.length)
@@ -207,7 +210,7 @@ function TkfBS({ branch, to }) {
   const q = useBalanceSheet(branch, { to });
   const d = q.data;
   const c = (n) => cur + fmt(n);
-  if (q.isLoading) return <div className="kbled"><style>{LEDGER_CSS}</style><div className="loading">Loading Balance Sheet…</div></div>;
+  if (q.isLoading) return <div className="kbled"><style>{LEDGER_CSS}</style><div style={{ padding: 16 }}>{Array.from({ length: 9 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.08) }} />)}</div></div>;
   if (!d) return <div className="kbled"><style>{LEDGER_CSS}</style><div className="loading">No data as on this date.</div></div>;
 
   const sideRows = (groups) => {

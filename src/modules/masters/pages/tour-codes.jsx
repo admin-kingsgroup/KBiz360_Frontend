@@ -13,8 +13,8 @@ import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { PageLayout } from '../../../shell/PageLayout';
 import { Modal, Button, Input, Select, FormField, ResponsiveGrid, StatusPill } from '../../../shell/primitives';
 
-const PAX_TYPE = { FIT: '#185FA5', GIT: '#854F0B', MICE: '#A32D2D' };
-const PAX_BG = { FIT: '#E6F1FB', GIT: '#FAEEDA', MICE: '#FCEBEB' };
+const PAX_TYPE = { FIT: '#2563eb', GIT: '#d97706', MICE: '#dc2626' };
+const PAX_BG = { FIT: '#e8f0ff', GIT: '#fbeedb', MICE: '#fbe9e9' };
 const MOD_ICONS = { Flight: '✈', Hotel: '🏨', Transfers: '🚐', Visa: '🛂', Insurance: '🛡', Guide: '🧭', Cruise: '🚢', Meals: '🍽' };
 const blankForm = { id: '', name: '', dest: '', nights: 4, days: 5, pax: 'FIT', base: 0, peak: 0, off: 0, gp: 12, active: true, tags: [], mods: ['Flight', 'Hotel'] };
 
@@ -56,7 +56,7 @@ export function TourCodeMaster({ setRoute }) {
       <ResponsiveGrid min="320px" gap="md">
         {filtered.map((c) => (
           <div key={c.id} className={`overflow-hidden rounded-brand border border-surface-border bg-surface shadow-sm ${c.active ? '' : 'opacity-60'}`}>
-            <div className="flex items-start justify-between border-b border-surface-border px-3.5 py-3" style={{ background: PAX_BG[c.pax] || '#E6F1FB' }}>
+            <div className="flex items-start justify-between border-b border-surface-border px-3.5 py-3" style={{ background: PAX_BG[c.pax] || '#e8f0ff' }}>
               <div>
                 <div className="mb-0.5 flex items-center gap-2">
                   <span className="rounded bg-navy px-1.5 py-0.5 font-mono text-[9.5px] font-bold text-gold">{c.id}</span>
@@ -72,21 +72,21 @@ export function TourCodeMaster({ setRoute }) {
             </div>
             <div className="px-3.5 py-2.5">
               <div className="mb-2.5 grid grid-cols-3 gap-2 text-[11px]">
-                <div className="flex justify-between"><span className="text-[#27500A]">Off-peak</span><span className="font-semibold">{c.off}</span></div>
-                <div className="flex justify-between"><span className="text-[#185FA5]">Base</span><span className="font-semibold">{c.base}</span></div>
-                <div className="flex justify-between"><span className="text-[#A32D2D]">Peak</span><span className="font-semibold">{c.peak}</span></div>
+                <div className="flex justify-between"><span className="text-[#16a34a]">Off-peak</span><span className="font-semibold">{c.off}</span></div>
+                <div className="flex justify-between"><span className="text-[#2563eb]">Base</span><span className="font-semibold">{c.base}</span></div>
+                <div className="flex justify-between"><span className="text-[#dc2626]">Peak</span><span className="font-semibold">{c.peak}</span></div>
               </div>
               <div className="mb-2 flex flex-wrap gap-1">
                 {c.mods.map((m) => <span key={m} className="rounded-full bg-surface-alt px-2 py-0.5 text-[9.5px] font-semibold text-role-hr">{MOD_ICONS[m] || '•'} {m}</span>)}
               </div>
               <div className="flex items-center justify-between">
-                <div className="flex flex-wrap gap-1">{c.tags.map((t) => <span key={t} className="rounded-full bg-[#E6F1FB] px-1.5 py-px text-[8.5px] text-[#185FA5]">{t}</span>)}</div>
-                <span className="text-[10.5px] font-extrabold text-[#27500A]">GP {c.gp}%</span>
+                <div className="flex flex-wrap gap-1">{c.tags.map((t) => <span key={t} className="rounded-full bg-[#e8f0ff] px-1.5 py-px text-[8.5px] text-[#2563eb]">{t}</span>)}</div>
+                <span className="text-[10.5px] font-extrabold text-[#16a34a]">GP {c.gp}%</span>
               </div>
               <div className="mt-2.5 flex gap-1.5">
                 <Button size="xs" variant="primary" icon={ClipboardList} className="flex-1" onClick={() => setRoute && setRoute('/sales/holiday')}>Use in Sale</Button>
                 <Button size="xs" variant="secondary" icon={Pencil}>Edit</Button>
-                <Button size="xs" variant="secondary" className={c.active ? 'text-maroon' : 'text-[#27500A]'} onClick={() => toggleArchive(c)}>{c.active ? 'Archive' : 'Restore'}</Button>
+                <Button size="xs" variant="secondary" className={c.active ? 'text-maroon' : 'text-[#16a34a]'} onClick={() => toggleArchive(c)}>{c.active ? 'Archive' : 'Restore'}</Button>
               </div>
             </div>
           </div>

@@ -53,7 +53,9 @@ export function PageAccessControl({ currentUser, setRoute }) {
 
   const qc = useQueryClient();
   const saveMut = useMutation({
-    mutationFn: ({ id, hidden }) => apiPut(`/api/auth/users/${id}/access`, { hidden }),
+    // id is a Mongo _id for DB-backed users, or the email for bootstrap-map users
+    // not yet persisted — encode it so the '@' rides safely in the URL path.
+    mutationFn: ({ id, hidden }) => apiPut(`/api/auth/users/${encodeURIComponent(id)}/access`, { hidden }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ref', 'users'] }),
   });
 

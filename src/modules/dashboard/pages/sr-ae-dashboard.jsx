@@ -3,6 +3,8 @@ import { DashboardHeader } from '../../../core/helpers';
 import { KPICard, WidgetCard } from '../../../core/styles';
 import { fmtINR } from '../../../core/format';
 import { CUR_MONTH_LABEL } from '../../../core/dates';
+import { PageLayout } from '../../../shell/PageLayout';
+import { ResponsiveGrid } from '../../../shell/primitives';
 import { useSrAeDashboard } from '../hooks/use-sr-ae-dashboard';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
 import { useDashboardStore } from '../store/dashboard.store';
@@ -21,13 +23,13 @@ export function SrAeDashboardPage({ currentUser, setRoute, branch }) {
   const setPeriod = useDashboardStore((s) => s.setPeriod);
 
   if (isLoading || !data) {
-    return <DashboardSkeleton title="Senior Accounts Executive Dashboard" numKpis={4} columns={2} hasCharts={false} />;
+    return <DashboardSkeleton numKpis={4} columns={2} hasCharts={false} />;
   }
 
   const { todayVouchers, reconStatus, topSuppliers } = data;
 
   return (
-    <div style={{ padding: 18, maxWidth: 1400, margin: '0 auto' }}>
+    <PageLayout>
       <DashboardHeader
         title="Senior Accounts Executive Dashboard"
         subtitle="Throughput · approvals · close progress"
@@ -37,48 +39,33 @@ export function SrAeDashboardPage({ currentUser, setRoute, branch }) {
         onExport={() => openPrintPreview({ selector: 'main', title: 'Senior Accounts Executive Dashboard', recommend: 'portrait' })}
       />
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))',
-          gap: 12,
-          marginBottom: 14,
-        }}
-      >
+      <ResponsiveGrid min="180px" gap="md" className="mb-3.5">
         {/* These counts aren't computed by the dashboard hook yet — show "—"
             (open the screen) rather than a hardcoded "0" that would falsely claim
             nothing is pending / no reco issues. */}
-        <KPICard label="Pending My Approval" value="—" delta="open approvals" color="#f97316" onClick={() => navigate('/approvals')} />
-        <KPICard label="Posted Today" value={todayTotal} delta={fmtINR(todayValue) + ' value'} color="#22c55e" />
-        <KPICard label="Rejected to Branches" value="—" delta="" color="#A32D2D" />
-        <KPICard
-          label="Bank Reco Issues"
-          value="—"
-          delta="open reco"
-          color="#d4a437"
-          onClick={() => navigate('/bank-reco')}
-        />
-      </div>
+        <KPICard label="Pending My Approval" value="—" delta="open approvals" color="#d97706" onClick={() => navigate('/approvals')} />
+        <KPICard label="Posted Today" value={todayTotal} delta={fmtINR(todayValue) + ' value'} color="#16a34a" />
+        <KPICard label="Rejected to Branches" value="—" delta="" color="#dc2626" />
+        <KPICard label="Bank Reco Issues" value="—" delta="open reco" color="#c2a04a" onClick={() => navigate('/bank-reco')} />
+      </ResponsiveGrid>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+      <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
         <WidgetCard title="Today's Voucher Volume — By Branch">
           <TodayVouchersTable data={todayVouchers} />
         </WidgetCard>
-
         <WidgetCard title="Bank Reconciliation Status" onDrill={() => navigate('/bank-reco')}>
           <BankReconStatusPanel rows={reconStatus} />
         </WidgetCard>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div className="grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
         <WidgetCard title="Monthly Close Checklist" subtitle={CUR_MONTH_LABEL}>
           <CloseChecklist onGo={navigate} />
         </WidgetCard>
-
         <WidgetCard title="Top 5 Vendors — Overdue Payables">
           <TopVendorsOverdueTable suppliers={topSuppliers.slice(0, 5)} />
         </WidgetCard>
       </div>
-    </div>
+    </PageLayout>
   );
 }

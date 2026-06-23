@@ -1,57 +1,25 @@
 import React from 'react';
-import { card } from '../../../../core/styles';
-import { useMobile } from '../../../../core/hooks';
 
 export function KpiTile({ label, value, growth, sub, color, bg, icon, onClick }) {
-  const mob = useMobile();
   return (
     <div
       onClick={onClick}
-      style={{
-        ...card,
-        borderTop: `4px solid ${color}`,
-        padding: '14px 16px',
-        background: bg || '#fff',
-        cursor: onClick ? 'pointer' : 'default',
-        transition: 'transform 0.15s,box-shadow 0.15s',
-      }}
-      onMouseEnter={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.1)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'none';
-        e.currentTarget.style.boxShadow = 'none';
-      }}
+      style={{ borderTopColor: color, background: bg || '#fff' }}
+      className={`rounded-brand border border-t-4 border-surface-border px-4 py-3.5 shadow-card transition-all duration-fast ease-premium ${onClick ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-pop' : ''}`}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-        <p style={{ margin: 0, fontSize: 9.5, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          {label}
-        </p>
-        <span style={{ fontSize: 18 }}>{icon}</span>
+      <div className="mb-1.5 flex items-start justify-between">
+        <p className="text-[9.5px] font-bold uppercase tracking-wide" style={{ color }}>{label}</p>
+        <span className="text-lg">{icon}</span>
       </div>
-      <p style={{ margin: 0, fontSize: mob ? 20 : 24, fontWeight: 800, color: '#0d1326', fontVariantNumeric: 'tabular-nums' }}>
-        {value}
-      </p>
+      <p className="text-xl font-extrabold tabular-nums text-ink tablet:text-2xl">{value}</p>
       {(growth != null || sub) && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+        <div className="mt-1 flex items-center gap-1.5">
           {growth != null && (
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                color: growth >= 0 ? '#27500A' : '#A32D2D',
-                background: growth >= 0 ? '#EAF3DE' : '#FCEBEB',
-                padding: '1px 7px',
-                borderRadius: 999,
-              }}
-            >
+            <span className={`rounded-full px-1.5 py-px text-[10px] font-bold ${growth >= 0 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
               {growth >= 0 ? '▲' : '▼'} {Math.abs(growth)}% vs Apr
             </span>
           )}
-          {sub && <span style={{ fontSize: 9.5, color: '#5a6691' }}>{sub}</span>}
+          {sub && <span className="text-[9.5px] text-ink-muted">{sub}</span>}
         </div>
       )}
     </div>

@@ -18,10 +18,10 @@ export function MstrShell({ title, icon, badge, badgeBg, badgeC, actions, childr
     <div className="mx-auto w-full max-w-[1260px] px-3 py-3 tablet:px-4 tablet:py-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
-          {icon && <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#E6F1FB] text-lg">{icon}</div>}
+          {icon && <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#e8f0ff] text-lg">{icon}</div>}
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="truncate text-[17px] font-bold tracking-tight text-navy">{title}</h2>
-            {badge && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: badgeBg || '#E6F1FB', color: badgeC || '#185FA5' }}>{badge}</span>}
+            {badge && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: badgeBg || '#e8f0ff', color: badgeC || '#2563eb' }}>{badge}</span>}
           </div>
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

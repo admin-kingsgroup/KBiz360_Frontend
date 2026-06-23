@@ -1,19 +1,19 @@
 export const PRODUCT_MODULES = ['Flight', 'Holiday', 'Hotel', 'Visa', 'Car', 'Insurance', 'Misc'];
 
-export const BAR_COLORS = ['#185FA5', '#27500A', '#854F0B', '#1D9E75', '#384677', '#A32D2D', '#5a6691'];
+export const BAR_COLORS = ['#2563eb', '#16a34a', '#d97706', '#3fb7a3', '#6b4c8b', '#dc2626', '#5b616e'];
 
 export const MEDALS = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
 
 export const ACTION_COLORS = {
-  warn: '#854F0B',
-  info: '#185FA5',
-  success: '#27500A',
+  warn: '#d97706',
+  info: '#2563eb',
+  success: '#16a34a',
 };
 
 export const ACTION_BACKGROUNDS = {
-  warn: '#FAEEDA',
-  info: '#E6F1FB',
-  success: '#EAF3DE',
+  warn: '#fbeedb',     // warning.soft
+  info: '#e8f0ff',     // info.soft
+  success: '#e8f6ed',  // success.soft
 };
 
 // Live, derived from the real system clock (single source of truth: core/dates).
@@ -33,19 +33,19 @@ export const FX_TO_INR = {
 };
 
 export const QUICK_CREATE_ACTIONS = [
-  { label: '✈ Flight Sale',   route: '/sales/flight',  color: '#185FA5' },
-  { label: '🌴 Holiday',      route: '/sales/holiday', color: '#27500A' },
-  { label: '🏨 Hotel',        route: '/sales/hotel',   color: '#854F0B' },
-  { label: '🛂 Visa',         route: '/sales/visa',    color: '#1D9E75' },
-  { label: '💰 Receipt',      route: '/receipts',      color: '#384677' },
-  { label: '💸 Payment',      route: '/payments',      color: '#A32D2D' },
-  { label: '📒 Journal',      route: '/journal',       color: '#5a6691' },
+  { label: '✈ Flight Sale',   route: '/sales/flight',  color: '#2563eb' },
+  { label: '🌴 Holiday',      route: '/sales/holiday', color: '#16a34a' },
+  { label: '🏨 Hotel',        route: '/sales/hotel',   color: '#d97706' },
+  { label: '🛂 Visa',         route: '/sales/visa',    color: '#3fb7a3' },
+  { label: '💰 Receipt',      route: '/receipts',      color: '#6b4c8b' },
+  { label: '💸 Payment',      route: '/payments',      color: '#dc2626' },
+  { label: '📒 Journal',      route: '/journal',       color: '#5b616e' },
 ];
 
 export const POST_SHORTCUTS = [
-  { label: 'Receipt',   icon: '⬇',  route: '/receipts',       color: '#22c55e' },
-  { label: 'Payment',   icon: '⬆',  route: '/payments',       color: '#A32D2D' },
-  { label: 'Sale Inv.', icon: '📄', route: '/sales/flight',   color: '#0d1326' },
+  { label: 'Receipt',   icon: '⬇',  route: '/receipts',       color: '#16a34a' },
+  { label: 'Payment',   icon: '⬆',  route: '/payments',       color: '#dc2626' },
+  { label: 'Sale Inv.', icon: '📄', route: '/sales/flight',   color: '#1a1c22' },
   { label: 'Purchase',  icon: '📥', route: '/purchase/flight',color: '#6B4C8B' },
 ];
 

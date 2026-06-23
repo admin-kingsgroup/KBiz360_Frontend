@@ -2,9 +2,9 @@
    Kept dependency-free so both the shell and the field modules can import it
    without creating an import cycle through transactions.jsx. */
 
-export const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691',
-  BLUE = '#185FA5', RED = '#A32D2D', GREEN = '#27500A',
-  V_DR = '#1B6B4C', V_CR = '#9B2C2C';
+export const DARK = '#1a1c22', GOLD = '#c2a04a', DIM = '#5b616e',
+  BLUE = '#2563eb', RED = '#dc2626', GREEN = '#16a34a',
+  V_DR = '#16a34a', V_CR = '#dc2626';
 
 // Whole-rupee (no decimals) money formatter used across the voucher journal view.
 export const money = (cur, n) => {

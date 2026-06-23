@@ -8,7 +8,7 @@ import { AlertTriangle, BarChart2, Calendar, Check, Download, Lock, Plus, Save, 
 import { openPrintPreview } from '../../core/PrintPreview';
 import { Legend, Line } from 'recharts';
 import { BRANCHES, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../../core/data';
-import { fmt, fmtINR } from '../../core/format';
+import { fmt, fmtINR, compactAmt } from '../../core/format';
 import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, _LEAVE_BALANCES, cardStyle, tabPanel } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
@@ -63,7 +63,7 @@ export function ExpenseBudget({branch,setRoute}){
   };
   const updM=(id,v)=>setDraft(d=>({...d,[id]:{...d[id],monthly:+v,yearly:Math.round(+v*12)}}));
   const updY=(id,v)=>setDraft(d=>({...d,[id]:{...d[id],yearly:+v,monthly:Math.round(+v/12)}}));
-  const f=n=>n>=1000000?(n/100000).toFixed(1)+"L":n>=1000?(n/1000).toFixed(0)+"K":n>0?String(n):"—";
+  const f=n=>compactAmt(n,{currency:'',dash:true}); // canonical compact (fixes 1–10 lakh shown as "K")
   const ff=n=>n>0?cur+Number(n).toLocaleString("en-IN"):"—";
 
   return (
@@ -955,8 +955,8 @@ export function HrPayslips({branch}){
   );
   const brCfg=BRANCHES.find(b=>b.code===emp.branch)||{cur:"₹",entity:"Travkings Tours & Travels"};
   const c=brCfg.cur;
-  const gross=emp.basic+emp.hra+emp.da+emp.travel+emp.medical;
-  const deductions=emp.pf+emp.esi+emp.tds;
+  const gross=(emp.basic||0)+(emp.hra||0)+(emp.da||0)+(emp.travel||0)+(emp.medical||0);
+  const deductions=(emp.pf||0)+(emp.esi||0)+(emp.tds||0);
   const net=gross-deductions;
 
   return (

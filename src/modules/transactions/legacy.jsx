@@ -57,9 +57,9 @@ export const PURCH_LEDGER_BY_MODULE = { Flight:"Purchase — Air Tickets", Holid
 
 // Inline save status banner driven by a react-query mutation result.
 export function VSaveMsg({m,okText}){
-  if(m.isPending) return <div style={{padding:"10px",borderRadius:9,background:"#E6F1FB",fontSize:11,color:"#185FA5",fontWeight:700,textAlign:"center",marginBottom:8}}>Posting voucher…</div>;
-  if(m.isError)   return <div style={{padding:"10px",borderRadius:9,background:"#FCEBEB",fontSize:11,color:"#A32D2D",fontWeight:700,textAlign:"center",marginBottom:8}}>✗ {String(m.error?.message||"Could not save voucher")}</div>;
-  if(m.isSuccess) return <div style={{padding:"10px",borderRadius:9,background:"#EAF3DE",fontSize:11,color:"#27500A",fontWeight:700,textAlign:"center",marginBottom:8}}>{okText}</div>;
+  if(m.isPending) return <div style={{padding:"10px",borderRadius:9,background:"#e8f0ff",fontSize:11,color:"#2563eb",fontWeight:700,textAlign:"center",marginBottom:8}}>Posting voucher…</div>;
+  if(m.isError)   return <div style={{padding:"10px",borderRadius:9,background:"#fbe9e9",fontSize:11,color:"#dc2626",fontWeight:700,textAlign:"center",marginBottom:8}}>✗ {String(m.error?.message||"Could not save voucher")}</div>;
+  if(m.isSuccess) return <div style={{padding:"10px",borderRadius:9,background:"#e8f6ed",fontSize:11,color:"#16a34a",fontWeight:700,textAlign:"center",marginBottom:8}}>{okText}</div>;
   return null;
 }
 
@@ -72,8 +72,8 @@ export function VSaveMsg({m,okText}){
    ════════════════════════════════════════════════════════════════════ */
 
 // DR green / CR maroon — the DR/CR colour convention used across the voucher forms.
-export const V_DR = "#1B6B4C";
-export const V_CR = "#9B2C2C";
+export const V_DR = "#16a34a";
+export const V_CR = "#dc2626";
 const _r2 = (n) => Math.round((Number(n)||0)*100)/100;
 
 // 2-decimal currency formatter for the voucher screens.
@@ -82,7 +82,7 @@ export const vf2 = (cur,n) => cur + Number(n||0).toLocaleString("en-IN",{minimum
 // Teaching banner atop each voucher (mirrors the HTML "explain" strip).
 export function VExplain({children}){
   return (
-    <div style={{padding:"10px 14px",background:"#FDFAF4",border:"1px solid #EFE7D4",borderRadius:9,fontSize:11.5,color:"#5a6691",lineHeight:1.55,marginBottom:14}}>
+    <div style={{padding:"10px 14px",background:"#FDFAF4",border:"1px solid #EFE7D4",borderRadius:9,fontSize:11.5,color:"#5b616e",lineHeight:1.55,marginBottom:14}}>
       {children}
     </div>
   );
@@ -93,7 +93,7 @@ export function VBalanceBar({dr,cr,cur,okPrefix="Balanced",emptyText="Enter amou
   const diff=_r2(dr-cr); const has=dr>0||cr>0; const ok=diff===0&&has;
   return (
     <div style={{display:"flex",alignItems:"center",gap:9,padding:"10px 14px",borderRadius:8,marginBottom:12,fontSize:12,fontWeight:700,
-      background:ok?"#EAF3DE":"#FCEBEB",color:ok?"#27500A":"#A32D2D",border:"1px solid "+(ok?"#C0DD97":"#F7C1C1")}}>
+      background:ok?"#e8f6ed":"#fbe9e9",color:ok?"#16a34a":"#dc2626",border:"1px solid "+(ok?"#bfe6cd":"#f3c9c9")}}>
       <span style={{width:9,height:9,borderRadius:"50%",background:"currentColor",flexShrink:0}}/>
       <span>{!has?emptyText:ok?`${okPrefix} — ${vf2(cur,dr)} Dr = ${vf2(cur,cr)} Cr`:`Out of balance by ${vf2(cur,Math.abs(diff))}`}</span>
     </div>
@@ -107,27 +107,27 @@ export function VJournalPreview({rows,cur,title="Accounting Effect (Double Entry
   const cr=rows.reduce((s,r)=>s+(r.side==="CR"?(+r.amount||0):0),0);
   return (
     <div style={{marginBottom:12}}>
-      <p style={{margin:"0 0 6px",fontSize:10.5,fontWeight:700,color:"#0d1326"}}>📒 {title}</p>
+      <p style={{margin:"0 0 6px",fontSize:10.5,fontWeight:700,color:"#1a1c22"}}>📒 {title}</p>
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr style={{background:"#0d1326"}}>
+          <thead><tr style={{background:"#1a1c22"}}>
             {["Ledger Account","Dr/Cr",`Amount (${cur})`,"Note"].map((h,i)=>
-              <th key={i} style={{padding:"7px 10px",textAlign:i===2?"right":i===1?"center":"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>{h}</th>)}
+              <th key={i} style={{padding:"7px 10px",textAlign:i===2?"right":i===1?"center":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5}}>{h}</th>)}
           </tr></thead>
           <tbody>
             {rows.map((r,i)=>(
-              <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:r.side==="DR"?"#f0fbf5":"#fdf3f3"}}>
-                <td style={{padding:"7px 10px",fontWeight:500,color:"#0d1326"}}>{r.ledger||"—"}</td>
+              <tr key={i} style={{borderBottom:"1px solid #f4f5f7",background:r.side==="DR"?"#f0fbf5":"#fdf3f3"}}>
+                <td style={{padding:"7px 10px",fontWeight:500,color:"#1a1c22"}}>{r.ledger||"—"}</td>
                 <td style={{padding:"7px 10px",textAlign:"center"}}>
                   <span style={{fontSize:9,fontWeight:800,letterSpacing:".5px",padding:"2px 8px",borderRadius:4,color:"#fff",background:r.side==="DR"?V_DR:V_CR}}>{r.side}</span>
                 </td>
                 <td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{vf2(cur,r.amount)}</td>
-                <td style={{padding:"7px 10px",fontSize:10,color:"#5a6691"}}>{r.note||""}</td>
+                <td style={{padding:"7px 10px",fontSize:10,color:"#5b616e"}}>{r.note||""}</td>
               </tr>
             ))}
-            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
-              <td colSpan={2} style={{padding:"7px 10px",fontWeight:800,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Total</td>
-              <td style={{padding:"7px 10px",textAlign:"right",fontWeight:800,color:"#0d1326",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,dr)} / {vf2(cur,cr)}</td>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+              <td colSpan={2} style={{padding:"7px 10px",fontWeight:800,fontSize:10,color:"#5b616e",textTransform:"uppercase"}}>Total</td>
+              <td style={{padding:"7px 10px",textAlign:"right",fontWeight:800,color:"#1a1c22",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,dr)} / {vf2(cur,cr)}</td>
               <td/>
             </tr>
           </tbody>
@@ -144,7 +144,7 @@ export function VPlaceOfSupply({mode,onChange}){
       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
         {[["intra","Within state — CGST + SGST"],["inter","Outside state — IGST"]].map(([k,lab])=>(
           <button key={k} onClick={()=>onChange(k)} style={{padding:"7px 13px",borderRadius:7,fontSize:11,fontWeight:600,cursor:"pointer",
-            background:mode===k?"#0d1326":"#fff",color:mode===k?"#d4a437":"#384677",border:"1.5px solid "+(mode===k?"#d4a437":"#e1e3ec")}}>{lab}</button>
+            background:mode===k?"#1a1c22":"#fff",color:mode===k?"#c2a04a":"#2e323c",border:"1.5px solid "+(mode===k?"#c2a04a":"#e6e8ec")}}>{lab}</button>
         ))}
       </div>
     </FL>
@@ -173,22 +173,22 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
   const {allocated,un,onAcc}=allocSummary(alloc,amount,parkOnAcc,mode);
   const settleWord=side==="supplier"?"payment":"receipt";
   const showOnAccToggle=mode==="bills"&&un>0.001&&allocated>0&&allocated<=amount+0.001;
-  const ageTone=(d)=>d<=7?["#1B6B4C","#EAF3DE"]:d<=30?["#B7791F","#FAEEDA"]:["#9B2C2C","#FCEBEB"];
+  const ageTone=(d)=>d<=7?["#16a34a","#e8f6ed"]:d<=30?["#d97706","#fbeedb"]:["#dc2626","#fbe9e9"];
 
   return (
-    <div style={{border:"1px solid #e1e3ec",borderRadius:10,overflow:"hidden",marginBottom:12}}>
+    <div style={{border:"1px solid #e6e8ec",borderRadius:10,overflow:"hidden",marginBottom:12}}>
       {/* header + Apply As toggle */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",padding:"10px 14px",background:"#f3f4f8",borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",padding:"10px 14px",background:"#f4f5f7",borderBottom:"1px solid #e6e8ec"}}>
         <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-          <span style={{fontSize:10,fontWeight:800,letterSpacing:"0.6px",color:"#d4a437",textTransform:"uppercase"}}>Bill-wise Allocation</span>
-          {party&&<span style={{fontSize:11.5,fontWeight:700,color:"#0d1326"}}>{party}</span>}
+          <span style={{fontSize:10,fontWeight:800,letterSpacing:"0.6px",color:"#c2a04a",textTransform:"uppercase"}}>Bill-wise Allocation</span>
+          {party&&<span style={{fontSize:11.5,fontWeight:700,color:"#1a1c22"}}>{party}</span>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.5px",color:"#5a6691",textTransform:"uppercase"}}>Apply As</span>
-          <div style={{display:"inline-flex",border:"1px solid #e1e3ec",borderRadius:6,overflow:"hidden"}}>
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.5px",color:"#5b616e",textTransform:"uppercase"}}>Apply As</span>
+          <div style={{display:"inline-flex",border:"1px solid #e6e8ec",borderRadius:6,overflow:"hidden"}}>
             {[["bills","Against Bills"],["onaccount","On Account"]].map(([m,lab])=>(
               <button key={m} onClick={()=>onMode(m)} style={{border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:10.5,fontWeight:700,padding:"6px 13px",
-                background:mode===m?"#0d1326":"#fff",color:mode===m?"#d4a437":"#5a6691"}}>{lab}</button>
+                background:mode===m?"#1a1c22":"#fff",color:mode===m?"#c2a04a":"#5b616e"}}>{lab}</button>
             ))}
           </div>
         </div>
@@ -196,44 +196,44 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
 
       {mode==="onaccount"?(
         <div style={{padding:"20px 16px",textAlign:"center"}}>
-          <p style={{margin:0,fontSize:10,fontWeight:700,letterSpacing:"0.6px",color:"#5a6691",textTransform:"uppercase"}}>Full amount parked as advance</p>
-          <p style={{margin:"6px 0",fontSize:26,fontWeight:800,color:"#B7791F",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,amount)}</p>
-          <p style={{margin:"0 auto",maxWidth:460,fontSize:11,color:"#5a6691",lineHeight:1.5}}>No bill is settled now. The amount is held as a credit on {party||"the party"}'s account and adjusts against their future bills.</p>
+          <p style={{margin:0,fontSize:10,fontWeight:700,letterSpacing:"0.6px",color:"#5b616e",textTransform:"uppercase"}}>Full amount parked as advance</p>
+          <p style={{margin:"6px 0",fontSize:26,fontWeight:800,color:"#d97706",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,amount)}</p>
+          <p style={{margin:"0 auto",maxWidth:460,fontSize:11,color:"#5b616e",lineHeight:1.5}}>No bill is settled now. The amount is held as a credit on {party||"the party"}'s account and adjusts against their future bills.</p>
         </div>
       ):(
         <>
           {q?.isLoading?(
-            <div style={{padding:"18px 16px",textAlign:"center",fontSize:11.5,color:"#5a6691"}}>Loading open bills…</div>
+            <div style={{padding:"18px 16px",textAlign:"center",fontSize:11.5,color:"#5b616e"}}>Loading open bills…</div>
           ):bills.length===0?(
-            <div style={{padding:"18px 16px",textAlign:"center",fontSize:11.5,color:"#5a6691"}}>
+            <div style={{padding:"18px 16px",textAlign:"center",fontSize:11.5,color:"#5b616e"}}>
               {party?`No open bills for ${party}. Use “On Account” to park this ${settleWord} as an advance.`:`Select a party to load their open bills.`}
             </div>
           ):(
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-                <thead><tr style={{background:"#fafafa",borderBottom:"1px solid #e1e3ec"}}>
+                <thead><tr style={{background:"#fafafa",borderBottom:"1px solid #e6e8ec"}}>
                   {["Bill No.","Date","Age","Outstanding","Status",`Allocate (${cur})`].map((h,i)=>(
-                    <th key={i} style={{padding:"8px 12px",textAlign:i>=3?(i===4?"center":"right"):"left",fontSize:9,fontWeight:700,letterSpacing:"0.4px",color:"#5a6691",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
+                    <th key={i} style={{padding:"8px 12px",textAlign:i>=3?(i===4?"center":"right"):"left",fontSize:9,fontWeight:700,letterSpacing:"0.4px",color:"#5b616e",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
                   {bills.map(b=>{
                     const [ac,abg]=ageTone(b.ageDays);
                     return (
-                      <tr key={b.billVno} style={{borderBottom:"1px solid #f3f4f8"}}>
-                        <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10.5,fontWeight:700,color:"#0d1326"}}>{b.billVno}</td>
-                        <td style={{padding:"8px 12px",fontSize:10.5,color:"#5a6691"}}>{b.date}</td>
+                      <tr key={b.billVno} style={{borderBottom:"1px solid #f4f5f7"}}>
+                        <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10.5,fontWeight:700,color:"#1a1c22"}}>{b.billVno}</td>
+                        <td style={{padding:"8px 12px",fontSize:10.5,color:"#5b616e"}}>{b.date}</td>
                         <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,fontWeight:700,padding:"2px 7px",borderRadius:999,background:abg,color:ac}}>{b.ageDays}d</span></td>
                         <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{vf2(cur,b.outstanding)}</td>
                         <td style={{padding:"8px 12px",textAlign:"center"}}>
                           <span style={{fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:999,textTransform:"uppercase",
-                            background:b.status==="partial"?"#FAEEDA":"#FCEBEB",color:b.status==="partial"?"#854F0B":"#A32D2D"}}>{b.status}</span>
+                            background:b.status==="partial"?"#fbeedb":"#fbe9e9",color:b.status==="partial"?"#d97706":"#dc2626"}}>{b.status}</span>
                         </td>
                         <td style={{padding:"6px 12px",textAlign:"right",whiteSpace:"nowrap"}}>
                           <input type="number" min="0" max={b.outstanding} value={alloc[b.billVno]||""} placeholder="0"
                             onChange={e=>onSetAlloc(b.billVno,e.target.value,b.outstanding)}
                             style={{...inp,width:104,display:"inline-block",textAlign:"right",fontWeight:600,minHeight:28}}/>
-                          <button onClick={()=>onFull(b.billVno,b.outstanding)} style={{border:"none",background:"transparent",color:"#d4a437",fontSize:10,fontWeight:700,cursor:"pointer",textDecoration:"underline",marginLeft:6,fontFamily:"inherit"}}>Full</button>
+                          <button onClick={()=>onFull(b.billVno,b.outstanding)} style={{border:"none",background:"transparent",color:"#c2a04a",fontSize:10,fontWeight:700,cursor:"pointer",textDecoration:"underline",marginLeft:6,fontFamily:"inherit"}}>Full</button>
                         </td>
                       </tr>
                     );
@@ -244,16 +244,16 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
           )}
 
           {/* summary foot */}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap",padding:"10px 14px",background:"#f3f4f8",borderTop:"1.5px solid #0d1326"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap",padding:"10px 14px",background:"#f4f5f7",borderTop:"1.5px solid #1a1c22"}}>
             <div style={{display:"flex",gap:22,flexWrap:"wrap"}}>
-              {[["Voucher Amount",vf2(cur,amount),"#0d1326"],["Allocated",vf2(cur,allocated),"#d4a437"],["Unallocated",vf2(cur,_r2(un-onAcc)),(_r2(un-onAcc)>0.001?"#A32D2D":"#27500A")],...(onAcc>0?[["On Account",vf2(cur,onAcc),"#B7791F"]]:[])].map(([l,v,c],i)=>(
-                <div key={i}><p style={{margin:0,fontSize:8.5,fontWeight:700,letterSpacing:"0.5px",color:"#5a6691",textTransform:"uppercase"}}>{l}</p><p style={{margin:"2px 0 0",fontSize:13.5,fontWeight:800,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</p></div>
+              {[["Voucher Amount",vf2(cur,amount),"#1a1c22"],["Allocated",vf2(cur,allocated),"#c2a04a"],["Unallocated",vf2(cur,_r2(un-onAcc)),(_r2(un-onAcc)>0.001?"#dc2626":"#16a34a")],...(onAcc>0?[["On Account",vf2(cur,onAcc),"#d97706"]]:[])].map(([l,v,c],i)=>(
+                <div key={i}><p style={{margin:0,fontSize:8.5,fontWeight:700,letterSpacing:"0.5px",color:"#5b616e",textTransform:"uppercase"}}>{l}</p><p style={{margin:"2px 0 0",fontSize:13.5,fontWeight:800,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</p></div>
               ))}
             </div>
             {showOnAccToggle&&(
-              <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#384677"}}>
-                <input type="checkbox" checked={parkOnAcc} onChange={e=>onParkOnAcc(e.target.checked)} style={{width:15,height:15,accentColor:"#d4a437",cursor:"pointer"}}/>
-                Park balance <span style={{color:"#B7791F"}}>On Account</span> (advance)
+              <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#2e323c"}}>
+                <input type="checkbox" checked={parkOnAcc} onChange={e=>onParkOnAcc(e.target.checked)} style={{width:15,height:15,accentColor:"#c2a04a",cursor:"pointer"}}/>
+                Park balance <span style={{color:"#d97706"}}>On Account</span> (advance)
               </label>
             )}
           </div>
@@ -261,7 +261,7 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
       )}
 
       {advances>0&&(
-        <div style={{padding:"8px 14px",fontSize:10.5,color:"#854F0B",background:"#FAEEDA",borderTop:"1px solid #FAC775"}}>
+        <div style={{padding:"8px 14px",fontSize:10.5,color:"#d97706",background:"#fbeedb",borderTop:"1px solid #f3d9a8"}}>
           ℹ {party} already holds {vf2(cur,advances)} on account (advance) — it will auto-adjust against open bills.
         </div>
       )}
@@ -292,7 +292,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
   const isLinked=!!selected;
   const gp=isLinked&&saleAmt?saleAmt-selected.amt:0;
   const gpPct=isLinked&&saleAmt>0?+((gp/saleAmt)*100).toFixed(1):0;
-  const gpC=gpPct>=25?"#27500A":gpPct>=15?"#854F0B":"#A32D2D";
+  const gpC=gpPct>=25?"#16a34a":gpPct>=15?"#d97706":"#dc2626";
 
   const MOD_LABELS={
     PF:"Flight Tickets",PH:"Holiday Packages",PHT:"Hotels",
@@ -300,7 +300,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
   };
 
   return (
-    <div style={{position:"relative",borderBottom:"2px solid "+(isLinked?"#C0DD97":"#F7C1C1"),
+    <div style={{position:"relative",borderBottom:"2px solid "+(isLinked?"#bfe6cd":"#f3c9c9"),
       background:isLinked?"#f8fff8":"#fffafa"}}>
 
       {/* ── Compact top bar ── */}
@@ -309,7 +309,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
 
         {/* Status icon */}
         <div style={{width:32,height:32,borderRadius:8,flexShrink:0,
-          background:isLinked?"#EAF3DE":"#FCEBEB",
+          background:isLinked?"#e8f6ed":"#fbe9e9",
           display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>
           {isLinked?"🔗":"⚠"}
         </div>
@@ -317,37 +317,37 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
         {/* Label + selected info */}
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-            <span style={{fontSize:9.5,fontWeight:700,color:isLinked?"#27500A":"#A32D2D",
+            <span style={{fontSize:9.5,fontWeight:700,color:isLinked?"#16a34a":"#dc2626",
               textTransform:"uppercase",letterSpacing:"0.5px"}}>
               {isLinked?"Purchase Linked":"Link Purchase Entry"}
             </span>
             <span style={{fontSize:9,padding:"1px 7px",borderRadius:999,
-              background:isLinked?"#EAF3DE":"#FCEBEB",
-              color:isLinked?"#27500A":"#A32D2D",fontWeight:700}}>
+              background:isLinked?"#e8f6ed":"#fbe9e9",
+              color:isLinked?"#16a34a":"#dc2626",fontWeight:700}}>
               {isLinked?"MANDATORY ✔":"SAVE BLOCKED 🔒"}
             </span>
           </div>
 
           {isLinked?(
             <div style={{display:"flex",alignItems:"center",gap:12,marginTop:3,flexWrap:"wrap"}}>
-              <span style={{fontFamily:"monospace",fontSize:11.5,fontWeight:700,color:"#185FA5"}}>
+              <span style={{fontFamily:"monospace",fontSize:11.5,fontWeight:700,color:"#2563eb"}}>
                 {selected.vno}
               </span>
-              <span style={{fontSize:11,color:"#384677"}}>{selected.supplier}</span>
-              <span style={{fontSize:10,color:"#5a6691",fontStyle:"italic"}}>{selected.desc}</span>
-              <span style={{fontSize:11,fontWeight:700,color:"#0d1326",fontVariantNumeric:"tabular-nums"}}>
+              <span style={{fontSize:11,color:"#2e323c"}}>{selected.supplier}</span>
+              <span style={{fontSize:10,color:"#5b616e",fontStyle:"italic"}}>{selected.desc}</span>
+              <span style={{fontSize:11,fontWeight:700,color:"#1a1c22",fontVariantNumeric:"tabular-nums"}}>
                 {cur+fmt(selected.amt)}
               </span>
               {saleAmt>0&&(
                 <span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,
-                  background:gpPct>=25?"#EAF3DE":gpPct>=15?"#FAEEDA":"#FCEBEB",
+                  background:gpPct>=25?"#e8f6ed":gpPct>=15?"#fbeedb":"#fbe9e9",
                   color:gpC}}>
                   GP {gpPct}%
                 </span>
               )}
             </div>
           ):(
-            <p style={{margin:"2px 0 0",fontSize:10,color:"#A32D2D"}}>
+            <p style={{margin:"2px 0 0",fontSize:10,color:"#dc2626"}}>
               Select a {MOD_LABELS[purchMod]||"purchase"} entry before saving this voucher
             </p>
           )}
@@ -357,8 +357,8 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
         <div style={{display:"flex",gap:7,flexShrink:0}}>
           {isLinked&&(
             <button onClick={()=>onSelect(null)}
-              style={{padding:"5px 10px",background:"transparent",border:"1px solid #e1e3ec",
-                borderRadius:7,fontSize:10.5,cursor:"pointer",color:"#5a6691",fontWeight:500}}>
+              style={{padding:"5px 10px",background:"transparent",border:"1px solid #e6e8ec",
+                borderRadius:7,fontSize:10.5,cursor:"pointer",color:"#5b616e",fontWeight:500}}>
               ✕
             </button>
           )}
@@ -367,9 +367,9 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
             style={{display:"flex",alignItems:"center",gap:5,
               padding:mob?"6px 11px":"6px 14px",borderRadius:8,
               fontSize:11,fontWeight:700,cursor:"pointer",
-              background:isLinked?"transparent":"#0d1326",
-              color:isLinked?"#27500A":"#fff",
-              border:isLinked?"1.5px solid #C0DD97":"1.5px solid #0d1326",
+              background:isLinked?"transparent":"#1a1c22",
+              color:isLinked?"#16a34a":"#fff",
+              border:isLinked?"1.5px solid #bfe6cd":"1.5px solid #1a1c22",
               transition:"all 0.15s",whiteSpace:"nowrap"}}>
             🔗 {isLinked?"Change":"Select Purchase"} ({available.length})
           </button>
@@ -380,7 +380,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
       {open&&(
         <div onKeyDown={listKeyNav({ onEscape:()=>{setOpen(false);setSearch("");} })} style={{
           position:"absolute",top:"100%",left:0,right:0,
-          background:"#fff",border:"1.5px solid #0d1326",
+          background:"#fff",border:"1.5px solid #1a1c22",
           borderTop:"none",borderRadius:"0 0 12px 12px",
           boxShadow:"0 16px 48px rgba(0,0,0,0.18)",
           zIndex:300,maxHeight:460,
@@ -388,7 +388,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
         }}>
 
           {/* Dropdown header */}
-          <div style={{padding:"11px 16px",background:"#0d1326",
+          <div style={{padding:"11px 16px",background:"#1a1c22",
             display:"flex",alignItems:"center",justifyContent:"space-between",
             gap:10,flexShrink:0}}>
             <div>
@@ -398,23 +398,23 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
                   Purchase — {MOD_LABELS[purchMod]}
                 </p>
               </div>
-              <p style={{margin:"2px 0 0",fontSize:10,color:"#5a6691"}}>
+              <p style={{margin:"2px 0 0",fontSize:10,color:"#5b616e"}}>
                 {branch?.code||"ALL"} branch · {cfg.curCode} · {available.length} available
                 {" · "}{allPurch.filter(p=>p.settled).length} already linked
               </p>
             </div>
             <button onClick={()=>{setOpen(false);setSearch("");}}
-              style={{background:"transparent",border:"none",color:"#5a6691",
+              style={{background:"transparent",border:"none",color:"#5b616e",
                 cursor:"pointer",fontSize:20,lineHeight:1,padding:"2px 6px"}}>✕</button>
           </div>
 
           {/* Search */}
-          <div style={{padding:"9px 14px",borderBottom:"1px solid #e1e3ec",flexShrink:0,
+          <div style={{padding:"9px 14px",borderBottom:"1px solid #e6e8ec",flexShrink:0,
             background:"#f9fafb"}}>
             <input autoFocus
               value={search} onChange={e=>setSearch(e.target.value)}
               placeholder={"Search voucher no., supplier, reference, description..."}
-              style={{width:"100%",padding:"7px 12px",border:"1.5px solid #e1e3ec",
+              style={{width:"100%",padding:"7px 12px",border:"1.5px solid #e6e8ec",
                 borderRadius:8,fontSize:11.5,outline:"none",boxSizing:"border-box",
                 background:"#fff"}}
             />
@@ -422,15 +422,15 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
 
           {/* Stats row */}
           <div style={{display:"flex",gap:12,padding:"7px 16px",
-            borderBottom:"1px solid #e1e3ec",background:"#f9fafb",flexShrink:0}}>
-            <span style={{fontSize:10,color:"#5a6691"}}>
-              <b style={{color:"#27500A"}}>{available.length}</b> available to link
+            borderBottom:"1px solid #e6e8ec",background:"#f9fafb",flexShrink:0}}>
+            <span style={{fontSize:10,color:"#5b616e"}}>
+              <b style={{color:"#16a34a"}}>{available.length}</b> available to link
             </span>
-            <span style={{fontSize:10,color:"#5a6691"}}>
-              <b style={{color:"#384677"}}>{allPurch.filter(p=>p.settled).length}</b> already linked
+            <span style={{fontSize:10,color:"#5b616e"}}>
+              <b style={{color:"#2e323c"}}>{allPurch.filter(p=>p.settled).length}</b> already linked
             </span>
             {search&&(
-              <span style={{fontSize:10,color:"#185FA5"}}>
+              <span style={{fontSize:10,color:"#2563eb"}}>
                 <b>{filtered.length}</b> matching "{search}"
               </span>
             )}
@@ -439,14 +439,14 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
           {/* List */}
           <div style={{overflowY:"auto",flex:1}}>
             {filtered.length===0?(
-              <div style={{padding:"28px",textAlign:"center",color:"#5a6691"}}>
+              <div style={{padding:"28px",textAlign:"center",color:"#5b616e"}}>
                 <p style={{margin:"0 0 6px",fontSize:22}}>🔍</p>
-                <p style={{margin:"0 0 4px",fontSize:12,fontWeight:600,color:"#0d1326"}}>
+                <p style={{margin:"0 0 4px",fontSize:12,fontWeight:600,color:"#1a1c22"}}>
                   {branch==="ALL"
                     ?"Select a branch first — cannot link vouchers in Travkings Group mode"
                     :`No available Purchase — ${MOD_LABELS[purchMod]} for ${branch?.code}`}
                 </p>
-                <p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>
+                <p style={{margin:0,fontSize:10.5,color:"#5b616e"}}>
                   {branch!=="ALL"&&"Create a purchase entry first, then come back here to link it."}
                 </p>
               </div>
@@ -455,14 +455,14 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
                 const isSelected=selected?.vno===p.vno&&selected?.ref===p.ref;
                 const previewGP=saleAmt?saleAmt-p.amt:0;
                 const previewGPPct=saleAmt&&saleAmt>0?+((previewGP/saleAmt)*100).toFixed(1):null;
-                const pgC=previewGPPct!=null?(previewGPPct>=25?"#27500A":previewGPPct>=15?"#854F0B":"#A32D2D"):"#5a6691";
+                const pgC=previewGPPct!=null?(previewGPPct>=25?"#16a34a":previewGPPct>=15?"#d97706":"#dc2626"):"#5b616e";
                 return (
                   <div key={i}
                     {...clickable(()=>{onSelect(p);setOpen(false);setSearch("");}, { role:'option' })}
                     style={{
-                      padding:"11px 16px",borderBottom:"1px solid #f3f4f8",
+                      padding:"11px 16px",borderBottom:"1px solid #f4f5f7",
                       cursor:"pointer",transition:"background 0.1s",
-                      background:isSelected?"#EAF3DE":"#fff",
+                      background:isSelected?"#e8f6ed":"#fff",
                       display:"flex",alignItems:"center",gap:14,
                     }}
                     onMouseEnter={e=>{if(!isSelected)e.currentTarget.style.background="#f5fbf5";}}
@@ -470,8 +470,8 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
                   >
                     {/* Left: check/radio indicator */}
                     <div style={{width:18,height:18,borderRadius:"50%",flexShrink:0,
-                      border:isSelected?"none":"2px solid #e1e3ec",
-                      background:isSelected?"#27500A":"transparent",
+                      border:isSelected?"none":"2px solid #e6e8ec",
+                      background:isSelected?"#16a34a":"transparent",
                       display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff"}}>
                       {isSelected&&"✔"}
                     </div>
@@ -479,37 +479,37 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
                     {/* Middle: voucher info */}
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
-                        <span style={{fontFamily:"monospace",fontSize:12,fontWeight:700,color:"#185FA5"}}>
+                        <span style={{fontFamily:"monospace",fontSize:12,fontWeight:700,color:"#2563eb"}}>
                           {p.vno}
                         </span>
                         <span style={{fontSize:11}}>{BRANCHES.find(b=>b.code===p.branch)?.flag}</span>
                         <span style={{fontSize:9,padding:"1px 6px",borderRadius:999,
-                          background:"#EAF3DE",color:"#27500A",fontWeight:700}}>
+                          background:"#e8f6ed",color:"#16a34a",fontWeight:700}}>
                           Available
                         </span>
-                        <span style={{fontSize:9,color:"#5a6691"}}>{p.date}</span>
+                        <span style={{fontSize:9,color:"#5b616e"}}>{p.date}</span>
                       </div>
-                      <p style={{margin:"0 0 2px",fontSize:11.5,fontWeight:600,color:"#0d1326"}}>
+                      <p style={{margin:"0 0 2px",fontSize:11.5,fontWeight:600,color:"#1a1c22"}}>
                         {p.supplier}
                       </p>
-                      <p style={{margin:0,fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>
+                      <p style={{margin:0,fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>
                         {p.desc}
                       </p>
-                      <p style={{margin:"3px 0 0",fontSize:10,fontFamily:"monospace",color:"#8b94b3"}}>
+                      <p style={{margin:"3px 0 0",fontSize:10,fontFamily:"monospace",color:"#9197a3"}}>
                         Ref: {p.ref}
                       </p>
                     </div>
 
                     {/* Right: amount + GP preview */}
                     <div style={{textAlign:"right",flexShrink:0}}>
-                      <p style={{margin:"0 0 4px",fontSize:15,fontWeight:800,color:"#0d1326",
+                      <p style={{margin:"0 0 4px",fontSize:15,fontWeight:800,color:"#1a1c22",
                         fontVariantNumeric:"tabular-nums"}}>
                         {cur+fmt(p.amt)}
                       </p>
                       {previewGPPct!=null&&(
                         <span style={{fontSize:10.5,padding:"3px 9px",borderRadius:999,
                           fontWeight:700,
-                          background:previewGPPct>=25?"#EAF3DE":previewGPPct>=15?"#FAEEDA":"#FCEBEB",
+                          background:previewGPPct>=25?"#e8f6ed":previewGPPct>=15?"#fbeedb":"#fbe9e9",
                           color:pgC}}>
                           GP {previewGPPct}%
                         </span>
@@ -523,14 +523,14 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
 
           {/* Footer */}
           <div style={{padding:"9px 16px",background:"#f9fafb",
-            borderTop:"1px solid #e1e3ec",flexShrink:0,
+            borderTop:"1px solid #e6e8ec",flexShrink:0,
             display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <p style={{margin:0,fontSize:10,color:"#5a6691"}}>
+            <p style={{margin:0,fontSize:10,color:"#5b616e"}}>
               {branch==="ALL"?"Switch to a branch to link vouchers."
                 :branch?.code+" branch · "+cfg.curCode+" · Create purchase first if not listed above"}
             </p>
             <button onClick={()=>{setOpen(false);setSearch("");}}
-              style={{padding:"5px 12px",background:"#0d1326",color:"#fff",
+              style={{padding:"5px 12px",background:"#1a1c22",color:"#fff",
                 border:"none",borderRadius:7,fontSize:10.5,cursor:"pointer",fontWeight:600}}>
               Close ✕
             </button>
@@ -574,47 +574,47 @@ export function SalesFlight({branch,setRoute}){
   const isIntl=tripType==="International";
   return (
     <div style={{padding:"12px 10px",maxWidth:1260,margin:"0 auto",paddingBottom:72}}>
-      <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:12,overflow:"hidden"}}>
+      <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:12,overflow:"hidden"}}>
         {/* Header */}
-        <div style={{padding:"12px 16px",background:"#0d1326"}}>
+        <div style={{padding:"12px 16px",background:"#1a1c22"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
             <div style={{display:"flex",alignItems:"center",gap:11}}>
-              <div style={{width:38,height:38,borderRadius:9,background:"#E6F1FB",
+              <div style={{width:38,height:38,borderRadius:9,background:"#e8f0ff",
                 display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>✈</div>
               <div>
                 <p style={{margin:0,fontSize:15,fontWeight:700,color:"#fff"}}>Sales — Flight Tickets</p>
-                <p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{"Voucher · "+(branch?.code||"BOM")+" · "+vNo}</p>
+                <p style={{margin:0,fontSize:10.5,color:"#5b616e"}}>{"Voucher · "+(branch?.code||"BOM")+" · "+vNo}</p>
               </div>
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-              <div style={{display:"flex",gap:0,borderRadius:999,overflow:"hidden",border:"1px solid #2a3450"}}>
+              <div style={{display:"flex",gap:0,borderRadius:999,overflow:"hidden",border:"1px solid #2e323c"}}>
                 <button onClick={()=>setTripType("Domestic")}
                   style={{padding:"5px 12px",fontSize:10,fontWeight:700,cursor:"pointer",border:"none",
-                    background:tripType==="Domestic"?"#27500A":"transparent",
-                    color:tripType==="Domestic"?"#fff":"#8b94b3"}}>
+                    background:tripType==="Domestic"?"#16a34a":"transparent",
+                    color:tripType==="Domestic"?"#fff":"#9197a3"}}>
                   🇮🇳 Domestic
                 </button>
                 <button onClick={()=>setTripType("International")}
                   style={{padding:"5px 12px",fontSize:10,fontWeight:700,cursor:"pointer",border:"none",
-                    background:tripType==="International"?"#185FA5":"transparent",
-                    color:tripType==="International"?"#fff":"#8b94b3"}}>
+                    background:tripType==="International"?"#2563eb":"transparent",
+                    color:tripType==="International"?"#fff":"#9197a3"}}>
                   🌍 International
                 </button>
               </div>
               <span style={{fontSize:10,padding:"4px 10px",borderRadius:999,
-                background:cfg.taxType==="GST"?"#E6F1FB":"#EAF3DE",
-                color:cfg.taxType==="GST"?"#185FA5":"#27500A",fontWeight:700}}>
+                background:cfg.taxType==="GST"?"#e8f0ff":"#e8f6ed",
+                color:cfg.taxType==="GST"?"#2563eb":"#16a34a",fontWeight:700}}>
                 {branch?.flag} {cfg.curCode} · {cfg.taxType==="GST"?"GST 18%":"VAT "+cfg.vatRate+"%"}
               </span>
             </div>
           </div>
           {/* IRN row */}
           <div style={{marginTop:10,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-            <label style={{fontSize:9.5,color:"#8b94b3",fontWeight:700,letterSpacing:"0.5px",textTransform:"uppercase",whiteSpace:"nowrap"}}>IRN No.</label>
+            <label style={{fontSize:9.5,color:"#9197a3",fontWeight:700,letterSpacing:"0.5px",textTransform:"uppercase",whiteSpace:"nowrap"}}>IRN No.</label>
             <input value={irn} onChange={e=>setIrn(e.target.value)}
-              style={{flex:1,minWidth:280,padding:"6px 10px",borderRadius:6,border:"1px solid #2a3450",
-                background:"#1a2238",color:"#d4a437",fontFamily:"monospace",fontSize:10.5,fontWeight:600}}/>
-            <span style={{fontSize:9,padding:"3px 9px",borderRadius:999,background:"#d4a437",color:"#0d1326",fontWeight:700,whiteSpace:"nowrap"}}>
+              style={{flex:1,minWidth:280,padding:"6px 10px",borderRadius:6,border:"1px solid #2e323c",
+                background:"#1a1c22",color:"#c2a04a",fontFamily:"monospace",fontSize:10.5,fontWeight:600}}/>
+            <span style={{fontSize:9,padding:"3px 9px",borderRadius:999,background:"#c2a04a",color:"#1a1c22",fontWeight:700,whiteSpace:"nowrap"}}>
               e-Invoice IRN
             </span>
           </div>
@@ -625,9 +625,9 @@ export function SalesFlight({branch,setRoute}){
           saleAmt={t.total} selected={linkedPurch} onSelect={setLinkedPurch}/>
 
         {/* Voucher fields */}
-        <div style={{padding:"13px 16px",borderBottom:"1px solid #e1e3ec"}}>
+        <div style={{padding:"13px 16px",borderBottom:"1px solid #e6e8ec"}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
-            <FL label="Voucher no."><input value={vNo} readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691"}}/></FL>
+            <FL label="Voucher no."><input value={vNo} readOnly style={{...inp,background:"#f4f5f7",color:"#5b616e"}}/></FL>
             <FL label="Date"><input type="date" defaultValue={todayISO()} style={inp}/></FL>
             <FL label="Invoice type"><select style={inp}><option>Tax Invoice</option><option>Bill of Supply</option><option>Proforma</option></select></FL>
             <FL label="Reference"><input defaultValue="REF-AI-78421" style={inp}/></FL>
@@ -636,9 +636,9 @@ export function SalesFlight({branch,setRoute}){
         </div>
 
         {/* Party */}
-        <div style={{padding:"13px 16px",borderBottom:"1px solid #e1e3ec"}}>
-          <p style={{margin:"0 0 8px",fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Customer</p>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:11}}>
+        <div style={{padding:"13px 16px",borderBottom:"1px solid #e6e8ec"}}>
+          <p style={{margin:"0 0 8px",fontSize:10,color:"#5b616e",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Customer</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:11}}>
             <FL label="Customer / Party A/c"><input placeholder="Select customer…" style={inp}/></FL>
             <FL label={cfg.taxType==="GST"?"GSTIN":"Tax ID"}><input value={partyGstin} onChange={e=>setPartyGstin(e.target.value.toUpperCase())} style={{...inp,fontFamily:"monospace"}}/></FL>
             <FL label={cfg.taxType==="GST"?"Place of supply":"Country"}>
@@ -653,24 +653,24 @@ export function SalesFlight({branch,setRoute}){
         </div>
 
         {/* Passenger table */}
-        <div style={{padding:"13px 16px",borderBottom:"1px solid #e1e3ec"}}>
+        <div style={{padding:"13px 16px",borderBottom:"1px solid #e6e8ec"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Passengers</p>
+            <p style={{margin:0,fontSize:10,color:"#5b616e",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Passengers</p>
             <button onClick={add} style={{...btnGh,padding:"5px 11px",fontSize:11,display:"flex",alignItems:"center",gap:5}}>
               <Plus size={12}/> Add passenger
             </button>
           </div>
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",fontSize:11.5,borderCollapse:"collapse",minWidth:880}}>
-              <thead><tr style={{background:"#f3f4f8"}}>
+              <thead><tr style={{background:"#f4f5f7"}}>
                 {["#","Passenger","Ticket no.","Airline","Sector","Date","Class","Base fare","K3","Taxes","Other taxes",""].map((h,i)=>(
                   <th key={i} style={{padding:"7px 8px",textAlign:i>=7&&i<=10?"right":"left",
-                    fontSize:10,color:"#5a6691",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
+                    fontSize:10,color:"#5b616e",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>{pax.map((p,i)=>(
-                <tr key={p.id} style={{borderBottom:"1px solid #e1e3ec"}}>
-                  <td style={{padding:"4px 8px",color:"#5a6691"}}>{i+1}</td>
+                <tr key={p.id} style={{borderBottom:"1px solid #e6e8ec"}}>
+                  <td style={{padding:"4px 8px",color:"#5b616e"}}>{i+1}</td>
                   <td style={{padding:3}}><input value={p.name} onChange={e=>upd(p.id,"name",e.target.value)} style={{...inp,minWidth:160}}/></td>
                   <td style={{padding:3}}><input value={p.ticket} onChange={e=>upd(p.id,"ticket",e.target.value)} style={{...inp,minWidth:130,fontFamily:"monospace"}}/></td>
                   <td style={{padding:3}}><input value={p.airline} onChange={e=>upd(p.id,"airline",e.target.value)} style={{...inp,minWidth:90}}/></td>
@@ -682,16 +682,16 @@ export function SalesFlight({branch,setRoute}){
                   <td style={{padding:3}}><input type="number" value={p.tax} onChange={e=>upd(p.id,"tax",+e.target.value)} style={{...inp,minWidth:80,textAlign:"right"}} title="Taxes / levies on this ticket"/></td>
                   <td style={{padding:3}}><input type="number" value={p.otherTax} onChange={e=>upd(p.id,"otherTax",+e.target.value)} style={{...inp,minWidth:80,textAlign:"right"}} title="Other taxes — YQ/YR fuel, airport fees, UDF, PSF"/></td>
                   <td style={{padding:"4px 8px",textAlign:"center"}}>
-                    <button onClick={()=>rm(p.id)} style={{background:"transparent",border:"none",color:"#A32D2D",cursor:"pointer",fontSize:16}}>×</button>
+                    <button onClick={()=>rm(p.id)} style={{background:"transparent",border:"none",color:"#dc2626",cursor:"pointer",fontSize:16}}>×</button>
                   </td>
                 </tr>
               ))}</tbody>
-              <tfoot><tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
-                <td colSpan={7} style={{padding:"7px 8px",fontWeight:700,fontSize:11,color:"#5a6691"}}>Totals</td>
-                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#185FA5"}}>{fmt(t.base)}</td>
-                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(t.k3)}</td>
-                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(t.tax)}</td>
-                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(t.otherTax)}</td>
+              <tfoot><tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+                <td colSpan={7} style={{padding:"7px 8px",fontWeight:700,fontSize:11,color:"#5b616e"}}>Totals</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#2563eb"}}>{fmt(t.base)}</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(t.k3)}</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(t.tax)}</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(t.otherTax)}</td>
                 <td/>
               </tr></tfoot>
             </table>
@@ -699,21 +699,21 @@ export function SalesFlight({branch,setRoute}){
         </div>
 
         {/* Tax + Totals */}
-        <div style={{padding:"13px 16px",borderBottom:"1px solid #e1e3ec"}}>
-          <p style={{margin:"0 0 8px",fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>
+        <div style={{padding:"13px 16px",borderBottom:"1px solid #e6e8ec"}}>
+          <p style={{margin:"0 0 8px",fontSize:10,color:"#5b616e",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>
             {cfg.taxType==="GST"?"Service charge & GST":"Service charge & VAT"}
           </p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
             <FL label={"Service charge "+cur}><input type="number" value={sc} onChange={e=>setSc(+e.target.value)} style={inp}/></FL>
             {cfg.taxType==="GST"
               ?(intra
-                  ?<><FL label="CGST 9%"><input value={fmt(t.cgst)} readOnly style={{...inp,background:"#f3f4f8"}}/></FL>
-                     <FL label="SGST 9%"><input value={fmt(t.sgst)} readOnly style={{...inp,background:"#f3f4f8"}}/></FL></>
-                  :<FL label="IGST 18%"><input value={fmt(t.igst)} readOnly style={{...inp,background:"#f3f4f8"}}/></FL>)
-              :<FL label={"VAT "+cfg.vatRate+"%"}><input value={fmt(+(sc*cfg.vatRate/100).toFixed(2))} readOnly style={{...inp,background:"#f3f4f8"}}/></FL>
+                  ?<><FL label="CGST 9%"><input value={fmt(t.cgst)} readOnly style={{...inp,background:"#f4f5f7"}}/></FL>
+                     <FL label="SGST 9%"><input value={fmt(t.sgst)} readOnly style={{...inp,background:"#f4f5f7"}}/></FL></>
+                  :<FL label="IGST 18%"><input value={fmt(t.igst)} readOnly style={{...inp,background:"#f4f5f7"}}/></FL>)
+              :<FL label={"VAT "+cfg.vatRate+"%"}><input value={fmt(+(sc*cfg.vatRate/100).toFixed(2))} readOnly style={{...inp,background:"#f4f5f7"}}/></FL>
             }
           </div>
-          <p style={{margin:"6px 0 0",fontSize:10,color:intra?"#27500A":"#185FA5",fontWeight:600}}>
+          <p style={{margin:"6px 0 0",fontSize:10,color:intra?"#16a34a":"#2563eb",fontWeight:600}}>
             {cfg.taxType==="GST"&&(intra
               ?"Intra-state supply (GSTIN starts with 27 — Maharashtra). CGST 9% + SGST 9% applied."
               :"Inter-state supply (GSTIN state code ≠ 27). IGST 18% applied; CGST/SGST suppressed.")}
@@ -729,23 +729,23 @@ export function SalesFlight({branch,setRoute}){
                 <textarea rows={5} value={terms} onChange={e=>setTerms(e.target.value)} style={{...inp,resize:"vertical",fontSize:10.5,lineHeight:1.45}}/>
               </FL>
               <div>
-                <label style={{fontSize:10,color:"#5a6691",fontWeight:600,letterSpacing:"0.4px",textTransform:"uppercase"}}>GST QR Code</label>
-                <div style={{marginTop:4,padding:"10px 12px",border:"2px dashed #c7cbe0",borderRadius:8,background:"#fff",
+                <label style={{fontSize:10,color:"#5b616e",fontWeight:600,letterSpacing:"0.4px",textTransform:"uppercase"}}>GST QR Code</label>
+                <div style={{marginTop:4,padding:"10px 12px",border:"2px dashed #cbd0db",borderRadius:8,background:"#fff",
                   display:"flex",alignItems:"center",gap:11,flexWrap:"wrap"}}>
                   {qrFile
                     ?<>
-                      <div style={{width:54,height:54,borderRadius:6,background:"#f3f4f8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,border:"1px solid #e1e3ec"}}>▦</div>
+                      <div style={{width:54,height:54,borderRadius:6,background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,border:"1px solid #e6e8ec"}}>▦</div>
                       <div style={{flex:1,minWidth:140}}>
-                        <p style={{margin:0,fontSize:11,fontWeight:700,color:"#0d1326"}}>{qrFile.name}</p>
-                        <p style={{margin:"2px 0 0",fontSize:10,color:"#5a6691"}}>{(qrFile.size/1024).toFixed(1)} KB · uploaded</p>
+                        <p style={{margin:0,fontSize:11,fontWeight:700,color:"#1a1c22"}}>{qrFile.name}</p>
+                        <p style={{margin:"2px 0 0",fontSize:10,color:"#5b616e"}}>{(qrFile.size/1024).toFixed(1)} KB · uploaded</p>
                       </div>
-                      <button onClick={()=>setQrFile(null)} style={{...btnGh,fontSize:10,padding:"4px 10px",color:"#A32D2D",borderColor:"#A32D2D"}}>Remove</button>
+                      <button onClick={()=>setQrFile(null)} style={{...btnGh,fontSize:10,padding:"4px 10px",color:"#dc2626",borderColor:"#dc2626"}}>Remove</button>
                     </>
                     :<>
-                      <div style={{width:54,height:54,borderRadius:6,background:"#f3f4f8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#8b94b3",border:"1px solid #e1e3ec"}}>▦</div>
+                      <div style={{width:54,height:54,borderRadius:6,background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#9197a3",border:"1px solid #e6e8ec"}}>▦</div>
                       <div style={{flex:1,minWidth:140}}>
-                        <p style={{margin:0,fontSize:11,fontWeight:600,color:"#0d1326"}}>Upload GST e-Invoice QR code</p>
-                        <p style={{margin:"2px 0 0",fontSize:9.5,color:"#5a6691"}}>PNG / JPG · signed QR from IRP portal</p>
+                        <p style={{margin:0,fontSize:11,fontWeight:600,color:"#1a1c22"}}>Upload GST e-Invoice QR code</p>
+                        <p style={{margin:"2px 0 0",fontSize:9.5,color:"#5b616e"}}>PNG / JPG · signed QR from IRP portal</p>
                       </div>
                       <label style={{...btnGh,fontSize:10,padding:"5px 12px",cursor:"pointer",display:"inline-block"}}>
                         Choose file
@@ -757,7 +757,7 @@ export function SalesFlight({branch,setRoute}){
                 </div>
               </div>
             </div>
-            <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:10,padding:14,alignSelf:"start"}}>
+            <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:10,padding:14,alignSelf:"start"}}>
               <TRow l="Base fare" v={cur+" "+fmt(t.base)}/>
               <TRow l="K3 tax" v={cur+" "+fmt(t.k3)}/>
               <TRow l="Taxes" v={cur+" "+fmt(t.tax)}/>
@@ -768,14 +768,14 @@ export function SalesFlight({branch,setRoute}){
                     ?<><TRow l="CGST 9%" v={cur+" "+fmt(t.cgst)}/><TRow l="SGST 9%" v={cur+" "+fmt(t.sgst)}/></>
                     :<TRow l="IGST 18%" v={cur+" "+fmt(t.igst)}/>)
                 :<TRow l={"VAT "+cfg.vatRate+"%"} v={cur+" "+fmt(+(sc*cfg.vatRate/100).toFixed(2))}/>}
-              <div style={{borderTop:"2px solid #0d1326",margin:"8px 0",paddingTop:8,
+              <div style={{borderTop:"2px solid #1a1c22",margin:"8px 0",paddingTop:8,
                 display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span style={{fontSize:13,fontWeight:700}}>Invoice total</span>
-                <span style={{fontSize:18,fontWeight:800,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>
+                <span style={{fontSize:18,fontWeight:800,color:"#2563eb",fontVariantNumeric:"tabular-nums"}}>
                   {cur+" "+fmt(t.total)}
                 </span>
               </div>
-              <p style={{margin:"10px 0 0",fontSize:9.5,color:"#5a6691",fontStyle:"italic"}}>
+              <p style={{margin:"10px 0 0",fontSize:9.5,color:"#5b616e",fontStyle:"italic"}}>
                 {isIntl
                   ?"International ticket — K3 (GST on airline tax) typically applies. CGST/SGST on service charge only."
                   :"Domestic ticket — K3 generally nil. Full GST on base fare + service charge as applicable."}
@@ -786,13 +786,13 @@ export function SalesFlight({branch,setRoute}){
       </div>
 
       {/* Sticky footer */}
-      <div style={{position:"sticky",bottom:0,background:"#f3f4f8",borderTop:"1px solid #e1e3ec",
+      <div style={{position:"sticky",bottom:0,background:"#f4f5f7",borderTop:"1px solid #e6e8ec",
         padding:"12px 10px",display:"flex",gap:9,justifyContent:"flex-end"}}>
         <button style={btnGh}>Cancel</button>
         <button
           disabled={!linkedPurch}
           style={{...btnG,
-            background:linkedPurch?"#0d1326":"#9ca3af",
+            background:linkedPurch?"#1a1c22":"#9ca3af",
             cursor:linkedPurch?"pointer":"not-allowed",
             opacity:linkedPurch?1:0.6,
           }}
@@ -829,14 +829,14 @@ export function SalesCar({branch,setRoute}){
     <VWrap title="Sales Voucher — Car Rentals" icon="🚗" vNo={vNo} branch={branch} type="sales" saleMod="SC" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} name="" gstin={partyGstin} onGstinChange={setPartyGstin}/>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec",overflowX:"auto"}}>
-        <p style={{margin:"0 0 8px",fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Vehicle &amp; hire details</p>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec",overflowX:"auto"}}>
+        <p style={{margin:"0 0 8px",fontSize:10,color:"#5b616e",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Vehicle &amp; hire details</p>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:820}}>
           <thead><tr>
             {["#","Vehicle","Pickup","Drop","Days","Basic ₹","Other fare ₹","Service charge ₹","Total ₹"].map((h,i)=><VTH key={i} c={h} r={i>=4&&i<=8}/>)}
           </tr></thead>
           <tbody>
-            <tr style={{borderBottom:"1px solid #e1e3ec"}}>
+            <tr style={{borderBottom:"1px solid #e6e8ec"}}>
               <VTD c={1}/>
               <td style={{padding:3}}>
                 <input value={row.vehicle} onChange={e=>upd("vehicle",e.target.value)} style={{...inp,minHeight:28,fontSize:11}} title="Vehicle type / model"/>
@@ -852,17 +852,17 @@ export function SalesCar({branch,setRoute}){
           </tbody>
         </table>
       </div>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
-          <FL label="GST rate"><input value={intra?"5% (CGST 2.5% + SGST 2.5%)":"5% (IGST)"} readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontWeight:600,cursor:"not-allowed"}}/></FL>
+          <FL label="GST rate"><input value={intra?"5% (CGST 2.5% + SGST 2.5%)":"5% (IGST)"} readOnly style={{...inp,background:"#f4f5f7",color:"#5b616e",fontWeight:600,cursor:"not-allowed"}}/></FL>
           {intra
             ?<>
-              <FL label="CGST 2.5% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-              <FL label="SGST 2.5% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="CGST 2.5% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
+              <FL label="SGST 2.5% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
             </>
-            :<FL label="IGST 5% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
+            :<FL label="IGST 5% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>}
         </div>
-        <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
+        <div style={{marginTop:9,padding:"8px 12px",background:"#e8f0ff",borderRadius:8,fontSize:11.5,color:"#2563eb"}}>
           5% GST applied on (Basic + Other fare + Service charge). SAC 996601 — Rental services of road vehicles with operator. {intra?"Intra-state (27): CGST 2.5% + SGST 2.5%.":"Inter-state (state ≠ 27): IGST 5%."} No ITC available to buyer under the 5% scheme.
         </div>
       </div>
@@ -913,7 +913,7 @@ export function SalesVisa({branch,setRoute}){
             {["#","Applicant name","Passport no.","Visa country","Visa type","VFS fee ₹","Taxes ₹","Other taxes ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=7}/>)}
           </tr></thead>
           <tbody>{appl.map((a,i)=>(
-            <tr key={a.id} style={{borderBottom:"1px solid #e1e3ec"}}>
+            <tr key={a.id} style={{borderBottom:"1px solid #e6e8ec"}}>
               <VTD c={i+1}/>
               <td style={{padding:3}}><input value={a.name} onChange={e=>upd(a.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:150}}/></td>
               <td style={{padding:3}}><input value={a.pp} onChange={e=>upd(a.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:100}}/></td>
@@ -926,29 +926,29 @@ export function SalesVisa({branch,setRoute}){
             </tr>
           ))}</tbody>
           <tfoot>
-            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
               <td colSpan={5} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(vfsTot)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(taxesTot)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(otherTot)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(taxesTot)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(otherTot)}</td>
               <td/>
             </tr>
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
           <FL label={bc(branch).cur+"Service charge"}>
             <input type="number" value={svc} onChange={e=>setSvc(+e.target.value||0)} style={{...inp,textAlign:"right"}}/>
           </FL>
           {intra
             ?<>
-              <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-              <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
+              <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
             </>
-            :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
+            :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>}
         </div>
-        <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
+        <div style={{marginTop:9,padding:"8px 12px",background:"#e8f0ff",borderRadius:8,fontSize:11.5,color:"#2563eb"}}>
           SAC code: <b>998212</b> — Visa and passport services. {intra?"Intra-state (27): CGST 9% + SGST 9% on service charge.":"Inter-state (state ≠ 27): IGST 18% on service charge."}
         </div>
       </div>
@@ -1005,7 +1005,7 @@ export function SalesHotel({branch,setRoute}){
           <tbody>{rows.map((r,i)=>{
             const lineTotal=(+r.basic||0)+(+r.taxes||0)+(+r.otherTax||0);
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.passenger} onChange={e=>upd(r.id,"passenger",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:160}}/></td>
                 <td style={{padding:3}}><input type="date" value={r.ci} onChange={e=>upd(r.id,"ci",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
@@ -1025,30 +1025,30 @@ export function SalesHotel({branch,setRoute}){
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
               <td colSpan={6} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totTaxes)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totOther)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(subTable)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(totTaxes)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(totOther)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#2563eb"}}>{fmt(subTable)}</td>
               <td/>
             </tr>
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
           <FL label={bc(branch).cur+"Service charge"}>
             <input type="number" value={svc} onChange={e=>setSvc(+e.target.value||0)} style={{...inp,textAlign:"right"}}/>
           </FL>
           {intra
             ?<>
-              <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-              <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
+              <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
             </>
-            :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
+            :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>}
         </div>
-        <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
+        <div style={{marginTop:9,padding:"8px 12px",background:"#e8f0ff",borderRadius:8,fontSize:11.5,color:"#2563eb"}}>
           SAC code: <b>998552</b> — Tour operator / accommodation reservation. Room fare + Taxes + Other tax are pass-through to the customer. {intra?"Intra-state (27): CGST 9% + SGST 9% on agency service charge.":"Inter-state (state ≠ 27): IGST 18% on agency service charge."}
         </div>
       </div>
@@ -1103,7 +1103,7 @@ export function SalesInsurance({branch,setRoute}){
           <tbody>{rows.map((r,i)=>{
             const lineTotal=(+r.basic||0)+(+r.otherTax||0)+(+r.svc||0);
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.name} onChange={e=>upd(r.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:180}}/></td>
                 <td style={{padding:3}}><input value={r.pp} onChange={e=>upd(r.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:100}}/></td>
@@ -1117,31 +1117,31 @@ export function SalesInsurance({branch,setRoute}){
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
               <td colSpan={4} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totOther)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#27500A"}}>{fmt(totSvc)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(taxable)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(totOther)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#16a34a"}}>{fmt(totSvc)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#2563eb"}}>{fmt(taxable)}</td>
               <td/>
             </tr>
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
-          <FL label={bc(branch).cur+"Taxable value"}><input value={fmt(taxable)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+          <FL label={bc(branch).cur+"Taxable value"}><input value={fmt(taxable)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
           {!isGST
-            ?<FL label={"VAT "+(bc(branch).vatRate||18)+"% "+bc(branch).cur}><input value={fmt(gstFull)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+            ?<FL label={"VAT "+(bc(branch).vatRate||18)+"% "+bc(branch).cur}><input value={fmt(gstFull)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
             :intra
               ?<>
-                <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-                <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+                <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
+                <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
               </>
-              :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
-          <FL label="Invoice total ₹"><input value={fmt(total)} readOnly style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#185FA5"}}/></FL>
+              :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>}
+          <FL label="Invoice total ₹"><input value={fmt(total)} readOnly style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#2563eb"}}/></FL>
         </div>
-        <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
+        <div style={{marginTop:9,padding:"8px 12px",background:"#e8f0ff",borderRadius:8,fontSize:11.5,color:"#2563eb"}}>
           {isGST
             ?<>GST 18% on (Basic + Other tax + Service charge). SAC 997131 — Life &amp; non-life insurance. {intra?"Intra-state (27): split as CGST 9% + SGST 9%.":"Inter-state (state ≠ 27): IGST 18%."}</>
             :<>VAT {(bc(branch).vatRate||18)}% on (Basic + Other tax + Service charge).</>}
@@ -1187,8 +1187,8 @@ export function SalesMisc({branch,setRoute}){
     gstByRate[r.gstPct].gst+=g;
   });
 
-  const rateBg={0:"#f3f4f8",5:"#EAF3DE",12:"#FAEEDA",18:"#E6F1FB"};
-  const rateC={0:"#5a6691",5:"#27500A",12:"#854F0B",18:"#185FA5"};
+  const rateBg={0:"#f4f5f7",5:"#e8f6ed",12:"#fbeedb",18:"#e8f0ff"};
+  const rateC={0:"#5b616e",5:"#16a34a",12:"#d97706",18:"#2563eb"};
 
   return (
     <VWrap title="Sales Voucher — Miscellaneous" icon="📦" vNo={vNo} branch={branch} type="sales" saleMod="SM" saleAmt={total||0} setRoute={setRoute}>
@@ -1203,7 +1203,7 @@ export function SalesMisc({branch,setRoute}){
             const amt=+r.amt||0;
             const g=+(amt*(r.gstPct/100)).toFixed(2);
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.gl} onChange={e=>upd(r.id,"gl",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:220}}/></td>
                 <td style={{padding:3}}><input value={r.sac} onChange={e=>upd(r.id,"sac",e.target.value)} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:90}}/></td>
@@ -1220,19 +1220,19 @@ export function SalesMisc({branch,setRoute}){
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
               <td colSpan={3} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(sub)}</td>
               <td/>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#27500A"}}>{fmt(gstAmt)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(total)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#16a34a"}}>{fmt(gstAmt)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#2563eb"}}>{fmt(total)}</td>
               <td/>
             </tr>
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
-        <p style={{margin:"0 0 9px",fontSize:10,color:"#5a6691",letterSpacing:"0.5px",textTransform:"uppercase"}}>GST breakup by rate</p>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+        <p style={{margin:"0 0 9px",fontSize:10,color:"#5b616e",letterSpacing:"0.5px",textTransform:"uppercase"}}>GST breakup by rate</p>
         <div style={{display:"flex",gap:9,flexWrap:"wrap"}}>
           {Object.entries(gstByRate).map(([rate,vals])=>(
             <div key={rate} style={{flex:1,minWidth:160,padding:"9px 13px",borderRadius:9,background:rateBg[+rate],border:"1px solid "+(rateBg[+rate])}}>
@@ -1247,7 +1247,7 @@ export function SalesMisc({branch,setRoute}){
               </div>
             </div>
           ))}
-          {Object.keys(gstByRate).length===0&&<p style={{fontSize:11.5,color:"#8b94b3",margin:0}}>Add line items above to see GST breakup.</p>}
+          {Object.keys(gstByRate).length===0&&<p style={{fontSize:11.5,color:"#9197a3",margin:0}}>Add line items above to see GST breakup.</p>}
         </div>
       </div>
       <VNarr def="Being miscellaneous travel services — SIM cards, documentation charges, forex card issuance.">
@@ -1413,11 +1413,11 @@ function InvoiceSelect({invoices,value,onChange,cur,loading,placeholder,noun="sa
   };
   const menu=open&&rect&&createPortal(
     <div ref={menuRef} style={{position:"fixed",top:rect.bottom+4,left:rect.left,width:Math.max(rect.width,330),zIndex:4000,background:"#fff",
-      border:"1px solid #e1e3ec",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.18)",overflow:"hidden"}}>
+      border:"1px solid #e6e8ec",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.18)",overflow:"hidden"}}>
       <div style={{position:"relative"}}>
-        <Search size={13} style={{position:"absolute",left:10,top:9,color:"#8b94b3"}}/>
+        <Search size={13} style={{position:"absolute",left:10,top:9,color:"#9197a3"}}/>
         <input autoFocus value={q} onChange={e=>setQ(e.target.value)} onKeyDown={onKeyNav} placeholder="Search by invoice no, party, pax, ticket, PNR or sector…  (↑ ↓ to move · Enter to select)"
-          style={{width:"100%",border:"none",borderBottom:"1px solid #e1e3ec",padding:"8px 12px 8px 30px",fontSize:11,outline:"none",boxSizing:"border-box"}}/>
+          style={{width:"100%",border:"none",borderBottom:"1px solid #e6e8ec",padding:"8px 12px 8px 30px",fontSize:11,outline:"none",boxSizing:"border-box"}}/>
       </div>
       <div style={{maxHeight:300,overflowY:"auto"}}>
         {filtered.map((inv,idx)=>{
@@ -1426,32 +1426,33 @@ function InvoiceSelect({invoices,value,onChange,cur,loading,placeholder,noun="sa
           return (
             <div key={inv.id} ref={el=>{ if(active&&el) el.scrollIntoView({block:"nearest"}); }}
               {...clickable(()=>{onChange(inv.id);setOpen(false);}, { role:'option' })} onMouseEnter={()=>setActiveIdx(idx)}
-              style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #f3f4f8",background:active?"#eaf0ff":"transparent"}}>
+              style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #f4f5f7",background:active?"#eaf0ff":"transparent"}}>
+
               <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"baseline"}}>
-                <span style={{fontFamily:"monospace",fontSize:10.5,fontWeight:700,color:"#185FA5"}}>{inv.vno}</span>
-                <span style={{fontSize:11,fontWeight:700,color:"#0d1326",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,inv.total)}</span>
+                <span style={{fontFamily:"monospace",fontSize:10.5,fontWeight:700,color:"#2563eb"}}>{inv.vno}</span>
+                <span style={{fontSize:11,fontWeight:700,color:"#1a1c22",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,inv.total)}</span>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",gap:10,marginTop:2}}>
-                <span style={{fontSize:10.5,color:"#0d1326",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{inv.party||"—"}</span>
-                <span style={{fontSize:9.5,color:"#5a6691",flexShrink:0}}>{inv.date}</span>
+                <span style={{fontSize:10.5,color:"#1a1c22",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{inv.party||"—"}</span>
+                <span style={{fontSize:9.5,color:"#5b616e",flexShrink:0}}>{inv.date}</span>
               </div>
-              {pl&&<div style={{fontSize:9.5,color:"#5a6691",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                <span style={{color:"#A07828",fontWeight:700}}>{invPax(inv).length} pax</span> · {pl}</div>}
+              {pl&&<div style={{fontSize:9.5,color:"#5b616e",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                <span style={{color:"#c2a04a",fontWeight:700}}>{invPax(inv).length} pax</span> · {pl}</div>}
             </div>
           );
         })}
-        {filtered.length===0&&<div style={{padding:"12px",fontSize:11,color:"#5a6691"}}>{loading?`Loading ${nounPlural}…`:`No matching ${noun}`}</div>}
+        {filtered.length===0&&<div style={{padding:"12px",fontSize:11,color:"#5b616e"}}>{loading?`Loading ${nounPlural}…`:`No matching ${noun}`}</div>}
       </div>
-      <div style={{padding:"6px 10px",borderTop:"1px solid #f3f4f8",fontSize:9.5,color:"#5a6691"}}>{invoices.length} {nounPlural} · type to filter</div>
+      <div style={{padding:"6px 10px",borderTop:"1px solid #f4f5f7",fontSize:9.5,color:"#5b616e"}}>{invoices.length} {nounPlural} · type to filter</div>
     </div>, document.body);
   return (
     <div ref={ref} style={{position:"relative"}}>
       <div {...clickable(()=>open?setOpen(false):openMenu())} style={{...inp,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:32,
-        borderColor:selected?"#C0DD97":"#F7C1C1",background:selected?"#f8fff8":"#fffafa"}}>
+        borderColor:selected?"#bfe6cd":"#f3c9c9",background:selected?"#f8fff8":"#fffafa"}}>
         {selected
-          ?<span style={{fontSize:11,color:"#0d1326",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><b style={{fontFamily:"monospace",color:"#185FA5"}}>{selected.vno}</b> · {selected.party||"—"} · {vf2(cur,selected.total)}</span>
+          ?<span style={{fontSize:11,color:"#1a1c22",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><b style={{fontFamily:"monospace",color:"#2563eb"}}>{selected.vno}</b> · {selected.party||"—"} · {vf2(cur,selected.total)}</span>
           :<span style={{fontSize:11,color:"#bf7d7d"}}>{loading?`Loading ${nounPlural}…`:(invoices.length?(placeholder||`Search & select a ${noun}…`):`No ${nounPlural} in this branch`)}</span>}
-        <ChevronDown size={12} style={{color:"#5a6691",flexShrink:0}}/>
+        <ChevronDown size={12} style={{color:"#5b616e",flexShrink:0}}/>
       </div>
       {menu}
     </div>
@@ -1472,49 +1473,49 @@ function InvoicePaxPanel({inv,cur,label="Invoice",selectable=false,selected,onTo
   const svc=invServiceCharge(inv);
   const gst=_r2(inv.taxAmt||inv.gstAmt||0), tcs=_r2(inv.tcsAmt||0);
   const chip=(l,v,c)=>(
-    <div style={{flex:1,minWidth:118,padding:"7px 11px",borderRadius:7,background:"#f3f4f8",border:"1px solid #e1e3ec"}}>
-      <div style={{fontSize:8.5,fontWeight:700,letterSpacing:".5px",color:"#5a6691",textTransform:"uppercase"}}>{l}</div>
-      <div style={{fontSize:13,fontWeight:800,marginTop:2,color:c||"#0d1326",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,v)}</div>
+    <div style={{flex:1,minWidth:118,padding:"7px 11px",borderRadius:7,background:"#f4f5f7",border:"1px solid #e6e8ec"}}>
+      <div style={{fontSize:8.5,fontWeight:700,letterSpacing:".5px",color:"#5b616e",textTransform:"uppercase"}}>{l}</div>
+      <div style={{fontSize:13,fontWeight:800,marginTop:2,color:c||"#1a1c22",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,v)}</div>
     </div>
   );
   return (
     <div style={{...card,padding:"11px 13px",marginBottom:14,background:"#FBFCFE"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6,marginBottom:8}}>
-        <span style={{fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#A07828",textTransform:"uppercase"}}>{label} {inv.vno} · Pax Detail{selectable&&pax.length>1?<span style={{color:"#185FA5"}}> · select who to {label.toLowerCase().includes("purchase")?"settle":"refund/reissue"}</span>:null}</span>
-        <span style={{fontSize:9.5,color:"#5a6691"}}>{selectable&&pax.length>0?`${selPax.length}/${pax.length} pax · `:""}{inv.date} · {inv.party||"—"}{inv.gstMode?` · ${inv.gstMode==="inter"?"Inter-state (IGST)":"Intra-state (CGST+SGST)"}`:""}</span>
+        <span style={{fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#c2a04a",textTransform:"uppercase"}}>{label} {inv.vno} · Pax Detail{selectable&&pax.length>1?<span style={{color:"#2563eb"}}> · select who to {label.toLowerCase().includes("purchase")?"settle":"refund/reissue"}</span>:null}</span>
+        <span style={{fontSize:9.5,color:"#5b616e"}}>{selectable&&pax.length>0?`${selPax.length}/${pax.length} pax · `:""}{inv.date} · {inv.party||"—"}{inv.gstMode?` · ${inv.gstMode==="inter"?"Inter-state (IGST)":"Intra-state (CGST+SGST)"}`:""}</span>
       </div>
       {pax.length>0?(
         <div style={{overflowX:"auto",marginBottom:9}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:10.5}}>
-            <thead><tr style={{borderBottom:"1px solid #e1e3ec"}}>
+            <thead><tr style={{borderBottom:"1px solid #e6e8ec"}}>
               {selectable&&<th style={{padding:"4px 8px",textAlign:"center"}}><input type="checkbox" checked={allSel} onChange={()=>onToggleAll&&onToggleAll(pax,!allSel)} title="Select all"/></th>}
               {["#","Passenger","Ticket / Ref","Sector","Airline / Operator","Class","Base Fare"].map((h,i)=>(
-                <th key={i} style={{textAlign:i===0?"center":i===6?"right":"left",padding:"4px 8px",fontSize:8.5,fontWeight:700,color:"#5a6691",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
+                <th key={i} style={{textAlign:i===0?"center":i===6?"right":"left",padding:"4px 8px",fontSize:8.5,fontWeight:700,color:"#5b616e",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>{pax.map((p,i)=>{
               const sel=isSel(p,i);
               return (
-              <tr key={i} style={{borderBottom:".5px solid #f3f4f8",opacity:selectable&&!sel?0.4:1}}>
+              <tr key={i} style={{borderBottom:".5px solid #f4f5f7",opacity:selectable&&!sel?0.4:1}}>
                 {selectable&&<td style={{padding:"4px 8px",textAlign:"center"}}><input type="checkbox" checked={sel} onChange={()=>onToggle&&onToggle(paxKey(p,i))}/></td>}
-                <td style={{padding:"4px 8px",textAlign:"center",color:"#9A9A9A"}}>{i+1}</td>
-                <td style={{padding:"4px 8px",fontWeight:600,color:"#0d1326",whiteSpace:"nowrap"}}>{p.name||"—"}</td>
-                <td style={{padding:"4px 8px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5",whiteSpace:"nowrap"}}>{p.ticket||p.pnr||"—"}</td>
-                <td style={{padding:"4px 8px",color:"#5a6691",whiteSpace:"nowrap"}}>{p.sector||"—"}</td>
-                <td style={{padding:"4px 8px",color:"#5a6691",whiteSpace:"nowrap"}}>{p.airline||"—"}</td>
-                <td style={{padding:"4px 8px",color:"#5a6691",whiteSpace:"nowrap"}}>{p.cls||"—"}</td>
-                <td style={{padding:"4px 8px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#1B6B4C",fontWeight:600,whiteSpace:"nowrap"}}>{vf2(cur,p.baseFare||0)}</td>
+                <td style={{padding:"4px 8px",textAlign:"center",color:"#9197a3"}}>{i+1}</td>
+                <td style={{padding:"4px 8px",fontWeight:600,color:"#1a1c22",whiteSpace:"nowrap"}}>{p.name||"—"}</td>
+                <td style={{padding:"4px 8px",fontFamily:"monospace",fontSize:9.5,color:"#2563eb",whiteSpace:"nowrap"}}>{p.ticket||p.pnr||"—"}</td>
+                <td style={{padding:"4px 8px",color:"#5b616e",whiteSpace:"nowrap"}}>{p.sector||"—"}</td>
+                <td style={{padding:"4px 8px",color:"#5b616e",whiteSpace:"nowrap"}}>{p.airline||"—"}</td>
+                <td style={{padding:"4px 8px",color:"#5b616e",whiteSpace:"nowrap"}}>{p.cls||"—"}</td>
+                <td style={{padding:"4px 8px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#16a34a",fontWeight:600,whiteSpace:"nowrap"}}>{vf2(cur,p.baseFare||0)}</td>
               </tr>
             );})}</tbody>
           </table>
         </div>
-      ):<div style={{fontSize:10,color:"#9A9A9A",marginBottom:9}}>No passenger detail recorded on this invoice.</div>}
+      ):<div style={{fontSize:10,color:"#9197a3",marginBottom:9}}>No passenger detail recorded on this invoice.</div>}
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-        {chip(selectable?"Selected Fare (excl. svc + GST)":"Original Fare (excl. svc + GST)",selBase,"#1B6B4C")}
-        {chip("Service Charge + Markup",svc,"#A07828")}
-        {chip("GST collected",gst,"#185FA5")}
-        {tcs>0&&chip("TCS collected",tcs,"#854F0B")}
-        {chip("Invoice Total",inv.total,"#0d1326")}
+        {chip(selectable?"Selected Fare (excl. svc + GST)":"Original Fare (excl. svc + GST)",selBase,"#16a34a")}
+        {chip("Service Charge + Markup",svc,"#c2a04a")}
+        {chip("GST collected",gst,"#2563eb")}
+        {tcs>0&&chip("TCS collected",tcs,"#d97706")}
+        {chip("Invoice Total",inv.total,"#1a1c22")}
       </div>
     </div>
   );
@@ -1702,7 +1703,7 @@ function RefundReissueVoucher({branch,kind}){
     });
   };
 
-  const accent=isRefund?"#A32D2D":"#185FA5";   // refund = reversal (maroon) · reissue = re-bill (blue)
+  const accent=isRefund?"#dc2626":"#2563eb";   // refund = reversal (maroon) · reissue = re-bill (blue)
   const title=isRefund?"Refund Voucher":"Reissue Voucher";
   const num=(v,set,extra={})=>(<input type="number" value={v||""} onChange={e=>set(+e.target.value||0)} placeholder="0.00" style={{...inp,textAlign:"right",fontWeight:600,...extra}}/>);
 
@@ -1712,15 +1713,15 @@ function RefundReissueVoucher({branch,kind}){
       <div style={{padding:"14px 16px"}}>
         <VExplain>
           {isRefund
-            ?<><b style={{color:"#A07828"}}>Refund:</b> a customer cancels a {module.toLowerCase()} booking. The {cfgM.sup} refunds the fare minus its cancellation charge; you retain a service charge + markup (+GST) and refund the balance to the customer. The supplier is <b>Debited</b> (receivable); the customer, your income & GST are <b>Credited</b>. Any <b>service charge the {cfgM.sup} levies is booked as your own cost</b> (separate {supSvcLedger} leg, reducing GP) and its GST as input credit — <b>not</b> passed to the customer. <b>Pick both the sales invoice</b> being cancelled <b>and its purchase invoice</b> below.</>
-            :<><b style={{color:"#A07828"}}>Reissue:</b> a customer changes a {module.toLowerCase()} booking. The {cfgM.sup} charges a change fee plus any fare difference; you add a service charge + markup (+GST) and bill the total to the customer. The customer is <b>Debited</b>; the supplier, your income & GST are <b>Credited</b>. Any <b>service charge the {cfgM.sup} levies is booked as your own cost</b> (separate {supSvcLedger} leg, reducing GP) and its GST as input credit — <b>not</b> added to the customer's bill. <b>Pick both the sales invoice</b> being amended <b>and its purchase invoice</b> below.</>}
+            ?<><b style={{color:"#c2a04a"}}>Refund:</b> a customer cancels a {module.toLowerCase()} booking. The {cfgM.sup} refunds the fare minus its cancellation charge; you retain a service charge + markup (+GST) and refund the balance to the customer. The supplier is <b>Debited</b> (receivable); the customer, your income & GST are <b>Credited</b>. Any <b>service charge the {cfgM.sup} levies is booked as your own cost</b> (separate {supSvcLedger} leg, reducing GP) and its GST as input credit — <b>not</b> passed to the customer. <b>Pick both the sales invoice</b> being cancelled <b>and its purchase invoice</b> below.</>
+            :<><b style={{color:"#c2a04a"}}>Reissue:</b> a customer changes a {module.toLowerCase()} booking. The {cfgM.sup} charges a change fee plus any fare difference; you add a service charge + markup (+GST) and bill the total to the customer. The customer is <b>Debited</b>; the supplier, your income & GST are <b>Credited</b>. Any <b>service charge the {cfgM.sup} levies is booked as your own cost</b> (separate {supSvcLedger} leg, reducing GP) and its GST as input credit — <b>not</b> added to the customer's bill. <b>Pick both the sales invoice</b> being amended <b>and its purchase invoice</b> below.</>}
         </VExplain>
 
         {/* Module strip — mirrors the mockup tabs */}
-        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14,borderBottom:"1px solid #e1e3ec",paddingBottom:10}}>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14,borderBottom:"1px solid #e6e8ec",paddingBottom:10}}>
           {RR_ORDER.map(m=>(
             <button key={m} onClick={()=>setModule(m)} style={{padding:"6px 13px",borderRadius:7,fontSize:10.5,fontWeight:700,cursor:"pointer",textTransform:"uppercase",letterSpacing:".3px",
-              background:module===m?"#0d1326":"#f3f4f8",color:module===m?"#d4a437":"#5a6691",border:"1.5px solid "+(module===m?"#d4a437":"#e1e3ec")}}>{RR_MODULES[m].tab}</button>
+              background:module===m?"#1a1c22":"#f4f5f7",color:module===m?"#c2a04a":"#5b616e",border:"1.5px solid "+(module===m?"#c2a04a":"#e6e8ec")}}>{RR_MODULES[m].tab}</button>
           ))}
         </div>
 
@@ -1731,7 +1732,7 @@ function RefundReissueVoucher({branch,kind}){
         </div>
 
         {/* ① Sales side — settles the customer (debtor) leg (required) */}
-        <p style={{margin:"0 0 8px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#185FA5",textTransform:"uppercase"}}>① Sales Invoice — customer side (required)</p>
+        <p style={{margin:"0 0 8px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#2563eb",textTransform:"uppercase"}}>① Sales Invoice — customer side (required)</p>
         <div style={{display:"grid",gridTemplateColumns:"1fr",gap:12,marginBottom:10}}>
           <FL label={`Against Sales Invoice — ${isRefund?"cancel":"amend"} (required)`}>
             <InvoiceSelect invoices={invoices} value={invId} onChange={pickInvoice} cur={cur} loading={salesQ.isLoading} noun="sales invoice"/>
@@ -1740,75 +1741,75 @@ function RefundReissueVoucher({branch,kind}){
         <InvoicePaxPanel inv={selInv} cur={cur} label="Sales Invoice" selectable selected={salePaxSel} onToggle={togglePax(setSalePaxSel)} onToggleAll={toggleAllPax(setSalePaxSel)}/>
 
         {/* ② Purchase side — AUTO-LINKED from the sale by Link No (no manual pick) */}
-        <p style={{margin:"0 0 8px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#27500A",textTransform:"uppercase"}}>② Purchase Invoice — supplier side (auto-linked by Link No · sets the original cost)</p>
+        <p style={{margin:"0 0 8px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#16a34a",textTransform:"uppercase"}}>② Purchase Invoice — supplier side (auto-linked by Link No · sets the original cost)</p>
         {selPur
           ? <InvoicePaxPanel inv={selPur} cur={cur} label="Purchase Invoice · auto-linked" selectable selected={purPaxSel} onToggle={togglePax(setPurPaxSel)} onToggleAll={toggleAllPax(setPurPaxSel)}/>
           : selInv
-            ? <div style={{padding:"10px 13px",borderRadius:8,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:10.5,color:"#A32D2D",fontWeight:600,marginBottom:14}}>⚠ No purchase invoice is linked to {selInv.vno}{selInv.linkNo?` (Link No ${selInv.linkNo})`:" — the sale has no Link No"}{purchQ.isLoading?" · loading purchases…":""}. A refund/reissue must settle the linked purchase — check the purchase exists with the same Link No.</div>
-            : <div style={{padding:"10px 13px",borderRadius:8,background:"#f3f4f8",border:"1px solid #e1e3ec",fontSize:10.5,color:"#5a6691",marginBottom:14}}>Pick a sales invoice above — its linked purchase invoice loads automatically.</div>}
+            ? <div style={{padding:"10px 13px",borderRadius:8,background:"#fbe9e9",border:"1px solid #f3c9c9",fontSize:10.5,color:"#dc2626",fontWeight:600,marginBottom:14}}>⚠ No purchase invoice is linked to {selInv.vno}{selInv.linkNo?` (Link No ${selInv.linkNo})`:" — the sale has no Link No"}{purchQ.isLoading?" · loading purchases…":""}. A refund/reissue must settle the linked purchase — check the purchase exists with the same Link No.</div>
+            : <div style={{padding:"10px 13px",borderRadius:8,background:"#f4f5f7",border:"1px solid #e6e8ec",fontSize:10.5,color:"#5b616e",marginBottom:14}}>Pick a sales invoice above — its linked purchase invoice loads automatically.</div>}
 
         <div style={{display:"grid",gridTemplateColumns:mob?"1fr 1fr":"repeat(4,1fr)",gap:12,marginBottom:14}}>
           <FL label={cfgM.ref1}><input value={ref1} onChange={e=>setRef1(e.target.value)} style={inp} placeholder={cfgM.ref1}/></FL>
           <FL label={cfgM.ref2}><input value={ref2} onChange={e=>setRef2(e.target.value)} style={inp} placeholder={cfgM.ref2}/></FL>
-          <FL label="Supplier (Creditor) · locked"><div title={supplierName} style={{...inp,background:"#f3f4f8",color:"#3A3A3A",display:"flex",alignItems:"center",minHeight:32,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{supplierName||"— from purchase —"}</div></FL>
-          <FL label="Customer (Debtor) · locked"><div title={customerName} style={{...inp,background:"#f3f4f8",color:"#3A3A3A",display:"flex",alignItems:"center",minHeight:32,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{customerName||"— from sale —"}</div></FL>
+          <FL label="Supplier (Creditor) · locked"><div title={supplierName} style={{...inp,background:"#f4f5f7",color:"#14161a",display:"flex",alignItems:"center",minHeight:32,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{supplierName||"— from purchase —"}</div></FL>
+          <FL label="Customer (Debtor) · locked"><div title={customerName} style={{...inp,background:"#f4f5f7",color:"#14161a",display:"flex",alignItems:"center",minHeight:32,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{customerName||"— from sale —"}</div></FL>
         </div>
 
         {/* Calc grid — mirrors the mockup calc-grid */}
-        <p style={{margin:"0 0 8px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#A07828",textTransform:"uppercase"}}>{module} {isRefund?"Refund":"Reissue"} Calculation</p>
+        <p style={{margin:"0 0 8px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#c2a04a",textTransform:"uppercase"}}>{module} {isRefund?"Refund":"Reissue"} Calculation</p>
         <div style={{...card,padding:"14px 16px",marginBottom:14}}>
           <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:"10px 26px"}}>
             {isRefund?<>
               <RRLine label="Original Fare" sub={selPur?`from purchase ${selPur.vno} (excl. svc + GST)`:`paid to ${cfgM.sup}`}>{num(origFare,setOrigFare)}</RRLine>
               <RRLine label={cfgM.rfCancel} sub={`${cfgM.sup} retains`}>{num(supCancel,setSupCancel)}</RRLine>
               <RRLine label="Supplier Service Charge" sub={`our cost → ${supSvcLedger} (reduces GP)`}>{num(supSvc,setSupSvc)}</RRLine>
-              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="input credit (claimable)" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
-              <RRLine label="Supplier Refund to Us" sub="fare − cancellation − supplier charges" derived><input type="number" value={supRefund} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
+              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e6e8ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="input credit (claimable)" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
+              <RRLine label="Supplier Refund to Us" sub="fare − cancellation − supplier charges" derived><input type="number" value={supRefund} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
               <div/>
             </>:<>
               <RRLine label={cfgM.riFee} sub={`charged by ${cfgM.sup}`}>{num(changeFee,setChangeFee)}</RRLine>
               <RRLine label={cfgM.diff} sub="new − old">{num(fareDiff,setFareDiff)}</RRLine>
               <RRLine label="Supplier Service Charge" sub={`our cost → ${supSvcLedger} (reduces GP)`}>{num(supSvc,setSupSvc)}</RRLine>
-              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="input credit (claimable)" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
-              <RRLine label="Payable to Supplier" sub="fee + difference + supplier charges" derived><input type="number" value={supPayable} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
+              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e6e8ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="input credit (claimable)" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
+              <RRLine label="Payable to Supplier" sub="fee + difference + supplier charges" derived><input type="number" value={supPayable} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
               <div/>
             </>}
             <RRLine label="Our Service Charge" sub="our income, retained">{num(svc,setSvc)}</RRLine>
-            <RRLine label={<>GST on Service @<input type="number" value={gstRateSvc} onChange={e=>setGstRateSvc(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="on service charge" derived><input type="number" value={gstSvc} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
+            <RRLine label={<>GST on Service @<input type="number" value={gstRateSvc} onChange={e=>setGstRateSvc(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e6e8ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="on service charge" derived><input type="number" value={gstSvc} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
             <RRLine label="Our Markup" sub="our margin, retained">{num(markup,setMarkup)}</RRLine>
-            <RRLine label={<>GST on Markup @<input type="number" value={gstRateMk} onChange={e=>setGstRateMk(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="on markup" derived><input type="number" value={gstMk} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}/></RRLine>
+            <RRLine label={<>GST on Markup @<input type="number" value={gstRateMk} onChange={e=>setGstRateMk(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e6e8ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="on markup" derived><input type="number" value={gstMk} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
           </div>
           {/* Highlight: amount to / from customer */}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginTop:12,padding:"11px 14px",borderRadius:8,background:"#FDFAF4",border:"1px solid "+(chargesExceed?"#F7C1C1":"#EFE7D4")}}>
-            <span style={{fontSize:12.5,fontWeight:800,color:chargesExceed?"#A32D2D":"#A07828"}}>{isRefund?"Refund to Customer":"Total Billed to Customer"}<span style={{display:"block",fontSize:10,fontWeight:400,color:"#9A9A9A"}}>{isRefund?"(fare − cancellation) − our charges · excl. supplier svc":"fee + difference + service + markup + GST · excl. supplier svc"}</span></span>
-            <span style={{fontSize:17,fontWeight:800,color:chargesExceed?"#A32D2D":"#A07828",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,isRefund?custRefund:custBill)}</span>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginTop:12,padding:"11px 14px",borderRadius:8,background:"#FDFAF4",border:"1px solid "+(chargesExceed?"#f3c9c9":"#EFE7D4")}}>
+            <span style={{fontSize:12.5,fontWeight:800,color:chargesExceed?"#dc2626":"#c2a04a"}}>{isRefund?"Refund to Customer":"Total Billed to Customer"}<span style={{display:"block",fontSize:10,fontWeight:400,color:"#9197a3"}}>{isRefund?"(fare − cancellation) − our charges · excl. supplier svc":"fee + difference + service + markup + GST · excl. supplier svc"}</span></span>
+            <span style={{fontSize:17,fontWeight:800,color:chargesExceed?"#dc2626":"#c2a04a",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,isRefund?custRefund:custBill)}</span>
           </div>
         </div>
 
-        <p style={{margin:"0 0 6px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#A07828",textTransform:"uppercase"}}>Account Entries</p>
+        <p style={{margin:"0 0 6px",fontSize:9,fontWeight:700,letterSpacing:"1px",color:"#c2a04a",textTransform:"uppercase"}}>Account Entries</p>
         <VJournalPreview rows={jrows} cur={cur}/>
         <VBalanceBar dr={tDr} cr={tCr} cur={cur} emptyText="Pick the sales + purchase invoices and enter the figures"/>
 
         {/* Gross Profit cards */}
         <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:14}}>
-          <div style={{flex:1,minWidth:160,...card,padding:"12px 16px",background:"#f3f4f8"}}>
-            <div style={{fontSize:9,fontWeight:700,letterSpacing:".6px",color:"#5a6691",textTransform:"uppercase"}}>Gross Profit (Service + Markup − Supplier Svc)</div>
-            <div style={{fontSize:18,fontWeight:800,color:gp<0?"#A32D2D":"#1B6B4C",marginTop:3,fontVariantNumeric:"tabular-nums"}}>{vf2(cur,gp)}</div>
+          <div style={{flex:1,minWidth:160,...card,padding:"12px 16px",background:"#f4f5f7"}}>
+            <div style={{fontSize:9,fontWeight:700,letterSpacing:".6px",color:"#5b616e",textTransform:"uppercase"}}>Gross Profit (Service + Markup − Supplier Svc)</div>
+            <div style={{fontSize:18,fontWeight:800,color:gp<0?"#dc2626":"#16a34a",marginTop:3,fontVariantNumeric:"tabular-nums"}}>{vf2(cur,gp)}</div>
           </div>
-          <div style={{flex:1,minWidth:160,...card,padding:"12px 16px",background:"#f3f4f8"}}>
-            <div style={{fontSize:9,fontWeight:700,letterSpacing:".6px",color:"#5a6691",textTransform:"uppercase"}}>GP % <span style={{textTransform:"none",fontWeight:400}}>(on {isRefund?"supplier refund":"total billed"})</span></div>
-            <div style={{fontSize:18,fontWeight:800,color:"#A07828",marginTop:3,fontVariantNumeric:"tabular-nums"}}>{gpPct.toFixed(2)}%</div>
+          <div style={{flex:1,minWidth:160,...card,padding:"12px 16px",background:"#f4f5f7"}}>
+            <div style={{fontSize:9,fontWeight:700,letterSpacing:".6px",color:"#5b616e",textTransform:"uppercase"}}>GP % <span style={{textTransform:"none",fontWeight:400}}>(on {isRefund?"supplier refund":"total billed"})</span></div>
+            <div style={{fontSize:18,fontWeight:800,color:"#c2a04a",marginTop:3,fontVariantNumeric:"tabular-nums"}}>{gpPct.toFixed(2)}%</div>
           </div>
         </div>
 
         <FL label="Narration"><textarea value={narration} onChange={e=>setNarration(e.target.value)} rows={2} style={{...inp,resize:"vertical",marginBottom:12}} placeholder={selInv?`Being ${kind} of ${module.toLowerCase()} booking ${ref1||selInv.vno} against ${selInv.vno}`:`Being ${kind} processed for the selected ${module.toLowerCase()} booking`}/></FL>
 
         <VSaveMsg m={post} okText={`✔ ${title} ${vNo} posted · ${isRefund?`${customerName} refunded ${vf2(cur,custRefund)}`:`${customerName} billed ${vf2(cur,custBill)}`} · against ${selInv?.vno||""} · books refreshed`}/>
-        {chargesExceed&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FCEBEB",fontSize:10.5,color:"#A32D2D",fontWeight:600,textAlign:"center",marginBottom:8}}>⚠ Your service charge + markup (+GST) exceed the supplier refund — the customer cannot be refunded a negative amount.</div>}
-        {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10.5,color:"#854F0B",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this voucher.</div>}
+        {chargesExceed&&<div style={{padding:"8px 12px",borderRadius:8,background:"#fbe9e9",fontSize:10.5,color:"#dc2626",fontWeight:600,textAlign:"center",marginBottom:8}}>⚠ Your service charge + markup (+GST) exceed the supplier refund — the customer cannot be refunded a negative amount.</div>}
+        {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#fbeedb",fontSize:10.5,color:"#d97706",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this voucher.</div>}
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={reset} style={btnGh}>Reset</button>
-          <button onClick={doSave} disabled={!canPost || post.isPending} style={{...btnG,background:(canPost&&!post.isPending)?accent:"#bfc3d6",opacity:(canPost&&!post.isPending)?1:0.55}}>
+          <button onClick={doSave} disabled={!canPost || post.isPending} style={{...btnG,background:(canPost&&!post.isPending)?accent:"#cbd0db",opacity:(canPost&&!post.isPending)?1:0.55}}>
             {isRefund?"💳":"🔄"} Save {title} {post.isPending?"…":!selInv?"(Pick Sales Invoice)":!selPur?"(Pick Purchase Invoice)":chargesExceed?"(Charges Exceed Refund)":!amountsOk?"(Enter Amounts)":""}
           </button>
         </div>
@@ -1820,8 +1821,8 @@ function RefundReissueVoucher({branch,kind}){
 // One calculation row inside the Refund / Reissue calc grid.
 function RRLine({label,sub,children,derived}){
   return (
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,padding:"7px 0",borderBottom:".5px solid #f3f4f8"}}>
-      <label style={{fontSize:11.5,fontWeight:600,color:derived?"#5a6691":"#3A3A3A"}}>{label}<span style={{display:"block",fontSize:9.5,fontWeight:400,color:"#9A9A9A",marginTop:1}}>{sub}</span></label>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,padding:"7px 0",borderBottom:".5px solid #f4f5f7"}}>
+      <label style={{fontSize:11.5,fontWeight:600,color:derived?"#5b616e":"#14161a"}}>{label}<span style={{display:"block",fontSize:9.5,fontWeight:400,color:"#9197a3",marginTop:1}}>{sub}</span></label>
       <div style={{width:128,flexShrink:0}}>{children}</div>
     </div>
   );
@@ -1851,28 +1852,28 @@ export function PurchaseFlight({branch,setRoute}){
       <VHead vNo={vNo}/>
 
       {/* Trip type + IRN strip */}
-      <div style={{padding:"10px 16px",background:"#0d1326",borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{padding:"10px 16px",background:"#1a1c22",borderBottom:"1px solid #e6e8ec"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-          <div style={{display:"flex",gap:0,borderRadius:999,overflow:"hidden",border:"1px solid #2a3450"}}>
+          <div style={{display:"flex",gap:0,borderRadius:999,overflow:"hidden",border:"1px solid #2e323c"}}>
             <button onClick={()=>setTripType("Domestic")}
               style={{padding:"5px 12px",fontSize:10,fontWeight:700,cursor:"pointer",border:"none",
-                background:tripType==="Domestic"?"#27500A":"transparent",
-                color:tripType==="Domestic"?"#fff":"#8b94b3"}}>
+                background:tripType==="Domestic"?"#16a34a":"transparent",
+                color:tripType==="Domestic"?"#fff":"#9197a3"}}>
               🇮🇳 Domestic
             </button>
             <button onClick={()=>setTripType("International")}
               style={{padding:"5px 12px",fontSize:10,fontWeight:700,cursor:"pointer",border:"none",
-                background:tripType==="International"?"#185FA5":"transparent",
-                color:tripType==="International"?"#fff":"#8b94b3"}}>
+                background:tripType==="International"?"#2563eb":"transparent",
+                color:tripType==="International"?"#fff":"#9197a3"}}>
               🌍 International
             </button>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:280}}>
-            <label style={{fontSize:9.5,color:"#8b94b3",fontWeight:700,letterSpacing:"0.5px",textTransform:"uppercase",whiteSpace:"nowrap"}}>IRN No.</label>
+            <label style={{fontSize:9.5,color:"#9197a3",fontWeight:700,letterSpacing:"0.5px",textTransform:"uppercase",whiteSpace:"nowrap"}}>IRN No.</label>
             <input value={irn} onChange={e=>setIrn(e.target.value)}
-              style={{flex:1,minWidth:240,padding:"6px 10px",borderRadius:6,border:"1px solid #2a3450",
-                background:"#1a2238",color:"#d4a437",fontFamily:"monospace",fontSize:10.5,fontWeight:600}}/>
-            <span style={{fontSize:9,padding:"3px 9px",borderRadius:999,background:"#d4a437",color:"#0d1326",fontWeight:700,whiteSpace:"nowrap"}}>
+              style={{flex:1,minWidth:240,padding:"6px 10px",borderRadius:6,border:"1px solid #2e323c",
+                background:"#1a1c22",color:"#c2a04a",fontFamily:"monospace",fontSize:10.5,fontWeight:600}}/>
+            <span style={{fontSize:9,padding:"3px 9px",borderRadius:999,background:"#c2a04a",color:"#1a1c22",fontWeight:700,whiteSpace:"nowrap"}}>
               e-Invoice IRN
             </span>
           </div>
@@ -1886,7 +1887,7 @@ export function PurchaseFlight({branch,setRoute}){
             {["#","Passenger","Ticket no.","Airline","Sector","Class","Date","Base cost ₹","K3 ₹","Taxes ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=7&&i<=10}/>)}
           </tr></thead>
           <tbody>{pax.map((p,i)=>(
-            <tr key={p.id} style={{borderBottom:"1px solid #e1e3ec"}}>
+            <tr key={p.id} style={{borderBottom:"1px solid #e6e8ec"}}>
               <VTD c={i+1}/>
               <td style={{padding:3}}><input value={p.name} onChange={e=>upd(p.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
               <td style={{padding:3}}><input value={p.ticket} onChange={e=>upd(p.id,"ticket",e.target.value)} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace"}}/></td>
@@ -1906,23 +1907,23 @@ export function PurchaseFlight({branch,setRoute}){
             </tr>
           ))}</tbody>
           <tfoot>
-            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
               <td colSpan={7} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totalBase)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totalK3)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totalOther)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(total)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(totalK3)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(totalOther)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#2563eb"}}>{fmt(total)}</td>
               <td/>
             </tr>
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
-          <div style={{padding:"8px 12px",background:"#EAF3DE",borderRadius:8,fontSize:11.5,color:"#27500A"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:9}}>
+          <div style={{padding:"8px 12px",background:"#e8f6ed",borderRadius:8,fontSize:11.5,color:"#16a34a"}}>
             Accounting: <b>Dr Flight Ticket Purchase</b> &nbsp;|&nbsp; <b>Cr BSP India / Airline ledger</b>. Base fare and taxes are both cost — no GST on ticket purchase side.
           </div>
-          <div style={{padding:"8px 12px",background:"#f3f4f8",borderRadius:8,fontSize:11.5,color:"#5a6691"}}>
+          <div style={{padding:"8px 12px",background:"#f4f5f7",borderRadius:8,fontSize:11.5,color:"#5b616e"}}>
             {isIntl
               ?"International ticket — K3 (GST on airline tax) appears on supplier BSP invoice and is input-creditable. Other taxes (YQ/YR, UDF, PSF) are non-creditable pass-through."
               :"Domestic ticket — K3 generally nil. Input GST applies only on GDS / agency service fees, not on base fare or airline taxes."}
@@ -1931,29 +1932,29 @@ export function PurchaseFlight({branch,setRoute}){
       </div>
 
       {/* Terms & GST QR upload */}
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:14}}>
           <FL label="Terms & Conditions">
             <textarea rows={5} value={terms} onChange={e=>setTerms(e.target.value)} style={{...inp,resize:"vertical",fontSize:10.5,lineHeight:1.45}}/>
           </FL>
           <div>
-            <label style={{fontSize:10,color:"#5a6691",fontWeight:600,letterSpacing:"0.4px",textTransform:"uppercase"}}>GST QR Code</label>
-            <div style={{marginTop:4,padding:"10px 12px",border:"2px dashed #c7cbe0",borderRadius:8,background:"#fff",
+            <label style={{fontSize:10,color:"#5b616e",fontWeight:600,letterSpacing:"0.4px",textTransform:"uppercase"}}>GST QR Code</label>
+            <div style={{marginTop:4,padding:"10px 12px",border:"2px dashed #cbd0db",borderRadius:8,background:"#fff",
               display:"flex",alignItems:"center",gap:11,flexWrap:"wrap"}}>
               {qrFile
                 ?<>
-                  <div style={{width:54,height:54,borderRadius:6,background:"#f3f4f8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,border:"1px solid #e1e3ec"}}>▦</div>
+                  <div style={{width:54,height:54,borderRadius:6,background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,border:"1px solid #e6e8ec"}}>▦</div>
                   <div style={{flex:1,minWidth:140}}>
-                    <p style={{margin:0,fontSize:11,fontWeight:700,color:"#0d1326"}}>{qrFile.name}</p>
-                    <p style={{margin:"2px 0 0",fontSize:10,color:"#5a6691"}}>{(qrFile.size/1024).toFixed(1)} KB · uploaded</p>
+                    <p style={{margin:0,fontSize:11,fontWeight:700,color:"#1a1c22"}}>{qrFile.name}</p>
+                    <p style={{margin:"2px 0 0",fontSize:10,color:"#5b616e"}}>{(qrFile.size/1024).toFixed(1)} KB · uploaded</p>
                   </div>
-                  <button onClick={()=>setQrFile(null)} style={{...btnGh,fontSize:10,padding:"4px 10px",color:"#A32D2D",borderColor:"#A32D2D"}}>Remove</button>
+                  <button onClick={()=>setQrFile(null)} style={{...btnGh,fontSize:10,padding:"4px 10px",color:"#dc2626",borderColor:"#dc2626"}}>Remove</button>
                 </>
                 :<>
-                  <div style={{width:54,height:54,borderRadius:6,background:"#f3f4f8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#8b94b3",border:"1px solid #e1e3ec"}}>▦</div>
+                  <div style={{width:54,height:54,borderRadius:6,background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#9197a3",border:"1px solid #e6e8ec"}}>▦</div>
                   <div style={{flex:1,minWidth:140}}>
-                    <p style={{margin:0,fontSize:11,fontWeight:600,color:"#0d1326"}}>Upload supplier GST QR code</p>
-                    <p style={{margin:"2px 0 0",fontSize:9.5,color:"#5a6691"}}>PNG / JPG · signed QR from BSP / airline e-invoice</p>
+                    <p style={{margin:0,fontSize:11,fontWeight:600,color:"#1a1c22"}}>Upload supplier GST QR code</p>
+                    <p style={{margin:"2px 0 0",fontSize:9.5,color:"#5b616e"}}>PNG / JPG · signed QR from BSP / airline e-invoice</p>
                   </div>
                   <label style={{...btnGh,fontSize:10,padding:"5px 12px",cursor:"pointer",display:"inline-block"}}>
                     Choose file
@@ -2020,21 +2021,21 @@ export function PurchaseHoliday({branch,setRoute}){
       </div>
 
       {/* Package Type selector */}
-      <div style={{margin:"0 16px 14px",padding:"12px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775"}}>
-        <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#854F0B"}}>Package Type</p>
+      <div style={{margin:"0 16px 14px",padding:"12px 14px",borderRadius:9,background:"#fbeedb",border:"1px solid #f3d9a8"}}>
+        <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#d97706"}}>Package Type</p>
         <div style={{display:"flex",gap:8,marginBottom:8}}>
           <button onClick={()=>setPkgType("Domestic")} style={{flex:1,padding:"8px 12px",borderRadius:8,cursor:"pointer",
-            background:pkgType==="Domestic"?"#27500A":"#fff",color:pkgType==="Domestic"?"#fff":"#27500A",
-            border:"2px solid #27500A",fontSize:11,fontWeight:600}}>
+            background:pkgType==="Domestic"?"#16a34a":"#fff",color:pkgType==="Domestic"?"#fff":"#16a34a",
+            border:"2px solid #16a34a",fontSize:11,fontWeight:600}}>
             Domestic — GST 5% only (No TCS)
           </button>
           <button onClick={()=>setPkgType("International")} style={{flex:1,padding:"8px 12px",borderRadius:8,cursor:"pointer",
-            background:pkgType==="International"?"#185FA5":"#fff",color:pkgType==="International"?"#fff":"#185FA5",
-            border:"2px solid #185FA5",fontSize:11,fontWeight:600}}>
+            background:pkgType==="International"?"#2563eb":"#fff",color:pkgType==="International"?"#fff":"#2563eb",
+            border:"2px solid #2563eb",fontSize:11,fontWeight:600}}>
             International — GST 5% + TCS 2%
           </button>
         </div>
-        <p style={{margin:0,fontSize:10,color:"#854F0B"}}>
+        <p style={{margin:0,fontSize:10,color:"#d97706"}}>
           {isIntl
             ?"INTERNATIONAL outbound package — GST 5% on (Basic + Service) and TCS 2% on (Basic + Service + GST). Verify supplier TCS certificate."
             :"DOMESTIC package — GST 5% on (Basic + Service). No TCS applicable."}
@@ -2042,62 +2043,62 @@ export function PurchaseHoliday({branch,setRoute}){
       </div>
 
       {/* Component breakout — fixed GL rows */}
-      <p style={{margin:"0 16px 8px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Package Component Breakout <span style={{fontSize:9.5,color:"#5a6691"}}>(Basic + Service → GST 5% → TCS 2% if international)</span></p>
+      <p style={{margin:"0 16px 8px",fontSize:11,fontWeight:700,color:"#1a1c22"}}>Package Component Breakout <span style={{fontSize:9.5,color:"#5b616e"}}>(Basic + Service → GST 5% → TCS 2% if international)</span></p>
       <div style={{margin:"0 16px",...card,padding:0,overflow:"hidden",marginBottom:12}}>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:720}}>
-            <thead><tr style={{background:"#0d1326"}}>
+            <thead><tr style={{background:"#1a1c22"}}>
               {["S.NO","GL Name","Description","SAC Code","Cost Price"].map((h,i)=>(
-                <th key={i} style={{padding:"8px 10px",textAlign:i===4?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+                <th key={i} style={{padding:"8px 10px",textAlign:i===4?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
-              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fff"}}>
-                <td style={{padding:"4px 10px",textAlign:"center",color:"#5a6691",fontSize:10}}>1</td>
-                <td style={{padding:"4px 10px",fontWeight:700,color:"#0d1326",fontSize:11}}>Basic</td>
+              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fff"}}>
+                <td style={{padding:"4px 10px",textAlign:"center",color:"#5b616e",fontSize:10}}>1</td>
+                <td style={{padding:"4px 10px",fontWeight:700,color:"#1a1c22",fontSize:11}}>Basic</td>
                 <td style={{padding:"3px 6px"}}><input value={basic.desc} onChange={e=>updBasic("desc",e.target.value)} style={{...inp,minHeight:28,fontSize:10.5,minWidth:200}}/></td>
                 <td style={{padding:"3px 6px"}}><input value={basic.sac} onChange={e=>updBasic("sac",e.target.value)} style={{...inp,minHeight:28,fontSize:10,fontFamily:"monospace",width:90}}/></td>
-                <td style={{padding:"3px 6px"}}><input type="number" value={basic.amt} onChange={e=>updBasic("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#A32D2D"}}/></td>
+                <td style={{padding:"3px 6px"}}><input type="number" value={basic.amt} onChange={e=>updBasic("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#dc2626"}}/></td>
               </tr>
-              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fafafa"}}>
-                <td style={{padding:"4px 10px",textAlign:"center",color:"#5a6691",fontSize:10}}>2</td>
-                <td style={{padding:"4px 10px",fontWeight:700,color:"#0d1326",fontSize:11}}>Service</td>
+              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fafafa"}}>
+                <td style={{padding:"4px 10px",textAlign:"center",color:"#5b616e",fontSize:10}}>2</td>
+                <td style={{padding:"4px 10px",fontWeight:700,color:"#1a1c22",fontSize:11}}>Service</td>
                 <td style={{padding:"3px 6px"}}><input value={service.desc} onChange={e=>updService("desc",e.target.value)} style={{...inp,minHeight:28,fontSize:10.5,minWidth:200}}/></td>
                 <td style={{padding:"3px 6px"}}><input value={service.sac} onChange={e=>updService("sac",e.target.value)} style={{...inp,minHeight:28,fontSize:10,fontFamily:"monospace",width:90}}/></td>
-                <td style={{padding:"3px 6px"}}><input type="number" value={service.amt} onChange={e=>updService("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#A32D2D"}}/></td>
+                <td style={{padding:"3px 6px"}}><input type="number" value={service.amt} onChange={e=>updService("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#dc2626"}}/></td>
               </tr>
-              <tr style={{borderBottom:"1px solid #e1e3ec",background:"#f3f4f8"}}>
-                <td style={{padding:"6px 10px",textAlign:"center",color:"#0d1326",fontSize:10,fontWeight:700}}>3</td>
-                <td style={{padding:"6px 10px",fontWeight:800,color:"#0d1326",fontSize:11.5}}>Total</td>
-                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>Basic + Service</td>
+              <tr style={{borderBottom:"1px solid #e6e8ec",background:"#f4f5f7"}}>
+                <td style={{padding:"6px 10px",textAlign:"center",color:"#1a1c22",fontSize:10,fontWeight:700}}>3</td>
+                <td style={{padding:"6px 10px",fontWeight:800,color:"#1a1c22",fontSize:11.5}}>Total</td>
+                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>Basic + Service</td>
                 <td style={{padding:"6px 10px"}}></td>
-                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:800,fontSize:12,color:"#0d1326",fontVariantNumeric:"tabular-nums"}}>{fmt(subTotal)}</td>
+                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:800,fontSize:12,color:"#1a1c22",fontVariantNumeric:"tabular-nums"}}>{fmt(subTotal)}</td>
               </tr>
-              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fff"}}>
-                <td style={{padding:"6px 10px",textAlign:"center",color:"#854F0B",fontSize:10,fontWeight:700}}>4</td>
-                <td style={{padding:"6px 10px",fontWeight:700,color:"#854F0B",fontSize:11}}>GST (5%)</td>
-                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>5% on (Basic + Service)</td>
-                <td style={{padding:"6px 10px",fontSize:10,fontFamily:"monospace",color:"#5a6691"}}>—</td>
-                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#854F0B",fontVariantNumeric:"tabular-nums"}}>{fmt(gstAmt)}</td>
+              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fff"}}>
+                <td style={{padding:"6px 10px",textAlign:"center",color:"#d97706",fontSize:10,fontWeight:700}}>4</td>
+                <td style={{padding:"6px 10px",fontWeight:700,color:"#d97706",fontSize:11}}>GST (5%)</td>
+                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>5% on (Basic + Service)</td>
+                <td style={{padding:"6px 10px",fontSize:10,fontFamily:"monospace",color:"#5b616e"}}>—</td>
+                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#d97706",fontVariantNumeric:"tabular-nums"}}>{fmt(gstAmt)}</td>
               </tr>
-              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fafafa",opacity:isIntl?1:0.45}}>
-                <td style={{padding:"6px 10px",textAlign:"center",color:"#185FA5",fontSize:10,fontWeight:700}}>5</td>
-                <td style={{padding:"6px 10px",fontWeight:700,color:"#185FA5",fontSize:11}}>TCS (2%) {!isIntl&&<span style={{fontSize:9,color:"#5a6691",fontWeight:500}}>— N/A (Domestic)</span>}</td>
-                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>2% on (Basic + Service + GST) — international only</td>
-                <td style={{padding:"6px 10px",fontSize:10,fontFamily:"monospace",color:"#5a6691"}}>—</td>
-                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{fmt(tcsAmt)}</td>
+              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fafafa",opacity:isIntl?1:0.45}}>
+                <td style={{padding:"6px 10px",textAlign:"center",color:"#2563eb",fontSize:10,fontWeight:700}}>5</td>
+                <td style={{padding:"6px 10px",fontWeight:700,color:"#2563eb",fontSize:11}}>TCS (2%) {!isIntl&&<span style={{fontSize:9,color:"#5b616e",fontWeight:500}}>— N/A (Domestic)</span>}</td>
+                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>2% on (Basic + Service + GST) — international only</td>
+                <td style={{padding:"6px 10px",fontSize:10,fontFamily:"monospace",color:"#5b616e"}}>—</td>
+                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#2563eb",fontVariantNumeric:"tabular-nums"}}>{fmt(tcsAmt)}</td>
               </tr>
             </tbody>
-            <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
-              <td colSpan={4} style={{padding:"8px 10px",fontWeight:800,color:"#d4a437",fontSize:11.5}}>Grand Total ({pkgType})</td>
-              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:"#d4a437",fontSize:13,fontVariantNumeric:"tabular-nums"}}>{fmt(grandTotal)}</td>
+            <tfoot><tr style={{background:"#1a1c22",borderTop:"2px solid #c2a04a"}}>
+              <td colSpan={4} style={{padding:"8px 10px",fontWeight:800,color:"#c2a04a",fontSize:11.5}}>Grand Total ({pkgType})</td>
+              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:"#c2a04a",fontSize:13,fontVariantNumeric:"tabular-nums"}}>{fmt(grandTotal)}</td>
             </tr></tfoot>
           </table>
         </div>
       </div>
 
       <div style={{padding:"0 16px 12px"}}>
-        <div style={{padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
+        <div style={{padding:"8px 12px",background:"#e8f0ff",borderRadius:8,fontSize:11.5,color:"#2563eb"}}>
           Accounting: <b>Dr Tour Package Purchase</b> &nbsp;|&nbsp; <b>Dr Input GST 5%</b> {isIntl&&<>&nbsp;|&nbsp; <b>Dr TCS Receivable</b></>} &nbsp;|&nbsp; <b>Cr {dmc||"DMC / Supplier"} ledger</b>.
         </div>
       </div>
@@ -2152,7 +2153,7 @@ export function PurchaseHotelVoucher({branch,setRoute}){
           <tbody>{rows.map((r,i)=>{
             const lineTotal=(+r.basic||0)+(+r.taxes||0)+(+r.otherTax||0);
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.passenger} onChange={e=>upd(r.id,"passenger",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:160}}/></td>
                 <td style={{padding:3}}><input type="date" value={r.ci} onChange={e=>upd(r.id,"ci",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
@@ -2172,30 +2173,30 @@ export function PurchaseHotelVoucher({branch,setRoute}){
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
               <td colSpan={6} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totTaxes)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totOther)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(subTable)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(totTaxes)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(totOther)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#2563eb"}}>{fmt(subTable)}</td>
               <td/>
             </tr>
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
           <FL label={bc(branch).cur+"Service charge"}>
             <input type="number" value={svc} onChange={e=>setSvc(+e.target.value||0)} style={{...inp,textAlign:"right"}}/>
           </FL>
           {intra
             ?<>
-              <FL label="Input CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-              <FL label="Input SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="Input CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
+              <FL label="Input SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
             </>
-            :<FL label="Input IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
+            :<FL label="Input IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>}
         </div>
-        <div style={{marginTop:9,padding:"8px 12px",background:"#EAF3DE",borderRadius:8,fontSize:11.5,color:"#27500A"}}>
+        <div style={{marginTop:9,padding:"8px 12px",background:"#e8f6ed",borderRadius:8,fontSize:11.5,color:"#16a34a"}}>
           Accounting: <b>Dr Hotel Purchase</b> &nbsp;|&nbsp; <b>Dr Input GST</b> (from Taxes column + 18% on service charge) &nbsp;|&nbsp; <b>Cr Hotel / Supplier ledger</b>. {intra?"Intra-state (27): CGST 9% + SGST 9% on service charge.":"Inter-state (state ≠ 27): IGST 18% on service charge."} ITC on hotel stays claimable only for business travel.
         </div>
       </div>
@@ -2250,7 +2251,7 @@ export function PurchaseVisa({branch,setRoute}){
           <tbody>{rows.map((r,i)=>{
             const lineTotal=(+r.vfsFee||0)+(+r.taxes||0)+(+r.otherTax||0);
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.name} onChange={e=>upd(r.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:150}}/></td>
                 <td style={{padding:3}}><input value={r.pp} onChange={e=>upd(r.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:100}}/></td>
@@ -2265,30 +2266,30 @@ export function PurchaseVisa({branch,setRoute}){
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
               <td colSpan={5} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(vfsTotal)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(taxesTotal)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(otherTotal)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(total)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(taxesTotal)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(otherTotal)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#2563eb"}}>{fmt(total)}</td>
               <td/>
             </tr>
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
           <FL label={bc(branch).cur+"Service charge"}>
             <input type="number" value={svc} onChange={e=>setSvc(+e.target.value||0)} style={{...inp,textAlign:"right"}}/>
           </FL>
           {intra
             ?<>
-              <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-              <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="CGST 9% ₹"><input value={fmt(cgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
+              <FL label="SGST 9% ₹"><input value={fmt(sgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
             </>
-            :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
+            :<FL label="IGST 18% ₹"><input value={fmt(igst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>}
         </div>
-        <div style={{marginTop:9,padding:"8px 12px",background:"#E6F1FB",borderRadius:8,fontSize:11.5,color:"#185FA5"}}>
+        <div style={{marginTop:9,padding:"8px 12px",background:"#e8f0ff",borderRadius:8,fontSize:11.5,color:"#2563eb"}}>
           Accounting: <b>Dr Visa Fee Expense</b> &nbsp;|&nbsp; <b>Dr Input GST</b> (from Taxes column + 18% on service charge) &nbsp;|&nbsp; <b>Cr VFS / Supplier ledger</b>. {intra?"Intra-state (27): CGST 9% + SGST 9% on service charge.":"Inter-state (state ≠ 27): IGST 18% on service charge."} Other taxes (biometric, courier) are non-creditable pass-through.
         </div>
       </div>
@@ -2331,14 +2332,14 @@ export function PurchaseCar({branch,setRoute}){
     <VWrap title="Purchase Voucher — Car Rentals" icon="🚗" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} label="Supplier / Transport Co." name={row.vendor} gstin={partyGstin} onGstinChange={setPartyGstin}/>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec",overflowX:"auto"}}>
-        <p style={{margin:"0 0 8px",fontSize:10,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Vehicle hire details</p>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec",overflowX:"auto"}}>
+        <p style={{margin:"0 0 8px",fontSize:10,color:"#5b616e",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Vehicle hire details</p>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
             {["#","Vendor","Vehicle","Pickup","Drop","Days","Basic ₹","Other fare ₹","Service charge ₹","Total ₹"].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=9}/>)}
           </tr></thead>
           <tbody>
-            <tr style={{borderBottom:"1px solid #e1e3ec"}}>
+            <tr style={{borderBottom:"1px solid #e6e8ec"}}>
               <VTD c={1}/>
               <td style={{padding:3}}><input value={row.vendor} onChange={e=>upd("vendor",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
               <td style={{padding:3}}>
@@ -2355,17 +2356,17 @@ export function PurchaseCar({branch,setRoute}){
           </tbody>
         </table>
       </div>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
-          <FL label="Input GST rate"><input value={intra?"5% (CGST 2.5% + SGST 2.5%)":"5% (IGST)"} readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontWeight:600,cursor:"not-allowed"}}/></FL>
+          <FL label="Input GST rate"><input value={intra?"5% (CGST 2.5% + SGST 2.5%)":"5% (IGST)"} readOnly style={{...inp,background:"#f4f5f7",color:"#5b616e",fontWeight:600,cursor:"not-allowed"}}/></FL>
           {intra
             ?<>
-              <FL label="Input CGST 2.5% ₹"><input value={fmt(inputCgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-              <FL label="Input SGST 2.5% ₹"><input value={fmt(inputSgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="Input CGST 2.5% ₹"><input value={fmt(inputCgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
+              <FL label="Input SGST 2.5% ₹"><input value={fmt(inputSgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
             </>
-            :<FL label="Input IGST 5% ₹"><input value={fmt(inputIgst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>}
+            :<FL label="Input IGST 5% ₹"><input value={fmt(inputIgst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>}
         </div>
-        <div style={{marginTop:9,padding:"8px 12px",background:"#EAF3DE",borderRadius:8,fontSize:11.5,color:"#27500A"}}>
+        <div style={{marginTop:9,padding:"8px 12px",background:"#e8f6ed",borderRadius:8,fontSize:11.5,color:"#16a34a"}}>
           5% GST on (Basic + Other fare + Service charge). {intra?"Intra-state (27): CGST 2.5% + SGST 2.5%.":"Inter-state (state ≠ 27): IGST 5%."} Accounting: <b>Dr Car Hire Expense</b> + <b>Dr Input {intra?"CGST/SGST":"IGST"}</b> | <b>Cr Vendor ledger</b>. TDS 194C: deduct 1% (individual) or 2% (company) above threshold.
         </div>
       </div>
@@ -2412,7 +2413,7 @@ export function PurchaseInsurance({branch,setRoute}){
           <tbody>{rows.map((r,i)=>{
             const lineTotal=(+r.basic||0)+(+r.otherTax||0)+(+r.svc||0);
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.name} onChange={e=>upd(r.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:180}}/></td>
                 <td style={{padding:3}}><input value={r.pp} onChange={e=>upd(r.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:100}}/></td>
@@ -2426,24 +2427,24 @@ export function PurchaseInsurance({branch,setRoute}){
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
               <td colSpan={4} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#854F0B"}}>{fmt(totOther)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#27500A"}}>{fmt(totSvc)}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(taxable)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(totOther)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#16a34a"}}>{fmt(totSvc)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#2563eb"}}>{fmt(taxable)}</td>
               <td/>
             </tr>
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11,marginBottom:9}}>
-          <FL label={bc(branch).cur+"Taxable value"}><input value={fmt(taxable)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          <FL label="Input GST 18% ₹"><input value={fmt(inputGst)} readOnly style={{...inp,textAlign:"right",background:"#f3f4f8",color:"#5a6691"}}/></FL>
-          <FL label="Total payable ₹"><input value={fmt(total)} readOnly style={{...inp,textAlign:"right",fontWeight:700,background:"#f3f4f8",color:"#185FA5"}}/></FL>
+          <FL label={bc(branch).cur+"Taxable value"}><input value={fmt(taxable)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
+          <FL label="Input GST 18% ₹"><input value={fmt(inputGst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
+          <FL label="Total payable ₹"><input value={fmt(total)} readOnly style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#2563eb"}}/></FL>
         </div>
-        <div style={{padding:"8px 12px",background:"#EAF3DE",borderRadius:8,fontSize:11.5,color:"#27500A"}}>
+        <div style={{padding:"8px 12px",background:"#e8f6ed",borderRadius:8,fontSize:11.5,color:"#16a34a"}}>
           Accounting: <b>Dr Insurance Premium Expense</b> + <b>Dr Input CGST/SGST 9%</b> | <b>Cr Insurer ledger</b>. Input GST 18% (SAC 997131) is creditable when on-billed to the customer.
         </div>
       </div>
@@ -2483,8 +2484,8 @@ export function PurchaseMisc({branch,setRoute}){
     gstByRate[r.gstPct].taxable+=amt;
     gstByRate[r.gstPct].gst+=+(amt*r.gstPct/100).toFixed(2);
   });
-  const rateBg={0:"#f3f4f8",5:"#EAF3DE",12:"#FAEEDA",18:"#E6F1FB"};
-  const rateC={0:"#5a6691",5:"#27500A",12:"#854F0B",18:"#185FA5"};
+  const rateBg={0:"#f4f5f7",5:"#e8f6ed",12:"#fbeedb",18:"#e8f0ff"};
+  const rateC={0:"#5b616e",5:"#16a34a",12:"#d97706",18:"#2563eb"};
 
   return (
     <VWrap title="Purchase Voucher — Miscellaneous" icon="📦" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
@@ -2500,7 +2501,7 @@ export function PurchaseMisc({branch,setRoute}){
             const gst=+(amt*r.gstPct/100).toFixed(2);
             const tdsLine=r.tds?+(amt*0.02).toFixed(2):0;
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e1e3ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.vendor} onChange={e=>upd(r.id,"vendor",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:160}}/></td>
                 <td style={{padding:3}}><input value={r.gl} onChange={e=>upd(r.id,"gl",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:200}}/></td>
@@ -2517,27 +2518,27 @@ export function PurchaseMisc({branch,setRoute}){
                 </td>
                 <td style={{padding:"4px 7px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums"}}>
                   <div>{fmt(amt+gst)}</div>
-                  {r.tds&&<div style={{fontSize:9.5,color:"#854F0B"}}>TDS: ({fmt(tdsLine)})</div>}
+                  {r.tds&&<div style={{fontSize:9.5,color:"#d97706"}}>TDS: ({fmt(tdsLine)})</div>}
                 </td>
                 <DBtn fn={()=>rm(r.id)}/>
               </tr>
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
               <td colSpan={4} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(sub)}</td>
               <td/>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#185FA5"}}>{fmt(inputGst)}</td>
-              <td style={{padding:"7px 8px",textAlign:"center",fontSize:10,color:"#854F0B"}}>{tdsAmt>0?"TDS: ("+fmt(tdsAmt)+")":""}</td>
-              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#185FA5"}}>{fmt(total)}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#2563eb"}}>{fmt(inputGst)}</td>
+              <td style={{padding:"7px 8px",textAlign:"center",fontSize:10,color:"#d97706"}}>{tdsAmt>0?"TDS: ("+fmt(tdsAmt)+")":""}</td>
+              <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:12,color:"#2563eb"}}>{fmt(total)}</td>
               <td/>
             </tr>
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
-        <p style={{margin:"0 0 9px",fontSize:10,color:"#5a6691",letterSpacing:"0.5px",textTransform:"uppercase"}}>Input GST breakup &amp; TDS summary</p>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+        <p style={{margin:"0 0 9px",fontSize:10,color:"#5b616e",letterSpacing:"0.5px",textTransform:"uppercase"}}>Input GST breakup &amp; TDS summary</p>
         <div style={{display:"flex",gap:9,flexWrap:"wrap",marginBottom:9}}>
           {Object.entries(gstByRate).map(([rate,vals])=>(
             <div key={rate} style={{flex:1,minWidth:155,padding:"9px 13px",borderRadius:9,background:rateBg[+rate]}}>
@@ -2553,17 +2554,17 @@ export function PurchaseMisc({branch,setRoute}){
             </div>
           ))}
           {tdsAmt>0&&(
-            <div style={{flex:1,minWidth:155,padding:"9px 13px",borderRadius:9,background:"#FAEEDA"}}>
-              <p style={{margin:0,fontSize:10,fontWeight:700,color:"#854F0B",textTransform:"uppercase",letterSpacing:"0.5px"}}>TDS 194C (2%)</p>
+            <div style={{flex:1,minWidth:155,padding:"9px 13px",borderRadius:9,background:"#fbeedb"}}>
+              <p style={{margin:0,fontSize:10,fontWeight:700,color:"#d97706",textTransform:"uppercase",letterSpacing:"0.5px"}}>TDS 194C (2%)</p>
               <div style={{display:"flex",justifyContent:"space-between",marginTop:4,fontSize:11.5}}>
-                <span style={{color:"#854F0B"}}>To deduct</span>
-                <span style={{fontWeight:700,color:"#854F0B",fontVariantNumeric:"tabular-nums"}}>({"₹ "+fmt(tdsAmt)})</span>
+                <span style={{color:"#d97706"}}>To deduct</span>
+                <span style={{fontWeight:700,color:"#d97706",fontVariantNumeric:"tabular-nums"}}>({"₹ "+fmt(tdsAmt)})</span>
               </div>
-              <p style={{margin:"3px 0 0",fontSize:10,color:"#854F0B"}}>Deposit by 7th of next month</p>
+              <p style={{margin:"3px 0 0",fontSize:10,color:"#d97706"}}>Deposit by 7th of next month</p>
             </div>
           )}
         </div>
-        <div style={{padding:"8px 12px",background:"#EAF3DE",borderRadius:8,fontSize:11.5,color:"#27500A"}}>
+        <div style={{padding:"8px 12px",background:"#e8f6ed",borderRadius:8,fontSize:11.5,color:"#16a34a"}}>
           Accounting: <b>Dr respective expense A/c</b> + <b>Dr Input CGST/SGST</b> | <b>Cr Vendor ledger</b> (net of TDS). TDS-applicable lines marked with checkbox — deduct before payment.
         </div>
       </div>
@@ -2613,15 +2614,15 @@ export function UnmatchedTickets({branch,setRoute}){
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
             <button onClick={()=>setRoute("/dashboard")}
               style={{background:"transparent",border:"none",cursor:"pointer",
-                color:"#5a6691",padding:0,display:"flex",alignItems:"center",gap:4,fontSize:11}}>
+                color:"#5b616e",padding:0,display:"flex",alignItems:"center",gap:4,fontSize:11}}>
               <ArrowLeft size={13}/> Dashboard
             </button>
           </div>
-          <p style={{margin:0,fontSize:9.5,color:"#A32D2D",letterSpacing:"0.5px",
+          <p style={{margin:0,fontSize:9.5,color:"#dc2626",letterSpacing:"0.5px",
             textTransform:"uppercase",fontWeight:600}}>⚠ Alert — Action Required</p>
           <h1 style={{margin:"3px 0 0",fontSize:mob?16:21,fontWeight:700,
-            color:"#0d1326",letterSpacing:"-0.02em"}}>Unmatched Flight Tickets</h1>
-          <p style={{margin:"2px 0 0",fontSize:11,color:"#5a6691"}}>
+            color:"#1a1c22",letterSpacing:"-0.02em"}}>Unmatched Flight Tickets</h1>
+          <p style={{margin:"2px 0 0",fontSize:11,color:"#5b616e"}}>
             Sales vouchers raised but no purchase entry found · {branch==="ALL"?CONSOLIDATED_LABEL:branch?.code+" — "+branch?.city}
           </p>
         </div>
@@ -2636,15 +2637,15 @@ export function UnmatchedTickets({branch,setRoute}){
       <div style={{display:"grid",
         gridTemplateColumns:mob?"1fr 1fr":"repeat(auto-fit,minmax(160px,1fr))",
         gap:mob?8:11,marginBottom:14}}>
-        <div style={{background:"#FCEBEB",border:"1px solid #F7C1C1",borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:9.5,color:"#A32D2D",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px"}}>Unmatched tickets</p><p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{unmatched.length}</p></div>
-          <div style={{background:"#FAEEDA",border:"1px solid #FAC775",borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:9.5,color:"#854F0B",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px"}}>Sale value at risk</p><p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#854F0B",fontVariantNumeric:"tabular-nums"}}>{cfg.cur+fmt(totalAmt)}</p></div>
-          <div style={{background:"#E6F1FB",border:"1px solid #B5D4F4",borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:9.5,color:"#185FA5",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px"}}>Airlines affected</p><p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{new Set(unmatched.map(t=>t.airline)).size}</p></div>
-          <div style={{background:"#f3f4f8",border:"1px solid #e1e3ec",borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:9.5,color:"#384677",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px"}}>Branches affected</p><p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#384677",fontVariantNumeric:"tabular-nums"}}>{new Set(unmatched.map(t=>t.branch)).size}</p></div>
+        <div style={{background:"#fbe9e9",border:"1px solid #f3c9c9",borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:9.5,color:"#dc2626",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px"}}>Unmatched tickets</p><p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#dc2626",fontVariantNumeric:"tabular-nums"}}>{unmatched.length}</p></div>
+          <div style={{background:"#fbeedb",border:"1px solid #f3d9a8",borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:9.5,color:"#d97706",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px"}}>Sale value at risk</p><p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#d97706",fontVariantNumeric:"tabular-nums"}}>{cfg.cur+fmt(totalAmt)}</p></div>
+          <div style={{background:"#e8f0ff",border:"1px solid #cfe0f8",borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:9.5,color:"#2563eb",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px"}}>Airlines affected</p><p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#2563eb",fontVariantNumeric:"tabular-nums"}}>{new Set(unmatched.map(t=>t.airline)).size}</p></div>
+          <div style={{background:"#f4f5f7",border:"1px solid #e6e8ec",borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:9.5,color:"#2e323c",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px"}}>Branches affected</p><p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#2e323c",fontVariantNumeric:"tabular-nums"}}>{new Set(unmatched.map(t=>t.branch)).size}</p></div>
       </div>
 
       {/* What this means */}
-      <div style={{padding:"11px 14px",background:"#FCEBEB",border:"1px solid #F7C1C1",
-        borderRadius:10,marginBottom:14,fontSize:11.5,color:"#A32D2D",lineHeight:1.6}}>
+      <div style={{padding:"11px 14px",background:"#fbe9e9",border:"1px solid #f3c9c9",
+        borderRadius:10,marginBottom:14,fontSize:11.5,color:"#dc2626",lineHeight:1.6}}>
         <b>What this means:</b> A sales voucher was raised (customer billed) but no purchase voucher
         exists for the same ticket number. This causes <b>inflated P&L</b> (revenue without cost),
         <b> incorrect creditor balances</b> (BSP/airline not payable), and <b>BSP reconciliation failure</b>.
@@ -2653,16 +2654,16 @@ export function UnmatchedTickets({branch,setRoute}){
 
       {/* Filter bar */}
       <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-        <span style={{fontSize:11,color:"#5a6691",fontWeight:500}}>Filter by airline:</span>
+        <span style={{fontSize:11,color:"#5b616e",fontWeight:500}}>Filter by airline:</span>
         {["All",...airlines].map(a=>(
           <button key={a} onClick={()=>setFilter(a)}
-            style={{padding:"4px 10px",borderRadius:7,border:"1px solid #e1e3ec",fontSize:11,
-              background:filter===a?"#0d1326":"#fff",
-              color:filter===a?"#fff":"#5a6691",cursor:"pointer"}}>
+            style={{padding:"4px 10px",borderRadius:7,border:"1px solid #e6e8ec",fontSize:11,
+              background:filter===a?"#1a1c22":"#fff",
+              color:filter===a?"#fff":"#5b616e",cursor:"pointer"}}>
             {a}
           </button>
         ))}
-        <span style={{marginLeft:"auto",fontSize:11,color:"#A32D2D",fontWeight:600}}>
+        <span style={{marginLeft:"auto",fontSize:11,color:"#dc2626",fontWeight:600}}>
           {rows.length} unmatched
         </span>
       </div>
@@ -2672,29 +2673,29 @@ export function UnmatchedTickets({branch,setRoute}){
         /* Mobile cards */
         <div style={{display:"flex",flexDirection:"column",gap:9}}>
           {rows.map((t,i)=>(
-            <div key={i} style={{background:"#fff",border:"1px solid #F7C1C1",
+            <div key={i} style={{background:"#fff",border:"1px solid #f3c9c9",
               borderRadius:10,padding:"11px 13px",
               borderLeft:"4px solid #e24b4a"}}>
               <div style={{display:"flex",justifyContent:"space-between",
                 alignItems:"flex-start",marginBottom:6}}>
                 <div>
-                  <p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{t.passenger}</p>
-                  <p style={{margin:"2px 0 0",fontSize:10,fontFamily:"monospace",color:"#5a6691"}}>{t.ticket}</p>
+                  <p style={{margin:0,fontSize:12,fontWeight:700,color:"#1a1c22"}}>{t.passenger}</p>
+                  <p style={{margin:"2px 0 0",fontSize:10,fontFamily:"monospace",color:"#5b616e"}}>{t.ticket}</p>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <p style={{margin:0,fontSize:13,fontWeight:700,color:"#A32D2D",
+                  <p style={{margin:0,fontSize:13,fontWeight:700,color:"#dc2626",
                     fontVariantNumeric:"tabular-nums"}}>{cfg.cur+fmt(t.saleAmt)}</p>
-                  <p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>{t.airline}</p>
+                  <p style={{margin:0,fontSize:9.5,color:"#5b616e"}}>{t.airline}</p>
                 </div>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",
                 alignItems:"center",flexWrap:"wrap",gap:6}}>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   <span style={{fontSize:10,padding:"2px 7px",borderRadius:999,
-                    background:"#f3f4f8",color:"#384677"}}>{t.sector}</span>
+                    background:"#f4f5f7",color:"#2e323c"}}>{t.sector}</span>
                   <span style={{fontSize:10,padding:"2px 7px",borderRadius:999,
-                    background:"#FAEEDA",color:"#854F0B"}}>{t.branch}</span>
-                  <span style={{fontSize:10,color:"#5a6691"}}>{t.date}</span>
+                    background:"#fbeedb",color:"#d97706"}}>{t.branch}</span>
+                  <span style={{fontSize:10,color:"#5b616e"}}>{t.date}</span>
                 </div>
                 <button
                   onClick={()=>setRoute("/purchase/flight")}
@@ -2702,8 +2703,8 @@ export function UnmatchedTickets({branch,setRoute}){
                   + Create Purchase
                 </button>
               </div>
-              <p style={{margin:"6px 0 0",fontSize:10,color:"#5a6691"}}>
-                Sales voucher: <span style={{fontFamily:"monospace",color:"#185FA5"}}>{t.vno}</span>
+              <p style={{margin:"6px 0 0",fontSize:10,color:"#5b616e"}}>
+                Sales voucher: <span style={{fontFamily:"monospace",color:"#2563eb"}}>{t.vno}</span>
                 {" · "}{t.customer}
               </p>
             </div>
@@ -2715,10 +2716,10 @@ export function UnmatchedTickets({branch,setRoute}){
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",fontSize:11.5,borderCollapse:"collapse"}}>
               <thead>
-                <tr style={{background:"#0d1326"}}>
+                <tr style={{background:"#1a1c22"}}>
                   {["Branch","Date","Passenger","Passport","Ticket no.","Airline","Sector","Class","Sales voucher","Customer","Billed ₹","Action"].map((h,i)=>(
                     <th key={i} style={{textAlign:i>=10&&i<=10?"right":"left",
-                      padding:"9px 11px",fontWeight:600,color:"#d4a437",fontSize:10.5,
+                      padding:"9px 11px",fontWeight:600,color:"#c2a04a",fontSize:10.5,
                       whiteSpace:"nowrap"}}>{h}</th>
                   ))}
                 </tr>
@@ -2733,23 +2734,23 @@ export function UnmatchedTickets({branch,setRoute}){
                     <td style={{padding:"8px 11px"}}>
                       <span style={{display:"flex",alignItems:"center",gap:5}}>
                         <span style={{fontSize:13}}>{BRANCHES.find(b=>b.code===t.branch)?.flag}</span>
-                        <span style={{fontWeight:600,color:"#384677"}}>{t.branch}</span>
+                        <span style={{fontWeight:600,color:"#2e323c"}}>{t.branch}</span>
                       </span>
                     </td>
-                    <td style={{padding:"8px 11px",color:"#5a6691"}}>{t.date}</td>
+                    <td style={{padding:"8px 11px",color:"#5b616e"}}>{t.date}</td>
                     <td style={{padding:"8px 11px",fontWeight:600}}>{t.passenger}</td>
-                    <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{t.pp}</td>
-                    <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:10.5,color:"#185FA5"}}>{t.ticket}</td>
+                    <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:10.5,color:"#5b616e"}}>{t.pp}</td>
+                    <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:10.5,color:"#2563eb"}}>{t.ticket}</td>
                     <td style={{padding:"8px 11px"}}>{t.airline}</td>
                     <td style={{padding:"8px 11px"}}>
-                      <span style={{padding:"2px 7px",borderRadius:6,background:"#f3f4f8",
+                      <span style={{padding:"2px 7px",borderRadius:6,background:"#f4f5f7",
                         fontSize:10.5,fontWeight:600}}>{t.sector}</span>
                     </td>
-                    <td style={{padding:"8px 11px",color:"#5a6691"}}>{t.cls}</td>
-                    <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:10.5,color:"#185FA5"}}>{t.vno}</td>
-                    <td style={{padding:"8px 11px",color:"#384677"}}>{t.customer}</td>
+                    <td style={{padding:"8px 11px",color:"#5b616e"}}>{t.cls}</td>
+                    <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:10.5,color:"#2563eb"}}>{t.vno}</td>
+                    <td style={{padding:"8px 11px",color:"#2e323c"}}>{t.customer}</td>
                     <td style={{padding:"8px 11px",textAlign:"right",fontWeight:700,
-                      color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>
+                      color:"#dc2626",fontVariantNumeric:"tabular-nums"}}>
                       {cfg.cur+fmt(t.saleAmt)}
                     </td>
                     <td style={{padding:"8px 11px"}}>
@@ -2763,12 +2764,12 @@ export function UnmatchedTickets({branch,setRoute}){
                 ))}
               </tbody>
               <tfoot>
-                <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
-                  <td colSpan={10} style={{padding:"9px 11px",fontWeight:700,color:"#A32D2D"}}>
+                <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+                  <td colSpan={10} style={{padding:"9px 11px",fontWeight:700,color:"#dc2626"}}>
                     Total exposure — {rows.length} unmatched ticket{rows.length!==1?"s":""}
                   </td>
                   <td style={{padding:"9px 11px",textAlign:"right",fontWeight:800,
-                    color:"#A32D2D",fontSize:14,fontVariantNumeric:"tabular-nums"}}>
+                    color:"#dc2626",fontSize:14,fontVariantNumeric:"tabular-nums"}}>
                     {cfg.cur+fmt(rows.reduce((s,t)=>s+t.saleAmt,0))}
                   </td>
                   <td/>
@@ -2782,28 +2783,28 @@ export function UnmatchedTickets({branch,setRoute}){
       {/* Next steps guide */}
       <div style={{marginTop:16,display:"grid",
         gridTemplateColumns:mob?"1fr":"1fr 1fr 1fr",gap:11}}>
-        <div key="1" style={{background:"#E6F1FB",borderRadius:10,padding:"13px 14px"}}>
+        <div key="1" style={{background:"#e8f0ff",borderRadius:10,padding:"13px 14px"}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
-              <span style={{width:22,height:22,borderRadius:"50%",background:"#185FA5",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,flexShrink:0}}>1</span>
-              <p style={{margin:0,fontSize:12,fontWeight:700,color:"#185FA5"}}>Create purchase entry</p>
+              <span style={{width:22,height:22,borderRadius:"50%",background:"#2563eb",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,flexShrink:0}}>1</span>
+              <p style={{margin:0,fontSize:12,fontWeight:700,color:"#2563eb"}}>Create purchase entry</p>
             </div>
-            <p style={{margin:0,fontSize:11,color:"#384677",lineHeight:1.5}}>Go to Purchase, enter BSP cost against ticket number.</p>
+            <p style={{margin:0,fontSize:11,color:"#2e323c",lineHeight:1.5}}>Go to Purchase, enter BSP cost against ticket number.</p>
             <button onClick={()=>setRoute("/purchase/flight")} style={{...btnG,fontSize:10,marginTop:8}}>Go to Purchase</button>
           </div>
-          <div key="2" style={{background:"#EAF3DE",borderRadius:10,padding:"13px 14px"}}>
+          <div key="2" style={{background:"#e8f6ed",borderRadius:10,padding:"13px 14px"}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
-              <span style={{width:22,height:22,borderRadius:"50%",background:"#27500A",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,flexShrink:0}}>2</span>
-              <p style={{margin:0,fontSize:12,fontWeight:700,color:"#27500A"}}>Verify with BSP report</p>
+              <span style={{width:22,height:22,borderRadius:"50%",background:"#16a34a",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,flexShrink:0}}>2</span>
+              <p style={{margin:0,fontSize:12,fontWeight:700,color:"#16a34a"}}>Verify with BSP report</p>
             </div>
-            <p style={{margin:0,fontSize:11,color:"#384677",lineHeight:1.5}}>Cross-check unmatched ticket numbers against BSP billing statement.</p>
-            <button onClick={()=>setRoute("/bank-reco")} style={{...btnG,fontSize:10,marginTop:8,background:"#27500A"}}>Go to Bank Reco</button>
+            <p style={{margin:0,fontSize:11,color:"#2e323c",lineHeight:1.5}}>Cross-check unmatched ticket numbers against BSP billing statement.</p>
+            <button onClick={()=>setRoute("/bank-reco")} style={{...btnG,fontSize:10,marginTop:8,background:"#16a34a"}}>Go to Bank Reco</button>
           </div>
-          <div key="3" style={{background:"#f3f4f8",borderRadius:10,padding:"13px 14px"}}>
+          <div key="3" style={{background:"#f4f5f7",borderRadius:10,padding:"13px 14px"}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
-              <span style={{width:22,height:22,borderRadius:"50%",background:"#384677",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,flexShrink:0}}>3</span>
-              <p style={{margin:0,fontSize:12,fontWeight:700,color:"#384677"}}>Reconcile &amp; close</p>
+              <span style={{width:22,height:22,borderRadius:"50%",background:"#2e323c",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,flexShrink:0}}>3</span>
+              <p style={{margin:0,fontSize:12,fontWeight:700,color:"#2e323c"}}>Reconcile &amp; close</p>
             </div>
-            <p style={{margin:0,fontSize:11,color:"#384677",lineHeight:1.5}}>Run the P&amp;L to confirm costs are booked.</p>
+            <p style={{margin:0,fontSize:11,color:"#2e323c",lineHeight:1.5}}>Run the P&amp;L to confirm costs are booked.</p>
             <button onClick={()=>setRoute("/reports/pnl")} style={{...btnGh,fontSize:10,marginTop:8}}>Go to P&amp;L</button>
           </div>
       </div>
@@ -2833,47 +2834,47 @@ export function SalesCancellation({branch}){
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:36,height:36,borderRadius:9,background:"#FCEBEB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>❌</div>
+          <div style={{width:36,height:36,borderRadius:9,background:"#fbe9e9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>❌</div>
           <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Cancellation Register</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Track cancellations, charges, and client refunds</p>
+            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#1a1c22"}}>Cancellation Register</h2>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>Track cancellations, charges, and client refunds</p>
           </div>
         </div>
-        <button onClick={()=>setModal(true)} style={{...btnG,background:"#A32D2D",fontSize:11}}><Plus size={13}/> New Cancellation</button>
+        <button onClick={()=>setModal(true)} style={{...btnG,background:"#dc2626",fontSize:11}}><Plus size={13}/> New Cancellation</button>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:14}}>
         {[
-          {l:"Total Cancellations",v:String(cancellations.length),  c:"#A32D2D",bg:"#FCEBEB"},
-          {l:"Cancellation Charges",v:cur+totCancCharge.toLocaleString(),c:"#27500A",bg:"#EAF3DE"},
-          {l:"Refunds to Clients",  v:cur+totRefund.toLocaleString(),    c:"#854F0B",bg:"#FAEEDA"},
-          {l:"Pending Refunds",     v:String(cancellations.filter(c=>c.status==="Refund Pending").length),c:"#A32D2D",bg:"#FCEBEB"},
+          {l:"Total Cancellations",v:String(cancellations.length),  c:"#dc2626",bg:"#fbe9e9"},
+          {l:"Cancellation Charges",v:cur+totCancCharge.toLocaleString(),c:"#16a34a",bg:"#e8f6ed"},
+          {l:"Refunds to Clients",  v:cur+totRefund.toLocaleString(),    c:"#d97706",bg:"#fbeedb"},
+          {l:"Pending Refunds",     v:String(cancellations.filter(c=>c.status==="Refund Pending").length),c:"#dc2626",bg:"#fbe9e9"},
         ].map((k,i)=>(
           <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"11px 13px",background:k.bg}}>
             <p style={{margin:0,fontSize:9,fontWeight:700,color:k.c,textTransform:"uppercase"}}>{k.l}</p>
-            <p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:"#0d1326"}}>{k.v}</p>
+            <p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:"#1a1c22"}}>{k.v}</p>
           </div>
         ))}
       </div>
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr style={{background:"#0d1326"}}>
+          <thead><tr style={{background:"#1a1c22"}}>
             {["Ref","Date","Original Voucher","Client","Module","Orig Amt","Canc. Charge","Client Refund","Supplier Refund","Net Loss","Status"].map((h,i)=>(
-              <th key={i} style={{padding:"9px 10px",textAlign:i>=5?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+              <th key={i} style={{padding:"9px 10px",textAlign:i>=5?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
           <tbody>{cancellations.map((c,i)=>(
-            <tr key={c.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-              <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:9.5,color:"#A32D2D"}}>{c.id}</td>
-              <td style={{padding:"8px 10px",fontSize:10,color:"#5a6691"}}>{c.date}</td>
-              <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:9.5,color:"#854F0B"}}>{c.origVno}</td>
-              <td style={{padding:"8px 10px",fontWeight:600,color:"#0d1326"}}>{c.client}</td>
-              <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 6px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{c.module}</span></td>
+            <tr key={c.id} style={{borderBottom:"1px solid #f4f5f7",background:i%2===0?"#fff":"#fafafa"}}>
+              <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:9.5,color:"#dc2626"}}>{c.id}</td>
+              <td style={{padding:"8px 10px",fontSize:10,color:"#5b616e"}}>{c.date}</td>
+              <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:9.5,color:"#d97706"}}>{c.origVno}</td>
+              <td style={{padding:"8px 10px",fontWeight:600,color:"#1a1c22"}}>{c.client}</td>
+              <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 6px",borderRadius:999,background:"#e8f0ff",color:"#2563eb",fontWeight:700}}>{c.module}</span></td>
               <td style={{padding:"8px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{cur}{c.origAmt.toLocaleString()}</td>
-              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:"#27500A"}}>{cur}{c.cancCharge.toLocaleString()}</td>
-              <td style={{padding:"8px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#A32D2D"}}>{cur}{c.refundToClient.toLocaleString()}</td>
-              <td style={{padding:"8px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#185FA5"}}>{cur}{c.supplierRefund.toLocaleString()}</td>
-              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:c.netLoss>0?"#A32D2D":"#27500A"}}>{c.netLoss>0?`-${cur}${c.netLoss.toLocaleString()}`:"Nil"}</td>
-              <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:c.status==="Completed"?"#EAF3DE":c.status==="Refund Paid"?"#EAF3DE":"#FAEEDA",color:c.status==="Completed"?"#27500A":c.status==="Refund Paid"?"#1D9E75":"#854F0B"}}>{c.status}</span></td>
+              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:"#16a34a"}}>{cur}{c.cancCharge.toLocaleString()}</td>
+              <td style={{padding:"8px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#dc2626"}}>{cur}{c.refundToClient.toLocaleString()}</td>
+              <td style={{padding:"8px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#2563eb"}}>{cur}{c.supplierRefund.toLocaleString()}</td>
+              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:c.netLoss>0?"#dc2626":"#16a34a"}}>{c.netLoss>0?`-${cur}${c.netLoss.toLocaleString()}`:"Nil"}</td>
+              <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:c.status==="Completed"?"#e8f6ed":c.status==="Refund Paid"?"#e8f6ed":"#fbeedb",color:c.status==="Completed"?"#16a34a":c.status==="Refund Paid"?"#3fb7a3":"#d97706"}}>{c.status}</span></td>
             </tr>
           ))}</tbody>
         </table>
@@ -2902,44 +2903,44 @@ export function PurchaseRefunds({branch}){
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
       <SampleBanner note="purchase refunds shown here are sample data, not live." />
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-        <div style={{width:36,height:36,borderRadius:9,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>💫</div>
+        <div style={{width:36,height:36,borderRadius:9,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>💫</div>
         <div>
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Refund Tracking</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Track airline, DMC, hotel refunds against purchase vouchers</p>
+          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#1a1c22"}}>Refund Tracking</h2>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>Track airline, DMC, hotel refunds against purchase vouchers</p>
         </div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>
         {[
-          {l:"Total Requested",v:cur+totReq.toLocaleString(),c:"#185FA5",bg:"#E6F1FB"},
-          {l:"Total Received",v:cur+totRec.toLocaleString(),c:"#27500A",bg:"#EAF3DE"},
-          {l:"Pending",v:cur+pending.toLocaleString(),c:"#A32D2D",bg:"#FCEBEB"},
-          {l:"Recovery %",v:`${totReq>0?Math.round(totRec/totReq*100):0}%`,c:"#854F0B",bg:"#FAEEDA"},
+          {l:"Total Requested",v:cur+totReq.toLocaleString(),c:"#2563eb",bg:"#e8f0ff"},
+          {l:"Total Received",v:cur+totRec.toLocaleString(),c:"#16a34a",bg:"#e8f6ed"},
+          {l:"Pending",v:cur+pending.toLocaleString(),c:"#dc2626",bg:"#fbe9e9"},
+          {l:"Recovery %",v:`${totReq>0?Math.round(totRec/totReq*100):0}%`,c:"#d97706",bg:"#fbeedb"},
         ].map((k,i)=>(
           <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"11px 13px",background:k.bg}}>
             <p style={{margin:0,fontSize:9,fontWeight:700,color:k.c,textTransform:"uppercase"}}>{k.l}</p>
-            <p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:"#0d1326"}}>{k.v}</p>
+            <p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:"#1a1c22"}}>{k.v}</p>
           </div>
         ))}
       </div>
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr style={{background:"#0d1326"}}>
+          <thead><tr style={{background:"#1a1c22"}}>
             {["Ref No.","Date","Supplier","Module","Original Voucher","Requested","Received","Pending","Status","Notes"].map((h,i)=>(
-              <th key={i} style={{padding:"9px 12px",textAlign:i>=5&&i<=7?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
+              <th key={i} style={{padding:"9px 12px",textAlign:i>=5&&i<=7?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
           <tbody>{refunds.map((r,i)=>(
-            <tr key={r.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-              <td style={{padding:"9px 12px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{r.id}</td>
-              <td style={{padding:"9px 12px",fontSize:10.5,color:"#5a6691"}}>{r.date}</td>
-              <td style={{padding:"9px 12px",fontWeight:600,color:"#0d1326"}}>{r.supplier}</td>
-              <td style={{padding:"9px 12px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,fontWeight:700,background:"#E6F1FB",color:"#185FA5"}}>{r.module}</span></td>
-              <td style={{padding:"9px 12px",fontFamily:"monospace",fontSize:10,color:"#854F0B"}}>{r.origVno}</td>
+            <tr key={r.id} style={{borderBottom:"1px solid #f4f5f7",background:i%2===0?"#fff":"#fafafa"}}>
+              <td style={{padding:"9px 12px",fontFamily:"monospace",fontSize:10,color:"#2563eb"}}>{r.id}</td>
+              <td style={{padding:"9px 12px",fontSize:10.5,color:"#5b616e"}}>{r.date}</td>
+              <td style={{padding:"9px 12px",fontWeight:600,color:"#1a1c22"}}>{r.supplier}</td>
+              <td style={{padding:"9px 12px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,fontWeight:700,background:"#e8f0ff",color:"#2563eb"}}>{r.module}</span></td>
+              <td style={{padding:"9px 12px",fontFamily:"monospace",fontSize:10,color:"#d97706"}}>{r.origVno}</td>
               <td style={{padding:"9px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{cur}{r.refundReq.toLocaleString()}</td>
-              <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:r.refundRec>0?"#27500A":"#bfc3d6"}}>{r.refundRec>0?cur+r.refundRec.toLocaleString():"—"}</td>
-              <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:r.refundReq-r.refundRec>0?"#A32D2D":"#27500A"}}>{r.refundReq-r.refundRec>0?cur+(r.refundReq-r.refundRec).toLocaleString():"Nil"}</td>
-              <td style={{padding:"9px 12px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:r.status==="Received"?"#EAF3DE":"#FAEEDA",color:r.status==="Received"?"#27500A":"#854F0B"}}>{r.status}</span></td>
-              <td style={{padding:"9px 12px",fontSize:10,color:"#5a6691",maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.notes}</td>
+              <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:r.refundRec>0?"#16a34a":"#cbd0db"}}>{r.refundRec>0?cur+r.refundRec.toLocaleString():"—"}</td>
+              <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:r.refundReq-r.refundRec>0?"#dc2626":"#16a34a"}}>{r.refundReq-r.refundRec>0?cur+(r.refundReq-r.refundRec).toLocaleString():"Nil"}</td>
+              <td style={{padding:"9px 12px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:r.status==="Received"?"#e8f6ed":"#fbeedb",color:r.status==="Received"?"#16a34a":"#d97706"}}>{r.status}</span></td>
+              <td style={{padding:"9px 12px",fontSize:10,color:"#5b616e",maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.notes}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -2990,8 +2991,8 @@ export function AdmRegister({branch}){
 
   // Backend dispute lifecycle: Received → Disputed → Accepted (spawns voucher) / Rejected.
   const STATUSES=["All","Received","Disputed","Accepted","Rejected"];
-  const STATUS_CLR={Received:"#185FA5",Disputed:"#A32D2D",Accepted:"#27500A",Rejected:"#5a6691"};
-  const STATUS_BG={Received:"#E6F1FB",Disputed:"#FCEBEB",Accepted:"#EAF3DE",Rejected:"#f3f4f8"};
+  const STATUS_CLR={Received:"#2563eb",Disputed:"#dc2626",Accepted:"#16a34a",Rejected:"#5b616e"};
+  const STATUS_BG={Received:"#e8f0ff",Disputed:"#fbe9e9",Accepted:"#e8f6ed",Rejected:"#f4f5f7"};
 
   const totPending=filtered.filter(a=>!["Accepted","Rejected"].includes(a.status))
     .reduce((s,a)=>s+(a.amount||0),0);
@@ -3018,12 +3019,12 @@ export function AdmRegister({branch}){
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:40,height:40,borderRadius:10,background:"#FCEBEB",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{width:40,height:40,borderRadius:10,background:"#fbe9e9",display:"flex",alignItems:"center",justifyContent:"center"}}>
             <span style={{fontSize:22}}>📩</span>
           </div>
           <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>ADM Register</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>
+            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#1a1c22"}}>ADM Register</h2>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>
               Agent Debit Memos · Airlines debit the agency via BSP · 30-day dispute window
             </p>
           </div>
@@ -3036,7 +3037,7 @@ export function AdmRegister({branch}){
           <input value={search} onChange={e=>setSearch(e.target.value)}
             placeholder="ADM no / airline / ticket / passenger..."
             style={{...inp,width:220,minHeight:32,fontSize:11}}/>
-          <button onClick={()=>setModal(true)} style={{...btnG,background:"#A32D2D",fontSize:11}}>
+          <button onClick={()=>setModal(true)} style={{...btnG,background:"#dc2626",fontSize:11}}>
             <Plus size={13}/> New ADM
           </button>
         </div>
@@ -3045,28 +3046,28 @@ export function AdmRegister({branch}){
       {/* KPI strip */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>
         {[
-          {l:"Total ADMs",        v:String(filtered.length),              c:"#185FA5",bg:"#E6F1FB"},
-          {l:"Pending / Disputed",v:f(totPending),                        c:"#A32D2D",bg:"#FCEBEB"},
-          {l:"Accepted (posted)", v:f(totAccepted),                       c:"#27500A",bg:"#EAF3DE"},
-          {l:"Overdue (>deadline)",v:String(overdue.length),              c:overdue.length>0?"#7B1F1F":"#27500A",bg:overdue.length>0?"#FCEBEB":"#EAF3DE"},
-          {l:"Under Dispute",      v:String(adms.filter(a=>a.status==="Disputed").length),c:"#854F0B",bg:"#FAEEDA"},
+          {l:"Total ADMs",        v:String(filtered.length),              c:"#2563eb",bg:"#e8f0ff"},
+          {l:"Pending / Disputed",v:f(totPending),                        c:"#dc2626",bg:"#fbe9e9"},
+          {l:"Accepted (posted)", v:f(totAccepted),                       c:"#16a34a",bg:"#e8f6ed"},
+          {l:"Overdue (>deadline)",v:String(overdue.length),              c:overdue.length>0?"#7B1F1F":"#16a34a",bg:overdue.length>0?"#fbe9e9":"#e8f6ed"},
+          {l:"Under Dispute",      v:String(adms.filter(a=>a.status==="Disputed").length),c:"#d97706",bg:"#fbeedb"},
         ].map((k,i)=>(
           <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"11px 13px",background:k.bg}}>
             <p style={{margin:0,fontSize:9,fontWeight:700,color:k.c,textTransform:"uppercase",letterSpacing:"0.5px"}}>{k.l}</p>
-            <p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#0d1326"}}>{k.v}</p>
+            <p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#1a1c22"}}>{k.v}</p>
           </div>
         ))}
       </div>
 
       {/* Overdue alert */}
       {overdue.length>0&&(
-        <div style={{marginBottom:12,padding:"10px 14px",borderRadius:9,background:"#FCEBEB",
-          border:"1px solid #F7C1C1",fontSize:10.5,color:"#A32D2D",fontWeight:600,
+        <div style={{marginBottom:12,padding:"10px 14px",borderRadius:9,background:"#fbe9e9",
+          border:"1px solid #f3c9c9",fontSize:10.5,color:"#dc2626",fontWeight:600,
           display:"flex",alignItems:"center",gap:8}}>
           <AlertTriangle size={15}/>
           {overdue.length} ADM{overdue.length>1?"s":""} past the 30-day dispute deadline
           — will be auto-debited from BSP next settlement:
-          {overdue.map(a=><span key={a.id} style={{marginLeft:8,padding:"1px 7px",borderRadius:999,background:"#A32D2D",color:"#fff",fontSize:9.5}}>{a.id}</span>)}
+          {overdue.map(a=><span key={a.id} style={{marginLeft:8,padding:"1px 7px",borderRadius:999,background:"#dc2626",color:"#fff",fontSize:9.5}}>{a.id}</span>)}
         </div>
       )}
 
@@ -3075,10 +3076,10 @@ export function AdmRegister({branch}){
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:1100}}>
             <thead>
-              <tr style={{background:"#0d1326"}}>
+              <tr style={{background:"#1a1c22"}}>
                 {["ADM Number","Date","Airline","Ticket No.","Passenger","Sector","Reason","Amount","Deadline","Status","Actions"].map((h,i)=>(
                   <th key={i} style={{padding:"9px 10px",textAlign:i===7?"right":"left",
-                    color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+                    color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -3089,59 +3090,59 @@ export function AdmRegister({branch}){
                 const isUrgent=dl>=0&&dl<=7&&!["Accepted","Rejected","Disputed"].includes(a.status);
                 const rc=ADM_REASON_CODES[a.reasonCode]||{code:a.reasonCode,label:a.reasonCode,desc:""};
                 return (
-                  <tr key={a.id} style={{borderBottom:"1px solid #f3f4f8",
+                  <tr key={a.id} style={{borderBottom:"1px solid #f4f5f7",
                     background:isOverdue?"#fff5f5":isUrgent?"#fffaf0":i%2===0?"#fff":"#fafafa"}}>
                     <td style={{padding:"8px 10px"}}>
-                      <p style={{margin:0,fontFamily:"monospace",fontSize:10,color:"#A32D2D",fontWeight:700}}>{a.id}</p>
-                      <p style={{margin:0,fontSize:8.5,color:"#5a6691"}}>{a.date}</p>
+                      <p style={{margin:0,fontFamily:"monospace",fontSize:10,color:"#dc2626",fontWeight:700}}>{a.id}</p>
+                      <p style={{margin:0,fontSize:8.5,color:"#5b616e"}}>{a.date}</p>
                     </td>
                     <td style={{padding:"8px 10px"}}>
-                      <p style={{margin:0,fontWeight:700,color:"#0d1326"}}>{a.airline}</p>
-                      <p style={{margin:0,fontSize:9,color:"#5a6691"}}>IATA {a.iataNum}</p>
+                      <p style={{margin:0,fontWeight:700,color:"#1a1c22"}}>{a.airline}</p>
+                      <p style={{margin:0,fontSize:9,color:"#5b616e"}}>IATA {a.iataNum}</p>
                     </td>
-                    <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{a.ticketNo||"—"}</td>
-                    <td style={{padding:"8px 10px",fontWeight:600,color:"#384677",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.passenger||"—"}</td>
-                    <td style={{padding:"8px 10px",color:"#5a6691",whiteSpace:"nowrap"}}>{a.sector||"—"}</td>
+                    <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:10,color:"#2563eb"}}>{a.ticketNo||"—"}</td>
+                    <td style={{padding:"8px 10px",fontWeight:600,color:"#2e323c",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.passenger||"—"}</td>
+                    <td style={{padding:"8px 10px",color:"#5b616e",whiteSpace:"nowrap"}}>{a.sector||"—"}</td>
                     <td style={{padding:"8px 10px"}}>
-                      <p style={{margin:0,fontSize:10,fontWeight:700,color:"#854F0B"}}>{rc.code} — {rc.label}</p>
-                      <p style={{margin:0,fontSize:8.5,color:"#5a6691",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={a.remarks}>{a.remarks}</p>
+                      <p style={{margin:0,fontSize:10,fontWeight:700,color:"#d97706"}}>{rc.code} — {rc.label}</p>
+                      <p style={{margin:0,fontSize:8.5,color:"#5b616e",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={a.remarks}>{a.remarks}</p>
                     </td>
                     <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,fontVariantNumeric:"tabular-nums",
-                      color:"#A32D2D",fontSize:13}}>{a.currency}{Number(a.amount).toLocaleString()}</td>
+                      color:"#dc2626",fontSize:13}}>{a.currency}{Number(a.amount).toLocaleString()}</td>
                     <td style={{padding:"8px 10px"}}>
                       {["Accepted","Rejected"].includes(a.status)
-                        ?<p style={{margin:0,fontSize:10,color:"#27500A"}}>{a.status==="Accepted"?`✔ ${a.voucherVno||"posted"}`:"—"}</p>
+                        ?<p style={{margin:0,fontSize:10,color:"#16a34a"}}>{a.status==="Accepted"?`✔ ${a.voucherVno||"posted"}`:"—"}</p>
                         :<div>
-                          <p style={{margin:0,fontSize:10,fontWeight:700,color:isOverdue?"#A32D2D":isUrgent?"#854F0B":"#384677"}}>
+                          <p style={{margin:0,fontSize:10,fontWeight:700,color:isOverdue?"#dc2626":isUrgent?"#d97706":"#2e323c"}}>
                             {isOverdue?`${Math.abs(dl)} days OVERDUE`:isUrgent?`${dl} days left`:`${dl} days`}
                           </p>
-                          <p style={{margin:0,fontSize:8.5,color:"#5a6691"}}>Due: {a.responseDeadline}</p>
+                          <p style={{margin:0,fontSize:8.5,color:"#5b616e"}}>Due: {a.responseDeadline}</p>
                         </div>
                       }
                     </td>
                     <td style={{padding:"8px 10px"}}>
                       <span style={{fontSize:9.5,padding:"3px 8px",borderRadius:999,fontWeight:700,
-                        background:STATUS_BG[a.status]||"#f3f4f8",color:STATUS_CLR[a.status]||"#5a6691"}}>
+                        background:STATUS_BG[a.status]||"#f4f5f7",color:STATUS_CLR[a.status]||"#5b616e"}}>
                         {a.status}
                       </span>
                     </td>
                     <td style={{padding:"8px 10px"}}>
                       <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                         {["Received","Disputed"].includes(a.status)&&(
-                          <button onClick={()=>{setDisputeNote("");setDisputeModal(a);}} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#A32D2D",whiteSpace:"nowrap"}}>Dispute</button>
+                          <button onClick={()=>{setDisputeNote("");setDisputeModal(a);}} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#dc2626",whiteSpace:"nowrap"}}>Dispute</button>
                         )}
                         {["Received","Disputed"].includes(a.status)&&(
-                          <button onClick={()=>acceptAdm(a)} disabled={acceptM.isPending} title="Accept → create a pending ADM voucher" style={{...btnG,padding:"2px 7px",fontSize:9,background:"#27500A",whiteSpace:"nowrap"}}>Accept → Voucher</button>
+                          <button onClick={()=>acceptAdm(a)} disabled={acceptM.isPending} title="Accept → create a pending ADM voucher" style={{...btnG,padding:"2px 7px",fontSize:9,background:"#16a34a",whiteSpace:"nowrap"}}>Accept → Voucher</button>
                         )}
                         {a.status==="Disputed"&&<button onClick={()=>rejectAdm(a)} style={{...btnGh,padding:"2px 7px",fontSize:9,whiteSpace:"nowrap"}}>Reject</button>}
-                        {a.status==="Accepted"&&a.voucherVno&&<span style={{fontSize:9,color:"#27500A",fontWeight:700}}>→ {a.voucherVno}</span>}
+                        {a.status==="Accepted"&&a.voucherVno&&<span style={{fontSize:9,color:"#16a34a",fontWeight:700}}>→ {a.voucherVno}</span>}
                       </div>
                     </td>
                   </tr>
                 );
               })}
               {filtered.length===0&&(
-                <tr><td colSpan={11} style={{padding:"28px",textAlign:"center",color:"#5a6691"}}>No ADMs found</td></tr>
+                <tr><td colSpan={11} style={{padding:"28px",textAlign:"center",color:"#5b616e"}}>No ADMs found</td></tr>
               )}
             </tbody>
           </table>
@@ -3149,7 +3150,7 @@ export function AdmRegister({branch}){
       </div>
 
       {/* Info box */}
-      <div style={{marginTop:12,padding:"10px 14px",borderRadius:9,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:10,color:"#185FA5"}}>
+      <div style={{marginTop:12,padding:"10px 14px",borderRadius:9,background:"#e8f0ff",border:"1px solid #cfe0f8",fontSize:10,color:"#2563eb"}}>
         <b>ADM Process:</b> Airline raises ADM via BSP Link → Agency receives notification → 30-day window to dispute or accept →
         If no response within 30 days, ADM is auto-accepted and debited from next BSP settlement →
         If disputed, airline must respond within 60 days → Unresolved disputes escalate to IATA.
@@ -3160,17 +3161,17 @@ export function AdmRegister({branch}){
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:560,maxHeight:"90vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",position:"sticky",top:0,background:"#0d1326",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#d4a437"}}>Record New ADM</p>
-              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#8b94b3"}}>✕</button>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #e6e8ec",position:"sticky",top:0,background:"#1a1c22",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#c2a04a"}}>Record New ADM</p>
+              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#9197a3"}}>✕</button>
             </div>
             <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:10}}>
                 <FL label="Airline name"><input value={form.airline} onChange={e=>setForm(f=>({...f,airline:e.target.value}))} style={inp} placeholder="Air India"/></FL>
                 <FL label="Airline code (2-letter)"><input value={form.airlineCode} onChange={e=>setForm(f=>({...f,airlineCode:e.target.value.toUpperCase()}))} style={{...inp,fontFamily:"monospace"}} placeholder="AI" maxLength={2}/></FL>
               </div>
               <FL label="Ticket number"><input value={form.ticketNo} onChange={e=>setForm(f=>({...f,ticketNo:e.target.value}))} style={{...inp,fontFamily:"monospace"}} placeholder="098-1234567890"/></FL>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:10}}>
                 <FL label="Passenger name"><input value={form.passenger} onChange={e=>setForm(f=>({...f,passenger:e.target.value}))} style={inp}/></FL>
                 <FL label="Sector"><input value={form.sector} onChange={e=>setForm(f=>({...f,sector:e.target.value}))} style={inp} placeholder="BOM-DXB"/></FL>
               </div>
@@ -3179,22 +3180,22 @@ export function AdmRegister({branch}){
                   {Object.values(ADM_REASON_CODES).map(r=><option key={r.code} value={r.code}>{r.code} — {r.label}</option>)}
                 </select>
               </FL>
-              <div style={{padding:"8px 12px",borderRadius:8,background:"#FAEEDA",fontSize:9.5,color:"#854F0B"}}>
+              <div style={{padding:"8px 12px",borderRadius:8,background:"#fbeedb",fontSize:9.5,color:"#d97706"}}>
                 {ADM_REASON_CODES[form.reasonCode]?.desc}
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:10}}>
                 <FL label="ADM amount"><input type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:+e.target.value}))} style={inp}/></FL>
                 <FL label="Currency"><select value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))} style={inp}>{branchCurrencies(form.branch).map(c=><option key={c}>{c}</option>)}</select></FL>
                 <FL label="Branch"><select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value,currency:branchMainCurrency(e.target.value)}))} style={inp}>{BRANCH_CODES.map(b=><option key={b}>{b}</option>)}</select></FL>
               </div>
               <FL label="Remarks / Airline explanation"><textarea value={form.remarks} onChange={e=>setForm(f=>({...f,remarks:e.target.value}))} rows={2} style={{...inp,resize:"vertical"}}/></FL>
-              <div style={{padding:"9px 12px",borderRadius:8,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:9.5,color:"#A32D2D",fontWeight:600}}>
+              <div style={{padding:"9px 12px",borderRadius:8,background:"#fbe9e9",border:"1px solid #f3c9c9",fontSize:9.5,color:"#dc2626",fontWeight:600}}>
                 Response deadline: 30 days from today — {new Date(Date.now()+30*86400000).toISOString().slice(0,10)}. Failure to dispute = auto-accepted and BSP debit raised.
               </div>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8,position:"sticky",bottom:0,background:"#fff"}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #e6e8ec",display:"flex",justifyContent:"flex-end",gap:8,position:"sticky",bottom:0,background:"#fff"}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={addAdm} style={{...btnG,background:"#A32D2D"}}>💾 Record ADM</button>
+              <button onClick={addAdm} style={{...btnG,background:"#dc2626"}}>💾 Record ADM</button>
             </div>
           </div>
         </div>
@@ -3204,15 +3205,15 @@ export function AdmRegister({branch}){
       {disputeModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:500,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",background:"#FCEBEB",borderRadius:"14px 14px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #e6e8ec",background:"#fbe9e9",borderRadius:"14px 14px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
-                <p style={{margin:0,fontSize:13,fontWeight:700,color:"#A32D2D"}}>Dispute ADM — {disputeModal.id}</p>
-                <p style={{margin:"2px 0 0",fontSize:10,color:"#A32D2D"}}>{disputeModal.airline} · {disputeModal.currency}{Number(disputeModal.amount).toLocaleString()} · Due {disputeModal.responseDeadline}</p>
+                <p style={{margin:0,fontSize:13,fontWeight:700,color:"#dc2626"}}>Dispute ADM — {disputeModal.id}</p>
+                <p style={{margin:"2px 0 0",fontSize:10,color:"#dc2626"}}>{disputeModal.airline} · {disputeModal.currency}{Number(disputeModal.amount).toLocaleString()} · Due {disputeModal.responseDeadline}</p>
               </div>
-              <button onClick={()=>setDisputeModal(null)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#A32D2D"}}>✕</button>
+              <button onClick={()=>setDisputeModal(null)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#dc2626"}}>✕</button>
             </div>
             <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-              <div style={{padding:"9px 12px",borderRadius:8,background:"#FAEEDA",fontSize:10,color:"#854F0B"}}>
+              <div style={{padding:"9px 12px",borderRadius:8,background:"#fbeedb",fontSize:10,color:"#d97706"}}>
                 <b>Reason raised:</b> {ADM_REASON_CODES[disputeModal.reasonCode]?.label} — {disputeModal.remarks}
               </div>
               <FL label="Dispute grounds (detailed explanation)">
@@ -3222,18 +3223,18 @@ export function AdmRegister({branch}){
               <FL label="Documents attached">
                 <input style={inp} placeholder="e.g. Amadeus fare quote, PLACI agreement, approval email"/>
               </FL>
-              <div style={{padding:"9px 12px",borderRadius:8,background:"#E6F1FB",fontSize:9.5,color:"#185FA5",fontWeight:600}}>
+              <div style={{padding:"9px 12px",borderRadius:8,background:"#e8f0ff",fontSize:9.5,color:"#2563eb",fontWeight:600}}>
                 Dispute will be filed via BSP Link within 24 hours. Airline has 60 days to respond. Track status in ADM Register.
               </div>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #e6e8ec",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setDisputeModal(null)} style={btnGh}>Cancel</button>
               <button disabled={disputeM.isPending} onClick={()=>{
                 disputeM.mutate({id:disputeModal.id,note:disputeNote||"Dispute filed via BSP Link — awaiting airline response"},{
                   onSuccess:()=>{setDisputeModal(null);toast("Dispute filed");},
                   onError:(e)=>toast("Could not file dispute — "+e.message,"error"),
                 });
-              }} style={{...btnG,background:"#A32D2D",opacity:disputeM.isPending?0.6:1,cursor:disputeM.isPending?"not-allowed":"pointer"}}>{disputeM.isPending?"📨 Filing…":"📨 File Dispute"}</button>
+              }} style={{...btnG,background:"#dc2626",opacity:disputeM.isPending?0.6:1,cursor:disputeM.isPending?"not-allowed":"pointer"}}>{disputeM.isPending?"📨 Filing…":"📨 File Dispute"}</button>
             </div>
           </div>
         </div>
@@ -3314,17 +3315,17 @@ export function BspSummary({branch}){
     {label:"═══ NET BSP SETTLEMENT AMOUNT ═══",      amt:netBsp,      type:"total",  bold:true},
   ];
 
-  const TYPE_CLR={credit:"#27500A",debit:"#A32D2D",neutral:"#0d1326",section:"#185FA5",total:"#0d1326"};
+  const TYPE_CLR={credit:"#16a34a",debit:"#dc2626",neutral:"#1a1c22",section:"#2563eb",total:"#1a1c22"};
 
   return (
     <div style={{padding:"12px 10px",maxWidth:900,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🏦</div>
+          <div style={{width:40,height:40,borderRadius:10,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🏦</div>
           <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>BSP Settlement Summary</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>
-              Linked to <b style={{color:"#185FA5"}}>{bspLedgerName}</b> ({bspLedger?.group||"Sundry Creditors"}) · Net BSP position from live books
+            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#1a1c22"}}>BSP Settlement Summary</h2>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>
+              Linked to <b style={{color:"#2563eb"}}>{bspLedgerName}</b> ({bspLedger?.group||"Sundry Creditors"}) · Net BSP position from live books
             </p>
           </div>
         </div>
@@ -3336,24 +3337,24 @@ export function BspSummary({branch}){
       {/* KPI row */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>
         {[
-          {l:"Ticket Sales",      v:f(grossSales), c:"#185FA5",bg:"#E6F1FB"},
-          {l:"Ticket Cost (BSP)", v:f(ticketCost), c:"#854F0B",bg:"#FAEEDA"},
-          {l:"ADM Debits",        v:f(admTotal),   c:"#A32D2D",bg:"#FCEBEB"},
-          {l:"ACM Credits",       v:f(acmTotal),   c:"#1D9E75",bg:"#EAF3DE"},
-          {l:"Net Settlement",    v:f(netBsp),     c:netBsp>0?"#27500A":"#A32D2D",bg:netBsp>0?"#EAF3DE":"#FCEBEB"},
-          {l:`BSP Payable (${stmt?.closingSide||"Cr"})`, v:f(Math.abs(closingPayable)), c:"#0d1326",bg:"#eef0f6"},
+          {l:"Ticket Sales",      v:f(grossSales), c:"#2563eb",bg:"#e8f0ff"},
+          {l:"Ticket Cost (BSP)", v:f(ticketCost), c:"#d97706",bg:"#fbeedb"},
+          {l:"ADM Debits",        v:f(admTotal),   c:"#dc2626",bg:"#fbe9e9"},
+          {l:"ACM Credits",       v:f(acmTotal),   c:"#3fb7a3",bg:"#e8f6ed"},
+          {l:"Net Settlement",    v:f(netBsp),     c:netBsp>0?"#16a34a":"#dc2626",bg:netBsp>0?"#e8f6ed":"#fbe9e9"},
+          {l:`BSP Payable (${stmt?.closingSide||"Cr"})`, v:f(Math.abs(closingPayable)), c:"#1a1c22",bg:"#eef0f6"},
         ].map((k,i)=>(
           <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"11px 13px",background:k.bg}}>
             <p style={{margin:0,fontSize:9,fontWeight:700,color:k.c,textTransform:"uppercase"}}>{k.l}</p>
-            <p style={{margin:"4px 0 0",fontSize:mob?17:21,fontWeight:800,color:"#0d1326"}}>{k.v}</p>
+            <p style={{margin:"4px 0 0",fontSize:mob?17:21,fontWeight:800,color:"#1a1c22"}}>{k.v}</p>
           </div>
         ))}
       </div>
 
       {/* Settlement computation */}
       <div style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
-        <div style={{padding:"10px 16px",background:"#0d1326",borderBottom:"1px solid #1a2340"}}>
-          <p style={{margin:0,fontSize:12,fontWeight:700,color:"#d4a437"}}>
+        <div style={{padding:"10px 16px",background:"#1a1c22",borderBottom:"1px solid #1a2340"}}>
+          <p style={{margin:0,fontSize:12,fontWeight:700,color:"#c2a04a"}}>
             BSP Settlement Computation — {PERIODS.find(p=>p.v===period)?.l} · {brCode||"India (BOM+AMD)"}
           </p>
         </div>
@@ -3361,15 +3362,15 @@ export function BspSummary({branch}){
           <tbody>
             {rows.map((r,i)=>(
               <tr key={i} style={{
-                borderBottom:"1px solid #f3f4f8",
-                background:r.type==="total"?"#0d1326":r.type==="section"?"#f0f4ff":i%2===0?"#fff":"#fafafa"
+                borderBottom:"1px solid #f4f5f7",
+                background:r.type==="total"?"#1a1c22":r.type==="section"?"#f0f4ff":i%2===0?"#fff":"#fafafa"
               }}>
                 <td style={{padding:"11px 16px",fontWeight:r.bold?700:400,
-                  color:r.type==="total"?"#d4a437":r.type==="section"?"#185FA5":TYPE_CLR[r.type]||"#0d1326",
+                  color:r.type==="total"?"#c2a04a":r.type==="section"?"#2563eb":TYPE_CLR[r.type]||"#1a1c22",
                   fontSize:r.bold?12:11.5}}>{r.label}</td>
                 <td style={{padding:"11px 16px",textAlign:"right",fontWeight:r.bold?800:500,
                   fontVariantNumeric:"tabular-nums",fontSize:r.bold?14:12,
-                  color:r.type==="total"?"#fff":r.amt<0?"#A32D2D":r.amt>0&&r.type==="credit"?"#27500A":"#0d1326"}}>
+                  color:r.type==="total"?"#fff":r.amt<0?"#dc2626":r.amt>0&&r.type==="credit"?"#16a34a":"#1a1c22"}}>
                   {r.amt===0?"—":r.amt<0?`(${f(Math.abs(r.amt))})`:f(r.amt)}
                 </td>
               </tr>
@@ -3380,56 +3381,56 @@ export function BspSummary({branch}){
 
       {/* BSP Supplier ledger — live transactions & running balance */}
       <div style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
-        <div style={{padding:"10px 16px",background:"#0d1326",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+        <div style={{padding:"10px 16px",background:"#1a1c22",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
           <div>
-            <p style={{margin:0,fontSize:12,fontWeight:700,color:"#d4a437"}}>🔗 BSP Supplier Ledger — {bspLedgerName}</p>
-            <p style={{margin:"2px 0 0",fontSize:9.5,color:"#8b93b3"}}>{bspLedger?.group||"Sundry Creditors"} · {stmtLines.length} postings · {from} → {to}</p>
+            <p style={{margin:0,fontSize:12,fontWeight:700,color:"#c2a04a"}}>🔗 BSP Supplier Ledger — {bspLedgerName}</p>
+            <p style={{margin:"2px 0 0",fontSize:9.5,color:"#9197a3"}}>{bspLedger?.group||"Sundry Creditors"} · {stmtLines.length} postings · {from} → {to}</p>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
             <button onClick={()=>openLedgerModal(bspLedgerName)} title="Open in the unified Ledger view" style={{border:"1px solid #2a3556",background:"rgba(255,255,255,0.08)",color:"#e7ecfb",borderRadius:6,fontSize:11,fontWeight:700,padding:"6px 11px",cursor:"pointer"}}>📒 Open Ledger</button>
             <LedgerActions d={stmt} cur="₹" branchLabel={brCode||"India"} from={from} to={to} variant="dark" />
             <div style={{textAlign:"right"}}>
-              <p style={{margin:0,fontSize:9,color:"#8b93b3",textTransform:"uppercase",fontWeight:700}}>Outstanding payable</p>
-              <p style={{margin:"2px 0 0",fontSize:16,fontWeight:800,color:closingPayable>=0?"#F7C1C1":"#C0DD97"}}>{f(Math.abs(closingPayable))} {stmt?.closingSide||"Cr"}</p>
+              <p style={{margin:0,fontSize:9,color:"#9197a3",textTransform:"uppercase",fontWeight:700}}>Outstanding payable</p>
+              <p style={{margin:"2px 0 0",fontSize:16,fontWeight:800,color:closingPayable>=0?"#f3c9c9":"#bfe6cd"}}>{f(Math.abs(closingPayable))} {stmt?.closingSide||"Cr"}</p>
             </div>
           </div>
         </div>
         {stmtQ.isLoading
-          ?<div style={{padding:"24px",textAlign:"center",color:"#5a6691",fontSize:12}}>Loading BSP ledger…</div>
+          ?<div style={{padding:"24px",textAlign:"center",color:"#5b616e",fontSize:12}}>Loading BSP ledger…</div>
           :stmtQ.isError
-          ?<div style={{padding:"20px",textAlign:"center",color:"#A32D2D",fontSize:12}}>⚠ Couldn't load BSP ledger — {stmtQ.error?.message||"check your connection"}</div>
+          ?<div style={{padding:"20px",textAlign:"center",color:"#dc2626",fontSize:12}}>⚠ Couldn't load BSP ledger — {stmtQ.error?.message||"check your connection"}</div>
           :(<>
-            <div style={{padding:"8px 16px",background:"#f3f4f8",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between",fontSize:11,flexWrap:"wrap",gap:6}}>
-              <span style={{color:"#5a6691"}}>Opening: {f(stmt?.openingBalance)} {stmt?.openingSide||"Cr"}</span>
-              <span style={{color:"#5a6691"}}>Period: Dr {f(stmt?.totalDebit)} · Cr {f(stmt?.totalCredit)}</span>
+            <div style={{padding:"8px 16px",background:"#f4f5f7",borderBottom:"1px solid #e6e8ec",display:"flex",justifyContent:"space-between",fontSize:11,flexWrap:"wrap",gap:6}}>
+              <span style={{color:"#5b616e"}}>Opening: {f(stmt?.openingBalance)} {stmt?.openingSide||"Cr"}</span>
+              <span style={{color:"#5b616e"}}>Period: Dr {f(stmt?.totalDebit)} · Cr {f(stmt?.totalCredit)}</span>
             </div>
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-                <thead><tr style={{background:"#0d1326"}}>
+                <thead><tr style={{background:"#1a1c22"}}>
                   {["Date","Voucher","Particulars","Dr","Cr","Balance"].map((h,i)=>(
-                    <th key={i} style={{padding:"8px 12px",textAlign:i>=3?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+                    <th key={i} style={{padding:"8px 12px",textAlign:i>=3?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
-                  {stmtLines.length===0&&<tr><td colSpan={6} style={{padding:"24px",textAlign:"center",color:"#5a6691",fontSize:11.5}}>No BSP postings in {PERIODS.find(p=>p.v===period)?.l}. Book a flight purchase or BSP payment against {bspLedgerName}.</td></tr>}
+                  {stmtLines.length===0&&<tr><td colSpan={6} style={{padding:"24px",textAlign:"center",color:"#5b616e",fontSize:11.5}}>No BSP postings in {PERIODS.find(p=>p.v===period)?.l}. Book a flight purchase or BSP payment against {bspLedgerName}.</td></tr>}
                   {stmtLines.map((e,i)=>(
-                    <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-                      <td style={{padding:"7px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{e.date}</td>
-                      <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{e.vno}</td>
-                      <td style={{padding:"7px 12px",color:"#384677"}}>
+                    <tr key={i} style={{borderBottom:"1px solid #f4f5f7",background:i%2===0?"#fff":"#fafafa"}}>
+                      <td style={{padding:"7px 12px",color:"#5b616e",whiteSpace:"nowrap"}}>{e.date}</td>
+                      <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:10,color:"#2563eb"}}>{e.vno}</td>
+                      <td style={{padding:"7px 12px",color:"#2e323c"}}>
                         <span style={{fontWeight:600}}>{contraLedgerName(e)}</span>
                         {lineNarration(e) && <div style={{marginTop:2,fontSize:10,color:"#8b93b3",fontStyle:"italic"}}>{lineNarration(e)}</div>}
                       </td>
-                      <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:e.debit>0?"#185FA5":"#bfc3d6"}}>{e.debit>0?f(e.debit):"—"}</td>
-                      <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:e.credit>0?"#A32D2D":"#bfc3d6"}}>{e.credit>0?f(e.credit):"—"}</td>
-                      <td style={{padding:"7px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:e.balanceSide==="Cr"?"#A32D2D":"#185FA5"}}>{f(Math.abs(e.balance))} {e.balanceSide}</td>
+                      <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:e.debit>0?"#2563eb":"#cbd0db"}}>{e.debit>0?f(e.debit):"—"}</td>
+                      <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:e.credit>0?"#dc2626":"#cbd0db"}}>{e.credit>0?f(e.credit):"—"}</td>
+                      <td style={{padding:"7px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:e.balanceSide==="Cr"?"#dc2626":"#2563eb"}}>{f(Math.abs(e.balance))} {e.balanceSide}</td>
                     </tr>
                   ))}
                 </tbody>
-                {stmtLines.length>0&&<tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
-                  <td colSpan={3} style={{padding:"9px 12px",fontWeight:700,color:"#d4a437",fontSize:12}}>CLOSING — {bspLedgerName}</td>
+                {stmtLines.length>0&&<tfoot><tr style={{background:"#1a1c22",borderTop:"2px solid #c2a04a"}}>
+                  <td colSpan={3} style={{padding:"9px 12px",fontWeight:700,color:"#c2a04a",fontSize:12}}>CLOSING — {bspLedgerName}</td>
                   <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(stmt?.totalDebit)}</td>
-                  <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(stmt?.totalCredit)}</td>
+                  <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#c2a04a",fontVariantNumeric:"tabular-nums"}}>{f(stmt?.totalCredit)}</td>
                   <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(Math.abs(closingPayable))} {stmt?.closingSide||"Cr"}</td>
                 </tr></tfoot>}
               </table>
@@ -3438,39 +3439,39 @@ export function BspSummary({branch}){
       </div>
 
       {/* ADM/ACM breakdown */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:12}}>
         {/* ADMs this period */}
         <div style={{...card}}>
-          <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#A32D2D"}}>📩 ADMs This Period</p>
+          <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#dc2626"}}>📩 ADMs This Period</p>
           {admList.length===0
-            ?<p style={{margin:0,fontSize:11,color:"#5a6691"}}>No ADMs this period</p>
+            ?<p style={{margin:0,fontSize:11,color:"#5b616e"}}>No ADMs this period</p>
             :admList.map(a=>(
-              <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f3f4f8",fontSize:11}}>
+              <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f4f5f7",fontSize:11}}>
                 <div>
-                  <p style={{margin:0,fontWeight:600,color:"#0d1326",fontSize:10.5}}>{a.id}</p>
-                  <p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>{a.airline} · {ADM_REASON_CODES[a.reasonCode]?.label}</p>
+                  <p style={{margin:0,fontWeight:600,color:"#1a1c22",fontSize:10.5}}>{a.id}</p>
+                  <p style={{margin:0,fontSize:9.5,color:"#5b616e"}}>{a.airline} · {ADM_REASON_CODES[a.reasonCode]?.label}</p>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <p style={{margin:0,fontWeight:700,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{a.currency}{a.amount.toLocaleString()}</p>
-                  <span style={{fontSize:9,padding:"1px 6px",borderRadius:999,background:"#FCEBEB",color:"#A32D2D",fontWeight:700}}>{a.status}</span>
+                  <p style={{margin:0,fontWeight:700,color:"#dc2626",fontVariantNumeric:"tabular-nums"}}>{a.currency}{a.amount.toLocaleString()}</p>
+                  <span style={{fontSize:9,padding:"1px 6px",borderRadius:999,background:"#fbe9e9",color:"#dc2626",fontWeight:700}}>{a.status}</span>
                 </div>
               </div>
           ))}
         </div>
         {/* ACMs this period */}
         <div style={{...card}}>
-          <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#27500A"}}>📨 ACMs This Period</p>
+          <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#16a34a"}}>📨 ACMs This Period</p>
           {acmList.length===0
-            ?<p style={{margin:0,fontSize:11,color:"#5a6691"}}>No ACMs this period</p>
+            ?<p style={{margin:0,fontSize:11,color:"#5b616e"}}>No ACMs this period</p>
             :acmList.map(a=>(
-              <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f3f4f8",fontSize:11}}>
+              <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f4f5f7",fontSize:11}}>
                 <div>
-                  <p style={{margin:0,fontWeight:600,color:"#0d1326",fontSize:10.5}}>{a.id}</p>
-                  <p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>{a.airline} · {ACM_REASON_CODES[a.reasonCode]?.label}</p>
+                  <p style={{margin:0,fontWeight:600,color:"#1a1c22",fontSize:10.5}}>{a.id}</p>
+                  <p style={{margin:0,fontSize:9.5,color:"#5b616e"}}>{a.airline} · {ACM_REASON_CODES[a.reasonCode]?.label}</p>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <p style={{margin:0,fontWeight:700,color:"#27500A",fontVariantNumeric:"tabular-nums"}}>+{a.currency}{a.amount.toLocaleString()}</p>
-                  <span style={{fontSize:9,padding:"1px 6px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700}}>{a.status}</span>
+                  <p style={{margin:0,fontWeight:700,color:"#16a34a",fontVariantNumeric:"tabular-nums"}}>+{a.currency}{a.amount.toLocaleString()}</p>
+                  <span style={{fontSize:9,padding:"1px 6px",borderRadius:999,background:"#e8f6ed",color:"#16a34a",fontWeight:700}}>{a.status}</span>
                 </div>
               </div>
           ))}
@@ -3497,8 +3498,8 @@ export function TicketControlRegister({branch}){
   const [search,setSearch]=useState("");
 
   const STATUSES=["All","Open","Used","Voided","Refunded","Exchanged","Reissued"];
-  const STATUS_CLR={Open:"#185FA5",Used:"#27500A",Voided:"#A32D2D",Refunded:"#854F0B",Exchanged:"#1D9E75",Reissued:"#384677"};
-  const STATUS_BG={Open:"#E6F1FB",Used:"#EAF3DE",Voided:"#FCEBEB",Refunded:"#FAEEDA",Exchanged:"#EAF3DE",Reissued:"#f3f4f8"};
+  const STATUS_CLR={Open:"#2563eb",Used:"#16a34a",Voided:"#dc2626",Refunded:"#d97706",Exchanged:"#3fb7a3",Reissued:"#2e323c"};
+  const STATUS_BG={Open:"#e8f0ff",Used:"#e8f6ed",Voided:"#fbe9e9",Refunded:"#fbeedb",Exchanged:"#e8f6ed",Reissued:"#f4f5f7"};
 
   const filtered=tickets.filter(t=>(
     (!brCode||t.branch===brCode)&&
@@ -3512,10 +3513,10 @@ export function TicketControlRegister({branch}){
     <div style={{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🎫</div>
+          <div style={{width:40,height:40,borderRadius:10,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🎫</div>
           <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Air Ticket Control Register</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Track every ticket: Issued · Used · Voided · Refunded · Exchanged · Reissued</p>
+            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#1a1c22"}}>Air Ticket Control Register</h2>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>Track every ticket: Issued · Used · Voided · Refunded · Exchanged · Reissued</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -3530,9 +3531,9 @@ export function TicketControlRegister({branch}){
         {STATUSES.slice(1).map(s=>(
           <div key={s} {...clickable(()=>setFilter(f=>f===s?"All":s))}
             style={{flexShrink:0,padding:"7px 12px",borderRadius:8,cursor:"pointer",textAlign:"center",
-              border:`2px solid ${filter===s?"#0d1326":"#e1e3ec"}`,
-              background:filter===s?"#0d1326":STATUS_BG[s]||"#f3f4f8"}}>
-            <p style={{margin:0,fontSize:16,fontWeight:800,color:filter===s?"#d4a437":STATUS_CLR[s]}}>{totByStatus[s]||0}</p>
+              border:`2px solid ${filter===s?"#1a1c22":"#e6e8ec"}`,
+              background:filter===s?"#1a1c22":STATUS_BG[s]||"#f4f5f7"}}>
+            <p style={{margin:0,fontSize:16,fontWeight:800,color:filter===s?"#c2a04a":STATUS_CLR[s]}}>{totByStatus[s]||0}</p>
             <p style={{margin:"1px 0 0",fontSize:8.5,fontWeight:700,color:filter===s?"#fff":STATUS_CLR[s],whiteSpace:"nowrap"}}>{s}</p>
           </div>
         ))}
@@ -3541,30 +3542,30 @@ export function TicketControlRegister({branch}){
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:1000}}>
-            <thead><tr style={{background:"#0d1326"}}>
+            <thead><tr style={{background:"#1a1c22"}}>
               {["Ticket Number","Airline","Passenger","Sector","Class","PNR","Issue Date","Travel Date","Fare","BSP Status","Ticket Status","Actions"].map((h,i)=>(
-                <th key={i} style={{padding:"9px 10px",textAlign:i===8?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+                <th key={i} style={{padding:"9px 10px",textAlign:i===8?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>{filtered.map((t,i)=>(
-              <tr key={t.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-                <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:10,color:"#185FA5",fontWeight:700}}>{t.ticket}</td>
-                <td style={{padding:"8px 10px",fontWeight:600,color:"#0d1326"}}>{t.airline}</td>
-                <td style={{padding:"8px 10px",color:"#384677"}}>{t.pax}</td>
-                <td style={{padding:"8px 10px",fontWeight:600,color:"#854F0B"}}>{t.sector}</td>
+              <tr key={t.id} style={{borderBottom:"1px solid #f4f5f7",background:i%2===0?"#fff":"#fafafa"}}>
+                <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:10,color:"#2563eb",fontWeight:700}}>{t.ticket}</td>
+                <td style={{padding:"8px 10px",fontWeight:600,color:"#1a1c22"}}>{t.airline}</td>
+                <td style={{padding:"8px 10px",color:"#2e323c"}}>{t.pax}</td>
+                <td style={{padding:"8px 10px",fontWeight:600,color:"#d97706"}}>{t.sector}</td>
                 <td style={{padding:"8px 10px",textAlign:"center",fontFamily:"monospace",fontSize:10.5,fontWeight:700}}>{t.class}</td>
-                <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:10.5,color:"#185FA5",fontWeight:700}}>{t.pnr}</td>
-                <td style={{padding:"8px 10px",color:"#5a6691",whiteSpace:"nowrap"}}>{t.issueDate}</td>
-                <td style={{padding:"8px 10px",color:"#5a6691",whiteSpace:"nowrap"}}>{t.travelDate}</td>
+                <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:10.5,color:"#2563eb",fontWeight:700}}>{t.pnr}</td>
+                <td style={{padding:"8px 10px",color:"#5b616e",whiteSpace:"nowrap"}}>{t.issueDate}</td>
+                <td style={{padding:"8px 10px",color:"#5b616e",whiteSpace:"nowrap"}}>{t.travelDate}</td>
                 <td style={{padding:"8px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",fontWeight:600}}>
                   {"₹"}{Number(t.fare).toLocaleString()}
                 </td>
-                <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:STATUS_BG[t.bspStatus]||"#f3f4f8",color:STATUS_CLR[t.bspStatus]||"#5a6691"}}>{t.bspStatus}</span></td>
-                <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:STATUS_BG[t.status]||"#f3f4f8",color:STATUS_CLR[t.status]||"#5a6691"}}>{t.status}</span></td>
+                <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:STATUS_BG[t.bspStatus]||"#f4f5f7",color:STATUS_CLR[t.bspStatus]||"#5b616e"}}>{t.bspStatus}</span></td>
+                <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:STATUS_BG[t.status]||"#f4f5f7",color:STATUS_CLR[t.status]||"#5b616e"}}>{t.status}</span></td>
                 <td style={{padding:"8px 10px"}}>
                   {t.status==="Open"&&(
                     <select onChange={e=>{if(e.target.value)setTickets(ts=>ts.map(x=>x.id===t.id?{...x,status:e.target.value,bspStatus:e.target.value}:x));}}
-                      style={{fontSize:9.5,border:"1px solid #e1e3ec",borderRadius:5,padding:"2px 5px",background:"#f9fafb"}}>
+                      style={{fontSize:9.5,border:"1px solid #e6e8ec",borderRadius:5,padding:"2px 5px",background:"#f9fafb"}}>
                       <option value="">Update...</option>
                       <option>Used</option><option>Voided</option><option>Refunded</option><option>Exchanged</option><option>Reissued</option>
                     </select>
@@ -3597,15 +3598,15 @@ export function QuickCreate({setRoute}){
         {open&&SHORTCUTS.map((s,i)=>(
           <button key={i} onClick={()=>{setOpen(false);setRoute&&setRoute(s.route);}}
             style={{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",borderRadius:24,
-              background:"#0d1326",border:"1px solid #d4a437",color:"#fff",cursor:"pointer",
+              background:"#1a1c22",border:"1px solid #c2a04a",color:"#fff",cursor:"pointer",
               fontSize:11,fontWeight:600,boxShadow:"0 4px 12px rgba(0,0,0,0.3)",whiteSpace:"nowrap",
               animation:`slideUp 0.${i+1}s ease`}}>
             <span style={{fontSize:15}}>{s.icon}</span>{s.label}
           </button>
         ))}
         <button onClick={()=>setOpen(o=>!o)}
-          style={{width:52,height:52,borderRadius:"50%",background:open?"#d4a437":"#0d1326",
-            border:`3px solid ${open?"#0d1326":"#d4a437"}`,color:open?"#0d1326":"#d4a437",
+          style={{width:52,height:52,borderRadius:"50%",background:open?"#c2a04a":"#1a1c22",
+            border:`3px solid ${open?"#1a1c22":"#c2a04a"}`,color:open?"#1a1c22":"#c2a04a",
             cursor:"pointer",fontSize:24,fontWeight:700,boxShadow:"0 4px 16px rgba(13,19,38,0.4)",
             display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s"}}>
           {open?"✕":"+"}
@@ -3649,23 +3650,23 @@ export function BspCsvImport({branch}){
   return (
     <div style={{padding:"12px 10px",maxWidth:1000,margin:"0 auto"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-        <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📂</div>
+        <div style={{width:40,height:40,borderRadius:10,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📂</div>
         <div>
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>BSP Statement Import</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Upload BSP Link CSV / SITI billing file → auto-match against book entries</p>
+          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#1a1c22"}}>BSP Statement Import</h2>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>Upload BSP Link CSV / SITI billing file → auto-match against book entries</p>
         </div>
       </div>
 
       {/* Step indicators */}
       <div style={{display:"flex",gap:0,marginBottom:16,...card,padding:"12px 16px"}}>
-        <div style={{flex:1,display:"flex",alignItems:"center",gap:0}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:28,height:28,borderRadius:"50%",fontWeight:700,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",background:step>=1?"#0d1326":"#e1e3ec",color:step>=1?"#d4a437":"#bfc3d6"}}>1</div><span style={{fontSize:11,fontWeight:step===1?700:400,color:step===1?"#0d1326":"#5a6691"}}>Upload File</span></div><div style={{flex:1,height:1,background:"#e1e3ec",margin:"0 8px"}}/></div><div style={{flex:1,display:"flex",alignItems:"center",gap:0}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:28,height:28,borderRadius:"50%",fontWeight:700,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",background:step>=2?"#0d1326":"#e1e3ec",color:step>=2?"#d4a437":"#bfc3d6"}}>2</div><span style={{fontSize:11,fontWeight:step===2?700:400,color:step===2?"#0d1326":"#5a6691"}}>Preview & Match</span></div><div style={{flex:1,height:1,background:"#e1e3ec",margin:"0 8px"}}/></div><div style={{flex:1,display:"flex",alignItems:"center",gap:0}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:28,height:28,borderRadius:"50%",fontWeight:700,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",background:step>=3?"#0d1326":"#e1e3ec",color:step>=3?"#d4a437":"#bfc3d6"}}>3</div><span style={{fontSize:11,fontWeight:step===3?700:400,color:step===3?"#0d1326":"#5a6691"}}>Reconcile</span></div></div>
+        <div style={{flex:1,display:"flex",alignItems:"center",gap:0}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:28,height:28,borderRadius:"50%",fontWeight:700,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",background:step>=1?"#1a1c22":"#e6e8ec",color:step>=1?"#c2a04a":"#cbd0db"}}>1</div><span style={{fontSize:11,fontWeight:step===1?700:400,color:step===1?"#1a1c22":"#5b616e"}}>Upload File</span></div><div style={{flex:1,height:1,background:"#e6e8ec",margin:"0 8px"}}/></div><div style={{flex:1,display:"flex",alignItems:"center",gap:0}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:28,height:28,borderRadius:"50%",fontWeight:700,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",background:step>=2?"#1a1c22":"#e6e8ec",color:step>=2?"#c2a04a":"#cbd0db"}}>2</div><span style={{fontSize:11,fontWeight:step===2?700:400,color:step===2?"#1a1c22":"#5b616e"}}>Preview & Match</span></div><div style={{flex:1,height:1,background:"#e6e8ec",margin:"0 8px"}}/></div><div style={{flex:1,display:"flex",alignItems:"center",gap:0}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:28,height:28,borderRadius:"50%",fontWeight:700,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",background:step>=3?"#1a1c22":"#e6e8ec",color:step>=3?"#c2a04a":"#cbd0db"}}>3</div><span style={{fontSize:11,fontWeight:step===3?700:400,color:step===3?"#1a1c22":"#5b616e"}}>Reconcile</span></div></div>
       </div>
 
       {step===1&&(
         <div style={{...card,textAlign:"center",padding:"40px 20px"}}>
           <p style={{margin:"0 0 8px",fontSize:32}}>📂</p>
-          <p style={{margin:"0 0 16px",fontSize:14,fontWeight:600,color:"#0d1326"}}>Upload BSP Billing CSV</p>
-          <p style={{margin:"0 0 20px",fontSize:11,color:"#5a6691"}}>Download from BSP Link → Reports → Billing Statement → CSV format. Supported: BSP India (IATA), KQ Direct, any airline CSV.</p>
+          <p style={{margin:"0 0 16px",fontSize:14,fontWeight:600,color:"#1a1c22"}}>Upload BSP Billing CSV</p>
+          <p style={{margin:"0 0 20px",fontSize:11,color:"#5b616e"}}>Download from BSP Link → Reports → Billing Statement → CSV format. Supported: BSP India (IATA), KQ Direct, any airline CSV.</p>
           <input type="file" accept=".csv,.txt" onChange={handleFile} style={{display:"none"}} id="bspFileInput"/>
           <label htmlFor="bspFileInput" style={{...btnG,cursor:"pointer",display:"inline-block",padding:"10px 24px",fontSize:12}}>📂 Choose CSV File</label>
         </div>
@@ -3674,30 +3675,30 @@ export function BspCsvImport({branch}){
       {step===2&&(
         <div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>Parsed: {parsed.length} records from {file?.name||"sample"}</p>
+            <p style={{margin:0,fontSize:12,fontWeight:700,color:"#1a1c22"}}>Parsed: {parsed.length} records from {file?.name||"sample"}</p>
             <div style={{display:"flex",gap:8}}>
-              <span style={{fontSize:10.5,padding:"4px 10px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700}}>{matched.filter(m=>m.inBooks).length} Matched</span>
-              <span style={{fontSize:10.5,padding:"4px 10px",borderRadius:999,background:"#FCEBEB",color:"#A32D2D",fontWeight:700}}>{matched.filter(m=>!m.inBooks).length} Unmatched</span>
+              <span style={{fontSize:10.5,padding:"4px 10px",borderRadius:999,background:"#e8f6ed",color:"#16a34a",fontWeight:700}}>{matched.filter(m=>m.inBooks).length} Matched</span>
+              <span style={{fontSize:10.5,padding:"4px 10px",borderRadius:999,background:"#fbe9e9",color:"#dc2626",fontWeight:700}}>{matched.filter(m=>!m.inBooks).length} Unmatched</span>
               <button onClick={()=>setStep(3)} style={{...btnG,fontSize:11}}>Proceed →</button>
             </div>
           </div>
           <div style={{...card,padding:0,overflow:"hidden"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-              <thead><tr style={{background:"#0d1326"}}>
+              <thead><tr style={{background:"#1a1c22"}}>
                 {["Ticket No.","Airline","Passenger","Sector","Amount","Type","In Books","Status"].map((h,i)=>(
-                  <th key={i} style={{padding:"9px 11px",textAlign:i===4?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+                  <th key={i} style={{padding:"9px 11px",textAlign:i===4?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>{matched.map((r,i)=>(
-                <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:!r.inBooks?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
-                  <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{r.ticketNo}</td>
-                  <td style={{padding:"8px 11px",fontWeight:600,color:"#0d1326"}}>{r.airline}</td>
-                  <td style={{padding:"8px 11px",color:"#384677"}}>{r.pax}</td>
-                  <td style={{padding:"8px 11px",color:"#5a6691"}}>{r.sector}</td>
+                <tr key={i} style={{borderBottom:"1px solid #f4f5f7",background:!r.inBooks?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
+                  <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:9.5,color:"#2563eb"}}>{r.ticketNo}</td>
+                  <td style={{padding:"8px 11px",fontWeight:600,color:"#1a1c22"}}>{r.airline}</td>
+                  <td style={{padding:"8px 11px",color:"#2e323c"}}>{r.pax}</td>
+                  <td style={{padding:"8px 11px",color:"#5b616e"}}>{r.sector}</td>
                   <td style={{padding:"8px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>₹{Number(r.amount).toLocaleString()}</td>
-                  <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:r.type==="SALE"?"#E6F1FB":"#FAEEDA",color:r.type==="SALE"?"#185FA5":"#854F0B"}}>{r.type}</span></td>
+                  <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:r.type==="SALE"?"#e8f0ff":"#fbeedb",color:r.type==="SALE"?"#2563eb":"#d97706"}}>{r.type}</span></td>
                   <td style={{padding:"8px 11px",textAlign:"center"}}>{r.inBooks?"✅":"❌"}</td>
-                  <td style={{padding:"8px 11px"}}>{!r.inBooks?<button style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#A32D2D",whiteSpace:"nowrap"}}>Create Entry</button>:<span style={{color:"#27500A",fontSize:12}}>✔</span>}</td>
+                  <td style={{padding:"8px 11px"}}>{!r.inBooks?<button style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#dc2626",whiteSpace:"nowrap"}}>Create Entry</button>:<span style={{color:"#16a34a",fontSize:12}}>✔</span>}</td>
                 </tr>
               ))}</tbody>
             </table>
@@ -3706,10 +3707,10 @@ export function BspCsvImport({branch}){
       )}
 
       {step===3&&(
-        <div style={{...card,padding:"24px",textAlign:"center",background:"#EAF3DE"}}>
+        <div style={{...card,padding:"24px",textAlign:"center",background:"#e8f6ed"}}>
           <p style={{margin:"0 0 8px",fontSize:32}}>✅</p>
-          <p style={{margin:"0 0 8px",fontSize:15,fontWeight:700,color:"#27500A"}}>Reconciliation Complete</p>
-          <p style={{margin:0,fontSize:11,color:"#5a6691"}}>{matched.filter(m=>m.inBooks).length} tickets matched · {matched.filter(m=>!m.inBooks).length} new entries created · BSP statement synced with books.</p>
+          <p style={{margin:"0 0 8px",fontSize:15,fontWeight:700,color:"#16a34a"}}>Reconciliation Complete</p>
+          <p style={{margin:0,fontSize:11,color:"#5b616e"}}>{matched.filter(m=>m.inBooks).length} tickets matched · {matched.filter(m=>!m.inBooks).length} new entries created · BSP statement synced with books.</p>
           <button onClick={()=>{setStep(1);setParsed([]);setMatched([]);setFile(null);}} style={{...btnGh,marginTop:16}}>Import Another File</button>
         </div>
       )}
@@ -3722,6 +3723,7 @@ export function BspCsvImport({branch}){
    ════════════════════════════════════════════════════════════════ */
 
 export function GdsPnrImport({branch,setRoute}){
+  const mob=useMobile();
   const [pnr,setPnr]=useState("");
   const [gds,setGds]=useState("Amadeus");
   const [parsed,setParsed]=useState(null);
@@ -3750,57 +3752,57 @@ export function GdsPnrImport({branch,setRoute}){
   return (
     <div style={{padding:"12px 10px",maxWidth:800,margin:"0 auto"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-        <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>✈</div>
+        <div style={{width:40,height:40,borderRadius:10,background:"#e8f6ed",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>✈</div>
         <div>
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>GDS PNR Import</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Paste PNR from Amadeus / Sabre / Galileo → auto-fill ticket details</p>
+          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#1a1c22"}}>GDS PNR Import</h2>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>Paste PNR from Amadeus / Sabre / Galileo → auto-fill ticket details</p>
         </div>
       </div>
 
       <div style={{...card,marginBottom:12}}>
-        <div style={{display:"grid",gridTemplateColumns:"auto 1fr auto",gap:10,alignItems:"flex-end"}}>
+        <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"auto 1fr auto",gap:10,alignItems:"flex-end"}}>
           <FL label="GDS System"><select value={gds} onChange={e=>setGds(e.target.value)} style={{...inp,minWidth:130}}><option>Amadeus</option><option>Sabre</option><option>Galileo</option><option>Direct Airline</option></select></FL>
           <FL label="PNR / Booking Reference"><input value={pnr} onChange={e=>setPnr(e.target.value.toUpperCase())} style={{...inp,fontFamily:"monospace",textTransform:"uppercase",fontSize:14,fontWeight:700,letterSpacing:2}} placeholder="ABCDE1" maxLength={8}/></FL>
-          <div style={{paddingBottom:2}}><button onClick={parsePnr} disabled={!pnr.trim()||loading} style={{...btnG,padding:"10px 16px",fontSize:12,opacity:!pnr.trim()||loading?0.6:1}}>{loading?"Fetching...":"Fetch PNR →"}</button></div>
+          <div style={{paddingBottom:2}}><button onClick={parsePnr} disabled={!pnr.trim()||loading} className="max-tablet:min-h-[44px] max-tablet:w-full" style={{...btnG,padding:"10px 16px",fontSize:12,opacity:!pnr.trim()||loading?0.6:1}}>{loading?"Fetching...":"Fetch PNR →"}</button></div>
         </div>
       </div>
 
       {parsed&&(
         <div style={{...card}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>PNR: <span style={{fontFamily:"monospace",color:"#185FA5"}}>{parsed.pnr}</span> — {parsed.gds}</p>
-            <span style={{fontSize:11,padding:"3px 10px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700}}>{parsed.status}</span>
+            <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>PNR: <span style={{fontFamily:"monospace",color:"#2563eb"}}>{parsed.pnr}</span> — {parsed.gds}</p>
+            <span style={{fontSize:11,padding:"3px 10px",borderRadius:999,background:"#e8f6ed",color:"#16a34a",fontWeight:700}}>{parsed.status}</span>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:12,marginBottom:12}}>
             {[{l:"Airline",v:parsed.airline},{l:"Fare Class",v:`${parsed.fareClass} (${parsed.fareBasis})`},
               {l:"Base Fare",v:`₹${parsed.fare.toLocaleString()}`},{l:"Taxes & Fees",v:`₹${parsed.taxes.toLocaleString()}`},
               {l:"Total",v:`₹${parsed.total.toLocaleString()}`},{l:"Currency",v:parsed.currency},
             ].map((k,i)=>(
-              <div key={i} style={{padding:"8px 12px",borderRadius:8,background:"#f3f4f8"}}>
-                <p style={{margin:0,fontSize:9,color:"#5a6691",textTransform:"uppercase"}}>{k.l}</p>
-                <p style={{margin:"2px 0 0",fontSize:13,fontWeight:700,color:"#0d1326"}}>{k.v}</p>
+              <div key={i} style={{padding:"8px 12px",borderRadius:8,background:"#f4f5f7"}}>
+                <p style={{margin:0,fontSize:9,color:"#5b616e",textTransform:"uppercase"}}>{k.l}</p>
+                <p style={{margin:"2px 0 0",fontSize:13,fontWeight:700,color:"#1a1c22"}}>{k.v}</p>
               </div>
             ))}
           </div>
-          <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Sectors</p>
+          <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#1a1c22"}}>Sectors</p>
           {parsed.sectors.map((s,i)=>(
-            <div key={i} style={{padding:"10px 14px",borderRadius:9,background:"#E6F1FB",marginBottom:8,display:"flex",gap:16,alignItems:"center"}}>
-              <span style={{fontSize:18,fontWeight:800,color:"#185FA5"}}>{s.from}</span>
-              <span style={{fontSize:14,color:"#5a6691"}}>✈ {s.flight} · {s.date}</span>
-              <span style={{fontSize:18,fontWeight:800,color:"#185FA5"}}>{s.to}</span>
-              <span style={{fontSize:11,color:"#5a6691"}}>{s.dep} → {s.arr} · {s.class}</span>
+            <div key={i} style={{padding:"10px 14px",borderRadius:9,background:"#e8f0ff",marginBottom:8,display:"flex",gap:16,alignItems:"center"}}>
+              <span style={{fontSize:18,fontWeight:800,color:"#2563eb"}}>{s.from}</span>
+              <span style={{fontSize:14,color:"#5b616e"}}>✈ {s.flight} · {s.date}</span>
+              <span style={{fontSize:18,fontWeight:800,color:"#2563eb"}}>{s.to}</span>
+              <span style={{fontSize:11,color:"#5b616e"}}>{s.dep} → {s.arr} · {s.class}</span>
             </div>
           ))}
-          <p style={{margin:"12px 0 6px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Passengers</p>
+          <p style={{margin:"12px 0 6px",fontSize:11,fontWeight:700,color:"#1a1c22"}}>Passengers</p>
           {parsed.pax.map((p,i)=>(
-            <div key={i} style={{padding:"8px 12px",borderRadius:8,background:"#f3f4f8",display:"flex",justifyContent:"space-between",marginBottom:6}}>
-              <span style={{fontWeight:600,color:"#0d1326"}}>{p.name}</span>
-              <span style={{fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{p.ticket}</span>
+            <div key={i} style={{padding:"8px 12px",borderRadius:8,background:"#f4f5f7",display:"flex",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{fontWeight:600,color:"#1a1c22"}}>{p.name}</span>
+              <span style={{fontFamily:"monospace",fontSize:10,color:"#2563eb"}}>{p.ticket}</span>
             </div>
           ))}
           <div style={{marginTop:14,display:"flex",gap:8,justifyContent:"flex-end"}}>
             <button onClick={()=>setParsed(null)} style={btnGh}>Clear</button>
-            <button onClick={createVoucher} style={{...btnG,background:"#27500A"}}>📋 Create Purchase Voucher</button>
+            <button onClick={createVoucher} style={{...btnG,background:"#16a34a"}}>📋 Create Purchase Voucher</button>
           </div>
         </div>
       )}
@@ -3925,21 +3927,21 @@ export function SalesHoliday({branch,setRoute}){
       </div>
 
       {/* Package Type selector — drives TCS applicability */}
-      <div style={{marginBottom:14,padding:"12px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775"}}>
-        <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#854F0B"}}>Package Type</p>
+      <div style={{marginBottom:14,padding:"12px 14px",borderRadius:9,background:"#fbeedb",border:"1px solid #f3d9a8"}}>
+        <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#d97706"}}>Package Type</p>
         <div style={{display:"flex",gap:8,marginBottom:8}}>
           <button onClick={()=>setPkgType("Domestic")} style={{flex:1,padding:"8px 12px",borderRadius:8,cursor:"pointer",
-            background:pkgType==="Domestic"?"#27500A":"#fff",color:pkgType==="Domestic"?"#fff":"#27500A",
-            border:"2px solid #27500A",fontSize:11,fontWeight:600}}>
+            background:pkgType==="Domestic"?"#16a34a":"#fff",color:pkgType==="Domestic"?"#fff":"#16a34a",
+            border:"2px solid #16a34a",fontSize:11,fontWeight:600}}>
             Domestic — GST 5% only (No TCS)
           </button>
           <button onClick={()=>setPkgType("International")} style={{flex:1,padding:"8px 12px",borderRadius:8,cursor:"pointer",
-            background:pkgType==="International"?"#185FA5":"#fff",color:pkgType==="International"?"#fff":"#185FA5",
-            border:"2px solid #185FA5",fontSize:11,fontWeight:600}}>
+            background:pkgType==="International"?"#2563eb":"#fff",color:pkgType==="International"?"#fff":"#2563eb",
+            border:"2px solid #2563eb",fontSize:11,fontWeight:600}}>
             International — GST 5% + TCS 2%
           </button>
         </div>
-        <p style={{margin:0,fontSize:10,color:"#854F0B"}}>
+        <p style={{margin:0,fontSize:10,color:"#d97706"}}>
           {isIntl
             ?"INTERNATIONAL outbound package — GST 5% on (Basic + Service) and TCS 2% u/s 206C(1G) on (Basic + Service + GST). Threshold ₹7L per FY waived in this demo."
             :"DOMESTIC package — GST 5% on (Basic + Service). No TCS applicable."}
@@ -3947,20 +3949,20 @@ export function SalesHoliday({branch,setRoute}){
       </div>
 
       {/* Component breakout — fixed GL rows */}
-      <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Package Component Breakout <span style={{fontSize:9.5,color:"#5a6691"}}>(Basic + Service → GST 5% → TCS 2% if international)</span></p>
+      <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#1a1c22"}}>Package Component Breakout <span style={{fontSize:9.5,color:"#5b616e"}}>(Basic + Service → GST 5% → TCS 2% if international)</span></p>
       <div style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:720}}>
-            <thead><tr style={{background:"#0d1326"}}>
+            <thead><tr style={{background:"#1a1c22"}}>
               {["S.NO","GL Name","Description","SAC Code","Sell Price"].map((h,i)=>(
-                <th key={i} style={{padding:"8px 10px",textAlign:i===4?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+                <th key={i} style={{padding:"8px 10px",textAlign:i===4?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
               {/* 1. Basic */}
-              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fff"}}>
-                <td style={{padding:"4px 10px",textAlign:"center",color:"#5a6691",fontSize:10}}>1</td>
-                <td style={{padding:"4px 10px",fontWeight:700,color:"#0d1326",fontSize:11}}>Basic</td>
+              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fff"}}>
+                <td style={{padding:"4px 10px",textAlign:"center",color:"#5b616e",fontSize:10}}>1</td>
+                <td style={{padding:"4px 10px",fontWeight:700,color:"#1a1c22",fontSize:11}}>Basic</td>
                 <td style={{padding:"3px 6px"}}>
                   <input value={basic.desc} onChange={e=>updBasic("desc",e.target.value)} style={{...inp,minHeight:28,fontSize:10.5,minWidth:200}}/>
                 </td>
@@ -3968,13 +3970,13 @@ export function SalesHoliday({branch,setRoute}){
                   <input value={basic.sac} onChange={e=>updBasic("sac",e.target.value)} style={{...inp,minHeight:28,fontSize:10,fontFamily:"monospace",width:90}}/>
                 </td>
                 <td style={{padding:"3px 6px"}}>
-                  <input type="number" value={basic.amt} onChange={e=>updBasic("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#185FA5"}}/>
+                  <input type="number" value={basic.amt} onChange={e=>updBasic("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#2563eb"}}/>
                 </td>
               </tr>
               {/* 2. Service */}
-              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fafafa"}}>
-                <td style={{padding:"4px 10px",textAlign:"center",color:"#5a6691",fontSize:10}}>2</td>
-                <td style={{padding:"4px 10px",fontWeight:700,color:"#0d1326",fontSize:11}}>Service</td>
+              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fafafa"}}>
+                <td style={{padding:"4px 10px",textAlign:"center",color:"#5b616e",fontSize:10}}>2</td>
+                <td style={{padding:"4px 10px",fontWeight:700,color:"#1a1c22",fontSize:11}}>Service</td>
                 <td style={{padding:"3px 6px"}}>
                   <input value={service.desc} onChange={e=>updService("desc",e.target.value)} style={{...inp,minHeight:28,fontSize:10.5,minWidth:200}}/>
                 </td>
@@ -3982,50 +3984,50 @@ export function SalesHoliday({branch,setRoute}){
                   <input value={service.sac} onChange={e=>updService("sac",e.target.value)} style={{...inp,minHeight:28,fontSize:10,fontFamily:"monospace",width:90}}/>
                 </td>
                 <td style={{padding:"3px 6px"}}>
-                  <input type="number" value={service.amt} onChange={e=>updService("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#185FA5"}}/>
+                  <input type="number" value={service.amt} onChange={e=>updService("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#2563eb"}}/>
                 </td>
               </tr>
               {/* 3. Total (subtotal) */}
-              <tr style={{borderBottom:"1px solid #e1e3ec",background:"#f3f4f8"}}>
-                <td style={{padding:"6px 10px",textAlign:"center",color:"#0d1326",fontSize:10,fontWeight:700}}>3</td>
-                <td style={{padding:"6px 10px",fontWeight:800,color:"#0d1326",fontSize:11.5}}>Total</td>
-                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>Basic + Service</td>
+              <tr style={{borderBottom:"1px solid #e6e8ec",background:"#f4f5f7"}}>
+                <td style={{padding:"6px 10px",textAlign:"center",color:"#1a1c22",fontSize:10,fontWeight:700}}>3</td>
+                <td style={{padding:"6px 10px",fontWeight:800,color:"#1a1c22",fontSize:11.5}}>Total</td>
+                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>Basic + Service</td>
                 <td style={{padding:"6px 10px"}}></td>
-                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:800,fontSize:12,color:"#0d1326",fontVariantNumeric:"tabular-nums"}}>{f(subTotal)}</td>
+                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:800,fontSize:12,color:"#1a1c22",fontVariantNumeric:"tabular-nums"}}>{f(subTotal)}</td>
               </tr>
               {/* 4. GST 5% */}
-              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fff"}}>
-                <td style={{padding:"6px 10px",textAlign:"center",color:"#854F0B",fontSize:10,fontWeight:700}}>4</td>
-                <td style={{padding:"6px 10px",fontWeight:700,color:"#854F0B",fontSize:11}}>GST (5%)</td>
-                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>5% on (Basic + Service)</td>
-                <td style={{padding:"6px 10px",fontSize:10,fontFamily:"monospace",color:"#5a6691"}}>—</td>
-                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#854F0B",fontVariantNumeric:"tabular-nums"}}>{f(gstAmt)}</td>
+              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fff"}}>
+                <td style={{padding:"6px 10px",textAlign:"center",color:"#d97706",fontSize:10,fontWeight:700}}>4</td>
+                <td style={{padding:"6px 10px",fontWeight:700,color:"#d97706",fontSize:11}}>GST (5%)</td>
+                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>5% on (Basic + Service)</td>
+                <td style={{padding:"6px 10px",fontSize:10,fontFamily:"monospace",color:"#5b616e"}}>—</td>
+                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#d97706",fontVariantNumeric:"tabular-nums"}}>{f(gstAmt)}</td>
               </tr>
               {/* 5. TCS 2% */}
-              <tr style={{borderBottom:"1px solid #f3f4f8",background:"#fafafa",opacity:isIntl?1:0.45}}>
-                <td style={{padding:"6px 10px",textAlign:"center",color:"#185FA5",fontSize:10,fontWeight:700}}>5</td>
-                <td style={{padding:"6px 10px",fontWeight:700,color:"#185FA5",fontSize:11}}>TCS (2%) {!isIntl&&<span style={{fontSize:9,color:"#5a6691",fontWeight:500}}>— N/A (Domestic)</span>}</td>
-                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>2% on (Basic + Service + GST) — international only</td>
-                <td style={{padding:"6px 10px",fontSize:10,fontFamily:"monospace",color:"#5a6691"}}>—</td>
-                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(tcsAmt)}</td>
+              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fafafa",opacity:isIntl?1:0.45}}>
+                <td style={{padding:"6px 10px",textAlign:"center",color:"#2563eb",fontSize:10,fontWeight:700}}>5</td>
+                <td style={{padding:"6px 10px",fontWeight:700,color:"#2563eb",fontSize:11}}>TCS (2%) {!isIntl&&<span style={{fontSize:9,color:"#5b616e",fontWeight:500}}>— N/A (Domestic)</span>}</td>
+                <td style={{padding:"6px 10px",fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>2% on (Basic + Service + GST) — international only</td>
+                <td style={{padding:"6px 10px",fontSize:10,fontFamily:"monospace",color:"#5b616e"}}>—</td>
+                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#2563eb",fontVariantNumeric:"tabular-nums"}}>{f(tcsAmt)}</td>
               </tr>
             </tbody>
-            <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
-              <td colSpan={4} style={{padding:"8px 10px",fontWeight:800,color:"#d4a437",fontSize:11.5}}>Grand Total ({pkgType})</td>
-              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:"#d4a437",fontSize:13,fontVariantNumeric:"tabular-nums"}}>{f(grandTotal)}</td>
+            <tfoot><tr style={{background:"#1a1c22",borderTop:"2px solid #c2a04a"}}>
+              <td colSpan={4} style={{padding:"8px 10px",fontWeight:800,color:"#c2a04a",fontSize:11.5}}>Grand Total ({pkgType})</td>
+              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:"#c2a04a",fontSize:13,fontVariantNumeric:"tabular-nums"}}>{f(grandTotal)}</td>
             </tr></tfoot>
           </table>
         </div>
       </div>
 
       {/* Summary tiles */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr",gap:10,marginBottom:12}}>
-        {[{l:"Basic",v:f(basicAmt),c:"#185FA5"},{l:"Service",v:f(serviceAmt),c:"#185FA5"},
-          {l:"GST 5%",v:f(gstAmt),c:"#854F0B"},{l:"TCS 2%",v:isIntl?f(tcsAmt):"N/A",c:isIntl?"#185FA5":"#8b94b3"},
-          {l:"Grand Total",v:f(grandTotal),c:"#0d1326"},
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,140px),1fr))",gap:10,marginBottom:12}}>
+        {[{l:"Basic",v:f(basicAmt),c:"#2563eb"},{l:"Service",v:f(serviceAmt),c:"#2563eb"},
+          {l:"GST 5%",v:f(gstAmt),c:"#d97706"},{l:"TCS 2%",v:isIntl?f(tcsAmt):"N/A",c:isIntl?"#2563eb":"#9197a3"},
+          {l:"Grand Total",v:f(grandTotal),c:"#1a1c22"},
         ].map((k,i)=>(
-          <div key={i} style={{padding:"9px 12px",borderRadius:8,background:"#f3f4f8",textAlign:"center"}}>
-            <p style={{margin:0,fontSize:9,color:"#5a6691",textTransform:"uppercase"}}>{k.l}</p>
+          <div key={i} style={{padding:"9px 12px",borderRadius:8,background:"#f4f5f7",textAlign:"center"}}>
+            <p style={{margin:0,fontSize:9,color:"#5b616e",textTransform:"uppercase"}}>{k.l}</p>
             <p style={{margin:"3px 0 0",fontSize:13,fontWeight:800,color:k.c}}>{k.v}</p>
           </div>
         ))}
@@ -4056,41 +4058,41 @@ export function RecurringVouchers({branch}){
     <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔄</div>
+          <div style={{width:40,height:40,borderRadius:10,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔄</div>
           <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Recurring Voucher Templates</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{templates.length} templates · {due.length} due for posting · Auto-posting saves time each month</p>
+            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#1a1c22"}}>Recurring Voucher Templates</h2>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>{templates.length} templates · {due.length} due for posting · Auto-posting saves time each month</p>
           </div>
         </div>
         <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> New Template</button>
       </div>
 
-      {due.length>0&&<div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775",fontSize:10.5,color:"#854F0B",fontWeight:600,display:"flex",gap:8,flexWrap:"wrap"}}>
+      {due.length>0&&<div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#fbeedb",border:"1px solid #f3d9a8",fontSize:10.5,color:"#d97706",fontWeight:600,display:"flex",gap:8,flexWrap:"wrap"}}>
         <Clock size={14}/> {due.length} recurring voucher{due.length>1?"s":""} due for posting:
-        {due.map(t=><span key={t.id} style={{padding:"1px 7px",borderRadius:999,background:"#854F0B",color:"#fff",fontSize:9.5}}>{t.name}</span>)}
-        <button onClick={()=>due.forEach(t=>run(t.id))} style={{...btnG,padding:"2px 10px",fontSize:9.5,background:"#854F0B",marginLeft:"auto"}}>Post All Now</button>
+        {due.map(t=><span key={t.id} style={{padding:"1px 7px",borderRadius:999,background:"#d97706",color:"#fff",fontSize:9.5}}>{t.name}</span>)}
+        <button onClick={()=>due.forEach(t=>run(t.id))} style={{...btnG,padding:"2px 10px",fontSize:9.5,background:"#d97706",marginLeft:"auto"}}>Post All Now</button>
       </div>}
 
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr style={{background:"#0d1326"}}>
+          <thead><tr style={{background:"#1a1c22"}}>
             {["Template","Type","Freq","Dr Ledger","Cr Ledger","Amount","Next Run","Status","Action"].map((h,i)=>(
-              <th key={i} style={{padding:"9px 12px",textAlign:i===6?"center":i===5?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+              <th key={i} style={{padding:"9px 12px",textAlign:i===6?"center":i===5?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
           <tbody>{templates.map((t,i)=>(
-            <tr key={t.id} style={{borderBottom:"1px solid #f3f4f8",background:t.nextRun<=TODAY?"#fffaf0":i%2===0?"#fff":"#fafafa",opacity:t.active?1:0.5}}>
-              <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{t.name}</td>
-              <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{t.type}</span></td>
-              <td style={{padding:"8px 12px",color:"#384677",fontSize:10.5}}>{t.freq}</td>
-              <td style={{padding:"8px 12px",color:"#A32D2D",fontSize:10.5}}>{t.dr}</td>
-              <td style={{padding:"8px 12px",color:"#27500A",fontSize:10.5}}>{t.cr}</td>
+            <tr key={t.id} style={{borderBottom:"1px solid #f4f5f7",background:t.nextRun<=TODAY?"#fffaf0":i%2===0?"#fff":"#fafafa",opacity:t.active?1:0.5}}>
+              <td style={{padding:"8px 12px",fontWeight:600,color:"#1a1c22"}}>{t.name}</td>
+              <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#e8f0ff",color:"#2563eb",fontWeight:700}}>{t.type}</span></td>
+              <td style={{padding:"8px 12px",color:"#2e323c",fontSize:10.5}}>{t.freq}</td>
+              <td style={{padding:"8px 12px",color:"#dc2626",fontSize:10.5}}>{t.dr}</td>
+              <td style={{padding:"8px 12px",color:"#16a34a",fontSize:10.5}}>{t.cr}</td>
               <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(t.amt)}</td>
-              <td style={{padding:"8px 12px",textAlign:"center",fontWeight:t.nextRun<=TODAY?700:400,color:t.nextRun<=TODAY?"#854F0B":"#5a6691"}}>{t.nextRun}{t.nextRun<=TODAY&&" ⚡"}</td>
-              <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:t.active?"#EAF3DE":"#f3f4f8",color:t.active?"#27500A":"#5a6691"}}>{t.active?"Active":"Paused"}</span></td>
+              <td style={{padding:"8px 12px",textAlign:"center",fontWeight:t.nextRun<=TODAY?700:400,color:t.nextRun<=TODAY?"#d97706":"#5b616e"}}>{t.nextRun}{t.nextRun<=TODAY&&" ⚡"}</td>
+              <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:t.active?"#e8f6ed":"#f4f5f7",color:t.active?"#16a34a":"#5b616e"}}>{t.active?"Active":"Paused"}</span></td>
               <td style={{padding:"8px 12px"}}>
                 <div style={{display:"flex",gap:4}}>
-                  {t.active&&t.nextRun<=TODAY&&<button onClick={()=>run(t.id)} style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#27500A"}}>Post</button>}
+                  {t.active&&t.nextRun<=TODAY&&<button onClick={()=>run(t.id)} style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#16a34a"}}>Post</button>}
                   <button onClick={()=>setTemplates(ts=>ts.map(x=>x.id===t.id?{...x,active:!x.active}:x))} style={{...btnGh,padding:"2px 8px",fontSize:9.5}}>{t.active?"Pause":"Resume"}</button>
                 </div>
               </td>
@@ -4102,24 +4104,24 @@ export function RecurringVouchers({branch}){
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:480,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
-              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>New Recurring Template</p>
-              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #e6e8ec",display:"flex",justifyContent:"space-between"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>New Recurring Template</p>
+              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5b616e"}}>✕</button>
             </div>
             <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
               <FL label="Template name"><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} style={inp} placeholder="e.g. Office Rent — BOM"/></FL>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:10}}>
                 <FL label="Voucher type"><select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} style={inp}><option>Journal</option><option>Payment</option><option>Receipt</option></select></FL>
                 <FL label="Frequency"><select value={form.freq} onChange={e=>setForm(f=>({...f,freq:e.target.value}))} style={inp}><option>Monthly</option><option>Quarterly</option><option>Annual</option><option>Weekly</option></select></FL>
                 <FL label="Day of month"><input type="number" min={1} max={31} value={form.day} onChange={e=>setForm(f=>({...f,day:+e.target.value}))} style={inp}/></FL>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:10}}>
                 <FL label="Debit ledger"><input value={form.dr} onChange={e=>setForm(f=>({...f,dr:e.target.value}))} style={inp} placeholder="e.g. Office Rent"/></FL>
                 <FL label="Credit ledger"><input value={form.cr} onChange={e=>setForm(f=>({...f,cr:e.target.value}))} style={inp} placeholder="e.g. HDFC Bank"/></FL>
               </div>
               <FL label="Amount (₹)"><input type="number" value={form.amt} onChange={e=>setForm(f=>({...f,amt:+e.target.value}))} style={inp}/></FL>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #e6e8ec",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
               <button onClick={()=>{const id=`REC${String(templates.length+1).padStart(3,"0")}`;setTemplates(ts=>[...ts,{...form,id,lastRun:"—",nextRun:`2026-06-${String(form.day).padStart(2,"0")}`,active:true}]);setModal(false);}} style={btnG}>Create Template</button>
             </div>
@@ -4136,8 +4138,8 @@ export function RefundTracker({branch,setRoute}){
   const mob=useMobile();
   const [refunds,setRefunds]=useState(REFUNDS_DATA);
   const [sel,setSel]=useState(null);
-  const STATUS_CLR={"Cancellation Requested":"#854F0B","BSP Filed":"#185FA5","Airline Refund Received":"#1D9E75","Client Refund Done":"#27500A",Closed:"#5a6691"};
-  const STATUS_BG ={"Cancellation Requested":"#FAEEDA","BSP Filed":"#E6F1FB","Airline Refund Received":"#EAF3DE","Client Refund Done":"#EAF3DE",Closed:"#f3f4f8"};
+  const STATUS_CLR={"Cancellation Requested":"#d97706","BSP Filed":"#2563eb","Airline Refund Received":"#3fb7a3","Client Refund Done":"#16a34a",Closed:"#5b616e"};
+  const STATUS_BG ={"Cancellation Requested":"#fbeedb","BSP Filed":"#e8f0ff","Airline Refund Received":"#e8f6ed","Client Refund Done":"#e8f6ed",Closed:"#f4f5f7"};
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
   const advance=id=>setRefunds(rs=>rs.map(r=>r.id===id?{...r,status:STATUS_FLOW[Math.min(STATUS_FLOW.indexOf(r.status)+1,STATUS_FLOW.length-1)]}:r));
 
@@ -4145,10 +4147,10 @@ export function RefundTracker({branch,setRoute}){
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:40,height:40,borderRadius:10,background:"#FCEBEB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>↩</div>
+          <div style={{width:40,height:40,borderRadius:10,background:"#fbe9e9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>↩</div>
           <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Refund Tracker</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Cancellation → BSP → Airline → Client refund pipeline</p>
+            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#1a1c22"}}>Refund Tracker</h2>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>Cancellation → BSP → Airline → Client refund pipeline</p>
           </div>
         </div>
         <button onClick={()=>setRoute("/sales/cancellation")} style={{...btnGh,fontSize:11}}>+ New Cancellation</button>
@@ -4159,9 +4161,9 @@ export function RefundTracker({branch,setRoute}){
         {STATUS_FLOW.map((s,i)=>{
           const cnt=refunds.filter(r=>r.status===s).length;
           return(
-            <div key={s} style={{flex:1,textAlign:"center",padding:"8px 4px",borderRight:i<STATUS_FLOW.length-1?"1px dashed #e1e3ec":"none",minWidth:100}}>
-              <p style={{margin:0,fontSize:20,fontWeight:800,color:cnt>0?STATUS_CLR[s]:"#bfc3d6"}}>{cnt}</p>
-              <p style={{margin:"2px 0 0",fontSize:8.5,fontWeight:600,color:cnt>0?STATUS_CLR[s]:"#bfc3d6",lineHeight:1.3}}>{s}</p>
+            <div key={s} style={{flex:1,textAlign:"center",padding:"8px 4px",borderRight:i<STATUS_FLOW.length-1?"1px dashed #e6e8ec":"none",minWidth:100}}>
+              <p style={{margin:0,fontSize:20,fontWeight:800,color:cnt>0?STATUS_CLR[s]:"#cbd0db"}}>{cnt}</p>
+              <p style={{margin:"2px 0 0",fontSize:8.5,fontWeight:600,color:cnt>0?STATUS_CLR[s]:"#cbd0db",lineHeight:1.3}}>{s}</p>
             </div>
           );
         })}
@@ -4170,20 +4172,20 @@ export function RefundTracker({branch,setRoute}){
       {refunds.map(r=>{
         const stageIdx=STATUS_FLOW.indexOf(r.status);
         return(
-          <div key={r.id} style={{...card,marginBottom:10,borderLeft:`4px solid ${STATUS_CLR[r.status]||"#384677"}`}}>
+          <div key={r.id} style={{...card,marginBottom:10,borderLeft:`4px solid ${STATUS_CLR[r.status]||"#2e323c"}`}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8,flexWrap:"wrap",gap:8}}>
               <div>
                 <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:3}}>
-                  <span style={{fontFamily:"monospace",fontSize:9.5,padding:"1px 7px",borderRadius:4,background:"#0d1326",color:"#d4a437"}}>{r.id}</span>
+                  <span style={{fontFamily:"monospace",fontSize:9.5,padding:"1px 7px",borderRadius:4,background:"#1a1c22",color:"#c2a04a"}}>{r.id}</span>
                   <span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:STATUS_BG[r.status],color:STATUS_CLR[r.status]}}>{r.status}</span>
                 </div>
-                <p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{r.client} — {r.dest}</p>
-                <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Booking: {r.bookingId} · Cancelled: {r.cancelDate} · Reason: {r.reason}</p>
+                <p style={{margin:0,fontSize:12,fontWeight:700,color:"#1a1c22"}}>{r.client} — {r.dest}</p>
+                <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>Booking: {r.bookingId} · Cancelled: {r.cancelDate} · Reason: {r.reason}</p>
               </div>
               <div style={{textAlign:"right"}}>
-                <p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>Original: {f(r.amount)}</p>
-                <p style={{margin:"1px 0 0",fontSize:12,fontWeight:700,color:"#A32D2D"}}>Charges: {f(r.charges)}</p>
-                <p style={{margin:"1px 0 0",fontSize:14,fontWeight:800,color:"#27500A"}}>Refund: {f(r.refundAmt)}</p>
+                <p style={{margin:0,fontSize:10.5,color:"#5b616e"}}>Original: {f(r.amount)}</p>
+                <p style={{margin:"1px 0 0",fontSize:12,fontWeight:700,color:"#dc2626"}}>Charges: {f(r.charges)}</p>
+                <p style={{margin:"1px 0 0",fontSize:14,fontWeight:800,color:"#16a34a"}}>Refund: {f(r.refundAmt)}</p>
               </div>
             </div>
 
@@ -4191,17 +4193,17 @@ export function RefundTracker({branch,setRoute}){
             <div style={{display:"flex",gap:0,marginBottom:10}}>
               {STATUS_FLOW.map((s,i)=>(
                 <div key={s} style={{flex:1,height:4,borderRadius:i===0?"4px 0 0 4px":i===STATUS_FLOW.length-1?"0 4px 4px 0":"none",
-                  background:i<=stageIdx?STATUS_CLR[r.status]:"#e1e3ec"}}/>
+                  background:i<=stageIdx?STATUS_CLR[r.status]:"#e6e8ec"}}/>
               ))}
             </div>
 
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-              <div style={{fontSize:10.5,color:"#5a6691"}}>
+              <div style={{fontSize:10.5,color:"#5b616e"}}>
                 BSP Ref: <b>{r.bspRef||"—"}</b> · Refund mode: <b>{r.mode}</b>
-                {r.clientRefund&&<span style={{marginLeft:8,color:"#27500A",fontWeight:700}}>✔ Client refund done</span>}
+                {r.clientRefund&&<span style={{marginLeft:8,color:"#16a34a",fontWeight:700}}>✔ Client refund done</span>}
               </div>
               {stageIdx<STATUS_FLOW.length-1&&(
-                <button onClick={()=>advance(r.id)} style={{...btnG,padding:"4px 12px",fontSize:10,background:STATUS_CLR[STATUS_FLOW[stageIdx+1]]||"#0d1326"}}>
+                <button onClick={()=>advance(r.id)} style={{...btnG,padding:"4px 12px",fontSize:10,background:STATUS_CLR[STATUS_FLOW[stageIdx+1]]||"#1a1c22"}}>
                   → {STATUS_FLOW[stageIdx+1]}
                 </button>
               )}
@@ -4237,28 +4239,28 @@ export function QuickPOS({branch,setRoute}){
   const f=n=>cur+Number(Math.round(n)).toLocaleString("en-IN");
 
   const SERVICES=[
-    {name:"Flight Ticket",icon:"✈",color:"#185FA5",bg:"#E6F1FB",suggestAmt:8500,route:"/sales/flight"},
-    {name:"Holiday Package",icon:"🌴",color:"#27500A",bg:"#EAF3DE",suggestAmt:45000,route:"/sales/holiday"},
-    {name:"Visa",icon:"🛂",color:"#854F0B",bg:"#FAEEDA",suggestAmt:3800,route:"/sales/visa"},
-    {name:"Hotel",icon:"🏨",color:"#1D9E75",bg:"#EAF3DE",suggestAmt:12000,route:"/sales/hotel"},
-    {name:"Insurance",icon:"🛡",color:"#384677",bg:"#f3f4f8",suggestAmt:1500,route:"/sales/insurance"},
-    {name:"Miscellaneous",icon:"📋",color:"#5a6691",bg:"#f3f4f8",suggestAmt:2000,route:"/sales/misc"},
+    {name:"Flight Ticket",icon:"✈",color:"#2563eb",bg:"#e8f0ff",suggestAmt:8500,route:"/sales/flight"},
+    {name:"Holiday Package",icon:"🌴",color:"#16a34a",bg:"#e8f6ed",suggestAmt:45000,route:"/sales/holiday"},
+    {name:"Visa",icon:"🛂",color:"#d97706",bg:"#fbeedb",suggestAmt:3800,route:"/sales/visa"},
+    {name:"Hotel",icon:"🏨",color:"#3fb7a3",bg:"#e8f6ed",suggestAmt:12000,route:"/sales/hotel"},
+    {name:"Insurance",icon:"🛡",color:"#2e323c",bg:"#f4f5f7",suggestAmt:1500,route:"/sales/insurance"},
+    {name:"Miscellaneous",icon:"📋",color:"#5b616e",bg:"#f4f5f7",suggestAmt:2000,route:"/sales/misc"},
   ];
   const selSvc=SERVICES.find(s=>s.name===service)||SERVICES[0];
 
   return(
     <div style={{padding:"12px 10px",maxWidth:700,margin:"0 auto"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-        <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>⚡</div>
+        <div style={{width:40,height:40,borderRadius:10,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>⚡</div>
         <div>
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Quick POS Booking</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>Walk-in client · Fast entry · Instant receipt · {brCode}</p>
+          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#1a1c22"}}>Quick POS Booking</h2>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>Walk-in client · Fast entry · Instant receipt · {brCode}</p>
         </div>
         <div style={{marginLeft:"auto",display:"flex",gap:6}}>
           {["1","2","3","4"].map((n,i)=>(
             <div key={n} style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,
-              background:step>i+1?"#27500A":step===i+1?"#0d1326":"#f3f4f8",
-              color:step>i+1?"#fff":step===i+1?"#d4a437":"#5a6691"}}>
+              background:step>i+1?"#16a34a":step===i+1?"#1a1c22":"#f4f5f7",
+              color:step>i+1?"#fff":step===i+1?"#c2a04a":"#5b616e"}}>
               {step>i+1?"✔":n}
             </div>
           ))}
@@ -4267,7 +4269,7 @@ export function QuickPOS({branch,setRoute}){
 
       {step===1&&(
         <div style={{...card}}>
-          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Step 1 — Client Details</p>
+          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>Step 1 — Client Details</p>
           <div style={{display:"flex",gap:8,marginBottom:12}}>
             <button onClick={()=>setClient(c=>({...c,isExisting:false}))} style={{...!client.isExisting?btnG:btnGh,fontSize:11,flex:1}}>Walk-in / New</button>
             <button onClick={()=>setClient(c=>({...c,isExisting:true}))} style={{...client.isExisting?btnG:btnGh,fontSize:11,flex:1}}>Existing Client</button>
@@ -4292,19 +4294,19 @@ export function QuickPOS({branch,setRoute}){
 
       {step===2&&(
         <div style={{...card}}>
-          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Step 2 — Service & Amount</p>
-          <p style={{margin:"0 0 12px",fontSize:10.5,color:"#5a6691"}}>Client: <b>{client.name}</b></p>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>Step 2 — Service & Amount</p>
+          <p style={{margin:"0 0 12px",fontSize:10.5,color:"#5b616e"}}>Client: <b>{client.name}</b></p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:8,marginBottom:14}}>
             {SERVICES.map(s=>(
               <div key={s.name} {...clickable(()=>{setService(s.name);setAmount(s.suggestAmt);})}
-                style={{padding:"12px 10px",borderRadius:10,cursor:"pointer",textAlign:"center",border:`2px solid ${service===s.name?s.color:"#e1e3ec"}`,background:service===s.name?s.bg:"#fff",transition:"all 0.15s"}}>
+                style={{padding:"12px 10px",borderRadius:10,cursor:"pointer",textAlign:"center",border:`2px solid ${service===s.name?s.color:"#e6e8ec"}`,background:service===s.name?s.bg:"#fff",transition:"all 0.15s"}}>
                 <span style={{fontSize:22}}>{s.icon}</span>
                 <p style={{margin:"4px 0 0",fontSize:10.5,fontWeight:700,color:s.color}}>{s.name}</p>
-                <p style={{margin:"1px 0 0",fontSize:9,color:"#5a6691"}}>~{cur+(s.suggestAmt/1000).toFixed(0)}K</p>
+                <p style={{margin:"1px 0 0",fontSize:9,color:"#5b616e"}}>~{cur+(s.suggestAmt/1000).toFixed(0)}K</p>
               </div>
             ))}
           </div>
-          <FL label="Amount (₹)"><input type="number" value={amount} onChange={e=>setAmount(+e.target.value)} style={{...inp,fontSize:18,fontWeight:700,color:"#0d1326"}}/></FL>
+          <FL label="Amount (₹)"><input type="number" value={amount} onChange={e=>setAmount(+e.target.value)} style={{...inp,fontSize:18,fontWeight:700,color:"#1a1c22"}}/></FL>
           <div style={{display:"flex",gap:8,marginTop:12}}>
             <button onClick={()=>setStep(1)} style={{...btnGh,flex:1}}>← Back</button>
             <button onClick={()=>setStep(3)} disabled={!amount} style={{...btnG,flex:2,opacity:!amount?0.5:1}}>Next → Payment</button>
@@ -4314,11 +4316,11 @@ export function QuickPOS({branch,setRoute}){
 
       {step===3&&(
         <div style={{...card}}>
-          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Step 3 — Payment Collection</p>
-          <div style={{padding:"12px 14px",borderRadius:9,background:"#EAF3DE",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>Step 3 — Payment Collection</p>
+          <div style={{padding:"12px 14px",borderRadius:9,background:"#e8f6ed",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
-              <p style={{margin:0,fontSize:10.5,color:"#27500A"}}>{client.name} — {service}</p>
-              <p style={{margin:"2px 0 0",fontSize:22,fontWeight:800,color:"#27500A"}}>{f(amount)}</p>
+              <p style={{margin:0,fontSize:10.5,color:"#16a34a"}}>{client.name} — {service}</p>
+              <p style={{margin:"2px 0 0",fontSize:22,fontWeight:800,color:"#16a34a"}}>{f(amount)}</p>
             </div>
             <span style={{fontSize:24}}>{selSvc.icon}</span>
           </div>
@@ -4326,7 +4328,7 @@ export function QuickPOS({branch,setRoute}){
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {["Cash","UPI","Card","Cheque","NEFT"].map(m=>(
                 <button key={m} onClick={()=>setMode(m)} style={{padding:"6px 14px",borderRadius:7,cursor:"pointer",fontSize:11,fontWeight:600,
-                  background:mode===m?"#0d1326":"#f3f4f8",color:mode===m?"#d4a437":"#384677",border:`1.5px solid ${mode===m?"#d4a437":"#e1e3ec"}`}}>
+                  background:mode===m?"#1a1c22":"#f4f5f7",color:mode===m?"#c2a04a":"#2e323c",border:`1.5px solid ${mode===m?"#c2a04a":"#e6e8ec"}`}}>
                   {m}
                 </button>
               ))}
@@ -4335,7 +4337,7 @@ export function QuickPOS({branch,setRoute}){
           {mode!=="Cash"&&<FL label="Reference / UTR"><input value={ref} onChange={e=>setRef(e.target.value)} style={{...inp,marginTop:8}} placeholder="Transaction ref..."/></FL>}
           <div style={{display:"flex",gap:8,marginTop:12}}>
             <button onClick={()=>setStep(2)} style={{...btnGh,flex:1}}>← Back</button>
-            <button onClick={()=>setStep(4)} style={{...btnG,flex:2,background:"#27500A",fontSize:13}}>✔ Confirm & Print Receipt</button>
+            <button onClick={()=>setStep(4)} style={{...btnG,flex:2,background:"#16a34a",fontSize:13}}>✔ Confirm & Print Receipt</button>
           </div>
         </div>
       )}
@@ -4343,10 +4345,10 @@ export function QuickPOS({branch,setRoute}){
       {step===4&&(
         <div style={{...card,textAlign:"center"}}>
           <div style={{fontSize:48,marginBottom:12}}>✅</div>
-          <p style={{margin:"0 0 4px",fontSize:16,fontWeight:800,color:"#27500A"}}>Booking Confirmed!</p>
-          <p style={{margin:"0 0 14px",fontSize:11,color:"#5a6691"}}>Receipt #{vNo} · {client.name} · {service} · {f(amount)}</p>
-          <div style={{padding:"12px 14px",borderRadius:9,background:"#f3f4f8",marginBottom:14,textAlign:"left"}}>
-            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>Voucher No.</span><span style={{fontWeight:600}}>{vNo}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>Client</span><span style={{fontWeight:600}}>{client.name}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e1e3ec"}}><span style={{color:"#5a6691"}}>Service</span><span style={{fontWeight:600}}>{service}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11}}><span style={{color:"#5a6691"}}>Branch</span><span style={{fontWeight:600}}>{bc(branch).voucherPrefix}</span></div>
+          <p style={{margin:"0 0 4px",fontSize:16,fontWeight:800,color:"#16a34a"}}>Booking Confirmed!</p>
+          <p style={{margin:"0 0 14px",fontSize:11,color:"#5b616e"}}>Receipt #{vNo} · {client.name} · {service} · {f(amount)}</p>
+          <div style={{padding:"12px 14px",borderRadius:9,background:"#f4f5f7",marginBottom:14,textAlign:"left"}}>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e6e8ec"}}><span style={{color:"#5b616e"}}>Voucher No.</span><span style={{fontWeight:600}}>{vNo}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e6e8ec"}}><span style={{color:"#5b616e"}}>Client</span><span style={{fontWeight:600}}>{client.name}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e6e8ec"}}><span style={{color:"#5b616e"}}>Service</span><span style={{fontWeight:600}}>{service}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11}}><span style={{color:"#5b616e"}}>Branch</span><span style={{fontWeight:600}}>{bc(branch).voucherPrefix}</span></div>
           </div>
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>openPrintPreview({ selector:'main', title:`Receipt ${vNo}`, recommend:'portrait' })} style={{...btnG,flex:1}}><Printer size={13}/> Print Receipt</button>
@@ -4366,10 +4368,10 @@ export function VoucherEntryTabbed(){
   const tabs=[{id:"entry",label:"1. Entry"},{id:"lines",label:"2. Line Items"},{id:"tax",label:"3. Tax Computation"},{id:"attach",label:"4. Attachments"},{id:"approval",label:"5. Approvals"},{id:"audit",label:"6. Audit Trail"},{id:"related",label:"7. Related Vouchers"},{id:"notes",label:"8. Notes"}];
   return TAB_Page("Receipt Voucher", "Standardised 8-tab structure",
     {user:"",date:"",created:""},
-    <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
-      <div style={{display:"flex",borderBottom:"1px solid #e1e3ec",overflowX:"auto",background:"#fafbfd"}}>{tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}</div>
+    <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden"}}>
+      <div style={{display:"flex",borderBottom:"1px solid #e6e8ec",overflowX:"auto",background:"#fafbfd"}}>{tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}</div>
       {tab==="entry"&&tabPanel(
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:14}}>
           <FL label="Voucher No."><input defaultValue="RV-BOM/2026/4521" readOnly style={{...inpStd,fontFamily:"monospace",background:"#fafbfd"}}/></FL>
           <FL label="Voucher Date"><input type="date" defaultValue={todayISO()} style={inpStd}/></FL>
           <FL label="Branch"><select style={inpStd}><option>BOM (Mumbai)</option></select></FL>
@@ -4385,60 +4387,60 @@ export function VoucherEntryTabbed(){
       {tab==="lines"&&tabPanel(
         <>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-            <thead style={{background:"#f7f8fb"}}><tr>{["#","Invoice Ref","Invoice Date","Invoice Amt","Outstanding","Allocated","Balance"].map((h,i)=><th key={h} style={{padding:"9px 12px",textAlign:i<2?"left":"right",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
+            <thead style={{background:"#f7f8fb"}}><tr>{["#","Invoice Ref","Invoice Date","Invoice Amt","Outstanding","Allocated","Balance"].map((h,i)=><th key={h} style={{padding:"9px 12px",textAlign:i<2?"left":"right",fontSize:10.5,color:"#5b616e",fontWeight:700,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
             <tbody>
-              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"10px 12px"}}>1</td><td style={{padding:"10px 12px",fontFamily:"monospace",fontWeight:600}}>INV-BOM/2026/8721</td><td style={{padding:"10px 12px",textAlign:"right",color:"#5a6691"}}>2026-05-15</td><td style={{padding:"10px 12px",textAlign:"right"}}>₹3,25,000</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700}}>₹3,25,000</td><td style={{padding:"10px 12px",textAlign:"right"}}><input defaultValue="325000" type="number" style={{...inpStd,textAlign:"right",fontWeight:700,maxWidth:120,marginLeft:"auto"}}/></td><td style={{padding:"10px 12px",textAlign:"right",color:"#22c55e",fontWeight:700}}>₹0</td></tr>
-              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"10px 12px"}}>2</td><td style={{padding:"10px 12px",fontFamily:"monospace",fontWeight:600}}>INV-BOM/2026/8688</td><td style={{padding:"10px 12px",textAlign:"right",color:"#5a6691"}}>2026-05-08</td><td style={{padding:"10px 12px",textAlign:"right"}}>₹1,85,000</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700}}>₹1,85,000</td><td style={{padding:"10px 12px",textAlign:"right"}}><input defaultValue="160000" type="number" style={{...inpStd,textAlign:"right",fontWeight:700,maxWidth:120,marginLeft:"auto"}}/></td><td style={{padding:"10px 12px",textAlign:"right",color:"#A32D2D",fontWeight:700}}>₹25,000</td></tr>
-              <tr style={{background:"#0d1326",color:"#d4a437"}}><td colSpan={5} style={{padding:"10px 12px",fontWeight:700,textAlign:"right"}}>TOTAL ALLOCATED</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,fontSize:13,fontFamily:"monospace"}}>₹4,85,000</td><td style={{padding:"10px 12px",textAlign:"right",fontFamily:"monospace"}}>₹25,000</td></tr>
+              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"10px 12px"}}>1</td><td style={{padding:"10px 12px",fontFamily:"monospace",fontWeight:600}}>INV-BOM/2026/8721</td><td style={{padding:"10px 12px",textAlign:"right",color:"#5b616e"}}>2026-05-15</td><td style={{padding:"10px 12px",textAlign:"right"}}>₹3,25,000</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700}}>₹3,25,000</td><td style={{padding:"10px 12px",textAlign:"right"}}><input defaultValue="325000" type="number" style={{...inpStd,textAlign:"right",fontWeight:700,maxWidth:120,marginLeft:"auto"}}/></td><td style={{padding:"10px 12px",textAlign:"right",color:"#16a34a",fontWeight:700}}>₹0</td></tr>
+              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"10px 12px"}}>2</td><td style={{padding:"10px 12px",fontFamily:"monospace",fontWeight:600}}>INV-BOM/2026/8688</td><td style={{padding:"10px 12px",textAlign:"right",color:"#5b616e"}}>2026-05-08</td><td style={{padding:"10px 12px",textAlign:"right"}}>₹1,85,000</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700}}>₹1,85,000</td><td style={{padding:"10px 12px",textAlign:"right"}}><input defaultValue="160000" type="number" style={{...inpStd,textAlign:"right",fontWeight:700,maxWidth:120,marginLeft:"auto"}}/></td><td style={{padding:"10px 12px",textAlign:"right",color:"#dc2626",fontWeight:700}}>₹25,000</td></tr>
+              <tr style={{background:"#1a1c22",color:"#c2a04a"}}><td colSpan={5} style={{padding:"10px 12px",fontWeight:700,textAlign:"right"}}>TOTAL ALLOCATED</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,fontSize:13,fontFamily:"monospace"}}>₹4,85,000</td><td style={{padding:"10px 12px",textAlign:"right",fontFamily:"monospace"}}>₹25,000</td></tr>
             </tbody>
           </table>
-          <button style={{marginTop:8,padding:"7px 14px",background:"transparent",border:"1px dashed #d4a437",color:"#d4a437",borderRadius:5,fontSize:11.5,cursor:"pointer",fontWeight:600}}>+ Add another invoice to allocate against</button>
+          <button style={{marginTop:8,padding:"7px 14px",background:"transparent",border:"1px dashed #c2a04a",color:"#c2a04a",borderRadius:5,fontSize:11.5,cursor:"pointer",fontWeight:600}}>+ Add another invoice to allocate against</button>
         </>
       )}
       {tab==="tax"&&tabPanel(
         <div style={cardStyle}>
-          <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>Tax Computation (for Receipt Voucher — typically nil)</p>
+          <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22",marginBottom:10}}>Tax Computation (for Receipt Voucher — typically nil)</p>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <tbody>
-              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",color:"#5a6691"}}>Gross Receipt</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace"}}>₹4,85,000</td></tr>
-              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",color:"#5a6691"}}>Less: TDS u/s 194C (deducted by L&T)</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",color:"#A32D2D"}}>(–) ₹9,700</td></tr>
-              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",color:"#5a6691"}}>Net Receipt</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",fontWeight:700}}>₹4,75,300</td></tr>
-              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",color:"#5a6691"}}>TDS Certificate Received?</td><td style={{padding:"9px 12px",textAlign:"right"}}><span style={{padding:"2px 8px",background:"#fff3cd",color:"#856404",borderRadius:3,fontSize:10,fontWeight:700}}>Pending — Q1 26-27</span></td></tr>
-              <tr><td style={{padding:"9px 12px",color:"#5a6691"}}>GST Impact</td><td style={{padding:"9px 12px",textAlign:"right",color:"#5a6691"}}>Nil (Receipt — already accounted at invoice stage)</td></tr>
+              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",color:"#5b616e"}}>Gross Receipt</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace"}}>₹4,85,000</td></tr>
+              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",color:"#5b616e"}}>Less: TDS u/s 194C (deducted by L&T)</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",color:"#dc2626"}}>(–) ₹9,700</td></tr>
+              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",color:"#5b616e"}}>Net Receipt</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",fontWeight:700}}>₹4,75,300</td></tr>
+              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",color:"#5b616e"}}>TDS Certificate Received?</td><td style={{padding:"9px 12px",textAlign:"right"}}><span style={{padding:"2px 8px",background:"#fbeedb",color:"#d97706",borderRadius:3,fontSize:10,fontWeight:700}}>Pending — Q1 26-27</span></td></tr>
+              <tr><td style={{padding:"9px 12px",color:"#5b616e"}}>GST Impact</td><td style={{padding:"9px 12px",textAlign:"right",color:"#5b616e"}}>Nil (Receipt — already accounted at invoice stage)</td></tr>
             </tbody>
           </table>
         </div>
       )}
       {tab==="attach"&&tabPanel(
         <div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:14}}>{[{n:"NEFT Confirmation",sz:"245 KB",ty:"pdf"},{n:"Customer Email Confirmation",sz:"82 KB",ty:"eml"}].map((f,i)=>(<div key={i} style={{padding:14,background:"#fafbfd",border:"1px solid #e1e3ec",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:30}}>{f.ty==="pdf"?"📄":"📧"}</p><p style={{margin:"6px 0 2px",fontSize:11,color:"#0d1326",fontWeight:600}}>{f.n}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>{f.sz} · {f.ty.toUpperCase()}</p><button style={{marginTop:6,padding:"3px 10px",background:"transparent",border:"1px solid #d4a437",color:"#d4a437",borderRadius:4,fontSize:10,cursor:"pointer",fontWeight:600}}>↓ Download</button></div>))}</div>
-          <div style={{padding:30,border:"2px dashed #d4a437",borderRadius:8,textAlign:"center",background:"#fafbfd"}}><p style={{margin:0,fontSize:36}}>📂</p><p style={{margin:"6px 0 2px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Drag & drop or browse</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>PDF, image, eml — max 10 MB per file</p></div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:14}}>{[{n:"NEFT Confirmation",sz:"245 KB",ty:"pdf"},{n:"Customer Email Confirmation",sz:"82 KB",ty:"eml"}].map((f,i)=>(<div key={i} style={{padding:14,background:"#fafbfd",border:"1px solid #e6e8ec",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:30}}>{f.ty==="pdf"?"📄":"📧"}</p><p style={{margin:"6px 0 2px",fontSize:11,color:"#1a1c22",fontWeight:600}}>{f.n}</p><p style={{margin:0,fontSize:10,color:"#5b616e"}}>{f.sz} · {f.ty.toUpperCase()}</p><button style={{marginTop:6,padding:"3px 10px",background:"transparent",border:"1px solid #c2a04a",color:"#c2a04a",borderRadius:4,fontSize:10,cursor:"pointer",fontWeight:600}}>↓ Download</button></div>))}</div>
+          <div style={{padding:30,border:"2px dashed #c2a04a",borderRadius:8,textAlign:"center",background:"#fafbfd"}}><p style={{margin:0,fontSize:36}}>📂</p><p style={{margin:"6px 0 2px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>Drag & drop or browse</p><p style={{margin:0,fontSize:11,color:"#5b616e"}}>PDF, image, eml — max 10 MB per file</p></div>
         </div>
       )}
       {tab==="approval"&&tabPanel(
         <div>
-          <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Approval Workflow</p>
+          <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>Approval Workflow</p>
           {[].map((s,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 14px",background:"#fafbfd",borderRadius:6,marginBottom:8,border:"1px solid #e1e3ec"}}>
-              <div style={{width:32,height:32,borderRadius:"50%",background:s.status==="done"?"#22c55e":s.status==="skip"?"#cbd0dc":"#d4a437",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:14}}>{s.status==="done"?"✓":s.status==="skip"?"⊘":"○"}</div>
-              <div style={{flex:1}}><p style={{margin:0,fontSize:12.5,fontWeight:700,color:"#0d1326"}}>{s.step}</p><p style={{margin:"2px 0 0",fontSize:11,color:"#5a6691"}}>by {s.by} · {s.ts}</p></div>
-              <span style={{padding:"3px 10px",background:s.status==="done"?"#d4edda":s.status==="skip"?"#e2e3e5":"#fff3cd",color:s.status==="done"?"#155724":s.status==="skip"?"#383d41":"#856404",borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px"}}>{s.status.toUpperCase()}</span>
+            <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 14px",background:"#fafbfd",borderRadius:6,marginBottom:8,border:"1px solid #e6e8ec"}}>
+              <div style={{width:32,height:32,borderRadius:"50%",background:s.status==="done"?"#16a34a":s.status==="skip"?"#cbd0dc":"#c2a04a",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:14}}>{s.status==="done"?"✓":s.status==="skip"?"⊘":"○"}</div>
+              <div style={{flex:1}}><p style={{margin:0,fontSize:12.5,fontWeight:700,color:"#1a1c22"}}>{s.step}</p><p style={{margin:"2px 0 0",fontSize:11,color:"#5b616e"}}>by {s.by} · {s.ts}</p></div>
+              <span style={{padding:"3px 10px",background:s.status==="done"?"#e8f6ed":s.status==="skip"?"#e2e3e5":"#fbeedb",color:s.status==="done"?"#16a34a":s.status==="skip"?"#383d41":"#d97706",borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px"}}>{s.status.toUpperCase()}</span>
             </div>))}
         </div>
       )}
       {tab==="audit"&&tabPanel(
-        <div>{[].map((h,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 12px",borderBottom:"1px solid #f0f2f7"}}><span style={{fontFamily:"monospace",fontSize:10.5,color:"#5a6691",minWidth:130}}>{h.ts}</span><span style={{fontSize:11.5,color:"#0d1326",fontWeight:600,minWidth:110}}>{h.u}</span><span style={{padding:"2px 8px",background:h.a==="POSTED"||h.a==="APPROVED"?"#d4edda":h.a==="CREATED"?"#cfe2ff":"#fff3cd",color:h.a==="POSTED"||h.a==="APPROVED"?"#155724":h.a==="CREATED"?"#004085":"#856404",borderRadius:3,fontSize:9.5,fontWeight:700,minWidth:80,textAlign:"center"}}>{h.a}</span><span style={{fontSize:11.5,color:"#5a6691"}}>{h.d}</span></div>))}</div>
+        <div>{[].map((h,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 12px",borderBottom:"1px solid #f0f2f7"}}><span style={{fontFamily:"monospace",fontSize:10.5,color:"#5b616e",minWidth:130}}>{h.ts}</span><span style={{fontSize:11.5,color:"#1a1c22",fontWeight:600,minWidth:110}}>{h.u}</span><span style={{padding:"2px 8px",background:h.a==="POSTED"||h.a==="APPROVED"?"#e8f6ed":h.a==="CREATED"?"#cfe2ff":"#fbeedb",color:h.a==="POSTED"||h.a==="APPROVED"?"#16a34a":h.a==="CREATED"?"#004085":"#d97706",borderRadius:3,fontSize:9.5,fontWeight:700,minWidth:80,textAlign:"center"}}>{h.a}</span><span style={{fontSize:11.5,color:"#5b616e"}}>{h.d}</span></div>))}</div>
       )}
       {tab==="related"&&tabPanel(
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead style={{background:"#f7f8fb"}}><tr>{["Voucher","Type","Date","Amount","Relationship"].map((h,i)=><th key={h} style={{padding:"9px 12px",textAlign:i===3?"right":"left",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-          <tbody>{[{v:"INV-BOM/2026/8721",t:"Tax Invoice",d:"2026-05-15",a:325000,r:"Settled (full)"},{v:"INV-BOM/2026/8688",t:"Tax Invoice",d:"2026-05-08",a:185000,r:"Partially settled (₹1.60L of ₹1.85L)"}].map(r=>(<tr key={r.v} style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"10px 12px",fontFamily:"monospace",fontWeight:600}}>{r.v}</td><td style={{padding:"10px 12px"}}>{r.t}</td><td style={{padding:"10px 12px",color:"#5a6691"}}>{r.d}</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700}}>₹{r.a.toLocaleString("en-IN")}</td><td style={{padding:"10px 12px",fontSize:11.5,color:"#5a6691"}}>{r.r}</td></tr>))}</tbody>
+          <thead style={{background:"#f7f8fb"}}><tr>{["Voucher","Type","Date","Amount","Relationship"].map((h,i)=><th key={h} style={{padding:"9px 12px",textAlign:i===3?"right":"left",fontSize:10.5,color:"#5b616e",fontWeight:700,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
+          <tbody>{[{v:"INV-BOM/2026/8721",t:"Tax Invoice",d:"2026-05-15",a:325000,r:"Settled (full)"},{v:"INV-BOM/2026/8688",t:"Tax Invoice",d:"2026-05-08",a:185000,r:"Partially settled (₹1.60L of ₹1.85L)"}].map(r=>(<tr key={r.v} style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"10px 12px",fontFamily:"monospace",fontWeight:600}}>{r.v}</td><td style={{padding:"10px 12px"}}>{r.t}</td><td style={{padding:"10px 12px",color:"#5b616e"}}>{r.d}</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700}}>₹{r.a.toLocaleString("en-IN")}</td><td style={{padding:"10px 12px",fontSize:11.5,color:"#5b616e"}}>{r.r}</td></tr>))}</tbody>
         </table>
       )}
       {tab==="notes"&&tabPanel(
         <div>
-          {[].map((c,i)=>(<div key={i} style={{display:"flex",gap:10,marginBottom:10,flexDirection:c.me?"row-reverse":"row"}}><div style={{width:32,height:32,borderRadius:"50%",background:c.me?"#2F7A8E":"#6B4C8B",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:11,flexShrink:0}}>{c.u.substring(0,2).toUpperCase()}</div><div style={{maxWidth:"70%",padding:"8px 12px",background:c.me?"#0d1326":"#fafbfd",color:c.me?"#fff":"#0d1326",borderRadius:c.me?"8px 8px 2px 8px":"8px 8px 8px 2px",border:c.me?"none":"1px solid #e1e3ec"}}><p style={{margin:0,fontSize:11,opacity:0.7,fontWeight:600}}>{c.u}</p><p style={{margin:"3px 0",fontSize:12,lineHeight:1.45}}>{c.txt}</p><p style={{margin:0,fontSize:9.5,opacity:0.6}}>{c.ts}</p></div></div>))}
-          <div style={{marginTop:10,display:"flex",gap:8}}><input placeholder="Add comment..." style={{flex:1,padding:9,border:"1px solid #e1e3ec",borderRadius:6,fontSize:12}}/><button style={{padding:"9px 18px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,cursor:"pointer",fontWeight:700}}>Send</button></div>
+          {[].map((c,i)=>(<div key={i} style={{display:"flex",gap:10,marginBottom:10,flexDirection:c.me?"row-reverse":"row"}}><div style={{width:32,height:32,borderRadius:"50%",background:c.me?"#2F7A8E":"#6B4C8B",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:11,flexShrink:0}}>{c.u.substring(0,2).toUpperCase()}</div><div style={{maxWidth:"70%",padding:"8px 12px",background:c.me?"#1a1c22":"#fafbfd",color:c.me?"#fff":"#1a1c22",borderRadius:c.me?"8px 8px 2px 8px":"8px 8px 8px 2px",border:c.me?"none":"1px solid #e6e8ec"}}><p style={{margin:0,fontSize:11,opacity:0.7,fontWeight:600}}>{c.u}</p><p style={{margin:"3px 0",fontSize:12,lineHeight:1.45}}>{c.txt}</p><p style={{margin:0,fontSize:9.5,opacity:0.6}}>{c.ts}</p></div></div>))}
+          <div style={{marginTop:10,display:"flex",gap:8}}><input placeholder="Add comment..." style={{flex:1,padding:9,border:"1px solid #e6e8ec",borderRadius:6,fontSize:12}}/><button style={{padding:"9px 18px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:12,cursor:"pointer",fontWeight:700}}>Send</button></div>
         </div>
       )}
     </div>
@@ -4457,70 +4459,70 @@ export function MultiCurrencyVoucher(){
   const costINR=Math.round(costAmt);
   const gpINR=saleINR-costINR;
   const gpPct=(gpINR/saleINR*100).toFixed(1);
-  const inp={padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12};
+  const inp={padding:"7px 10px",border:"1px solid #e6e8ec",borderRadius:5,fontSize:12};
 
   return (
     <PHASE2_Page title="Gross Profit Voucher" subtitle="Single voucher · sale and cost in INR · auto GP calculation">
-      <div style={{padding:12,background:"#e8f0fe",border:"1px solid #b8d0f8",borderLeft:"3px solid #3b82f6",borderRadius:6,marginBottom:14,fontSize:11.5,color:"#1e3a5f"}}>
+      <div style={{padding:12,background:"#e8f0ff",border:"1px solid #cfe0f8",borderLeft:"3px solid #2563eb",borderRadius:6,marginBottom:14,fontSize:11.5,color:"#2e323c"}}>
         <b>How it works:</b> Enter the sale amount billed to the customer and the cost paid to the supplier — both in INR. KBiz360 calculates gross profit and GP% automatically.
       </div>
-      <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:20}}>
+      <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,padding:20}}>
         {/* Header */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,marginBottom:18,paddingBottom:14,borderBottom:"1px solid #f0f2f7"}}>
-          <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Voucher Type</label><select style={{...inp,width:"100%"}}><option>Sales Voucher</option><option>Mixed Purchase-Sale</option></select></div>
-          <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Date</label><input type="date" defaultValue={todayISO()} style={{...inp,width:"100%"}}/></div>
-          <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Branch</label><select style={{...inp,width:"100%"}}><option>TKHO</option><option>BOM</option><option>AMD</option></select></div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:14,marginBottom:18,paddingBottom:14,borderBottom:"1px solid #f0f2f7"}}>
+          <div><label style={{fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Voucher Type</label><select style={{...inp,width:"100%"}}><option>Sales Voucher</option><option>Mixed Purchase-Sale</option></select></div>
+          <div><label style={{fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Date</label><input type="date" defaultValue={todayISO()} style={{...inp,width:"100%"}}/></div>
+          <div><label style={{fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Branch</label><select style={{...inp,width:"100%"}}><option>TKHO</option><option>BOM</option><option>AMD</option></select></div>
         </div>
 
         {/* Revenue side */}
         <div style={{padding:14,background:"#f0fff4",border:"1px solid #bbf7d0",borderRadius:6,marginBottom:10}}>
-          <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#155724"}}>📄 Revenue side (Sale)</p>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:10,alignItems:"flex-end"}}>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Customer</label><input placeholder="Customer" style={{...inp,width:"100%"}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Currency</label><select style={{...inp,width:"100%"}}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Amount (₹)</label><input type="number" value={saleAmt} onChange={e=>setSaleAmt(+e.target.value)} style={{...inp,width:"100%",fontFamily:"monospace",fontWeight:700}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>INR Value</label><input readOnly value={"₹"+saleINR.toLocaleString("en-IN")} style={{...inp,width:"100%",background:"#d4edda",fontFamily:"monospace",fontWeight:700,color:"#155724"}}/></div>
+          <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#16a34a"}}>📄 Revenue side (Sale)</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,150px),1fr))",gap:10,alignItems:"flex-end"}}>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Customer</label><input placeholder="Customer" style={{...inp,width:"100%"}}/></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Currency</label><select style={{...inp,width:"100%"}}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Amount (₹)</label><input type="number" value={saleAmt} onChange={e=>setSaleAmt(+e.target.value)} style={{...inp,width:"100%",fontFamily:"monospace",fontWeight:700}}/></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>INR Value</label><input readOnly value={"₹"+saleINR.toLocaleString("en-IN")} style={{...inp,width:"100%",background:"#e8f6ed",fontFamily:"monospace",fontWeight:700,color:"#16a34a"}}/></div>
           </div>
         </div>
 
         {/* Cost side */}
-        <div style={{padding:14,background:"#fff5f5",border:"1px solid #fecaca",borderRadius:6,marginBottom:10}}>
-          <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#721c24"}}>📥 Cost side (Purchase)</p>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:10,alignItems:"flex-end"}}>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Supplier</label><input defaultValue="Marriott Group (Bali)" style={{...inp,width:"100%"}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Currency</label><select style={{...inp,width:"100%"}}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Amount (₹)</label><input type="number" value={costAmt} onChange={e=>setCostAmt(+e.target.value)} style={{...inp,width:"100%",fontFamily:"monospace",fontWeight:700}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>INR Value</label><input readOnly value={"₹"+costINR.toLocaleString("en-IN")} style={{...inp,width:"100%",background:"#f8d7da",fontFamily:"monospace",fontWeight:700,color:"#721c24"}}/></div>
+        <div style={{padding:14,background:"#fff5f5",border:"1px solid #f3c9c9",borderRadius:6,marginBottom:10}}>
+          <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#dc2626"}}>📥 Cost side (Purchase)</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,150px),1fr))",gap:10,alignItems:"flex-end"}}>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Supplier</label><input defaultValue="Marriott Group (Bali)" style={{...inp,width:"100%"}}/></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Currency</label><select style={{...inp,width:"100%"}}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Amount (₹)</label><input type="number" value={costAmt} onChange={e=>setCostAmt(+e.target.value)} style={{...inp,width:"100%",fontFamily:"monospace",fontWeight:700}}/></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>INR Value</label><input readOnly value={"₹"+costINR.toLocaleString("en-IN")} style={{...inp,width:"100%",background:"#fbe9e9",fontFamily:"monospace",fontWeight:700,color:"#dc2626"}}/></div>
           </div>
         </div>
 
         {/* Auto-calculated GP summary */}
         <div style={{padding:14,background:"#fff8e8",border:"1px solid #fde68a",borderRadius:6,marginBottom:14}}>
-          <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Auto-calculated (INR)</p>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
-            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700}}>SALE</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:"#155724"}}>{fmtINR(saleINR)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>billed to customer</p></div>
-            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700}}>COST</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:"#721c24"}}>{fmtINR(costINR)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>paid to supplier</p></div>
-            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700}}>GROSS PROFIT</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:gpINR>0?"#22c55e":"#A32D2D"}}>{fmtINR(gpINR)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>sale − cost</p></div>
-            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700}}>GP %</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:+gpPct>=20?"#22c55e":+gpPct>=12?"#d4a437":"#A32D2D"}}>{gpPct}%</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>on sale value</p></div>
+          <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#1a1c22"}}>Auto-calculated (INR)</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,150px),1fr))",gap:12}}>
+            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5b616e",fontWeight:700}}>SALE</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:"#16a34a"}}>{fmtINR(saleINR)}</p><p style={{margin:0,fontSize:10,color:"#5b616e"}}>billed to customer</p></div>
+            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5b616e",fontWeight:700}}>COST</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:"#dc2626"}}>{fmtINR(costINR)}</p><p style={{margin:0,fontSize:10,color:"#5b616e"}}>paid to supplier</p></div>
+            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5b616e",fontWeight:700}}>GROSS PROFIT</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:gpINR>0?"#16a34a":"#dc2626"}}>{fmtINR(gpINR)}</p><p style={{margin:0,fontSize:10,color:"#5b616e"}}>sale − cost</p></div>
+            <div style={{textAlign:"center"}}><p style={{margin:0,fontSize:10.5,color:"#5b616e",fontWeight:700}}>GP %</p><p style={{margin:"3px 0 0",fontSize:17,fontWeight:700,color:+gpPct>=20?"#16a34a":+gpPct>=12?"#c2a04a":"#dc2626"}}>{gpPct}%</p><p style={{margin:0,fontSize:10,color:"#5b616e"}}>on sale value</p></div>
           </div>
         </div>
 
         {/* Posting lines */}
-        <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Accounting posting lines (auto-generated)</p>
+        <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#1a1c22"}}>Accounting posting lines (auto-generated)</p>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5,marginBottom:14}}>
           <thead style={{background:"#f7f8fb"}}><tr><th style={RPT_thStyle}>Ledger</th><th style={RPT_thStyle}>Narration</th><th style={{...RPT_thStyle,textAlign:"right"}}>Debit (₹)</th><th style={{...RPT_thStyle,textAlign:"right"}}>Credit (₹)</th></tr></thead>
           <tbody>
-            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Customer (Receivable)</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>Sample package</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
-            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Sales — Bali Holidays</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>Package sale</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td></tr>
-            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Tour Cost — Hotels</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>Supplier cost</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
-            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Marriott Group (Payable)</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>Marriott Bali, 3 nights</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td></tr>
+            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Customer (Receivable)</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Sample package</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
+            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Sales — Bali Holidays</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Package sale</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td></tr>
+            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Tour Cost — Hotels</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Supplier cost</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
+            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Marriott Group (Payable)</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Marriott Bali, 3 nights</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td></tr>
           </tbody>
-          <tfoot style={{background:"#fafbfd",fontWeight:700}}><tr><td style={{...RPT_tdStyle,fontWeight:700}}>TOTAL</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,borderTop:"2px solid #e1e3ec"}}>{(saleINR+costINR).toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,borderTop:"2px solid #e1e3ec"}}>{(saleINR+costINR).toLocaleString("en-IN")}</td></tr></tfoot>
+          <tfoot style={{background:"#fafbfd",fontWeight:700}}><tr><td style={{...RPT_tdStyle,fontWeight:700}}>TOTAL</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,borderTop:"2px solid #e6e8ec"}}>{(saleINR+costINR).toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,borderTop:"2px solid #e6e8ec"}}>{(saleINR+costINR).toLocaleString("en-IN")}</td></tr></tfoot>
         </table>
         <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
-          <button style={{padding:"8px 16px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Print Preview</button>
-          <button style={{padding:"8px 16px",background:"#0d1326",color:"#d4a437",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>Submit for Approval</button>
-          <button style={{padding:"8px 18px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Voucher</button>
+          <button style={{padding:"8px 16px",background:"#fff",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Print Preview</button>
+          <button style={{padding:"8px 16px",background:"#1a1c22",color:"#c2a04a",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>Submit for Approval</button>
+          <button style={{padding:"8px 18px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Voucher</button>
         </div>
       </div>
     </PHASE2_Page>
@@ -4532,46 +4534,47 @@ export function MultiCurrencyVoucher(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function VoucherCommentsDemo(){
+  const mob=useMobile();
   const [comment,setComment]=useState("");
   const THREAD=[];
   const voucherInfo={no:"PV-BOM/2026/0892",date:"2026-05-17",type:"Payment Voucher",party:"Air India Ltd. (BSP)",amount:285000,status:"Approved"};
 
   return (
     <PHASE2_Page title="Voucher Comments Thread" subtitle="Collaborate on a voucher before approval · all comments are audit-tracked">
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1.7fr",gap:14}}>
+      <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1.7fr",gap:14}}>
         {/* Voucher summary panel */}
         <div>
-          <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:16,marginBottom:12}}>
+          <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,padding:16,marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Voucher Details</p>
-              <span style={{padding:"3px 10px",background:"#d4edda",color:"#155724",borderRadius:4,fontSize:10.5,fontWeight:700}}>✓ Approved</span>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>Voucher Details</p>
+              <span style={{padding:"3px 10px",background:"#e8f6ed",color:"#16a34a",borderRadius:4,fontSize:10.5,fontWeight:700}}>✓ Approved</span>
             </div>
             {[{l:"Voucher No.",v:voucherInfo.no},{l:"Date",v:voucherInfo.date},{l:"Type",v:voucherInfo.type},{l:"Party",v:voucherInfo.party},{l:"Amount",v:fmtINR(voucherInfo.amount)}].map((f,i)=>(
               <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f0f2f7"}}>
-                <span style={{fontSize:11,color:"#5a6691",fontWeight:600}}>{f.l}</span>
-                <span style={{fontSize:11.5,color:"#0d1326",fontWeight:600,fontFamily:f.l.includes("No.")||f.l==="Amount"?"monospace":"inherit"}}>{f.v}</span>
+                <span style={{fontSize:11,color:"#5b616e",fontWeight:600}}>{f.l}</span>
+                <span style={{fontSize:11.5,color:"#1a1c22",fontWeight:600,fontFamily:f.l.includes("No.")||f.l==="Amount"?"monospace":"inherit"}}>{f.v}</span>
               </div>
             ))}
           </div>
-          <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:14}}>
-            <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Approval Timeline</p>
+          <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,padding:14}}>
+            <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#1a1c22"}}>Approval Timeline</p>
             {[].map((t,i)=>(
               <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:10}}>
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
                   <div style={{width:28,height:28,borderRadius:"50%",background:t.color,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700}}>{t.user.substring(0,2).toUpperCase()}</div>
-                  {i<3&&<div style={{width:2,height:16,background:"#e1e3ec",marginTop:2}}/>}
+                  {i<3&&<div style={{width:2,height:16,background:"#e6e8ec",marginTop:2}}/>}
                 </div>
-                <div style={{paddingTop:4}}><p style={{margin:0,fontSize:11.5,fontWeight:600,color:"#0d1326"}}>{t.user}</p><p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{t.action} · {t.ts}</p></div>
+                <div style={{paddingTop:4}}><p style={{margin:0,fontSize:11.5,fontWeight:600,color:"#1a1c22"}}>{t.user}</p><p style={{margin:0,fontSize:10.5,color:"#5b616e"}}>{t.action} · {t.ts}</p></div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Comments thread */}
-        <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,display:"flex",flexDirection:"column"}}>
-          <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>💬 Comment Thread</p>
-            <span style={{fontSize:11,color:"#5a6691"}}>{THREAD.length} messages · 1 day ago</span>
+        <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,display:"flex",flexDirection:"column"}}>
+          <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>💬 Comment Thread</p>
+            <span style={{fontSize:11,color:"#5b616e"}}>{THREAD.length} messages · 1 day ago</span>
           </div>
           <div style={{flex:1,padding:16,overflowY:"auto",maxHeight:440}}>
             {THREAD.map((c,i)=>(
@@ -4580,15 +4583,15 @@ export function VoucherCommentsDemo(){
                   <div style={{width:34,height:34,borderRadius:"50%",background:c.color,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,flexShrink:0}}>{c.user.substring(0,2).toUpperCase()}</div>
                   <div style={{flex:1}}>
                     <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:4}}>
-                      <span style={{fontSize:12.5,fontWeight:700,color:"#0d1326"}}>{c.user}</span>
-                      <span style={{fontSize:10.5,color:"#5a6691"}}>{c.role}</span>
-                      <span style={{fontSize:10,color:"#5a6691",marginLeft:"auto"}}>{c.ts}</span>
+                      <span style={{fontSize:12.5,fontWeight:700,color:"#1a1c22"}}>{c.user}</span>
+                      <span style={{fontSize:10.5,color:"#5b616e"}}>{c.role}</span>
+                      <span style={{fontSize:10,color:"#5b616e",marginLeft:"auto"}}>{c.ts}</span>
                     </div>
-                    <div style={{padding:"10px 12px",background:i%2===0?"#f7f8fb":"#f0f4f8",borderRadius:6,fontSize:12,color:"#0d1326",lineHeight:1.5,borderLeft:"3px solid "+c.color}}>
+                    <div style={{padding:"10px 12px",background:i%2===0?"#f7f8fb":"#f0f4f8",borderRadius:6,fontSize:12,color:"#1a1c22",lineHeight:1.5,borderLeft:"3px solid "+c.color}}>
                       {c.msg}
                       {c.attachment&&(
-                        <div style={{marginTop:8,padding:"5px 8px",background:"#fff",borderRadius:4,border:"1px solid #e1e3ec",display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer"}}>
-                          <span>📎</span><span style={{fontSize:10.5,color:"#d4a437",fontWeight:600}}>{c.attachment}</span>
+                        <div style={{marginTop:8,padding:"5px 8px",background:"#fff",borderRadius:4,border:"1px solid #e6e8ec",display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer"}}>
+                          <span>📎</span><span style={{fontSize:10.5,color:"#c2a04a",fontWeight:600}}>{c.attachment}</span>
                         </div>
                       )}
                     </div>
@@ -4597,12 +4600,12 @@ export function VoucherCommentsDemo(){
               </div>
             ))}
           </div>
-          <div style={{padding:"10px 14px",borderTop:"1px solid #e1e3ec"}}>
+          <div style={{padding:"10px 14px",borderTop:"1px solid #e6e8ec"}}>
             <div style={{display:"flex",gap:8}}>
-              <textarea value={comment} onChange={e=>setComment(e.target.value)} placeholder="Add a comment… (Shift+Enter for new line, Enter to send)" rows={2} style={{flex:1,padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,resize:"none",fontFamily:"inherit"}}/>
-              <button style={{padding:"8px 14px",background:"#0d1326",color:"#d4a437",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",alignSelf:"flex-end"}}>Send</button>
+              <textarea value={comment} onChange={e=>setComment(e.target.value)} placeholder="Add a comment… (Shift+Enter for new line, Enter to send)" rows={2} style={{flex:1,padding:"8px 10px",border:"1px solid #e6e8ec",borderRadius:6,fontSize:12,resize:"none",fontFamily:"inherit"}}/>
+              <button className="max-tablet:min-h-[44px]" style={{padding:"8px 14px",background:"#1a1c22",color:"#c2a04a",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",alignSelf:"flex-end"}}>Send</button>
             </div>
-            <p style={{margin:"5px 0 0",fontSize:10,color:"#5a6691"}}>📎 Attach file · @mention · All comments are audit-logged</p>
+            <p style={{margin:"5px 0 0",fontSize:10,color:"#5b616e"}}>📎 Attach file · @mention · All comments are audit-logged</p>
           </div>
         </div>
       </div>
@@ -4618,68 +4621,68 @@ export function PrintPreviewDemo(){
   const [show,setShow]=useState(true);
   const voucher={no:"PV-BOM/2026/0893",date:"20 May 2026",type:"Payment Voucher",branch:"BOM — Mumbai",payTo:"Air India Ltd. (BSP)",bank:"HDFC Bank BOM A/c ...4321",mode:"NEFT",refNo:"NEFT2605120024",amount:285000,amountWords:"Indian Rupees Two Lakhs Eighty-Five Thousand Only",narration:"BSP settlement April 2026 — SURC included as per Board minute 2026-03-15",lines:[{ledger:"Air India BSP Payable",dr:285000,cr:0},{ledger:"HDFC Bank BOM Current A/c",dr:0,cr:285000}]};
 
-  const printPage = {background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,maxWidth:740,margin:"0 auto",padding:"30px 36px",fontFamily:"Georgia, serif"};
+  const printPage = {background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,maxWidth:740,margin:"0 auto",padding:"30px 36px",fontFamily:"Georgia, serif"};
 
   return (
     <PHASE2_Page title="Print Preview Before Saving" subtitle="Review the formatted voucher before committing · matches the actual printout">
       <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
-        <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>← Edit Voucher</button>
-        <button onClick={()=>openPrintPreview({ selector:'main', title:'Voucher', recommend:'portrait' })} style={{padding:"7px 14px",background:"#fff",border:"1px solid #0d1326",color:"#0d1326",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>🖨 Print</button>
-        <button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>✓ Save & Post</button>
+        <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>← Edit Voucher</button>
+        <button onClick={()=>openPrintPreview({ selector:'main', title:'Voucher', recommend:'portrait' })} style={{padding:"7px 14px",background:"#fff",border:"1px solid #1a1c22",color:"#1a1c22",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>🖨 Print</button>
+        <button style={{padding:"7px 14px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>✓ Save & Post</button>
       </div>
 
       <div style={printPage}>
         {/* Header */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18,paddingBottom:14,borderBottom:"2px solid #0d1326"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18,paddingBottom:14,borderBottom:"2px solid #1a1c22"}}>
           <div>
-            <p style={{margin:0,fontSize:20,fontWeight:700,color:"#0d1326",letterSpacing:"0.5px"}}>Travkings Tours &amp; Travels Pvt. Ltd.</p>
-            <p style={{margin:"2px 0 0",fontSize:11,color:"#5a6691"}}>IATA Accredited · GST 27AAACT1234A1ZF · CIN U63090MH2006PTC160xxx</p>
-            <p style={{margin:"1px 0 0",fontSize:11,color:"#5a6691"}}>Lower Parel, Mumbai 400013 · +91 22 6654 8800</p>
+            <p style={{margin:0,fontSize:20,fontWeight:700,color:"#1a1c22",letterSpacing:"0.5px"}}>Travkings Tours &amp; Travels Pvt. Ltd.</p>
+            <p style={{margin:"2px 0 0",fontSize:11,color:"#5b616e"}}>IATA Accredited · GST 27AAACT1234A1ZF · CIN U63090MH2006PTC160xxx</p>
+            <p style={{margin:"1px 0 0",fontSize:11,color:"#5b616e"}}>Lower Parel, Mumbai 400013 · +91 22 6654 8800</p>
           </div>
           <div style={{textAlign:"right"}}>
-            <p style={{margin:0,fontSize:18,fontWeight:700,color:"#0d1326",textTransform:"uppercase",letterSpacing:"1px"}}>{voucher.type}</p>
-            <p style={{margin:"4px 0 0",fontSize:13,color:"#5a6691",fontFamily:"monospace"}}>{voucher.no}</p>
+            <p style={{margin:0,fontSize:18,fontWeight:700,color:"#1a1c22",textTransform:"uppercase",letterSpacing:"1px"}}>{voucher.type}</p>
+            <p style={{margin:"4px 0 0",fontSize:13,color:"#5b616e",fontFamily:"monospace"}}>{voucher.no}</p>
           </div>
         </div>
 
         {/* Meta */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:18,fontSize:12}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:14,marginBottom:18,fontSize:12}}>
           <div>
-            <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{minWidth:80,color:"#5a6691"}}>Date</span><b>{voucher.date}</b></div>
-            <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{minWidth:80,color:"#5a6691"}}>Branch</span><b>{voucher.branch}</b></div>
-            <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{minWidth:80,color:"#5a6691"}}>Pay to</span><b>{voucher.payTo}</b></div>
+            <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{minWidth:80,color:"#5b616e"}}>Date</span><b>{voucher.date}</b></div>
+            <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{minWidth:80,color:"#5b616e"}}>Branch</span><b>{voucher.branch}</b></div>
+            <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{minWidth:80,color:"#5b616e"}}>Pay to</span><b>{voucher.payTo}</b></div>
           </div>
           <div>
-            <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{minWidth:80,color:"#5a6691"}}>Bank</span><b>{voucher.bank}</b></div>
-            <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{minWidth:80,color:"#5a6691"}}>Mode</span><b>{voucher.mode}</b></div>
-            <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{minWidth:80,color:"#5a6691"}}>Ref No.</span><b style={{fontFamily:"monospace"}}>{voucher.refNo}</b></div>
+            <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{minWidth:80,color:"#5b616e"}}>Bank</span><b>{voucher.bank}</b></div>
+            <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{minWidth:80,color:"#5b616e"}}>Mode</span><b>{voucher.mode}</b></div>
+            <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{minWidth:80,color:"#5b616e"}}>Ref No.</span><b style={{fontFamily:"monospace"}}>{voucher.refNo}</b></div>
           </div>
         </div>
 
         {/* Amount */}
-        <div style={{padding:14,background:"#f7f8fb",border:"1px solid #e1e3ec",borderRadius:6,marginBottom:18,textAlign:"center"}}>
-          <p style={{margin:0,fontSize:11,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.5px"}}>Amount</p>
-          <p style={{margin:"4px 0 2px",fontSize:28,fontWeight:700,color:"#0d1326",fontFamily:"Georgia"}}>₹ {voucher.amount.toLocaleString("en-IN")}</p>
-          <p style={{margin:0,fontSize:11.5,color:"#0d1326",fontStyle:"italic"}}>( {voucher.amountWords} )</p>
+        <div style={{padding:14,background:"#f7f8fb",border:"1px solid #e6e8ec",borderRadius:6,marginBottom:18,textAlign:"center"}}>
+          <p style={{margin:0,fontSize:11,color:"#5b616e",textTransform:"uppercase",letterSpacing:"0.5px"}}>Amount</p>
+          <p style={{margin:"4px 0 2px",fontSize:28,fontWeight:700,color:"#1a1c22",fontFamily:"Georgia"}}>₹ {voucher.amount.toLocaleString("en-IN")}</p>
+          <p style={{margin:0,fontSize:11.5,color:"#1a1c22",fontStyle:"italic"}}>( {voucher.amountWords} )</p>
         </div>
 
         {/* Posting lines */}
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,marginBottom:14}}>
-          <thead><tr style={{background:"#0d1326",color:"#fff"}}><th style={{padding:"8px 12px",textAlign:"left",fontWeight:600}}>Ledger Account</th><th style={{padding:"8px 12px",textAlign:"right",fontWeight:600}}>Debit (₹)</th><th style={{padding:"8px 12px",textAlign:"right",fontWeight:600}}>Credit (₹)</th></tr></thead>
+          <thead><tr style={{background:"#1a1c22",color:"#fff"}}><th style={{padding:"8px 12px",textAlign:"left",fontWeight:600}}>Ledger Account</th><th style={{padding:"8px 12px",textAlign:"right",fontWeight:600}}>Debit (₹)</th><th style={{padding:"8px 12px",textAlign:"right",fontWeight:600}}>Credit (₹)</th></tr></thead>
           <tbody>
-            {voucher.lines.map((l,i)=><tr key={i} style={{borderBottom:"1px solid #e1e3ec"}}><td style={{padding:"8px 12px"}}>{l.ledger}</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{l.dr>0?l.dr.toLocaleString("en-IN"):"—"}</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{l.cr>0?l.cr.toLocaleString("en-IN"):"—"}</td></tr>)}
+            {voucher.lines.map((l,i)=><tr key={i} style={{borderBottom:"1px solid #e6e8ec"}}><td style={{padding:"8px 12px"}}>{l.ledger}</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{l.dr>0?l.dr.toLocaleString("en-IN"):"—"}</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{l.cr>0?l.cr.toLocaleString("en-IN"):"—"}</td></tr>)}
           </tbody>
-          <tfoot><tr style={{fontWeight:700,borderTop:"2px solid #0d1326"}}><td style={{padding:"8px 12px"}}>Total</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{voucher.amount.toLocaleString("en-IN")}</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{voucher.amount.toLocaleString("en-IN")}</td></tr></tfoot>
+          <tfoot><tr style={{fontWeight:700,borderTop:"2px solid #1a1c22"}}><td style={{padding:"8px 12px"}}>Total</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{voucher.amount.toLocaleString("en-IN")}</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{voucher.amount.toLocaleString("en-IN")}</td></tr></tfoot>
         </table>
 
-        <p style={{fontSize:11.5,color:"#0d1326",marginBottom:28}}><b>Narration:</b> {voucher.narration}</p>
+        <p style={{fontSize:11.5,color:"#1a1c22",marginBottom:28}}><b>Narration:</b> {voucher.narration}</p>
 
         {/* Signatories */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20,marginTop:28,paddingTop:14,borderTop:"1px solid #e1e3ec"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:20,marginTop:28,paddingTop:14,borderTop:"1px solid #e6e8ec"}}>
           {["Prepared by","Checked by","Authorised by"].map(s=>(
             <div key={s} style={{textAlign:"center"}}>
-              <div style={{height:40,borderBottom:"1px solid #0d1326",marginBottom:4}}/>
-              <p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{s}</p>
+              <div style={{height:40,borderBottom:"1px solid #1a1c22",marginBottom:4}}/>
+              <p style={{margin:0,fontSize:10.5,color:"#5b616e"}}>{s}</p>
             </div>
           ))}
         </div>
@@ -4696,42 +4699,42 @@ export function AutoLinkedVouchers(){
   const [cycle,setCycle]=useState("sale");
   const SALE_CYCLE=[];
   const PUR_CYCLE=[
-    {step:1,voucher:"PUR-BOM/2026/3214",type:"Purchase Invoice",party:"Air India BSP",amount:285000,date:"2026-05-12",status:"Unpaid",color:"#A32D2D"},
-    {step:2,voucher:"PV-BOM/2026/0892",type:"Payment Voucher",party:"Air India BSP",amount:285000,date:"2026-05-17",status:"Approved",color:"#d4a437"},
-    {step:3,voucher:"PUR-BOM/2026/3214",type:"Purchase Invoice (auto-updated)",party:"Air India BSP",amount:285000,date:"2026-05-12",status:"PAID ✓",color:"#22c55e"},
+    {step:1,voucher:"PUR-BOM/2026/3214",type:"Purchase Invoice",party:"Air India BSP",amount:285000,date:"2026-05-12",status:"Unpaid",color:"#dc2626"},
+    {step:2,voucher:"PV-BOM/2026/0892",type:"Payment Voucher",party:"Air India BSP",amount:285000,date:"2026-05-17",status:"Approved",color:"#c2a04a"},
+    {step:3,voucher:"PUR-BOM/2026/3214",type:"Purchase Invoice (auto-updated)",party:"Air India BSP",amount:285000,date:"2026-05-12",status:"PAID ✓",color:"#16a34a"},
   ];
   const steps=cycle==="sale"?SALE_CYCLE:PUR_CYCLE;
   const LINK_TABLE=[]; // populated from live linked sale/receipt vouchers
 
   return (
     <PHASE2_Page title="Auto-link Related Vouchers" subtitle="Sale Invoice ↔ Receipt · Purchase Invoice ↔ Payment — auto-matched on party + amount + date proximity">
-      <div style={{padding:12,background:"#e8f0fe",border:"1px solid #b8d0f8",borderLeft:"3px solid #3b82f6",borderRadius:6,marginBottom:14,fontSize:11.5,color:"#1e3a5f"}}>
+      <div style={{padding:12,background:"#e8f0ff",border:"1px solid #cfe0f8",borderLeft:"3px solid #2563eb",borderRadius:6,marginBottom:14,fontSize:11.5,color:"#2e323c"}}>
         <b>Auto-link logic:</b> When a Receipt is posted for a party, KBiz360 automatically looks for an outstanding Sales Invoice with the same party and amount (±5% tolerance). If found, the invoice is marked as Paid and the two vouchers are bi-directionally linked. Same for Purchase ↔ Payment.
       </div>
 
       {/* Cycle selector */}
       <div style={{display:"flex",gap:8,marginBottom:14}}>
         {[{k:"sale",label:"Sale ↔ Receipt cycle"},{k:"purchase",label:"Purchase ↔ Payment cycle"}].map(b=>(
-          <button key={b.k} onClick={()=>setCycle(b.k)} style={{padding:"8px 18px",border:cycle===b.k?"2px solid #0d1326":"1px solid #e1e3ec",background:cycle===b.k?"#0d1326":"#fff",color:cycle===b.k?"#d4a437":"#5a6691",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>{b.label}</button>
+          <button key={b.k} onClick={()=>setCycle(b.k)} style={{padding:"8px 18px",border:cycle===b.k?"2px solid #1a1c22":"1px solid #e6e8ec",background:cycle===b.k?"#1a1c22":"#fff",color:cycle===b.k?"#c2a04a":"#5b616e",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>{b.label}</button>
         ))}
       </div>
 
       {/* Flow visualization */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:0,marginBottom:18,padding:"24px 20px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflowX:"auto"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:0,marginBottom:18,padding:"24px 20px",background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflowX:"auto"}}>
         {steps.map((s,i)=>(
           <div key={s.step} style={{display:"flex",alignItems:"center"}}>
             <div style={{width:200,padding:14,background:"#fff",border:"2px solid "+s.color,borderRadius:8,textAlign:"center",position:"relative"}}>
               <div style={{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",background:s.color,color:"#fff",borderRadius:"50%",width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700}}>{s.step}</div>
               <p style={{margin:"6px 0 4px",fontSize:11,fontWeight:700,color:s.color,textTransform:"uppercase",letterSpacing:"0.4px"}}>{s.type}</p>
-              <p style={{margin:0,fontSize:10.5,fontFamily:"monospace",color:"#0d1326",fontWeight:700}}>{s.voucher}</p>
-              <p style={{margin:"3px 0",fontSize:11,color:"#0d1326"}}>{s.party}</p>
-              <p style={{margin:"3px 0 0",fontSize:13,fontWeight:700,color:"#0d1326"}}>{fmtINR(s.amount)}</p>
-              <span style={{display:"inline-block",marginTop:6,padding:"2px 8px",background:s.status.includes("PAID")||s.status==="Posted"?"#d4edda":s.status==="Approved"?"#fff3cd":"#f8d7da",color:s.status.includes("PAID")||s.status==="Posted"?"#155724":s.status==="Approved"?"#856404":"#721c24",borderRadius:3,fontSize:10.5,fontWeight:700}}>{s.status}</span>
+              <p style={{margin:0,fontSize:10.5,fontFamily:"monospace",color:"#1a1c22",fontWeight:700}}>{s.voucher}</p>
+              <p style={{margin:"3px 0",fontSize:11,color:"#1a1c22"}}>{s.party}</p>
+              <p style={{margin:"3px 0 0",fontSize:13,fontWeight:700,color:"#1a1c22"}}>{fmtINR(s.amount)}</p>
+              <span style={{display:"inline-block",marginTop:6,padding:"2px 8px",background:s.status.includes("PAID")||s.status==="Posted"?"#e8f6ed":s.status==="Approved"?"#fbeedb":"#fbe9e9",color:s.status.includes("PAID")||s.status==="Posted"?"#16a34a":s.status==="Approved"?"#d97706":"#dc2626",borderRadius:3,fontSize:10.5,fontWeight:700}}>{s.status}</span>
             </div>
             {i<steps.length-1&&(
               <div style={{width:60,display:"flex",flexDirection:"column",alignItems:"center",padding:"0 4px"}}>
-                <div style={{fontSize:20,color:"#d4a437",fontWeight:700}}>→</div>
-                <p style={{margin:0,fontSize:9,color:"#5a6691",textAlign:"center",lineHeight:1.3}}>auto-<br/>linked</p>
+                <div style={{fontSize:20,color:"#c2a04a",fontWeight:700}}>→</div>
+                <p style={{margin:0,fontSize:9,color:"#5b616e",textAlign:"center",lineHeight:1.3}}>auto-<br/>linked</p>
               </div>
             )}
           </div>
@@ -4739,21 +4742,21 @@ export function AutoLinkedVouchers(){
       </div>
 
       {/* Linked vouchers table */}
-      <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
-        <div style={{padding:"10px 14px",borderBottom:"1px solid #e1e3ec",background:"#fafbfd",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <p style={{margin:0,fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Linked Voucher Register</p>
-          <button style={{padding:"5px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer"}}>📤 Export</button>
+      <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden"}}>
+        <div style={{padding:"10px 14px",borderBottom:"1px solid #e6e8ec",background:"#fafbfd",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <p style={{margin:0,fontSize:12.5,fontWeight:700,color:"#1a1c22"}}>Linked Voucher Register</p>
+          <button style={{padding:"5px 12px",background:"#fff",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer"}}>📤 Export</button>
         </div>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Invoice / Purchase</th><th style={RPT_thStyle}>Receipt / Payment</th><th style={RPT_thStyle}>Party</th><th style={{...RPT_thStyle,textAlign:"right"}}>Amount</th><th style={RPT_thStyle}>Settled On</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
           <tbody>{LINK_TABLE.map((r,i)=>(
             <tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}>
               <td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:600,fontSize:11}}>{r.sale}</td>
-              <td style={{...RPT_tdStyle,fontFamily:"monospace",color:r.receipt==="—"?"#A32D2D":"#22c55e",fontWeight:r.receipt==="—"?400:600,fontSize:11}}>{r.receipt}</td>
+              <td style={{...RPT_tdStyle,fontFamily:"monospace",color:r.receipt==="—"?"#dc2626":"#16a34a",fontWeight:r.receipt==="—"?400:600,fontSize:11}}>{r.receipt}</td>
               <td style={RPT_tdStyle}>{r.party}</td>
               <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(r.amount)}</td>
-              <td style={{...RPT_tdStyle,color:r.date==="—"?"#A32D2D":"#5a6691"}}>{r.date}</td>
-              <td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:3,fontSize:10.5,fontWeight:700,background:r.receipt!=="—"?"#d4edda":"#fff3cd",color:r.receipt!=="—"?"#155724":"#856404"}}>{r.receipt!=="—"?"Linked ✓":"Pending"}</span></td>
+              <td style={{...RPT_tdStyle,color:r.date==="—"?"#dc2626":"#5b616e"}}>{r.date}</td>
+              <td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:3,fontSize:10.5,fontWeight:700,background:r.receipt!=="—"?"#e8f6ed":"#fbeedb",color:r.receipt!=="—"?"#16a34a":"#d97706"}}>{r.receipt!=="—"?"Linked ✓":"Pending"}</span></td>
             </tr>
           ))}</tbody>
         </table>

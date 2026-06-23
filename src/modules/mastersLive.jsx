@@ -7,24 +7,22 @@
    modal; each master is just a field config.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, X, Download, Printer } from 'lucide-react';
-import { card, inp } from '../core/styles';
+import React, { useState } from 'react';
+import { Plus, Pencil, Trash2, Download, Printer } from 'lucide-react';
 import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../core/data';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
 import { SourceBadge } from '../core/LedgerLabel';
 import { branchCode } from '../core/useAccounting';
-import { apiPost } from '../core/api';
 import { exportToExcel } from '../core/exportExcel';
 import { openPrintPreview } from '../core/PrintPreview';
-import { pushModal } from '../core/ux/modalStore';
 import { useFormKeys } from '../core/ux/forms';
 import { toast } from '../core/ux/toast';
 import { confirmDialog } from '../core/ux/confirm';
 import { Kbd } from '../core/ux/widgets.jsx';
+import { PageLayout } from '../shell/PageLayout';
+import { Modal, Button, Select, Input, LoadingState, ErrorState } from '../shell/primitives';
 
-const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
-const btn = (bg, fg) => ({ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: bg, color: fg });
+const DARK = '#1a1c22', BLUE = '#2563eb', DIM = '#5b616e', RED = '#dc2626', GREEN = '#16a34a';
 
 // Ledger list filter: empty group → all; group set → match the ledger's parent group;
 // sub-group set → also match its sub-group. Pure so the Ledgers screen can unit-test it.
@@ -39,7 +37,7 @@ const blankFromFields = (fields) => fields.reduce((o, f) => {
 function FieldInput({ field, value, onChange, form }) {
   if (field.type === 'bool') {
     return (
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#334155', cursor: 'pointer' }}>
+      <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-ink">
         <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} />
         {field.label}
       </label>
@@ -50,17 +48,17 @@ function FieldInput({ field, value, onChange, form }) {
     // on the chosen Group). An empty list renders just the placeholder.
     const options = typeof field.options === 'function' ? (field.options(form) || []) : (field.options || []);
     return (
-      <select value={value} onChange={(e) => onChange(e.target.value)} style={{ ...inp, fontSize: 12.5 }}>
+      <Select value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">{field.emptyLabel || 'Select…'}</option>
         {options.map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>
+      </Select>
     );
   }
   if (field.type === 'tags') {
     return (
-      <input value={Array.isArray(value) ? value.join(', ') : value}
+      <Input value={Array.isArray(value) ? value.join(', ') : value}
         onChange={(e) => onChange(e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
-        placeholder="comma, separated, values" style={{ ...inp, fontSize: 12.5 }} />
+        placeholder="comma, separated, values" />
     );
   }
   // System-managed fields (e.g. a ledger's auto-generated code) are shown but not
@@ -73,9 +71,9 @@ function FieldInput({ field, value, onChange, form }) {
     );
   }
   return (
-    <input type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+    <Input type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
       value={value} onChange={(e) => onChange(field.type === 'number' ? Number(e.target.value) : e.target.value)}
-      placeholder={field.placeholder || ''} style={{ ...inp, fontSize: 12.5 }} />
+      placeholder={field.placeholder || ''} />
   );
 }
 
@@ -90,33 +88,32 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   const visible = editable.filter(isShown);
   const missing = visible.filter((f) => isReq(f) && (form[f.key] === '' || form[f.key] == null));
   const submit = () => { if (!saving && !missing.length) onSave(form); };
-  useEffect(() => pushModal(onClose), []); // Esc closes
   // Enter advances fields; Enter on the last field (or Ctrl/Cmd+Enter) saves; Esc cancels.
   const formKeys = useFormKeys({ onSubmit: submit, onCancel: onClose });
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', zIndex: 700, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '7vh' }} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 460, maxWidth: '94vw', maxHeight: '82vh', overflowY: 'auto', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid #e5e9f0' }}>
-          <h3 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: DARK }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM }}><X size={18} /></button>
-        </div>
-        <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {visible.map((f) => (
-            <div key={f.key}>
-              {f.type !== 'bool' && <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: DIM, marginBottom: 4 }}>{f.label}{isReq(f) && <span style={{ color: RED }}> *</span>}</label>}
-              <FieldInput field={f} value={form[f.key]} onChange={(v) => set(f.key, v)} form={form} />
-            </div>
-          ))}
-          {error && <div style={{ fontSize: 11.5, color: RED, fontWeight: 600 }}>⚠ {error}</div>}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 16px', borderTop: '1px solid #e5e9f0' }}>
-          <button onClick={onClose} style={btn('#eef1f6', DIM)}>Cancel</button>
-          <button disabled={saving || missing.length > 0} onClick={submit} title="Save (Ctrl/Cmd+Enter)" style={{ ...btn(BLUE, '#fff'), opacity: missing.length ? 0.5 : 1 }}>
+    <Modal
+      title={title}
+      onClose={onClose}
+      maxWidth={460}
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" size="sm" disabled={saving || missing.length > 0} loading={saving} onClick={submit} title="Save (Ctrl/Cmd+Enter)">
             {saving ? 'Saving…' : <>Save <Kbd>⌃↵</Kbd></>}
-          </button>
-        </div>
+          </Button>
+        </>
+      }
+    >
+      <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} className="flex flex-col gap-3 p-4">
+        {visible.map((f) => (
+          <div key={f.key}>
+            {f.type !== 'bool' && <label className="mb-1 block text-[11px] font-bold text-ink-muted">{f.label}{isReq(f) && <span className="text-danger"> *</span>}</label>}
+            <FieldInput field={f} value={form[f.key]} onChange={(v) => set(f.key, v)} form={form} />
+          </div>
+        ))}
+        {error && <div className="text-[11.5px] font-semibold text-danger">⚠ {error}</div>}
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -208,36 +205,30 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
   };
 
   return (
-    <div style={{ padding: '12px 10px', maxWidth: 1100, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>{title}</h2>
-          <p style={{ margin: '2px 0 0', fontSize: 10.5, color: DIM }}>{subtitle} · {rows.length} record{rows.length === 1 ? '' : 's'}</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+    <PageLayout
+      maxWidth="max-w-[1100px] mx-auto"
+      title={title}
+      subtitle={`${subtitle} · ${rows.length} record${rows.length === 1 ? '' : 's'}`}
+      actions={
+        <>
           {toolbar}
-          <button onClick={exportSheet} disabled={rows.length === 0} title="Export all records to Excel"
-            style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', opacity: rows.length === 0 ? 0.5 : 1, cursor: rows.length === 0 ? 'not-allowed' : 'pointer' }}>
-            <Download size={14} /> Export Excel
-          </button>
-          <button onClick={printList} disabled={rows.length === 0} title="Print the current list"
-            style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', opacity: rows.length === 0 ? 0.5 : 1, cursor: rows.length === 0 ? 'not-allowed' : 'pointer' }}>
-            <Printer size={14} /> Print
-          </button>
-          {!readOnly && <button onClick={openNew} style={btn(BLUE, '#fff')}><Plus size={14} /> New</button>}
-        </div>
-      </div>
-      {note && <div style={{ ...card, padding: '9px 13px', marginBottom: 12, fontSize: 11, color: DIM }}>{note}</div>}
+          <Button variant="secondary" size="sm" icon={Download} onClick={exportSheet} disabled={rows.length === 0} title="Export all records to Excel">Export Excel</Button>
+          <Button variant="secondary" size="sm" icon={Printer} onClick={printList} disabled={rows.length === 0} title="Print the current list">Print</Button>
+          {!readOnly && <Button variant="primary" size="sm" icon={Plus} onClick={openNew}>New</Button>}
+        </>
+      }
+    >
+      {note && <div className="kbiz-card mb-3 px-3.5 py-2.5 text-[11px] text-ink-muted">{note}</div>}
 
-      {list.isLoading && <div style={{ ...card, padding: 28, textAlign: 'center', color: DIM, fontSize: 12 }}>Loading…</div>}
-      {list.isError && <div style={{ ...card, padding: 16, color: RED, fontSize: 12, fontWeight: 600 }}>⚠ {list.error?.message || 'Failed to load'} — is the ERP backend running and are you logged in?</div>}
+      {list.isLoading && <LoadingState />}
+      {list.isError && <ErrorState message={`${list.error?.message || 'Failed to load'} — is the ERP backend running and are you logged in?`} onRetry={list.refetch} />}
 
       {!list.isLoading && !list.isError && (
-        <div className="kb-sticky" style={{ ...card, padding: 0, '--stick-head': '#f3f5f9', maxHeight: 'calc(100vh - 220px)' }}>
+        <div className="kb-sticky rounded-brand border border-surface-border bg-surface shadow-card" style={{ '--stick-head': '#f3f5f9', maxHeight: 'calc(100vh - 220px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead><tr style={{ background: '#f3f5f9' }}>
-              {cols.map((f) => <th key={f.key} style={{ textAlign: f.type === 'number' ? 'right' : 'left', padding: '10px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #e5e9f0' }}>{f.label}</th>)}
-              <th style={{ width: 84, padding: '10px 13px', borderBottom: '1px solid #e5e9f0' }} />
+              {cols.map((f) => <th key={f.key} style={{ textAlign: f.type === 'number' ? 'right' : 'left', padding: '10px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #e6e8ec' }}>{f.label}</th>)}
+              <th style={{ width: 84, padding: '10px 13px', borderBottom: '1px solid #e6e8ec' }} />
             </tr></thead>
             <tbody>
               {rows.length === 0 && <tr><td colSpan={cols.length + 1} style={{ padding: 28, textAlign: 'center', color: DIM }}>No records yet — click “New” to add one.</td></tr>}
@@ -270,7 +261,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
           onClose={() => setEditing(null)} onSave={save}
         />
       )}
-    </div>
+    </PageLayout>
   );
 }
 
@@ -329,7 +320,9 @@ export const CustomersMaster = () => (
   <MasterCrud title="Customers" subtitle="Clients (Sundry Debtors) — live from the backend" resource="customers"
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
-      { key: 'branch', label: 'Branch', type: 'text' },
+      // Branch must be a real code (not a free-text/blank field) — a blank branch creates
+      // an unscoped party. Default 'ALL' matches how auto-created party ledgers are scoped.
+      { key: 'branch', label: 'Branch', type: 'select', options: ['ALL', ...BRANCH_CODES], default: 'ALL', required: true },
       { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
       { key: 'address', label: 'Address', type: 'text', table: false },
       { key: 'city', label: 'City', type: 'text', table: false },
@@ -347,7 +340,8 @@ export const SuppliersMaster = () => (
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'category', label: 'Category', type: 'text' },
       { key: 'type', label: 'Type', type: 'text' },
-      { key: 'branch', label: 'Branch', type: 'text' },
+      // Branch must be a real code, not free-text/blank (a blank branch = unscoped party).
+      { key: 'branch', label: 'Branch', type: 'select', options: ['ALL', ...BRANCH_CODES], default: 'ALL', required: true },
       { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
       { key: 'pan', label: 'PAN', type: 'text', table: false },
       { key: 'contact', label: 'Contact', type: 'text', table: false },
@@ -465,11 +459,15 @@ export const GroupsMaster = ({ branch }) => {
     { key: 'parent', label: 'Nest under (parent group / sub-group)', type: 'select', options: parentOptions, required: true },
     { key: 'active', label: 'Active', type: 'bool', default: true },
   ];
+  // Tax accounts are governed (super-admin-only) and manual creation is blocked server-side
+  // for everyone — so don't offer them in the create form (picking one just yields a raw 403).
+  const TAX_GROUP_NAMES = new Set(['Duties & Taxes', 'Input GST', 'Output GST', 'Reverse Charge (RCM)', 'GST Control / Reconciliation', 'TDS & TCS', 'VAT']);
+  const ledgerGroupOptions = parentOptions.filter((g) => !TAX_GROUP_NAMES.has(g));
   const LED_FIELDS = [
     // Code is allocated by the server (<BRANCH>-MN-NNNN) — read-only, never typed.
     { key: 'code', label: 'Code (auto-generated)', type: 'text', readOnly: true, placeholder: 'Assigned automatically on save' },
     { key: 'name', label: 'Ledger Name', type: 'text', required: true },
-    { key: 'group', label: 'Group', type: 'select', options: parentOptions, required: true },
+    { key: 'group', label: 'Group', type: 'select', options: ledgerGroupOptions, required: true },
     { key: 'subGroup', label: 'Sub-Group', type: 'select', emptyLabel: '— None —',
       options: (form) => { const subs = subGroupsUnder(form.group); return form.subGroup && !subs.includes(form.subGroup) ? [form.subGroup, ...subs] : subs; } },
     { key: 'branch', label: 'Branch', type: 'select', options: ['ALL', ...BRANCH_CODES], default: 'ALL' },
@@ -527,46 +525,43 @@ export const GroupsMaster = ({ branch }) => {
     rows.map((r) => ({ tallyParent: r.tallyParent, tallySub: r.tallySub, erpGroup: r.erpGroup, erpSub: r.erpSub, ledgerName: r.ledgerName })));
   const subGroupCount = groups.filter((g) => !g.system).length;
   const loading = groupsQ.isLoading || ledgersQ.isLoading;
-  const th = { textAlign: 'left', padding: '10px 12px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #e5e9f0', whiteSpace: 'nowrap' };
+  const th = { textAlign: 'left', padding: '10px 12px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #e6e8ec', whiteSpace: 'nowrap' };
   const pencilBtn = { background: 'none', border: 'none', cursor: 'pointer', color: BLUE, padding: 2, marginLeft: 6, verticalAlign: 'middle' };
 
   return (
-    <div style={{ padding: '12px 10px', maxWidth: 1280, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>Chart of Accounts</h2>
-          <p style={{ margin: '2px 0 0', fontSize: 10.5, color: DIM }}>Primary Group ▸ Primary Sub Group ▸ ERP Group ▸ ERP Sub Group ▸ ERP Ledger · {rows.length} rows · {subGroupCount} sub-groups · {ledgers.length} ledgers{branchView !== 'ALL' ? ` (${branchView} + Common)` : ''}</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
+    <PageLayout
+      maxWidth="max-w-[1280px] mx-auto"
+      title="Chart of Accounts"
+      subtitle={`Primary Group ▸ Primary Sub Group ▸ ERP Group ▸ ERP Sub Group ▸ ERP Ledger · ${rows.length} rows · ${subGroupCount} sub-groups · ${ledgers.length} ledgers${branchView !== 'ALL' ? ` (${branchView} + Common)` : ''}`}
+      actions={
+        <>
+          <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-ink-muted">
             Branch
-            <select value={branchView} onChange={(e) => setBranchView(e.target.value)} style={{ ...inp, fontSize: 12, padding: '7px 9px', width: 'auto', minWidth: 130 }}>
+            <div className="w-36"><Select value={branchView} onChange={(e) => setBranchView(e.target.value)}>
               <option value="ALL">{CONSOLIDATED_LABEL}</option>
               {BRANCH_CODES.map((b) => <option key={b} value={b}>{b} + Common</option>)}
-            </select>
+            </Select></div>
           </label>
-          <button onClick={doExport} disabled={!rows.length} style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', opacity: rows.length ? 1 : 0.5, cursor: rows.length ? 'pointer' : 'not-allowed' }}>
-            <Download size={14} /> Export Excel
-          </button>
-        </div>
-      </div>
-
+          <Button variant="secondary" size="sm" icon={Download} onClick={doExport} disabled={!rows.length}>Export Excel</Button>
+        </>
+      }
+    >
       {/* Create row — one button per ERP level (Tally groups are fixed, so none here). */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: DIM, marginRight: 2 }}>New:</span>
-        <button onClick={() => openNew('group')} style={btn(BLUE, '#fff')}><Plus size={14} /> ERP Group</button>
-        <button onClick={() => openNew('subgroup')} style={btn('#1a3a6e', '#fff')}><Plus size={14} /> ERP Sub Group</button>
-        <button onClick={() => openNew('ledger')} style={btn(GREEN, '#fff')}><Plus size={14} /> ERP Ledger</button>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="mr-0.5 text-[11px] font-bold text-ink-muted">New:</span>
+        <Button variant="primary" size="sm" icon={Plus} onClick={() => openNew('group')}>ERP Group</Button>
+        <Button variant="primary" size="sm" icon={Plus} onClick={() => openNew('subgroup')} className="bg-[#1a3a6e] hover:bg-[#15315c]">ERP Sub Group</Button>
+        <Button variant="success" size="sm" icon={Plus} onClick={() => openNew('ledger')}>ERP Ledger</Button>
       </div>
-      <div style={{ ...card, padding: '9px 13px', marginBottom: 12, fontSize: 11, color: DIM }}>
+      <div className="kbiz-card mb-3 px-3.5 py-2.5 text-[11px] text-ink-muted">
         🔒 <b>Primary Group</b> (16) &amp; <b>Primary Sub Group</b> (12) are the fixed 28-group backbone — <b>locked &amp; non-editable</b>. The <b>ERP Group / Sub Group / Ledger</b> columns are your custom chart — click the <Pencil size={11} style={{ verticalAlign: 'middle', color: BLUE }} /> in a cell to edit that node. To add new ones, use Masters → Sub-Groups / Ledgers.
       </div>
 
-      {loading && <div style={{ ...card, padding: 28, textAlign: 'center', color: DIM, fontSize: 12 }}>Loading chart…</div>}
-      {(groupsQ.isError || ledgersQ.isError) && <div style={{ ...card, padding: 16, color: RED, fontSize: 12, fontWeight: 600 }}>⚠ Failed to load — is the ERP backend running and are you logged in?</div>}
+      {loading && <LoadingState label="Loading chart…" />}
+      {(groupsQ.isError || ledgersQ.isError) && <ErrorState message="Failed to load — is the ERP backend running and are you logged in?" />}
 
       {!loading && !groupsQ.isError && (
-        <div className="kb-sticky" style={{ ...card, padding: 0, '--stick-head': '#f3f5f9', maxHeight: 'calc(100vh - 240px)' }}>
+        <div className="kb-sticky rounded-brand border border-surface-border bg-surface shadow-card" style={{ '--stick-head': '#f3f5f9', maxHeight: 'calc(100vh - 240px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead><tr style={{ background: '#f3f5f9' }}>
               {COLS.map((c) => <th key={c.key} style={th}>{c.lock ? '🔒 ' : ''}{c.label}</th>)}
@@ -604,7 +599,7 @@ export const GroupsMaster = ({ branch }) => {
         <EditModal title={`${editing.record?.__new ? 'New' : 'Edit'} ${editing.label}`} fields={editing.fields} record={editing.record}
           saving={saving} error={err} onClose={() => setEditing(null)} onSave={saveEdit} />
       )}
-    </div>
+    </PageLayout>
   );
 };
 
@@ -679,28 +674,27 @@ export const LedgersMaster = ({ branch }) => {
   const subFilterOptions = groupFilter ? subGroupsUnder(groupFilter) : [];
   const ledgerRowFilter = (r) => ledgerMatchesFilter(r, groupFilter, subGroupFilter);
 
-  const selWrap = { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM };
-  const selStyle = { ...inp, fontSize: 12, padding: '7px 9px', width: 'auto', minWidth: 120 };
+  const selWrap = 'inline-flex items-center gap-1.5 text-[11px] font-bold text-ink-muted';
   const toolbar = (
     <>
-      <label style={selWrap}>Branch
-        <select value={branchView} onChange={(e) => setBranchView(e.target.value)} style={selStyle}>
+      <label className={selWrap}>Branch
+        <div className="w-28"><Select value={branchView} onChange={(e) => setBranchView(e.target.value)}>
           <option value="ALL">All branches</option>
           {BRANCH_CODES.map((b) => <option key={b} value={b}>{b}</option>)}
-        </select>
+        </Select></div>
       </label>
-      <label style={selWrap}>Group
-        <select value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setSubGroupFilter(''); }} style={selStyle}>
+      <label className={selWrap}>Group
+        <div className="w-44"><Select value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setSubGroupFilter(''); }}>
           <option value="">All groups</option>
           {mainGroupOptions.map((g) => <option key={g} value={g}>{g}</option>)}
-        </select>
+        </Select></div>
       </label>
       {groupFilter && (
-        <label style={selWrap}>Sub-Group
-          <select value={subGroupFilter} onChange={(e) => setSubGroupFilter(e.target.value)} style={selStyle}>
+        <label className={selWrap}>Sub-Group
+          <div className="w-44"><Select value={subGroupFilter} onChange={(e) => setSubGroupFilter(e.target.value)}>
             <option value="">All sub-groups</option>
             {subFilterOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          </Select></div>
         </label>
       )}
     </>

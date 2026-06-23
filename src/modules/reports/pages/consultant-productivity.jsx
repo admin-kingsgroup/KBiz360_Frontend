@@ -18,7 +18,7 @@ import { PageSection, ResponsiveGrid, StatusPill, Button } from '../../../shell/
 import { RptShell } from '../components/scaffold';
 
 const f = (n) => '₹' + Number(Math.round(n)).toLocaleString('en-IN');
-const MOD_CLR = { Flight: '#378ADD', Holiday: '#1D9E75', Hotel: '#BA7517', Visa: '#D4537E', Car: '#7F77DD', Insurance: '#5F9EA0', Misc: '#888' };
+const MOD_CLR = { Flight: '#378ADD', Holiday: '#3fb7a3', Hotel: '#BA7517', Visa: '#D4537E', Car: '#7F77DD', Insurance: '#5F9EA0', Misc: '#888' };
 const gpPctTone = (p) => (p >= 15 ? 'success' : p >= 8 ? 'warning' : 'danger');
 
 export function ConsultantReport({ branch }) {
@@ -78,12 +78,12 @@ export function ConsultantReport({ branch }) {
   const totBks = filtered.reduce((s, c) => s + c.bks, 0);
 
   const KPIS = [
-    { l: 'Consultants', v: String(filtered.length), c: '#384677' },
-    { l: 'Total Revenue', v: f(totRev), c: '#185FA5' },
-    { l: 'Total GP', v: f(totGP), c: '#27500A' },
-    { l: 'Avg GP/Consultant', v: filtered.length > 0 ? f(Math.round(totGP / filtered.length)) : '—', c: '#1D9E75' },
-    { l: 'Avg Ticket Value', v: totBks > 0 ? f(Math.round(totRev / totBks)) : '—', c: '#854F0B' },
-    { l: 'Total Bookings', v: String(totBks), c: '#384677' },
+    { l: 'Consultants', v: String(filtered.length), c: '#2e323c' },
+    { l: 'Total Revenue', v: f(totRev), c: '#2563eb' },
+    { l: 'Total GP', v: f(totGP), c: '#16a34a' },
+    { l: 'Avg GP/Consultant', v: filtered.length > 0 ? f(Math.round(totGP / filtered.length)) : '—', c: '#3fb7a3' },
+    { l: 'Avg Ticket Value', v: totBks > 0 ? f(Math.round(totRev / totBks)) : '—', c: '#d97706' },
+    { l: 'Total Bookings', v: String(totBks), c: '#2e323c' },
   ];
 
   const columns = [
@@ -91,12 +91,12 @@ export function ConsultantReport({ branch }) {
     { key: 'name', header: 'Consultant', className: 'font-bold text-navy', hideable: false },
     { key: 'rev', header: 'Revenue', num: true, render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.rev, 0)) },
     { key: 'cost', header: 'Cost', num: true, className: 'text-maroon', render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.cost, 0)) },
-    { key: 'gp', header: 'Gross Profit', num: true, className: 'font-bold text-[#27500A]', render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.gp, 0)) },
+    { key: 'gp', header: 'Gross Profit', num: true, className: 'font-bold text-[#16a34a]', render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.gp, 0)) },
     { key: 'gpPct', header: 'GP%', num: true, render: (r, v) => <StatusPill tone={gpPctTone(v)} size="sm">{v}%</StatusPill>, footer: (rs) => { const tr = rs.reduce((s, r) => s + r.rev, 0); const tg = rs.reduce((s, r) => s + r.gp, 0); return tr > 0 ? +(tg / tr * 100).toFixed(1) + '%' : '0%'; } },
     { key: 'bks', header: 'Bookings', num: true, footer: (rs) => rs.reduce((s, r) => s + r.bks, 0) },
     { key: 'avgTicket', header: 'Avg Ticket', num: true, className: 'text-role-hr', render: (r, v) => f(v) },
-    { key: 'topMod', header: 'Top Module', render: (r, v) => <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: (MOD_CLR[v] || '#384677') + '22', color: MOD_CLR[v] || '#384677' }}>{v}</span> },
-    { key: 'gpDelta', header: 'vs 1 Yr Ago', num: true, render: (r, v) => (v == null ? <span className="text-ink-subtle">—</span> : <span className={`font-bold ${v >= 0 ? 'text-[#27500A]' : 'text-maroon'}`}>{v >= 0 ? '+' : ''}{f(v)}</span>) },
+    { key: 'topMod', header: 'Top Module', render: (r, v) => <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: (MOD_CLR[v] || '#2e323c') + '22', color: MOD_CLR[v] || '#2e323c' }}>{v}</span> },
+    { key: 'gpDelta', header: 'vs 1 Yr Ago', num: true, render: (r, v) => (v == null ? <span className="text-ink-subtle">—</span> : <span className={`font-bold ${v >= 0 ? 'text-[#16a34a]' : 'text-maroon'}`}>{v >= 0 ? '+' : ''}{f(v)}</span>) },
   ];
 
   const filters = (
@@ -123,6 +123,8 @@ export function ConsultantReport({ branch }) {
 
       {view === 'table' ? (
         <DataTable
+          loading={q.isLoading}
+          isError={q.isError}
           columns={columns}
           rows={filtered}
           getRowKey={(r) => r.name}
@@ -150,7 +152,7 @@ export function ConsultantReport({ branch }) {
                   return (
                     <div key={d.m} className="flex-1 text-center">
                       <div className="mb-0.5 flex h-16 items-end justify-center">
-                        <div className="w-[60%] rounded-t" style={{ height: Math.max(h, 2), background: ['#185FA5', '#27500A', '#854F0B'][ci % 3] || '#384677' }} />
+                        <div className="w-[60%] rounded-t" style={{ height: Math.max(h, 2), background: ['#2563eb', '#16a34a', '#d97706'][ci % 3] || '#2e323c' }} />
                       </div>
                       <p className="text-[8.5px] text-ink-muted">{d.m.slice(5)}</p>
                       <p className="text-[9.5px] font-bold text-navy">₹{Math.round(d.gp / 1000)}K</p>

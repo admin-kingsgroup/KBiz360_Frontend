@@ -15,22 +15,24 @@
    a reconciliation panel vs TB/P&L/BS, and Excel + Print export.
    ════════════════════════════════════════════════════════════════════════ */
 import React, { useMemo, useState } from 'react';
-import { card, bc, RPT_thStyle, RPT_tdStyle } from '../core/styles';
+import { FileSpreadsheet, Printer } from 'lucide-react';
+import { bc, RPT_thStyle, RPT_tdStyle } from '../core/styles';
 import { fmtINR } from '../core/format';
 import { CUR_FY, CUR_QUARTER, CUR_MONTH, MONTH_OPTIONS, todayISO, monthLabel, fyOptions, fyRange, fmtDate } from '../core/dates';
 import { useBalanceSheet, useProfitAndLoss, useTrialBalance, useAgeing, useLedgerStatement } from '../core/useAccounting';
 import { VoucherEditor } from './accountingLive';
 import { exportToExcel } from '../core/exportExcel';
+import { toast } from '../core/ux/toast';
 import { buildNotes } from './notesEngine';
-import { useModalEsc } from '../core/ux/useModalEsc';
-import { clickable } from '../core/ux/clickable';
 import { PeriodBar, periodRange } from '../core/period';
+import { PageLayout } from '../shell/PageLayout';
+import { Modal, Button, LoadingState, ErrorState, EmptyState } from '../shell/primitives';
+import { clickable } from '../core/ux/clickable';
 import { openPrintPreview } from '../core/PrintPreview';
 
-const INK = '#0d1326', GOLD = '#d4a437', MUTE = '#5a6691', LINE = '#e1e3ec';
-const OK = '#1D9E75', WARN = '#A32D2D';
+const INK = '#1a1c22', GOLD = '#c2a04a', MUTE = '#5b616e', LINE = '#e6e8ec';
+const OK = '#3fb7a3', WARN = '#dc2626';
 const cell = (v) => { const x = Math.round(Number(v) || 0); return x ? x.toLocaleString('en-IN') : '—'; };
-const ctrl = { padding: '7px 10px', border: `1px solid ${LINE}`, borderRadius: 6, fontSize: 11.5, background: '#fff', color: INK, cursor: 'pointer', fontWeight: 600 };
 
 function lastDayISO(ym) { const [y, m] = String(ym).split('-').map(Number); const last = new Date(y, m, 0).getDate(); return `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`; }
 function periodOf(mode, fy, month) {
@@ -75,12 +77,12 @@ function ReconRow({ label, line, cur }) {
 function ReconPanel({ recon, cur }) {
   const allOk = recon.assets.ok && recon.liabilities.ok && recon.income.ok && recon.expenses.ok && recon.balanced !== false;
   return (
-    <div style={{ ...card, borderLeft: `4px solid ${allOk ? OK : WARN}`, marginBottom: 14 }}>
+    <div className="mb-3.5 rounded-brand border border-l-4 border-surface-border bg-surface p-4 shadow-card" style={{ borderLeftColor: allOk ? OK : WARN }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
         <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: INK }}>Reconciliation — every note ties back to the statements</p>
         <span style={{ fontSize: 11, fontWeight: 700, color: allOk ? OK : WARN }}>{allOk ? '✓ All schedules reconcile' : '⚠ Review highlighted differences'}{recon.balanced != null && ` · Balance Sheet ${recon.balanced ? 'balanced' : 'OUT OF BALANCE'}`}</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(330px,1fr))', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,330px),1fr))', gap: 8 }}>
         {recon.hasBs && <ReconRow label="Total Assets" line={recon.assets} cur={cur} />}
         {recon.hasBs && <ReconRow label="Total Equity & Liabilities" line={recon.liabilities} cur={cur} />}
         {recon.hasPl && <ReconRow label="Total Income" line={recon.income} cur={cur} />}
@@ -104,7 +106,7 @@ function AgeingBlock({ ageing, cur, onDrill }) {
   return (
     <div style={{ margin: '10px 0', padding: 10, background: '#fafbfd', border: `1px solid ${LINE}`, borderRadius: 6 }}>
       <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: MUTE, textTransform: 'uppercase', letterSpacing: 0.4 }}>Ageing Analysis</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(110px,1fr))', gap: 6, marginBottom: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,110px),1fr))', gap: 6, marginBottom: 10 }}>
         {AGE_BUCKETS.map(([k, lbl, c]) => (
           <div key={k} style={{ border: `1px solid ${LINE}`, borderRadius: 5, padding: '6px 8px', background: '#fff' }}>
             <p style={{ margin: 0, fontSize: 9.5, color: MUTE, fontWeight: 700 }}>{lbl} days</p>
@@ -193,39 +195,33 @@ function NoteTable({ note, cur, openG, toggleG, detailed, onDrill }) {
 /* ── ledger → voucher drill modal ─────────────────────────────────────── */
 function DrillModal({ ledger, branch, to, cur, onClose }) {
   const [vid, setVid] = useState(null);
-  useModalEsc(onClose);
   const q = useLedgerStatement(ledger, branch, { to });
   const lines = q.data?.lines || [];
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 10, width: 'min(720px,100%)', maxHeight: '86vh', overflowY: 'auto', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${LINE}`, position: 'sticky', top: 0, background: '#fff' }}>
-          <strong style={{ color: INK, fontSize: 14 }}>{vid ? 'Voucher' : ledger}</strong>
-          <button onClick={onClose} style={{ ...ctrl, padding: '4px 9px' }}>✕ Close</button>
-        </div>
-        <div style={{ padding: 14 }}>
-          {vid ? <VoucherEditor voucherId={vid} cur={cur} onBack={() => setVid(null)} /> : (
-            <>
-              {q.isLoading && <div style={{ padding: 20, textAlign: 'center', color: MUTE }}>Loading ledger…</div>}
-              {q.isError && <div style={{ padding: 14, color: WARN, fontSize: 12 }}>⚠ {q.error?.message}</div>}
-              {!q.isLoading && !lines.length && <div style={{ padding: 20, textAlign: 'center', color: MUTE, fontSize: 12 }}>No postings for this period.</div>}
-              {lines.map((ln, i) => (
-                <div key={i} {...clickable(() => ln.voucherId && setVid(ln.voucherId))} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '8px 10px', borderBottom: `1px solid ${LINE}`, cursor: ln.voucherId ? 'pointer' : 'default' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ color: GOLD, fontWeight: 600, fontSize: 12 }}>{ln.vno} <span style={{ color: MUTE, fontWeight: 400 }}>· {fmtDate(ln.date)}</span></div>
-                    <div style={{ fontSize: 11, color: MUTE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ln.narration || ln.party || ln.category}</div>
-                  </div>
-                  <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <div style={{ fontWeight: 700, fontSize: 12, color: ln.debit ? '#0070f2' : WARN }}>{ln.debit ? `Dr ${cell(ln.debit)}` : `Cr ${cell(ln.credit)}`}</div>
-                    {ln.voucherId ? <div style={{ fontSize: 10, color: MUTE }}>open ›</div> : null}
-                  </div>
+    <Modal title={vid ? 'Voucher' : ledger} maxWidth={720} onClose={onClose}>
+      <div className="p-3.5">
+        {vid ? <VoucherEditor voucherId={vid} cur={cur} onBack={() => setVid(null)} /> : (
+          <>
+            {q.isLoading && <LoadingState label="Loading ledger…" />}
+            {q.isError && <div className="p-3.5 text-xs text-danger">⚠ {q.error?.message}</div>}
+            {!q.isLoading && !lines.length && <div className="px-2 py-5 text-center text-xs text-ink-muted">No postings for this period.</div>}
+            {lines.map((ln, i) => (
+              <div key={i} {...clickable(() => ln.voucherId && setVid(ln.voucherId))}
+                className={`flex justify-between gap-2.5 border-b border-surface-border px-2.5 py-2 ${ln.voucherId ? 'cursor-pointer hover:bg-surface-alt' : ''}`}>
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-gold-dark">{ln.vno} <span className="font-normal text-ink-muted">· {fmtDate(ln.date)}</span></div>
+                  <div className="truncate text-[11px] text-ink-muted">{ln.narration || ln.party || ln.category}</div>
                 </div>
-              ))}
-            </>
-          )}
-        </div>
+                <div className="whitespace-nowrap text-right">
+                  <div className={`text-xs font-bold tabular-nums ${ln.debit ? 'text-info' : 'text-danger'}`}>{ln.debit ? `Dr ${cell(ln.debit)}` : `Cr ${cell(ln.credit)}`}</div>
+                  {ln.voucherId ? <div className="text-[10px] text-ink-muted">open ›</div> : null}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -256,44 +252,49 @@ export function NotesToFinancials({ branch }) {
   const err = qBs.error || qPl.error || qTb.error;
   const empty = !loading && !qBs.data && !qPl.data;
 
-  const doExcel = () => exportToExcel(`notes-to-financials-${period.label}`.replace(/\s+/g, '-'), EXPORT_COLS, notesToRows(notes));
+  const doExcel = () => { try { exportToExcel(`notes-to-financials-${period.label}`.replace(/\s+/g, '-'), EXPORT_COLS, notesToRows(notes)); toast('Downloading Excel export…', 'success'); } catch (e) { toast('Export failed: ' + (e?.message || e), 'error'); } };
+  const doPrint = () => openPrintPreview({ selector: 'main', title: 'Notes to Financial Statements', recommend: 'portrait' });
   const toggleG = (k) => setOpenG((s) => ({ ...s, [k]: s[k] === false ? true : false }));
   const isOpen = (no) => detailed || !!open[no];
 
   return (
-    <div style={{ padding: 18, maxWidth: 1280, margin: '0 auto' }}>
-      {/* header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${LINE}` }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: INK }}>Notes to Financial Statements</h2>
-          <p style={{ margin: '3px 0 0', fontSize: 12, color: MUTE }}><strong>{branchLabel(branch)}</strong> · {period.label} · auto-generated & reconciled to the live books · {cur} (excl. internal GST control)</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={setRange} />
-          <div style={{ display: 'inline-flex', border: `1px solid ${LINE}`, borderRadius: 6, overflow: 'hidden' }}>
+    <PageLayout
+      maxWidth="max-w-[1280px] mx-auto"
+      title="Notes to Financial Statements"
+      subtitle={`${branchLabel(branch)} · ${period.label} · auto-generated & reconciled to the live books · ${cur} (excl. internal GST control)`}
+      actions={
+        <>
+          <PeriodBar branch={branch} compact defaultPreset="all" onChange={setRange} />
+          <div className="inline-flex overflow-hidden rounded-lg border border-surface-border">
             {[['summary', 'Summary'], ['detailed', 'Detailed']].map(([id, l]) => (
-              <button key={id} onClick={() => setView(id)} style={{ ...ctrl, border: 'none', borderRadius: 0, background: view === id ? INK : '#fff', color: view === id ? '#fff' : MUTE }}>{l}</button>
+              <button key={id} onClick={() => setView(id)}
+                className={`px-3 py-2 text-xs font-semibold transition max-tablet:min-h-[44px] ${view === id ? 'bg-navy text-white' : 'bg-surface text-ink-muted hover:bg-surface-alt'}`}>{l}</button>
             ))}
           </div>
-          <button onClick={doExcel} style={ctrl}>📊 Excel</button>
-          <button onClick={() => openPrintPreview({ selector: 'main', title: 'Notes to Financial Statements', recommend: 'portrait' })} style={ctrl}>🖨 Print / PDF</button>
-        </div>
-      </div>
-
-      {loading && <div style={{ ...card, textAlign: 'center', color: MUTE, padding: 30 }}>Loading the books…</div>}
-      {err && !loading && <div style={{ ...card, color: WARN, fontWeight: 600 }}>⚠ {err.message || 'Failed to load accounting data'}</div>}
-      {empty && <div style={{ ...card, textAlign: 'center', color: MUTE, padding: 30 }}>No posted books for this selection yet — record vouchers to generate the notes.</div>}
+          <Button variant="secondary" size="sm" icon={FileSpreadsheet} onClick={doExcel}>Excel</Button>
+          <Button variant="secondary" size="sm" icon={Printer} onClick={doPrint}>Print / PDF</Button>
+        </>
+      }
+    >
+      {loading && <LoadingState label="Building notes…" />}
+      {err && !loading && (
+        <ErrorState
+          message={err.message || 'Failed to load accounting data'}
+          onRetry={() => { qBs.refetch(); qPl.refetch(); qTb.refetch(); qAg.refetch(); }}
+        />
+      )}
+      {empty && <EmptyState title="No posted books for this selection yet" hint="Record vouchers to generate the notes." />}
 
       {!loading && !err && !empty && (
         <>
           <ReconPanel recon={recon} cur={cur} />
 
-          {!notes.length && <div style={{ ...card, textAlign: 'center', color: MUTE, padding: 24 }}>No ledger balances in this period.</div>}
+          {!notes.length && <EmptyState title="No ledger balances in this period." />}
 
           {notes.map((n) => {
             const expanded = isOpen(n.no);
             return (
-              <div key={n.no} style={{ ...card, marginBottom: 12, borderLeft: `3px solid ${n.section === 'Income' || n.section === 'Expenses' ? GOLD : INK}` }}>
+              <div key={n.no} className="mb-3 rounded-brand border border-l-[3px] border-surface-border bg-surface p-4 shadow-card" style={{ borderLeftColor: n.section === 'Income' || n.section === 'Expenses' ? GOLD : INK }}>
                 <div {...clickable(() => setOpen((s) => ({ ...s, [n.no]: !s[n.no] })))} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
                   <span style={{ minWidth: 34, height: 34, borderRadius: '50%', background: INK, color: GOLD, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>{n.no}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -322,6 +323,6 @@ export function NotesToFinancials({ branch }) {
       )}
 
       {drill && <DrillModal ledger={drill} branch={branch} to={to} cur={cur} onClose={() => setDrill(null)} />}
-    </div>
+    </PageLayout>
   );
 }

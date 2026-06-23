@@ -3,6 +3,8 @@ import { DashboardHeader } from '../../../core/helpers';
 import { KPICard, WidgetCard } from '../../../core/styles';
 import { fmtINR } from '../../../core/format';
 import { CUR_MONTH_LABEL } from '../../../core/dates';
+import { PageLayout } from '../../../shell/PageLayout';
+import { ResponsiveGrid } from '../../../shell/primitives';
 import { useSrFmDashboard } from '../hooks/use-sr-fm-dashboard';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
 import { useDashboardStore } from '../store/dashboard.store';
@@ -26,7 +28,7 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
   const setPeriod = useDashboardStore((s) => s.setPeriod);
 
   if (isLoading || !data) {
-    return <DashboardSkeleton title="Senior Finance Manager Dashboard" numKpis={5} columns={3} hasCharts={true} />;
+    return <DashboardSkeleton numKpis={5} columns={3} hasCharts={true} />;
   }
 
   const { cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags } = data;
@@ -39,7 +41,7 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
   const gstr3bFiled = (GSTR_FILING_STATUS || []).filter((g) => g.gstr3b === 'Filed').length;
 
   return (
-    <div style={{ padding: 18, maxWidth: 1400, margin: '0 auto' }}>
+    <PageLayout>
       <DashboardHeader
         title="Senior Finance Manager Dashboard"
         subtitle="Operational finance · all branches"
@@ -49,80 +51,43 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
         onExport={() => openPrintPreview({ selector: 'main', title: 'Senior Finance Manager Dashboard', recommend: 'portrait' })}
       />
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))',
-          gap: 12,
-          marginBottom: 14,
-        }}
-      >
-        <KPICard label="Pending My Approval" value={String(varianceFlags.length)} delta="" color="#f97316" onClick={() => navigate('/approvals')} />
-        <KPICard
-          label="Banks Balance Total"
-          value={fmtINR(banksTotal)}
-          delta=""
-          color="#22c55e"
-          onClick={() => navigate('/masters/bank-accounts')}
-        />
-        <KPICard label="Period Close" value={`${periodClosed}/${periodClose.length || 0}`} delta="" color="#d4a437" />
-        <KPICard
-          label="GSTR-3B Filed"
-          value={`${gstr3bFiled}/${GSTR_FILING_STATUS.length}`}
-          delta=""
-          color="#A32D2D"
-          onClick={() => navigate('/tax/gstr-3b')}
-        />
-        <KPICard
-          label="Total AR Outstanding"
-          value={fmtINR(arOutstanding)}
-          delta=""
-          color="#5a6691"
-          onClick={() => navigate('/reports/rec')}
-        />
-      </div>
+      <ResponsiveGrid min="170px" gap="md" className="mb-3.5">
+        <KPICard label="Pending My Approval" value={String(varianceFlags.length)} delta="" color="#d97706" onClick={() => navigate('/approvals')} />
+        <KPICard label="Banks Balance Total" value={fmtINR(banksTotal)} delta="" color="#16a34a" onClick={() => navigate('/masters/bank-accounts')} />
+        <KPICard label="Period Close" value={`${periodClosed}/${periodClose.length || 0}`} delta="" color="#c2a04a" />
+        <KPICard label="GSTR-3B Filed" value={`${gstr3bFiled}/${GSTR_FILING_STATUS.length}`} delta="" color="#dc2626" onClick={() => navigate('/tax/gstr-3b')} />
+        <KPICard label="Total AR Outstanding" value={fmtINR(arOutstanding)} delta="" color="#5b616e" onClick={() => navigate('/reports/rec')} />
+      </ResponsiveGrid>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14, marginBottom: 14 }}>
-        <WidgetCard
-          title="13-Week Cash Forecast"
-          subtitle="Projected inflows / outflows / closing balance"
-          onDrill={() => navigate('/reports/cashflow-forecast')}
-        >
+      <div className="mb-3.5 grid grid-cols-1 gap-3.5 desktop:grid-cols-[2fr_1fr]">
+        <WidgetCard title="13-Week Cash Forecast" subtitle="Projected inflows / outflows / closing balance" onDrill={() => navigate('/reports/cashflow-forecast')}>
           <CashForecastChart data={cashForecast} />
         </WidgetCard>
-
         <WidgetCard title="Bank Balances — Real Time" onDrill={() => navigate('/masters/bank-accounts')}>
           <BankBalancesPanel accounts={bankAccounts} />
         </WidgetCard>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+      <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
         <WidgetCard title="Period Close Progress" subtitle={`Branch-by-branch ${CUR_MONTH_LABEL} close status`}>
           <PeriodCloseTable rows={periodClose} />
         </WidgetCard>
-
         <WidgetCard title="GSTR Filing Status" onDrill={() => navigate('/tax/gstr-1')}>
           <GstrFilingPanel rows={GSTR_FILING_STATUS} />
         </WidgetCard>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+      <div className="grid grid-cols-1 gap-3.5 tablet:grid-cols-2 desktop:grid-cols-3">
         <WidgetCard title="Receivables Ageing" onDrill={() => navigate('/reports/rec')}>
           <AgeingBuckets buckets={arAgeing} kind="receivable" formatMoney={fmtINR} />
         </WidgetCard>
-
         <WidgetCard title="Payables Ageing" onDrill={() => navigate('/reports/pay')}>
           <AgeingBuckets buckets={apAgeing} kind="payable" formatMoney={fmtINR} />
         </WidgetCard>
-
-        <WidgetCard
-          title="Recent Variance Flags"
-          subtitle={varianceFlags.length + ' items'}
-          onDrill={() => navigate('/reports/variance')}
-        >
+        <WidgetCard title="Recent Variance Flags" subtitle={varianceFlags.length + ' items'} onDrill={() => navigate('/reports/variance')}>
           <VarianceFlagsPanel flags={varianceFlags} />
         </WidgetCard>
       </div>
-    </div>
+    </PageLayout>
   );
 }

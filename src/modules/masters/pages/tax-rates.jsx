@@ -18,8 +18,8 @@ import { Modal, Button, Input, Select, FormField, StatusPill } from '../../../sh
 
 const MODULE_OPTS = ['Flight', 'Holiday', 'Hotel', 'Car', 'Visa', 'Insurance', 'Misc'];
 const ITC_OPTS = ['Yes', 'No', 'Varies'];
-const rateColor = { 0: '#5a6691', 5: '#27500A', 12: '#854F0B', 18: '#A32D2D' };
-const rateBg = { 0: '#f3f4f8', 5: '#EAF3DE', 12: '#FAEEDA', 18: '#FCEBEB' };
+const rateColor = { 0: '#5b616e', 5: '#16a34a', 12: '#d97706', 18: '#dc2626' };
+const rateBg = { 0: '#f3f4f8', 5: '#e8f6ed', 12: '#fbeedb', 18: '#fbe9e9' };
 const blankHsn = { code: '', service: '', module: 'Flight', basis: '', rate: 0, itc: 'Yes', tcs: 'No', active: true };
 
 const GST_DEFAULTS = [
@@ -72,22 +72,22 @@ export function MastersTaxRates() {
   const filt_g = gstRows.filter((r) => !search || (r.service || '').toLowerCase().includes(search.toLowerCase()) || (r.code || '').includes(search) || (r.module || '').toLowerCase().includes(search.toLowerCase()));
 
   const gstColumns = [
-    { key: 'code', header: 'HSN / SAC Code', className: 'font-mono font-bold text-[#185FA5]', hideable: false },
+    { key: 'code', header: 'HSN / SAC Code', className: 'font-mono font-bold text-[#2563eb]', hideable: false },
     { key: 'service', header: 'Service', className: 'text-navy' },
     { key: 'module', header: 'Module', render: (r, v) => (v ? <StatusPill tone="info" size="sm">{v}</StatusPill> : null) },
     { key: 'basis', header: 'Taxable Basis', className: 'text-ink-muted' },
-    { key: 'rate', header: 'GST %', num: true, align: 'center', render: (r, v) => <span className="rounded-full px-2 py-0.5 text-[11px] font-extrabold" style={{ background: rateBg[v] || '#f3f4f8', color: rateColor[v] || '#5a6691' }}>{v}%</span> },
-    { key: 'itc', header: 'ITC', align: 'center', render: (r, v) => <span className="text-[10px] font-bold" style={{ color: v === 'Yes' ? '#27500A' : v === 'No' ? '#A32D2D' : '#854F0B' }}>{v}</span> },
-    { key: 'tcs', header: 'TCS', align: 'center', className: 'text-[10px]', render: (r, v) => <span style={{ color: v !== 'No' ? '#854F0B' : '#bfc3d6' }}>{v}</span> },
+    { key: 'rate', header: 'GST %', num: true, align: 'center', render: (r, v) => <span className="rounded-full px-2 py-0.5 text-[11px] font-extrabold" style={{ background: rateBg[v] || '#f3f4f8', color: rateColor[v] || '#5b616e' }}>{v}%</span> },
+    { key: 'itc', header: 'ITC', align: 'center', render: (r, v) => <span className="text-[10px] font-bold" style={{ color: v === 'Yes' ? '#16a34a' : v === 'No' ? '#dc2626' : '#d97706' }}>{v}</span> },
+    { key: 'tcs', header: 'TCS', align: 'center', className: 'text-[10px]', render: (r, v) => <span style={{ color: v !== 'No' ? '#d97706' : '#cbd0db' }}>{v}</span> },
     { key: '__act', header: '', align: 'right', sortable: false, exportable: false, hideable: false, render: (r) => (r.id ? (
       <span className="inline-flex gap-1">
-        <button onClick={() => openEditHsn(r)} title="Edit" className="p-1 text-[#185FA5] hover:text-[#134d85]"><Pencil size={14} /></button>
+        <button onClick={() => openEditHsn(r)} title="Edit" className="p-1 text-[#2563eb] hover:text-[#134d85]"><Pencil size={14} /></button>
         <button onClick={() => delHsn(r)} title="Delete" className="p-1 text-maroon hover:opacity-80"><Trash2 size={14} /></button>
       </span>
     ) : <span title="Built-in default — seed the HSN/SAC master to edit (npm run seed:hsn)" className="text-ink-subtle">🔒</span>) },
   ];
   const tcsColumns = [
-    { key: 'section', header: 'Section', className: 'font-mono font-extrabold text-[#185FA5]', hideable: false },
+    { key: 'section', header: 'Section', className: 'font-mono font-extrabold text-[#2563eb]', hideable: false },
     { key: 'nature', header: 'Nature', render: (r, v) => <StatusPill tone={v === 'TCS' ? 'warning' : 'info'} size="sm">{v}</StatusPill> },
     { key: 'rate', header: 'Rate', className: 'font-bold text-navy' },
     { key: 'threshold', header: 'Threshold', className: 'text-ink-muted' },

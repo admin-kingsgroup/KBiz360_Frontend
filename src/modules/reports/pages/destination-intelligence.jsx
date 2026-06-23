@@ -51,7 +51,7 @@ export function DestinationIntelligence({ branch }) {
     { key: 'bks', header: 'Bookings', num: true, footer: (rs) => rs.reduce((s, r) => s + r.bks, 0) },
     { key: 'rev', header: 'Revenue', num: true, render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.rev, 0)) },
     { key: 'cost', header: 'Cost', num: true, className: 'text-maroon', render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.cost, 0)) },
-    { key: 'gp', header: 'Gross Profit', num: true, className: 'font-bold text-[#27500A]', render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.gp, 0)) },
+    { key: 'gp', header: 'Gross Profit', num: true, className: 'font-bold text-[#16a34a]', render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.gp, 0)) },
     { key: 'gpPct', header: 'GP%', num: true, render: (r, v) => <StatusPill tone={gpPctTone(v)} size="sm">{v}%</StatusPill> },
     { key: 'avgTicket', header: 'Avg Ticket', num: true, className: 'text-role-hr', render: (r, v) => f(v) },
     { key: 'share', header: 'Rev Share', num: true, sortValue: (r) => r.rev, render: (r) => `${totRev > 0 ? Math.round(r.rev / totRev * 100) : 0}%` },
@@ -69,7 +69,7 @@ export function DestinationIntelligence({ branch }) {
       {/* Spotlight cards — top 6 by GP */}
       <ResponsiveGrid min="280px" gap="md" className="mb-4">
         {filtered.slice(0, 6).map((d, i) => (
-          <div key={d.dest} className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{ borderTopColor: i < 3 ? '#d4a437' : '#e1e3ec' }}>
+          <div key={d.dest} className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{ borderTopColor: i < 3 ? '#c2a04a' : '#e6e8ec' }}>
             <div className="mb-2 flex items-start justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-[22px]">{DEST_EMOJIS[d.dest] || '🌍'}</span>
@@ -79,17 +79,17 @@ export function DestinationIntelligence({ branch }) {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-extrabold text-[#27500A]">{f(d.gp)}</p>
-                <p className={`mt-px text-[9.5px] ${d.gpPct >= 12 ? 'text-[#27500A]' : 'text-[#854F0B]'}`}>GP {d.gpPct}%</p>
+                <p className="text-sm font-extrabold text-[#16a34a]">{f(d.gp)}</p>
+                <p className={`mt-px text-[9.5px] ${d.gpPct >= 12 ? 'text-[#16a34a]' : 'text-[#d97706]'}`}>GP {d.gpPct}%</p>
               </div>
             </div>
             <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-surface-border">
-              <div className="h-full rounded-full" style={{ width: `${Math.round(d.gp / maxGP * 100)}%`, background: i < 3 ? '#d4a437' : '#27500A' }} />
+              <div className="h-full rounded-full" style={{ width: `${Math.round(d.gp / maxGP * 100)}%`, background: i < 3 ? '#c2a04a' : '#16a34a' }} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-md bg-surface-alt px-2 py-1.5 text-center">
                 <p className="text-[8.5px] text-ink-muted">Revenue</p>
-                <p className="mt-px text-[11px] font-bold text-[#185FA5]">{f(d.rev)}</p>
+                <p className="mt-px text-[11px] font-bold text-[#2563eb]">{f(d.rev)}</p>
               </div>
               <div className="rounded-md bg-surface-alt px-2 py-1.5 text-center">
                 <p className="text-[8.5px] text-ink-muted">Avg Ticket</p>
@@ -101,6 +101,8 @@ export function DestinationIntelligence({ branch }) {
       </ResponsiveGrid>
 
       <DataTable
+        loading={q.isLoading}
+        isError={q.isError}
         columns={columns}
         rows={filtered}
         getRowKey={(r) => r.dest}

@@ -18,12 +18,13 @@ import { exportToExcel } from '../../../core/exportExcel';
 import { MODULE_ICONS, CONSOLIDATED_LABEL } from '../../../core/data';
 import { CUR_FY, todayISO, monthLabel, rangeNote, presetRange, fyQuarterKey } from '../../../core/dates';
 import { periodRange } from '../../../core/period';
+import { compactAmt } from '../../../core/format';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { ResponsiveGrid, PageSection, Button, Select, Input } from '../../../shell/primitives';
 
-const gpClr = (p) => (p >= 20 ? '#27500A' : p >= 12 ? '#1D9E75' : p >= 8 ? '#854F0B' : '#A32D2D');
-const gpBg = (p) => (p >= 12 ? '#EAF3DE' : p >= 8 ? '#FAEEDA' : '#FCEBEB');
+const gpClr = (p) => (p >= 20 ? '#16a34a' : p >= 12 ? '#3fb7a3' : p >= 8 ? '#d97706' : '#dc2626');
+const gpBg = (p) => (p >= 12 ? '#e8f6ed' : p >= 8 ? '#fbeedb' : '#fbe9e9');
 
 const TABS = [
   { k: 'summary', l: '📊 Summary' }, { k: 'bill', l: '🧾 Bill-wise' }, { k: 'module', l: '📦 Module' },
@@ -93,7 +94,7 @@ export function ReportGP({ branch }) {
     [{ key: 'id', label: 'Voucher / File' }, { key: 'date', label: 'Date' }, { key: 'mod', label: 'Module' }, { key: 'client', label: 'Client' }, { key: 'dest', label: 'Destination' }, { key: 'airline', label: 'Airline' }, { key: 'supplier', label: 'Supplier' }, { key: 'consultant', label: 'Consultant' }, { key: 'sell', label: 'Revenue' }, { key: 'cost', label: 'Cost' }, { key: 'gp', label: 'Gross Profit' }, { key: 'gpPct', label: 'GP %' }],
     [...bills].sort((a, b) => b.gp - a.gp));
 
-  const f = (n) => (n >= 10000000 ? (n / 10000000).toFixed(2) + 'Cr' : n >= 100000 ? (n / 100000).toFixed(2) + 'L' : n >= 1000 ? (n / 1000).toFixed(1) + 'K' : String(Math.round(n)));
+  const f = (n) => compactAmt(n, { currency: '' }); // canonical compact (no currency prefix here)
   const money = (n) => cur + f(n);
   const pctPill = (p) => <span className="rounded-full px-2 py-0.5 text-[11px] font-extrabold" style={{ background: gpBg(p), color: gpClr(p) }}>{p}%</span>;
 
@@ -111,9 +112,9 @@ export function ReportGP({ branch }) {
   );
 
   const billColumns = [
-    { key: 'id', header: 'Voucher No.', className: 'font-mono text-[10px] text-[#185FA5]', hideable: false },
+    { key: 'id', header: 'Voucher No.', className: 'font-mono text-[10px] text-[#2563eb]', hideable: false },
     { key: 'date', header: 'Date', className: 'text-ink-muted' },
-    { key: 'mod', header: 'Module', render: (r, v) => <span className="rounded-full bg-[#E6F1FB] px-1.5 py-0.5 text-[9.5px] font-bold text-[#185FA5]">{v}</span> },
+    { key: 'mod', header: 'Module', render: (r, v) => <span className="rounded-full bg-[#e8f0ff] px-1.5 py-0.5 text-[9.5px] font-bold text-[#2563eb]">{v}</span> },
     { key: 'client', header: 'Client', className: 'font-semibold text-navy' },
     { key: 'dest', header: 'Destination', className: 'text-role-hr' },
     { key: 'airline', header: 'Airline / Supplier', className: 'text-ink-muted', sortValue: (r) => r.airline || r.supplier, render: (r) => r.airline || r.supplier },
@@ -136,11 +137,11 @@ export function ReportGP({ branch }) {
     { key: 'cost', header: 'Cost', num: true, className: 'text-ink-muted', render: (r, v) => (v > 0 ? money(v) : '—'), footer: () => money(totCost) },
     { key: 'gp', header: 'Gross Profit', num: true, render: (r, v) => (v !== 0 ? <span className="font-bold" style={{ color: gpClr(r.gpPct) }}>{money(v)}</span> : '—'), footer: () => money(totGP) },
     { key: 'gpPct', header: 'GP%', num: true, render: (r, v) => (r.sell > 0 ? pctPill(v) : null), footer: () => pctPill(totGPPct) },
-    { key: 'delta', header: 'vs Prior', num: true, render: (r) => (r.delta === null ? <span className="text-ink-subtle">—</span> : <span className="font-bold" style={{ color: r.delta > 0 ? '#27500A' : r.delta < 0 ? '#A32D2D' : '#5a6691' }}>{r.delta > 0 ? '+' + r.delta : r.delta}%</span>) },
+    { key: 'delta', header: 'vs Prior', num: true, render: (r) => (r.delta === null ? <span className="text-ink-subtle">—</span> : <span className="font-bold" style={{ color: r.delta > 0 ? '#16a34a' : r.delta < 0 ? '#dc2626' : '#5b616e' }}>{r.delta > 0 ? '+' + r.delta : r.delta}%</span>) },
   ];
 
   const KCard = ({ label, value, sub, accent = 'info' }) => {
-    const c = { info: '#185FA5', success: '#27500A', warning: '#854F0B', danger: '#A32D2D' }[accent] || '#185FA5';
+    const c = { info: '#2563eb', success: '#16a34a', warning: '#d97706', danger: '#dc2626' }[accent] || '#2563eb';
     return (
       <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{ borderTopColor: c }}>
         <p className="text-[9.5px] font-bold uppercase tracking-wide" style={{ color: c }}>{label}</p>
@@ -227,8 +228,8 @@ export function ReportGP({ branch }) {
                       <div key={i} className="flex min-w-[44px] flex-1 flex-col items-center gap-1">
                         <p className="text-[9px] font-bold" style={{ color: gpClr(m.gpPct) }}>{m.gpPct}%</p>
                         <div className="flex h-[120px] w-full items-end">
-                          <div className="relative w-full overflow-hidden rounded-t bg-[#E6F1FB]" style={{ height: barH }}>
-                            <div className="absolute bottom-0 w-full rounded-t bg-[#185FA5]" style={{ height: gpBarH }} />
+                          <div className="relative w-full overflow-hidden rounded-t bg-[#e8f0ff]" style={{ height: barH }}>
+                            <div className="absolute bottom-0 w-full rounded-t bg-[#2563eb]" style={{ height: gpBarH }} />
                           </div>
                         </div>
                         <p className="text-[9px] font-semibold text-ink-muted">{m.m}</p>
@@ -238,8 +239,8 @@ export function ReportGP({ branch }) {
                   })}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-ink-muted">
-                  <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#E6F1FB]" /> Total Revenue</span>
-                  <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#185FA5]" /> Gross Profit</span>
+                  <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#e8f0ff]" /> Total Revenue</span>
+                  <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#2563eb]" /> Gross Profit</span>
                 </div>
               </PageSection>
               <p className="text-xs font-bold text-navy">Module-wise Snapshot</p>
@@ -289,7 +290,7 @@ export function ReportGP({ branch }) {
                     <thead><tr className="bg-surface-alt text-left text-[10px] font-bold text-ink-muted"><th className="px-3 py-1.5">#</th><th className="px-3 py-1.5">Name</th><th className="px-3 py-1.5 text-right">GP</th><th className="px-3 py-1.5 text-right">GP%</th></tr></thead>
                     <tbody>{data.map((r, i) => (
                       <tr key={r.key} className={`border-b border-surface-alt ${i === 0 ? 'bg-[#f9fff4]' : ''}`}>
-                        <td className="px-3 py-1.5 font-bold" style={{ color: i === 0 ? '#d4a437' : '#bfc3d6', fontSize: i === 0 ? 13 : 11 }}>{i === 0 ? '🏆' : i + 1}</td>
+                        <td className="px-3 py-1.5 font-bold" style={{ color: i === 0 ? '#c2a04a' : '#cbd0db', fontSize: i === 0 ? 13 : 11 }}>{i === 0 ? '🏆' : i + 1}</td>
                         <td className="truncate px-3 py-1.5 text-navy" style={{ fontWeight: i === 0 ? 700 : 500, maxWidth: 140 }}>{icon} {r.key}</td>
                         <td className="px-3 py-1.5 text-right font-bold tabular-nums" style={{ color: gpClr(r.gpPct) }}>{money(r.gp)}</td>
                         <td className="px-3 py-1.5 text-right">{pctPill(r.gpPct)}</td>

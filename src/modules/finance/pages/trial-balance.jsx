@@ -5,6 +5,7 @@ import { DataTable } from '../../../shell/DataTable';
 import { useTrialBalance } from '../hooks/use-trial-balance';
 import { useFinanceStore } from '../store/finance.store';
 import { CUR_FY, CUR_QUARTER, CUR_MONTH, todayISO, fmtDate } from '../../../core/dates';
+import { toastError } from '../../../core/ux/toast';
 
 /* Money formatter — Indian grouping, currency symbol from the branch config.
    Zero/empty renders as an em-dash so the grid reads cleanly. */
@@ -67,7 +68,7 @@ export function TrialBalancePage({ branch }) {
       <div className="inline-flex overflow-hidden rounded-md border border-surface-border">
         {['detailed', 'summary'].map((v) => (
           <button key={v} onClick={() => setView(v)}
-            className={`px-3 py-1.5 text-xs font-semibold capitalize transition ${view === v ? 'bg-navy text-white' : 'bg-surface text-ink-muted hover:bg-surface-alt'}`}>
+            className={`px-3 py-1.5 text-xs font-semibold capitalize transition-colors duration-fast max-tablet:min-h-[44px] max-tablet:px-4 ${view === v ? 'bg-navy text-white' : 'bg-surface text-ink-muted hover:bg-surface-alt'}`}>
             {v}
           </button>
         ))}
@@ -76,16 +77,16 @@ export function TrialBalancePage({ branch }) {
       {/* Period presets */}
       {presets.map((p) => (
         <button key={p.label} onClick={() => setPeriod(p.from, p.to)}
-          className={`rounded-md border px-3 py-1.5 text-xs font-medium transition ${isActivePreset(p) ? 'border-gold bg-gold-light/30 text-navy' : 'border-surface-border bg-surface text-ink-muted hover:bg-surface-alt'}`}>
+          className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors duration-fast max-tablet:min-h-[44px] ${isActivePreset(p) ? 'border-gold bg-gold-light/30 text-navy' : 'border-surface-border bg-surface text-ink-muted hover:bg-surface-alt'}`}>
           {p.label}
         </button>
       ))}
       {/* Custom range */}
       <input type="date" value={from} max={to} onChange={(e) => setPeriod(e.target.value, to)} aria-label="From date"
-        className="h-8 rounded-md border border-surface-border bg-surface px-2 text-xs text-ink outline-none focus:border-gold" />
+        className="h-9 rounded-md border border-surface-border bg-surface px-2 text-xs text-ink outline-none transition-[box-shadow,border-color] duration-fast focus:border-info focus:shadow-focus-ring max-tablet:h-11" />
       <span className="text-xs text-ink-subtle">→</span>
       <input type="date" value={to} min={from} onChange={(e) => setPeriod(from, e.target.value)} aria-label="To date"
-        className="h-8 rounded-md border border-surface-border bg-surface px-2 text-xs text-ink outline-none focus:border-gold" />
+        className="h-9 rounded-md border border-surface-border bg-surface px-2 text-xs text-ink outline-none transition-[box-shadow,border-color] duration-fast focus:border-info focus:shadow-focus-ring max-tablet:h-11" />
     </>
   );
 
@@ -94,12 +95,12 @@ export function TrialBalancePage({ branch }) {
       {/* Balanced banner — reflects the FULL trial balance from the server */}
       {data && (
         balanced ? (
-          <div className="mb-3 flex items-center gap-2 rounded-md border border-success/40 bg-success/10 px-3 py-2 text-xs font-semibold text-[#27500A]">
+          <div className="mb-3 flex items-center gap-2 rounded-brand border border-success/40 bg-success-soft px-3 py-2 text-xs font-semibold text-success">
             <CheckCircle2 className="h-4 w-4" />
             Trial Balance tallied — Dr {money(cur, data.grandClosingDebit)} = Cr {money(cur, data.grandClosingCredit)}
           </div>
         ) : (
-          <div className="mb-3 flex items-center gap-2 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs font-semibold text-maroon">
+          <div className="mb-3 flex items-center gap-2 rounded-brand border border-danger/40 bg-danger-soft px-3 py-2 text-xs font-semibold text-danger">
             <AlertTriangle className="h-4 w-4" />
             Out of balance — Dr {money(cur, data.grandClosingDebit)} vs Cr {money(cur, data.grandClosingCredit)}
           </div>
@@ -112,7 +113,7 @@ export function TrialBalancePage({ branch }) {
         loading={isLoading}
         isError={isError}
         error={error}
-        onRetry={refetch}
+        onRetry={() => Promise.resolve(refetch()).catch(() => toastError('Retry failed — still unable to load the trial balance.'))}
         searchable
         searchPlaceholder="Search ledger / group / code…"
         stickyHeader

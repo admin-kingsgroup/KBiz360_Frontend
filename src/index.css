@@ -1,33 +1,94 @@
 /* ════════════════════════════════════════════════════════════════════
-   KBiz360 — Global Styles
-   Tailwind directives + minimal base resets.
+   KBiz360 Pro — Global Styles
+   Premium graphite + refined-gold visual system. Tokens mirror
+   tailwind.config.js. Typography, motion + component primitives live here.
    ════════════════════════════════════════════════════════════════════ */
+
+/* Premium typeface — Inter, with a graceful SF/system fallback if offline. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Base resets (kept from original index.html) ─── */
-* {
-  box-sizing: border-box;
+/* ─── Design tokens (CSS variables) ─────────────────────────────────── */
+:root {
+  /* color */
+  --kb-bg:            #f7f8fa;
+  --kb-surface:       #ffffff;
+  --kb-surface-alt:   #f4f5f7;
+  --kb-elevated:      #ffffff;
+  --kb-border:        #e6e8ec;
+  --kb-border-strong: #d6d9df;
+
+  --kb-fg:            #14161a;
+  --kb-fg-muted:      #5b616e;
+  --kb-fg-subtle:     #9197a3;
+
+  --kb-primary:       #1a1c22;
+  --kb-primary-hover: #2e323c;
+  --kb-accent:        #c2a04a;
+  --kb-accent-hover:  #98792c;
+  --kb-accent-soft:   #f6efda;
+
+  --kb-success:       #16a34a;
+  --kb-warning:       #d97706;
+  --kb-danger:        #dc2626;
+  --kb-info:          #2563eb;
+  --kb-ring:          rgba(37, 99, 235, 0.22);
+
+  /* radius */
+  --kb-r-sm: 8px;
+  --kb-r-md: 10px;
+  --kb-r-lg: 12px;
+  --kb-r-xl: 16px;
+
+  /* elevation */
+  --kb-shadow-sm:  0 1px 2px rgba(16,18,22,0.04), 0 1px 3px rgba(16,18,22,0.06);
+  --kb-shadow-card: 0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12);
+  --kb-shadow-pop: 0 16px 40px -12px rgba(16,18,22,0.20), 0 2px 8px -4px rgba(16,18,22,0.10);
+
+  /* motion */
+  --kb-t-fast: 140ms;
+  --kb-t-med:  240ms;
+  --kb-ease:   cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* typography scale */
+  --kb-fs-page:    20px;
+  --kb-fs-section: 15px;
+  --kb-fs-card:    14px;
+  --kb-fs-body:    13px;
+  --kb-fs-label:   11px;
+  --kb-fs-caption: 10.5px;
+  --kb-fs-table:   12px;
 }
 
-html,
-body,
-#root {
+/* ─── Base resets ───────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+html, body, #root {
   margin: 0;
   padding: 0;
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--kb-bg);
+  color: var(--kb-fg);
+  font-family: 'Inter', 'InterVariable', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'ss01';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #f3f4f8;
+  text-rendering: optimizeLegibility;
 }
 
-/* Prevent iOS double-tap zoom on buttons */
-button {
-  touch-action: manipulation;
-}
+::selection { background: var(--kb-accent-soft); color: var(--kb-fg); }
+
+/* Premium thin scrollbars (desktop) */
+* { scrollbar-width: thin; scrollbar-color: #cdd1d8 transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: #cdd1d8; border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: #b6bbc4; background-clip: content-box; }
+
+/* Prevent iOS double-tap zoom on controls */
+button, [role="button"] { touch-action: manipulation; }
 
 /* ─── Global keyboard focus ring (WS0 accessibility foundation) ───
    A single visible focus indicator for KEYBOARD users on every interactive
@@ -45,80 +106,100 @@ button {
   outline: none;
 }
 
-/* ─── Component classes (use @apply for repeated patterns) ─── */
+/* ─── Component classes / primitives (use @apply for repeated patterns) ─── */
 @layer components {
-  /* Standard card — replaces inline cardStyle */
-  .kbiz-card {
-    @apply bg-white rounded-brand border border-surface-border p-4 shadow-sm;
-  }
+  /* Typography scale */
+  .kbiz-page-title    { @apply text-[20px] font-bold tracking-[-0.02em] text-ink tablet:text-[22px]; }
+  .kbiz-section-title { @apply text-[15px] font-semibold tracking-[-0.01em] text-ink; }
+  .kbiz-card-title    { @apply text-sm font-semibold text-ink; }
+  .kbiz-body          { @apply text-[13px] text-ink; }
+  .kbiz-label         { @apply text-[11px] font-semibold uppercase tracking-wide text-ink-muted; }
+  .kbiz-caption       { @apply text-[10.5px] text-ink-subtle; }
+  .kbiz-table-text    { @apply text-xs text-ink; }
 
-  /* Standard input — replaces inline inpStd */
+  /* Surfaces */
+  .kbiz-card  { @apply rounded-brand border border-surface-border bg-surface p-4 shadow-card; }
+  .kbiz-panel { @apply rounded-brand border border-surface-border bg-surface shadow-card; }
+
+  /* Inputs */
   .kbiz-input {
-    @apply w-full px-3 py-2 border border-surface-border rounded-md text-sm
-           text-navy bg-white outline-none transition-colors
-           focus:border-gold;
+    @apply h-9 w-full rounded-[8px] border border-surface-border bg-surface px-3 text-[13px] text-ink outline-none
+           transition-[box-shadow,border-color] duration-[140ms] ease-[cubic-bezier(0.22,1,0.36,1)]
+           placeholder:text-ink-subtle focus:border-info focus:shadow-[0_0_0_3px_rgba(37,99,235,0.22)];
   }
 
-  /* Primary CTA button (navy with gold text) */
+  /* Buttons */
   .kbiz-btn-primary {
-    @apply w-full px-5 py-3.5 bg-navy text-gold border-none rounded-lg
-           text-sm font-extrabold cursor-pointer tracking-wider
-           transition-colors hover:bg-navy-light
-           disabled:bg-ink-muted disabled:cursor-wait;
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-[8px] bg-navy px-4 text-[13px] font-semibold text-white
+           transition-all duration-[140ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-navy-light
+           focus:outline-none focus-visible:shadow-[0_0_0_3px_rgba(37,99,235,0.22)] active:scale-[0.98]
+           disabled:cursor-not-allowed disabled:opacity-50;
   }
-
-  /* Gold accent button */
   .kbiz-btn-accent {
-    @apply px-4 py-2 bg-gold text-navy border-none rounded-md
-           text-xs font-bold cursor-pointer
-           transition-colors hover:bg-gold-dark hover:text-white;
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-[8px] bg-gold px-4 text-[13px] font-semibold text-navy
+           transition-all duration-[140ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-gold-dark hover:text-white
+           focus:outline-none focus-visible:shadow-[0_0_0_3px_rgba(194,160,74,0.28)] active:scale-[0.98]
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .kbiz-btn-ghost {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-[8px] border border-surface-border bg-surface px-4
+           text-[13px] font-semibold text-ink-muted transition-all duration-[140ms] ease-[cubic-bezier(0.22,1,0.36,1)]
+           hover:border-ink/20 hover:bg-surface-alt hover:text-ink
+           focus:outline-none focus-visible:shadow-[0_0_0_3px_rgba(37,99,235,0.22)] active:scale-[0.98];
   }
 
-  /* Touch-optimized clickable region (≥44px) */
-  .kbiz-touchable {
-    @apply min-h-[44px] cursor-pointer select-none
-           [-webkit-tap-highlight-color:transparent];
-  }
+  .kbiz-touchable { @apply min-h-[44px] cursor-pointer select-none [-webkit-tap-highlight-color:transparent]; }
+  .kbiz-brand-name { @apply font-extrabold tracking-tight; }
+  .kbiz-tagline    { @apply text-gold font-bold tracking-[1.5px] uppercase; }
 
-  /* Brand text treatment — "KBiz" gold + "360" white/navy */
-  .kbiz-brand-name {
-    @apply font-extrabold tracking-tight;
+  /* Skeleton loaders — shimmer that respects reduced-motion */
+  .kb-skeleton {
+    @apply relative overflow-hidden rounded-[8px] bg-surface-alt;
   }
-
-  /* "THE BUSINESS ENGINE" tagline */
-  .kbiz-tagline {
-    @apply text-gold font-bold tracking-brand-tagline uppercase;
+  .kb-skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+    animation: kb-shimmer 1.4s infinite;
   }
 }
 
-/* ─── Sticky-header / sticky-footer scroll tables ───
-   Wrap a <table> in <div class="kb-sticky">. The thead pins to the top and the
-   tfoot pins to the bottom while the table body scrolls inside the bounded
-   height — header & footer never scroll off the page. Per-table colors come
-   from the --stick-head / --stick-foot CSS variables set on the wrapper
-   (default white); override max-height inline when a screen needs it. */
-.kb-sticky {
-  overflow: auto;
-  max-height: calc(100vh - 200px);
-}
-.kb-sticky thead th {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  background: var(--stick-head, #ffffff);
-}
-.kb-sticky tfoot td {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  background: var(--stick-foot, #ffffff);
+@layer utilities {
+  .tnum { font-variant-numeric: tabular-nums; }
 }
 
-/* ── Print: report screens use window.print(); the app shell is a 100vh flex with
-   an overflow:auto <main>, so without this only the first viewport page printed and
-   content was clipped at the edges. On print, free the scroll containers so the full
-   report paginates, hide app chrome, and set sane page margins. Separate print
-   windows (vouchers / statements) carry their own styles and are unaffected. ── */
+/* ─── Motion: premium transitions on interactive elements ───────────── */
+button, a, input, select, textarea, [role="button"], .kbiz-card, .kbiz-panel {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: var(--kb-t-fast);
+  transition-timing-function: var(--kb-ease);
+}
+button:active:not(:disabled), [role="button"]:active { transform: scale(0.985); }
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--kb-info) !important;
+  box-shadow: var(--kb-shadow-sm), 0 0 0 3px var(--kb-ring) !important;
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .kb-skeleton::after { animation: none; }
+}
+
+/* ─── Sticky-header / sticky-footer scroll tables ───────────────────── */
+.kb-sticky { overflow: auto; max-height: calc(100vh - 200px); }
+.kb-sticky thead th { position: sticky; top: 0; z-index: 3; background: var(--stick-head, var(--kb-surface)); }
+.kb-sticky tfoot td { position: sticky; bottom: 0; z-index: 2; background: var(--stick-foot, var(--kb-surface)); }
+
+/* ─── Print: free scroll containers so reports paginate fully ───────── */
 @media print {
   @page { margin: 10mm; }
   html, body, #root { height: auto !important; overflow: visible !important; background: #fff !important; }
@@ -128,159 +209,39 @@ button {
   .noprint, .no-print, .np, .cl-noprint { display: none !important; }
 }
 
-/* ─── Route-level lazy-load fallback (Suspense) ─── */
+/* ─── Route-level lazy-load fallback (Suspense) ─────────────────────── */
 @keyframes kb-spin { to { transform: rotate(360deg); } }
 .kb-route-fallback {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  min-height: 60vh;
-  color: #5a6691;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; min-height: 60vh; color: var(--kb-fg-muted);
+  font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
 }
 .kb-route-spinner {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 3px solid #e1e3ec;
-  border-top-color: #d4a437;       /* gold accent */
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 3px solid var(--kb-border); border-top-color: var(--kb-accent);
   animation: kb-spin 0.7s linear infinite;
 }
+@media (prefers-reduced-motion: reduce) { .kb-route-spinner { animation-duration: 2s; } }
+
+/* ─── Global fetch progress bar (any pending API) ───────────────────── */
+.kb-fetchbar {
+  height: 100%;
+  width: 35%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--kb-accent, #c2a04a) 40%, var(--kb-primary, #1a1c22));
+  box-shadow: 0 0 8px rgba(194, 160, 74, 0.5);
+  animation: kb-fetchbar-slide 1.05s ease-in-out infinite;
+}
+@keyframes kb-fetchbar-slide {
+  0%   { transform: translateX(-120%); width: 30%; }
+  50%  { width: 55%; }
+  100% { transform: translateX(320%);  width: 30%; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .kb-route-spinner { animation-duration: 2s; }
+  .kb-fetchbar { animation: none; width: 100%; opacity: 0.7; }
 }
 
-/* Remove up/down spin buttons from number inputs */
+/* Remove number-input spin buttons */
 input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-input[type="number"] {
-  -moz-appearance: textfield;
-}
-
-/* ─── Micro-interactions & Visual Transitions ─── */
-
-/* General transitions for all interactive elements */
-button,
-a,
-input,
-select,
-textarea,
-.kbiz-card,
-[role="button"] {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Button click animations (Active State) */
-button:active:not(:disabled),
-.kbiz-btn-primary:active:not(:disabled),
-.kbiz-btn-accent:active:not(:disabled) {
-  transform: scale(0.96) !important;
-}
-
-/* Hover effects for inline-styled buttons based on background colors */
-
-/* Navy Buttons (style btnG) */
-button[style*="#0d1326"],
-button[style*="rgb(13, 19, 38)"] {
-  background-color: #0d1326;
-}
-button[style*="#0d1326"]:hover,
-button[style*="rgb(13, 19, 38)"]:hover {
-  background-color: #1e293b !important;
-  box-shadow: 0 4px 12px rgba(13, 19, 38, 0.15);
-}
-
-/* Gold Accent Buttons */
-button[style*="#d4a437"],
-button[style*="rgb(212, 164, 55)"] {
-  background-color: #d4a437;
-}
-button[style*="#d4a437"]:hover,
-button[style*="rgb(212, 164, 55)"]:hover {
-  background-color: #c2932e !important;
-  box-shadow: 0 4px 12px rgba(212, 164, 55, 0.2);
-}
-
-/* Green Buttons */
-button[style*="#27500A"],
-button[style*="rgb(39, 80, 10)"] {
-  background-color: #27500a;
-}
-button[style*="#27500A"]:hover,
-button[style*="rgb(39, 80, 10)"]:hover {
-  background-color: #1e3f07 !important;
-  box-shadow: 0 4px 12px rgba(39, 80, 10, 0.15);
-}
-
-/* Blue Buttons */
-button[style*="#185FA5"],
-button[style*="rgb(24, 95, 165)"] {
-  background-color: #185fa5;
-}
-button[style*="#185FA5"]:hover,
-button[style*="rgb(24, 95, 165)"]:hover {
-  background-color: #134d85 !important;
-  box-shadow: 0 4px 12px rgba(24, 95, 165, 0.15);
-}
-
-/* Ghost Buttons (style btnGh) */
-button[style*="background: transparent"][style*="color: #0d1326"],
-button[style*="background:transparent"][style*="color:#0d1326"],
-button[style*="background: transparent"][style*="color: rgb(13, 19, 38)"],
-button[style*="background:transparent"][style*="color:rgb(13, 19, 38)"] {
-  background-color: transparent;
-}
-button[style*="background: transparent"][style*="color: #0d1326"]:hover,
-button[style*="background:transparent"][style*="color:#0d1326"]:hover,
-button[style*="background: transparent"][style*="color: rgb(13, 19, 38)"]:hover,
-button[style*="background:transparent"][style*="color:rgb(13, 19, 38)"]:hover {
-  background-color: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
-}
-
-/* Input / Control Focus States */
-input:focus,
-select:focus,
-textarea:focus {
-  border-color: #d4a437 !important;
-  box-shadow: 0 0 0 2px rgba(212, 164, 55, 0.25) !important;
-  outline: none;
-}
-
-/* Clickable Cards (e.g., KPICard) Hover Effects */
-div[style*="cursor: pointer"]:hover,
-div[style*="cursor:pointer"]:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px -5px rgba(13, 19, 38, 0.08) !important;
-}
-div[style*="cursor: pointer"]:active,
-div[style*="cursor:pointer"]:active {
-  transform: translateY(0px) scale(0.99);
-}
-
-/* SideNav Menu Item Hover / Active States */
-.kb-sidenav [onClick] {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.kb-sidenav [onClick]:hover {
-  background-color: rgba(255, 255, 255, 0.05) !important;
-}
-.kb-sidenav [onClick]:active {
-  transform: scale(0.98);
-}
-.kb-sidenav [onClick]:hover span {
-  color: #fff !important;
-}
-/* Ensure active item label retains its color on hover */
-.kb-sidenav [onClick][style*="rgba(212,164,55,0.12)"]:hover span,
-.kb-sidenav [onClick][style*="rgba(212,164,55,0.1)"]:hover span {
-  color: #d4a437 !important;
-}
-
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }

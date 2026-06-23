@@ -2,6 +2,8 @@ import React from 'react';
 import { DashboardHeader } from '../../../core/helpers';
 import { KPICard, WidgetCard } from '../../../core/styles';
 import { CUR_MONTH_LABEL } from '../../../core/dates';
+import { PageLayout } from '../../../shell/PageLayout';
+import { ResponsiveGrid } from '../../../shell/primitives';
 import { useHrMgrDashboard } from '../hooks/use-hr-mgr-dashboard';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
 import { useDashboardStore } from '../store/dashboard.store';
@@ -17,13 +19,13 @@ export function HrMgrDashboardPage({ currentUser, setRoute }) {
   const setPeriod = useDashboardStore((s) => s.setPeriod);
 
   if (isLoading || !stats) {
-    return <DashboardSkeleton title="HR Manager Dashboard" numKpis={5} columns={2} hasCharts={false} />;
+    return <DashboardSkeleton numKpis={5} columns={2} hasCharts={false} />;
   }
 
   const [payrollLabel, payrollDelta = ''] = (stats.payrollStatus || '').split(' — ');
 
   return (
-    <div style={{ padding: 18, maxWidth: 1400, margin: '0 auto' }}>
+    <PageLayout>
       <DashboardHeader
         title="HR Manager Dashboard"
         subtitle="People · attendance · payroll"
@@ -33,60 +35,22 @@ export function HrMgrDashboardPage({ currentUser, setRoute }) {
         onExport={() => openPrintPreview({ selector: 'main', title: 'HR Manager Dashboard', recommend: 'portrait' })}
       />
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))',
-          gap: 12,
-          marginBottom: 14,
-        }}
-      >
-        <KPICard
-          label="Total Headcount"
-          value={stats.totalHeadcount}
-          delta={`+${stats.changeThisMonth} this month`}
-          color="#22c55e"
-          onClick={() => navigate('/hr/employees')}
-        />
-        <KPICard
-          label="Attendance %"
-          value={stats.attendancePct == null ? '—' : stats.attendancePct + '%'}
-          delta={`${CUR_MONTH_LABEL} current`}
-          color="#d4a437"
-          onClick={() => navigate('/hr/attendance')}
-        />
-        <KPICard
-          label="Pending Leave"
-          value={stats.pendingLeave}
-          delta="awaiting approval"
-          color="#f97316"
-          onClick={() => navigate('/hr/leave')}
-        />
-        <KPICard
-          label="Payroll Status"
-          value={payrollLabel}
-          delta={payrollDelta}
-          color="#22c55e"
-          onClick={() => navigate('/hr/payroll')}
-        />
-        <KPICard
-          label="Open Positions"
-          value={stats.openPositions}
-          delta="recruitment active"
-          color="#5a6691"
-          onClick={() => navigate('/hr/recruitment')}
-        />
-      </div>
+      <ResponsiveGrid min="170px" gap="md" className="mb-3.5">
+        <KPICard label="Total Headcount" value={stats.totalHeadcount} delta={`+${stats.changeThisMonth} this month`} color="#16a34a" onClick={() => navigate('/hr/employees')} />
+        <KPICard label="Attendance %" value={stats.attendancePct == null ? '—' : stats.attendancePct + '%'} delta={`${CUR_MONTH_LABEL} current`} color="#c2a04a" onClick={() => navigate('/hr/attendance')} />
+        <KPICard label="Pending Leave" value={stats.pendingLeave} delta="awaiting approval" color="#d97706" onClick={() => navigate('/hr/leave')} />
+        <KPICard label="Payroll Status" value={payrollLabel} delta={payrollDelta} color="#16a34a" onClick={() => navigate('/hr/payroll')} />
+        <KPICard label="Open Positions" value={stats.openPositions} delta="recruitment active" color="#5b616e" onClick={() => navigate('/hr/recruitment')} />
+      </ResponsiveGrid>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div className="grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
         <WidgetCard title="🎂 Upcoming Birthdays" subtitle="Next 7 days">
           <BirthdaysPanel birthdays={stats.birthdays} />
         </WidgetCard>
-
         <WidgetCard title="🎉 Work Anniversaries" subtitle="Next 30 days">
           <AnniversariesPanel anniversaries={stats.anniversaries} />
         </WidgetCard>
       </div>
-    </div>
+    </PageLayout>
   );
 }

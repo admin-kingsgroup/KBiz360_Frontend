@@ -6,15 +6,18 @@
    payment lands in this queue (read from the CRM backend via shared SSO) for
    finance to verify / reject / request clarification. Verifying drives CRM's
    existing logic (tax-invoice auto-generation + workflow advance) untouched.
+
+   UI: shared responsive primitives (PageLayout, Button, Select, Textarea,
+   StatusPill, Loading/Error/EmptyState). Business logic / hooks unchanged.
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useMemo, useState } from 'react';
 import { CheckCircle2, XCircle, MessageSquare, FileImage, RefreshCw, Clock, Building2, Calendar } from 'lucide-react';
-import { card, inp } from '../core/styles';
 import { useFinanceQueue, usePaymentActions } from '../core/usePaymentVerification';
+import { PageLayout } from '../shell/PageLayout';
+import { Button, Select, Textarea, StatusPill, LoadingState, ErrorState, EmptyState } from '../shell/primitives';
 import { confirmDialog } from '../core/ux/confirm';
 
-const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691', BLUE = '#185FA5', RED = '#A32D2D', GREEN = '#27500A';
 const inr = (n) => (n != null ? '₹' + Number(n).toLocaleString('en-IN') : '₹0');
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 const fmtTime = (d) => (d ? new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
@@ -30,7 +33,6 @@ const REJECTION_REASONS = [
 ];
 
 const partyName = (c) => c?.company_name || `${c?.first_name || ''} ${c?.last_name || ''}`.trim() || '—';
-const btn = (bg, fg) => ({ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: bg, color: fg });
 
 function PaymentCard({ p, actions }) {
   const [mode, setMode] = useState(null); // 'reject' | 'clarify'
@@ -61,72 +63,77 @@ function PaymentCard({ p, actions }) {
   };
 
   return (
-    <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 12 }}>
-      <div style={{ padding: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 700, color: DARK, fontFamily: 'monospace' }}>{p.payment_number || p._id?.slice(-6)}</span>
-              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, fontWeight: 700, background: '#FAEEDA', color: '#854F0B', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Clock size={9} /> Pending</span>
+    <div className="mb-3 overflow-hidden rounded-brand border border-surface-border bg-surface shadow-card">
+      <div className="p-3.5">
+        <div className="flex flex-wrap justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono font-bold text-ink">{p.payment_number || p._id?.slice(-6)}</span>
+              <StatusPill tone="warning" icon={Clock}>Pending</StatusPill>
             </div>
-            <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 11, color: DIM, flexWrap: 'wrap' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Building2 size={11} /> {partyName(p.customer_id)}</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Calendar size={11} /> {fmtDate(p.payment_date)}</span>
+            <div className="mt-1.5 flex flex-wrap gap-3 text-[11px] text-ink-muted">
+              <span className="inline-flex items-center gap-1"><Building2 size={11} /> {partyName(p.customer_id)}</span>
+              <span className="inline-flex items-center gap-1"><Calendar size={11} /> {fmtDate(p.payment_date)}</span>
               <span>{METHOD_LABELS[p.payment_method] || p.payment_method}</span>
-              {p.utr_number && <span style={{ fontFamily: 'monospace' }}>UTR: {p.utr_number}</span>}
-              {p.transaction_id && <span style={{ fontFamily: 'monospace' }}>Ref: {p.transaction_id}</span>}
+              {p.utr_number && <span className="font-mono">UTR: {p.utr_number}</span>}
+              {p.transaction_id && <span className="font-mono">Ref: {p.transaction_id}</span>}
             </div>
-            <div style={{ fontSize: 10.5, color: '#8a93b2', marginTop: 4 }}>
+            <div className="mt-1 text-[10.5px] text-ink-subtle">
               Submitted by {p.submitted_by?.first_name || ''} {p.submitted_by?.last_name || ''} · {fmtTime(p.submitted_at)}
             </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: DARK }}>{inr(p.amount)}</div>
-            <div style={{ fontSize: 11, color: DIM, textTransform: 'capitalize' }}>{p.payment_type}</div>
+          <div className="text-right">
+            <div className="text-[20px] font-extrabold tabular-nums text-ink">{inr(p.amount)}</div>
+            <div className="text-[11px] capitalize text-ink-muted">{p.payment_type}</div>
           </div>
         </div>
 
         {p.proof_documents?.length > 0 && (
-          <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div className="mt-3 flex flex-wrap gap-2">
             {p.proof_documents.map((doc, i) => (
-              <a key={i} href={doc.url} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, background: '#f3f4f8', border: '1px solid #e1e3ec', borderRadius: 8, padding: '6px 10px', color: BLUE, textDecoration: 'none' }}>
+              <a key={i} href={doc.url} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border bg-surface-alt px-2.5 py-1.5 text-[11px] font-medium text-info no-underline transition-colors hover:bg-info-soft">
                 <FileImage size={12} /> {doc.filename || `Proof ${i + 1}`}
               </a>
             ))}
           </div>
         )}
 
-        {err && <div style={{ marginTop: 10, fontSize: 11, color: RED, fontWeight: 600 }}>⚠ {err}</div>}
+        {err && <div className="mt-2.5 text-[11px] font-semibold text-danger">⚠ {err}</div>}
 
         {/* Action bar */}
         {!mode && (
-          <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button disabled={busy} onClick={doVerify} style={btn(GREEN, '#fff')}><CheckCircle2 size={13} /> Verify</button>
-            <button disabled={busy} onClick={() => { setMode('reject'); setErr(''); }} style={btn('#FCEBEB', RED)}><XCircle size={13} /> Reject</button>
-            <button disabled={busy} onClick={() => { setMode('clarify'); setErr(''); }} style={btn('#E6F1FB', BLUE)}><MessageSquare size={13} /> Clarify</button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="success" size="sm" icon={CheckCircle2} disabled={busy} onClick={doVerify}>Verify</Button>
+            <Button variant="secondary" size="sm" icon={XCircle} disabled={busy}
+              className="border-danger/30 text-danger hover:bg-danger-soft hover:text-danger"
+              onClick={() => { setMode('reject'); setErr(''); }}>Reject</Button>
+            <Button variant="secondary" size="sm" icon={MessageSquare} disabled={busy}
+              className="border-info/30 text-info hover:bg-info-soft hover:text-info"
+              onClick={() => { setMode('clarify'); setErr(''); }}>Clarify</Button>
           </div>
         )}
 
         {mode === 'reject' && (
-          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <select value={reason} onChange={(e) => setReason(e.target.value)} style={{ ...inp, minHeight: 34, fontSize: 12 }}>
+          <div className="mt-3 flex flex-col gap-2">
+            <Select value={reason} onChange={(e) => setReason(e.target.value)}>
               <option value="">Select rejection reason…</option>
               {REJECTION_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-            </select>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes (optional)" rows={2} style={{ ...inp, fontSize: 12, resize: 'vertical' }} />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button disabled={busy} onClick={doReject} style={btn(RED, '#fff')}>Confirm Reject</button>
-              <button onClick={() => setMode(null)} style={btn('#f3f4f8', DIM)}>Cancel</button>
+            </Select>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes (optional)" rows={2} />
+            <div className="flex gap-2">
+              <Button variant="danger" size="sm" disabled={busy} onClick={doReject}>Confirm Reject</Button>
+              <Button variant="secondary" size="sm" onClick={() => setMode(null)}>Cancel</Button>
             </div>
           </div>
         )}
 
         {mode === 'clarify' && (
-          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="What clarification do you need from the salesperson?" rows={2} style={{ ...inp, fontSize: 12, resize: 'vertical' }} />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button disabled={busy} onClick={doClarify} style={btn(BLUE, '#fff')}>Send Request</button>
-              <button onClick={() => setMode(null)} style={btn('#f3f4f8', DIM)}>Cancel</button>
+          <div className="mt-3 flex flex-col gap-2">
+            <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="What clarification do you need from the salesperson?" rows={2} />
+            <div className="flex gap-2">
+              <Button variant="primary" size="sm" disabled={busy} onClick={doClarify}>Send Request</Button>
+              <Button variant="secondary" size="sm" onClick={() => setMode(null)}>Cancel</Button>
             </div>
           </div>
         )}
@@ -143,28 +150,24 @@ export function PaymentVerificationLive() {
   const total = data.summary?.total_amount ?? payments.reduce((s, p) => s + (p.amount || 0), 0);
 
   return (
-    <div style={{ padding: '12px 10px', maxWidth: 900, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>Payment Verification</h2>
-          <p style={{ margin: '2px 0 0', fontSize: 10.5, color: DIM }}>
-            {payments.length} payment{payments.length === 1 ? '' : 's'} pending · {inr(total)} · submitted from CRM by sales
-          </p>
-        </div>
-        <button onClick={() => q.refetch()} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <RefreshCw size={13} /> Refresh
-        </button>
-      </div>
-
-      {q.isLoading && <div style={{ ...card, padding: 28, textAlign: 'center', color: DIM, fontSize: 12 }}>Loading queue…</div>}
-      {q.isError && <div style={{ ...card, padding: 16, color: RED, fontSize: 12, fontWeight: 600 }}>⚠ {q.error?.message || 'Failed to reach CRM backend'} — check VITE_CRM_API_BASE and that you are logged in with finance permissions.</div>}
+    <PageLayout
+      maxWidth="max-w-4xl mx-auto"
+      title="Payment Verification"
+      subtitle={`${payments.length} payment${payments.length === 1 ? '' : 's'} pending · ${inr(total)} · submitted from CRM by sales`}
+      actions={<Button variant="secondary" size="sm" icon={RefreshCw} onClick={() => q.refetch()}>Refresh</Button>}
+    >
+      {q.isLoading && <LoadingState label="Loading queue…" />}
+      {q.isError && (
+        <ErrorState
+          title="Couldn’t reach CRM backend"
+          message={`${q.error?.message || 'Failed to reach CRM backend'} — check VITE_CRM_API_BASE and that you are logged in with finance permissions.`}
+          onRetry={q.refetch}
+        />
+      )}
       {!q.isLoading && !q.isError && payments.length === 0 && (
-        <div style={{ ...card, padding: 36, textAlign: 'center', color: DIM }}>
-          <CheckCircle2 size={26} style={{ color: GREEN, marginBottom: 8 }} /><div style={{ fontSize: 13, fontWeight: 600, color: DARK }}>All payments verified</div>
-          <div style={{ fontSize: 11, marginTop: 4 }}>New submissions from CRM sales will appear here.</div>
-        </div>
+        <EmptyState icon={CheckCircle2} title="All payments verified" hint="New submissions from CRM sales will appear here." />
       )}
       {payments.map((p) => <PaymentCard key={p._id} p={p} actions={actions} />)}
-    </div>
+    </PageLayout>
   );
 }

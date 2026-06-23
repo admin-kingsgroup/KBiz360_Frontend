@@ -16,7 +16,7 @@ import { DataTable } from '../../../shell/DataTable';
 import { PageSection, ResponsiveGrid, LoadingState, EmptyState } from '../../../shell/primitives';
 import { RptShell } from '../components/scaffold';
 
-const PALETTE = ['#185FA5', '#854F0B', '#27500A', '#A32D2D', '#5B21B6', '#0d7a6b'];
+const PALETTE = ['#2563eb', '#d97706', '#16a34a', '#dc2626', '#5B21B6', '#0d7a6b'];
 
 export function ReportBranch() {
   // LIVE — one row per booking file, grouped by branch. Empty books → empty state.
@@ -64,8 +64,8 @@ export function ReportBranch() {
       ),
     },
     { key: 'rev', header: 'Revenue ₹', num: true, render: (r, v) => fmt(v), footer: (rs) => fmt(rs.reduce((s, r) => s + r.rev, 0)) },
-    { key: 'gp', header: 'Gross Profit ₹', num: true, className: 'text-[#27500A]', render: (r, v) => fmt(v), footer: (rs) => fmt(rs.reduce((s, r) => s + r.gp, 0)) },
-    { key: 'gpPct', header: 'GP %', num: true, className: 'font-semibold text-[#27500A]', render: (r, v) => `${v}%` },
+    { key: 'gp', header: 'Gross Profit ₹', num: true, className: 'text-[#16a34a]', render: (r, v) => fmt(v), footer: (rs) => fmt(rs.reduce((s, r) => s + r.gp, 0)) },
+    { key: 'gpPct', header: 'GP %', num: true, className: 'font-semibold text-[#16a34a]', render: (r, v) => `${v}%` },
     { key: 'share', header: 'Revenue share', num: true, sortValue: (r) => r.rev / totR, render: (r) => `${((r.rev / totR) * 100).toFixed(1)}%` },
   ];
 
@@ -76,7 +76,7 @@ export function ReportBranch() {
           <div key={i} className="rounded-brand border border-t-[3px] border-surface-border bg-surface-alt px-3.5 py-3" style={{ borderTopColor: b.color }}>
             <p className="text-[10.5px] font-semibold text-role-hr">{b.branch}</p>
             <p className="mb-px mt-1 text-base font-bold tabular-nums text-navy">{'₹ ' + fmt(b.rev / 100000) + 'L'}</p>
-            <p className="text-[11px] font-semibold text-[#27500A]">{'GP: ' + b.gpPct + '%'}</p>
+            <p className="text-[11px] font-semibold text-[#16a34a]">{'GP: ' + b.gpPct + '%'}</p>
           </div>
         ))}
       </ResponsiveGrid>
@@ -99,6 +99,8 @@ export function ReportBranch() {
       </PageSection>
 
       <DataTable
+        loading={q.isLoading}
+        isError={q.isError}
         columns={columns}
         rows={BR_D}
         getRowKey={(r) => r.branch}

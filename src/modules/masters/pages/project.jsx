@@ -44,8 +44,8 @@ export function ProjectMaster() {
     { key: 'period', header: 'Period', sortable: false, className: 'text-ink-muted', render: (r) => `${r.startDate} → ${r.endDate}` },
     { key: 'manager', header: 'Manager', className: 'text-navy' },
     { key: 'budget', header: 'Budget', num: true, className: 'font-bold', render: (r, v) => k(v), footer: (rs) => k(rs.reduce((s, r) => s + r.budget, 0)) },
-    { key: 'actual', header: 'Actual', num: true, render: (r, v) => <span style={{ color: v > r.budget ? '#A32D2D' : '#0d1326' }} className="font-semibold">{k(v)}</span>, footer: (rs) => k(rs.reduce((s, r) => s + r.actual, 0)) },
-    { key: 'util', header: 'Util %', num: true, align: 'center', sortValue: (r) => (r.budget > 0 ? r.actual / r.budget : 0), render: (r) => { const u = r.budget > 0 ? Math.round(r.actual / r.budget * 100) : 0; return <span className="font-bold" style={{ color: u > 100 ? '#A32D2D' : u > 80 ? '#856404' : '#155724' }}>{u}%</span>; } },
+    { key: 'actual', header: 'Actual', num: true, render: (r, v) => <span style={{ color: v > r.budget ? '#dc2626' : '#1a1c22' }} className="font-semibold">{k(v)}</span>, footer: (rs) => k(rs.reduce((s, r) => s + r.actual, 0)) },
+    { key: 'util', header: 'Util %', num: true, align: 'center', sortValue: (r) => (r.budget > 0 ? r.actual / r.budget : 0), render: (r) => { const u = r.budget > 0 ? Math.round(r.actual / r.budget * 100) : 0; return <span className="font-bold" style={{ color: u > 100 ? '#dc2626' : u > 80 ? '#d97706' : '#16a34a' }}>{u}%</span>; } },
     { key: 'status', header: 'Status', align: 'center', render: (r, v) => <StatusPill tone={STATUS_TONE[v] || 'neutral'} size="sm">{v}</StatusPill> },
   ];
 

@@ -90,10 +90,10 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
   // Fiori Light vs Dark colors
   const bgColor = light ? "#eff4f9" : "rgba(255,255,255,0.07)";
   const borderColor = light ? "#dbe0eb" : "rgba(255,255,255,0.1)";
-  const labelColor = light ? "#0070f2" : "#d4a437";
-  const labelText = light ? "#24272a" : "#fff";
+  const labelColor = light ? "#2563eb" : "#c2a04a";
+  const labelText = light ? "#14161a" : "#fff";
   const caretColor = light ? "#556b82" : "#5a6691";
-  const panelBg = light ? "#ffffff" : "#0d1326";
+  const panelBg = light ? "#ffffff" : "#1a1c22";
   const panelBorder = light ? "#cbd5e1" : "#1a2340";
   const panelShadow = light ? "0 8px 32px rgba(29, 45, 62, 0.15)" : "0 8px 24px rgba(0,0,0,0.4)";
   const itemBorder = light ? "1px solid #f1f5f9" : "1px solid #1a2340";
@@ -107,6 +107,7 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Branch: ${brLabel}. Change branch`}
+        className="max-desktop:min-h-[44px]"
         style={{display:"flex",alignItems:"center",gap:8,padding:"7.5px 10px",width:"100%",textAlign:"left",
           borderRadius:6,background:bgColor,cursor:"pointer",
           border:"1px solid "+borderColor,transition:"all 0.15s ease-in-out"}}
@@ -129,7 +130,7 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
           {list.map((b,i)=>{
             const sel=isSel(b);
             const optBg = sel ? (light ? "rgba(0,112,242,0.08)" : "rgba(212,164,55,0.12)") : "transparent";
-            const optColor = sel ? (light ? "#0070f2" : "#d4a437") : (light ? "#334155" : "#fff");
+            const optColor = sel ? (light ? "#2563eb" : "#c2a04a") : (light ? "#334155" : "#fff");
             return (
               <button key={b.code||"ALL"} type="button"
                 ref={(el)=>{ itemRefs.current[i]=el; }}

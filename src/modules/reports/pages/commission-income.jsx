@@ -50,10 +50,10 @@ export function ReportCommission({ branch }) {
   const tds = filtered.reduce((s, r) => s + r.tdsAmt, 0);
 
   const KPIS = [
-    { l: 'Total Commission', v: f(totComm), c: '#27500A' },
-    { l: 'On Revenue', v: f(totRev), c: '#185FA5' },
-    { l: 'TDS 194H (2%)', v: f(tds), c: '#A32D2D' },
-    { l: 'Net Receivable', v: f(totComm - tds), c: '#1D9E75' },
+    { l: 'Total Commission', v: f(totComm), c: '#16a34a' },
+    { l: 'On Revenue', v: f(totRev), c: '#2563eb' },
+    { l: 'TDS 194H (2%)', v: f(tds), c: '#dc2626' },
+    { l: 'Net Receivable', v: f(totComm - tds), c: '#3fb7a3' },
   ];
 
   const columns = [
@@ -61,8 +61,8 @@ export function ReportCommission({ branch }) {
     { key: 'mod', header: 'Module', render: (r, v) => <StatusPill tone="info" size="sm">{v}</StatusPill> },
     { key: 'bookings', header: 'Bookings', num: true, className: 'text-ink-muted' },
     { key: 'revenue', header: 'Revenue', num: true, render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.revenue, 0)) },
-    { key: 'commRate', header: 'Comm %', num: true, className: 'font-bold text-[#27500A]', render: (r, v) => `${v}%` },
-    { key: 'commission', header: 'Commission Earned', num: true, className: 'font-bold text-[#27500A]', render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.commission, 0)) },
+    { key: 'commRate', header: 'Comm %', num: true, className: 'font-bold text-[#16a34a]', render: (r, v) => `${v}%` },
+    { key: 'commission', header: 'Commission Earned', num: true, className: 'font-bold text-[#16a34a]', render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.commission, 0)) },
     { key: 'tdsAmt', header: 'TDS 194H', num: true, render: (r, v) => (v > 0 ? <span className="text-maroon">{f(v)}</span> : <span className="text-ink-subtle">—</span>), footer: (rs) => f(rs.reduce((s, r) => s + r.tdsAmt, 0)) },
     { key: 'net', header: 'Net Payable', num: true, className: 'font-bold', render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.net, 0)) },
   ];
@@ -83,6 +83,8 @@ export function ReportCommission({ branch }) {
       </ResponsiveGrid>
 
       <DataTable
+        loading={q.isLoading}
+        isError={q.isError}
         columns={columns}
         rows={filtered}
         getRowKey={(r) => r.supplier}

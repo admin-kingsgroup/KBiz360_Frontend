@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { exportToExcel } from '../core/exportExcel';
 import { openPrintPreview } from '../core/PrintPreview';
+import { toastSuccess, toastError, toastInfo } from '../core/ux/toast';
 
 const cn = (...xs) => xs.filter(Boolean).join(' ');
 const escHtml = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -178,9 +179,14 @@ export function DataTable({
 
   const doExcel = () => {
     if (onExport) return onExport();
-    const cols = exportCols.map((c) => ({ key: c.key, label: c.header ?? c.key }));
-    const rowsOut = sorted.map((r) => { const o = {}; for (const c of exportCols) o[c.key] = valueFor(r, c); return o; });
-    exportToExcel(exportName || 'export', cols, rowsOut);
+    try {
+      const cols = exportCols.map((c) => ({ key: c.key, label: c.header ?? c.key }));
+      const rowsOut = sorted.map((r) => { const o = {}; for (const c of exportCols) o[c.key] = valueFor(r, c); return o; });
+      exportToExcel(exportName || 'export', cols, rowsOut);
+      toastSuccess('Excel file downloaded');
+    } catch (e) {
+      toastError('Excel export failed — ' + (e?.message || 'please try again'));
+    }
   };
 
   const doPrint = () => {
@@ -190,7 +196,12 @@ export function DataTable({
     const body = sorted.map((r, i) => `<tr style="background:${i % 2 ? '#f7f8fb' : '#fff'}">${exportCols.map((c) => `<td style="text-align:${align(c)};padding:5px 10px;border-bottom:1px solid #eceef4;font-size:11px;color:#1a1a1a">${escHtml(fmt(valueFor(r, c), c))}</td>`).join('')}</tr>`).join('');
     const foot = hasFooter ? `<tr>${exportCols.map((c) => `<td style="text-align:${align(c)};padding:7px 10px;border-top:2px solid #d4a437;font-weight:700;font-size:11.5px;color:#0d1326">${escHtml(typeof c.footer === 'function' ? c.footer(sorted) : (c.footerLabel ?? ''))}</td>`).join('')}</tr>` : '';
     const html = `<div style="font-family:system-ui,-apple-system,sans-serif"><h2 style="margin:0 0 2px;font-size:16px;color:#0d1326">${escHtml(printTitle)}</h2>${printSubtitle ? `<div style="font-size:11px;color:#5a6691;margin-bottom:10px">${escHtml(printSubtitle)}</div>` : '<div style="margin-bottom:10px"></div>'}<table style="width:100%;border-collapse:collapse"><thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot ? `<tfoot>${foot}</tfoot>` : ''}</table><div style="margin-top:8px;font-size:9px;color:#8b94b3">${sorted.length} rows</div></div>`;
-    openPrintPreview({ title: printTitle, html, recommend: 'landscape' });
+    try {
+      openPrintPreview({ title: printTitle, html, recommend: 'landscape' });
+      toastInfo('Opening print preview…');
+    } catch (e) {
+      toastError('Could not open print preview — ' + (e?.message || 'please try again'));
+    }
   };
 
   const toggleSort = (col) => {
@@ -218,16 +229,16 @@ export function DataTable({
             {title && <h3 className="truncate text-sm font-bold text-navy">{title}</h3>}
             {subtitle && <p className="mt-0.5 truncate text-xs text-ink-muted">{subtitle}</p>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 max-tablet:w-full max-tablet:justify-start">
             {searchable && (
-              <div className="relative">
+              <div className="relative max-tablet:order-first max-tablet:w-full max-tablet:basis-full">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-subtle" />
                 <input
                   value={query}
                   onChange={(e) => { setQuery(e.target.value); setPage(0); }}
                   placeholder={searchPlaceholder}
                   aria-label="Search table"
-                  className="h-8 w-40 rounded-md border border-surface-border bg-surface-alt pl-8 pr-2 text-xs text-ink outline-none transition focus:border-gold focus:bg-surface focus:shadow-gold-glow tablet:w-56"
+                  className="h-9 w-40 rounded-md border border-surface-border bg-surface-alt pl-8 pr-2 text-xs text-ink outline-none transition-[box-shadow,border-color] duration-fast ease-premium focus:border-info focus:bg-surface focus:shadow-focus-ring tablet:w-56 max-tablet:h-11 max-tablet:w-full"
                 />
               </div>
             )}
@@ -236,7 +247,7 @@ export function DataTable({
                 onClick={handleToggleDensity}
                 title={dense ? 'Comfortable rows' : 'Compact rows'}
                 aria-label="Toggle row density"
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-surface-border px-2.5 text-xs font-medium text-ink-muted transition hover:bg-surface-alt"
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-surface-border px-2.5 text-xs font-medium text-ink-muted transition-colors duration-fast hover:bg-surface-alt hover:text-ink max-tablet:h-11 max-tablet:w-11 max-tablet:px-0"
               >
                 {dense ? <Rows3 className="h-4 w-4" /> : <Rows4 className="h-4 w-4" />}
               </button>
@@ -248,7 +259,7 @@ export function DataTable({
                   onClick={() => setColMenuOpen((o) => !o)}
                   title="Show / hide columns"
                   aria-haspopup="true" aria-expanded={colMenuOpen}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-surface-border px-2.5 text-xs font-medium text-ink-muted transition hover:bg-surface-alt"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-surface-border px-2.5 text-xs font-medium text-ink-muted transition-colors duration-fast hover:bg-surface-alt hover:text-ink max-tablet:h-11"
                 >
                   <Columns3 className="h-4 w-4" /> Columns
                 </button>
@@ -267,7 +278,7 @@ export function DataTable({
                             role="menuitemcheckbox"
                             aria-checked={shown}
                             onClick={() => toggleColumn(c.key)}
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-ink hover:bg-surface-alt"
+                            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-ink transition-colors duration-fast hover:bg-surface-alt"
                           >
                             <span className={cn('flex h-3.5 w-3.5 items-center justify-center rounded border', shown ? 'border-navy bg-navy text-white' : 'border-surface-border')}>
                               {shown && <Check className="h-2.5 w-2.5" />}
@@ -285,7 +296,7 @@ export function DataTable({
               <button
                 onClick={doExcel}
                 title="Export to Excel"
-                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#1D6F42] px-3 text-xs font-semibold text-white transition hover:bg-[#17592f]"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-success px-3 text-xs font-semibold text-white transition-all duration-fast ease-premium hover:bg-success/90 active:scale-[0.98] max-tablet:h-11"
               >
                 <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
               </button>
@@ -294,7 +305,7 @@ export function DataTable({
               <button
                 onClick={doPrint}
                 title="Print / Save as PDF"
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-surface-border px-3 text-xs font-semibold text-ink-muted transition hover:bg-surface-alt hover:text-navy"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-surface-border px-3 text-xs font-semibold text-ink-muted transition-colors duration-fast hover:bg-surface-alt hover:text-ink max-tablet:h-11"
               >
                 <Printer className="h-3.5 w-3.5" /> Print
               </button>
@@ -360,7 +371,7 @@ export function DataTable({
               <tr key={`sk-${i}`} className="border-b border-surface-border">
                 {effColumns.map((col) => (
                   <td key={col.key} className={cn(padX, padY)}>
-                    <div className="h-3 w-3/4 animate-pulse rounded bg-surface-border" />
+                    <div className="kb-skeleton h-3" style={{ width: `${60 + ((i * 7 + col.key.length * 5) % 35)}%` }} />
                   </td>
                 ))}
               </tr>

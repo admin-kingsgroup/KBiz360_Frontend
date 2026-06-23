@@ -473,17 +473,19 @@ export function AgeTable({data}){
 
 /* ── UserSwitcher (demo simulator — switch viewing identity) ── */
 
+const PREMIUM_CARD={...cardStyle,border:"1px solid #e6e8ec",borderRadius:12,boxShadow:"0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)"};
+
 export function WidgetCard({title,subtitle,children,onPin,pinned,onDrill}){
   return (
-    <div style={cardStyle}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-        <div>
-          <p style={{margin:0,fontSize:11,color:"#5a6691",letterSpacing:"0.5px",textTransform:"uppercase",fontWeight:700}}>{title}</p>
-          {subtitle&&<p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{subtitle}</p>}
+    <div style={PREMIUM_CARD}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,gap:8}}>
+        <div style={{minWidth:0}}>
+          <p style={{margin:0,fontSize:11,color:"#5b616e",letterSpacing:"0.4px",textTransform:"uppercase",fontWeight:700}}>{title}</p>
+          {subtitle&&<p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>{subtitle}</p>}
         </div>
-        <div style={{display:"flex",gap:6}}>
-          {onPin&&<button onClick={onPin} title={pinned?"Unpin":"Pin"} style={{padding:"3px 6px",background:"transparent",border:"none",cursor:"pointer",color:pinned?"#d4a437":"#cbd0dc",fontSize:14}}>★</button>}
-          {onDrill&&<button onClick={onDrill} style={{padding:"3px 8px",background:"transparent",border:"1px solid #e1e3ec",borderRadius:4,color:"#5a6691",cursor:"pointer",fontSize:10,fontWeight:600}}>Drill ↗</button>}
+        <div style={{display:"flex",gap:6,flexShrink:0}}>
+          {onPin&&<button onClick={onPin} title={pinned?"Unpin":"Pin"} className="inline-flex items-center justify-center max-tablet:min-h-[44px] max-tablet:min-w-[44px]" style={{padding:"3px 6px",background:"transparent",border:"none",cursor:"pointer",color:pinned?"#c2a04a":"#cdd1d8",fontSize:14}}>★</button>}
+          {onDrill&&<button onClick={onDrill} className="inline-flex items-center justify-center max-tablet:min-h-[44px]" style={{padding:"4px 9px",background:"transparent",border:"1px solid #e6e8ec",borderRadius:6,color:"#5b616e",cursor:"pointer",fontSize:10,fontWeight:600}}>Drill ↗</button>}
         </div>
       </div>
       {children}
@@ -494,10 +496,10 @@ export function WidgetCard({title,subtitle,children,onPin,pinned,onDrill}){
 
 export function KPICard({label,value,delta,color,onClick}){
   return (
-    <div onClick={onClick} style={{...cardStyle,cursor:onClick?"pointer":"default",borderTop:"3px solid "+(color||"#d4a437")}}>
-      <p style={{margin:0,fontSize:10.5,color:"#5a6691",letterSpacing:"0.5px",textTransform:"uppercase",fontWeight:700}}>{label}</p>
-      <p style={{margin:"5px 0 2px",fontSize:22,fontWeight:700,color:"#0d1326"}}>{value}</p>
-      {delta&&<p style={{margin:0,fontSize:11,color:delta.includes("+")?"#22c55e":"#A32D2D",fontWeight:600}}>{delta}</p>}
+    <div onClick={onClick} style={{...PREMIUM_CARD,cursor:onClick?"pointer":"default",borderTop:"3px solid "+(color||"#c2a04a")}}>
+      <p style={{margin:0,fontSize:10.5,color:"#5b616e",letterSpacing:"0.4px",textTransform:"uppercase",fontWeight:700}}>{label}</p>
+      <p style={{margin:"5px 0 2px",fontSize:22,fontWeight:800,color:"#14161a",fontVariantNumeric:"tabular-nums"}}>{value}</p>
+      {delta&&<p style={{margin:0,fontSize:11,color:delta.includes("+")?"#16a34a":"#dc2626",fontWeight:600}}>{delta}</p>}
     </div>
   );
 }
@@ -1037,15 +1039,15 @@ export function RPT_CurrencyExposure(){
 
 export const tabBtnStyle = (active) => ({
   padding:"10px 16px",border:"none",
-  borderBottom: active?"3px solid #d4a437":"3px solid transparent",
+  borderBottom: active?"2px solid #c2a04a":"2px solid transparent",
   background:"transparent",
-  color: active?"#0d1326":"#5a6691",
+  color: active?"#14161a":"#5b616e",
   fontWeight: active?700:500,
   fontSize:12.5,cursor:"pointer",whiteSpace:"nowrap"
 });
 
 
-export const inpStd = {padding:8,width:"100%",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,boxSizing:"border-box"};
+export const inpStd = {padding:"8px 10px",width:"100%",border:"1px solid #e6e8ec",borderRadius:8,fontSize:12,boxSizing:"border-box",color:"#14161a"};
 
 /* ════════════════════════════════════════════════════════════════════
    1. CUSTOMER MASTER (12 tabs) — L&T Limited demo

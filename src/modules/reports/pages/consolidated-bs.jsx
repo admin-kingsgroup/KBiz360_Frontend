@@ -53,7 +53,7 @@ export function ConsolidatedBS() {
     <div className={`flex justify-between border-b border-surface-alt px-3.5 ${bold ? 'bg-surface-alt py-2.5' : 'py-1.5'}`}>
       <span className={`text-[11px] text-navy ${bold ? 'font-bold' : ''}`}>{label}</span>
       <div className="text-right">
-        <p className="tabular-nums" style={{ fontWeight: bold ? 800 : 500, color: bold ? '#0d1326' : '#384677', fontSize: bold ? 13 : 11 }}>{val ? f(val) : '—'}</p>
+        <p className="tabular-nums" style={{ fontWeight: bold ? 800 : 500, color: bold ? '#1a1c22' : '#2e323c', fontSize: bold ? 13 : 11 }}>{val ? f(val) : '—'}</p>
         {sub && <p className="text-[9px] text-ink-muted">{sub}</p>}
       </div>
     </div>
@@ -69,8 +69,8 @@ export function ConsolidatedBS() {
   const branchCols = [
     { key: 'code', header: 'Branch', className: 'font-bold text-navy', render: (r) => `${BRANCHES.find((br) => br.code === r.code)?.flag || ''} ${r.code}` },
     { key: 'rev', header: 'Revenue', num: true, render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.rev, 0)) },
-    { key: 'gp', header: 'Gross Profit', num: true, className: 'text-[#27500A]', render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.gp, 0)) },
-    { key: 'gpPct', header: 'GP %', num: true, className: 'font-semibold text-[#27500A]', render: (r, v) => `${v}%` },
+    { key: 'gp', header: 'Gross Profit', num: true, className: 'text-[#16a34a]', render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.gp, 0)) },
+    { key: 'gpPct', header: 'GP %', num: true, className: 'font-semibold text-[#16a34a]', render: (r, v) => `${v}%` },
   ];
 
   return (
@@ -84,11 +84,11 @@ export function ConsolidatedBS() {
       {!loading && !errored && hasData && (
         <>
           {d.balanced
-            ? <div className="mb-2.5 rounded-lg border border-[#C0DD97] bg-[#EAF3DE] px-3.5 py-2 text-[10.5px] font-semibold text-[#27500A]">✔ Consolidated Balance Sheet balanced · Total: {f(totalAssets)}</div>
-            : <div className="mb-2.5 rounded-lg border border-[#FAC775] bg-[#FAEEDA] px-3.5 py-2 text-[10.5px] font-semibold text-[#854F0B]">⚠ Difference: {f(Math.abs(totalAssets - totalLiab))} — review postings</div>}
+            ? <div className="mb-2.5 rounded-lg border border-[#bfe6cd] bg-[#e8f6ed] px-3.5 py-2 text-[10.5px] font-semibold text-[#16a34a]">✔ Consolidated Balance Sheet balanced · Total: {f(totalAssets)}</div>
+            : <div className="mb-2.5 rounded-lg border border-[#f3d9a8] bg-[#fbeedb] px-3.5 py-2 text-[10.5px] font-semibold text-[#d97706]">⚠ Difference: {f(Math.abs(totalAssets - totalLiab))} — review postings</div>}
 
           <ResponsiveGrid cols={2} gap="md">
-            <Panel title="ASSETS" color="#185FA5">
+            <Panel title="ASSETS" color="#2563eb">
               <Row label="Fixed Assets (net)" val={fixedAssets} sub="Tangible + intangible across all branches" />
               <Row label="Non-current Investments" val={investments} />
               <Row label="Bank & Cash" val={bank} sub="All branches" />
@@ -96,7 +96,7 @@ export function ConsolidatedBS() {
               <Row label="Other Assets" val={otherAssets} sub="Deposits, advances, current assets" />
               <Row label="TOTAL ASSETS" val={totalAssets} bold />
             </Panel>
-            <Panel title="LIABILITIES & CAPITAL" color="#0d1326">
+            <Panel title="LIABILITIES & CAPITAL" color="#1a1c22">
               <Row label="Capital Account" val={capital} />
               <Row label="Reserves & Surplus (incl. P&L)" val={reserves} sub="Cumulative net profit" />
               <Row label="Borrowings" val={borrowings} sub="Loans + bank OD" />
@@ -110,6 +110,8 @@ export function ConsolidatedBS() {
           <DataTable
             className="mt-3"
             title="Branch Contribution — Revenue & Gross Profit (live)"
+            loading={qBS.isLoading || qGP.isLoading}
+            isError={qBS.isError || qGP.isError}
             columns={branchCols}
             rows={branchRows}
             getRowKey={(r) => r.code}

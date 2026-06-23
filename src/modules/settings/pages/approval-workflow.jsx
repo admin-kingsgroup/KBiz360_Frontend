@@ -13,7 +13,8 @@ import { DataTable } from '../../../shell/DataTable';
 import { ResponsiveGrid, StatusPill, Button } from '../../../shell/primitives';
 
 export function ApprovalWorkflow({ setRoute }) {
-  const RULES = useApprovalRules().data || [];
+  const rulesQ = useApprovalRules();
+  const RULES = rulesQ.data || [];
   const active = RULES.filter((r) => r.active).length;
   const KPIS = [
     { l: 'Active Rules', v: active, c: '#27500A' },
@@ -45,7 +46,7 @@ export function ApprovalWorkflow({ setRoute }) {
           </div>
         ))}
       </ResponsiveGrid>
-      <DataTable columns={columns} rows={RULES} getRowKey={(r) => r.id} dense exportName="approval-rules" printTitle="Approval Workflow" emptyMessage="No approval rules configured." />
+      <DataTable columns={columns} rows={RULES} loading={rulesQ.isLoading} isError={rulesQ.isError} getRowKey={(r) => r.id} dense exportName="approval-rules" printTitle="Approval Workflow" emptyMessage="No approval rules configured." />
     </PageLayout>
   );
 }

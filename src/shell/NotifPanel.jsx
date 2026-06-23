@@ -17,8 +17,8 @@ import { todayISO } from '../core/dates';
 export function NotifPanel({onClose,setRoute}){
   useNotifRefresh();
   const panelRef = useRef(null);
-  const TYPE_CLR={info:"#185FA5",warning:"#854F0B",danger:"#A32D2D",success:"#27500A"};
-  const TYPE_BG ={info:"#E6F1FB",warning:"#FAEEDA",danger:"#FCEBEB",success:"#EAF3DE"};
+  const TYPE_CLR={info:"#2563eb",warning:"#b45309",danger:"#dc2626",success:"#16a34a"};
+  const TYPE_BG ={info:"#e8f0ff",warning:"#fbeedb",danger:"#fbe9e9",success:"#e8f6ed"};
   const TYPE_ICON={info:"ℹ",warning:"⚠",danger:"🔴",success:"✔"};
   const unread=getUnreadCount();
   // Esc closes (via the modal stack); focus moves into the panel and returns to
@@ -27,15 +27,15 @@ export function NotifPanel({onClose,setRoute}){
   useFocusTrap(panelRef);
 
   return (
-    <div ref={panelRef} role="dialog" aria-label="Notifications"
-      style={{position:"fixed",top:60,right:8,width:340,maxHeight:"calc(100vh - 78px)",overflowY:"auto",
-      background:"#fff",borderRadius:12,boxShadow:"0 8px 32px rgba(0,0,0,0.18)",
-      zIndex:600,border:"1px solid #e1e3ec"}}>
-      <div style={{padding:"12px 14px",borderBottom:"1px solid #e1e3ec",position:"sticky",top:0,background:"#fff",
+    <div ref={panelRef} role="dialog" aria-label="Notifications" className="animate-kb-rise"
+      style={{position:"fixed",top:52,right:8,width:340,maxHeight:"calc(100vh - 70px)",overflowY:"auto",
+      background:"#fff",borderRadius:14,boxShadow:"0 16px 40px -12px rgba(16,18,22,0.20), 0 2px 8px -4px rgba(16,18,22,0.10)",
+      zIndex:600,border:"1px solid #e6e8ec"}}>
+      <div style={{padding:"12px 14px",borderBottom:"1px solid #e6e8ec",position:"sticky",top:0,background:"#fff",
         display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div>
-          <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Notifications</p>
-          {unread>0&&<p style={{margin:0,fontSize:10,color:"#A32D2D",fontWeight:600}}>{unread} unread</p>}
+          <p style={{margin:0,fontSize:13,fontWeight:700,color:"#14161a"}}>Notifications</p>
+          {unread>0&&<p style={{margin:0,fontSize:10,color:"#dc2626",fontWeight:600}}>{unread} unread</p>}
         </div>
         <div style={{display:"flex",gap:6}}>
           {unread>0&&<button onClick={markAllRead} style={{...btnGh,padding:"3px 9px",fontSize:10}}>Mark all read</button>}
@@ -44,11 +44,11 @@ export function NotifPanel({onClose,setRoute}){
       </div>
       {_NOTIFS.map(n=>(
         <button key={n.id} type="button" onClick={()=>{markNotifRead(n.id);if(n.route)setRoute(n.route);onClose();}}
-          style={{display:"block",width:"100%",textAlign:"left",padding:"10px 14px",borderBottom:"1px solid #f3f4f8",cursor:"pointer",
-            border:"none",borderLeft:`3px solid ${n.read?"transparent":TYPE_CLR[n.type]||"#185FA5"}`,
-            background:n.read?"#fff":"#fafffe"}}
-          onMouseEnter={e=>e.currentTarget.style.background="#f0f4ff"}
-          onMouseLeave={e=>e.currentTarget.style.background=n.read?"#fff":"#fafffe"}>
+          style={{display:"block",width:"100%",textAlign:"left",padding:"10px 14px",borderBottom:"1px solid #f1f2f4",cursor:"pointer",transition:"background .14s",
+            border:"none",borderLeft:`3px solid ${n.read?"transparent":TYPE_CLR[n.type]||"#2563eb"}`,
+            background:n.read?"#fff":"#fbfaf5"}}
+          onMouseEnter={e=>e.currentTarget.style.background="#f4f5f7"}
+          onMouseLeave={e=>e.currentTarget.style.background=n.read?"#fff":"#fbfaf5"}>
           <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
             <div style={{width:28,height:28,borderRadius:7,flexShrink:0,
               background:TYPE_BG[n.type]||"#f3f4f8",

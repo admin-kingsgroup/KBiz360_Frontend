@@ -14,7 +14,7 @@ import { DataTable } from '../../../shell/DataTable';
 import { PageSection, ResponsiveGrid, StatusPill, LoadingState, ErrorState, EmptyState } from '../../../shell/primitives';
 import { RptShell } from '../components/scaffold';
 
-const CAT_COLOR = { Liquidity: '#185FA5', Activity: '#854F0B', Leverage: '#A32D2D', Profitability: '#27500A' };
+const CAT_COLOR = { Liquidity: '#2563eb', Activity: '#d97706', Leverage: '#dc2626', Profitability: '#16a34a' };
 
 export function RatioAnalysis({ branch }) {
   // LIVE — ratios from the double-entry Balance Sheet + Module P&L.
@@ -103,6 +103,8 @@ export function RatioAnalysis({ branch }) {
             <DataTable
               key={cat}
               title={cat}
+              loading={qBS.isLoading || qPL.isLoading}
+              isError={qBS.isError || qPL.isError}
               columns={columnsFor(CAT_COLOR[cat])}
               rows={RATIOS.filter((r) => r.category === cat)}
               getRowKey={(r) => r.name}
