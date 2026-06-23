@@ -40,6 +40,7 @@ import {
 import { exportToExcel } from '../core/exportExcel';
 import { openPrintPreview } from '../core/PrintPreview';
 import { toastSuccess, toastError, toastInfo } from '../core/ux/toast';
+import { usePager, Pager } from '../core/ux/pager';
 
 const cn = (...xs) => xs.filter(Boolean).join(' ');
 const escHtml = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -107,7 +108,6 @@ export function DataTable({
 }) {
   const [sort, setSort] = useState(initialSort);
   const [query, setQuery] = useState('');
-  const [page, setPage] = useState(0);
   const [hidden, setHidden] = useState(() => new Set());
   const [colMenuOpen, setColMenuOpen] = useState(false);
   const colBtnRef = useRef(null);
@@ -157,15 +157,13 @@ export function DataTable({
   }, [searched, sort, columns]);
 
   const total = sorted.length;
-  // Virtualization-lite: callers that don't set a pageSize render every row. For
-  // very large result sets that means thousands of DOM nodes (jank). When a list
-  // crosses the threshold we auto-paginate so the DOM stays bounded — export and
-  // the totals footer still use the full `sorted` set, so numbers are unaffected.
-  const AUTO_PAGE_THRESHOLD = 300, AUTO_PAGE_SIZE = 100;
-  const effPageSize = pageSize > 0 ? pageSize : (total > AUTO_PAGE_THRESHOLD ? AUTO_PAGE_SIZE : 0);
-  const pages = effPageSize > 0 ? Math.max(1, Math.ceil(total / effPageSize)) : 1;
-  const safePage = Math.min(page, pages - 1);
-  const visible = effPageSize > 0 ? sorted.slice(safePage * effPageSize, safePage * effPageSize + effPageSize) : sorted;
+  // Infinite scroll: render a growing WINDOW (pageSize rows, default 20; +more as the
+  // bottom sentinel scrolls into view) instead of every row — so the DOM stays bounded
+  // and the screen paints fast. Export, print and the totals footer still run over the
+  // full `sorted` set, so numbers are unaffected. The sentinel (<Pager>) sits inside the
+  // scroll box below; the window resets to the top when the filtered set changes.
+  const pg = usePager(sorted, pageSize > 0 ? pageSize : undefined);
+  const visible = pg.pageRows;
 
   const hasFooter = effColumns.some((c) => typeof c.footer === 'function');
 
@@ -206,7 +204,6 @@ export function DataTable({
 
   const toggleSort = (col) => {
     if (col.sortable === false) return;
-    setPage(0);
     setSort((prev) => {
       if (!prev || prev.key !== col.key) return { key: col.key, dir: col.num ? 'desc' : 'asc' };
       if (prev.dir === 'asc') return { key: col.key, dir: 'desc' };
@@ -235,7 +232,7 @@ export function DataTable({
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-subtle" />
                 <input
                   value={query}
-                  onChange={(e) => { setQuery(e.target.value); setPage(0); }}
+                  onChange={(e) => setQuery(e.target.value)}
                   placeholder={searchPlaceholder}
                   aria-label="Search table"
                   className="h-9 w-40 rounded-md border border-surface-border bg-surface-alt pl-8 pr-2 text-xs text-ink outline-none transition-[box-shadow,border-color] duration-fast ease-premium focus:border-info focus:bg-surface focus:shadow-focus-ring tablet:w-56 max-tablet:h-11 max-tablet:w-full"
@@ -454,20 +451,10 @@ export function DataTable({
             </tfoot>
           )}
         </table>
+        {/* infinite-scroll sentinel lives INSIDE the scroll box → only loads more when
+            you reach the bottom (and never auto-loads everything at once) */}
+        {!loading && !isError && <Pager pager={pg} />}
       </div>
-
-      {effPageSize > 0 && !loading && !isError && total > effPageSize && (
-        <div className="flex items-center justify-between gap-2 border-t border-surface-border px-4 py-2.5 text-xs text-ink-muted">
-          <span>{safePage * effPageSize + 1}–{Math.min((safePage + 1) * effPageSize, total)} of {total}</span>
-          <div className="flex items-center gap-1">
-            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0}
-              className="rounded-md border border-surface-border px-2.5 py-1 font-medium disabled:opacity-40 enabled:hover:bg-surface-alt">Prev</button>
-            <span className="px-1">Page {safePage + 1} / {pages}</span>
-            <button onClick={() => setPage((p) => Math.min(pages - 1, p + 1))} disabled={safePage >= pages - 1}
-              className="rounded-md border border-surface-border px-2.5 py-1 font-medium disabled:opacity-40 enabled:hover:bg-surface-alt">Next</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
