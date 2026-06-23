@@ -47,6 +47,30 @@ function SnapGrid({ title, snap, color }) {
   );
 }
 
+// One posted side (Sale or Purchase) of the original booking's JV — the Dr/Cr legs
+// the booking put on the books, shown read-only under the SO/PO/GP grids.
+function JvSide({ side, label, color }) {
+  if (!side || !Array.isArray(side.postings) || side.postings.length === 0) return null;
+  const td = { padding: '3px 8px', fontVariantNumeric: 'tabular-nums', borderBottom: '1px solid #f0f1f4' };
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ fontSize: 10.5, fontWeight: 700, color, marginBottom: 3 }}>{label}{side.vno ? ` · ${side.vno}` : ''}</div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10.5 }}>
+        <tbody>
+          {side.postings.map((p, i) => (
+            <tr key={i}>
+              <td style={{ ...td, color: '#14161a' }}>{p.ledger}</td>
+              <td style={{ ...td, color: '#9197a3' }}>{p.group || ''}</td>
+              <td style={{ ...td, textAlign: 'right', color: '#185FA5' }}>{num(p.debit) ? fmtN(p.debit) : ''}</td>
+              <td style={{ ...td, textAlign: 'right', color: '#A32D2D' }}>{num(p.credit) ? fmtN(p.credit) : ''}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /**
  * Refund (RF) / Reissue (RI) body — two-party, raised against a sales invoice.
  * `kind` ('refund' | 'reissue') flips the customer/supplier direction:
@@ -70,13 +94,14 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
 
   const [linkInput, setLinkInput] = useState(state.againstInvoice || '');
   const [booking, setBooking] = useState(null);
+  const [bookingJv, setBookingJv] = useState(null);
   const [fetching, setFetching] = useState(false);
   const [fetchErr, setFetchErr] = useState('');
 
   async function fetchLink() {
     const link = linkInput.trim();
     if (!link) return;
-    setFetching(true); setFetchErr(''); setBooking(null);
+    setFetching(true); setFetchErr(''); setBooking(null); setBookingJv(null);
     try {
       const b = await apiGet('/api/booking-orders/by-link', { link, branch: branchCode || branch });
       setBooking(b);
@@ -84,6 +109,8 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       // our Other-Taxes margin, commission reversal) — but NOT our service charge / its
       // GST nor the supplier service fee / its GST (those are retained, not refunded).
       patch(refundPrefillFromBooking(b, state));   // honours the Commission-Reversal toggle
+      // Also pull the original booking's JV (Sale + Purchase posting legs) to show below.
+      if (b?.id) { try { setBookingJv(await apiGet('/api/booking-orders/' + b.id + '/journal')); } catch { setBookingJv(null); } }
     } catch (e) {
       setFetchErr(e?.message || 'Lookup failed');
     } finally {
@@ -102,6 +129,13 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   const total = isRefund
     ? r2(supplierAmt + supSvc + supGst - ourIncome - taxAmt)
     : r2(supplierAmt - supSvc - supGst + ourIncome + taxAmt);
+
+  // GST on the supplier's service fee + the airline cancellation fee auto-calculates
+  // at the voucher's GST rate (the "GST on our charges" slab, 18% by default), so the
+  // accountant doesn't key it by hand. Still editable — a manual override sticks until
+  // the base or the slab changes again.
+  const gstRate = num(state.gstPct) || 18;
+  const gstOf = (base) => r2(num(base) * gstRate / 100);
 
   // Commission Reversal (refund only): the "clawback" IS the commission reversal.
   // When OFF, the original commission / its GST / TDS are NOT reversed on the refund —
@@ -150,7 +184,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
         <div style={{ border: '1px solid #dfe3ea', borderRadius: 10, padding: 14, marginBottom: 16, background: '#fbfcfe' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
             <div style={{ fontSize: 12.5, fontWeight: 800, color: '#14161a' }}>SO/PO/GP voucher — {booking.bookingNo} <span style={{ color: '#9197a3', fontWeight: 600 }}>({booking.module} · {booking.status})</span></div>
-            <button type="button" onClick={() => setBooking(null)} style={{ border: 'none', background: 'none', color: '#9197a3', cursor: 'pointer', fontSize: 11 }}>hide ✕</button>
+            <button type="button" onClick={() => { setBooking(null); setBookingJv(null); }} style={{ border: 'none', background: 'none', color: '#9197a3', cursor: 'pointer', fontSize: 11 }}>hide ✕</button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 16px', fontSize: 10.5, color: '#5b616e', marginBottom: 12 }}>
             <span>Link No: <b style={{ color: '#14161a' }}>{booking.linkNo || '—'}</b></span>
@@ -165,6 +199,13 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
           <SnapGrid title="SO — Sales / sell side" snap={booking.so} color="#185FA5" />
           <SnapGrid title="PO — Purchase / cost side (incl. Supplier Incentive)" snap={poSnapForView(booking.po, booking.rows)} color="#A32D2D" />
           <SnapGrid title="GP — Gross Profit" snap={booking.gp} color="#A07828" />
+          {bookingJv && (bookingJv.sale || bookingJv.purchase) && (
+            <div style={{ marginTop: 6, paddingTop: 10, borderTop: '1px dashed #dfe3ea' }}>
+              <div style={{ fontSize: 11.5, fontWeight: 800, color: '#14161a', marginBottom: 6 }}>JV — Accounting effect of this booking</div>
+              <JvSide side={bookingJv.sale} label="Sales voucher" color="#185FA5" />
+              <JvSide side={bookingJv.purchase} label="Purchase voucher" color="#A32D2D" />
+            </div>
+          )}
         </div>
       )}
 
@@ -197,16 +238,16 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
-        <FL label="GST on our charges"><select value={state.gstPct} onChange={(e) => patch({ gstPct: +e.target.value })} style={inp}>{GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}</select></FL>
-        <FL label={`Supplier service charge (${cur}, our cost)`}><input type="number" value={state.supplierSvc} onChange={(e) => patch({ supplierSvc: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
-        <FL label={`Supplier GST (${cur}, input credit)`}><input type="number" value={state.supplierGst} onChange={(e) => patch({ supplierGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+        <FL label="GST on our charges"><select value={state.gstPct} onChange={(e) => { const g = +e.target.value; patch({ gstPct: g, supplierGst: num(state.supplierSvc) ? r2(num(state.supplierSvc) * g / 100) : state.supplierGst, supplierCancelGst: num(state.supplierCancel) ? r2(num(state.supplierCancel) * g / 100) : state.supplierCancelGst }); }} style={inp}>{GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}</select></FL>
+        <FL label={`Supplier service charge (${cur}, our cost)`}><input type="number" value={state.supplierSvc} onChange={(e) => patch({ supplierSvc: e.target.value, supplierGst: gstOf(e.target.value) })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+        <FL label={`Supplier GST (${cur}, input credit · auto ${gstRate}%)`}><input type="number" value={state.supplierGst} onChange={(e) => patch({ supplierGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
       </div>
 
       {isRefund && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
-            <FL label={`Airline cancellation fee (${cur}, supplier kept)`}><input type="number" value={state.supplierCancel} onChange={(e) => patch({ supplierCancel: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
-            <FL label={`Cancellation GST (${cur})`}><input type="number" value={state.supplierCancelGst} onChange={(e) => patch({ supplierCancelGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+            <FL label={`Airline cancellation fee (${cur}, supplier kept)`}><input type="number" value={state.supplierCancel} onChange={(e) => patch({ supplierCancel: e.target.value, supplierCancelGst: gstOf(e.target.value) })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+            <FL label={`Cancellation GST (${cur} · auto ${gstRate}%)`}><input type="number" value={state.supplierCancelGst} onChange={(e) => patch({ supplierCancelGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
             <FL label="Recover cancellation from customer"><label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34 }}><input type="checkbox" checked={state.cancelRecover !== false} onChange={(e) => patch({ cancelRecover: e.target.checked })} /> charge it to the client (pass-through)</label></FL>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
