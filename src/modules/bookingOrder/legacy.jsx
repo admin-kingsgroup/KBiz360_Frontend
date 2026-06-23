@@ -18,6 +18,7 @@ import { PeriodBar, periodRange } from '../../core/period';
 import { openPrintPreview } from '../../core/PrintPreview';
 import { buildBookingInvoice } from '../../core/invoiceHtml';
 import { apiGet, apiPost, apiPut } from '../../core/api';
+import { useOpenInb, useBookInb } from '../../core/useInterBranchVoucher';
 import { AuditTrail } from '../../core/AuditTrail';
 import { useLedgerRegistry } from '../../core/useReference';
 import { useFormKeys } from '../../core/ux/forms';
@@ -156,6 +157,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  // Inter-branch (INB): the PO can fetch an open INB leg sent to this branch — it
+  // pre-fills the supplier (the selling branch) + fares + Service Fee, and on save
+  // the link is marked booked (consumed). inbLinkNo holds the fetched link.
+  const [inbLinkNo, setInbLinkNo] = useState('');
+  const openInbQ = useOpenInb(branch);
+  const bookInb = useBookInb();
 
   // Switching module reloads the seed grid for that module — never while editing
   // (the module is locked to the existing voucher so its lines aren't wiped).
@@ -279,9 +286,35 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
       if (editing) invalidateBooks(qc); // an edit reverses the prior posting → refresh every books cache
       toast(`Voucher ${booking.bookingNo || ''} saved — pending approval`);
+      // If this PO was fetched from an open inter-branch leg, consume it (mark the
+      // INB link booked). Non-fatal: a miss leaves the link open to retry.
+      if (inbLinkNo && booking?.bookingNo) {
+        try { await bookInb.mutateAsync({ inbLinkNo, purchaseVno: booking.bookingNo }); setInbLinkNo(''); }
+        catch (_) { /* link stays open; surfaced in the INB reconciliation */ }
+      }
     } catch (e) { setError(e.message || 'Failed to save voucher'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
     finally { setSaving(false); }
   };
+  // Pull an open inter-branch leg into the PO: supplier = the selling branch, each
+  // fare mapped to its matching fare column, Service Fee → Supplier Service, GST →
+  // inter (IGST). Stamps inbLinkNo so the link is consumed on save.
+  const fetchInb = (link) => {
+    if (!link) return;
+    setSupplier({ name: `Travkings Tours and Travels ${link.fromBranch}`, gstin: '', address: '', email: '', contact: '', ledgerGroup: '' });
+    setPurGstMode('inter');
+    if (link.packageType) setPackageType(link.packageType);
+    const parts = String(link.passenger || '').trim().split(/\s+/);
+    const ln = { ...blankLine(spec), fn: parts[0] || '', sn: parts.slice(1).join(' ') };
+    for (const rl of (link.lines || [])) {
+      const col = (spec.fareCols || []).find((c) => c.label.toLowerCase() === String(rl.desc || '').toLowerCase());
+      if (col) ln[col.key] = num(rl.amt);
+    }
+    ln.psvc = num(link.serviceFee);
+    setLines([ln]);
+    setInbLinkNo(link.inbLinkNo);
+    toast(`Fetched ${link.inbLinkNo} from ${link.fromBranch} — review & save`);
+  };
+
   // Tally-style keys across the whole entry screen: Enter advances between data
   // fields (skipping action buttons), Enter on the last field / Ctrl+Cmd+Enter saves.
   const formKeys = useFormKeys({ onSubmit: () => { if (canSave) save(); } });
@@ -596,6 +629,17 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* ② Purchase Order — hidden in no-supplier mode (there's no cost leg). */}
       {!isNoSupp && (
       <Section n="2" name="Purchase Order" sub="what you pay the airline / supplier · supplier incentive is automatically subtracted, 2% TDS is added" accent={CR}>
+        {!editing && (openInbQ.data || []).length > 0 && (
+          <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: CR }}>Fetch open INB:</span>
+            <select value="" onChange={(e) => { const l = (openInbQ.data || []).find((x) => x.inbLinkNo === e.target.value); if (l) fetchInb(l); }}
+              style={{ padding: '5px 8px', border: '1px solid #e1e3ec', borderRadius: 6, fontSize: 12, minWidth: 340 }}>
+              <option value="">Inter-branch legs sent to {brCode}…</option>
+              {(openInbQ.data || []).map((l) => <option key={l.inbLinkNo} value={l.inbLinkNo}>{l.inbLinkNo} · from {l.fromBranch} · {l.passenger || '—'} · {fmt(l.total)}</option>)}
+            </select>
+            {inbLinkNo && <span style={{ fontSize: 11, fontWeight: 700, color: '#27500A' }}>✓ {inbLinkNo} — fares & Service Fee pre-filled (IGST)</span>}
+          </div>
+        )}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
             <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
