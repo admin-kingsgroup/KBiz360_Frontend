@@ -6,7 +6,7 @@
 // which group, Dr/Cr) and Approves & Posts → that spawns the linked LOCKED Sales
 // + Purchase vouchers (and their double-entry), and it moves to Approved. One
 // Link No ties SO/PO/GP so profit is tracked invoice-wise.
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Save, ArrowRight, Check, Lock, RefreshCw, Clock, CheckCircle2,
   XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil,
@@ -23,6 +23,8 @@ import { useLedgerRegistry } from '../../core/useReference';
 import { useFormKeys } from '../../core/ux/forms';
 import { toast } from '../../core/ux/toast';
 import { confirmDialog } from '../../core/ux/confirm';
+import { clickable } from '../../core/ux/clickable';
+import { listKeyNav } from '../../core/ux/listKeys';
 import {
   VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc, isVatBranch, rowsFromSnapshots,
 } from '../../core/voucherSpecs.js';
@@ -864,18 +866,26 @@ function PartyPicker({ branch, kind, value, onChange, subGroupFilter }) {
     onChange({ name: v, group: exact ? subGroupOf(exact) : (subGroupFilter || defaultGroup) });
   };
   const pick = (l) => { onChange({ name: l.name, group: subGroupOf(l) || defaultGroup }); setOpen(false); };
+  const wrapRef = useRef(null);
   return (
-    <div style={{ position: 'relative' }}>
+    // ↑/↓ roam the suggestions (focus auto-scrolls each into view), Enter/Space picks, Esc
+    // closes. Close on blur only when focus leaves the whole picker, so arrowing onto an
+    // option (which moves focus off the input) doesn't slam the list shut.
+    <div ref={wrapRef} style={{ position: 'relative' }}
+      onKeyDown={listKeyNav({ onEscape: () => setOpen(false) })}
+      onBlur={(e) => { if (!wrapRef.current || !wrapRef.current.contains(e.relatedTarget)) setOpen(false); }}>
       <input value={q} placeholder={kind === 'customer' ? 'Search or type customer…' : 'Search or type supplier…'}
         onChange={(e) => { setName(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} style={inp} />
+        onFocus={() => setOpen(true)} style={inp} />
       {open && matches.length > 0 && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 60, marginTop: 2, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', maxHeight: 220, overflowY: 'auto' }}>
           {matches.map((l) => (
-            <div key={l.id} onMouseDown={() => pick(l)}
-              style={{ padding: '7px 11px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5 }}
+            <div key={l.id} {...clickable(() => pick(l), { role: 'option' })}
+              style={{ padding: '7px 11px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5, outline: 'none' }}
               onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f4ff')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              onFocus={(e) => (e.currentTarget.style.background = '#f0f4ff')}
+              onBlur={(e) => (e.currentTarget.style.background = 'transparent')}>
               <span style={{ color: '#1a1c22', fontWeight: 500 }}>{l.name}</span>
               <span style={{ color: '#9197a3', fontSize: 9.5, flexShrink: 0 }}>{subGroupOf(l) || l.group}</span>
             </div>

@@ -1715,8 +1715,8 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
                     <td style={num}>{inr(g.amount)}</td>
                     <DiffCells cur={g.amount} prev={pv} showPY={showPY} />
                   </tr>
-                  {/* Sub-groups (if the ledgers carry one) → expand to their ledgers */}
-                  {!summary && isOpen && subs.map((sg) => {
+                  {/* Sub-groups (if the ledgers carry one) → expand to their ledgers; A→Z within the group */}
+                  {!summary && isOpen && [...subs].sort((a, b) => azByName(a.name, b.name)).map((sg) => {
                     const sk = `${g.group}|${sg.name}`;
                     const so = !!openSub[sk];
                     return (
@@ -1727,12 +1727,12 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
                           <td style={{ ...num, fontWeight: 600 }}>{inr(sg.amount)}</td>
                           <DiffCells cur={sg.amount} prev={null} showPY={showPY} />
                         </tr>
-                        {so && sg.ledgers.map((l, i) => bsLedgerRow(l, i, 62, onPickLedger, showPY))}
+                        {so && [...sg.ledgers].sort((a, b) => azByName(a.name, b.name)).map((l, i) => bsLedgerRow(l, i, 62, onPickLedger, showPY))}
                       </React.Fragment>
                     );
                   })}
-                  {/* Ledgers with no sub-group hang directly under the 28-group head */}
-                  {!summary && isOpen && direct.map((l, i) => bsLedgerRow(l, i, 48, onPickLedger, showPY))}
+                  {/* Ledgers with no sub-group hang directly under the 28-group head; A→Z within the group */}
+                  {!summary && isOpen && [...direct].sort((a, b) => azByName(a.name, b.name)).map((l, i) => bsLedgerRow(l, i, 48, onPickLedger, showPY))}
                 </React.Fragment>
               );
             })}
