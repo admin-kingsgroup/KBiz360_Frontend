@@ -27,7 +27,7 @@ import { SkeletonTable } from '../shell/primitives';
 const money = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
 
 const C = { dark: '#1a1c22', gold: '#c2a04a', blue: '#2563eb', red: '#dc2626', green: '#16a34a', dim: '#5b616e', border: '#e6e8ec' };
-const VCH = { payment: 'Payment', receipt: 'Receipt', contra: 'Contra', journal: 'Journal', 'credit-note': 'Credit Note', 'debit-note': 'Debit Note', 'purchase-expense': 'Purchase Expense' };
+const VCH = { payment: 'Payment', receipt: 'Receipt', contra: 'Contra', journal: 'Journal', 'credit-note': 'Credit Note', 'debit-note': 'Debit Note', 'purchase-expense': 'Purchase Expense', refund: 'Refund', reissue: 'Reissue', adm: 'ADM', acm: 'ACM' };
 const card = { background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' };
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 const branchLabel = (b) => (!b || b === 'ALL' ? CONSOLIDATED_LABEL : (b.code || b));
@@ -316,6 +316,73 @@ export function VoucherApprovals({ branch, currentUser }) {
     </table>
   );
 
+  // Columnar per module — one table per voucher category. Columns = the union of
+  // every component head (non-party posting ledger) any voucher of that module
+  // uses, so each module shows its FULL column set; a head a given voucher doesn't
+  // use shows 0 (column never hidden). Party (debtor) + Supplier (creditor) get
+  // their own columns. Branch tags ([BOM]…) are trimmed from headers (full name on
+  // hover); [Pur] is kept so sale vs purchase heads stay distinct.
+  const shortHead = (h) => String(h).replace(/\s*\[(BOM|AMD|NBO|DAR|FBM|TKHO)\]/gi, '').trim();
+  const columnarWise = () => {
+    const byCat = {};
+    flatEntries.forEach((e) => { (byCat[e.category] || (byCat[e.category] = [])).push(e); });
+    const cats = Object.keys(byCat).sort((a, b) => {
+      const ia = TYPE_ORDER.indexOf(a), ib = TYPE_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    const isPartyLeg = (e, p) => p.ledger === e.party || p.ledger === e.counterParty;
+    return (
+      <div>
+        {cats.map((cat) => {
+          const list = byCat[cat];
+          const heads = [];
+          list.forEach((e) => (e.postings || []).forEach((p) => {
+            if (p.ledger && !isPartyLeg(e, p) && !heads.includes(p.ledger)) heads.push(p.ledger);
+          }));
+          const hasSupplier = list.some((e) => e.counterParty);
+          const cellOf = (e, head) => r2((e.postings || []).reduce((v, p) => v + (p.ledger === head ? (p.debit || 0) - (p.credit || 0) : 0), 0));
+          return (
+            <div key={cat} style={{ marginBottom: 16, overflowX: 'auto' }}>
+              <div style={{ fontWeight: 800, color: C.dark, fontSize: 12.5, margin: '10px 0 4px' }}>
+                {VCH[cat] || cat} <span style={{ color: C.dim, fontWeight: 600, fontSize: 11 }}>· {list.length} voucher{list.length === 1 ? '' : 's'}</span>
+              </div>
+              <table style={{ borderCollapse: 'collapse', fontSize: 11, minWidth: '100%' }}>
+                <thead><tr>
+                  <th style={flatTh}>Date</th>
+                  <th style={flatTh}>Vch No</th>
+                  <th style={flatTh}>Party</th>
+                  {hasSupplier && <th style={flatTh}>Supplier</th>}
+                  {heads.map((h) => <th key={h} style={{ ...flatTh, textAlign: 'right' }} title={h}>{shortHead(h)}</th>)}
+                  <th style={{ ...flatTh, textAlign: 'right' }}>Total</th>
+                  <th style={{ ...flatTh, textAlign: 'center' }}>Action</th>
+                </tr></thead>
+                <tbody>
+                  {list.map((e) => {
+                    const tot = r2((e.postings || []).reduce((s, p) => s + (p.debit || 0), 0));
+                    return (
+                      <tr key={e.id} style={{ background: '#fff', borderTop: '1px solid #eef1f6' }}>
+                        <td style={{ ...flatTd, color: C.dim }}>{ckbox(e)}{fmtDate(e.date)}</td>
+                        <td {...clickable(() => setViewId(e.id))} title="View full voucher" style={{ ...flatTd, color: C.blue, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{e.vno}</td>
+                        <td style={flatTd} title={e.party}>{e.party || '—'}</td>
+                        {hasSupplier && <td style={flatTd} title={e.counterParty}>{e.counterParty || '—'}</td>}
+                        {heads.map((h) => {
+                          const v = cellOf(e, h);
+                          return <td key={h} style={{ ...flatTd, ...num, color: v > 0 ? C.blue : v < 0 ? C.red : '#c2c8da' }}>{v ? money(Math.abs(v)) : '0'}</td>;
+                        })}
+                        <td style={{ ...flatTd, ...num, fontWeight: 700, color: C.dark }}>{money(tot)}</td>
+                        <td style={{ ...flatTd, textAlign: 'center' }}>{actionCell(e)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div style={{ margin: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -344,7 +411,7 @@ export function VoucherApprovals({ branch, currentUser }) {
         </div>
         {status !== 'edited' && <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: '#fafbfe', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden' }}>
-            {[['entry', 'Entry wise'], ['voucher', 'Voucher Type wise'], ['tree', 'Group-Subgroup-Ledger-Entry']].map(([v, l]) => (
+            {[['entry', 'Entry wise'], ['columnar', 'Columnar (all heads)'], ['voucher', 'Voucher Type wise'], ['tree', 'Group-Subgroup-Ledger-Entry']].map(([v, l]) => (
               <button key={v} onClick={() => setView(v)} style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: view === v ? C.blue : '#fff', color: view === v ? '#fff' : C.dim }}>{l}</button>
             ))}
           </div>
@@ -371,6 +438,7 @@ export function VoucherApprovals({ branch, currentUser }) {
             {flatEntries.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: C.dim }}>No {status} vouchers.</div>}
             {flatEntries.length > 0 && view === 'voucher' && voucherTypeWise()}
             {flatEntries.length > 0 && view === 'entry' && entryWise()}
+            {flatEntries.length > 0 && view === 'columnar' && columnarWise()}
             {view === 'tree' && tree.map((g) => {
               const gk = 'g:' + g.name, gOpen = isOpen(gk, false);
               return (
