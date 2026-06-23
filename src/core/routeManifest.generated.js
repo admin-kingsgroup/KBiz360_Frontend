@@ -88,6 +88,7 @@ export const APP_ROUTES = [
   "/finance/receipt-register",
   "/finance/reco-queue",
   "/finance/refund",
+  "/finance/refund-partial",
   "/finance/reissue",
   "/finance/targets",
   "/finance/tds-calculator",

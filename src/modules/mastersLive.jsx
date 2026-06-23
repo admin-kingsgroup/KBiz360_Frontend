@@ -16,6 +16,7 @@ import { branchCode } from '../core/useAccounting';
 import { exportToExcel } from '../core/exportExcel';
 import { openPrintPreview } from '../core/PrintPreview';
 import { useFormKeys } from '../core/ux/forms';
+import { usePager, Pager } from '../core/ux/pager';
 import { toast } from '../core/ux/toast';
 import { confirmDialog } from '../core/ux/confirm';
 import { Kbd } from '../core/ux/widgets.jsx';
@@ -132,6 +133,9 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
   let rows = (list.data || []).filter(rowFilter || (() => true));
   if (mapRow) rows = rows.map(mapRow);
   if (sortRows) rows = [...rows].sort(sortRows);
+  // Render one page at a time so a big master (900+ ledgers/parties) doesn't paint
+  // every row; export/print below still build over the full `rows`.
+  const pg = usePager(rows);
   const cols = fields.filter((f) => f.table !== false);
 
   const openNew = () => { setErr(''); setEditing({ __new: true, ...blankFromFields(fields) }); };
@@ -246,7 +250,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
             </tr></thead>
             <tbody>
               {rows.length === 0 && <tr><td colSpan={cols.length + 1} style={{ padding: 28, textAlign: 'center', color: DIM }}>No records yet — click “New” to add one.</td></tr>}
-              {rows.map((r) => (
+              {pg.pageRows.map((r) => (
                 // rowStyle lets a view emphasize certain rows (e.g. a tinted,
                 // bold band on each primary Tally group). Cell weight inherits
                 // from the row so a bold rowStyle cascades to the text.
@@ -264,6 +268,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
               ))}
             </tbody>
           </table>
+          <Pager pager={pg} />
         </div>
       )}
 

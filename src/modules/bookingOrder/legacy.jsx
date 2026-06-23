@@ -25,6 +25,7 @@ import { toast } from '../../core/ux/toast';
 import { confirmDialog } from '../../core/ux/confirm';
 import { clickable } from '../../core/ux/clickable';
 import { listKeyNav } from '../../core/ux/listKeys';
+import { usePager, Pager } from '../../core/ux/pager';
 import {
   VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc, isVatBranch, rowsFromSnapshots,
 } from '../../core/voucherSpecs.js';
@@ -1028,6 +1029,11 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
   // The four money columns drive both header right-alignment and the group-summary
   // colSpans; derive their start from the header so adding lead columns can't misalign them.
   const numStart = cols.indexOf('Sale');
+  // Page the flat (un-grouped) list so the DOM stays bounded on big branches. Grouped
+  // views render in full so each group's subtotal stays correct (the grouping itself
+  // already bounds how much is on screen).
+  const pg = usePager(rows);
+  const shown = groupBy === 'none' ? pg.pageRows : rows;
   return (
     <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1080 }}>
@@ -1039,7 +1045,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
             <tr key={'sk' + r}><td colSpan={cols.length} style={{ padding: '8px 10px' }}><div className="kb-skeleton" style={{ height: 14, borderRadius: 6, opacity: Math.max(0.4, 1 - r * 0.12) }} /></td></tr>
           ))}
           {!isLoading && rows.length === 0 && <tr><td colSpan={cols.length} style={{ padding: 22, textAlign: 'center', color: '#9197a3', fontSize: 12 }}>{mode === 'pending' ? 'No pending vouchers. Create one under “SO/PO/GP Voucher”.' : mode === 'rejected' ? 'No rejected vouchers.' : mode === 'deleted' ? 'No deleted vouchers.' : 'No approved vouchers yet.'}</td></tr>}
-          {groupBookings(rows, groupBy).map((g) => (
+          {groupBookings(shown, groupBy).map((g) => (
             <React.Fragment key={g.key}>
               {g.label != null && (
                 <tr style={{ background: '#eef1f8' }}>
@@ -1122,6 +1128,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
           ))}
         </tbody>
       </table>
+      {groupBy === 'none' && <Pager pager={pg} />}
     </div>
   );
 }

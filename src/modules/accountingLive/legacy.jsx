@@ -26,6 +26,7 @@ import { openLedgerModal } from '../../core/LedgerModalHost';
 import { usePrefs } from '../../core/prefs';
 import { pushModal } from '../../core/ux/modalStore';
 import { clickable } from '../../core/ux/clickable';
+import { usePager, Pager } from '../../core/ux/pager';
 import { contraLedgerName, lineNarration } from '../../core/cashBookRows';
 import { toast } from '../../core/ux/toast';
 import { CUR_QUARTER, CUR_FY } from '../../core/dates';
@@ -294,6 +295,8 @@ function DetailedTable({ columns, rows }) {
   }, [columns, rows]);
   const fromTop = () => { if (bodyRef.current && topRef.current) bodyRef.current.scrollLeft = topRef.current.scrollLeft; };
   const fromBody = () => { if (bodyRef.current && topRef.current) topRef.current.scrollLeft = bodyRef.current.scrollLeft; };
+  // Page the rows so the DOM stays bounded; Excel export still runs over the full set.
+  const pg = usePager(rows);
   return (
     <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
       {/* mirrored top scrollbar */}
@@ -309,7 +312,7 @@ function DetailedTable({ columns, rows }) {
             ))}
           </tr></thead>
           <tbody>
-            {rows.map((r, i) => (
+            {pg.pageRows.map((r, i) => (
               <tr key={i} style={rowBg(i)}>
                 {columns.map((c) => {
                   const f = cellFmt(r[c.key]);
@@ -320,6 +323,7 @@ function DetailedTable({ columns, rows }) {
           </tbody>
         </table>
       </div>
+      <Pager pager={pg} />
     </div>
   );
 }
@@ -1484,6 +1488,9 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
   const fromBody = () => { if (bodyRef.current && topRef.current) topRef.current.scrollLeft = bodyRef.current.scrollLeft; };
   const cellNum = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : '—'; };
   const mono = (k) => k === 'linkNo' || k === 'saleVno' || k === 'purVno';
+  // Render only one page of rows so the DOM stays bounded; the tfoot totals + count
+  // below still reflect the FULL set (totals/rows.length are unchanged).
+  const pg = usePager(rows);
   return (
     <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
       <div ref={topRef} onScroll={fromTop} style={{ overflowX: 'auto', overflowY: 'hidden', height: 14, borderBottom: '1px solid #eef1f6' }}>
@@ -1497,7 +1504,7 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
             ))}
           </tr></thead>
           <tbody>
-            {rows.map((r, i) => (
+            {pg.pageRows.map((r, i) => (
               <tr key={i} style={rowBg(i)}>
                 {columns.map((c, ci) => {
                   // Final Invoice / Bill Value → green + clickable, opens the voucher's JV.
@@ -1539,6 +1546,7 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
           )}
         </table>
       </div>
+      <Pager pager={pg} />
     </div>
   );
 }
@@ -1577,6 +1585,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
     .filter((v) => !!needle || dateInRange(v.date, from, to))
     .filter((v) => !needle || voucherHaystack(v).includes(needle)), [allRows, product, from, to, needle]);
   const sum = (k) => rows.reduce((s, v) => s + (v[k] || 0), 0);
+  const summaryPager = usePager(rows); // Summary view paging — sum() above still totals the full set
   const sheet = useMemo(() => vouchersToSheet(rows), [rows]);
 
   // Sale ↔ purchase invoice numbers share a booking's Link No — index both sides so
@@ -1672,13 +1681,13 @@ export function RegisterLive({ branch, initial = 'sales' }) {
         ) : view === 'detailed' ? (
           <DetailedTable columns={sheet.columns} rows={sheet.rows} />
         ) : (
-          <Table>
+          <><Table>
             <thead><tr style={headRow}>
               <Th>Date</Th><Th>Voucher</Th><Th>Type</Th><Th>{tab === 'sales' ? 'Customer' : 'Supplier'}</Th><Th>Link No</Th>
               <Th right>Taxable</Th><Th right>GST</Th><Th right>Total</Th>
             </tr></thead>
             <tbody>
-              {rows.map((v, i) => (
+              {summaryPager.pageRows.map((v, i) => (
                 <tr key={v.id || v.vno} style={{ ...rowBg(i), cursor: 'pointer' }} {...clickable(() => setDetail(v))}
                   onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
@@ -1702,7 +1711,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
               <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, sum('taxAmt'))}</td>
               <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, sum('total'))}</td>
             </tr></tfoot>
-          </Table>
+          </Table><Pager pager={summaryPager} /></>
         )}
       </State>
       <VoucherDetail voucher={detail} cur={cur} onClose={() => setDetail(null)} />
