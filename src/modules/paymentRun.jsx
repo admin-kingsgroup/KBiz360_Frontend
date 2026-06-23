@@ -41,7 +41,10 @@ export function PaymentRun({ branch, setRoute }) {
   const summary = paymentRunSummary(rows);
 
   const toggle = (k, b) => setSel((p) => ({ ...p, [k]: { selected: !(p[k]?.selected), amount: p[k]?.amount != null ? p[k].amount : b.outstanding } }));
-  const setAmt = (k, v) => setSel((p) => ({ ...p, [k]: { selected: p[k]?.selected ?? true, amount: v } }));
+  // Editing the Pay Amount must NOT auto-select a row — the checkbox is the only
+  // way to add a bill to the run. (Was `?? true`, which silently selected any
+  // untouched row the moment its amount field was edited.)
+  const setAmt = (k, v) => setSel((p) => ({ ...p, [k]: { selected: !!p[k]?.selected, amount: v } }));
   const allSelected = rows.length > 0 && rows.every((r) => r.selected);
   const toggleAll = () => { const next = {}; rows.forEach((r) => { next[r.key] = { selected: !allSelected, amount: sel[r.key]?.amount != null ? sel[r.key].amount : r.outstanding }; }); setSel(next); };
 
@@ -83,8 +86,17 @@ export function PaymentRun({ branch, setRoute }) {
           </select>
         </label>
         <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-          <div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>{summary.bills} bills · {summary.suppliers} supplier{summary.suppliers === 1 ? '' : 's'}</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: C.dark }}>{money(cur, summary.total)}</div>
+          {outQ.isLoading ? (
+            <>
+              <div className="kb-skeleton" style={{ height: 11, width: 120, borderRadius: 5, marginLeft: 'auto' }} />
+              <div className="kb-skeleton" style={{ height: 20, width: 110, borderRadius: 6, marginTop: 6, marginLeft: 'auto' }} />
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>{summary.bills} bills · {summary.suppliers} supplier{summary.suppliers === 1 ? '' : 's'}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: C.dark }}>{money(cur, summary.total)}</div>
+            </>
+          )}
           <button disabled={!summary.bills || run.isPending} onClick={submit}
             style={{ marginTop: 6, padding: '8px 16px', fontSize: 13, fontWeight: 800, border: 'none', borderRadius: 6, cursor: summary.bills ? 'pointer' : 'not-allowed', color: '#fff', background: C.amber, opacity: !summary.bills || run.isPending ? 0.6 : 1 }}>
             {run.isPending ? 'Posting…' : `Post ${summary.suppliers} payment${summary.suppliers === 1 ? '' : 's'}`}</button>

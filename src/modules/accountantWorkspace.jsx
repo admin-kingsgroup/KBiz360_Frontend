@@ -9,7 +9,7 @@ import { clickable } from '../core/ux/clickable';
 import { bc } from '../core/styles';
 import {
   branchCode, useAgeing, useTaxSummary, useTrialBalance, useVoucherApprovals,
-  useBookingOrders, useSalesRegister, usePurchaseRegister, useConfigValue, useSaveConfigValue,
+  useBookingOrders, useRegisterSummary, useConfigValue, useSaveConfigValue,
   useOutstanding, useDayBook, useAlerts,
 } from '../core/useAccounting';
 import { useTaxCalendar } from '../core/useReference';
@@ -83,11 +83,15 @@ const aBtn = (bg) => ({ padding: '5px 11px', fontSize: 11, fontWeight: 700, bord
 
 // ════════════════════════ 1) DASHBOARD ACCOUNTANT ════════════════════════════
 // Module-level so they don't remount each render.
-const Tile = ({ icon, label, value, sub, tone = C.dark, onClick }) => (
+const Tile = ({ icon, label, value, sub, tone = C.dark, onClick, loading }) => (
   <div {...(onClick ? clickable(onClick) : {})} style={{ ...card, padding: 14, cursor: onClick ? 'pointer' : 'default', minWidth: 180, flex: '1 1 180px', borderLeft: `4px solid ${tone}` }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: C.dim, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>{icon}{label}</div>
-    <div style={{ fontSize: 21, fontWeight: 800, color: tone, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
-    {sub && <div style={{ fontSize: 11, color: C.dim, marginTop: 3 }}>{sub} {onClick && <ArrowRight size={11} style={{ verticalAlign: 'middle' }} />}</div>}
+    {loading
+      ? <div className="kb-skeleton" style={{ height: 22, width: '68%', marginTop: 8, borderRadius: 6 }} />
+      : <div style={{ fontSize: 21, fontWeight: 800, color: tone, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>{value}</div>}
+    {sub && (loading
+      ? <div className="kb-skeleton" style={{ height: 10, width: '42%', marginTop: 7, borderRadius: 5 }} />
+      : <div style={{ fontSize: 11, color: C.dim, marginTop: 3 }}>{sub} {onClick && <ArrowRight size={11} style={{ verticalAlign: 'middle' }} />}</div>)}
   </div>
 );
 const SecTitle = ({ children }) => <div style={{ fontSize: 11, fontWeight: 800, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.5, margin: '4px 2px 8px' }}>{children}</div>;
@@ -128,21 +132,27 @@ export function DashboardAccountant({ branch, setRoute }) {
   const ym = thisYM();
   const monthFrom = `${ym}-01`;
   const today = new Date().toISOString().slice(0, 10);
-  const age = useAgeing(branch).data || {};
+  // Keep the query objects (not just .data) so tiles can show a skeleton while their
+  // source query is loading instead of flashing a 0 / blank number.
+  const ageQ = useAgeing(branch); const age = ageQ.data || {};
   // GST is a PERIODIC return — scope to the current month (a bare call is inception-to-date).
-  const tax = useTaxSummary(branch, { from: monthFrom, to: today }).data || {};
-  const tb = useTrialBalance(branch).data?.rows || []; // bare = cumulative closing = current balance
-  const bookings = useBookingOrders(branch, { status: 'pending' }).data || []; // only pending is used here (stuck/suspense/counts)
+  const taxQ = useTaxSummary(branch, { from: monthFrom, to: today }); const tax = taxQ.data || {};
+  const tbQ = useTrialBalance(branch); const tb = tbQ.data?.rows || []; // bare = cumulative closing = current balance
+  const bookingsQ = useBookingOrders(branch, { status: 'pending' }); const bookings = bookingsQ.data || []; // only pending is used here (stuck/suspense/counts)
   // /api/vouchers/approvals returns an OBJECT { counts, entries } — NOT an array. Reading
   // `.data || []` then `.length` yielded undefined → pendCount became NaN (tile showed
   // "NaN" and the "all posted" check never went green). Use the entries[] array.
-  const pendVouchers = useVoucherApprovals(branch, 'pending').data?.entries || [];
-  // Dashboard only shows THIS MONTH's sales/purchase totals, so scope the register
-  // queries to the current month instead of pulling the whole branch history.
-  const sales = useSalesRegister(branch, { from: monthFrom, to: today }).data || [];
-  const purch = usePurchaseRegister(branch, { from: monthFrom, to: today }).data || [];
-  const out = useOutstanding(branch).data || {};
-  const day = useDayBook(branch, { from: today, to: today }).data || [];
+  const pendVQ = useVoucherApprovals(branch, 'pending'); const pendVouchers = pendVQ.data?.entries || [];
+  // Dashboard only shows THIS MONTH's sales/purchase TOTALS — fetch the server-side
+  // aggregate (?summary=1 → {count,total}) for the month instead of pulling every
+  // voucher doc just to sum it client-side (a few bytes vs ~MB over the Atlas link).
+  const salesSumQ = useRegisterSummary(branch, { category: 'sale', from: monthFrom, to: today });
+  const purchSumQ = useRegisterSummary(branch, { category: 'purchase', from: monthFrom, to: today });
+  const outQ = useOutstanding(branch); const out = outQ.data || {};
+  const dayQ = useDayBook(branch, { from: today, to: today }); const day = dayQ.data || [];
+  // True only during an actual fetch with no data yet (React Query v5: isPending && isFetching),
+  // so skeletons show on first load / branch switch but not on background refetches.
+  const txnLoading = bookingsQ.isLoading || pendVQ.isLoading;
   const savedTicks = useConfigValue(`month-end:${branchCode(branch) || 'ALL'}:${ym}`).data || {};
   
   // Custom additions for dashboard
@@ -160,14 +170,13 @@ export function DashboardAccountant({ branch, setRoute }) {
     }
   }, [bankLedgers, selectedBank]);
 
-  const { data: recoSummary } = useBankReconSummary(selectedBank, branch, { from: monthFrom, to: today });
+  const recoQ = useBankReconSummary(selectedBank, branch, { from: monthFrom, to: today });
+  const recoSummary = recoQ.data;
 
   const savedNotes = useConfigValue(`followup-notes:${branchCode(branch) || 'ALL'}`).data || {};
   const saveNoteMutation = useSaveConfigValue();
   const [editingNotes, setEditingNotes] = useState({});
 
-  const inMonth = (v) => ymOf(v.date) === ym;
-  const sumTot = (arr) => arr.reduce((s, v) => s + (Number(v.total) || 0), 0);
   const pendBookings = bookings.filter((b) => b.status === 'pending');
   const pendCount = pendBookings.length + pendVouchers.length;
   const suspense = pendBookings.filter((b) => b.validation?.hasErrors);
@@ -193,8 +202,6 @@ export function DashboardAccountant({ branch, setRoute }) {
   const tbDr = tb.reduce((s, r) => s + (Number(r.closingDebit ?? r.debit) || 0), 0);
   const tbCr = tb.reduce((s, r) => s + (Number(r.closingCredit ?? r.credit) || 0), 0);
   const tbBalanced = tb.length > 0 && Math.abs(tbDr - tbCr) < 1;
-  const meDone = [pendCount === 0, suspense.length === 0, tbBalanced].filter(Boolean).length
-    + ['bankreco', 'debtors', 'cash'].filter((k) => savedTicks[k]).length;
   const qa = (label, route, bg = C.blue) => <button key={route} onClick={() => go(route)} style={aBtn(bg)}><Plus size={13} />{label}</button>;
 
   // Checklist handler inside compliance tab
@@ -261,10 +268,10 @@ export function DashboardAccountant({ branch, setRoute }) {
         <>
           <SecTitle>Money Position</SecTitle>
           <Row>
-            <Tile icon={<Wallet size={13} />} label="Cash in Hand" value={money(cur, cash)} sub="Open Cash Book" tone={C.green} onClick={() => go('/finance/cash-book')} />
-            <Tile icon={<Landmark size={13} />} label={`Bank Balance${banks.length > 1 ? ` (${banks.length} a/c)` : ''}`} value={money(cur, bankTotal)} sub="Open bank balances" tone={C.blue} onClick={() => go('/finance/bank-balance')} />
-            <Tile icon={<TrendingUp size={13} />} label="Collected Today" value={money(cur, collectedToday)} sub="Receipts posted today" tone={C.green} onClick={() => go('/finance/receipt-register')} />
-            <Tile icon={<TrendingDown size={13} />} label="Paid Today" value={money(cur, paidToday)} sub="Payments posted today" tone={C.amber} onClick={() => go('/finance/payment-register')} />
+            <Tile icon={<Wallet size={13} />} label="Cash in Hand" value={money(cur, cash)} sub="Open Cash Book" tone={C.green} onClick={() => go('/finance/cash-book')} loading={tbQ.isLoading} />
+            <Tile icon={<Landmark size={13} />} label={`Bank Balance${banks.length > 1 ? ` (${banks.length} a/c)` : ''}`} value={money(cur, bankTotal)} sub="Open bank balances" tone={C.blue} onClick={() => go('/finance/bank-balance')} loading={tbQ.isLoading} />
+            <Tile icon={<TrendingUp size={13} />} label="Collected Today" value={money(cur, collectedToday)} sub="Receipts posted today" tone={C.green} onClick={() => go('/finance/receipt-register')} loading={dayQ.isLoading} />
+            <Tile icon={<TrendingDown size={13} />} label="Paid Today" value={money(cur, paidToday)} sub="Payments posted today" tone={C.amber} onClick={() => go('/finance/payment-register')} loading={dayQ.isLoading} />
           </Row>
           {banks.length > 1 && (
             <div style={{ ...card, padding: '8px 12px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
@@ -294,7 +301,16 @@ export function DashboardAccountant({ branch, setRoute }) {
               <button onClick={() => go('/bank-reco')} style={aBtn(C.blue)}>Open Bank Reco Matcher <ArrowRight size={12} /></button>
             </div>
 
-            {recoSummary ? (
+            {recoQ.isLoading && selectedBank ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+                {['ERP Ledger Balance', 'Statement Balance', 'Unreconciled Difference', 'Unmatched Lines'].map((lbl) => (
+                  <div key={lbl} style={{ padding: '8px 10px', background: '#fafbff', border: `1px solid ${C.border}`, borderRadius: 6 }}>
+                    <div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>{lbl}</div>
+                    <div className="kb-skeleton" style={{ height: 16, width: '70%', marginTop: 6, borderRadius: 5 }} />
+                  </div>
+                ))}
+              </div>
+            ) : recoSummary ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
                 <div style={{ padding: '8px 10px', background: '#fafbff', border: `1px solid ${C.border}`, borderRadius: 6 }}>
                   <div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>ERP Ledger Balance</div>
@@ -322,10 +338,10 @@ export function DashboardAccountant({ branch, setRoute }) {
 
           <SecTitle>Worklist — needs action</SecTitle>
           <Row>
-            <Tile icon={<CheckSquare size={13} />} label="Pending to Approve & Post" value={pendCount} sub="Open approvals" tone={C.amber} onClick={() => go('/transactions/approvals')} />
-            <Tile icon={<ReceiptText size={13} />} label="Unallocated Receipts" value={money(cur, onAcctSum)} sub={`${onAcct.length} on-account · settle bills`} tone={C.blue} onClick={() => go('/reports/rec')} />
-            <Tile icon={<AlertTriangle size={13} />} label="Suspense / To Fix" value={suspense.length} sub="Clear suspense" tone={C.red} onClick={() => go('/accounts/suspense')} />
-            <Tile icon={<ListChecks size={13} />} label="Month-End Progress" value={`${checklistDone}/6`} sub="Open close checklist" tone={checklistDone === 6 ? C.green : C.dark} onClick={() => setActiveTab('compliance')} />
+            <Tile icon={<CheckSquare size={13} />} label="Pending to Approve & Post" value={pendCount} sub="Open approvals" tone={C.amber} onClick={() => go('/transactions/approvals')} loading={txnLoading} />
+            <Tile icon={<ReceiptText size={13} />} label="Unallocated Receipts" value={money(cur, onAcctSum)} sub={`${onAcct.length} on-account · settle bills`} tone={C.blue} onClick={() => go('/reports/rec')} loading={outQ.isLoading} />
+            <Tile icon={<AlertTriangle size={13} />} label="Suspense / To Fix" value={suspense.length} sub="Clear suspense" tone={C.red} onClick={() => go('/accounts/suspense')} loading={bookingsQ.isLoading} />
+            <Tile icon={<ListChecks size={13} />} label="Month-End Progress" value={`${checklistDone}/6`} sub="Open close checklist" tone={checklistDone === 6 ? C.green : C.dark} onClick={() => setActiveTab('compliance')} loading={txnLoading || tbQ.isLoading} />
           </Row>
 
           {/* Today's posted transactions book feed */}
@@ -471,10 +487,10 @@ export function DashboardAccountant({ branch, setRoute }) {
 
           <SecTitle>Statutory compliance &amp; Balances</SecTitle>
           <Row>
-            <Tile icon={<ReceiptText size={13} />} label="GST / VAT (this month)" value={netGst == null ? 'View' : money(cur, Math.abs(netGst))} sub={`${netGst == null ? 'open tax summary' : (netGst >= 0 ? 'net payable' : 'refundable')} · due 20th`} tone={netGst != null && netGst > 0 ? C.amber : C.blue} onClick={() => go('/reports/tax-summary')} />
-            <Tile icon={<ReceiptText size={13} />} label="TDS Payable" value={money(cur, tds)} sub="due 7th · TDS calculator" tone={tds > 0 ? C.amber : C.blue} onClick={() => go('/finance/tds-calculator')} />
-            <Tile icon={<ReceiptText size={13} />} label="TCS Payable" value={money(cur, tcs)} sub="statutory dues calendar" tone={tcs > 0 ? C.amber : C.blue} onClick={() => go('/reports/statutory-dues')} />
-            <Tile icon={<CheckSquare size={13} />} label="Trial Balance" value={tbBalanced ? '✓ Balanced' : (tb.length ? '✗ Out' : '—')} sub={tb.length && !tbBalanced ? `out by ${money(cur, Math.abs(tbDr - tbCr))}` : 'open trial balance'} tone={tbBalanced ? C.green : (tb.length ? C.red : C.dim)} onClick={() => go('/finance/trial-balance')} />
+            <Tile icon={<ReceiptText size={13} />} label="GST / VAT (this month)" value={netGst == null ? 'View' : money(cur, Math.abs(netGst))} sub={`${netGst == null ? 'open tax summary' : (netGst >= 0 ? 'net payable' : 'refundable')} · due 20th`} tone={netGst != null && netGst > 0 ? C.amber : C.blue} onClick={() => go('/reports/tax-summary')} loading={taxQ.isLoading} />
+            <Tile icon={<ReceiptText size={13} />} label="TDS Payable" value={money(cur, tds)} sub="due 7th · TDS calculator" tone={tds > 0 ? C.amber : C.blue} onClick={() => go('/finance/tds-calculator')} loading={taxQ.isLoading} />
+            <Tile icon={<ReceiptText size={13} />} label="TCS Payable" value={money(cur, tcs)} sub="statutory dues calendar" tone={tcs > 0 ? C.amber : C.blue} onClick={() => go('/reports/statutory-dues')} loading={taxQ.isLoading} />
+            <Tile icon={<CheckSquare size={13} />} label="Trial Balance" value={tbBalanced ? '✓ Balanced' : (tb.length ? '✗ Out' : '—')} sub={tb.length && !tbBalanced ? `out by ${money(cur, Math.abs(tbDr - tbCr))}` : 'open trial balance'} tone={tbBalanced ? C.green : (tb.length ? C.red : C.dim)} onClick={() => go('/finance/trial-balance')} loading={tbQ.isLoading} />
           </Row>
 
           {/* New tax events compliance list */}
@@ -508,8 +524,8 @@ export function DashboardAccountant({ branch, setRoute }) {
 
           <SecTitle>Performance Metrics (This Month)</SecTitle>
           <Row>
-            <Tile icon={<TrendingUp size={13} />} label="Sales (this month)" value={money(cur, sumTot(sales.filter(inMonth)))} sub="Open Sales Register" tone={C.green} onClick={() => go('/reports/sreg')} />
-            <Tile icon={<TrendingDown size={13} />} label="Purchase (this month)" value={money(cur, sumTot(purch.filter(inMonth)))} sub="Open Purchase Register" tone={C.amber} onClick={() => go('/reports/preg')} />
+            <Tile icon={<TrendingUp size={13} />} label="Sales (this month)" value={money(cur, salesSumQ.data?.total || 0)} sub="Open Sales Register" tone={C.green} onClick={() => go('/reports/sreg')} loading={salesSumQ.isLoading} />
+            <Tile icon={<TrendingDown size={13} />} label="Purchase (this month)" value={money(cur, purchSumQ.data?.total || 0)} sub="Open Purchase Register" tone={C.amber} onClick={() => go('/reports/preg')} loading={purchSumQ.isLoading} />
             <Tile icon={<ReceiptText size={13} />} label="Invoice-wise GP" value="View" sub="Open GP report" tone={C.dark} onClick={() => go('/reports/invoice-gp')} />
           </Row>
 
@@ -587,12 +603,13 @@ export function NetAgeing({ branch }) {
   const rec = age.receivables?.totals?.total || 0;
   const pay = age.payables?.totals?.total || 0;
   const net = rec - pay;
+  const skel = <span className="kb-skeleton" style={{ display: 'inline-block', height: 18, width: 96, borderRadius: 5, verticalAlign: 'middle' }} />;
   return (
     <Shell title="Net Ageing — Debtors + Creditors" sub={`${brLabel(branch)}${age.asOf ? ` · as on ${age.asOf}` : ''} · receivable vs payable, with net working-capital position`}>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
-        <div style={{ ...card, padding: 14, borderLeft: `4px solid ${C.blue}`, minWidth: 220 }}><div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>RECEIVABLE (Debtors)</div><div style={{ fontSize: 20, fontWeight: 800, color: C.blue }}>{money(cur, rec)}</div></div>
-        <div style={{ ...card, padding: 14, borderLeft: `4px solid ${C.amber}`, minWidth: 220 }}><div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>PAYABLE (Creditors)</div><div style={{ fontSize: 20, fontWeight: 800, color: C.amber }}>{money(cur, pay)}</div></div>
-        <div style={{ ...card, padding: 14, borderLeft: `4px solid ${net >= 0 ? C.green : C.red}`, minWidth: 220 }}><div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>NET POSITION</div><div style={{ fontSize: 20, fontWeight: 800, color: net >= 0 ? C.green : C.red }}>{money(cur, net)}</div><div style={{ fontSize: 10.5, color: C.dim }}>{net >= 0 ? 'net receivable' : 'net payable'}</div></div>
+        <div style={{ ...card, padding: 14, borderLeft: `4px solid ${C.blue}`, minWidth: 220 }}><div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>RECEIVABLE (Debtors)</div><div style={{ fontSize: 20, fontWeight: 800, color: C.blue }}>{q.isLoading ? skel : money(cur, rec)}</div></div>
+        <div style={{ ...card, padding: 14, borderLeft: `4px solid ${C.amber}`, minWidth: 220 }}><div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>PAYABLE (Creditors)</div><div style={{ fontSize: 20, fontWeight: 800, color: C.amber }}>{q.isLoading ? skel : money(cur, pay)}</div></div>
+        <div style={{ ...card, padding: 14, borderLeft: `4px solid ${net >= 0 ? C.green : C.red}`, minWidth: 220 }}><div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>NET POSITION</div><div style={{ fontSize: 20, fontWeight: 800, color: net >= 0 ? C.green : C.red }}>{q.isLoading ? skel : money(cur, net)}</div><div style={{ fontSize: 10.5, color: C.dim }}>{net >= 0 ? 'net receivable' : 'net payable'}</div></div>
       </div>
       <div style={{ fontSize: 12, fontWeight: 700, color: C.dark, margin: '0 0 6px' }}>Debtors (Receivables) ageing</div>
       <AgeingTable side={age.receivables} cur={cur} tone={C.blue} partyLabel="Customer" />
@@ -793,10 +810,10 @@ export function SupplierReco({ branch, setRoute }) {
         <>
           {/* Summary KPIs */}
           <Row>
-            <Tile icon={<Scale size={13} />} label="Per Our Books" value={money(cur, sum.bookOwed)} sub="we owe (ledger)" tone={C.dark} />
-            <Tile icon={<ReceiptText size={13} />} label="Per Their Statement" value={money(cur, sum.statementOwed)} sub={sum.statementOwedDerived ? 'derived' : 'as stated'} tone={C.blue} />
-            <Tile icon={<AlertTriangle size={13} />} label="Difference" value={money(cur, Math.abs(diff))} sub={Math.abs(diff) <= 0.01 ? '✓ reconciled' : (diff < 0 ? 'books lower than statement' : 'books higher than statement')} tone={Math.abs(diff) <= 0.01 ? C.green : C.red} />
-            <Tile icon={<CheckSquare size={13} />} label="Matched / Open" value={`${sum.counts?.statementReconciled || 0} / ${sum.counts?.statementUnreconciled || 0}`} sub={`${sum.counts?.statementException || 0} disputed · ${sum.counts?.statementPartial || 0} partial`} tone={C.gold} />
+            <Tile icon={<Scale size={13} />} label="Per Our Books" value={money(cur, sum.bookOwed)} sub="we owe (ledger)" tone={C.dark} loading={sumQ.isLoading} />
+            <Tile icon={<ReceiptText size={13} />} label="Per Their Statement" value={money(cur, sum.statementOwed)} sub={sum.statementOwedDerived ? 'derived' : 'as stated'} tone={C.blue} loading={sumQ.isLoading} />
+            <Tile icon={<AlertTriangle size={13} />} label="Difference" value={money(cur, Math.abs(diff))} sub={Math.abs(diff) <= 0.01 ? '✓ reconciled' : (diff < 0 ? 'books lower than statement' : 'books higher than statement')} tone={Math.abs(diff) <= 0.01 ? C.green : C.red} loading={sumQ.isLoading} />
+            <Tile icon={<CheckSquare size={13} />} label="Matched / Open" value={`${sum.counts?.statementReconciled || 0} / ${sum.counts?.statementUnreconciled || 0}`} sub={`${sum.counts?.statementException || 0} disputed · ${sum.counts?.statementPartial || 0} partial`} tone={C.gold} loading={sumQ.isLoading} />
           </Row>
 
           {/* Import box */}
@@ -940,10 +957,10 @@ export function ClientReco({ branch, setRoute }) {
           </>
         }>
         <Row>
-          <Tile icon={<CheckCircle2 size={13} />} label="Reconciled" value={list.totals?.reconciled || 0} sub="fully matched" tone={C.green} />
-          <Tile icon={<AlertTriangle size={13} />} label="With Differences" value={list.totals?.differences || 0} sub="need attention" tone={C.red} />
-          <Tile icon={<ListChecks size={13} />} label="Not Started" value={list.totals?.notStarted || 0} sub="no statement yet" tone={C.dim} />
-          <Tile icon={<Scale size={13} />} label="Total Receivable" value={money(cur, list.totals?.bookOwed)} sub="per our books" tone={C.dark} />
+          <Tile icon={<CheckCircle2 size={13} />} label="Reconciled" value={list.totals?.reconciled || 0} sub="fully matched" tone={C.green} loading={listQ.isLoading} />
+          <Tile icon={<AlertTriangle size={13} />} label="With Differences" value={list.totals?.differences || 0} sub="need attention" tone={C.red} loading={listQ.isLoading} />
+          <Tile icon={<ListChecks size={13} />} label="Not Started" value={list.totals?.notStarted || 0} sub="no statement yet" tone={C.dim} loading={listQ.isLoading} />
+          <Tile icon={<Scale size={13} />} label="Total Receivable" value={money(cur, list.totals?.bookOwed)} sub="per our books" tone={C.dark} loading={listQ.isLoading} />
         </Row>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 2px 10px' }}>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search client…"
@@ -995,10 +1012,10 @@ export function ClientReco({ branch, setRoute }) {
       }>
       {/* Summary KPIs */}
       <Row>
-        <Tile icon={<Scale size={13} />} label="Per Our Books" value={money(cur, sum.bookOwed)} sub="they owe us (ledger)" tone={C.dark} />
-        <Tile icon={<ReceiptText size={13} />} label="Per Their Statement" value={money(cur, sum.statementOwed)} sub={sum.statementOwedDerived ? 'derived' : 'as stated'} tone={C.blue} />
-        <Tile icon={<AlertTriangle size={13} />} label="Difference" value={money(cur, Math.abs(diff))} sub={Math.abs(diff) <= 0.01 ? '✓ reconciled' : (diff > 0 ? 'books higher than statement' : 'books lower than statement')} tone={Math.abs(diff) <= 0.01 ? C.green : C.red} />
-        <Tile icon={<Coins size={13} />} label="Open / Unapplied" value={`${alloc.totals?.openInvoiceCount || 0} / ${alloc.totals?.unappliedReceiptCount || 0}`} sub="open invoices · unapplied receipts" tone={C.gold} />
+        <Tile icon={<Scale size={13} />} label="Per Our Books" value={money(cur, sum.bookOwed)} sub="they owe us (ledger)" tone={C.dark} loading={sumQ.isLoading} />
+        <Tile icon={<ReceiptText size={13} />} label="Per Their Statement" value={money(cur, sum.statementOwed)} sub={sum.statementOwedDerived ? 'derived' : 'as stated'} tone={C.blue} loading={sumQ.isLoading} />
+        <Tile icon={<AlertTriangle size={13} />} label="Difference" value={money(cur, Math.abs(diff))} sub={Math.abs(diff) <= 0.01 ? '✓ reconciled' : (diff > 0 ? 'books higher than statement' : 'books lower than statement')} tone={Math.abs(diff) <= 0.01 ? C.green : C.red} loading={sumQ.isLoading} />
+        <Tile icon={<Coins size={13} />} label="Open / Unapplied" value={`${alloc.totals?.openInvoiceCount || 0} / ${alloc.totals?.unappliedReceiptCount || 0}`} sub="open invoices · unapplied receipts" tone={C.gold} loading={allocQ.isLoading} />
       </Row>
 
       {/* Tabs */}
@@ -1123,10 +1140,10 @@ export function InterBranchReco({ branch }) {
     <Shell title="Inter-branch Reconciliation" sub="every branch pair's two directional current accounts — they should net to zero"
       right={<div style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: data.totals?.mismatched ? C.red : C.green }}>{data.totals?.mismatched || 0} mismatched · {data.totals?.matched || 0} matched</div>}>
       <Row>
-        <Tile icon={<Scale size={13} />} label="Branch Pairs" value={data.totals?.pairs || 0} sub="with activity" tone={C.dark} />
-        <Tile icon={<CheckCircle2 size={13} />} label="Reconciled" value={data.totals?.matched || 0} sub="net to zero" tone={C.green} />
-        <Tile icon={<AlertTriangle size={13} />} label="Mismatched" value={data.totals?.mismatched || 0} sub="one-sided / unequal" tone={C.red} />
-        <Tile icon={<Coins size={13} />} label="Total Difference" value={money(cur, data.totals?.totalDifference)} sub="sum of |differences|" tone={C.gold} />
+        <Tile icon={<Scale size={13} />} label="Branch Pairs" value={data.totals?.pairs || 0} sub="with activity" tone={C.dark} loading={q.isLoading} />
+        <Tile icon={<CheckCircle2 size={13} />} label="Reconciled" value={data.totals?.matched || 0} sub="net to zero" tone={C.green} loading={q.isLoading} />
+        <Tile icon={<AlertTriangle size={13} />} label="Mismatched" value={data.totals?.mismatched || 0} sub="one-sided / unequal" tone={C.red} loading={q.isLoading} />
+        <Tile icon={<Coins size={13} />} label="Total Difference" value={money(cur, data.totals?.totalDifference)} sub="sum of |differences|" tone={C.gold} loading={q.isLoading} />
       </Row>
       <Table>
         <thead><tr>
@@ -1205,10 +1222,10 @@ export function TallyReco({ branch }) {
       ) : (
         <>
           <Row>
-            <Tile icon={<Scale size={13} />} label="Per ERP Books" value={money(cur, sum.bookBalance)} sub="ledger closing" tone={C.dark} />
-            <Tile icon={<ReceiptText size={13} />} label="Per Tally" value={money(cur, sum.tallyBalance)} sub={sum.tallyBalanceDerived ? 'derived' : 'as imported'} tone={C.blue} />
-            <Tile icon={<AlertTriangle size={13} />} label="Difference" value={money(cur, Math.abs(diff))} sub={Math.abs(diff) <= 0.01 ? '✓ reconciled' : 'ERP vs Tally gap'} tone={Math.abs(diff) <= 0.01 ? C.green : C.red} />
-            <Tile icon={<CheckSquare size={13} />} label="Matched / Open" value={`${sum.counts?.tallyReconciled || 0} / ${sum.counts?.tallyUnreconciled || 0}`} sub={`${sum.counts?.tallyException || 0} exceptions`} tone={C.gold} />
+            <Tile icon={<Scale size={13} />} label="Per ERP Books" value={money(cur, sum.bookBalance)} sub="ledger closing" tone={C.dark} loading={sumQ.isLoading} />
+            <Tile icon={<ReceiptText size={13} />} label="Per Tally" value={money(cur, sum.tallyBalance)} sub={sum.tallyBalanceDerived ? 'derived' : 'as imported'} tone={C.blue} loading={sumQ.isLoading} />
+            <Tile icon={<AlertTriangle size={13} />} label="Difference" value={money(cur, Math.abs(diff))} sub={Math.abs(diff) <= 0.01 ? '✓ reconciled' : 'ERP vs Tally gap'} tone={Math.abs(diff) <= 0.01 ? C.green : C.red} loading={sumQ.isLoading} />
+            <Tile icon={<CheckSquare size={13} />} label="Matched / Open" value={`${sum.counts?.tallyReconciled || 0} / ${sum.counts?.tallyUnreconciled || 0}`} sub={`${sum.counts?.tallyException || 0} exceptions`} tone={C.gold} loading={sumQ.isLoading} />
           </Row>
 
           <div style={{ ...card, padding: 12, marginBottom: 12 }}>

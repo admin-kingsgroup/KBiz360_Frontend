@@ -1717,6 +1717,10 @@ export function InvoiceGPLive({ branch }) {
   const [to, setTo] = useState(todayISO);
   const [open, setOpen] = useState(null);     // expanded row index
   const [view, setView] = useState('summary'); // summary | detailed
+  // The expanded row is tracked by array index, but `rows` is re-derived when the
+  // date range changes — so a stale index would expand the wrong (or a missing)
+  // file. Collapse on any filter change to keep the open row honest.
+  useEffect(() => { setOpen(null); }, [from, to]);
   // Fetch all; date filtering is client-side (Tally dates are mixed-format strings).
   const q = useInvoiceGP(branch);
   // Underlying vouchers (with full Tally bifurcation in line.meta) → drill + export.
@@ -1917,9 +1921,9 @@ export function LedgerGroupsLive() {
   const Section = ({ title, list }) => (
     <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 12 }}>
       <div style={{ padding: '9px 14px', background: DARK, color: GOLD, fontWeight: 700, fontSize: 12 }}>{title} — {list.length} groups</div>
-      <div className="kb-sticky" style={{ '--stick-head': '#f3f4f8', maxHeight: '60vh' }}>
+      <div className="kb-sticky" style={{ '--stick-head': DARK, maxHeight: '60vh' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-        <thead><tr style={{ background: '#f3f4f8' }}><Th>#</Th><Th>Group</Th><Th>Nature</Th><Th>Golden-Rule Class</Th><Th>Natural Side</Th><Th>Under</Th></tr></thead>
+        <thead><tr style={headRow}><Th>#</Th><Th>Group</Th><Th>Nature</Th><Th>Golden-Rule Class</Th><Th>Natural Side</Th><Th>Under</Th></tr></thead>
         <tbody>
           {list.map((g, i) => (
             <tr key={g.id} style={rowBg(i)}>
@@ -2284,7 +2288,7 @@ export function CashBookLive({ branch }) {
           <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
             <td colSpan={view === 'detailed' ? 4 : 3} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD, fontSize: 12 }}>CLOSING BALANCE</td>
             <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#5ab84b' }}>{money(cur, receipts)}</td>
-            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#f3c9c9' }}>{money(cur, payments)}</td>
+            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#f08c8c' }}>{money(cur, payments)}</td>
             {view === 'detailed' && <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, Math.abs(closing))} {closing < 0 ? 'Cr' : 'Dr'}</td>}
           </tr></tfoot>
         </Table>

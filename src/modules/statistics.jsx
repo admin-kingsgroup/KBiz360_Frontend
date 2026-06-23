@@ -9,6 +9,7 @@
 import React from 'react';
 import { card } from '../core/styles';
 import { useStatistics } from '../core/useAccounting';
+import { SkeletonTable } from '../shell/primitives';
 
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691';
 
@@ -31,7 +32,7 @@ function MasterRow({ label, value, indent, onClick }) {
   return (
     <tr style={{ borderBottom: '1px solid #f1f3f8', cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
       <td style={{ padding: '7px 13px', color: indent ? DIM : '#334155', paddingLeft: indent ? 30 : 13, fontWeight: indent ? 400 : 600 }}>{label}</td>
-      <td style={{ padding: '7px 13px', textAlign: 'right', fontWeight: 700, color: DARK, color: onClick ? BLUE : DARK }}>{value}</td>
+      <td style={{ padding: '7px 13px', textAlign: 'right', fontWeight: 700, color: onClick ? BLUE : DARK }}>{value}</td>
     </tr>
   );
 }
@@ -39,7 +40,7 @@ function MasterRow({ label, value, indent, onClick }) {
 export function Statistics({ branch, setRoute }) {
   const { data, isLoading, isError, error } = useStatistics(branch);
   const go = (href) => href && setRoute && setRoute(href);
-  const m = data?.masters;
+  const m = data?.masters || {};
   const vouchers = data?.vouchers || [];
   const totals = data?.totals;
   const th = { textAlign: 'left', padding: '9px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #e5e9f0' };
@@ -52,7 +53,12 @@ export function Statistics({ branch, setRoute }) {
         <p style={{ margin: '2px 0 0', fontSize: 10.5, color: DIM }}>Masters &amp; voucher counts {data?.branch && data.branch !== 'ALL' ? `· ${data.branch}` : '· All branches'} · live</p>
       </div>
 
-      {isLoading && <div style={{ ...card, padding: 28, textAlign: 'center', color: DIM, fontSize: 12 }}>Loading…</div>}
+      {isLoading && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: 14, alignItems: 'start' }}>
+          <SkeletonTable rows={9} cols={2} />
+          <SkeletonTable rows={7} cols={5} />
+        </div>
+      )}
       {isError && <div style={{ ...card, padding: 16, color: '#A32D2D', fontSize: 12, fontWeight: 600 }}>⚠ {error?.message || 'Failed to load'} — is the ERP backend running and are you logged in?</div>}
 
       {!isLoading && !isError && data && (
@@ -62,12 +68,12 @@ export function Statistics({ branch, setRoute }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead><tr style={{ background: '#f3f5f9' }}><th style={th}>Masters</th><th style={{ ...th, textAlign: 'right' }}>Count</th></tr></thead>
               <tbody>
-                <MasterRow label="Groups (total)" value={num(m.groups.total)} onClick={() => go('/masters/groups')} />
-                <MasterRow indent label="Primary Groups" value={num(m.groups.primary)} />
-                <MasterRow indent label="Primary Sub Groups" value={num(m.groups.primarySub)} />
-                <MasterRow indent label="ERP Groups" value={num(m.groups.erpGroup)} />
-                <MasterRow indent label="ERP Sub Groups" value={num(m.groups.erpSub)} />
-                <MasterRow label="Ledgers (active)" value={`${num(m.ledgers.active)} / ${num(m.ledgers.total)}`} onClick={() => go('/masters/ledgers')} />
+                <MasterRow label="Groups (total)" value={num(m.groups?.total)} onClick={() => go('/masters/groups')} />
+                <MasterRow indent label="Primary Groups" value={num(m.groups?.primary)} />
+                <MasterRow indent label="Primary Sub Groups" value={num(m.groups?.primarySub)} />
+                <MasterRow indent label="ERP Groups" value={num(m.groups?.erpGroup)} />
+                <MasterRow indent label="ERP Sub Groups" value={num(m.groups?.erpSub)} />
+                <MasterRow label="Ledgers (active)" value={`${num(m.ledgers?.active)} / ${num(m.ledgers?.total)}`} onClick={() => go('/masters/ledgers')} />
                 <MasterRow label="Cost Centres" value={num(m.costCenters)} onClick={() => go('/masters/cost-centers')} />
                 <MasterRow label="Cost Categories" value={num(m.costCategories)} onClick={() => go('/masters/cost-categories')} />
                 <MasterRow label="Voucher Types" value={num(m.voucherTypes)} onClick={() => go('/masters/voucher-types')} />

@@ -25,6 +25,7 @@ export function BankAccountMaster({ branch, setRoute }) {
     .filter((l) => ['Bank Accounts', 'Cash-in-Hand'].includes(l.group))
     .map((l) => ({
       id: l._id || l.code,
+      code: l.code || l._id || '',   // stable key for the deep-link edit (?edit=<code>)
       branch: l.branch || '',
       bank: l.bankName || l.name,
       branchAddr: l.subGroup || '',
@@ -53,7 +54,7 @@ export function BankAccountMaster({ branch, setRoute }) {
     { key: 'openingBal', header: 'Opening Bal', num: true, className: 'font-bold', render: (r, v) => `${r.currency} ${v.toLocaleString('en-IN')}` },
     { key: 'limit', header: 'Limit', num: true, className: 'text-ink-muted', render: (r, v) => `${r.currency} ${v.toLocaleString('en-IN')}` },
     { key: 'status', header: 'Status', align: 'center', render: (r, v) => <StatusPill tone={v === 'Active' ? 'success' : 'danger'} size="sm">{v}</StatusPill> },
-    { key: '__act', header: 'Action', align: 'center', sortable: false, exportable: false, hideable: false, render: () => <Button variant="secondary" size="xs">Edit</Button> },
+    { key: '__act', header: 'Action', align: 'center', sortable: false, exportable: false, hideable: false, render: (r) => <Button variant="secondary" size="xs" onClick={() => setRoute && setRoute(`/masters/ledgers?edit=${encodeURIComponent(r.code)}`)} title="Edit this account (a ledger under Bank Accounts)" disabled={!r.code}>Edit</Button> },
   ];
 
   return (

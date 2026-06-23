@@ -419,7 +419,7 @@ export default function KB360App(){
     if(route==="/masters/bulk-import")          return <BulkImportMaster/>;
     if(route==="/masters/merge")                return <MergeRecordsUtility/>;
     if(route==="/masters/bank-accounts")  return <BankAccountMaster branch={branch} setRoute={navigate}/>;
-    if(route==="/masters/currency")       return <CurrencyMaster/>;
+    if(route==="/masters/currency")       return <CurrencyMaster setRoute={navigate}/>;
     if(route==="/masters/cost-centers")   return <CostCenterMasterLive currentUser={currentUser}/>;
     if(route==="/masters/projects")       return <ProjectMaster/>;
     if(route==="/masters/doc-types")      return <DocumentTypeMaster/>;

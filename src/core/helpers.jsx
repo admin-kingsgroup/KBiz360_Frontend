@@ -23,6 +23,7 @@ import { fmt, fmtINR } from './format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS, PERIOD_OPTIONS as MONTH_PERIOD_OPTIONS, FY_YTD_MONTHS } from './dates';
 import { useMobile } from './hooks';
 import { clickable } from './ux/clickable';
+import { listKeyNav } from './ux/listKeys';
 import { SampleBanner } from './ux/SampleBanner';
 /* Import style primitives from the lightweight token module (NOT ./styles) so
    helpers no longer depends on styles.jsx — breaking the styles↔helpers cycle
@@ -633,7 +634,10 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}
     return()=>{ document.removeEventListener("mousedown",onDoc); window.removeEventListener("scroll",reposition,true); window.removeEventListener("resize",reposition); };
   },[open]);
   const menu = open && rect && createPortal(
-    <div ref={menuRef} style={{position:"fixed",top:rect.bottom+4,left:rect.left,width:rect.width,zIndex:4000,background:"#fff",
+    // ↑/↓ roam the options (focus auto-scrolls each into view), Home/End jump, Enter/Space
+    // pick (via clickable), Esc closes — ↓ from the search input lands on the first option.
+    <div ref={menuRef} onKeyDown={listKeyNav({ onEscape:()=>setOpen(false) })}
+      style={{position:"fixed",top:rect.bottom+4,left:rect.left,width:rect.width,zIndex:4000,background:"#fff",
       border:"1px solid #e1e3ec",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.18)",overflow:"hidden"}}>
       <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Type to search..."
         style={{width:"100%",border:"none",borderBottom:"1px solid #e1e3ec",padding:"8px 12px",
@@ -641,9 +645,11 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}
       <div style={{maxHeight:220,overflowY:"auto"}}>
         {filtered.map(l=>(
           <div key={l.id} {...clickable(()=>{onChange(l.id);setOpen(false);},{role:'option'})}
-            style={{padding:"7px 12px",cursor:"pointer",display:"flex",justifyContent:"space-between",fontSize:11}}
+            style={{padding:"7px 12px",cursor:"pointer",display:"flex",justifyContent:"space-between",fontSize:11,outline:"none"}}
             onMouseEnter={e=>e.currentTarget.style.background="#f0f4ff"}
-            onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+            onFocus={e=>e.currentTarget.style.background="#f0f4ff"}
+            onBlur={e=>e.currentTarget.style.background="transparent"}>
             <span style={{color:"#0d1326",fontWeight:500}}>{l.name}</span>
             <span style={{fontSize:9.5,color:"#5a6691",marginLeft:8,flexShrink:0}}>{l.group}</span>
           </div>

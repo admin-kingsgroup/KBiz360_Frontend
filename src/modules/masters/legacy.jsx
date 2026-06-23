@@ -46,10 +46,13 @@ export function MastersForex(){
   const { data: rates = [] } = useMasterList('forex-rates');
   const { create } = useMasterMutations('forex-rates');
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
-  const [form,setForm]=useState({from:"INR",to:"INR",rate:0,source:"Manual"});
+  // Default To to a non-INR currency so the From≠To guard isn't tripped by the
+  // initial INR→INR pair (the user only needs to type the rate).
+  const [form,setForm]=useState({from:"INR",to:(ACTIVE_CURRENCIES.find((c)=>c!=="INR")||"USD"),rate:0,source:"Manual"});
   const CURRENCIES=ACTIVE_CURRENCIES;
 
   const save=async()=>{
+    if(create.isPending) return;            // ignore double-clicks while the POST is in flight
     if(+form.rate<=0){
       await confirmDialog({title:"Invalid exchange rate",message:"Exchange rate must be greater than 0.",confirmLabel:"OK",cancelLabel:"Close"});
       return;
@@ -59,7 +62,10 @@ export function MastersForex(){
       return;
     }
     const rec={...form,date:new Date().toISOString().slice(0,10)};
-    create.mutate(rec,{ onSuccess:()=>setModal(false) });
+    create.mutate(rec,{
+      onSuccess:()=>setModal(false),
+      onError:(e)=>confirmDialog({title:"Save failed",message:`Could not save the rate — ${e?.message||'unknown error'}.`,confirmLabel:"OK",cancelLabel:"Close"}),
+    });
   };
 
   return (
@@ -84,8 +90,12 @@ export function MastersForex(){
               <th key={i} style={{padding:"9px 14px",textAlign:i===3||i===5?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
-          <tbody>{rates.map((r,i)=>(
-            <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+          <tbody>{rates.map((r,i)=>{
+            // Coerce — legacy/imported docs may carry rate as a string/null, which would
+            // crash on .toFixed and blank the whole screen.
+            const rate=Number(r.rate)||0;
+            return (
+            <tr key={r._id||`${r.date}-${r.from}-${r.to}-${i}`} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
               <td style={{padding:"9px 14px",fontFamily:"monospace",fontSize:10.5,color:"#5b616e"}}>{r.date}</td>
               <td style={{padding:"9px 14px"}}>
                 <span style={{fontSize:13,fontWeight:800,color:"#2563eb",background:"#e8f0ff",padding:"3px 10px",borderRadius:999}}>{r.from}</span>
@@ -93,11 +103,11 @@ export function MastersForex(){
               <td style={{padding:"9px 14px"}}>
                 <span style={{fontSize:13,fontWeight:800,color:"#16a34a",background:"#e8f6ed",padding:"3px 10px",borderRadius:999}}>{r.to}</span>
               </td>
-              <td style={{padding:"9px 14px",textAlign:"right",fontWeight:800,fontSize:15,fontVariantNumeric:"tabular-nums",color:"#1a1c22"}}>{r.rate.toFixed(2)}</td>
+              <td style={{padding:"9px 14px",textAlign:"right",fontWeight:800,fontSize:15,fontVariantNumeric:"tabular-nums",color:"#1a1c22"}}>{rate.toFixed(2)}</td>
               <td style={{padding:"9px 14px",fontSize:10.5,color:"#5b616e"}}>{r.source}</td>
-              <td style={{padding:"9px 14px",textAlign:"right",fontSize:10.5,color:"#5b616e",fontVariantNumeric:"tabular-nums"}}>1 {r.to} = {r.rate>0?(1/r.rate).toFixed(4):"—"} {r.from}</td>
+              <td style={{padding:"9px 14px",textAlign:"right",fontSize:10.5,color:"#5b616e",fontVariantNumeric:"tabular-nums"}}>1 {r.to} = {rate>0?(1/rate).toFixed(4):"—"} {r.from}</td>
             </tr>
-          ))}</tbody>
+          );})}</tbody>
         </table>
       </div>
       {modal&&(
@@ -117,7 +127,7 @@ export function MastersForex(){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #e6e8ec",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={save} style={btnG}>💾 Save Rate</button>
+              <button onClick={save} disabled={create.isPending} style={{...btnG, opacity: create.isPending ? 0.6 : 1, cursor: create.isPending ? 'not-allowed' : 'pointer'}}>{create.isPending ? 'Saving…' : '💾 Save Rate'}</button>
             </div>
           </div>
         </div>
