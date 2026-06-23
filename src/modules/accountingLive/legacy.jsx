@@ -233,9 +233,11 @@ export function VoucherLines({ voucher: v, cur }) {
   );
 }
 
-const Table = ({ children, maxHeight }) => (
+const Table = ({ children, maxHeight, pager }) => (
   <div className="kb-sticky" style={{ ...card, padding: 0, '--stick-head': DARK, '--stick-foot': DARK, ...(maxHeight ? { maxHeight } : null) }}>
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>{children}</table>
+    {/* infinite-scroll sentinel lives INSIDE this scroll box so it only fires at the bottom */}
+    {pager && <Pager pager={pager} />}
   </div>
 );
 const Th = ({ children, right }) => (
@@ -322,8 +324,9 @@ function DetailedTable({ columns, rows }) {
             ))}
           </tbody>
         </table>
+        {/* sentinel lives INSIDE the scroll box so it only fires at the bottom */}
+        <Pager pager={pg} />
       </div>
-      <Pager pager={pg} />
     </div>
   );
 }
@@ -1545,8 +1548,9 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
             </tr></tfoot>
           )}
         </table>
+        {/* sentinel INSIDE the scroll box → only fires at the bottom (not on mount) */}
+        <Pager pager={pg} />
       </div>
-      <Pager pager={pg} />
     </div>
   );
 }
@@ -1681,7 +1685,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
         ) : view === 'detailed' ? (
           <DetailedTable columns={sheet.columns} rows={sheet.rows} />
         ) : (
-          <><Table>
+          <Table pager={summaryPager}>
             <thead><tr style={headRow}>
               <Th>Date</Th><Th>Voucher</Th><Th>Type</Th><Th>{tab === 'sales' ? 'Customer' : 'Supplier'}</Th><Th>Link No</Th>
               <Th right>Taxable</Th><Th right>GST</Th><Th right>Total</Th>
@@ -1711,7 +1715,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
               <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, sum('taxAmt'))}</td>
               <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, sum('total'))}</td>
             </tr></tfoot>
-          </Table><Pager pager={summaryPager} /></>
+          </Table>
         )}
       </State>
       <VoucherDetail voucher={detail} cur={cur} onClose={() => setDetail(null)} />
