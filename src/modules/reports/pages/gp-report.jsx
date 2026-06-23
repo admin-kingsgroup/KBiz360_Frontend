@@ -10,6 +10,7 @@
    ──────────────────────────────────────────────────────────────────── */
 
 import React, { useMemo, useState } from 'react';
+import { openPrintPreview } from '../../../core/PrintPreview';
 import { Download, Printer } from 'lucide-react';
 import { useGpBills } from '../../../core/useAccounting';
 import { bc } from '../../../core/styles';
@@ -162,7 +163,7 @@ export function ReportGP({ branch }) {
       actions={
         <>
           <Button size="sm" variant="secondary" icon={Download} onClick={exportBills}>Export</Button>
-          <Button size="sm" variant="secondary" icon={Printer} onClick={() => window.print()}>Print</Button>
+          <Button size="sm" variant="secondary" icon={Printer} onClick={() => openPrintPreview({ selector: 'main', title: 'GP Report', recommend: 'portrait' })}>Print</Button>
         </>
       }
       filters={

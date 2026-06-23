@@ -16,6 +16,7 @@ import { CUR_MONTH, MONTH_OPTIONS, monthLabel, rangeNote } from '../../core/date
 import { Dashboard } from '../dashboard';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../core/api';
+import { clickable } from '../../core/ux/clickable';
 
 // ── Live consolidated group data (all branches, INR-normalised) ──────────────
 // Replaces the old GROUP_DASH_DATA / GP_BILLS seed: per-branch P&L + invoice GP,
@@ -37,17 +38,17 @@ function useGroupLive(period) {
     const exp = (p.indirect && p.indirect.debitTotal) || 0;
     const np = p.netProfit || 0;
     const rate = FX_RATES[b.currency] || 1;
-    return { code: b.code, flag: b.flag, city: b.city, cur: b.cur, rate, rev, cost, gp, exp, np, gpPct: rev > 0 ? +(gp / rev * 100).toFixed(1) : 0, books: ((inv.rows) || []).length, revINR: rev * rate, costINR: cost * rate, gpINR: gp * rate, npINR: np * rate };
+    return { code: b.code, flag: b.flag, city: b.city, cur: b.currency, rate, rev, cost, gp, exp, np, gpPct: rev > 0 ? +(gp / rev * 100).toFixed(1) : 0, books: ((inv.rows) || []).length, revINR: rev * rate, costINR: cost * rate, gpINR: gp * rate, npINR: np * rate };
   });
   const totals = rows.reduce((a, r) => ({ rev: a.rev + r.revINR, cost: a.cost + r.costINR, gp: a.gp + r.gpINR, np: a.np + r.npINR, books: a.books + r.books }), { rev: 0, cost: 0, gp: 0, np: 0, books: 0 });
   totals.gpPct = totals.rev > 0 ? +(totals.gp / totals.rev * 100).toFixed(1) : 0;
   const tbRows = (tb.data && tb.data.rows) || [];
   const cash = Math.round(tbRows.filter((r) => /bank|cash/i.test(r.group || '')).reduce((s, r) => s + ((r.closingDebit || 0) - (r.closingCredit || 0)), 0));
   const recv = (ag.data && ag.data.receivables) || { rows: [], totals: {} };
-  const overdue = { amount: Math.round(recv.totals.total || 0), count: (recv.rows || []).length, over90: Math.round(recv.totals.d90 || 0) };
+  const overdue = { amount: Math.round(recv?.totals?.total || 0), count: (recv.rows || []).length, over90: Math.round(recv?.totals?.d90 || 0) };
   const cmap = {}; ((invAll.data && invAll.data.rows) || []).forEach((r) => { cmap[r.party || '—'] = (cmap[r.party || '—'] || 0) + (r.sale || 0); });
   const topCustomers = Object.entries(cmap).map(([name, revenue]) => ({ name, revenue })).sort((a, b) => b.revenue - a.revenue).slice(0, 6);
-  const loading = pq.some((q) => q.isLoading) || tb.isLoading || ag.isLoading;
+  const loading = pq.some((q) => q.isLoading) || iq.some((q) => q.isLoading) || tb.isLoading || ag.isLoading || invAll.isLoading;
   return { rows, totals, cash, overdue, topCustomers, loading };
 }
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
@@ -89,6 +90,8 @@ export function GroupDashboard(){
           {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
         </select>
       </div>
+
+      {loading&&<div style={{margin:"0 0 12px",padding:"9px 14px",borderRadius:9,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:11,color:"#185FA5",fontWeight:600}}>⏳ Loading live group data…</div>}
 
       {/* Group KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10,marginBottom:16}}>
@@ -257,7 +260,7 @@ export function GroupBookings({branch,setRoute}){
       {/* Group cards */}
       {!selGrp&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(350px,1fr))",gap:12,marginBottom:12}}>
         {groups.map(g=>(
-          <div key={g.id} onClick={()=>setSel(g.id)} style={{...card,cursor:"pointer",borderLeft:`4px solid ${STATUS_CLR[g.status]||"#384677"}`,transition:"transform 0.1s"}}
+          <div key={g.id} {...clickable(()=>setSel(g.id))} style={{...card,cursor:"pointer",borderLeft:`4px solid ${STATUS_CLR[g.status]||"#384677"}`,transition:"transform 0.1s"}}
             onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)"}}
             onMouseLeave={e=>{e.currentTarget.style.transform="none"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
@@ -440,7 +443,7 @@ export function BankingApiSettings({branch,setRoute}){
         <div style={{...card,borderTop:"3px solid #27500A"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Connected Banks</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#27500A"}}>{connected}</p></div>
         <div style={{...card,borderTop:"3px solid #854F0B"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Pending</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#854F0B"}}>{BANK_INTEGRATIONS.filter(b=>b.status==="Pending").length}</p></div>
         <div style={{...card,borderTop:"3px solid #5a6691"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Manual Only</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#5a6691"}}>{BANK_INTEGRATIONS.filter(b=>b.status==="Manual").length}</p></div>
-        <div style={{...card,borderTop:"3px solid #185FA5"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Live Balance Total</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#185FA5"}}>11.7M</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>Aggregated INR</p></div>
+        <div style={{...card,borderTop:"3px solid #185FA5"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Live Balance Total</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#185FA5"}} title="Live bank-balance aggregation isn’t wired on this screen yet">—</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>Aggregated INR</p></div>
       </div>
 
       <div style={{...card,padding:0,overflow:"hidden"}}>
@@ -598,7 +601,7 @@ export function HOVendorMasterLock(){
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
-        {[{l:"Locked Vendors",v:HO_LOCKED_VENDORS.length,c:"#0d1326"},{l:"Change Attempts (90d)",v:2,c:"#A32D2D"},{l:"Attempts Denied",v:2,c:"#22c55e"}].map(k=>(
+        {[{l:"Locked Vendors",v:HO_LOCKED_VENDORS.length,c:"#0d1326"},{l:"Change Attempts (90d)",v:"—",c:"#A32D2D"},{l:"Attempts Denied",v:"—",c:"#22c55e"}].map(k=>(
           <div key={k.l} style={{...cardStyle,borderTop:"3px solid "+k.c}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:k.c}}>{k.v}</p></div>
         ))}
       </div>
@@ -793,7 +796,7 @@ export function GroupMonthlyDashboard(){
           ))}
         </div>
         <div style={cardStyle}>
-          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>5️⃣ Statutory Dues — Next 30 days</p>
+          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>5️⃣ Statutory Dues — Next 30 days <span style={{marginLeft:6,fontSize:9.5,fontWeight:700,padding:"1px 6px",borderRadius:4,background:"#FAEEDA",color:"#854F0B"}}>SAMPLE</span></p>
           {[
             {label:"GSTR-3B (Apr)",   due:"2026-05-20",amt:1579300},
             {label:"PF/ESI Challan",  due:"2026-05-31",amt:60700},
@@ -917,7 +920,7 @@ export function PeriodLockControl(){
                   const bg=state==="open"?"#d4edda":state==="soft"?"#fff3cd":"#f8d7da";
                   const col=state==="open"?"#155724":state==="soft"?"#856404":"#721c24";
                   const lbl=state==="open"?"🟢 Open":state==="soft"?"🟡 Soft":"🔴 Hard";
-                  return(<td key={m} style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #f0f2f7",cursor:"pointer"}} onClick={()=>cycle(b,m)}>
+                  return(<td key={m} style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #f0f2f7",cursor:"pointer"}} {...clickable(()=>cycle(b,m))}>
                     <span style={{padding:"4px 12px",background:bg,color:col,borderRadius:4,fontSize:10.5,fontWeight:700,display:"inline-block",minWidth:70}}>{lbl}</span>
                   </td>);
                 })}
@@ -961,7 +964,7 @@ export function CentralAuditQueue(){
   const pending=AUDIT_QUEUE_DATA.filter(v=>v.status==="Pending Review").length;
   const flagged=AUDIT_QUEUE_DATA.filter(v=>v.status==="Flagged").length;
   const reviewed=AUDIT_QUEUE_DATA.filter(v=>v.status==="Reviewed").length;
-  const completion=Math.round((reviewed/(AUDIT_QUEUE_DATA.length))*100);
+  const completion=AUDIT_QUEUE_DATA.length?Math.round((reviewed/AUDIT_QUEUE_DATA.length)*100):0;
   const statusStyle={"Pending Review":{bg:"#fff3cd",color:"#856404"},"Reviewed":{bg:"#d4edda",color:"#155724"},"Flagged":{bg:"#f8d7da",color:"#721c24"}};
   const riskStyle={Low:{bg:"#d4edda",color:"#155724"},Medium:{bg:"#fff3cd",color:"#856404"},High:{bg:"#f8d7da",color:"#721c24"}};
   return(
@@ -983,9 +986,9 @@ export function CentralAuditQueue(){
           <span style={{fontSize:12,fontWeight:700,color:"#0d1326"}}>{reviewed}/{AUDIT_QUEUE_DATA.length} vouchers reviewed</span>
         </div>
         <div style={{height:14,background:"#f0f2f7",borderRadius:7,overflow:"hidden",display:"flex"}}>
-          <div style={{height:"100%",width:(reviewed/AUDIT_QUEUE_DATA.length*100)+"%",background:"#22c55e"}}/>
-          <div style={{height:"100%",width:(flagged/AUDIT_QUEUE_DATA.length*100)+"%",background:"#A32D2D"}}/>
-          <div style={{height:"100%",width:(pending/AUDIT_QUEUE_DATA.length*100)+"%",background:"#f97316"}}/>
+          <div style={{height:"100%",width:(AUDIT_QUEUE_DATA.length?reviewed/AUDIT_QUEUE_DATA.length*100:0)+"%",background:"#22c55e"}}/>
+          <div style={{height:"100%",width:(AUDIT_QUEUE_DATA.length?flagged/AUDIT_QUEUE_DATA.length*100:0)+"%",background:"#A32D2D"}}/>
+          <div style={{height:"100%",width:(AUDIT_QUEUE_DATA.length?pending/AUDIT_QUEUE_DATA.length*100:0)+"%",background:"#f97316"}}/>
         </div>
         <div style={{display:"flex",gap:14,marginTop:6,fontSize:10.5}}>
           <span><span style={{color:"#22c55e",fontWeight:700}}>■</span> Reviewed ({reviewed})</span>
@@ -1104,9 +1107,9 @@ export function AuthorityConfigCenter(){
     <PHASE2_Page title="Authority Configuration Center"
       subtitle="Faiz Patel · Sr. Finance Manager · Configure approval limits · master-data permissions · branch isolation · time-based controls"
       toolbar={<>
-        {saved && <span style={{padding:"5px 12px",background:"#d4edda",color:"#155724",borderRadius:4,fontSize:11,fontWeight:700}}>✓ Saved · Effective immediately</span>}
+        {saved && <span style={{padding:"5px 12px",background:"#FAEEDA",color:"#854F0B",borderRadius:4,fontSize:11,fontWeight:700}} title="Server persistence for this screen isn’t wired yet — changes are held in this session only.">⚠ Captured in this session — not yet saved to the server</span>}
         <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Matrix</button>
-        <button onClick={()=>setSaved(true)} style={{padding:"7px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save All Changes</button>
+        <button onClick={()=>setSaved(true)} title="Holds your changes for this session — server save is not enabled on this screen yet" style={{padding:"7px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save All Changes</button>
       </>}>
 
       {/* Big policy callout */}
@@ -1411,7 +1414,7 @@ export function DelegationsManager(){
       subtitle="All vacation back-up & temporary authority delegations · explicit, time-bound, fully logged"
       toolbar={<button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Create Delegation</button>}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
-        {[{l:"Active Delegations",v:active,c:"#22c55e"},{l:"Completed (YTD)",v:2,c:"#5a6691"},{l:"Avg Duration",v:"6 days",c:"#3b82f6"},{l:"Pending Approval",v:0,c:"#f97316"}].map(k=>(
+        {[{l:"Active Delegations",v:active,c:"#22c55e"},{l:"Completed (YTD)",v:all.filter(d=>d.status==="Completed").length,c:"#5a6691"},{l:"Avg Duration",v:"—",c:"#3b82f6"},{l:"Pending Approval",v:all.filter(d=>d.status==="Pending Approval"||d.status==="Pending").length,c:"#f97316"}].map(k=>(
           <div key={k.l} style={{...cardStyle,borderTop:"3px solid "+k.c}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p><p style={{margin:"4px 0 0",fontSize:18,fontWeight:700,color:k.c}}>{k.v}</p></div>
         ))}
       </div>

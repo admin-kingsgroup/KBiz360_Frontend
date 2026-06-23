@@ -6,16 +6,28 @@
    buttons remain visual placeholders for future wiring, as before.
    ──────────────────────────────────────────────────────────────────── */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { RefreshCw, Upload, Plus } from 'lucide-react';
-import { CURRENCY_DATA } from '../../../core/helpers';
+import { useCurrencies } from '../../../core/useReference';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { Input, Button, StatusPill } from '../../../shell/primitives';
 
 export function CurrencyMaster() {
   const [search, setSearch] = useState('');
-  const filtered = CURRENCY_DATA.filter((c) => {
+  // Live currency metadata from /api/app-config/currencies — an object keyed by code:
+  // { INR: { symbol, name, toINR }, USD: {...}, ... }. Mapped to table rows here.
+  const { data: meta } = useCurrencies();
+  const rows = useMemo(() => Object.entries(meta || {}).map(([code, m]) => ({
+    code,
+    name: m?.name || code,
+    symbol: m?.symbol || '',
+    dailyRate: Number(m?.toINR) || 0,
+    isBase: code === 'INR' || Number(m?.toINR) === 1,
+    lastUpdated: m?.updatedAt || '',
+    active: m?.active !== false,
+  })), [meta]);
+  const filtered = rows.filter((c) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q);

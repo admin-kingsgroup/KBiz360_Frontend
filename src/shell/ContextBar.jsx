@@ -13,6 +13,8 @@ import { crumbsFor, labelFor } from '../core/routeMeta';
 import { closeTopModal } from '../core/ux/modalStore';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { Kbd } from '../core/ux/widgets.jsx';
+import { clickable } from '../core/ux/clickable';
+import { listKeyNav } from '../core/ux/listKeys';
 
 const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5', LINE = '#e1e3ec';
 
@@ -119,12 +121,12 @@ export function ContextBar({ branch }) {
         })}
 
         {recents.length > 0 && (
-          <div ref={recRef} style={{ position: 'relative' }}>
+          <div ref={recRef} style={{ position: 'relative' }} onKeyDown={listKeyNav({ onEscape: () => setRecOpen(false) })}>
             <button type="button" onClick={() => setRecOpen((o) => !o)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', fontSize: 11, fontWeight: 600, color: DIM, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 6, cursor: 'pointer' }}>🕑 Recent ▾</button>
             {recOpen && (
               <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 9200, minWidth: 220, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 8, boxShadow: '0 10px 30px rgba(13,19,38,.18)', overflow: 'hidden' }}>
                 {recents.map((r) => (
-                  <div key={r.route} onClick={() => { setRecOpen(false); nav.navigate(r.route); }}
+                  <div key={r.route} {...clickable(() => { setRecOpen(false); nav.navigate(r.route); }, { role: 'option' })}
                     style={{ padding: '8px 12px', fontSize: 12, color: DARK, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')} onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}>{r.label}</div>
                 ))}

@@ -16,6 +16,7 @@ import { CheckCircle2, XCircle, MessageSquare, FileImage, RefreshCw, Clock, Buil
 import { useFinanceQueue, usePaymentActions } from '../core/usePaymentVerification';
 import { PageLayout } from '../shell/PageLayout';
 import { Button, Select, Textarea, StatusPill, LoadingState, ErrorState, EmptyState } from '../shell/primitives';
+import { confirmDialog } from '../core/ux/confirm';
 
 const inr = (n) => (n != null ? '₹' + Number(n).toLocaleString('en-IN') : '₹0');
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
@@ -41,7 +42,17 @@ function PaymentCard({ p, actions }) {
   const [err, setErr] = useState('');
   const busy = actions.verify.isPending || actions.reject.isPending || actions.clarify.isPending;
 
-  const doVerify = () => { setErr(''); actions.verify.mutate(p._id, { onError: (e) => setErr(e.message) }); };
+  const doVerify = async () => {
+    // Verifying generates a tax invoice and advances the CRM workflow — it can't be
+    // undone from here, so confirm first (Reject/Clarify already require input).
+    const { confirmed } = await confirmDialog({
+      title: 'Verify this payment?',
+      message: `Verifying ${p.payment_number || ''} (${inr(p.amount)}) generates the tax invoice and cannot be undone.`,
+      confirmLabel: 'Verify payment',
+    });
+    if (!confirmed) return;
+    setErr(''); actions.verify.mutate(p._id, { onError: (e) => setErr(e.message) });
+  };
   const doReject = () => {
     if (!reason) { setErr('Select a rejection reason'); return; }
     setErr(''); actions.reject.mutate({ id: p._id, reason, notes }, { onError: (e) => setErr(e.message) });

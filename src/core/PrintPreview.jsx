@@ -32,9 +32,10 @@ const headStyles = () => Array.from(document.querySelectorAll('style, link[rel="
 
 export function PrintPreviewHost() {
   const [job, setJob] = useState(null);          // { html, title, recommend }
+  // App-wide print defaults: Portrait · A4 · Narrow margins · Shrink-to-fit ON.
   const [orient, setOrient] = useState('portrait');
   const [paper, setPaper] = useState('A4');
-  const [margin, setMargin] = useState('Normal');
+  const [margin, setMargin] = useState('Narrow');
   const [fit, setFit] = useState(true);
   const frameRef = useRef(null);
 
@@ -47,8 +48,10 @@ export function PrintPreviewHost() {
     return () => window.removeEventListener('kb:print', onPrint);
   }, []);
 
-  // Reset options to the document's recommendation each time a job opens.
-  useEffect(() => { if (job) { setOrient(job.recommend); setPaper('A4'); setMargin('Normal'); setFit(true); } }, [job]);
+  // Open every print job with the standard defaults: Portrait · A4 · Narrow margins
+  // · Shrink-to-fit ON. (The screen's `recommend` is still shown as a hint so the
+  // user can one-click switch to Landscape for wide reports.)
+  useEffect(() => { if (job) { setOrient('portrait'); setPaper('A4'); setMargin('Narrow'); setFit(true); } }, [job]);
 
   const page = useMemo(() => {
     const p = PAPER[paper]; const land = orient === 'landscape';

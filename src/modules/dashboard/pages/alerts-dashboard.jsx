@@ -4,6 +4,8 @@ import { useAlerts, useSetAlertStatus } from '../../../core/useAccounting';
 import { setNavFocus } from '../../../core/ux/navFocus';
 import { PageLayout } from '../../../shell/PageLayout';
 import { toastInfo, toastSuccess, toastError } from '../../../core/ux/toast';
+import { clickable } from '../../../core/ux/clickable';
+import { listKeyNav } from '../../../core/ux/listKeys';
 
 const DARK = '#14161a', DIM = '#5b616e', LINE = '#e6e8ec';
 const SEV = {
@@ -98,10 +100,10 @@ export function AlertsDashboard({ branch, setRoute }) {
 
       {/* severity chips */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-        <span onClick={() => setSev('all')} className={TAP_CHIP} style={chip(sev === 'all', '#eef0f3', DARK)}>All {all.length}</span>
-        <span onClick={() => setSev('error')} className={TAP_CHIP} style={chip(sev === 'error', SEV.error.bg, SEV.error.dot)}>🔴 {data.counts?.error || 0} Critical</span>
-        <span onClick={() => setSev('warn')} className={TAP_CHIP} style={chip(sev === 'warn', SEV.warn.bg, SEV.warn.dot)}>🟠 {data.counts?.warn || 0} Warnings</span>
-        <span onClick={() => setSev('info')} className={TAP_CHIP} style={chip(sev === 'info', SEV.info.bg, SEV.info.dot)}>🔵 {data.counts?.info || 0} To review</span>
+        <span {...clickable(() => setSev('all'))} className={TAP_CHIP} style={chip(sev === 'all', '#eef0f3', DARK)}>All {all.length}</span>
+        <span {...clickable(() => setSev('error'))} className={TAP_CHIP} style={chip(sev === 'error', SEV.error.bg, SEV.error.dot)}>🔴 {data.counts?.error || 0} Critical</span>
+        <span {...clickable(() => setSev('warn'))} className={TAP_CHIP} style={chip(sev === 'warn', SEV.warn.bg, SEV.warn.dot)}>🟠 {data.counts?.warn || 0} Warnings</span>
+        <span {...clickable(() => setSev('info'))} className={TAP_CHIP} style={chip(sev === 'info', SEV.info.bg, SEV.info.dot)}>🔵 {data.counts?.info || 0} To review</span>
       </div>
 
       {/* tabs */}
@@ -115,7 +117,7 @@ export function AlertsDashboard({ branch, setRoute }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {DOMAINS.map(([k, lab]) => (
-            <span key={k} onClick={() => setDomain(k)} className={TAP_CHIP} style={chip(domain === k, '#eef0f3', DARK)}>{lab}</span>
+            <span key={k} {...clickable(() => setDomain(k))} className={TAP_CHIP} style={chip(domain === k, '#eef0f3', DARK)}>{lab}</span>
           ))}
         </div>
         <div className="max-tablet:w-full" style={{ position: 'relative' }}>
@@ -154,7 +156,7 @@ export function AlertsDashboard({ branch, setRoute }) {
                   <div style={{ fontSize: 11.5, color: '#5b616e', marginTop: 2 }}>{a.detail}</div>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5 max-tablet:w-full" style={{ flexShrink: 0, position: 'relative' }}>
+              <div className="flex flex-wrap items-center gap-1.5 max-tablet:w-full" style={{ flexShrink: 0, position: 'relative' }} onKeyDown={listKeyNav({ onEscape: () => setRemindFor(null) })}>
                 {a.link && <button onClick={() => open(a)} title="Open & fix" className={TAP} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: '#2563eb', color: '#fff' }}>Open <ChevronRight size={13} /></button>}
                 {tab !== 'finished' && <button onClick={() => act(a, 'finished')} title="Mark finished" className={TAP} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid ' + LINE, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: '#fff', color: '#16a34a' }}><Check size={13} /> Finish</button>}
                 {tab !== 'remind' && <button onClick={() => setRemindFor(remindFor === a.key ? null : a.key)} title="Remind later" className={TAP} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid ' + LINE, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: '#fff', color: '#B7791F' }}><Clock size={13} /> Remind</button>}
@@ -162,7 +164,7 @@ export function AlertsDashboard({ branch, setRoute }) {
                 {remindFor === a.key && (
                   <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: '#fff', border: '1px solid ' + LINE, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 10, overflow: 'hidden', minWidth: 130 }}>
                     {REMIND_PRESETS.map(([lab, d]) => (
-                      <div key={d} onClick={() => act(a, 'remind', futureISO(d))} className={`${TAP} flex items-center`} style={{ padding: '8px 12px', fontSize: 11.5, cursor: 'pointer', color: DARK }} onMouseEnter={(e) => e.currentTarget.style.background = '#f0f4ff'} onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}>{lab}</div>
+                      <div key={d} {...clickable(() => act(a, 'remind', futureISO(d)), { role: 'option' })} className={`${TAP} flex items-center`} style={{ padding: '8px 12px', fontSize: 11.5, cursor: 'pointer', color: DARK }} onMouseEnter={(e) => e.currentTarget.style.background = '#f0f4ff'} onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}>{lab}</div>
                     ))}
                   </div>
                 )}

@@ -6,8 +6,11 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { confirmDialog } from '../../core/ux/confirm';
 import { toast } from '../../core/ux/toast';
+import { clickable } from '../../core/ux/clickable';
+import { SampleBanner } from '../../core/ux/SampleBanner';
 import { AlertTriangle, Download, Lock, Plus, Printer, Save, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
-import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement } from '../../core/useBankReco';
+import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useBankBRS, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement } from '../../core/useBankReco';
+import { usePDCs, usePDCSummary, useCreatePDC, useDepositPDC, useBouncePDC, useRepresentPDC, useDeletePDC } from '../../core/usePDC';
 import { branchCode } from '../../core/useAccounting';
 import { PeriodBar } from '../../core/period';
 import { exportToCSV } from '../../core/business-logic';
@@ -25,6 +28,7 @@ import { ForexReport } from '../reports';
 import { EWayBill, Form26AS } from '../taxation';
 import { RecurringVouchers } from '../transactions';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
+import { openPrintPreview } from '../../core/PrintPreview';
 
 /* ════════════════════════════════════════════════════════════════════
    BANK RECONCILIATION  —  live book (ledger) vs imported bank statement.
@@ -148,6 +152,45 @@ function downloadCSV(filename,headerArr,rowArrs){
   a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
 }
 
+/* Printable demand notice for a bounced cheque (for openPrintPreview). */
+function demandNoticeHTML(p,f){
+  return `<div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;line-height:1.6">
+    <h2 style="margin:0 0 4px">Demand Notice — Dishonoured Cheque</h2>
+    <p style="color:#555;margin:0 0 16px">Ref: ${p.chequeNo||"—"} · ${p.chequeDate||""}</p>
+    <p>To: <b>${p.party}</b></p>
+    <p>This is to inform you that your cheque <b>#${p.chequeNo||"—"}</b> drawn on <b>${p.bank||"—"}</b>
+    for the sum of <b>${f(p.amount)}</b> dated <b>${p.chequeDate||""}</b>, presented towards settlement of your
+    outstanding dues, has been <b>returned unpaid</b>${p.bounceReason?` for the reason: <i>${p.bounceReason}</i>`:""}.</p>
+    <p>You are hereby called upon to make payment of the said amount${p.bounceFee?` together with bounce charges of ${f(p.bounceFee)}`:""}
+    within 15 days of receipt of this notice, failing which we shall be constrained to initiate appropriate
+    proceedings under Section 138 of the Negotiable Instruments Act, 1881, at your risk and cost.</p>
+    <p style="margin-top:32px">For Travkings Tours and Travels<br/><br/>Authorised Signatory</p>
+  </div>`;
+}
+
+/* Printable Bank Reconciliation Statement HTML (for openPrintPreview). */
+function brsHTML(brs,ledger,asOf,f){
+  if(!brs) return "<p>No data</p>";
+  const row=(label,amt,bold)=>`<tr><td style="padding:5px 10px;${bold?'font-weight:700':''}">${label}</td><td style="padding:5px 10px;text-align:right;${bold?'font-weight:700':''}">${f(amt)}</td></tr>`;
+  const items=(arr,signFlip)=>arr.length?arr.map(l=>row(`&nbsp;&nbsp;${l.date} · ${l.vno||l.description||l.reference||'—'}`,signFlip?-l.signed:l.signed)).join(""):`<tr><td colspan="2" style="padding:4px 22px;color:#888">None</td></tr>`;
+  return `<div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto">
+    <h2 style="margin:0 0 2px">Bank Reconciliation Statement</h2>
+    <p style="margin:0 0 12px;color:#555">${ledger} · as on ${asOf||''}</p>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <tbody>
+        ${row("Balance as per Books",brs.bookBalance,true)}
+        <tr><td colspan="2" style="padding:8px 10px 2px;font-weight:700;color:#27500A">Add/Less: Bank-only items</td></tr>
+        ${items(brs.bankOnly,false)}
+        <tr><td colspan="2" style="padding:8px 10px 2px;font-weight:700;color:#A32D2D">Less: Entries in books not yet in bank</td></tr>
+        ${items(brs.bookOnly,true)}
+        <tr style="border-top:2px solid #000">${`<td style="padding:7px 10px;font-weight:700">Derived Balance as per Bank</td><td style="padding:7px 10px;text-align:right;font-weight:700">${f(brs.derivedBankBalance)}</td>`}</tr>
+        ${row("Actual Balance per Bank Statement",brs.bankBalance)}
+        ${row("Difference",brs.difference,true)}
+      </tbody>
+    </table>
+  </div>`;
+}
+
 export function BankReco({branch}){
   const mob=useMobile();
   const cfg=bc(branch);
@@ -178,17 +221,26 @@ export function BankReco({branch}){
   const clearMut=useClearStatement();
 
   /* ── UI state ── */
-  const [tab,setTab]=useState("reco");        // reco | pdc | bounce
+  const [tab,setTab]=useState("reco");        // reco | brs | pdc | bounce
+  const {data:brs}=useBankBRS(ledger,branch,range);
   const [view,setView]=useState("detailed");  // detailed | minimal
   const [search,setSearch]=useState("");
   const [selBook,setSelBook]=useState(null);   // { bookKey, vno, debit, credit }
   const [selStmt,setSelStmt]=useState(null);   // statement line
   const [showImport,setShowImport]=useState(false);
 
-  /* PDC Register — local demo state (separate feature; empty until a PDC backend exists) */
-  const [pdcs,setPdcs]=useState([]);
-  const depositPDC=id=>setPdcs(ps=>ps.map(p=>p.id===id?{...p,status:"Deposited",depositDate:todayISO()}:p));
-  const bouncePDC=id=>setPdcs(ps=>ps.map(p=>p.id===id?{...p,status:"Bounced"}:p));
+  /* PDC Register — live backend (post-dated cheque lifecycle + bounce workflow) */
+  const {data:pdcs=[]}=usePDCs(branch);
+  const {data:pdcSummary}=usePDCSummary(branch);
+  const createPDC=useCreatePDC();
+  const depositMut=useDepositPDC();
+  const bounceMut=useBouncePDC();
+  const representMut=useRepresentPDC();
+  const deletePDCMut=useDeletePDC();
+  const [pdcForm,setPdcForm]=useState({party:"",chequeNo:"",bank:"",chequeDate:"",amount:""});
+  const depositPDC=id=>depositMut.mutate({id});
+  const bouncePDC=async id=>{ const {confirmed,reason}=await confirmDialog({title:"Bounce cheque",message:"This marks the cheque returned unpaid. Reverse the receipt and charge the bounce fee from the books.",danger:true,reasonRequired:true,reasonLabel:"Reason for return (e.g. Insufficient funds)",confirmLabel:"Mark Bounced"}); if(confirmed) bounceMut.mutate({id,reason}); };
+  const addPDC=()=>{ if(!pdcForm.party||!pdcForm.chequeDate||!(Number(pdcForm.amount)>0))return; createPDC.mutate({branch:code,...pdcForm,amount:Number(pdcForm.amount)},{onSuccess:()=>setPdcForm({party:"",chequeNo:"",bank:"",chequeDate:"",amount:""})}); };
   const PDC_CLR={Pending:"#185FA5",Deposited:"#27500A",Bounced:"#A32D2D"};
   const PDC_BG ={Pending:"#E6F1FB",Deposited:"#EAF3DE",Bounced:"#FCEBEB"};
 
@@ -283,7 +335,7 @@ export function BankReco({branch}){
 
       {/* Tabs */}
       <div style={{display:"flex",gap:0,background:"#f3f4f8",borderRadius:"9px 9px 0 0",border:"1px solid #e1e3ec"}}>
-        <button onClick={()=>setTab("reco")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="reco"?700:500,background:tab==="reco"?"#fff":"transparent",borderRadius:6,fontSize:11}}>🔄 Reconciliation</button><button onClick={()=>setTab("pdc")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="pdc"?700:500,background:tab==="pdc"?"#fff":"transparent",borderRadius:6,fontSize:11}}>📑 PDC Register</button><button onClick={()=>setTab("bounce")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="bounce"?700:500,background:tab==="bounce"?"#fff":"transparent",borderRadius:6,fontSize:11}}>🔴 Bounce / Returns</button>
+        <button onClick={()=>setTab("reco")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="reco"?700:500,background:tab==="reco"?"#fff":"transparent",borderRadius:6,fontSize:11}}>🔄 Reconciliation</button><button onClick={()=>setTab("brs")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="brs"?700:500,background:tab==="brs"?"#fff":"transparent",borderRadius:6,fontSize:11}}>🧾 BRS Report</button><button onClick={()=>setTab("pdc")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="pdc"?700:500,background:tab==="pdc"?"#fff":"transparent",borderRadius:6,fontSize:11}}>📑 PDC Register</button><button onClick={()=>setTab("bounce")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="bounce"?700:500,background:tab==="bounce"?"#fff":"transparent",borderRadius:6,fontSize:11}}>🔴 Bounce / Returns</button>
       </div>
 
       {tab==="reco"&&(
@@ -329,7 +381,7 @@ export function BankReco({branch}){
                       const sel=selBook?.bookKey===l.bookKey;
                       const net=l.debit-l.credit;
                       return (
-                        <tr key={l.bookKey} onClick={()=>{ if(l.reconciled) return; setSelBook(sel?null:{bookKey:l.bookKey,vno:l.vno,debit:l.debit,credit:l.credit}); }}
+                        <tr key={l.bookKey} {...(!l.reconciled ? clickable(()=>{ setSelBook(sel?null:{bookKey:l.bookKey,vno:l.vno,debit:l.debit,credit:l.credit}); }) : {})}
                           style={{borderBottom:"1px solid #f3f4f8",cursor:l.reconciled?"default":"pointer",background:sel?"#FFF4D6":l.reconciled?"#EAF3DE":i%2===0?"#fff":"#fafafa"}}>
                           <td style={{padding:"6px 9px",color:"#5a6691",fontSize:10,whiteSpace:"nowrap"}}>{fmtDate?fmtDate(l.date):l.date}</td>
                           <td style={{padding:"6px 9px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{l.vno}</td>
@@ -362,7 +414,7 @@ export function BankReco({branch}){
                       const ref=l.reference||l.chequeNo||l.utr||"";
                       const open=l.status==="unreconciled"||l.status==="exception";
                       return (
-                        <tr key={l.id} onClick={()=>{ if(!open) return; setSelStmt(sel?null:l); }}
+                        <tr key={l.id} {...(open ? clickable(()=>{ setSelStmt(sel?null:l); }) : {})}
                           style={{borderBottom:"1px solid #f3f4f8",cursor:open?"pointer":"default",background:sel?"#FFF4D6":l.status==="reconciled"?"#EAF3DE":l.status==="partial"?"#E6F1FB":l.status==="exception"?"#FCEBEB":i%2===0?"#fff":"#fafafa"}}>
                           <td style={{padding:"6px 9px",color:"#5a6691",fontSize:10,whiteSpace:"nowrap"}}>{fmtDate?fmtDate(l.date):l.date}</td>
                           {view!=="minimal"&&<td style={{padding:"6px 9px",fontFamily:"monospace",fontSize:9,color:"#185FA5",maxWidth:110,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={ref}>{ref}</td>}
@@ -391,36 +443,72 @@ export function BankReco({branch}){
         </div>
       )}
 
+      {tab==="brs"&&(
+        <div style={{...card,borderTop:"none",borderRadius:"0 0 9px 9px",padding:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div>
+              <p style={{margin:0,fontSize:13,fontWeight:800,color:"#0d1326"}}>Bank Reconciliation Statement</p>
+              <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{ledger} · as on {to}{brs?.balanced?" · ✔ reconciled":brs&&Math.abs(brs.difference)>0.01?` · ⚠ difference ${f(brs.difference)}`:""}</p>
+            </div>
+            <button onClick={()=>openPrintPreview&&openPrintPreview(brsHTML(brs,ledger,to,f))} disabled={!brs} style={{...btnG,fontSize:11,padding:"6px 12px",opacity:brs?1:0.6}}><Printer size={13}/> Print</button>
+          </div>
+          {!brs?(<p style={{fontSize:11,color:"#5a6691"}}>Loading…</p>):(
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <tbody>
+              <tr style={{borderBottom:"2px solid #0d1326"}}><td style={{padding:"7px 10px",fontWeight:700}}>Balance as per Books</td><td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(brs.bookBalance)}</td></tr>
+              <tr><td colSpan={2} style={{padding:"8px 10px 2px",fontSize:10.5,fontWeight:700,color:"#27500A",textTransform:"uppercase"}}>Add: Credits in bank not in books / Less: charges ({brs.counts.bankOnly})</td></tr>
+              {brs.bankOnly.map((l,i)=>(<tr key={"bk"+i} style={{borderBottom:"1px solid #f3f4f8"}}><td style={{padding:"5px 10px 5px 22px",color:"#5a6691"}}>{l.date} · {l.description||l.reference||"—"} <span style={{fontSize:9.5,color:"#8893b8"}}>({l.kind})</span></td><td style={{padding:"5px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:l.signed<0?"#A32D2D":"#27500A"}}>{f(l.signed)}</td></tr>))}
+              {brs.bankOnly.length===0&&<tr><td colSpan={2} style={{padding:"4px 22px",color:"#8893b8",fontSize:11}}>None</td></tr>}
+              <tr><td colSpan={2} style={{padding:"8px 10px 2px",fontSize:10.5,fontWeight:700,color:"#A32D2D",textTransform:"uppercase"}}>Less: Entries in books not yet in bank ({brs.counts.bookOnly})</td></tr>
+              {brs.bookOnly.map((l,i)=>(<tr key={"bo"+i} style={{borderBottom:"1px solid #f3f4f8"}}><td style={{padding:"5px 10px 5px 22px",color:"#5a6691"}}>{l.date} · {l.vno} · {l.narration||"—"} <span style={{fontSize:9.5,color:"#8893b8"}}>({l.kind})</span></td><td style={{padding:"5px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:l.signed<0?"#A32D2D":"#27500A"}}>{f(-l.signed)}</td></tr>))}
+              {brs.bookOnly.length===0&&<tr><td colSpan={2} style={{padding:"4px 22px",color:"#8893b8",fontSize:11}}>None</td></tr>}
+              <tr style={{borderTop:"2px solid #0d1326"}}><td style={{padding:"7px 10px",fontWeight:700}}>Derived Balance as per Bank</td><td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(brs.derivedBankBalance)}</td></tr>
+              <tr><td style={{padding:"7px 10px",color:"#5a6691"}}>Actual Balance per Bank Statement{brs.bankBalanceDerived?" (derived)":""}</td><td style={{padding:"7px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(brs.bankBalance)}</td></tr>
+              <tr style={{background:brs.balanced?"#EAF3DE":"#FCEBEB"}}><td style={{padding:"7px 10px",fontWeight:700,color:brs.balanced?"#27500A":"#A32D2D"}}>Difference</td><td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:brs.balanced?"#27500A":"#A32D2D"}}>{f(brs.difference)}</td></tr>
+            </tbody>
+          </table>)}
+        </div>
+      )}
+
       {tab==="pdc"&&(
         <div style={{...card,borderTop:"none",borderRadius:"0 0 9px 9px",padding:0,overflow:"hidden"}}>
           <div style={{padding:"10px 14px",background:"#E6F1FB",borderBottom:"1px solid #B5D4F4",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <p style={{margin:0,fontSize:11,color:"#185FA5"}}>PDC Register — Post-Dated Cheques received from clients. Deposit on or after cheque date.</p>
-            <span style={{fontSize:10.5,fontWeight:700,color:"#185FA5"}}>Pending: {pdcs.filter(p=>p.status==="Pending").length}</span>
+            <span style={{fontSize:10.5,fontWeight:700,color:"#185FA5"}}>Pending: {pdcSummary?.counts?.pending ?? pdcs.filter(p=>p.status==="Pending").length} · Due to deposit: {pdcSummary?.dueToDeposit ?? 0}</span>
+          </div>
+          {/* Add a PDC */}
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",padding:"10px 14px",borderBottom:"1px solid #eef0f6"}}>
+            <input value={pdcForm.party} onChange={e=>setPdcForm(s=>({...s,party:e.target.value}))} placeholder="Client" style={{...inp,minWidth:160}}/>
+            <input value={pdcForm.chequeNo} onChange={e=>setPdcForm(s=>({...s,chequeNo:e.target.value}))} placeholder="Cheque No." style={{...inp,width:120}}/>
+            <input value={pdcForm.bank} onChange={e=>setPdcForm(s=>({...s,bank:e.target.value}))} placeholder="Drawee bank" style={{...inp,width:130}}/>
+            <input type="date" value={pdcForm.chequeDate} onChange={e=>setPdcForm(s=>({...s,chequeDate:e.target.value}))} style={{...inp,width:150}}/>
+            <input type="number" value={pdcForm.amount} onChange={e=>setPdcForm(s=>({...s,amount:e.target.value}))} placeholder="Amount" style={{...inp,width:120,textAlign:"right"}}/>
+            <button onClick={addPDC} disabled={!pdcForm.party||!pdcForm.chequeDate||!(Number(pdcForm.amount)>0)||createPDC.isPending} style={{...btnG,padding:"6px 12px",fontSize:11,opacity:(!pdcForm.party||!pdcForm.chequeDate||!(Number(pdcForm.amount)>0))?0.6:1}}><Plus size={12}/> Add PDC</button>
           </div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#0d1326"}}>
-              {["PDC ID","Client","Cheque No.","Bank","Cheque Date","Amount","Status","Action"].map((h,i)=>(
-                <th key={i} style={{padding:"9px 12px",textAlign:i===5?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+              {["Client","Cheque No.","Bank","Cheque Date","Amount","Status","Action"].map((h,i)=>(
+                <th key={i} style={{padding:"9px 12px",textAlign:i===4?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
-              {pdcs.length===0&&<tr><td colSpan={8} style={{padding:14,textAlign:"center",color:"#5a6691"}}>No post-dated cheques on record.</td></tr>}
+              {pdcs.length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691"}}>No post-dated cheques on record.</td></tr>}
               {pdcs.map((p,i)=>(
               <tr key={p.id} style={{borderBottom:"1px solid #f3f4f8",background:p.status==="Bounced"?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
-                <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{p.id}</td>
-                <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{p.client}</td>
-                <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10.5}}>{p.chqNo}</td>
-                <td style={{padding:"8px 12px",color:"#5a6691"}}>{p.bank}</td>
-                <td style={{padding:"8px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{p.date}</td>
+                <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{p.party}</td>
+                <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10.5}}>{p.chequeNo||"—"}</td>
+                <td style={{padding:"8px 12px",color:"#5a6691"}}>{p.bank||"—"}</td>
+                <td style={{padding:"8px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{p.chequeDate}</td>
                 <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(p.amount)}</td>
                 <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:PDC_BG[p.status],color:PDC_CLR[p.status]}}>{p.status}</span></td>
                 <td style={{padding:"8px 12px"}}>
                   {p.status==="Pending"&&<div style={{display:"flex",gap:4}}>
                     <button onClick={()=>depositPDC(p.id)} style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#27500A"}}>Deposit</button>
                     <button onClick={()=>bouncePDC(p.id)} style={{...btnGh,padding:"2px 8px",fontSize:9.5,color:"#A32D2D"}}>Bounce</button>
+                    <button onClick={()=>deletePDCMut.mutate({id:p.id})} title="Delete" style={{...btnGh,padding:"2px 8px",fontSize:9.5,color:"#5a6691"}}>✕</button>
                   </div>}
                   {p.status==="Deposited"&&<span style={{fontSize:10,color:"#27500A"}}>✔ {p.depositDate}</span>}
-                  {p.status==="Bounced"&&<button style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#A32D2D"}}>Notify Client</button>}
+                  {p.status==="Bounced"&&<button onClick={()=>representMut.mutate({id:p.id})} style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#A32D2D"}}>Re-present</button>}
                 </td>
               </tr>
             ))}</tbody>
@@ -438,15 +526,15 @@ export function BankReco({branch}){
             <div key={p.id} style={{...card,marginBottom:8,borderLeft:"4px solid #A32D2D",padding:"12px 14px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                 <div>
-                  <p style={{margin:0,fontSize:13,fontWeight:700,color:"#A32D2D"}}>{p.client} — Cheque #{p.chqNo}</p>
-                  <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{p.bank} · Date: {p.date} · {f(p.amount)}</p>
+                  <p style={{margin:0,fontSize:13,fontWeight:700,color:"#A32D2D"}}>{p.party} — Cheque #{p.chequeNo||"—"}</p>
+                  <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{p.bank||"—"} · Date: {p.chequeDate} · {f(p.amount)}{p.bounceReason?` · ${p.bounceReason}`:""}{p.bounceFee?` · fee ${f(p.bounceFee)}`:""}</p>
                 </div>
                 <span style={{fontSize:10.5,padding:"3px 10px",borderRadius:999,background:"#FCEBEB",color:"#A32D2D",fontWeight:700}}>BOUNCED</span>
               </div>
               <div style={{display:"flex",gap:8}}>
-                <button style={{...btnGh,fontSize:10.5,padding:"4px 12px"}}>💬 WhatsApp Client</button>
-                <button style={{...btnG,fontSize:10.5,padding:"4px 12px",background:"#A32D2D"}}>📋 Issue Demand Notice</button>
-                <button style={{...btnG,fontSize:10.5,padding:"4px 12px"}}>🔄 Re-present Cheque</button>
+                <button onClick={()=>window.open(`https://wa.me/?text=${encodeURIComponent(`Dear ${p.party}, your cheque #${p.chequeNo||""} for ${f(p.amount)} dated ${p.chequeDate} has been returned unpaid${p.bounceReason?` (${p.bounceReason})`:""}. Kindly arrange payment at the earliest.`)}`,"_blank","noopener")} style={{...btnGh,fontSize:10.5,padding:"4px 12px"}}>💬 WhatsApp Client</button>
+                <button onClick={()=>openPrintPreview&&openPrintPreview(demandNoticeHTML(p,f))} style={{...btnG,fontSize:10.5,padding:"4px 12px",background:"#A32D2D"}}>📋 Issue Demand Notice</button>
+                <button onClick={()=>representMut.mutate({id:p.id})} style={{...btnG,fontSize:10.5,padding:"4px 12px"}}>🔄 Re-present Cheque</button>
               </div>
             </div>
           ))}
@@ -870,7 +958,7 @@ export function CashFlowForecast({branch}){
   const blank={date:'',kind:'inflow',category:'',amount:''};
   const [f,setF]=useState(blank);
   const set=(k)=>(e)=>setF(s=>({...s,[k]:e.target.value}));
-  const add=()=>{ if(!f.date||!f.amount){return;} create.mutate({branch:brCode||'BOM',date:f.date,kind:f.kind,category:f.category,amount:Number(f.amount)||0},{onSuccess:()=>setF(blank)}); };
+  const add=()=>{ if(!brCode){ toast('Select a specific branch (not All) before adding.','error'); return; } if(!f.date||!f.amount){return;} create.mutate({branch:brCode,date:f.date,kind:f.kind,category:f.category,amount:Number(f.amount)||0},{onSuccess:()=>setF(blank)}); };
   const today=new Date(); today.setHours(0,0,0,0);
   const wk=(d)=>{ const dt=new Date(d); return Math.floor((dt-today)/(7*86400000)); };
   const weeks=Array.from({length:13},(_,i)=>({i,inflow:0,outflow:0}));
@@ -971,7 +1059,7 @@ export function CashBookReport({branch}){
         </div>
         <div style={{display:"flex",gap:8}}>
           <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}/>
-          <button onClick={()=>window.print()} style={{...btnGh,fontSize:11}}><Printer size={12}/> Print</button>
+          <button onClick={()=>openPrintPreview({ selector: 'main', title: 'Finance', recommend: 'portrait' })} style={{...btnGh,fontSize:11}}><Printer size={12}/> Print</button>
           <button onClick={()=>exportToCSV(entries,["id","type","ref","narration","dr","cr"],"cashbook.csv")} style={{...btnGh,fontSize:11}}><Download size={12}/> CSV</button>
         </div>
       </div>
@@ -1081,6 +1169,7 @@ export function YearEndClose({branch}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:900,margin:"0 auto"}}>
+      <SampleBanner note="year-end closing entries and carry-forward balances aren’t wired to live books yet." />
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
         <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📅</div>
         <div>
@@ -1092,7 +1181,7 @@ export function YearEndClose({branch}){
       {/* Progress bar */}
       <div style={{marginBottom:16,display:"flex",gap:0}}>
         {steps.map((s,i)=>(
-          <div key={i} onClick={()=>setStep(i)} style={{flex:1,cursor:"pointer",textAlign:"center",padding:"8px 4px",borderBottom:`3px solid ${step===i?"#d4a437":i<step?"#27500A":"#e1e3ec"}`,background:step===i?"#f9fafb":"transparent"}}>
+          <div key={i} {...clickable(()=>setStep(i))} style={{flex:1,cursor:"pointer",textAlign:"center",padding:"8px 4px",borderBottom:`3px solid ${step===i?"#d4a437":i<step?"#27500A":"#e1e3ec"}`,background:step===i?"#f9fafb":"transparent"}}>
             <span style={{fontSize:16}}>{s.icon}</span>
             {!mob&&<p style={{margin:"2px 0 0",fontSize:9.5,fontWeight:step===i?700:400,color:step===i?"#0d1326":i<step?"#27500A":"#5a6691"}}>{s.title}</p>}
           </div>
@@ -1189,7 +1278,7 @@ export function LoanEmiRegister({branch}){
   const blank={lender:'',type:'Term',purpose:'',principal:'',rate:'',tenure:'',emi:'',balance:'',nextDue:''};
   const [f,setF]=useState(blank);
   const set=(k)=>(e)=>setF(s=>({...s,[k]:e.target.value}));
-  const add=()=>{ if(!f.lender){return;} create.mutate({branch:brCode||'BOM',lender:f.lender,type:f.type,purpose:f.purpose,principal:Number(f.principal)||0,rate:Number(f.rate)||0,tenure:Number(f.tenure)||0,emi:Number(f.emi)||0,balance:Number(f.balance)||Number(f.principal)||0,nextDue:f.nextDue,status:'active'},{onSuccess:()=>setF(blank)}); };
+  const add=()=>{ if(!brCode){ toast('Select a specific branch (not All) before adding.','error'); return; } if(!f.lender){return;} create.mutate({branch:brCode,lender:f.lender,type:f.type,purpose:f.purpose,principal:Number(f.principal)||0,rate:Number(f.rate)||0,tenure:Number(f.tenure)||0,emi:Number(f.emi)||0,balance:Number(f.balance)||Number(f.principal)||0,nextDue:f.nextDue,status:'active'},{onSuccess:()=>setF(blank)}); };
   const totP=rows.reduce((s,l)=>s+(l.principal||0),0),totB=rows.reduce((s,l)=>s+(l.balance||0),0),totE=rows.reduce((s,l)=>s+(l.emi||0),0);
   const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
   const ip={...inp,minHeight:30,fontSize:11,width:"100%"};
@@ -1262,7 +1351,8 @@ export function WorkingCapitalDashboard({branch,setRoute}){
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
       <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>💼 Working Capital Dashboard</h2>
-      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Receivables + Inventory − Payables · Cash conversion cycle · 6-month trend</p>
+      <p style={{margin:"4px 0 8px",fontSize:11.5,color:"#5a6691"}}>Receivables + Inventory − Payables · Cash conversion cycle · 6-month trend</p>
+      <div role="note" style={{margin:"0 0 14px",padding:"8px 12px",background:"#FAEEDA",border:"1px solid #f0d28a",borderRadius:8,fontSize:11.5,color:"#854F0B",fontWeight:600}}>⚠ Sample figures — this layout isn’t wired to your live books yet. Do not use for reporting or decisions.</div>
 
       <div style={{display:"grid",gridTemplateColumns:mob?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:14}}>
         <div style={{...card,borderTop:"3px solid #27500A"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Trade Receivables</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#27500A"}}>{cur+fmt(curr.ar)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>DSO {curr.dso} days</p></div>
@@ -1392,7 +1482,8 @@ export function CashFlowDirect({branch,setRoute}){
   return(
     <div style={{padding:"12px 10px",maxWidth:900,margin:"0 auto"}}>
       <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>💧 Cash Flow Statement — Direct Method</h2>
-      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>For the year ended 31 March 2026 · AS 3 / Ind AS 7 · RBI-preferred format</p>
+      <p style={{margin:"4px 0 8px",fontSize:11.5,color:"#5a6691"}}>AS 3 / Ind AS 7 · RBI-preferred format</p>
+      <div role="note" style={{margin:"0 0 14px",padding:"8px 12px",background:"#FAEEDA",border:"1px solid #f0d28a",borderRadius:8,fontSize:11.5,color:"#854F0B",fontWeight:600}}>⚠ Sample figures — this statement isn’t wired to your live books yet. Do not use for filing or decisions.</div>
 
       <Section title="A. Cash Flows from Operating Activities" rows={OPERATING} color="#185FA5"/>
       <Section title="B. Cash Flows from Investing Activities" rows={INVESTING} color="#854F0B"/>
@@ -1415,7 +1506,7 @@ export function CashFlowDirect({branch,setRoute}){
 export const TDS_SECTIONS_TABLE = [
   {section:"194A",description:"Interest (other than securities)",threshold:40000,rateWithPAN:10,rateWithoutPAN:20,category:"Interest"},
   {section:"194C",description:"Payment to contractors/sub-contractors",threshold:30000,rateWithPAN:1,rateWithoutPAN:20,rateCompany:2,category:"Contract"},
-  {section:"194H",description:"Commission or brokerage",threshold:15000,rateWithPAN:5,rateWithoutPAN:20,category:"Commission"},
+  {section:"194H",description:"Commission or brokerage",threshold:15000,rateWithPAN:2,rateWithoutPAN:20,category:"Commission"},
   {section:"194I(a)",description:"Rent — plant & machinery",threshold:240000,rateWithPAN:2,rateWithoutPAN:20,category:"Rent"},
   {section:"194I(b)",description:"Rent — land, building, furniture",threshold:240000,rateWithPAN:10,rateWithoutPAN:20,category:"Rent"},
   {section:"194J",description:"Fees for professional/technical services",threshold:30000,rateWithPAN:10,rateWithoutPAN:20,category:"Professional"},
@@ -1676,7 +1767,7 @@ export function InvestmentRegister({branch}){
   const blank={instrument:'',type:'FD',institution:'',amount:'',rate:'',maturityDate:'',maturityValue:'',status:'active'};
   const [f,setF]=useState(blank);
   const set=(k)=>(e)=>setF(s=>({...s,[k]:e.target.value}));
-  const add=()=>{ if(!f.instrument){return;} create.mutate({branch:brCode||'BOM',instrument:f.instrument,type:f.type,institution:f.institution,amount:Number(f.amount)||0,rate:Number(f.rate)||0,maturityDate:f.maturityDate,maturityValue:Number(f.maturityValue)||0,status:f.status},{onSuccess:()=>setF(blank)}); };
+  const add=()=>{ if(!brCode){ toast('Select a specific branch (not All) before adding.','error'); return; } if(!f.instrument){return;} create.mutate({branch:brCode,instrument:f.instrument,type:f.type,institution:f.institution,amount:Number(f.amount)||0,rate:Number(f.rate)||0,maturityDate:f.maturityDate,maturityValue:Number(f.maturityValue)||0,status:f.status},{onSuccess:()=>setF(blank)}); };
   const totA=rows.reduce((s,i)=>s+(i.amount||0),0),totM=rows.reduce((s,i)=>s+(i.maturityValue||0),0);
   const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
   const ip={...inp,minHeight:30,fontSize:11,width:"100%"};

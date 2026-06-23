@@ -1,16 +1,19 @@
-import { ADM_DATA } from '../../../core/data';
-import { _PASSPORTS } from '../../../core/helpers';
-import { isoDate } from '../../../core/dates';
+import { apiGet } from '../../../core/api';
+import { todayISO } from '../../../core/dates';
 
+// Action items — LIVE from the books. Surfaces ADM memos whose dispute window has
+// lapsed while still open (status Received/Disputed, responseDeadline already passed),
+// read from /api/adm-memos. Returns an array (empty when nothing needs attention).
+// (Passenger passports are tracked in the CRM, not the ERP — no item here.)
 export const getActionItems = async () => {
-  const items = [];
-  const now = new Date();
-  const DISPUTE_DEADLINE = isoDate(now);                                                  // anything dated before today is overdue
-  const PASSPORT_EXPIRY_THRESHOLD = isoDate(new Date(now.getFullYear(), now.getMonth() + 6, now.getDate())); // expiring within 6 months
+  const today = todayISO();
+  let adms = [];
+  try { adms = (await apiGet('/api/adm-memos')) || []; } catch { adms = []; }
 
-  const overdueAdm = (ADM_DATA || []).filter(
-    (a) => a.status === 'Disputed' && a.date < DISPUTE_DEADLINE,
+  const overdueAdm = (adms || []).filter(
+    (a) => a && (a.status === 'Disputed' || a.status === 'Received') && a.responseDeadline && a.responseDeadline < today,
   );
+  const items = [];
   if (overdueAdm.length) {
     items.push({
       type: 'warn',
@@ -20,35 +23,5 @@ export const getActionItems = async () => {
       urgent: true,
     });
   }
-
-  items.push({
-    type: 'info',
-    icon: '💳',
-    text: 'BSP settlement due Monday — ₹2,14,000',
-    route: '/purchase/bsp-summary',
-    urgent: false,
-  });
-
-  const expiringPassports = (_PASSPORTS || []).filter(
-    (p) => p.expiry < PASSPORT_EXPIRY_THRESHOLD,
-  );
-  if (expiringPassports.length) {
-    items.push({
-      type: 'warn',
-      icon: '📔',
-      text: `${expiringPassports.length} passport${expiringPassports.length > 1 ? 's' : ''} expiring within 6 months`,
-      route: '/masters/passports',
-      urgent: true,
-    });
-  }
-
-  items.push({
-    type: 'info',
-    icon: '📋',
-    text: 'GSTR-1 due 11 Jun 2026 — prepare outward supplies',
-    route: '/tax/gstr1',
-    urgent: false,
-  });
-
   return items;
 };

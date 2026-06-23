@@ -83,7 +83,13 @@ export const TAX_INDIA = {label:"Taxation — GST", icon:FileText, _regime:"GST"
   {divider:true, label:"GST Returns"},
   {label:"GSTR-1  Outward Supplies", href:"/tax/gstr1"},
   {label:"GSTR-3B Summary Return",   href:"/tax/gstr3b"},
-  {label:"GSTR-2B Reconciliation",   href:"/tax/gstr2b"},
+  /* — Reconciliation — all GST recon screens gathered under one head (mirrors the
+     dedicated "Reconciliation" head under the Accounts pill for bank/supplier). — */
+  {divider:true, label:"Reconciliation"},
+  {label:"GSTR-2B Reconciliation (ITC)", href:"/tax/gstr2b"},
+  {label:"GSTR-2A Reconciliation",       href:"/tax/gstr2a"},
+  {label:"GSTR-9C — Audit Reco",         href:"/tax/gstr9c"},
+  {label:"Tax Reco (3B/1/TDS vs Books)", href:"/tax/reconciliation"},
   /* — TDS — */
   {divider:true, label:"TDS / TCS"},
   {label:"TDS & TCS Register",        href:"/tax/tds"},
@@ -95,14 +101,18 @@ export const TAX_INDIA = {label:"Taxation — GST", icon:FileText, _regime:"GST"
   {divider:true, label:"Compliance"},
   {label:"E-Invoice & IRN",           href:"/tax/einvoice"},
   {label:"Compliance Calendar",       href:"/tax/calendar"},
-  {label:"GSTR-9C — Audit Reco",    href:"/tax/gstr9c"},
   {label:"Tax Audit 3CD",           href:"/tax/audit-3cd"},
-  {label:"GSTR-2A Reconciliation",  href:"/tax/gstr2a"},
   {divider:true, label:"Auto-Prep Tools"},
   {label:"GSTR-1 Auto-Prep", href:"/tax/gstr-1-prep"},
   {label:"GSTR-3B Auto-Prep", href:"/tax/gstr-3b-prep"},
   {label:"Form 16A Generator", href:"/tax/form-16a"},
   {label:"Tax Calendar & Reminders", href:"/tax/calendar"},
+  /* — Tax & Statutory (moved here from the Accounts pill) — */
+  {divider:true, label:"Tax & Statutory"},
+  {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
+  {label:"TDS Auto-Calculator",        href:"/finance/tds-calculator"},
+  {label:"Statutory Dues Calendar",    href:"/reports/statutory-dues"},
+  {label:"Tax Filing Status Board",    href:"/reports/tax-board"},
 ]};
 
 /* ── TAXATION — AFRICA VAT ───────────────────────────────────── */
@@ -111,8 +121,16 @@ export const TAX_AFRICA = {label:"Taxation — VAT", icon:FileText, _regime:"VAT
   {divider:true, label:"VAT Returns"},
   {label:"VAT Return (Monthly)",      href:"/tax/vat"},
   {label:"Withholding Tax",           href:"/tax/tds"},
+  {divider:true, label:"Reconciliation"},
+  {label:"VAT Return vs Books",       href:"/tax/reconciliation"},
   {divider:true, label:"Compliance"},
   {label:"Compliance Calendar",       href:"/tax/calendar"},
+  /* — Tax & Statutory (moved here from the Accounts pill) — */
+  {divider:true, label:"Tax & Statutory"},
+  {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
+  {label:"TDS Auto-Calculator",        href:"/finance/tds-calculator"},
+  {label:"Statutory Dues Calendar",    href:"/reports/statutory-dues"},
+  {label:"Tax Filing Status Board",    href:"/reports/tax-board"},
 ]};
 
 /* ── TAXATION — TRAVKINGS GROUP ─────────────────────────────────── */
@@ -122,6 +140,7 @@ export const TAX_ALL = {label:"Taxation", icon:FileText, _regime:"ALL", children
   {label:"GSTR-1",                    href:"/tax/gstr1"},
   {label:"GSTR-3B",                   href:"/tax/gstr3b"},
   {label:"GSTR-2B Recon",             href:"/tax/gstr2b"},
+  {label:"Tax Reco (3B/1/TDS/VAT vs Books)", href:"/tax/reconciliation"},
   {label:"TDS / TCS",                 href:"/tax/tds"},
   {label:"TDS Certificates (16A)",    href:"/tax/tds-certs"},
   {label:"RCM Register",              href:"/tax/rcm"},
@@ -131,6 +150,12 @@ export const TAX_ALL = {label:"Taxation", icon:FileText, _regime:"ALL", children
   {label:"Withholding Tax (WHT)",     href:"/tax/tds"},
   {divider:true, label:"Travkings Group"},
   {label:"Compliance Calendar",       href:"/tax/calendar"},
+  /* — Tax & Statutory (moved here from the Accounts pill) — */
+  {divider:true, label:"Tax & Statutory"},
+  {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
+  {label:"TDS Auto-Calculator",        href:"/finance/tds-calculator"},
+  {label:"Statutory Dues Calendar",    href:"/reports/statutory-dues"},
+  {label:"Tax Filing Status Board",    href:"/reports/tax-board"},
 ]};
 
 /* ── REPORTS ─────────────────────────────────────────────────── */
@@ -297,6 +322,7 @@ export const ROUTE_TITLES={
   "/contra":               "Contra Voucher",
   "/bank-reco":            "Bank Reconciliation",
   "/journal":              "Journal Entry",
+  "/debit-note":           "Debit Note",
   "/finance/credit-note":  "Credit Note",
   "/finance/debit-note":   "Debit Note",
   "/day-book":             "Day Book",
@@ -311,8 +337,8 @@ export const ROUTE_TITLES={
   "/reports/pnl":          "Profit & Loss Report",
   "/reports/bs":           "Balance Sheet",
   "/reports/cf":           "Cash Flow Statement",
-  "/reports/rec":          "Receivables Ageing",
-  "/reports/pay":          "Payables Ageing",
+  "/reports/rec":          "Receivables",
+  "/reports/pay":          "Payables",
   "/reports/sreg":         "Sales Register",
   "/reports/branch":       "Branch Comparison",
   "/reports/pkg":          "Package P&L",
@@ -338,6 +364,7 @@ export const ROUTE_TITLES={
   "/reports/consolidated-bs":"Consolidated Balance Sheet — Travkings Group",
   "/reports/cashflow-forecast":"Cash Flow Forecast — 90 Days",
   "/reports/supplier-360":   "Supplier 360° View",
+  "/reports/customer-360":   "Customer 360° View",
   "/reports/tally-export":   "Tally XML Export",
   "/masters/passports":      "Passport & Document Manager",
   "/masters/markup":         "Other Taxes / Net Rate Sheet",
@@ -358,6 +385,7 @@ export const ROUTE_TITLES={
   "/settings/branches":    "Branch Configuration",
   "/settings/users":       "Users & Roles",
   "/settings/audit":       "Audit Log",
+  "/accounts/statistics":  "Statistics",
   "/masters/groups":       "Chart of Accounts",
   "/masters/ledgers":      "Masters — Ledgers",
   "/masters/customers":    "Masters — Customers",

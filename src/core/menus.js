@@ -3,7 +3,7 @@
    Auto-generated from KBiz360_v2.jsx · 361 lines · 11 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, LayoutDashboard, Lock, Settings, ShoppingCart, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
+import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, LayoutDashboard, Lock, Settings, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { PERM_MODULES } from './permissions';
 import { getRole } from './referenceCache';
@@ -16,18 +16,8 @@ import { isPageAccessAdmin } from './pageCatalog';
 // Organised on Tally's master taxonomy: Accounts Info · Statutory Info ·
 // Parties (which in Tally are just ledgers) · Inventory & Catalog · Utilities.
 export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
-  {label:"Accounts Master", children:[
-    {label:"Accounts Tree View (Parent ▸ Group ▸ Sub-Group ▸ Ledger)", href:"/masters/accounts-tree"},
-    {divider:true, label:"Create / Edit"},
-    {label:"Parent Groups (28 Tally · view)", href:"/masters/groups"},
-    {label:"Groups & Sub-Groups (Create)", href:"/masters/subgroups"},
-    {label:"Ledgers (Create · Chart of Accounts)", href:"/masters/ledgers"},
-    {label:"Bank Accounts", href:"/masters/bank-accounts"},
-    {label:"Cost Categories", href:"/masters/cost-categories"},
-    {label:"Cost Centres", href:"/masters/cost-centers"},
-    {label:"Budgets", href:"/masters/budgets"},
-    {label:"Scenarios", href:"/masters/scenarios"},
-  ]},
+  // Accounts Master (Chart of Accounts, Cost Centres, Budgets, Scenarios) lives
+  // under the ACCOUNTS header now — see MENU_ACCOUNTS ▸ "Accounts Master".
   {label:"Voucher Master", children:[
     {label:"Voucher Types", href:"/masters/voucher-types"},
     {label:"Numbering Series (🔒 auto)", href:"/masters/numbering"},
@@ -42,10 +32,9 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
     {label:"Sub-Agents", href:"/masters/sub-agents"},
     {label:"Vendor Credit Terms", href:"/masters/vendor-terms"},
   ]},
-  {label:"Tax & Currency Master", children:[
+  {label:"Tax Master", children:[
     {label:"Tax / HSN-SAC Codes", href:"/masters/tax"},
-    {label:"Currencies", href:"/masters/currency"},
-    {label:"Forex Rates", href:"/masters/forex"},
+    // Currencies & Forex Rates moved to ACCOUNTS ▸ Accounts Master ▸ Currency.
   ]},
   {label:"Inventory & Catalog Master", children:[
     {label:"Airlines & GDSs", href:"/masters/airlines"},
@@ -55,10 +44,8 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
     {label:"Seat Inventory", href:"/masters/seats"},
     {label:"Other Taxes Rates", href:"/masters/markup"},
   ]},
-  {label:"HR Master", children:[
-    {label:"Employee Master", href:"/hr/employees"},
-    {label:"Employee — 10-Tab View", href:"/hr/employee-tabs"},
-  ]},
+  // Employee Master + 10-Tab View now live under the dedicated HR pill
+  // (HR ▸ Employee Master) — removed here to avoid the duplicate entry point.
   {label:"Utilities", children:[
     {label:"Passport Register", href:"/masters/passports"},
     {label:"Document Type Master", href:"/masters/doc-types"},
@@ -91,6 +78,10 @@ export const MENU_ASSETS={label:"Assets",icon:Wrench,children:[
 export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
   {label:"Registers & Outstanding", children:[
     {label:"Module Sales & Purchase Register", href:"/finance/module-register"},
+    {label:"Module Sales Register",     href:"/finance/module-sales-register"},
+    {label:"Module Purchase Register",  href:"/finance/module-purchase-register"},
+    {label:"Invoice-wise GP (Link No)", href:"/reports/invoice-gp"},
+    {label:"Sales & GP Analytics",      href:"/reports/sales-gp-analytics"},
   ]},
   {label:"Books", children:[
     {label:"Trial Balance", href:"/trial-balance"},
@@ -122,19 +113,17 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
 /* ── TAXATION — INDIA GST ────────────────────────────────────── */
 
 export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
+  // P&L, Balance Sheet, Cash Position & Audit Trail are account reports — they
+  // live under the Accounts pill now (Accounts ▸ Branch MIS / Books & Scrutiny).
   {label:"Financial Statements", children:[
-    {label:"Profit & Loss", href:"/reports/pnl"},          // Fiori · Classic · Vertical · Tally · TKF
-    {label:"Balance Sheet", href:"/reports/bs"},            // + Schedule III · Consolidated as modes
     {label:"Cash Flow Statement", href:"/reports/cf"},
     {label:"Report Viewer (9-Tab View)", href:"/reports/viewer"},
-    {label:"Cash Position Summary", href:"/reports/cash-position"},
     {label:"Inter-branch Elimination", href:"/reports/interbranch"},
     {label:"Notes to Financial Statements", href:"/reports/fs-notes"},
-    {label:"Audit Trail Report", href:"/reports/audit-trail"},
   ]},
   {label:"Profitability & GP", children:[
-    {label:"Sales & GP Analytics", href:"/reports/sales-gp-analytics"},
-    {label:"Invoice-wise GP (by Link No)", href:"/reports/invoice-gp"},
+    // Sales & GP Analytics + Invoice-wise GP live in Finance ▸ Registers &
+    // Outstanding (kept there to avoid the duplicate entry point).
     {label:"GP Reports (Multi-view)", href:"/reports/gp"},
     {label:"Yield by Destination", href:"/reports/yield-destination"},
     {label:"Yield by Consultant", href:"/reports/yield-consultant"},
@@ -147,32 +136,29 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
     {label:"MIS One-Pager", href:"/reports/mis"},
     {label:"Group Dashboard", href:"/group-dashboard"},
   ]},
+  // Sales/Purchase Register + Client Statement are account reports — see
+  // Accounts ▸ Sales & Purchase / Receivables & Collections.
   {label:"Operational", children:[
-    {label:"Sales Register", href:"/reports/sreg"},
-    {label:"Purchase Register", href:"/reports/preg"},
     {label:"Consultant Report", href:"/reports/consultant"},
-    {label:"Supplier 360 View", href:"/reports/supplier-360"},
     {label:"Destination Intel", href:"/reports/destination"},
     {label:"Forex Report", href:"/reports/forex"},
     {label:"Commission Income", href:"/reports/commission"},
-    {label:"Client Statement", href:"/reports/client-statement"},
   ]},
+  // Receivables & Payables are account reports — see Accounts ▸ Receivables &
+  // Collections / Payables & Suppliers.
   {label:"Working Capital", children:[
-    {label:"Receivables Ageing", href:"/reports/rec"},
-    {label:"Payables Ageing", href:"/reports/pay"},
     {label:"Cash Flow Forecast 90d", href:"/reports/cashflow-forecast"},
     {label:"Working Capital Dashboard", href:"/reports/working-capital"},
     {label:"Ratio Analysis", href:"/reports/ratios"},
   ]},
   {label:"Compliance & Tax", children:[
     {label:"Variance Analysis", href:"/reports/variance"},
-    {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
-    {label:"Statutory Dues Calendar", href:"/reports/statutory-dues"},
-    {label:"Tax Filing Status Board", href:"/reports/tax-board"},
+    // GST/VAT Summary, Statutory Dues Calendar & Tax Filing Status Board are tax
+    // reports — they live under the regime-aware Taxation pill (see core/data.js).
     {label:"Currency Exposure", href:"/reports/fx-exposure"},
     {label:"Budget vs Actual", href:"/reports/budget"},
     {label:"Expense Budget vs Actual", href:"/reports/exp-bgt"},
-    {label:"Tally XML Export", href:"/reports/tally-export"},
+    // Tally XML Export lives under Admin ▸ Import / Export Data ▸ Export.
     {label:"Client Concentration Risk", href:"/reports/concentration"},
   ]},
   {label:"Report Tools", children:[
@@ -185,17 +171,19 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
 
 /* ── HR ──────────────────────────────────────────────────────── */
 
-export const MENU_HR = {label:"HR & Payroll", icon:Users, children:[
-  {label:"People", children:[
+// Dedicated HR Management pill — every HR master, operation, payroll item,
+// HR report and self-service screen in one header (pulled out of Admin and the
+// Masters/Reports pills so nothing HR is duplicated elsewhere).
+export const MENU_HR = {label:"HR", icon:Users, children:[
+  {label:"Employee Master", children:[
     {label:"Employee Master", href:"/hr/employees"},
     {label:"Employee (10-Tab View)", href:"/hr/employee-tabs"},
+  ]},
+  {label:"Operations", children:[
     {label:"Attendance", href:"/hr/attendance"},
     {label:"Leave Management", href:"/hr/leave"},
-    {label:"Leave Utilization Report", href:"/hr/leave-utilization"},
     {label:"Recruitment", href:"/hr/recruitment"},
     {label:"Training Records", href:"/hr/training"},
-    {label:"Attrition Report", href:"/hr/attrition"},
-    {label:"Birthday & Anniversary Calendar", href:"/hr/calendar"},
   ]},
   {label:"Payroll", children:[
     {label:"Salary Run", href:"/hr/payroll"},
@@ -207,6 +195,11 @@ export const MENU_HR = {label:"HR & Payroll", icon:Users, children:[
   {label:"Expense & Loans", children:[
     {label:"Expense Claims", href:"/hr/expenses"},
     {label:"Employee Loans & Advances", href:"/hr/loans-advances"},
+  ]},
+  {label:"HR Reports", children:[
+    {label:"Leave Utilization Report", href:"/hr/leave-utilization"},
+    {label:"Attrition Report", href:"/hr/attrition"},
+    {label:"Birthday & Anniversary Calendar", href:"/hr/calendar"},
   ]},
   {label:"Self-Service", children:[
     {label:"Employee Portal", href:"/hr/portal"},
@@ -264,70 +257,102 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
 export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   {label:"Dashboard Accountant", href:"/accounts/dashboard"},
   {label:"Daily Entry", children:[
+    {label:"SO/PO/GP Voucher",         href:"/bookings/new"},
     {label:"Receipt Voucher",          href:"/receipts"},
     {label:"Payment Voucher",          href:"/payments"},
     {label:"Contra Entry",             href:"/contra"},
     {label:"Journal Entry",            href:"/journal"},
     {label:"Purchase Expense Voucher", href:"/purchase-expense"},
+    {label:"Debit Note (Purchase Return)", href:"/debit-note"},
     {label:"Refund (against Sale)",    href:"/finance/refund"},
     {label:"Reissue (against Sale)",   href:"/finance/reissue"},
     {label:"ADM Voucher",              href:"/finance/adm-voucher"},
     {label:"ACM Voucher",              href:"/finance/acm-voucher"},
-    {divider:true, label:"Booking entry (operations)"},
-    {label:"SO/PO/GP Voucher",         href:"/bookings/new"},
   ]},
-  {label:"Approve & Post", href:"/transactions/approvals"},
+  // "Approve & Post" → the top-level Approvals pill (single home for
+  // /transactions/approvals); accountants get that pill too (see getMenu).
   {label:"Sales & Purchase", children:[
     {label:"Sales Register",            href:"/reports/sreg"},
     {label:"Purchase Register",         href:"/reports/preg"},
-    {label:"Module Sales Register",     href:"/finance/module-sales-register"},
-    {label:"Module Purchase Register",  href:"/finance/module-purchase-register"},
-    {label:"Invoice-wise GP (Link No)", href:"/reports/invoice-gp"},
-    {label:"Sales & GP Analytics",      href:"/reports/sales-gp-analytics"},
+    // Module Sales/Purchase Register, Invoice-wise GP and Sales & GP Analytics
+    // moved to the Finance pill (Finance ▸ Registers & Outstanding).
   ]},
   {label:"Receivables & Collections", children:[
-    {label:"Debtors (Receivables) Ageing",      href:"/reports/rec"},
-    {label:"Outstanding & On-Account (Settle)", href:"/finance/outstanding"},
+    {label:"Receivables (Ageing + Settle)",     href:"/reports/rec"},
     {label:"Client Statement",                  href:"/reports/client-statement"},
+    {label:"Customer 360 View",                 href:"/reports/customer-360"},
     {label:"Receipt Register",                  href:"/finance/receipt-register"},
     {label:"Collections Follow-up",             href:"/accounts/collections"},
   ]},
   {label:"Payables & Suppliers", children:[
-    {label:"Creditors (Payables) Ageing", href:"/reports/pay"},
+    {label:"Payables (Ageing + Settle)",  href:"/reports/pay"},
+    {label:"Payment Run / Batch Pay",     href:"/accounts/payment-run"},
     {label:"Vendor Advances",             href:"/accounting/vendor-advances"},
     {label:"Payment Register",            href:"/finance/payment-register"},
-    {label:"Supplier Reconciliation",        href:"/accounts/supplier-reco"},
+    {label:"Supplier 360 View",              href:"/reports/supplier-360"},
     {label:"Net Ageing (Debtors+Creditors)", href:"/accounts/net-ageing"},
+    // Supplier Reconciliation moved to the dedicated "Reconciliation" head below.
   ]},
   {label:"Cash & Bank", children:[
     {label:"Cash Book",            href:"/finance/cash-book"},
     {label:"Bank Balances",        href:"/finance/bank-balance"},
-    {label:"Bank Reconciliation",  href:"/bank-reco"},
     {label:"Contra Register",      href:"/finance/contra-register"},
-    {label:"Reconciliation Queue", href:"/finance/reco-queue"},
+    // Bank Reconciliation + Reconciliation Queue moved to the "Reconciliation" head below.
+  ]},
+  // Dedicated Reconciliation head — gathers EVERY non-tax reconciliation screen in
+  // one place (was previously scattered across Cash & Bank + Payables), split into
+  // Client · Bank · Supplier sections. Tax/GST reconciliation (GSTR-2B/2A/9C) stays
+  // under the regime-aware Taxation pill so VAT (Africa) branches don't see GST-only
+  // links — a pointer divider below sends India accountants there.
+  {label:"Reconciliation", children:[
+    {divider:true, label:"Client"},
+    {label:"Client Reconciliation",    href:"/accounts/client-reco"},
+    {divider:true, label:"Bank"},
+    {label:"Bank Reconciliation",      href:"/bank-reco"},
+    {label:"Reconciliation Queue",     href:"/finance/reco-queue"},
+    {divider:true, label:"Supplier"},
+    {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
+    {divider:true, label:"Inter-branch"},
+    {label:"Inter-branch Reconciliation", href:"/accounts/interbranch-reco"},
+    {divider:true, label:"Tally"},
+    {label:"Tally Reconciliation (ERP vs Tally)", href:"/accounts/tally-reco"},
+    {divider:true, label:"Tax (see Taxation pill)"},
+    {label:"Tax Reco (Returns vs Books)", href:"/tax/reconciliation"},
+    {label:"GSTR-2B Reconciliation",   href:"/tax/gstr2b"},
+    {label:"GSTR-2A Reconciliation",   href:"/tax/gstr2a"},
+    {label:"GSTR-9C — Audit Reco",     href:"/tax/gstr9c"},
   ]},
   {label:"Books & Scrutiny", children:[
+    {label:"Statistics",       href:"/accounts/statistics"},
     {label:"Day Book",         href:"/day-book"},
     {label:"Ledger Account",   href:"/ledger"},
     {label:"Trial Balance",    href:"/finance/trial-balance"},
     {label:"Journal Register", href:"/finance/journal-register"},
     {label:"Audit Trail",      href:"/reports/audit-trail"},
   ]},
-  // Self-serve master creation so the accountant can clear suspense (create a missing
-  // ledger) without leaving the workspace. Same screens as the main Masters tab. Cost
-  // Centres are intentionally NOT here — their writes are Super-Admin only (branch-wise
-  // master), so they'd 403 for a Branch Accountant.
-  {label:"Masters (quick create)", children:[
-    {label:"Ledgers (Create · Chart of Accounts)", href:"/masters/ledgers"},
-    {label:"Groups & Sub-Groups (Create)",         href:"/masters/subgroups"},
-    {label:"Bank Accounts",                        href:"/masters/bank-accounts"},
+  // Accounts Master — the Chart-of-Accounts masters now live under THIS Accounts
+  // header (moved out of the standalone Masters pill). Cost Centres are Super-Admin-
+  // only (branch-wise master) — their writes 403 for a Branch Accountant, who can
+  // still open the screen to view.
+  {label:"Accounts Master", children:[
+    {divider:true, label:"Chart of Accounts"},
+    {label:"Accounts Tree View (read-only)", href:"/masters/accounts-tree"},
+    {label:"Chart of Accounts (Groups ▸ Ledgers)", href:"/masters/groups"},
+    {label:"Groups & Sub-Groups (Create / Edit)", href:"/masters/subgroups"},
+    {label:"Ledgers (Create / Edit)", href:"/masters/ledgers"},
+    {label:"Bank Accounts", href:"/masters/bank-accounts"},
+    {divider:true, label:"Currency"},
+    {label:"Currencies", href:"/masters/currency"},
+    {label:"Forex Rates", href:"/masters/forex"},
+    {divider:true, label:"Costing"},
+    {label:"Cost Categories", href:"/masters/cost-categories"},
+    {label:"Cost Centres (🔒 Super-Admin)", href:"/masters/cost-centers"},
+    {divider:true, label:"Planning"},
+    {label:"Budgets", href:"/masters/budgets"},
+    {label:"Scenarios", href:"/masters/scenarios"},
   ]},
-  {label:"Tax & Statutory", children:[
-    {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
-    {label:"TDS Auto-Calculator",        href:"/finance/tds-calculator"},
-    {label:"Statutory Dues Calendar",    href:"/reports/statutory-dues"},
-    {label:"Tax Filing Status Board",    href:"/reports/tax-board"},
-  ]},
+  // Tax & Statutory moved to the Taxation header (see TAX_INDIA / TAX_AFRICA /
+  // TAX_ALL in core/data.js) — it no longer lives under the Accounts pill.
   {label:"BSP & Airline", children:[
     {label:"BSP Summary",             href:"/purchase/bsp-summary"},
     {label:"BSP Statement Import",    href:"/purchase/bsp-import"},
@@ -350,24 +375,9 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
 
 /* ── FINAL MENU ASSEMBLY ─────────────────────────────────────── */
 
-export const MENU_TRANSACTIONS = {label:"Transactions", icon:ShoppingCart, children:[
-  /* SO/PO/GP Voucher creation now lives under Finance ▸ Vouchers; all approvals
-     (SO/PO/GP + Vouchers) live in the top-level "Approvals" section. */
-  /* Standardized 8-tab Voucher Entry pattern */
-  {label:"Standardized Patterns", children:[
-    {label:"Voucher Entry (8-Tab View)", href:"/transactions/voucher-tabs"},
-  ]},
-  /* Per-module Sale/Purchase ENTRY retired — all 7 products are entered via SO/PO/GP
-     (Finance ▸ Vouchers ▸ SO/PO/GP Voucher) and VIEWED via Finance ▸ Module Register. */
-  {label:"Airline Memos", children:[
-    {label:"ADM — Agent Debit Memos", href:"/purchase/adm"},
-    {label:"ACM — Agent Credit Memos", href:"/purchase/acm"},
-  ]},
-  {label:"Cancellations & Refunds", children:[
-    {label:"Sales Cancellations", href:"/sales/cancellation"},
-    {label:"Purchase Refunds", href:"/purchase/refunds"},
-  ]},
-]};
+/* The old MENU_TRANSACTIONS pill was deleted: it was never assembled into
+   getMenu(), and every route it listed (voucher-tabs, ADM/ACM, sales
+   cancellation, purchase refunds) already lives under Finance / Accounts. */
 
 /* ── HO CONTROL CENTER ─────────────────────────────────────────── */
 
@@ -405,8 +415,8 @@ export const MENU_COMMON_TOP = [
 export const MENU_IMPORT_EXPORT = {label:"Import / Export Data", icon:Database, children:[
   {label:"Import", children:[
     {label:"Data Import — Vouchers, Accounts & Masters", href:"/import"},
-    {label:"BSP Statement Import", href:"/purchase/bsp-import"},
-    {label:"GDS / PNR Import", href:"/purchase/gds-import"},
+    // BSP Statement Import → Accounts ▸ BSP & Airline; GDS / PNR Import →
+    // Finance ▸ BSP & Airline Memos (kept where the work is done, not duplicated).
   ]},
   {label:"Export", children:[
     {label:"Tally XML Export", href:"/reports/tally-export"},
@@ -414,30 +424,32 @@ export const MENU_IMPORT_EXPORT = {label:"Import / Export Data", icon:Database, 
 ]};
 
 // Back-office sections grouped under one "Admin" header pill (cleaner top bar).
-export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_HR, MENU_ASSETS, MENU_HO_CONTROL, MENU_SETTINGS, MENU_IMPORT_EXPORT]};
+// HR now has its own top-level pill (MENU_HR) — no longer nested under Admin.
+export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_ASSETS, MENU_HO_CONTROL, MENU_SETTINGS, MENU_IMPORT_EXPORT]};
 
 // Director/Super-Admin only: the plain "Dashboard" pill becomes a "Dashboards"
 // dropdown with the whole-company suite. Other roles keep the single Dashboard link.
 export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, children:[
   {label:"Overview", children:[
-    {label:"Executive Overview", href:"/dashboards/exec"},
+    {label:"My Dashboard", href:"/dashboard"},
     {label:"Alerts Dashboard", href:"/dashboard/alerts"},
     {label:"Capital vs Investment", href:"/dashboards/capital"},
-    {label:"My Dashboard", href:"/dashboard"},
   ]},
   {label:"Financials", children:[
     {label:"Profitability (P&L)", href:"/dashboards/profitability"},
+    {label:"YoY Growth", href:"/dashboards/yoy"},
     {label:"Balance Sheet", href:"/dashboards/balance-sheet"},
     {label:"Cash & Liquidity", href:"/dashboards/cash"},
+    {label:"Cash Forecast (13-week)", href:"/dashboards/cash-forecast"},
     {label:"Receivables & Payables", href:"/dashboards/arap"},
-    {label:"Outstanding & On-Account", href:"/finance/outstanding"},
     {label:"Expenses", href:"/dashboards/expenses"},
     {label:"Tax & Compliance", href:"/dashboards/tax"},
   ]},
   {label:"Business", children:[
     {label:"Sales & Bookings", href:"/dashboards/sales"},
     {label:"Module / Product GP", href:"/dashboards/module-gp"},
-    {label:"Branch Performance", href:"/dashboards/branch"},
+    {label:"Customer Value (LTV + ABC)", href:"/dashboards/customer-value"},
+    {label:"Branch & Group Performance", href:"/dashboards/branch"},
     {label:"Supplier / Purchase", href:"/dashboards/supplier"},
   ]},
   {label:"Targets", children:[
@@ -502,10 +514,20 @@ function applyHidden(menus, currentUser){
   return menus.map(m=>pruneNode(m,hidden)).filter(Boolean);
 }
 
+// The Accounts ▸ Reconciliation ▸ "Tax" pointer links to India GST recon screens
+// (GSTR-2B/2A/9C). On pure VAT (Africa) branches those screens don't apply, so we
+// prune them there — the regime-aware Taxation pill already shows the right thing.
+// India and the consolidated ("ALL") group view keep them.
+const GST_RECO_HREFS = new Set(['/tax/gstr2b', '/tax/gstr2a', '/tax/gstr9c']);
+function accountsMenuFor(showGstReco){
+  return showGstReco ? MENU_ACCOUNTS : pruneNode(MENU_ACCOUNTS, GST_RECO_HREFS);
+}
+
 export function getMenu(branch, currentUser){
   const isAll   = branch==="ALL";
   const isIndia = !isAll && branch?.code && ["TKHO","BOM","AMD"].includes(branch.code);
   const taxSection = isAll ? TAX_ALL : isIndia ? TAX_INDIA : TAX_AFRICA;
+  const accountsMenu = accountsMenuFor(isAll || isIndia);
   // Map each top-level menu label to its PERM_MODULES group name
   const MENU_TO_GROUP = {
     "Dashboard":        null,            // always visible
@@ -517,7 +539,7 @@ export function getMenu(branch, currentUser){
     "Taxation — GST":   "Taxation",
     "Taxation — VAT":   "Taxation",
     "Reports":          "Reports",
-    "HR & Payroll":     "HR & Payroll",
+    "HR":               "HR & Payroll",
     "Settings":         "Settings",
     "HO Control":       "Settings",
   };
@@ -527,16 +549,17 @@ export function getMenu(branch, currentUser){
   const role = currentUser?.role || 'Super Admin';
   const isDir = role === 'Director' || role === 'Super Admin';
   const isAccountant = /accountant/i.test(role || ''); // "Branch Accountant" et al.
-  // Branch Accountant → a single, self-contained workspace: the Accounts pill ONLY.
-  // It already bundles their Dashboard, Daily-Entry vouchers, Approve & Post,
-  // Sales/Purchase + Receivables/Payables + Cash/Bank registers, Books & Scrutiny,
-  // quick-create Masters, Tax & Statutory, Period Close and Branch MIS — so there's
-  // no need for the Finance/Reports/Taxation/Masters/Admin pills. Branch scope is
-  // enforced by the top-right switcher (limited to their stored branches).
-  if (isAccountant) return applyHidden([MENU_ACCOUNTS], currentUser);
+  // Branch Accountant → their self-contained Accounts workspace PLUS the Taxation
+  // pill. The Accounts pill bundles their Dashboard, Daily-Entry vouchers, Approve
+  // & Post, Sales/Purchase + Receivables/Payables + Cash/Bank registers, Books &
+  // Scrutiny, quick-create Masters, Period Close and Branch MIS. Tax & Statutory now
+  // lives under the Taxation header (regime-aware: GST / VAT / consolidated), so the
+  // accountant gets that pill too. Branch scope is still enforced by the top-right
+  // switcher (limited to their stored branches).
+  if (isAccountant) return applyHidden([accountsMenu, MENU_APPROVALS, taxSection], currentUser);
   const top = isDir ? [MENU_DASHBOARDS, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
-  // 8 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · Admin
-  const menus = [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_ADMIN];
+  // 9 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · HR · Admin
+  const menus = [...top, accountsMenu, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN];
   // Strip each user's hidden pages/reports (Settings → Page Visibility Control).
   return applyHidden(menus, currentUser);
 }

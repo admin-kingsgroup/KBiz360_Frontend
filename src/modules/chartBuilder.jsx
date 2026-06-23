@@ -15,6 +15,8 @@ import { useMasterList } from '../core/useMasters';
 import { branchCode } from '../core/useAccounting';
 import { FocusBanner } from '../core/ux/FocusBanner';
 import { useNavFocusStore } from '../core/ux/navFocus';
+import { clickable } from '../core/ux/clickable';
+import { listKeyNav } from '../core/ux/listKeys';
 import { BRANCH_CODES, CONSOLIDATED_LABEL } from '../core/data';
 
 const DARK = '#1a1c22', DIM = '#5b616e', BLUE = '#2563eb', GREEN = '#16a34a', GOLD = '#c2a04a', GREY = '#7b86a8';
@@ -113,7 +115,7 @@ export function AccountsTreeView({ branch }) {
     setTimeout(() => { const el = document.getElementById('led-' + led.id); if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 90);
   }, [fLedger, display.length, groups.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const Caret = ({ k, has }) => <span style={{ width: 14, display: 'inline-block', color: GOLD, cursor: has ? 'pointer' : 'default' }} onClick={() => has && tog(k)}>{has ? (open[k] ? '▾' : '▸') : ''}</span>;
+  const Caret = ({ k, has }) => <span {...(has ? clickable(() => tog(k)) : {})} style={{ width: 14, display: 'inline-block', color: GOLD, cursor: has ? 'pointer' : 'default' }}>{has ? (open[k] ? '▾' : '▸') : ''}</span>;
   const ledgerRow = (l, indent) => (
     <div key={'L' + l.id} id={'led-' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #f5f6fa', color: DARK, background: fLower && (l.name || '').toLowerCase() === fLower ? '#FFF6D6' : undefined }}>
       <span style={{ color: GREEN, marginRight: 6 }}>•</span>{l.name}{scopeBadge(l)}
@@ -133,7 +135,7 @@ export function AccountsTreeView({ branch }) {
         return (
           <div key={pg.name}>
             <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', fontWeight: 800, color: DARK }}>
-              <Caret k={pg.name} has={pgHas} /><span onClick={() => pgHas && tog(pg.name)} style={{ cursor: pgHas ? 'pointer' : 'default' }}>{pg.name}</span>{badge('Parent Group', BLUE)}
+              <Caret k={pg.name} has={pgHas} /><span {...(pgHas ? clickable(() => tog(pg.name)) : {})} style={{ cursor: pgHas ? 'pointer' : 'default' }}>{pg.name}</span>{badge('Parent Group', BLUE)}
               <span style={{ marginLeft: 'auto', fontSize: 10.5, color: DIM }}>{pg.children.length} group{pg.children.length === 1 ? '' : 's'}{pg.ledgers.length ? ` · ${countNote(pg.ledgers)}` : ''}</span>
             </div>
             {open[pg.name] && pg.children.map((grp) => {
@@ -141,14 +143,14 @@ export function AccountsTreeView({ branch }) {
               return (
                 <div key={grp.name}>
                   <div style={{ display: 'flex', alignItems: 'center', padding: '7px 12px 7px 26px', background: '#f6f9fd', fontWeight: 700, color: '#1a3a6e' }}>
-                    <Caret k={grp.name} has={grpHas} /><span onClick={() => grpHas && tog(grp.name)} style={{ cursor: grpHas ? 'pointer' : 'default' }}>{grp.name}</span>{badge('Group', '#1a3a6e')}
+                    <Caret k={grp.name} has={grpHas} /><span {...(grpHas ? clickable(() => tog(grp.name)) : {})} style={{ cursor: grpHas ? 'pointer' : 'default' }}>{grp.name}</span>{badge('Group', '#1a3a6e')}
                     {grp.ledgers.length > 0 && <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM }}>{countNote(grp.ledgers)}</span>}
                   </div>
                   {open[grp.name] && <>
                     {grp.children.map((sg) => (
                       <div key={sg.name}>
                         <div style={{ display: 'flex', alignItems: 'center', padding: '6px 12px 6px 46px', fontWeight: 600, color: DARK, borderBottom: '1px solid #f0f2f7' }}>
-                          <Caret k={sg.name} has={sg.ledgers.length} /><span onClick={() => sg.ledgers.length && tog(sg.name)} style={{ cursor: sg.ledgers.length ? 'pointer' : 'default' }}>{sg.name}</span>{badge('Sub-Group', GOLD)}
+                          <Caret k={sg.name} has={sg.ledgers.length} /><span {...(sg.ledgers.length ? clickable(() => tog(sg.name)) : {})} style={{ cursor: sg.ledgers.length ? 'pointer' : 'default' }}>{sg.name}</span>{badge('Sub-Group', GOLD)}
                           {sg.ledgers.length > 0 && <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM }}>{countNote(sg.ledgers)}</span>}
                         </div>
                         {open[sg.name] && sg.ledgers.map((l) => ledgerRow(l, 70))}
@@ -172,9 +174,9 @@ export function AccountsTreeView({ branch }) {
   const col = (title, items, selVal, onPick, kind) => (
     <div style={{ flex: 1, minWidth: 180, border: '1px solid #e6e8ec', borderRadius: 8, background: '#fff', display: 'flex', flexDirection: 'column', maxHeight: '64vh' }}>
       <div style={{ padding: '8px 10px', fontSize: 10, fontWeight: 800, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, borderBottom: '1px solid #eef1f6', background: '#f7f8fb' }}>{title} <span style={{ color: '#9aa2c0' }}>({items.length})</span></div>
-      <div style={{ overflow: 'auto' }}>
+      <div style={{ overflow: 'auto' }} onKeyDown={onPick ? listKeyNav() : undefined}>
         {items.map((it) => (
-          <div key={it.name || it.id} onClick={() => onPick && onPick(it)} style={{ padding: '6px 10px', fontSize: 12, cursor: onPick ? 'pointer' : 'default', background: selVal === (it.name) ? '#eef3fb' : 'transparent', borderBottom: '1px solid #f5f6fa', color: DARK, fontWeight: selVal === it.name ? 700 : 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div key={it.name || it.id} {...(onPick ? clickable(() => onPick(it), { role: 'option' }) : {})} style={{ padding: '6px 10px', fontSize: 12, cursor: onPick ? 'pointer' : 'default', background: selVal === (it.name) ? '#eef3fb' : 'transparent', borderBottom: '1px solid #f5f6fa', color: DARK, fontWeight: selVal === it.name ? 700 : 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span>{kind === 'ledger' ? <><span style={{ color: GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}</> : it.name}</span>
             {onPick && kind !== 'ledger' && <span style={{ color: '#c3cbe0' }}>›</span>}
           </div>
@@ -193,7 +195,7 @@ export function AccountsTreeView({ branch }) {
   const sgNode = sgName ? nodes[sgName] : null;
   const sideView = () => (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-      {col('Parent Group (28)', roots, pgName, (it) => setSel({ pg: it.name, g: '', sg: '' }))}
+      {col(`Parent Group (${roots.length})`, roots, pgName, (it) => setSel({ pg: it.name, g: '', sg: '' }))}
       {col('Group', pgNode ? pgNode.children : [], gName, (it) => setSel((s) => ({ ...s, g: it.name, sg: '' })))}
       {col('Sub-Group', gNode ? gNode.children : [], sgName, (it) => setSel((s) => ({ ...s, sg: it.name })))}
       {col('Ledger', sgNode ? sgNode.ledgers : gNode ? gNode.ledgers : pgNode ? pgNode.ledgers : [], '', null, 'ledger')}
@@ -208,7 +210,7 @@ export function AccountsTreeView({ branch }) {
       <FocusBanner />
       <div style={{ marginBottom: 8 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK }}>Accounts Tree View</h2>
-        <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Parent Group (28) ▸ Group ▸ Sub-Group ▸ Ledger · View-only — create under <b>Masters ▸ Accounts Master</b>.</p>
+        <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Primary Group ▸ Primary Sub Group ▸ ERP Group ▸ ERP Sub Group ▸ Ledger · View-only — create under <b>Masters ▸ Accounts Master</b>.</p>
       </div>
 
       {/* Scope legend — Groups/Sub-Groups are org-wide; only Ledgers carry a branch. */}
@@ -234,7 +236,7 @@ export function AccountsTreeView({ branch }) {
           </span>
         </span>
         <span style={{ marginLeft: 'auto', fontSize: 11, color: DIM }}>
-          28 parent groups · <b style={{ color: DARK }}>{subGroupCount}</b> sub-groups <span style={{ color: '#9aa2c0' }}>(org-wide)</span> · <b style={{ color: DARK }}>{display.length}</b> ledgers (<b style={{ color: GREY }}>{commonCount}</b> common + <b style={{ color: BLUE }}>{branchCount}</b> branch)
+          <b style={{ color: DARK }}>{roots.length}</b> parent groups · <b style={{ color: DARK }}>{subGroupCount}</b> sub-groups <span style={{ color: '#9aa2c0' }}>(org-wide)</span> · <b style={{ color: DARK }}>{display.length}</b> ledgers (<b style={{ color: GREY }}>{commonCount}</b> common + <b style={{ color: BLUE }}>{branchCount}</b> branch)
         </span>
       </div>
 

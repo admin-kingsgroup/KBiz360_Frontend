@@ -13,19 +13,21 @@ import {
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../../core/styles.jsx';
+import { todayISO } from '../../core/dates';
 import { PeriodBar, periodRange } from '../../core/period';
 import { openPrintPreview } from '../../core/PrintPreview';
 import { buildBookingInvoice } from '../../core/invoiceHtml';
 import { apiGet, apiPost, apiPut } from '../../core/api';
 import { AuditTrail } from '../../core/AuditTrail';
 import { useLedgerRegistry } from '../../core/useReference';
-import { useHotkey } from '../../core/ux/hotkeys';
+import { useFormKeys } from '../../core/ux/forms';
 import { toast } from '../../core/ux/toast';
 import { confirmDialog } from '../../core/ux/confirm';
 import {
   VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc, isVatBranch, rowsFromSnapshots,
 } from '../../core/voucherSpecs.js';
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
+import { invalidateBooks } from '../../core/useAccounting';
 
 const GOLD = '#c2a04a', DARK = '#1a1c22', DR = '#16a34a', CR = '#dc2626', BLUE = '#2563eb';
 // Reversal modules (Refund / Reissue) act on an existing sale — picked from the same
@@ -100,6 +102,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     return [blankLine(VSPECS.SF)];   // start blank — no demo rows
   });
   const [date, setDate] = useState(editing ? (editBooking.date || today()) : today());
+  const [travelDate, setTravelDate] = useState(editing ? (editBooking.travelDate || '') : '');
   const [headerRef, setHeaderRef] = useState(editing ? (editBooking.headerRef || '') : '');
   const [customer, setCustomer] = useState(editing
     ? { name: editBooking.customer?.name || '', gstin: editBooking.customer?.gstin || '', address: editBooking.customer?.address || '', email: editBooking.customer?.email || '', contact: editBooking.customer?.contact || '', group: editBooking.customer?.group || '', ledgerName: editBooking.customer?.ledgerName || '', ledgerGroup: editBooking.customer?.ledgerGroup || '' }
@@ -152,7 +155,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   // Switching module reloads the seed grid for that module — never while editing
   // (the module is locked to the existing voucher so its lines aren't wiped).
-  useEffect(() => { if (editing) return; setLines([blankLine(VSPECS[moduleCode])]); setNoSupplier(false); setResult(null); setError(''); }, [moduleCode]);
+  // Reversal modules (RF/RI) have no fare-grid spec, so there's no seed grid to load —
+  // skip the reset for them (the reversal UI is rendered via an early return and never
+  // touches `lines`). Resetting here would call blankLine(undefined) → idCols crash.
+  useEffect(() => { if (editing || !VSPECS[moduleCode]) return; setLines([blankLine(VSPECS[moduleCode])]); setNoSupplier(false); setResult(null); setError(''); }, [moduleCode]);
 
   // No-supplier is only offered on Miscellaneous (sell-without-buy: seats / extra
   // services). Any other module always has a supplier (cost) leg.
@@ -177,14 +183,39 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const addLine = () => setLines([...lines, blankLine(spec)]);
   const delLine = (i) => setLines(lines.length > 1 ? lines.filter((_, idx) => idx !== i) : [blankLine(spec)]);
 
+  // Has the user entered anything worth protecting? Used to confirm before a
+  // destructive module switch and to warn on navigate-away (unsaved guard).
+  const rowHasData = (l) => Object.keys(l || {}).some((k) => {
+    if (k === 'id') return false;
+    const v = l[k];
+    if (v == null || v === '' || typeof v === 'object') return false;
+    if (typeof v === 'number') return v !== 0;
+    return String(v).trim() !== '';
+  });
+  const isDirty = () => !!(
+    (customer.name || '').trim() || (supplier.name || '').trim() ||
+    (remarks || '').trim() || lines.some(rowHasData)
+  );
+
   // Switch the active module. For a NEW voucher the effect on `moduleCode` swaps the
   // seed grid. While EDITING the entered details are KEPT — each existing row is
   // re-shaped onto the new module's columns (shared fields like markup / service charge
   // / supplier service and any same-named fare/id columns carry over; the new module's
   // own fields default in). Customer, supplier, dates, tags & remarks are untouched.
   // The backend accepts the new module on Save and re-prefixes the spawned vouchers.
-  const changeModule = (code) => {
+  const changeModule = async (code) => {
     if (code === moduleCode) return;
+    // For a NEW voucher, switching type reseeds (and so WIPES) the grid — confirm
+    // first if the user has entered anything, so an accidental chip click can't
+    // silently discard a half-typed booking.
+    if (!editing && isDirty()) {
+      const { confirmed } = await confirmDialog({
+        title: 'Switch voucher type?',
+        message: 'This will clear the lines and details you have entered for this voucher.',
+        confirmLabel: 'Switch & clear', danger: true,
+      });
+      if (!confirmed) return;
+    }
     // Reversal modules (RF/RI) have no fare grid to reshape — just switch; the entry
     // form swaps to the reversal UI (early return below).
     if (isReversalModule(code) || isReversalModule(moduleCode)) { setModuleCode(code); setResult(null); setError(''); return; }
@@ -207,12 +238,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
   const canSave = !!brCode && !saving && totals.so.total > 0 && customer.name.trim() && hasCustLedger
     && (isNoSupp || (totals.po.total > 0 && hasSuppLedger));
-  // Flights / Holiday can be SAVED untagged (it parks as Pending), but it cannot be
-  // approved/posted until International vs Domestic is chosen — mirrors the backend gate.
-  const isTagged = !hasPackage || !!packageType;
-  const canApprove = canSave && isTagged;
 
-  const save = async (thenApprove = false) => {
+  // Saving ALWAYS lands the booking in Pending — there is no save-and-approve from
+  // entry (for ANY user, Super Admin included). Approval happens only from the
+  // Pending queue, so every voucher's books impact passes the same review gate.
+  const save = async () => {
     // Editing an existing booking requires a reason (saved to the audit trail).
     let editReason = '';
     if (editing) {
@@ -228,7 +258,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       });
       const payload = {
         ...(editing ? { editReason } : {}),
-        module: moduleCode, branch: brCode, date, noSupplier: isNoSupp, noVat: effNoVat,
+        module: moduleCode, branch: brCode, date, travelDate, noSupplier: isNoSupp, noVat: effNoVat,
         customer: { name: customer.name, gstin: customer.gstin, address: customer.address, email: customer.email, contact: customer.contact, group: customer.group, ledgerName: customer.ledgerName || customer.name, ledgerGroup: customer.ledgerGroup || customer.group },
         supplier: isNoSupp ? { name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }
           : { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup },
@@ -238,18 +268,28 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         gp: { lines: gpLines, total: totals.gp.total, pct: totals.gp.pct },
         remarks, saleTallyRef, purTallyRef,
       };
-      let booking = editing
+      const booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, payload)
         : await apiPost('/api/booking-orders', payload);
-      if (thenApprove) booking = await apiPost('/api/booking-orders/' + booking.id + '/approve');
-      setResult({ ...booking, _approved: thenApprove, _edited: editing });
+      setResult({ ...booking, _approved: false, _edited: editing });
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
-      toast(thenApprove ? `Voucher ${booking.bookingNo || ''} approved & posted` : `Voucher ${booking.bookingNo || ''} saved — pending approval`);
+      if (editing) invalidateBooks(qc); // an edit reverses the prior posting → refresh every books cache
+      toast(`Voucher ${booking.bookingNo || ''} saved — pending approval`);
     } catch (e) { setError(e.message || 'Failed to save voucher'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
     finally { setSaving(false); }
   };
-  // Ctrl/Cmd+Enter saves from anywhere on this (large, multi-grid) entry screen.
-  useHotkey('mod+enter', () => { if (canSave) save(false); }, [canSave]);
+  // Tally-style keys across the whole entry screen: Enter advances between data
+  // fields (skipping action buttons), Enter on the last field / Ctrl+Cmd+Enter saves.
+  const formKeys = useFormKeys({ onSubmit: () => { if (canSave) save(); } });
+
+  // Warn before leaving/refreshing with unsaved booking data (the form autosave
+  // doesn't cover the multi-grid line state). Skipped once a save has succeeded.
+  useEffect(() => {
+    const onBeforeUnload = (e) => { if (!result && isDirty()) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, customer, supplier, lines, remarks]);
 
   // Reversal modules (Refund / Reissue) render a dedicated entry instead of the fare
   // grid — same module bar, but the original-invoice link + supplier-refund + retained
@@ -343,7 +383,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   );
 
   return (
-    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
+    <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
       {/* Header */}
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
         <div style={{ padding: '14px 18px', background: DARK, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
@@ -351,7 +391,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : 'SO / PO / GP VOUCHER'}</p>
             <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#9197a3' }}>
               {editing
-                ? <>Fix any data-entry mistake — or switch the <b style={{ color: GOLD }}>module</b> if it was booked wrong — then <b style={{ color: GOLD }}>Save</b> or <b style={{ color: GOLD }}>Save &amp; Approve</b> · {brCode} · still Pending until approved</>
+                ? <>Fix any data-entry mistake — or switch the <b style={{ color: GOLD }}>module</b> if it was booked wrong — then <b style={{ color: GOLD }}>Save changes</b> · {brCode} · returns to Pending; approve it from the Pending queue</>
                 : <>Enter cost + Other Taxes → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
             </p>
           </div>
@@ -445,7 +485,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* Header fields */}
       <div style={{ ...card, marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
-          <FL label="SPG Date"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></FL>
+          <FL label="SPG Date"><input type="date" max={todayISO()} value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></FL>
+          <FL label="Travel / Departure Date"><input type="date" value={travelDate} onChange={(e) => setTravelDate(e.target.value)} style={inp} title="When the customer travels — drives the Upcoming Travel dashboard" /></FL>
           <FL label="Client Type">
             <select value={clientType} onChange={(e) => handleClientTypeChange(e.target.value)} style={inp}>
               <option value="">— All Client Types —</option>
@@ -508,7 +549,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l);
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
                 return (
                   <React.Fragment key={i}>
                   <tr>
@@ -568,7 +609,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l);
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
                 return (
                   <React.Fragment key={i}>
                   <tr>
@@ -627,7 +668,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l);
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
                 return (
                   <tr key={i}>
                     <td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.fn || '—'}</td><td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.sn || ''}</td>
@@ -656,7 +697,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* Footer */}
       <div style={{ position: 'sticky', bottom: 0, background: '#f3f4f8', borderTop: '1px solid #e6e8ec', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, color: '#5b616e', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
-          {editing ? <><Pencil size={12} /> Editing a pending voucher — “Save &amp; Approve” fixes it and posts the books in one step.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
+          {editing ? <><Pencil size={12} /> Editing returns this voucher to Pending — approve it from the Pending queue to post the books.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
         </span>
         <FL label="Remarks"><input value={remarks} onChange={(e) => setRemarks(e.target.value)} style={{ ...inp, width: 220 }} placeholder="optional" /></FL>
         <FL label="Sales Tally Ref"><input value={saleTallyRef} onChange={(e) => setSaleTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>
@@ -664,17 +705,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         {editing && (
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
         )}
-        <button disabled={!canSave} onClick={() => save(false)} className="max-tablet:min-h-[44px]"
+        <button disabled={!canSave} onClick={() => save()} className="max-tablet:min-h-[44px]"
           style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7 }}>
-          {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (editing ? 'Save changes' : 'Save voucher (Pending)')}
+          {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (editing ? 'Save changes (Pending)' : 'Save voucher (Pending)')}
         </button>
-        {editing && (
-          <button disabled={!canApprove} onClick={() => save(true)} className="max-tablet:min-h-[44px]"
-            title={!isTagged ? 'Pick International or Domestic first — it sets the cost centre.' : ''}
-            style={{ ...btnG, background: canApprove ? DR : '#9ca3af', cursor: canApprove ? 'pointer' : 'not-allowed', opacity: canApprove ? 1 : 0.7 }}>
-            {saving ? <RefreshCw size={14} className="spin" /> : <CheckCircle2 size={14} />} Save &amp; Approve
-          </button>
-        )}
       </div>
     </div>
   );
@@ -707,7 +741,9 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
 
   const ready = !!brCode && !!state.againstInvoice && !!state.party && !!state.counterParty && (+state.supplierAmt > 0) && !saving;
 
-  const save = async (thenApprove = false) => {
+  // Saving always lands the RF/RI booking in Pending — no save-and-approve from entry
+  // (any user). It posts only when approved from the Pending queue.
+  const save = async () => {
     setError(''); setSaving(true);
     try {
       const reversal = {
@@ -724,13 +760,13 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
         againstInvoice: state.againstInvoice, againstPurchase: state.againstPurchase || '',
         reversal, remarks: state.remarks,
       };
-      let booking = editing
+      const booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, { ...payload, editReason: 'Edit ' + kind })
         : await apiPost('/api/booking-orders', payload);
-      if (thenApprove) booking = await apiPost('/api/booking-orders/' + booking.id + '/approve');
-      setResult({ ...booking, _approved: thenApprove });
+      setResult({ ...booking, _approved: false });
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
-      toast(thenApprove ? `Voucher ${booking.bookingNo || ''} approved & posted` : `Voucher ${booking.bookingNo || ''} saved — pending approval`);
+      if (editing) invalidateBooks(qc); // an edit reverses the prior posting → refresh every books cache
+      toast(`Voucher ${booking.bookingNo || ''} saved — pending approval`);
     } catch (e) { setError(e.message || 'Failed to save'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
     finally { setSaving(false); }
   };
@@ -777,8 +813,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
         <RefundReissueFields state={state} setState={setState} ctx={{ branch: brCode, cur }} kind={kind} />
         {error && <p style={{ margin: '8px 0 0', fontSize: 12, color: CR, fontWeight: 600 }}>⚠ {error}</p>}
         <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-          <button disabled={!ready} onClick={() => save(false)} className="max-tablet:min-h-[44px]" style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Save size={14} /> Save (Pending)</button>
-          <button disabled={!ready} onClick={() => save(true)} className="max-tablet:min-h-[44px]" style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Check size={14} /> Save &amp; Approve</button>
+          <button disabled={!ready} onClick={() => save()} className="max-tablet:min-h-[44px]" style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Save size={14} /> Save (Pending)</button>
         </div>
         {!ready && <p style={{ margin: '8px 0 0', fontSize: 10.5, color: '#9197a3' }}>Need: original invoice, customer, supplier/airline &amp; a supplier amount &gt; 0.</p>}
       </div>
@@ -1042,6 +1077,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                           {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve
                         </button>
                         <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#dc2626', borderColor: '#f3c9c9' }}><XCircle size={12} /> Reject</button>
+                        {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} title="Delete — remove from Pending, view-only (number not reusable)" style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: '#dc2626' }}><Trash2 size={12} /> Delete</button>}
                       </div>
                     ) : mode === 'approved' ? (
                       // Edit is open to everyone (it un-posts the booking → Pending → re-approve);
@@ -1126,6 +1162,7 @@ export function PendingBookings({ branch, setRoute }) {
         ? `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} (no purchase leg) under Link ${res.linkNo}.`
         : `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno} under Link ${res.linkNo}.`);
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
+      invalidateBooks(qc); // posting spawns Sale+Purchase journals → refresh every books cache
     } catch (e) { setMsg('⚠ ' + (e.message || 'Approve failed')); }
     finally { setBusyId(null); }
   };
@@ -1146,6 +1183,7 @@ export function PendingBookings({ branch, setRoute }) {
       const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] });
       setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`);
       setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] });
+      invalidateBooks(qc); // each posting spawns Sale+Purchase journals → refresh every books cache
     } catch (e) { setMsg('⚠ ' + (e.message || 'Bulk approve failed')); }
     finally { setBusyId(null); }
   };
@@ -1197,7 +1235,7 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
     const { confirmed, reason } = await confirmDialog({ title: `Delete approved booking ${b.bookingNo}?`, message: `Its Sales (${b.saleVno}) & Purchase (${b.purchaseVno}) invoices will be reversed out of the books. The record stays view-only under Deleted and its numbers can never be reused.`, danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
     if (!confirmed) return;
     setBusyId(b.id);
-    try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); toast(`Deleted ${b.bookingNo} & reversed out of the books`); }
+    try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); setOpen(null); toast(`Deleted ${b.bookingNo} & reversed out of the books`); }
     catch (e) { toast(e.message || 'Delete failed', 'error'); }
     finally { setBusyId(null); }
   };
@@ -1280,7 +1318,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
 
   const onApprove = async (b) => {
     setBusyId(b.id); setMsg('');
-    try { const res = await apiPost('/api/booking-orders/' + b.id + '/approve'); setMsg(res.noSupplier ? `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} (no purchase leg).` : `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno}.`); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }
+    try { const res = await apiPost('/api/booking-orders/' + b.id + '/approve'); setMsg(res.noSupplier ? `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} (no purchase leg).` : `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno}.`); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Approve failed')); } finally { setBusyId(null); }
   };
   // Open the editor. Editing an already-approved booking reverses its posted Sales/
@@ -1301,10 +1339,13 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   };
   const onDelete = async (b) => {
     if (!canDelete) return;
-    const { confirmed, reason } = await confirmDialog({ title: `Delete approved booking ${b.bookingNo}?`, message: `Its Sales (${b.saleVno}) & Purchase (${b.purchaseVno}) are reversed out of the books; kept view-only under Deleted, numbers never reused.`, danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
+    // A pending booking hasn't posted, so there's nothing to reverse — only the
+    // approved-tab delete unwinds the posted Sales/Purchase. Either way the number is burned.
+    const posted = b.status === 'approved' || b.status === 'posted';
+    const { confirmed, reason } = await confirmDialog({ title: `Delete ${posted ? 'approved ' : ''}booking ${b.bookingNo}?`, message: posted ? `Its Sales (${b.saleVno}) & Purchase (${b.purchaseVno}) are reversed out of the books; kept view-only under Deleted, numbers never reused.` : `It has no books impact; kept view-only under Deleted, numbers never reused.`, danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
     if (!confirmed) return;
     setBusyId(b.id);
-    try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); setOpen(null); setMsg(`✓ Deleted ${b.bookingNo}.`); }
+    try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); setOpen(null); setMsg(`✓ Deleted ${b.bookingNo}.`); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Delete failed')); } finally { setBusyId(null); }
   };
   const onApproveSelected = async () => {
@@ -1312,7 +1353,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
     const { confirmed } = await confirmDialog({ title: `Approve ${sel.size} selected voucher(s)?`, message: 'Each posts its linked Sales + Purchase.', confirmLabel: 'Approve' });
     if (!confirmed) return;
     setBusyId('bulk'); setMsg(`⏳ Approving ${sel.size} voucher(s)… please wait.`);
-    try { const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] }); setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`); setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }
+    try { const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] }); setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`); setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Bulk approve failed')); } finally { setBusyId(null); }
   };
 

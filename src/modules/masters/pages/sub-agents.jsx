@@ -8,10 +8,12 @@
 
 import React, { useState } from 'react';
 import { Plus, Download } from 'lucide-react';
-import { SUBAGENTS, ACTIVE_CURRENCIES } from '../../../core/data';
+import { ACTIVE_CURRENCIES } from '../../../core/data';
+import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { exportToExcel } from '../../../core/exportExcel';
 import { PageLayout } from '../../../shell/PageLayout';
 import { Modal, Button, Input, Select, FormField, ResponsiveGrid, StatusPill } from '../../../shell/primitives';
+import { clickable } from '../../../core/ux/clickable';
 
 const TYPE_TONE = { Retail: 'info', Corporate: 'warning', Local: 'success', Online: 'success' };
 const f = (n) => '₹' + Number(Math.round(n)).toLocaleString('en-IN');
@@ -22,6 +24,10 @@ export function MastersSubAgents() {
   const [sel, setSel] = useState(null);
   const [form, setForm] = useState(blankForm);
   const setF = (o) => setForm((p) => ({ ...p, ...o }));
+  // Live sub-agent master (/api/sub-agents); Add persists via the create mutation.
+  const { data: SUBAGENTS = [] } = useMasterList('sub-agents');
+  const { create } = useMasterMutations('sub-agents');
+  const addSubAgent = () => create.mutate(form, { onSuccess: () => { setModal(false); setForm(blankForm); } });
 
   const KPIS = [
     { l: 'Sub-Agents', v: String(SUBAGENTS.length), c: '#2e323c' },
@@ -64,7 +70,7 @@ export function MastersSubAgents() {
           const open = sel?.id === s.id;
           const tone = TYPE_TONE[s.type] || 'neutral';
           return (
-            <div key={s.id} onClick={() => setSel(open ? null : s)}
+            <div key={s.id} {...clickable(() => setSel(open ? null : s))}
               className={`cursor-pointer rounded-brand border border-t-[4px] bg-surface p-3.5 transition ${open ? 'shadow-brand' : 'border-surface-border shadow-sm hover:shadow'}`}
               style={{ borderTopColor: { info: '#2563eb', warning: '#d97706', success: '#16a34a', neutral: '#2e323c' }[tone] }}>
               <div className="mb-2.5 flex items-start justify-between">
@@ -103,7 +109,7 @@ export function MastersSubAgents() {
 
       {modal && (
         <Modal title="Add Sub-Agent" maxWidth={600} onClose={() => setModal(false)}
-          footer={<><Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button><Button variant="primary" size="sm" onClick={() => setModal(false)}>Add Sub-Agent</Button></>}>
+          footer={<><Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button><Button variant="primary" size="sm" disabled={!form.name || create.isPending} onClick={addSubAgent}>{create.isPending ? 'Adding…' : 'Add Sub-Agent'}</Button></>}>
           <div className="flex flex-col gap-3 p-4">
             <div className="grid grid-cols-2 gap-3">
               <FormField label="Agency name"><Input value={form.name} onChange={(e) => setF({ name: e.target.value })} /></FormField>

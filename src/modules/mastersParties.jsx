@@ -24,6 +24,7 @@ import { apiGet, getAuthToken } from '../core/api';
 import { BRANCH_CODES } from '../core/data';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { useHotkey } from '../core/ux/hotkeys';
+import { Combobox } from '../core/ux/Combobox';
 import { toast } from '../core/ux/toast';
 import { Kbd } from '../core/ux/widgets.jsx';
 import { PageLayout } from '../shell/PageLayout';
@@ -36,7 +37,7 @@ const tabPanel = (children) => <div className="min-h-[360px] p-4 tablet:p-5">{ch
 const SUPPLIER_CATS = ['Airline', 'DMC', 'Hotel', 'Visa', 'Insurance', 'Car', 'Misc'];
 const GST_TREATMENTS = ['', 'Registered — Regular', 'Registered — Composition', 'Unregistered', 'SEZ', 'Overseas'];
 const MSME_STATUS = ['', 'Not Registered', 'Micro', 'Small', 'Medium'];
-const TDS_SECTIONS = ['', '194C @ 2%', '194J @ 10%', '194I @ 10%', '194H @ 5%', '194O @ 0.1%', 'None'];
+const TDS_SECTIONS = ['', '194C @ 2%', '194J @ 10%', '194I @ 10%', '194H @ 2%', '194O @ 0.1%', 'None'];
 const PAY_TERMS = ['', 'Advance', 'Net 15', 'Net 30', 'Net 45', 'Net 60', 'Net 90'];
 const SETTLE_CYCLES = ['', 'Weekly', 'Bi-Monthly (BSP)', 'Monthly', 'On Invoice'];
 const PAY_METHODS = ['', 'Bank Transfer', 'BSP NEFT', 'NEFT/RTGS', 'Cheque', 'UPI', 'Cash'];
@@ -314,12 +315,17 @@ function PartyShell({ title, subtitle, m, tabs, tab, setTab, children }) {
 
   const selector = (
     <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
-      <label className="text-[11px] font-bold text-ink-muted">Record</label>
+      <label className="text-[11px] font-bold text-ink-muted" htmlFor="party-record-select">Record</label>
+      {/* Searchable picker — type-ahead over potentially long customer/supplier lists. */}
       <div className="min-w-[280px]">
-        <Select value={(current && current.id) || ''} onChange={(e) => m.setSelectedId(e.target.value)} className="font-semibold">
-          {rows.length === 0 && <option value="">— no records —</option>}
-          {rows.map((r) => <option key={r.id} value={r.id}>{r.name}{r.branch ? ` · ${r.branch}` : ''}</option>)}
-        </Select>
+        <Combobox
+          id="party-record-select"
+          ariaLabel="Record"
+          value={(current && current.id) || ''}
+          options={[...rows].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' })).map((r) => ({ value: r.id, label: r.name, sublabel: r.branch ? `· ${r.branch}` : '' }))}
+          onChange={(id) => m.setSelectedId(id)}
+          placeholder={rows.length === 0 ? '— no records —' : 'Search records…'}
+        />
       </div>
       <span className="text-[11px] text-ink-muted">{rows.length} record{rows.length === 1 ? '' : 's'}</span>
       {current && current.name && (

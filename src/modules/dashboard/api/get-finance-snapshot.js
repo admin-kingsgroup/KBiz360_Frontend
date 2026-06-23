@@ -1,15 +1,6 @@
-import {
-  BANK_ACCOUNTS_DATA,
-  BRANCH_PL_HEATMAP,
-  PERIOD_CLOSE_DATA,
-  RECON_STATUS_DATA,
-  VARIANCE_FLAGS_DATA,
-} from '../../../core/helpers';
-import {
-  CASH_FORECAST_13W,
-  FY_TARGETS_DATA,
-} from '../../../core/data';
 import { apiGet } from '../../../core/api';
+import { isBankRow } from '../../../core/ledgerKind';
+import { CUR_MONTH } from '../../../core/dates';
 
 /**
  * Finance-snapshot data access.
@@ -81,16 +72,18 @@ const topEntities = async (category, branchCode) => {
 export const getTopCustomers = async (branchCode) => topEntities('sale', branchCode);
 export const getTopSuppliers = async (branchCode) => topEntities('purchase', branchCode);
 
-// AR / AP ageing buckets (live, FIFO) → the shape AgeingBuckets renders.
+// AR / AP ageing buckets (live, bill-wise / no FIFO) → the shape AgeingBuckets renders.
 const BUCKET_META = [
   ['d0', '0–30 days', '#16a34a'],
   ['d30', '31–60 days', '#d97706'],
   ['d60', '61–90 days', '#dc2626'],
   ['d90', '90+ days', '#6b1010'],
 ];
-const ageingSide = async (sideKey) => {
+const ageingSide = async (sideKey, branchCode) => {
   try {
-    const d = await apiGet('/api/accounting/ageing');
+    // Branch-scope the ageing call (every sibling dashboard call passes branch); without
+    // it the AR/AP buckets show consolidated all-branch data mixed with branch KPIs.
+    const d = await apiGet('/api/accounting/ageing', { branch: branchCode });
     const sd = d && d[sideKey];
     if (!sd) return [];
     const rows = sd.rows || [], totals = sd.totals || {};
@@ -101,16 +94,106 @@ const ageingSide = async (sideKey) => {
     }));
   } catch { return []; }
 };
-export const getArAgeingSummary = async () => ageingSide('receivables');
-export const getApAgeingSummary = async () => ageingSide('payables');
+export const getArAgeingSummary = async (branchCode) => ageingSide('receivables', branchCode);
+export const getApAgeingSummary = async (branchCode) => ageingSide('payables', branchCode);
 
-// ── Phase 2 (need new backend endpoints) — still seed data for now ──────────
-export const getBankAccounts = async () => BANK_ACCOUNTS_DATA;
-export const getFyTargets = async () => FY_TARGETS_DATA;
-export const getBranchHeatmap = async () => BRANCH_PL_HEATMAP;
-// Key Alerts are now derived live in the dashboard service (buildKeyAlerts) from
-// ageing + module P&L + concentration — no seed accessor needed.
-export const getCashForecast = async () => CASH_FORECAST_13W;
-export const getPeriodClose = async () => PERIOD_CLOSE_DATA;
-export const getReconStatus = async () => RECON_STATUS_DATA;
-export const getVarianceFlags = async () => VARIANCE_FLAGS_DATA;
+// ── LIVE (Phase 2 wiring) ───────────────────────────────────────────────────
+// Recent variance flags — live from indirect-expense budget vs actual. Over-budget
+// ledgers become the SR-FM "Recent Variance Flags" panel. Shape the widget needs:
+// { account, pct, variance, branch, date }.
+export const getVarianceFlags = async (branchCode) => {
+  try {
+    const d = await apiGet('/api/accounting/budget-vs-actual', { branch: branchCode });
+    const today = new Date().toISOString().slice(0, 10);
+    return (d?.rows || [])
+      .filter((r) => (r.actual || 0) > (r.budget || 0)) // only overruns are "flags"
+      .map((r) => {
+        const over = Math.round((r.actual || 0) - (r.budget || 0));
+        return { account: r.name, variance: over, pct: r.budget ? Math.round((over / r.budget) * 100) : 0, branch: branchCode || 'All', date: today };
+      })
+      .sort((a, b) => b.variance - a.variance);
+  } catch { return []; }
+};
+
+// Bank reconciliation status — live: one summary per active bank ledger, mapped to
+// the panel's { bank, status, matched, unmatched }. 'Clean' (green) when nothing is
+// unreconciled, 'Behind' (red) when there's an open backlog (see statusColor()).
+export const getReconStatus = async (branchCode) => {
+  try {
+    const ledgers = await apiGet('/api/bank-reconciliation/ledgers', { branch: branchCode });
+    const list = Array.isArray(ledgers) ? ledgers : [];
+    return await Promise.all(list.map(async (lg) => {
+      try {
+        const s = await apiGet('/api/bank-reconciliation/summary', { ledger: lg.name, branch: branchCode });
+        const c = s?.counts || {};
+        const matched = (c.statementReconciled || 0) + (c.statementPartial || 0);
+        const unmatched = (c.statementUnreconciled || 0) + (c.statementException || 0);
+        const status = unmatched > 0 ? 'Behind' : (matched > 0 ? 'Clean' : 'Pending');
+        return { bank: lg.name, status, matched, unmatched };
+      } catch { return { bank: lg.name, status: 'Pending', matched: 0, unmatched: 0 }; }
+    }));
+  } catch { return []; }
+};
+
+// Bank balances — live: each Bank-group ledger's closing balance from the Trial
+// Balance (branch-scoped). Mapped to the BankBalancesPanel shape
+// { id, bank, branch, accountNo, currency, openingBal, limit }; openingBal carries
+// the live closing balance (Dr − Cr) so the "Banks Balance Total" KPI is real.
+export const getBankAccounts = async (branchCode) => {
+  try {
+    const d = await apiGet('/api/accounting/trial-balance', { branch: branchCode });
+    return (d?.rows || [])
+      .filter((r) => isBankRow(r))
+      .map((r) => ({
+        id: r.ledger,
+        bank: r.ledger,
+        branch: branchCode || 'All',
+        accountNo: '',
+        currency: '₹',
+        openingBal: Math.round((r.closingDebit || 0) - (r.closingCredit || 0)),
+        limit: 0,
+      }))
+      .sort((a, b) => b.openingBal - a.openingBal);
+  } catch { return []; }
+};
+
+// Branch × month GP heatmap — live (GET /api/accounting/branch-heatmap). Each row
+// { branch, cells:[{month, rev, gp}] } drives the Director heatmap shading (GP%).
+export const getBranchHeatmap = async (fy) => {
+  try {
+    const d = await apiGet('/api/accounting/branch-heatmap', { fy });
+    return d?.rows || [];
+  } catch { return []; }
+};
+
+// 13-week cash-flow forecast — live (GET /api/accounting/cash-forecast). Returns
+// [{ week, inflow, outflow, closing }] derived from open AR/AP bills' due dates.
+export const getCashForecast = async (branchCode) => {
+  try {
+    const d = await apiGet('/api/accounting/cash-forecast', { branch: branchCode });
+    return d?.rows || [];
+  } catch { return []; }
+};
+
+// Period-close status per branch — LIVE, derived from the books. There is no
+// dedicated period-lock subsystem, so the one signal we can know for certain is
+// whether the branch still has unposted (pending) vouchers this month: zero pending
+// ⇒ every entry is posted, so the period is effectively closed from a data-entry
+// standpoint. tbClosed/reconciled/approved all reflect that same real signal — never
+// a fabricated tick. (When a true month-end-lock subsystem lands, source it here.)
+export const getPeriodClose = async () => {
+  try {
+    const [branches, pending] = await Promise.all([
+      apiGet('/api/branches'),
+      apiGet('/api/vouchers', { status: 'pending', from: `${CUR_MONTH}-01`, to: `${CUR_MONTH}-31` }),
+    ]);
+    const pendingByBr = {};
+    for (const v of (pending || [])) pendingByBr[v.branch] = (pendingByBr[v.branch] || 0) + 1;
+    return (branches || [])
+      .filter((b) => b && b.code && b.active !== false)
+      .map((b) => {
+        const done = !(pendingByBr[b.code] > 0); // no pending vouchers ⇒ all posted
+        return { branch: b.code, tbClosed: done, reconciled: done, approved: done, status: done ? 'Closed' : 'Open' };
+      });
+  } catch { return []; }
+};

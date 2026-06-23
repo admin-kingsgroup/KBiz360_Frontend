@@ -1,18 +1,14 @@
-import { BOOKING_FILES_SEED } from '../../../core/helpers';
-import { isoDate } from '../../../core/dates';
+import { apiGet } from '../../../core/api';
+import { todayISO } from '../../../core/dates';
+import { selectUpcomingTravel } from '../utils/transformers';
 
-// Rolling 2-week window from today (recomputed each call so it tracks the real date).
-export const getUpcomingTravel = async ({ limit = 5 } = {}) => {
-  const now = new Date();
-  const WINDOW_FROM = isoDate(now);
-  const WINDOW_TO = isoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 14));
-  return (BOOKING_FILES_SEED || [])
-    .filter((b) => {
-      const dep = b.travelDate || b.departure;
-      return dep && dep >= WINDOW_FROM && dep <= WINDOW_TO;
-    })
-    .sort((a, b) =>
-      (a.travelDate || a.departure || '').localeCompare(b.travelDate || b.departure || ''),
-    )
-    .slice(0, limit);
+// Upcoming travel — LIVE from /api/booking-orders (no seed array). Prefers bookings
+// with a travelDate in the next 14 days (soonest first); falls back to the most
+// recent bookings when older data has no travelDate yet. Shaping is the pure
+// selectUpcomingTravel transform (unit-tested).
+export const getUpcomingTravel = async ({ limit = 5, branchCode } = {}) => {
+  try {
+    const bookings = (await apiGet('/api/booking-orders', branchCode ? { branch: branchCode } : {})) || [];
+    return selectUpcomingTravel(bookings, todayISO(), 14, limit);
+  } catch { return []; }
 };

@@ -6,8 +6,8 @@ const EMPTY_BRANCH = { receipt: 0, payment: 0, journal: 0, total: 0, value: 0 };
 
 export function useAcctsExecDashboard(branchCode) {
   const query = useQuery({
-    queryKey: ['dashboard', 'accts-exec'],
-    queryFn: loadAcctsExecDashboard,
+    queryKey: ['dashboard', 'accts-exec', branchCode || ''],
+    queryFn: () => loadAcctsExecDashboard({ branchCode }),
   });
 
   const branchData = useMemo(

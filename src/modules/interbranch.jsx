@@ -34,6 +34,8 @@ import { VoucherEditor } from './accountingLive';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { PageLayout } from '../shell/PageLayout';
 import { Button, StatusPill, Card, ResponsiveGrid, LoadingState, EmptyState } from '../shell/primitives';
+import { clickable } from '../core/ux/clickable';
+import { openPrintPreview } from '../core/PrintPreview';
 
 /* ── inter-branch ledger detector ──────────────────────────────────────
    Only fires INSIDE the Sundry Debtors / Sundry Creditors groups (checked
@@ -197,7 +199,7 @@ export function RPT_InterbranchElim() {
       actions={
         <>
           <PeriodBar branch="ALL" defaultPreset="all" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
-          <Button variant="secondary" size="sm" icon={Printer} onClick={() => window.print()}>Print</Button>
+          <Button variant="secondary" size="sm" icon={Printer} onClick={() => openPrintPreview({ selector: 'main', title: 'Inter-Branch', recommend: 'portrait' })}>Print</Button>
           <Button variant="secondary" size="sm" icon={FileSpreadsheet} onClick={doExcel}>Excel</Button>
           <Button variant="secondary" size="sm" icon={FileText} onClick={doCsv}>CSV</Button>
         </>
@@ -368,7 +370,7 @@ function DetailGroup({ title, accent, side, rows, open, setOpen, from, to, onVou
         const isOpen = open === key;
         return (
           <div key={r.ledger} style={{ border: '1px solid #eef1f6', borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
-            <div onClick={() => setOpen(isOpen ? '' : key)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', cursor: 'pointer', background: isOpen ? '#f7f8fb' : '#fff' }}>
+            <div {...clickable(() => setOpen(isOpen ? '' : key))} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', cursor: 'pointer', background: isOpen ? '#f7f8fb' : '#fff' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                 <span style={{ color: '#b9bed4', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>▸</span>
                 <div style={{ minWidth: 0 }}>

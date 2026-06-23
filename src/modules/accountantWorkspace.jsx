@@ -5,6 +5,7 @@
 // Branch-scoped via the top-right selector (the `branch` prop), exactly like every
 // other live screen. Cards/links jump into the existing working screens via setRoute.
 import React, { useEffect, useMemo, useState } from 'react';
+import { clickable } from '../core/ux/clickable';
 import { bc } from '../core/styles';
 import {
   branchCode, useAgeing, useTaxSummary, useTrialBalance, useVoucherApprovals,
@@ -13,6 +14,26 @@ import {
 } from '../core/useAccounting';
 import { useTaxCalendar } from '../core/useReference';
 import { useBankLedgers, useBankReconSummary } from '../core/useBankReco';
+import {
+  useSupplierBook, useSupplierStatement, useSupplierReconSummary,
+  useImportSupplierStatement, useSupplierAutoMatch, useSupplierManualMatch,
+  useSupplierUnmatch, useSetSupplierReconStatus, useClearSupplierStatement,
+  useDeleteSupplierStatementLine,
+} from '../core/useSupplierReco';
+import { parseSupplierStatement } from '../core/supplierStatementParse';
+import {
+  useClientList, useClientBook, useClientStatement, useClientAllocation, useClientReconSummary,
+  useImportClientStatement, useClientAutoMatch, useClientAutoMatchAll, useClientManualMatch,
+  useClientUnmatch, useSetClientReconStatus, useClearClientStatement, useDeleteClientStatementLine,
+} from '../core/useClientReco';
+import { parseClientStatement } from '../core/clientStatementParse';
+import { useInterBranchReco } from '../core/useInterBranchReco';
+import {
+  useTallyBook, useTallyRows, useTallyRecoSummary, useImportTally, useTallyAutoMatch,
+  useTallyManualMatch, useTallyUnmatch, useSetTallyRecoStatus, useClearTally, useDeleteTallyLine,
+} from '../core/useTallyReco';
+import { parseTallyStatement } from '../core/tallyStatementParse';
+import { useCollectionsBoard, useUpsertFollowup, useAddContact, useReminderRun } from '../core/useCollections';
 import {
   Wallet, Landmark, CheckSquare, TrendingUp, TrendingDown, ReceiptText, AlertTriangle,
   ListChecks, ArrowRight, Plus, RefreshCw, Calendar, History, AlertCircle, CheckCircle2,
@@ -63,7 +84,7 @@ const aBtn = (bg) => ({ padding: '5px 11px', fontSize: 11, fontWeight: 700, bord
 // ════════════════════════ 1) DASHBOARD ACCOUNTANT ════════════════════════════
 // Module-level so they don't remount each render.
 const Tile = ({ icon, label, value, sub, tone = C.dark, onClick }) => (
-  <div onClick={onClick} style={{ ...card, padding: 14, cursor: onClick ? 'pointer' : 'default', minWidth: 180, flex: '1 1 180px', borderLeft: `4px solid ${tone}` }}>
+  <div {...(onClick ? clickable(onClick) : {})} style={{ ...card, padding: 14, cursor: onClick ? 'pointer' : 'default', minWidth: 180, flex: '1 1 180px', borderLeft: `4px solid ${tone}` }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: C.dim, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>{icon}{label}</div>
     <div style={{ fontSize: 21, fontWeight: 800, color: tone, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
     {sub && <div style={{ fontSize: 11, color: C.dim, marginTop: 3 }}>{sub} {onClick && <ArrowRight size={11} style={{ verticalAlign: 'middle' }} />}</div>}
@@ -76,7 +97,7 @@ const Row = ({ children }) => <div style={{ display: 'flex', gap: 12, flexWrap: 
 function AgeBucketRow({ label, totals = {}, cur, tone, onClick }) {
   const cell = (v, red) => <td style={{ padding: '7px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: red && v > 0 ? C.red : C.dark, whiteSpace: 'nowrap' }}>{v ? money(cur, v) : '—'}</td>;
   return (
-    <tr onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', borderTop: '1px solid #f0f2f7' }}>
+    <tr {...(onClick ? clickable(onClick) : {})} style={{ cursor: onClick ? 'pointer' : 'default', borderTop: '1px solid #f0f2f7' }}>
       <td style={{ padding: '7px 10px', fontWeight: 700, color: tone, whiteSpace: 'nowrap' }}>{label}</td>
       {cell(totals.d0)}{cell(totals.d30)}{cell(totals.d60)}{cell(totals.d90, true)}
       <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: tone, fontVariantNumeric: 'tabular-nums' }}>{money(cur, totals.total || 0)}{onClick && <ArrowRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4 }} />}</td>
@@ -116,8 +137,10 @@ export function DashboardAccountant({ branch, setRoute }) {
   // `.data || []` then `.length` yielded undefined → pendCount became NaN (tile showed
   // "NaN" and the "all posted" check never went green). Use the entries[] array.
   const pendVouchers = useVoucherApprovals(branch, 'pending').data?.entries || [];
-  const sales = useSalesRegister(branch).data || [];
-  const purch = usePurchaseRegister(branch).data || [];
+  // Dashboard only shows THIS MONTH's sales/purchase totals, so scope the register
+  // queries to the current month instead of pulling the whole branch history.
+  const sales = useSalesRegister(branch, { from: monthFrom, to: today }).data || [];
+  const purch = usePurchaseRegister(branch, { from: monthFrom, to: today }).data || [];
   const out = useOutstanding(branch).data || {};
   const day = useDayBook(branch, { from: today, to: today }).data || [];
   const savedTicks = useConfigValue(`month-end:${branchCode(branch) || 'ALL'}:${ym}`).data || {};
@@ -300,7 +323,7 @@ export function DashboardAccountant({ branch, setRoute }) {
           <SecTitle>Worklist — needs action</SecTitle>
           <Row>
             <Tile icon={<CheckSquare size={13} />} label="Pending to Approve & Post" value={pendCount} sub="Open approvals" tone={C.amber} onClick={() => go('/transactions/approvals')} />
-            <Tile icon={<ReceiptText size={13} />} label="Unallocated Receipts" value={money(cur, onAcctSum)} sub={`${onAcct.length} on-account · settle bills`} tone={C.blue} onClick={() => go('/finance/outstanding')} />
+            <Tile icon={<ReceiptText size={13} />} label="Unallocated Receipts" value={money(cur, onAcctSum)} sub={`${onAcct.length} on-account · settle bills`} tone={C.blue} onClick={() => go('/reports/rec')} />
             <Tile icon={<AlertTriangle size={13} />} label="Suspense / To Fix" value={suspense.length} sub="Clear suspense" tone={C.red} onClick={() => go('/accounts/suspense')} />
             <Tile icon={<ListChecks size={13} />} label="Month-End Progress" value={`${checklistDone}/6`} sub="Open close checklist" tone={checklistDone === 6 ? C.green : C.dark} onClick={() => setActiveTab('compliance')} />
           </Row>
@@ -348,7 +371,7 @@ export function DashboardAccountant({ branch, setRoute }) {
               <tbody>
                 <AgeBucketRow label="Debtors (Receivable)" totals={rec} cur={cur} tone={C.blue} onClick={() => go('/reports/rec')} />
                 <AgeBucketRow label="Creditors (Payable)" totals={pay} cur={cur} tone={C.amber} onClick={() => go('/reports/pay')} />
-                <tr onClick={() => go('/accounts/net-ageing')} style={{ borderTop: `2px solid ${C.border}`, background: '#fafbff', cursor: 'pointer' }}>
+                <tr {...clickable(() => go('/accounts/net-ageing'))} style={{ borderTop: `2px solid ${C.border}`, background: '#fafbff', cursor: 'pointer' }}>
                   <td style={{ padding: '7px 10px', fontWeight: 800, color: C.dark }}>Net Working Position</td>
                   <td colSpan={4} />
                   <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: recNet >= 0 ? C.green : C.red, fontVariantNumeric: 'tabular-nums' }}>{money(cur, recNet)} <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></td>
@@ -501,7 +524,7 @@ export function DashboardAccountant({ branch, setRoute }) {
               const ok = it.manualOnly ? !!manualChecklist[it.key] : it.auto;
               return (
                 <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderTop: i ? '1px solid #f0f2f7' : 'none' }}>
-                  <span onClick={() => it.manualOnly && toggleManualCheck(it.key)}
+                  <span {...(it.manualOnly ? clickable(() => toggleManualCheck(it.key)) : {})}
                     style={{ width: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? 'pointer' : 'default', background: ok ? C.green : (it.manualOnly ? '#cbd0db' : C.amber), fontSize: 11 }}>
                     {ok ? '✓' : (it.manualOnly ? '' : '!')}
                   </span>
@@ -579,40 +602,123 @@ export function NetAgeing({ branch }) {
   );
 }
 
-// ════════════════════════ 3) COLLECTIONS FOLLOW-UP ════════════════════════════
+// ════════════════════════ 3) COLLECTIONS FOLLOW-UP (DUNNING WORKSPACE) ═════════
+// Real collections workspace: live overdue receivables (from the ageing engine)
+// merged with persisted follow-up state — status, promise-to-pay, contact log,
+// reminder count and dunning level. Batch "Send reminders" logs a dunning run.
+const DUN_STATUS = ['open', 'promised', 'escalated', 'closed'];
+const STATUS_C = { open: C.dim, promised: C.green, escalated: C.red, closed: C.blue };
+const dunBadge = (s) => ({ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 800, color: '#fff', background: STATUS_C[s] || C.dim, textTransform: 'capitalize' });
+const fmtWhen = (d) => (d ? String(d).slice(0, 10) : '');
+
 export function CollectionsFollowup({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
-  const age = useAgeing(branch).data || {};
-  // Overdue = anything older than 30 days; sort the worst payers first.
-  const overdue = useMemo(() => (age.receivables?.rows || [])
-    .map((r) => ({ ...r, overdue: (r.d30 || 0) + (r.d60 || 0) + (r.d90 || 0) }))
-    .filter((r) => r.overdue > 0.5)
-    .sort((a, b) => b.overdue - a.overdue), [age]);
-  const total = overdue.reduce((s, r) => s + r.overdue, 0);
+  const boardQ = useCollectionsBoard(branch);
+  const board = boardQ.data || { rows: [], totals: {} };
+  const rows = board.rows || [];
+  const t = board.totals || {};
+
+  const upsert = useUpsertFollowup();
+  const contact = useAddContact();
+  const remind = useReminderRun();
+  const brCode = branch?.code || branch;
+
+  const [openLog, setOpenLog] = useState(null);   // party whose contact log/form is expanded
+  const [draft, setDraft] = useState({ channel: 'call', note: '', outcome: '' });
+
+  const save = (party, patch) => upsert.mutate({ party, branch: brCode, ...patch });
+  const logContact = (party) => {
+    if (!draft.note && !draft.outcome) return;
+    contact.mutate({ party, branch: brCode, ...draft }, { onSuccess: () => setDraft({ channel: 'call', note: '', outcome: '' }) });
+  };
+
   return (
-    <Shell title="Collections Follow-up" sub={`${brLabel(branch)} · customers overdue > 30 days · chase the worst first`}
-      right={<div style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: C.red }}>Overdue {money(cur, total)} · {overdue.length} customers</div>}>
+    <Shell title="Collections Follow-up" sub={`${brLabel(branch)} · overdue customers (>30d) with promise-to-pay, contact log & dunning`}
+      right={
+        <>
+          <div style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: C.red }}>Overdue {money(cur, t.overdue || 0)} · {t.customers || 0} customers</div>
+          <button disabled={!rows.length || remind.isPending} onClick={() => remind.mutate({ branch: brCode, channel: 'whatsapp' })}
+            style={{ ...aBtn(C.amber), opacity: !rows.length || remind.isPending ? 0.6 : 1 }}>
+            <ReceiptText size={12} /> {remind.isPending ? 'Sending…' : 'Send reminders to all'}</button>
+        </>
+      }>
+      {remind.data && <div style={{ ...card, padding: 10, marginBottom: 10, color: C.green, fontWeight: 700, fontSize: 12 }}>✓ Dunning run logged — {remind.data.reminded} reminder(s) via {remind.data.channel}.</div>}
       <Table>
         <thead><tr>
           <th style={th}>Customer</th>
           {AGE_COLS.map(([, l]) => <th key={l} style={{ ...th, ...rnum }}>{l}</th>)}
-          <th style={{ ...th, ...rnum }}>Overdue</th><th style={{ ...th, ...rnum }}>Total Due</th>
+          <th style={{ ...th, ...rnum }}>Overdue</th>
+          <th style={th}>Status</th><th style={th}>Promise</th><th style={{ ...th, ...rnum }}>Remind</th>
           <th style={{ ...th, textAlign: 'center' }}>Action</th>
         </tr></thead>
         <tbody>
-          {overdue.length === 0 && <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: C.green, padding: 20 }}>✓ Nothing overdue — all current.</td></tr>}
-          {overdue.map((r, i) => (
-            <tr key={i} style={{ background: i % 2 ? '#fafbff' : '#fff' }}>
-              <td style={{ ...td, fontWeight: 600, color: C.dark }}>{r.party}</td>
-              {AGE_COLS.map(([k]) => <td key={k} style={{ ...td, ...rnum, color: k === 'd90' && r[k] > 0 ? C.red : C.dark }}>{r[k] ? money(cur, r[k]) : '—'}</td>)}
-              <td style={{ ...td, ...rnum, fontWeight: 800, color: C.red }}>{money(cur, r.overdue)}</td>
-              <td style={{ ...td, ...rnum, fontWeight: 700 }}>{money(cur, r.total)}</td>
-              <td style={{ ...td, textAlign: 'center', whiteSpace: 'nowrap' }}>
-                <button onClick={() => setRoute && setRoute('/reports/client-statement')} style={{ ...aBtn(C.dark), marginRight: 5 }}>Statement</button>
-                <button onClick={() => setRoute && setRoute('/receipts')} style={aBtn(C.green)}>Record Receipt</button>
-              </td>
-            </tr>
-          ))}
+          {rows.length === 0 && <tr><td colSpan={10} style={{ ...td, textAlign: 'center', color: C.green, padding: 20 }}>✓ Nothing overdue — all current.</td></tr>}
+          {rows.map((r) => {
+            const f = r.followup || {};
+            const isOpen = openLog === r.party;
+            return (
+              <React.Fragment key={r.party}>
+                <tr style={{ background: isOpen ? '#f4f8ff' : '#fff' }}>
+                  <td style={{ ...td, fontWeight: 600, color: C.dark }}>{r.party}
+                    {f.dunningLevel > 0 && <span style={{ marginLeft: 6, fontSize: 10, color: C.red, fontWeight: 800 }}>L{f.dunningLevel}</span>}
+                    <div style={{ fontSize: 10.5, color: C.dim }}>Total due {money(cur, r.total)}{f.lastContactAt ? ` · last contact ${fmtWhen(f.lastContactAt)}` : ''}</div>
+                  </td>
+                  {AGE_COLS.map(([k]) => <td key={k} style={{ ...td, ...rnum, color: k === 'd90' && r[k] > 0 ? C.red : C.dark }}>{r[k] ? money(cur, r[k]) : '—'}</td>)}
+                  <td style={{ ...td, ...rnum, fontWeight: 800, color: C.red }}>{money(cur, r.overdue)}</td>
+                  <td style={td}>
+                    <select value={f.status || 'open'} onChange={(e) => save(r.party, { status: e.target.value })}
+                      style={{ ...dunBadge(f.status || 'open'), border: 'none', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
+                      {DUN_STATUS.map((s) => <option key={s} value={s} style={{ color: '#000', background: '#fff' }}>{s}</option>)}
+                    </select>
+                  </td>
+                  <td style={td}>
+                    <input type="date" value={fmtWhen(f.promisedDate)} onChange={(e) => save(r.party, { promisedDate: e.target.value, status: e.target.value ? 'promised' : (f.status || 'open') })}
+                      style={{ padding: '3px 6px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11 }} />
+                  </td>
+                  <td style={{ ...td, ...rnum }}>
+                    <span style={{ fontWeight: 700 }}>{f.remindersSent || 0}</span>
+                    <button title="Send one reminder" onClick={() => remind.mutate({ branch: brCode, parties: [r.party], channel: 'whatsapp' })} style={{ ...aBtn(C.amber), marginLeft: 6, padding: '3px 7px' }}>Remind</button>
+                  </td>
+                  <td style={{ ...td, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    {setRoute && <button title="Customer 360°" onClick={() => setRoute(`/reports/customer-360?party=${encodeURIComponent(r.party)}`)} style={{ ...aBtn(C.blue), marginRight: 4 }}>360°</button>}
+                    {setRoute && <button onClick={() => setRoute(`/reports/client-statement?party=${encodeURIComponent(r.party)}`)} style={{ ...aBtn(C.dark), marginRight: 4 }}>Statement</button>}
+                    {setRoute && <button onClick={() => setRoute('/receipts')} style={{ ...aBtn(C.green), marginRight: 4 }}>Receipt</button>}
+                    <button onClick={() => { setOpenLog(isOpen ? null : r.party); setDraft({ channel: 'call', note: '', outcome: '' }); }} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>{isOpen ? 'Hide' : `Log (${(f.contactLog || []).length})`}</button>
+                  </td>
+                </tr>
+                {isOpen && (
+                  <tr>
+                    <td colSpan={10} style={{ ...td, background: '#f7f9ff' }}>
+                      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                        <div style={{ flex: '1 1 320px' }}>
+                          <div style={{ fontSize: 11, fontWeight: 800, color: C.dim, marginBottom: 6 }}>LOG A CONTACT</div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <select value={draft.channel} onChange={(e) => setDraft((d) => ({ ...d, channel: e.target.value }))} style={{ padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12 }}>
+                              {['call', 'email', 'whatsapp', 'sms', 'visit', 'other'].map((c) => <option key={c}>{c}</option>)}
+                            </select>
+                            <input placeholder="Note (what was said)" value={draft.note} onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))} style={{ flex: 1, minWidth: 160, padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12 }} />
+                            <input placeholder="Outcome (e.g. promised 5th)" value={draft.outcome} onChange={(e) => setDraft((d) => ({ ...d, outcome: e.target.value }))} style={{ width: 180, padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12 }} />
+                            <button onClick={() => logContact(r.party)} style={aBtn(C.green)}>Save</button>
+                          </div>
+                          <textarea placeholder="Account notes (auto-saves)" defaultValue={f.notes || ''} onBlur={(e) => { if (e.target.value !== (f.notes || '')) save(r.party, { notes: e.target.value }); }}
+                            rows={2} style={{ width: '100%', boxSizing: 'border-box', marginTop: 8, border: `1px solid ${C.border}`, borderRadius: 6, padding: 6, fontSize: 12 }} />
+                        </div>
+                        <div style={{ flex: '1 1 320px' }}>
+                          <div style={{ fontSize: 11, fontWeight: 800, color: C.dim, marginBottom: 6 }}>CONTACT HISTORY ({(f.contactLog || []).length})</div>
+                          {(f.contactLog || []).length === 0 ? <div style={{ fontSize: 12, color: C.dim }}>No contact logged yet.</div> :
+                            (f.contactLog || []).map((c, j) => (
+                              <div key={j} style={{ fontSize: 11.5, padding: '4px 0', borderBottom: '1px solid #eef1f8' }}>
+                                <b style={{ color: C.dark }}>{fmtWhen(c.at)}</b> · {c.channel} · {c.by} {c.note ? `— ${c.note}` : ''} {c.outcome ? <span style={{ color: C.green }}>({c.outcome})</span> : null}
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            );
+          })}
         </tbody>
       </Table>
     </Shell>
@@ -620,16 +726,538 @@ export function CollectionsFollowup({ branch, setRoute }) {
 }
 
 // ════════════════════════ 4) SUPPLIER RECONCILIATION ══════════════════════════
+// Real statement reconciliation: import the vendor's statement of account, then
+// match it line-by-line against OUR creditor ledger (the book). Mirrors Bank
+// Reconciliation. Book side comes from the double-entry engine; statement side
+// from the imported rows. Differences surface a missing bill / unposted payment.
+const STATUS_TONE = { reconciled: C.green, partial: C.gold, exception: C.red, unreconciled: C.dim };
+const recoBadge = (s) => ({ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 800, color: '#fff', background: STATUS_TONE[s] || C.dim, textTransform: 'capitalize' });
+
 export function SupplierReco({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const age = useAgeing(branch).data || {};
+  const suppliers = useMemo(() => (age.payables?.rows || []).map((r) => r.party).filter(Boolean), [age]);
+  const [supplier, setSupplier] = useState('');
+  const sel = supplier || suppliers[0] || '';
+
+  const bookQ = useSupplierBook(sel, branch);
+  const stmtQ = useSupplierStatement(sel, branch);
+  const sumQ = useSupplierReconSummary(sel, branch);
+  const book = bookQ.data || { lines: [] };
+  const stmt = stmtQ.data || [];
+  const sum = sumQ.data || {};
+
+  const imp = useImportSupplierStatement();
+  const auto = useSupplierAutoMatch();
+  const manual = useSupplierManualMatch();
+  const unmatch = useSupplierUnmatch();
+  const setStatus = useSetSupplierReconStatus();
+  const del = useDeleteSupplierStatementLine();
+  const clear = useClearSupplierStatement();
+
+  const [paste, setPaste] = useState('');
+  const parsed = useMemo(() => parseSupplierStatement(paste), [paste]);
+  const unreconciledBook = (book.lines || []).filter((l) => !l.reconciled);
+
+  const doImport = () => {
+    if (!sel || !parsed.length) return;
+    imp.mutate({ supplier: sel, branch: branch?.code || branch, rows: parsed, fileName: 'pasted' },
+      { onSuccess: () => setPaste('') });
+  };
+
+  const diff = Number(sum.differenceAmount || 0);
+  const matchTo = (s, bookKey) => {
+    const b = (book.lines || []).find((x) => x.bookKey === bookKey);
+    if (!b) return;
+    manual.mutate({ id: s.id, bookKey: b.bookKey, vno: b.vno, bookDebit: b.debit, bookCredit: b.credit });
+  };
+
   return (
-    <Shell title="Supplier Reconciliation" sub={`${brLabel(branch)} · creditor balances by ageing — reconcile each against the supplier statement, then pay`}>
-      <AgeingTable side={age.payables} cur={cur} tone={C.amber} partyLabel="Supplier"
-        onAct={() => setRoute && setRoute('/payments')} actLabel="Record Payment" actBg={C.amber} />
-      <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
-        Tip: open each supplier's <b>Ledger Account</b> to match line-by-line against their statement; differences usually mean a missing bill, an unposted payment, or an ADM/ACM not captured.
+    <Shell title="Supplier Reconciliation"
+      sub={`${brLabel(branch)} · import the vendor statement, then match it against our ledger`}
+      right={
+        <>
+          <select value={sel} onChange={(e) => setSupplier(e.target.value)}
+            style={{ padding: '6px 10px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12.5, minWidth: 200 }}>
+            {!suppliers.length && <option value="">No suppliers with open balances</option>}
+            {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <button disabled={!sel || auto.isPending} onClick={() => auto.mutate({ supplier: sel, branch: branch?.code || branch })}
+            style={{ ...aBtn(C.blue), opacity: !sel || auto.isPending ? 0.6 : 1 }}>{auto.isPending ? 'Matching…' : 'Auto-match'}</button>
+          {setRoute && <button onClick={() => setRoute('/payments')} style={aBtn(C.amber)}>Record Payment</button>}
+        </>
+      }>
+      {!sel ? (
+        <div style={{ ...card, padding: 20, color: C.dim, fontSize: 13 }}>Select a supplier to begin reconciling.</div>
+      ) : (
+        <>
+          {/* Summary KPIs */}
+          <Row>
+            <Tile icon={<Scale size={13} />} label="Per Our Books" value={money(cur, sum.bookOwed)} sub="we owe (ledger)" tone={C.dark} />
+            <Tile icon={<ReceiptText size={13} />} label="Per Their Statement" value={money(cur, sum.statementOwed)} sub={sum.statementOwedDerived ? 'derived' : 'as stated'} tone={C.blue} />
+            <Tile icon={<AlertTriangle size={13} />} label="Difference" value={money(cur, Math.abs(diff))} sub={Math.abs(diff) <= 0.01 ? '✓ reconciled' : (diff < 0 ? 'books lower than statement' : 'books higher than statement')} tone={Math.abs(diff) <= 0.01 ? C.green : C.red} />
+            <Tile icon={<CheckSquare size={13} />} label="Matched / Open" value={`${sum.counts?.statementReconciled || 0} / ${sum.counts?.statementUnreconciled || 0}`} sub={`${sum.counts?.statementException || 0} disputed · ${sum.counts?.statementPartial || 0} partial`} tone={C.gold} />
+          </Row>
+
+          {/* Import box */}
+          <div style={{ ...card, padding: 12, marginBottom: 12 }}>
+            <SecTitle>Import vendor statement (paste CSV / Excel rows: date, invoiceNo, debit, credit, description)</SecTitle>
+            <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={3} placeholder={'2026-05-01, INV-77, 1000, 0, May airfare\n2026-05-10, , 0, 400, payment recd'}
+              style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 6, padding: 8, fontSize: 12, fontFamily: 'monospace' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+              <button disabled={!parsed.length || imp.isPending} onClick={doImport}
+                style={{ ...aBtn(C.green), opacity: !parsed.length || imp.isPending ? 0.6 : 1 }}>
+                <Plus size={12} /> {imp.isPending ? 'Importing…' : `Import ${parsed.length} row${parsed.length === 1 ? '' : 's'}`}</button>
+              {stmt.length > 0 && <button onClick={() => clear.mutate({ supplier: sel })} style={{ ...aBtn(C.red), background: '#fff', color: C.red, border: `1px solid ${C.red}` }}>Clear all imported</button>}
+              <span style={{ fontSize: 11, color: C.dim }}>Duplicates and blank rows are skipped automatically.</span>
+            </div>
+          </div>
+
+          {/* Statement lines */}
+          <SecTitle>Vendor statement ({stmt.length}) — match each to a book entry</SecTitle>
+          <Table>
+            <thead><tr>
+              {['Date', 'Invoice / Ref', 'Description', 'Debit', 'Credit', 'Status', 'Match / Action'].map((h, i) =>
+                <th key={h} style={{ ...th, ...(i >= 3 && i <= 4 ? rnum : {}) }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {stmt.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No statement imported yet for {sel}.</td></tr>}
+              {stmt.map((s) => (
+                <tr key={s.id} style={{ background: s.status === 'reconciled' ? '#f4fbf4' : s.status === 'exception' ? '#fdf4f4' : '#fff' }}>
+                  <td style={td}>{s.date}</td>
+                  <td style={{ ...td, fontWeight: 600, color: C.blue }}>{s.invoiceNo || s.reference || '—'}</td>
+                  <td style={{ ...td, color: C.dim }}>{s.description || '—'}</td>
+                  <td style={{ ...td, ...rnum }}>{s.debit ? money(cur, s.debit) : '—'}</td>
+                  <td style={{ ...td, ...rnum }}>{s.credit ? money(cur, s.credit) : '—'}</td>
+                  <td style={td}><span style={recoBadge(s.status)}>{s.status}{s.variance ? ` · Δ${money(cur, Math.abs(s.variance))}` : ''}</span>{s.matchedVno ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{s.matchedVno}</div> : null}</td>
+                  <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                    {s.status === 'reconciled' || s.status === 'partial' ? (
+                      <button onClick={() => unmatch.mutate({ id: s.id })} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button>
+                    ) : (
+                      <>
+                        <select defaultValue="" onChange={(e) => e.target.value && matchTo(s, e.target.value)}
+                          style={{ padding: '4px 6px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, maxWidth: 200 }}>
+                          <option value="">Match to book…</option>
+                          {unreconciledBook.map((b) => <option key={b.bookKey} value={b.bookKey}>{b.vno} · {b.date} · {money(cur, b.credit - b.debit)}</option>)}
+                        </select>
+                        <button onClick={() => setStatus.mutate({ id: s.id, status: 'exception' })} style={{ ...aBtn(C.red), marginLeft: 5 }}>Dispute</button>
+                        <button onClick={() => del.mutate({ id: s.id })} title="Delete this line" style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, marginLeft: 5 }}>✕</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+
+          <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
+            A statement <b>debit</b> (they billed us) matches a book <b>credit</b> (a bill we posted); a statement <b>credit</b> (our payment) matches a book <b>debit</b>. Unmatched items on either side are the reconciling differences — usually a missing bill, an unposted payment, or an ADM/ACM not captured.
+          </div>
+        </>
+      )}
+    </Shell>
+  );
+}
+
+// ════════════════════════ 4b) CLIENT RECONCILIATION ═══════════════════════════
+// Receivable-side reconciliation, the mirror of Supplier Reco. Two levels:
+//   • Workbench — a grid of every client (debtor) ledger with its recon status.
+//   • Drill-in  — one client, with BOTH internal allocation (FIFO receipts↔
+//     invoices, no statement needed) AND external statement matching.
+const WB_TONE = { reconciled: C.green, differences: C.red, 'not-started': C.dim };
+const wbBadge = (s) => ({ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 800, color: '#fff', background: WB_TONE[s] || C.dim, textTransform: 'capitalize', whiteSpace: 'nowrap' });
+
+// Download an array of flat objects as a CSV file (reconciliation statement export).
+function downloadCSV(filename, rows) {
+  if (!rows || !rows.length) return;
+  const cols = Object.keys(rows[0]);
+  const esc = (v) => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const csv = [cols.join(','), ...rows.map((r) => cols.map((c) => esc(r[c])).join(','))].join('\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function ClientReco({ branch, setRoute }) {
+  const cur = (bc(branch) || {}).cur || '₹';
+  const [client, setClient] = useState('');           // '' = workbench view
+  const [tab, setTab] = useState('statement');        // 'statement' | 'internal'
+  const [q, setQ] = useState('');
+  const [onlyDiff, setOnlyDiff] = useState(false);
+  const [paste, setPaste] = useState('');
+
+  const listQ = useClientList(branch);
+  const list = listQ.data || { rows: [], totals: {} };
+
+  const bookQ = useClientBook(client, branch);
+  const stmtQ = useClientStatement(client, branch);
+  const sumQ = useClientReconSummary(client, branch);
+  const allocQ = useClientAllocation(client, branch);
+  const book = bookQ.data || { lines: [] };
+  const stmt = stmtQ.data || [];
+  const sum = sumQ.data || {};
+  const alloc = allocQ.data || { invoices: [], receipts: [], openInvoices: [], unappliedReceipts: [], totals: {} };
+
+  const imp = useImportClientStatement();
+  const auto = useClientAutoMatch();
+  const autoAll = useClientAutoMatchAll();
+  const manual = useClientManualMatch();
+  const unmatch = useClientUnmatch();
+  const setStatus = useSetClientReconStatus();
+  const del = useDeleteClientStatementLine();
+  const clear = useClearClientStatement();
+
+  const parsed = useMemo(() => parseClientStatement(paste), [paste]);
+  const unreconciledBook = (book.lines || []).filter((l) => !l.reconciled);
+
+  const filtered = useMemo(() => (list.rows || []).filter((r) =>
+    (!q || r.client.toLowerCase().includes(q.toLowerCase())) &&
+    (!onlyDiff || r.status === 'differences')), [list.rows, q, onlyDiff]);
+
+  const doImport = () => {
+    if (!client || !parsed.length) return;
+    imp.mutate({ client, branch: branch?.code || branch, rows: parsed, fileName: 'pasted' }, { onSuccess: () => setPaste('') });
+  };
+  const matchTo = (s, bookKey) => {
+    const b = (book.lines || []).find((x) => x.bookKey === bookKey);
+    if (!b) return;
+    manual.mutate({ id: s.id, bookKey: b.bookKey, vno: b.vno, bookDebit: b.debit, bookCredit: b.credit });
+  };
+  const exportStatement = () => downloadCSV(`client-reco-${client}.csv`,
+    stmt.map((s) => ({ date: s.date, invoice: s.invoiceNo || s.reference, description: s.description, debit: s.debit, credit: s.credit, status: s.status, matchedVoucher: s.matchedVno, variance: s.variance })));
+
+  // ── Level 1: Workbench grid ──────────────────────────────────────────────
+  if (!client) {
+    return (
+      <Shell title="Client Reconciliation" sub={`${brLabel(branch)} · pick a client to reconcile — or scan every account's status below`}
+        right={
+          <>
+            <button disabled={autoAll.isPending} onClick={() => autoAll.mutate({ branch: branch?.code || branch })}
+              style={{ ...aBtn(C.blue), opacity: autoAll.isPending ? 0.6 : 1 }} title="Auto-match every client with open lines">
+              {autoAll.isPending ? 'Matching all…' : 'Auto-match all'}</button>
+            <div style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: C.dark }}>{list.totals?.clients || 0} clients · {money(cur, list.totals?.bookOwed)} receivable</div>
+          </>
+        }>
+        <Row>
+          <Tile icon={<CheckCircle2 size={13} />} label="Reconciled" value={list.totals?.reconciled || 0} sub="fully matched" tone={C.green} />
+          <Tile icon={<AlertTriangle size={13} />} label="With Differences" value={list.totals?.differences || 0} sub="need attention" tone={C.red} />
+          <Tile icon={<ListChecks size={13} />} label="Not Started" value={list.totals?.notStarted || 0} sub="no statement yet" tone={C.dim} />
+          <Tile icon={<Scale size={13} />} label="Total Receivable" value={money(cur, list.totals?.bookOwed)} sub="per our books" tone={C.dark} />
+        </Row>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 2px 10px' }}>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search client…"
+            style={{ padding: '6px 10px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12.5, minWidth: 220 }} />
+          <label style={{ fontSize: 12, color: C.dim, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} /> Only show differences
+          </label>
+        </div>
+        <Table>
+          <thead><tr>
+            {['Client', 'Per Our Books', 'Per Statement', 'Difference', 'Matched / Open', 'Last Reconciled', 'Status', ''].map((h, i) =>
+              <th key={h} style={{ ...th, ...(i >= 1 && i <= 3 ? rnum : {}) }}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {listQ.isLoading && <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>Loading…</td></tr>}
+            {!listQ.isLoading && filtered.length === 0 && <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No client ledgers found for {brLabel(branch)}.</td></tr>}
+            {filtered.map((r) => (
+              <tr key={r.client} style={{ background: r.status === 'reconciled' ? '#f4fbf4' : r.status === 'differences' ? '#fdf6f4' : '#fff' }}>
+                <td style={{ ...td, fontWeight: 700, color: C.dark }}>{r.client}</td>
+                <td style={{ ...td, ...rnum }}>{money(cur, r.bookOwed)}</td>
+                <td style={{ ...td, ...rnum }}>{r.statementOwed == null ? '—' : money(cur, r.statementOwed)}</td>
+                <td style={{ ...td, ...rnum, color: Math.abs(r.difference || 0) > 0.01 ? C.red : C.dim }}>{r.difference == null ? '—' : money(cur, Math.abs(r.difference))}</td>
+                <td style={{ ...td, ...rnum }}>{r.counts.reconciled} / {r.counts.open + r.counts.exception}</td>
+                <td style={{ ...td, color: C.dim }}>{r.lastReconciledAt ? String(r.lastReconciledAt).slice(0, 10) : '—'}</td>
+                <td style={td}><span style={wbBadge(r.status)}>{r.status === 'not-started' ? 'not started' : r.status}</span></td>
+                <td style={{ ...td, textAlign: 'right' }}>
+                  <button onClick={() => { setClient(r.client); setTab('statement'); }} style={aBtn(C.blue)}>Reconcile <ArrowRight size={11} /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </Shell>
+    );
+  }
+
+  // ── Level 2: Drill-in for one client ─────────────────────────────────────
+  const diff = Number(sum.differenceAmount || 0);
+  return (
+    <Shell title={`Client Reconciliation · ${client}`}
+      sub={`${brLabel(branch)} · internal receipts↔invoices and external statement matching`}
+      right={
+        <>
+          <button onClick={() => setClient('')} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>← All clients</button>
+          {tab === 'statement' && <button disabled={auto.isPending} onClick={() => auto.mutate({ client, branch: branch?.code || branch })} style={{ ...aBtn(C.blue), opacity: auto.isPending ? 0.6 : 1 }}>{auto.isPending ? 'Matching…' : 'Auto-match'}</button>}
+          {tab === 'statement' && stmt.length > 0 && <button onClick={exportStatement} style={aBtn(C.dark)}>Export CSV</button>}
+          {setRoute && <button onClick={() => setRoute('/receipts')} style={aBtn(C.amber)}>Record Receipt</button>}
+        </>
+      }>
+      {/* Summary KPIs */}
+      <Row>
+        <Tile icon={<Scale size={13} />} label="Per Our Books" value={money(cur, sum.bookOwed)} sub="they owe us (ledger)" tone={C.dark} />
+        <Tile icon={<ReceiptText size={13} />} label="Per Their Statement" value={money(cur, sum.statementOwed)} sub={sum.statementOwedDerived ? 'derived' : 'as stated'} tone={C.blue} />
+        <Tile icon={<AlertTriangle size={13} />} label="Difference" value={money(cur, Math.abs(diff))} sub={Math.abs(diff) <= 0.01 ? '✓ reconciled' : (diff > 0 ? 'books higher than statement' : 'books lower than statement')} tone={Math.abs(diff) <= 0.01 ? C.green : C.red} />
+        <Tile icon={<Coins size={13} />} label="Open / Unapplied" value={`${alloc.totals?.openInvoiceCount || 0} / ${alloc.totals?.unappliedReceiptCount || 0}`} sub="open invoices · unapplied receipts" tone={C.gold} />
+      </Row>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 6, margin: '0 2px 12px' }}>
+        {[['statement', '📑 Statement matching'], ['internal', '🔁 Internal (receipts↔invoices)']].map(([k, lbl]) => (
+          <button key={k} onClick={() => setTab(k)}
+            style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, borderRadius: 6, cursor: 'pointer', border: `1px solid ${tab === k ? C.blue : C.border}`, background: tab === k ? C.blue : '#fff', color: tab === k ? '#fff' : C.dim }}>{lbl}</button>
+        ))}
       </div>
+
+      {tab === 'statement' ? (
+        <>
+          <div style={{ ...card, padding: 12, marginBottom: 12 }}>
+            <SecTitle>Import client statement (paste CSV / Excel rows: date, invoiceNo, debit, credit, description)</SecTitle>
+            <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={3} placeholder={'2026-05-01, INV-77, 1000, 0, May tour invoice\n2026-05-10, , 0, 400, payment received'}
+              style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 6, padding: 8, fontSize: 12, fontFamily: 'monospace' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+              <button disabled={!parsed.length || imp.isPending} onClick={doImport} style={{ ...aBtn(C.green), opacity: !parsed.length || imp.isPending ? 0.6 : 1 }}>
+                <Plus size={12} /> {imp.isPending ? 'Importing…' : `Import ${parsed.length} row${parsed.length === 1 ? '' : 's'}`}</button>
+              {stmt.length > 0 && <button onClick={() => clear.mutate({ client, branch })} style={{ ...aBtn(C.red), background: '#fff', color: C.red, border: `1px solid ${C.red}` }}>Clear all imported</button>}
+              <span style={{ fontSize: 11, color: C.dim }}>Duplicates and blank rows are skipped automatically.</span>
+            </div>
+          </div>
+
+          <SecTitle>Client statement ({stmt.length}) — match each to a book entry</SecTitle>
+          <Table>
+            <thead><tr>
+              {['Date', 'Invoice / Ref', 'Description', 'Debit', 'Credit', 'Status', 'Match / Action'].map((h, i) =>
+                <th key={h} style={{ ...th, ...(i >= 3 && i <= 4 ? rnum : {}) }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {stmt.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No statement imported yet for {client}. Use the internal tab to reconcile against our own books.</td></tr>}
+              {stmt.map((s) => (
+                <tr key={s.id} style={{ background: s.status === 'reconciled' ? '#f4fbf4' : s.status === 'exception' ? '#fdf4f4' : '#fff' }}>
+                  <td style={td}>{s.date}</td>
+                  <td style={{ ...td, fontWeight: 600, color: C.blue }}>{s.invoiceNo || s.reference || '—'}</td>
+                  <td style={{ ...td, color: C.dim }}>{s.description || '—'}</td>
+                  <td style={{ ...td, ...rnum }}>{s.debit ? money(cur, s.debit) : '—'}</td>
+                  <td style={{ ...td, ...rnum }}>{s.credit ? money(cur, s.credit) : '—'}</td>
+                  <td style={td}><span style={recoBadge(s.status)}>{s.status}{s.variance ? ` · Δ${money(cur, Math.abs(s.variance))}` : ''}</span>{s.matchedVno ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{s.matchedVno}</div> : null}</td>
+                  <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                    {s.status === 'reconciled' || s.status === 'partial' ? (
+                      <button onClick={() => unmatch.mutate({ id: s.id })} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button>
+                    ) : (
+                      <>
+                        <select defaultValue="" onChange={(e) => e.target.value && matchTo(s, e.target.value)}
+                          style={{ padding: '4px 6px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, maxWidth: 200 }}>
+                          <option value="">Match to book…</option>
+                          {unreconciledBook.map((b) => <option key={b.bookKey} value={b.bookKey}>{b.vno} · {b.date} · {money(cur, b.debit - b.credit)}</option>)}
+                        </select>
+                        <button onClick={() => setStatus.mutate({ id: s.id, status: 'exception' })} style={{ ...aBtn(C.red), marginLeft: 5 }}>Dispute</button>
+                        <button onClick={() => del.mutate({ id: s.id })} title="Delete this line" style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, marginLeft: 5 }}>✕</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
+            A statement <b>debit</b> (an invoice) matches a book <b>debit</b> (a sale); a statement <b>credit</b> (their payment) matches a book <b>credit</b> (a receipt) — same direction, since a client is a debtor. Unmatched items are the reconciling differences.
+          </div>
+        </>
+      ) : (
+        <>
+          <SecTitle>Open invoices ({alloc.openInvoices?.length || 0}) — receipts auto-applied oldest-first (FIFO)</SecTitle>
+          <Table>
+            <thead><tr>{['Date', 'Voucher', 'Narration', 'Invoice', 'Received', 'Outstanding'].map((h, i) =>
+              <th key={h} style={{ ...th, ...(i >= 3 ? rnum : {}) }}>{h}</th>)}</tr></thead>
+            <tbody>
+              {(alloc.invoices || []).length === 0 && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No invoices in this period for {client}.</td></tr>}
+              {(alloc.invoices || []).map((i, idx) => (
+                <tr key={idx} style={{ background: i.settled ? '#f4fbf4' : '#fff' }}>
+                  <td style={td}>{i.date}</td>
+                  <td style={{ ...td, fontWeight: 600, color: C.blue }}>{i.vno}</td>
+                  <td style={{ ...td, color: C.dim }}>{i.narration || '—'}</td>
+                  <td style={{ ...td, ...rnum }}>{money(cur, i.amount)}</td>
+                  <td style={{ ...td, ...rnum }}>{money(cur, i.allocated)}</td>
+                  <td style={{ ...td, ...rnum, fontWeight: 700, color: i.settled ? C.green : C.red }}>{i.settled ? '✓ settled' : money(cur, i.outstanding)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          <div style={{ height: 12 }} />
+          <SecTitle>Unapplied receipts ({alloc.unappliedReceipts?.length || 0}) — money on account, not yet against an invoice</SecTitle>
+          <Table>
+            <thead><tr>{['Date', 'Voucher', 'Narration', 'Receipt', 'Applied', 'Unapplied'].map((h, i) =>
+              <th key={h} style={{ ...th, ...(i >= 3 ? rnum : {}) }}>{h}</th>)}</tr></thead>
+            <tbody>
+              {(alloc.unappliedReceipts || []).length === 0 && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.green, padding: 20 }}>✓ Every receipt is fully applied to invoices.</td></tr>}
+              {(alloc.unappliedReceipts || []).map((r, idx) => (
+                <tr key={idx}>
+                  <td style={td}>{r.date}</td>
+                  <td style={{ ...td, fontWeight: 600, color: C.blue }}>{r.vno}</td>
+                  <td style={{ ...td, color: C.dim }}>{r.narration || '—'}</td>
+                  <td style={{ ...td, ...rnum }}>{money(cur, r.amount)}</td>
+                  <td style={{ ...td, ...rnum }}>{money(cur, r.applied)}</td>
+                  <td style={{ ...td, ...rnum, fontWeight: 700, color: C.gold }}>{money(cur, r.unapplied)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
+            Internal reconciliation needs no external file — it matches the client's own receipts against their open invoices to show what's still <b>outstanding</b> and any receipt money sitting <b>unapplied</b> (on account). Total outstanding {money(cur, alloc.totals?.totalOutstanding)} · unapplied {money(cur, alloc.totals?.totalUnapplied)}.
+          </div>
+        </>
+      )}
+    </Shell>
+  );
+}
+
+// ════════════════════════ 4c) INTER-BRANCH RECONCILIATION ═════════════════════
+// Branches are independent books; a transaction between two must be booked on BOTH
+// sides via their directional current accounts ("TK- {other} Branch"). This screen
+// pairs the two sides per branch pair and flags any that don't net to zero — a
+// one-sided or mismatched inter-branch entry.
+export function InterBranchReco({ branch }) {
+  const cur = (bc(branch) || {}).cur || '₹';
+  const q = useInterBranchReco();
+  const data = q.data || { pairs: [], totals: {} };
+  return (
+    <Shell title="Inter-branch Reconciliation" sub="every branch pair's two directional current accounts — they should net to zero"
+      right={<div style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: data.totals?.mismatched ? C.red : C.green }}>{data.totals?.mismatched || 0} mismatched · {data.totals?.matched || 0} matched</div>}>
+      <Row>
+        <Tile icon={<Scale size={13} />} label="Branch Pairs" value={data.totals?.pairs || 0} sub="with activity" tone={C.dark} />
+        <Tile icon={<CheckCircle2 size={13} />} label="Reconciled" value={data.totals?.matched || 0} sub="net to zero" tone={C.green} />
+        <Tile icon={<AlertTriangle size={13} />} label="Mismatched" value={data.totals?.mismatched || 0} sub="one-sided / unequal" tone={C.red} />
+        <Tile icon={<Coins size={13} />} label="Total Difference" value={money(cur, data.totals?.totalDifference)} sub="sum of |differences|" tone={C.gold} />
+      </Row>
+      <Table>
+        <thead><tr>
+          {['Branch A', 'Branch B', 'A receivable from B', 'B receivable from A', 'Difference', 'Status'].map((h, i) =>
+            <th key={h} style={{ ...th, ...(i >= 2 && i <= 4 ? rnum : {}) }}>{h}</th>)}
+        </tr></thead>
+        <tbody>
+          {q.isLoading && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>Loading…</td></tr>}
+          {!q.isLoading && data.pairs.length === 0 && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.green, padding: 20 }}>✓ No inter-branch balances to reconcile.</td></tr>}
+          {data.pairs.map((p, i) => (
+            <tr key={i} style={{ background: p.matched ? '#f4fbf4' : '#fdf6f4' }}>
+              <td style={{ ...td, fontWeight: 700, color: C.dark }}>{p.branchA}</td>
+              <td style={{ ...td, fontWeight: 700, color: C.dark }}>{p.branchB}</td>
+              <td style={{ ...td, ...rnum }}>{money(cur, p.aReceivableFromB)}</td>
+              <td style={{ ...td, ...rnum }}>{money(cur, p.bReceivableFromA)}</td>
+              <td style={{ ...td, ...rnum, fontWeight: 700, color: p.matched ? C.dim : C.red }}>{money(cur, Math.abs(p.difference))}</td>
+              <td style={td}><span style={wbBadge(p.matched ? 'reconciled' : 'differences')}>{p.matched ? 'reconciled' : 'mismatch'}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+      <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
+        Each pair compares branch A's "Travkings Tours and Travels B" ledger against branch B's "Travkings Tours and Travels A" ledger (sub-group <b>Inter Branch</b>). The selling branch books a debtor and the buying branch a creditor, so the two should be equal and opposite (net zero). A non-zero difference means one branch booked the deal and the other hasn't, or the amounts disagree — an agreement check, not an elimination.
+      </div>
+    </Shell>
+  );
+}
+
+// ════════════════════════ 4d) TALLY RECONCILIATION ════════════════════════════
+// Reconcile ANY ERP ledger against an imported Tally ledger export — the in-app
+// version of the per-bank Tally↔ERP recon scripts. Pick a ledger, paste its Tally
+// export, then auto/manual match against the live ERP postings.
+export function TallyReco({ branch }) {
+  const cur = (bc(branch) || {}).cur || '₹';
+  const tb = useTrialBalance(branch).data || {};
+  const ledgers = useMemo(() => (tb.rows || []).map((r) => r.ledger).filter(Boolean), [tb]);
+  const [ledger, setLedger] = useState('');
+  const sel = ledger || ledgers[0] || '';
+
+  const bookQ = useTallyBook(sel, branch);
+  const tallyQ = useTallyRows(sel, branch);
+  const sumQ = useTallyRecoSummary(sel, branch);
+  const book = bookQ.data || { lines: [] };
+  const rows = tallyQ.data || [];
+  const sum = sumQ.data || {};
+
+  const imp = useImportTally();
+  const auto = useTallyAutoMatch();
+  const manual = useTallyManualMatch();
+  const unmatch = useTallyUnmatch();
+  const setStatus = useSetTallyRecoStatus();
+  const del = useDeleteTallyLine();
+  const clear = useClearTally();
+
+  const [paste, setPaste] = useState('');
+  const parsed = useMemo(() => parseTallyStatement(paste), [paste]);
+  const unreconciledBook = (book.lines || []).filter((l) => !l.reconciled);
+  const diff = Number(sum.differenceAmount || 0);
+
+  const doImport = () => { if (!sel || !parsed.length) return; imp.mutate({ ledger: sel, branch: branch?.code || branch, rows: parsed, fileName: 'pasted' }, { onSuccess: () => setPaste('') }); };
+  const matchTo = (t, bookKey) => { const b = (book.lines || []).find((x) => x.bookKey === bookKey); if (!b) return; manual.mutate({ id: t.id, bookKey: b.bookKey, vno: b.vno, bookDebit: b.debit, bookCredit: b.credit }); };
+
+  return (
+    <Shell title="Tally Reconciliation" sub={`${brLabel(branch)} · import a ledger's Tally export, then match it against the ERP books`}
+      right={
+        <>
+          <select value={sel} onChange={(e) => setLedger(e.target.value)} style={{ padding: '6px 10px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12.5, minWidth: 220 }}>
+            {!ledgers.length && <option value="">No ledgers</option>}
+            {ledgers.map((l) => <option key={l} value={l}>{l}</option>)}
+          </select>
+          <button disabled={!sel || auto.isPending} onClick={() => auto.mutate({ ledger: sel, branch: branch?.code || branch })} style={{ ...aBtn(C.blue), opacity: !sel || auto.isPending ? 0.6 : 1 }}>{auto.isPending ? 'Matching…' : 'Auto-match'}</button>
+        </>
+      }>
+      {!sel ? (
+        <div style={{ ...card, padding: 20, color: C.dim, fontSize: 13 }}>Select a ledger to reconcile against Tally.</div>
+      ) : (
+        <>
+          <Row>
+            <Tile icon={<Scale size={13} />} label="Per ERP Books" value={money(cur, sum.bookBalance)} sub="ledger closing" tone={C.dark} />
+            <Tile icon={<ReceiptText size={13} />} label="Per Tally" value={money(cur, sum.tallyBalance)} sub={sum.tallyBalanceDerived ? 'derived' : 'as imported'} tone={C.blue} />
+            <Tile icon={<AlertTriangle size={13} />} label="Difference" value={money(cur, Math.abs(diff))} sub={Math.abs(diff) <= 0.01 ? '✓ reconciled' : 'ERP vs Tally gap'} tone={Math.abs(diff) <= 0.01 ? C.green : C.red} />
+            <Tile icon={<CheckSquare size={13} />} label="Matched / Open" value={`${sum.counts?.tallyReconciled || 0} / ${sum.counts?.tallyUnreconciled || 0}`} sub={`${sum.counts?.tallyException || 0} exceptions`} tone={C.gold} />
+          </Row>
+
+          <div style={{ ...card, padding: 12, marginBottom: 12 }}>
+            <SecTitle>Import Tally export (paste CSV / Excel rows: date, voucher no, debit, credit, narration)</SecTitle>
+            <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={3} placeholder={'2026-05-01, RCP-1, 1000, 0, deposit\n2026-05-04, PMT-1, 0, 300, cheque 5001'}
+              style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 6, padding: 8, fontSize: 12, fontFamily: 'monospace' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+              <button disabled={!parsed.length || imp.isPending} onClick={doImport} style={{ ...aBtn(C.green), opacity: !parsed.length || imp.isPending ? 0.6 : 1 }}><Plus size={12} /> {imp.isPending ? 'Importing…' : `Import ${parsed.length} row${parsed.length === 1 ? '' : 's'}`}</button>
+              {rows.length > 0 && <button onClick={() => clear.mutate({ ledger: sel, branch })} style={{ ...aBtn(C.red), background: '#fff', color: C.red, border: `1px solid ${C.red}` }}>Clear all imported</button>}
+              <span style={{ fontSize: 11, color: C.dim }}>Duplicates and blank rows are skipped automatically.</span>
+            </div>
+          </div>
+
+          <SecTitle>Tally rows ({rows.length}) — match each to an ERP posting</SecTitle>
+          <Table>
+            <thead><tr>{['Date', 'Voucher', 'Narration', 'Debit', 'Credit', 'Status', 'Match / Action'].map((h, i) => <th key={h} style={{ ...th, ...(i >= 3 && i <= 4 ? rnum : {}) }}>{h}</th>)}</tr></thead>
+            <tbody>
+              {rows.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No Tally rows imported yet for {sel}.</td></tr>}
+              {rows.map((t) => (
+                <tr key={t.id} style={{ background: t.status === 'reconciled' ? '#f4fbf4' : t.status === 'exception' ? '#fdf4f4' : '#fff' }}>
+                  <td style={td}>{t.date}</td>
+                  <td style={{ ...td, fontWeight: 600, color: C.blue }}>{t.vno || t.reference || '—'}</td>
+                  <td style={{ ...td, color: C.dim }}>{t.description || '—'}</td>
+                  <td style={{ ...td, ...rnum }}>{t.debit ? money(cur, t.debit) : '—'}</td>
+                  <td style={{ ...td, ...rnum }}>{t.credit ? money(cur, t.credit) : '—'}</td>
+                  <td style={td}><span style={recoBadge(t.status)}>{t.status}{t.variance ? ` · Δ${money(cur, Math.abs(t.variance))}` : ''}</span>{t.matchedVno ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{t.matchedVno}</div> : null}</td>
+                  <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                    {t.status === 'reconciled' || t.status === 'partial' ? (
+                      <button onClick={() => unmatch.mutate({ id: t.id })} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button>
+                    ) : (
+                      <>
+                        <select defaultValue="" onChange={(e) => e.target.value && matchTo(t, e.target.value)} style={{ padding: '4px 6px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, maxWidth: 200 }}>
+                          <option value="">Match to ERP…</option>
+                          {unreconciledBook.map((b) => <option key={b.bookKey} value={b.bookKey}>{b.vno} · {b.date} · {money(cur, b.debit - b.credit)}</option>)}
+                        </select>
+                        <button onClick={() => setStatus.mutate({ id: t.id, status: 'exception' })} style={{ ...aBtn(C.red), marginLeft: 5 }}>Exception</button>
+                        <button onClick={() => del.mutate({ id: t.id })} title="Delete" style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, marginLeft: 5 }}>✕</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
+            A Tally <b>debit</b> matches an ERP book <b>debit</b> and a credit a credit (same ledger convention on both sides). Unmatched rows are the ERP↔Tally differences — usually an entry posted in one system but not the other.
+          </div>
+        </>
+      )}
     </Shell>
   );
 }
@@ -721,7 +1349,7 @@ export function MonthEndChecklist({ branch, setRoute }) {
           const ok = it.manualOnly ? !!manual[it.key] : it.auto;
           return (
             <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderTop: i ? '1px solid #f0f2f7' : 'none' }}>
-              <span onClick={() => it.manualOnly && toggleManual(it.key)}
+              <span {...(it.manualOnly ? clickable(() => toggleManual(it.key)) : {})}
                 style={{ width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? 'pointer' : 'default', background: ok ? C.green : (it.manualOnly ? '#cbd0db' : C.amber) }}>
                 {ok ? '✓' : (it.manualOnly ? '' : '!')}
               </span>

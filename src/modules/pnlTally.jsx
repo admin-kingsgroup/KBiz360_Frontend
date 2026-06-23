@@ -18,6 +18,7 @@ import { LedgerActions } from '../core/ledgerActions';
 import { PageLayout } from '../shell/PageLayout';
 import { SkeletonTable } from '../shell/primitives';
 import { toastInfo } from '../core/ux/toast';
+import { clickable } from '../core/ux/clickable';
 
 const DARK = '#1a1c22', DIM = '#5b616e', LINE = '#e6e8ec', HEAD = '#2e323c';
 const money = (n) => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -103,12 +104,12 @@ function PLLines({ line, onPick, branch, from, to }) {
   const canExpand = line.isGroup && ledgers.length > 0;
   return (
     <>
-      <tr onClick={() => drillable && onPick(line)} style={{ cursor: drillable ? 'pointer' : 'default', background: line.isGroup ? '#fcfdff' : '#fff' }}
+      <tr {...clickable(() => drillable && onPick(line))} style={{ cursor: drillable ? 'pointer' : 'default', background: line.isGroup ? '#fcfdff' : '#fff' }}
         onMouseEnter={(e) => drillable && (e.currentTarget.style.background = '#eef4ff')}
         onMouseLeave={(e) => (e.currentTarget.style.background = line.isGroup ? '#fcfdff' : '#fff')}>
         <td style={{ ...tdName, fontWeight: line.isGroup ? 700 : 400, color: line.isGroup ? DARK : '#2563eb', paddingLeft: line.isGroup ? 12 : 26 }}>
           {canExpand && (
-            <span onClick={(e) => { e.stopPropagation(); setOpenLedgers((o) => !o); }}
+            <span {...clickable((e) => { e.stopPropagation(); setOpenLedgers((o) => !o); })}
               style={{ cursor: 'pointer', color: '#9197a3', fontWeight: 700, marginRight: 5, display: 'inline-block', width: 10 }}
               title={openLedgers ? 'Hide ledgers' : 'Show ledgers → captured fares'}>{openLedgers ? '▾' : '▸'}</span>
           )}
@@ -119,7 +120,7 @@ function PLLines({ line, onPick, branch, from, to }) {
       </tr>
       {/* Sub-group breakup stays inline (drills on click), exactly as Tally does. */}
       {line.isGroup && subGroups.map((it, j) => (
-        <tr key={'g' + j} onClick={() => onPick(it)} style={{ cursor: 'pointer' }}
+        <tr key={'g' + j} {...clickable(() => onPick(it))} style={{ cursor: 'pointer' }}
           onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
           <td style={{ ...tdName, paddingLeft: 30, color: DARK, fontWeight: 600 }}>
@@ -139,10 +140,10 @@ function PLLines({ line, onPick, branch, from, to }) {
               onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
               onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}>
               <td style={{ ...tdName, paddingLeft: 38, color: '#2563eb' }}>
-                <span onClick={(e) => { e.stopPropagation(); setOpenComp((s) => ({ ...s, [led]: !s[led] })); }}
+                <span {...clickable((e) => { e.stopPropagation(); setOpenComp((s) => ({ ...s, [led]: !s[led] })); })}
                   style={{ cursor: 'pointer', color: '#9197a3', fontWeight: 700, marginRight: 5, display: 'inline-block', width: 10 }}
                   title={co ? 'Hide components' : 'Show captured fares'}>{co ? '▾' : '▸'}</span>
-                <span onClick={() => openLedgerModal(led)} style={{ cursor: 'pointer' }} title="Open ledger account">{it.name}</span>
+                <span {...clickable(() => openLedgerModal(led))} style={{ cursor: 'pointer' }} title="Open ledger account">{it.name}</span>
                 {badge(it.name)}
               </td>
               <td style={tdNum}>{money(it.amount)}</td>
@@ -172,7 +173,7 @@ export function GroupSummary({ frame, onPick }) {
         {items.map((it, i) => {
           const drillable = it.isGroup || it.ledger || !!it.name;
           return (
-            <tr key={i} onClick={() => drillable && onPick(it)} style={{ cursor: drillable ? 'pointer' : 'default', borderBottom: '1px solid #f0f2f7' }}
+            <tr key={i} {...clickable(() => drillable && onPick(it))} style={{ cursor: drillable ? 'pointer' : 'default', borderBottom: '1px solid #f0f2f7' }}
               onMouseEnter={(e) => drillable && (e.currentTarget.style.background = '#eef4ff')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
               <td style={{ ...tdName, fontWeight: it.isGroup ? 700 : 400, color: it.isGroup ? DARK : '#2563eb' }}>
@@ -214,7 +215,7 @@ function LedgerComponents({ name, costCenter, branch, from, to, onPick }) {
       </tr></thead>
       <tbody>
         {rows.map((r, i) => (
-          <tr key={i} onClick={() => onPick({ kind: 'vouchers', name, costCenter, title: r.label })}
+          <tr key={i} {...clickable(() => onPick({ kind: 'vouchers', name, costCenter, title: r.label }))}
             style={{ cursor: 'pointer', borderBottom: '1px solid #f0f2f7' }}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
@@ -254,7 +255,7 @@ function LedgerDrill({ name, branch, from, to, onPick }) {
       </tr></thead>
       <tbody>
         {rows.map((r, i) => (
-          <tr key={i} onClick={() => onPick({ kind: 'ledger', name, costCenter: r.costCenter, title: r.label })}
+          <tr key={i} {...clickable(() => onPick({ kind: 'ledger', name, costCenter: r.costCenter, title: r.label }))}
             style={{ cursor: 'pointer', borderBottom: '1px solid #f0f2f7' }}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
@@ -350,7 +351,7 @@ export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
             </tr>
             {(d.lines || []).map((ln, i) => (
               <React.Fragment key={i}>
-                <tr onClick={() => ln.voucherId && onPick({ kind: 'voucher', id: ln.voucherId, vno: ln.vno })}
+                <tr {...clickable(() => ln.voucherId && onPick({ kind: 'voucher', id: ln.voucherId, vno: ln.vno }))}
                   style={{ cursor: ln.voucherId ? 'pointer' : 'default', borderBottom: showNarration ? 'none' : '1px solid #f0f2f7' }}
                   onMouseEnter={(e) => ln.voucherId && (e.currentTarget.style.background = '#eef4ff')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>

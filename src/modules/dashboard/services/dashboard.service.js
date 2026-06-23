@@ -27,7 +27,7 @@ export const loadBranchDashboard = async ({ branchCode }) => {
     api.getAgeingTotals(branchCode),
     api.getSaleVouchers({ branchCode, ...p.month }),
     api.getActionItems(),
-    api.getUpcomingTravel({ limit: 5 }),
+    api.getUpcomingTravel({ limit: 5, branchCode }),
     api.getBookingSummary(branchCode), // SO/PO/GP pipeline { pending, approved } (whole queue, not date-bound)
   ]);
 
@@ -63,19 +63,20 @@ export const loadBranchDashboard = async ({ branchCode }) => {
 export const loadDirectorDashboard = async ({ range = 'month', branchCode, from, to } = {}) => {
   // Prefer explicit from/to (uniform 7-preset bar); fall back to the legacy range preset.
   const dates = (from != null || to != null) ? { from: from || '', to: to || '', label: 'Custom' } : api.rangeToDates(range);
-  const [revenueTrend, fyTargets, branchHeatmap, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, bookingSummary] =
+  // NOTE: FY targets and the branch heatmap are rendered LIVE by the page itself
+  // (useTargetsVsActual + per-branch module-pl), so we no longer fetch the seed
+  // getFyTargets() or getBranchHeatmap() here — they were unused round-trips.
+  const [revenueTrend, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, bookingSummary] =
     await Promise.all([
       api.getRevenueTrend(branchCode),
-      api.getFyTargets(),
-      api.getBranchHeatmap(),
       api.getTopCustomers(branchCode),
       api.getTopSuppliers(branchCode),
-      api.getBankAccounts(),
+      api.getBankAccounts(branchCode),
       api.getModulePL({ branchCode, from: dates.from, to: dates.to, summary: true }), // live, period + scope driven (totals/bridge only → summary)
       api.getAgeingTotals(branchCode),
       api.getCashPosition(branchCode),
-      api.getArAgeingSummary(),
-      api.getApAgeingSummary(),
+      api.getArAgeingSummary(branchCode),  // branch-scoped: an all-scope Director who selects a
+      api.getApAgeingSummary(branchCode),  // branch isn't auto-coerced server-side — must pass it
       api.getBookingSummary(branchCode), // SO/PO/GP pipeline { pending, approved } (not date-bound — whole queue)
     ]);
 
@@ -86,7 +87,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
   });
 
   return {
-    revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers, bankAccounts,
+    revenueTrend, keyAlerts, topCustomers, topSuppliers, bankAccounts,
     pendingBookings: bookingSummary.pending,
     approvedBookings: bookingSummary.approved,
     rejectedBookings: bookingSummary.rejected,
@@ -108,35 +109,35 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
   };
 };
 
-export const loadSrFmDashboard = async () => {
+export const loadSrFmDashboard = async ({ branchCode } = {}) => {
   const [cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags] =
     await Promise.all([
-      api.getCashForecast(),
-      api.getBankAccounts(),
+      api.getCashForecast(branchCode),
+      api.getBankAccounts(branchCode),
       api.getPeriodClose(),
-      api.getArAgeingSummary(),
-      api.getApAgeingSummary(),
-      api.getVarianceFlags(),
+      api.getArAgeingSummary(branchCode),
+      api.getApAgeingSummary(branchCode),
+      api.getVarianceFlags(branchCode),
     ]);
 
   return { cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags };
 };
 
-export const loadSrAeDashboard = async () => {
+export const loadSrAeDashboard = async ({ branchCode } = {}) => {
   const [todayVouchers, reconStatus, topSuppliers] = await Promise.all([
     api.getTodayVouchersByBranch(),
-    api.getReconStatus(),
-    api.getTopSuppliers(),
+    api.getReconStatus(branchCode),
+    api.getTopSuppliers(branchCode),
   ]);
 
   return { todayVouchers, reconStatus, topSuppliers };
 };
 
-export const loadAcctsExecDashboard = async () => {
+export const loadAcctsExecDashboard = async ({ branchCode } = {}) => {
   const [todayVouchers, recentActivity, arAgeing] = await Promise.all([
     api.getTodayVouchersByBranch(),
     api.getRecentActivity(),
-    api.getArAgeingSummary(),
+    api.getArAgeingSummary(branchCode),
   ]);
 
   return { todayVouchers, recentActivity, arAgeing };

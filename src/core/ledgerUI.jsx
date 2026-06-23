@@ -13,6 +13,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 import React, { useMemo, useState } from 'react';
 import { bc } from './styleTokens';
+import { clickable } from './ux/clickable';
 import { PeriodBar } from './period';
 import { useLedgerStatement, useOpenBills, useLedgerSplit, useLedgerComponents, branchCode } from './useAccounting';
 import { openPrintPreview } from './PrintPreview';
@@ -271,9 +272,9 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
       <td className="l"><span className="vt">{r.vt}</span></td>
       <td className="l vno">
         {r.voucherId && onPickInvoice && /sale|purchase/i.test(r.category || '')
-          ? <span className="vlink" onClick={() => onPickInvoice({ id: r.voucherId, vno: r.vno, category: r.category })} title={/purchase/i.test(r.category) ? 'Open in Purchase Register' : 'Open in Sales Register'}>{r.vno}</span>
+          ? <span className="vlink" {...clickable(() => onPickInvoice({ id: r.voucherId, vno: r.vno, category: r.category }))} title={/purchase/i.test(r.category) ? 'Open in Purchase Register' : 'Open in Sales Register'}>{r.vno}</span>
           : r.voucherId && onPickVoucher
-            ? <span className="vlink" onClick={() => onPickVoucher({ id: r.voucherId, vno: r.vno })} title="Open voucher">{r.vno}</span>
+            ? <span className="vlink" {...clickable(() => onPickVoucher({ id: r.voucherId, vno: r.vno }))} title="Open voucher">{r.vno}</span>
             : r.vno}
         {r.tallyRef && <div className="narr" title="Tally Ref">Tally: {r.tallyRef}</div>}
       </td>

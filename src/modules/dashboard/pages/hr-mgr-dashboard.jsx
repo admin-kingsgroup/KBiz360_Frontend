@@ -10,6 +10,7 @@ import { useDashboardStore } from '../store/dashboard.store';
 import { BirthdaysPanel } from '../components/shared/BirthdaysPanel';
 import { AnniversariesPanel } from '../components/shared/AnniversariesPanel';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+import { openPrintPreview } from '../../../core/PrintPreview';
 
 export function HrMgrDashboardPage({ currentUser, setRoute }) {
   const { data: stats, isLoading } = useHrMgrDashboard();
@@ -31,12 +32,12 @@ export function HrMgrDashboardPage({ currentUser, setRoute }) {
         user={currentUser}
         period={period}
         setPeriod={setPeriod}
-        onExport={() => window.print()}
+        onExport={() => openPrintPreview({ selector: 'main', title: 'HR Manager Dashboard', recommend: 'portrait' })}
       />
 
       <ResponsiveGrid min="170px" gap="md" className="mb-3.5">
         <KPICard label="Total Headcount" value={stats.totalHeadcount} delta={`+${stats.changeThisMonth} this month`} color="#16a34a" onClick={() => navigate('/hr/employees')} />
-        <KPICard label="Attendance %" value={stats.attendancePct + '%'} delta={`${CUR_MONTH_LABEL} current`} color="#c2a04a" onClick={() => navigate('/hr/attendance')} />
+        <KPICard label="Attendance %" value={stats.attendancePct == null ? '—' : stats.attendancePct + '%'} delta={`${CUR_MONTH_LABEL} current`} color="#c2a04a" onClick={() => navigate('/hr/attendance')} />
         <KPICard label="Pending Leave" value={stats.pendingLeave} delta="awaiting approval" color="#d97706" onClick={() => navigate('/hr/leave')} />
         <KPICard label="Payroll Status" value={payrollLabel} delta={payrollDelta} color="#16a34a" onClick={() => navigate('/hr/payroll')} />
         <KPICard label="Open Positions" value={stats.openPositions} delta="recruitment active" color="#5b616e" onClick={() => navigate('/hr/recruitment')} />

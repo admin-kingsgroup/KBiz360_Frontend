@@ -42,7 +42,18 @@ export function useBankStatement(ledger, branch, { from, to } = {}) {
   const code = branchCode(branch);
   return useQuery({
     queryKey: ['bank-reco', 'statement', ledger || '', code || 'all', from || '', to || ''],
-    queryFn: () => apiGet('/api/bank-reconciliation/statement', { ledger, from, to }),
+    queryFn: () => apiGet('/api/bank-reconciliation/statement', { ledger, branch: code, from, to }),
+    enabled: enabled() && !!ledger,
+    staleTime: 15_000,
+  });
+}
+
+// Formal Bank Reconciliation Statement (printable) for a ledger + period.
+export function useBankBRS(ledger, branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['bank-reco', 'brs', ledger || '', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/bank-reconciliation/brs', { ledger, branch: code, from, to }),
     enabled: enabled() && !!ledger,
     staleTime: 15_000,
   });
@@ -52,7 +63,7 @@ export function useBankReconSummary(ledger, branch, { from, to } = {}) {
   const code = branchCode(branch);
   return useQuery({
     queryKey: ['bank-reco', 'summary', ledger || '', code || 'all', from || '', to || ''],
-    queryFn: () => apiGet('/api/bank-reconciliation/summary', { ledger, from, to }),
+    queryFn: () => apiGet('/api/bank-reconciliation/summary', { ledger, branch: code, from, to }),
     enabled: enabled() && !!ledger,
     staleTime: 15_000,
   });

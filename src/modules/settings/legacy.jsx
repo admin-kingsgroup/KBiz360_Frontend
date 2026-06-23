@@ -4,17 +4,20 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect } from 'react';
+import { todayISO } from '../../core/dates';
 import { AlertTriangle, Download, Lock, Plus, Save, Search, Settings, User, Users } from 'lucide-react';
 import { Line } from 'recharts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { exportToCSV } from '../../core/business-logic';
 import { toast } from '../../core/ux/toast';
+import { clickable } from '../../core/ux/clickable';
+import { listKeyNav } from '../../core/ux/listKeys';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../core/data';
 import { apiPost, apiPut, apiDelete } from '../../core/api';
-import { useUsersAdmin, useRoles, useCompanyProfiles, useApprovalRules } from '../../core/useReference';
+import { useUsersAdmin, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../core/useReference';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { fmt } from '../../core/format';
-import { APPROVAL_LIMITS_DATA, CUSTOM_FIELDS_DATA, EMAIL_TEMPLATES_DATA, FIELD_ACCESS_DATA, PERM_ACTIONS, cardStyle } from '../../core/helpers';
+import { PERM_ACTIONS, cardStyle } from '../../core/helpers';
 import { useIsMob, useMobile } from '../../core/hooks';
 // Permission CATALOGUE (which modules/actions/toggles exist) stays in code as
 // app structure; the per-role GRANTS, users, company profiles and approval rules
@@ -33,7 +36,7 @@ export function SettingsBranches(){
   const profilesLive=useCompanyProfiles().data;                 // DB-backed (/api/company-profile)
   const [branches,setBranches]=useState([]);
   useEffect(()=>{ if(profilesLive) setBranches(profilesLive); },[profilesLive]);
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
   const daysLeft=d=>d?Math.ceil((new Date(d)-new Date(TODAY))/(1000*60*60*24)):null;
 
   const TAX_CLR={GST:"#185FA5",VAT:"#27500A"};
@@ -59,7 +62,7 @@ export function SettingsBranches(){
   };
 
   const BranchCard=({b})=>(
-    <div onClick={()=>setSel(sel===b.code?null:b.code)} style={{
+    <div {...clickable(()=>setSel(sel===b.code?null:b.code))} style={{
       ...card,cursor:"pointer",padding:0,overflow:"hidden",
       border:sel===b.code?"2px solid #d4a437":"1px solid #e1e3ec",
       transform:sel===b.code?"translateY(-2px)":"none",
@@ -131,7 +134,7 @@ export function SettingsBranches(){
         <div style={{...card,padding:0,overflow:"hidden"}}>
           {/* Detail tabs */}
           <div style={{display:"flex",gap:0,background:"#f3f4f8",borderBottom:"1px solid #e1e3ec",overflowX:"auto"}}>
-            <button onClick={()=>setTab("overview")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="overview"?700:400,background:tab==="overview"?"#fff":"transparent",borderRadius:6}}>📋 Overview</button><button onClick={()=>setTab("identity")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="identity"?700:400,background:tab==="identity"?"#fff":"transparent",borderRadius:6}}>🏢 Identity & Tax</button><button onClick={()=>setTab("compliance")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="compliance"?700:400,background:tab==="compliance"?"#fff":"transparent",borderRadius:6}}>📋 Compliance</button><button onClick={()=>setTab("bank")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="bank"?700:400,background:tab==="bank"?"#fff":"transparent",borderRadius:6}}>🏦 Bank Details</button>
+            <button onClick={()=>setTab("overview")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="overview"?700:400,background:tab==="overview"?"#fff":"transparent",borderRadius:6}}>📋 Overview</button><button onClick={()=>setTab("identity")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="identity"?700:400,background:tab==="identity"?"#fff":"transparent",borderRadius:6}}>🏢 Identity & Tax</button><button onClick={()=>setTab("compliance")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="compliance"?700:400,background:tab==="compliance"?"#fff":"transparent",borderRadius:6}}>📋 Compliance</button><button onClick={()=>setTab("bank")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="bank"?700:400,background:tab==="bank"?"#fff":"transparent",borderRadius:6}}>🏦 Bank Details</button><button onClick={()=>setTab("vouchers")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="vouchers"?700:400,background:tab==="vouchers"?"#fff":"transparent",borderRadius:6}}>🔢 Voucher Series</button>
           </div>
 
           <div style={{padding:"16px 18px"}}>
@@ -253,13 +256,13 @@ export function SettingsBranches(){
               </div>
             )}
 
-            {tab==="banking"&&(
+            {tab==="bank"&&(
               <div>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
                   <p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>🏦 Bank Accounts — {selBranch.code}</p>
                   <button style={{...btnG,fontSize:11,padding:"5px 12px"}}><Plus size={12}/> Add Bank</button>
                 </div>
-                {selBranch.banks.map((bk,i)=>(
+                {(selBranch.banks||[]).map((bk,i)=>(
                   <div key={i} style={{...card,marginBottom:10,borderLeft:`4px solid ${bk.primary?"#d4a437":"#e1e3ec"}`}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -688,6 +691,10 @@ export function SettingsUsers(){
             </p>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setEditPerms(null)} style={btnGh}>Cancel</button>
+              {/* Persist only what the backend stores: a user's permissions are driven by
+                  their ROLE (granular perms/special come from the role template) plus the
+                  branch scope. perms/special are UI-derived from the role and not stored.
+                  savePermissions() persists role + branches with toast + error handling. */}
               <button onClick={savePermissions} disabled={updateUserMut.isPending} style={{...btnG,background:"#27500A",opacity:updateUserMut.isPending?0.6:1,cursor:updateUserMut.isPending?"wait":"pointer"}}>{updateUserMut.isPending?"Saving…":"💾 Save Permissions"}</button>
             </div>
           </div>
@@ -909,7 +916,7 @@ export function DocTemplateEditor(){
             </div>
             <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
               {["#0d1326","#d4a437","#A32D2D","#2F7A8E","#22c55e","#3b82f6"].map(c=>(
-                <div key={c} onClick={()=>setColor(c)} style={{width:24,height:24,borderRadius:"50%",background:c,cursor:"pointer",border:color===c?"2px solid #fff":"none",boxShadow:color===c?"0 0 0 2px "+c:"none"}}/>
+                <div key={c} {...clickable(()=>setColor(c))} style={{width:24,height:24,borderRadius:"50%",background:c,cursor:"pointer",border:color===c?"2px solid #fff":"none",boxShadow:color===c?"0 0 0 2px "+c:"none"}}/>
               ))}
             </div>
           </div>
@@ -954,19 +961,22 @@ export function DocTemplateEditor(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function EmailSMSTemplates(){
+  // Live email/SMS templates (GET /api/email-templates). Was hardcoded EMAIL_TEMPLATES_DATA.
+  const templates=useEmailTemplates().data||[];
   const [sel,setSel]=useState(0);
-  const [editBody,setEditBody]=useState(EMAIL_TEMPLATES_DATA[0].body);
-  const t=EMAIL_TEMPLATES_DATA[sel];
+  const [editBody,setEditBody]=useState("");
+  const t=templates[sel]||templates[0]||{name:"",body:"",channel:"Email",trigger:"",subject:"",active:true};
+  useEffect(()=>{ if(templates[sel]) setEditBody(templates[sel].body||""); },[sel,templates.length]);
   const tokens=["{CustomerName}","{BookingRef}","{TripName}","{Amount}","{DueDate}","{VoucherNo}","{ConsultantName}","{BranchPhone}","{InvoiceNo}","{Date}"];
   return(
     <PHASE2_Page title="Email / SMS Template Editor" subtitle="Customise communication templates · token substitution · channel-specific"
       toolbar={<><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Template</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>Send Test</button></>}>
       <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:14}}>
         {/* Template list */}
-        <div style={cardStyle}>
-          <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Templates ({EMAIL_TEMPLATES_DATA.length})</p>
-          {EMAIL_TEMPLATES_DATA.map((tmpl,i)=>(
-            <div key={tmpl.id} onClick={()=>{setSel(i);setEditBody(tmpl.body);}} style={{padding:"9px 10px",border:sel===i?"2px solid #d4a437":"1px solid #e1e3ec",borderRadius:6,marginBottom:6,cursor:"pointer",background:sel===i?"#fff8e8":"#fff"}}>
+        <div style={cardStyle} onKeyDown={listKeyNav()}>
+          <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Templates ({templates.length})</p>
+          {templates.map((tmpl,i)=>(
+            <div key={tmpl.id} {...clickable(()=>{setSel(i);setEditBody(tmpl.body);},{role:'option'})} style={{padding:"9px 10px",border:sel===i?"2px solid #d4a437":"1px solid #e1e3ec",borderRadius:6,marginBottom:6,cursor:"pointer",background:sel===i?"#fff8e8":"#fff"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                 <p style={{margin:0,fontSize:11.5,fontWeight:700,color:"#0d1326"}}>{tmpl.name}</p>
                 <span style={{padding:"1px 6px",background:tmpl.channel==="SMS"?"#fff3cd":"#cfe2ff",color:tmpl.channel==="SMS"?"#856404":"#004085",borderRadius:3,fontSize:9.5,fontWeight:700}}>{tmpl.channel}</span>
@@ -1007,15 +1017,18 @@ export function EmailSMSTemplates(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function ApprovalMatrixBuilder(){
-  const [rules,setRules]=useState(APPROVAL_LIMITS_DATA);
+  // Live approval thresholds (GET /api/approval-limits). Was hardcoded APPROVAL_LIMITS_DATA.
+  const live=useApprovalLimits().data;
+  const [rules,setRules]=useState([]);
+  useEffect(()=>{ if(live) setRules(live); },[live]);
   const [form,setForm]=useState({role:"Accounts Executive",voucherType:"Payment Voucher",minAmount:0,maxAmount:50000,backup:"Sr. Accounts Executive"});
   const groupByType={};
   rules.forEach(r=>{if(!groupByType[r.voucherType])groupByType[r.voucherType]=[];groupByType[r.voucherType].push(r);});
   const fmt=n=>n>=999999999?"Unlimited":"₹"+n.toLocaleString("en-IN");
   const inp={padding:"7px 8px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:11.5,width:"100%"};
   return(
-    <PHASE2_Page title="Approval Matrix Builder" subtitle="Drag-and-configure per-role, per-voucher-type thresholds · changes take effect immediately"
-      toolbar={<button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save & Publish</button>}>
+    <PHASE2_Page title="Approval Matrix Builder" subtitle="Preview — drag-and-configure per-role, per-voucher-type thresholds (server save not enabled on this screen yet)"
+      toolbar={<button disabled title="Saving the approval matrix isn’t available on this screen yet" style={{padding:"7px 14px",background:"#eef0f6",color:"#9aa3bd",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,fontWeight:700,cursor:"not-allowed"}}>💾 Save & Publish</button>}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:14}}>
         <div>
           {Object.entries(groupByType).map(([type,typeRules])=>(
@@ -1064,9 +1077,11 @@ export function ApprovalMatrixBuilder(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function CustomFieldsManager(){
+  // Live custom fields (GET /api/custom-fields). Was hardcoded CUSTOM_FIELDS_DATA.
+  const all=useCustomFields().data||[];
   const [master,setMaster]=useState("ALL");
   const masters=["ALL","Customer","Supplier","Employee"];
-  const filtered=master==="ALL"?CUSTOM_FIELDS_DATA:CUSTOM_FIELDS_DATA.filter(f=>f.master===master);
+  const filtered=master==="ALL"?all:all.filter(f=>f.master===master);
   return(
     <PHASE2_Page title="Custom Fields Manager" subtitle="Add fields to any master without code changes · applies across all branches"
       toolbar={<><select value={master} onChange={e=>setMaster(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{masters.map(m=><option key={m}>{m}</option>)}</select><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Add Field</button></>}>
@@ -1102,6 +1117,8 @@ export function CustomFieldsManager(){
 export function FieldAccessControl(){
   const accessColor={"View+Edit":"#22c55e","View Only":"#d4a437","Hidden":"#A32D2D"};
   const PERM_ROLES=(useRoles().data||[]).map(r=>r.name);   // DB-backed role names
+  // Live field-access rules (GET /api/field-access). Was hardcoded FIELD_ACCESS_DATA.
+  const accessRows=useFieldAccess().data||[];
   return(
     <PHASE2_Page title="Field-Level Access Control" subtitle="Control which fields each role can view or edit · per module · per field">
       <div style={cardStyle}>
@@ -1115,7 +1132,7 @@ export function FieldAccessControl(){
               </tr>
             </thead>
             <tbody>
-              {FIELD_ACCESS_DATA.map((row,i)=>(
+              {accessRows.map((row,i)=>(
                 <tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}>
                   <td style={{...RPT_tdStyle,fontWeight:700}}>{row.field}</td>
                   <td style={{...RPT_tdStyle,color:"#5a6691"}}>{row.module}</td>
@@ -1177,7 +1194,7 @@ export function BulkUserOperations(){
               <td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#e6e8f1",borderRadius:3,fontSize:10.5,fontWeight:600}}>{u.role}</span></td>
               <td style={{...RPT_tdStyle,fontSize:11}}>{Array.isArray(u.branches)?u.branches.join(", "):u.branches}</td>
               <td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:3,fontSize:10,fontWeight:700,background:u.active?"#d4edda":"#f8d7da",color:u.active?"#155724":"#721c24"}}>{u.active?"Active":"Inactive"}</span></td>
-              <td style={{...RPT_tdStyle,fontSize:11,color:"#5a6691"}}>2026-05-{10+u.id}</td>
+              <td style={{...RPT_tdStyle,fontSize:11,color:"#5a6691"}}>{u.lastLogin || u.last_login || '—'}</td>
             </tr>
           ))}</tbody>
         </table>

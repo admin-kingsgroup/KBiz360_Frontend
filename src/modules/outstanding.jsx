@@ -101,20 +101,31 @@ function SettleModal({ adv, side, branch, cur, onClose }) {
   );
 }
 
-export function OutstandingOnAccount({ branch }) {
+// `side` scopes the screen to one party-side so it can be embedded as the
+// "Open Bills & On-Account" tab of Receivables / Payables:
+//   'customer' → only the AR tabs (unsettled sales bills + on-account receipts)
+//   'supplier' → only the AP tabs (unsettled purchase bills + on-account payments)
+//   undefined  → all four tabs (the standalone whole-book view)
+export function OutstandingOnAccount({ branch, side, initialTab, initialParty }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const q = useOutstanding(branch);
   const d = q.data || {};
   const t = d.totals || {};
-  const [tab, setTab] = useState('sales');
-  const [settleAdv, setSettleAdv] = useState(null); // { adv, side }
+  const showAR = side !== 'supplier';
+  const showAP = side !== 'customer';
+  // When deep-linked from the "Adjust advance" shortcut on the Payables ageing,
+  // focus that supplier's on-account advances so the user can allocate straight away.
+  const [partyFocus, setPartyFocus] = useState(initialParty || '');
 
-  const KPIS = [
-    { k: 'sales', label: 'Unsettled Sales Bills', amt: t.salesOutstanding, n: (d.salesBills || []).length, color: BLUE },
-    { k: 'purchase', label: 'Unsettled Purchase Bills', amt: t.purchaseOutstanding, n: (d.purchaseBills || []).length, color: RED },
-    { k: 'recAdv', label: 'On-Account Receipts', amt: t.onAccountReceipts, n: (d.onAccountReceipts || []).length, color: GREEN },
-    { k: 'payAdv', label: 'On-Account Payments', amt: t.onAccountPayments, n: (d.onAccountPayments || []).length, color: GOLD },
-  ];
+  const KPIS = useMemo(() => [
+    { k: 'sales', label: 'Unsettled Sales Bills', amt: t.salesOutstanding, n: (d.salesBills || []).length, color: BLUE, ar: true },
+    { k: 'recAdv', label: 'On-Account Receipts', amt: t.onAccountReceipts, n: (d.onAccountReceipts || []).length, color: GREEN, ar: true },
+    { k: 'purchase', label: 'Unsettled Purchase Bills', amt: t.purchaseOutstanding, n: (d.purchaseBills || []).length, color: RED, ap: true },
+    { k: 'payAdv', label: 'On-Account Payments', amt: t.onAccountPayments, n: (d.onAccountPayments || []).length, color: GOLD, ap: true },
+  ].filter((c) => (c.ar && showAR) || (c.ap && showAP)), [d, t, showAR, showAP]);
+
+  const [tab, setTab] = useState(initialTab || (showAP && !showAR ? 'purchase' : 'sales'));
+  const [settleAdv, setSettleAdv] = useState(null); // { adv, side }
 
   const moneyCell = (r, v) => money(cur, v);
   const ageCell = (r, v) => <span style={{ color: ageColor(v) }} className="font-bold tabular-nums">{v}</span>;
@@ -144,12 +155,15 @@ export function OutstandingOnAccount({ branch }) {
   ];
 
   const active = useMemo(() => {
-    if (tab === 'sales') return { rows: d.salesBills || [], columns: billColumns('Customer'), empty: 'Nothing unsettled here. 🎉', name: 'unsettled-sales' };
-    if (tab === 'purchase') return { rows: d.purchaseBills || [], columns: billColumns('Supplier'), empty: 'Nothing unsettled here. 🎉', name: 'unsettled-purchase' };
-    if (tab === 'recAdv') return { rows: d.onAccountReceipts || [], columns: advColumns('Customer', 'customer'), empty: 'No on-account amounts awaiting settlement.', name: 'on-account-receipts' };
-    return { rows: d.onAccountPayments || [], columns: advColumns('Supplier', 'supplier'), empty: 'No on-account amounts awaiting settlement.', name: 'on-account-payments' };
+    let a;
+    if (tab === 'sales') a = { rows: d.salesBills || [], columns: billColumns('Customer'), empty: 'Nothing unsettled here. 🎉', name: 'unsettled-sales' };
+    else if (tab === 'purchase') a = { rows: d.purchaseBills || [], columns: billColumns('Supplier'), empty: 'Nothing unsettled here. 🎉', name: 'unsettled-purchase' };
+    else if (tab === 'recAdv') a = { rows: d.onAccountReceipts || [], columns: advColumns('Customer', 'customer'), empty: 'No on-account amounts awaiting settlement.', name: 'on-account-receipts' };
+    else a = { rows: d.onAccountPayments || [], columns: advColumns('Supplier', 'supplier'), empty: 'No on-account amounts awaiting settlement.', name: 'on-account-payments' };
+    if (partyFocus) a = { ...a, rows: a.rows.filter((r) => r.party === partyFocus) };
+    return a;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, d, cur]);
+  }, [tab, d, cur, partyFocus]);
 
   return (
     <PageLayout
@@ -161,18 +175,34 @@ export function OutstandingOnAccount({ branch }) {
 
       {!q.isLoading && !q.isError && (
         <>
+          {partyFocus && (
+            <div className="mb-3 flex items-center gap-2 text-[12px]">
+              <span className="rounded-full bg-[#FFF6E0] px-2.5 py-1 font-bold text-[#8a6d1a]">Focused on {partyFocus}</span>
+              <button className="text-[#185FA5] font-semibold underline" onClick={() => setPartyFocus('')}>show all parties</button>
+            </div>
+          )}
           <ResponsiveGrid min="220px" gap="md" className="mb-4">
             {KPIS.map((c) => (
-              <button
+              // NOTE: the colour hex must NEVER sit on the <button>'s own inline
+              // style — global rules in index.css (button[style*="#185FA5"] etc.)
+              // would then paint the whole card that colour and bury the text.
+              // So the active ring lives on this wrapper div, and the brand colour
+              // only appears on the child stripe/amount (descendants are unaffected).
+              <div
                 key={c.k}
-                onClick={() => setTab(c.k)}
-                style={{ borderLeftColor: c.color, boxShadow: tab === c.k ? `0 0 0 2px ${c.color}55` : undefined }}
-                className="rounded-brand border border-l-4 border-surface-border bg-surface p-3.5 text-left transition hover:shadow-sm"
+                className="rounded-brand"
+                style={tab === c.k ? { boxShadow: `0 0 0 2px ${c.color}55` } : undefined}
               >
-                <div className="text-[10.5px] font-bold uppercase tracking-wide text-ink-muted">{c.label}</div>
-                <div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: c.color }}>{money(cur, c.amt)}</div>
-                <div className="mt-0.5 text-[11px] text-ink-muted">{c.n} item{c.n === 1 ? '' : 's'}</div>
-              </button>
+                <button
+                  onClick={() => setTab(c.k)}
+                  className="relative h-full w-full overflow-hidden rounded-brand border border-surface-border bg-surface p-3.5 pl-4 text-left transition hover:shadow-sm"
+                >
+                  <span aria-hidden className="absolute left-0 top-0 h-full w-1.5" style={{ backgroundColor: c.color }} />
+                  <div className="text-[10.5px] font-bold uppercase tracking-wide text-ink-muted">{c.label}</div>
+                  <div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: c.color }}>{money(cur, c.amt)}</div>
+                  <div className="mt-0.5 text-[11px] text-ink-muted">{c.n} item{c.n === 1 ? '' : 's'}</div>
+                </button>
+              </div>
             ))}
           </ResponsiveGrid>
 

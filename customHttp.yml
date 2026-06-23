@@ -1,0 +1,19 @@
+customHeaders:
+  # The HTML entry point must NEVER be cached — it carries the references to the
+  # hashed JS/CSS chunks. If a browser reuses a stale index.html after a deploy,
+  # it asks for chunk hashes that no longer exist → "Failed to fetch dynamically
+  # imported module". Force a revalidate on every load so chunk refs stay current.
+  - pattern: '/'
+    headers:
+      - key: 'Cache-Control'
+        value: 'no-cache, no-store, must-revalidate'
+  - pattern: '/index.html'
+    headers:
+      - key: 'Cache-Control'
+        value: 'no-cache, no-store, must-revalidate'
+  # Hashed build assets are content-addressed and immutable — cache them hard so
+  # navigation stays fast. A new build emits new filenames, never overwrites.
+  - pattern: '/assets/**'
+    headers:
+      - key: 'Cache-Control'
+        value: 'public, max-age=31536000, immutable'

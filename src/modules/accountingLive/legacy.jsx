@@ -25,6 +25,8 @@ import { LedgerAccountView } from '../../core/ledgerUI';
 import { openLedgerModal } from '../../core/LedgerModalHost';
 import { usePrefs } from '../../core/prefs';
 import { pushModal } from '../../core/ux/modalStore';
+import { clickable } from '../../core/ux/clickable';
+import { contraLedgerName, lineNarration } from '../../core/cashBookRows';
 import { toast } from '../../core/ux/toast';
 import { CUR_QUARTER, CUR_FY } from '../../core/dates';
 import { PeriodBar } from '../../core/period';
@@ -499,7 +501,7 @@ export function TrialBalanceLive({ branch }) {
   const [view, setView] = useState('detailed'); // detailed (4-col) | summary (closing only)
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(100);
+  const [pageSize, setPageSize] = useState(1000); // show the whole ledger by default; pager still kicks in past 1000
   const [drill, setDrill] = useState(null); // ledger name
   const q = useTrialBalance(branch, { from, to });
 
@@ -600,7 +602,7 @@ export function TrialBalanceLive({ branch }) {
                     </tr>
                   )}
                   <tr style={{ ...rowBg(i), cursor: 'pointer' }}
-                    onClick={() => setDrill(l.ledger)}
+                    {...clickable(() => setDrill(l.ledger))}
                     onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
                     <td style={{ padding: '8px 14px 8px 26px', color: BLUE, fontWeight: 600 }}>{l.ledger}{l.code ? <span style={{ color: '#9197a3', fontSize: 9.5, marginLeft: 6 }}>{l.code}</span> : null} <span style={{ color: '#9197a3', fontSize: 10 }}>›</span></td>
@@ -648,7 +650,7 @@ export function DayBookLive({ branch }) {
   const [view, setView] = useState('minimal'); // minimal | detailed
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(100);
+  const [pageSize, setPageSize] = useState(1000); // show the whole ledger by default; pager still kicks in past 1000
   const [voucher, setVoucher] = useState(null); // clicked Day Book line → voucher modal
   // Fetch only the selected window server-side (journal dates are all ISO, so the
   // {date:$gte..$lte} range is exact) — defaults to today, so the Day Book opens fast
@@ -729,7 +731,7 @@ export function DayBookLive({ branch }) {
                     </tr>
                   )}
                   <tr style={{ ...rowBg(i), cursor: r.voucherId ? 'pointer' : 'default' }}
-                    onClick={() => r.voucherId && setVoucher({ id: r.voucherId, vno: r.vno })}
+                    {...clickable(() => r.voucherId && setVoucher({ id: r.voucherId, vno: r.vno }))}
                     onMouseEnter={(e) => { if (r.voucherId) e.currentTarget.style.background = '#eff6ff'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
                     <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.date}</td>
@@ -995,7 +997,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         <button onClick={onBack} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 34, fontSize: 11.5, cursor: 'pointer' }}>Back</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: 10 }}>
-        <div><div style={lab}>Date</div><input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} style={fld} /></div>
+        <div><div style={lab}>Date</div><input type="date" max={todayISO()} value={form.date} onChange={(e) => set('date', e.target.value)} style={fld} /></div>
         <div><div style={lab}>Branch</div><input value={form.branch} onChange={(e) => set('branch', e.target.value)} style={fld} /></div>
         <div><div style={lab}>{v.category === 'purchase' || v.category === 'purchase-expense' ? 'Supplier (party ledger)' : 'Customer / Party ledger'}</div><input list={dlId} value={form.party} onChange={(e) => set('party', e.target.value)} style={fld} /></div>
         <div><div style={lab}>Link No</div><input value={form.linkNo} onChange={(e) => set('linkNo', e.target.value)} style={fld} /></div>
@@ -1141,7 +1143,7 @@ function DrillDown({ branch, group, onClose }) {
               </div>
               {(stmt.data.lines || []).length === 0 && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>No entries.</div>}
               {(stmt.data.lines || []).map((ln, i) => (
-                <div key={i} style={tapRow} onClick={() => ln.voucherId && setVoucher({ id: ln.voucherId, vno: ln.vno })}>
+                <div key={i} style={tapRow} {...clickable(() => ln.voucherId && setVoucher({ id: ln.voucherId, vno: ln.vno }))}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 12, color: BLUE, fontWeight: 600 }}>{ln.vno} <span style={{ color: DIM, fontWeight: 400 }}>· {ln.date}</span></div>
                     <div style={{ fontSize: 10.5, color: DIM, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ln.narration || ln.party || ln.category}</div>
@@ -1167,7 +1169,7 @@ function DrillDown({ branch, group, onClose }) {
               const clDr = r.closingDebit != null ? r.closingDebit : r.debit;
               const clCr = r.closingCredit != null ? r.closingCredit : r.credit;
               return (
-                <div key={i} style={tapRow} onClick={() => setLedger(r.ledger)}>
+                <div key={i} style={tapRow} {...clickable(() => setLedger(r.ledger))}>
                   <span style={{ fontSize: 12.5, color: DARK, fontWeight: 600 }}>{r.ledger}</span>
                   <span style={{ fontSize: 12, fontWeight: 700, color: clDr ? BLUE : RED, whiteSpace: 'nowrap' }}>{money(cur, clDr || clCr)} {clDr ? 'Dr' : 'Cr'}</span>
                 </div>
@@ -1501,7 +1503,7 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
                   // Final Invoice / Bill Value → green + clickable, opens the voucher's JV.
                   if (c.key === 'finalValue') {
                     return (
-                      <td key={c.key} onClick={() => onOpenJV && r._v && onOpenJV(r._v)} title="Open journal voucher (JV)"
+                      <td key={c.key} {...clickable(() => onOpenJV && r._v && onOpenJV(r._v))} title="Open journal voucher (JV)"
                         style={{ padding: '7px 12px', whiteSpace: 'nowrap', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: GREEN, fontWeight: 800, cursor: onOpenJV && r._v ? 'pointer' : 'default', textDecoration: onOpenJV && r._v ? 'underline' : 'none' }}>
                         {cellNum(r[c.key])}
                       </td>
@@ -1677,7 +1679,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
             </tr></thead>
             <tbody>
               {rows.map((v, i) => (
-                <tr key={v.id || v.vno} style={{ ...rowBg(i), cursor: 'pointer' }} onClick={() => setDetail(v)}
+                <tr key={v.id || v.vno} style={{ ...rowBg(i), cursor: 'pointer' }} {...clickable(() => setDetail(v))}
                   onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
                   <td style={{ padding: '8px 12px', color: DIM, whiteSpace: 'nowrap' }}>{v.date}</td>
@@ -1855,7 +1857,7 @@ export function InvoiceGPLive({ branch }) {
               const isOpen = open === i;
               return (
                 <React.Fragment key={r.ref + '-' + i}>
-                  <tr style={{ ...rowBg(i), cursor: 'pointer', background: isOpen ? '#eef4ff' : rowBg(i).background }} onClick={() => setOpen(isOpen ? null : i)}>
+                  <tr style={{ ...rowBg(i), cursor: 'pointer', background: isOpen ? '#eef4ff' : rowBg(i).background }} {...clickable(() => setOpen(isOpen ? null : i))}>
                     <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10.5, color: r.linked ? '#6b21a8' : '#64748b', fontWeight: 700 }}>
                       <span style={{ color: DIM, marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{f.ref}
                     </td>
@@ -1986,7 +1988,8 @@ export function ChartOfAccountsLive({ branch }) {
           <thead><tr style={headRow}><Th>Group</Th><Th>Code</Th><Th>Ledger</Th><Th>Nature</Th><Th>Statement</Th><Th right>Opening</Th></tr></thead>
           <tbody>
             {groups.map((grp) => {
-              const gl = shown.filter((l) => l.group === grp);
+              const gl = shown.filter((l) => l.group === grp)
+                .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }));
               return gl.map((l, i) => (
                 <tr key={l.id || l.code} style={rowBg(i)}>
                   {i === 0 && <td rowSpan={gl.length} style={{ padding: '9px 14px', fontWeight: 700, color: DARK, borderRight: '2px solid #e6e8ec', verticalAlign: 'top', fontSize: 10.5, background: '#f9fafb' }}>{grp}</td>}
@@ -2063,7 +2066,7 @@ export function AccountsChartLive({ branch }) {
     const lc = countLedgers(node);
     return (
       <div>
-        <div onClick={() => setOpen((s) => ({ ...s, [key]: !opened }))}
+        <div {...clickable(() => setOpen((s) => ({ ...s, [key]: !opened })))}
           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: `7px 12px 7px ${12 + depth * 18}px`, background: isSystem ? '#eef3fb' : '#f6f9fd', borderTop: '1px solid #e4ebf5', cursor: 'pointer', fontWeight: isSystem ? 700 : 600, color: isSystem ? DARK : '#1a3a6e' }}>
           <span style={{ color: GOLD, width: 12 }}>{(kids.length || leds.length) ? (opened ? '▾' : '▸') : ''}</span>
           <span style={{ textDecoration: isSystem ? 'underline' : 'none' }}>{node.name}</span>
@@ -2076,7 +2079,7 @@ export function AccountsChartLive({ branch }) {
             {kids.map((c) => <Node key={c.id || c.name} node={c} depth={depth + 1} />)}
             {leds.map((l) => (
               <div key={l.id || l.code || l.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: `5px 12px 5px ${12 + (depth + 1) * 18 + 14}px`, borderBottom: '1px solid #f4f6fa', fontSize: 12 }}>
-                <span onClick={() => openLedgerModal(l.name)} title="Open ledger account" style={{ fontWeight: 600, color: BLUE, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>{l.name}</span>
+                <span {...clickable(() => openLedgerModal(l.name))} title="Open ledger account" style={{ fontWeight: 600, color: BLUE, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>{l.name}</span>
                 {l.code ? <span style={{ fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{l.code}</span> : null}
               </div>
             ))}
@@ -2128,7 +2131,7 @@ export function AccountsChartLive({ branch }) {
             <Col title="Ledgers" count={ledgers.length}>
               {ledgers.map((l, i) => (
                 <div key={l.id || l.code || l.name} style={{ padding: '7px 12px', ...rowBg(i), fontSize: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span onClick={() => openLedgerModal(l.name)} title="Open ledger account" style={{ fontWeight: 600, color: BLUE, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>{l.name}</span>{l.code ? <span style={{ fontFamily: 'monospace', fontSize: 9.5, color: BLUE }}>{l.code}</span> : null}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span {...clickable(() => openLedgerModal(l.name))} title="Open ledger account" style={{ fontWeight: 600, color: BLUE, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>{l.name}</span>{l.code ? <span style={{ fontFamily: 'monospace', fontSize: 9.5, color: BLUE }}>{l.code}</span> : null}</div>
                   <div style={{ color: DIM, fontSize: 10.5 }}>{l.topGroup}{l.subGroup ? ` › ${l.subGroup}` : ''}</div>
                 </div>
               ))}
@@ -2150,9 +2153,10 @@ export function CashBookLive({ branch }) {
   const [from, setFrom] = useState(todayISO);
   const [to, setTo] = useState(todayISO);
   const [view, setView] = useState('detailed'); // detailed | minimal
+  const [expandAll, setExpandAll] = useState(false); // show narration under each ledger name
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(100);
+  const [pageSize, setPageSize] = useState(1000); // show the whole ledger by default; pager still kicks in past 1000
   const [ledger, setLedger] = useState('');
   const [voucher, setVoucher] = useState(null); // { id, vno } — drill-down to the voucher
 
@@ -2176,11 +2180,13 @@ export function CashBookLive({ branch }) {
   }, [allLines, masterOpen, from]);
 
   // In-range lines with a running balance carried from the period opening.
+  // "Particulars" is the contra ledger NAME; the narration shows under it on Expand all.
   const rowsFull = useMemo(() => {
     let run = periodOpen;
     return allLines.filter((ln) => dateInRange(ln.date, from, to)).map((ln) => {
       run = Math.round((run + (ln.debit || 0) - (ln.credit || 0)) * 100) / 100;
-      return { date: ln.date, vno: ln.vno, category: ln.category, voucherId: ln.voucherId, debit: ln.debit || 0, credit: ln.credit || 0, particulars: ln.narration || ln.party || ln.category || '', running: run };
+      const ledgerName = contraLedgerName(ln);
+      return { date: ln.date, vno: ln.vno, category: ln.category, voucherId: ln.voucherId, debit: ln.debit || 0, credit: ln.credit || 0, ledgerName, narration: lineNarration(ln), particulars: ledgerName, running: run };
     });
   }, [allLines, periodOpen, from, to]);
 
@@ -2189,12 +2195,12 @@ export function CashBookLive({ branch }) {
   const closing = Math.round(periodOpen + receipts - payments);
 
   const term = search.trim().toLowerCase();
-  const rowsShown = useMemo(() => (term ? rowsFull.filter((r) => `${r.vno} ${r.particulars} ${r.category}`.toLowerCase().includes(term)) : rowsFull), [rowsFull, term]);
+  const rowsShown = useMemo(() => (term ? rowsFull.filter((r) => `${r.vno} ${r.ledgerName} ${r.narration} ${r.category}`.toLowerCase().includes(term)) : rowsFull), [rowsFull, term]);
   const pageRows = useMemo(() => rowsShown.slice(page * pageSize, page * pageSize + pageSize), [rowsShown, page, pageSize]);
 
   const expColumns = view === 'minimal'
-    ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'particulars', label: 'Particulars' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }]
-    : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'category', label: 'Type' }, { key: 'particulars', label: 'Particulars' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }, { key: 'running', label: `Balance (${cur})`, num: true }];
+    ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'ledgerName', label: 'Ledger Name' }, { key: 'narration', label: 'Narration' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }]
+    : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'category', label: 'Type' }, { key: 'ledgerName', label: 'Ledger Name' }, { key: 'narration', label: 'Narration' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }, { key: 'running', label: `Balance (${cur})`, num: true }];
   const printRows = rowsFull.map((r) => ({ ...r, debit: nfmt(r.debit), credit: nfmt(r.credit), running: nfmt(r.running) }));
   const totalRow = { date: 'CLOSING', vno: '', particulars: '', debit: nfmt(receipts), credit: nfmt(payments), running: nfmt(closing) };
   const sub = `${selected || 'Cash account'} · ${branchLabel(branch)} · ${rowsFull.length} entries · Closing ${money(cur, closing)}`;
@@ -2220,7 +2226,14 @@ export function CashBookLive({ branch }) {
           {cashLedgers.length === 0 && <option value="">No cash ledger</option>}
           {cashLedgers.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
         </select>
-        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Particulars / voucher…" />
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Ledger / narration / voucher…" />
+        <button
+          onClick={() => setExpandAll((x) => !x)}
+          title={expandAll ? 'Hide narration under each ledger' : 'Show narration under each ledger'}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 32, padding: '0 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', borderRadius: 7, border: `1px solid ${expandAll ? BLUE : '#d3d8e4'}`, background: expandAll ? BLUE : '#fff', color: expandAll ? '#fff' : '#384677' }}
+        >
+          {expandAll ? '▾ Collapse all' : '▸ Expand all'}
+        </button>
         <ModeToggle view={view} setView={setView} modes={[{ id: 'detailed', label: 'Detailed' }, { id: 'minimal', label: 'Minimal' }]} />
         <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(0)} full branch={branch} />
         <ExportBtn onClick={exportNow} disabled={!rowsFull.length} />
@@ -2241,7 +2254,7 @@ export function CashBookLive({ branch }) {
           <thead><tr style={headRow}>
             <Th>Date</Th><Th>Voucher</Th>
             {view === 'detailed' && <Th>Type</Th>}
-            <Th>Particulars</Th><Th right>Receipt (Dr)</Th><Th right>Payment (Cr)</Th>
+            <Th>Ledger Name</Th><Th right>Receipt (Dr)</Th><Th right>Payment (Cr)</Th>
             {view === 'detailed' && <Th right>Balance</Th>}
           </tr></thead>
           <tbody>
@@ -2252,11 +2265,16 @@ export function CashBookLive({ branch }) {
               </tr>
             )}
             {pageRows.map((r, i) => (
-              <tr key={r.vno + '-' + i} title={r.voucherId ? 'Open voucher' : ''} onClick={() => r.voucherId && setVoucher({ id: r.voucherId, vno: r.vno })} style={{ ...rowBg(i), background: r.debit > 0 ? '#f4fbf4' : (i % 2 === 0 ? '#fff' : '#fafafa'), cursor: r.voucherId ? 'pointer' : 'default' }}>
+              <tr key={r.vno + '-' + i} title={r.voucherId ? 'Open voucher' : ''} {...clickable(() => r.voucherId && setVoucher({ id: r.voucherId, vno: r.vno }))} style={{ ...rowBg(i), background: r.debit > 0 ? '#f4fbf4' : (i % 2 === 0 ? '#fff' : '#fafafa'), cursor: r.voucherId ? 'pointer' : 'default' }}>
                 <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.date}</td>
                 <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 10, color: BLUE, whiteSpace: 'nowrap' }}>{r.vno}</td>
                 {view === 'detailed' && <td style={{ padding: '7px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: (TYPE_CLR[r.category] || '#2e323c') + '22', color: TYPE_CLR[r.category] || '#2e323c' }}>{r.category || '—'}</span></td>}
-                <td style={{ padding: '7px 12px', maxWidth: 360 }}><NarrationCell text={r.particulars} /></td>
+                <td style={{ padding: '7px 12px', maxWidth: 360 }}>
+                  <span style={{ color: '#2e323c', fontWeight: 600 }}>{r.ledgerName || '—'}</span>
+                  {expandAll && r.narration && (
+                    <div style={{ marginTop: 2, fontSize: 10, color: DIM, fontStyle: 'italic', whiteSpace: 'normal' }}>{r.narration}</div>
+                  )}
+                </td>
                 <td style={{ padding: '7px 12px', ...num, fontWeight: 600, color: r.debit > 0 ? GREEN : '#dfe2ee' }}>{money(cur, r.debit)}</td>
                 <td style={{ padding: '7px 12px', ...num, fontWeight: 600, color: r.credit > 0 ? RED : '#dfe2ee' }}>{money(cur, r.credit)}</td>
                 {view === 'detailed' && <td style={{ padding: '7px 12px', ...num, fontWeight: 700, color: r.running >= 0 ? DARK : RED }}>{money(cur, Math.abs(r.running))} {r.running < 0 ? 'Cr' : ''}</td>}

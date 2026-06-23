@@ -5,7 +5,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useEffect, useState, useRef, useCallback, Suspense } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
 import { apiPost } from './core/api';
@@ -45,26 +45,27 @@ import { financeRoutes } from './modules/finance/routes';
 const MIGRATED_FEATURE_ROUTES = [...financeRoutes];
 const { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
 const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrExpenses, HrLeave, HrPayroll, HrPayslips, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
-const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
+const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
 const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/mastersParties'));
 const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } = lazyModule(() => import('./modules/reports'));
 const { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } = lazyModule(() => import('./modules/settings'));
 const { PageAccessControl } = lazyModule(() => import('./modules/pageAccess'));
-const { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxTdsTcs, TaxVat } = lazyModule(() => import('./modules/taxation'));
-const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
+const { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxReco, TaxTdsTcs, TaxVat } = lazyModule(() => import('./modules/taxation'));
+const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, DebitNoteVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
 const { SoPoGpVoucherEntry } = lazyModule(() => import('./modules/bookingOrder'));
 const { UnifiedApprovals } = lazyModule(() => import('./modules/voucherApprovals'));
 const { ModuleRegister } = lazyModule(() => import('./modules/moduleRegister'));
-const { OutstandingOnAccount } = lazyModule(() => import('./modules/outstanding'));
 const { AccountsTreeView } = lazyModule(() => import('./modules/chartBuilder'));
 const { PnLTallyLive } = lazyModule(() => import('./modules/pnlTally'));
 const { BalanceSheetTallyLive } = lazyModule(() => import('./modules/balanceSheetTally'));
 const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/capitalVsInvestment'));
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, AccountsChartLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
-const { DashboardAccountant, NetAgeing, CollectionsFollowup, SupplierReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
+const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
+const { PaymentRun } = lazyModule(() => import('./modules/paymentRun'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
 const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('./modules/financialStatements'));
 const { NotesToFinancials } = lazyModule(() => import('./modules/reportsNotes'));
+const { Statistics } = lazyModule(() => import('./modules/statistics'));
 const { CostCenterMasterLive } = lazyModule(() => import('./modules/costCentersLive'));
 const { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, GroupsMaster, SubGroupsMaster, LedgersMaster } = lazyModule(() => import('./modules/mastersLive'));
 const { DataImportPage } = lazyModule(() => import('./modules/dataImport'));
@@ -146,8 +147,12 @@ export default function KB360App(){
   const goForward = useCallback(()=>rrNavigate(1), [rrNavigate]);
   const navValue={ route, navigate, goBack, goForward, canBack:histIdx>0, canForward:histIdx<maxIdxRef.current };
 
-  /* Persist the current route so a refresh / re-open returns you here. */
-  useEffect(()=>{ try{ localStorage.setItem("kb360-route", route); }catch{ /* ignore */ } },[route]);
+  /* Persist the current route so a refresh / re-open returns you here.
+     Never persist the bare root "/": it is the live host's entry URL, not a real
+     destination. Persisting it would clobber the saved route BEFORE the restore
+     effect below reads it (this effect runs first on mount), leaving the user
+     stranded on "/" → <Placeholder> on every live load. */
+  useEffect(()=>{ if(route==="/") return; try{ localStorage.setItem("kb360-route", route); }catch{ /* ignore */ } },[route]);
 
   /* Persist the selected branch so a refresh keeps you on it (restored above). */
   useEffect(()=>{ try{ localStorage.setItem("kb360-branch", branch==="ALL"?"ALL":(branch?.code||"")); }catch{ /* ignore */ } },[branch]);
@@ -403,7 +408,9 @@ export default function KB360App(){
     if(route==="/finance/investments")   return <InvestmentRegister branch={branch}/>;
     if(route==="/finance/loan-amort")    return <LoanAmortization/>;
     if(route==="/finance/reco-queue")    return <ReconciliationQueue branch={branch} setRoute={navigate}/>;
-    if(route==="/finance/outstanding")   return <OutstandingOnAccount branch={branch}/>;
+    // Retired: the combined Outstanding & On-Account screen is now split into the
+    // Receivables / Payables 2-tab workbenches. Redirect old links to Receivables.
+    if(route==="/finance/outstanding")   return <Navigate to="/reports/rec" replace/>;
     if(route==="/finance/multi-currency")  return <MultiCurrencyVoucher/>;
     if(route==="/finance/comments-demo")   return <VoucherCommentsDemo/>;
     if(route==="/finance/print-preview")   return <PrintPreviewDemo/>;
@@ -420,16 +427,20 @@ export default function KB360App(){
     if(route==="/masters/numbering")      return <NumberingSeriesMaster branch={branch}/>;
     // ── Accounts — branch accountant workspace (new screens) ──
     if(route==="/accounts/dashboard")     return <DashboardAccountant branch={branch} setRoute={navigate}/>;
-    if(route==="/accounts/net-ageing")    return <NetAgeing branch={branch}/>;
+    if(route==="/accounts/net-ageing")    return <PayablesLive branch={branch} setRoute={navigate} initialTab="net"/>;
     if(route==="/accounts/collections")   return <CollectionsFollowup branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/supplier-reco") return <SupplierReco branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/client-reco")   return <ClientReco branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/interbranch-reco") return <InterBranchReco branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/tally-reco")    return <TallyReco branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/payment-run")   return <PaymentRun branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/suspense")      return <SuspenseClearing branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/month-end")     return <MonthEndChecklist branch={branch} setRoute={navigate}/>;
     if(route==="/dashboard")          return <DashboardRouter branch={branch} setRoute={navigate} currentUser={currentUser}/>;
     if(route==="/dashboard/alerts")   return <AlertsDashboard branch={branch} setRoute={navigate}/>;
     if(route==="/dashboards/capital") return <CapitalVsInvestmentLive branch={branch}/>; // Capital vs Investment (live from BS + P&L)
     // Director/Super-Admin dashboard suite (menu is role-gated in getMenu).
-    if(/^\/dashboards\/(exec|profitability|cash|arap|branch|balance-sheet|module-gp|sales|supplier|tax|expenses|audit|sales-target|gp-target|collections-target|budget-expense)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch}/>;
+    if(/^\/dashboards\/(exec|profitability|cash|cash-forecast|arap|branch|balance-sheet|module-gp|sales|supplier|tax|expenses|audit|sales-target|gp-target|collections-target|budget-expense|yoy|customer-value)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch} setRoute={navigate}/>;
     if(route==="/finance/targets") return <TargetsMaster branch={branch}/>;
     if(route==="/bookings/new")       return <SoPoGpVoucherEntry branch={branch} setRoute={navigate}/>;
     // Unified Approvals — SO/PO/GP + Vouchers, each with Pending/Approved/Rejected/Deleted.
@@ -448,6 +459,9 @@ export default function KB360App(){
     if(route==="/purchase-expense")          return <PurchaseExpenseVoucher branch={branch} setRoute={navigate}/>;
     // Purchase-Expense pending/approved/etc. now live in the unified Voucher Approvals queue.
     if(/^\/purchase-expense\/(pending|approved|rejected|deleted)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;
+    if(route==="/debit-note")         return <DebitNoteVoucher branch={branch} setRoute={navigate}/>;
+    // Debit-Note pending/approved/etc. share the unified Voucher Approvals queue.
+    if(/^\/debit-note\/(pending|approved|rejected|deleted)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;
     // Refund / Reissue are now SO/PO/GP reversal modules — these routes open the
     // booking entry with the module preselected (the standalone RefundVoucher/
     // ReissueVoucher are retired; old links land on the new flow).
@@ -456,10 +470,11 @@ export default function KB360App(){
     if(route==="/finance/adm-voucher") return <AdmVoucher branch={branch}/>;
     if(route==="/finance/acm-voucher") return <AcmVoucher branch={branch}/>;
     if(route==="/contra")             return <ContraVoucher branch={branch}/>;
-    if(route==="/bank-reco")          return <BankReco/>;
+    if(route==="/bank-reco")          return <BankReco branch={branch}/>;
     if(route==="/journal")            return <JournalEntry branch={branch}/>;
     if(route==="/import")               return <DataImportPage currentUser={currentUser}/>;
     if(route==="/day-book")           return <DayBookLive branch={branch}/>;
+    if(route==="/accounts/statistics") return <Statistics branch={branch} setRoute={navigate}/>;
     if(route==="/finance/cash-book")  return <CashBookLive branch={branch}/>;
     if(route==="/ledger")             return <LedgerAcLive branch={branch}/>;
     if(route==="/trial-balance")      return <TrialBalanceLive branch={branch}/>;
@@ -476,8 +491,8 @@ export default function KB360App(){
     if(route==="/reports/pnl" || route==="/reports/pnl-tally" || route==="/reports/pnl-modulewise") return <ProfitAndLossUnified branch={branch}/>;
     if(route==="/reports/bs" || route==="/reports/bs-tally" || route==="/reports/bs-modulewise") return <BalanceSheetUnified branch={branch}/>;
     if(route==="/reports/cf")         return <ReportCF/>;
-    if(route==="/reports/rec")        return <ReceivablesLive branch={branch}/>;
-    if(route==="/reports/pay")        return <PayablesLive branch={branch}/>;
+    if(route==="/reports/rec")        return <ReceivablesLive branch={branch} setRoute={navigate}/>;
+    if(route==="/reports/pay")        return <PayablesLive branch={branch} setRoute={navigate}/>;
     if(route==="/reports/sreg")       return <RegisterLive branch={branch} initial="sales"/>;
     if(route==="/reports/preg")       return <RegisterLive branch={branch} initial="purchase"/>;
     if(route==="/reports/invoice-gp") return <InvoiceGPLive branch={branch}/>;
@@ -503,6 +518,7 @@ export default function KB360App(){
     if(route==="/reports/consolidated-bs")return <ConsolidatedBS/>;
     if(route==="/reports/cashflow-forecast")return <CashFlowForecast branch={branch}/>;
     if(route==="/reports/supplier-360")   return <Supplier360 branch={branch}/>;
+    if(route==="/reports/customer-360")   return <Customer360 branch={branch}/>;
     if(route==="/reports/tally-export")   return <TallyExport branch={branch}/>;
     if(route==="/masters/passports")      return <PassportManager branch={branch}/>;
     if(route==="/masters/markup")         return <MarkupRateSheet branch={branch}/>;
@@ -510,6 +526,7 @@ export default function KB360App(){
     if(route==="/purchase/ticket-control")return <TicketControlRegister branch={branch}/>;
     if(route==="/purchase/bsp-import")    return <BspCsvImport branch={branch}/>;
     if(route==="/purchase/gds-import")    return <GdsPnrImport branch={branch} setRoute={navigate}/>;
+    if(route==="/tax/reconciliation")     return <TaxReco branch={branch}/>;
     if(route==="/tax/gstr2b")             return <GstrRecon branch={branch}/>;
     if(route==="/tax/tds-certs")          return <TdsCertRegister branch={branch}/>;
     if(route==="/hr/salary-revision")     return <SalaryRevision branch={branch}/>;

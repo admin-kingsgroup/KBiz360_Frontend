@@ -146,6 +146,9 @@ export function blankSector() {
 // A blank booking line for a module: all numbers 0, all texts ''.
 export function blankLine(spec) {
   const l = {};
+  // Reversal modules (RF/RI) have no fare-grid spec — guard so a missing spec yields
+  // an empty line instead of throwing "Cannot read properties of undefined (idCols)".
+  if (!spec) return l;
   spec.idCols.forEach((c) => { l[c.key] = ''; });
   spec.fareCols.forEach((c) => { l[c.key] = ''; });
   l.psvc = ''; l.markup = ''; l.ssvc = ''; l.psvcGst = '';

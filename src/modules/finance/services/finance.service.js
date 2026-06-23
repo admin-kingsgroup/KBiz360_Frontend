@@ -40,5 +40,10 @@ export const loadTrialBalance = async ({ branch, from, to } = {}) => {
  */
 export const loadVoucherRegister = async ({ branch, category, from, to } = {}) => {
   const rows = await api.getVouchers({ branch, category, from, to });
-  return (rows || []).map(toVoucherRegisterRow);
+  // GET /api/vouchers returns EVERY status (no status filter is sent). A deleted
+  // voucher is reversed out of the books and kept view-only, so it must NOT appear
+  // in — or be summed into the total of — a register (a register reflects the live
+  // books). Drop deleted entries so a deleted voucher leaves the register at once
+  // (the actual Ledger A/c, which reads journals, already excludes them).
+  return (rows || []).filter((v) => v.status !== 'deleted').map(toVoucherRegisterRow);
 };

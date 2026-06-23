@@ -18,9 +18,11 @@ import { VarianceFlagsPanel } from '../components/shared/VarianceFlagsPanel';
 // modules until a dedicated taxation feature service exists.
 import { GSTR_FILING_STATUS } from '../../taxation';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+import { openPrintPreview } from '../../../core/PrintPreview';
 
-export function SrFmDashboardPage({ currentUser, setRoute }) {
-  const { data, isLoading } = useSrFmDashboard();
+export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
+  const branchCode = branch === 'ALL' ? null : branch?.code;
+  const { data, isLoading } = useSrFmDashboard(branchCode);
   const { navigate } = useDashboardActions(setRoute);
   const period = useDashboardStore((s) => s.period);
   const setPeriod = useDashboardStore((s) => s.setPeriod);
@@ -46,7 +48,7 @@ export function SrFmDashboardPage({ currentUser, setRoute }) {
         user={currentUser}
         period={period}
         setPeriod={setPeriod}
-        onExport={() => window.print()}
+        onExport={() => openPrintPreview({ selector: 'main', title: 'Senior Finance Manager Dashboard', recommend: 'portrait' })}
       />
 
       <ResponsiveGrid min="170px" gap="md" className="mb-3.5">

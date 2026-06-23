@@ -13,9 +13,11 @@ import { BankReconStatusPanel } from '../components/shared/BankReconStatusPanel'
 import { CloseChecklist } from '../components/shared/CloseChecklist';
 import { TopVendorsOverdueTable } from '../components/tables/TopVendorsOverdueTable';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+import { openPrintPreview } from '../../../core/PrintPreview';
 
-export function SrAeDashboardPage({ currentUser, setRoute }) {
-  const { data, todayTotal, todayValue, isLoading } = useSrAeDashboard();
+export function SrAeDashboardPage({ currentUser, setRoute, branch }) {
+  const branchCode = branch === 'ALL' ? null : branch?.code;
+  const { data, todayTotal, todayValue, isLoading } = useSrAeDashboard(branchCode);
   const { navigate } = useDashboardActions(setRoute);
   const period = useDashboardStore((s) => s.period);
   const setPeriod = useDashboardStore((s) => s.setPeriod);
@@ -34,14 +36,17 @@ export function SrAeDashboardPage({ currentUser, setRoute }) {
         user={currentUser}
         period={period}
         setPeriod={setPeriod}
-        onExport={() => window.print()}
+        onExport={() => openPrintPreview({ selector: 'main', title: 'Senior Accounts Executive Dashboard', recommend: 'portrait' })}
       />
 
       <ResponsiveGrid min="180px" gap="md" className="mb-3.5">
-        <KPICard label="Pending My Approval" value="0" delta="" color="#d97706" onClick={() => navigate('/approvals')} />
+        {/* These counts aren't computed by the dashboard hook yet — show "—"
+            (open the screen) rather than a hardcoded "0" that would falsely claim
+            nothing is pending / no reco issues. */}
+        <KPICard label="Pending My Approval" value="—" delta="open approvals" color="#d97706" onClick={() => navigate('/approvals')} />
         <KPICard label="Posted Today" value={todayTotal} delta={fmtINR(todayValue) + ' value'} color="#16a34a" />
-        <KPICard label="Rejected to Branches" value="0" delta="" color="#dc2626" />
-        <KPICard label="Bank Reco Issues" value="0" delta="" color="#c2a04a" onClick={() => navigate('/bank-reco')} />
+        <KPICard label="Rejected to Branches" value="—" delta="" color="#dc2626" />
+        <KPICard label="Bank Reco Issues" value="—" delta="open reco" color="#c2a04a" onClick={() => navigate('/bank-reco')} />
       </ResponsiveGrid>
 
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">

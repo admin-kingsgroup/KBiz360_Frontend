@@ -1,10 +1,11 @@
 import React from 'react';
+import { safeRatio } from '../../utils/helpers';
 
 export function FyTargetsPanel({ targets }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {targets.map((t) => {
-        const pct = Math.min(100, (t.actual / t.target) * 100);
+        const pct = Math.min(100, safeRatio(t.actual, t.target));
         return (
           <div key={t.metric}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>

@@ -35,6 +35,18 @@ jest.mock('../core/useAccounting', () => ({
   useDayBook: () => ({ data: [{ category: 'receipt', totalDebit: 1200 }, { category: 'payment', totalDebit: 400 }] }),
   useAlerts: () => ({ data: { alerts: [] } }),
 }));
+// Collections workspace reads its own board endpoint + mutation hooks.
+jest.mock('../core/useCollections', () => ({
+  useCollectionsBoard: () => ({ data: {
+    asOf: '2026-06-20',
+    totals: { overdue: 1700, customers: 1, promised: 0, escalated: 0 },
+    rows: [{ party: 'ACME', d0: 1000, d30: 500, d60: 0, d90: 200, overdue: 700, total: 1700, net: 1700, onAccount: 0,
+      followup: { party: 'ACME', branch: 'BOM', status: 'open', dunningLevel: 0, remindersSent: 0, contactLog: [], notes: '', promisedDate: '' } }],
+  } }),
+  useUpsertFollowup: () => ({ mutate: jest.fn() }),
+  useAddContact: () => ({ mutate: jest.fn() }),
+  useReminderRun: () => ({ mutate: jest.fn() }),
+}));
 // The redesigned dashboard also pulls the tax calendar and bank-reco summary.
 jest.mock('../core/useReference', () => ({ useTaxCalendar: () => ({ data: [] }) }));
 jest.mock('../core/useBankReco', () => ({
@@ -72,10 +84,11 @@ describe('accountant workspace — screens render', () => {
     // net = 1700 − 800 = 900 → ₹900
     expect(screen.getByText('₹900')).toBeInTheDocument();
   });
-  test('Collections lists only overdue customers (>30d), not zero/current ones', () => {
+  test('Collections dunning workspace lists overdue customers from the board', () => {
     render(<CollectionsFollowup branch={{ code: 'BOM' }} />);
-    expect(screen.getByText('ACME')).toBeInTheDocument();   // has d30+d90 overdue
-    expect(screen.queryByText('Globe')).toBeNull();          // zero — excluded
+    expect(screen.getByText('ACME')).toBeInTheDocument();       // overdue customer from the board
+    expect(screen.getByText('Send reminders to all')).toBeInTheDocument(); // dunning-run action
+    expect(screen.queryByText('Globe')).toBeNull();             // board already excludes current ones
   });
 
   test('Dashboard cockpit: three workspace tabs (daily money · collections ageing · compliance)', () => {

@@ -37,6 +37,8 @@ import { isInterBranch, brName } from './interbranch';
 import { Printer, FileSpreadsheet, FileText } from 'lucide-react';
 import { PageLayout } from '../shell/PageLayout';
 import { Button, Card, ResponsiveGrid, LoadingState, EmptyState } from '../shell/primitives';
+import { clickable } from '../core/ux/clickable';
+import { openPrintPreview } from '../core/PrintPreview';
 
 /* ── service (product) from voucher type ── */
 const PRODUCT = {
@@ -224,7 +226,7 @@ export function SalesGpAnalytics({ branch }) {
   const fname = `sales-gp-analytics_${from || 'all'}_to_${to || 'today'}`;
   const doExcel = () => { try { exportToExcel(fname, exportCols, exportRows); toast('Downloading Excel export…', 'success'); } catch (e) { toast('Export failed: ' + (e?.message || e), 'error'); } };
   const doCsv = () => { try { exportToCSV(exportRows, exportCols.map((c) => c.key), `${fname}.csv`); toast('Downloading CSV export…', 'success'); } catch (e) { toast('Export failed: ' + (e?.message || e), 'error'); } };
-  const doPrint = () => { toast('Opening print view…', 'info'); window.print(); };
+  const doPrint = () => { toast('Opening print view…', 'info'); openPrintPreview({ selector: 'main', title: 'Sales & GP Analytics', recommend: 'portrait' }); };
 
   /* ── voucher drill overlay ── */
   if (voucher) {
@@ -391,7 +393,7 @@ function AnalysisTab({ tab, invoices, catSummary, onDrill }) {
           </tr></thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.key} onClick={() => onDrill({ dim: cfg.dim, key: r.key, label: cfg.fmt ? cfg.fmt(r.key) : (cfg.brand ? brName(r.key) : r.key) })}
+              <tr key={r.key} {...clickable(() => onDrill({ dim: cfg.dim, key: r.key, label: cfg.fmt ? cfg.fmt(r.key) : (cfg.brand ? brName(r.key) : r.key) }))}
                 style={{ cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }} onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}>
                 <td style={{ ...RPT_tdStyle, fontWeight: 600, ...linkCell }}>{cfg.fmt ? cfg.fmt(r.key) : (cfg.brand ? brName(r.key) : r.key)}</td>
                 <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#2563eb' }}>{money(r.sale)}</td>
@@ -443,7 +445,7 @@ function InvoiceTable({ title, invoices, onVoucher, drill, clearDrill }) {
               const isOpen = open === inv.key;
               return (
                 <React.Fragment key={inv.key}>
-                  <tr onClick={() => setOpen(isOpen ? '' : inv.key)} style={{ cursor: 'pointer', background: isOpen ? '#f7f8fb' : '' }}>
+                  <tr {...clickable(() => setOpen(isOpen ? '' : inv.key))} style={{ cursor: 'pointer', background: isOpen ? '#f7f8fb' : '' }}>
                     <td style={{ ...RPT_tdStyle, fontWeight: 600 }}><span style={{ color: '#9197a3', marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{inv.customer}</td>
                     <td style={{ ...RPT_tdStyle, fontFamily: 'monospace', fontSize: 10, color: '#2563eb' }}>{inv.ref || '—'}</td>
                     <td style={RPT_tdStyle}>{inv.service}</td>
@@ -554,7 +556,7 @@ function InterBranchTab({ branch, from, to, invoices, onVoucher }) {
           const isOpen = openLedger === l.ledger;
           return (
             <div key={`${l.side}:${l.ledger}`} style={{ border: '1px solid #eef1f6', borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
-              <div onClick={() => setOpenLedger(isOpen ? '' : l.ledger)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '9px 12px', cursor: 'pointer', background: isOpen ? '#f7f8fb' : '#fff' }}>
+              <div {...clickable(() => setOpenLedger(isOpen ? '' : l.ledger))} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '9px 12px', cursor: 'pointer', background: isOpen ? '#f7f8fb' : '#fff' }}>
                 <div style={{ minWidth: 0 }}>
                   <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#1a1c22' }}><span style={{ color: '#9197a3', marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{l.ledger}</p>
                   <p style={{ margin: '1px 0 0 16px', fontSize: 10, color: '#5b616e' }}>{l.owning ? brName(l.owning) : '—'} · {l.side}</p>

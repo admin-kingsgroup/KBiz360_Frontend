@@ -10,7 +10,10 @@
 // Textareas keep native Enter (new line); buttons/submit keep native behaviour.
 import { useCallback, useEffect, useRef } from 'react';
 
-const FOCUSABLE = 'input,select,textarea,button,[tabindex]:not([tabindex="-1"])';
+// Enter-to-advance walks DATA fields only — buttons (Dr/Cr toggles, "Add line",
+// row delete ×) are intentionally excluded so Enter never lands on an action
+// control mid-entry; users Tab to reach buttons. Ctrl/Cmd+Enter submits.
+const ADVANCE_SELECTOR = 'input,select,textarea,[tabindex]:not([tabindex="-1"])';
 const isField = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'SELECT');
 
 export function useFormKeys({ onSubmit, onCancel } = {}) {
@@ -27,7 +30,7 @@ export function useFormKeys({ onSubmit, onCancel } = {}) {
     if (!isField(el)) return;
     e.preventDefault();
     const scope = ref.current || document;
-    const fields = Array.from(scope.querySelectorAll(FOCUSABLE))
+    const fields = Array.from(scope.querySelectorAll(ADVANCE_SELECTOR))
       .filter((n) => !n.disabled && n.offsetParent !== null && n.type !== 'hidden');
     const i = fields.indexOf(el);
     const next = fields[i + 1];

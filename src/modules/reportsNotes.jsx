@@ -27,6 +27,8 @@ import { buildNotes } from './notesEngine';
 import { PeriodBar, periodRange } from '../core/period';
 import { PageLayout } from '../shell/PageLayout';
 import { Modal, Button, LoadingState, ErrorState, EmptyState } from '../shell/primitives';
+import { clickable } from '../core/ux/clickable';
+import { openPrintPreview } from '../core/PrintPreview';
 
 const INK = '#1a1c22', GOLD = '#c2a04a', MUTE = '#5b616e', LINE = '#e6e8ec';
 const OK = '#3fb7a3', WARN = '#dc2626';
@@ -117,7 +119,7 @@ function AgeingBlock({ ageing, cur, onDrill }) {
           <thead><tr><th style={RPT_thStyle}>Party</th>{AGE_BUCKETS.map(([, l]) => <th key={l} style={{ ...RPT_thStyle, textAlign: 'right' }}>{l}</th>)}<th style={{ ...RPT_thStyle, textAlign: 'right' }}>Total</th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={r.party + i} onClick={() => onDrill(r.party)} style={{ cursor: 'pointer' }}>
+              <tr key={r.party + i} {...clickable(() => onDrill(r.party))} style={{ cursor: 'pointer' }}>
                 <td style={{ ...RPT_tdStyle, fontWeight: 600 }}>{r.party} <span style={{ color: GOLD }}>›</span></td>
                 {AGE_BUCKETS.map(([k, , c]) => <td key={k} style={{ ...RPT_tdStyle, textAlign: 'right', color: r[k] ? c : '#b8bdd0' }}>{cell(r[k])}</td>)}
                 <td style={{ ...RPT_tdStyle, textAlign: 'right', fontWeight: 700 }}>{cell(r.total)}</td>
@@ -145,7 +147,7 @@ function NoteTable({ note, cur, openG, toggleG, detailed, onDrill }) {
     : note.kind === 'flow' ? [l.amount ?? l.closing] : [l.closing];
   const multi = note.groups.length > 1;
   const ledgerRow = (l, indent, sg) => (
-    <tr key={`${sg}-${l.ledger}`} onClick={() => onDrill(l.ledger)} style={{ cursor: 'pointer' }}>
+    <tr key={`${sg}-${l.ledger}`} {...clickable(() => onDrill(l.ledger))} style={{ cursor: 'pointer' }}>
       <td style={{ ...RPT_tdStyle, paddingLeft: indent }}>{l.ledger}{sg ? <span style={{ color: MUTE, fontSize: 10 }}> · {sg}</span> : null} <span style={{ color: GOLD }}>›</span></td>
       {vals(l).map((v, i) => <td key={i} style={{ ...RPT_tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{cell(v)}</td>)}
     </tr>
@@ -161,7 +163,7 @@ function NoteTable({ note, cur, openG, toggleG, detailed, onDrill }) {
             const span = (
               <React.Fragment key={gk}>
                 {multi && (
-                  <tr onClick={() => toggleG(gk)} style={{ background: '#f2f4fa', cursor: 'pointer', fontWeight: 700 }}>
+                  <tr {...clickable(() => toggleG(gk))} style={{ background: '#f2f4fa', cursor: 'pointer', fontWeight: 700 }}>
                     <td style={{ ...RPT_tdStyle, color: INK }}>{gOpen ? '▾' : '▸'} {g.group}</td>
                     {cols.map((c, i) => <td key={i} style={{ ...RPT_tdStyle, textAlign: 'right', color: INK }}>{i === cols.length - 1 ? cell(g.total) : ''}</td>)}
                   </tr>
@@ -204,7 +206,7 @@ function DrillModal({ ledger, branch, to, cur, onClose }) {
             {q.isError && <div className="p-3.5 text-xs text-danger">⚠ {q.error?.message}</div>}
             {!q.isLoading && !lines.length && <div className="px-2 py-5 text-center text-xs text-ink-muted">No postings for this period.</div>}
             {lines.map((ln, i) => (
-              <div key={i} onClick={() => ln.voucherId && setVid(ln.voucherId)}
+              <div key={i} {...clickable(() => ln.voucherId && setVid(ln.voucherId))}
                 className={`flex justify-between gap-2.5 border-b border-surface-border px-2.5 py-2 ${ln.voucherId ? 'cursor-pointer hover:bg-surface-alt' : ''}`}>
                 <div className="min-w-0">
                   <div className="text-xs font-semibold text-gold-dark">{ln.vno} <span className="font-normal text-ink-muted">· {fmtDate(ln.date)}</span></div>
@@ -226,7 +228,7 @@ function DrillModal({ ledger, branch, to, cur, onClose }) {
 /* ── main report ──────────────────────────────────────────────────────── */
 export function NotesToFinancials({ branch }) {
   const cur = (bc(branch) && bc(branch).cur) || '₹';
-  const [range, setRange] = useState(() => periodRange('all', { branch }));
+  const [range, setRange] = useState(() => periodRange('cfy', { branch }));
   const [view, setView] = useState('summary');
   const [open, setOpen] = useState({});
   const [openG, setOpenG] = useState({});
@@ -251,7 +253,7 @@ export function NotesToFinancials({ branch }) {
   const empty = !loading && !qBs.data && !qPl.data;
 
   const doExcel = () => { try { exportToExcel(`notes-to-financials-${period.label}`.replace(/\s+/g, '-'), EXPORT_COLS, notesToRows(notes)); toast('Downloading Excel export…', 'success'); } catch (e) { toast('Export failed: ' + (e?.message || e), 'error'); } };
-  const doPrint = () => { toast('Opening print view…', 'info'); window.print(); };
+  const doPrint = () => openPrintPreview({ selector: 'main', title: 'Notes to Financial Statements', recommend: 'portrait' });
   const toggleG = (k) => setOpenG((s) => ({ ...s, [k]: s[k] === false ? true : false }));
   const isOpen = (no) => detailed || !!open[no];
 
@@ -293,7 +295,7 @@ export function NotesToFinancials({ branch }) {
             const expanded = isOpen(n.no);
             return (
               <div key={n.no} className="mb-3 rounded-brand border border-l-[3px] border-surface-border bg-surface p-4 shadow-card" style={{ borderLeftColor: n.section === 'Income' || n.section === 'Expenses' ? GOLD : INK }}>
-                <div onClick={() => setOpen((s) => ({ ...s, [n.no]: !s[n.no] }))} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+                <div {...clickable(() => setOpen((s) => ({ ...s, [n.no]: !s[n.no] })))} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
                   <span style={{ minWidth: 34, height: 34, borderRadius: '50%', background: INK, color: GOLD, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>{n.no}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: INK }}>{detailed ? '' : expanded ? '▾ ' : '▸ '}{n.title}</p>

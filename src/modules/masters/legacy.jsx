@@ -4,16 +4,17 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect } from 'react';
+import { todayISO } from '../../core/dates';
 import { confirmDialog } from '../../core/ux/confirm';
 import { AlertTriangle, Check, Download, Pencil, Plus, Save, Search, Settings, Trash2 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ACTIVE_CURRENCIES, ADM_DATA, BRANCH_CODES, CASH, CUSTOMERS, FOREX_RATES_DATA, GP_BILLS, SUBAGENTS } from '../../core/data';
-import { useNumberingSeries } from '../../core/useReference';
+import { useNumberingSeries, useApprovalLimits } from '../../core/useReference';
 import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { apiPost, apiPut } from '../../core/api';
 import { fmt, fmtINR } from '../../core/format';
 import { exportToExcel } from '../../core/exportExcel';
-import { ACM_DATA, APPROVAL_LIMITS_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, CURRENCY_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, _PASSPORTS, cardStyle, tabPanel } from '../../core/helpers';
+import { ACM_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, _PASSPORTS, cardStyle, tabPanel } from '../../core/helpers';
 // MstrShell / MstrModal modernized (responsive header + shared Modal) — same props.
 import { MstrShell, MstrModal } from './components/mstr';
 import { useMobile } from '../../core/hooks';
@@ -23,6 +24,7 @@ import { ReportDateBar, ReportSearch, matchNeedle, resolveReportRange } from '..
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../../core/styles';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { TopBar } from '../../shell/TopBar';
+import { clickable } from '../../core/ux/clickable';
 
 // Shared "Export to Excel" toolbar button — wires a master's visible rows to the
 // dependency-free CSV exporter. Pass the rows array + {key,label} columns. The
@@ -39,15 +41,25 @@ export function ExportBtn({ name, columns, rows, label = "📤 Export" }) {
 }
 
 export function MastersForex(){
-  const [rates,setRates]=useState(FOREX_RATES_DATA);
+  // Live forex rates from /api/forex-rates (date/from/to/rate/source). Add Rate
+  // persists via the create mutation, so the table reflects the live collection.
+  const { data: rates = [] } = useMasterList('forex-rates');
+  const { create } = useMasterMutations('forex-rates');
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [form,setForm]=useState({from:"INR",to:"INR",rate:0,source:"Manual"});
   const CURRENCIES=ACTIVE_CURRENCIES;
 
-  const save=()=>{
+  const save=async()=>{
+    if(+form.rate<=0){
+      await confirmDialog({title:"Invalid exchange rate",message:"Exchange rate must be greater than 0.",confirmLabel:"OK",cancelLabel:"Close"});
+      return;
+    }
+    if(form.from===form.to){
+      await confirmDialog({title:"Invalid currency pair",message:"From and To currency must differ (e.g. INR → INR is not a valid rate).",confirmLabel:"OK",cancelLabel:"Close"});
+      return;
+    }
     const rec={...form,date:new Date().toISOString().slice(0,10)};
-    setRates(r=>[rec,...r]);
-    setModal(false);
+    create.mutate(rec,{ onSuccess:()=>setModal(false) });
   };
 
   return (
@@ -83,7 +95,7 @@ export function MastersForex(){
               </td>
               <td style={{padding:"9px 14px",textAlign:"right",fontWeight:800,fontSize:15,fontVariantNumeric:"tabular-nums",color:"#1a1c22"}}>{r.rate.toFixed(2)}</td>
               <td style={{padding:"9px 14px",fontSize:10.5,color:"#5b616e"}}>{r.source}</td>
-              <td style={{padding:"9px 14px",textAlign:"right",fontSize:10.5,color:"#5b616e",fontVariantNumeric:"tabular-nums"}}>1 {r.to} = {(1/r.rate).toFixed(4)} {r.from}</td>
+              <td style={{padding:"9px 14px",textAlign:"right",fontSize:10.5,color:"#5b616e",fontVariantNumeric:"tabular-nums"}}>1 {r.to} = {r.rate>0?(1/r.rate).toFixed(4):"—"} {r.from}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -136,7 +148,7 @@ export function VendorTermsMaster({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const [terms,setTerms]=useState([]);   // demo data removed — populate from live vendor terms
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
   const daysLeft=d=>Math.ceil((new Date(d)-new Date(TODAY))/(1000*60*60*24));
   const totDue=terms.filter(t=>daysLeft(t.dueDate)<=7).reduce((s,t)=>s+t.dueAmt,0);
   const totTds=terms.filter(t=>t.tds!=="None").reduce((s,t)=>s+Math.round(t.dueAmt*t.tdsRate/100),0);
@@ -509,7 +521,7 @@ export function MastersCustomers(){
           const active=tab===t;
           const outAmt=sets[t].data.reduce((s,d)=>s+d.out,0);
           return (
-            <div key={t} onClick={()=>{setTab(t);setSearch("");}}
+            <div key={t} {...clickable(()=>{setTab(t);setSearch("");})}
               style={{padding:"12px 14px",borderRadius:10,cursor:"pointer",
                 border:`2px solid ${active?c.color:"#e6e8ec"}`,
                 background:active?c.bg:"#fff",
@@ -1169,8 +1181,10 @@ export function CostCenterMaster(){
 
 
 export function ApprovalLimitsMaster(){
+  // Live approval thresholds (GET /api/approval-limits). Was hardcoded APPROVAL_LIMITS_DATA.
+  const rows=useApprovalLimits().data||[];
   const groupByType={};
-  APPROVAL_LIMITS_DATA.forEach(a=>{
+  rows.forEach(a=>{
     if(!groupByType[a.voucherType])groupByType[a.voucherType]=[];
     groupByType[a.voucherType].push(a);
   });
@@ -1178,9 +1192,9 @@ export function ApprovalLimitsMaster(){
   return MASTER_PAGE("Approval Limits Master","Per-role × per-voucher-type thresholds. Defines automatic escalation in voucher workflow",
     <>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
-        <p style={{margin:0,fontSize:12,color:"#5b616e"}}>{APPROVAL_LIMITS_DATA.length} rules configured across {Object.keys(groupByType).length} voucher types</p>
+        <p style={{margin:0,fontSize:12,color:"#5b616e"}}>{rows.length} rules configured across {Object.keys(groupByType).length} voucher types</p>
         <div style={{flex:1}}/>
-        <ExportBtn name="approval-limits" label="📤 Export Matrix" rows={APPROVAL_LIMITS_DATA} columns={[{key:"voucherType",label:"Voucher Type"},{key:"role",label:"Approver Role"},{key:"minAmount",label:"From (>=)"},{key:"maxAmount",label:"To (<=)"},{key:"backup",label:"Backup Approver"}]}/>
+        <ExportBtn name="approval-limits" label="📤 Export Matrix" rows={rows} columns={[{key:"voucherType",label:"Voucher Type"},{key:"role",label:"Approver Role"},{key:"minAmount",label:"From (>=)"},{key:"maxAmount",label:"To (<=)"},{key:"backup",label:"Backup Approver"}]}/>
         <button style={{padding:"8px 16px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Limit Rule</button>
       </div>
       {Object.entries(groupByType).map(([type,rules])=>(
@@ -1638,7 +1652,7 @@ export function MasterChangeQueue(){
       subtitle="All master-data change requests requiring approval · vendor bank/PAN, credit limits, user permissions, CoA, etc."
       toolbar={<select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e6e8ec",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All statuses</option>{statuses.map(s=><option key={s}>{s}</option>)}</select>}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,150px),1fr))",gap:10,marginBottom:14}}>
-        {[{l:"Pending Approval",v:pending,c:"#d97706"},{l:"Approved (MTD)",v:approved,c:"#16a34a"},{l:"Rejected (MTD)",v:rejected,c:"#dc2626"},{l:"High-Risk Pending",v:1,c:"#dc2626"}].map(k=>(
+        {[{l:"Pending Approval",v:pending,c:"#d97706"},{l:"Approved (MTD)",v:approved,c:"#16a34a"},{l:"Rejected (MTD)",v:rejected,c:"#dc2626"},{l:"High-Risk Pending",v:MASTER_CHANGE_QUEUE.filter(q=>q.status==="Pending Approval"&&/high/i.test(q.risk||q.riskLevel||q.priority||"")).length,c:"#dc2626"}].map(k=>(
           <div key={k.l} style={{...cardStyle,borderTop:"3px solid "+k.c}}><p style={{margin:0,fontSize:10,color:"#5b616e",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:k.c}}>{k.v}</p></div>
         ))}
       </div>
@@ -1687,7 +1701,7 @@ export function PassportManager({branch}){
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [form,setForm]=useState({client:"",person:"",passport:"",nationality:"Indian",issued:"",expiry:"",branch:"BOM"});
   const [passports,setPassports]=useState(_PASSPORTS);
-  const TODAY="2026-05-19";
+  const TODAY=todayISO();
 
   const filtered=passports.filter(p=>(
     (!brCode||p.branch===brCode)&&

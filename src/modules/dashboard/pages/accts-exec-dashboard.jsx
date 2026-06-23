@@ -11,9 +11,12 @@ import { PostShortcutTiles } from '../components/shared/PostShortcutTiles';
 import { RecentActivityFeed } from '../components/shared/RecentActivityFeed';
 import { AgeingBuckets } from '../components/shared/AgeingBuckets';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+import { openPrintPreview } from '../../../core/PrintPreview';
 
-export function AcctsExecDashboardPage({ currentUser, setRoute /*, branch */ }) {
-  const ownBranch = currentUser?.branches?.[0] || 'BOM';
+export function AcctsExecDashboardPage({ currentUser, setRoute, branch }) {
+  // Follow the active branch from the switcher; fall back to the user's own
+  // branch (an AE is single-branch). No hardcoded 'BOM' default.
+  const ownBranch = (branch && branch !== 'ALL' && branch.code) || currentUser?.branches?.[0] || null;
   const { data, branchData, isLoading } = useAcctsExecDashboard(ownBranch);
   const { navigate } = useDashboardActions(setRoute);
   const period = useDashboardStore((s) => s.period);
@@ -33,16 +36,17 @@ export function AcctsExecDashboardPage({ currentUser, setRoute /*, branch */ }) 
         user={currentUser}
         period={period}
         setPeriod={setPeriod}
-        onExport={() => window.print()}
+        onExport={() => openPrintPreview({ selector: 'main', title: 'Accounts Executive Dashboard', recommend: 'portrait' })}
       />
 
       <PostShortcutTiles onNavigate={navigate} />
 
       <ResponsiveGrid min="170px" gap="md" className="mb-3.5">
         <KPICard label="Today's Vouchers" value={branchData.total} delta={fmtINR(branchData.value) + ' total'} color="#16a34a" />
-        <KPICard label="Errors to Fix" value="0" delta="" color="#dc2626" />
-        <KPICard label="Receipts This Week" value="0" delta="" color="#c2a04a" />
-        <KPICard label="Payments Due" value="0" delta="" color="#d97706" />
+        {/* Not computed by the dashboard hook yet — "—" rather than a misleading "0". */}
+        <KPICard label="Errors to Fix" value="—" delta="" color="#dc2626" />
+        <KPICard label="Receipts This Week" value="—" delta="" color="#c2a04a" />
+        <KPICard label="Payments Due" value="—" delta="" color="#d97706" />
       </ResponsiveGrid>
 
       <div className="grid grid-cols-1 gap-3.5 desktop:grid-cols-[2fr_1fr]">

@@ -14,8 +14,10 @@ import { useAdmMemos, useCreateAdmMemo, useDisputeAdmMemo, useAcceptAdmMemo, use
 import { toast } from '../../core/ux/toast';
 import { useLedgerStatement, useCreateVoucher, useOpenBills, useSalesRegister, usePurchaseRegister } from '../../core/useAccounting';
 import { LedgerActions } from '../../core/ledgerActions';
+import { contraLedgerName, lineNarration } from '../../core/cashBookRows';
 import { openLedgerModal } from '../../core/LedgerModalHost';
 import { useModalEsc } from '../../core/ux/useModalEsc';
+import { SampleBanner } from '../../core/ux/SampleBanner';
 import { useLivePurchaseRegistry, useLiveSalesTickets } from '../../core/useVouchers';
 import { fmt, fmtINR } from '../../core/format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS } from '../../core/dates';
@@ -28,8 +30,11 @@ import { ChartOfAccounts, MastersLedgers, MastersSubAgents } from '../masters';
 import { ApiKeySettings } from '../settings';
 import { Form26AS } from '../taxation';
 import { NotificationCentre } from '../../shell/NotifPanel';
+import { openPrintPreview } from '../../core/PrintPreview';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
+import { clickable } from '../../core/ux/clickable';
+import { listKeyNav } from '../../core/ux/listKeys';
 
 /* ════════════════════════════════════════════════════════════════════
    FINANCE VOUCHER PERSISTENCE
@@ -373,7 +378,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
 
       {/* ── Dropdown panel ── */}
       {open&&(
-        <div style={{
+        <div onKeyDown={listKeyNav({ onEscape:()=>{setOpen(false);setSearch("");} })} style={{
           position:"absolute",top:"100%",left:0,right:0,
           background:"#fff",border:"1.5px solid #1a1c22",
           borderTop:"none",borderRadius:"0 0 12px 12px",
@@ -453,7 +458,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
                 const pgC=previewGPPct!=null?(previewGPPct>=25?"#16a34a":previewGPPct>=15?"#d97706":"#dc2626"):"#5b616e";
                 return (
                   <div key={i}
-                    onClick={()=>{onSelect(p);setOpen(false);setSearch("");}}
+                    {...clickable(()=>{onSelect(p);setOpen(false);setSearch("");}, { role:'option' })}
                     style={{
                       padding:"11px 16px",borderBottom:"1px solid #f4f5f7",
                       cursor:"pointer",transition:"background 0.1s",
@@ -1420,8 +1425,9 @@ function InvoiceSelect({invoices,value,onChange,cur,loading,placeholder,noun="sa
           const active=idx===activeIdx;
           return (
             <div key={inv.id} ref={el=>{ if(active&&el) el.scrollIntoView({block:"nearest"}); }}
-              onClick={()=>{onChange(inv.id);setOpen(false);}} onMouseEnter={()=>setActiveIdx(idx)}
+              {...clickable(()=>{onChange(inv.id);setOpen(false);}, { role:'option' })} onMouseEnter={()=>setActiveIdx(idx)}
               style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #f4f5f7",background:active?"#eaf0ff":"transparent"}}>
+
               <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"baseline"}}>
                 <span style={{fontFamily:"monospace",fontSize:10.5,fontWeight:700,color:"#2563eb"}}>{inv.vno}</span>
                 <span style={{fontSize:11,fontWeight:700,color:"#1a1c22",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,inv.total)}</span>
@@ -1441,7 +1447,7 @@ function InvoiceSelect({invoices,value,onChange,cur,loading,placeholder,noun="sa
     </div>, document.body);
   return (
     <div ref={ref} style={{position:"relative"}}>
-      <div onClick={()=>open?setOpen(false):openMenu()} style={{...inp,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:32,
+      <div {...clickable(()=>open?setOpen(false):openMenu())} style={{...inp,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:32,
         borderColor:selected?"#bfe6cd":"#f3c9c9",background:selected?"#f8fff8":"#fffafa"}}>
         {selected
           ?<span style={{fontSize:11,color:"#1a1c22",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><b style={{fontFamily:"monospace",color:"#2563eb"}}>{selected.vno}</b> · {selected.party||"—"} · {vf2(cur,selected.total)}</span>
@@ -2118,7 +2124,7 @@ export function PurchaseHotelVoucher({branch,setRoute}){
   const vNo=useVNo(branch,"PHT");
   const [rows,setRows]=useState([{id:1,passenger:"",ci:"",co:"",rtype:"",meal:"CP",basic:0,taxes:0,otherTax:0}]);
   const [svc,setSvc]=useState(0);
-  const [partyGstin,setPartyGstin]=useState("24AABCH7890J1Z5");
+  const [partyGstin,setPartyGstin]=useState("27AABCH7890J1Z5");
   const intra=(partyGstin||"").trim().slice(0,2)==="27";
   const upd=(id,k,v)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[k]:v}:r));
   const add=()=>setRows(rs=>[...rs,{id:Date.now(),passenger:"",ci:"",co:"",rtype:"Deluxe",meal:"EP",basic:0,taxes:0,otherTax:0}]);
@@ -2894,6 +2900,7 @@ export function PurchaseRefunds({branch}){
 
   return (
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+      <SampleBanner note="purchase refunds shown here are sample data, not live." />
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
         <div style={{width:36,height:36,borderRadius:9,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>💫</div>
         <div>
@@ -3285,9 +3292,11 @@ export function BspSummary({branch}){
   const commission=Math.round(ticketCost*0.02);
   const bspCharge =Math.round(ticketCost*0.0025);
 
-  // 4) ADM / ACM memos for the period (same store the ADM register uses).
-  const admList=_ADM_LIST.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&(!a.currency||a.currency===cur));
-  const acmList=_ACM_LIST.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&(!a.currency||a.currency===cur));
+  // 4) ADM / ACM memos for the period (same live store the ADM register uses).
+  const admMemos=useAdmMemos("adm",branch).data||[];
+  const acmMemos=useAdmMemos("acm",branch).data||[];
+  const admList=admMemos.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&(!a.currency||a.currency===cur));
+  const acmList=acmMemos.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&(!a.currency||a.currency===cur));
   const admTotal=admList.reduce((s,a)=>s+(Number(a.amount)||0),0);
   const acmTotal=acmList.reduce((s,a)=>s+(Number(a.amount)||0),0);
   const netBsp  =ticketCost-commission-bspCharge-admTotal+acmTotal;
@@ -3407,7 +3416,10 @@ export function BspSummary({branch}){
                     <tr key={i} style={{borderBottom:"1px solid #f4f5f7",background:i%2===0?"#fff":"#fafafa"}}>
                       <td style={{padding:"7px 12px",color:"#5b616e",whiteSpace:"nowrap"}}>{e.date}</td>
                       <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:10,color:"#2563eb"}}>{e.vno}</td>
-                      <td style={{padding:"7px 12px",color:"#2e323c"}}>{e.narration||e.party||e.category}</td>
+                      <td style={{padding:"7px 12px",color:"#2e323c"}}>
+                        <span style={{fontWeight:600}}>{contraLedgerName(e)}</span>
+                        {lineNarration(e) && <div style={{marginTop:2,fontSize:10,color:"#8b93b3",fontStyle:"italic"}}>{lineNarration(e)}</div>}
+                      </td>
                       <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:e.debit>0?"#2563eb":"#cbd0db"}}>{e.debit>0?f(e.debit):"—"}</td>
                       <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:e.credit>0?"#dc2626":"#cbd0db"}}>{e.credit>0?f(e.credit):"—"}</td>
                       <td style={{padding:"7px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:e.balanceSide==="Cr"?"#dc2626":"#2563eb"}}>{f(Math.abs(e.balance))} {e.balanceSide}</td>
@@ -3516,7 +3528,7 @@ export function TicketControlRegister({branch}){
 
       <div style={{display:"flex",gap:8,marginBottom:14,overflowX:"auto",paddingBottom:4}}>
         {STATUSES.slice(1).map(s=>(
-          <div key={s} onClick={()=>setFilter(f=>f===s?"All":s)}
+          <div key={s} {...clickable(()=>setFilter(f=>f===s?"All":s))}
             style={{flexShrink:0,padding:"7px 12px",borderRadius:8,cursor:"pointer",textAlign:"center",
               border:`2px solid ${filter===s?"#1a1c22":"#e6e8ec"}`,
               background:filter===s?"#1a1c22":STATUS_BG[s]||"#f4f5f7"}}>
@@ -3853,6 +3865,13 @@ export function JournalEntry({ branch }) {
 // sharing one form with the ledger-account edit screen.
 export function PurchaseExpenseVoucher({ branch }) {
   return <VoucherShell category="purchase-expense" mode="create" branch={branch} />;
+}
+
+// Debit Note CREATE — a purchase return to a supplier. Renders through the unified
+// VoucherShell (category 'debit-note', type DN); GATED → enters the approval queue
+// and posts the reversal journal (Dr supplier / Cr purchase + input GST) on approval.
+export function DebitNoteVoucher({ branch }) {
+  return <VoucherShell category="debit-note" mode="create" branch={branch} />;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -4278,7 +4297,7 @@ export function QuickPOS({branch,setRoute}){
           <p style={{margin:"0 0 12px",fontSize:10.5,color:"#5b616e"}}>Client: <b>{client.name}</b></p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:8,marginBottom:14}}>
             {SERVICES.map(s=>(
-              <div key={s.name} onClick={()=>{setService(s.name);setAmount(s.suggestAmt);}}
+              <div key={s.name} {...clickable(()=>{setService(s.name);setAmount(s.suggestAmt);})}
                 style={{padding:"12px 10px",borderRadius:10,cursor:"pointer",textAlign:"center",border:`2px solid ${service===s.name?s.color:"#e6e8ec"}`,background:service===s.name?s.bg:"#fff",transition:"all 0.15s"}}>
                 <span style={{fontSize:22}}>{s.icon}</span>
                 <p style={{margin:"4px 0 0",fontSize:10.5,fontWeight:700,color:s.color}}>{s.name}</p>
@@ -4331,7 +4350,7 @@ export function QuickPOS({branch,setRoute}){
             <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e6e8ec"}}><span style={{color:"#5b616e"}}>Voucher No.</span><span style={{fontWeight:600}}>{vNo}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e6e8ec"}}><span style={{color:"#5b616e"}}>Client</span><span style={{fontWeight:600}}>{client.name}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e6e8ec"}}><span style={{color:"#5b616e"}}>Service</span><span style={{fontWeight:600}}>{service}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11}}><span style={{color:"#5b616e"}}>Branch</span><span style={{fontWeight:600}}>{bc(branch).voucherPrefix}</span></div>
           </div>
           <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>window.print()} style={{...btnG,flex:1}}><Printer size={13}/> Print Receipt</button>
+            <button onClick={()=>openPrintPreview({ selector:'main', title:`Receipt ${vNo}`, recommend:'portrait' })} style={{...btnG,flex:1}}><Printer size={13}/> Print Receipt</button>
             <button onClick={()=>setRoute(selSvc.route)} style={{...btnGh,flex:1}}>Full Invoice →</button>
             <button onClick={()=>{setStep(1);setClient({name:"",mobile:"",isExisting:false});setAmount(0);}} style={{...btnGh,flex:1}}>New Booking</button>
           </div>
@@ -4607,7 +4626,7 @@ export function PrintPreviewDemo(){
     <PHASE2_Page title="Print Preview Before Saving" subtitle="Review the formatted voucher before committing · matches the actual printout">
       <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
         <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>← Edit Voucher</button>
-        <button onClick={()=>window.print()} style={{padding:"7px 14px",background:"#fff",border:"1px solid #1a1c22",color:"#1a1c22",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>🖨 Print</button>
+        <button onClick={()=>openPrintPreview({ selector:'main', title:'Voucher', recommend:'portrait' })} style={{padding:"7px 14px",background:"#fff",border:"1px solid #1a1c22",color:"#1a1c22",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>🖨 Print</button>
         <button style={{padding:"7px 14px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>✓ Save & Post</button>
       </div>
 

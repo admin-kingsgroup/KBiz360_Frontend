@@ -12,9 +12,13 @@ import { fmt, fmtINR } from '../../core/format';
 import { FORM16A_DATA, _TCS_ENTRIES, _TDS_ENTRIES, cardStyle } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
+import { clickable } from '../../core/ux/clickable';
+import { listKeyNav } from '../../core/ux/listKeys';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, tabBtnStyle } from '../../core/styles';
 import { TDS_SECTIONS } from '../finance';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
+import { openPrintPreview } from '../../core/PrintPreview';
+import { SampleBanner } from '../../core/ux/SampleBanner';
 
 export function TaxShell({title,subtitle,children,action}){
   return (
@@ -36,12 +40,12 @@ export function TaxShell({title,subtitle,children,action}){
 
 export function TaxGstr1({branch}){
   const mob=useMobile();
-  const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
+  const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
 
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const bills=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
+  const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
   const B2B_CLIENTS=[]; // TODO: derive B2B/B2C split from the customer master's GST-registration flag
 
   const b2b=bills.filter(b=>B2B_CLIENTS.includes(b.client));
@@ -65,7 +69,7 @@ export function TaxGstr1({branch}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>GSTR-1 — Outward Supplies</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {monthLabel(period)} · Due: 11th of following month</p>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode||"All branches"} · {monthLabel(period)} · Due: 11th of following month</p>
           <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {rangeNote('month',{month:period})} · use the period selector to change</p>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -126,14 +130,19 @@ export function TaxGstr1({branch}){
 
 export function TaxGstr3b({branch}){
   const mob=useMobile();
-  const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
+  const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
 
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const sales=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
-  const purch=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
-  const rcm=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period)&&(b.supplier||'').includes("BSP")); // GDS as RCM proxy
+  // NOTE (needs-confirmation): gp-bills returns ONE row per booking file carrying both the
+  // sale side (b.sell) and the supplier/purchase side (b.cost). There is no type/voucher-kind
+  // field to split sale vs purchase rows, so `sales` and `purch` are intentionally the same set;
+  // ITC below correctly draws from b.cost (purchase amount). If a dedicated purchase voucher
+  // source is added later, repoint `purch` to it.
+  const sales=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
+  const purch=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
+  const rcm=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&(b.supplier||'').includes("BSP")); // GDS as RCM proxy
 
   const gstRate=mod=>mod==="Holiday"?5:18;
   const totOutward =sales.reduce((s,b)=>s+b.sell/(1+gstRate(b.mod)/100)*(gstRate(b.mod)/100),0);
@@ -167,7 +176,7 @@ export function TaxGstr3b({branch}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>GSTR-3B — Monthly Summary</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {monthLabel(period)} · Due: 20th of following month</p>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode||"All branches"} · {monthLabel(period)} · Due: 20th of following month</p>
           <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {rangeNote('month',{month:period})} · use the period selector to change</p>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -213,7 +222,7 @@ export function TaxGstr3b({branch}){
 
 export function TaxRcm({branch}){
   const mob=useMobile();
-  const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
+  const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
@@ -221,7 +230,7 @@ export function TaxRcm({branch}){
   /* Identify RCM entries: overseas DMC purchases + GDS charges */
   const rcmEntries=useMemo(()=>{
     const OVERSEAS_SUPPLIERS=[]; // TODO: flag overseas suppliers in the supplier master
-    return GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period)&&
+    return GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&
       OVERSEAS_SUPPLIERS.some(s=>(b.supplier||'').includes(s.split(" ")[0]))).map(b=>{
       const igst=Math.round(b.cost/(1+0.18)*0.18);
       return {date:b.date,party:b.supplier,desc:`${b.mod} — ${b.dest}`,taxable:Math.round(b.cost/(1+0.18)),igst,status:"Paid",vno:b.id};
@@ -236,7 +245,7 @@ export function TaxRcm({branch}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>RCM Register — Reverse Charge</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {PERIODS.find(p=>p.v===period)?.l} · Pay in cash + claim ITC same month</p>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode||"All branches"} · {PERIODS.find(p=>p.v===period)?.l} · Pay in cash + claim ITC same month</p>
         </div>
         <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
           {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
@@ -288,7 +297,7 @@ export function TaxVat({branch}){
   const AFRICA_BRANCHES=[];
 
   const getBranchData=(brCode,rate)=>{
-    const bills=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
+    const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
     const sales=bills.reduce((s,b)=>s+b.sell,0);
     const taxable=sales/(1+rate/100);
     const outputVAT=taxable*(rate/100);
@@ -345,6 +354,7 @@ export function TaxVat({branch}){
 }
 
 export function TaxEInvoice(){
+  const EINV_D=[]; // TODO: wire up live e-invoice / IRN rows; empty until the data source exists
   return (
     <TaxShell title="E-Invoice &amp; IRN Log" subtitle="Invoice Reference Numbers · May 2026">
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
@@ -482,13 +492,13 @@ export function TaxCalendar(){
    ════════════════════════════════════════════════════════════════ */
 
 export function GstrRecon({branch}){
-  const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
+  const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
 
   /* Simulate GSTR-2B data vs books */
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const bills=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period)&&["BSP India","Emirates GSA","Bali Tours DMC"].includes(b.supplier));
+  const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&["BSP India","Emirates GSA","Bali Tours DMC"].includes(b.supplier));
   const recon=bills.map((b,i)=>{
     const itcBooks=Math.round(b.cost/(1+0.18)*0.18);
     const gstr2bAmt=i%3===1?Math.round(itcBooks*0.85):itcBooks; // simulate 1-in-3 mismatch
@@ -511,7 +521,7 @@ export function GstrRecon({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔄</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>GSTR-2B Reconciliation</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · ITC in books vs ITC available in GSTR-2B · {PERIODS.find(p=>p.v===period)?.l}</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode||"All branches"} ·ITC in books vs ITC available in GSTR-2B · {PERIODS.find(p=>p.v===period)?.l}</p>
           </div>
         </div>
         <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
@@ -685,7 +695,7 @@ export function TallyExport({branch}){
 
 export function TaxTdsTcs({branch}){
   const mob=useMobile();
-  const brCode=(branch==="ALL"?"BOM":branch?.code)||"BOM";
+  const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
   const [tab,setTab]=useState("tds"); // tds | tcs | challan
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
@@ -708,7 +718,7 @@ export function TaxTdsTcs({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📋</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>TDS / TCS Register</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {PERIODS.find(p=>p.v===period)?.l} · TDS due 7th · Form 26Q / 27EQ data</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode||"All branches"} · {PERIODS.find(p=>p.v===period)?.l} · TDS due 7th · Form 26Q / 27EQ data</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -967,6 +977,7 @@ export function EWayBill({branch}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+      <SampleBanner note="e-way bills shown here are sample data, not live." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📦</div>
@@ -1076,6 +1087,7 @@ export function Gstr9c({branch,setRoute}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+      <SampleBanner note="GSTR-9C books-vs-returns reconciliation isn’t wired to live data yet." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>📑 GSTR-9C — Audit Reconciliation</h2>
@@ -1185,6 +1197,7 @@ export function TaxAudit3CD({branch,setRoute}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+      <SampleBanner note="these cash-payment audit flags are sample data, not live." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>📋 Tax Audit Working Papers — Form 3CD</h2>
@@ -1282,6 +1295,7 @@ export function Gstr2aReco({branch,setRoute}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+      <SampleBanner note="GSTR-2A / 2B ITC matching isn’t wired to live data yet." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>🔁 GSTR-2A vs Purchase Register</h2>
@@ -1346,11 +1360,11 @@ export function Gstr2aReco({branch,setRoute}){
    ════════════════════════════════════════════════════════════════ */
 
 
-export const GSTR_FILING_STATUS = [
-  {entity:"Travkings — Head Office", gstin:"27AAACT1234A1ZF",gstr1:"Filed",   gstr3b:"Filed",  due:"2026-05-20"},
-  {entity:"Travkings — BOM",        gstin:"27AAACT5678B1ZG",gstr1:"Filed",   gstr3b:"Pending",due:"2026-05-20"},
-  {entity:"Travkings — AMD",        gstin:"24AAACT9012C1ZH",gstr1:"Pending", gstr3b:"Pending",due:"2026-05-20"},
-];
+// GST return-filing status per registered entity. There is no live backend feed for
+// actual GSTR-1/GSTR-3B filing status yet, so this is intentionally EMPTY rather than
+// showing fabricated GSTINs/statuses. Consumers (GstrFilingPanel, sr-fm-dashboard KPI)
+// render an honest empty state until a taxation filing service is wired up.
+export const GSTR_FILING_STATUS = [];
 
 
 export function Form16Generator(){
@@ -1358,7 +1372,8 @@ export function Form16Generator(){
   const [fy,setFy]=useState(CUR_FY.label);
   return(
     <PHASE2_Page title="Form 16 Generator — India" subtitle="Annual salary certificate for income tax filing · generated from payroll data"
-      toolbar={<><select value={selEmp} onChange={e=>setSelEmp(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{[].map(e=><option key={e}>{e}</option>)}</select><select value={fy} onChange={e=>setFy(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{fyOptions().map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select><button onClick={()=>window.print()} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download Form 16</button></>}>
+      toolbar={<><select value={selEmp} onChange={e=>setSelEmp(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{[].map(e=><option key={e}>{e}</option>)}</select><select value={fy} onChange={e=>setFy(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{fyOptions().map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select><button onClick={()=>openPrintPreview({ selector: 'main', title: 'Taxation', recommend: 'portrait' })} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download Form 16</button></>}>
+      <SampleBanner note="Form 16 figures are sample data, not an issued certificate." />
       <div style={{maxWidth:760,margin:"0 auto",background:"#fff",border:"2px solid #0d1326",borderRadius:6,overflow:"hidden",fontSize:12}}>
         {/* Header */}
         <div style={{padding:"12px 20px",background:"#0d1326",color:"#fff",textAlign:"center"}}>
@@ -1505,6 +1520,7 @@ export function GSTR3BPrep(){
   return(
     <PHASE2_Page title="GSTR-3B Auto-Prep" subtitle="Summary return auto-built from vouchers · April 2026 · 27AAACT1234A1ZF (Head Office)"
       toolbar={<><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download JSON</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 File on GST Portal</button></>}>
+      <SampleBanner note="this GSTR-3B summary is sample data, not a live return." />
       {/* Liability summary */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
         {[{l:"Outward Tax",v:fmtINR(d.outwardSupplies.igst+d.outwardSupplies.cgst+d.outwardSupplies.sgst),c:"#A32D2D"},{l:"ITC Available",v:fmtINR(d.itcAvailable.total),c:"#22c55e"},{l:"Net ITC Applied",v:fmtINR(d.netITC),c:"#d4a437"},{l:"Cash Payment",v:fmtINR(d.cashPayable),c:"#22c55e"}].map(k=>(
@@ -1539,13 +1555,13 @@ export function Form16AGenerator(){
   const v=FORM16A_DATA[selVendor];
   return(
     <PHASE2_Page title="TDS Certificate — Form 16A Generator" subtitle="Per-vendor TDS certificate · Q4 FY 2025-26 · auto-generated from TDS register"
-      toolbar={<><select value={selVendor} onChange={e=>setSelVendor(+e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{FORM16A_DATA.map((v,i)=><option key={i} value={i}>{v.vendor}</option>)}</select><button onClick={()=>window.print()} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download PDF</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 Send by Email</button></>}>
+      toolbar={<><select value={selVendor} onChange={e=>setSelVendor(+e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{FORM16A_DATA.map((v,i)=><option key={i} value={i}>{v.vendor}</option>)}</select><button onClick={()=>openPrintPreview({ selector: 'main', title: 'Taxation', recommend: 'portrait' })} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download PDF</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 Send by Email</button></>}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:14}}>
         {/* Vendor list */}
-        <div style={cardStyle}>
+        <div style={cardStyle} onKeyDown={listKeyNav()}>
           <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Vendors — Q4 FY 2025-26</p>
           {FORM16A_DATA.map((v,i)=>(
-            <div key={i} onClick={()=>setSelVendor(i)} style={{padding:"10px",border:selVendor===i?"2px solid #d4a437":"1px solid #e1e3ec",borderRadius:6,marginBottom:6,cursor:"pointer",background:selVendor===i?"#fff8e8":"#fff"}}>
+            <div key={i} {...clickable(()=>setSelVendor(i),{role:'option'})} style={{padding:"10px",border:selVendor===i?"2px solid #d4a437":"1px solid #e1e3ec",borderRadius:6,marginBottom:6,cursor:"pointer",background:selVendor===i?"#fff8e8":"#fff"}}>
               <p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{v.vendor}</p>
               <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{v.section} · {fmtINR(v.tds)} TDS</p>
               <span style={{padding:"1px 7px",background:v.paid?"#d4edda":"#f8d7da",color:v.paid?"#155724":"#721c24",borderRadius:3,fontSize:9.5,fontWeight:700}}>{v.paid?"TDS Paid":"TDS Pending"}</span>

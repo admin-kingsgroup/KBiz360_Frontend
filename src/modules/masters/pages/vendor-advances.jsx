@@ -6,11 +6,11 @@
    (sort/sticky/totals/export/mobile scroll).
    ──────────────────────────────────────────────────────────────────── */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { bc } from '../../../core/styles';
 import { fmt } from '../../../core/format';
-import { VENDOR_ADVANCES_DATA } from '../../../core/helpers';
+import { useMasterList } from '../../../core/useMasters';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { ResponsiveGrid, StatusPill, Button } from '../../../shell/primitives';
@@ -20,6 +20,9 @@ export function VendorAdvances({ branch }) {
   const brCode = branch === 'ALL' ? null : branch?.code;
   const [filter, setFilter] = useState('Unadjusted');
 
+  // Live vendor-advance register (/api/vendor-advances). advId surfaces as the row id.
+  const { data = [] } = useMasterList('vendor-advances');
+  const VENDOR_ADVANCES_DATA = useMemo(() => (data || []).map((a) => ({ ...a, id: a.advId || a.id })), [data]);
   const all = VENDOR_ADVANCES_DATA.filter((a) => !brCode || a.branch === brCode);
   const visible = filter === 'Unadjusted' ? all.filter((a) => a.unadjusted > 0) : filter === 'Fully Adjusted' ? all.filter((a) => a.unadjusted === 0) : all;
 

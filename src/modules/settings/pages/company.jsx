@@ -7,10 +7,9 @@
    ──────────────────────────────────────────────────────────────────── */
 
 import React, { useState } from 'react';
-import { Save } from 'lucide-react';
 import { useCompanyProfiles } from '../../../core/useReference';
 import { PageLayout } from '../../../shell/PageLayout';
-import { PageSection, ResponsiveGrid, Button, Textarea } from '../../../shell/primitives';
+import { PageSection, ResponsiveGrid, Textarea } from '../../../shell/primitives';
 
 const Row = ({ l, v, mono }) => (
   <div className="flex items-start gap-2 border-b border-surface-alt py-2 last:border-0">
@@ -21,7 +20,6 @@ const Row = ({ l, v, mono }) => (
 
 export function SettingsCompany() {
   const [tab, setTab] = useState('india');
-  const [saved, setSaved] = useState(false);
   const profiles = useCompanyProfiles().data || [];
 
   const bom = profiles.find((p) => p.code === 'BOM') || {};
@@ -45,7 +43,6 @@ export function SettingsCompany() {
     <PageLayout
       title="Company Profile"
       subtitle="Travkings Tours & Travels · 4 legal entities · 1 HO + 5 branches"
-      actions={<Button size="sm" variant="primary" icon={Save} onClick={() => setSaved(true)}>{saved ? '✔ Saved' : 'Save Changes'}</Button>}
       filters={companies.map((c2) => (
         <button key={c2.key} onClick={() => setTab(c2.key)} className={`rounded-lg border px-4 py-1.5 text-[11px] font-semibold transition ${tab === c2.key ? 'border-navy bg-navy text-gold' : 'border-surface-border bg-surface text-ink-muted hover:bg-surface-alt'}`}>{c2.flag} {c2.label}</button>
       ))}
@@ -89,8 +86,8 @@ export function SettingsCompany() {
             </PageSection>
           )}
           <PageSection title="Invoice footer note" className="border border-[#B5D4F4] bg-[#E6F1FB]">
-            <Textarea rows={3} defaultValue={`${co.name} | ${co.addr1}, ${co.addr2} | ${co.phone}`} className="text-[10.5px]" />
-            <p className="mt-1.5 text-[9.5px] text-ink-muted">This text appears on the footer of all printed invoices for this entity.</p>
+            <Textarea rows={3} readOnly value={`${co.name} | ${co.addr1}, ${co.addr2} | ${co.phone}`} className="text-[10.5px]" />
+            <p className="mt-1.5 text-[9.5px] text-ink-muted">Derived from this entity&apos;s live profile — appears on the footer of all printed invoices.</p>
           </PageSection>
         </div>
       </ResponsiveGrid>

@@ -22,6 +22,8 @@ import { useQueries } from '@tanstack/react-query';
 import { apiGet } from '../../../core/api';
 
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+import { openPrintPreview } from '../../../core/PrintPreview';
+import { isLiquidRow } from '../../../core/ledgerKind';
 
 const RANGE_SHORT = { month: 'This Month', quarter: 'This Quarter', ytd: 'YTD', all: 'All Time' };
 const C = { dark: '#14161a', dim: '#5b616e', green: '#16a34a', red: '#dc2626', gold: '#b45309', border: '#e6e8ec' };
@@ -77,7 +79,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
     return <DashboardSkeleton numKpis={12} />;
   }
 
-  const { revenueTrend, fyTargets, branchHeatmap, keyAlerts, topCustomers, topSuppliers } = data;
+  const { revenueTrend, keyAlerts, topCustomers, topSuppliers } = data;
   const fig = data.figures || { revenue: 0, gp: 0, gpPct: 0, netProfit: 0, outstanding: 0, payable: 0, cash: 0 };
   const pb = data.pendingBookings || { count: 0, sales: 0, gp: 0 };
   const ab = data.approvedBookings || { count: 0, sales: 0, gp: 0 };
@@ -88,8 +90,8 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
   const aT = assets.reduce((s, a) => s + (a.amount || 0), 0);
   const lT = liabs.reduce((s, a) => s + (a.amount || 0), 0);
   const balanced = Math.abs(aT - lT) < 1;
-  const netWorth = liabs.filter((l) => /capital|reserve|profit|equity|surplus/i.test(l.name || '')).reduce((s, l) => s + (l.amount || 0), 0);
-  const bankRows = (trial.rows || []).filter((r) => /cash|bank/i.test(r.group || ''));
+  const netWorth = liabs.filter((l) => /capital|reserve|profit|equity|surplus/i.test(l.group || l.name || '')).reduce((s, l) => s + (l.amount || 0), 0);
+  const bankRows = (trial.rows || []).filter(isLiquidRow);
   const bal = (r) => (r.closingDebit || 0) - (r.closingCredit || 0);
   const liquid = bankRows.reduce((s, r) => s + bal(r), 0) || fig.cash || totalCashInr;
   const arOverdue = age?.receivables?.totals?.d90 || 0;
@@ -97,7 +99,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
 
   return (
     <PageLayout>
-      <DashboardHeader title="Director Dashboard" subtitle="Whole-company owner view" user={currentUser} onExport={() => window.print()} />
+      <DashboardHeader title="Director Dashboard" subtitle="Whole-company owner view" user={currentUser} onExport={() => openPrintPreview({ selector: 'main', title: 'Director Dashboard', recommend: 'portrait' })} />
       {Controls}
       <AlertsPanel branch={scope} onGo={navigate} />
 

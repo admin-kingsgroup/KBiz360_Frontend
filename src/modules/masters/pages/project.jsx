@@ -8,7 +8,7 @@
 
 import React, { useState } from 'react';
 import { Upload, Plus } from 'lucide-react';
-import { PROJECTS_DATA } from '../../../core/helpers';
+import { useMasterList } from '../../../core/useMasters';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { Input, Select, Button, StatusPill, ResponsiveGrid } from '../../../shell/primitives';
@@ -19,6 +19,8 @@ const k = (n) => '₹' + (n / 1000).toFixed(0) + 'K';
 export function ProjectMaster() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
+  // Live project costing master (/api/projects).
+  const { data: PROJECTS_DATA = [] } = useMasterList('projects');
   const filtered = PROJECTS_DATA.filter((p) => {
     if (filterStatus !== 'ALL' && p.status !== filterStatus) return false;
     if (!search) return true;

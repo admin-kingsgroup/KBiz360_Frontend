@@ -9,9 +9,8 @@
 
 import React, { useState } from 'react';
 import { bc } from '../../../core/styles';
-import { useGpBills } from '../../../core/useAccounting';
-import { ADM_DATA } from '../../../core/data';
-import { ACM_DATA } from '../../../core/helpers';
+import { useGpBills, useAgeing } from '../../../core/useAccounting';
+import { useAdmMemos } from '../../../core/useAdmMemos';
 import { ReportSearch, ReportDateBar, resolveReportRange, matchNeedle } from '../../../core/reportDateBar';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
@@ -22,10 +21,15 @@ export function Supplier360({ branch }) {
   const brCode = branch === 'ALL' ? null : branch?.code;
   const [range, setRange] = useState(() => ({ mode: 'all', ...resolveReportRange('all') }));
   const gpQ = useGpBills(branch, { from: range.from || undefined, to: range.to || undefined });
+  const ageQ = useAgeing(branch);
+  const admQ = useAdmMemos('adm', branch);
+  const acmQ = useAdmMemos('acm', branch);
   const BILLS = gpQ.data || [];
 
   const ALL_SUPPLIERS = [...new Set(BILLS.filter((b) => b.supplier).map((b) => b.supplier))].sort((a, b) => a.localeCompare(b));
-  const [supplier, setSupplier] = useState('');
+  // Allow deep-linking a supplier via ?party= (e.g. the "360°" drill from the
+  // Payables ageing row). Seeded once on mount; the selector still works after.
+  const [supplier, setSupplier] = useState(() => { try { return new URLSearchParams(window.location.search).get('party') || ''; } catch { return ''; } });
   const [search, setSearch] = useState('');
   const needle = search.trim().toLowerCase();
   const selSupplier = (supplier && ALL_SUPPLIERS.includes(supplier)) ? supplier : (ALL_SUPPLIERS[0] || '');
@@ -35,15 +39,20 @@ export function Supplier360({ branch }) {
   const totRev = suppBills.reduce((s, b) => s + b.sell, 0);
   const totGP = totRev - totCost;
   const gpPct = totRev > 0 ? +(totGP / totRev * 100).toFixed(1) : 0;
-  const outstanding = Math.round(totCost * 0.20);
+  // REAL payable outstanding for this supplier from the ageing endpoint (was a
+  // fabricated 20%-of-cost estimate before — now live, mirroring Customer 360).
+  const ageRow = (ageQ.data?.payables?.rows || []).find((r) => r.party === selSupplier) || {};
+  const outstanding = ageRow.net != null ? ageRow.net : (ageRow.total || 0);
   const mods = [...new Set(suppBills.map((b) => b.mod).filter(Boolean))];
   const branches = [...new Set(suppBills.map((b) => b.branch).filter(Boolean))];
   const histBills = suppBills.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
   const filteredHist = histBills.filter((b) => matchNeedle([b.id, b.date, b.mod, b.dest], needle));
   const displayHist = (needle ? filteredHist : filteredHist.slice(0, 10)).map((b) => ({ ...b, gp: b.sell - b.cost, gpPct: b.sell > 0 ? +((b.sell - b.cost) / b.sell * 100).toFixed(1) : 0 }));
 
-  const suppADMs = ADM_DATA.filter((a) => selSupplier && (a.airline === selSupplier || a.airline.includes(selSupplier.split(' ')[0])));
-  const suppACMs = ACM_DATA.filter((a) => selSupplier && (a.airline === selSupplier || a.airline.includes(selSupplier.split(' ')[0])));
+  // Live ADM/ACM memos for this supplier (was empty static arrays before).
+  const memoMatch = (a) => selSupplier && (a.airline === selSupplier || (a.airline || '').includes(selSupplier.split(' ')[0]));
+  const suppADMs = (admQ.data || []).filter(memoMatch);
+  const suppACMs = (acmQ.data || []).filter(memoMatch);
   const f = (n) => cur + Number(Math.round(n)).toLocaleString('en-IN');
 
   const profileKpis = [
@@ -63,7 +72,7 @@ export function Supplier360({ branch }) {
 
   const MemoRow = ({ a, gain }) => (
     <div className="flex justify-between border-b border-surface-alt py-1.5 text-[10.5px]">
-      <div><p className="font-mono text-[9.5px]" style={{ color: gain ? '#16a34a' : '#dc2626' }}>{a.id}</p><p className="text-[9px] text-ink-muted">{a.reasonCode} — {a.date}</p></div>
+      <div><p className="font-mono text-[9.5px]" style={{ color: gain ? '#16a34a' : '#dc2626' }}>{a.memoNo || a.id}</p><p className="text-[9px] text-ink-muted">{a.reasonCode} — {a.date}</p></div>
       <div className="text-right"><p className="font-bold" style={{ color: gain ? '#16a34a' : '#dc2626' }}>{gain ? '+' : ''}{a.currency}{a.amount.toLocaleString()}</p><span className="rounded-full px-1.5 py-px text-[9px] font-bold" style={{ background: gain ? '#e8f6ed' : '#fbe9e9', color: gain ? '#16a34a' : '#dc2626' }}>{a.status}</span></div>
     </div>
   );
@@ -120,11 +129,27 @@ export function Supplier360({ branch }) {
           <DataTable columns={histColumns} rows={displayHist} loading={gpQ.isLoading} isError={gpQ.isError} getRowKey={(r) => r.id} dense exportName={`supplier-${selSupplier || 'none'}`} emptyMessage="No purchases for this supplier." />
         </div>
         <div className="flex flex-col gap-3">
+          <PageSection title="Payable Ageing" className="border-t-[3px] border-t-[#185FA5]">
+            {!ageRow.party ? <p className="text-[11px] text-ink-muted">No open payable for this supplier.</p> : (
+              <div className="text-[11px]">
+                {[['d0', '0–30'], ['d30', '31–60'], ['d60', '61–90'], ['d90', '90+']].map(([k, lbl]) => (
+                  <div key={k} className="flex justify-between border-b border-surface-alt py-1.5">
+                    <span className="text-ink-muted">{lbl} days</span>
+                    <span className="font-bold tabular-nums" style={{ color: k === 'd90' && ageRow[k] > 0 ? '#A32D2D' : '#0d1326' }}>{ageRow[k] ? f(ageRow[k]) : '—'}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between py-1.5">
+                  <span className="font-bold text-navy">Net Outstanding</span>
+                  <span className="font-extrabold tabular-nums text-navy">{f(outstanding)}</span>
+                </div>
+              </div>
+            )}
+          </PageSection>
           <PageSection title={`ADMs (${suppADMs.length})`} className="border-t-[3px] border-t-maroon">
-            {suppADMs.length === 0 ? <p className="text-[11px] text-ink-muted">No ADMs from this supplier</p> : suppADMs.map((a) => <MemoRow key={a.id} a={a} gain={false} />)}
+            {suppADMs.length === 0 ? <p className="text-[11px] text-ink-muted">No ADMs from this supplier</p> : suppADMs.map((a) => <MemoRow key={a.memoNo || a._id} a={a} gain={false} />)}
           </PageSection>
           <PageSection title={`ACMs (${suppACMs.length})`} className="border-t-[3px] border-t-[#16a34a]">
-            {suppACMs.length === 0 ? <p className="text-[11px] text-ink-muted">No ACMs from this supplier</p> : suppACMs.map((a) => <MemoRow key={a.id} a={a} gain />)}
+            {suppACMs.length === 0 ? <p className="text-[11px] text-ink-muted">No ACMs from this supplier</p> : suppACMs.map((a) => <MemoRow key={a.memoNo || a._id} a={a} gain />)}
           </PageSection>
         </div>
       </div>

@@ -152,3 +152,55 @@ export const computeTotalBankBalanceInr = (accounts) =>
 
 export const sumVoucherTotals = (vouchersByBranch, key) =>
   Object.values(vouchersByBranch).reduce((s, b) => s + b[key], 0);
+
+// Pure transforms for the LIVE voucher-activity feeds (get-voucher-activity.js).
+// Kept here (no I/O) so they are unit-testable without the Vite-only api client.
+
+// Tally today's receipt/payment/journal voucher counts per branch.
+// Shape: { [branch]: { receipt, payment, journal } } — only cash-book categories.
+export const tallyVouchersByBranch = (vouchers = []) => {
+  const out = {};
+  for (const v of vouchers || []) {
+    if (!v || !['receipt', 'payment', 'journal'].includes(v.category)) continue;
+    const br = v.branch || '—';
+    const row = out[br] || (out[br] = { receipt: 0, payment: 0, journal: 0 });
+    row[v.category] += 1;
+  }
+  return out;
+};
+
+// Select the dashboard's "Upcoming Travel" rows from live bookings. Prefers bookings
+// whose travelDate falls in the next `windowDays` (soonest first); if none carry a
+// travelDate yet (legacy data), falls back to the most recent bookings by booking
+// date. Pure (today passed in) so it is unit-testable.
+export const selectUpcomingTravel = (bookings = [], today, windowDays = 14, limit = 5) => {
+  const h = new Date(today + 'T00:00:00'); h.setDate(h.getDate() + windowDays);
+  const horizon = h.toISOString().slice(0, 10);
+  const upcoming = (bookings || []).filter((b) => b && b.travelDate && b.travelDate >= today && b.travelDate <= horizon);
+  const picked = upcoming.length
+    ? upcoming.sort((a, b) => String(a.travelDate).localeCompare(String(b.travelDate)))           // soonest first
+    : (bookings || []).slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))); // fallback: recent
+  return picked.slice(0, limit).map((b) => ({
+    id: b.id || b._id || b.bookingNo || b.linkNo,
+    client: (b.customer && b.customer.name) || b.customer || 'Client',
+    destination: b.headerRef || '',
+    mod: b.module || '',
+    travelDate: b.travelDate || b.date || '',
+    pax: Array.isArray(b.rows) ? b.rows.length : 1,
+  }));
+};
+
+// Map recent vouchers to the activity-feed shape { action, amount, vendor, ts }.
+export const vouchersToActivity = (vouchers = [], limit = 8) => {
+  const cap = (s) => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1);
+  return (vouchers || [])
+    .slice()
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+    .slice(0, limit)
+    .map((v) => ({
+      action: `${cap(v.category)} ${v.vno || ''}`.trim(),
+      amount: Number(v.total) || 0,
+      vendor: v.party || v.branch || '',
+      ts: v.date || '',
+    }));
+};

@@ -4,6 +4,7 @@ jest.mock('../fields/JournalFields', () => ({ JournalFields: () => null }));
 jest.mock('../fields/ReceiptPaymentFields', () => ({ ReceiptPaymentFields: () => null }));
 jest.mock('../fields/ContraFields', () => ({ ContraFields: () => null }));
 jest.mock('../fields/PurchaseExpenseFields', () => ({ PurchaseExpenseFields: () => null }));
+jest.mock('../fields/DebitNoteFields', () => ({ DebitNoteFields: () => null }));
 jest.mock('../fields/RefundReissueFields', () => ({ RefundReissueFields: () => null }));
 jest.mock('../fields/AdmAcmFields', () => ({ AdmAcmFields: () => null }));
 
@@ -12,6 +13,42 @@ const RC = VOUCHER_REGISTRY.receipt;
 const PM = VOUCHER_REGISTRY.payment;
 const CV = VOUCHER_REGISTRY.contra;
 const ctx = { branchCode: 'BOM' };
+
+describe('purchase-expense — Save not blocked on a balanced/valued entry', () => {
+  const PXP = VOUCHER_REGISTRY['purchase-expense'];
+
+  test.concurrent('recruitment-charges entry (expense + GST + TDS) is savable', async () => {
+    // Mirrors the reported case: HR Consultancy 39,984 (Dr) · 18% GST · 10% TDS, supplier "Job Search".
+    const s = {
+      party: 'Job Search', gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 7198,
+      tdsSection: '194J', tdsAmt: 3999,
+      lines: [{ ledger: 'HR Consultancy Expenses', drCr: 'Dr', amt: 39984 }],
+    };
+    expect(PXP.validate(s).ok).toBe(true);   // balanced + valued → must save
+  });
+
+  test.concurrent('a discount/income Cr line that exceeds the net does NOT lock Save', async () => {
+    // taxable = 1000 − 1200 = −200 (≤ 0 under the old check) but the entry still has a
+    // real expense debit + GST, so it must remain savable.
+    const s = {
+      party: 'Vendor', gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 180,
+      tdsSection: 'None', tdsAmt: 0,
+      lines: [{ ledger: 'Office Rent', drCr: 'Dr', amt: 1000 }, { ledger: 'Discount Received', drCr: 'Cr', amt: 1200 }],
+    };
+    expect(PXP.validate(s).ok).toBe(true);
+  });
+
+  test.concurrent('a line with an amount but no ledger blocks with a precise hint', async () => {
+    const s = { party: 'Vendor', gstApplicable: false, lines: [{ ledger: '', drCr: 'Dr', amt: 5000 }] };
+    const v = PXP.validate(s);
+    expect(v.ok).toBe(false);
+    expect(v.hint).toMatch(/ledger/i);
+  });
+
+  test.concurrent('no party still blocks (supplier required)', async () => {
+    expect(PXP.validate({ party: '', lines: [{ ledger: 'Office Rent', drCr: 'Dr', amt: 1000 }], gstApplicable: false }).ok).toBe(false);
+  });
+});
 
 describe('refund / reissue / adm / acm — registered & gated payloads', () => {
   test.concurrent('all four categories are registered', async () => {
@@ -52,6 +89,181 @@ describe('refund / reissue / adm / acm — registered & gated payloads', () => {
   test.concurrent('adm validate needs only airline + amount (no customer)', async () => {
     expect(VOUCHER_REGISTRY.adm.validate({ counterParty: '', amount: 100 }).ok).toBe(false);
     expect(VOUCHER_REGISTRY.adm.validate({ counterParty: 'AI', amount: 100 }).ok).toBe(true);
+  });
+});
+
+describe('debit-note — purchase return registered & gated payload', () => {
+  const DN = VOUCHER_REGISTRY['debit-note'];
+
+  test.concurrent('debit-note is registered with type DN', async () => {
+    expect(DN).toBeTruthy();
+    expect(DN.type).toBe('DN');
+  });
+
+  test.concurrent('debit-note is rapid-entry: closeOnSave resets to a fresh voucher after save', async () => {
+    // The shell reads desc.closeOnSave to skip the Print/New panel and reset() to a
+    // blank voucher on a successful create. Other voucher types must NOT opt in.
+    expect(DN.closeOnSave).toBe(true);
+    ['receipt', 'payment', 'contra', 'journal', 'purchase-expense', 'refund', 'reissue', 'adm', 'acm']
+      .forEach((c) => expect(VOUCHER_REGISTRY[c].closeOnSave).toBeFalsy());
+  });
+
+  test.concurrent('toBody: supplier party + return lines, total = net of lines (input GST is a Cr line)', async () => {
+    // Input GST is reversed by entering CGST/SGST Input as their own Cr lines — the
+    // supplier Dr leg = the net of all lines. There is NO separate GST add-on.
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Air India', billNo: 'PI/BOM/26/0042',
+      lines: [
+        { ledger: 'Purchase — Air Ticket', amt: 10000, drCr: 'Cr', desc: 'cancelled PNR' },
+        { ledger: 'CGST Input [BOM]', amt: 900, drCr: 'Cr' },
+        { ledger: 'SGST Input [BOM]', amt: 900, drCr: 'Cr' },
+      ],
+    }, ctx);
+    expect(b).toMatchObject({ type: 'DN', category: 'debit-note', party: 'Air India', partyType: 'supplier' });
+    expect(b.subtotal).toBe(11800);
+    expect(b.taxAmt).toBe(0);                   // never a separate GST leg
+    expect(b.total).toBe(11800);               // Dr supplier = Σ Cr lines
+    expect(b.lines).toHaveLength(3);
+    expect(b.againstInvoice).toBe('PI/BOM/26/0042');
+  });
+
+  test.concurrent('toBody: GST is NEVER double-counted — stray gstApplicable/gstAmt in state is ignored', async () => {
+    // Regression for the reported double-count: even if legacy GST state leaks in, the
+    // body must carry taxAmt 0 (so the backend posts no extra CGST/SGST on top of the
+    // tax lines) and total = the net of the lines, not net + phantom GST.
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Job Search',
+      gstApplicable: true, gstMode: 'intra', gstPct: 18, gstAmt: 7772.76,
+      lines: [
+        { ledger: 'HR Consultancy Expenses', amt: 39983.90, drCr: 'Cr' },
+        { ledger: 'CGST Input [BOM]', amt: 3598.55, drCr: 'Cr' },
+        { ledger: 'SGST Input [BOM]', amt: 3598.55, drCr: 'Cr' },
+        { ledger: 'TDS Payable [BOM]', amt: 3999, drCr: 'Dr' },
+      ],
+    }, ctx);
+    expect(b.taxAmt).toBe(0);
+    expect(b.gstMode).toBe('');
+    expect(b.gstPct).toBe(0);
+    expect(b.subtotal).toBe(43182);            // 47181 Cr − 3999 Dr
+    expect(b.total).toBe(43182);               // NOT 50,954.76
+  });
+
+  test.concurrent('toBody: total = net of lines regardless of any GST state', async () => {
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Hotel Co',
+      lines: [{ ledger: 'Purchase — Hotel', amt: 5000, drCr: 'Cr' }],
+    }, ctx);
+    expect(b.taxAmt).toBe(0);
+    expect(b.total).toBe(5000);
+    expect(b.gstMode).toBe('');
+  });
+
+  test.concurrent('toBody: zero-amount / blank-ledger lines are dropped', async () => {
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Air India', gstApplicable: false,
+      lines: [{ ledger: 'Purchase — Air Ticket', amt: 8000 }, { ledger: '', amt: 500 }, { ledger: 'X', amt: 0 }],
+    }, ctx);
+    expect(b.lines).toHaveLength(1);
+    expect(b.total).toBe(8000);
+  });
+
+  test.concurrent('validate: needs supplier + at least one priced line', async () => {
+    expect(DN.validate({ party: '', lines: [{ ledger: 'Purchase', amt: 1000 }], gstApplicable: false }).ok).toBe(false);
+    expect(DN.validate({ party: 'Air India', lines: [], gstApplicable: false }).ok).toBe(false);
+    expect(DN.validate({ party: 'Air India', lines: [{ ledger: '', amt: 1000 }], gstApplicable: false }).ok).toBe(false);
+    expect(DN.validate({ party: 'Air India', lines: [{ ledger: 'Purchase', amt: 1000 }], gstApplicable: false }).ok).toBe(true);
+  });
+
+  test.concurrent('validate: precise hints for partially-filled lines (the can\'t-save case)', async () => {
+    // Ledger picked but no amount → tell them to enter an amount (not vague "add lines").
+    const noAmt = DN.validate({ party: 'Air India', gstApplicable: false, lines: [{ ledger: 'Purchase — Air Ticket', drCr: 'Cr', amt: '' }] });
+    expect(noAmt.ok).toBe(false);
+    expect(noAmt.hint).toMatch(/amount/i);
+    // Amount typed but no ledger → tell them to pick a ledger.
+    const noLed = DN.validate({ party: 'Air India', gstApplicable: false, lines: [{ ledger: '', drCr: 'Cr', amt: 1000 }] });
+    expect(noLed.ok).toBe(false);
+    expect(noLed.hint).toMatch(/ledger/i);
+    // Both blank → generic add-a-line guidance.
+    const blank = DN.validate({ party: 'Air India', gstApplicable: false, lines: [{ ledger: '', drCr: 'Cr', amt: '' }] });
+    expect(blank.ok).toBe(false);
+    expect(blank.hint).toMatch(/add a line/i);
+  });
+
+  test.concurrent('validate: expense/GST on Dr with supplier auto-balancing on Cr is savable (reported case)', async () => {
+    // The reported screenshot: HR Consultancy 39,984 + CGST 3,599 + SGST 3,599 on Dr,
+    // TDS Payable 3,999 on Cr, supplier "Job Search" absorbs the −43,183 balance. The
+    // old check (subtotal = Cr − Dr ≤ 0) locked Save; the gross-value check passes it.
+    const v = DN.validate({
+      party: 'Job Search', gstApplicable: false,
+      lines: [
+        { ledger: 'HR Consultancy Expenses', drCr: 'Dr', amt: 39984 },
+        { ledger: 'CGST Input [BOM]', drCr: 'Dr', amt: 3599 },
+        { ledger: 'SGST Input [BOM]', drCr: 'Dr', amt: 3599 },
+        { ledger: 'TDS Payable [BOM]', drCr: 'Cr', amt: 3999 },
+      ],
+    });
+    expect(v.ok).toBe(true);
+  });
+
+  test.concurrent('validate: a self-balanced Dr/Cr entry saves with NO party (journal-style)', async () => {
+    const v = DN.validate({
+      party: '', gstApplicable: false,
+      lines: [{ ledger: 'Air India', drCr: 'Dr', amt: 1000 }, { ledger: 'Purchase — Air Ticket', drCr: 'Cr', amt: 1000 }],
+    });
+    expect(v.ok).toBe(true);          // Dr 1000 = Cr 1000, no balancing party needed
+  });
+
+  test.concurrent('validate: a two-line Dr/Cr entry that does NOT balance still needs a party', async () => {
+    const v = DN.validate({
+      party: '', gstApplicable: false,
+      lines: [{ ledger: 'Air India', drCr: 'Dr', amt: 800 }, { ledger: 'Purchase — Air Ticket', drCr: 'Cr', amt: 1000 }],
+    });
+    expect(v.ok).toBe(false);         // out by 200 → must pick a supplier to absorb it
+    expect(v.hint).toMatch(/Supplier|balance/i);
+  });
+
+  test.concurrent('toBody: per-line Dr/Cr — Dr line nets against Cr returns; lines carry drCr', async () => {
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Air India', gstApplicable: false,
+      lines: [
+        { ledger: 'Purchase — Air Ticket', drCr: 'Cr', amt: 10000 },
+        { ledger: 'Cancellation Charges', drCr: 'Dr', amt: 200 },
+      ],
+    }, ctx);
+    expect(b.subtotal).toBe(9800);                 // 10,000 returned − 200 charge
+    expect(b.total).toBe(9800);
+    expect(b.lines).toHaveLength(2);
+    expect(b.lines.find((l) => l.ledger === 'Cancellation Charges').drCr).toBe('Dr');
+    expect(b.lines.find((l) => l.ledger === 'Purchase — Air Ticket').drCr).toBe('Cr');
+  });
+
+  test.concurrent('toBody: a line with no drCr defaults to Cr (legacy return)', async () => {
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Air India', gstApplicable: false,
+      lines: [{ ledger: 'Purchase — Air Ticket', amt: 7000 }],
+    }, ctx);
+    expect(b.lines[0].drCr).toBe('Cr');
+    expect(b.subtotal).toBe(7000);
+  });
+
+  test.concurrent('fromVoucher round-trips a saved debit note for the edit form', async () => {
+    const b = DN.toBody({
+      date: '2026-06-19', party: 'Air India', billNo: 'PI/1',
+      lines: [
+        { ledger: 'Purchase — Air Ticket', amt: 10000, drCr: 'Cr', desc: 'rtn' },
+        { ledger: 'CGST Input [BOM]', amt: 900, drCr: 'Cr' },
+        { ledger: 'SGST Input [BOM]', amt: 900, drCr: 'Cr' },
+      ],
+    }, ctx);
+    const s = DN.fromVoucher(b);
+    expect(s.party).toBe('Air India');
+    expect(s.lines).toHaveLength(3);
+    expect(s.lines[0].ledger).toBe('Purchase — Air Ticket');
+    // input GST is carried back as ordinary Cr lines, not a separate GST add-on
+    expect(s.lines[1].ledger).toBe('CGST Input [BOM]');
+    // re-serialising the recovered state reproduces the same total (idempotent edit)
+    expect(DN.toBody(s, ctx).total).toBe(11800);
+    expect(DN.toBody(s, ctx).taxAmt).toBe(0);
   });
 });
 

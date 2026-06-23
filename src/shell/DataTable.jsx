@@ -32,7 +32,7 @@
      }
    ──────────────────────────────────────────────────────────────────── */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   ChevronDown, ChevronUp, ChevronsUpDown, Inbox, Search, AlertTriangle,
   Columns3, Rows3, Rows4, Download, Check, FileSpreadsheet, Printer,
@@ -110,6 +110,7 @@ export function DataTable({
   const [page, setPage] = useState(0);
   const [hidden, setHidden] = useState(() => new Set());
   const [colMenuOpen, setColMenuOpen] = useState(false);
+  const colBtnRef = useRef(null);
   const [denseState, setDenseState] = useState(() => {
     const saved = localStorage.getItem('kbiz360_table_density');
     if (saved) return saved === 'compact';
@@ -156,9 +157,15 @@ export function DataTable({
   }, [searched, sort, columns]);
 
   const total = sorted.length;
-  const pages = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+  // Virtualization-lite: callers that don't set a pageSize render every row. For
+  // very large result sets that means thousands of DOM nodes (jank). When a list
+  // crosses the threshold we auto-paginate so the DOM stays bounded — export and
+  // the totals footer still use the full `sorted` set, so numbers are unaffected.
+  const AUTO_PAGE_THRESHOLD = 300, AUTO_PAGE_SIZE = 100;
+  const effPageSize = pageSize > 0 ? pageSize : (total > AUTO_PAGE_THRESHOLD ? AUTO_PAGE_SIZE : 0);
+  const pages = effPageSize > 0 ? Math.max(1, Math.ceil(total / effPageSize)) : 1;
   const safePage = Math.min(page, pages - 1);
-  const visible = pageSize > 0 ? sorted.slice(safePage * pageSize, safePage * pageSize + pageSize) : sorted;
+  const visible = effPageSize > 0 ? sorted.slice(safePage * effPageSize, safePage * effPageSize + effPageSize) : sorted;
 
   const hasFooter = effColumns.some((c) => typeof c.footer === 'function');
 
@@ -248,6 +255,7 @@ export function DataTable({
             {showColumnToggle && (
               <div className="relative">
                 <button
+                  ref={colBtnRef}
                   onClick={() => setColMenuOpen((o) => !o)}
                   title="Show / hide columns"
                   aria-haspopup="true" aria-expanded={colMenuOpen}
@@ -258,12 +266,17 @@ export function DataTable({
                 {colMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setColMenuOpen(false)} />
-                    <div className="absolute right-0 z-50 mt-1 max-h-72 w-52 overflow-auto rounded-md border border-surface-border bg-surface py-1 shadow-brand">
+                    <div
+                      role="menu"
+                      onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setColMenuOpen(false); colBtnRef.current?.focus(); } }}
+                      className="absolute right-0 z-50 mt-1 max-h-72 w-52 overflow-auto rounded-md border border-surface-border bg-surface py-1 shadow-brand">
                       {columns.filter((c) => c.hideable !== false).map((c) => {
                         const shown = !hidden.has(c.key);
                         return (
                           <button
                             key={c.key}
+                            role="menuitemcheckbox"
+                            aria-checked={shown}
                             onClick={() => toggleColumn(c.key)}
                             className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-ink transition-colors duration-fast hover:bg-surface-alt"
                           >
@@ -304,7 +317,7 @@ export function DataTable({
 
       {/* Scroll viewport — bounded height; thead/tfoot stick within it */}
       <div className="w-full overflow-auto" style={{ maxHeight }}>
-        <table className={cn('w-full border-collapse', tableFontSize)} style={{ minWidth }}>
+        <table aria-busy={loading || undefined} className={cn('w-full border-collapse', tableFontSize)} style={{ minWidth }}>
           <thead>
             <tr className="bg-navy">
               {effColumns.map((col) => {
@@ -316,23 +329,37 @@ export function DataTable({
                     scope="col"
                     aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
                     style={col.width ? { width: col.width } : undefined}
-                    onClick={() => toggleSort(col)}
                     className={cn(
                       padX, padY,
                       'bg-navy text-[10.5px] font-bold uppercase tracking-wide text-gold whitespace-nowrap select-none',
                       stickyHeader && 'sticky top-0 z-20',
                       alignClass(col),
                       stickyCell(col, 'head'),
-                      sortable && 'cursor-pointer hover:text-gold-light',
                       col.headerClassName,
                     )}
                   >
-                    <span className={cn('inline-flex items-center gap-1', (col.align === 'right' || col.num) && 'flex-row-reverse')}>
-                      {col.header ?? col.key}
-                      {sortable && (active
-                        ? (sort.dir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)
-                        : <ChevronsUpDown className="h-3 w-3 opacity-30" />)}
-                    </span>
+                    {/* Sort control is a real button so it's keyboard-operable
+                        (Enter/Space) and announced; non-sortable headers render
+                        plain text. */}
+                    {sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(col)}
+                        className={cn(
+                          'inline-flex items-center gap-1 font-bold uppercase tracking-wide text-gold hover:text-gold-light focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 rounded',
+                          (col.align === 'right' || col.num) && 'flex-row-reverse',
+                        )}
+                      >
+                        {col.header ?? col.key}
+                        {active
+                          ? (sort.dir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)
+                          : <ChevronsUpDown className="h-3 w-3 opacity-30" />}
+                      </button>
+                    ) : (
+                      <span className={cn('inline-flex items-center gap-1', (col.align === 'right' || col.num) && 'flex-row-reverse')}>
+                        {col.header ?? col.key}
+                      </span>
+                    )}
                   </th>
                 );
               })}
@@ -379,10 +406,13 @@ export function DataTable({
               <tr
                 key={getRowKey ? getRowKey(row, i) : i}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
+                onKeyDown={onRowClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRowClick(row); } } : undefined}
+                role={onRowClick ? 'button' : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
                 className={cn(
                   'group border-b border-surface-border',
                   zebra && (i % 2 === 1 ? 'bg-surface-alt/60' : 'bg-surface'),
-                  onRowClick && 'cursor-pointer hover:bg-gold-light/20',
+                  onRowClick && 'cursor-pointer hover:bg-gold-light/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold/50',
                 )}
               >
                 {effColumns.map((col) => {
@@ -426,9 +456,9 @@ export function DataTable({
         </table>
       </div>
 
-      {pageSize > 0 && !loading && !isError && total > pageSize && (
+      {effPageSize > 0 && !loading && !isError && total > effPageSize && (
         <div className="flex items-center justify-between gap-2 border-t border-surface-border px-4 py-2.5 text-xs text-ink-muted">
-          <span>{safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, total)} of {total}</span>
+          <span>{safePage * effPageSize + 1}–{Math.min((safePage + 1) * effPageSize, total)} of {total}</span>
           <div className="flex items-center gap-1">
             <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0}
               className="rounded-md border border-surface-border px-2.5 py-1 font-medium disabled:opacity-40 enabled:hover:bg-surface-alt">Prev</button>

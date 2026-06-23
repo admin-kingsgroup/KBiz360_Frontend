@@ -4,9 +4,10 @@ import { JournalFields } from './fields/JournalFields';
 import { ReceiptPaymentFields } from './fields/ReceiptPaymentFields';
 import { ContraFields } from './fields/ContraFields';
 import { PurchaseExpenseFields } from './fields/PurchaseExpenseFields';
+import { DebitNoteFields } from './fields/DebitNoteFields';
 import { RefundReissueFields } from './fields/RefundReissueFields';
 import { AdmAcmFields } from './fields/AdmAcmFields';
-import { r2, allocSummary, pxpTotals } from './ui';
+import { r2, allocSummary, pxpTotals, dnTotals } from './ui';
 
 // Recover a saved income line's amount (Service Charge / Markup) for the edit form.
 const lineAmt = (v, ledger) => {
@@ -410,15 +411,110 @@ export const VOUCHER_REGISTRY = {
 
     validate: (s) => {
       const t = pxpTotals(s);
-      const lines = (s.lines || []).filter((l) => l.ledger && (+l.amt || 0) !== 0);
+      const all = s.lines || [];
+      const lines = all.filter((l) => l.ledger && (+l.amt || 0) !== 0);
+      const amtNoLedger = all.some((l) => !l.ledger && (+l.amt || 0) !== 0);
+      const ledgerNoAmt = all.some((l) => l.ledger && (+l.amt || 0) === 0);
+      // Value test = the GROSS DEBIT (expense/asset legs + input GST). This stays
+      // positive even when a credit line (discount/income received) shrinks the taxable
+      // base or TDS/rounding pushes `taxable = Dr − Cr` to ≤ 0 — so a balanced, valued
+      // voucher (the supplier leg balances it) is never wrongly locked on Save.
+      const grossDr = r2(t.drSum + t.gstAmt);
       let hint = '';
       if (!s.party) hint = '(Pick Supplier)';
-      else if (!lines.length) hint = '(Add expense lines)';
-      else if (t.total <= 0) hint = '(Enter amount)';
-      return { ok: !!s.party && lines.length > 0 && lines.every((l) => l.ledger) && t.total > 0, hint };
+      else if (!lines.length) hint = amtNoLedger ? '(Pick a ledger on each line)' : ledgerNoAmt ? '(Enter an amount)' : '(Add expense lines)';
+      else if (amtNoLedger) hint = '(Pick a ledger on each line)';
+      else if (grossDr <= 0) hint = '(Enter an amount)';
+      return { ok: !!s.party && lines.length > 0 && !amtNoLedger && grossDr > 0, hint };
     },
 
     fields: (props) => <PurchaseExpenseFields {...props} />,
+  },
+
+  /**
+   * Debit Note (DN) — a PURCHASE RETURN to a supplier (the mirror of a purchase):
+   *   Dr Supplier (Sundry Creditor)   net        (we owe the supplier less)
+   *   Cr Purchase ledger(s)           Σ returns  (cost reversed — default side)
+   *   Dr Charge/adjustment ledger(s)  Σ Dr lines (an added charge the supplier keeps)
+   *   Cr Input CGST/SGST or IGST      gstAmt     (input credit reversed)
+   * Like a journal/purchase voucher, every line carries a per-line Dr/Cr toggle
+   * (defaulting to Cr = cost reversed); the backend's debitNoteLines posts each line
+   * on its own side and makes the supplier the balancing leg, and the shell shows the
+   * live JV effect. GATED → enters PENDING and posts on approval. See
+   * posting.builder.debitNoteLines.
+   */
+  'debit-note': {
+    type: 'DN',
+    label: 'Debit Note',
+    icon: '🔻',
+    // Rapid-entry: after a successful save the form closes the confirmation panel and
+    // resets to a fresh blank voucher (the save is confirmed by the toast + vno) so the
+    // user can immediately enter the next purchase return. See VoucherShell.save().
+    closeOnSave: true,
+    explain: (<><b style={{ color: '#A07828' }}>Debit Note:</b> a <b>purchase return</b> to a supplier (goods/services sent back, or a supplier over-billing reversed). The <b>supplier (Sundry Creditors) is Debited</b> — we owe them less — and the <b>Purchase ledger(s) and input GST are Credited</b> (the cost is reversed). Each line has a <b>Dr/Cr</b> toggle: returns are <b>Cr</b> by default, switch a line to <b>Dr</b> to book a charge the supplier retains. For cancelling a <b>sale</b>, use Refund / Reissue instead.</>),
+
+    initial: () => ({
+      date: todayISO(), billNo: '', party: '',
+      remarks: '', lines: [{ _k: 1, ledger: '', drCr: 'Cr', amt: '', desc: '' }, { _k: 2, ledger: '', drCr: 'Dr', amt: '', desc: '' }],
+    }),
+
+    fromVoucher: (v) => ({
+      date: v.date || '', billNo: v.billNo || v.againstInvoice || '', party: v.party || '',
+      remarks: v.remarks || '',
+      lines: (v.lines && v.lines.length ? v.lines : [{ ledger: '', drCr: 'Cr', amt: '', desc: '' }, { ledger: '', drCr: 'Dr', amt: '', desc: '' }])
+        .map((l, i) => ({ _k: i + 1, ledger: l.ledger || '', drCr: l.drCr === 'Dr' ? 'Dr' : 'Cr', amt: l.amt ?? '', desc: l.desc || '' })),
+    }),
+
+    // The line grid is the complete itemisation: input GST is reversed by entering the
+    // CGST/SGST/IGST Input ledgers as lines, so we NEVER emit a separate taxAmt — that
+    // add-on used to post a second GST leg on top of the tax lines (double-count). The
+    // supplier leg balances to the net of the lines (= total).
+    toBody: (s, ctx) => {
+      const t = dnTotals(s);
+      const lines = (s.lines || [])
+        .filter((l) => l.ledger && (+l.amt || 0) !== 0)
+        .map((l) => ({ ledger: l.ledger, amt: +l.amt || 0, drCr: l.drCr === 'Dr' ? 'Dr' : 'Cr', desc: l.desc || '' }));
+      return {
+        type: 'DN', category: 'debit-note', branch: ctx.branchCode, date: s.date,
+        party: s.party, partyType: 'supplier', billNo: s.billNo, againstInvoice: s.billNo,
+        lines, subtotal: t.subtotal, taxAmt: 0, gstMode: '', gstPct: 0, total: t.subtotal,
+        remarks: s.remarks || `Being purchase return to ${s.party}${s.billNo ? ` against ${s.billNo}` : ''}`,
+        status: 'saved',
+      };
+    },
+
+    validate: (s) => {
+      const t = dnTotals(s);
+      const all = s.lines || [];
+      // A line "counts" only when it has BOTH a ledger and a non-zero amount. Track the
+      // partially-filled rows so the hint tells the user exactly what's missing instead
+      // of a vague "add lines" (the cause of the can't-save confusion).
+      const lines = all.filter((l) => l.ledger && (+l.amt || 0) !== 0);
+      const ledgerNoAmt = all.some((l) => l.ledger && (+l.amt || 0) === 0);
+      const amtNoLedger = all.some((l) => !l.ledger && (+l.amt || 0) !== 0);
+      // Full Dr/Cr of the lines (input GST is reversed via its own Cr lines). With a
+      // supplier party the creditor leg absorbs any imbalance (so the entry always
+      // balances); without a party the Dr/Cr lines must balance on their own — a
+      // journal-style entry.
+      const crTotal = r2(t.crSum);  // Cr returns + input GST reversed (all as lines)
+      const drTotal = r2(t.drSum);  // Dr charges / TDS / adjustments
+      const selfBalanced = Math.abs(r2(crTotal - drTotal)) < 0.01;
+      const gross = Math.max(crTotal, drTotal);
+      let hint = '';
+      if (!lines.length) {
+        if (amtNoLedger) hint = '(Pick a ledger on each line)';
+        else if (ledgerNoAmt) hint = '(Enter an amount)';
+        else hint = '(Add a line — ledger + amount)';
+      } else if (amtNoLedger) hint = '(Pick a ledger on each line)';
+      else if (gross <= 0) hint = '(Enter an amount)';
+      else if (!s.party && !selfBalanced) hint = '(Pick Supplier or balance Dr = Cr)';
+      // Every priced line must have a ledger; need value; and either a party absorbs
+      // the balance or the lines self-balance.
+      const ok = lines.length > 0 && !amtNoLedger && gross > 0 && (!!s.party || selfBalanced);
+      return { ok, hint };
+    },
+
+    fields: (props) => <DebitNoteFields {...props} />,
   },
 };
 

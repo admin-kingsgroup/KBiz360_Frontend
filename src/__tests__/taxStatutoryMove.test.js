@@ -1,0 +1,51 @@
+/* Verifies the "Tax & Statutory" group was moved OUT of the Accounts pill and
+   INTO the Taxation header, with no duplication. */
+import { MENU_ACCOUNTS, getMenu } from '../core/menus';
+import { TAX_INDIA, TAX_AFRICA, TAX_ALL } from '../core/data';
+
+const TAX_HREFS = [
+  '/reports/tax-summary',
+  '/finance/tds-calculator',
+  '/reports/statutory-dues',
+  '/reports/tax-board',
+];
+
+// Flatten a menu node tree into the list of every href it contains.
+function hrefs(node, acc = []) {
+  if (!node) return acc;
+  if (node.href) acc.push(node.href);
+  (node.children || []).forEach(c => hrefs(c, acc));
+  return acc;
+}
+
+describe('Tax & Statutory → Taxation header', () => {
+  test('removed from the Accounts pill', () => {
+    const labels = (MENU_ACCOUNTS.children || []).map(c => c.label);
+    expect(labels).not.toContain('Tax & Statutory');
+    const accountsHrefs = hrefs(MENU_ACCOUNTS);
+    TAX_HREFS.forEach(h => expect(accountsHrefs).not.toContain(h));
+  });
+
+  test.each([
+    ['TAX_INDIA', TAX_INDIA],
+    ['TAX_AFRICA', TAX_AFRICA],
+    ['TAX_ALL', TAX_ALL],
+  ])('present in %s without duplication', (_name, menu) => {
+    const list = hrefs(menu);
+    TAX_HREFS.forEach(h => {
+      expect(list).toContain(h);
+      // each tax href appears exactly once (no duplicate menu entry)
+      expect(list.filter(x => x === h)).toHaveLength(1);
+    });
+  });
+
+  test('Branch Accountant gets Accounts + Taxation pills, with tax links reachable', () => {
+    const user = { role: 'Branch Accountant' };
+    const menu = getMenu({ code: 'BOM' }, user); // Indian branch → GST regime
+    const labels = menu.map(m => m.label);
+    expect(labels).toContain('Accounts');
+    expect(labels).toContain('Taxation — GST');
+    const allHrefs = menu.flatMap(m => hrefs(m));
+    TAX_HREFS.forEach(h => expect(allHrefs).toContain(h));
+  });
+});

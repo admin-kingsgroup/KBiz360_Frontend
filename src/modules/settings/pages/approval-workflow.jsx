@@ -20,7 +20,7 @@ export function ApprovalWorkflow({ setRoute }) {
     { l: 'Active Rules', v: active, c: '#27500A' },
     { l: 'Voucher Types', v: new Set(RULES.map((r) => r.voucherType)).size, c: '#185FA5' },
     { l: 'Approvers', v: new Set(RULES.map((r) => r.approver)).size, c: '#854F0B' },
-    { l: 'Avg SLA', v: '16h', c: '#A32D2D' },
+    { l: 'Avg SLA', v: RULES.length ? `${Math.round(RULES.reduce((s, r) => s + (parseInt(r.sla, 10) || 0), 0) / RULES.length)}h` : '—', c: '#A32D2D' },
   ];
   const columns = [
     { key: 'id', header: 'Rule ID', className: 'font-mono text-[10px] text-[#185FA5]', hideable: false },

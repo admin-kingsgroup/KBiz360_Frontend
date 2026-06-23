@@ -12,11 +12,18 @@ import { Cell } from 'recharts';
 import { exportToCSV } from './business-logic';
 import { exportToExcel } from './exportExcel';
 import { ADM_DATA, CASH, CONSOLIDATED_LABEL, FY_TARGETS_DATA, GP_BILLS, HR_EMPLOYEES_DATA, NOTIFICATIONS_DATA, SUBAGENTS, _EXP_BGT_LISTENERS, _EXP_BUDGETS } from './data';
-import { useLedgerRegistry } from './useReference';
+import { useLedgerRegistry, useDocumentTypes } from './useReference';
+import { useMasterList, useMasterMutations } from './useMasters';
+import { toast } from './ux/toast';
+import { fromJobDTO, toJobPayload, JOB_NEXT_STATUS } from '../modules/hr/hrMaps';
+import { fromEmpDTO } from '../modules/hr/employeeMap';
+import { pickLedgers } from './ledgerPick';
 import { useGpBills } from './useAccounting';
 import { fmt, fmtINR } from './format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS, PERIOD_OPTIONS as MONTH_PERIOD_OPTIONS, FY_YTD_MONTHS } from './dates';
 import { useMobile } from './hooks';
+import { clickable } from './ux/clickable';
+import { SampleBanner } from './ux/SampleBanner';
 /* Import style primitives from the lightweight token module (NOT ./styles) so
    helpers no longer depends on styles.jsx — breaking the styles↔helpers cycle
    that was forcing both (and recharts) into the initial bundle. vDate was an
@@ -212,7 +219,7 @@ export function UxPreferences(){
             <p style={{margin:0,fontSize:12,color:"#384677"}}>Dark theme for low-light environments</p>
             <p style={{margin:"2px 0 0",fontSize:10,color:"#5a6691"}}>Currently: <b>{dark?"Dark":"Light"}</b></p>
           </div>
-          <div onClick={toggleDark} style={{width:48,height:26,borderRadius:13,background:dark?"#0d1326":"#e1e3ec",cursor:"pointer",
+          <div {...clickable(toggleDark)} style={{width:48,height:26,borderRadius:13,background:dark?"#0d1326":"#e1e3ec",cursor:"pointer",
             position:"relative",transition:"background 0.2s",border:`2px solid ${dark?"#d4a437":"#bfc3d6"}`}}>
             <div style={{position:"absolute",top:2,left:dark?22:2,width:18,height:18,borderRadius:"50%",
               background:dark?"#d4a437":"#fff",transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.3)"}}/>
@@ -611,11 +618,7 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}
   const ref=useRef(null);
   const menuRef=useRef(null);
   const LEDGER_REGISTRY=useLedgerRegistry(branch).data||[];   // live chart of accounts (/api/ledgers), branch-scoped
-  const filtered=LEDGER_REGISTRY.filter(l=>{
-    const matchQ=!q||l.name.toLowerCase().includes(q.toLowerCase())||l.group.toLowerCase().includes(q.toLowerCase());
-    const matchFilter=!filter||filter(l);
-    return matchQ&&matchFilter;
-  }).slice(0,12);
+  const {matches,shown:filtered}=pickLedgers(LEDGER_REGISTRY,q,filter);
   const selected=LEDGER_REGISTRY.find(l=>l.id===value);
   const place=()=>{ if(ref.current) setRect(ref.current.getBoundingClientRect()); };
   const openMenu=()=>{ place(); setQ(""); setOpen(true); };
@@ -637,7 +640,7 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}
           fontSize:11,outline:"none",boxSizing:"border-box"}}/>
       <div style={{maxHeight:220,overflowY:"auto"}}>
         {filtered.map(l=>(
-          <div key={l.id} onClick={()=>{onChange(l.id);setOpen(false);}}
+          <div key={l.id} {...clickable(()=>{onChange(l.id);setOpen(false);},{role:'option'})}
             style={{padding:"7px 12px",cursor:"pointer",display:"flex",justifyContent:"space-between",fontSize:11}}
             onMouseEnter={e=>e.currentTarget.style.background="#f0f4ff"}
             onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
@@ -648,12 +651,14 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}
         {filtered.length===0&&<div style={{padding:"10px 12px",fontSize:11,color:"#5a6691"}}>No ledger found</div>}
       </div>
       <div style={{padding:"6px 10px",borderTop:"1px solid #f3f4f8",fontSize:9.5,color:"#5a6691"}}>
-        {LEDGER_REGISTRY.length} ledgers · Type to filter
+        {matches.length>filtered.length
+          ? `Showing ${filtered.length} of ${matches.length} matches · Type to narrow`
+          : `${LEDGER_REGISTRY.length} ledgers · Type to filter`}
       </div>
     </div>, document.body);
   return (
     <div ref={ref} style={{position:"relative"}}>
-      <div onClick={()=>open?setOpen(false):openMenu()} style={{...inp,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:32,...style}}>
+      <div {...clickable(()=>open?setOpen(false):openMenu())} style={{...inp,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:32,...style}}>
         {selected
           ?<span style={{fontSize:11,color:"#0d1326",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected.name}</span>
           :<span style={{fontSize:11,color:"#bfc3d6"}}>{placeholder||"Select ledger..."}</span>
@@ -833,13 +838,24 @@ export const STATUS_FLOW=["Cancellation Requested","BSP Filed","Airline Refund R
 
 export function Recruitment({branch}){
   const mob=useMobile();
-  const [jobs,setJobs]=useState([
-    {id:"JOB001",title:"Senior Travel Consultant",dept:"Operations",location:"Mumbai",type:"Full-time",salary:"₹35K–50K/mo",status:"Open",applicants:12,posted:"2026-05-01",skills:"GDS, Flight ticketing, holiday packages"},
-    {id:"JOB002",title:"Accountant",dept:"Finance",location:"Ahmedabad",type:"Full-time",salary:"₹25K–35K/mo",status:"Open",applicants:8,posted:"2026-05-10",skills:"Tally, GST, bank reconciliation"},
-  ]);
-  const [modal,setModal]=useState(false);
-  const STATUS_CLR={Open:"#185FA5",Interviewing:"#854F0B",Hired:"#27500A",Closed:"#5a6691"};
-  const STATUS_BG ={Open:"#E6F1FB",Interviewing:"#FAEEDA",Hired:"#EAF3DE",Closed:"#f3f4f8"};
+  const brScope=branch==="ALL"?"":(branch?.code||"");
+  const jobsQ=useMasterList('job-openings', brScope?{branch:brScope}:{});
+  const jobs=((jobsQ.data)||[]).map(fromJobDTO);
+  const {create,update}=useMasterMutations('job-openings');
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
+  const blank={title:"",dept:"",branch:brScope||"BOM",location:"",type:"Full-time",salary:"",skills:"",applicants:0,posted:todayISO(),status:"Open"};
+  const [form,setForm]=useState(blank);
+  const STATUS_CLR={Open:"#185FA5",Interviewing:"#854F0B",Hired:"#27500A","On-hold":"#854F0B",Closed:"#5a6691"};
+  const STATUS_BG ={Open:"#E6F1FB",Interviewing:"#FAEEDA",Hired:"#EAF3DE","On-hold":"#FAEEDA",Closed:"#f3f4f8"};
+
+  const advance=(j)=>update.mutate({id:j.id,body:toJobPayload({...j,status:JOB_NEXT_STATUS[j.status]||"Closed"})},
+    {onError:e=>toast(e?.message||"Could not update","error")});
+  const postJob=()=>{
+    if(!form.title){toast("Job title is required","error");return;}
+    create.mutate(toJobPayload(form),{
+      onSuccess:()=>{toast("Job posted");setModal(false);setForm(blank);},
+      onError:e=>toast(e?.message||"Could not post job","error")});
+  };
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
@@ -848,12 +864,15 @@ export function Recruitment({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>👔</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Recruitment</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{jobs.filter(j=>j.status==="Open").length} open positions · {jobs.reduce((s,j)=>s+j.applicants,0)} total applicants</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{jobsQ.isLoading?"Loading…":`${jobs.filter(j=>j.status==="Open").length} open positions`} · {jobs.reduce((s,j)=>s+j.applicants,0)} total applicants · {branch==="ALL"?"All branches":(branch?.code||brScope||"—")}</p>
           </div>
         </div>
-        <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Post Job</button>
+        <button onClick={()=>{setForm(blank);setModal(true);}} style={{...btnG,fontSize:11}}><Plus size={13}/> Post Job</button>
       </div>
 
+      {jobs.length===0&&!jobsQ.isLoading&&(
+        <div style={{...card,padding:"24px",textAlign:"center",color:"#8b94b3",fontSize:12}}>No job openings for this branch. Use “Post Job” to add one.</div>
+      )}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))",gap:12}}>
         {jobs.map(j=>(
           <div key={j.id} style={{...card,borderTop:`3px solid ${STATUS_CLR[j.status]||"#384677"}`}}>
@@ -877,11 +896,37 @@ export function Recruitment({branch}){
             <p style={{margin:"0 0 10px",fontSize:10.5,color:"#5a6691"}}><b>Skills:</b> {j.skills}</p>
             <div style={{display:"flex",gap:6}}>
               <button style={{...btnG,fontSize:10,padding:"4px 12px",flex:1}}>View Applicants</button>
-              <button onClick={()=>setJobs(js=>js.map(x=>x.id===j.id?{...x,status:x.status==="Open"?"Interviewing":x.status==="Interviewing"?"Hired":"Closed"}:x))} style={{...btnGh,fontSize:10,padding:"4px 10px"}}>{j.status==="Open"?"→ Interview":j.status==="Interviewing"?"→ Hire":"Close"}</button>
+              <button onClick={()=>advance(j)} disabled={update.isPending} style={{...btnGh,fontSize:10,padding:"4px 10px"}}>{j.status==="Open"?"→ Interview":j.status==="Interviewing"?"→ Hire":j.status==="Hired"?"Close":"Close"}</button>
             </div>
           </div>
         ))}
       </div>
+
+      {modal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:520,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Post a Job Opening</p>
+              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
+            </div>
+            <div style={{padding:"16px 18px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <FL label="Job title"><input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} style={inp}/></FL>
+              <FL label="Department"><input value={form.dept} onChange={e=>setForm(f=>({...f,dept:e.target.value}))} style={inp}/></FL>
+              <FL label="Branch"><input value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))} style={inp}/></FL>
+              <FL label="Location"><input value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} style={inp}/></FL>
+              <FL label="Employment type"><select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} style={inp}>{["Full-time","Part-time","Contract"].map(t=><option key={t}>{t}</option>)}</select></FL>
+              <FL label="Salary range"><input value={form.salary} onChange={e=>setForm(f=>({...f,salary:e.target.value}))} placeholder="₹35K–50K/mo" style={inp}/></FL>
+              <FL label="Applicants"><input type="number" value={form.applicants} onChange={e=>setForm(f=>({...f,applicants:e.target.value}))} style={inp}/></FL>
+              <FL label="Opened on"><input type="date" value={form.posted} onChange={e=>setForm(f=>({...f,posted:e.target.value}))} style={inp}/></FL>
+              <div style={{gridColumn:"1/-1"}}><FL label="Skills"><input value={form.skills} onChange={e=>setForm(f=>({...f,skills:e.target.value}))} placeholder="GDS, ticketing, holiday packages" style={inp}/></FL></div>
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+              <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
+              <button onClick={postJob} disabled={create.isPending} style={btnG}>{create.isPending?"Posting…":"Post Job"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -972,6 +1017,7 @@ export function BudgetPlanning({branch}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+      <SampleBanner note="budget figures and actuals are sample data, not live." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📊</div>
@@ -1035,7 +1081,7 @@ export function BudgetPlanning({branch}){
 export function SeatInventory({branch}){
   const mob=useMobile();
   const [search,setSearch]=useState("");
-  const [date,setDate]=useState("2026-06-15");
+  const [date,setDate]=useState(todayISO());
   const SEATS=[
     {id:"SI001",flight:"AI-144",route:"BOM-DXB",date:"2026-06-15",aircraft:"B787",classConfig:[{cls:"Economy",total:250,held:18,sold:196,avail:36},{cls:"Business",total:30,held:2,sold:21,avail:7}],status:"Open",dep:"14:20"},
     {id:"SI002",flight:"EK-506",route:"BOM-DXB",date:"2026-06-15",aircraft:"A380",classConfig:[{cls:"Economy",total:420,held:22,sold:398,avail:0},{cls:"Business",total:58,held:3,sold:45,avail:10},{cls:"First",total:14,held:0,sold:12,avail:2}],status:"Near Full",dep:"03:30"},
@@ -1049,6 +1095,7 @@ export function SeatInventory({branch}){
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+      <div role="note" style={{margin:"0 0 12px",padding:"8px 12px",background:"#FAEEDA",border:"1px solid #f0d28a",borderRadius:8,fontSize:11.5,color:"#854F0B",fontWeight:600}}>⚠ Sample data — seat inventory isn’t wired to a live source yet.</div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>💺</div>
@@ -1121,8 +1168,10 @@ export function SeatInventory({branch}){
 
 export function GratuityRegister({branch}){
   const mob=useMobile();
-  const brCode=branch==="ALL"?null:branch?.code;
-  const emps=HR_EMPLOYEES_DATA.filter(e=>!brCode||e.branch===brCode);
+  const brScope=branch==="ALL"?"":(branch?.code||"");
+  /* Live, branch-scoped employees; gratuity provision is computed from Basic+DA
+     and length of service per the Payment of Gratuity Act. */
+  const emps=((useMasterList('employees', brScope?{branch:brScope}:{}).data)||[]).map(fromEmpDTO);
   const DOJ_TO_YEARS=doj=>{const d=new Date(doj);const n=new Date("2026-05-19");return+((n-d)/(365.25*86400000)).toFixed(2);};
   const GRATUITY=e=>{
     const yrs=DOJ_TO_YEARS(e.joined||"2021-04-01");
@@ -1463,42 +1512,10 @@ export const COST_CENTERS_DATA = [];
 export const PROJECTS_DATA = [];
 
 
-export const DOCUMENT_TYPES_DATA = [
-  {id:"DT-001",type:"Tax Invoice",                layout:"GST Standard",     header:"Travkings Tax Invoice",      footer:"Subject to Mumbai Jurisdiction", logo:"travkings-logo.png",numberingSeries:"TKHO/INV/{YY}/{####}",active:true},
-  {id:"DT-002",type:"Bill of Supply",             layout:"Non-GST Standard", header:"Travkings Bill of Supply",   footer:"Subject to Mumbai Jurisdiction", logo:"travkings-logo.png",numberingSeries:"TKHO/BOS/{YY}/{####}",active:true},
-  {id:"DT-003",type:"Receipt Voucher",            layout:"Voucher Standard", header:"Travkings Receipt Voucher",  footer:"Computer generated",             logo:"travkings-logo.png",numberingSeries:"{BR}/RV/{YY}/{####}",active:true},
-  {id:"DT-004",type:"Payment Voucher",            layout:"Voucher Standard", header:"Travkings Payment Voucher",  footer:"Computer generated",             logo:"travkings-logo.png",numberingSeries:"{BR}/PV/{YY}/{####}",active:true},
-  {id:"DT-005",type:"Credit Note",                layout:"Note Standard",    header:"Travkings Credit Note",      footer:"Subject to Mumbai Jurisdiction", logo:"travkings-logo.png",numberingSeries:"{BR}/CN/{YY}/{####}",active:true},
-  {id:"DT-006",type:"Debit Note",                 layout:"Note Standard",    header:"Travkings Debit Note",       footer:"Subject to Mumbai Jurisdiction", logo:"travkings-logo.png",numberingSeries:"{BR}/DN/{YY}/{####}",active:true},
-  {id:"DT-007",type:"Quotation / Estimate",       layout:"Quotation Standard",header:"Travkings Quotation",        footer:"Valid for 15 days",             logo:"travkings-logo.png",numberingSeries:"{BR}/QT/{YY}/{####}",active:true},
-  {id:"DT-008",type:"Visa Application Cover",     layout:"Letter Standard",  header:"Travkings — Authorised Travel Agent",footer:"For visa office use",      logo:"travkings-logo.png",numberingSeries:"{BR}/VA/{YY}/{####}",active:true},
-  {id:"DT-009",type:"Hotel Voucher",              layout:"Voucher Standard", header:"Travkings Hotel Voucher",    footer:"Show at check-in",               logo:"travkings-logo.png",numberingSeries:"{BR}/HV/{YY}/{####}",active:true},
-  {id:"DT-010",type:"Vehicle / Transfer Voucher", layout:"Voucher Standard", header:"Travkings Transfer Voucher", footer:"Show to driver at pickup",       logo:"travkings-logo.png",numberingSeries:"{BR}/TV/{YY}/{####}",active:true},
-];
+// DOCUMENT_TYPES_DATA moved to DB — fetch via useDocumentTypes() (/api/document-types).
 
 
-export const APPROVAL_LIMITS_DATA = [
-  /* Payment Voucher */
-  {id:"AL-001",role:"Accounts Executive",    voucherType:"Payment Voucher", minAmount:0,       maxAmount:50000,    backup:"Sr. Accounts Executive"},
-  {id:"AL-002",role:"Sr. Accounts Executive",voucherType:"Payment Voucher", minAmount:50001,   maxAmount:200000,   backup:"Senior Finance Manager"},
-  {id:"AL-003",role:"Senior Finance Manager",voucherType:"Payment Voucher", minAmount:200001,  maxAmount:2500000,  backup:"Director"},
-  {id:"AL-004",role:"Director",              voucherType:"Payment Voucher", minAmount:2500001, maxAmount:999999999,backup:"—"},
-  /* Journal Voucher */
-  {id:"AL-005",role:"Accounts Executive",    voucherType:"Journal Voucher", minAmount:0,       maxAmount:0,        backup:"Sr. Accounts Executive"},
-  {id:"AL-006",role:"Sr. Accounts Executive",voucherType:"Journal Voucher", minAmount:0,       maxAmount:100000,   backup:"Senior Finance Manager"},
-  {id:"AL-007",role:"Senior Finance Manager",voucherType:"Journal Voucher", minAmount:100001,  maxAmount:999999999,backup:"Director"},
-  /* Credit Note */
-  {id:"AL-008",role:"Sr. Accounts Executive",voucherType:"Credit Note",     minAmount:0,       maxAmount:25000,    backup:"Senior Finance Manager"},
-  {id:"AL-009",role:"Senior Finance Manager",voucherType:"Credit Note",     minAmount:25001,   maxAmount:500000,   backup:"Director"},
-  {id:"AL-010",role:"Director",              voucherType:"Credit Note",     minAmount:500001,  maxAmount:999999999,backup:"—"},
-  /* Cash Refund */
-  {id:"AL-011",role:"Sr. Accounts Executive",voucherType:"Cash Refund",     minAmount:0,       maxAmount:10000,    backup:"Senior Finance Manager"},
-  {id:"AL-012",role:"Senior Finance Manager",voucherType:"Cash Refund",     minAmount:10001,   maxAmount:200000,   backup:"Director"},
-  /* Forex Trade */
-  {id:"AL-013",role:"Senior Finance Manager",voucherType:"Forex Trade",     minAmount:0,       maxAmount:5000000,  backup:"Director"},
-  /* Period Lock */
-  {id:"AL-014",role:"Senior Finance Manager",voucherType:"Period Lock",     minAmount:0,       maxAmount:0,        backup:"Director"},
-];
+// APPROVAL_LIMITS_DATA moved to DB — fetch via useApprovalLimits() (/api/approval-limits).
 
 
 export const MASTER_PAGE = (title, subtitle, children) => (
@@ -1517,17 +1534,19 @@ export const MASTER_PAGE = (title, subtitle, children) => (
 
 
 export function DocumentTypeMaster(){
+  // Live print-template master (GET /api/document-types). Was hardcoded DOCUMENT_TYPES_DATA.
+  const rows = useDocumentTypes().data || [];
   return MASTER_PAGE("Document Type Master","Configurable templates for invoices, receipts, certificates — header, footer, logo, numbering",
     <>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
-        <p style={{margin:0,fontSize:12,color:"#5a6691"}}>10 document templates configured · {DOCUMENT_TYPES_DATA.filter(d=>d.active).length} active</p>
+        <p style={{margin:0,fontSize:12,color:"#5a6691"}}>{rows.length} document templates configured · {rows.filter(d=>d.active).length} active</p>
         <div style={{flex:1}}/>
         <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
-        <HExportBtn name="document-types" rows={DOCUMENT_TYPES_DATA} columns={[{key:"type",label:"Document Type"},{key:"layout",label:"Layout"},{key:"header",label:"Header"},{key:"footer",label:"Footer"},{key:"numberingSeries",label:"Numbering Series"},{key:"active",label:"Active"}]}/>
+        <HExportBtn name="document-types" rows={rows} columns={[{key:"type",label:"Document Type"},{key:"layout",label:"Layout"},{key:"header",label:"Header"},{key:"footer",label:"Footer"},{key:"numberingSeries",label:"Numbering Series"},{key:"active",label:"Active"}]}/>
         <button style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Document Type</button>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(360px,1fr))",gap:12}}>
-        {DOCUMENT_TYPES_DATA.map(d=>(
+        {rows.map(d=>(
           <div key={d.id} style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
               <p style={{margin:0,fontSize:13.5,fontWeight:700,color:"#0d1326"}}>{d.type}</p>
@@ -1632,8 +1651,8 @@ export const cardStyle={background:"#fff",border:"1px solid #e1e3ec",borderRadiu
 export function DashboardRouter({branch,setRoute,currentUser}){
   const role = currentUser?.role || "Super Admin";
   if(role==="Director" || role==="Super Admin") return <DirectorDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;
-  if(role==="Senior Finance Manager")          return <SrFmDashboard currentUser={currentUser} setRoute={setRoute}/>;
-  if(role==="Sr. Accounts Executive")          return <SrAeDashboard currentUser={currentUser} setRoute={setRoute}/>;
+  if(role==="Senior Finance Manager")          return <SrFmDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;
+  if(role==="Sr. Accounts Executive")          return <SrAeDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;
   if(role==="Accounts Executive")              return <AcctsExecDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;
   if(role==="HR Manager")                      return <HrMgrDashboard currentUser={currentUser} setRoute={setRoute}/>;
   /* Fallback to existing branch dashboard */
@@ -1856,34 +1875,13 @@ export const MY_CLAIMS_DATA = [];
 export const FORM16A_DATA = [];
 
 
-export const EMAIL_TEMPLATES_DATA = [
-  {id:"ET-001",name:"Booking Confirmation",trigger:"On booking creation",channel:"Email",subject:"Your booking is confirmed — {BookingRef}",body:"Dear {CustomerName},\n\nThank you for booking with Travkings. Your booking reference is {BookingRef}.\n\nTrip: {TripName}\nDates: {DepartureDate} — {ReturnDate}\nPassengers: {PaxCount}\n\nPlease find your detailed itinerary attached.\n\nRegards,\n{ConsultantName}\nTravkings Tours & Travels",active:true},
-  {id:"ET-002",name:"Payment Receipt",trigger:"On receipt voucher posting",channel:"Email",subject:"Payment received — {VoucherNo}",body:"Dear {CustomerName},\n\nWe acknowledge receipt of ₹{Amount} on {Date}. Voucher: {VoucherNo}.\n\nThank you.\nTravkings Accounts Team",active:true},
-  {id:"ET-003",name:"Invoice Reminder",trigger:"7 days before due date",channel:"Email",subject:"Reminder: Invoice {InvoiceNo} due on {DueDate}",body:"Dear {CustomerName},\n\nThis is a friendly reminder that invoice {InvoiceNo} for ₹{Amount} is due on {DueDate}.\n\nKindly arrange payment at the earliest.\n\nRegards,\nTravkings Accounts",active:true},
-  {id:"ET-004",name:"Visa Status Update (SMS)",trigger:"On visa approval",channel:"SMS",subject:"",body:"Travkings: Visa for {PassengerName} ({Country}) has been {VisaStatus}. Contact {BranchPhone} for details.",active:true},
-  {id:"ET-005",name:"Leave Approval (Email)",trigger:"On leave approval",channel:"Email",subject:"Leave approved — {LeaveType} {Dates}",body:"Dear {EmployeeName},\n\nYour leave request for {LeaveType} from {FromDate} to {ToDate} has been approved.\n\nRegards,\nHR Team",active:true},
-];
+// EMAIL_TEMPLATES_DATA moved to DB — fetch via useEmailTemplates() (/api/email-templates).
 
 
-export const CUSTOM_FIELDS_DATA = [
-  {id:"CF-001",master:"Customer",label:"Account Manager",type:"Dropdown",required:false,options:"",active:true},
-  {id:"CF-002",master:"Customer",label:"SLA Tier",type:"Dropdown",required:false,options:"Platinum,Gold,Silver,Standard",active:true},
-  {id:"CF-003",master:"Customer",label:"Procurement Code",type:"Text",required:false,options:"",active:true},
-  {id:"CF-004",master:"Customer",label:"Next Review Date",type:"Date",required:false,options:"",active:true},
-  {id:"CF-005",master:"Supplier",label:"Reliability Rating",type:"Number (1-5)",required:false,options:"",active:true},
-  {id:"CF-006",master:"Supplier",label:"Contract Expiry",type:"Date",required:false,options:"",active:true},
-  {id:"CF-007",master:"Employee",label:"Emergency Contact",type:"Text",required:true,options:"",active:true},
-  {id:"CF-008",master:"Employee",label:"Blood Group",type:"Dropdown",required:false,options:"A+,A-,B+,B-,O+,O-,AB+,AB-",active:true},
-];
+// CUSTOM_FIELDS_DATA moved to DB — fetch via useCustomFields() (/api/custom-fields).
 
 
-export const FIELD_ACCESS_DATA = [
-  {field:"Credit Limit",module:"Customer",roles:{SuperAdmin:"View+Edit",Director:"View+Edit","Senior Finance Manager":"View+Edit","Sr. Accounts Executive":"View Only","Accounts Executive":"Hidden","HR Manager":"Hidden"}},
-  {field:"Vendor PAN",module:"Supplier",roles:{SuperAdmin:"View+Edit",Director:"View+Edit","Senior Finance Manager":"View+Edit","Sr. Accounts Executive":"View+Edit","Accounts Executive":"Hidden","HR Manager":"Hidden"}},
-  {field:"Bank Account No.",module:"Customer/Supplier",roles:{SuperAdmin:"View+Edit",Director:"View","Senior Finance Manager":"View","Sr. Accounts Executive":"View","Accounts Executive":"Hidden","HR Manager":"Hidden"}},
-  {field:"Salary",module:"Employee",roles:{SuperAdmin:"View+Edit",Director:"View+Edit","Senior Finance Manager":"View+Edit","Sr. Accounts Executive":"Hidden","Accounts Executive":"Hidden","HR Manager":"View+Edit"}},
-  {field:"Cost Center",module:"Voucher",roles:{SuperAdmin:"View+Edit",Director:"View","Senior Finance Manager":"View+Edit","Sr. Accounts Executive":"View+Edit","Accounts Executive":"View+Edit","HR Manager":"Hidden"}},
-];
+// FIELD_ACCESS_DATA moved to DB — fetch via useFieldAccess() (/api/field-access).
 
 
 export const PERM_ROLES = ["Super Admin","Director","Senior Finance Manager","Sr. Accounts Executive","Accounts Executive","HR Manager"];

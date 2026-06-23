@@ -7,12 +7,19 @@ import React, { useRef, useState, useEffect, Suspense } from 'react';
 import { Calendar, ChevronRight, Clock, Download, Plus, Save, Search, Trash2, TrendingDown, TrendingUp, User } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from './business-logic';
-import { FX_RATES, HR_STATS_DATA, INTERBRANCH_ELIMINATIONS, LEAVE_UTILIZATION, PURCHASE_REGISTRY, TAX_FILING_BOARD, YIELD_BY_CONSULTANT, YIELD_BY_DESTINATION, YIELD_BY_SUPPLIER, YOY_PL } from './data';
+import { FX_RATES, INTERBRANCH_ELIMINATIONS, PURCHASE_REGISTRY, TAX_FILING_BOARD, YIELD_BY_CONSULTANT, YIELD_BY_DESTINATION, YIELD_BY_SUPPLIER, YOY_PL } from './data';
 import { branchCfg } from './referenceCache';
 import { useSalespeople } from './useReference';
+import { useQuery } from '@tanstack/react-query';
+import { apiGet, getAuthToken } from './api';
+import { useMasterList } from './useMasters';
+import { fromEmpDTO } from '../modules/hr/employeeMap';
+import { fromLeaveDTO } from '../modules/hr/hrMaps';
+import { buildLeaveUtilization, buildAttrition, lastMonths } from '../modules/hr/hrReports';
 import { fmt, fmtINR } from './format';
 import { todayISO, nowLabel, CUR_FY } from './dates';
-import { ATTRITION_DATA, AUDIT_TRAIL_DATA, BANK_ACCOUNTS_DATA, CUSTOMER_LTV_DATA, FS_NOTES, FX_EXPOSURE, STATUTORY_DUES, TOP_SUPPLIERS_DATA, abcOf, cardStyle } from './helpers';
+import { openPrintPreview } from './PrintPreview';
+import { AUDIT_TRAIL_DATA, BANK_ACCOUNTS_DATA, CUSTOMER_LTV_DATA, FS_NOTES, FX_EXPOSURE, STATUTORY_DUES, TOP_SUPPLIERS_DATA, abcOf, cardStyle } from './helpers';
 import { useGpBills, useProfitAndLoss, useYieldByDestination, useCustomerLtv, useAbcAnalysis, useYearOverYear } from './useAccounting';
 import { ReportDateBar, resolveReportRange } from './reportDateBar';
 import { triggerSaveRefresh, useMobile } from './hooks';
@@ -508,7 +515,7 @@ export function RPT_Page({title,subtitle,toolbar,children}){
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           {toolbar}
-          <button onClick={()=>window.print()} style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📄 PDF</button>
+          <button onClick={()=>openPrintPreview({ selector: 'main', title: 'Report', recommend: 'portrait' })} style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📄 PDF</button>
           <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📊 Excel</button>
           <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📋 CSV</button>
         </div>
@@ -873,10 +880,12 @@ export function RPT_ABCAnalysis({ branch }){
 /* 11. Attrition Rate */
 
 export function RPT_Attrition(){
-  const ttlJoiners=ATTRITION_DATA.reduce((s,m)=>s+m.joiners,0);
-  const ttlLeavers=ATTRITION_DATA.reduce((s,m)=>s+m.leavers,0);
-  const avgHc=ATTRITION_DATA.reduce((s,m)=>s+m.closingHc,0)/ATTRITION_DATA.length;
-  const annualAttrition=(ttlLeavers/avgHc*100).toFixed(1);
+  /* Live from the employee master: joiners by joinDate, leavers by exitDate, and a
+     running headcount over the last 12 months. */
+  const emps=((useMasterList('employees').data)||[]).map(fromEmpDTO);
+  const months=lastMonths(todayISO().slice(0,7),12);
+  const {rows:ATTRITION_DATA,ttlJoiners,ttlLeavers,annualAttrition:annualAttritionN}=buildAttrition(emps,months);
+  const annualAttrition=(annualAttritionN||0).toFixed(1);
   return (
     <RPT_Page title="Attrition Rate Report" subtitle="Monthly joiners vs leavers · FY 2025-26">
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
@@ -911,12 +920,17 @@ export function RPT_Attrition(){
 /* 12. Leave Utilization */
 
 export function RPT_LeaveUtilization(){
+  /* Live: approved leave days per employee from the leave register, against a
+     policy entitlement. Consolidated across branches. */
+  const emps=((useMasterList('employees').data)||[]).map(fromEmpDTO);
+  const leaves=((useMasterList('leave-requests').data)||[]).map(fromLeaveDTO);
+  const LEAVE_UTILIZATION=buildLeaveUtilization(emps,leaves);
   return (
     <RPT_Page title="Leave Utilization Report" subtitle="% of entitlement used per employee · current FY">
       <div style={cardStyle}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Employee</th><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"right"}}>Entitled</th><th style={{...RPT_thStyle,textAlign:"right"}}>Used</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th><th style={{...RPT_thStyle,textAlign:"right"}}>CL</th><th style={{...RPT_thStyle,textAlign:"right"}}>SL</th><th style={{...RPT_thStyle,textAlign:"right"}}>EL</th><th style={{...RPT_thStyle,textAlign:"center"}}>Utilization</th></tr></thead>
-          <tbody>{LEAVE_UTILIZATION.map(l=>(<tr key={l.empId}><td style={{...RPT_tdStyle,fontWeight:600}}>{l.name}</td><td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{l.branch}</span></td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.entitled}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{l.used}</td><td style={{...RPT_tdStyle,textAlign:"right",color:l.balance<5?"#A32D2D":"#0d1326"}}>{l.balance}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.casual}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.sick}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.earned}</td><td style={{padding:"6px 12px",borderBottom:"1px solid #f0f2f7"}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{flex:1,height:6,background:"#f0f2f7",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:l.utilPct+"%",background:l.utilPct>75?"#A32D2D":l.utilPct>50?"#d4a437":"#22c55e",borderRadius:3}}/></div><span style={{fontSize:10.5,fontWeight:700,color:l.utilPct>75?"#A32D2D":"#0d1326",minWidth:36,textAlign:"right"}}>{l.utilPct.toFixed(0)}%</span></div></td></tr>))}</tbody>
+          <tbody>{LEAVE_UTILIZATION.length===0&&(<tr><td colSpan={9} style={{...RPT_tdStyle,textAlign:"center",color:"#8b94b3"}}>No employees yet.</td></tr>)}{LEAVE_UTILIZATION.map(l=>(<tr key={l.empId}><td style={{...RPT_tdStyle,fontWeight:600}}>{l.name}</td><td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{l.branch}</span></td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.entitled}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{l.used}</td><td style={{...RPT_tdStyle,textAlign:"right",color:l.balance<5?"#A32D2D":"#0d1326"}}>{l.balance}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.casual}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.sick}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.earned}</td><td style={{padding:"6px 12px",borderBottom:"1px solid #f0f2f7"}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{flex:1,height:6,background:"#f0f2f7",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:l.utilPct+"%",background:l.utilPct>75?"#A32D2D":l.utilPct>50?"#d4a437":"#22c55e",borderRadius:3}}/></div><span style={{fontSize:10.5,fontWeight:700,color:l.utilPct>75?"#A32D2D":"#0d1326",minWidth:36,textAlign:"right"}}>{l.utilPct.toFixed(0)}%</span></div></td></tr>))}</tbody>
         </table>
       </div>
     </RPT_Page>
@@ -926,17 +940,23 @@ export function RPT_LeaveUtilization(){
 /* 13. Birthday & Anniversary Calendar */
 
 export function RPT_BirthdayCalendar(){
+  /* Live from the employee master — the backend /stats endpoint derives upcoming
+     birthdays + work anniversaries from each employee's dob / joinDate, scoped to
+     the caller's branch(es). */
+  const statsQ=useQuery({queryKey:['employees','stats'],queryFn:()=>apiGet('/api/employees/stats'),enabled:!!getAuthToken(),staleTime:60_000});
+  const stats=statsQ.data||{birthdays:[],anniversaries:[]};
   return (
     <RPT_Page title="Birthday &amp; Anniversary Calendar" subtitle="Engagement events for HR &amp; team celebrations">
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326",marginBottom:12}}>🎂 Upcoming Birthdays</p>
-          {HR_STATS_DATA.birthdays.length===0&&<p style={{color:"#5a6691",fontSize:12}}>No birthdays in the next 7 days</p>}
-          {HR_STATS_DATA.birthdays.map(b=>(<div key={b.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #f0f2f7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#d4a437",display:"flex",alignItems:"center",justifyContent:"center",color:"#0d1326",fontSize:14,fontWeight:700}}>{b.name.substring(0,2).toUpperCase()}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{b.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{b.branch} · {b.date}</p></div><button style={{padding:"5px 12px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Send wish</button></div>))}
+          {(stats.birthdays||[]).length===0&&<p style={{color:"#5a6691",fontSize:12}}>{statsQ.isLoading?"Loading…":"No upcoming birthdays"}</p>}
+          {(stats.birthdays||[]).map(b=>(<div key={b.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #f0f2f7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#d4a437",display:"flex",alignItems:"center",justifyContent:"center",color:"#0d1326",fontSize:14,fontWeight:700}}>{b.name.substring(0,2).toUpperCase()}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{b.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{b.branch} · {b.date}</p></div><button style={{padding:"5px 12px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Send wish</button></div>))}
         </div>
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326",marginBottom:12}}>🎉 Work Anniversaries</p>
-          {HR_STATS_DATA.anniversaries.map(a=>(<div key={a.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #f0f2f7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#6B4C8B",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:14,fontWeight:700}}>{a.years}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{a.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{a.branch} · {a.years} year{a.years!==1?"s":""} on {a.date}</p></div><button style={{padding:"5px 12px",background:"#6B4C8B",color:"#fff",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Acknowledge</button></div>))}
+          {(stats.anniversaries||[]).length===0&&<p style={{color:"#5a6691",fontSize:12}}>{statsQ.isLoading?"Loading…":"No upcoming anniversaries"}</p>}
+          {(stats.anniversaries||[]).map(a=>(<div key={a.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #f0f2f7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#6B4C8B",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:14,fontWeight:700}}>{a.years}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{a.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{a.branch} · {a.years} year{a.years!==1?"s":""} on {a.date}</p></div><button style={{padding:"5px 12px",background:"#6B4C8B",color:"#fff",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Acknowledge</button></div>))}
         </div>
       </div>
     </RPT_Page>
