@@ -3,7 +3,7 @@ import { fmtINR } from '../../../../core/format';
 
 const HEADER_BASE = { padding: '7px 8px', fontSize: 10, color: '#5b616e', fontWeight: 700 };
 
-export function TodayVouchersTable({ data }) {
+export function TodayVouchersTable({ data, formatMoney = fmtINR }) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
       <thead>
@@ -23,7 +23,7 @@ export function TodayVouchersTable({ data }) {
             <td style={{ padding: '7px 6px', textAlign: 'center' }}>{v.payment}</td>
             <td style={{ padding: '7px 6px', textAlign: 'center' }}>{v.journal}</td>
             <td style={{ padding: '7px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>
-              {fmtINR(v.value)}
+              {formatMoney(v.value)}
             </td>
           </tr>
         ))}

@@ -7,7 +7,7 @@ export function ConsultantLeaderboard({ consultants, formatMoney, onViewAll }) {
   return (
     <div className="rounded-brand border border-surface-border bg-surface p-4 shadow-card">
       <div className="mb-2.5 flex items-center justify-between">
-        <p className="text-xs font-bold text-ink">🏆 Consultant Leaderboard — This Month</p>
+        <h3 className="m-0 text-xs font-bold text-ink">🏆 Consultant Leaderboard — This Month</h3>
         <Button variant="ghost" size="xs" onClick={onViewAll}>Full →</Button>
       </div>
       {consultants.length === 0 && <p className="text-[11px] text-ink-muted">No data</p>}

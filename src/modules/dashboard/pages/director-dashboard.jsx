@@ -1,5 +1,4 @@
 import React from 'react';
-import { AlertsPanel } from '../../alertsPanel';
 import { DashboardHeader } from '../../../core/helpers';
 import { KPICard, WidgetCard } from '../../../core/styles';
 import { compactAmt } from '../../../core/format';
@@ -16,7 +15,6 @@ import { BRANCHES } from '../../../core/data';
 import { RevenueTrendChart } from '../components/shared/RevenueTrendChart';
 import { FyTargetsPanel } from '../components/shared/FyTargetsPanel';
 import { BranchPlHeatmap } from '../components/shared/BranchPlHeatmap';
-import { KeyAlertsPanel } from '../components/shared/KeyAlertsPanel';
 import { TopEntitiesTable } from '../components/tables/TopEntitiesTable';
 import { useModulePL, useBalanceSheet, useAgeing, useTaxSummary, useTrialBalance, useTargetsVsActual } from '../../../core/useAccounting';
 import { useQueries } from '@tanstack/react-query';
@@ -87,7 +85,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
     return <DashboardSkeleton numKpis={12} />;
   }
 
-  const { revenueTrend, keyAlerts, topCustomers, topSuppliers } = data;
+  const { revenueTrend, topCustomers, topSuppliers } = data;
   const fig = data.figures || { revenue: 0, gp: 0, gpPct: 0, netProfit: 0, outstanding: 0, payable: 0, cash: 0 };
   const pb = data.pendingBookings || { count: 0, sales: 0, gp: 0 };
   const ab = data.approvedBookings || { count: 0, sales: 0, gp: 0 };
@@ -109,7 +107,6 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
     <PageLayout>
       <DashboardHeader title="Director Dashboard" subtitle="Whole-company owner view" user={currentUser} onExport={() => openPrintPreview({ selector: 'main', title: 'Director Dashboard', recommend: 'portrait' })} />
       {Controls}
-      <AlertsPanel branch={scope} onGo={navigate} />
 
       {/* ── Headline KPIs ── */}
       <ResponsiveGrid min="180px" gap="md" className="mb-4">
@@ -135,7 +132,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
       {/* ── Trend + Targets ── */}
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 desktop:grid-cols-[2fr_1fr]">
         <WidgetCard title="Revenue Trend — 12 Months" subtitle={compare ? 'Current Year vs Last Year' : 'Current Year only'} onPin={() => togglePin('rev')} pinned={pinned.rev} onDrill={() => navigate('/reports/pnl')}>
-          <RevenueTrendChart data={revenueTrend} compareLastYear={compare} onToggleCompare={setCompare} />
+          <RevenueTrendChart data={revenueTrend} compareLastYear={compare} onToggleCompare={setCompare} formatMoney={m0} />
         </WidgetCard>
         <WidgetCard title={`FY ${CUR_FY.label} Targets vs Actual`} onPin={() => togglePin('targets')} pinned={pinned.targets} onDrill={() => navigate('/dashboards/sales-target')}>
           {liveTargets.length
@@ -149,7 +146,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
         <WidgetCard title="Gross Profit by Module" subtitle="Which products earn" onDrill={() => navigate('/dashboards/module-gp')}>
           <Scroll>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={th}>Module</th><th style={{ ...th, ...num }}>Sales</th><th style={{ ...th, ...num }}>GP</th><th style={{ ...th, ...num }}>GP %</th></tr></thead>
+              <thead><tr><th scope="col" style={th}>Module</th><th scope="col" style={{ ...th, ...num }}>Sales</th><th scope="col" style={{ ...th, ...num }}>GP</th><th scope="col" style={{ ...th, ...num }}>GP %</th></tr></thead>
               <tbody>
                 {mods.map((mm) => <tr key={mm.key}><td style={td}>{mm.name || mm.key}</td><td style={{ ...td, ...num }}>{m0(mm.sales)}</td><td style={{ ...td, ...num, fontWeight: 700, color: (mm.gp || 0) < 0 ? C.red : C.green }}>{m0(mm.gp)}</td><td style={{ ...td, ...num }}>{(mm.gpPct || 0).toFixed(1)}%</td></tr>)}
                 {!mods.length && <tr><td colSpan={4} style={{ ...td, textAlign: 'center', color: C.dim, padding: 16 }}>No data for this period.</td></tr>}
@@ -176,7 +173,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
         <WidgetCard title="Receivables / Payables Ageing" subtitle="As of today" onDrill={() => navigate('/dashboards/arap')}>
           <Scroll>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={th}></th><th style={{ ...th, ...num }}>0–30</th><th style={{ ...th, ...num }}>30–60</th><th style={{ ...th, ...num }}>60–90</th><th style={{ ...th, ...num }}>90+</th><th style={{ ...th, ...num }}>Total</th></tr></thead>
+              <thead><tr><th scope="col" style={th}></th><th scope="col" style={{ ...th, ...num }}>0–30</th><th scope="col" style={{ ...th, ...num }}>30–60</th><th scope="col" style={{ ...th, ...num }}>60–90</th><th scope="col" style={{ ...th, ...num }}>90+</th><th scope="col" style={{ ...th, ...num }}>Total</th></tr></thead>
               <tbody>
                 {[['Receivable', age.receivables?.totals], ['Payable', age.payables?.totals]].map(([lbl, t]) => (
                   <tr key={lbl}><td style={{ ...td, fontWeight: 700 }}>{lbl}</td><td style={{ ...td, ...num }}>{m0(t?.d0)}</td><td style={{ ...td, ...num }}>{m0(t?.d30)}</td><td style={{ ...td, ...num }}>{m0(t?.d60)}</td><td style={{ ...td, ...num, color: (t?.d90) ? C.red : undefined }}>{m0(t?.d90)}</td><td style={{ ...td, ...num, fontWeight: 700 }}>{m0(t?.total)}</td></tr>
@@ -197,30 +194,27 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
         </WidgetCard>
       </div>
 
-      {/* ── Branch heatmap + Alerts ── */}
-      <div className="mb-3.5 grid grid-cols-1 gap-3.5 desktop:grid-cols-[2fr_1fr]">
+      {/* ── Branch performance ── (alerts live on the dedicated Alerts Dashboard) */}
+      <div className="mb-3.5">
         <WidgetCard title="Branch Performance" subtitle={`Sales · GP · Net Profit · ${rangeShort}`} onPin={() => togglePin('heat')} pinned={pinned.heat} onDrill={() => navigate('/dashboards/branch')}>
           <Scroll>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={th}>Branch</th><th style={{ ...th, ...num }}>Sales</th><th style={{ ...th, ...num }}>GP</th><th style={{ ...th, ...num }}>GP %</th><th style={{ ...th, ...num }}>Net</th></tr></thead>
+              <thead><tr><th scope="col" style={th}>Branch</th><th scope="col" style={{ ...th, ...num }}>Sales</th><th scope="col" style={{ ...th, ...num }}>GP</th><th scope="col" style={{ ...th, ...num }}>GP %</th><th scope="col" style={{ ...th, ...num }}>Net</th></tr></thead>
               <tbody>
                 {branchRows.map((r) => <tr key={r.code}><td style={{ ...td, fontWeight: 700 }}>{r.code}</td><td style={{ ...td, ...num }}>{m0(r.sales)}</td><td style={{ ...td, ...num, color: r.gp < 0 ? C.red : C.green }}>{m0(r.gp)}</td><td style={{ ...td, ...num }}>{r.sales ? ((r.gp / r.sales) * 100).toFixed(1) : '0.0'}%</td><td style={{ ...td, ...num, fontWeight: 700, color: r.net < 0 ? C.red : C.dark }}>{m0(r.net)}</td></tr>)}
               </tbody>
             </table>
           </Scroll>
         </WidgetCard>
-        <WidgetCard title="Attention Needed" subtitle={keyAlerts.length + ' active'} onPin={() => togglePin('alerts')} pinned={pinned.alerts}>
-          <KeyAlertsPanel alerts={keyAlerts} onAlertClick={navigate} />
-        </WidgetCard>
       </div>
 
       {/* ── Top customers / suppliers ── */}
       <div className="grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
         <WidgetCard title="Top 10 Customers" onPin={() => togglePin('topcust')} pinned={pinned.topcust} onDrill={() => navigate('/masters/customers')}>
-          <TopEntitiesTable rows={topCustomers} kind="customer" />
+          <TopEntitiesTable rows={topCustomers} kind="customer" formatMoney={m0} />
         </WidgetCard>
         <WidgetCard title="Top 10 Suppliers" onPin={() => togglePin('topsup')} pinned={pinned.topsup} onDrill={() => navigate('/masters/suppliers')}>
-          <TopEntitiesTable rows={topSuppliers} kind="supplier" valueKey="spend" countKey="vouchers" />
+          <TopEntitiesTable rows={topSuppliers} kind="supplier" valueKey="spend" countKey="vouchers" formatMoney={m0} />
         </WidgetCard>
       </div>
     </PageLayout>

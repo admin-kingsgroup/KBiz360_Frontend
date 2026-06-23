@@ -57,7 +57,7 @@ export function SrAeDashboardPage({ currentUser, setRoute, branch }) {
 
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
         <WidgetCard title="Today's Voucher Volume — By Branch">
-          <TodayVouchersTable data={todayVouchers} />
+          <TodayVouchersTable data={todayVouchers} formatMoney={money} />
         </WidgetCard>
         <WidgetCard title="Bank Reconciliation Status" onDrill={() => navigate('/bank-reco')}>
           <BankReconStatusPanel rows={reconStatus} />
@@ -69,7 +69,7 @@ export function SrAeDashboardPage({ currentUser, setRoute, branch }) {
           <CloseChecklist onGo={navigate} />
         </WidgetCard>
         <WidgetCard title="Top 5 Vendors — Overdue Payables">
-          <TopVendorsOverdueTable suppliers={topVendorsOverdue.slice(0, 5)} />
+          <TopVendorsOverdueTable suppliers={topVendorsOverdue.slice(0, 5)} formatMoney={money} />
         </WidgetCard>
       </div>
     </PageLayout>

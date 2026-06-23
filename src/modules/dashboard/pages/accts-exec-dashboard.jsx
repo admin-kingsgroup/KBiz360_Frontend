@@ -60,7 +60,7 @@ export function AcctsExecDashboardPage({ currentUser, setRoute, branch }) {
 
       <div className="grid grid-cols-1 gap-3.5 desktop:grid-cols-[2fr_1fr]">
         <WidgetCard title="Recent Activity Feed" subtitle="Last 5 actions on this branch">
-          <RecentActivityFeed entries={recentActivity} />
+          <RecentActivityFeed entries={recentActivity} formatMoney={money} />
         </WidgetCard>
         <WidgetCard title={`Customer Ageing — ${ownBranch}`} onDrill={() => navigate('/reports/rec')}>
           <AgeingBuckets buckets={arAgeing} kind="receivable" formatMoney={money} scale={1 / 6} condensed />

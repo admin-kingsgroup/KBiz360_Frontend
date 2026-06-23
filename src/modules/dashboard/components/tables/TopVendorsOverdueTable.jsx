@@ -1,7 +1,7 @@
 import React from 'react';
 import { fmtINR } from '../../../../core/format';
 
-export function TopVendorsOverdueTable({ suppliers }) {
+export function TopVendorsOverdueTable({ suppliers, formatMoney = fmtINR }) {
   if (!suppliers || !suppliers.length) {
     return <p style={{ margin: 0, padding: '14px 4px', fontSize: 11, color: '#9197a3', textAlign: 'center' }}>No overdue payables.</p>;
   }
@@ -21,7 +21,7 @@ export function TopVendorsOverdueTable({ suppliers }) {
               </p>
             </td>
             <td style={{ padding: '7px 4px', textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>
-              {s.overdueAmount != null ? fmtINR(s.overdueAmount) : '—'}
+              {s.overdueAmount != null ? formatMoney(s.overdueAmount) : '—'}
             </td>
           </tr>
         ))}

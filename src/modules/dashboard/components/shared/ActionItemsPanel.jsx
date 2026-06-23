@@ -4,7 +4,7 @@ import { ACTION_COLORS, ACTION_BACKGROUNDS } from '../../utils/constants';
 export function ActionItemsPanel({ items, onItemClick }) {
   return (
     <div className="rounded-brand border border-surface-border bg-surface p-4 shadow-card">
-      <p className="mb-2.5 text-xs font-bold text-ink">⚡ Today&apos;s Action Items</p>
+      <h3 className="mb-2.5 text-xs font-bold text-ink">⚡ Today&apos;s Action Items</h3>
       {(!items || items.length === 0) && (
         <p className="m-0 px-2.5 py-2 text-[10.5px] text-ink-muted">Nothing needs attention right now.</p>
       )}

@@ -66,7 +66,7 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
 
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 desktop:grid-cols-[2fr_1fr]">
         <WidgetCard title="13-Week Cash Forecast" subtitle="Projected inflows / outflows / closing balance" onDrill={() => navigate('/reports/cashflow-forecast')}>
-          <CashForecastChart data={cashForecast} />
+          <CashForecastChart data={cashForecast} formatMoney={money} />
         </WidgetCard>
         <WidgetCard title="Bank Balances — Real Time" onDrill={() => navigate('/masters/bank-accounts')}>
           <BankBalancesPanel accounts={bankAccounts} />
@@ -78,7 +78,7 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
           <PeriodCloseTable rows={periodClose} />
         </WidgetCard>
         <WidgetCard title="GSTR Filing Status" subtitle="Return for the just-closed month — net liability & due date" onDrill={() => navigate('/tax/gstr-1')}>
-          <GstrFilingPanel rows={gstrFiling} />
+          <GstrFilingPanel rows={gstrFiling} formatMoney={money} />
         </WidgetCard>
       </div>
 
@@ -90,7 +90,7 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
           <AgeingBuckets buckets={apAgeing} kind="payable" formatMoney={money} />
         </WidgetCard>
         <WidgetCard title="Recent Variance Flags" subtitle={varianceFlags.length + ' items'} onDrill={() => navigate('/reports/variance')}>
-          <VarianceFlagsPanel flags={varianceFlags} />
+          <VarianceFlagsPanel flags={varianceFlags} currency={bc(branch).cur} />
         </WidgetCard>
       </div>
     </PageLayout>

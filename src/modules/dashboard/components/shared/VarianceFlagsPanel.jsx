@@ -1,6 +1,6 @@
 import React from 'react';
 
-export function VarianceFlagsPanel({ flags }) {
+export function VarianceFlagsPanel({ flags, currency = '₹' }) {
   return (
     <>
       {flags.map((v, i) => (
@@ -10,7 +10,7 @@ export function VarianceFlagsPanel({ flags }) {
             <p style={{ margin: 0, fontSize: 11, color: '#dc2626', fontWeight: 700 }}>{`${v.pct >= 0 ? '+' : ''}${v.pct}%`}</p>
           </div>
           <p style={{ margin: '2px 0 0', fontSize: 9.5, color: '#5b616e' }}>
-            {v.branch} · {v.date} · ₹{(v.variance / 1000).toFixed(0)}K over budget
+            {v.branch} · {v.date} · {currency}{(v.variance / 1000).toFixed(0)}K over budget
           </p>
         </div>
       ))}

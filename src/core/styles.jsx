@@ -480,7 +480,7 @@ export function WidgetCard({title,subtitle,children,onPin,pinned,onDrill}){
     <div style={PREMIUM_CARD}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,gap:8}}>
         <div style={{minWidth:0}}>
-          <p style={{margin:0,fontSize:11,color:"#5b616e",letterSpacing:"0.4px",textTransform:"uppercase",fontWeight:700}}>{title}</p>
+          <h3 style={{margin:0,fontSize:11,color:"#5b616e",letterSpacing:"0.4px",textTransform:"uppercase",fontWeight:700}}>{title}</h3>
           {subtitle&&<p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>{subtitle}</p>}
         </div>
         <div style={{display:"flex",gap:6,flexShrink:0}}>

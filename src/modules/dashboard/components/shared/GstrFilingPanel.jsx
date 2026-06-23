@@ -1,7 +1,7 @@
 import React from 'react';
 import { fmtINR } from '../../../../core/format';
 
-export function GstrFilingPanel({ rows }) {
+export function GstrFilingPanel({ rows, formatMoney = fmtINR }) {
   if (!rows || rows.length === 0) {
     return <p style={{ margin: 0, padding: '8px 0', fontSize: 10.5, color: '#5a6691' }}>No GST return due.</p>;
   }
@@ -11,7 +11,7 @@ export function GstrFilingPanel({ rows }) {
         <div key={g.entity} style={{ padding: '8px 0', borderBottom: '1px solid #f0f2f7' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
             <p style={{ margin: 0, fontSize: 11.5, color: '#14161a', fontWeight: 600 }}>{g.entity}</p>
-            {g.net != null && <span style={{ fontSize: 11, fontWeight: 700, color: g.net > 0 ? '#dc2626' : '#16a34a' }}>{fmtINR(g.net)}</span>}
+            {g.net != null && <span style={{ fontSize: 11, fontWeight: 700, color: g.net > 0 ? '#dc2626' : '#16a34a' }}>{formatMoney(g.net)}</span>}
           </div>
           <p style={{ margin: '2px 0 4px', fontSize: 9.5, color: '#5b616e', fontFamily: 'monospace' }}>{g.gstin || '—'}</p>
           <div style={{ display: 'flex', gap: 14, fontSize: 10.5 }}>
