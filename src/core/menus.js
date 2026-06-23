@@ -258,6 +258,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   {label:"Dashboard Accountant", href:"/accounts/dashboard"},
   {label:"Daily Entry", children:[
     {label:"SO/PO/GP Voucher",         href:"/bookings/new"},
+    {label:"Inter-Branch (INB) Voucher", href:"/bookings/inter-branch"},
     {label:"Receipt Voucher",          href:"/receipts"},
     {label:"Payment Voucher",          href:"/payments"},
     {label:"Contra Entry",             href:"/contra"},

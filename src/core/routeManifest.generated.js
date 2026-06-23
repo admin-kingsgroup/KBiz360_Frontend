@@ -32,6 +32,7 @@ export const APP_ROUTES = [
   "/bank-reco",
   "/bookings/approved",
   "/bookings/deleted",
+  "/bookings/inter-branch",
   "/bookings/list",
   "/bookings/new",
   "/bookings/pending",

@@ -1,10 +1,49 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FL, inp } from '../../styles';
 import { todayISO } from '../../dates';
 import { VPlaceOfSupply } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
 import { useVoucherRef } from '../useVoucherRef';
+import { apiGet } from '../../api';
 import { money2, r2 } from '../ui';
+
+const num = (v) => (Number(v) || 0);
+const fmtN = (v) => num(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const lockedInp = { ...inp, background: '#f3f4f7', color: '#444b5e', cursor: 'not-allowed' };
+
+// Read-only grid that renders EVERY column present across the snapshot lines —
+// including ones whose amount is 0/blank — so the preparer sees the full SO/PO/GP
+// voucher exactly as captured at booking time.
+function SnapGrid({ title, snap, color }) {
+  if (!snap || typeof snap !== 'object') return null;
+  const lines = Array.isArray(snap.lines) ? snap.lines : [];
+  const cols = [];
+  for (const r of lines) for (const k of Object.keys(r || {})) if (!cols.includes(k)) cols.push(k);
+  const scalars = Object.entries(snap).filter(([k, v]) => k !== 'lines' && (typeof v !== 'object' || v === null));
+  const th = { padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#5a6691', borderBottom: '1px solid #e6e8ec', whiteSpace: 'nowrap' };
+  const td = { padding: '4px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', borderBottom: '1px solid #f0f1f4' };
+  const cell = (v) => (v === null || v === undefined ? '' : (typeof v === 'number' ? fmtN(v) : (typeof v === 'object' ? JSON.stringify(v) : String(v))));
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 11.5, fontWeight: 800, color, marginBottom: 4 }}>{title}</div>
+      {cols.length > 0 ? (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10.5 }}>
+            <thead><tr>{cols.map((c) => <th key={c} style={{ ...th, textAlign: 'left' }}>{c}</th>)}</tr></thead>
+            <tbody>
+              {lines.map((r, i) => <tr key={i}>{cols.map((c) => <td key={c} style={{ ...td, textAlign: 'left' }}>{cell(r ? r[c] : '')}</td>)}</tr>)}
+            </tbody>
+          </table>
+        </div>
+      ) : <div style={{ fontSize: 10.5, color: '#9197a3' }}>(no line grid)</div>}
+      {scalars.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 14px', marginTop: 5, fontSize: 10.5, color: '#5b616e' }}>
+          {scalars.map(([k, v]) => <span key={k}>{k}: <b style={{ color: '#14161a' }}>{cell(v)}</b></span>)}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Refund (RF) / Reissue (RI) body — two-party, raised against a sales invoice.
@@ -14,13 +53,46 @@ import { money2, r2 } from '../ui';
  * Our retained service charge + Other Taxes (margin) post as income; any charge the
  * supplier levies on us posts as our own cost. The customer figure is derived so
  * the voucher always balances (see posting.builder refundLines/reissueLines).
+ *
+ * The preparer enters the original SO/PO/GP **Link No** (or the booking / Sales /
+ * Purchase invoice number); we fetch that booking read-only, lock the Sales &
+ * Purchase invoice fields to what it spawned, and show the full SO/PO/GP grid below
+ * so the cancellation can be checked against the original booking before saving.
  */
 export function RefundReissueFields({ state, setState, ctx, kind }) {
-  const { branch, cur } = ctx;
+  const { branch, branchCode, cur } = ctx;
   const isRefund = kind === 'refund';
   const patch = (p) => setState((s) => ({ ...s, ...p }));
   const ref = useVoucherRef();
   const GST_SLABS = ref.gstSlabs;
+
+  const [linkInput, setLinkInput] = useState(state.againstInvoice || '');
+  const [booking, setBooking] = useState(null);
+  const [fetching, setFetching] = useState(false);
+  const [fetchErr, setFetchErr] = useState('');
+
+  async function fetchLink() {
+    const link = linkInput.trim();
+    if (!link) return;
+    setFetching(true); setFetchErr(''); setBooking(null);
+    try {
+      const b = await apiGet('/api/booking-orders/by-link', { link, branch: branchCode || branch });
+      setBooking(b);
+      // Lock-fill the invoice references the refund is raised against + prefill the
+      // customer/supplier ledgers from the original booking (blank ones only).
+      patch({
+        againstInvoice: b.saleVno || '',
+        againstPurchase: b.purchaseVno || '',
+        ...(state.party ? {} : { party: b.customer?.ledgerName || b.customer?.name || '' }),
+        ...(state.counterParty ? {} : { counterParty: b.supplier?.ledgerName || b.supplier?.name || '' }),
+        ...(state.gstMode ? {} : { gstMode: b.so?.gstMode || b.gstMode || '' }),
+      });
+    } catch (e) {
+      setFetchErr(e?.message || 'Lookup failed');
+    } finally {
+      setFetching(false);
+    }
+  }
 
   const supplierAmt = r2(+state.supplierAmt || 0);   // airline refund receivable (RF) / payable (RI)
   const svc = r2(+state.serviceCharge || 0);
@@ -36,12 +108,53 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
 
   return (
     <>
+      {/* Link No → fetch the original SO/PO/GP booking (read-only) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr auto', gap: 12, marginBottom: 14, alignItems: 'end' }}>
+        <FL label="Link No  (or booking / Sales / Purchase invoice no)">
+          <input
+            value={linkInput}
+            onChange={(e) => setLinkInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); fetchLink(); } }}
+            style={inp}
+            placeholder="LK/BOM/00524  ·  BKG/BOM/26/0357  ·  SF/BOM/26/0001"
+          />
+        </FL>
+        <button type="button" onClick={fetchLink} disabled={fetching || !linkInput.trim()}
+          style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #185FA5', background: fetching ? '#9bbbd8' : '#185FA5', color: '#fff', fontSize: 12, fontWeight: 700, cursor: fetching ? 'default' : 'pointer', height: 36 }}>
+          {fetching ? 'Fetching…' : 'Fetch SO/PO/GP'}
+        </button>
+      </div>
+      {fetchErr && <p style={{ margin: '-8px 0 12px', fontSize: 11, color: '#A32D2D', fontWeight: 600 }}>⚠ {fetchErr}</p>}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
         <FL label="Date"><input type="date" max={todayISO()} value={state.date || ''} onChange={(e) => patch({ date: e.target.value })} style={inp} /></FL>
-        <FL label="Against sales invoice"><input value={state.againstInvoice || ''} onChange={(e) => patch({ againstInvoice: e.target.value })} style={inp} placeholder="SF/BOM/26/0001" /></FL>
-        <FL label="Related purchase invoice"><input value={state.againstPurchase || ''} onChange={(e) => patch({ againstPurchase: e.target.value })} style={inp} placeholder="PF/BOM/26/0001" /></FL>
+        <FL label="Against sales invoice 🔒"><input value={state.againstInvoice || ''} readOnly tabIndex={-1} style={lockedInp} placeholder="— fetch by Link No —" title="Locked — set by Link No lookup" /></FL>
+        <FL label="Related purchase invoice 🔒"><input value={state.againstPurchase || ''} readOnly tabIndex={-1} style={lockedInp} placeholder="— fetch by Link No —" title="Locked — set by Link No lookup" /></FL>
         <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} />
       </div>
+
+      {/* Read-only SO/PO/GP voucher view — every column, incl. 0 amounts */}
+      {booking && (
+        <div style={{ border: '1px solid #dfe3ea', borderRadius: 10, padding: 14, marginBottom: 16, background: '#fbfcfe' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: '#14161a' }}>SO/PO/GP voucher — {booking.bookingNo} <span style={{ color: '#9197a3', fontWeight: 600 }}>({booking.module} · {booking.status})</span></div>
+            <button type="button" onClick={() => setBooking(null)} style={{ border: 'none', background: 'none', color: '#9197a3', cursor: 'pointer', fontSize: 11 }}>hide ✕</button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 16px', fontSize: 10.5, color: '#5b616e', marginBottom: 12 }}>
+            <span>Link No: <b style={{ color: '#14161a' }}>{booking.linkNo || '—'}</b></span>
+            <span>Date: <b style={{ color: '#14161a' }}>{booking.date || '—'}</b></span>
+            <span>Sale inv: <b style={{ color: '#14161a' }}>{booking.saleVno || '—'}</b></span>
+            <span>Purchase inv: <b style={{ color: '#14161a' }}>{booking.purchaseVno || '—'}</b></span>
+            <span>Customer: <b style={{ color: '#14161a' }}>{booking.customer?.name || booking.customer?.ledgerName || '—'}</b></span>
+            <span>Supplier: <b style={{ color: '#14161a' }}>{booking.supplier?.name || booking.supplier?.ledgerName || '—'}</b></span>
+            {booking.saleTallyRef ? <span>Sale Ref: <b style={{ color: '#14161a' }}>{booking.saleTallyRef}</b></span> : null}
+            {booking.purTallyRef ? <span>Pur Ref: <b style={{ color: '#14161a' }}>{booking.purTallyRef}</b></span> : null}
+          </div>
+          <SnapGrid title="SO — Sales / sell side" snap={booking.so} color="#185FA5" />
+          <SnapGrid title="PO — Purchase / cost side" snap={booking.po} color="#A32D2D" />
+          <SnapGrid title="GP — Gross Profit" snap={booking.gp} color="#A07828" />
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
         <FL label="Customer (Debtor)">
