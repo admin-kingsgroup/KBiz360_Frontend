@@ -7,7 +7,7 @@ import { LedgerPicker } from '../LedgerPicker';
 import { useVoucherRef } from '../useVoucherRef';
 import { apiGet } from '../../api';
 import { money2, r2 } from '../ui';
-import { refundPrefillFromBooking } from './refundPrefill';
+import { refundPrefillFromBooking, poSnapForView } from './refundPrefill';
 
 const num = (v) => (Number(v) || 0);
 const fmtN = (v) => num(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -83,7 +83,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       // Lock-fill the invoice refs + carry over the refundable amounts (supplier fare,
       // our Other-Taxes margin, commission reversal) — but NOT our service charge / its
       // GST nor the supplier service fee / its GST (those are retained, not refunded).
-      patch(refundPrefillFromBooking(b, state));
+      patch(refundPrefillFromBooking(b, state));   // honours the Commission-Reversal toggle
     } catch (e) {
       setFetchErr(e?.message || 'Lookup failed');
     } finally {
@@ -102,6 +102,21 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   const total = isRefund
     ? r2(supplierAmt + supSvc + supGst - ourIncome - taxAmt)
     : r2(supplierAmt - supSvc - supGst + ourIncome + taxAmt);
+
+  // Commission Reversal (refund only): the "clawback" IS the commission reversal.
+  // When OFF, the original commission / its GST / TDS are NOT reversed on the refund —
+  // the three fields lock to 0 so the posting engine skips them entirely.
+  const reverseCommission = state.commissionReversal !== false;
+  const setReverseCommission = (on) => {
+    if (!on) { patch({ commissionReversal: false, incentiveAmt: '', incentiveGst: '', incentiveTds: '' }); return; }
+    const po = booking?.po || {};                                   // re-apply the fetched booking's commission, if any
+    patch({
+      commissionReversal: true,
+      incentiveAmt: po.incentiveAmt ? r2(num(po.incentiveAmt)) : state.incentiveAmt,
+      incentiveGst: po.incentiveGst ? r2(num(po.incentiveGst)) : state.incentiveGst,
+      incentiveTds: po.incentiveTds ? r2(num(po.incentiveTds)) : state.incentiveTds,
+    });
+  };
 
   return (
     <>
@@ -148,15 +163,26 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
             {booking.purTallyRef ? <span>Pur Ref: <b style={{ color: '#14161a' }}>{booking.purTallyRef}</b></span> : null}
           </div>
           <SnapGrid title="SO — Sales / sell side" snap={booking.so} color="#185FA5" />
-          <SnapGrid title="PO — Purchase / cost side" snap={booking.po} color="#A32D2D" />
+          <SnapGrid title="PO — Purchase / cost side (incl. Supplier Incentive)" snap={poSnapForView(booking.po, booking.rows)} color="#A32D2D" />
           <SnapGrid title="GP — Gross Profit" snap={booking.gp} color="#A07828" />
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-        <FL label="Customer (Debtor)">
+        {/* Customer + the Commission-Reversal (Yes/No) tick sitting right next to it */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: 10, color: '#5a6691', fontWeight: 600, letterSpacing: '0.4px', textTransform: 'uppercase' }}>Customer (Debtor)</label>
+            {isRefund && (
+              <label title="Reverse the original commission/incentive (+ its GST & TDS) on this refund?"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', userSelect: 'none', color: reverseCommission ? '#185FA5' : '#9197a3' }}>
+                <input type="checkbox" checked={reverseCommission} onChange={(e) => setReverseCommission(e.target.checked)} />
+                Commission Reversal: {reverseCommission ? 'Yes' : 'No'}
+              </label>
+            )}
+          </div>
           <LedgerPicker branch={branch} value={state.party} onChange={(v) => patch({ party: v })} filter={(l) => l.type === 'Debtor'} placeholder="Select customer / debtor..." />
-        </FL>
+        </div>
         <FL label="Supplier / Airline (Creditor)">
           <LedgerPicker branch={branch} value={state.counterParty} onChange={(v) => patch({ counterParty: v })} filter={(l) => l.type === 'Creditor'} placeholder="Select airline / supplier..." />
         </FL>
@@ -184,10 +210,11 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
             <FL label="Recover cancellation from customer"><label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34 }}><input type="checkbox" checked={state.cancelRecover !== false} onChange={(e) => patch({ cancelRecover: e.target.checked })} /> charge it to the client (pass-through)</label></FL>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
-            <FL label={`Commission clawback (${cur})`}><input type="number" value={state.incentiveAmt} onChange={(e) => patch({ incentiveAmt: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
-            <FL label={`Commission GST (${cur})`}><input type="number" value={state.incentiveGst} onChange={(e) => patch({ incentiveGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
-            <FL label={`TDS reversed (${cur})`}><input type="number" value={state.incentiveTds} onChange={(e) => patch({ incentiveTds: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+            <FL label={`Commission clawback (${cur})`}><input type="number" value={reverseCommission ? state.incentiveAmt : 0} disabled={!reverseCommission} onChange={(e) => patch({ incentiveAmt: e.target.value })} placeholder="0.00" style={{ ...(reverseCommission ? inp : lockedInp), textAlign: 'right' }} /></FL>
+            <FL label={`Commission GST (${cur})`}><input type="number" value={reverseCommission ? state.incentiveGst : 0} disabled={!reverseCommission} onChange={(e) => patch({ incentiveGst: e.target.value })} placeholder="0.00" style={{ ...(reverseCommission ? inp : lockedInp), textAlign: 'right' }} /></FL>
+            <FL label={`TDS reversed (${cur})`}><input type="number" value={reverseCommission ? state.incentiveTds : 0} disabled={!reverseCommission} onChange={(e) => patch({ incentiveTds: e.target.value })} placeholder="0.00" style={{ ...(reverseCommission ? inp : lockedInp), textAlign: 'right' }} /></FL>
           </div>
+          {!reverseCommission && <p style={{ margin: '0 0 8px', fontSize: 10.5, color: '#9197a3' }}>Commission Reversal is <b>No</b> — the original commission, its GST and TDS are <b>not</b> reversed on this refund.</p>}
         </>
       )}
 

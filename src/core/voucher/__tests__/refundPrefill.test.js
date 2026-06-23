@@ -1,4 +1,4 @@
-import { refundPrefillFromBooking } from '../fields/refundPrefill';
+import { refundPrefillFromBooking, poSnapForView } from '../fields/refundPrefill';
 
 // The original SO/PO/GP booking BKG/BOM/26/0357 (BOM intl flight) as the by-link
 // endpoint returns it. PO has no supplier service fee; SO has a 250 service charge
@@ -34,6 +34,21 @@ describe('refundPrefillFromBooking', () => {
     expect(p.incentiveTds).toBe(25.5);
   });
 
+  test('Commission Reversal OFF → clawback / GST / TDS are NOT filled (blank)', () => {
+    const p = refundPrefillFromBooking(BOOKING, { commissionReversal: false });
+    expect(p.incentiveAmt).toBe('');
+    expect(p.incentiveGst).toBe('');
+    expect(p.incentiveTds).toBe('');
+    // the rest still fills
+    expect(p.supplierAmt).toBe(74227);
+    expect(p.markup).toBe(120);
+  });
+
+  test('Commission Reversal default / Yes → clawback fills as before', () => {
+    expect(refundPrefillFromBooking(BOOKING, {}).incentiveAmt).toBe(1275);          // default = Yes
+    expect(refundPrefillFromBooking(BOOKING, { commissionReversal: true }).incentiveAmt).toBe(1275);
+  });
+
   test('NEVER fills our service charge / its GST nor the supplier service charge / its GST', () => {
     const p = refundPrefillFromBooking(BOOKING, {});
     expect(p).not.toHaveProperty('serviceCharge');
@@ -54,5 +69,39 @@ describe('refundPrefillFromBooking', () => {
     expect(p.party).toBe('Travkings AMD');
     expect(p.counterParty).toBe('IATA-BSP [Stock]');
     expect(p.gstMode).toBe('inter');
+  });
+});
+
+describe('poSnapForView — surface Supplier Incentive on the PO grid', () => {
+  test('adds incentive + 2% TDS columns from the rows entry grid', () => {
+    const po = { total: 74227, incentiveAmt: 1275, incentiveTds: 25.5,
+                 lines: [{ base: 42485, tax: 31742, psvc: 0 }] };
+    const rows = [{ base: 42485, tax: 31742, psvc: 0, incentive: 1275 }];
+    const v = poSnapForView(po, rows);
+    expect(v.lines[0].incentive).toBe(1275);
+    expect(v.lines[0].incentiveTds).toBe(25.5);
+    // original scalars preserved
+    expect(v.incentiveAmt).toBe(1275);
+  });
+
+  test('falls back to the PO scalar when a single line has no rows detail', () => {
+    const po = { incentiveAmt: 1275, incentiveTds: 25.5, lines: [{ base: 42485, tax: 31742 }] };
+    const v = poSnapForView(po, []);
+    expect(v.lines[0].incentive).toBe(1275);
+    expect(v.lines[0].incentiveTds).toBe(25.5);
+  });
+
+  test('leaves lines untouched when there is no incentive', () => {
+    const po = { incentiveAmt: 0, lines: [{ base: 1000, tax: 200 }] };
+    const v = poSnapForView(po, [{ base: 1000, tax: 200, incentive: 0 }]);
+    expect(v.lines[0]).not.toHaveProperty('incentive');
+  });
+
+  test('multi-line: takes incentive per row, computes 2% TDS each', () => {
+    const po = { incentiveAmt: 300, lines: [{ base: 1000 }, { base: 2000 }] };
+    const rows = [{ incentive: 100 }, { incentive: 200 }];
+    const v = poSnapForView(po, rows);
+    expect(v.lines[0]).toMatchObject({ incentive: 100, incentiveTds: 2 });
+    expect(v.lines[1]).toMatchObject({ incentive: 200, incentiveTds: 4 });
   });
 });

@@ -13,20 +13,42 @@ import { r2 } from '../ui';
 
 const num = (v) => (Number(v) || 0);
 
+// PO snapshot for the read-only fetch view, with the Supplier Incentive surfaced as
+// a per-line column (+ its 2% TDS). The stored `po.lines` snapshot doesn't keep
+// incentive per-line — it's aggregated into the `incentiveAmt` scalar — while the
+// per-line value lives in the booking's `rows` grid. We merge it back so the PO grid
+// matches the booking-entry form (which has a "Supplier Incentive" column). Falls
+// back to the scalar when there's a single line and no rows detail.
+export function poSnapForView(po = {}, rows = []) {
+  const lines = Array.isArray(po && po.lines) ? po.lines : [];
+  const r = Array.isArray(rows) ? rows : [];
+  const single = lines.length === 1;
+  const merged = lines.map((l, i) => {
+    const inc = num(r[i] && r[i].incentive) || (single ? num(po.incentiveAmt) : 0);
+    if (!inc) return l;
+    const tds = single ? (num(po.incentiveTds) || r2(inc * 0.02)) : r2(inc * 0.02);
+    return { ...l, incentive: r2(inc), incentiveTds: tds };
+  });
+  return { ...po, lines: merged };
+}
+
 export function refundPrefillFromBooking(b, state = {}) {
   const po = b?.po || {}, so = b?.so || {};
   const soLines = Array.isArray(so.lines) ? so.lines : [];
   const blank = (n) => (n ? n : '');                       // keep the 0.00 placeholder for empty values
   const supplierRefund = r2(num(po.total) - num(po.serviceCharge) - num(po.gst));
   const markupTotal = r2(soLines.reduce((s, l) => s + num(l && l.markup), 0));
+  // Commission Reversal toggle (refund only): when explicitly OFF the original
+  // commission / its GST / TDS are NOT reversed on the refund, so never fill them.
+  const reverse = state.commissionReversal !== false;
   return {
     againstInvoice: b?.saleVno || '',
     againstPurchase: b?.purchaseVno || '',
     supplierAmt: supplierRefund,
     markup: blank(markupTotal),                            // Our Other Taxes ← original SO markup
-    incentiveAmt: blank(r2(num(po.incentiveAmt))),         // Commission clawback ← PO incentive
-    incentiveGst: blank(r2(num(po.incentiveGst))),
-    incentiveTds: blank(r2(num(po.incentiveTds))),
+    incentiveAmt: reverse ? blank(r2(num(po.incentiveAmt))) : '',   // Commission clawback ← PO incentive
+    incentiveGst: reverse ? blank(r2(num(po.incentiveGst))) : '',
+    incentiveTds: reverse ? blank(r2(num(po.incentiveTds))) : '',
     ...(state.party ? {} : { party: b?.customer?.ledgerName || b?.customer?.name || '' }),
     ...(state.counterParty ? {} : { counterParty: b?.supplier?.ledgerName || b?.supplier?.name || '' }),
     ...(state.gstMode ? {} : { gstMode: so.gstMode || b?.gstMode || '' }),
