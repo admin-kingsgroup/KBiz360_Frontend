@@ -39,6 +39,7 @@ const EXTRA = {
   '/accounts/client-reco': ['Accounts', 'Reconciliation', 'Client Reconciliation'],
   '/accounts/supplier-reco': ['Accounts', 'Reconciliation', 'Supplier Reconciliation'],
   '/accounts/interbranch-reco': ['Accounts', 'Reconciliation', 'Inter-branch Reconciliation'],
+  '/accounts/inb-register': ['Accounts', 'Reconciliation', 'Inter-Branch Register'],
   '/accounts/tally-reco': ['Accounts', 'Reconciliation', 'Tally Reconciliation'],
   '/finance/reco-queue': ['Accounts', 'Reconciliation', 'Reconciliation Queue'],
   '/import': ['Admin', 'Import / Export', 'Data Import'],

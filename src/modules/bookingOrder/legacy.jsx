@@ -160,7 +160,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Inter-branch (INB): the PO can fetch an open INB leg sent to this branch — it
   // pre-fills the supplier (the selling branch) + fares + Service Fee, and on save
   // the link is marked booked (consumed). inbLinkNo holds the fetched link.
-  const [inbLinkNo, setInbLinkNo] = useState('');
+  const [inbLinkNo, setInbLinkNo] = useState(''); // display (INB Link No)
+  const [inbId, setInbId] = useState('');         // the InbLink _id (API target)
   const openInbQ = useOpenInb(branch);
   const bookInb = useBookInb();
 
@@ -288,8 +289,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       toast(`Voucher ${booking.bookingNo || ''} saved — pending approval`);
       // If this PO was fetched from an open inter-branch leg, consume it (mark the
       // INB link booked). Non-fatal: a miss leaves the link open to retry.
-      if (inbLinkNo && booking?.bookingNo) {
-        try { await bookInb.mutateAsync({ inbLinkNo, purchaseVno: booking.bookingNo }); setInbLinkNo(''); }
+      if (inbId && booking?.bookingNo) {
+        try { await bookInb.mutateAsync({ id: inbId, purchaseVno: booking.bookingNo }); setInbLinkNo(''); setInbId(''); }
         catch (_) { /* link stays open; surfaced in the INB reconciliation */ }
       }
     } catch (e) { setError(e.message || 'Failed to save voucher'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
@@ -312,6 +313,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     ln.psvc = num(link.serviceFee);
     setLines([ln]);
     setInbLinkNo(link.inbLinkNo);
+    setInbId(link._id || link.id || '');
     toast(`Fetched ${link.inbLinkNo} from ${link.fromBranch} — review & save`);
   };
 
@@ -333,7 +335,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Other Taxes inputs, spawning ONE RF/RI voucher on approval (reuses the proven
   // reversal posting). All hooks above have run, so this early return is safe.
   if (isReversalModule(moduleCode)) {
-    return <ReversalEntry moduleCode={moduleCode} changeModule={changeModule} brCode={brCode} cur={cur} editing={editing} editBooking={editBooking} qc={qc} />;
+    return <ReversalEntry moduleCode={moduleCode} changeModule={changeModule} brCode={brCode} cur={cur} editing={editing} editBooking={editBooking} qc={qc} setRoute={setRoute} onDone={onDone} />;
   }
 
   const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' }); setSupplier({ name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }); setNoSupplier(false); setResult(null); setError(''); setClientType(''); };
@@ -766,7 +768,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 // Picked from the SO/PO/GP module bar; references the original sale invoice and, on
 // approval, spawns ONE RF/RI voucher posted via the proven reversal engine. Reuses
 // the RefundReissueFields body; maps its margin input → the booking's Other Taxes.
-function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBooking, qc }) {
+function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBooking, qc, setRoute, onDone }) {
   const kind = moduleCode === 'RF' ? 'refund' : 'reissue';
   const [state, setState] = useState(() => {
     const r = (editing && editBooking && editBooking.reversal) || {};
@@ -811,7 +813,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       const booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, { ...payload, editReason: 'Edit ' + kind })
         : await apiPost('/api/booking-orders', payload);
-      setResult({ ...booking, _approved: false });
+      setResult({ ...booking, _approved: false, _edited: editing });
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
       if (editing) invalidateBooks(qc); // an edit reverses the prior posting → refresh every books cache
       toast(`Voucher ${booking.bookingNo || ''} saved — pending approval`);
@@ -827,12 +829,14 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
         <div style={{ ...card, textAlign: 'center', padding: 28 }}>
           <div style={{ width: 54, height: 54, borderRadius: '50%', background: approved ? '#e8f6ed' : '#FEF6E6', color: approved ? '#16a34a' : GOLD, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>{approved ? <Check size={28} /> : <Clock size={28} />}</div>
-          <h2 style={{ margin: '0 0 4px', fontSize: 18, color: DARK }}>{approved ? `${kind === 'refund' ? 'Refund' : 'Reissue'} approved & posted` : `${kind === 'refund' ? 'Refund' : 'Reissue'} saved — Pending approval`}</h2>
+          <h2 style={{ margin: '0 0 4px', fontSize: 18, color: DARK }}>{approved ? `${kind === 'refund' ? 'Refund' : 'Reissue'} approved & posted` : result._edited ? `${kind === 'refund' ? 'Refund' : 'Reissue'} updated — still Pending` : `${kind === 'refund' ? 'Refund' : 'Reissue'} saved — Pending approval`}</h2>
           <p style={{ margin: '0 0 18px', fontSize: 12.5, color: '#5b616e' }}>{approved ? <>The original sale is <b>reversed in full</b> and the {kind} voucher posted to the books.</> : <>No books impact yet — approve it under <b>Pending</b> to post.</>}</p>
           <div className="grid grid-cols-1 gap-2.5 tablet:grid-cols-2" style={{ textAlign: 'left' }}>
             {fields.map(([k, v]) => (<div key={k} style={{ padding: '8px 12px', background: '#f6f7fb', borderRadius: 8 }}><div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.6px', color: '#9197a3', textTransform: 'uppercase' }}>{k}</div><div style={{ fontSize: 13, fontWeight: 700, color: DARK }}>{v}</div></div>))}
           </div>
-          <button onClick={() => { setResult(null); setState((s) => ({ ...s, againstInvoice: '', supplierAmt: '', serviceCharge: '', markup: '' })); }} style={{ ...btnG, marginTop: 18 }}>New {kind}</button>
+          {editing
+            ? <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} style={{ ...btnG, marginTop: 18 }}><ArrowRight size={14} /> Back to list</button>
+            : <button onClick={() => { setResult(null); setState((s) => ({ ...s, againstInvoice: '', supplierAmt: '', serviceCharge: '', markup: '' })); }} style={{ ...btnG, marginTop: 18 }}><Plus size={14} /> New {kind}</button>}
         </div>
       </div>
     );
@@ -843,12 +847,16 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
         <div style={{ padding: '14px 18px', background: DARK, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{kind === 'refund' ? 'REFUND VOUCHER' : 'REISSUE VOUCHER'}</p>
-            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#9197a3' }}>Reverses the linked original sale + retained charges → one <b style={{ color: GOLD }}>Pending</b> {kind} voucher · {brCode || 'select a branch'}</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : (kind === 'refund' ? 'REFUND VOUCHER' : 'REISSUE VOUCHER')}</p>
+            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#9197a3' }}>{editing
+              ? <>Fix this {kind} voucher, then <b style={{ color: GOLD }}>Save changes</b> · {brCode} · returns to Pending; approve it from the Pending queue</>
+              : <>Reverses the linked original sale + retained charges → one <b style={{ color: GOLD }}>Pending</b> {kind} voucher · {brCode || 'select a branch'}</>}</p>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {[...VMODULE_LIST, ...REVERSAL_CHIPS].map((m) => (
               <button key={m.code} onClick={() => changeModule(m.code)}
+                title={editing && m.code !== moduleCode ? `Switch this voucher to ${m.name} — the entered details are kept` : ''}
+                className="inline-flex items-center max-tablet:min-h-[44px]"
                 style={{ padding: '5px 11px', borderRadius: 999, border: '1px solid ' + (moduleCode === m.code ? GOLD : '#2e323c'), background: moduleCode === m.code ? GOLD : 'transparent', color: moduleCode === m.code ? '#fff' : '#9197a3', fontSize: 10.5, fontWeight: 700, cursor: m.code === moduleCode ? 'default' : 'pointer' }}>
                 {m.icon} {m.name}
               </button>
@@ -860,7 +868,15 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       <div style={{ ...card, padding: 18 }}>
         <RefundReissueFields state={state} setState={setState} ctx={{ branch: brCode, cur }} kind={kind} />
         {error && <p style={{ margin: '8px 0 0', fontSize: 12, color: CR, fontWeight: 600 }}>⚠ {error}</p>}
-        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 16, alignItems: 'center' }}>
+          {editing && (
+            <span style={{ fontSize: 11, color: '#5b616e', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Pencil size={12} /> Editing returns this voucher to Pending — approve it from the Pending queue to post the books.
+            </span>
+          )}
+          {editing && (
+            <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
+          )}
           <button disabled={!ready} onClick={() => save()} className="max-tablet:min-h-[44px]" style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Save size={14} /> Save (Pending)</button>
         </div>
         {!ready && <p style={{ margin: '8px 0 0', fontSize: 10.5, color: '#9197a3' }}>Need: original invoice, customer, supplier/airline &amp; a supplier amount &gt; 0.</p>}

@@ -315,6 +315,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {divider:true, label:"Supplier"},
     {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
     {divider:true, label:"Inter-branch"},
+    {label:"Inter-Branch Register",      href:"/accounts/inb-register"},
     {label:"Inter-branch Reconciliation", href:"/accounts/interbranch-reco"},
     {divider:true, label:"Tally"},
     {label:"Tally Reconciliation (ERP vs Tally)", href:"/accounts/tally-reco"},

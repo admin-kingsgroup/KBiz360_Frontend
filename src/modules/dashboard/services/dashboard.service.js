@@ -110,7 +110,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
 };
 
 export const loadSrFmDashboard = async ({ branchCode } = {}) => {
-  const [cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags] =
+  const [cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags, gstrFiling] =
     await Promise.all([
       api.getCashForecast(branchCode),
       api.getBankAccounts(branchCode),
@@ -118,19 +118,20 @@ export const loadSrFmDashboard = async ({ branchCode } = {}) => {
       api.getArAgeingSummary(branchCode),
       api.getApAgeingSummary(branchCode),
       api.getVarianceFlags(branchCode),
+      api.getGstrFiling(branchCode),
     ]);
 
-  return { cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags };
+  return { cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags, gstrFiling };
 };
 
 export const loadSrAeDashboard = async ({ branchCode } = {}) => {
-  const [todayVouchers, reconStatus, topSuppliers] = await Promise.all([
+  const [todayVouchers, reconStatus, topVendorsOverdue] = await Promise.all([
     api.getTodayVouchersByBranch(),
     api.getReconStatus(branchCode),
-    api.getTopSuppliers(branchCode),
+    api.getTopVendorsOverdue(branchCode),
   ]);
 
-  return { todayVouchers, reconStatus, topSuppliers };
+  return { todayVouchers, reconStatus, topVendorsOverdue };
 };
 
 export const loadAcctsExecDashboard = async ({ branchCode } = {}) => {

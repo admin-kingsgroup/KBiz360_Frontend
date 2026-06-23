@@ -5,7 +5,7 @@
 jest.mock('../../../core/api', () => ({ apiGet: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 
 import { apiGet } from '../../../core/api';
-import { getVarianceFlags, getReconStatus, getBankAccounts, getBranchHeatmap, getCashForecast } from '../api/get-finance-snapshot';
+import { getVarianceFlags, getReconStatus, getBankAccounts, getBranchHeatmap, getCashForecast, getTopVendorsOverdue, getGstrFiling } from '../api/get-finance-snapshot';
 
 afterEach(() => jest.clearAllMocks());
 
@@ -97,5 +97,51 @@ describe('getReconStatus — live bank-reconciliation', () => {
   test('returns [] when the ledger list call fails', async () => {
     apiGet.mockRejectedValueOnce(new Error('no ledgers'));
     expect(await getReconStatus()).toEqual([]);
+  });
+});
+
+describe('getTopVendorsOverdue — live AP ageing', () => {
+  test('keeps only past-30-day vendors, maps overdueDays from the oldest bucket, ranks oldest-then-largest', async () => {
+    apiGet.mockResolvedValueOnce({ payables: { rows: [
+      { party: 'Airline A', d0: 1000, d30: 0, d60: 0, d90: 0, net: 1000 },     // only current → dropped
+      { party: 'Hotel B',   d0: 0, d30: 5000, d60: 0, d90: 0, net: 5000 },     // 30+
+      { party: 'TBO',       d0: 0, d30: 0, d60: 0, d90: 90000, net: 90000 },   // 90+ (oldest)
+    ] } });
+    const out = await getTopVendorsOverdue('BOM');
+    expect(out).toHaveLength(2);
+    expect(out[0]).toMatchObject({ name: 'TBO', overdueDays: 90, overdueAmount: 90000 }); // oldest first
+    expect(out[1]).toMatchObject({ name: 'Hotel B', overdueDays: 30, overdueAmount: 5000 });
+  });
+
+  test('returns [] on error (never blanks the panel)', async () => {
+    apiGet.mockRejectedValueOnce(new Error('boom'));
+    expect(await getTopVendorsOverdue()).toEqual([]);
+  });
+});
+
+describe('getGstrFiling — live GST return liability', () => {
+  test('a specific branch yields one row with the net payable from tax-summary (never a fake "Filed")', async () => {
+    apiGet.mockResolvedValueOnce({ netPayable: 123456 }); // tax-summary for BOM
+    const out = await getGstrFiling('BOM');
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ entity: 'BOM', net: 123456, gstr1: 'Pending', gstr3b: 'Pending' });
+    expect(out[0].gstr3b).not.toBe('Filed');
+    expect(out[0].due).toMatch(/^20 /);
+  });
+
+  test('all-branches fans tax-summary over active branches', async () => {
+    apiGet
+      .mockResolvedValueOnce([{ code: 'BOM', city: 'Mumbai', tax: '27AAA', active: true }, { code: 'AMD', city: 'Ahmedabad', tax: '24BBB' }]) // branches
+      .mockResolvedValueOnce({ netPayable: 1000 })  // BOM
+      .mockResolvedValueOnce({ netPayable: 2000 }); // AMD
+    const out = await getGstrFiling(null);
+    expect(out).toHaveLength(2);
+    expect(out[0]).toMatchObject({ entity: 'Mumbai (BOM)', gstin: '27AAA', net: 1000 });
+    expect(out[1]).toMatchObject({ entity: 'Ahmedabad (AMD)', gstin: '24BBB', net: 2000 });
+  });
+
+  test('returns [] on error', async () => {
+    apiGet.mockRejectedValueOnce(new Error('boom'));
+    expect(await getGstrFiling(null)).toEqual([]);
   });
 });

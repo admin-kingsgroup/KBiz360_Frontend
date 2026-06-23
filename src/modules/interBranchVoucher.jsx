@@ -10,6 +10,15 @@ import { toast } from '../core/ux/toast';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec' };
 const ALL_BRANCHES = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'TKHO'];
+// Tax jurisdiction per branch (mirror of the backend). Same country (India) =
+// IGST taxable; different country = cross-border export (zero-rated).
+const COUNTRY = { BOM: 'IN', AMD: 'IN', TKHO: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'FB' };
+const inbTreatment = (from, to) => {
+  const cf = COUNTRY[from] || 'IN'; const ct = COUNTRY[to] || 'IN';
+  return cf !== ct
+    ? { crossBorder: true, label: `Export · zero-rated (${cf}→${ct})` }
+    : { crossBorder: false, label: 'IGST · inter-state (18% on Service Fee)' };
+};
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const num = (x) => { const n = Number(x); return Number.isFinite(n) ? n : 0; };
 const todayISO = () => new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
@@ -26,10 +35,11 @@ export function InterBranchVoucher({ branch }) {
   });
   const set = (k, v) => setForm((s) => ({ ...s, [k]: v }));
 
+  const treatment = inbTreatment(fromBranch, form.toBranch);
   const taxRate = 18;
   const fares = r2(num(form.base) + num(form.k3) + num(form.taxes));
   const svc = r2(num(form.serviceFee));
-  const igst = r2(svc * taxRate / 100);
+  const igst = treatment.crossBorder ? 0 : r2(svc * taxRate / 100); // export → zero-rated
   const total = r2(fares + svc + igst);
 
   const create = useCreateInb();
@@ -96,7 +106,9 @@ export function InterBranchVoucher({ branch }) {
         <div style={{ display: 'flex', gap: 18, marginTop: 12, fontSize: 12.5, color: C.dark, flexWrap: 'wrap' }}>
           <span>Fares: <b>{cur}{fares.toLocaleString('en-IN')}</b></span>
           <span>Service Fee: <b>{cur}{svc.toLocaleString('en-IN')}</b></span>
-          <span>IGST (18% on fee): <b>{cur}{igst.toLocaleString('en-IN')}</b></span>
+          {treatment.crossBorder
+            ? <span style={{ color: C.blue }}>Tax: <b>Export · zero-rated</b></span>
+            : <span>IGST (18% on fee): <b>{cur}{igst.toLocaleString('en-IN')}</b></span>}
           <span style={{ marginLeft: 'auto', fontWeight: 800 }}>Total: {cur}{total.toLocaleString('en-IN')}</span>
         </div>
       </div>
@@ -107,7 +119,12 @@ export function InterBranchVoucher({ branch }) {
           Dr&nbsp; Travkings Tours &amp; Travels {form.toBranch || '<branch>'} &nbsp; {cur}{total.toLocaleString('en-IN')}<br />
           &nbsp;&nbsp;&nbsp;Cr&nbsp; Inter-Branch Sales (fares) &nbsp; {cur}{fares.toLocaleString('en-IN')}<br />
           &nbsp;&nbsp;&nbsp;Cr&nbsp; Service Fee Income &nbsp; {cur}{svc.toLocaleString('en-IN')}<br />
-          &nbsp;&nbsp;&nbsp;Cr&nbsp; Output IGST &nbsp; {cur}{igst.toLocaleString('en-IN')}
+          {treatment.crossBorder
+            ? <span style={{ color: C.blue }}>&nbsp;&nbsp;&nbsp;(export — zero-rated, no output tax)</span>
+            : <>&nbsp;&nbsp;&nbsp;Cr&nbsp; Output IGST &nbsp; {cur}{igst.toLocaleString('en-IN')}</>}
+        </div>
+        <div style={{ fontSize: 11, color: form.toBranch ? (treatment.crossBorder ? C.blue : C.green) : C.dim, marginTop: 6 }}>
+          {form.toBranch ? `Tax treatment: ${treatment.label}` : 'Select a destination branch to see the tax treatment'}
         </div>
       </div>
 

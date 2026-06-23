@@ -1,6 +1,6 @@
 import { apiGet } from '../../../core/api';
 import { isBankRow } from '../../../core/ledgerKind';
-import { CUR_MONTH } from '../../../core/dates';
+import { CUR_MONTH, prevMonthKey, monthLabelLong } from '../../../core/dates';
 
 /**
  * Finance-snapshot data access.
@@ -97,6 +97,30 @@ const ageingSide = async (sideKey, branchCode) => {
 export const getArAgeingSummary = async (branchCode) => ageingSide('receivables', branchCode);
 export const getApAgeingSummary = async (branchCode) => ageingSide('payables', branchCode);
 
+// Top vendors by overdue payable — LIVE from the AP ageing (bill-wise) so the
+// "Top Vendors Overdue" table shows a real outstanding amount + how stale it is,
+// instead of the purchase-value ranking (which carried no overdue field at all).
+// overdueDays = lower bound of the oldest bucket carrying a balance (90+/61–90/31–60),
+// overdueAmount = that supplier's net outstanding. Ranked oldest-then-largest, and
+// only suppliers with something actually past 30 days are "overdue".
+export const getTopVendorsOverdue = async (branchCode) => {
+  try {
+    const d = await apiGet('/api/accounting/ageing', { branch: branchCode });
+    const rows = (d && d.payables && d.payables.rows) || [];
+    return rows
+      .map((r) => {
+        const d30 = +r.d30 || 0, d60 = +r.d60 || 0, d90 = +r.d90 || 0;
+        const pastDue = d30 + d60 + d90;            // anything beyond the 0–30 bucket
+        const overdueDays = d90 > 0 ? 90 : d60 > 0 ? 60 : d30 > 0 ? 30 : 0;
+        const net = +r.net || +r.total || 0;
+        return { name: r.party || '—', overdueAmount: Math.round(net), overdueDays, pastDue };
+      })
+      .filter((r) => r.pastDue > 0)                  // only genuinely overdue vendors
+      .sort((a, b) => b.overdueDays - a.overdueDays || b.overdueAmount - a.overdueAmount)
+      .slice(0, 8);
+  } catch { return []; }
+};
+
 // ── LIVE (Phase 2 wiring) ───────────────────────────────────────────────────
 // Recent variance flags — live from indirect-expense budget vs actual. Over-budget
 // ledgers become the SR-FM "Recent Variance Flags" panel. Shape the widget needs:
@@ -172,6 +196,32 @@ export const getCashForecast = async (branchCode) => {
   try {
     const d = await apiGet('/api/accounting/cash-forecast', { branch: branchCode });
     return d?.rows || [];
+  } catch { return []; }
+};
+
+// GSTR filing status per branch (entity) — LIVE, derived from the books for the
+// return period (the just-closed month). The system has no filing-confirmation
+// register, so we NEVER fabricate a "Filed" tick: each return is reported as the
+// real net GST liability for that month (from tax-summary) plus its statutory due
+// date. `net` carries the live figure so the panel/KPI reflect the actual return
+// to be filed instead of a permanently-empty placeholder.
+//   GSTR-1  due: 11th of the following month   GSTR-3B due: 20th of the following month
+export const getGstrFiling = async (branchCode) => {
+  try {
+    const retMonth = prevMonthKey(CUR_MONTH);              // month being filed now, e.g. "2026-05"
+    const from = `${retMonth}-01`, to = `${retMonth}-31`;
+    const due3b = `20 ${monthLabelLong(CUR_MONTH)}`;       // filed in the current month
+    const branches = branchCode
+      ? [{ code: branchCode }]
+      : ((await apiGet('/api/branches')) || []).filter((b) => b && b.code && b.active !== false);
+    const rows = await Promise.all(branches.map(async (b) => {
+      try {
+        const t = await apiGet('/api/accounting/tax-summary', { branch: b.code, from, to });
+        const net = Math.round(t?.netPayable || 0);
+        return { entity: b.city ? `${b.city} (${b.code})` : b.code, gstin: b.tax || '', period: retMonth, net, gstr1: 'Pending', gstr3b: 'Pending', due: due3b };
+      } catch { return null; }
+    }));
+    return rows.filter(Boolean);
   } catch { return []; }
 };
 

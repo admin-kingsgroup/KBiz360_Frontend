@@ -14,9 +14,6 @@ import { PeriodCloseTable } from '../components/tables/PeriodCloseTable';
 import { GstrFilingPanel } from '../components/shared/GstrFilingPanel';
 import { AgeingBuckets } from '../components/shared/AgeingBuckets';
 import { VarianceFlagsPanel } from '../components/shared/VarianceFlagsPanel';
-// GSTR_FILING_STATUS lives in the taxation module and is shared across both
-// modules until a dedicated taxation feature service exists.
-import { GSTR_FILING_STATUS } from '../../taxation';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 import { openPrintPreview } from '../../../core/PrintPreview';
 
@@ -31,14 +28,16 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
     return <DashboardSkeleton numKpis={5} columns={3} hasCharts={true} />;
   }
 
-  const { cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags } = data;
+  const { cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags, gstrFiling = [] } = data;
 
   // Derive KPIs from the loaded data instead of hard-coded zeros, so figures
   // reflect reality (and populate automatically once the data sources fill in).
   const banksTotal = (bankAccounts || []).reduce((s, b) => s + (b.openingBal ?? b.balance ?? 0), 0);
   const arOutstanding = (arAgeing || []).reduce((s, b) => s + (b.amount || 0), 0);
   const periodClosed = (periodClose || []).filter((p) => p.status === 'Closed').length;
-  const gstr3bFiled = (GSTR_FILING_STATUS || []).filter((g) => g.gstr3b === 'Filed').length;
+  // Live GST return for the just-closed month: total net payable across entities (the
+  // system tracks the liability, not the act of filing — so this is "due", never "filed").
+  const gstrDue = gstrFiling.reduce((s, g) => s + (g.net || 0), 0);
 
   return (
     <PageLayout>
@@ -55,7 +54,7 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
         <KPICard label="Pending My Approval" value={String(varianceFlags.length)} delta="" color="#d97706" onClick={() => navigate('/approvals')} />
         <KPICard label="Banks Balance Total" value={fmtINR(banksTotal)} delta="" color="#16a34a" onClick={() => navigate('/masters/bank-accounts')} />
         <KPICard label="Period Close" value={`${periodClosed}/${periodClose.length || 0}`} delta="" color="#c2a04a" />
-        <KPICard label="GSTR-3B Filed" value={`${gstr3bFiled}/${GSTR_FILING_STATUS.length}`} delta="" color="#dc2626" onClick={() => navigate('/tax/gstr-3b')} />
+        <KPICard label="GST Payable (Return)" value={fmtINR(gstrDue)} delta={gstrFiling[0] ? `due ${gstrFiling[0].due}` : 'no return due'} color="#dc2626" onClick={() => navigate('/tax/gstr-3b')} />
         <KPICard label="Total AR Outstanding" value={fmtINR(arOutstanding)} delta="" color="#5b616e" onClick={() => navigate('/reports/rec')} />
       </ResponsiveGrid>
 
@@ -72,8 +71,8 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
         <WidgetCard title="Period Close Progress" subtitle={`Branch-by-branch ${CUR_MONTH_LABEL} close status`}>
           <PeriodCloseTable rows={periodClose} />
         </WidgetCard>
-        <WidgetCard title="GSTR Filing Status" onDrill={() => navigate('/tax/gstr-1')}>
-          <GstrFilingPanel rows={GSTR_FILING_STATUS} />
+        <WidgetCard title="GSTR Filing Status" subtitle="Return for the just-closed month — net liability & due date" onDrill={() => navigate('/tax/gstr-1')}>
+          <GstrFilingPanel rows={gstrFiling} />
         </WidgetCard>
       </div>
 

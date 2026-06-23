@@ -26,7 +26,7 @@ export function SrAeDashboardPage({ currentUser, setRoute, branch }) {
     return <DashboardSkeleton numKpis={4} columns={2} hasCharts={false} />;
   }
 
-  const { todayVouchers, reconStatus, topSuppliers } = data;
+  const { todayVouchers, reconStatus, topVendorsOverdue } = data;
 
   return (
     <PageLayout>
@@ -63,7 +63,7 @@ export function SrAeDashboardPage({ currentUser, setRoute, branch }) {
           <CloseChecklist onGo={navigate} />
         </WidgetCard>
         <WidgetCard title="Top 5 Vendors — Overdue Payables">
-          <TopVendorsOverdueTable suppliers={topSuppliers.slice(0, 5)} />
+          <TopVendorsOverdueTable suppliers={topVendorsOverdue.slice(0, 5)} />
         </WidgetCard>
       </div>
     </PageLayout>
