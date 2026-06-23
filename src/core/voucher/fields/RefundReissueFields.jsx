@@ -7,6 +7,7 @@ import { LedgerPicker } from '../LedgerPicker';
 import { useVoucherRef } from '../useVoucherRef';
 import { apiGet } from '../../api';
 import { money2, r2 } from '../ui';
+import { refundPrefillFromBooking } from './refundPrefill';
 
 const num = (v) => (Number(v) || 0);
 const fmtN = (v) => num(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -79,15 +80,10 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
     try {
       const b = await apiGet('/api/booking-orders/by-link', { link, branch: branchCode || branch });
       setBooking(b);
-      // Lock-fill the invoice references the refund is raised against + prefill the
-      // customer/supplier ledgers from the original booking (blank ones only).
-      patch({
-        againstInvoice: b.saleVno || '',
-        againstPurchase: b.purchaseVno || '',
-        ...(state.party ? {} : { party: b.customer?.ledgerName || b.customer?.name || '' }),
-        ...(state.counterParty ? {} : { counterParty: b.supplier?.ledgerName || b.supplier?.name || '' }),
-        ...(state.gstMode ? {} : { gstMode: b.so?.gstMode || b.gstMode || '' }),
-      });
+      // Lock-fill the invoice refs + carry over the refundable amounts (supplier fare,
+      // our Other-Taxes margin, commission reversal) — but NOT our service charge / its
+      // GST nor the supplier service fee / its GST (those are retained, not refunded).
+      patch(refundPrefillFromBooking(b, state));
     } catch (e) {
       setFetchErr(e?.message || 'Lookup failed');
     } finally {
