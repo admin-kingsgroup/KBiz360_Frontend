@@ -1,7 +1,8 @@
 import React from 'react';
 import { DashboardHeader } from '../../../core/helpers';
 import { KPICard, WidgetCard } from '../../../core/styles';
-import { fmtINR } from '../../../core/format';
+import { compactAmt } from '../../../core/format';
+import { bc } from '../../../core/styleTokens';
 import { CUR_MONTH_LABEL } from '../../../core/dates';
 import { PageLayout } from '../../../shell/PageLayout';
 import { ResponsiveGrid } from '../../../shell/primitives';
@@ -15,15 +16,20 @@ import { GstrFilingPanel } from '../components/shared/GstrFilingPanel';
 import { AgeingBuckets } from '../components/shared/AgeingBuckets';
 import { VarianceFlagsPanel } from '../components/shared/VarianceFlagsPanel';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+import { DashboardError } from '../../../core/ux/DashboardError';
 import { openPrintPreview } from '../../../core/PrintPreview';
 
 export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
   const branchCode = branch === 'ALL' ? null : branch?.code;
-  const { data, isLoading } = useSrFmDashboard(branchCode);
+  const { data, isLoading, isError, error, refetch } = useSrFmDashboard(branchCode);
   const { navigate } = useDashboardActions(setRoute);
   const period = useDashboardStore((s) => s.period);
   const setPeriod = useDashboardStore((s) => s.setPeriod);
+  const money = (n) => compactAmt(n, { currency: bc(branch).cur });
 
+  if (isError && !data) {
+    return <DashboardError error={error} onRetry={refetch} title="Could not load the Senior Finance Manager Dashboard." />;
+  }
   if (isLoading || !data) {
     return <DashboardSkeleton numKpis={5} columns={3} hasCharts={true} />;
   }
@@ -52,10 +58,10 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
 
       <ResponsiveGrid min="170px" gap="md" className="mb-3.5">
         <KPICard label="Pending My Approval" value={String(varianceFlags.length)} delta="" color="#d97706" onClick={() => navigate('/approvals')} />
-        <KPICard label="Banks Balance Total" value={fmtINR(banksTotal)} delta="" color="#16a34a" onClick={() => navigate('/masters/bank-accounts')} />
+        <KPICard label="Banks Balance Total" value={money(banksTotal)} delta="" color="#16a34a" onClick={() => navigate('/masters/bank-accounts')} />
         <KPICard label="Period Close" value={`${periodClosed}/${periodClose.length || 0}`} delta="" color="#c2a04a" />
-        <KPICard label="GST Payable (Return)" value={fmtINR(gstrDue)} delta={gstrFiling[0] ? `due ${gstrFiling[0].due}` : 'no return due'} color="#dc2626" onClick={() => navigate('/tax/gstr-3b')} />
-        <KPICard label="Total AR Outstanding" value={fmtINR(arOutstanding)} delta="" color="#5b616e" onClick={() => navigate('/reports/rec')} />
+        <KPICard label="GST Payable (Return)" value={money(gstrDue)} delta={gstrFiling[0] ? `due ${gstrFiling[0].due}` : 'no return due'} color="#dc2626" onClick={() => navigate('/tax/gstr-3b')} />
+        <KPICard label="Total AR Outstanding" value={money(arOutstanding)} delta="" color="#5b616e" onClick={() => navigate('/reports/rec')} />
       </ResponsiveGrid>
 
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 desktop:grid-cols-[2fr_1fr]">
@@ -78,10 +84,10 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
 
       <div className="grid grid-cols-1 gap-3.5 tablet:grid-cols-2 desktop:grid-cols-3">
         <WidgetCard title="Receivables Ageing" onDrill={() => navigate('/reports/rec')}>
-          <AgeingBuckets buckets={arAgeing} kind="receivable" formatMoney={fmtINR} />
+          <AgeingBuckets buckets={arAgeing} kind="receivable" formatMoney={money} />
         </WidgetCard>
         <WidgetCard title="Payables Ageing" onDrill={() => navigate('/reports/pay')}>
-          <AgeingBuckets buckets={apAgeing} kind="payable" formatMoney={fmtINR} />
+          <AgeingBuckets buckets={apAgeing} kind="payable" formatMoney={money} />
         </WidgetCard>
         <WidgetCard title="Recent Variance Flags" subtitle={varianceFlags.length + ' items'} onDrill={() => navigate('/reports/variance')}>
           <VarianceFlagsPanel flags={varianceFlags} />

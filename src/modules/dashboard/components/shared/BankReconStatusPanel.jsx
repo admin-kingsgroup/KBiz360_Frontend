@@ -1,6 +1,9 @@
 import React from 'react';
 
 const statusColor = (s) => (s === 'Clean' || s === 'Good' ? '#16a34a' : s === 'Behind' ? '#dc2626' : '#d97706');
+// Icon backs up the colour so the status is legible without relying on green/red
+// alone (colour-blind / greyscale / printed PDF).
+const statusIcon = (s) => (s === 'Clean' || s === 'Good' ? '✓' : s === 'Behind' ? '✗' : '⚠');
 
 export function BankReconStatusPanel({ rows }) {
   return (
@@ -12,11 +15,13 @@ export function BankReconStatusPanel({ rows }) {
           <div key={r.bank} style={{ padding: '6px 0', borderBottom: '1px solid #f0f2f7' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
               <span style={{ fontSize: 11, color: '#14161a', fontWeight: 600 }}>{r.bank}</span>
-              <span style={{ fontSize: 10, color: statusColor(r.status), fontWeight: 700 }}>{r.status}</span>
+              <span style={{ fontSize: 10, color: statusColor(r.status), fontWeight: 700 }}>
+                <span aria-hidden="true">{statusIcon(r.status)}</span> {r.status}
+              </span>
             </div>
             <div style={{ display: 'flex', gap: 6, fontSize: 9.5, color: '#5b616e' }}>
               <span>{r.matched} matched</span>
-              <span style={{ color: r.unmatched > 0 ? '#dc2626' : '#5b616e' }}>{r.unmatched} unmatched</span>
+              <span style={{ color: r.unmatched > 0 ? '#dc2626' : '#5b616e', fontWeight: r.unmatched > 0 ? 700 : 400 }}>{r.unmatched} unmatched</span>
               <span style={{ marginLeft: 'auto' }}>{(ratio * 100).toFixed(1)}% reconciled</span>
             </div>
           </div>

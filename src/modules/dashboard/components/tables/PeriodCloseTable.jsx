@@ -18,14 +18,14 @@ export function PeriodCloseTable({ rows }) {
       <thead>
         <tr style={{ background: '#f4f5f7' }}>
           {HEADERS.map((h, i) => (
-            <th key={h} style={{ ...HEADER_BASE, textAlign: i === 0 || i === 4 ? 'left' : 'center' }}>
+            <th key={h} scope="col" style={{ ...HEADER_BASE, textAlign: i === 0 || i === 4 ? 'left' : 'center' }}>
               {h}
             </th>
           ))}
         </tr>
       </thead>
       <tbody>
-        {rows.map((p) => (
+        {(rows || []).map((p) => (
           <tr key={p.branch} style={{ borderBottom: '1px solid #f0f2f7' }}>
             <td style={{ padding: '7px 8px', fontWeight: 700, color: '#14161a' }}>{p.branch}</td>
             <td style={{ padding: '7px 8px', textAlign: 'center' }}>{p.tbClosed ? '✓' : '○'}</td>

@@ -2,7 +2,8 @@ import React from 'react';
 import { AlertsPanel } from '../../alertsPanel';
 import { DashboardHeader } from '../../../core/helpers';
 import { KPICard, WidgetCard } from '../../../core/styles';
-import { fmtINR } from '../../../core/format';
+import { compactAmt } from '../../../core/format';
+import { bc } from '../../../core/styleTokens';
 import { CUR_FY } from '../../../core/dates';
 import { PageLayout } from '../../../shell/PageLayout';
 import { ResponsiveGrid } from '../../../shell/primitives';
@@ -22,6 +23,7 @@ import { useQueries } from '@tanstack/react-query';
 import { apiGet } from '../../../core/api';
 
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+import { DashboardError } from '../../../core/ux/DashboardError';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { isLiquidRow } from '../../../core/ledgerKind';
 
@@ -30,7 +32,6 @@ const C = { dark: '#14161a', dim: '#5b616e', green: '#16a34a', red: '#dc2626', g
 const th = { padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' };
 const td = { padding: '6px 10px', fontSize: 12, borderBottom: '1px solid #f4f5f7' };
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
-const m0 = (n) => fmtINR(Math.round(Number(n) || 0));
 const Scroll = ({ children }) => <div style={{ overflowX: 'auto' }}>{children}</div>;
 
 export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
@@ -45,7 +46,11 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
   const branchArg = scopeBranchArg(scope);
   const [period, setPeriod] = React.useState(() => periodRange('all', { branch: branchArg }));
   const dates = period; // { from, to, label }
-  const { data, totalCashInr, isLoading } = useDirectorDashboard({ scope, from: period.from, to: period.to });
+  const { data, totalCashInr, isLoading, isError, error, refetch } = useDirectorDashboard({ scope, from: period.from, to: period.to });
+  // Branch-aware money — uses the active branch's currency symbol (USD branches
+  // NBO/DAR/FBM no longer see ₹); falls back to ₹ for the consolidated (ALL) view.
+  const cur = bc(branch).cur;
+  const m0 = (n) => compactAmt(Math.round(Number(n) || 0), { currency: cur });
   const mpl = useModulePL(branchArg, { ...dates, summary: true }).data || {};
   const bs = useBalanceSheet(branchArg, { to: dates.to }).data || {};
   const age = useAgeing(branchArg).data || {};
@@ -57,8 +62,8 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
   const salesTot = useTargetsVsActual(branchArg, 'sales', { from: dates.from, to: dates.to, fy }).data?.totals;
   const gpTot = useTargetsVsActual(branchArg, 'gp', { from: dates.from, to: dates.to, fy }).data?.totals;
   const liveTargets = [
-    { metric: 'Sales', actual: salesTot?.actual || 0, target: salesTot?.target || 0, unit: '₹' },
-    { metric: 'Gross Profit', actual: gpTot?.actual || 0, target: gpTot?.target || 0, unit: '₹' },
+    { metric: 'Sales', actual: salesTot?.actual || 0, target: salesTot?.target || 0, unit: cur },
+    { metric: 'Gross Profit', actual: gpTot?.actual || 0, target: gpTot?.target || 0, unit: cur },
   ].filter((t) => t.target > 0);
 
   // Live per-branch performance — replaces the old empty BRANCH_PL_HEATMAP seed.
@@ -75,6 +80,9 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
     </div>
   );
 
+  if (isError && !data) {
+    return <DashboardError error={error} onRetry={refetch} title="Could not load the Director Dashboard." />;
+  }
   if (isLoading || !data) {
     return <DashboardSkeleton numKpis={12} />;
   }

@@ -10,14 +10,18 @@ import { useDashboardStore } from '../store/dashboard.store';
 import { BirthdaysPanel } from '../components/shared/BirthdaysPanel';
 import { AnniversariesPanel } from '../components/shared/AnniversariesPanel';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+import { DashboardError } from '../../../core/ux/DashboardError';
 import { openPrintPreview } from '../../../core/PrintPreview';
 
 export function HrMgrDashboardPage({ currentUser, setRoute }) {
-  const { data: stats, isLoading } = useHrMgrDashboard();
+  const { data: stats, isLoading, isError, error, refetch } = useHrMgrDashboard();
   const { navigate } = useDashboardActions(setRoute);
   const period = useDashboardStore((s) => s.period);
   const setPeriod = useDashboardStore((s) => s.setPeriod);
 
+  if (isError && !stats) {
+    return <DashboardError error={error} onRetry={refetch} title="Could not load the HR Manager Dashboard." />;
+  }
   if (isLoading || !stats) {
     return <DashboardSkeleton numKpis={5} columns={2} hasCharts={false} />;
   }

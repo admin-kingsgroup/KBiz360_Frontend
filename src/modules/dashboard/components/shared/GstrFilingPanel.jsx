@@ -16,10 +16,10 @@ export function GstrFilingPanel({ rows }) {
           <p style={{ margin: '2px 0 4px', fontSize: 9.5, color: '#5b616e', fontFamily: 'monospace' }}>{g.gstin || '—'}</p>
           <div style={{ display: 'flex', gap: 14, fontSize: 10.5 }}>
             <span style={{ color: g.gstr1 === 'Filed' ? '#16a34a' : '#dc2626' }}>
-              GSTR-1: <b>{g.gstr1}</b>
+              <span aria-hidden="true">{g.gstr1 === 'Filed' ? '✓ ' : '✗ '}</span>GSTR-1: <b>{g.gstr1}</b>
             </span>
             <span style={{ color: g.gstr3b === 'Filed' ? '#16a34a' : '#dc2626' }}>
-              GSTR-3B: <b>{g.gstr3b}</b>
+              <span aria-hidden="true">{g.gstr3b === 'Filed' ? '✓ ' : '✗ '}</span>GSTR-3B: <b>{g.gstr3b}</b>
             </span>
             <span style={{ color: '#5b616e' }}>Due: {g.due}</span>
           </div>

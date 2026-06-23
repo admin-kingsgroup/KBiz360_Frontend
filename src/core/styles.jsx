@@ -495,11 +495,18 @@ export function WidgetCard({title,subtitle,children,onPin,pinned,onDrill}){
 
 
 export function KPICard({label,value,delta,color,onClick}){
+  /* Delta colour is SIGNED, not "anything-without-a-plus-is-red":
+       leading "+" → positive (green), leading "-" → negative (red),
+       everything else (e.g. "to pay", "5 awaiting", "not tracked yet") → neutral.
+     The old `delta.includes("+")` test also mis-greened strings like
+     "₹2L overdue 90+" (a "+" inside the text). */
+  const d=String(delta||"").trim();
+  const deltaColor=d.startsWith("+")?"#16a34a":d.startsWith("-")?"#dc2626":"#5b616e";
   return (
     <div onClick={onClick} style={{...PREMIUM_CARD,cursor:onClick?"pointer":"default",borderTop:"3px solid "+(color||"#c2a04a")}}>
       <p style={{margin:0,fontSize:10.5,color:"#5b616e",letterSpacing:"0.4px",textTransform:"uppercase",fontWeight:700}}>{label}</p>
       <p style={{margin:"5px 0 2px",fontSize:22,fontWeight:800,color:"#14161a",fontVariantNumeric:"tabular-nums"}}>{value}</p>
-      {delta&&<p style={{margin:0,fontSize:11,color:delta.includes("+")?"#16a34a":"#dc2626",fontWeight:600}}>{delta}</p>}
+      {delta&&<p style={{margin:0,fontSize:11,color:deltaColor,fontWeight:600}}>{delta}</p>}
     </div>
   );
 }

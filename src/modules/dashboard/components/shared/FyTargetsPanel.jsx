@@ -1,6 +1,10 @@
 import React from 'react';
 import { safeRatio } from '../../utils/helpers';
 
+// Word + colour so "how am I tracking" reads without relying on the bar colour.
+const bandColor = (pct) => (pct >= 90 ? '#16a34a' : pct >= 70 ? '#c2a04a' : '#dc2626');
+const bandLabel = (pct) => (pct >= 90 ? 'On track' : pct >= 70 ? 'At risk' : 'Behind');
+
 export function FyTargetsPanel({ targets }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -10,14 +14,16 @@ export function FyTargetsPanel({ targets }) {
           <div key={t.metric}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
               <span style={{ fontSize: 11.5, color: '#14161a', fontWeight: 600 }}>{t.metric}</span>
-              <span style={{ fontSize: 11, color: '#5b616e' }}>{Math.round(pct)}%</span>
+              <span style={{ fontSize: 11, color: '#5b616e' }}>
+                <span style={{ color: bandColor(pct), fontWeight: 700 }}>{bandLabel(pct)}</span> · {Math.round(pct)}%
+              </span>
             </div>
             <div style={{ height: 8, background: '#f0f2f7', borderRadius: 4, overflow: 'hidden' }}>
               <div
                 style={{
                   height: '100%',
                   width: pct + '%',
-                  background: pct >= 90 ? '#16a34a' : pct >= 70 ? '#c2a04a' : '#dc2626',
+                  background: bandColor(pct),
                   borderRadius: 4,
                 }}
               />

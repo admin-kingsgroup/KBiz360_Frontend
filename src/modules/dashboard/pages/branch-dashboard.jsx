@@ -13,11 +13,15 @@ import { UpcomingTravelPanel } from '../components/shared/UpcomingTravelPanel';
 import { QuickStatsCard } from '../components/cards/QuickStatsCard';
 import { QuickCreateBar } from '../components/shared/QuickCreateBar';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
+import { DashboardError } from '../../../core/ux/DashboardError';
 
 export function BranchDashboardPage({ branch, setRoute }) {
-  const { data, isLoading, branchCode, currencySymbol, isIndia } = useBranchDashboard(branch);
+  const { data, isLoading, isError, error, refetch, branchCode, currencySymbol, isIndia } = useBranchDashboard(branch);
   const { navigate } = useDashboardActions(setRoute);
 
+  if (isError && !data) {
+    return <DashboardError error={error} onRetry={refetch} title="Could not load the Branch Dashboard." />;
+  }
   if (isLoading || !data) {
     return <DashboardSkeleton title="Branch Dashboard" numKpis={4} />;
   }

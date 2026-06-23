@@ -8,15 +8,15 @@ export function TodayVouchersTable({ data }) {
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
       <thead>
         <tr style={{ background: '#f4f5f7' }}>
-          <th style={{ ...HEADER_BASE, textAlign: 'left' }}>Branch</th>
-          <th style={{ ...HEADER_BASE, padding: '7px 6px', textAlign: 'center' }}>Receipt</th>
-          <th style={{ ...HEADER_BASE, padding: '7px 6px', textAlign: 'center' }}>Payment</th>
-          <th style={{ ...HEADER_BASE, padding: '7px 6px', textAlign: 'center' }}>Journal</th>
-          <th style={{ ...HEADER_BASE, textAlign: 'right' }}>Total Value</th>
+          <th scope="col" style={{ ...HEADER_BASE, textAlign: 'left' }}>Branch</th>
+          <th scope="col" style={{ ...HEADER_BASE, padding: '7px 6px', textAlign: 'center' }}>Receipt</th>
+          <th scope="col" style={{ ...HEADER_BASE, padding: '7px 6px', textAlign: 'center' }}>Payment</th>
+          <th scope="col" style={{ ...HEADER_BASE, padding: '7px 6px', textAlign: 'center' }}>Journal</th>
+          <th scope="col" style={{ ...HEADER_BASE, textAlign: 'right' }}>Total Value</th>
         </tr>
       </thead>
       <tbody>
-        {Object.entries(data).map(([br, v]) => (
+        {Object.entries(data || {}).map(([br, v]) => (
           <tr key={br} style={{ borderBottom: '1px solid #f0f2f7' }}>
             <td style={{ padding: '7px 8px', fontWeight: 700, color: '#14161a' }}>{br}</td>
             <td style={{ padding: '7px 6px', textAlign: 'center' }}>{v.receipt}</td>
@@ -27,6 +27,13 @@ export function TodayVouchersTable({ data }) {
             </td>
           </tr>
         ))}
+        {Object.keys(data || {}).length === 0 && (
+          <tr>
+            <td colSpan={5} style={{ padding: '14px 8px', textAlign: 'center', color: '#9197a3', fontSize: 11 }}>
+              No vouchers posted today.
+            </td>
+          </tr>
+        )}
       </tbody>
     </table>
   );
