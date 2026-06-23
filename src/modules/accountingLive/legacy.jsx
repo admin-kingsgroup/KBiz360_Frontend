@@ -27,6 +27,7 @@ import { usePrefs } from '../../core/prefs';
 import { pushModal } from '../../core/ux/modalStore';
 import { clickable } from '../../core/ux/clickable';
 import { usePager, Pager } from '../../core/ux/pager';
+import { SmartDateInput } from '../../core/ux/SmartDateInput';
 import { contraLedgerName, lineNarration } from '../../core/cashBookRows';
 import { toast } from '../../core/ux/toast';
 import { CUR_QUARTER, CUR_FY } from '../../core/dates';
@@ -1004,7 +1005,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         <button onClick={onBack} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 34, fontSize: 11.5, cursor: 'pointer' }}>Back</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: 10 }}>
-        <div><div style={lab}>Date</div><input type="date" max={todayISO()} value={form.date} onChange={(e) => set('date', e.target.value)} style={fld} /></div>
+        <div><div style={lab}>Date</div><SmartDateInput max={todayISO()} value={form.date} onChange={(iso) => set('date', iso)} style={fld} /></div>
         <div><div style={lab}>Branch</div><input value={form.branch} onChange={(e) => set('branch', e.target.value)} style={fld} /></div>
         <div><div style={lab}>{v.category === 'purchase' || v.category === 'purchase-expense' ? 'Supplier (party ledger)' : 'Customer / Party ledger'}</div><input list={dlId} value={form.party} onChange={(e) => set('party', e.target.value)} style={fld} /></div>
         <div><div style={lab}>Link No</div><input value={form.linkNo} onChange={(e) => set('linkNo', e.target.value)} style={fld} /></div>

@@ -489,7 +489,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* Header fields */}
       <div style={{ ...card, marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
-          <FL label="SPG Date"><input type="date" max={todayISO()} value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></FL>
+          <FL label="SPG Date"><SmartDateInput max={todayISO()} value={date} onChange={setDate} style={inp} /></FL>
           <FL label="Travel / Departure Date"><SmartDateInput value={travelDate} onChange={setTravelDate} min={editing ? undefined : todayISO()} style={inp} title="When the customer travels (no past dates) — type e.g. 20.03.2026 → 20/03/2026; drives the Upcoming Travel dashboard" /></FL>
           <FL label="Client Type">
             <select value={clientType} onChange={(e) => handleClientTypeChange(e.target.value)} style={inp}>

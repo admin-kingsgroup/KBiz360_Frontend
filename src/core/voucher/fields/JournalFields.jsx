@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { Plus } from 'lucide-react';
 import { FL, inp, btnGh, card } from '../../styles';
 import { todayISO } from '../../dates';
+import { SmartDateInput } from '../../ux/SmartDateInput';
 import { LedgerPicker } from '../LedgerPicker';
 import { V_DR, V_CR, money2, DIM, DARK } from '../ui';
 
@@ -28,7 +29,7 @@ export function JournalFields({ state, setState, ctx }) {
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginBottom: 14 }}>
-        <FL label="Journal date"><input type="date" max={todayISO()} value={state.date || ''} onChange={(e) => setState((s) => ({ ...s, date: e.target.value }))} style={inp} /></FL>
+        <FL label="Journal date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => setState((s) => ({ ...s, date: iso }))} style={inp} /></FL>
         <FL label="Master narration"><input value={state.remarks || ''} onChange={(e) => setState((s) => ({ ...s, remarks: e.target.value }))} style={inp} placeholder="Being adjustment entry passed" /></FL>
       </div>
 

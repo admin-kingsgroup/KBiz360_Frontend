@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { FL, inp, btnGh } from '../../styles';
 import { todayISO } from '../../dates';
+import { SmartDateInput } from '../../ux/SmartDateInput';
 import { useOpenBills } from '../../useAccounting';
 import { useLedgerRegistry } from '../../useReference';
 import { BillAllocPanel } from '../../../modules/transactions';
@@ -70,7 +71,7 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
     <>
       <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: 14 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <FL label="Date"><input type="date" max={todayISO()} value={state.date || ''} onChange={(e) => patch({ date: e.target.value })} style={inp} /></FL>
+          <FL label="Date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
           <FL label={isReceipt ? 'Received from (account credited — Cr)' : 'Paid to (account debited — Dr)'}>
             <LedgerPicker branch={branch} value={state.party} onChange={onParty} filter={(l) => l.type !== 'Bank' && l.type !== 'Cash'} placeholder={isReceipt ? 'Customer, loan, income, any account…' : 'Supplier, expense, salary, tax, any account…'} />
           </FL>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { FL, inp } from '../../styles';
 import { todayISO } from '../../dates';
+import { SmartDateInput } from '../../ux/SmartDateInput';
 import { LedgerPicker } from '../LedgerPicker';
 import { V_DR, V_CR, RED } from '../ui';
 
@@ -19,7 +20,7 @@ export function ContraFields({ state, setState, ctx }) {
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-        <FL label="Date"><input type="date" max={todayISO()} value={state.date || ''} onChange={(e) => patch({ date: e.target.value })} style={inp} /></FL>
+        <FL label="Date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
         <FL label="Reference (UTR / cash receipt no.)"><input value={state.ref || ''} onChange={(e) => patch({ ref: e.target.value })} style={inp} placeholder="Optional" /></FL>
       </div>
 
