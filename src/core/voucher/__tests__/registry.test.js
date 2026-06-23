@@ -353,3 +353,23 @@ describe('refund-partial toBody / validate', () => {
     expect(RFP.validate({ ...ok, partialAmount: 0 }).ok).toBe(false);
   });
 });
+
+describe('refund toBody — cancellation + commission clawback fields', () => {
+  const RF = VOUCHER_REGISTRY.refund;
+  test.concurrent('carries supplierCancel / cancelRecover / incentive(commission) into the body', async () => {
+    const b = RF.toBody({ date: '2025-12-27', againstInvoice: 'SF/1', againstPurchase: 'PF/1', gstMode: 'intra',
+      party: 'ABC', counterParty: 'Akbar', supplierAmt: 39271, serviceCharge: 100, markup: 318, gstPct: 18,
+      supplierSvc: 100, supplierGst: 18, supplierCancel: 4970, supplierCancelGst: 0, cancelRecover: true,
+      incentiveAmt: 324.72, incentiveGst: 0, incentiveTds: 6.49 }, ctx);
+    expect(b.supplierCancel).toBe(4970);
+    expect(b.cancelRecover).toBe(true);
+    expect(b.incentiveAmt).toBe(324.72);
+    expect(b.incentiveTds).toBe(6.49);
+  });
+  test.concurrent('reissue ignores cancellation/commission (refund-only)', async () => {
+    const b = VOUCHER_REGISTRY.reissue.toBody({ date: '2025-12-27', againstInvoice: 'SF/1', party: 'ABC', counterParty: 'Akbar',
+      supplierAmt: 3000, supplierCancel: 4970, incentiveAmt: 324.72, gstPct: 18 }, ctx);
+    expect(b.supplierCancel).toBe(0);
+    expect(b.incentiveAmt).toBe(0);
+  });
+});

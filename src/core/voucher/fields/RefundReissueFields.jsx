@@ -66,6 +66,21 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
         <FL label={`Supplier GST (${cur}, input credit)`}><input type="number" value={state.supplierGst} onChange={(e) => patch({ supplierGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
       </div>
 
+      {isRefund && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
+            <FL label={`Airline cancellation fee (${cur}, supplier kept)`}><input type="number" value={state.supplierCancel} onChange={(e) => patch({ supplierCancel: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+            <FL label={`Cancellation GST (${cur})`}><input type="number" value={state.supplierCancelGst} onChange={(e) => patch({ supplierCancelGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+            <FL label="Recover cancellation from customer"><label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34 }}><input type="checkbox" checked={state.cancelRecover !== false} onChange={(e) => patch({ cancelRecover: e.target.checked })} /> charge it to the client (pass-through)</label></FL>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
+            <FL label={`Commission clawback (${cur})`}><input type="number" value={state.incentiveAmt} onChange={(e) => patch({ incentiveAmt: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+            <FL label={`Commission GST (${cur})`}><input type="number" value={state.incentiveGst} onChange={(e) => patch({ incentiveGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+            <FL label={`TDS reversed (${cur})`}><input type="number" value={state.incentiveTds} onChange={(e) => patch({ incentiveTds: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+          </div>
+        </>
+      )}
+
       <p style={{ margin: '2px 0 12px', fontSize: 10.5, color: '#5a6691' }}>
         Our income <b>{money2(cur, ourIncome)}</b> · GST <b>{money2(cur, taxAmt)}</b> ·
         {isRefund ? ' Refund payable to customer ' : ' Billed to customer '}

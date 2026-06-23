@@ -169,14 +169,16 @@ function makeRefundReissue(kind) {
       ? (<><b style={{ color: '#A07828' }}>Refund:</b> cancellation of a sale — the <b>original sale and its purchase are reversed in full</b> (Base Fare / taxes on both Sales &amp; Purchase unwind). We then retain a cancellation service charge + markup (income) and absorb the airline's cancellation fee; the <b>customer is refunded the net balance</b>. Link the related Purchase invoice so the supplier side also reverses.</>)
       : (<><b style={{ color: '#A07828' }}>Reissue:</b> amendment of a sale. The <b>customer (Debtor) is Debited</b> with the total billed; the <b>supplier/airline (Creditor) is Credited</b> with the fee + fare difference; our service charge + markup are retained as income.</>),
 
-    initial: () => ({ date: todayISO(), againstInvoice: '', againstPurchase: '', gstMode: 'intra', party: '', counterParty: '', supplierAmt: '', serviceCharge: '', markup: '', gstPct: 18, supplierSvc: '', supplierGst: '', remarks: '' }),
+    initial: () => ({ date: todayISO(), againstInvoice: '', againstPurchase: '', gstMode: 'intra', party: '', counterParty: '', supplierAmt: '', serviceCharge: '', markup: '', gstPct: 18, supplierSvc: '', supplierGst: '', supplierCancel: '', supplierCancelGst: '', cancelRecover: true, incentiveAmt: '', incentiveGst: '', incentiveTds: '', remarks: '' }),
 
     fromVoucher: (v) => ({
       date: v.date || '', againstInvoice: v.againstInvoice || v.linkNo || '', againstPurchase: v.againstPurchase || '', gstMode: v.gstMode || 'intra',
       party: v.party || '', counterParty: v.counterParty || '', supplierAmt: v.supplierAmt ?? '',
       serviceCharge: lineAmt(v, 'Service Charge Income'), markup: lineAmt(v, 'Markup Income'),
       gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18,
-      supplierSvc: v.supplierSvc ?? '', supplierGst: v.supplierGst ?? '', remarks: v.remarks || '',
+      supplierSvc: v.supplierSvc ?? '', supplierGst: v.supplierGst ?? '',
+      supplierCancel: v.supplierCancel ?? '', supplierCancelGst: v.supplierCancelGst ?? '', cancelRecover: v.cancelRecover !== false,
+      incentiveAmt: v.incentiveAmt ?? '', incentiveGst: v.incentiveGst ?? '', incentiveTds: v.incentiveTds ?? '', remarks: v.remarks || '',
     }),
 
     toBody: (s, ctx) => {
@@ -185,6 +187,13 @@ function makeRefundReissue(kind) {
       const ourIncome = r2(svc + markup);
       const taxAmt = r2(ourIncome * (+s.gstPct || 0) / 100);
       const supSvc = r2(+s.supplierSvc || 0), supGst = r2(+s.supplierGst || 0);
+      // Refund-only: the airline's cancellation fee the supplier keeps (passed through
+      // to the customer when cancelRecover) and the commission/TDS we clawed back.
+      const supCancel = isRefund ? r2(+s.supplierCancel || 0) : 0;
+      const supCancelGst = isRefund ? r2(+s.supplierCancelGst || 0) : 0;
+      const incentiveAmt = isRefund ? r2(+s.incentiveAmt || 0) : 0;
+      const incentiveGst = isRefund ? r2(+s.incentiveGst || 0) : 0;
+      const incentiveTds = isRefund ? r2(+s.incentiveTds || 0) : 0;
       const total = isRefund
         ? r2(supplierAmt + supSvc + supGst - ourIncome - taxAmt)
         : r2(supplierAmt - supSvc - supGst + ourIncome + taxAmt);
@@ -196,6 +205,8 @@ function makeRefundReissue(kind) {
         party: s.party, partyType: 'customer',
         counterParty: s.counterParty, counterPartyGroup: 'Sundry Creditors',
         supplierAmt, supplierSvc: supSvc, supplierGst: supGst,
+        supplierCancel: supCancel, supplierCancelGst: supCancelGst, cancelRecover: s.cancelRecover !== false,
+        incentiveAmt, incentiveGst, incentiveTds,
         lines, subtotal: ourIncome, taxAmt, gstMode: s.gstMode, gstPct: +s.gstPct || 0, total,
         againstInvoice: s.againstInvoice, againstPurchase: s.againstPurchase || '', linkNo: s.againstInvoice,
         remarks: s.remarks || `Being ${kind}${s.againstInvoice ? ` against ${s.againstInvoice}` : ''}`,
