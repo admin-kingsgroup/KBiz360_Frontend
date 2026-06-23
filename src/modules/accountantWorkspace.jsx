@@ -6,6 +6,7 @@
 // other live screen. Cards/links jump into the existing working screens via setRoute.
 import React, { useEffect, useMemo, useState } from 'react';
 import { clickable } from '../core/ux/clickable';
+import { usePager, Pager } from '../core/ux/pager';
 import { bc } from '../core/styles';
 import {
   branchCode, useAgeing, useTaxSummary, useTrialBalance, useVoucherApprovals,
@@ -564,7 +565,11 @@ const AGE_COLS = [['d0', '0–30'], ['d30', '31–60'], ['d60', '61–90'], ['d9
 function AgeingTable({ side = {}, cur, tone, partyLabel = 'Party', onAct, actLabel, actBg }) {
   const rows = side.rows || [];
   const t = side.totals || {};
+  // Render one page of rows (DOM stays bounded); the tfoot totals + count below still
+  // reflect the FULL set (they read `t`/`rows.length`, not the page).
+  const pg = usePager(rows);
   return (
+    <>
     <Table>
       <thead><tr>
         <th style={th}>{partyLabel}</th>
@@ -574,7 +579,7 @@ function AgeingTable({ side = {}, cur, tone, partyLabel = 'Party', onAct, actLab
       </tr></thead>
       <tbody>
         {rows.length === 0 && <tr><td colSpan={onAct ? 7 : 6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>Nothing outstanding.</td></tr>}
-        {rows.map((r, i) => (
+        {pg.pageRows.map((r, i) => (
           <tr key={i} style={{ background: i % 2 ? '#fafbff' : '#fff' }}>
             <td style={{ ...td, fontWeight: 600, color: C.dark }}>{r.party}</td>
             {AGE_COLS.map(([k]) => <td key={k} style={{ ...td, ...rnum, color: k === 'd90' && r[k] > 0 ? C.red : C.dark }}>{r[k] ? money(cur, r[k]) : '—'}</td>)}
@@ -592,6 +597,8 @@ function AgeingTable({ side = {}, cur, tone, partyLabel = 'Party', onAct, actLab
         </tr></tfoot>
       )}
     </Table>
+    <Pager pager={pg} />
+    </>
   );
 }
 
@@ -762,6 +769,7 @@ export function SupplierReco({ branch, setRoute }) {
   const sumQ = useSupplierReconSummary(sel, branch);
   const book = bookQ.data || { lines: [] };
   const stmt = stmtQ.data || [];
+  const stmtPager = usePager(stmt); // page the statement rows; count/badges read full `stmt`
   const sum = sumQ.data || {};
 
   const imp = useImportSupplierStatement();
@@ -839,7 +847,7 @@ export function SupplierReco({ branch, setRoute }) {
             </tr></thead>
             <tbody>
               {stmt.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No statement imported yet for {sel}.</td></tr>}
-              {stmt.map((s) => (
+              {stmtPager.pageRows.map((s) => (
                 <tr key={s.id} style={{ background: s.status === 'reconciled' ? '#f4fbf4' : s.status === 'exception' ? '#fdf4f4' : '#fff' }}>
                   <td style={td}>{s.date}</td>
                   <td style={{ ...td, fontWeight: 600, color: C.blue }}>{s.invoiceNo || s.reference || '—'}</td>
@@ -866,6 +874,7 @@ export function SupplierReco({ branch, setRoute }) {
               ))}
             </tbody>
           </Table>
+          <Pager pager={stmtPager} />
 
           <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
             A statement <b>debit</b> (they billed us) matches a book <b>credit</b> (a bill we posted); a statement <b>credit</b> (our payment) matches a book <b>debit</b>. Unmatched items on either side are the reconciling differences — usually a missing bill, an unposted payment, or an ADM/ACM not captured.
@@ -931,6 +940,9 @@ export function ClientReco({ branch, setRoute }) {
   const filtered = useMemo(() => (list.rows || []).filter((r) =>
     (!q || r.client.toLowerCase().includes(q.toLowerCase())) &&
     (!onlyDiff || r.status === 'differences')), [list.rows, q, onlyDiff]);
+  // Page the long lists; KPI totals/badges and the empty-states read the full sets.
+  const wbPager = usePager(filtered);   // workbench: every client ledger
+  const stmtPager = usePager(stmt);     // drill-in: imported statement rows
 
   const doImport = () => {
     if (!client || !parsed.length) return;
@@ -977,7 +989,7 @@ export function ClientReco({ branch, setRoute }) {
           <tbody>
             {listQ.isLoading && <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>Loading…</td></tr>}
             {!listQ.isLoading && filtered.length === 0 && <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No client ledgers found for {brLabel(branch)}.</td></tr>}
-            {filtered.map((r) => (
+            {wbPager.pageRows.map((r) => (
               <tr key={r.client} style={{ background: r.status === 'reconciled' ? '#f4fbf4' : r.status === 'differences' ? '#fdf6f4' : '#fff' }}>
                 <td style={{ ...td, fontWeight: 700, color: C.dark }}>{r.client}</td>
                 <td style={{ ...td, ...rnum }}>{money(cur, r.bookOwed)}</td>
@@ -993,6 +1005,7 @@ export function ClientReco({ branch, setRoute }) {
             ))}
           </tbody>
         </Table>
+        <Pager pager={wbPager} />
       </Shell>
     );
   }
@@ -1048,7 +1061,7 @@ export function ClientReco({ branch, setRoute }) {
             </tr></thead>
             <tbody>
               {stmt.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No statement imported yet for {client}. Use the internal tab to reconcile against our own books.</td></tr>}
-              {stmt.map((s) => (
+              {stmtPager.pageRows.map((s) => (
                 <tr key={s.id} style={{ background: s.status === 'reconciled' ? '#f4fbf4' : s.status === 'exception' ? '#fdf4f4' : '#fff' }}>
                   <td style={td}>{s.date}</td>
                   <td style={{ ...td, fontWeight: 600, color: C.blue }}>{s.invoiceNo || s.reference || '—'}</td>
@@ -1075,6 +1088,7 @@ export function ClientReco({ branch, setRoute }) {
               ))}
             </tbody>
           </Table>
+          <Pager pager={stmtPager} />
           <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
             A statement <b>debit</b> (an invoice) matches a book <b>debit</b> (a sale); a statement <b>credit</b> (their payment) matches a book <b>credit</b> (a receipt) — same direction, since a client is a debtor. Unmatched items are the reconciling differences.
           </div>
@@ -1188,6 +1202,7 @@ export function TallyReco({ branch }) {
   const sumQ = useTallyRecoSummary(sel, branch);
   const book = bookQ.data || { lines: [] };
   const rows = tallyQ.data || [];
+  const rowsPager = usePager(rows); // page the Tally rows; count/totals read full `rows`
   const sum = sumQ.data || {};
 
   const imp = useImportTally();
@@ -1244,7 +1259,7 @@ export function TallyReco({ branch }) {
             <thead><tr>{['Date', 'Voucher', 'Narration', 'Debit', 'Credit', 'Status', 'Match / Action'].map((h, i) => <th key={h} style={{ ...th, ...(i >= 3 && i <= 4 ? rnum : {}) }}>{h}</th>)}</tr></thead>
             <tbody>
               {rows.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No Tally rows imported yet for {sel}.</td></tr>}
-              {rows.map((t) => (
+              {rowsPager.pageRows.map((t) => (
                 <tr key={t.id} style={{ background: t.status === 'reconciled' ? '#f4fbf4' : t.status === 'exception' ? '#fdf4f4' : '#fff' }}>
                   <td style={td}>{t.date}</td>
                   <td style={{ ...td, fontWeight: 600, color: C.blue }}>{t.vno || t.reference || '—'}</td>
@@ -1270,6 +1285,7 @@ export function TallyReco({ branch }) {
               ))}
             </tbody>
           </Table>
+          <Pager pager={rowsPager} />
           <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
             A Tally <b>debit</b> matches an ERP book <b>debit</b> and a credit a credit (same ledger convention on both sides). Unmatched rows are the ERP↔Tally differences — usually an entry posted in one system but not the other.
           </div>
