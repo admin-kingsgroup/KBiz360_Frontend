@@ -6,6 +6,7 @@ import { ContraFields } from './fields/ContraFields';
 import { PurchaseExpenseFields } from './fields/PurchaseExpenseFields';
 import { DebitNoteFields } from './fields/DebitNoteFields';
 import { RefundReissueFields } from './fields/RefundReissueFields';
+import { buildRefundReissueBody } from './fields/refundBody';
 import { RefundPartialFields } from './fields/RefundPartialFields';
 import { AdmAcmFields } from './fields/AdmAcmFields';
 import { r2, allocSummary, pxpTotals, dnTotals } from './ui';
@@ -181,38 +182,7 @@ function makeRefundReissue(kind) {
       incentiveAmt: v.incentiveAmt ?? '', incentiveGst: v.incentiveGst ?? '', incentiveTds: v.incentiveTds ?? '', remarks: v.remarks || '',
     }),
 
-    toBody: (s, ctx) => {
-      const supplierAmt = r2(+s.supplierAmt || 0);
-      const svc = r2(+s.serviceCharge || 0), markup = r2(+s.markup || 0);
-      const ourIncome = r2(svc + markup);
-      const taxAmt = r2(ourIncome * (+s.gstPct || 0) / 100);
-      const supSvc = r2(+s.supplierSvc || 0), supGst = r2(+s.supplierGst || 0);
-      // Refund-only: the airline's cancellation fee the supplier keeps (passed through
-      // to the customer when cancelRecover) and the commission/TDS we clawed back.
-      const supCancel = isRefund ? r2(+s.supplierCancel || 0) : 0;
-      const supCancelGst = isRefund ? r2(+s.supplierCancelGst || 0) : 0;
-      const incentiveAmt = isRefund ? r2(+s.incentiveAmt || 0) : 0;
-      const incentiveGst = isRefund ? r2(+s.incentiveGst || 0) : 0;
-      const incentiveTds = isRefund ? r2(+s.incentiveTds || 0) : 0;
-      const total = isRefund
-        ? r2(supplierAmt + supSvc + supGst - ourIncome - taxAmt)
-        : r2(supplierAmt - supSvc - supGst + ourIncome + taxAmt);
-      const lines = [];
-      if (svc > 0) lines.push({ ledger: 'Service Charge Income', amt: svc, desc: 'Service charge' });
-      if (markup > 0) lines.push({ ledger: 'Markup Income', amt: markup, desc: 'Markup' });
-      return {
-        type: isRefund ? 'RF' : 'RI', category: kind, branch: ctx.branchCode, date: s.date,
-        party: s.party, partyType: 'customer',
-        counterParty: s.counterParty, counterPartyGroup: 'Sundry Creditors',
-        supplierAmt, supplierSvc: supSvc, supplierGst: supGst,
-        supplierCancel: supCancel, supplierCancelGst: supCancelGst, cancelRecover: s.cancelRecover !== false,
-        incentiveAmt, incentiveGst, incentiveTds,
-        lines, subtotal: ourIncome, taxAmt, gstMode: s.gstMode, gstPct: +s.gstPct || 0, total,
-        againstInvoice: s.againstInvoice, againstPurchase: s.againstPurchase || '', linkNo: s.againstInvoice,
-        remarks: s.remarks || `Being ${kind}${s.againstInvoice ? ` against ${s.againstInvoice}` : ''}`,
-        status: 'saved',
-      };
-    },
+    toBody: (s, ctx) => buildRefundReissueBody(s, ctx, kind),
 
     validate: (s) => {
       const supplierAmt = +s.supplierAmt || 0;
@@ -225,6 +195,10 @@ function makeRefundReissue(kind) {
     },
 
     fields: (props) => <RefundReissueFields {...props} kind={kind} />,
+    // The refund/reissue field component renders its OWN live JV right under the form,
+    // so the shell's generic editor journal would just duplicate it. (Post-save view
+    // still shows the shell journal.)
+    hideShellJournal: true,
   };
 }
 

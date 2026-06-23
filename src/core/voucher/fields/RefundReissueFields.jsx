@@ -6,8 +6,10 @@ import { VPlaceOfSupply } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
 import { useVoucherRef } from '../useVoucherRef';
 import { apiGet } from '../../api';
+import { useVoucherPreview } from '../../useAccounting';
 import { money2, r2 } from '../ui';
 import { refundPrefillFromBooking, poSnapForView } from './refundPrefill';
+import { buildRefundReissueBody } from './refundBody';
 
 const num = (v) => (Number(v) || 0);
 const fmtN = (v) => num(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -129,6 +131,10 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   const total = isRefund
     ? r2(supplierAmt + supSvc + supGst - ourIncome - taxAmt)
     : r2(supplierAmt - supSvc - supGst + ourIncome + taxAmt);
+
+  // Live, backend-computed JV for THIS refund — same body & engine VoucherShell posts
+  // with (deduped by React-Query on an identical key), shown right under the form.
+  const refundPv = useVoucherPreview({ ...buildRefundReissueBody(state, ctx, kind), sourceRef: state.sourceRef || '' }).data || {};
 
   // GST on the supplier's service fee + the airline cancellation fee auto-calculates
   // at the voucher's GST rate (the "GST on our charges" slab, 18% by default), so the
@@ -272,6 +278,34 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       )}
 
       <FL label="Narration"><textarea value={state.remarks || ''} onChange={(e) => patch({ remarks: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder={`Being ${kind}${state.againstInvoice ? ` against ${state.againstInvoice}` : ''}`} /></FL>
+
+      {/* Live JV for this refund — the actual double-entry that will post (full reversal
+          of the linked sale/purchase + the refund economics), recomputed as you type. */}
+      <div style={{ border: '1px solid #dfe3ea', borderRadius: 10, padding: 12, marginTop: 14, background: '#fbfcfe' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#14161a' }}>Live JV — this {kind} (where it hits the books)</div>
+          <span style={{ fontSize: 11, fontWeight: 800, color: refundPv.error ? '#A32D2D' : refundPv.balanced ? '#16a34a' : '#A32D2D' }}>
+            {refundPv.error ? '⚠ ' + refundPv.error : refundPv.balanced ? '✓ Balanced' : (refundPv.postings || []).length ? `✗ Out by ${money2(cur, refundPv.diff)}` : ''}
+          </span>
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <thead><tr>{['Ledger', 'Group', 'Debit', 'Credit'].map((h, i) => <th key={h} style={{ textAlign: i > 1 ? 'right' : 'left', padding: '4px 8px', color: '#9197a3', fontWeight: 700, borderBottom: '1px solid #e6e8ec' }}>{h}</th>)}</tr></thead>
+          <tbody>
+            {(refundPv.postings || []).map((p, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}>
+                <td style={{ padding: '4px 8px', fontWeight: 600, color: '#14161a' }}>{p.ledger}</td>
+                <td style={{ padding: '4px 8px', color: '#9197a3' }}>{p.group || ''}</td>
+                <td style={{ padding: '4px 8px', textAlign: 'right', color: '#185FA5', fontVariantNumeric: 'tabular-nums' }}>{num(p.debit) ? fmtN(p.debit) : ''}</td>
+                <td style={{ padding: '4px 8px', textAlign: 'right', color: '#A32D2D', fontVariantNumeric: 'tabular-nums' }}>{num(p.credit) ? fmtN(p.credit) : ''}</td>
+              </tr>
+            ))}
+            {!(refundPv.postings || []).length && <tr><td colSpan={4} style={{ padding: 12, textAlign: 'center', color: '#9197a3' }}>Fill the refund (and fetch the Link No) to see the journal effect.</td></tr>}
+          </tbody>
+          {(refundPv.postings || []).length > 0 && (
+            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '5px 8px' }} colSpan={2}>Total</td><td style={{ padding: '5px 8px', textAlign: 'right', color: '#185FA5' }}>{fmtN(refundPv.totalDebit)}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: '#A32D2D' }}>{fmtN(refundPv.totalCredit)}</td></tr></tfoot>
+          )}
+        </table>
+      </div>
     </>
   );
 }
