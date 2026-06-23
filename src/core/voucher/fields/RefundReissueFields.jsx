@@ -277,11 +277,10 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
         </p>
       )}
 
-      <FL label="Narration"><textarea value={state.remarks || ''} onChange={(e) => patch({ remarks: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder={`Being ${kind}${state.againstInvoice ? ` against ${state.againstInvoice}` : ''}`} /></FL>
-
       {/* Live JV for this refund — the actual double-entry that will post (full reversal
-          of the linked sale/purchase + the refund economics), recomputed as you type. */}
-      <div style={{ border: '1px solid #dfe3ea', borderRadius: 10, padding: 12, marginTop: 14, background: '#fbfcfe' }}>
+          of the linked sale/purchase + the refund economics), recomputed as you type.
+          Sits right under the amounts so the books effect is visible while entering. */}
+      <div style={{ border: '1px solid #cdd6e6', borderRadius: 10, padding: 12, margin: '4px 0 14px', background: '#f7f9fc' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#14161a' }}>Live JV — this {kind} (where it hits the books)</div>
           <span style={{ fontSize: 11, fontWeight: 800, color: refundPv.error ? '#A32D2D' : refundPv.balanced ? '#16a34a' : '#A32D2D' }}>
@@ -302,10 +301,12 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
             {!(refundPv.postings || []).length && <tr><td colSpan={4} style={{ padding: 12, textAlign: 'center', color: '#9197a3' }}>Fill the refund (and fetch the Link No) to see the journal effect.</td></tr>}
           </tbody>
           {(refundPv.postings || []).length > 0 && (
-            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '5px 8px' }} colSpan={2}>Total</td><td style={{ padding: '5px 8px', textAlign: 'right', color: '#185FA5' }}>{fmtN(refundPv.totalDebit)}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: '#A32D2D' }}>{fmtN(refundPv.totalCredit)}</td></tr></tfoot>
+            <tfoot><tr style={{ fontWeight: 800, background: '#eef1f7' }}><td style={{ padding: '5px 8px' }} colSpan={2}>Total</td><td style={{ padding: '5px 8px', textAlign: 'right', color: '#185FA5' }}>{fmtN(refundPv.totalDebit)}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: '#A32D2D' }}>{fmtN(refundPv.totalCredit)}</td></tr></tfoot>
           )}
         </table>
       </div>
+
+      <FL label="Narration"><textarea value={state.remarks || ''} onChange={(e) => patch({ remarks: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder={`Being ${kind}${state.againstInvoice ? ` against ${state.againstInvoice}` : ''}`} /></FL>
     </>
   );
 }
