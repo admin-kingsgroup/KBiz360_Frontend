@@ -6,6 +6,7 @@ import { ContraFields } from './fields/ContraFields';
 import { PurchaseExpenseFields } from './fields/PurchaseExpenseFields';
 import { DebitNoteFields } from './fields/DebitNoteFields';
 import { RefundReissueFields } from './fields/RefundReissueFields';
+import { RefundPartialFields } from './fields/RefundPartialFields';
 import { AdmAcmFields } from './fields/AdmAcmFields';
 import { r2, allocSummary, pxpTotals, dnTotals } from './ui';
 
@@ -217,6 +218,61 @@ function makeRefundReissue(kind) {
 }
 
 /**
+ * Refund PARTIAL — cancellation of only PART of a booking. Like a Refund it links the
+ * original sale + purchase, but instead of unwinding the whole booking it reverses
+ * only the entered amount off the basic fare/cost head, refunds the customer and
+ * recovers the same from the supplier (the rest of the booking is untouched, net P&L
+ * nil). Stored as a refund (so it flows through the same register / approval / posting
+ * plumbing) but carries partialAmount, which the engine uses to take the partial path
+ * (posting.builder refundPartialLines). GATED → PENDING → posts on approval.
+ */
+function makeRefundPartial() {
+  return {
+    type: 'RF',
+    label: 'Refund Partial Voucher',
+    icon: '↩️',
+    explain: (<><b style={{ color: '#A07828' }}>Refund (Partial):</b> reverses only <b>part</b> of a booking. Enter the amount to refund — the linked sale &amp; purchase <b>basic fare/cost is reversed by that amount</b>, the customer is refunded and the supplier recovered, and the rest of the booking stays intact (P&amp;L-neutral). Link the original sale and its purchase.</>),
+
+    initial: () => ({ date: todayISO(), againstInvoice: '', againstPurchase: '', gstMode: 'intra', party: '', counterParty: '', partialAmount: '', remarks: '' }),
+
+    fromVoucher: (v) => ({
+      date: v.date || '', againstInvoice: v.againstInvoice || v.linkNo || '', againstPurchase: v.againstPurchase || '',
+      gstMode: v.gstMode || 'intra', party: v.party || '', counterParty: v.counterParty || '',
+      partialAmount: v.partialAmount ?? '', remarks: v.remarks || '',
+    }),
+
+    toBody: (s, ctx) => {
+      const amt = r2(+s.partialAmount || 0);
+      return {
+        // Stored as a refund (category 'refund') + partialAmount so the backend takes
+        // the partial posting path while reusing all the refund plumbing.
+        type: 'RF', category: 'refund', branch: ctx.branchCode, date: s.date,
+        party: s.party, partyType: 'customer',
+        counterParty: s.counterParty, counterPartyGroup: 'Sundry Creditors',
+        partialAmount: amt, supplierAmt: amt, lines: [], subtotal: 0, taxAmt: 0,
+        gstMode: s.gstMode, gstPct: 0, total: amt,
+        againstInvoice: s.againstInvoice, againstPurchase: s.againstPurchase || '', linkNo: s.againstInvoice,
+        remarks: s.remarks || `Being partial refund of ${amt}${s.againstInvoice ? ` against ${s.againstInvoice}` : ''}`,
+        status: 'saved',
+      };
+    },
+
+    validate: (s) => {
+      const amt = +s.partialAmount || 0;
+      let hint = '';
+      if (!s.againstInvoice) hint = '(Reference sale invoice)';
+      else if (!s.againstPurchase) hint = '(Reference purchase invoice)';
+      else if (!s.party) hint = '(Pick customer)';
+      else if (!s.counterParty) hint = '(Pick supplier/airline)';
+      else if (amt <= 0) hint = '(Enter refund amount)';
+      return { ok: !!s.againstInvoice && !!s.againstPurchase && !!s.party && !!s.counterParty && amt > 0, hint };
+    },
+
+    fields: (props) => <RefundPartialFields {...props} />,
+  };
+}
+
+/**
  * ADM (Agent Debit Memo) / ACM (Agent Credit Memo) — independent BSP memos. BSP-only
  * with NO markup and NO Sales/customer involvement: always single-party vs the
  * BSP/airline creditor, posting straight to Direct Expenses (ADM = a cost; ACM = a
@@ -273,6 +329,7 @@ export const VOUCHER_REGISTRY = {
   payment: makeRcptPmt('supplier'),
   refund: makeRefundReissue('refund'),
   reissue: makeRefundReissue('reissue'),
+  'refund-partial': makeRefundPartial(),
   adm: makeAdmAcm('adm'),
   acm: makeAdmAcm('acm'),
 

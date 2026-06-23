@@ -265,6 +265,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Purchase Expense Voucher", href:"/purchase-expense"},
     {label:"Debit Note (Purchase Return)", href:"/debit-note"},
     {label:"Refund (against Sale)",    href:"/finance/refund"},
+    {label:"Refund Partial (against Sale)", href:"/finance/refund-partial"},
     {label:"Reissue (against Sale)",   href:"/finance/reissue"},
     {label:"ADM Voucher",              href:"/finance/adm-voucher"},
     {label:"ACM Voucher",              href:"/finance/acm-voucher"},

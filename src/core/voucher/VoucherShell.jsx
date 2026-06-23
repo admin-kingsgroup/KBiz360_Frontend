@@ -21,7 +21,10 @@ import { isViewOnly } from '../api';
  * registry entry supplies the fields and the state↔payload transforms.
  */
 export function VoucherShell({ category, mode = 'create', branch, voucher, voucherId, cur: curProp, onBack, onClose }) {
-  const desc = VOUCHER_REGISTRY[category];
+  // A partial refund is stored as category 'refund' (+ partialAmount) so it reuses the
+  // refund plumbing; render it with the dedicated 'refund-partial' form when editing.
+  const regKey = (category === 'refund' && +(voucher?.partialAmount) > 0) ? 'refund-partial' : category;
+  const desc = VOUCHER_REGISTRY[regKey];
   const isEdit = mode === 'edit';
 
   const branchCode = isEdit ? (voucher?.branch || null) : brCodeOf(branch);

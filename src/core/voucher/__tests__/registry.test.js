@@ -6,6 +6,7 @@ jest.mock('../fields/ContraFields', () => ({ ContraFields: () => null }));
 jest.mock('../fields/PurchaseExpenseFields', () => ({ PurchaseExpenseFields: () => null }));
 jest.mock('../fields/DebitNoteFields', () => ({ DebitNoteFields: () => null }));
 jest.mock('../fields/RefundReissueFields', () => ({ RefundReissueFields: () => null }));
+jest.mock('../fields/RefundPartialFields', () => ({ RefundPartialFields: () => null }));
 jest.mock('../fields/AdmAcmFields', () => ({ AdmAcmFields: () => null }));
 
 const { VOUCHER_REGISTRY } = require('../registry');
@@ -328,5 +329,27 @@ describe('validate — Option A branches', () => {
   });
   test.concurrent('zero amount is invalid', async () => {
     expect(PM.validate({ party: 'Office Rent', otherType: 'Expense', bankRef: 'ICICI', amount: 0 }).ok).toBe(false);
+  });
+});
+
+// Refund Partial Voucher — stored as a refund (+ partialAmount) so it reuses the
+// refund plumbing, but takes the partial posting path.
+describe('refund-partial toBody / validate', () => {
+  const RFP = VOUCHER_REGISTRY['refund-partial'];
+  test.concurrent('toBody → category refund + partialAmount, total = amount', async () => {
+    const b = RFP.toBody({ date: '2026-03-23', againstInvoice: 'SHT/BOM/26/0009', againstPurchase: 'PHT/BOM/26/0009',
+      party: 'Global Konnection', counterParty: 'Sugo India', partialAmount: '6000', gstMode: 'intra' }, ctx);
+    expect(b.type).toBe('RF');
+    expect(b.category).toBe('refund');
+    expect(b.partialAmount).toBe(6000);
+    expect(b.total).toBe(6000);
+    expect(b.againstInvoice).toBe('SHT/BOM/26/0009');
+    expect(b.againstPurchase).toBe('PHT/BOM/26/0009');
+  });
+  test.concurrent('validate needs sale + purchase + parties + amount', async () => {
+    const ok = { againstInvoice: 'S', againstPurchase: 'P', party: 'C', counterParty: 'V', partialAmount: 6000 };
+    expect(RFP.validate(ok).ok).toBe(true);
+    expect(RFP.validate({ ...ok, againstPurchase: '' }).ok).toBe(false);
+    expect(RFP.validate({ ...ok, partialAmount: 0 }).ok).toBe(false);
   });
 });

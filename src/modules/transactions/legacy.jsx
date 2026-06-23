@@ -1526,6 +1526,7 @@ function InvoicePaxPanel({inv,cur,label="Invoice",selectable=false,selected,onTo
 // RefundReissueVoucher below is retained for reference only (no longer routed).
 export function RefundVoucher({branch}){ return <VoucherShell category="refund" mode="create" branch={branch} />; }
 export function ReissueVoucher({branch}){ return <VoucherShell category="reissue" mode="create" branch={branch} />; }
+export function RefundPartialVoucher({branch}){ return <VoucherShell category="refund-partial" mode="create" branch={branch} />; }
 export function AdmVoucher({branch}){ return <VoucherShell category="adm" mode="create" branch={branch} />; }
 export function AcmVoucher({branch}){ return <VoucherShell category="acm" mode="create" branch={branch} />; }
 
