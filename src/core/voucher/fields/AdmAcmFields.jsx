@@ -1,6 +1,7 @@
 import React from 'react';
 import { FL, inp } from '../../styles';
 import { todayISO } from '../../dates';
+import { SmartDateInput } from '../../ux/SmartDateInput';
 import { VPlaceOfSupply } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
 import { useVoucherRef } from '../useVoucherRef';
@@ -30,7 +31,7 @@ export function AdmAcmFields({ state, setState, ctx, kind }) {
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
-        <FL label="Date"><input type="date" max={todayISO()} value={state.date || ''} onChange={(e) => patch({ date: e.target.value })} style={inp} /></FL>
+        <FL label="Date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
         <FL label="Ticket / reference (optional)"><input value={state.againstInvoice || ''} onChange={(e) => patch({ againstInvoice: e.target.value })} style={inp} placeholder="Ticket / ADM no." /></FL>
         <FL label="Reason code">
           <select value={state.reasonCode || ''} onChange={(e) => patch({ reasonCode: e.target.value })} style={inp}>

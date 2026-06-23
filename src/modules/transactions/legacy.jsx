@@ -35,6 +35,7 @@ import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { clickable } from '../../core/ux/clickable';
 import { listKeyNav } from '../../core/ux/listKeys';
+import { SmartDateInput } from '../../core/ux/SmartDateInput';
 
 /* ════════════════════════════════════════════════════════════════════
    FINANCE VOUCHER PERSISTENCE
@@ -675,7 +676,7 @@ export function SalesFlight({branch,setRoute}){
                   <td style={{padding:3}}><input value={p.ticket} onChange={e=>upd(p.id,"ticket",e.target.value)} style={{...inp,minWidth:130,fontFamily:"monospace"}}/></td>
                   <td style={{padding:3}}><input value={p.airline} onChange={e=>upd(p.id,"airline",e.target.value)} style={{...inp,minWidth:90}}/></td>
                   <td style={{padding:3}}><input value={p.sector} onChange={e=>upd(p.id,"sector",e.target.value)} style={{...inp,minWidth:90}}/></td>
-                  <td style={{padding:3}}><input type="date" value={p.date} onChange={e=>upd(p.id,"date",e.target.value)} style={{...inp,minWidth:120}}/></td>
+                  <td style={{padding:3}}><SmartDateInput value={p.date} onChange={(iso)=>upd(p.id,"date",iso)} style={{...inp,minWidth:120}}/></td>
                   <td style={{padding:3}}><select value={p.cls} onChange={e=>upd(p.id,"cls",e.target.value)} style={{...inp,minWidth:90}}><option>Economy</option><option>Business</option><option>First</option></select></td>
                   <td style={{padding:3}}><input type="number" value={p.base} onChange={e=>upd(p.id,"base",+e.target.value)} style={{...inp,minWidth:90,textAlign:"right"}}/></td>
                   <td style={{padding:3}}><input type="number" value={p.k3} onChange={e=>upd(p.id,"k3",+e.target.value)} style={{...inp,minWidth:75,textAlign:"right"}} title="K3 tax (GST on airline tax — typically applicable on international tickets)"/></td>
@@ -1008,8 +1009,8 @@ export function SalesHotel({branch,setRoute}){
               <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.passenger} onChange={e=>upd(r.id,"passenger",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:160}}/></td>
-                <td style={{padding:3}}><input type="date" value={r.ci} onChange={e=>upd(r.id,"ci",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input type="date" value={r.co} onChange={e=>upd(r.id,"co",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
+                <td style={{padding:3}}><SmartDateInput value={r.ci} onChange={(iso)=>upd(r.id,"ci",iso)} style={{...inp,minHeight:28,fontSize:11}}/></td>
+                <td style={{padding:3}}><SmartDateInput value={r.co} onChange={(iso)=>upd(r.id,"co",iso)} style={{...inp,minHeight:28,fontSize:11}}/></td>
                 <td style={{padding:3}}><input value={r.rtype} onChange={e=>upd(r.id,"rtype",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
                 <td style={{padding:3}}>
                   <select value={r.meal} onChange={e=>upd(r.id,"meal",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}>
@@ -1898,7 +1899,7 @@ export function PurchaseFlight({branch,setRoute}){
                   <option>Economy</option><option>Premium Economy</option><option>Business</option><option>First</option>
                 </select>
               </td>
-              <td style={{padding:3}}><input type="date" value={p.date} onChange={e=>upd(p.id,"date",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
+              <td style={{padding:3}}><SmartDateInput value={p.date} onChange={(iso)=>upd(p.id,"date",iso)} style={{...inp,minHeight:28,fontSize:11}}/></td>
               <td style={{padding:3}}><input type="number" value={p.base} onChange={e=>upd(p.id,"base",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}}/></td>
               <td style={{padding:3}}><input type="number" value={p.k3} onChange={e=>upd(p.id,"k3",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="K3 tax (GST on airline tax — typically applicable on international tickets)"/></td>
               <td style={{padding:3}}><input type="number" value={p.otherTax} onChange={e=>upd(p.id,"otherTax",+e.target.value||0)} style={{...inp,minHeight:28,fontSize:11,textAlign:"right"}} title="Taxes — YQ/YR fuel, airport fees, UDF, PSF"/></td>
@@ -2016,8 +2017,8 @@ export function PurchaseHoliday({branch,setRoute}){
         <FL label="Package name"><input value={pkg} onChange={e=>setPkg(e.target.value)} style={inp}/></FL>
         <FL label="Destination"><input value={dest} onChange={e=>setDest(e.target.value)} style={inp}/></FL>
         <FL label="No. of pax"><input type="number" value={pax} onChange={e=>setPax(+e.target.value||1)} style={inp}/></FL>
-        <FL label="Departure date"><input type="date" value={dept} onChange={e=>setDept(e.target.value)} style={inp}/></FL>
-        <FL label="Return date"><input type="date" value={rtrn} onChange={e=>setRtrn(e.target.value)} style={inp}/></FL>
+        <FL label="Departure date"><SmartDateInput value={dept} onChange={setDept} style={inp}/></FL>
+        <FL label="Return date"><SmartDateInput value={rtrn} onChange={setRtrn} style={inp}/></FL>
       </div>
 
       {/* Package Type selector */}
@@ -2156,8 +2157,8 @@ export function PurchaseHotelVoucher({branch,setRoute}){
               <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.passenger} onChange={e=>upd(r.id,"passenger",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:160}}/></td>
-                <td style={{padding:3}}><input type="date" value={r.ci} onChange={e=>upd(r.id,"ci",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
-                <td style={{padding:3}}><input type="date" value={r.co} onChange={e=>upd(r.id,"co",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
+                <td style={{padding:3}}><SmartDateInput value={r.ci} onChange={(iso)=>upd(r.id,"ci",iso)} style={{...inp,minHeight:28,fontSize:11}}/></td>
+                <td style={{padding:3}}><SmartDateInput value={r.co} onChange={(iso)=>upd(r.id,"co",iso)} style={{...inp,minHeight:28,fontSize:11}}/></td>
                 <td style={{padding:3}}><input value={r.rtype} onChange={e=>upd(r.id,"rtype",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
                 <td style={{padding:3}}>
                   <select value={r.meal} onChange={e=>upd(r.id,"meal",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}>
@@ -3921,8 +3922,8 @@ export function SalesHoliday({branch,setRoute}){
         <FL label="Client"><input value={client} onChange={e=>setClient(e.target.value)} style={inp}/></FL>
         <FL label="Tour code (optional)"><input value={tourCode} onChange={e=>setTourCode(e.target.value)} style={inp} placeholder="e.g. DXB-4N-2PAX"/></FL>
         <FL label="Destination"><input value={dest} onChange={e=>setDest(e.target.value)} style={inp}/></FL>
-        <FL label="Departure date"><input type="date" value={deptDate} onChange={e=>setDeptDate(e.target.value)} style={inp}/></FL>
-        <FL label="Return date"><input type="date" value={returnDate} onChange={e=>setReturnDate(e.target.value)} style={inp}/></FL>
+        <FL label="Departure date"><SmartDateInput value={deptDate} onChange={setDeptDate} style={inp}/></FL>
+        <FL label="Return date"><SmartDateInput value={returnDate} onChange={setReturnDate} style={inp}/></FL>
         <FL label="No. of pax"><input type="number" value={pax} onChange={e=>setPax(+e.target.value)} style={inp}/></FL>
       </div>
 

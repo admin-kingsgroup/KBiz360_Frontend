@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { Plus } from 'lucide-react';
 import { FL, inp, btnGh, card } from '../../styles';
 import { todayISO } from '../../dates';
+import { SmartDateInput } from '../../ux/SmartDateInput';
 import { LedgerPicker } from '../LedgerPicker';
 import { V_DR, V_CR, DARK, DIM, money2, dnTotals } from '../ui';
 
@@ -39,7 +40,7 @@ export function DebitNoteFields({ state, setState, ctx }) {
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-        <FL label="Voucher date"><input type="date" max={todayISO()} value={state.date || ''} onChange={(e) => patch({ date: e.target.value })} style={inp} /></FL>
+        <FL label="Voucher date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
         <FL label="Against purchase bill (optional)"><input value={state.billNo || ''} onChange={(e) => patch({ billNo: e.target.value })} style={inp} placeholder="PI/BOM/2026/0042" /></FL>
       </div>
 

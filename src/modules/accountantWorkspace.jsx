@@ -75,9 +75,15 @@ const Shell = ({ title, sub, right, children }) => (
 const th = { padding: '8px 12px', background: C.dark, color: C.gold, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'left', whiteSpace: 'nowrap' };
 const td = { padding: '8px 12px', borderBottom: '1px solid #f0f2f7', fontSize: 12.5 };
 const rnum = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
-const Table = ({ children }) => (
+// `pager` (from usePager) renders the infinite-scroll sentinel INSIDE this scroll
+// box, right after the table — so it only triggers a load when you scroll to the
+// bottom of the box (not the moment the table mounts).
+const Table = ({ children, pager }) => (
   <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
-    <div style={{ maxHeight: '70vh', overflow: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>{children}</table></div>
+    <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>{children}</table>
+      {pager && <Pager pager={pager} />}
+    </div>
   </div>
 );
 const aBtn = (bg) => ({ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', borderRadius: 6, cursor: 'pointer', color: '#fff', background: bg, display: 'inline-flex', alignItems: 'center', gap: 5 });
@@ -569,8 +575,7 @@ function AgeingTable({ side = {}, cur, tone, partyLabel = 'Party', onAct, actLab
   // reflect the FULL set (they read `t`/`rows.length`, not the page).
   const pg = usePager(rows);
   return (
-    <>
-    <Table>
+    <Table pager={pg}>
       <thead><tr>
         <th style={th}>{partyLabel}</th>
         {AGE_COLS.map(([, l]) => <th key={l} style={{ ...th, ...rnum }}>{l}</th>)}
@@ -597,8 +602,6 @@ function AgeingTable({ side = {}, cur, tone, partyLabel = 'Party', onAct, actLab
         </tr></tfoot>
       )}
     </Table>
-    <Pager pager={pg} />
-    </>
   );
 }
 
@@ -840,7 +843,7 @@ export function SupplierReco({ branch, setRoute }) {
 
           {/* Statement lines */}
           <SecTitle>Vendor statement ({stmt.length}) — match each to a book entry</SecTitle>
-          <Table>
+          <Table pager={stmtPager}>
             <thead><tr>
               {['Date', 'Invoice / Ref', 'Description', 'Debit', 'Credit', 'Status', 'Match / Action'].map((h, i) =>
                 <th key={h} style={{ ...th, ...(i >= 3 && i <= 4 ? rnum : {}) }}>{h}</th>)}
@@ -874,7 +877,6 @@ export function SupplierReco({ branch, setRoute }) {
               ))}
             </tbody>
           </Table>
-          <Pager pager={stmtPager} />
 
           <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
             A statement <b>debit</b> (they billed us) matches a book <b>credit</b> (a bill we posted); a statement <b>credit</b> (our payment) matches a book <b>debit</b>. Unmatched items on either side are the reconciling differences — usually a missing bill, an unposted payment, or an ADM/ACM not captured.
@@ -981,7 +983,7 @@ export function ClientReco({ branch, setRoute }) {
             <input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} /> Only show differences
           </label>
         </div>
-        <Table>
+        <Table pager={wbPager}>
           <thead><tr>
             {['Client', 'Per Our Books', 'Per Statement', 'Difference', 'Matched / Open', 'Last Reconciled', 'Status', ''].map((h, i) =>
               <th key={h} style={{ ...th, ...(i >= 1 && i <= 3 ? rnum : {}) }}>{h}</th>)}
@@ -1005,7 +1007,6 @@ export function ClientReco({ branch, setRoute }) {
             ))}
           </tbody>
         </Table>
-        <Pager pager={wbPager} />
       </Shell>
     );
   }
@@ -1054,7 +1055,7 @@ export function ClientReco({ branch, setRoute }) {
           </div>
 
           <SecTitle>Client statement ({stmt.length}) — match each to a book entry</SecTitle>
-          <Table>
+          <Table pager={stmtPager}>
             <thead><tr>
               {['Date', 'Invoice / Ref', 'Description', 'Debit', 'Credit', 'Status', 'Match / Action'].map((h, i) =>
                 <th key={h} style={{ ...th, ...(i >= 3 && i <= 4 ? rnum : {}) }}>{h}</th>)}
@@ -1088,7 +1089,6 @@ export function ClientReco({ branch, setRoute }) {
               ))}
             </tbody>
           </Table>
-          <Pager pager={stmtPager} />
           <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
             A statement <b>debit</b> (an invoice) matches a book <b>debit</b> (a sale); a statement <b>credit</b> (their payment) matches a book <b>credit</b> (a receipt) — same direction, since a client is a debtor. Unmatched items are the reconciling differences.
           </div>
@@ -1255,7 +1255,7 @@ export function TallyReco({ branch }) {
           </div>
 
           <SecTitle>Tally rows ({rows.length}) — match each to an ERP posting</SecTitle>
-          <Table>
+          <Table pager={rowsPager}>
             <thead><tr>{['Date', 'Voucher', 'Narration', 'Debit', 'Credit', 'Status', 'Match / Action'].map((h, i) => <th key={h} style={{ ...th, ...(i >= 3 && i <= 4 ? rnum : {}) }}>{h}</th>)}</tr></thead>
             <tbody>
               {rows.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No Tally rows imported yet for {sel}.</td></tr>}
@@ -1285,7 +1285,6 @@ export function TallyReco({ branch }) {
               ))}
             </tbody>
           </Table>
-          <Pager pager={rowsPager} />
           <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
             A Tally <b>debit</b> matches an ERP book <b>debit</b> and a credit a credit (same ledger convention on both sides). Unmatched rows are the ERP↔Tally differences — usually an entry posted in one system but not the other.
           </div>
