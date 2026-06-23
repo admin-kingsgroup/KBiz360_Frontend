@@ -429,11 +429,14 @@ export function useChartOfAccounts(branch) {
   });
 }
 
-export function useSalesRegister(branch, { from, to } = {}) {
+// `fields` (e.g. 'vno,linkNo,sourceRef') fetches a slim projection — for callers that
+// only cross-reference these vouchers (not display their lines), so the heavy
+// lines[]/meta payload isn't pulled over the throttled Atlas link.
+export function useSalesRegister(branch, { from, to, fields } = {}) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['vouchers', 'sale', code || 'all', from || '', to || ''],
-    queryFn: () => apiGet('/api/vouchers', { branch: code, category: 'sale', from, to }),
+    queryKey: ['vouchers', 'sale', code || 'all', from || '', to || '', fields || ''],
+    queryFn: () => apiGet('/api/vouchers', { branch: code, category: 'sale', from, to, ...(fields ? { fields } : {}) }),
     enabled: enabled(),
     staleTime: 30_000,
   });
@@ -594,11 +597,11 @@ export function useUpdateVoucher() {
   });
 }
 
-export function usePurchaseRegister(branch, { from, to } = {}) {
+export function usePurchaseRegister(branch, { from, to, fields } = {}) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['vouchers', 'purchase', code || 'all', from || '', to || ''],
-    queryFn: () => apiGet('/api/vouchers', { branch: code, category: 'purchase', from, to }),
+    queryKey: ['vouchers', 'purchase', code || 'all', from || '', to || '', fields || ''],
+    queryFn: () => apiGet('/api/vouchers', { branch: code, category: 'purchase', from, to, ...(fields ? { fields } : {}) }),
     enabled: enabled(),
     staleTime: 30_000,
   });
@@ -624,13 +627,15 @@ export function useRefundReissue(branch, { from, to } = {}) {
 // posted invoice back to its booking for the per-passenger Pax / PNR / Ticket
 // detail (booking-spawned voucher lines are aggregate heads, so the travel detail
 // lives only on the booking's `rows`). Keyed by linkNo on the consumer side.
-export function useBookingOrders(branch, { status } = {}) {
+export function useBookingOrders(branch, { status, fields } = {}) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['booking-orders', code || 'all', status || 'all'],
+    queryKey: ['booking-orders', code || 'all', status || 'all', fields || ''],
     // A status filter (e.g. 'pending') is applied server-side so a consumer that only
-    // needs one bucket doesn't pull every booking's SO/PO/GP grid.
-    queryFn: () => apiGet('/api/booking-orders', { branch: code, ...(status ? { status } : {}) }),
+    // needs one bucket doesn't pull every booking's SO/PO/GP grid. `fields` fetches a
+    // slim projection (e.g. 'linkNo,status,bookingNo,packageType,rows') for callers
+    // that only need the travel detail, not the full so/po/gp financial nesting.
+    queryFn: () => apiGet('/api/booking-orders', { branch: code, ...(status ? { status } : {}), ...(fields ? { fields } : {}) }),
     enabled: enabled(),
     staleTime: 60_000,
   });

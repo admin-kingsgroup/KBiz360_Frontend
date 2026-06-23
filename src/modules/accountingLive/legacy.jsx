@@ -39,6 +39,7 @@ import {
   useSalesRegister, usePurchaseRegister, useRefundReissue, useInvoiceGP, useBookingOrders,
   useVoucher, useUpdateVoucher, useCostCenters, useVoucherPreview,
 } from '../../core/useAccounting';
+import { apiGet } from '../../core/api';
 import { LedgerVouchers } from '../pnlTally.jsx';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { hasRegistry } from '../../core/voucher/registry';
@@ -1568,10 +1569,19 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   const [to, setTo] = useState(todayISO);
   const [detail, setDetail] = useState(null);
   // Fetch all (date filtering is done client-side because Tally dates are mixed-format strings).
-  const sales = useSalesRegister(branch);
-  const purch = usePurchaseRegister(branch);
+  // The PRIMARY side (this register's own category) is fetched in full — its lines drive the
+  // SO/PO/GP capture pivot. The OTHER side is only cross-referenced (linkNo → vno/sourceRef for
+  // the counterpart Invoice No / Tally Ref columns), so fetch it SLIM (no heavy lines/meta) —
+  // e.g. the Sales Register no longer pulls every full purchase doc just to show its invoice no.
+  const XREF_FIELDS = 'vno,linkNo,sourceRef';
+  const sales = useSalesRegister(branch, tab === 'sales' ? undefined : { fields: XREF_FIELDS });
+  const purch = usePurchaseRegister(branch, tab === 'purchase' ? undefined : { fields: XREF_FIELDS });
   const refReissue = useRefundReissue(branch); // RF/RI folded into BOTH registers' All-modules view
-  const bookingsQ = useBookingOrders(branch); // joins each invoice → its SO/PO/GP for Pax/PNR/Ticket
+  // Join each invoice → its booking, but ONLY for the travel detail (Pax/PNR/Ticket via
+  // booking.rows) + bookingNo/packageType — so fetch a SLIM projection and skip every
+  // booking's heavy so/po/gp grid. The full booking is lazily fetched only when a row's
+  // "print invoice" is clicked (printInvoice below).
+  const bookingsQ = useBookingOrders(branch, { fields: 'linkNo,status,bookingNo,packageType,rows' });
   const q = tab === 'sales' ? sales : purch;
   // Sales register = sale + reissue + refund; Purchase register = purchase + the same
   // RF/RI vouchers (their cost reversal lives in the one combined voucher). They show
@@ -1619,13 +1629,17 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   );
   // Final Invoice Value → open the voucher's journal (JV). Per-row Invoice → print PDF.
   const openJV = (v) => { if (v) setDetail(v); };
-  const printInvoice = (r) => {
+  const printInvoice = async (r) => {
     const b = r && r._booking;
     if (!b) return;
+    // The booking list is slim (no so/po/gp) — fetch the full booking on demand so the
+    // printed invoice has its financial detail. Fall back to the slim row if it fails.
+    let full = b;
+    if (b.id) { try { full = await apiGet(`/api/booking-orders/${b.id}`); } catch { full = b; } }
     openPrintPreview({
-      title: `${tab === 'sales' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo || b.linkNo || ''}`,
+      title: `${tab === 'sales' ? 'Sales Invoice' : 'Purchase Invoice'} · ${full.bookingNo || full.linkNo || ''}`,
       recommend: 'portrait',
-      html: buildBookingInvoice(b, tab === 'sales' ? 'sale' : 'purchase', branch),
+      html: buildBookingInvoice(full, tab === 'sales' ? 'sale' : 'purchase', branch),
     });
   };
 
