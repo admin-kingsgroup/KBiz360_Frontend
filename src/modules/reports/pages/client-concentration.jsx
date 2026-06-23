@@ -15,9 +15,9 @@ import { DataTable } from '../../../shell/DataTable';
 import { PageSection, ResponsiveGrid, StatusPill } from '../../../shell/primitives';
 import { RptShell } from '../components/scaffold';
 
-const COLORS = ['#185FA5', '#27500A', '#854F0B', '#1D9E75', '#A32D2D', '#384677', '#d4a437', '#5a6691', '#0d1326', '#1a2340'];
-const RISK_CLR = { HIGH: '#A32D2D', MEDIUM: '#854F0B', LOW: '#27500A' };
-const RISK_BG = { HIGH: '#FCEBEB', MEDIUM: '#FAEEDA', LOW: '#EAF3DE' };
+const COLORS = ['#2563eb', '#16a34a', '#d97706', '#3fb7a3', '#dc2626', '#2e323c', '#c2a04a', '#5b616e', '#1a1c22', '#1a2340'];
+const RISK_CLR = { HIGH: '#dc2626', MEDIUM: '#d97706', LOW: '#16a34a' };
+const RISK_BG = { HIGH: '#fbe9e9', MEDIUM: '#fbeedb', LOW: '#e8f6ed' };
 const riskTone = { HIGH: 'danger', MEDIUM: 'warning', LOW: 'success' };
 const levelFor = (share) => (share > 0.3 ? 'HIGH' : share > 0.15 ? 'MEDIUM' : 'LOW');
 
@@ -35,7 +35,7 @@ export function ClientConcentration({ branch }) {
       m[b.client].rev += b.sell; m[b.client].gp += b.sell - b.cost; m[b.client].books++;
     });
     return Object.values(m).sort((a, b) => b.rev - a.rev)
-      .map((c, i) => ({ ...c, color: COLORS[i] || '#bfc3d6', share: totalRev > 0 ? c.rev / totalRev : 0 }));
+      .map((c, i) => ({ ...c, color: COLORS[i] || '#cbd0db', share: totalRev > 0 ? c.rev / totalRev : 0 }));
   }, [bills, totalRev]);
 
   const top10Rev = clients.slice(0, 10).reduce((s, c) => s + c.rev, 0);
@@ -50,7 +50,7 @@ export function ClientConcentration({ branch }) {
     { key: 'color', header: '', align: 'center', sortable: false, hideable: false, exportable: false, width: '2.5rem', render: (r) => <span className="inline-block h-3 w-3 rounded-sm" style={{ background: r.color }} /> },
     { key: 'client', header: 'Client', className: 'font-semibold text-navy', hideable: false },
     { key: 'rev', header: 'Revenue', num: true, render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.rev, 0)) },
-    { key: 'gp', header: 'GP', num: true, className: 'text-[#27500A]', render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.gp, 0)) },
+    { key: 'gp', header: 'GP', num: true, className: 'text-[#16a34a]', render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + r.gp, 0)) },
     {
       key: 'share', header: 'Share', num: true, render: (r, v) => (
         <div className="flex flex-col items-end gap-1">
@@ -106,6 +106,8 @@ export function ClientConcentration({ branch }) {
         </PageSection>
 
         <DataTable
+          loading={q.isLoading}
+          isError={q.isError}
           columns={columns}
           rows={clients}
           getRowKey={(r) => r.client}

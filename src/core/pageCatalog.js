@@ -11,21 +11,25 @@
    automatically appear here — no second list to keep in sync.
    ════════════════════════════════════════════════════════════════════ */
 
-import {
-  MENU_MASTERS, MENU_FINANCE, MENU_REPORTS, MENU_HR, MENU_SETTINGS, MENU_ASSETS,
-  MENU_HO_CONTROL, MENU_TRANSACTIONS, MENU_DASHBOARDS, MENU_IMPORT_EXPORT,
-  MENU_APPROVALS, MENU_ACCOUNTS,
-} from './menus';
-import { TAX_ALL, TAX_INDIA, TAX_AFRICA } from './data';
+// Namespace imports (not named) so the catalogue can DISCOVER every menu tree the
+// app exports — including ones added later — instead of a hand-maintained list.
+// Accessed only lazily inside sectionRoots(), never at module-eval, so the
+// menus.js ↔ pageCatalog.js import cycle can't read a binding before it's
+// initialised (TDZ).
+import * as MENUS from './menus';
+import * as DATA from './data';
+// Complete list of routes App.jsx can render — AUTO-GENERATED from App.jsx by
+// scripts/gen-route-manifest.cjs (runs on predev/prebuild/pretest). Lets the
+// catalogue expose EVERY page, including standalone routes not in any nav menu.
+import { APP_ROUTES, APP_ROUTE_LABELS } from './routeManifest.generated';
 
-// Who may open Page Visibility Control (mirrors the backend gate in
-// features/auth/auth.route.js — keep both in sync).
+// Who may open Page Visibility Control: ONLY afshin, by email — no role (not even
+// Super Admin / Senior Finance Manager) grants it. Mirrors the backend gate in
+// features/auth/auth.route.js (requirePageAccessAdmin) — keep both in sync.
 export const PAGE_ACCESS_ADMIN_EMAIL = 'afshin.dhanani@kingsgroupco.com';
-const PAGE_ACCESS_ADMIN_ROLES = new Set(['Super Admin', 'Senior Finance Manager', 'super_admin']);
 
 export function isPageAccessAdmin(user) {
   if (!user) return false;
-  if (PAGE_ACCESS_ADMIN_ROLES.has(user.role)) return true;
   return String(user.email || '').toLowerCase() === PAGE_ACCESS_ADMIN_EMAIL;
 }
 
@@ -34,18 +38,46 @@ export function isPageAccessAdmin(user) {
 // excluded from the catalogue (can't be toggled) and never pruned.
 export const ALWAYS_VISIBLE = new Set(['/dashboard', '/settings/page-access']);
 
-// The top-level sections to expose, in nav order. Each becomes a collapsible
-// group of leaf pages on the control screen. The plain Dashboard pill and the
-// branch Accounts workspace are folded in so nothing reachable is missing.
-// Resolved lazily (inside a function) — never at module-eval time — so the
-// menus.js ↔ pageCatalog.js import cycle can't read a menu binding before it's
-// initialised (TDZ). By the time build() runs, both modules are fully evaluated.
+// Is this value a menu node?  { label, children[] } or a leaf { label, href }.
+function isMenuNode(v) {
+  return !!v && typeof v === 'object' && !Array.isArray(v)
+    && typeof v.label === 'string'
+    && (Array.isArray(v.children) || typeof v.href === 'string');
+}
+
+// Curated order for the sections we already know — gives the nicest grouping and
+// nav-order on the control screen. Listed by EXPORT NAME so they resolve from the
+// live namespaces below.
+const PREFERRED_SECTIONS = [
+  'MENU_DASHBOARDS', 'MENU_FINANCE', 'MENU_APPROVALS', 'MENU_ACCOUNTS', 'MENU_REPORTS',
+  'TAX_ALL', 'TAX_INDIA', 'TAX_AFRICA', 'MENU_MASTERS', 'MENU_TRANSACTIONS',
+  'MENU_HR', 'MENU_ASSETS', 'MENU_HO_CONTROL', 'MENU_SETTINGS', 'MENU_IMPORT_EXPORT',
+];
+// Umbrella / alias exports skipped when auto-appending: they only RE-GROUP sections
+// already listed above (MENU_ADMIN nests HR/Assets/Settings/…; MENU_COMMON_TOP is an
+// array of pills already covered), so including them would duplicate, not add.
+const SECTION_SKIP = new Set(['MENU_ADMIN', 'MENU_COMMON_TOP']);
+
+// The top-level sections to expose. We take the curated order first, then
+// AUTO-APPEND every OTHER menu tree the app exports that isn't already represented.
+// That auto-append is the guarantee the admin asked for: a new page under an
+// existing menu already appears (build() walks children), AND a whole new
+// module/section added as a new MENU_* / TAX_* export shows up here automatically —
+// with no edit to this file. Resolved lazily (TDZ-safe; see the import note above).
 function sectionRoots() {
-  return [
-    MENU_DASHBOARDS, MENU_FINANCE, MENU_APPROVALS, MENU_ACCOUNTS, MENU_REPORTS,
-    TAX_ALL, TAX_INDIA, TAX_AFRICA, MENU_MASTERS, MENU_TRANSACTIONS,
-    MENU_HR, MENU_ASSETS, MENU_HO_CONTROL, MENU_SETTINGS, MENU_IMPORT_EXPORT,
-  ].filter(Boolean);
+  const sources = { ...MENUS, ...DATA };
+  const roots = [];
+  const taken = new Set();
+  // 1) Curated sections, in order.
+  for (const key of PREFERRED_SECTIONS) {
+    if (isMenuNode(sources[key])) { roots.push(sources[key]); taken.add(key); }
+  }
+  // 2) Safety net: any other exported menu tree (a newly added module/section).
+  for (const [key, val] of Object.entries(sources)) {
+    if (taken.has(key) || SECTION_SKIP.has(key)) continue;
+    if (isMenuNode(val)) { roots.push(val); taken.add(key); }
+  }
+  return roots;
 }
 
 // Flatten one menu tree to its navigable leaves: { key (href), label, trail }.
@@ -56,11 +88,31 @@ function collectLeaves(node, trail, out) {
   (node.children || []).forEach((c) => collectLeaves(c, here, out));
 }
 
+// Friendly section name for a standalone route (one not found in any menu),
+// grouped by its first path segment so related extras sit together.
+const PREFIX_SECTION = {
+  finance: 'Finance', reports: 'Reports', hr: 'HR & Payroll', ho: 'HO Control',
+  tax: 'Taxation', masters: 'Masters', settings: 'Settings', accounts: 'Accounts',
+  accounting: 'Accounting', assets: 'Assets', sales: 'Sales', purchase: 'Purchase',
+  'purchase-expense': 'Purchase', dashboards: 'Dashboards', dashboard: 'Dashboards',
+  bookings: 'Bookings', transactions: 'Transactions', expense: 'Expense',
+};
+const titleCase = (s) => String(s || '').split(/[-_]/).filter(Boolean)
+  .map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+const routeSection = (route) => {
+  const seg = route.replace(/^\//, '').split('/');
+  return seg.length < 2 ? 'Other · General' : `Other · ${PREFIX_SECTION[seg[0]] || titleCase(seg[0])}`;
+};
+const routeLabel = (route) =>
+  APP_ROUTE_LABELS[route] || titleCase(route.replace(/^\//, '').split('/').pop());
+
 // Build the catalogue once (menus are static module-level data). Each section
 // lists its leaves de-duplicated by href; a href that appears in several
 // sections is shown only under the first section it occurs in, so toggling it
 // once has one obvious home (it still hides everywhere, since `hidden` is keyed
-// by href). ALWAYS_VISIBLE keys are dropped.
+// by href). ALWAYS_VISIBLE keys are dropped. After the menu sections we fold in
+// EVERY remaining App route (from the generated manifest) under "Other · …"
+// groups, so the admin can hide ANY page — not just nav links.
 function build() {
   const sections = [];
   const seen = new Set();
@@ -74,6 +126,18 @@ function build() {
       items.push({ key: lf.key, label: lf.label });
     }
     if (items.length) sections.push({ section: root.label, icon: root.icon || null, items });
+  }
+  // Standalone routes not surfaced by any menu, grouped under "Other · …".
+  const extra = new Map();
+  for (const route of APP_ROUTES) {
+    if (ALWAYS_VISIBLE.has(route) || seen.has(route)) continue;
+    seen.add(route);
+    const sec = routeSection(route);
+    if (!extra.has(sec)) extra.set(sec, []);
+    extra.get(sec).push({ key: route, label: routeLabel(route) });
+  }
+  for (const sec of [...extra.keys()].sort()) {
+    sections.push({ section: sec, icon: null, items: extra.get(sec).sort((a, b) => a.label.localeCompare(b.label)) });
   }
   return sections;
 }

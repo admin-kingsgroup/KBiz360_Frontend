@@ -16,8 +16,11 @@ import { PeriodBar, periodRange } from '../core/period';
 import { openPrintPreview } from '../core/PrintPreview';
 import { buildBookingInvoice } from '../core/invoiceHtml';
 import { useReportExport } from '../core/reportExportContext';
+import { Search, X, Receipt, FileText } from 'lucide-react';
+import { PageLayout } from '../shell/PageLayout';
+import { DataTable } from '../shell/DataTable';
+import { Button, Select, Input } from '../shell/primitives';
 
-const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
 const MODS = ['SF', 'SH', 'SHT', 'SV', 'SI', 'SC', 'SM'];
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -75,8 +78,15 @@ function invoiceHtml(b, side, branch) {
   return `<style>${css}</style>${body}`;
 }
 
-function useBookingsReg(brCode) {
-  return useQuery({ queryKey: ['booking-orders', brCode], queryFn: () => apiGet('/api/booking-orders', { branch: brCode === 'ALL' ? '' : brCode }) });
+// Fetch the bookings for the register, bounded to the selected window server-side so
+// it doesn't pull every booking's SO/PO/GP grid up front. `filterBookingsForRegister`
+// still applies the same window client-side (a no-op refinement on the fetched set).
+function useBookingsReg(brCode, range) {
+  const from = range?.from || '', to = range?.to || '';
+  return useQuery({
+    queryKey: ['booking-orders', brCode, from, to],
+    queryFn: () => apiGet('/api/booking-orders', { branch: brCode === 'ALL' ? '' : brCode, from, to }),
+  });
 }
 
 
@@ -87,9 +97,13 @@ export function ModuleRegister({ branch, mode = 'both' }) {
   // register lands on that one booking; normal navigation starts blank.
   const [q, setQ] = useState(() => consumePendingRegisterSearch() || '');
   const brCode = branchCode(branch) || 'ALL';
-  const { data = [], isLoading } = useBookingsReg(brCode);
+  // Default to the current MONTH so the register opens fast (~2.7s vs ~10s for the FY
+  // on the remote DB) — the fetch is period-scoped, and full bookings (SO/PO grids +
+  // passenger rows) are heavy to transfer. The period bar widens to QTD/CFY/All when
+  // you need older bookings.
+  const [range, setRange] = useState(() => periodRange('mtd', { branch }));
+  const { data = [], isLoading } = useBookingsReg(brCode, range);
   const spec = VSPECS[mod] || {};
-  const [range, setRange] = useState(() => periodRange('all', { branch })); // default All = inception→today
   const needle = q.trim().toLowerCase();
   const rows = useMemo(
     () => filterBookingsForRegister(data, { mod, from: range.from, to: range.to, needle }),
@@ -142,99 +156,86 @@ export function ModuleRegister({ branch, mode = 'both' }) {
   }, [rows, showSale, showPur]);
   useReportExport({ title: heading, kind: 'vouchers', rows: tallyVouchers, recommend: 'landscape' }, [tallyVouchers, heading]);
   const showMod = mod === 'ALL';
-  // every datum is now a column on the single row → colSpan for loading/empty spans
-  const colSpan = 3 /* bkg·link·date */ + (showMod ? 1 : 0) + 2 /* customer·supplier */
-    + 4 /* passenger·ticket·pnr·sector */
-    + (showSale ? 2 : 0) /* sale·saleGST */ + (showPur ? 2 : 0) /* purchase·purGST */
-    + 1 /* GP */ + (showSale ? 1 : 0) /* saleInv */ + (showPur ? 1 : 0) /* purInv */ + 1 /* invoice */;
 
-  const th = { padding: '9px 12px', background: C.dark, color: C.gold, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'left', whiteSpace: 'nowrap' };
-  const td = { padding: '8px 12px', borderBottom: '1px solid #f0f2f7', fontSize: 12.5 };
-  const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
-  const ibtn = (bg, bd) => ({ padding: '4px 9px', fontSize: 10.5, fontWeight: 700, border: `1px solid ${bd}`, color: bd === C.green ? '#fff' : bd, background: bg, borderRadius: 5, cursor: 'pointer', marginRight: 5 });
+  const columns = useMemo(() => [
+    { key: 'bookingNo', header: 'Booking No', className: 'font-mono font-semibold whitespace-nowrap' },
+    { key: 'linkNo', header: 'Link No', className: 'font-mono text-[#185FA5]', render: (r) => r.linkNo || '—' },
+    { key: 'date', header: 'Date', className: 'whitespace-nowrap text-ink-muted' },
+    ...(showMod ? [{ key: 'module', header: 'Module', className: 'whitespace-nowrap', render: (r) => `${VSPECS[r.module]?.icon || ''} ${VSPECS[r.module]?.name || r.module}` }] : []),
+    { key: 'customer.name', header: 'Customer', render: (r) => r.customer?.name || '—' },
+    { key: 'supplier.name', header: 'Service / Vendor', render: (r) => (r.noSupplier ? '—' : (r.supplier?.name || '—')) },
+    { key: '__pax', header: 'Passenger / Name', sortable: false, render: (r) => bookingTravelDetail(r).passengers || '—' },
+    { key: '__tkt', header: 'Ticket No', sortable: false, className: 'font-mono text-[11px]', render: (r) => bookingTravelDetail(r).tickets || '—' },
+    { key: '__pnr', header: 'PNR', sortable: false, className: 'font-mono text-[11px] text-gold-dark', render: (r) => bookingTravelDetail(r).pnrs || '—' },
+    { key: '__sector', header: 'Sector', sortable: false, className: 'whitespace-nowrap', render: (r) => bookingTravelDetail(r).sectors || '—' },
+    ...(showSale ? [
+      { key: 'so.total', header: 'Sale (incl GST)', num: true, render: (r) => fmt(r.so?.total) },
+      { key: 'so.gst', header: 'Sale GST', num: true, className: 'text-[#854F0B]', render: (r) => fmt(r.so?.gst) },
+    ] : []),
+    ...(showPur ? [
+      { key: 'po.total', header: 'Purchase (incl GST)', num: true, render: (r) => (r.noSupplier ? '—' : fmt(r.po?.total)) },
+      { key: 'po.gst', header: 'Purchase GST', num: true, className: 'text-[#854F0B]', render: (r) => (r.noSupplier ? '—' : fmt(r.po?.gst)) },
+    ] : []),
+    { key: 'gp.total', header: 'Gross Profit', num: true, className: 'font-bold text-success', render: (r) => <>{fmt(r.gp?.total)} <span className="font-semibold text-ink-muted">({r.gp?.pct ?? 0}%)</span></> },
+    ...(showSale ? [{ key: 'saleVno', header: 'Sales Invoice', className: 'font-mono text-[11px] text-ink-muted', render: (r) => r.saleVno || '—' }] : []),
+    ...(showPur ? [{ key: 'purchaseVno', header: 'Purchase Invoice', className: 'font-mono text-[11px] text-ink-muted', render: (r) => (r.noSupplier ? '—' : (r.purchaseVno || '—')) }] : []),
+    {
+      key: '__inv', header: 'Invoice', align: 'center', sortable: false, hideable: false,
+      render: (r) => (
+        <div className="flex justify-center gap-1.5 whitespace-nowrap">
+          {showSale && <Button variant="secondary" size="xs" icon={Receipt} onClick={() => print(r, 'sale')}>Sales</Button>}
+          {showPur && !r.noSupplier && <Button variant="secondary" size="xs" icon={FileText} onClick={() => print(r, 'purchase')}>Purchase</Button>}
+        </div>
+      ),
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [showMod, showSale, showPur, branch]);
+
+  const emptyMsg = needle
+    ? `No deals match “${q.trim()}”.`
+    : `No approved ${mod === 'ALL' ? '' : (spec.name || mod) + ' '}deals. Create one in SO/PO/GP Voucher → approve it.`;
 
   return (
-    <div style={{ margin: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 17, fontWeight: 800, color: C.dark }}>{heading} <span style={{ fontSize: 12, fontWeight: 600, color: C.dim }}>(view-only)</span></div>
-          <div style={{ fontSize: 12, color: C.dim }}>Approved SO/PO/GP deals — <b>one line per booking</b> with full sale / purchase / GST / GP detail. All entry is via <b>Finance ▸ Vouchers ▸ SO/PO/GP Voucher</b>. {mode === 'sales' ? 'Print the Sales Invoice (give to customer)' : mode === 'purchase' ? 'Print the Purchase Invoice (internal filing)' : 'Print the Sales Invoice (customer) or Purchase Invoice (filing)'} — Link No stamped.</div>
-        </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <PeriodBar branch={branch} compact defaultPreset="all" onChange={setRange} />
-          <select value={mod} onChange={(e) => setMod(e.target.value)} style={{ padding: '8px 12px', fontSize: 13, fontWeight: 700, border: `1px solid ${C.border}`, borderRadius: 6, background: '#fff', color: C.dark }}>
+    <PageLayout
+      title={<>{heading} <span className="text-xs font-semibold text-ink-muted">(view-only)</span></>}
+      subtitle={`Approved SO/PO/GP deals — one line per booking with full sale / purchase / GST / GP detail. All entry is via Finance ▸ Vouchers ▸ SO/PO/GP Voucher. ${mode === 'sales' ? 'Print the Sales Invoice (give to customer)' : mode === 'purchase' ? 'Print the Purchase Invoice (internal filing)' : 'Print the Sales Invoice (customer) or Purchase Invoice (filing)'} — Link No stamped.`}
+      filters={
+        <>
+          <PeriodBar branch={branch} compact defaultPreset="mtd" onChange={setRange} />
+          <div className="w-52"><Select value={mod} onChange={(e) => setMod(e.target.value)} className="font-semibold">
             <option value="ALL">📋 All modules</option>
             {MODS.map((m) => <option key={m} value={m}>{(VSPECS[m]?.icon || '') + ' ' + (VSPECS[m]?.name || m)}</option>)}
-          </select>
-        </div>
-      </div>
-      {/* Search across everything captured on the SO/PO — passenger name, ticket, PNR, sector, customer, supplier… */}
-      <div style={{ position: 'relative', marginBottom: 10, maxWidth: 460 }}>
-        <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: C.dim, fontSize: 13, pointerEvents: 'none' }}>🔍</span>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search passenger / guest / ticket / PNR / sector / customer / supplier / link no…"
-          style={{ width: '100%', padding: '9px 30px 9px 32px', fontSize: 13, border: `1px solid ${C.border}`, borderRadius: 8, background: '#fff', color: C.dark, boxSizing: 'border-box' }}
-        />
-        {q && <button onClick={() => setQ('')} title="Clear" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: C.dim, fontSize: 15 }}>✕</button>}
-      </div>
-      <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
-        <div style={{ maxHeight: '72vh', overflow: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr>
-              <th style={th}>Booking No</th><th style={th}>Link No</th><th style={th}>Date</th>
-              {showMod && <th style={th}>Module</th>}
-              <th style={th}>Customer</th>
-              <th style={th}>Service / Vendor</th>
-              <th style={th}>Passenger / Name</th>
-              <th style={th}>Ticket No</th>
-              <th style={th}>PNR</th>
-              <th style={th}>Sector</th>
-              {showSale && <th style={{ ...th, ...num }}>Sale (incl GST)</th>}
-              {showSale && <th style={{ ...th, ...num }}>Sale GST</th>}
-              {showPur && <th style={{ ...th, ...num }}>Purchase (incl GST)</th>}
-              {showPur && <th style={{ ...th, ...num }}>Purchase GST</th>}
-              <th style={{ ...th, ...num }}>Gross Profit</th>
-              {showSale && <th style={th}>Sales Invoice</th>}
-              {showPur && <th style={th}>Purchase Invoice</th>}
-              <th style={{ ...th, textAlign: 'center' }}>Invoice</th>
-            </tr></thead>
-            <tbody>
-              {isLoading && <tr><td colSpan={colSpan} style={{ ...td, textAlign: 'center', color: C.dim, padding: 22 }}>Loading…</td></tr>}
-              {!isLoading && rows.length === 0 && <tr><td colSpan={colSpan} style={{ ...td, textAlign: 'center', color: C.dim, padding: 22 }}>{needle ? `No deals match “${q.trim()}”.` : `No approved ${mod === 'ALL' ? '' : (spec.name || mod) + ' '}deals. Create one in SO/PO/GP Voucher → approve it.`}</td></tr>}
-              {rows.map((b, i) => {
-                const tv = bookingTravelDetail(b);
-                return (
-                <tr key={b.id} style={{ background: i % 2 ? '#fafbff' : '#fff' }}>
-                  <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700 }}>{b.bookingNo}</td>
-                  <td style={{ ...td, fontFamily: 'monospace', color: C.blue }}>{b.linkNo || '—'}</td>
-                  <td style={{ ...td, color: C.dim, whiteSpace: 'nowrap' }}>{b.date}</td>
-                  {showMod && <td style={{ ...td, whiteSpace: 'nowrap' }}>{(VSPECS[b.module]?.icon || '') + ' ' + (VSPECS[b.module]?.name || b.module)}</td>}
-                  <td style={{ ...td }}>{b.customer?.name || '—'}</td>
-                  <td style={{ ...td }}>{b.noSupplier ? '—' : (b.supplier?.name || '—')}</td>
-                  <td style={{ ...td, minWidth: 140 }}>{tv.passengers || '—'}</td>
-                  <td style={{ ...td, fontFamily: 'monospace', fontSize: 11 }}>{tv.tickets || '—'}</td>
-                  <td style={{ ...td, fontFamily: 'monospace', fontSize: 11, color: C.gold }}>{tv.pnrs || '—'}</td>
-                  <td style={{ ...td, whiteSpace: 'nowrap' }}>{tv.sectors || '—'}</td>
-                  {showSale && <td style={{ ...td, ...num }}>{fmt(b.so?.total)}</td>}
-                  {showSale && <td style={{ ...td, ...num, color: '#854F0B' }}>{fmt(b.so?.gst)}</td>}
-                  {showPur && <td style={{ ...td, ...num }}>{b.noSupplier ? '—' : fmt(b.po?.total)}</td>}
-                  {showPur && <td style={{ ...td, ...num, color: '#854F0B' }}>{b.noSupplier ? '—' : fmt(b.po?.gst)}</td>}
-                  <td style={{ ...td, ...num, fontWeight: 700, color: C.green }}>{fmt(b.gp?.total)} <span style={{ fontWeight: 600, color: C.dim }}>({b.gp?.pct ?? 0}%)</span></td>
-                  {showSale && <td style={{ ...td, fontFamily: 'monospace', fontSize: 11, color: C.dim }}>{b.saleVno || '—'}</td>}
-                  {showPur && <td style={{ ...td, fontFamily: 'monospace', fontSize: 11, color: C.dim }}>{b.noSupplier ? '—' : (b.purchaseVno || '—')}</td>}
-                  <td style={{ ...td, textAlign: 'center', whiteSpace: 'nowrap' }}>
-                    {showSale && <button onClick={() => print(b, 'sale')} style={ibtn('#fff', C.blue)}>🧾 Sales Invoice</button>}
-                    {showPur && !b.noSupplier && <button onClick={() => print(b, 'purchase')} style={ibtn('#fff', C.dark)}>📄 Purchase Invoice</button>}
-                  </td>
-                </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+          </Select></div>
+          {/* Search across everything captured on the SO/PO — passenger, ticket, PNR, sector, customer, supplier… */}
+          <div className="relative w-full max-w-[460px]">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search passenger / guest / ticket / PNR / sector / customer / supplier / link no…"
+              className="pl-9 pr-9"
+            />
+            {q && (
+              <button onClick={() => setQ('')} title="Clear" className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-subtle transition-colors hover:text-ink">
+                <X size={15} />
+              </button>
+            )}
+          </div>
+        </>
+      }
+    >
+      <DataTable
+        columns={columns}
+        rows={rows}
+        getRowKey={(b) => b.id}
+        loading={isLoading}
+        emptyMessage={emptyMsg}
+        stickyHeader
+        stickyFirstColumn
+        showColumnToggle
+        maxHeight="72vh"
+        minWidth="80rem"
+      />
+    </PageLayout>
   );
 }

@@ -22,10 +22,10 @@ export function UserMenu({currentUser, setCurrentUser, setRoute}){
     .toUpperCase();
   const roleColor = {
     "Super Admin":"#A32D2D", "Director":"#3C1B14",
-    "Senior Finance Manager":"#0d1326", "Sr. Accounts Executive":"#6B4C8B",
+    "Senior Finance Manager":"#1a1c22", "Sr. Accounts Executive":"#6B4C8B",
     "Accounts Executive":"#2F7A8E", "HR Manager":"#384677",
   };
-  const ringColor = roleColor[currentUser.role] || "#d4a437";
+  const ringColor = roleColor[currentUser.role] || "#c2a04a";
 
   const handleSignOut = async () => {
     setOpen(false);
@@ -39,9 +39,13 @@ export function UserMenu({currentUser, setCurrentUser, setRoute}){
         <div onClick={()=>setOpen(o=>!o)}
           onMouseEnter={()=>setTriggerHover(true)}
           onMouseLeave={()=>setTriggerHover(false)}
+          role="button" tabIndex={0} aria-haspopup="menu" aria-expanded={open}
+          aria-label={currentUser.name+" — account menu"}
+          onKeyDown={(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setOpen(o=>!o); } }}
           title={currentUser.name+" — Click for menu"}
+          className="max-desktop:min-h-[44px] max-desktop:min-w-[44px]"
           style={{width:32,height:32,borderRadius:"50%",
-            background:"linear-gradient(135deg,#d4a437,#9a6810)",
+            background:"linear-gradient(135deg,#c2a04a,#9a6810)",
             border:"2px solid "+ringColor,
             display:"flex",alignItems:"center",justifyContent:"center",
             fontSize:11.5,fontWeight:800,color:"#fff",cursor:"pointer",
@@ -87,7 +91,7 @@ export function UserMenu({currentUser, setCurrentUser, setRoute}){
             }}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
                 <div style={{width:40,height:40,borderRadius:"50%",
-                  background:"linear-gradient(135deg,#d4a437,#9a6810)",
+                  background:"linear-gradient(135deg,#c2a04a,#9a6810)",
                   display:"flex",alignItems:"center",justifyContent:"center",
                   fontSize:14,fontWeight:800,color:"#fff",flexShrink:0,
                   boxShadow: "0 2px 4px rgba(212, 164, 55, 0.2)"}}>
@@ -108,8 +112,8 @@ export function UserMenu({currentUser, setCurrentUser, setRoute}){
                       display: "inline-block",
                       fontSize: 8.5,
                       fontWeight: 700,
-                      color: ringColor === "#0d1326" ? "#334155" : ringColor,
-                      background: (ringColor === "#0d1326" ? "#334155" : ringColor) + "15",
+                      color: ringColor === "#1a1c22" ? "#334155" : ringColor,
+                      background: (ringColor === "#1a1c22" ? "#334155" : ringColor) + "15",
                       padding: "1.5px 5px",
                       borderRadius: 4,
                       textTransform: "uppercase",
@@ -157,7 +161,7 @@ export function MenuItem({icon:Icon, label, onClick, danger}){
   const activeBg = danger ? "#fef2f2" : "#f1f5f9";
   const activeFg = danger ? "#ef4444" : "#0f172a";
   const normalFg = danger ? "#b91c1c" : "#334155";
-  const iconColor = danger ? (hovered ? "#ef4444" : "#b91c1c") : (hovered ? "#0070f2" : "#64748b");
+  const iconColor = danger ? (hovered ? "#ef4444" : "#b91c1c") : (hovered ? "#2563eb" : "#64748b");
 
   return (
     <div onClick={onClick}

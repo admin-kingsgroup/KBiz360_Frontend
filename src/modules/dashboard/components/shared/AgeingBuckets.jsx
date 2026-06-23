@@ -10,15 +10,15 @@ export function AgeingBuckets({ buckets, kind = 'receivable', formatMoney, scale
         <div key={b.bucket} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <div style={{ width: 8, height: condensed ? 26 : 30, background: b.color, borderRadius: 2 }} />
           <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontSize: 11, color: '#0d1326', fontWeight: 600 }}>{b.bucket}</p>
-            {!condensed && <p style={{ margin: 0, fontSize: 9.5, color: '#5a6691' }}>{b.count} {itemLabel}</p>}
+            <p style={{ margin: 0, fontSize: 11, color: '#14161a', fontWeight: 600 }}>{b.bucket}</p>
+            {!condensed && <p style={{ margin: 0, fontSize: 9.5, color: '#5b616e' }}>{b.count} {itemLabel}</p>}
           </div>
           <p
             style={{
               margin: 0,
               fontSize: condensed ? 11.5 : 12,
               fontWeight: 700,
-              color: '#0d1326',
+              color: '#14161a',
               fontFamily: 'monospace',
             }}
           >

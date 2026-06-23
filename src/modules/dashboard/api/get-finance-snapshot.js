@@ -38,7 +38,12 @@ const monthLabel = (k) => { const [y, m] = k.split('-'); return `${MON[+m - 1]} 
 // Revenue trend → last 12 months of sales (taxable value), with same-month-last-year.
 export const getRevenueTrend = async (branchCode) => {
   try {
-    const sales = await apiGet('/api/vouchers', { category: 'sale', branch: branchCode });
+    // Only the last ~24 months are ever rendered (12 months + same-month-last-year)
+    // and only date+subtotal are summed → bound the range and project to those two
+    // fields so we never pull the whole voucher history (with line payloads).
+    const now = new Date();
+    const from = `${now.getFullYear() - 2}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const sales = await apiGet('/api/vouchers', { category: 'sale', branch: branchCode, from, fields: 'date,subtotal' });
     const byMonth = {};
     for (const v of sales || []) { const k = ym(v.date); if (k) byMonth[k] = (byMonth[k] || 0) + (v.subtotal || 0); }
     const months = Object.keys(byMonth).sort();
@@ -53,7 +58,9 @@ export const getRevenueTrend = async (branchCode) => {
 // valueKey/countKey it's configured with (customer or supplier).
 const topEntities = async (category, branchCode) => {
   try {
-    const rows = await apiGet('/api/vouchers', { category, branch: branchCode });
+    // Same rows + same ranking, but project to only the summed fields so the heavy
+    // lines[]/meta payload never crosses the wire (was fetching every full voucher).
+    const rows = await apiGet('/api/vouchers', { category, branch: branchCode, fields: 'date,subtotal,party,branch' });
     const map = {};
     for (const v of rows || []) {
       const name = v.party || '—';
@@ -76,9 +83,9 @@ export const getTopSuppliers = async (branchCode) => topEntities('purchase', bra
 
 // AR / AP ageing buckets (live, FIFO) → the shape AgeingBuckets renders.
 const BUCKET_META = [
-  ['d0', '0–30 days', '#27500A'],
-  ['d30', '31–60 days', '#854F0B'],
-  ['d60', '61–90 days', '#A32D2D'],
+  ['d0', '0–30 days', '#16a34a'],
+  ['d30', '31–60 days', '#d97706'],
+  ['d60', '61–90 days', '#dc2626'],
   ['d90', '90+ days', '#6b1010'],
 ];
 const ageingSide = async (sideKey) => {

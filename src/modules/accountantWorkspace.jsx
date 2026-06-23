@@ -5,7 +5,6 @@
 // Branch-scoped via the top-right selector (the `branch` prop), exactly like every
 // other live screen. Cards/links jump into the existing working screens via setRoute.
 import React, { useEffect, useMemo, useState } from 'react';
-import { card } from '../core/styles';
 import { bc } from '../core/styles';
 import {
   branchCode, useAgeing, useTaxSummary, useTrialBalance, useVoucherApprovals,
@@ -19,8 +18,12 @@ import {
   ListChecks, ArrowRight, Plus, RefreshCw, Calendar, History, AlertCircle, CheckCircle2,
   Scale, Coins, CreditCard,
 } from 'lucide-react';
+import { PageLayout } from '../shell/PageLayout';
 
-const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec', amber: '#854F0B' };
+const C = { dark: '#1a1c22', gold: '#c2a04a', blue: '#2563eb', red: '#dc2626', green: '#16a34a', dim: '#5b616e', border: '#e6e8ec', amber: '#d97706' };
+// Design-system card values (brand radius + soft elevation + subtle border), so every
+// `{...card}` surface in this workspace adopts the premium look without structural change.
+const card = { background: '#fff', border: '1px solid #e6e8ec', borderRadius: 12, boxShadow: '0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
 const brLabel = (b) => (b === 'ALL' || !b ? 'All Branches' : (b.name || b.code || b));
 
@@ -43,16 +46,9 @@ export function groupBalance(rows, re) {
 
 // ── shared UI bits ───────────────────────────────────────────────────────────
 const Shell = ({ title, sub, right, children }) => (
-  <div style={{ margin: 12 }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-      <div>
-        <div style={{ fontSize: 17, fontWeight: 800, color: C.dark }}>{title}</div>
-        {sub && <div style={{ fontSize: 12, color: C.dim }}>{sub}</div>}
-      </div>
-      {right && <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>{right}</div>}
-    </div>
+  <PageLayout title={title} subtitle={sub} actions={right}>
     {children}
-  </div>
+  </PageLayout>
 );
 const th = { padding: '8px 12px', background: C.dark, color: C.gold, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'left', whiteSpace: 'nowrap' };
 const td = { padding: '8px 12px', borderBottom: '1px solid #f0f2f7', fontSize: 12.5 };
@@ -115,8 +111,11 @@ export function DashboardAccountant({ branch, setRoute }) {
   // GST is a PERIODIC return — scope to the current month (a bare call is inception-to-date).
   const tax = useTaxSummary(branch, { from: monthFrom, to: today }).data || {};
   const tb = useTrialBalance(branch).data?.rows || []; // bare = cumulative closing = current balance
-  const bookings = useBookingOrders(branch).data || [];
-  const pendVouchers = useVoucherApprovals(branch, 'pending').data || [];
+  const bookings = useBookingOrders(branch, { status: 'pending' }).data || []; // only pending is used here (stuck/suspense/counts)
+  // /api/vouchers/approvals returns an OBJECT { counts, entries } — NOT an array. Reading
+  // `.data || []` then `.length` yielded undefined → pendCount became NaN (tile showed
+  // "NaN" and the "all posted" check never went green). Use the entries[] array.
+  const pendVouchers = useVoucherApprovals(branch, 'pending').data?.entries || [];
   const sales = useSalesRegister(branch).data || [];
   const purch = usePurchaseRegister(branch).data || [];
   const out = useOutstanding(branch).data || {};
@@ -204,13 +203,18 @@ export function DashboardAccountant({ branch, setRoute }) {
     fontWeight: '700',
     fontSize: '12.5px',
     color: active ? C.gold : C.dim,
+    // Use side longhands (not the `border` shorthand) so toggling `active` never
+    // mixes shorthand `border` with longhand `borderBottom` — that combination
+    // triggers React's "Removing a style property during rerender" warning.
+    borderTop: 'none',
+    borderLeft: 'none',
+    borderRight: 'none',
     borderBottom: active ? `3px solid ${C.gold}` : '3px solid transparent',
-    background: active ? '#1a2238' : 'transparent',
+    background: active ? '#1a1c22' : 'transparent',
     borderTopLeftRadius: '6px',
     borderTopRightRadius: '6px',
     transition: 'all 0.2s ease',
     marginRight: '6px',
-    border: 'none',
     outline: 'none',
   });
 
@@ -220,7 +224,7 @@ export function DashboardAccountant({ branch, setRoute }) {
     <Shell
       title="Branch Accountant Portal"
       sub={`${brLabel(branch)} · workspace and accounts control${age.asOf ? ` · as on ${age.asOf}` : ''}`}
-      right={<>{qa('Receipt', '/receipts')}{qa('Payment', '/payments', C.amber)}{qa('Contra', '/contra', '#6b21a8')}{qa('Journal', '/journal', C.dark)}{qa('Purchase Expense', '/purchase-expense', C.amber)}</>}
+      right={<>{qa('Receipt', '/receipts')}{qa('Payment', '/payments', C.amber)}{qa('Contra', '/contra', '#6b4c8b')}{qa('Journal', '/journal', C.dark)}{qa('Purchase Expense', '/purchase-expense', C.amber)}</>}
     >
       {/* Workspace Tabs Navigation */}
       <div style={{ display: 'flex', borderBottom: `2px solid ${C.border}`, marginBottom: 16 }}>
@@ -498,7 +502,7 @@ export function DashboardAccountant({ branch, setRoute }) {
               return (
                 <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderTop: i ? '1px solid #f0f2f7' : 'none' }}>
                   <span onClick={() => it.manualOnly && toggleManualCheck(it.key)}
-                    style={{ width: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? 'pointer' : 'default', background: ok ? C.green : (it.manualOnly ? '#c7ccdb' : C.amber), fontSize: 11 }}>
+                    style={{ width: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? 'pointer' : 'default', background: ok ? C.green : (it.manualOnly ? '#cbd0db' : C.amber), fontSize: 11 }}>
                     {ok ? '✓' : (it.manualOnly ? '' : '!')}
                   </span>
                   <div style={{ flex: 1 }}>
@@ -632,8 +636,9 @@ export function SupplierReco({ branch, setRoute }) {
 
 // ════════════════════════ 5) SUSPENSE / UNSPECIFIED CLEARING ═══════════════════
 export function SuspenseClearing({ branch, setRoute }) {
-  const bookings = useBookingOrders(branch).data || [];
-  const pendVouchers = useVoucherApprovals(branch, 'pending').data || [];
+  const bookings = useBookingOrders(branch, { status: 'pending' }).data || []; // only pending is used here (stuck/suspense/counts)
+  // /api/vouchers/approvals returns { counts, entries } — use the entries[] array.
+  const pendVouchers = useVoucherApprovals(branch, 'pending').data?.entries || [];
   // Suspense = pending items the books can't accept yet: a booking failing the
   // verification gate (missing ledger / out of balance), or a pending voucher.
   const stuck = useMemo(() => bookings
@@ -668,8 +673,9 @@ export function SuspenseClearing({ branch, setRoute }) {
 // ════════════════════════ 6) MONTH-END CHECKLIST / DAY-CLOSE ═══════════════════
 export function MonthEndChecklist({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
-  const bookings = useBookingOrders(branch).data || [];
-  const pendVouchers = useVoucherApprovals(branch, 'pending').data || [];
+  const bookings = useBookingOrders(branch, { status: 'pending' }).data || []; // only pending is used here (stuck/suspense/counts)
+  // /api/vouchers/approvals returns { counts, entries } — use the entries[] array.
+  const pendVouchers = useVoucherApprovals(branch, 'pending').data?.entries || [];
   const tbData = useTrialBalance(branch).data || {};
   const tb = tbData.rows || [];
 
@@ -716,7 +722,7 @@ export function MonthEndChecklist({ branch, setRoute }) {
           return (
             <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderTop: i ? '1px solid #f0f2f7' : 'none' }}>
               <span onClick={() => it.manualOnly && toggleManual(it.key)}
-                style={{ width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? 'pointer' : 'default', background: ok ? C.green : (it.manualOnly ? '#c7ccdb' : C.amber) }}>
+                style={{ width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? 'pointer' : 'default', background: ok ? C.green : (it.manualOnly ? '#cbd0db' : C.amber) }}>
                 {ok ? '✓' : (it.manualOnly ? '' : '!')}
               </span>
               <div style={{ flex: 1 }}>

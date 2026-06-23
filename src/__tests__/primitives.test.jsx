@@ -3,9 +3,11 @@
 // interactive bits (Button click, Drawer open/close, FormField error) work.
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { Plus } from 'lucide-react';
 import {
   Button, StatusPill, Badge, PageSection, ResponsiveGrid, Toolbar, FilterBar,
   FormField, Input, Select, Textarea, EmptyState, ErrorState, LoadingState, Drawer, Modal,
+  IconButton, Checkbox, Switch, Card, Skeleton, SkeletonTable, Tooltip,
 } from '../shell/primitives';
 
 describe('primitives', () => {
@@ -91,5 +93,33 @@ describe('primitives', () => {
     render(<Modal title="Confirm" onClose={() => {}}><div>inside</div></Modal>);
     expect(screen.getByText('Confirm')).toBeInTheDocument();
     expect(screen.getByText('inside')).toBeInTheDocument();
+  });
+
+  test('IconButton fires onClick and exposes its label', () => {
+    const onClick = jest.fn();
+    render(<IconButton icon={Plus} label="Add row" onClick={onClick} />);
+    fireEvent.click(screen.getByLabelText('Add row'));
+    expect(onClick).toHaveBeenCalled();
+  });
+
+  test('Checkbox + Switch toggle their value', () => {
+    const onCheck = jest.fn(); const onToggle = jest.fn();
+    render(<Checkbox checked={false} onChange={onCheck} label="Active" />);
+    fireEvent.click(screen.getByText('Active'));
+    expect(onCheck).toHaveBeenCalledWith(true);
+    render(<Switch checked={false} onChange={onToggle} label="Live" />);
+    fireEvent.click(screen.getByRole('switch'));
+    expect(onToggle).toHaveBeenCalledWith(true);
+  });
+
+  test('Card / Skeleton / SkeletonTable / Tooltip render', () => {
+    render(<Card><div>panel</div></Card>);
+    expect(screen.getByText('panel')).toBeInTheDocument();
+    const { container: skel } = render(<SkeletonTable rows={3} cols={3} />);
+    expect(skel.querySelectorAll('.kb-skeleton').length).toBeGreaterThan(0);
+    render(<Skeleton className="h-3" />);
+    render(<Tooltip label="hint"><button>hover me</button></Tooltip>);
+    expect(screen.getByText('hover me')).toBeInTheDocument();
+    expect(screen.getByText('hint')).toBeInTheDocument();
   });
 });

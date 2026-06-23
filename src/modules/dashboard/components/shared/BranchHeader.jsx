@@ -1,41 +1,24 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
-import { btnG, btnGh } from '../../../../core/styles';
-import { useMobile } from '../../../../core/hooks';
 import { CUR_MONTH_LABEL } from '../../../../core/dates';
 import { CONSOLIDATED_LABEL } from '../../../../core/data';
+import { Button } from '../../../../shell/primitives';
 
 export function BranchHeader({ branch, branchCode, isIndia, bookingsCount, onNavigate }) {
-  const mob = useMobile();
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-        flexWrap: 'wrap',
-        gap: 8,
-      }}
-    >
-      <div>
-        <h2 style={{ margin: 0, fontSize: mob ? 16 : 20, fontWeight: 800, color: '#0d1326' }}>
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="kbiz-page-title truncate">
           {branch === 'ALL' ? 'Group Dashboard' : 'Branch Dashboard'} — {branchCode || CONSOLIDATED_LABEL}
-        </h2>
-        <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#5a6691' }}>
+        </h1>
+        <p className="mt-0.5 text-[13px] text-ink-muted">
           {CUR_MONTH_LABEL} · Live data from {bookingsCount} bookings · {isIndia ? 'GST Regime' : 'VAT Regime'}
         </p>
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={() => onNavigate('/sales/flight')} style={{ ...btnG, fontSize: 11, background: '#185FA5' }}>
-          <Plus size={13} /> New Sale
-        </button>
-        <button onClick={() => onNavigate('/receipts')} style={{ ...btnG, fontSize: 11, background: '#27500A' }}>
-          <Plus size={13} /> Receipt
-        </button>
-        <button onClick={() => onNavigate('/reports/pnl')} style={{ ...btnGh, fontSize: 11 }}>
-          P&amp;L →
-        </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="primary" icon={Plus} onClick={() => onNavigate('/sales/flight')}>New Sale</Button>
+        <Button size="sm" variant="success" icon={Plus} onClick={() => onNavigate('/receipts')}>Receipt</Button>
+        <Button size="sm" variant="secondary" onClick={() => onNavigate('/reports/pnl')}>P&amp;L →</Button>
       </div>
     </div>
   );

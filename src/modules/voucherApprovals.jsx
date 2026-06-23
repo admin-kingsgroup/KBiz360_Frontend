@@ -20,11 +20,12 @@ import { BookingApprovals } from './bookingOrder';
 import { bc } from '../core/styles';
 import { PeriodBar, periodRange } from '../core/period';
 import { CONSOLIDATED_LABEL } from '../core/data';
+import { SkeletonTable } from '../shell/primitives';
 
 // Full rupee amount with Indian grouping — NO Cr/L abbreviation.
 const money = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
 
-const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec' };
+const C = { dark: '#1a1c22', gold: '#c2a04a', blue: '#2563eb', red: '#dc2626', green: '#16a34a', dim: '#5b616e', border: '#e6e8ec' };
 const VCH = { payment: 'Payment', receipt: 'Receipt', contra: 'Contra', journal: 'Journal', 'credit-note': 'Credit Note', 'debit-note': 'Debit Note', 'purchase-expense': 'Purchase Expense' };
 const card = { background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' };
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
@@ -65,7 +66,10 @@ export function VoucherApprovals({ branch, currentUser }) {
   useModalEsc(() => setViewId(null), !!viewId);     // Esc closes the view modal
   useModalEsc(() => setEditId(null), !!editId);     // Esc closes the edit modal
   const cur = (bc(branch) || {}).cur || '₹';
-  const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
+  // Default to the current FY (not All): the Approved/Deleted tabs can hold thousands
+  // of settled entries, and loading them all-time was ~18-40s. CFY keeps every tab fast;
+  // the period bar still lets you widen to All when you need older entries.
+  const [range, setRange] = useState(() => periodRange('cfy', { branch }));
   const q = useVoucherApprovals(branch, status, { from: range.from, to: range.to });
   const d = q.data || {};
   // Vouchers edited ≥ once (cross-cuts status) — its own source for the Edited tab.
@@ -117,11 +121,30 @@ export function VoucherApprovals({ branch, currentUser }) {
   const doApproveSelected = async () => {
     if (!sel.size) return;
     const { confirmed } = await confirmDialog({ title: `Approve ${sel.size} voucher(s)?`, message: 'They will post to the books.', confirmLabel: 'Approve' });
-    if (confirmed) approveMany.mutate({ ids: [...sel], approver: 'admin' }, { onSuccess: () => { setSel(new Set()); toast(`Approved ${sel.size} voucher(s)`); }, onError: (e) => toast(e?.message || 'Approve failed', 'error') });
+    if (confirmed) approveMany.mutate({ ids: [...sel], approver: 'admin' }, {
+      // Read the server tally instead of blindly claiming success — some may fail the
+      // posting gate / be out of branch scope. Surface "Approved X of Y · N failed (why)".
+      onSuccess: (res) => {
+        setSel(new Set());
+        const a = res?.approved ?? 0, f = res?.failed ?? 0, t = res?.total ?? a + f;
+        if (f > 0) {
+          const why = (res?.errors || []).map((e) => e?.error).filter(Boolean).slice(0, 2).join(' · ');
+          toast(`Approved ${a} of ${t} · ${f} failed${why ? ` — ${why}` : ''}`, 'error');
+        } else { toast(`Approved ${a} voucher(s)`); }
+      },
+      onError: (e) => toast(e?.message || 'Approve failed', 'error'),
+    });
   };
   const doApproveAll = async () => {
     const { confirmed } = await confirmDialog({ title: `Approve all ${counts.pending.n} pending vouchers?`, message: `For ${branchLabel(branch)}. They will post to the books.`, confirmLabel: 'Approve all' });
-    if (confirmed) approveAll.mutate({ branch, approver: 'admin' }, { onSuccess: () => toast('All pending vouchers approved'), onError: (e) => toast(e?.message || 'Approve failed', 'error') });
+    if (confirmed) approveAll.mutate({ branch, approver: 'admin' }, {
+      onSuccess: (res) => {
+        const a = res?.approved ?? 0, f = res?.failed ?? 0, t = res?.total ?? a + f;
+        if (f > 0) toast(`Approved ${a} of ${t} · ${f} failed`, 'error');
+        else toast(`Approved all ${a} pending voucher(s)`);
+      },
+      onError: (e) => toast(e?.message || 'Approve failed', 'error'),
+    });
   };
 
   // Build the nested tree: Group › Sub-group › Ledger › Entries (one row per
@@ -163,7 +186,7 @@ export function VoucherApprovals({ branch, currentUser }) {
   const setMany = (keys, v) => setOpen((s) => ({ ...s, ...Object.fromEntries(keys.map((k) => [k, v])) }));
 
   const tab = (k, label) => (
-    <button key={k} onClick={() => setStatus(k)} style={{ padding: '8px 16px', border: 'none', borderBottom: `3px solid ${status === k ? C.gold : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? C.dark : C.dim }}>
+    <button key={k} onClick={() => setStatus(k)} className="max-tablet:min-h-[44px]" style={{ padding: '8px 16px', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `3px solid ${status === k ? C.gold : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? C.dark : C.dim }}>
       {label} <span style={{ fontSize: 11, color: C.dim }}>({counts[k]?.n || 0} · {money(counts[k]?.amount || 0)})</span>
     </button>
   );
@@ -292,18 +315,18 @@ export function VoucherApprovals({ branch, currentUser }) {
     <div style={{ margin: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
         <div>
-          <div style={{ fontSize: 17, fontWeight: 800, color: C.dark }}>Voucher Approvals</div>
+          <div className="kbiz-page-title">Voucher Approvals</div>
           <div style={{ fontSize: 12, color: C.dim }}>{branchLabel(branch)} · Payment · Receipt · Contra · Journal · Credit/Debit Note · Purchase Expense — manual & bulk post only when approved</div>
         </div>
-        <PeriodBar branch={branch} compact defaultPreset="all" onChange={setRange} />
+        <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={setRange} />
         {status === 'pending' && counts.pending.n > 0 && (
           <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
             {sel.size > 0 && (
-              <button onClick={doApproveSelected} disabled={busy} style={{ padding: '8px 16px', background: C.blue, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12.5, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+              <button onClick={doApproveSelected} disabled={busy} className="max-tablet:min-h-[44px]" style={{ padding: '8px 16px', background: C.blue, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12.5, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
                 ✓ Approve selected ({sel.size})
               </button>
             )}
-            <button onClick={doApproveAll} disabled={busy} style={{ padding: '8px 16px', background: C.green, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12.5, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+            <button onClick={doApproveAll} disabled={busy} className="max-tablet:min-h-[44px]" style={{ padding: '8px 16px', background: C.green, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12.5, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
               ✓ Approve all {counts.pending.n} pending
             </button>
           </div>
@@ -338,7 +361,7 @@ export function VoucherApprovals({ branch, currentUser }) {
         <EditedVouchersList rows={editedRows} isLoading={editedQ.isLoading} open={open} setOpen={setOpen} setViewId={setViewId} />
       ) : (
       <div style={{ ...card }}>
-        {q.isLoading ? <div style={{ padding: 28, textAlign: 'center', color: C.dim }}>Loading…</div> : (
+        {q.isLoading ? <div style={{ padding: 12 }}><SkeletonTable rows={8} cols={5} /></div> : (
           <div style={{ maxHeight: '72vh', overflow: 'auto', fontSize: 12.5 }}>
             {flatEntries.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: C.dim }}>No {status} vouchers.</div>}
             {flatEntries.length > 0 && view === 'voucher' && voucherTypeWise()}
@@ -431,8 +454,8 @@ export function VoucherApprovals({ branch, currentUser }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, background: '#fff' }}>
               <strong style={{ color: C.dark }}>Voucher View</strong>
               <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-                <button onClick={() => openPrintWindow(branch, (entries.find((e) => e.id === viewId) || {}).vno || '', 'Voucher', viewRef.current)} style={{ padding: '5px 11px', background: C.dark, color: C.gold, border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 11.5, cursor: 'pointer' }}>🖨 Print / PDF</button>
-                <button onClick={() => setViewId(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: C.dim }}>✕</button>
+                <button onClick={() => openPrintWindow(branch, (entries.find((e) => e.id === viewId) || {}).vno || '', 'Voucher', viewRef.current)} className="max-tablet:min-h-[44px]" style={{ padding: '5px 11px', background: C.dark, color: C.gold, border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 11.5, cursor: 'pointer' }}>🖨 Print / PDF</button>
+                <button onClick={() => setViewId(null)} className="inline-flex items-center justify-center max-tablet:min-h-[44px] max-tablet:min-w-[44px]" style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: C.dim }}>✕</button>
               </span>
             </div>
             <div ref={viewRef}><VoucherView id={viewId} cur={cur} /></div>

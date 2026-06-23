@@ -17,7 +17,7 @@ import { FocusBanner } from '../core/ux/FocusBanner';
 import { useNavFocusStore } from '../core/ux/navFocus';
 import { BRANCH_CODES, CONSOLIDATED_LABEL } from '../core/data';
 
-const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5', GREEN = '#27500A', GOLD = '#A07828', GREY = '#7b86a8';
+const DARK = '#1a1c22', DIM = '#5b616e', BLUE = '#2563eb', GREEN = '#16a34a', GOLD = '#c2a04a', GREY = '#7b86a8';
 const TALLY_ORDER = [
   'Capital Account', 'Loans (Liability)', 'Bank OD Accounts', 'Secured Loans', 'Unsecured Loans',
   'Current Liabilities', 'Duties & Taxes', 'Provisions', 'Sundry Creditors',
@@ -127,7 +127,7 @@ export function AccountsTreeView({ branch }) {
 
   // ── Tree view (read-only structure) ──
   const treeView = () => (
-    <div style={{ border: '1px solid #e5e9f0', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+    <div style={{ border: '1px solid #e6e8ec', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
       {roots.map((pg) => {
         const pgHas = pg.children.length || pg.ledgers.length;
         return (
@@ -170,7 +170,7 @@ export function AccountsTreeView({ branch }) {
 
   // ── Side-by-Side (miller columns) ──
   const col = (title, items, selVal, onPick, kind) => (
-    <div style={{ flex: 1, minWidth: 180, border: '1px solid #e5e9f0', borderRadius: 8, background: '#fff', display: 'flex', flexDirection: 'column', maxHeight: '64vh' }}>
+    <div style={{ flex: 1, minWidth: 180, border: '1px solid #e6e8ec', borderRadius: 8, background: '#fff', display: 'flex', flexDirection: 'column', maxHeight: '64vh' }}>
       <div style={{ padding: '8px 10px', fontSize: 10, fontWeight: 800, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, borderBottom: '1px solid #eef1f6', background: '#f7f8fb' }}>{title} <span style={{ color: '#9aa2c0' }}>({items.length})</span></div>
       <div style={{ overflow: 'auto' }}>
         {items.map((it) => (
@@ -200,8 +200,8 @@ export function AccountsTreeView({ branch }) {
     </div>
   );
 
-  const tabBtn = (k, l) => <button key={k} onClick={() => setTab(k)} style={{ padding: '7px 14px', fontSize: 12, fontWeight: 700, border: 'none', borderBottom: `3px solid ${tab === k ? GOLD : 'transparent'}`, background: 'transparent', cursor: 'pointer', color: tab === k ? DARK : DIM }}>{l}</button>;
-  const scopePill = (k, l) => <button key={k} onClick={() => setScope(k)} style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: scope === k ? BLUE : '#fff', color: scope === k ? '#fff' : DIM }}>{l}</button>;
+  const tabBtn = (k, l) => <button key={k} onClick={() => setTab(k)} className="max-tablet:min-h-[44px]" style={{ padding: '7px 14px', fontSize: 12, fontWeight: 700, borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `3px solid ${tab === k ? GOLD : 'transparent'}`, background: 'transparent', cursor: 'pointer', color: tab === k ? DARK : DIM }}>{l}</button>;
+  const scopePill = (k, l) => <button key={k} onClick={() => setScope(k)} className="max-tablet:min-h-[44px]" style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: scope === k ? BLUE : '#fff', color: scope === k ? '#fff' : DIM }}>{l}</button>;
 
   return (
     <div style={{ padding: '12px 14px', maxWidth: 1100, margin: '0 auto' }}>
@@ -212,7 +212,7 @@ export function AccountsTreeView({ branch }) {
       </div>
 
       {/* Scope legend — Groups/Sub-Groups are org-wide; only Ledgers carry a branch. */}
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, background: '#f7f9fc', border: '1px solid #e5e9f0', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 11.5, color: DIM }}>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, background: '#f7f9fc', border: '1px solid #e6e8ec', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 11.5, color: DIM }}>
         <span><b style={{ color: DARK }}>Groups & Sub-Groups</b> are shared across all branches (org-wide). Only <b style={{ color: DARK }}>Ledgers</b> are branch-scoped:</span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Common', GREY)}<span style={{ marginLeft: 4 }}>= shared by every branch (ALL)</span></span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('BOM', BLUE)}<span style={{ marginLeft: 4 }}>= specific to that branch</span></span>
@@ -238,7 +238,7 @@ export function AccountsTreeView({ branch }) {
         </span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #e5e9f0', marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #e6e8ec', marginBottom: 12 }}>
         {tabBtn('tree', 'Tree View')}{tabBtn('side', 'Side-by-Side')}
         {tab === 'tree' && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6, padding: '4px 0' }}>
@@ -248,7 +248,11 @@ export function AccountsTreeView({ branch }) {
         )}
       </div>
 
-      {(groupsQ.isLoading || ledgersQ.isLoading) && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading chart…</div>}
+      {(groupsQ.isLoading || ledgersQ.isLoading) && (
+        <div style={{ padding: 14 }}>
+          {Array.from({ length: 7 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.1) }} />)}
+        </div>
+      )}
       {tab === 'tree' ? treeView() : sideView()}
     </div>
   );

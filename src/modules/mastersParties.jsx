@@ -17,18 +17,22 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Plus, X } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
 import { apiGet, getAuthToken } from '../core/api';
 import { BRANCH_CODES } from '../core/data';
-import { FL, inpStd, tabBtnStyle } from '../core/styles';
-import { TAB_Page, tabPanel, cardStyle } from '../core/helpers';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { useHotkey } from '../core/ux/hotkeys';
 import { toast } from '../core/ux/toast';
 import { Kbd } from '../core/ux/widgets.jsx';
+import { PageLayout } from '../shell/PageLayout';
+import { Button, IconButton, Input, Select, Textarea, FormField, LoadingState, ErrorState, EmptyState } from '../shell/primitives';
 
-const GOLD = '#d4a437', DARK = '#0d1326', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#22c55e';
+const GOLD = '#c2a04a', DARK = '#1a1c22', DIM = '#5b616e', RED = '#dc2626', GREEN = '#16a34a';
+
+// Local panel wrapper (replaces helpers.tabPanel) — design-system spacing.
+const tabPanel = (children) => <div className="min-h-[360px] p-4 tablet:p-5">{children}</div>;
 const SUPPLIER_CATS = ['Airline', 'DMC', 'Hotel', 'Visa', 'Insurance', 'Car', 'Misc'];
 const GST_TREATMENTS = ['', 'Registered — Regular', 'Registered — Composition', 'Unregistered', 'SEZ', 'Overseas'];
 const MSME_STATUS = ['', 'Not Registered', 'Micro', 'Small', 'Medium'];
@@ -41,7 +45,6 @@ const ADDR_TYPES = ['Billing', 'Shipping', 'Registered Office', 'Head Office', '
 
 const rupee = (n) => '₹' + (Number(n) || 0).toLocaleString('en-IN');
 const numOf = (s) => Number(String(s == null ? '' : s).replace(/[^0-9.-]/g, '')) || 0;
-const cellInp = { ...inpStd, padding: '5px 7px', fontSize: 11.5 };
 
 /* ── Live data hooks (party-scoped, only fire once a record is chosen) ─────── */
 function usePartyVouchers(party) {
@@ -133,32 +136,32 @@ function ArrayEditor({ rows, cols, onChange, addLabel }) {
     if (c.type === 'bool') return <input type="checkbox" checked={!!v} onChange={(e) => setCell(i, c.key, e.target.checked)} />;
     if (c.type === 'primary') return <input type="radio" checked={!!v} onChange={() => setPrimary(i, c.key)} title="Set primary" />;
     if (c.type === 'select') return (
-      <select value={v == null ? '' : v} onChange={(e) => setCell(i, c.key, e.target.value)} style={cellInp}>
+      <Select value={v == null ? '' : v} onChange={(e) => setCell(i, c.key, e.target.value)}>
         {(c.options || []).map((o) => <option key={o} value={o}>{o || '—'}</option>)}
-      </select>
+      </Select>
     );
-    if (c.type === 'textarea') return <textarea value={v || ''} rows={2} onChange={(e) => setCell(i, c.key, e.target.value)} style={{ ...cellInp, fontFamily: 'inherit', resize: 'vertical' }} />;
-    return <input type={c.type === 'number' ? 'number' : c.type === 'date' ? 'date' : c.type === 'email' ? 'email' : 'text'} value={v == null ? '' : v} onChange={(e) => setCell(i, c.key, e.target.value)} style={{ ...cellInp, ...(c.mono ? { fontFamily: 'monospace' } : {}) }} />;
+    if (c.type === 'textarea') return <Textarea value={v || ''} rows={2} onChange={(e) => setCell(i, c.key, e.target.value)} />;
+    return <Input type={c.type === 'number' ? 'number' : c.type === 'date' ? 'date' : c.type === 'email' ? 'email' : 'text'} value={v == null ? '' : v} onChange={(e) => setCell(i, c.key, e.target.value)} className={c.mono ? 'font-mono' : ''} />;
   };
 
   return (
     <div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-        <thead style={{ background: '#f7f8fb' }}><tr>
-          {cols.map((c) => <th key={c.key} style={{ padding: '8px 10px', textAlign: c.type === 'primary' || c.type === 'bool' ? 'center' : 'left', fontSize: 10, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>{c.label}</th>)}
-          <th style={{ width: 40 }} />
+      <table className="w-full border-collapse text-[11.5px]">
+        <thead className="bg-surface-alt"><tr>
+          {cols.map((c) => <th key={c.key} className={`px-2.5 py-2 text-[10px] font-bold uppercase text-ink-muted ${c.type === 'primary' || c.type === 'bool' ? 'text-center' : 'text-left'}`}>{c.label}</th>)}
+          <th className="w-10" />
         </tr></thead>
         <tbody>
-          {list.length === 0 && <tr><td colSpan={cols.length + 1} style={{ padding: 16, textAlign: 'center', color: DIM }}>None yet — click “{addLabel}” below.</td></tr>}
+          {list.length === 0 && <tr><td colSpan={cols.length + 1} className="p-4 text-center text-ink-muted">None yet — click “{addLabel}” below.</td></tr>}
           {list.map((r, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #f0f2f7' }}>
-              {cols.map((c) => <td key={c.key} style={{ padding: '6px 8px', textAlign: c.type === 'primary' || c.type === 'bool' ? 'center' : 'left', width: c.w }}>{renderCell(c, r, i)}</td>)}
-              <td style={{ textAlign: 'center' }}><button onClick={() => del(i)} title="Remove" style={{ background: 'none', border: 'none', color: RED, cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>✕</button></td>
+            <tr key={i} className="border-b border-surface-border align-top">
+              {cols.map((c) => <td key={c.key} className={`px-2 py-1.5 ${c.type === 'primary' || c.type === 'bool' ? 'text-center' : 'text-left'}`} style={{ width: c.w }}>{renderCell(c, r, i)}</td>)}
+              <td className="text-center"><IconButton icon={X} label="Remove" size="sm" onClick={() => del(i)} className="text-danger hover:bg-danger-soft hover:text-danger" /></td>
             </tr>
           ))}
         </tbody>
       </table>
-      <button onClick={add} style={{ marginTop: 8, padding: '7px 14px', background: 'transparent', border: '1px dashed ' + GOLD, color: GOLD, borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700 }}>+ {addLabel}</button>
+      <Button variant="secondary" size="sm" icon={Plus} onClick={add} className="mt-2 border-dashed border-gold text-gold-dark hover:bg-gold-light/30">{addLabel}</Button>
     </div>
   );
 }
@@ -166,39 +169,39 @@ function ArrayEditor({ rows, cols, onChange, addLabel }) {
 /* ── Small shared presentational pieces ───────────────────────────────────── */
 function Field({ label, value, onChange, readOnly, mono, type = 'text', placeholder }) {
   return (
-    <FL label={label}>
-      <input
+    <FormField label={label}>
+      <Input
         type={type} value={value == null ? '' : value} readOnly={readOnly} placeholder={placeholder || ''}
+        className={`${mono ? 'font-mono ' : ''}${readOnly ? 'bg-surface-alt text-ink-muted' : ''}`}
         onChange={onChange ? (e) => onChange(type === 'number' ? Number(e.target.value) : e.target.value) : undefined}
-        style={{ ...inpStd, ...(mono ? { fontFamily: 'monospace' } : {}), ...(readOnly ? { background: '#fafbfd', color: DIM } : {}) }}
       />
-    </FL>
+    </FormField>
   );
 }
 
 function SelectField({ label, value, onChange, options }) {
   return (
-    <FL label={label}>
-      <select value={value == null ? '' : value} onChange={(e) => onChange(e.target.value)} style={inpStd}>
+    <FormField label={label}>
+      <Select value={value == null ? '' : value} onChange={(e) => onChange(e.target.value)}>
         {options.map((o) => <option key={o} value={o}>{o === '' ? '— Select —' : o}</option>)}
-      </select>
-    </FL>
+      </Select>
+    </FormField>
   );
 }
 
 function CheckField({ label, checked, onChange, onText, offText, danger }) {
   return (
-    <FL label={label}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 6, cursor: 'pointer' }}>
+    <FormField label={label}>
+      <label className="flex cursor-pointer items-center gap-1.5 pt-1.5">
         <input type="checkbox" checked={!!checked} onChange={(e) => onChange(e.target.checked)} />
-        <span style={{ fontSize: 12, color: checked ? (danger ? RED : GREEN) : DIM, fontWeight: 600 }}>{checked ? onText : offText}</span>
+        <span className="text-xs font-semibold" style={{ color: checked ? (danger ? RED : GREEN) : DIM }}>{checked ? onText : offText}</span>
       </label>
-    </FL>
+    </FormField>
   );
 }
 
 function EmptyHint({ children }) {
-  return <p style={{ margin: '0 0 12px', fontSize: 11.5, color: DIM }}>{children}</p>;
+  return <p className="mb-3 text-[11.5px] text-ink-muted">{children}</p>;
 }
 
 // Linked Vouchers — live table of every voucher whose party = this record.
@@ -221,7 +224,7 @@ function LinkedVouchersTab({ q }) {
             <td style={{ padding: '9px 12px' }}>{r.type || r.category || '—'}</td>
             <td style={{ padding: '9px 12px' }}><span style={{ padding: '2px 6px', background: '#e6e8f1', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{r.branch || '—'}</span></td>
             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700 }}>{rupee(r.total)}</td>
-            <td style={{ padding: '9px 12px', textAlign: 'center' }}><span style={{ padding: '2px 8px', background: paid ? '#d4edda' : '#fff3cd', color: paid ? '#155724' : '#856404', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{r.status || '—'}</span></td>
+            <td style={{ padding: '9px 12px', textAlign: 'center' }}><span style={{ padding: '2px 8px', background: paid ? '#e8f6ed' : '#fbeedb', color: paid ? '#16a34a' : '#d97706', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{r.status || '—'}</span></td>
           </tr>
         );
       })}</tbody>
@@ -238,7 +241,7 @@ function OutstandingTab({ q, side }) {
   const total = bills.reduce((s, b) => s + (Number(b.outstanding) || 0), 0);
   if (!bills.length && !data.advances) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>{side === 'supplier' ? 'No unpaid bills to this supplier.' : 'No unpaid invoices from this customer.'}</p>);
   return tabPanel(
-    <div style={cardStyle}>
+    <div className="kbiz-card">
       <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: DARK, marginBottom: 10 }}>{side === 'supplier' ? 'Open bills (we owe)' : 'Open invoices (owed to us)'}</p>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
         <thead style={{ background: '#f7f8fb' }}><tr>{['Bill', 'Date', 'Bill Amt', 'Outstanding', 'Age', 'Status'].map((h, i) => (
@@ -253,7 +256,7 @@ function OutstandingTab({ q, side }) {
               <td style={{ padding: '8px 12px', textAlign: 'right' }}>{rupee(b.total)}</td>
               <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>{rupee(b.outstanding)}</td>
               <td style={{ padding: '8px 12px', textAlign: 'center', color: overdue ? RED : GREEN, fontWeight: 700 }}>{b.ageDays}d</td>
-              <td style={{ padding: '8px 12px', textAlign: 'center' }}><span style={{ padding: '2px 8px', background: b.status === 'partial' ? '#fff3cd' : '#e6e8f1', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{b.status}</span></td>
+              <td style={{ padding: '8px 12px', textAlign: 'center' }}><span style={{ padding: '2px 8px', background: b.status === 'partial' ? '#fbeedb' : '#e6e8f1', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{b.status}</span></td>
             </tr>
           );
         })}</tbody>
@@ -284,9 +287,9 @@ function HistoryTab({ q }) {
   ];
   return tabPanel(
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,150px),1fr))', gap: 10, marginBottom: 14 }}>
         {kpis.map((k) => (
-          <div key={k.l} style={{ padding: 12, background: '#fafbfd', borderRadius: 6, border: '1px solid #e1e3ec', borderTop: '3px solid ' + k.c }}>
+          <div key={k.l} style={{ padding: 12, background: '#fafbfd', borderRadius: 6, border: '1px solid #e6e8ec', borderTop: '3px solid ' + k.c }}>
             <p style={{ margin: 0, fontSize: 10, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>{k.l}</p>
             <p style={{ margin: '3px 0 0', fontSize: 20, fontWeight: 700, color: DARK }}>{k.v}</p>
           </div>
@@ -310,48 +313,50 @@ function PartyShell({ title, subtitle, m, tabs, tab, setTab, children }) {
   const { list, rows, current, save, saving, err, savedAt, dirty } = m;
 
   const selector = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
-      <label style={{ fontSize: 11, fontWeight: 700, color: DIM }}>Record</label>
-      <select
-        value={(current && current.id) || ''}
-        onChange={(e) => m.setSelectedId(e.target.value)}
-        style={{ ...inpStd, width: 'auto', minWidth: 280, fontWeight: 600 }}
-      >
-        {rows.length === 0 && <option value="">— no records —</option>}
-        {rows.map((r) => <option key={r.id} value={r.id}>{r.name}{r.branch ? ` · ${r.branch}` : ''}</option>)}
-      </select>
-      <span style={{ fontSize: 11, color: DIM }}>{rows.length} record{rows.length === 1 ? '' : 's'}</span>
+    <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
+      <label className="text-[11px] font-bold text-ink-muted">Record</label>
+      <div className="min-w-[280px]">
+        <Select value={(current && current.id) || ''} onChange={(e) => m.setSelectedId(e.target.value)} className="font-semibold">
+          {rows.length === 0 && <option value="">— no records —</option>}
+          {rows.map((r) => <option key={r.id} value={r.id}>{r.name}{r.branch ? ` · ${r.branch}` : ''}</option>)}
+        </Select>
+      </div>
+      <span className="text-[11px] text-ink-muted">{rows.length} record{rows.length === 1 ? '' : 's'}</span>
       {current && current.name && (
-        <button type="button" onClick={() => openLedgerModal(current.name)} title="Open this party's ledger account (current branch)"
-          style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}>📒 Open Ledger</button>
+        <Button variant="secondary" size="sm" onClick={() => openLedgerModal(current.name)} title="Open this party's ledger account (current branch)">Open Ledger</Button>
       )}
-      <div style={{ flex: 1 }} />
-      {err && <span style={{ fontSize: 11.5, color: RED, fontWeight: 600 }}>⚠ {err}</span>}
-      {!err && savedAt > 0 && !dirty && <span style={{ fontSize: 11.5, color: GREEN, fontWeight: 600 }}>✓ Saved</span>}
-      <button
-        onClick={save} disabled={!current || saving || !dirty} title="Save (Ctrl/Cmd+Enter)"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 16px', background: dirty ? GOLD : '#e6e8f1', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, color: dirty ? DARK : DIM, cursor: !current || saving || !dirty ? 'not-allowed' : 'pointer' }}
-      >
-        {saving ? 'Saving…' : <>💾 Save changes <Kbd>⌃↵</Kbd></>}
-      </button>
+      <div className="flex-1" />
+      {err && <span className="text-[11.5px] font-semibold text-danger">⚠ {err}</span>}
+      {!err && savedAt > 0 && !dirty && <span className="text-[11.5px] font-semibold text-success">✓ Saved</span>}
+      <Button variant="accent" onClick={save} disabled={!current || saving || !dirty} loading={saving} title="Save (Ctrl/Cmd+Enter)">
+        {saving ? 'Saving…' : <>Save changes <Kbd>⌃↵</Kbd></>}
+      </Button>
     </div>
   );
 
   let body;
-  if (list.isLoading) body = <div style={{ ...cardStyle, padding: 36, textAlign: 'center', color: DIM, fontSize: 12 }}>Loading records…</div>;
-  else if (list.isError) body = <div style={{ ...cardStyle, padding: 18, color: RED, fontSize: 12, fontWeight: 600 }}>⚠ {list.error?.message || 'Failed to load'} — is the ERP backend running and are you logged in?</div>;
-  else if (!current) body = <div style={{ ...cardStyle, padding: 36, textAlign: 'center', color: DIM, fontSize: 12 }}>No records yet. Add one from the {title.replace(' Master', '')}s list master.</div>;
+  if (list.isLoading) body = <LoadingState label="Loading records…" />;
+  else if (list.isError) body = <ErrorState message={`${list.error?.message || 'Failed to load'} — is the ERP backend running and are you logged in?`} onRetry={list.refetch} />;
+  else if (!current) body = <EmptyState title="No records yet" hint={`Add one from the ${title.replace(' Master', '')}s list master.`} />;
   else body = (
-    <div style={{ background: '#fff', border: '1px solid #e1e3ec', borderRadius: 8, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', borderBottom: '1px solid #e1e3ec', overflowX: 'auto', background: '#fafbfd' }}>
-        {tabs.map((t) => <button key={t.id} onClick={() => setTab(t.id)} style={tabBtnStyle(tab === t.id)}>{t.label}</button>)}
+    <div className="overflow-hidden rounded-brand border border-surface-border bg-surface">
+      <div className="flex overflow-x-auto border-b border-surface-border bg-surface-alt [scrollbar-width:thin]">
+        {tabs.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-[12.5px] transition ${tab === t.id ? 'border-gold font-bold text-ink' : 'border-transparent font-medium text-ink-muted hover:text-ink'}`}>
+            {t.label}
+          </button>
+        ))}
       </div>
       {children}
     </div>
   );
 
-  return TAB_Page(title, `${subtitle}${current ? ` · ${current.name}` : ''}`, null,
-    <div>{selector}{body}</div>
+  return (
+    <PageLayout maxWidth="max-w-[1400px] mx-auto" title={title} subtitle={`${subtitle}${current ? ` · ${current.name}` : ''}`}>
+      {selector}
+      {body}
+    </PageLayout>
   );
 }
 
@@ -417,7 +422,7 @@ export function CustomerMasterTabbed() {
   return (
     <PartyShell title="Customer Master" subtitle="Clients (Sundry Debtors) — live" m={m} tabs={CUST_TABS} tab={tab} setTab={setTab}>
       {tab === 'basic' && tabPanel(
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,160px),1fr))', gap: 14 }}>
           <Field label="Legal Name" value={f.name} onChange={(v) => set('name', v)} />
           <Field label="Customer Code" value={f.id} readOnly mono />
           <SelectField label="Customer Type" value={f.customerType} onChange={(v) => set('customerType', v)} options={CUST_TYPES} />
@@ -434,10 +439,10 @@ export function CustomerMasterTabbed() {
       )}
       {tab === 'address' && tabPanel(
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14, marginBottom: 18 }}>
-            <FL label="Primary Billing Address (used on invoices)">
-              <textarea value={f.address || ''} onChange={(e) => set('address', e.target.value)} rows={3} style={{ ...inpStd, fontFamily: 'inherit', resize: 'vertical' }} />
-            </FL>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,200px),1fr))', gap: 14, marginBottom: 18 }}>
+            <FormField label="Primary Billing Address (used on invoices)">
+              <Textarea value={f.address || ''} onChange={(e) => set('address', e.target.value)} rows={3} />
+            </FormField>
             <Field label="City" value={f.city} onChange={(v) => set('city', v)} />
           </div>
           <EmptyHint>Additional addresses (shipping, registered office, …)</EmptyHint>
@@ -451,7 +456,7 @@ export function CustomerMasterTabbed() {
         <ArrayEditor rows={f.banks} cols={BANK_COLS} onChange={(v) => set('banks', v)} addLabel="Add Bank Account" />
       )}
       {tab === 'tax' && tabPanel(
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
           <Field label="GSTIN" value={f.gstin} onChange={(v) => set('gstin', v)} mono />
           <Field label="PAN" value={f.pan} onChange={(v) => set('pan', v)} mono />
           <Field label="TAN" value={f.tan} onChange={(v) => set('tan', v)} mono />
@@ -463,19 +468,19 @@ export function CustomerMasterTabbed() {
         </div>
       )}
       {tab === 'credit' && tabPanel(
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #e1e3ec' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
+          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #e6e8ec' }}>
             <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase' }}>Credit Configuration</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10, marginTop: 10 }}>
               <Field label="Credit Limit (₹)" type="number" value={f.creditLimit} onChange={(v) => set('creditLimit', v)} />
               <Field label="Credit Days" type="number" value={f.creditDays} onChange={(v) => set('creditDays', v)} />
               <SelectField label="Payment Terms" value={f.paymentTerms} onChange={(v) => set('paymentTerms', v)} options={PAY_TERMS} />
               <Field label="Late Payment Interest" value={f.interestRate} onChange={(v) => set('interestRate', v)} placeholder="e.g. 18% pa" />
             </div>
           </div>
-          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #e1e3ec' }}>
+          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #e6e8ec' }}>
             <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase' }}>Current Exposure</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10, marginTop: 10 }}>
               <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Outstanding</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: DARK }}>{f.out || rupee(0)}</p></div>
               <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Available</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: GREEN }}>{rupee(available)}</p></div>
             </div>
@@ -525,7 +530,7 @@ export function SupplierMasterTabbed() {
   return (
     <PartyShell title="Supplier Master" subtitle="Vendors (Sundry Creditors) — live" m={m} tabs={SUPP_TABS} tab={tab} setTab={setTab}>
       {tab === 'basic' && tabPanel(
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,160px),1fr))', gap: 14 }}>
           <Field label="Legal Name" value={f.name} onChange={(v) => set('name', v)} />
           <Field label="Supplier Code" value={f.id} readOnly mono />
           <SelectField label="Category" value={f.category} onChange={(v) => set('category', v)} options={SUPPLIER_CATS} />
@@ -541,7 +546,7 @@ export function SupplierMasterTabbed() {
       )}
       {tab === 'address' && tabPanel(
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14, marginBottom: 18 }}>
             <Field label="City" value={f.city} onChange={(v) => set('city', v)} />
             <Field label="Country" value={f.country} onChange={(v) => set('country', v)} />
           </div>
@@ -556,7 +561,7 @@ export function SupplierMasterTabbed() {
         <ArrayEditor rows={f.banks} cols={BANK_COLS} onChange={(v) => set('banks', v)} addLabel="Add Bank Account" />
       )}
       {tab === 'tax' && tabPanel(
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
           <Field label="GSTIN" value={f.gstin} onChange={(v) => set('gstin', v)} mono />
           <Field label="PAN" value={f.pan} onChange={(v) => set('pan', v)} mono />
           <Field label="TAN" value={f.tan} onChange={(v) => set('tan', v)} mono />
@@ -568,10 +573,10 @@ export function SupplierMasterTabbed() {
         </div>
       )}
       {tab === 'credit' && tabPanel(
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #e1e3ec' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
+          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #e6e8ec' }}>
             <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase' }}>Payment Configuration</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10, marginTop: 10 }}>
               <SelectField label="Settlement Cycle" value={f.settlementCycle} onChange={(v) => set('settlementCycle', v)} options={SETTLE_CYCLES} />
               <Field label="Credit Days" type="number" value={f.creditDays} onChange={(v) => set('creditDays', v)} />
               <SelectField label="Payment Method" value={f.paymentMethod} onChange={(v) => set('paymentMethod', v)} options={PAY_METHODS} />

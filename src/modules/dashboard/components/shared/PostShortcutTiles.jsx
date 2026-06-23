@@ -3,13 +3,14 @@ import { POST_SHORTCUTS } from '../../utils/constants';
 
 export function PostShortcutTiles({ onNavigate }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 14 }}>
+    <div className="mb-3.5 grid grid-cols-2 gap-3 tablet:grid-cols-4">
       {POST_SHORTCUTS.map((b) => (
         <button
           key={b.label}
           onClick={() => onNavigate(b.route)}
+          className="min-h-[44px]"
           style={{
-            padding: '22px 14px',
+            padding: '18px 14px',
             background: '#fff',
             border: '2px solid ' + b.color,
             borderRadius: 10,
@@ -17,6 +18,7 @@ export function PostShortcutTiles({ onNavigate }) {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: 6,
             fontWeight: 700,
             color: b.color,

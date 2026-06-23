@@ -80,6 +80,7 @@ import { PrefsProvider } from './core/prefs';
 import { HotkeysProvider } from './core/ux/hotkeys';
 import { NavContext } from './core/ux/nav';
 import { ToastHost } from './core/ux/toast';
+import { GlobalFetchBar } from './core/ux/GlobalFetchBar';
 import { ConfirmHost } from './core/ux/confirm';
 import { ContextBar } from './shell/ContextBar';
 import { LedgerSwitcher } from './shell/LedgerSwitcher';
@@ -194,7 +195,10 @@ export default function KB360App(){
   /* ── Sign out: clear the stored JWT + user so the next session must log in ── */
   const setUser = (u) => {
     if(!u){
-      try{ localStorage.removeItem("kb360-token"); localStorage.removeItem("kb360-user"); }catch{}
+      // Clear the ENTIRE kb360-* session — token, user, AND branch / route / prefs. Clearing
+      // only token+user let the previous user's saved branch and last route bleed into the
+      // next login on a shared machine. Wipe every kb360-* key so nothing leaks across users.
+      try{ Object.keys(localStorage).filter(k=>k.startsWith("kb360-")).forEach(k=>localStorage.removeItem(k)); }catch{}
       // Drop any minimized/parked (branch-scoped) items so they never leak to the next session.
       try{ window.dispatchEvent(new CustomEvent("kbiz:logout")); }catch{ /* ignore */ }
     }
@@ -625,6 +629,7 @@ export default function KB360App(){
       </AppShell>
 
       {/* Global overlays / hosts (mounted once) */}
+      <GlobalFetchBar/>
       <PrintPreviewHost/>
       <ToastHost/>
       <ConfirmHost/>

@@ -28,7 +28,7 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { X, Inbox, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, Inbox, AlertTriangle, Loader2, Check } from 'lucide-react';
 import { pushModal } from '../core/ux/modalStore';
 
 export const cn = (...xs) => xs.filter(Boolean).join(' ');
@@ -38,12 +38,12 @@ export const cn = (...xs) => xs.filter(Boolean).join(' ');
    ════════════════════════════════════════════════════════════════════ */
 
 const BTN_VARIANT = {
-  primary: 'bg-navy text-gold border border-transparent hover:bg-navy-light disabled:bg-ink-muted',
-  accent:  'bg-gold text-navy border border-transparent hover:bg-gold-dark hover:text-white disabled:opacity-50',
-  secondary: 'bg-surface text-navy border border-surface-border hover:bg-surface-alt hover:border-navy/20 disabled:opacity-50',
-  ghost:   'bg-transparent text-ink-muted border border-transparent hover:bg-navy/5 hover:text-navy disabled:opacity-50',
-  danger:  'bg-danger text-white border border-transparent hover:bg-danger/90 disabled:opacity-50',
-  success: 'bg-[#1D6F42] text-white border border-transparent hover:bg-[#17592f] disabled:opacity-50',
+  primary:   'bg-navy text-white shadow-sm hover:bg-navy-light disabled:bg-ink-muted',
+  accent:    'bg-gold text-navy shadow-sm hover:bg-gold-dark hover:text-white disabled:opacity-50',
+  secondary: 'bg-surface text-ink border border-surface-border hover:bg-surface-alt hover:border-ink/20 disabled:opacity-50',
+  ghost:     'bg-transparent text-ink-muted hover:bg-ink/[0.06] hover:text-ink disabled:opacity-50',
+  danger:    'bg-danger text-white shadow-sm hover:bg-danger/90 disabled:opacity-50',
+  success:   'bg-success text-white shadow-sm hover:bg-success/90 disabled:opacity-50',
 };
 
 // Nominal (desktop) heights; sm/md bump to a 44px tap target below `tablet`.
@@ -73,8 +73,9 @@ export function Button({
       type={type}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex items-center justify-center font-semibold whitespace-nowrap select-none transition',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50',
+        'inline-flex items-center justify-center font-semibold whitespace-nowrap select-none',
+        'transition-all duration-fast ease-premium active:scale-[0.98]',
+        'focus:outline-none focus-visible:shadow-focus-ring',
         'disabled:cursor-not-allowed',
         BTN_VARIANT[variant] || BTN_VARIANT.secondary,
         BTN_SIZE[size] || BTN_SIZE.md,
@@ -98,11 +99,11 @@ export function Button({
 
 const PILL_TONE = {
   neutral: 'bg-surface-alt text-ink-muted ring-surface-border',
-  info:    'bg-[#E6F1FB] text-[#185FA5] ring-[#B5D4F4]',
-  success: 'bg-[#EAF3DE] text-[#3B6D11] ring-[#C0DD97]',
-  warning: 'bg-[#FAEEDA] text-[#854F0B] ring-[#FAC775]',
-  danger:  'bg-[#FCEBEB] text-[#A32D2D] ring-[#F7C1C1]',
-  gold:    'bg-gold-light/40 text-gold-dark ring-gold/40',
+  info:    'bg-info-soft text-info ring-info/25',
+  success: 'bg-success-soft text-success ring-success/25',
+  warning: 'bg-warning-soft text-warning ring-warning/25',
+  danger:  'bg-danger-soft text-danger ring-danger/25',
+  gold:    'bg-gold-light/50 text-gold-dark ring-gold/30',
   navy:    'bg-navy/5 text-navy ring-navy/15',
 };
 
@@ -340,7 +341,7 @@ export function Drawer({ open = true, onClose, title, subtitle, footer, width = 
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted transition hover:bg-navy/5"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-all duration-fast ease-premium hover:bg-ink/[0.06] hover:text-ink focus:outline-none focus-visible:shadow-focus-ring max-desktop:h-11 max-desktop:w-11"
           >
             <X size={18} />
           </button>
@@ -357,9 +358,136 @@ export function Drawer({ open = true, onClose, title, subtitle, footer, width = 
   );
 }
 
+/* ════════════════════════════════════════════════════════════════════
+   IconButton — square, touch-friendly icon action.
+   ════════════════════════════════════════════════════════════════════ */
+const ICONBTN_SIZE = { sm: 'h-8 w-8', md: 'h-9 w-9 max-tablet:h-11 max-tablet:w-11', lg: 'h-11 w-11' };
+const ICONBTN_VARIANT = {
+  ghost:  'text-ink-muted hover:bg-ink/[0.06] hover:text-ink',
+  solid:  'bg-navy text-white hover:bg-navy-light',
+  subtle: 'bg-surface-alt text-ink-muted hover:bg-surface-border hover:text-ink',
+};
+export function IconButton({ icon: Icon, label, size = 'md', variant = 'ghost', className = '', ...rest }) {
+  return (
+    <button
+      type="button" aria-label={label} title={label}
+      className={cn('inline-flex shrink-0 items-center justify-center rounded-[8px] transition-all duration-fast ease-premium active:scale-[0.94] focus:outline-none focus-visible:shadow-focus-ring',
+        ICONBTN_SIZE[size] || ICONBTN_SIZE.md, ICONBTN_VARIANT[variant] || ICONBTN_VARIANT.ghost, className)}
+      {...rest}
+    >
+      {Icon && <Icon size={size === 'lg' ? 20 : 17} />}
+    </button>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Checkbox / Switch — accessible, branded toggles.
+   ════════════════════════════════════════════════════════════════════ */
+export function Checkbox({ checked, onChange, label, disabled, className = '' }) {
+  return (
+    <label className={cn('inline-flex select-none items-center gap-2 text-[13px] text-ink max-tablet:min-h-[44px]', disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer', className)}>
+      <input type="checkbox" className="peer sr-only" checked={!!checked} disabled={disabled} onChange={(e) => onChange && onChange(e.target.checked)} />
+      <span className={cn('flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border transition-colors duration-fast peer-focus-visible:ring-2 peer-focus-visible:ring-info/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-surface', checked ? 'border-navy bg-navy text-white' : 'border-surface-border bg-surface')}>
+        {checked && <Check size={13} strokeWidth={3} />}
+      </span>
+      {label && <span>{label}</span>}
+    </label>
+  );
+}
+
+export function Switch({ checked, onChange, label, disabled, className = '' }) {
+  return (
+    <label className={cn('inline-flex select-none items-center gap-2 text-[13px] text-ink', disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer', className)}>
+      {/* Hit target ≥44px on mobile; the visible track stays compact and shows focus. */}
+      <button
+        type="button" role="switch" aria-checked={!!checked} aria-label={label || 'Toggle'} disabled={disabled}
+        onClick={() => !disabled && onChange && onChange(!checked)}
+        className="group/sw inline-flex shrink-0 items-center justify-center rounded-full bg-transparent focus:outline-none max-tablet:min-h-[44px] max-tablet:min-w-[44px]"
+      >
+        <span className={cn('relative h-[22px] w-[38px] rounded-full transition-colors duration-fast ease-premium',
+          'group-focus-visible/sw:ring-2 group-focus-visible/sw:ring-info/50 group-focus-visible/sw:ring-offset-2 group-focus-visible/sw:ring-offset-surface',
+          checked ? 'bg-success' : 'bg-surface-border')}>
+          <span className={cn('absolute top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow transition-[left] duration-fast ease-premium', checked ? 'left-[18px]' : 'left-0.5')} />
+        </span>
+      </button>
+      {label && <span>{label}</span>}
+    </label>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Card — plain elevated surface (Panel = PageSection with header).
+   ════════════════════════════════════════════════════════════════════ */
+export function Card({ className = '', children, ...rest }) {
+  return <div className={cn('rounded-brand border border-surface-border bg-surface p-4 shadow-card', className)} {...rest}>{children}</div>;
+}
+export const Panel = PageSection;
+
+/* ════════════════════════════════════════════════════════════════════
+   Skeleton loaders — shimmer that matches final layout shape.
+   ════════════════════════════════════════════════════════════════════ */
+export function Skeleton({ className = '', style }) {
+  return <div className={cn('kb-skeleton', className)} style={style} aria-hidden="true" />;
+}
+export function SkeletonText({ lines = 3, className = '' }) {
+  return (
+    <div className={cn('flex flex-col gap-2', className)} aria-hidden="true">
+      {Array.from({ length: lines }).map((_, i) => <Skeleton key={i} className="h-3" style={{ width: i === lines - 1 ? '70%' : '100%' }} />)}
+    </div>
+  );
+}
+export function SkeletonTable({ rows = 6, cols = 4, className = '' }) {
+  return (
+    <div className={cn('overflow-hidden rounded-brand border border-surface-border bg-surface shadow-card', className)} aria-hidden="true">
+      <div className="flex gap-3 border-b border-surface-border bg-surface-alt px-3.5 py-3">
+        {Array.from({ length: cols }).map((_, i) => <Skeleton key={i} className="h-3 flex-1" />)}
+      </div>
+      {Array.from({ length: rows }).map((_, r) => (
+        <div key={r} className="flex gap-3 border-b border-surface-border px-3.5 py-3 last:border-0">
+          {Array.from({ length: cols }).map((_, c) => <Skeleton key={c} className="h-3 flex-1" style={{ opacity: Math.max(0.35, 1 - r * 0.09) }} />)}
+        </div>
+      ))}
+    </div>
+  );
+}
+export function SkeletonCards({ count = 4, min = '200px', className = '' }) {
+  return (
+    <ResponsiveGrid min={min} gap="md" className={className}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="rounded-brand border border-surface-border bg-surface p-4 shadow-card">
+          <Skeleton className="mb-2 h-2.5 w-1/2" /><Skeleton className="mb-1.5 h-6 w-2/3" /><Skeleton className="h-2.5 w-1/3" />
+        </div>
+      ))}
+    </ResponsiveGrid>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Tooltip — lightweight CSS hover tooltip (no portal, no deps).
+   ════════════════════════════════════════════════════════════════════ */
+const TT_POS = {
+  top:    'bottom-full left-1/2 -translate-x-1/2 mb-1.5',
+  bottom: 'top-full left-1/2 -translate-x-1/2 mt-1.5',
+  left:   'right-full top-1/2 -translate-y-1/2 mr-1.5',
+  right:  'left-full top-1/2 -translate-y-1/2 ml-1.5',
+};
+export function Tooltip({ label, side = 'top', className = '', children }) {
+  if (!label) return children;
+  return (
+    <span className={cn('group/tt relative inline-flex', className)}>
+      {children}
+      <span role="tooltip" className={cn('pointer-events-none absolute z-[9999] whitespace-nowrap rounded-md bg-navy px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-pop transition-opacity duration-fast ease-premium group-hover/tt:opacity-100', TT_POS[side] || TT_POS.top)}>
+        {label}
+      </span>
+    </span>
+  );
+}
+
 export { Modal } from '../core/ux/Modal';
 
 export default {
-  Button, StatusPill, Badge, PageSection, ResponsiveGrid, Toolbar, FilterBar,
-  FormField, Input, Select, Textarea, EmptyState, ErrorState, LoadingState, Drawer,
+  Button, IconButton, StatusPill, Badge, PageSection, Panel, Card, ResponsiveGrid,
+  Toolbar, FilterBar, FormField, Input, Select, Textarea, Checkbox, Switch,
+  EmptyState, ErrorState, LoadingState, Skeleton, SkeletonText, SkeletonTable, SkeletonCards,
+  Tooltip, Drawer,
 };

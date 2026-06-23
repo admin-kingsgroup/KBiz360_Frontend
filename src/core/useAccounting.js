@@ -236,11 +236,19 @@ export function useInvoiceGP(branch, { from, to } = {}) {
 // Module-wise P&L: Sales/COGS/Gross Profit per product module (Flights, Holiday,
 // Hotels, Visa…) + indirect overheads + a Gross→Net profit bridge. Live from the
 // double-entry engine (GET /api/accounting/module-pl).
-export function useModulePL(branch, { from, to, includeZero } = {}) {
+// `summary: true` asks the backend for the totals + per-module Sales/COGS/GP only,
+// skipping the per-booking file drill (the part that scans every voucher). Use it
+// wherever the consumer reads only `totals` / `bridge` / `indirect` / per-module
+// amounts — i.e. dashboards — NOT where it reads `fileCount` / `files` / `subs`
+// (the full Module-GP report). `withHeads: true` (only meaningful with summary) ALSO
+// returns the per-module fare-component `heads` drill — computed server-side via an
+// aggregation, so the P&L statement gets its ledger→component breakdown without the
+// slow voucher scan. Cached separately per flag combination.
+export function useModulePL(branch, { from, to, includeZero, summary, withHeads } = {}) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['accounting', 'module-pl', code || 'all', from || '', to || '', !!includeZero],
-    queryFn: () => apiGet('/api/accounting/module-pl', { branch: code, from, to, ...(includeZero ? { includeZero: 1 } : {}) }),
+    queryKey: ['accounting', 'module-pl', code || 'all', from || '', to || '', !!includeZero, !!summary, !!withHeads],
+    queryFn: () => apiGet('/api/accounting/module-pl', { branch: code, from, to, ...(includeZero ? { includeZero: 1 } : {}), ...(summary ? { summary: 1 } : {}), ...(withHeads ? { withHeads: 1 } : {}) }),
     enabled: enabled(),
     staleTime: 30_000,
   });
@@ -466,7 +474,12 @@ export function useVoucher(id) {
 // Live full-JV preview for the editor: posts the (possibly edited) voucher body and
 // returns every Dr/Cr leg + totals + balanced flag, even when it doesn't balance.
 export function useVoucherPreview(body) {
-  const key = body ? JSON.stringify({ b: body.branch, c: body.category, p: body.party, t: body.taxAmt, d: body.tdsAmt, x: body.tcsAmt, tot: body.total, st: body.subtotal, l: body.lines, br: body.bankRef, pm: body.paymentMode }) : 'none';
+  // Key on the FULL body. The old selective key omitted gstMode, counterParty, supplier
+  // breakup (supplierAmt/Svc/Gst), gstPct and allocations — so toggling intra↔inter
+  // (CGST/SGST↔IGST) or changing the counter-party while `total` stayed equal returned a
+  // STALE cached journal that didn't match what the backend would post (approver signs off
+  // on the wrong entry). Hashing the whole body guarantees the preview tracks every change.
+  const key = body ? JSON.stringify(body) : 'none';
   return useQuery({
     queryKey: ['accounting', 'preview-voucher', key],
     queryFn: () => apiPost('/api/accounting/preview-voucher', body),
@@ -547,11 +560,13 @@ export function useRefundReissue(branch, { from, to } = {}) {
 // posted invoice back to its booking for the per-passenger Pax / PNR / Ticket
 // detail (booking-spawned voucher lines are aggregate heads, so the travel detail
 // lives only on the booking's `rows`). Keyed by linkNo on the consumer side.
-export function useBookingOrders(branch) {
+export function useBookingOrders(branch, { status } = {}) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['booking-orders', code || 'all'],
-    queryFn: () => apiGet('/api/booking-orders', { branch: code }),
+    queryKey: ['booking-orders', code || 'all', status || 'all'],
+    // A status filter (e.g. 'pending') is applied server-side so a consumer that only
+    // needs one bucket doesn't pull every booking's SO/PO/GP grid.
+    queryFn: () => apiGet('/api/booking-orders', { branch: code, ...(status ? { status } : {}) }),
     enabled: enabled(),
     staleTime: 60_000,
   });

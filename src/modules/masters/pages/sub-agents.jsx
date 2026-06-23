@@ -24,11 +24,11 @@ export function MastersSubAgents() {
   const setF = (o) => setForm((p) => ({ ...p, ...o }));
 
   const KPIS = [
-    { l: 'Sub-Agents', v: String(SUBAGENTS.length), c: '#384677' },
-    { l: 'Active', v: String(SUBAGENTS.filter((s) => s.active).length), c: '#27500A' },
-    { l: 'Total YTD Revenue', v: f(SUBAGENTS.reduce((s, a) => s + a.revYTD, 0)), c: '#185FA5' },
-    { l: 'Commission Paid YTD', v: f(SUBAGENTS.reduce((s, a) => s + (a.commType.includes('%') ? a.gpYTD * (a.commRate / 100) : a.books * a.commRate), 0)), c: '#854F0B' },
-    { l: 'Total Bookings', v: String(SUBAGENTS.reduce((s, a) => s + a.books, 0)), c: '#1D9E75' },
+    { l: 'Sub-Agents', v: String(SUBAGENTS.length), c: '#2e323c' },
+    { l: 'Active', v: String(SUBAGENTS.filter((s) => s.active).length), c: '#16a34a' },
+    { l: 'Total YTD Revenue', v: f(SUBAGENTS.reduce((s, a) => s + a.revYTD, 0)), c: '#2563eb' },
+    { l: 'Commission Paid YTD', v: f(SUBAGENTS.reduce((s, a) => s + (a.commType.includes('%') ? a.gpYTD * (a.commRate / 100) : a.books * a.commRate), 0)), c: '#d97706' },
+    { l: 'Total Bookings', v: String(SUBAGENTS.reduce((s, a) => s + a.books, 0)), c: '#3fb7a3' },
   ];
 
   const exportAgents = () => exportToExcel('sub-agents',
@@ -36,7 +36,7 @@ export function MastersSubAgents() {
     SUBAGENTS);
 
   const Stat = ({ l, v, c }) => (
-    <div className="rounded-lg bg-surface-alt px-2 py-2.5 text-center"><div className="mb-1 text-[11px] text-ink-muted">{l}</div><div className="font-bold" style={{ color: c || '#0d1326' }}>{v}</div></div>
+    <div className="rounded-lg bg-surface-alt px-2 py-2.5 text-center"><div className="mb-1 text-[11px] text-ink-muted">{l}</div><div className="font-bold" style={{ color: c || '#1a1c22' }}>{v}</div></div>
   );
 
   return (
@@ -66,7 +66,7 @@ export function MastersSubAgents() {
           return (
             <div key={s.id} onClick={() => setSel(open ? null : s)}
               className={`cursor-pointer rounded-brand border border-t-[4px] bg-surface p-3.5 transition ${open ? 'shadow-brand' : 'border-surface-border shadow-sm hover:shadow'}`}
-              style={{ borderTopColor: { info: '#185FA5', warning: '#854F0B', success: '#27500A', neutral: '#384677' }[tone] }}>
+              style={{ borderTopColor: { info: '#2563eb', warning: '#d97706', success: '#16a34a', neutral: '#2e323c' }[tone] }}>
               <div className="mb-2.5 flex items-start justify-between">
                 <div>
                   <p className="text-[13px] font-bold text-navy">{s.name}</p>
@@ -76,7 +76,7 @@ export function MastersSubAgents() {
               </div>
               <div className="mb-2.5 grid grid-cols-3 gap-2">
                 <Stat l="YTD Revenue" v={f(s.revYTD)} />
-                <Stat l="YTD GP" v={f(s.gpYTD)} c="#1D9E75" />
+                <Stat l="YTD GP" v={f(s.gpYTD)} c="#3fb7a3" />
                 <Stat l="Bookings" v={String(s.books)} />
               </div>
               <div className="flex justify-between border-t border-surface-alt pt-2 text-[10.5px] text-ink-muted">

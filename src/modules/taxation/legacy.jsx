@@ -41,7 +41,7 @@ export function TaxGstr1({branch}){
   const PERIODS=MONTH_OPTIONS;
 
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const bills=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period));
+  const bills=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
   const B2B_CLIENTS=[]; // TODO: derive B2B/B2C split from the customer master's GST-registration flag
 
   const b2b=bills.filter(b=>B2B_CLIENTS.includes(b.client));
@@ -131,9 +131,9 @@ export function TaxGstr3b({branch}){
   const PERIODS=MONTH_OPTIONS;
 
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const sales=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period));
-  const purch=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period));
-  const rcm=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&b.supplier.includes("BSP")); // GDS as RCM proxy
+  const sales=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
+  const purch=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
+  const rcm=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period)&&(b.supplier||'').includes("BSP")); // GDS as RCM proxy
 
   const gstRate=mod=>mod==="Holiday"?5:18;
   const totOutward =sales.reduce((s,b)=>s+b.sell/(1+gstRate(b.mod)/100)*(gstRate(b.mod)/100),0);
@@ -221,12 +221,12 @@ export function TaxRcm({branch}){
   /* Identify RCM entries: overseas DMC purchases + GDS charges */
   const rcmEntries=useMemo(()=>{
     const OVERSEAS_SUPPLIERS=[]; // TODO: flag overseas suppliers in the supplier master
-    return GP.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&
-      OVERSEAS_SUPPLIERS.some(s=>b.supplier.includes(s.split(" ")[0]))).map(b=>{
+    return GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period)&&
+      OVERSEAS_SUPPLIERS.some(s=>(b.supplier||'').includes(s.split(" ")[0]))).map(b=>{
       const igst=Math.round(b.cost/(1+0.18)*0.18);
       return {date:b.date,party:b.supplier,desc:`${b.mod} — ${b.dest}`,taxable:Math.round(b.cost/(1+0.18)),igst,status:"Paid",vno:b.id};
     });
-  },[brCode,period]);
+  },[GP,brCode,period]); // GP must be a dep — else the register never recomputes once bills load
 
   const tot=rcmEntries.reduce((s,r)=>s+r.igst,0);
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
@@ -288,7 +288,7 @@ export function TaxVat({branch}){
   const AFRICA_BRANCHES=[];
 
   const getBranchData=(brCode,rate)=>{
-    const bills=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period));
+    const bills=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period));
     const sales=bills.reduce((s,b)=>s+b.sell,0);
     const taxable=sales/(1+rate/100);
     const outputVAT=taxable*(rate/100);
@@ -488,7 +488,7 @@ export function GstrRecon({branch}){
 
   /* Simulate GSTR-2B data vs books */
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const bills=GP.filter(b=>b.branch===brCode&&b.date.startsWith(period)&&["BSP India","Emirates GSA","Bali Tours DMC"].includes(b.supplier));
+  const bills=GP.filter(b=>b.branch===brCode&&(b.date||'').startsWith(period)&&["BSP India","Emirates GSA","Bali Tours DMC"].includes(b.supplier));
   const recon=bills.map((b,i)=>{
     const itcBooks=Math.round(b.cost/(1+0.18)*0.18);
     const gstr2bAmt=i%3===1?Math.round(itcBooks*0.85):itcBooks; // simulate 1-in-3 mismatch
@@ -583,7 +583,7 @@ export function TallyExport({branch}){
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
 
   const generateXML=()=>{
-    const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&b.date.startsWith(period));
+    const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
     const totRev=bills.reduce((s,b)=>s+b.sell,0);
     const totCost=bills.reduce((s,b)=>s+b.cost,0);
 
@@ -693,10 +693,10 @@ export function TaxTdsTcs({branch}){
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [form,setForm]=useState({payee:"",pan:"",section:"194C",nature:"",gross:0,date:""});
 
-  const tFiltered=tdsEntries.filter(t=>t.date.startsWith(period));
+  const tFiltered=tdsEntries.filter(t=>(t.date||'').startsWith(period));
   const totTds=tFiltered.reduce((s,t)=>s+t.tds,0);
   const totPending=tFiltered.filter(t=>t.status!=="Deposited").reduce((s,t)=>s+t.tds,0);
-  const totTcs=_TCS_ENTRIES.filter(t=>t.date.startsWith(period)).reduce((s,t)=>s+t.tcs,0);
+  const totTcs=_TCS_ENTRIES.filter(t=>(t.date||'').startsWith(period)).reduce((s,t)=>s+t.tcs,0);
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
 
   const markDeposited=(id)=>setTdsEntries(ts=>ts.map(t=>t.id===id?{...t,status:"Deposited",challanDate:"2026-05-"+new Date().getDate().toString().padStart(2,"0"),challanBsr:"0600115",challanSerial:String(Math.floor(Math.random()*90000)+10000)}:t));
@@ -796,7 +796,7 @@ export function TaxTdsTcs({branch}){
                 <th key={i} style={{padding:"8px 10px",textAlign:i>=5&&i<=7?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{_TCS_ENTRIES.filter(t=>t.date.startsWith(period)).map((t,i)=>(
+            <tbody>{_TCS_ENTRIES.filter(t=>(t.date||'').startsWith(period)).map((t,i)=>(
               <tr key={t.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"7px 10px",color:"#5a6691"}}>{t.date}</td>
                 <td style={{padding:"7px 10px",fontWeight:600,color:"#0d1326"}}>{t.collector}</td>

@@ -52,7 +52,7 @@ export function ReportCF({ branch }) {
   const other = netCF - (operatingCF + investingCF + financingCF);
 
   const sections = [
-    { title: 'A. OPERATING ACTIVITIES', color: '#185FA5', rows: [
+    { title: 'A. OPERATING ACTIVITIES', color: '#2563eb', rows: [
       { l: 'Net Profit before tax', v: netProfit },
       { l: 'Add: Depreciation & amortisation (non-cash)', v: depn },
       { l: '(Increase) / decrease in trade receivables', v: -dRecv },
@@ -60,20 +60,20 @@ export function ReportCF({ branch }) {
       { l: '(Increase) / decrease in inventories', v: -dInv },
       { l: 'Net Cash from Operating Activities', v: operatingCF, bold: true, border: true },
     ] },
-    { title: 'B. INVESTING ACTIVITIES', color: '#27500A', rows: [
+    { title: 'B. INVESTING ACTIVITIES', color: '#16a34a', rows: [
       { l: 'Net (purchase) / sale of fixed assets & investments', v: investingCF },
       { l: 'Net Cash from Investing Activities', v: investingCF, bold: true, border: true },
     ] },
-    { title: 'C. FINANCING ACTIVITIES', color: '#854F0B', rows: [
+    { title: 'C. FINANCING ACTIVITIES', color: '#d97706', rows: [
       { l: 'Change in share / capital account', v: dCap },
       { l: 'Change in borrowings', v: dBorrow },
       { l: 'Net Cash from Financing Activities', v: financingCF, bold: true, border: true },
     ] },
   ];
-  if (Math.abs(other) >= 1) sections.push({ title: 'D. OTHER MOVEMENTS', color: '#5a6691', rows: [{ l: 'Unclassified / other balance movements', v: other, bold: true, border: true }] });
+  if (Math.abs(other) >= 1) sections.push({ title: 'D. OTHER MOVEMENTS', color: '#5b616e', rows: [{ l: 'Unclassified / other balance movements', v: other, bold: true, border: true }] });
 
   const f = (n) => { const abs = Math.abs(Math.round(n)); const s = cur + abs.toLocaleString('en-IN'); return n < 0 ? `(${s})` : s; };
-  const clr = (n) => (n >= 0 ? '#27500A' : '#A32D2D');
+  const clr = (n) => (n >= 0 ? '#16a34a' : '#dc2626');
   const hasData = !!qC.data && (Math.abs(closingCash) > 0.01 || Math.abs(openingCash) > 0.01 || Math.abs(netProfit) > 0.01);
 
   const periodSelect = (
@@ -100,7 +100,7 @@ export function ReportCF({ branch }) {
                   {sec.rows.map((r, ri) => (
                     <tr key={ri} className={`border-b border-surface-alt ${r.border ? 'border-t-2 border-t-surface-border bg-surface-alt' : ''}`}>
                       <td className={`px-3.5 py-2.5 text-navy ${r.bold ? 'font-bold' : ''}`}>{r.l}</td>
-                      <td className="px-3.5 py-2.5 text-right tabular-nums" style={{ color: r.bold ? clr(r.v) : r.v < 0 ? '#A32D2D' : '#384677', fontWeight: r.bold ? 800 : 500, fontSize: r.bold ? 13 : 11.5 }}>{f(r.v)}</td>
+                      <td className="px-3.5 py-2.5 text-right tabular-nums" style={{ color: r.bold ? clr(r.v) : r.v < 0 ? '#dc2626' : '#2e323c', fontWeight: r.bold ? 800 : 500, fontSize: r.bold ? 13 : 11.5 }}>{f(r.v)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -118,7 +118,7 @@ export function ReportCF({ branch }) {
             </table>
           </div>
 
-          <div className="rounded-brand border border-[#B5D4F4] bg-[#E6F1FB] px-3.5 py-2.5 text-[10px] leading-relaxed text-[#185FA5]">
+          <div className="rounded-brand border border-[#cfe0f8] bg-[#e8f0ff] px-3.5 py-2.5 text-[10px] leading-relaxed text-[#2563eb]">
             Indirect method from live double-entry: opening vs closing Balance Sheet (Bank + Cash), Net Profit + non-cash items ± working-capital changes. Positive = cash generated, Negative (in brackets) = cash used.
           </div>
         </div>

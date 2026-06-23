@@ -26,14 +26,17 @@ import { useLedgerRegistry } from '../core/useReference';
 import { PeriodBar } from '../core/period';
 import { BRANCHES } from '../core/data';
 import { fmtINR } from '../core/format';
+import { toast } from '../core/ux/toast';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { CUR_FY, CUR_QUARTER, CUR_MONTH, ALL_TIME_FROM, todayISO, fmtDate, monthLabel, fyQuarterOf } from '../core/dates';
-import { cardStyle } from '../core/helpers';
 import { RPT_thStyle, RPT_tdStyle } from '../core/styles';
 import { exportToExcel } from '../core/exportExcel';
 import { exportToCSV } from '../core/business-logic';
 import { VoucherEditor } from './accountingLive';
 import { isInterBranch, brName } from './interbranch';
+import { Printer, FileSpreadsheet, FileText } from 'lucide-react';
+import { PageLayout } from '../shell/PageLayout';
+import { Button, Card, ResponsiveGrid, LoadingState, EmptyState } from '../shell/primitives';
 
 /* ── service (product) from voucher type ── */
 const PRODUCT = {
@@ -45,8 +48,8 @@ const serviceOf = (v) => PRODUCT[v.type] || v.type || 'Other';
 /* ── the five segments (+ a transparent catch-all so nothing is hidden) ── */
 const CATS = ['B2C Meta', 'B2C Ref', 'B2B', 'B2E', 'Inter Branch'];
 const CAT_CLR = {
-  'B2C Meta': '#185FA5', 'B2C Ref': '#1D9E75', 'B2B': '#854F0B', 'B2E': '#6B4C8B',
-  'Inter Branch': '#A32D2D', 'Unclassified': '#5a6691', 'Direct Cost': '#5a6691',
+  'B2C Meta': '#2563eb', 'B2C Ref': '#3fb7a3', 'B2B': '#d97706', 'B2E': '#6B4C8B',
+  'Inter Branch': '#dc2626', 'Unclassified': '#5b616e', 'Direct Cost': '#5b616e',
 };
 function categoryOf(v) {
   const hay = `${v.partyGroup || ''} ${v.party || ''}`;
@@ -79,13 +82,13 @@ const monthKeyOf = (s) => { const d = toDate(s); return d ? `${d.getFullYear()}-
 const money = (n) => fmtINR(n || 0);
 const pct = (gp, sale) => (sale ? (gp / sale) * 100 : 0);
 const pctStr = (gp, sale) => `${pct(gp, sale).toFixed(1)}%`;
-const gpColor = (p) => (p >= 25 ? '#1D9E75' : p >= 12 ? '#854F0B' : '#A32D2D');
+const gpColor = (p) => (p >= 25 ? '#3fb7a3' : p >= 12 ? '#d97706' : '#dc2626');
 
 /* ── tiny UI atoms ── */
-const tBtn = (active) => ({ padding: '6px 12px', borderRadius: 7, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', border: `1.5px solid ${active ? '#0d1326' : '#e1e3ec'}`, background: active ? '#0d1326' : '#fff', color: active ? '#d4a437' : '#5a6691', whiteSpace: 'nowrap' });
-const xBtn = { padding: '7px 12px', background: '#fff', border: '1px solid #e1e3ec', borderRadius: 6, fontSize: 11.5, cursor: 'pointer', fontWeight: 600, color: '#5a6691' };
+// Segmented pill button (view toggle + analysis tab bar).
+const segCls = (active) => `whitespace-nowrap rounded-lg border px-3 py-1.5 text-[11.5px] font-bold transition max-tablet:min-h-[44px] ${active ? 'border-navy bg-navy text-gold' : 'border-surface-border bg-surface text-ink-muted hover:bg-surface-alt'}`;
 const Th = ({ children, right }) => <th style={{ ...RPT_thStyle, textAlign: right ? 'right' : 'left' }}>{children}</th>;
-const linkCell = { color: '#185FA5', cursor: 'pointer', fontWeight: 600 };
+const linkCell = { color: '#2563eb', cursor: 'pointer', fontWeight: 600 };
 
 /* ══════════════════════════════════════════════════════════════════════
    MAIN
@@ -219,50 +222,48 @@ export function SalesGpAnalytics({ branch }) {
   ];
   const exportRows = invoices.map((i) => ({ ...i, gpPctR: i.gpPct.toFixed(1) }));
   const fname = `sales-gp-analytics_${from || 'all'}_to_${to || 'today'}`;
-  const doExcel = () => exportToExcel(fname, exportCols, exportRows);
-  const doCsv = () => exportToCSV(exportRows, exportCols.map((c) => c.key), `${fname}.csv`);
+  const doExcel = () => { try { exportToExcel(fname, exportCols, exportRows); toast('Downloading Excel export…', 'success'); } catch (e) { toast('Export failed: ' + (e?.message || e), 'error'); } };
+  const doCsv = () => { try { exportToCSV(exportRows, exportCols.map((c) => c.key), `${fname}.csv`); toast('Downloading CSV export…', 'success'); } catch (e) { toast('Export failed: ' + (e?.message || e), 'error'); } };
+  const doPrint = () => { toast('Opening print view…', 'info'); window.print(); };
 
   /* ── voucher drill overlay ── */
   if (voucher) {
     return (
-      <div style={{ padding: 18, maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ fontSize: 12, color: '#5a6691', marginBottom: 8 }}>
-          <button onClick={() => setVoucher(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#185FA5', fontWeight: 600, padding: 0 }}>Sales &amp; GP Analytics</button>
-          <span style={{ color: '#b9bed4' }}> ▸ </span><span style={{ color: '#0d1326', fontWeight: 700 }}>Voucher</span>
+      <PageLayout maxWidth="max-w-[1100px] mx-auto">
+        <div className="mb-2 text-xs text-ink-muted">
+          <button onClick={() => setVoucher(null)} className="font-semibold text-info hover:underline">Sales &amp; GP Analytics</button>
+          <span className="text-ink-subtle"> ▸ </span><span className="font-bold text-ink">Voucher</span>
         </div>
-        <div style={cardStyle}><VoucherEditor voucherId={voucher.id} cur="₹" onBack={() => setVoucher(null)} /></div>
-      </div>
+        <Card><VoucherEditor voucherId={voucher.id} cur="₹" onBack={() => setVoucher(null)} /></Card>
+      </PageLayout>
     );
   }
 
   return (
-    <div style={{ padding: 18, maxWidth: 1500, margin: '0 auto' }}>
-      {/* header */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #e1e3ec' }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 20, color: '#0d1326', fontWeight: 700 }}>Sales &amp; GP Analytics</h2>
-          <p style={{ margin: '3px 0 0', fontSize: 12, color: '#5a6691' }}>Revenue · Cost · Gross Profit · GP% across B2C Meta · B2C Ref · B2B · B2E · Inter-Branch — live from the books</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <button onClick={() => window.print()} style={xBtn}>📄 PDF</button>
-          <button onClick={() => window.print()} style={xBtn}>🖨 Print</button>
-          <button onClick={doExcel} style={xBtn}>📊 Excel</button>
-          <button onClick={doCsv} style={xBtn}>📋 CSV</button>
-        </div>
-      </div>
-
+    <PageLayout
+      maxWidth="max-w-[1500px] mx-auto"
+      title="Sales & GP Analytics"
+      subtitle="Revenue · Cost · Gross Profit · GP% across B2C Meta · B2C Ref · B2B · B2E · Inter-Branch — live from the books"
+      actions={
+        <>
+          <Button variant="secondary" size="sm" icon={Printer} onClick={doPrint}>Print</Button>
+          <Button variant="secondary" size="sm" icon={FileSpreadsheet} onClick={doExcel}>Excel</Button>
+          <Button variant="secondary" size="sm" icon={FileText} onClick={doCsv}>CSV</Button>
+        </>
+      }
+    >
       {/* time filters */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <PeriodBar branch={branch} defaultPreset="all" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
-        <span style={{ width: 1, height: 22, background: '#e1e3ec' }} />
-        <button onClick={() => setView('summary')} style={tBtn(view === 'summary')}>Summary</button>
-        <button onClick={() => setView('detailed')} style={tBtn(view === 'detailed')}>Detailed</button>
+        <span className="h-5 w-px bg-surface-border" />
+        <button onClick={() => setView('summary')} className={segCls(view === 'summary')}>Summary</button>
+        <button onClick={() => setView('detailed')} className={segCls(view === 'detailed')}>Detailed</button>
       </div>
 
       {/* reconciliation banner */}
       {hasData && (
-        <div style={{ ...cardStyle, marginBottom: 12, borderLeft: `4px solid ${revOk && costOk ? '#1D9E75' : '#854F0B'}`, background: revOk && costOk ? '#f4faf0' : '#fffaf0' }}>
-          <p style={{ margin: 0, fontSize: 11.5, color: '#384677', lineHeight: 1.6 }}>
+        <div className="mb-3 rounded-brand border border-l-4 border-surface-border p-4" style={{ borderLeftColor: revOk && costOk ? '#3fb7a3' : '#d97706', background: revOk && costOk ? '#f4faf0' : '#fffaf0' }}>
+          <p className="text-[11.5px] leading-relaxed text-ink">
             <b>Reconciliation</b> · Revenue {money(totals.sale)} {revOk ? '✔' : `⚠ vs Invoice-GP ${money(recon.gpRevenue)}`} ·
             Cost {money(totals.cost)} {costOk ? '✔' : `⚠ vs Invoice-GP ${money(recon.gpCost)}`} ·
             Gross Profit {money(totals.gp)}{recon.pnlGross != null ? ` · P&L GP ${money(recon.pnlGross)}` : ''}
@@ -272,45 +273,42 @@ export function SalesGpAnalytics({ branch }) {
       )}
 
       {/* category KPI cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10, marginBottom: 14 }}>
+      <ResponsiveGrid min="220px" gap="md" className="mb-3.5">
         {catSummary.map((c) => {
-          const clr = CAT_CLR[c.cat] || '#5a6691';
+          const clr = CAT_CLR[c.cat] || '#5b616e';
           return (
-            <div key={c.cat} onClick={() => { setTab('category'); setDrill({ dim: 'category', key: c.cat, label: c.cat }); }}
-              style={{ ...cardStyle, borderTop: `3px solid ${clr}`, cursor: 'pointer', transition: 'box-shadow .15s' }}
-              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 6px 18px rgba(13,19,38,0.10)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = ''; }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <p style={{ margin: 0, fontSize: 11, fontWeight: 800, color: clr }}>{c.cat}</p>
-                <span style={{ fontSize: 11, fontWeight: 700, color: gpColor(c.gpPct) }}>GP {pctStr(c.gp, c.sale)}</span>
+            <button key={c.cat} onClick={() => { setTab('category'); setDrill({ dim: 'category', key: c.cat, label: c.cat }); }}
+              className="rounded-brand border border-t-[3px] border-surface-border bg-surface p-4 text-left shadow-sm transition hover:shadow-card" style={{ borderTopColor: clr }}>
+              <div className="flex items-baseline justify-between">
+                <p className="text-[11px] font-extrabold" style={{ color: clr }}>{c.cat}</p>
+                <span className="text-[11px] font-bold" style={{ color: gpColor(c.gpPct) }}>GP {pctStr(c.gp, c.sale)}</span>
               </div>
-              <p style={{ margin: '6px 0 0', fontSize: 20, fontWeight: 800, color: '#0d1326' }}>{money(c.sale)}</p>
-              <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 10, color: '#5a6691', flexWrap: 'wrap' }}>
+              <p className="mt-1.5 text-xl font-extrabold tabular-nums text-ink">{money(c.sale)}</p>
+              <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] text-ink-muted">
                 <span>Cost {money(c.cost)}</span>
-                <span style={{ color: gpColor(c.gpPct), fontWeight: 700 }}>GP {money(c.gp)}</span>
+                <span className="font-bold" style={{ color: gpColor(c.gpPct) }}>GP {money(c.gp)}</span>
               </div>
-              <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: 10, color: '#8b93b3', flexWrap: 'wrap' }}>
+              <div className="mt-1 flex flex-wrap gap-3 text-[10px] text-ink-subtle">
                 <span>{c.txns} txns</span><span>{c.customers} customers</span><span>Avg {money(c.avg)}</span>
               </div>
-            </div>
+            </button>
           );
         })}
-      </div>
+      </ResponsiveGrid>
 
       {/* analysis tab bar */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div className="mb-3 flex flex-wrap gap-1.5">
         {TABS.map((t) => (
-          <button key={t.id} onClick={() => { setTab(t.id); setDrill(null); }} style={tBtn(tab === t.id)}>{t.label}</button>
+          <button key={t.id} onClick={() => { setTab(t.id); setDrill(null); }} className={segCls(tab === t.id)}>{t.label}</button>
         ))}
       </div>
 
-      {loading && <div style={{ ...cardStyle, textAlign: 'center', color: '#5a6691', padding: 28 }}>Loading sales &amp; purchase vouchers…</div>}
+      {loading && <LoadingState label="Crunching the books…" />}
       {!loading && !hasData && (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: 36 }}>
-          <p style={{ margin: 0, fontSize: 32 }}>📊</p>
-          <p style={{ margin: '8px 0 4px', fontSize: 14, fontWeight: 700, color: '#0d1326' }}>No sales in this period</p>
-          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>Adjust the date range, or post sale/purchase vouchers — the segment comes from each customer's party sub-group (B2C Meta / B2C Ref / B2B / B2E).</p>
-        </div>
+        <EmptyState
+          title="No sales in this period"
+          hint="Adjust the date range, or post sale/purchase vouchers — the segment comes from each customer's party sub-group (B2C Meta / B2C Ref / B2B / B2E)."
+        />
       )}
 
       {!loading && hasData && view === 'detailed' && (
@@ -327,7 +325,7 @@ export function SalesGpAnalytics({ branch }) {
           )}
         </>
       )}
-    </div>
+    </PageLayout>
   );
 }
 
@@ -383,8 +381,8 @@ function AnalysisTab({ tab, invoices, catSummary, onDrill }) {
   const tot = rows.reduce((a, r) => ({ sale: a.sale + r.sale, cost: a.cost + r.cost, gp: a.gp + r.gp, txns: a.txns + r.txns }), { sale: 0, cost: 0, gp: 0, txns: 0 });
 
   return (
-    <div style={{ ...cardStyle }}>
-      <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#0d1326' }}>{cfg.label} <span style={{ color: '#5a6691', fontWeight: 500 }}>· {rows.length} rows · click any row to drill</span></p>
+    <div className="kbiz-card">
+      <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1a1c22' }}>{cfg.label} <span style={{ color: '#5b616e', fontWeight: 500 }}>· {rows.length} rows · click any row to drill</span></p>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
           <thead><tr>
@@ -396,21 +394,21 @@ function AnalysisTab({ tab, invoices, catSummary, onDrill }) {
               <tr key={r.key} onClick={() => onDrill({ dim: cfg.dim, key: r.key, label: cfg.fmt ? cfg.fmt(r.key) : (cfg.brand ? brName(r.key) : r.key) })}
                 style={{ cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }} onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}>
                 <td style={{ ...RPT_tdStyle, fontWeight: 600, ...linkCell }}>{cfg.fmt ? cfg.fmt(r.key) : (cfg.brand ? brName(r.key) : r.key)}</td>
-                <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#185FA5' }}>{money(r.sale)}</td>
-                <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#854F0B' }}>{money(r.cost)}</td>
+                <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#2563eb' }}>{money(r.sale)}</td>
+                <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#d97706' }}>{money(r.cost)}</td>
                 <td style={{ ...RPT_tdStyle, textAlign: 'right', fontWeight: 700 }}>{money(r.gp)}</td>
                 <td style={{ ...RPT_tdStyle, textAlign: 'right', fontWeight: 700, color: gpColor(r.gpPct) }}>{pctStr(r.gp, r.sale)}</td>
                 <td style={{ ...RPT_tdStyle, textAlign: 'right' }}>{r.txns}</td>
                 <td style={{ ...RPT_tdStyle, textAlign: 'right' }}>{r.customers}</td>
-                <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#5a6691' }}>{money(r.avg)}</td>
+                <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#5b616e' }}>{money(r.avg)}</td>
               </tr>
             ))}
           </tbody>
-          <tfoot><tr style={{ background: '#0d1326' }}>
-            <td style={{ padding: '9px 12px', fontWeight: 700, color: '#d4a437' }}>TOTAL</td>
+          <tfoot><tr style={{ background: '#1a1c22' }}>
+            <td style={{ padding: '9px 12px', fontWeight: 700, color: '#c2a04a' }}>TOTAL</td>
             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#fff' }}>{money(tot.sale)}</td>
             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#fff' }}>{money(tot.cost)}</td>
-            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#d4a437' }}>{money(tot.gp)}</td>
+            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#c2a04a' }}>{money(tot.gp)}</td>
             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#fff' }}>{pctStr(tot.gp, tot.sale)}</td>
             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#fff' }}>{tot.txns}</td>
             <td colSpan={2} />
@@ -429,10 +427,10 @@ function InvoiceTable({ title, invoices, onVoucher, drill, clearDrill }) {
   const rows = [...invoices].sort((a, b) => b.sale - a.sale);
   const tot = rows.reduce((a, r) => ({ sale: a.sale + r.sale, cost: a.cost + r.cost, gp: a.gp + r.gp }), { sale: 0, cost: 0, gp: 0 });
   return (
-    <div style={{ ...cardStyle, marginTop: 14 }}>
+    <div className="kbiz-card mt-3.5">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0d1326' }}>{title} <span style={{ color: '#5a6691', fontWeight: 500 }}>· {rows.length} invoices</span></p>
-        {drill && clearDrill && <button onClick={clearDrill} style={xBtn}>✕ Clear filter</button>}
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#1a1c22' }}>{title} <span style={{ color: '#5b616e', fontWeight: 500 }}>· {rows.length} invoices</span></p>
+        {drill && clearDrill && <Button variant="secondary" size="sm" onClick={clearDrill}>Clear filter</Button>}
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
@@ -446,31 +444,31 @@ function InvoiceTable({ title, invoices, onVoucher, drill, clearDrill }) {
               return (
                 <React.Fragment key={inv.key}>
                   <tr onClick={() => setOpen(isOpen ? '' : inv.key)} style={{ cursor: 'pointer', background: isOpen ? '#f7f8fb' : '' }}>
-                    <td style={{ ...RPT_tdStyle, fontWeight: 600 }}><span style={{ color: '#b9bed4', marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{inv.customer}</td>
-                    <td style={{ ...RPT_tdStyle, fontFamily: 'monospace', fontSize: 10, color: '#185FA5' }}>{inv.ref || '—'}</td>
+                    <td style={{ ...RPT_tdStyle, fontWeight: 600 }}><span style={{ color: '#9197a3', marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{inv.customer}</td>
+                    <td style={{ ...RPT_tdStyle, fontFamily: 'monospace', fontSize: 10, color: '#2563eb' }}>{inv.ref || '—'}</td>
                     <td style={RPT_tdStyle}>{inv.service}</td>
-                    <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#185FA5' }}>{money(inv.sale)}</td>
-                    <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#854F0B' }}>{money(inv.cost)}</td>
+                    <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#2563eb' }}>{money(inv.sale)}</td>
+                    <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#d97706' }}>{money(inv.cost)}</td>
                     <td style={{ ...RPT_tdStyle, textAlign: 'right', fontWeight: 700 }}>{money(inv.gp)}</td>
                     <td style={{ ...RPT_tdStyle, textAlign: 'right', fontWeight: 700, color: gpColor(inv.gpPct) }}>{pctStr(inv.gp, inv.sale)}</td>
                     <td style={RPT_tdStyle}>{inv.consultant}</td>
                     <td style={RPT_tdStyle}>{brName(inv.branch)}</td>
-                    <td style={RPT_tdStyle}><span style={{ padding: '2px 7px', borderRadius: 999, fontSize: 9.5, fontWeight: 700, background: inv.status === 'cancelled' ? '#FCEBEB' : '#EAF3DE', color: inv.status === 'cancelled' ? '#A32D2D' : '#27500A' }}>{inv.status || 'saved'}</span></td>
+                    <td style={RPT_tdStyle}><span style={{ padding: '2px 7px', borderRadius: 999, fontSize: 9.5, fontWeight: 700, background: inv.status === 'cancelled' ? '#fbe9e9' : '#e8f6ed', color: inv.status === 'cancelled' ? '#dc2626' : '#16a34a' }}>{inv.status || 'saved'}</span></td>
                   </tr>
                   {isOpen && (
                     <tr><td colSpan={10} style={{ padding: '4px 12px 12px 34px', background: '#fafbfd' }}>
-                      <p style={{ margin: '6px 0 4px', fontSize: 10, fontWeight: 700, color: '#5a6691', textTransform: 'uppercase' }}>Ledger entries / vouchers — click to view &amp; edit</p>
+                      <p style={{ margin: '6px 0 4px', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase' }}>Ledger entries / vouchers — click to view &amp; edit</p>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10.5 }}>
                         <tbody>
                           {[...inv.saleV.map((x) => ({ ...x, side: 'Sale' })), ...inv.purchV.map((x) => ({ ...x, side: 'Purchase' }))].map((vx, j) => (
                             <tr key={j} style={{ borderBottom: '1px solid #eef1f6' }}>
-                              <td style={{ padding: '5px 8px', width: 70 }}><span style={{ fontSize: 9, fontWeight: 700, color: vx.side === 'Sale' ? '#185FA5' : '#854F0B' }}>{vx.side}</span></td>
+                              <td style={{ padding: '5px 8px', width: 70 }}><span style={{ fontSize: 9, fontWeight: 700, color: vx.side === 'Sale' ? '#2563eb' : '#d97706' }}>{vx.side}</span></td>
                               <td style={{ padding: '5px 8px' }}>
-                                {vx.id ? <button onClick={() => onVoucher({ id: vx.id })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#185FA5', fontFamily: 'monospace', fontSize: 10, fontWeight: 700, padding: 0 }}>{vx.vno}</button>
+                                {vx.id ? <button onClick={() => onVoucher({ id: vx.id })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontFamily: 'monospace', fontSize: 10, fontWeight: 700, padding: 0 }}>{vx.vno}</button>
                                   : <span style={{ fontFamily: 'monospace', fontSize: 10 }}>{vx.vno}</span>}
                               </td>
-                              <td style={{ padding: '5px 8px', color: '#384677' }}>{vx.party || '—'}</td>
-                              <td style={{ padding: '5px 8px', color: '#5a6691' }}>{serviceOf(vx)}</td>
+                              <td style={{ padding: '5px 8px', color: '#2e323c' }}>{vx.party || '—'}</td>
+                              <td style={{ padding: '5px 8px', color: '#5b616e' }}>{serviceOf(vx)}</td>
                               <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>{money(vx.amt)}</td>
                             </tr>
                           ))}
@@ -482,11 +480,11 @@ function InvoiceTable({ title, invoices, onVoucher, drill, clearDrill }) {
               );
             })}
           </tbody>
-          <tfoot><tr style={{ background: '#0d1326' }}>
-            <td colSpan={3} style={{ padding: '9px 12px', fontWeight: 700, color: '#d4a437' }}>TOTAL — {rows.length}</td>
+          <tfoot><tr style={{ background: '#1a1c22' }}>
+            <td colSpan={3} style={{ padding: '9px 12px', fontWeight: 700, color: '#c2a04a' }}>TOTAL — {rows.length}</td>
             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#fff' }}>{money(tot.sale)}</td>
             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#fff' }}>{money(tot.cost)}</td>
-            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#d4a437' }}>{money(tot.gp)}</td>
+            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#c2a04a' }}>{money(tot.gp)}</td>
             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#fff' }}>{pctStr(tot.gp, tot.sale)}</td>
             <td colSpan={3} />
           </tr></tfoot>
@@ -529,41 +527,41 @@ function InterBranchTab({ branch, from, to, invoices, onVoucher }) {
   const cost = seg.reduce((s, i) => s + i.cost, 0);
 
   const Stat = ({ label, value, clr }) => (
-    <div style={{ ...cardStyle, borderTop: `3px solid ${clr}` }}>
-      <p style={{ margin: 0, fontSize: 9.5, fontWeight: 700, color: clr, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{label}</p>
-      <p style={{ margin: '4px 0 0', fontSize: 18, fontWeight: 800, color: '#0d1326' }}>{money(value)}</p>
+    <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface p-4 shadow-sm" style={{ borderTopColor: clr }}>
+      <p className="text-[9.5px] font-bold uppercase tracking-wide" style={{ color: clr }}>{label}</p>
+      <p className="mt-1 text-lg font-extrabold tabular-nums text-ink">{money(value)}</p>
     </div>
   );
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 14 }}>
-        <Stat label="Revenue" value={rev} clr="#185FA5" />
-        <Stat label="Cost" value={cost} clr="#854F0B" />
-        <Stat label="Gross Profit" value={rev - cost} clr="#1D9E75" />
-        <Stat label="Receivable" value={ib.totRecv} clr="#185FA5" />
-        <Stat label="Payable" value={ib.totPay} clr="#A32D2D" />
+      <ResponsiveGrid min="150px" gap="md" className="mb-3.5">
+        <Stat label="Revenue" value={rev} clr="#2563eb" />
+        <Stat label="Cost" value={cost} clr="#d97706" />
+        <Stat label="Gross Profit" value={rev - cost} clr="#3fb7a3" />
+        <Stat label="Receivable" value={ib.totRecv} clr="#2563eb" />
+        <Stat label="Payable" value={ib.totPay} clr="#dc2626" />
         <Stat label="Elimination Impact" value={ib.elim} clr="#6B4C8B" />
-      </div>
+      </ResponsiveGrid>
 
       {seg.length > 0 && <InvoiceTable title="Inter-Branch Transactions" invoices={seg} onVoucher={onVoucher} />}
 
       {/* inter-branch ledger drill (Branch → Ledger → Voucher) */}
-      <div style={{ ...cardStyle, marginTop: 14 }}>
-        <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#0d1326' }}>Inter-Branch Ledgers — Receivable ⇄ Payable</p>
-        {ib.recv.length === 0 && ib.pay.length === 0 && <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>No inter-branch Sundry Debtor / Creditor ledgers found in this period.</p>}
+      <div className="kbiz-card mt-3.5">
+        <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1a1c22' }}>Inter-Branch Ledgers — Receivable ⇄ Payable</p>
+        {ib.recv.length === 0 && ib.pay.length === 0 && <p style={{ margin: 0, fontSize: 11.5, color: '#5b616e' }}>No inter-branch Sundry Debtor / Creditor ledgers found in this period.</p>}
         {[...ib.recv.map((r) => ({ ...r, side: 'Receivable' })), ...ib.pay.map((p) => ({ ...p, side: 'Payable' }))].map((l) => {
           const isOpen = openLedger === l.ledger;
           return (
             <div key={`${l.side}:${l.ledger}`} style={{ border: '1px solid #eef1f6', borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
               <div onClick={() => setOpenLedger(isOpen ? '' : l.ledger)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '9px 12px', cursor: 'pointer', background: isOpen ? '#f7f8fb' : '#fff' }}>
                 <div style={{ minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0d1326' }}><span style={{ color: '#b9bed4', marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{l.ledger}</p>
-                  <p style={{ margin: '1px 0 0 16px', fontSize: 10, color: '#5a6691' }}>{l.owning ? brName(l.owning) : '—'} · {l.side}</p>
+                  <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#1a1c22' }}><span style={{ color: '#9197a3', marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{l.ledger}</p>
+                  <p style={{ margin: '1px 0 0 16px', fontSize: 10, color: '#5b616e' }}>{l.owning ? brName(l.owning) : '—'} · {l.side}</p>
                 </div>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: l.side === 'Receivable' ? '#185FA5' : '#A32D2D' }}>{money(l.outstanding)}</span>
-                  <button onClick={(e) => { e.stopPropagation(); openLedgerModal(l.ledger); }} title="Open full ledger account" style={{ border: '1px solid #d6dbe6', background: '#fff', borderRadius: 6, fontSize: 11, padding: '3px 8px', cursor: 'pointer', color: '#0d1326', fontWeight: 700 }}>📒 Ledger</button>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: l.side === 'Receivable' ? '#2563eb' : '#dc2626' }}>{money(l.outstanding)}</span>
+                  <button onClick={(e) => { e.stopPropagation(); openLedgerModal(l.ledger); }} title="Open full ledger account" style={{ border: '1px solid #d6dbe6', background: '#fff', borderRadius: 6, fontSize: 11, padding: '3px 8px', cursor: 'pointer', color: '#1a1c22', fontWeight: 700 }}>📒 Ledger</button>
                 </span>
               </div>
               {isOpen && <IBLedgerVouchers ledger={l.ledger} branch={branch} from={from} to={to} onVoucher={onVoucher} />}
@@ -578,23 +576,23 @@ function InterBranchTab({ branch, from, to, invoices, onVoucher }) {
 function IBLedgerVouchers({ ledger, branch, from, to, onVoucher }) {
   const q = useLedgerStatement(ledger, branch, { from, to });
   const lines = q.data?.lines || [];
-  if (q.isLoading) return <div style={{ padding: 14, fontSize: 11, color: '#5a6691' }}>Loading postings…</div>;
+  if (q.isLoading) return <div style={{ padding: 14, fontSize: 11, color: '#5b616e' }}>Loading postings…</div>;
   return (
     <div style={{ overflowX: 'auto', borderTop: '1px solid #eef1f6' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10.5 }}>
         <thead><tr style={{ background: '#f3f4f8' }}>
-          {['Date', 'Voucher', 'Narration', 'Dr', 'Cr', 'Balance'].map((h, i) => <th key={i} style={{ padding: '6px 10px', textAlign: i >= 3 ? 'right' : 'left', color: '#5a6691', fontWeight: 700, fontSize: 9.5 }}>{h}</th>)}
+          {['Date', 'Voucher', 'Narration', 'Dr', 'Cr', 'Balance'].map((h, i) => <th key={i} style={{ padding: '6px 10px', textAlign: i >= 3 ? 'right' : 'left', color: '#5b616e', fontWeight: 700, fontSize: 9.5 }}>{h}</th>)}
         </tr></thead>
         <tbody>
-          {lines.length === 0 && <tr><td colSpan={6} style={{ padding: 16, textAlign: 'center', color: '#5a6691' }}>No postings in range.</td></tr>}
+          {lines.length === 0 && <tr><td colSpan={6} style={{ padding: 16, textAlign: 'center', color: '#5b616e' }}>No postings in range.</td></tr>}
           {lines.map((e, i) => (
             <tr key={i} style={{ borderBottom: '1px solid #f3f4f8' }}>
-              <td style={{ padding: '5px 10px', color: '#5a6691', whiteSpace: 'nowrap' }}>{fmtDate(e.date)}</td>
-              <td style={{ padding: '5px 10px' }}>{e.voucherId ? <button onClick={() => onVoucher({ id: e.voucherId })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#185FA5', fontFamily: 'monospace', fontSize: 10, fontWeight: 700, padding: 0 }}>{e.vno || '(view)'}</button> : <span style={{ fontFamily: 'monospace', fontSize: 10 }}>{e.vno}</span>}</td>
-              <td style={{ padding: '5px 10px', color: '#384677' }}>{e.narration || e.party || '—'}</td>
-              <td style={{ padding: '5px 10px', textAlign: 'right', color: e.debit > 0 ? '#185FA5' : '#cfd3e2' }}>{e.debit > 0 ? money(e.debit) : '—'}</td>
-              <td style={{ padding: '5px 10px', textAlign: 'right', color: e.credit > 0 ? '#A32D2D' : '#cfd3e2' }}>{e.credit > 0 ? money(e.credit) : '—'}</td>
-              <td style={{ padding: '5px 10px', textAlign: 'right', fontWeight: 700, color: e.balanceSide === 'Cr' ? '#A32D2D' : '#185FA5' }}>{money(Math.abs(e.balance))} {e.balanceSide}</td>
+              <td style={{ padding: '5px 10px', color: '#5b616e', whiteSpace: 'nowrap' }}>{fmtDate(e.date)}</td>
+              <td style={{ padding: '5px 10px' }}>{e.voucherId ? <button onClick={() => onVoucher({ id: e.voucherId })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontFamily: 'monospace', fontSize: 10, fontWeight: 700, padding: 0 }}>{e.vno || '(view)'}</button> : <span style={{ fontFamily: 'monospace', fontSize: 10 }}>{e.vno}</span>}</td>
+              <td style={{ padding: '5px 10px', color: '#2e323c' }}>{e.narration || e.party || '—'}</td>
+              <td style={{ padding: '5px 10px', textAlign: 'right', color: e.debit > 0 ? '#2563eb' : '#cbd0db' }}>{e.debit > 0 ? money(e.debit) : '—'}</td>
+              <td style={{ padding: '5px 10px', textAlign: 'right', color: e.credit > 0 ? '#dc2626' : '#cbd0db' }}>{e.credit > 0 ? money(e.credit) : '—'}</td>
+              <td style={{ padding: '5px 10px', textAlign: 'right', fontWeight: 700, color: e.balanceSide === 'Cr' ? '#dc2626' : '#2563eb' }}>{money(Math.abs(e.balance))} {e.balanceSide}</td>
             </tr>
           ))}
         </tbody>

@@ -27,7 +27,7 @@ import {
 } from '../../core/voucherSpecs.js';
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
 
-const GOLD = '#A07828', DARK = '#0d1326', DR = '#1B6B4C', CR = '#9B2C2C', BLUE = '#185FA5';
+const GOLD = '#c2a04a', DARK = '#1a1c22', DR = '#16a34a', CR = '#dc2626', BLUE = '#2563eb';
 // Reversal modules (Refund / Reissue) act on an existing sale — picked from the same
 // module bar as Flight/Hotel, but they open the reversal entry (ReversalEntry) instead
 // of the fare grid and spawn one RF/RI voucher on approval.
@@ -43,7 +43,7 @@ const thM = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacin
 const thA = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: GOLD, textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #f2e6cc', background: '#fdfbfa' };
 const thL = { textAlign: 'left' };
 const tdC = { padding: '6px 8px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #e2e8f0', fontVariantNumeric: 'tabular-nums', verticalAlign: 'middle' };
-const tdAuto = { ...tdC, background: '#faf7ef', color: '#5a6691', fontWeight: 600 };
+const tdAuto = { ...tdC, background: '#faf7ef', color: '#5b616e', fontWeight: 600 };
 const tdTot = { ...tdC, fontWeight: 800, color: DARK };
 const cellInp = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'right', border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s' };
 const cellTxt = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'left', border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', fontFamily: 'inherit', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' };
@@ -270,21 +270,21 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
         <div style={{ ...card, textAlign: 'center', padding: 28 }}>
-          <div style={{ width: 54, height: 54, borderRadius: '50%', background: approved ? '#EAF3DE' : '#FEF6E6', color: approved ? '#27500A' : GOLD, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>{approved ? <Check size={28} /> : <Clock size={28} />}</div>
+          <div style={{ width: 54, height: 54, borderRadius: '50%', background: approved ? '#e8f6ed' : '#FEF6E6', color: approved ? '#16a34a' : GOLD, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>{approved ? <Check size={28} /> : <Clock size={28} />}</div>
           <h2 style={{ margin: '0 0 4px', fontSize: 18, color: DARK }}>
             {approved ? 'Voucher approved & posted' : result._edited ? 'Voucher updated — still Pending' : 'Voucher saved — Pending approval'}
           </h2>
-          <p style={{ margin: '0 0 18px', fontSize: 12.5, color: '#5a6691' }}>
+          <p style={{ margin: '0 0 18px', fontSize: 12.5, color: '#5b616e' }}>
             {approved
               ? (noSupp
                   ? <>The <b>Sales invoice</b> was generated and posted to the books — no purchase leg (the full sale value is income).</>
                   : <>The linked <b>Sales &amp; Purchase invoices</b> were generated and posted to the books, tied by the Link No.</>)
               : <>It has <b>no effect on the books yet</b>. Approve it under <b>Pending</b> to post {noSupp ? <>the <b>Sales invoice</b> (no purchase leg)</> : <>the linked Sales &amp; Purchase invoices</>}.</>}
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, textAlign: 'left' }}>
+          <div className="grid grid-cols-1 gap-2.5 tablet:grid-cols-2" style={{ textAlign: 'left' }}>
             {fields.map(([k, v]) => (
               <div key={k} style={{ background: '#f7f8fb', borderRadius: 8, padding: '8px 12px' }}>
-                <p style={{ margin: 0, fontSize: 9.5, color: '#8b94b3', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{k}</p>
+                <p style={{ margin: 0, fontSize: 9.5, color: '#9197a3', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{k}</p>
                 <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 700, color: DARK, fontFamily: 'monospace' }}>{v}</p>
               </div>
             ))}
@@ -293,7 +293,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             {editing
               ? <button onClick={() => (onDone ? onDone() : setRoute && setRoute(approved ? '/bookings/approved' : '/bookings/pending'))} style={btnG}><ArrowRight size={14} /> Back to list</button>
               : <>
-                  <button onClick={reset} style={btnG}><Plus size={14} /> New voucher</button>
+                  <button onClick={reset} className="max-tablet:min-h-[44px]" style={btnG}><Plus size={14} /> New voucher</button>
                   <button onClick={() => setRoute && setRoute(approved ? '/bookings/approved' : '/bookings/pending')} style={btnGh}>Go to {approved ? 'Approved' : 'Pending'} <ArrowRight size={14} /></button>
                 </>}
           </div>
@@ -349,7 +349,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <div style={{ padding: '14px 18px', background: DARK, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : 'SO / PO / GP VOUCHER'}</p>
-            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#8b94b3' }}>
+            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#9197a3' }}>
               {editing
                 ? <>Fix any data-entry mistake — or switch the <b style={{ color: GOLD }}>module</b> if it was booked wrong — then <b style={{ color: GOLD }}>Save</b> or <b style={{ color: GOLD }}>Save &amp; Approve</b> · {brCode} · still Pending until approved</>
                 : <>Enter cost + Other Taxes → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
@@ -359,7 +359,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             {[...VMODULE_LIST, ...REVERSAL_CHIPS].map((m) => (
               <button key={m.code} onClick={() => changeModule(m.code)}
                 title={editing && m.code !== moduleCode ? `Switch this voucher to ${m.name} — the entered details are kept` : ''}
-                style={{ padding: '5px 11px', borderRadius: 999, border: '1px solid ' + (moduleCode === m.code ? GOLD : '#2a3450'), background: moduleCode === m.code ? GOLD : 'transparent', color: moduleCode === m.code ? '#fff' : '#8b94b3', fontSize: 10.5, fontWeight: 700, cursor: m.code === moduleCode ? 'default' : 'pointer' }}>
+                className="inline-flex items-center max-tablet:min-h-[44px]"
+                style={{ padding: '5px 11px', borderRadius: 999, border: '1px solid ' + (moduleCode === m.code ? GOLD : '#2e323c'), background: moduleCode === m.code ? GOLD : 'transparent', color: moduleCode === m.code ? '#fff' : '#9197a3', fontSize: 10.5, fontWeight: 700, cursor: m.code === moduleCode ? 'default' : 'pointer' }}>
                 {m.icon} {m.name}
               </button>
             ))}
@@ -369,7 +370,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: '#1b2138' }}>
           <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#C49A3C', textTransform: 'uppercase' }}>Link No</span>
           <span style={{ padding: '5px 12px', borderRadius: 4, background: '#11162a', color: '#fff', fontWeight: 800, letterSpacing: '.5px', fontFamily: 'monospace', fontSize: 13 }}>Auto · assigned on save</span>
-          <span style={{ fontSize: 10.5, color: '#9aa2c0', fontStyle: 'italic' }}>links the Sales Order, Purchase Order &amp; Gross Profit of this invoice</span>
+          <span style={{ fontSize: 10.5, color: '#9197a3', fontStyle: 'italic' }}>links the Sales Order, Purchase Order &amp; Gross Profit of this invoice</span>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
             {['SO', 'PO', 'GP'].map((c) => <span key={c} style={{ fontSize: 9, fontWeight: 800, padding: '3px 9px', borderRadius: 20, background: '#262c47', color: '#C49A3C' }}>{c}</span>)}
           </span>
@@ -386,7 +387,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               const active = (v === 'without') === noSupplier;
               return (
                 <button key={v} type="button" onClick={() => setNoSupplier(v === 'without')}
-                  style={{ padding: '6px 14px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: active ? GOLD : '#fff', color: active ? '#fff' : '#5a6691' }}>{l}</button>
+                  className="max-tablet:min-h-[44px]"
+                  style={{ padding: '6px 14px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: active ? GOLD : '#fff', color: active ? '#fff' : '#5b616e' }}>{l}</button>
               );
             })}
           </div>
@@ -409,7 +411,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               const active = (v === 'without') === noVat;
               return (
                 <button key={v} type="button" onClick={() => setNoVat(v === 'without')}
-                  style={{ padding: '6px 14px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: active ? GOLD : '#fff', color: active ? '#fff' : '#5a6691' }}>{l}</button>
+                  className="max-tablet:min-h-[44px]"
+                  style={{ padding: '6px 14px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: active ? GOLD : '#fff', color: active ? '#fff' : '#5b616e' }}>{l}</button>
               );
             })}
           </div>
@@ -422,14 +425,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       )}
 
       {!brCode && (
-        <div style={{ ...card, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#A32D2D', fontSize: 12, marginBottom: 14 }}>
+        <div style={{ ...card, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 12, marginBottom: 14 }}>
           Select a specific branch (not “All branches”) from the top bar to create a voucher.
         </div>
       )}
 
       {editing && !(Array.isArray(editBooking.rows) && editBooking.rows.length) && (
         rowsFromSnapshots(editBooking).length ? (
-          <div style={{ ...card, background: '#EAF1FB', border: '1px solid #B9D6F2', color: '#185FA5', fontSize: 12, marginBottom: 14 }}>
+          <div style={{ ...card, background: '#EAF1FB', border: '1px solid #B9D6F2', color: '#2563eb', fontSize: 12, marginBottom: 14 }}>
             ⓘ This voucher was bulk-imported without the full per-line grid. The line(s) below were <b>rebuilt from the saved Sale / Purchase figures</b> — please verify them; <b>saving recomputes the totals &amp; GST</b> from what's shown here.
           </div>
         ) : (
@@ -465,23 +468,23 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 });
                 if (v.group) setClientType(v.group);
               }} />
-            {!hasCustLedger && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — pick the Client Ledger to post & follow for payment</span>}
+            {!hasCustLedger && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — pick the Client Ledger to post & follow for payment</span>}
           </FL>
           {isB2C && (
             <FL label="Customer (Bill to) — free text *">
               <input value={customer.name} onChange={(e) => setCustomer((c) => ({ ...c, name: e.target.value }))} placeholder="End-customer name (B2C)" style={inp} />
-              {!customer.name.trim() && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — type the end customer's name for the invoice</span>}
+              {!customer.name.trim() && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — type the end customer's name for the invoice</span>}
             </FL>
           )}
           <FL label="Sale GST mode"><select value={saleGstMode} onChange={(e) => setSaleGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
           {!isNoSupp && <FL label="Supplier ledger (Pay to) *">
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
               onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
-            {!hasSuppLedger && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — pick the Creditor ledger to post & pay against</span>}
+            {!hasSuppLedger && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — pick the Creditor ledger to post & pay against</span>}
           </FL>}
           {!isNoSupp && <FL label="Purchase GST mode"><select value={purGstMode} onChange={(e) => setPurGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>}
-          {hasPackage && <FL label="Package type *"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={{ ...inp, ...(packageType ? {} : { borderColor: '#A32D2D' }) }}><option value="">— Select International / Domestic —</option><option value="Domestic">Domestic</option><option value="International">International</option></select>
-            {!packageType && <span style={{ fontSize: 10, color: '#A32D2D' }}>Required — sets the cost centre (Int'l/Domestic GP). Must be picked before approving.</span>}
+          {hasPackage && <FL label="Package type *"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={{ ...inp, ...(packageType ? {} : { borderColor: '#dc2626' }) }}><option value="">— Select International / Domestic —</option><option value="Domestic">Domestic</option><option value="International">International</option></select>
+            {!packageType && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — sets the cost centre (Int'l/Domestic GP). Must be picked before approving.</span>}
           </FL>}
         </div>
       </div>
@@ -604,7 +607,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {/* ③ Gross Profit */}
       <Section n="3" name="Gross Profit" sub="GP = net sales − net purchase · % on final sales value" accent={DR}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 12 }}>
+        <div className="mb-3 grid grid-cols-1 gap-3 tablet:grid-cols-3">
           <GpCard k={'Total Sales (incl GST' + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(totals.so.total)} color={DARK} />
           <GpCard k="Total Purchase (incl GST)" v={cur + ' ' + fmt(totals.po.total)} color={CR} />
           <GpCard k="Gross Profit" v={cur + ' ' + fmt(totals.gp.total)} color={DR} pct={totals.gp.pct + '% margin'} />
@@ -648,25 +651,25 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         </div>
       </Section>
 
-      {error && <div style={{ ...card, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#A32D2D', fontSize: 12, marginBottom: 14 }}>{error}</div>}
+      {error && <div style={{ ...card, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 12, marginBottom: 14 }}>{error}</div>}
 
       {/* Footer */}
-      <div style={{ position: 'sticky', bottom: 0, background: '#f3f4f8', borderTop: '1px solid #e1e3ec', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11, color: '#5a6691', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+      <div style={{ position: 'sticky', bottom: 0, background: '#f3f4f8', borderTop: '1px solid #e6e8ec', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, color: '#5b616e', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
           {editing ? <><Pencil size={12} /> Editing a pending voucher — “Save &amp; Approve” fixes it and posts the books in one step.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
         </span>
         <FL label="Remarks"><input value={remarks} onChange={(e) => setRemarks(e.target.value)} style={{ ...inp, width: 220 }} placeholder="optional" /></FL>
         <FL label="Sales Tally Ref"><input value={saleTallyRef} onChange={(e) => setSaleTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>
         {!isNoSupp && <FL label="Purchase Tally Ref"><input value={purTallyRef} onChange={(e) => setPurTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>}
         {editing && (
-          <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} style={btnGh}><XCircle size={14} /> Cancel</button>
+          <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
         )}
-        <button disabled={!canSave} onClick={() => save(false)}
+        <button disabled={!canSave} onClick={() => save(false)} className="max-tablet:min-h-[44px]"
           style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7 }}>
           {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (editing ? 'Save changes' : 'Save voucher (Pending)')}
         </button>
         {editing && (
-          <button disabled={!canApprove} onClick={() => save(true)}
+          <button disabled={!canApprove} onClick={() => save(true)} className="max-tablet:min-h-[44px]"
             title={!isTagged ? 'Pick International or Domestic first — it sets the cost centre.' : ''}
             style={{ ...btnG, background: canApprove ? DR : '#9ca3af', cursor: canApprove ? 'pointer' : 'not-allowed', opacity: canApprove ? 1 : 0.7 }}>
             {saving ? <RefreshCw size={14} className="spin" /> : <CheckCircle2 size={14} />} Save &amp; Approve
@@ -739,11 +742,11 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
         <div style={{ ...card, textAlign: 'center', padding: 28 }}>
-          <div style={{ width: 54, height: 54, borderRadius: '50%', background: approved ? '#EAF3DE' : '#FEF6E6', color: approved ? '#27500A' : GOLD, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>{approved ? <Check size={28} /> : <Clock size={28} />}</div>
+          <div style={{ width: 54, height: 54, borderRadius: '50%', background: approved ? '#e8f6ed' : '#FEF6E6', color: approved ? '#16a34a' : GOLD, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>{approved ? <Check size={28} /> : <Clock size={28} />}</div>
           <h2 style={{ margin: '0 0 4px', fontSize: 18, color: DARK }}>{approved ? `${kind === 'refund' ? 'Refund' : 'Reissue'} approved & posted` : `${kind === 'refund' ? 'Refund' : 'Reissue'} saved — Pending approval`}</h2>
-          <p style={{ margin: '0 0 18px', fontSize: 12.5, color: '#5a6691' }}>{approved ? <>The original sale is <b>reversed in full</b> and the {kind} voucher posted to the books.</> : <>No books impact yet — approve it under <b>Pending</b> to post.</>}</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, textAlign: 'left' }}>
-            {fields.map(([k, v]) => (<div key={k} style={{ padding: '8px 12px', background: '#f6f7fb', borderRadius: 8 }}><div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.6px', color: '#9aa2c0', textTransform: 'uppercase' }}>{k}</div><div style={{ fontSize: 13, fontWeight: 700, color: DARK }}>{v}</div></div>))}
+          <p style={{ margin: '0 0 18px', fontSize: 12.5, color: '#5b616e' }}>{approved ? <>The original sale is <b>reversed in full</b> and the {kind} voucher posted to the books.</> : <>No books impact yet — approve it under <b>Pending</b> to post.</>}</p>
+          <div className="grid grid-cols-1 gap-2.5 tablet:grid-cols-2" style={{ textAlign: 'left' }}>
+            {fields.map(([k, v]) => (<div key={k} style={{ padding: '8px 12px', background: '#f6f7fb', borderRadius: 8 }}><div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.6px', color: '#9197a3', textTransform: 'uppercase' }}>{k}</div><div style={{ fontSize: 13, fontWeight: 700, color: DARK }}>{v}</div></div>))}
           </div>
           <button onClick={() => { setResult(null); setState((s) => ({ ...s, againstInvoice: '', supplierAmt: '', serviceCharge: '', markup: '' })); }} style={{ ...btnG, marginTop: 18 }}>New {kind}</button>
         </div>
@@ -757,12 +760,12 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
         <div style={{ padding: '14px 18px', background: DARK, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{kind === 'refund' ? 'REFUND VOUCHER' : 'REISSUE VOUCHER'}</p>
-            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#8b94b3' }}>Reverses the linked original sale + retained charges → one <b style={{ color: GOLD }}>Pending</b> {kind} voucher · {brCode || 'select a branch'}</p>
+            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#9197a3' }}>Reverses the linked original sale + retained charges → one <b style={{ color: GOLD }}>Pending</b> {kind} voucher · {brCode || 'select a branch'}</p>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {[...VMODULE_LIST, ...REVERSAL_CHIPS].map((m) => (
               <button key={m.code} onClick={() => changeModule(m.code)}
-                style={{ padding: '5px 11px', borderRadius: 999, border: '1px solid ' + (moduleCode === m.code ? GOLD : '#2a3450'), background: moduleCode === m.code ? GOLD : 'transparent', color: moduleCode === m.code ? '#fff' : '#8b94b3', fontSize: 10.5, fontWeight: 700, cursor: m.code === moduleCode ? 'default' : 'pointer' }}>
+                style={{ padding: '5px 11px', borderRadius: 999, border: '1px solid ' + (moduleCode === m.code ? GOLD : '#2e323c'), background: moduleCode === m.code ? GOLD : 'transparent', color: moduleCode === m.code ? '#fff' : '#9197a3', fontSize: 10.5, fontWeight: 700, cursor: m.code === moduleCode ? 'default' : 'pointer' }}>
                 {m.icon} {m.name}
               </button>
             ))}
@@ -774,10 +777,10 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
         <RefundReissueFields state={state} setState={setState} ctx={{ branch: brCode, cur }} kind={kind} />
         {error && <p style={{ margin: '8px 0 0', fontSize: 12, color: CR, fontWeight: 600 }}>⚠ {error}</p>}
         <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-          <button disabled={!ready} onClick={() => save(false)} style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Save size={14} /> Save (Pending)</button>
-          <button disabled={!ready} onClick={() => save(true)} style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Check size={14} /> Save &amp; Approve</button>
+          <button disabled={!ready} onClick={() => save(false)} className="max-tablet:min-h-[44px]" style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Save size={14} /> Save (Pending)</button>
+          <button disabled={!ready} onClick={() => save(true)} className="max-tablet:min-h-[44px]" style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Check size={14} /> Save &amp; Approve</button>
         </div>
-        {!ready && <p style={{ margin: '8px 0 0', fontSize: 10.5, color: '#9aa2c0' }}>Need: original invoice, customer, supplier/airline &amp; a supplier amount &gt; 0.</p>}
+        {!ready && <p style={{ margin: '8px 0 0', fontSize: 10.5, color: '#9197a3' }}>Need: original invoice, customer, supplier/airline &amp; a supplier amount &gt; 0.</p>}
       </div>
     </div>
   );
@@ -832,14 +835,14 @@ function PartyPicker({ branch, kind, value, onChange, subGroupFilter }) {
         onChange={(e) => { setName(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} style={inp} />
       {open && matches.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 60, marginTop: 2, background: '#fff', border: '1px solid #e1e3ec', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', maxHeight: 220, overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 60, marginTop: 2, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', maxHeight: 220, overflowY: 'auto' }}>
           {matches.map((l) => (
             <div key={l.id} onMouseDown={() => pick(l)}
               style={{ padding: '7px 11px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5 }}
               onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f4ff')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-              <span style={{ color: '#0d1326', fontWeight: 500 }}>{l.name}</span>
-              <span style={{ color: '#8b94b3', fontSize: 9.5, flexShrink: 0 }}>{subGroupOf(l) || l.group}</span>
+              <span style={{ color: '#1a1c22', fontWeight: 500 }}>{l.name}</span>
+              <span style={{ color: '#9197a3', fontSize: 9.5, flexShrink: 0 }}>{subGroupOf(l) || l.group}</span>
             </div>
           ))}
         </div>
@@ -855,20 +858,20 @@ function PostingTable({ side, accent, title }) {
   if (!side) return null;
   const balanced = Math.abs((side.totalDr || 0) - (side.totalCr || 0)) < 0.01;
   return (
-    <div style={{ border: '1px solid #e1e3ec', borderRadius: 8, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: accent + '12', borderBottom: '1px solid #e1e3ec' }}>
+    <div style={{ border: '1px solid #e6e8ec', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: accent + '12', borderBottom: '1px solid #e6e8ec' }}>
         <span style={{ fontSize: 11.5, fontWeight: 800, color: accent }}>{title}</span>
-        <span style={{ fontSize: 10.5, fontFamily: 'monospace', color: '#5a6691' }}>{side.vno} · {side.type}</span>
+        <span style={{ fontSize: 10.5, fontFamily: 'monospace', color: '#5b616e' }}>{side.vno} · {side.type}</span>
       </div>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr style={{ background: '#f7f8fb' }}>
-          {['Ledger', 'Group', 'Debit', 'Credit'].map((h, i) => <th key={h} style={{ padding: '6px 10px', fontSize: 9.5, fontWeight: 700, color: '#5a6691', textTransform: 'uppercase', textAlign: i >= 2 ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>)}
+          {['Ledger', 'Group', 'Debit', 'Credit'].map((h, i) => <th key={h} style={{ padding: '6px 10px', fontSize: 9.5, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', textAlign: i >= 2 ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>)}
         </tr></thead>
         <tbody>
           {(side.postings || []).map((p, i) => (
             <tr key={i} style={{ borderBottom: '1px solid #f0f2f7' }}>
               <td style={{ padding: '5px 10px', fontSize: 11.5, fontWeight: 600, color: DARK, paddingLeft: p.credit > 0 ? 22 : 10 }}>{p.ledger}</td>
-              <td style={{ padding: '5px 10px', fontSize: 10.5, color: '#8b94b3' }}>{p.group}</td>
+              <td style={{ padding: '5px 10px', fontSize: 10.5, color: '#9197a3' }}>{p.group}</td>
               <td style={{ padding: '5px 10px', fontSize: 11.5, textAlign: 'right', color: DR, fontVariantNumeric: 'tabular-nums' }}>{p.debit > 0 ? fmt(p.debit) : ''}</td>
               <td style={{ padding: '5px 10px', fontSize: 11.5, textAlign: 'right', color: CR, fontVariantNumeric: 'tabular-nums' }}>{p.credit > 0 ? fmt(p.credit) : ''}</td>
             </tr>
@@ -889,23 +892,23 @@ function JournalView({ id, cur }) {
     queryKey: ['booking-journal', id],
     queryFn: () => apiGet('/api/booking-orders/' + id + '/journal'),
   });
-  if (isLoading) return <div style={{ padding: 14, fontSize: 12, color: '#8b94b3' }}>Building JV…</div>;
-  if (error) return <div style={{ padding: 14, fontSize: 12, color: '#A32D2D' }}>{error.message || 'Failed to build JV'}</div>;
+  if (isLoading) return <div style={{ padding: 14, fontSize: 12, color: '#9197a3' }}>Building JV…</div>;
+  if (error) return <div style={{ padding: 14, fontSize: 12, color: '#dc2626' }}>{error.message || 'Failed to build JV'}</div>;
   if (!data) return null;
   return (
     <div>
       {data.balanced === false && (
-        <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#A32D2D', fontSize: 11.5, fontWeight: 700 }}>
+        <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 11.5, fontWeight: 700 }}>
           ⚠ This booking is out of balance (Debit ≠ Credit) and <b>cannot be approved</b>. Fix the SO/PO figures (Edit) so each side balances before approving.
         </div>
       )}
       {data.status !== 'approved' && data.status !== 'posted' && Array.isArray(data.errors) && data.errors.length > 0 && (
-        <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#A32D2D', fontSize: 11.5, fontWeight: 700 }}>
+        <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 11.5, fontWeight: 700 }}>
           ⚠ Verification failed — <b>cannot be approved</b>. Fix and re-check before approving:
           <ul style={{ margin: '4px 0 0 18px', fontWeight: 600 }}>{data.errors.map((m, i) => <li key={i}>{m}</li>)}</ul>
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 10, fontSize: 11.5, color: '#5a6691' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 10, fontSize: 11.5, color: '#5b616e' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'monospace', fontWeight: 700, color: BLUE }}><Link2 size={13} /> {data.linkNo}</span>
         <span>Gross Profit: <b style={{ color: DR }}>{cur} {fmt(data.gp?.total)}</b> ({data.gp?.pct ?? 0}%)</span>
         <span style={{ fontStyle: 'italic', color: '#9A9A9A' }}>journal entries that {data.status === 'approved' || data.status === 'posted' ? 'were posted' : 'will post on approval'}</span>
@@ -984,16 +987,18 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
     <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1080 }}>
         <thead><tr style={{ background: '#f3f4f8' }}>
-          {cols.map((h, i) => <th key={i} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#5a6691', textTransform: 'uppercase', textAlign: i >= numStart && i <= numStart + 3 ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>)}
+          {cols.map((h, i) => <th key={i} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', textAlign: i >= numStart && i <= numStart + 3 ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>)}
         </tr></thead>
         <tbody>
-          {isLoading && <tr><td colSpan={cols.length} style={{ padding: 20, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>Loading…</td></tr>}
-          {!isLoading && rows.length === 0 && <tr><td colSpan={cols.length} style={{ padding: 22, textAlign: 'center', color: '#8b94b3', fontSize: 12 }}>{mode === 'pending' ? 'No pending vouchers. Create one under “SO/PO/GP Voucher”.' : mode === 'rejected' ? 'No rejected vouchers.' : mode === 'deleted' ? 'No deleted vouchers.' : 'No approved vouchers yet.'}</td></tr>}
+          {isLoading && Array.from({ length: 6 }).map((_, r) => (
+            <tr key={'sk' + r}><td colSpan={cols.length} style={{ padding: '8px 10px' }}><div className="kb-skeleton" style={{ height: 14, borderRadius: 6, opacity: Math.max(0.4, 1 - r * 0.12) }} /></td></tr>
+          ))}
+          {!isLoading && rows.length === 0 && <tr><td colSpan={cols.length} style={{ padding: 22, textAlign: 'center', color: '#9197a3', fontSize: 12 }}>{mode === 'pending' ? 'No pending vouchers. Create one under “SO/PO/GP Voucher”.' : mode === 'rejected' ? 'No rejected vouchers.' : mode === 'deleted' ? 'No deleted vouchers.' : 'No approved vouchers yet.'}</td></tr>}
           {groupBookings(rows, groupBy).map((g) => (
             <React.Fragment key={g.key}>
               {g.label != null && (
                 <tr style={{ background: '#eef1f8' }}>
-                  <td colSpan={numStart} style={{ padding: '7px 12px', fontWeight: 700, fontSize: 11.5, color: DARK }}>{g.label} <span style={{ color: '#8b94b3', fontWeight: 600 }}>· {g.rows.length} bill{g.rows.length === 1 ? '' : 's'}</span></td>
+                  <td colSpan={numStart} style={{ padding: '7px 12px', fontWeight: 700, fontSize: 11.5, color: DARK }}>{g.label} <span style={{ color: '#9197a3', fontWeight: 600 }}>· {g.rows.length} bill{g.rows.length === 1 ? '' : 's'}</span></td>
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'so'))}</td>
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'po'))}</td>
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'gp'))}</td>
@@ -1008,10 +1013,10 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
               <React.Fragment key={b.id}>
                 <tr onClick={() => setOpen(isOpen ? null : b.id)} style={{ borderBottom: '1px solid #f0f2f7', cursor: 'pointer', background: isOpen ? '#faf7ef' : '#fff' }}>
                   <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{mode === 'pending' && onToggleSel && <input type="checkbox" checked={!!(sel && sel.has(b.id))} onChange={() => onToggleSel(b.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} />}{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
-                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}{mode === 'pending' && b.validation?.hasErrors ? <span title={(b.validation.errors || []).join(' · ')} style={{ marginLeft: 6, color: '#A32D2D', fontWeight: 800 }}>⚠</span> : null}</td>
-                  {(mode === 'approved' || mode === 'pending') && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5a6691' }}>{b.date || '—'}</td>}
+                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}{mode === 'pending' && b.validation?.hasErrors ? <span title={(b.validation.errors || []).join(' · ')} style={{ marginLeft: 6, color: '#dc2626', fontWeight: 800 }}>⚠</span> : null}</td>
+                  {(mode === 'approved' || mode === 'pending') && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5b616e' }}>{b.date || '—'}</td>}
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: BLUE, fontSize: 11.5 }}>{b.linkNo}</td>
-                  {(mode === 'pending' || mode === 'approved') && <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, color: '#5a6691', whiteSpace: 'nowrap' }} title="Sales / Purchase Tally Ref">{(b.saleTallyRef || '—')}{b.purTallyRef ? ' / ' + b.purTallyRef : ''}</td>}
+                  {(mode === 'pending' || mode === 'approved') && <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, color: '#5b616e', whiteSpace: 'nowrap' }} title="Sales / Purchase Tally Ref">{(b.saleTallyRef || '—')}{b.purTallyRef ? ' / ' + b.purTallyRef : ''}</td>}
                   <td style={{ padding: '8px 12px', fontSize: 12 }}>{sp ? sp.icon + ' ' + sp.name : b.module}</td>
                   {mode === 'approved' || mode === 'deleted' ? (
                     <>
@@ -1028,7 +1033,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.po?.total)}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.gp?.total)}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{gpPctTxt(b.gp?.total || 0, b.so?.total || 0)}</td>
-                  {mode !== 'pending' && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5a6691' }}>{mode === 'approved' ? (b.approvedAt ? String(b.approvedAt).slice(0, 10) : '—') : mode === 'deleted' ? (b.deletedAt ? String(b.deletedAt).slice(0, 10) : '—') : b.date}</td>}
+                  {mode !== 'pending' && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5b616e' }}>{mode === 'approved' ? (b.approvedAt ? String(b.approvedAt).slice(0, 10) : '—') : mode === 'deleted' ? (b.deletedAt ? String(b.deletedAt).slice(0, 10) : '—') : b.date}</td>}
                   <td style={{ padding: '8px 12px' }} onClick={(e) => e.stopPropagation()}>
                     {mode === 'pending' ? (
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -1036,20 +1041,20 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                         <button disabled={busyId === b.id || !!b.validation?.hasErrors} onClick={() => onApprove(b)} title={b.validation?.hasErrors ? 'Verification failed — ' + (b.validation.errors || []).join(' · ') : ''} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: b.validation?.hasErrors ? '#cfd6e4' : DR, cursor: b.validation?.hasErrors ? 'not-allowed' : 'pointer' }}>
                           {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve
                         </button>
-                        <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><XCircle size={12} /> Reject</button>
+                        <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#dc2626', borderColor: '#f3c9c9' }}><XCircle size={12} /> Reject</button>
                       </div>
                     ) : mode === 'approved' ? (
                       // Edit is open to everyone (it un-posts the booking → Pending → re-approve);
                       // Delete is admin-only (Super Admin / Director).
                       <div style={{ display: 'flex', gap: 6 }}>
                         {onEdit && <button disabled={busyId === b.id} onClick={() => onEdit(b)} title="Edit — reverses the posted Sales/Purchase out of the books and returns this to Pending for re-approval" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit</button>}
-                        {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#A32D2D', borderColor: '#F7C1C1' }}><Trash2 size={12} /> Delete</button>}
+                        {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#dc2626', borderColor: '#f3c9c9' }}><Trash2 size={12} /> Delete</button>}
                         {!onEdit && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
                       </div>
                     ) : mode === 'deleted' ? (
-                      <span style={{ fontSize: 11, color: '#8b94b3' }} title={b.deletedReason || ''}>{b.deletedBy || '—'}{b.deletedReason ? ` · ${b.deletedReason}` : ''}</span>
+                      <span style={{ fontSize: 11, color: '#9197a3' }} title={b.deletedReason || ''}>{b.deletedBy || '—'}{b.deletedReason ? ` · ${b.deletedReason}` : ''}</span>
                     ) : (
-                      <span style={{ fontSize: 11, color: '#8b94b3' }}>{b.rejectedReason || '—'}</span>
+                      <span style={{ fontSize: 11, color: '#9197a3' }}>{b.rejectedReason || '—'}</span>
                     )}
                   </td>
                 </tr>
@@ -1082,7 +1087,7 @@ function GroupByBar({ value, onChange }) {
     <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden', marginBottom: 12 }}>
       {OPTS.map(([v, l]) => (
         <button key={v} onClick={() => onChange(v)}
-          style={{ padding: '6px 12px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: value === v ? BLUE : '#fff', color: value === v ? '#fff' : '#5a6691' }}>{l}</button>
+          style={{ padding: '6px 12px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: value === v ? BLUE : '#fff', color: value === v ? '#fff' : '#5b616e' }}>{l}</button>
       ))}
     </div>
   );
@@ -1150,11 +1155,11 @@ export function PendingBookings({ branch, setRoute }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><Clock size={18} style={{ color: GOLD }} /> Pending Approval</h2>
-          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>These have <b>no books impact</b> yet. Expand a row to review the full JV, then <b>Approve &amp; Post</b> to generate the linked Sales &amp; Purchase invoices.</p>
+          <p style={{ margin: 0, fontSize: 11.5, color: '#5b616e' }}>These have <b>no books impact</b> yet. Expand a row to review the full JV, then <b>Approve &amp; Post</b> to generate the linked Sales &amp; Purchase invoices.</p>
         </div>
-        <button onClick={() => setRoute && setRoute('/bookings/new')} style={btnG}><Plus size={14} /> New voucher</button>
+        <button onClick={() => setRoute && setRoute('/bookings/new')} className="max-tablet:min-h-[44px]" style={btnG}><Plus size={14} /> New voucher</button>
       </div>
-      {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, color: msg.startsWith('⚠') ? '#A32D2D' : '#27500A', background: msg.startsWith('⚠') ? '#FCEBEB' : '#EAF3DE', border: '1px solid ' + (msg.startsWith('⚠') ? '#F7C1C1' : '#cde3b6') }}>{msg}</div>}
+      {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, color: msg.startsWith('⚠') ? '#dc2626' : '#16a34a', background: msg.startsWith('⚠') ? '#fbe9e9' : '#e8f6ed', border: '1px solid ' + (msg.startsWith('⚠') ? '#f3c9c9' : '#cde3b6') }}>{msg}</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
         <PeriodBar branch={branch} compact defaultPreset="all" onChange={setRange} />
         <GroupByBar value={groupBy} onChange={setGroupBy} />
@@ -1202,7 +1207,7 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><FileCheck2 size={18} style={{ color: DR }} /> Approved &amp; Posted</h2>
-          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>Posted to the books as linked Sales + Purchase invoices. Expand to see the JV &amp; ledger posting. The <b>Link No</b> tracks invoice-wise GP everywhere.{canDelete ? ' Admins can Delete a booking — it reverses out of the books and is kept view-only under Deleted.' : ''}</p>
+          <p style={{ margin: 0, fontSize: 11.5, color: '#5b616e' }}>Posted to the books as linked Sales + Purchase invoices. Expand to see the JV &amp; ledger posting. The <b>Link No</b> tracks invoice-wise GP everywhere.{canDelete ? ' Admins can Delete a booking — it reverses out of the books and is kept view-only under Deleted.' : ''}</p>
         </div>
         <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>
@@ -1224,8 +1229,8 @@ export function DeletedBookings({ branch, setRoute }) {
     <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><Trash2 size={18} style={{ color: '#A32D2D' }} /> Deleted</h2>
-          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>Approved bookings an admin deleted. They were <b>reversed out of the books</b> (no accounting effect). This is a <b>view-only</b> audit trail — the Booking No, Link No and Sale/Purchase invoice numbers shown here are <b>permanently retired and can never be reused</b>.</p>
+          <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><Trash2 size={18} style={{ color: '#dc2626' }} /> Deleted</h2>
+          <p style={{ margin: 0, fontSize: 11.5, color: '#5b616e' }}>Approved bookings an admin deleted. They were <b>reversed out of the books</b> (no accounting effect). This is a <b>view-only</b> audit trail — the Booking No, Link No and Sale/Purchase invoice numbers shown here are <b>permanently retired and can never be reused</b>.</p>
         </div>
         <button onClick={() => setRoute && setRoute('/bookings/approved')} style={btnGh}><FileCheck2 size={14} /> View approved</button>
       </div>
@@ -1312,7 +1317,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   };
 
   const tab = (k, label) => (
-    <button key={k} onClick={() => setStatus(k)} style={{ padding: '8px 16px', border: 'none', borderBottom: `3px solid ${status === k ? GOLD : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? DARK : '#5a6691' }}>{label} <span style={{ fontSize: 11, color: '#8b94b3' }}>({counts[k]})</span></button>
+    <button key={k} onClick={() => setStatus(k)} className="max-tablet:min-h-[44px]" style={{ padding: '8px 16px', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `3px solid ${status === k ? GOLD : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? DARK : '#5b616e' }}>{label} <span style={{ fontSize: 11, color: '#9197a3' }}>({counts[k]})</span></button>
   );
 
   return (
@@ -1320,14 +1325,14 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, color: DARK }}>SO/PO/GP Approvals</h2>
-          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>Pending have no books impact; approving posts the linked Sales + Purchase. Deleted are reversed out & view-only.</p>
+          <p style={{ margin: 0, fontSize: 11.5, color: '#5b616e' }}>Pending have no books impact; approving posts the linked Sales + Purchase. Deleted are reversed out & view-only.</p>
         </div>
-        <button onClick={() => setRoute && setRoute('/bookings/new')} style={btnG}><Plus size={14} /> New voucher</button>
+        <button onClick={() => setRoute && setRoute('/bookings/new')} className="max-tablet:min-h-[44px]" style={btnG}><Plus size={14} /> New voucher</button>
       </div>
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 10 }}>
-        <div style={{ display: 'flex', borderBottom: '1px solid #e1e3ec', flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}</div>
+        <div style={{ display: 'flex', borderBottom: '1px solid #e6e8ec', flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}</div>
       </div>
-      {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, padding: '8px 12px', color: msg.startsWith('⚠') ? '#A32D2D' : '#27500A', background: msg.startsWith('⚠') ? '#FCEBEB' : '#EAF3DE', border: '1px solid ' + (msg.startsWith('⚠') ? '#F7C1C1' : '#cde3b6') }}>{msg}</div>}
+      {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, padding: '8px 12px', color: msg.startsWith('⚠') ? '#dc2626' : '#16a34a', background: msg.startsWith('⚠') ? '#fbe9e9' : '#e8f6ed', border: '1px solid ' + (msg.startsWith('⚠') ? '#f3c9c9' : '#cde3b6') }}>{msg}</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
         <GroupByBar value={groupBy} onChange={setGroupBy} />
         {status === 'pending' && rows.length > 0 && (
@@ -1348,10 +1353,10 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
 // to its full audit timeline (who/when/why + field-level changes + full snapshot) and
 // the live JV. Cross-cuts status: an approved booking that was later edited shows here.
 function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
-  const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#5a6691', textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: '2px solid #e1e3ec', whiteSpace: 'nowrap' };
+  const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: '2px solid #e6e8ec', whiteSpace: 'nowrap' };
   const td = { padding: '7px 10px', borderBottom: '1px solid #f4f6fa', fontSize: 12, whiteSpace: 'nowrap' };
-  if (isLoading) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#8b94b3' }}>Loading edited bookings…</div>;
-  if (!rows.length) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#8b94b3' }}>No edited bookings in this period.</div>;
+  if (isLoading) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#9197a3' }}>Loading edited bookings…</div>;
+  if (!rows.length) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#9197a3' }}>No edited bookings in this period.</div>;
   const fmtAt = (s) => { const d = new Date(s); return isNaN(d) ? (s || '—') : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
   return (
     <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
@@ -1365,17 +1370,17 @@ function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
                 <tr onClick={() => setOpen(isOpen ? null : 'edit:' + r.id)} style={{ cursor: 'pointer', background: isOpen ? '#fbfcfe' : '#fff' }}>
                   <td style={{ ...td, color: GOLD, fontWeight: 800 }}>{isOpen ? '▾' : '▸'}</td>
                   <td style={{ ...td, fontWeight: 700, color: BLUE }}>{r.bookingNo}</td>
-                  <td style={{ ...td, fontFamily: 'monospace', color: '#5a6691' }}>{r.linkNo || '—'}</td>
+                  <td style={{ ...td, fontFamily: 'monospace', color: '#5b616e' }}>{r.linkNo || '—'}</td>
                   <td style={td}>{r.module}</td>
                   <td style={{ ...td, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.customer || '—'}</td>
                   <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{cur} {Math.round(r.saleTotal || 0).toLocaleString('en-IN')}</td>
-                  <td style={td}><span style={{ fontSize: 10.5, fontWeight: 700, color: '#5a6691', textTransform: 'capitalize' }}>{r.status}</span></td>
+                  <td style={td}><span style={{ fontSize: 10.5, fontWeight: 700, color: '#5b616e', textTransform: 'capitalize' }}>{r.status}</span></td>
                   <td style={{ ...td, textAlign: 'center' }}><span style={{ fontSize: 10.5, fontWeight: 800, padding: '2px 8px', borderRadius: 20, background: '#FFF6D6', color: '#8a6d12' }}>{r.edits}{r.preAudit ? '*' : ''}</span></td>
                   <td style={td}>{r.lastBy || 'unknown'} · {fmtAt(r.lastAt)}</td>
-                  <td style={{ ...td, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', color: '#5a6691' }} title={r.lastReason || ''}>{r.lastReason || (r.preAudit ? '— pre-audit —' : '—')}</td>
+                  <td style={{ ...td, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', color: '#5b616e' }} title={r.lastReason || ''}>{r.lastReason || (r.preAudit ? '— pre-audit —' : '—')}</td>
                 </tr>
                 {isOpen && (
-                  <tr><td colSpan={10} style={{ padding: 12, background: '#f7f8fb', borderBottom: '1px solid #e1e3ec' }}>
+                  <tr><td colSpan={10} style={{ padding: 12, background: '#f7f8fb', borderBottom: '1px solid #e6e8ec' }}>
                     <div style={{ fontWeight: 800, fontSize: 12, color: DARK, marginBottom: 8 }}>Audit trail — {r.bookingNo}</div>
                     <AuditTrail entityType="booking" entityId={r.id} />
                   </td></tr>
@@ -1402,8 +1407,8 @@ export function RejectedBookings({ branch, setRoute }) {
     <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><XCircle size={18} style={{ color: '#A32D2D' }} /> Rejected</h2>
-          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>Declined SO/PO/GP vouchers. They <b>never touched the books</b> (no Sales/Purchase invoices posted). Expand a row to review what was entered.</p>
+          <h2 style={{ margin: 0, fontSize: 17, color: DARK, display: 'flex', alignItems: 'center', gap: 8 }}><XCircle size={18} style={{ color: '#dc2626' }} /> Rejected</h2>
+          <p style={{ margin: 0, fontSize: 11.5, color: '#5b616e' }}>Declined SO/PO/GP vouchers. They <b>never touched the books</b> (no Sales/Purchase invoices posted). Expand a row to review what was entered.</p>
         </div>
         <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>

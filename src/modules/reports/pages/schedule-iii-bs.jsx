@@ -84,10 +84,10 @@ export function ScheduleIIIBS({ branch }) {
   const hasData = !!d && (Math.abs(totLiab) > 0.01 || Math.abs(totAssets) > 0.01);
 
   const Row = ({ head, value, total, bold }) => (
-    <tr className={`border-b border-surface-border ${bold ? 'bg-[#FAEEDA]' : ''}`}>
+    <tr className={`border-b border-surface-border ${bold ? 'bg-[#fbeedb]' : ''}`}>
       <td className={`whitespace-pre px-2.5 py-1.5 text-navy ${bold ? 'text-[11.5px] font-bold' : 'text-[11px]'}`}>{head}</td>
-      <td className="px-2.5 py-1.5 text-right tabular-nums" style={{ fontWeight: bold ? 700 : 400, color: bold ? '#0d1326' : '#5a6691' }}>{value !== undefined ? (value ? cur + fmt(value) : '—') : ''}</td>
-      <td className="px-2.5 py-1.5 text-right font-bold tabular-nums text-[#185FA5]">{total !== undefined ? cur + fmt(total) : ''}</td>
+      <td className="px-2.5 py-1.5 text-right tabular-nums" style={{ fontWeight: bold ? 700 : 400, color: bold ? '#1a1c22' : '#5b616e' }}>{value !== undefined ? (value ? cur + fmt(value) : '—') : ''}</td>
+      <td className="px-2.5 py-1.5 text-right font-bold tabular-nums text-[#2563eb]">{total !== undefined ? cur + fmt(total) : ''}</td>
     </tr>
   );
 

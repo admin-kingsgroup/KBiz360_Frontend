@@ -108,7 +108,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
         <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.error ? '⚠ ' + pv.error : pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
       </div>
       {pv.missing?.length > 0 && (
-        <div style={{ margin: '0 0 8px', padding: '6px 9px', borderRadius: 6, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#854F0B', fontSize: 11, fontWeight: 600 }}>
+        <div style={{ margin: '0 0 8px', padding: '6px 9px', borderRadius: 6, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#d97706', fontSize: 11, fontWeight: 600 }}>
           ⚠ Ledger not in Chart of Accounts: <b>{pv.missing.join(', ')}</b>. Create it in Masters first.
         </div>
       )}
@@ -133,10 +133,10 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
         </div>
         {journalTable}
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-          <button onClick={printEntry} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
+          <button onClick={printEntry} className="max-tablet:min-h-[44px]" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
           {isEdit
-            ? <button onClick={dismiss} style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #d6dbe6', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
-            : <button onClick={reset} style={{ ...btnG }}>＋ New Voucher</button>}
+            ? <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #e6e8ec', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
+            : <button onClick={reset} className="max-tablet:min-h-[44px]" style={{ ...btnG }}>＋ New Voucher</button>}
         </div>
       </div>
     );
@@ -150,13 +150,13 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
       {desc.fields({ state, setState, ctx })}
       <FL label="Tally Ref"><input value={state.sourceRef || ''} onChange={(e) => setState((s) => ({ ...s, sourceRef: e.target.value }))} style={{ ...inp, maxWidth: 200 }} placeholder="original Tally voucher no (optional)" /></FL>
       {journalTable}
-      {!branchCode && !isEdit && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#FAEEDA', fontSize: 10.5, color: '#854F0B', fontWeight: 600, textAlign: 'center', margin: '10px 0' }}>Select a specific branch (not “All”) to post this voucher.</div>}
-      {err && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#FCEBEB', fontSize: 11, color: RED, fontWeight: 600, margin: '10px 0' }}>! {err}</div>}
-      {viewOnly && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#FAEEDA', fontSize: 10.5, color: '#854F0B', fontWeight: 600, textAlign: 'center', margin: '10px 0' }}>View only — this account can review vouchers but cannot post them.</div>}
+      {!branchCode && !isEdit && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#fbeedb', fontSize: 10.5, color: '#d97706', fontWeight: 600, textAlign: 'center', margin: '10px 0' }}>Select a specific branch (not “All”) to post this voucher.</div>}
+      {err && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#fbe9e9', fontSize: 11, color: RED, fontWeight: 600, margin: '10px 0' }}>! {err}</div>}
+      {viewOnly && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#fbeedb', fontSize: 10.5, color: '#d97706', fontWeight: 600, textAlign: 'center', margin: '10px 0' }}>View only — this account can review vouchers but cannot post them.</div>}
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
-        {!isEdit && <button onClick={reset} style={btnGh}>Reset</button>}
-        {isEdit && <button onClick={dismiss} style={btnGh}>Back</button>}
-        <button onClick={save} disabled={!canSave} title={viewOnly ? 'View only — changes are not allowed' : 'Save (Ctrl/Cmd+Enter)'} style={{ ...btnG, background: canSave ? '#185FA5' : '#bfc3d6', opacity: canSave ? 1 : 0.6, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+        {!isEdit && <button onClick={reset} className="max-tablet:min-h-[44px]" style={btnGh}>Reset</button>}
+        {isEdit && <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={btnGh}>Back</button>}
+        <button onClick={save} disabled={!canSave} title={viewOnly ? 'View only — changes are not allowed' : 'Save (Ctrl/Cmd+Enter)'} className="max-tablet:min-h-[44px]" style={{ ...btnG, background: canSave ? '#2563eb' : '#cbd0db', opacity: canSave ? 1 : 0.6, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           {desc.icon} Save Voucher {saving ? '…' : val.hint} {!saving && <Kbd>⌃↵</Kbd>}
         </button>
       </div>

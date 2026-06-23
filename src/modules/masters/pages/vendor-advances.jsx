@@ -30,21 +30,21 @@ export function VendorAdvances({ branch }) {
   const money = (n) => cur + fmt(n);
 
   const KPIS = [
-    { l: 'Total Advances Given', v: money(totGiven), c: '#185FA5' },
-    { l: 'Adjusted', v: money(totAdj), c: '#27500A' },
-    { l: 'Unadjusted', v: money(totUnadj), c: '#A32D2D', sub: `${aged} aged > 30 days` },
-    { l: 'Records', v: String(visible.length), c: '#854F0B' },
+    { l: 'Total Advances Given', v: money(totGiven), c: '#2563eb' },
+    { l: 'Adjusted', v: money(totAdj), c: '#16a34a' },
+    { l: 'Unadjusted', v: money(totUnadj), c: '#dc2626', sub: `${aged} aged > 30 days` },
+    { l: 'Records', v: String(visible.length), c: '#d97706' },
   ];
 
   const columns = [
-    { key: 'id', header: 'Advance ID', className: 'font-mono text-[10px] text-[#185FA5]', hideable: false },
+    { key: 'id', header: 'Advance ID', className: 'font-mono text-[10px] text-[#2563eb]', hideable: false },
     { key: 'vendor', header: 'Vendor', className: 'font-semibold text-navy', render: (r, v) => <div>{v}<div className="text-[9.5px] font-normal text-ink-muted">{r.contact}</div></div> },
     { key: 'vendorType', header: 'Type', align: 'center', render: (r, v) => <StatusPill tone={v === 'Airline' ? 'info' : 'warning'} size="sm">{v}</StatusPill> },
     { key: 'date', header: 'Date', align: 'center', className: 'text-ink-muted' },
     { key: 'amount', header: 'Amount', num: true, render: (r, v) => money(v), footer: (rs) => money(rs.reduce((s, r) => s + r.amount, 0)) },
-    { key: 'adjusted', header: 'Adjusted', num: true, className: 'text-[#27500A]', render: (r, v) => money(v), footer: (rs) => money(rs.reduce((s, r) => s + r.adjusted, 0)) },
-    { key: 'unadjusted', header: 'Unadjusted', num: true, render: (r, v) => <span className="font-bold" style={{ color: v > 0 ? '#A32D2D' : '#5a6691' }}>{money(v)}</span>, footer: (rs) => money(rs.reduce((s, r) => s + r.unadjusted, 0)) },
-    { key: 'ageDays', header: 'Age', num: true, align: 'center', render: (r, v) => <span className="font-semibold" style={{ color: v > 30 ? '#A32D2D' : v > 15 ? '#854F0B' : '#27500A' }}>{v}d</span> },
+    { key: 'adjusted', header: 'Adjusted', num: true, className: 'text-[#16a34a]', render: (r, v) => money(v), footer: (rs) => money(rs.reduce((s, r) => s + r.adjusted, 0)) },
+    { key: 'unadjusted', header: 'Unadjusted', num: true, render: (r, v) => <span className="font-bold" style={{ color: v > 0 ? '#dc2626' : '#5b616e' }}>{money(v)}</span>, footer: (rs) => money(rs.reduce((s, r) => s + r.unadjusted, 0)) },
+    { key: 'ageDays', header: 'Age', num: true, align: 'center', render: (r, v) => <span className="font-semibold" style={{ color: v > 30 ? '#dc2626' : v > 15 ? '#d97706' : '#16a34a' }}>{v}d</span> },
     { key: 'ref', header: 'Reference', className: 'text-[10px] text-ink-muted' },
   ];
 

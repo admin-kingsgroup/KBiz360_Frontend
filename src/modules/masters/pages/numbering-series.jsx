@@ -66,7 +66,7 @@ export function NumberingSeriesMaster({ branch }) {
         </>
       }
     >
-      <div className="mb-3 flex items-start gap-2 rounded-brand border border-[#B5D4F4] bg-[#E6F1FB] px-3.5 py-2.5 text-[11px] leading-relaxed text-[#185FA5]">
+      <div className="mb-3 flex items-start gap-2 rounded-brand border border-[#B5D4F4] bg-[#e8f0ff] px-3.5 py-2.5 text-[11px] leading-relaxed text-[#2563eb]">
         <Lock size={14} className="mt-0.5 shrink-0" />
         Numbering is fully automatic and system-controlled — prefix, format and sequence are locked and cannot be edited. Every voucher (manual entry + bulk import) is numbered automatically.
       </div>

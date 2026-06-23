@@ -52,19 +52,19 @@ export function Supplier360({ branch }) {
   ];
 
   const histColumns = [
-    { key: 'id', header: 'Voucher No.', className: 'font-mono text-[9.5px] text-[#185FA5]', hideable: false },
+    { key: 'id', header: 'Voucher No.', className: 'font-mono text-[9.5px] text-[#2563eb]', hideable: false },
     { key: 'date', header: 'Date', className: 'text-ink-muted' },
-    { key: 'mod', header: 'Module', render: (r, v) => <span className="rounded-full bg-[#E6F1FB] px-1.5 py-0.5 text-[9.5px] font-bold text-[#185FA5]">{v}</span> },
+    { key: 'mod', header: 'Module', render: (r, v) => <span className="rounded-full bg-[#e8f0ff] px-1.5 py-0.5 text-[9.5px] font-bold text-[#2563eb]">{v}</span> },
     { key: 'dest', header: 'Destination', className: 'text-role-hr', render: (r, v) => v || '—' },
     { key: 'cost', header: 'Cost', num: true, render: (r, v) => f(v) },
-    { key: 'gp', header: 'GP', num: true, render: (r, v) => <span className="font-semibold" style={{ color: v > 0 ? '#27500A' : '#A32D2D' }}>{f(v)}</span> },
-    { key: 'gpPct', header: 'GP%', num: true, render: (r, v) => <span className="rounded-full px-1.5 py-0.5 text-[9.5px] font-extrabold" style={{ background: v >= 12 ? '#EAF3DE' : '#FAEEDA', color: v >= 12 ? '#27500A' : '#854F0B' }}>{v}%</span> },
+    { key: 'gp', header: 'GP', num: true, render: (r, v) => <span className="font-semibold" style={{ color: v > 0 ? '#16a34a' : '#dc2626' }}>{f(v)}</span> },
+    { key: 'gpPct', header: 'GP%', num: true, render: (r, v) => <span className="rounded-full px-1.5 py-0.5 text-[9.5px] font-extrabold" style={{ background: v >= 12 ? '#e8f6ed' : '#fbeedb', color: v >= 12 ? '#16a34a' : '#d97706' }}>{v}%</span> },
   ];
 
   const MemoRow = ({ a, gain }) => (
     <div className="flex justify-between border-b border-surface-alt py-1.5 text-[10.5px]">
-      <div><p className="font-mono text-[9.5px]" style={{ color: gain ? '#27500A' : '#A32D2D' }}>{a.id}</p><p className="text-[9px] text-ink-muted">{a.reasonCode} — {a.date}</p></div>
-      <div className="text-right"><p className="font-bold" style={{ color: gain ? '#27500A' : '#A32D2D' }}>{gain ? '+' : ''}{a.currency}{a.amount.toLocaleString()}</p><span className="rounded-full px-1.5 py-px text-[9px] font-bold" style={{ background: gain ? '#EAF3DE' : '#FCEBEB', color: gain ? '#27500A' : '#A32D2D' }}>{a.status}</span></div>
+      <div><p className="font-mono text-[9.5px]" style={{ color: gain ? '#16a34a' : '#dc2626' }}>{a.id}</p><p className="text-[9px] text-ink-muted">{a.reasonCode} — {a.date}</p></div>
+      <div className="text-right"><p className="font-bold" style={{ color: gain ? '#16a34a' : '#dc2626' }}>{gain ? '+' : ''}{a.currency}{a.amount.toLocaleString()}</p><span className="rounded-full px-1.5 py-px text-[9px] font-bold" style={{ background: gain ? '#e8f6ed' : '#fbe9e9', color: gain ? '#16a34a' : '#dc2626' }}>{a.status}</span></div>
     </div>
   );
 
@@ -83,7 +83,7 @@ export function Supplier360({ branch }) {
       }
     >
       {gpQ.isError && (
-        <div className="mb-3.5 flex items-start gap-2.5 rounded-brand border border-[#E8B4B4] bg-[#FCEBEB] px-4 py-3">
+        <div className="mb-3.5 flex items-start gap-2.5 rounded-brand border border-[#E8B4B4] bg-[#fbe9e9] px-4 py-3">
           <span className="text-lg leading-none">⚠️</span>
           <div><p className="text-xs font-bold text-navy">Couldn’t load supplier purchases</p><p className="mt-0.5 text-[11px] text-maroon">{gpQ.error?.message || 'Request failed.'} — check you’re signed in and the ERP API is reachable.</p></div>
         </div>
@@ -97,7 +97,7 @@ export function Supplier360({ branch }) {
       {gpQ.isLoading && <div className="mb-3.5 rounded-brand border border-surface-border bg-surface px-4 py-6 text-center text-xs text-ink-muted">Loading supplier purchases…</div>}
 
       {/* Profile card — navy gradient */}
-      <div className="mb-3.5 rounded-brand p-4" style={{ background: 'linear-gradient(135deg,#0d1326,#185FA5)' }}>
+      <div className="mb-3.5 rounded-brand p-4" style={{ background: 'linear-gradient(135deg,#1a1c22,#2563eb)' }}>
         <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))' }}>
           {profileKpis.map((k, i) => (
             <div key={i} className="rounded-lg px-3.5 py-2.5" style={{ background: 'rgba(255,255,255,0.1)' }}>
@@ -117,13 +117,13 @@ export function Supplier360({ branch }) {
       <div className="grid grid-cols-1 gap-3 desktop:grid-cols-[2fr_1fr]">
         <div>
           <p className="mb-2 text-xs font-bold text-navy">Purchase History ({needle ? filteredHist.length : suppBills.length} bookings)</p>
-          <DataTable columns={histColumns} rows={displayHist} getRowKey={(r) => r.id} dense exportName={`supplier-${selSupplier || 'none'}`} emptyMessage="No purchases for this supplier." />
+          <DataTable columns={histColumns} rows={displayHist} loading={gpQ.isLoading} isError={gpQ.isError} getRowKey={(r) => r.id} dense exportName={`supplier-${selSupplier || 'none'}`} emptyMessage="No purchases for this supplier." />
         </div>
         <div className="flex flex-col gap-3">
           <PageSection title={`ADMs (${suppADMs.length})`} className="border-t-[3px] border-t-maroon">
             {suppADMs.length === 0 ? <p className="text-[11px] text-ink-muted">No ADMs from this supplier</p> : suppADMs.map((a) => <MemoRow key={a.id} a={a} gain={false} />)}
           </PageSection>
-          <PageSection title={`ACMs (${suppACMs.length})`} className="border-t-[3px] border-t-[#27500A]">
+          <PageSection title={`ACMs (${suppACMs.length})`} className="border-t-[3px] border-t-[#16a34a]">
             {suppACMs.length === 0 ? <p className="text-[11px] text-ink-muted">No ACMs from this supplier</p> : suppACMs.map((a) => <MemoRow key={a.id} a={a} gain />)}
           </PageSection>
         </div>

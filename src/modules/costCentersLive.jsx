@@ -18,7 +18,7 @@ import { useCostCenters, useCreateCostCenter, useUpdateCostCenter, useDeleteCost
 import { useBranches } from '../core/useReference';
 import { exportToExcel } from '../core/exportExcel';
 
-const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#5a6691', GREEN = '#27500A', RED = '#A32D2D';
+const DARK = '#1a1c22', GOLD = '#c2a04a', DIM = '#5b616e', GREEN = '#16a34a', RED = '#dc2626';
 const isSuperAdmin = (u) => /super\s*admin/i.test(u?.role || '');
 const inp = { padding: '7px 10px', border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 12.5, outline: 'none' };
 const btn = (bg, fg) => ({ padding: '6px 12px', background: bg, color: fg, border: 'none', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' });
@@ -49,7 +49,7 @@ export function CostCenterMasterLive({ currentUser }) {
 
   if (!isSuperAdmin(currentUser)) {
     return (
-      <div style={{ maxWidth: 760, margin: '40px auto', padding: 28, background: '#fff', border: '1px solid #e1e3ec', borderRadius: 10, textAlign: 'center' }}>
+      <div style={{ maxWidth: 760, margin: '40px auto', padding: 28, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 10, textAlign: 'center' }}>
         <div style={{ fontSize: 34, marginBottom: 6 }}>🔒</div>
         <h2 style={{ margin: 0, color: DARK, fontSize: 17 }}>Cost Centre Master — restricted</h2>
         <p style={{ color: DIM, fontSize: 12.5, marginTop: 8 }}>
@@ -105,23 +105,23 @@ export function CostCenterMasterLive({ currentUser }) {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: DIM }}>Branch&nbsp;
-            <select value={activeBranch} onChange={(e) => setBranch(e.target.value)} style={{ ...inp, padding: '5px 8px' }}>
+            <select value={activeBranch} onChange={(e) => setBranch(e.target.value)} className="max-tablet:min-h-[44px]" style={{ ...inp, padding: '5px 8px' }}>
               {branches.map((b) => <option key={b.code} value={b.code}>{b.code}{b.city ? ` — ${b.city}` : ''}</option>)}
             </select>
           </label>
           <span style={{ padding: '4px 10px', background: '#fff7e6', color: '#8a6300', border: '1px solid #f0dca6', borderRadius: 14, fontSize: 11, fontWeight: 700 }}>{centers.length} centres</span>
-          <button onClick={() => setShowAdd((s) => !s)} style={btn(GOLD, DARK)}>＋ Add cost centre</button>
-          <button onClick={exportSheet} disabled={!centers.length} style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', cursor: centers.length ? 'pointer' : 'not-allowed', opacity: centers.length ? 1 : 0.5 }}>📤 Export</button>
-          <button onClick={runBackfill} disabled={backfill.isPending} style={btn(DARK, GOLD)} title="Re-derive cost centres for already-imported vouchers from their saved Ticket Type / Service Type / Country">
+          <button onClick={() => setShowAdd((s) => !s)} className="max-tablet:min-h-[44px]" style={btn(GOLD, DARK)}>＋ Add cost centre</button>
+          <button onClick={exportSheet} disabled={!centers.length} className="max-tablet:min-h-[44px]" style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', cursor: centers.length ? 'pointer' : 'not-allowed', opacity: centers.length ? 1 : 0.5 }}>📤 Export</button>
+          <button onClick={runBackfill} disabled={backfill.isPending} className="max-tablet:min-h-[44px]" style={btn(DARK, GOLD)} title="Re-derive cost centres for already-imported vouchers from their saved Ticket Type / Service Type / Country">
             {backfill.isPending ? 'Re-tagging…' : '↻ Re-tag vouchers'}
           </button>
         </div>
       </div>
 
-      {msg && <div style={{ marginBottom: 12, padding: '8px 14px', borderRadius: 8, background: msg.ok ? '#eef4ec' : '#FCEBEB', color: msg.ok ? GREEN : RED, fontSize: 12, fontWeight: 600 }}>{msg.ok ? '✓ ' : '⚠ '}{msg.text}</div>}
+      {msg && <div style={{ marginBottom: 12, padding: '8px 14px', borderRadius: 8, background: msg.ok ? '#eef4ec' : '#fbe9e9', color: msg.ok ? GREEN : RED, fontSize: 12, fontWeight: 600 }}>{msg.ok ? '✓ ' : '⚠ '}{msg.text}</div>}
 
       {showAdd && (
-        <div style={{ marginBottom: 14, padding: 14, background: '#fff', border: '1px solid #e1e3ec', borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div style={{ marginBottom: 14, padding: 14, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <label style={{ fontSize: 10, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Cost-centre name *</label>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Safari Packages" style={{ ...inp, width: 220 }} />
@@ -138,16 +138,20 @@ export function CostCenterMasterLive({ currentUser }) {
             <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="auto from name" style={{ ...inp, width: 150, fontFamily: 'monospace' }} />
           </div>
           <span style={{ fontSize: 10.5, color: DIM, alignSelf: 'center' }}>Will be created for <b>{activeBranch}</b> as <code style={{ color: DARK }}>{activeBranch}-…</code></span>
-          <button onClick={add} disabled={createCc.isPending} style={btn(GREEN, '#fff')}>{createCc.isPending ? 'Saving…' : 'Save'}</button>
-          <button onClick={() => setShowAdd(false)} style={{ ...btn('#fff', DIM), border: '1px solid #d6dbe6' }}>Cancel</button>
+          <button onClick={add} disabled={createCc.isPending} className="max-tablet:min-h-[44px]" style={btn(GREEN, '#fff')}>{createCc.isPending ? 'Saving…' : 'Save'}</button>
+          <button onClick={() => setShowAdd(false)} className="max-tablet:min-h-[44px]" style={{ ...btn('#fff', DIM), border: '1px solid #d6dbe6' }}>Cancel</button>
         </div>
       )}
 
-      {q.isLoading && <div style={{ padding: 28, textAlign: 'center', color: DIM, background: '#fff', border: '1px solid #e1e3ec', borderRadius: 10 }}>Loading…</div>}
-      {q.isError && <div style={{ padding: 16, color: RED, background: '#FCEBEB', border: '1px solid #f3c9c9', borderRadius: 10, fontSize: 12, fontWeight: 600 }}>⚠ {q.error?.message || 'Failed to load cost centres'}</div>}
+      {q.isLoading && (
+        <div style={{ padding: 14, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 10 }}>
+          {Array.from({ length: 7 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.1) }} />)}
+        </div>
+      )}
+      {q.isError && <div style={{ padding: 16, color: RED, background: '#fbe9e9', border: '1px solid #f3c9c9', borderRadius: 10, fontSize: 12, fontWeight: 600 }}>⚠ {q.error?.message || 'Failed to load cost centres'}</div>}
 
       {!q.isLoading && !q.isError && (
-        <div style={{ background: '#fff', border: '1px solid #e1e3ec', borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid #e6e8ec', borderRadius: 10, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
               <tr style={{ background: DARK }}>
@@ -159,10 +163,10 @@ export function CostCenterMasterLive({ currentUser }) {
             <tbody>
               {byModule.map((m) => (
                 <React.Fragment key={m.key}>
-                  <tr style={{ background: '#f3f6fb', borderTop: '1px solid #e1e3ec' }}>
+                  <tr style={{ background: '#f3f6fb', borderTop: '1px solid #e6e8ec' }}>
                     <td colSpan={6} style={{ padding: '7px 14px', fontWeight: 700, color: DARK }}>
                       <span style={{ marginRight: 7 }}>{m.meta?.icon || '•'}</span>{m.key}
-                      {m.meta?.hasSubs && <span style={{ marginLeft: 8, fontSize: 9.5, fontWeight: 700, color: '#185FA5', background: '#e6f1fb', border: '1px solid #c3ddf5', borderRadius: 5, padding: '1px 6px' }}>INT'L / DOMESTIC</span>}
+                      {m.meta?.hasSubs && <span style={{ marginLeft: 8, fontSize: 9.5, fontWeight: 700, color: '#2563eb', background: '#e8f0ff', border: '1px solid #c3ddf5', borderRadius: 5, padding: '1px 6px' }}>INT'L / DOMESTIC</span>}
                     </td>
                   </tr>
                   {m.leaves.map((c) => (

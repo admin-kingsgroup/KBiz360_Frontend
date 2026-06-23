@@ -20,18 +20,20 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useMemo, useState } from 'react';
+import { Printer, FileSpreadsheet, FileText, Building2 } from 'lucide-react';
 import { useTrialBalance, useLedgerStatement } from '../core/useAccounting';
 import { useLedgerRegistry } from '../core/useReference';
 import { BRANCHES } from '../core/data';
 import { fmtINR } from '../core/format';
 import { CUR_FY, todayISO, fmtDate } from '../core/dates';
-import { cardStyle } from '../core/helpers';
 import { RPT_thStyle, RPT_tdStyle } from '../core/styles';
 import { PeriodBar } from '../core/period';
 import { exportToExcel } from '../core/exportExcel';
 import { exportToCSV } from '../core/business-logic';
 import { VoucherEditor } from './accountingLive';
 import { openLedgerModal } from '../core/LedgerModalHost';
+import { PageLayout } from '../shell/PageLayout';
+import { Button, StatusPill, Card, ResponsiveGrid, LoadingState, EmptyState } from '../shell/primitives';
 
 /* ── inter-branch ledger detector ──────────────────────────────────────
    Only fires INSIDE the Sundry Debtors / Sundry Creditors groups (checked
@@ -65,20 +67,11 @@ export const brName = (code) => {
   return b ? `${b.code} · ${b.city}` : (code || '—');
 };
 
-/* ── status palette ── */
-const STATUS = {
-  Matched:    { c: '#1D9E75', bg: '#EAF3DE', label: 'Matched' },
-  Eliminated: { c: '#185FA5', bg: '#E6F1FB', label: 'Eliminated' },
-  Partial:    { c: '#854F0B', bg: '#FAEEDA', label: 'Partial' },
-  Unmatched:  { c: '#A32D2D', bg: '#FCEBEB', label: 'Unmatched' },
-};
+/* ── status palette → design-system StatusPill tones ── */
+const STATUS_TONE = { Matched: 'success', Eliminated: 'info', Partial: 'warning', Unmatched: 'danger' };
 function Badge({ status }) {
-  const s = STATUS[status] || STATUS.Unmatched;
-  return <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700, background: s.bg, color: s.c, whiteSpace: 'nowrap' }}>{s.label}</span>;
+  return <StatusPill tone={STATUS_TONE[status] || 'danger'} size="sm">{status}</StatusPill>;
 }
-
-const tBtn = (active) => ({ padding: '7px 14px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: `1.5px solid ${active ? '#0d1326' : '#e1e3ec'}`, background: active ? '#0d1326' : '#fff', color: active ? '#d4a437' : '#5a6691' });
-const xBtn = { padding: '7px 12px', background: '#fff', border: '1px solid #e1e3ec', borderRadius: 6, fontSize: 11.5, cursor: 'pointer', fontWeight: 600, color: '#5a6691' };
 
 /* ══════════════════════════════════════════════════════════════════════
    MAIN REPORT
@@ -184,35 +177,34 @@ export function RPT_InterbranchElim() {
   /* ── voucher drill overlay ── */
   if (voucher) {
     return (
-      <div style={{ padding: 18, maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ fontSize: 12, color: '#5a6691', marginBottom: 8 }}>
-          <button onClick={() => setVoucher(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#185FA5', fontWeight: 600, padding: 0 }}>Inter-Branch Report</button>
-          <span style={{ color: '#b9bed4' }}> ▸ </span><span style={{ color: '#0d1326', fontWeight: 700 }}>Voucher</span>
+      <PageLayout maxWidth="max-w-[1100px] mx-auto">
+        <div className="mb-2 text-xs text-ink-muted">
+          <button onClick={() => setVoucher(null)} className="font-semibold text-info hover:underline">Inter-Branch Report</button>
+          <span className="text-ink-subtle"> ▸ </span><span className="font-bold text-ink">Voucher</span>
         </div>
-        <div style={cardStyle}><VoucherEditor voucherId={voucher.id} cur="₹" onBack={() => setVoucher(null)} /></div>
-      </div>
+        <Card><VoucherEditor voucherId={voucher.id} cur="₹" onBack={() => setVoucher(null)} /></Card>
+      </PageLayout>
     );
   }
 
-  return (
-    <div style={{ padding: 18, maxWidth: 1400, margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid #e1e3ec' }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 20, color: '#0d1326', fontWeight: 700 }}>Inter-Branch Elimination Report</h2>
-          <p style={{ margin: '3px 0 0', fontSize: 12, color: '#5a6691' }}>Group consolidation · Inter-Branch Sundry Debtors ⇄ Sundry Creditors · reconciled & auto-eliminated</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <PeriodBar branch="ALL" defaultPreset="all" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
-          <button onClick={() => window.print()} style={xBtn}>📄 PDF</button>
-          <button onClick={() => window.print()} style={xBtn}>🖨 Print</button>
-          <button onClick={doExcel} style={xBtn}>📊 Excel</button>
-          <button onClick={doCsv} style={xBtn}>📋 CSV</button>
-        </div>
-      </div>
+  const reconciled = Math.abs(totals.netDiff) < 1 && totals.unmatchedRec < 1 && totals.unmatchedPay < 1;
 
+  return (
+    <PageLayout
+      maxWidth="max-w-[1400px] mx-auto"
+      title="Inter-Branch Elimination Report"
+      subtitle="Group consolidation · Inter-Branch Sundry Debtors ⇄ Sundry Creditors · reconciled & auto-eliminated"
+      actions={
+        <>
+          <PeriodBar branch="ALL" defaultPreset="all" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
+          <Button variant="secondary" size="sm" icon={Printer} onClick={() => window.print()}>Print</Button>
+          <Button variant="secondary" size="sm" icon={FileSpreadsheet} onClick={doExcel}>Excel</Button>
+          <Button variant="secondary" size="sm" icon={FileText} onClick={doCsv}>CSV</Button>
+        </>
+      }
+    >
       {/* Dashboard summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 14 }}>
+      <ResponsiveGrid min="150px" gap="md" className="mb-3.5">
         {[
           { l: 'Total Receivables', v: totals.totalRec, c: '#185FA5', bg: '#E6F1FB' },
           { l: 'Total Payables', v: totals.totalPay, c: '#854F0B', bg: '#FAEEDA' },
@@ -221,18 +213,18 @@ export function RPT_InterbranchElim() {
           { l: 'Unmatched Payables', v: totals.unmatchedPay, c: '#A32D2D', bg: '#FCEBEB' },
           { l: 'Net Difference', v: totals.netDiff, c: Math.abs(totals.netDiff) < 1 ? '#1D9E75' : '#A32D2D', bg: Math.abs(totals.netDiff) < 1 ? '#EAF3DE' : '#FCEBEB' },
         ].map((k, i) => (
-          <div key={i} style={{ ...cardStyle, borderTop: `3px solid ${k.c}`, background: k.bg }}>
-            <p style={{ margin: 0, fontSize: 9, fontWeight: 700, color: k.c, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{k.l}</p>
-            <p style={{ margin: '4px 0 0', fontSize: 19, fontWeight: 800, color: '#0d1326' }}>{fmtINR(k.v)}</p>
+          <div key={i} className="rounded-brand border border-t-[3px] border-surface-border p-3" style={{ borderTopColor: k.c, background: k.bg }}>
+            <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: k.c }}>{k.l}</p>
+            <p className="mt-1 text-[19px] font-extrabold tabular-nums text-ink">{fmtINR(k.v)}</p>
           </div>
         ))}
-      </div>
+      </ResponsiveGrid>
 
       {/* Validation banner */}
       {hasData && (
-        <div style={{ ...cardStyle, marginBottom: 14, borderLeft: `4px solid ${Math.abs(totals.netDiff) < 1 && totals.unmatchedRec < 1 && totals.unmatchedPay < 1 ? '#1D9E75' : '#A32D2D'}`, background: Math.abs(totals.netDiff) < 1 && totals.unmatchedRec < 1 && totals.unmatchedPay < 1 ? '#f4faf0' : '#fdf3f3' }}>
-          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: Math.abs(totals.netDiff) < 1 && totals.unmatchedRec < 1 && totals.unmatchedPay < 1 ? '#27500A' : '#A32D2D' }}>
-            {Math.abs(totals.netDiff) < 1 && totals.unmatchedRec < 1 && totals.unmatchedPay < 1
+        <div className="mb-3.5 rounded-brand border border-l-4 border-surface-border p-4" style={{ borderLeftColor: reconciled ? '#1D9E75' : '#A32D2D', background: reconciled ? '#f4faf0' : '#fdf3f3' }}>
+          <p className="text-xs font-bold" style={{ color: reconciled ? '#27500A' : '#A32D2D' }}>
+            {reconciled
               ? '✔ All inter-branch balances reconcile — receivables fully match payables. Safe to eliminate on consolidation.'
               : `⚠ ${fmtINR(Math.abs(totals.netDiff))} net difference · ${fmtINR(totals.unmatchedRec)} unmatched receivables · ${fmtINR(totals.unmatchedPay)} unmatched payables. Resolve before signing off group accounts.`}
           </p>
@@ -240,23 +232,21 @@ export function RPT_InterbranchElim() {
       )}
 
       {/* View toggle */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-        <button onClick={() => setView('summary')} style={tBtn(view === 'summary')}>Summary</button>
-        <button onClick={() => setView('detailed')} style={tBtn(view === 'detailed')}>Detailed</button>
+      <div className="mb-3.5 inline-flex overflow-hidden rounded-lg border border-surface-border">
+        {[['summary', 'Summary'], ['detailed', 'Detailed']].map(([id, l]) => (
+          <button key={id} onClick={() => setView(id)}
+            className={`px-3.5 py-2 text-xs font-semibold transition max-tablet:min-h-[44px] ${view === id ? 'bg-navy text-white' : 'bg-surface text-ink-muted hover:bg-surface-alt'}`}>{l}</button>
+        ))}
       </div>
 
-      {loading && <div style={{ ...cardStyle, textAlign: 'center', color: '#5a6691', padding: 28 }}>Loading inter-branch ledgers…</div>}
+      {loading && <LoadingState label="Loading inter-branch ledgers…" />}
 
       {!loading && !hasData && (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: 36 }}>
-          <p style={{ margin: 0, fontSize: 32 }}>🏢↔🏢</p>
-          <p style={{ margin: '8px 0 4px', fontSize: 14, fontWeight: 700, color: '#0d1326' }}>No inter-branch ledgers found for this period</p>
-          <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691', maxWidth: 620, marginInline: 'auto', lineHeight: 1.6 }}>
-            This report reconciles ledgers under <b>Sundry Debtors</b> &amp; <b>Sundry Creditors</b> whose names mark them as inter-branch control accounts
-            (e.g. <i>"Inter-Branch — Nairobi"</i>, <i>"BOM Branch A/c"</i>, <i>"Due to DAR"</i>). Create those ledgers and post the inter-branch journals,
-            then the receivable in one branch and the payable in its counter-branch will appear here, match up, and eliminate automatically.
-          </p>
-        </div>
+        <EmptyState
+          icon={Building2}
+          title="No inter-branch ledgers found for this period"
+          hint='This report reconciles ledgers under Sundry Debtors & Sundry Creditors whose names mark them as inter-branch control accounts (e.g. "Inter-Branch — Nairobi", "BOM Branch A/c", "Due to DAR"). Create those ledgers and post the inter-branch journals, then the receivable in one branch and the payable in its counter-branch will appear here, match up, and eliminate automatically.'
+        />
       )}
 
       {!loading && hasData && view === 'summary' && (
@@ -270,7 +260,7 @@ export function RPT_InterbranchElim() {
           from={from} to={to} onVoucher={setVoucher}
         />
       )}
-    </div>
+    </PageLayout>
   );
 }
 
@@ -281,7 +271,7 @@ function SummaryView({ branchSummary, receivables, payables }) {
   return (
     <>
       {/* Branch-wise totals */}
-      <div style={{ ...cardStyle, marginBottom: 14 }}>
+      <div className="kbiz-card mb-3.5">
         <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#0d1326' }}>Branch-wise Summary</p>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
@@ -318,7 +308,7 @@ function LedgerTable({ title, side, rows, amountLabel, amountKey }) {
   const totAmt = rows.reduce((s, r) => s + (r[amountKey] || 0), 0);
   const totOut = rows.reduce((s, r) => s + (r.outstanding || 0), 0);
   return (
-    <div style={{ ...cardStyle, marginBottom: 14 }}>
+    <div className="kbiz-card mb-3.5">
       <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: accent }}>{title} <span style={{ color: '#5a6691', fontWeight: 500 }}>· {rows.length} ledgers</span></p>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
@@ -370,7 +360,7 @@ function DetailedView({ receivables, payables, open, setOpen, from, to, onVouche
 
 function DetailGroup({ title, accent, side, rows, open, setOpen, from, to, onVoucher }) {
   return (
-    <div style={{ ...cardStyle, marginBottom: 14 }}>
+    <div className="kbiz-card mb-3.5">
       <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: accent }}>{title}</p>
       {rows.length === 0 && <p style={{ margin: 0, fontSize: 11.5, color: '#5a6691' }}>No inter-branch {side}s this period.</p>}
       {rows.map((r) => {

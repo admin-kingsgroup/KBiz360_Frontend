@@ -7,7 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { AlertTriangle, BarChart2, Calendar, Check, Download, Lock, Plus, Save, Search, Settings, Users } from 'lucide-react';
 import { Legend, Line } from 'recharts';
 import { BRANCHES, EMP_LOANS_DATA, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../../core/data';
-import { fmt, fmtINR } from '../../core/format';
+import { fmt, fmtINR, compactAmt } from '../../core/format';
 import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, _LEAVES, _LEAVE_BALANCES, _REVISION_DUE, _SALARY_HISTORY, cardStyle, tabPanel } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
@@ -56,7 +56,7 @@ export function ExpenseBudget({branch,setRoute}){
   };
   const updM=(id,v)=>setDraft(d=>({...d,[id]:{...d[id],monthly:+v,yearly:Math.round(+v*12)}}));
   const updY=(id,v)=>setDraft(d=>({...d,[id]:{...d[id],yearly:+v,monthly:Math.round(+v/12)}}));
-  const f=n=>n>=1000000?(n/100000).toFixed(1)+"L":n>=1000?(n/1000).toFixed(0)+"K":n>0?String(n):"—";
+  const f=n=>compactAmt(n,{currency:'',dash:true}); // canonical compact (fixes 1–10 lakh shown as "K")
   const ff=n=>n>0?cur+Number(n).toLocaleString("en-IN"):"—";
 
   return (
@@ -569,13 +569,18 @@ export function HrPayroll({branch}){
   const [journalPosted,setJournalPosted]=useState(false);
   const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
 
-  const emps=HR_EMPLOYEES_DATA.filter(e=>e.branch===brCode&&e.active);
+  // The employee master uses status:"Active" (not an `active` flag) and stores pay as
+  // components (basic/hra/da/travel/medical) — there is no `e.salary`. Using e.active +
+  // e.salary left payroll EMPTY and every total NaN. Filter on status; derive gross from
+  // the components.
+  const emps=HR_EMPLOYEES_DATA.filter(e=>e.branch===brCode&&e.status==="Active");
 
   const payroll=useMemo(()=>emps.map(e=>{
-    const basic   =Math.round(e.salary*0.50);
-    const hra     =Math.round(e.salary*0.20);
-    const special =e.salary-basic-hra;
-    const gross   =e.salary;
+    const salary  =(e.basic||0)+(e.hra||0)+(e.da||0)+(e.travel||0)+(e.medical||0); // gross CTC from master
+    const basic   =Math.round(salary*0.50);
+    const hra     =Math.round(salary*0.20);
+    const special =salary-basic-hra;
+    const gross   =salary;
     // PF: 12% of Basic (both employee & employer)
     const empPF   =Math.round(basic*0.12);
     const empPFr  =Math.round(basic*0.12);  // employer
@@ -871,10 +876,19 @@ export function HrPayslips({branch}){
 
   const filtEmps=HR_EMPLOYEES_DATA.filter(e=>brFilter==="All"||e.branch===brFilter);
   const emp=HR_EMPLOYEES_DATA.find(e=>e.id===empId)||HR_EMPLOYEES_DATA[0];
+  // No employees (the master is empty) → emp is undefined; reading emp.branch/emp.basic
+  // would white-screen the page. Show an empty state instead.
+  if(!emp){
+    return (
+      <div style={{padding:"48px 10px",maxWidth:900,margin:"0 auto",textAlign:"center",color:"#8b94b3",fontSize:13}}>
+        No employees yet — add employees to generate payslips.
+      </div>
+    );
+  }
   const brCfg=BRANCHES.find(b=>b.code===emp.branch)||{cur:"₹",entity:"Travkings Tours & Travels"};
   const c=brCfg.cur;
-  const gross=emp.basic+emp.hra+emp.da+emp.travel+emp.medical;
-  const deductions=emp.pf+emp.esi+emp.tds;
+  const gross=(emp.basic||0)+(emp.hra||0)+(emp.da||0)+(emp.travel||0)+(emp.medical||0);
+  const deductions=(emp.pf||0)+(emp.esi||0)+(emp.tds||0);
   const net=gross-deductions;
 
   return (

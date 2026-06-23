@@ -1598,12 +1598,13 @@ export const PERIOD_OPTIONS = ["Today","Week","Month","Quarter","YTD","Custom"];
 
 export function PeriodSelector({period,setPeriod}){
   return (
-    <div style={{display:"flex",gap:4,padding:3,background:"#f7f8fb",borderRadius:7,border:"1px solid #e1e3ec"}}>
+    <div className="max-tablet:w-full max-tablet:flex-wrap" style={{display:"flex",gap:4,padding:3,background:"#f4f5f7",borderRadius:7,border:"1px solid #e6e8ec"}}>
       {PERIOD_OPTIONS.map(p=>(
         <button key={p} onClick={()=>setPeriod(p)}
+          className="max-tablet:flex-1 max-tablet:min-h-[44px]"
           style={{padding:"5px 11px",border:"none",borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer",
-            background:period===p?"#0d1326":"transparent",
-            color:period===p?"#d4a437":"#5a6691"}}>{p}</button>
+            background:period===p?"#1a1c22":"transparent",
+            color:period===p?"#c2a04a":"#5b616e"}}>{p}</button>
       ))}
     </div>
   );
@@ -1612,14 +1613,14 @@ export function PeriodSelector({period,setPeriod}){
 
 export function DashboardHeader({title,subtitle,user,period,setPeriod,onExport}){
   return (
-    <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:14,marginBottom:18,paddingBottom:14,borderBottom:"1px solid #e1e3ec"}}>
-      <div>
-        <h2 style={{margin:0,fontSize:22,color:"#0d1326",fontWeight:700}}>{title}</h2>
-        <p style={{margin:"3px 0 0",fontSize:12.5,color:"#5a6691"}}>{subtitle} · <span style={{color:"#d4a437",fontWeight:600}}>{user.name}</span></p>
+    <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:14,marginBottom:18,paddingBottom:14,borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{minWidth:0}}>
+        <h2 style={{margin:0,fontSize:20,letterSpacing:"-0.02em",color:"#14161a",fontWeight:700}}>{title}</h2>
+        <p style={{margin:"3px 0 0",fontSize:12.5,color:"#5b616e"}}>{subtitle} · <span style={{color:"#98792c",fontWeight:600}}>{user.name}</span></p>
       </div>
-      <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+      <div className="max-tablet:w-full" style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
         {period && setPeriod && <PeriodSelector period={period} setPeriod={setPeriod}/>}
-        <button onClick={onExport} style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📄 Export PDF</button>
+        <button onClick={onExport} className="inline-flex items-center max-tablet:min-h-[44px]" style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 14px",background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,fontSize:12,cursor:"pointer",fontWeight:600,color:"#5b616e"}}>📄 Export PDF</button>
       </div>
     </div>
   );

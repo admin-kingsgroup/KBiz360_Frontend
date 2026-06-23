@@ -1,5 +1,6 @@
 import React from 'react';
-import { useMobile } from '../../../core/hooks';
+import { PageLayout } from '../../../shell/PageLayout';
+import { ResponsiveGrid } from '../../../shell/primitives';
 import { useBranchDashboard } from '../hooks/use-branch-dashboard';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
 import { formatCurrency } from '../utils/helpers';
@@ -14,7 +15,6 @@ import { QuickCreateBar } from '../components/shared/QuickCreateBar';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 
 export function BranchDashboardPage({ branch, setRoute }) {
-  const mob = useMobile();
   const { data, isLoading, branchCode, currencySymbol, isIndia } = useBranchDashboard(branch);
   const { navigate } = useDashboardActions(setRoute);
 
@@ -30,7 +30,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
   const formatMoney = (n) => formatCurrency(currencySymbol, n);
 
   return (
-    <div style={{ padding: '12px 10px', maxWidth: 1400, margin: '0 auto' }}>
+    <PageLayout>
       <BranchHeader
         branch={branch}
         branchCode={branchCode}
@@ -40,20 +40,13 @@ export function BranchDashboardPage({ branch, setRoute }) {
       />
 
       {/* KPI Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: mob ? '1fr 1fr' : 'repeat(auto-fit,minmax(150px,1fr))',
-          gap: 10,
-          marginBottom: 16,
-        }}
-      >
+      <ResponsiveGrid min="150px" gap="md" className="mb-4">
         <KpiTile
           label="MTD Revenue"
           value={formatMoney(kpis.revenue)}
           growth={kpis.revenueGrowth}
           icon="💰"
-          color="#185FA5"
+          color="#2563eb"
           onClick={() => navigate('/reports/sreg')}
         />
         <KpiTile
@@ -61,7 +54,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(kpis.gp)}
           growth={kpis.gpGrowth}
           icon="📈"
-          color="#27500A"
+          color="#16a34a"
           sub={kpis.gpPct + '%'}
           onClick={() => navigate('/reports/gp')}
         />
@@ -70,7 +63,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(kpis.netProfit)}
           sub="after expenses"
           icon="🏆"
-          color={kpis.netProfit > 0 ? '#1D9E75' : '#A32D2D'}
+          color={kpis.netProfit > 0 ? '#16a34a' : '#dc2626'}
           onClick={() => navigate('/reports/pnl')}
         />
         <KpiTile
@@ -78,7 +71,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(kpis.outstanding)}
           sub="pending to collect"
           icon="⏰"
-          color="#854F0B"
+          color="#b45309"
           onClick={() => navigate('/reports/rec')}
         />
         <KpiTile
@@ -86,7 +79,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(kpis.payable)}
           sub="pending to pay"
           icon="📤"
-          color="#A32D2D"
+          color="#dc2626"
           onClick={() => navigate('/reports/pay')}
         />
         <KpiTile
@@ -94,14 +87,14 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={String(kpis.bookings)}
           sub={`${(kpis.revenue / Math.max(1, kpis.bookings) | 0).toLocaleString()} avg`}
           icon="✈"
-          color="#384677"
+          color="#5b616e"
         />
         <KpiTile
           label="YTD Revenue"
           value={formatMoney(kpis.ytdRevenue)}
           sub={`GP ${formatMoney(kpis.ytdGp)}`}
           icon="📊"
-          color="#5a6691"
+          color="#5b616e"
           onClick={() => navigate('/reports/pnl')}
         />
         <KpiTile
@@ -109,7 +102,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(kpis.revenue)}
           sub="from the books (MTD)"
           icon="📒"
-          color="#185FA5"
+          color="#2563eb"
           onClick={() => navigate('/reports/pnl')}
         />
         <KpiTile
@@ -117,7 +110,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(kpis.cost)}
           sub="COGS (MTD)"
           icon="📒"
-          color="#854F0B"
+          color="#b45309"
           onClick={() => navigate('/reports/pnl')}
         />
         <KpiTile
@@ -125,7 +118,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(kpis.gp)}
           sub={kpis.gpPct + '% GP'}
           icon="📒"
-          color="#27500A"
+          color="#16a34a"
           onClick={() => navigate('/reports/gp')}
         />
         <KpiTile
@@ -133,7 +126,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(kpis.expenses)}
           sub="indirect (MTD)"
           icon="📒"
-          color="#A32D2D"
+          color="#dc2626"
           onClick={() => navigate('/reports/pnl')}
         />
         <KpiTile
@@ -141,7 +134,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(kpis.netProfit)}
           sub="net profit (MTD)"
           icon="📒"
-          color={kpis.netProfit > 0 ? '#1D9E75' : '#A32D2D'}
+          color={kpis.netProfit > 0 ? '#16a34a' : '#dc2626'}
           onClick={() => navigate('/reports/pnl')}
         />
         <KpiTile
@@ -149,7 +142,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(ab.sales)}
           sub={`${ab.count} approved booking${ab.count === 1 ? '' : 's'}`}
           icon="🧾"
-          color="#185FA5"
+          color="#2563eb"
           onClick={() => navigate('/bookings/approved')}
         />
         <KpiTile
@@ -157,7 +150,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(ab.purchase)}
           sub="approved & posted"
           icon="📦"
-          color="#854F0B"
+          color="#b45309"
           onClick={() => navigate('/bookings/approved')}
         />
         <KpiTile
@@ -165,7 +158,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(ab.gp)}
           sub={ab.sales > 0 ? `${((ab.gp / ab.sales) * 100).toFixed(1)}% GP` : 'approved bookings'}
           icon="📈"
-          color="#27500A"
+          color="#16a34a"
           onClick={() => navigate('/bookings/approved')}
         />
         <KpiTile
@@ -173,7 +166,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(pb.sales)}
           sub={`${pb.count} pending booking${pb.count === 1 ? '' : 's'}`}
           icon="🧾"
-          color="#185FA5"
+          color="#2563eb"
           onClick={() => navigate('/bookings/pending')}
         />
         <KpiTile
@@ -181,7 +174,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(pb.purchase)}
           sub="awaiting approval"
           icon="📥"
-          color="#854F0B"
+          color="#b45309"
           onClick={() => navigate('/bookings/pending')}
         />
         <KpiTile
@@ -189,7 +182,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(pb.gp)}
           sub={pb.sales > 0 ? `${((pb.gp / pb.sales) * 100).toFixed(1)}% GP` : 'SO/PO/GP queue'}
           icon="⌛"
-          color="#27500A"
+          color="#16a34a"
           onClick={() => navigate('/bookings/pending')}
         />
         <KpiTile
@@ -197,7 +190,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(rb.sales)}
           sub={`${rb.count} rejected booking${rb.count === 1 ? '' : 's'}`}
           icon="🚫"
-          color="#A32D2D"
+          color="#dc2626"
           onClick={() => navigate('/bookings/rejected')}
         />
         <KpiTile
@@ -205,7 +198,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(rb.purchase)}
           sub="declined"
           icon="🚫"
-          color="#A32D2D"
+          color="#dc2626"
           onClick={() => navigate('/bookings/rejected')}
         />
         <KpiTile
@@ -213,7 +206,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           value={formatMoney(rb.gp)}
           sub={rb.sales > 0 ? `${((rb.gp / rb.sales) * 100).toFixed(1)}% GP` : 'declined bookings'}
           icon="🚫"
-          color="#A32D2D"
+          color="#dc2626"
           onClick={() => navigate('/bookings/rejected')}
         />
         <KpiTile
@@ -232,18 +225,11 @@ export function BranchDashboardPage({ branch, setRoute }) {
           color="#6b7280"
           onClick={() => navigate('/bookings/deleted')}
         />
-      </div>
+      </ResponsiveGrid>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: mob ? '1fr' : '2fr 1fr',
-          gap: 12,
-          marginBottom: 12,
-        }}
-      >
+      <div className="mb-3 grid grid-cols-1 gap-3 desktop:grid-cols-[2fr_1fr]">
         {/* Left column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="flex flex-col gap-3">
           <GpByModulePanel
             modGp={gpByModule}
             totalGp={kpis.gp}
@@ -258,7 +244,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
         </div>
 
         {/* Right column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="flex flex-col gap-3">
           <ActionItemsPanel items={actionItems} onItemClick={navigate} />
           <UpcomingTravelPanel bookings={upcomingTravel} />
           <QuickStatsCard
@@ -268,7 +254,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
               {
                 label: 'GP Margin',
                 value: kpis.ytdRevenue > 0 ? +((kpis.ytdGp / kpis.ytdRevenue) * 100).toFixed(1) + '%' : '—',
-                color: '#d4a437',
+                color: '#c2a04a',
               },
               { label: 'Active Bookings', value: String(billsYtd.length), color: '#5da0e0' },
               {
@@ -282,6 +268,6 @@ export function BranchDashboardPage({ branch, setRoute }) {
       </div>
 
       <QuickCreateBar onNavigate={navigate} />
-    </div>
+    </PageLayout>
   );
 }

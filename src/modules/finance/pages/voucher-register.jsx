@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
+import { StatusPill } from '../../../shell/primitives';
 import { Modal } from '../../../core/ux/Modal';
+import { toastError } from '../../../core/ux/toast';
 import { VoucherView } from '../../pnlTally';
 import { useVoucherRegister } from '../hooks/use-voucher-register';
 import { useFinanceStore } from '../store/finance.store';
@@ -10,16 +12,10 @@ import { fmtDate } from '../../../core/dates';
 
 const money = (cur, n) => (n ? `${cur}${Math.round(n).toLocaleString('en-IN')}` : '—');
 
-const STATUS_STYLES = {
-  approved: 'bg-success/15 text-[#27500A]',
-  pending: 'bg-warning/15 text-[#854F0B]',
-  rejected: 'bg-danger/15 text-maroon',
-  deleted: 'bg-ink-subtle/15 text-ink-muted',
-};
+const STATUS_TONE = { approved: 'success', pending: 'warning', rejected: 'danger', deleted: 'neutral' };
 function StatusChip({ status }) {
   if (!status) return <span className="text-ink-subtle">—</span>;
-  const cls = STATUS_STYLES[status] || 'bg-navy/5 text-ink-muted';
-  return <span className={`inline-block rounded-full px-2 py-0.5 text-[10.5px] font-semibold capitalize ${cls}`}>{status}</span>;
+  return <StatusPill tone={STATUS_TONE[status] || 'neutral'} size="sm" className="capitalize">{status}</StatusPill>;
 }
 
 /**
@@ -63,13 +59,13 @@ export function VoucherRegisterPage({ branch, category, title }) {
     <>
       <span className="text-xs font-semibold text-ink-muted">Period</span>
       <input type="date" value={from} max={to} onChange={(e) => setRegisterPeriod(e.target.value, to)} aria-label="From date"
-        className="h-8 rounded-md border border-surface-border bg-surface px-2 text-xs text-ink outline-none focus:border-gold" />
+        className="h-9 rounded-md border border-surface-border bg-surface px-2 text-xs text-ink outline-none transition-[box-shadow,border-color] duration-fast focus:border-info focus:shadow-focus-ring max-tablet:h-11" />
       <span className="text-xs text-ink-subtle">→</span>
       <input type="date" value={to} min={from} onChange={(e) => setRegisterPeriod(from, e.target.value)} aria-label="To date"
-        className="h-8 rounded-md border border-surface-border bg-surface px-2 text-xs text-ink outline-none focus:border-gold" />
+        className="h-9 rounded-md border border-surface-border bg-surface px-2 text-xs text-ink outline-none transition-[box-shadow,border-color] duration-fast focus:border-info focus:shadow-focus-ring max-tablet:h-11" />
       {isOverridden ? (
         <button onClick={resetRegisterPeriod}
-          className="rounded-md border border-gold bg-gold-light/30 px-3 py-1.5 text-xs font-medium text-navy transition hover:bg-gold-light/50">
+          className="rounded-md border border-gold bg-gold-light/30 px-3 py-1.5 text-xs font-medium text-navy transition-colors duration-fast hover:bg-gold-light/50 max-tablet:min-h-[44px]">
           ↺ Follow FY {fy.label}
         </button>
       ) : (
@@ -86,7 +82,7 @@ export function VoucherRegisterPage({ branch, category, title }) {
         loading={isLoading}
         isError={isError}
         error={error}
-        onRetry={refetch}
+        onRetry={() => Promise.resolve(refetch()).catch(() => toastError('Retry failed — still unable to load this register.'))}
         searchable
         searchPlaceholder="Search voucher / account / narration…"
         stickyHeader

@@ -31,11 +31,11 @@ export function ForexReport({ branch }) {
   const totalUnreal = filtered.filter((r) => r.status === 'Unsettled').length;
 
   const KPIS = [
-    { l: 'Realized Gain/(Loss)', v: f(totalGain), c: totalGain >= 0 ? '#27500A' : '#A32D2D' },
-    { l: 'Gain Transactions', v: String(realized.filter((r) => r.gain > 0).length), c: '#27500A' },
-    { l: 'Loss Transactions', v: String(realized.filter((r) => r.gain < 0).length), c: '#A32D2D' },
-    { l: 'Unsettled (Unrealized)', v: String(totalUnreal), c: '#854F0B' },
-    { l: 'Total FCY Volume', v: `${filtered.reduce((s, r) => s + r.fcAmt, 0).toLocaleString()} FCY`, c: '#185FA5' },
+    { l: 'Realized Gain/(Loss)', v: f(totalGain), c: totalGain >= 0 ? '#16a34a' : '#dc2626' },
+    { l: 'Gain Transactions', v: String(realized.filter((r) => r.gain > 0).length), c: '#16a34a' },
+    { l: 'Loss Transactions', v: String(realized.filter((r) => r.gain < 0).length), c: '#dc2626' },
+    { l: 'Unsettled (Unrealized)', v: String(totalUnreal), c: '#d97706' },
+    { l: 'Total FCY Volume', v: `${filtered.reduce((s, r) => s + r.fcAmt, 0).toLocaleString()} FCY`, c: '#2563eb' },
   ];
 
   const columns = [
@@ -48,7 +48,7 @@ export function ForexReport({ branch }) {
     { key: 'inrAmt', header: 'INR Booked', num: true, render: (r, v) => f(v) },
     { key: 'settleRate', header: 'Rate Settled', num: true, className: 'font-mono text-[10px]', render: (r, v) => v || '—' },
     { key: 'settleInr', header: 'INR Settled', num: true, render: (r, v) => (v ? f(v) : '—') },
-    { key: 'gain', header: 'Gain/(Loss)', num: true, render: (r, v) => (v ? <span className={`font-bold ${v > 0 ? 'text-[#27500A]' : 'text-maroon'}`}>{f(v)}</span> : '—'), footer: (rs) => f(rs.filter((r) => r.status === 'Settled').reduce((s, r) => s + r.gain, 0)), footerLabel: 'NET' },
+    { key: 'gain', header: 'Gain/(Loss)', num: true, render: (r, v) => (v ? <span className={`font-bold ${v > 0 ? 'text-[#16a34a]' : 'text-maroon'}`}>{f(v)}</span> : '—'), footer: (rs) => f(rs.filter((r) => r.status === 'Settled').reduce((s, r) => s + r.gain, 0)), footerLabel: 'NET' },
     { key: 'status', header: 'Status', render: (r, v) => <StatusPill tone={v === 'Settled' ? 'success' : 'warning'} size="sm">{v}</StatusPill> },
   ];
 
@@ -82,7 +82,7 @@ export function ForexReport({ branch }) {
         emptyHint="The book is India-only / INR base — FX gain/loss appears here once foreign-currency settlements are posted."
       />
 
-      <div className="mt-3 rounded-brand border border-[#B5D4F4] bg-[#E6F1FB] px-3.5 py-2.5 text-[10px] leading-relaxed text-[#185FA5]">
+      <div className="mt-3 rounded-brand border border-[#cfe0f8] bg-[#e8f0ff] px-3.5 py-2.5 text-[10px] leading-relaxed text-[#2563eb]">
         Forex Gain/Loss is posted to GL via Journal Entry. Rate booked = rate at invoice. Rate settled = rate at payment.
         Unrealized: open positions at period-end rated at the closing rate.
       </div>

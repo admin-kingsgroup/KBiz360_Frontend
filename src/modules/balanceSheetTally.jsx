@@ -16,8 +16,11 @@ import { bc } from '../core/styles.jsx';
 import { PeriodBar } from '../core/period';
 import { PLSide, GroupSummary, LedgerVouchers, VoucherView } from './pnlTally.jsx';
 import { openLedgerModal } from '../core/LedgerModalHost';
+import { PageLayout } from '../shell/PageLayout';
+import { SkeletonTable } from '../shell/primitives';
+import { toastInfo } from '../core/ux/toast';
 
-const DARK = '#0d1326', DIM = '#5a6691', LINE = '#e1e3ec';
+const DARK = '#1a1c22', DIM = '#5b616e', LINE = '#e6e8ec';
 const money = (n) => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
 // Open by default (inception → today): a Balance Sheet must accumulate every
@@ -25,7 +28,6 @@ const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
 // movement. The PeriodBar (defaultPreset="all") refines `from` to inception.
 const openDefault = () => ({ from: '2000-01-01', to: new Date().toISOString().slice(0, 10) });
 const dmy = (s) => { const d = new Date(s); return Number.isNaN(d.getTime()) ? s : `${d.getDate()}-${d.toLocaleString('en', { month: 'short' })}-${String(d.getFullYear()).slice(-2)}`; };
-const dateInp = { padding: '5px 8px', borderRadius: 6, border: '1px solid #2a3450', background: '#1a2238', color: '#cfd8e8', fontSize: 11 };
 const backBtn = { display: 'inline-flex', alignItems: 'center', gap: 3, background: '#fff', border: '1px solid ' + LINE, borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 600, color: DARK, cursor: 'pointer' };
 
 export function BalanceSheetTallyLive({ branch }) {
@@ -36,7 +38,7 @@ export function BalanceSheetTallyLive({ branch }) {
   const top = stack[stack.length - 1];
   const asAt = `as at ${dmy(range.to)}`;
 
-  const { data: bs, isLoading, error } = useQuery({
+  const { data: bs, isLoading, error, refetch } = useQuery({
     queryKey: ['bs-tally', brCodeOf(branch), range.from, range.to, showZero],
     queryFn: () => apiGet('/api/accounting/bs-tally', { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from: range.from, to: range.to, ...(showZero ? { includeZero: 1 } : {}) }),
   });
@@ -52,37 +54,42 @@ export function BalanceSheetTallyLive({ branch }) {
 
   const crumb = (label, i) => (
     <span key={i} style={{ display: 'inline-flex', alignItems: 'center' }}>
-      {i > 0 && <ChevronRight size={12} style={{ color: '#9aa6c4', margin: '0 2px' }} />}
-      <button onClick={() => goto(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: i === stack.length - 1 ? DARK : '#1f6fc4', fontWeight: i === stack.length - 1 ? 700 : 600, fontSize: 12, padding: '2px 4px' }}>{label}</button>
+      {i > 0 && <ChevronRight size={12} style={{ color: '#9197a3', margin: '0 2px' }} />}
+      <button onClick={() => goto(i)} className="inline-flex items-center max-tablet:min-h-[44px]" style={{ background: 'none', border: 'none', cursor: 'pointer', color: i === stack.length - 1 ? DARK : '#2563eb', fontWeight: i === stack.length - 1 ? 700 : 600, fontSize: 12, padding: '2px 4px' }}>{label}</button>
     </span>
   );
 
   return (
-    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '12px 10px 40px' }}>
+    <PageLayout maxWidth="mx-auto max-w-[1280px] pb-10">
       <div style={{ background: DARK, borderRadius: '10px 10px 0 0', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <div>
-          <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#fff' }}>Balance Sheet <span style={{ color: '#d4a437', fontSize: 11, fontWeight: 600 }}>· Tally view</span></p>
-          <p style={{ margin: 0, fontSize: 10.5, color: '#8b94b3' }}>{brCodeOf(branch)} (Branch) · {asAt}</p>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#fff' }}>Balance Sheet <span style={{ color: '#c2a04a', fontSize: 11, fontWeight: 600 }}>· Tally view</span></p>
+          <p style={{ margin: 0, fontSize: 10.5, color: '#9197a3' }}>{brCodeOf(branch)} (Branch) · {asAt}</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#cfd6ea', fontSize: 11, cursor: 'pointer', userSelect: 'none' }} title="Show every ledger in the chart, including those with a zero balance / no entries">
+        <div className="max-tablet:w-full" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label className="max-tablet:min-h-[44px]" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#c9ccd2', fontSize: 11, cursor: 'pointer', userSelect: 'none' }} title="Show every ledger in the chart, including those with a zero balance / no entries">
             <input type="checkbox" checked={showZero} onChange={(e) => setShowZero(e.target.checked)} /> Show zero-balance accounts
           </label>
           <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setRange({ from: r.from, to: r.to })} />
         </div>
       </div>
 
-      <div style={{ background: '#f3f4f8', borderLeft: '1px solid ' + LINE, borderRight: '1px solid ' + LINE, padding: '7px 14px', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
-        {stack.length > 1 && <button onClick={() => setStack((s) => s.slice(0, -1))} style={backBtn}><ChevronLeft size={13} /> Back</button>}
+      <div style={{ background: '#f4f5f7', borderLeft: '1px solid ' + LINE, borderRight: '1px solid ' + LINE, padding: '7px 14px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+        {stack.length > 1 && <button onClick={() => setStack((s) => s.slice(0, -1))} className="max-tablet:min-h-[44px]" style={backBtn}><ChevronLeft size={13} /> Back</button>}
         <div style={{ marginLeft: stack.length > 1 ? 10 : 0 }}>
           {crumb('Balance Sheet', 0)}
           {stack.slice(1).map((f, i) => crumb(f.title || (f.kind === 'voucher' ? f.vno : f.name), i + 1))}
         </div>
       </div>
 
-      <div style={{ border: '1px solid ' + LINE, borderTop: 'none', borderRadius: '0 0 10px 10px', background: '#fff', overflow: 'hidden' }}>
-        {isLoading && <div style={{ padding: 30, textAlign: 'center', color: DIM }}>Loading Balance Sheet…</div>}
-        {error && <div style={{ padding: 20, color: '#A32D2D', fontSize: 12.5 }}>Couldn’t load Balance Sheet: {String(error.message || error)}</div>}
+      <div style={{ borderLeft: '1px solid ' + LINE, borderRight: '1px solid ' + LINE, borderBottom: '1px solid ' + LINE, borderRadius: '0 0 10px 10px', background: '#fff', overflow: 'hidden' }}>
+        {isLoading && <div style={{ padding: 16 }}><SkeletonTable rows={8} cols={3} /></div>}
+        {error && (
+          <div style={{ padding: 20 }}>
+            <div style={{ color: '#dc2626', fontSize: 12.5, marginBottom: 10 }}>Couldn’t load Balance Sheet: {String(error.message || error)}</div>
+            <button onClick={() => { toastInfo('Retrying…'); refetch(); }} className="max-tablet:min-h-[44px]" style={backBtn}>Retry</button>
+          </div>
+        )}
 
         {!isLoading && !error && top.kind === 'bs' && bs && (
           <div style={{ overflowX: 'auto' }}>
@@ -113,6 +120,6 @@ export function BalanceSheetTallyLive({ branch }) {
 
         {top.kind === 'voucher' && <VoucherView id={top.id} cur={cur} />}
       </div>
-    </div>
+    </PageLayout>
   );
 }

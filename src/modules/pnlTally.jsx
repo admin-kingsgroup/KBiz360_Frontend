@@ -15,8 +15,11 @@ import { useLedgerMeta, SourceBadge } from '../core/LedgerLabel';
 import { bc } from '../core/styles.jsx';
 import { PeriodBar } from '../core/period';
 import { LedgerActions } from '../core/ledgerActions';
+import { PageLayout } from '../shell/PageLayout';
+import { SkeletonTable } from '../shell/primitives';
+import { toastInfo } from '../core/ux/toast';
 
-const DARK = '#0d1326', DIM = '#5a6691', LINE = '#e1e3ec', HEAD = '#1c3a5e';
+const DARK = '#1a1c22', DIM = '#5b616e', LINE = '#e6e8ec', HEAD = '#2e323c';
 const money = (n) => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
 // Open by default (inception → today): the books may have no postings in the
@@ -42,7 +45,7 @@ export function PLSide({ lines, total, periodLabel, onPick, title = 'Particulars
         <tbody>
           {(lines || []).map((l, i) => <PLLines key={i} line={l} onPick={onPick} branch={branch} from={from} to={to} />)}
         </tbody>
-        <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
+        <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
           <td style={{ ...tdName, fontWeight: 800 }}>Total</td>
           <td />
           <td style={{ ...tdNum, fontWeight: 800, color: DARK }}>{money(total)}</td>
@@ -90,7 +93,7 @@ function PLLines({ line, onPick, branch, from, to }) {
   const drillable = line.isGroup || line.ledger || (!line.isGroup && !!line.name);
   if (line.isCarry || line.isResult) {
     return (
-      <tr><td style={{ ...tdName, fontStyle: 'italic', fontWeight: 700, color: line.isResult ? '#9B2C2C' : DARK }}>{line.name}</td>
+      <tr><td style={{ ...tdName, fontStyle: 'italic', fontWeight: 700, color: line.isResult ? '#dc2626' : DARK }}>{line.name}</td>
         <td /><td style={{ ...tdNum, fontWeight: 700, fontStyle: 'italic' }}>{money(line.amount)}</td></tr>
     );
   }
@@ -103,13 +106,13 @@ function PLLines({ line, onPick, branch, from, to }) {
       <tr onClick={() => drillable && onPick(line)} style={{ cursor: drillable ? 'pointer' : 'default', background: line.isGroup ? '#fcfdff' : '#fff' }}
         onMouseEnter={(e) => drillable && (e.currentTarget.style.background = '#eef4ff')}
         onMouseLeave={(e) => (e.currentTarget.style.background = line.isGroup ? '#fcfdff' : '#fff')}>
-        <td style={{ ...tdName, fontWeight: line.isGroup ? 700 : 400, color: line.isGroup ? DARK : '#1f3a8a', paddingLeft: line.isGroup ? 12 : 26 }}>
+        <td style={{ ...tdName, fontWeight: line.isGroup ? 700 : 400, color: line.isGroup ? DARK : '#2563eb', paddingLeft: line.isGroup ? 12 : 26 }}>
           {canExpand && (
             <span onClick={(e) => { e.stopPropagation(); setOpenLedgers((o) => !o); }}
-              style={{ cursor: 'pointer', color: '#9aa6c4', fontWeight: 700, marginRight: 5, display: 'inline-block', width: 10 }}
+              style={{ cursor: 'pointer', color: '#9197a3', fontWeight: 700, marginRight: 5, display: 'inline-block', width: 10 }}
               title={openLedgers ? 'Hide ledgers' : 'Show ledgers → captured fares'}>{openLedgers ? '▾' : '▸'}</span>
           )}
-          {line.name}{line.isGroup && <ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9aa6c4' }} />}
+          {line.name}{line.isGroup && <ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9197a3' }} />}
         </td>
         <td style={tdNum}>{line.isGroup ? '' : money(line.amount)}</td>
         <td style={{ ...tdNum, fontWeight: 700 }}>{line.isGroup ? money(line.amount) : ''}</td>
@@ -120,7 +123,7 @@ function PLLines({ line, onPick, branch, from, to }) {
           onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
           <td style={{ ...tdName, paddingLeft: 30, color: DARK, fontWeight: 600 }}>
-            {it.name}<ChevronRight size={10} style={{ verticalAlign: 'middle', marginLeft: 3, color: '#b6c0da' }} />
+            {it.name}<ChevronRight size={10} style={{ verticalAlign: 'middle', marginLeft: 3, color: '#9197a3' }} />
           </td>
           <td style={tdNum}>{money(it.amount)}</td>
           <td />
@@ -135,9 +138,9 @@ function PLLines({ line, onPick, branch, from, to }) {
             <tr style={{ background: '#fff' }}
               onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
               onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}>
-              <td style={{ ...tdName, paddingLeft: 38, color: '#1f3a8a' }}>
+              <td style={{ ...tdName, paddingLeft: 38, color: '#2563eb' }}>
                 <span onClick={(e) => { e.stopPropagation(); setOpenComp((s) => ({ ...s, [led]: !s[led] })); }}
-                  style={{ cursor: 'pointer', color: '#9aa6c4', fontWeight: 700, marginRight: 5, display: 'inline-block', width: 10 }}
+                  style={{ cursor: 'pointer', color: '#9197a3', fontWeight: 700, marginRight: 5, display: 'inline-block', width: 10 }}
                   title={co ? 'Hide components' : 'Show captured fares'}>{co ? '▾' : '▸'}</span>
                 <span onClick={() => openLedgerModal(led)} style={{ cursor: 'pointer' }} title="Open ledger account">{it.name}</span>
                 {badge(it.name)}
@@ -172,8 +175,8 @@ export function GroupSummary({ frame, onPick }) {
             <tr key={i} onClick={() => drillable && onPick(it)} style={{ cursor: drillable ? 'pointer' : 'default', borderBottom: '1px solid #f0f2f7' }}
               onMouseEnter={(e) => drillable && (e.currentTarget.style.background = '#eef4ff')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-              <td style={{ ...tdName, fontWeight: it.isGroup ? 700 : 400, color: it.isGroup ? DARK : '#1f3a8a' }}>
-                {it.name}{it.isGroup && <ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9aa6c4' }} />}
+              <td style={{ ...tdName, fontWeight: it.isGroup ? 700 : 400, color: it.isGroup ? DARK : '#2563eb' }}>
+                {it.name}{it.isGroup && <ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9197a3' }} />}
                 {!it.isGroup && (() => { const m = metaOf(it.name); return m ? <>{m.locked && <span title="Locked — super-admin only" style={{ marginLeft: 4 }}>🔒</span>}<SourceBadge source={m.source} compact /></> : null; })()}
               </td>
               <td style={tdNum}>{it.side === 'Dr' ? money(it.amount) : ''}</td>
@@ -182,7 +185,7 @@ export function GroupSummary({ frame, onPick }) {
           );
         })}
       </tbody>
-      <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
+      <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
         <td style={{ ...tdName, fontWeight: 800 }}>Grand Total</td>
         <td style={{ ...tdNum, fontWeight: 800 }}>{grand < 0 ? money(-grand) : ''}</td>
         <td style={{ ...tdNum, fontWeight: 800 }}>{grand >= 0 ? money(grand) : ''}</td>
@@ -215,13 +218,13 @@ function LedgerComponents({ name, costCenter, branch, from, to, onPick }) {
             style={{ cursor: 'pointer', borderBottom: '1px solid #f0f2f7' }}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-            <td style={{ ...tdName, fontWeight: 600, color: '#1f3a8a' }}>{r.label}<ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9aa6c4' }} /></td>
+            <td style={{ ...tdName, fontWeight: 600, color: '#2563eb' }}>{r.label}<ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9197a3' }} /></td>
             <td style={tdNum}>{r.side === 'Dr' ? money(r.amount) : ''}</td>
             <td style={tdNum}>{r.side === 'Cr' ? money(r.amount) : ''}</td>
           </tr>
         ))}
       </tbody>
-      <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
+      <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
         <td style={{ ...tdName, fontWeight: 800 }}>Grand Total</td>
         <td style={{ ...tdNum, fontWeight: 800 }}>{grand < 0 ? money(-grand) : ''}</td>
         <td style={{ ...tdNum, fontWeight: 800 }}>{grand >= 0 ? money(grand) : ''}</td>
@@ -255,13 +258,13 @@ function LedgerDrill({ name, branch, from, to, onPick }) {
             style={{ cursor: 'pointer', borderBottom: '1px solid #f0f2f7' }}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-            <td style={{ ...tdName, fontWeight: 700, color: DARK }}>{r.label}<ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9aa6c4' }} /></td>
+            <td style={{ ...tdName, fontWeight: 700, color: DARK }}>{r.label}<ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9197a3' }} /></td>
             <td style={tdNum}>{r.side === 'Dr' ? money(r.amount) : ''}</td>
             <td style={tdNum}>{r.side === 'Cr' ? money(r.amount) : ''}</td>
           </tr>
         ))}
       </tbody>
-      <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
+      <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
         <td style={{ ...tdName, fontWeight: 800 }}>Grand Total</td>
         <td style={{ ...tdNum, fontWeight: 800 }}>{grand < 0 ? money(-grand) : ''}</td>
         <td style={{ ...tdNum, fontWeight: 800 }}>{grand >= 0 ? money(grand) : ''}</td>
@@ -277,7 +280,7 @@ function LedgerDrill({ name, branch, from, to, onPick }) {
 const lightInp = { padding: '4px 8px', borderRadius: 6, border: '1px solid ' + LINE, fontSize: 11, color: DARK, background: '#fff' };
 const tabBtn = (active) => ({ padding: '4px 12px', borderRadius: 6, border: '1px solid ' + (active ? DARK : LINE), background: active ? DARK : '#fff', color: active ? '#fff' : DARK, fontSize: 11, fontWeight: 600, cursor: 'pointer' });
 const addDaysStr = (s, n) => { const d = new Date(s); if (Number.isNaN(d.getTime())) return s; d.setDate(d.getDate() + (Number(n) || 0)); return d.toISOString().slice(0, 10); };
-const ageColor = (n) => (n <= 7 ? '#27500A' : n <= 30 ? '#8a6d00' : '#9B2C2C');
+const ageColor = (n) => (n <= 7 ? '#16a34a' : n <= 30 ? '#d97706' : '#dc2626');
 // Tally's "Particulars" is the contra leg of the voucher (every other ledger).
 const contraLabel = (ln) => {
   const ps = ln.particulars || [];
@@ -368,7 +371,7 @@ export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
               </React.Fragment>
             ))}
           </tbody>
-          <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
+          <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
             <td style={{ ...tdName, fontWeight: 800 }} colSpan={4}>Current Total / Closing</td>
             <td style={{ ...tdNum, fontWeight: 800 }}>{money(d.totalDebit)}</td>
             <td style={{ ...tdNum, fontWeight: 800 }}>{money(d.totalCredit)}</td>
@@ -413,7 +416,7 @@ function LedgerBillwise({ name, branch, side }) {
         ))}
       </tbody>
       <tfoot>
-        <tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
+        <tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
           <td style={{ ...tdName, fontWeight: 800 }} colSpan={5}>Total Outstanding</td>
           <td style={{ ...tdNum, fontWeight: 800 }}>{money(totalOut)}</td>
           <td />
@@ -501,11 +504,11 @@ export function VoucherView({ id, cur }) {
         <thead><tr style={{ background: HEAD }}><th style={th}>Particulars</th><th style={{ ...th, textAlign: 'right' }}>Amount</th></tr></thead>
         <tbody>{particulars.map((p, i) => (
           <tr key={i} style={{ borderBottom: '1px solid #f0f2f7' }}>
-            <td style={{ ...tdName, fontWeight: 700, color: p.tax ? '#854F0B' : DARK }}>{p.label}</td>
+            <td style={{ ...tdName, fontWeight: 700, color: p.tax ? '#d97706' : DARK }}>{p.label}</td>
             <td style={{ ...tdNum, fontWeight: 600 }}>{money(p.amount)}</td>
           </tr>
         ))}</tbody>
-        <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
+        <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
           <td style={{ ...tdName, fontWeight: 800 }}>Total</td>
           <td style={{ ...tdNum, fontWeight: 800 }}>{money(partTotal)}</td>
         </tr></tfoot>
@@ -536,14 +539,14 @@ function JVPostings({ jv }) {
   const rows = jv && Array.isArray(jv.postings) ? jv.postings : [];
   // Debits first, then credits — the conventional Tally voucher reading order.
   const ordered = [...rows].sort((a, b) => ((b.debit || 0) > 0 ? 1 : 0) - ((a.debit || 0) > 0 ? 1 : 0));
-  const DR = '#185FA5', CR = '#A32D2D';
+  const DR = '#2563eb', CR = '#dc2626';
   const badge = jv && jv.posted
-    ? { t: '● Posted to books', bg: '#E7F3E7', c: '#27500A' }
+    ? { t: '● Posted to books', bg: '#E7F3E7', c: '#16a34a' }
     : jv && jv.status === 'deleted'
-      ? { t: '⟲ Reversed out of books (view-only)', bg: '#FBEAEA', c: '#A32D2D' }
+      ? { t: '⟲ Reversed out of books (view-only)', bg: '#FBEAEA', c: '#dc2626' }
       : jv && jv.status === 'rejected'
-        ? { t: '✗ Not posted (rejected)', bg: '#FBEAEA', c: '#A32D2D' }
-        : { t: '○ Would-be entry — posts on approval', bg: '#FFF6D6', c: '#8a6d12' };
+        ? { t: '✗ Not posted (rejected)', bg: '#FBEAEA', c: '#dc2626' }
+        : { t: '○ Would-be entry — posts on approval', bg: '#FFF6D6', c: '#d97706' };
   return (
     <div style={{ marginTop: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
@@ -579,13 +582,13 @@ function JVPostings({ jv }) {
                 </tr>
               );
             })}</tbody>
-            <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f3f4f8' }}>
+            <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
               <td style={{ ...tdName, fontWeight: 800 }}>Total</td>
               <td style={{ ...tdNum, fontWeight: 800, color: DR }}>{money(jv.totalDebit)}</td>
               <td style={{ ...tdNum, fontWeight: 800, color: CR }}>{money(jv.totalCredit)}</td>
             </tr></tfoot>
           </table>
-          {!jv.balanced && <div style={{ marginTop: 6, fontSize: 11, color: '#9a6a00' }}>⚠ This entry does not balance (Debit ≠ Credit){jv.error ? ` — ${jv.error}` : ''}.</div>}
+          {!jv.balanced && <div style={{ marginTop: 6, fontSize: 11, color: '#d97706' }}>⚠ This entry does not balance (Debit ≠ Credit){jv.error ? ` — ${jv.error}` : ''}.</div>}
         </>
       )}
     </div>
@@ -601,7 +604,7 @@ export function PnLTallyLive({ branch }) {
   const top = stack[stack.length - 1];
   const periodLabel = `${dmy(range.from)} to ${dmy(range.to)}`;
 
-  const { data: pl, isLoading, error } = useQuery({
+  const { data: pl, isLoading, error, refetch } = useQuery({
     queryKey: ['pl-tally', brCodeOf(branch), range.from, range.to, showZero],
     queryFn: () => apiGet('/api/accounting/pl-tally', { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from: range.from, to: range.to, ...(showZero ? { includeZero: 1 } : {}) }),
   });
@@ -617,21 +620,21 @@ export function PnLTallyLive({ branch }) {
 
   const crumb = (label, i) => (
     <span key={i} style={{ display: 'inline-flex', alignItems: 'center' }}>
-      {i > 0 && <ChevronRight size={12} style={{ color: '#9aa6c4', margin: '0 2px' }} />}
-      <button onClick={() => goto(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: i === stack.length - 1 ? DARK : '#1f6fc4', fontWeight: i === stack.length - 1 ? 700 : 600, fontSize: 12, padding: '2px 4px' }}>{label}</button>
+      {i > 0 && <ChevronRight size={12} style={{ color: '#9197a3', margin: '0 2px' }} />}
+      <button onClick={() => goto(i)} className="inline-flex items-center max-tablet:min-h-[44px]" style={{ background: 'none', border: 'none', cursor: 'pointer', color: i === stack.length - 1 ? DARK : '#2563eb', fontWeight: i === stack.length - 1 ? 700 : 600, fontSize: 12, padding: '2px 4px' }}>{label}</button>
     </span>
   );
 
   return (
-    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '12px 10px 40px' }}>
+    <PageLayout maxWidth="mx-auto max-w-[1280px] pb-10">
       {/* Header / date bar */}
       <div style={{ background: DARK, borderRadius: '10px 10px 0 0', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <div>
-          <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#fff' }}>Profit &amp; Loss A/c <span style={{ color: '#d4a437', fontSize: 11, fontWeight: 600 }}>· Tally view</span></p>
-          <p style={{ margin: 0, fontSize: 10.5, color: '#8b94b3' }}>{brCodeOf(branch)} (Branch) · {periodLabel}</p>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#fff' }}>Profit &amp; Loss A/c <span style={{ color: '#c2a04a', fontSize: 11, fontWeight: 600 }}>· Tally view</span></p>
+          <p style={{ margin: 0, fontSize: 10.5, color: '#9197a3' }}>{brCodeOf(branch)} (Branch) · {periodLabel}</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#cfd6ea', fontSize: 11, cursor: 'pointer', userSelect: 'none' }} title="Show every ledger in the chart, including those with a zero balance / no entries">
+        <div className="max-tablet:w-full" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label className="max-tablet:min-h-[44px]" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#c9ccd2', fontSize: 11, cursor: 'pointer', userSelect: 'none' }} title="Show every ledger in the chart, including those with a zero balance / no entries">
             <input type="checkbox" checked={showZero} onChange={(e) => setShowZero(e.target.checked)} /> Show zero-balance accounts
           </label>
           <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setRange({ from: r.from, to: r.to })} />
@@ -639,8 +642,8 @@ export function PnLTallyLive({ branch }) {
       </div>
 
       {/* Breadcrumb */}
-      <div style={{ background: '#f3f4f8', borderLeft: '1px solid ' + LINE, borderRight: '1px solid ' + LINE, padding: '7px 14px', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
-        {stack.length > 1 && <button onClick={() => setStack((s) => s.slice(0, -1))} style={{ ...backBtn }}><ChevronLeft size={13} /> Back</button>}
+      <div style={{ background: '#f4f5f7', borderLeft: '1px solid ' + LINE, borderRight: '1px solid ' + LINE, padding: '7px 14px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+        {stack.length > 1 && <button onClick={() => setStack((s) => s.slice(0, -1))} className="max-tablet:min-h-[44px]" style={{ ...backBtn }}><ChevronLeft size={13} /> Back</button>}
         <div style={{ marginLeft: stack.length > 1 ? 10 : 0 }}>
           {crumb('Profit & Loss A/c', 0)}
           {stack.slice(1).map((f, i) => crumb(f.title || (f.kind === 'voucher' ? f.vno : f.name), i + 1))}
@@ -648,9 +651,14 @@ export function PnLTallyLive({ branch }) {
       </div>
 
       {/* Body */}
-      <div style={{ border: '1px solid ' + LINE, borderTop: 'none', borderRadius: '0 0 10px 10px', background: '#fff', overflow: 'hidden' }}>
-        {isLoading && <div style={{ padding: 30, textAlign: 'center', color: DIM }}>Loading P&amp;L…</div>}
-        {error && <div style={{ padding: 20, color: '#A32D2D', fontSize: 12.5 }}>Couldn’t load P&amp;L: {String(error.message || error)}</div>}
+      <div style={{ borderLeft: '1px solid ' + LINE, borderRight: '1px solid ' + LINE, borderBottom: '1px solid ' + LINE, borderRadius: '0 0 10px 10px', background: '#fff', overflow: 'hidden' }}>
+        {isLoading && <div style={{ padding: 16 }}><SkeletonTable rows={8} cols={3} /></div>}
+        {error && (
+          <div style={{ padding: 20 }}>
+            <div style={{ color: '#dc2626', fontSize: 12.5, marginBottom: 10 }}>Couldn’t load P&amp;L: {String(error.message || error)}</div>
+            <button onClick={() => { toastInfo('Retrying…'); refetch(); }} className="max-tablet:min-h-[44px]" style={{ ...backBtn }}>Retry</button>
+          </div>
+        )}
 
         {!isLoading && !error && top.kind === 'pl' && pl && (
           <div style={{ overflowX: 'auto' }}>
@@ -667,7 +675,7 @@ export function PnLTallyLive({ branch }) {
               <PLSide lines={pl.pl.credit} total={pl.pl.total} periodLabel={periodLabel} onPick={pick} branch={branch} from={range.from} to={range.to} />
             </div>
             <div style={{ padding: '8px 16px', background: '#f7f8fb', fontSize: 11.5, color: DIM, borderTop: '1px solid ' + LINE }}>
-              {pl.grossResult}: <b style={{ color: DARK }}>{cur} {money(pl.grossProfit)}</b> &nbsp;·&nbsp; {pl.result}: <b style={{ color: pl.netProfit >= 0 ? '#27500A' : '#9B2C2C' }}>{cur} {money(Math.abs(pl.netProfit))}</b> &nbsp;· tap ▸ to reveal a group’s ledgers → captured fares inline, or click any name to drill down.
+              {pl.grossResult}: <b style={{ color: DARK }}>{cur} {money(pl.grossProfit)}</b> &nbsp;·&nbsp; {pl.result}: <b style={{ color: pl.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>{cur} {money(Math.abs(pl.netProfit))}</b> &nbsp;· tap ▸ to reveal a group’s ledgers → captured fares inline, or click any name to drill down.
             </div>
           </div>
         )}
@@ -701,9 +709,8 @@ export function PnLTallyLive({ branch }) {
 
         {top.kind === 'voucher' && <VoucherView id={top.id} cur={cur} />}
       </div>
-    </div>
+    </PageLayout>
   );
 }
 
-const dateInp = { padding: '5px 8px', borderRadius: 6, border: '1px solid #2a3450', background: '#1a2238', color: '#cfd8e8', fontSize: 11 };
 const backBtn = { display: 'inline-flex', alignItems: 'center', gap: 3, background: '#fff', border: '1px solid ' + LINE, borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 600, color: DARK, cursor: 'pointer' };

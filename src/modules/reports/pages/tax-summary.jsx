@@ -43,11 +43,11 @@ export function RPT_TaxSummary({ branch }) {
   ];
 
   const kpis = [
-    { l: 'Output ' + (isVat ? 'VAT' : 'GST'), v: f(out.total), c: '#185FA5' },
-    { l: 'Input ' + (isVat ? 'VAT' : 'GST'), v: f(input.total), c: '#854F0B' },
-    { l: 'Net ' + (net >= 0 ? 'Payable' : 'Refundable'), v: f(Math.abs(net)), c: net >= 0 ? '#A32D2D' : '#27500A' },
-    { l: (isVat ? 'WHT' : 'TDS') + ' Payable', v: f(wh.payable), c: '#384677' },
-    { l: (isVat ? 'WHT' : 'TDS') + ' Receivable', v: f(wh.receivable), c: '#1D9E75' },
+    { l: 'Output ' + (isVat ? 'VAT' : 'GST'), v: f(out.total), c: '#2563eb' },
+    { l: 'Input ' + (isVat ? 'VAT' : 'GST'), v: f(input.total), c: '#d97706' },
+    { l: 'Net ' + (net >= 0 ? 'Payable' : 'Refundable'), v: f(Math.abs(net)), c: net >= 0 ? '#dc2626' : '#16a34a' },
+    { l: (isVat ? 'WHT' : 'TDS') + ' Payable', v: f(wh.payable), c: '#2e323c' },
+    { l: (isVat ? 'WHT' : 'TDS') + ' Receivable', v: f(wh.receivable), c: '#3fb7a3' },
     ...(!isVat ? [{ l: 'TCS Payable', v: f(tcs.payable), c: '#7F77DD' }] : []),
   ];
 
@@ -56,7 +56,7 @@ export function RPT_TaxSummary({ branch }) {
     { key: 'amount', header: 'Amount', num: true, render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + (r.amount || 0), 0)) },
   ];
   const Section = ({ title, lines }) => (
-    <DataTable title={title} columns={sectionCols} rows={lines || []} getRowKey={(r, i) => i} dense showDensityToggle={false} className="mb-3.5" emptyMessage="No movement in this period." />
+    <DataTable title={title} columns={sectionCols} rows={lines || []} loading={q.isLoading} isError={q.isError} getRowKey={(r, i) => i} dense showDensityToggle={false} className="mb-3.5" emptyMessage="No movement in this period." />
   );
 
   return (
@@ -80,7 +80,7 @@ export function RPT_TaxSummary({ branch }) {
             ))}
           </ResponsiveGrid>
 
-          <div className="mb-4 rounded-brand border-l-4 px-3.5 py-3" style={{ background: net >= 0 ? '#FBEAEA' : '#EAF3DE', borderLeftColor: net >= 0 ? '#A32D2D' : '#27500A' }}>
+          <div className="mb-4 rounded-brand border-l-4 px-3.5 py-3" style={{ background: net >= 0 ? '#FBEAEA' : '#e8f6ed', borderLeftColor: net >= 0 ? '#dc2626' : '#16a34a' }}>
             <span className="text-[12.5px] font-bold text-navy">
               Net {isVat ? 'VAT' : 'GST'} {net >= 0 ? 'payable to' : 'refundable from'} the authority: {f(Math.abs(net))}
             </span>

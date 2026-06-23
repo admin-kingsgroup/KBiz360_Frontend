@@ -385,15 +385,33 @@ export function SettingsUsers(){
 
   /* Load permissions for editing */
   const startEdit=(user)=>{
-    const tmpl=ROLE_TEMPLATES[user.role]||ROLE_TEMPLATES["Accounts Executive"];
+    // Guard: ROLE_TEMPLATES is built from useRoles().data and is empty while roles load
+    // (or if the user's role has no template) — `tmpl.perms` would then throw and blank
+    // the whole Users screen. Fall back to a safe empty matrix.
+    const tmpl=ROLE_TEMPLATES[user.role]||ROLE_TEMPLATES["Accounts Executive"]||{perms:{},special:{}};
     setEditPerms({
       userId:user.id,
       userName:user.name,
       userRole:user.role,
-      perms:JSON.parse(JSON.stringify(tmpl.perms)),
-      special:{...tmpl.special},
-      branches:[...user.branches],
+      perms:JSON.parse(JSON.stringify(tmpl.perms||{})),
+      special:{...(tmpl.special||{})},
+      branches:[...(user.branches||[])],
     });
+  };
+
+  /* Persist the edited access. The backend BooksAccess model backs (and ENFORCES) role +
+     branch access; the per-module `perms` matrix / `special` toggles are a UI overlay that
+     no server endpoint stores, so Save persists the role + branches that actually take
+     effect. Previously this button discarded everything (it only closed the modal). */
+  const savePermissions=()=>{
+    if(!editPerms)return;
+    updateUserMut.mutate(
+      {id:editPerms.userId, body:{role:editPerms.userRole, branches:editPerms.branches}},
+      {
+        onSuccess:()=>{ toast(`Saved access for ${editPerms.userName}`); setEditPerms(null); },
+        onError:(e)=>toast(e?.message||'Failed to save permissions','error'),
+      }
+    );
   };
 
   const togglePerm=(modId,action)=>{
@@ -457,9 +475,9 @@ export function SettingsUsers(){
                   <div style={{width:30,height:30,borderRadius:"50%",background:ROLE_BG[u.role]||"#f3f4f8",
                     display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,
                     color:ROLE_CLR[u.role]||"#5a6691",flexShrink:0}}>
-                    {u.name.split(" ").map(n=>n[0]).join("").slice(0,2)}
+                    {String(u.name||u.email||"?").split(" ").map(n=>n[0]).filter(Boolean).join("").slice(0,2)||"?"}
                   </div>
-                  <span style={{fontWeight:600,color:"#0d1326"}}>{u.name}</span>
+                  <span style={{fontWeight:600,color:"#0d1326"}}>{u.name||u.email||"—"}</span>
                 </div>
               </td>
               <td style={{padding:"8px 12px",color:"#5a6691",fontSize:10.5}}>{u.email}</td>
@@ -470,9 +488,9 @@ export function SettingsUsers(){
               </td>
               <td style={{padding:"8px 12px"}}>
                 <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
-                  {u.branches.includes("ALL")
+                  {(u.branches||[]).includes("ALL")
                     ?<span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#0d1326",color:"#d4a437",fontWeight:700}}>ALL</span>
-                    :u.branches.map(b=><span key={b} style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{b}</span>)
+                    :(u.branches||[]).map(b=><span key={b} style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{b}</span>)
                   }
                 </div>
               </td>
@@ -486,8 +504,9 @@ export function SettingsUsers(){
               <td style={{padding:"8px 12px"}}>
                 <div style={{display:"flex",gap:4}}>
                   <button onClick={()=>startEdit(u)} style={{...btnG,padding:"3px 9px",fontSize:9.5,background:"#185FA5"}}>Permissions</button>
-                  <button onClick={()=>updateUserMut.mutate({id:u.id,body:{active:!u.active}})}
-                    style={{...btnGh,padding:"3px 9px",fontSize:9.5,color:u.active?"#A32D2D":"#27500A"}}>
+                  <button disabled={updateUserMut.isPending}
+                    onClick={()=>updateUserMut.mutate({id:u.id,body:{active:!u.active}},{onError:(e)=>toast(e?.message||'Failed to update user','error')})}
+                    style={{...btnGh,padding:"3px 9px",fontSize:9.5,color:u.active?"#A32D2D":"#27500A",opacity:updateUserMut.isPending?0.5:1}}>
                     {u.active?"Deactivate":"Activate"}
                   </button>
                 </div>
@@ -669,7 +688,7 @@ export function SettingsUsers(){
             </p>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setEditPerms(null)} style={btnGh}>Cancel</button>
-              <button onClick={()=>{setEditPerms(null);}} style={{...btnG,background:"#27500A"}}>💾 Save Permissions</button>
+              <button onClick={savePermissions} disabled={updateUserMut.isPending} style={{...btnG,background:"#27500A",opacity:updateUserMut.isPending?0.6:1,cursor:updateUserMut.isPending?"wait":"pointer"}}>{updateUserMut.isPending?"Saving…":"💾 Save Permissions"}</button>
             </div>
           </div>
         </div>

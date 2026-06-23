@@ -154,7 +154,7 @@ function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave }) {
   return createPortal(
     <div role="menu" data-mega-menu style={style} onMouseEnter={onEnter} onMouseLeave={onLeave}>
       <div
-        className="rounded-2xl border border-black/5 bg-white/95 p-4 shadow-[0_24px_60px_-12px_rgba(13,19,38,0.25)] backdrop-blur-xl"
+        className="animate-kb-pop rounded-2xl border border-surface-border bg-surface/95 p-4 shadow-pop backdrop-blur-xl"
         style={{ width: panelW, maxHeight: '74vh', overflowY: 'auto' }}
       >
         {featured.length > 0 && (
@@ -166,7 +166,7 @@ function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave }) {
           <div style={{ columnCount: colCount, columnGap: COL_GAP }}>
             {groups.map((col, ci) => (
               <div key={ci} className="mb-4" style={{ breakInside: 'avoid' }}>
-                <div className="mb-1.5 border-b border-surface-border px-2.5 pb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-[#0070f2]">
+                <div className="mb-1.5 border-b border-surface-border px-2.5 pb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-ink-subtle">
                   {col.title}
                 </div>
                 <div className="space-y-0.5">
@@ -185,6 +185,10 @@ function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave }) {
 /* Horizontal desktop nav with hover/click mega-menus. The open panel is portaled to
    <body> (see MegaPanel), so a short close-delay bridges the gap between the nav and
    the now-detached panel — hovering onto the panel must not dismiss it. */
+// Shorter labels for the horizontal nav pills only (the mega-panel keeps its full title).
+// Keeps the 8-pill bar from overflowing on laptops — "Taxation — GST" is the long one.
+const NAV_SHORT_LABEL = { 'Taxation — GST': 'Taxation', 'Taxation — VAT': 'Taxation' };
+
 function DesktopNav({ menu, route, go }) {
   const [open, setOpen] = useState(null);
   const [anchor, setAnchor] = useState(null);
@@ -231,15 +235,20 @@ function DesktopNav({ menu, route, go }) {
               aria-haspopup={hasChildren ? 'true' : undefined}
               aria-expanded={hasChildren ? isOpen : undefined}
               className={cn(
-                'flex items-center gap-1 rounded-lg px-3 py-2 text-[13.5px] font-medium transition',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50',
-                active || isOpen ? 'text-navy' : 'text-ink-muted hover:text-navy',
+                // Compact on laptops (desktop ≤ width < 2xl) so the whole 8-item nav + the
+                // right cluster fit; full size only from 2xl (1536px) up. Prevents the nav
+                // overflowing behind the right-hand controls on 1024–1535px screens
+                // (e.g. a 1512px MacBook where "Masters"/"Admin" were getting clipped).
+                'flex items-center gap-0.5 rounded-lg px-2 py-2 text-[12px] font-medium transition-all duration-fast ease-premium',
+                '2xl:gap-1 2xl:px-3 2xl:text-[13.5px]',
+                'focus:outline-none focus-visible:shadow-focus-ring',
+                active || isOpen ? 'bg-ink/[0.05] text-navy' : 'text-ink-muted hover:bg-ink/[0.04] hover:text-navy',
               )}
             >
-              <span className="whitespace-nowrap">{item.label}</span>
-              {hasChildren && <ChevronDown size={14} className={cn('transition-transform', isOpen && 'rotate-180')} />}
+              <span className="whitespace-nowrap">{NAV_SHORT_LABEL[item.label] || item.label}</span>
+              {hasChildren && <ChevronDown size={13} className={cn('shrink-0 transition-transform', isOpen && 'rotate-180')} />}
               {/* active underline pill */}
-              <span className={cn('absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-gold transition-opacity', active ? 'opacity-100' : 'opacity-0')} />
+              <span className={cn('absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-gold transition-opacity 2xl:inset-x-3', active ? 'opacity-100' : 'opacity-0')} />
             </button>
           </div>
         );
@@ -264,8 +273,8 @@ function MobileNode({ node, route, go, depth = 0 }) {
         type="button"
         onClick={() => go(node.href)}
         style={{ paddingLeft: 12 + depth * 14 }}
-        className={cn('flex w-full items-center rounded-lg py-2.5 pr-3 text-left text-sm transition',
-          active ? 'bg-navy/5 font-semibold text-navy' : 'font-medium text-ink-muted hover:bg-navy/5')}
+        className={cn('flex min-h-[44px] w-full items-center rounded-lg py-2.5 pr-3 text-left text-sm transition-colors duration-fast',
+          active ? 'bg-navy/5 font-semibold text-navy' : 'font-medium text-ink-muted hover:bg-navy/5 hover:text-navy')}
       >
         {node.label}
       </button>
@@ -278,7 +287,7 @@ function MobileNode({ node, route, go, depth = 0 }) {
         onClick={() => setOpen((o) => !o)}
         style={{ paddingLeft: 12 + depth * 14 }}
         aria-expanded={open}
-        className="flex w-full items-center justify-between rounded-lg py-2.5 pr-3 text-left text-sm font-semibold text-navy"
+        className="flex min-h-[44px] w-full items-center justify-between rounded-lg py-2.5 pr-3 text-left text-sm font-semibold text-navy transition-colors duration-fast hover:bg-navy/5"
       >
         <span className="flex items-center gap-2">{node.icon && <node.icon size={16} className="text-ink-muted" />}{node.label}</span>
         <ChevronDown size={15} className={cn('text-ink-subtle transition-transform', open && 'rotate-180')} />
@@ -292,13 +301,13 @@ function FySelector() {
   const fy = useFyStore((s) => s.fy);
   const setFy = useFyStore((s) => s.setFy);
   return (
-    <label className="flex items-center gap-1.5 rounded-lg border border-surface-border bg-white/70 px-2.5 py-1.5">
-      <span className="text-[9px] font-bold uppercase tracking-wide text-[#0070f2]">FY</span>
+    <label className="flex items-center gap-1.5 rounded-lg border border-surface-border bg-surface/70 px-2.5 py-1.5 transition-colors hover:border-ink/20 max-desktop:min-h-[44px] max-desktop:flex-1">
+      <span className="text-[9px] font-bold uppercase tracking-wide text-ink-subtle">FY</span>
       <select
         value={fy.startYear}
         onChange={(e) => setFy(Number(e.target.value))}
         aria-label="Financial year"
-        className="bg-transparent text-xs font-semibold text-ink outline-none"
+        className="w-full bg-transparent text-xs font-semibold text-ink outline-none"
       >
         {FY_OPTIONS.map((o) => <option key={o.startYear} value={o.startYear}>{o.label}</option>)}
       </select>
@@ -324,11 +333,11 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-surface-alt">
       {/* ── Sticky, blurred app-bar ──────────────────────────────────── */}
-      <header className="noprint sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b border-black/5 bg-white/80 px-3 backdrop-blur-xl transition-shadow tablet:px-5 shadow-[0_1px_0_rgba(13,19,38,0.04),0_8px_24px_-16px_rgba(13,19,38,0.18)]">
+      <header className="noprint sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b border-surface-border bg-surface/80 px-3 backdrop-blur-xl transition-shadow tablet:px-5 shadow-[0_1px_0_rgba(16,18,22,0.04),0_6px_20px_-16px_rgba(16,18,22,0.16)]">
         {/* Logo */}
-        <button type="button" onClick={() => go('/dashboard')} className="flex shrink-0 items-center gap-2 rounded-lg pr-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50">
+        <button type="button" onClick={() => go('/dashboard')} aria-label="Go to dashboard" className="flex shrink-0 items-center justify-center gap-2 rounded-lg pr-1 transition-colors duration-fast hover:bg-ink/[0.04] focus:outline-none focus-visible:shadow-focus-ring max-desktop:min-h-[44px] max-desktop:min-w-[44px]">
           <img src={KBIZ_LOGO} alt="KBiz360" className="h-8 w-8 rounded-lg object-contain" />
-          <span className="hidden text-[15px] font-extrabold tracking-tight text-[#24272a] tablet:block"><span className="text-[#0070f2]">KBiz</span>360</span>
+          <span className="hidden text-[15px] font-extrabold tracking-tight text-ink tablet:block">KBiz<span className="text-gold">360</span></span>
         </button>
 
         <span className="mx-1 hidden h-6 w-px bg-surface-border desktop:block" />
@@ -338,15 +347,17 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
 
         <div className="flex-1" />
 
-        {/* Right cluster */}
-        <div className="flex items-center gap-1.5">
-          <div className="hidden w-44 desktop:block xl:w-64"><ModuleSearch branch={branch} currentUser={currentUser} setRoute={setRoute} /></div>
+        {/* Right cluster — tighten the gap on laptops so the items fit */}
+        <div className="flex shrink-0 items-center gap-1 2xl:gap-1.5">
+          <div className="hidden w-40 desktop:block 2xl:w-64"><ModuleSearch branch={branch} currentUser={currentUser} setRoute={setRoute} /></div>
 
           <button
             type="button"
             title="Print / Save as PDF"
             onClick={() => openPrintPreview({ selector: 'main', title: 'Document', recommend: 'portrait' })}
-            className="hidden h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition hover:bg-navy/5 hover:text-[#0070f2] desktop:flex"
+            // Secondary action — shown only from `wide` (1400px) up, where the header has
+            // room for it without clipping the nav (pages also have their own Export/Print).
+            className="hidden h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition-all duration-fast ease-premium hover:bg-ink/[0.06] hover:text-ink wide:flex"
           >
             <Printer size={18} />
           </button>
@@ -356,7 +367,7 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
               type="button"
               onClick={() => setShowNotif((s) => !s)}
               aria-label="Notifications"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition hover:bg-navy/5 hover:text-[#0070f2] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition-all duration-fast ease-premium hover:bg-ink/[0.06] hover:text-ink focus:outline-none focus-visible:shadow-focus-ring max-desktop:h-11 max-desktop:w-11"
             >
               <Bell size={18} />
             </button>
@@ -367,8 +378,8 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
             )}
           </div>
 
-          <div className="hidden desktop:block"><FySelector /></div>
-          <div className="hidden w-[168px] desktop:block"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
+          <div className="hidden wide:block"><FySelector /></div>
+          <div className="hidden w-[150px] desktop:block 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
 
           <UserMenu currentUser={currentUser} setCurrentUser={setCurrentUser} setRoute={setRoute} />
 
@@ -377,7 +388,7 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition hover:bg-navy/5 desktop:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition-all duration-fast ease-premium hover:bg-ink/[0.06] hover:text-ink desktop:hidden"
           >
             <Menu size={20} />
           </button>
@@ -387,14 +398,14 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
       {/* ── Mobile slide-over ────────────────────────────────────────── */}
       {mobileOpen && (
         <>
-          <div className="noprint fixed inset-0 z-50 bg-navy/40 backdrop-blur-sm desktop:hidden" onClick={() => setMobileOpen(false)} aria-hidden="true" />
-          <aside className="noprint fixed inset-y-0 right-0 z-50 flex w-[300px] max-w-[88vw] flex-col bg-white shadow-brand-lg desktop:hidden">
+          <div className="noprint fixed inset-0 z-50 animate-kb-fade-in bg-ink/40 backdrop-blur-sm desktop:hidden" onClick={() => setMobileOpen(false)} aria-hidden="true" />
+          <aside className="noprint fixed inset-y-0 right-0 z-50 flex w-[300px] max-w-[88vw] flex-col bg-surface shadow-brand-lg desktop:hidden" style={{ animation: 'kb-rise 240ms cubic-bezier(0.22,1,0.36,1) both' }}>
             <div className="flex items-center justify-between border-b border-surface-border px-4 py-3">
               <span className="text-sm font-bold text-navy">Menu</span>
-              <button type="button" onClick={() => setMobileOpen(false)} aria-label="Close menu" className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted hover:bg-navy/5"><X size={18} /></button>
+              <button type="button" onClick={() => setMobileOpen(false)} aria-label="Close menu" className="flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition-all duration-fast ease-premium hover:bg-ink/[0.06] hover:text-ink"><X size={18} /></button>
             </div>
             <div className="space-y-2 border-b border-surface-border p-3">
-              <ModuleSearch branch={branch} currentUser={currentUser} setRoute={(r) => go(r)} />
+              <ModuleSearch branch={branch} currentUser={currentUser} setRoute={(r) => go(r)} bar />
               <div className="flex items-center gap-2">
                 <div className="min-w-0 flex-1"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
                 <FySelector />
