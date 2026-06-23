@@ -319,7 +319,24 @@ function priorPeriod(mode, fy, custom, period) {
     const ps = new Date(pe); ps.setDate(ps.getDate() - days + 1);
     return { from: isoDate(ps), to: isoDate(pe), label: 'Previous period' };
   }
-  const p = fyPrior(fy); // ytd / cfy / month / quarter → prior FY
+  // LFY's comparison window is the FY *before* last — not last FY itself. The `fy`
+  // state isn't shown/updated in LFY mode (it stays at the current FY), so basing
+  // the prior on it made the comparison resolve back to the LFY period and every
+  // Trend/Δ showed 0% (a period compared against itself). Anchor on the LFY label.
+  if (mode === 'lfy') {
+    const lfyLabel = `${CUR_FY.startYear - 1}-${String(CUR_FY.startYear).slice(2)}`;
+    const p = fyPrior(lfyLabel);
+    return { from: p.from, to: p.to, label: 'FY prior' };
+  }
+  // CFY is year-to-date (FY start → today), so compare against the SAME window one
+  // year earlier — not the full prior FY — otherwise a part-year is measured against a
+  // 12-month total and every Trend/Δ is overstated. (month/quarter keep the prior-FY
+  // comparison since they're full, fixed-length periods.)
+  if (mode === 'cfy' && period?.from && period?.to) {
+    const shiftYr = (iso) => { const d = new Date(iso); if (isNaN(d.getTime())) return iso; d.setFullYear(d.getFullYear() - 1); return isoDate(d); };
+    return { from: shiftYr(period.from), to: shiftYr(period.to), label: 'Prior YTD' };
+  }
+  const p = fyPrior(fy); // month / quarter → prior FY
   return { from: p.from, to: p.to, label: 'FY prior' };
 }
 // Flatten a single-period payload into an Excel sheet (Section A modules + the
@@ -547,10 +564,10 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
     const groups = d.indirect.groups || [];
     return groups.length ? [{ name: 'Indirect Expenses', amount: d.indirect.expense, pctOfSales: d.totals.sales ? (d.indirect.expense / d.totals.sales) * 100 : 0, groups }] : [];
   }, [d]);
-  // Estimated tax provision → PAT (matches the HTML's Section C; statutory rate, flagged estimated).
-  const TAX_RATE = 0.2517;
-  const tax = d ? Math.max(d.bridge.netProfit, 0) * TAX_RATE : 0;
-  const pat = d ? d.bridge.netProfit - tax : 0;
+  // Bottom line is Net Profit (Gross − overheads). Per the honest-data policy in this
+  // file's header, there is NO fabricated "Provision for Tax @ 25.17%" / PAT line —
+  // any real tax flows through indirect expenses, and the Balance Sheet posts this same
+  // pre-tax Net Profit to Capital, so the two now agree.
   const ratios = useMemo(() => {
     if (!d) return [];
     const mods = (d.modules || []).filter((m) => m.sales > 0);
@@ -562,11 +579,10 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
       ['Highest GP% Module', hi ? `${hi.name} (${pctTxt(hi.gpPct)})` : '—'],
       ['Lowest GP% Module', lo ? `${lo.name} (${pctTxt(lo.gpPct)})` : '—'],
       ['Indirect Exp. as % of GP', d.totals.gp ? pctTxt((d.indirect.expense / d.totals.gp) * 100) : '—'],
-      ['Net Profit Margin (PBT)', pctTxt(s ? (d.bridge.netProfit / s) * 100 : 0)],
-      ['Net Profit Margin (PAT)', pctTxt(s ? (pat / s) * 100 : 0)],
+      ['Net Profit Margin', pctTxt(s ? (d.bridge.netProfit / s) * 100 : 0)],
       ['Break-even GP needed', compact(cur, d.indirect.expense)],
     ];
-  }, [d, pat, cur]);
+  }, [d, cur]);
   const periodTxt = period.note || period.label || 'all periods';
   const classicPeriod = period.from ? `${asOn(period.from)} to ${asOn(period.to)}` : 'All periods';
 
@@ -757,20 +773,10 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
                     <td style={{ ...num, color: SAP.red }}>{paren(d.bridge.indirectExpense)}</td>
                     <td style={{ ...num, color: SAP.sec }}>{pctTxt(d.totals.sales ? d.bridge.indirectExpense / d.totals.sales * 100 : 0)}</td>
                   </tr>
-                  <tr style={{ background: SAP.blueBg, color: '#003d99', fontWeight: 700 }}>
-                    <td style={{ padding: '10px 16px' }}>NET PROFIT BEFORE TAX (PBT)</td>
-                    <td style={num}>{inr(d.bridge.netProfit)}</td>
-                    <td style={num}>{pctTxt(d.totals.sales ? d.bridge.netProfit / d.totals.sales * 100 : 0)} of Sales</td>
-                  </tr>
-                  <tr style={{ borderBottom: `1px solid ${SAP.borderLt}` }}>
-                    <td style={{ padding: '7px 16px' }}>Less: Provision for Tax @ 25.17% <span style={{ color: SAP.label, fontSize: 10 }}>(estimated)</span></td>
-                    <td style={{ ...num, color: SAP.red }}>{paren(tax)}</td>
-                    <td style={{ ...num, color: SAP.sec }}>{pctTxt(d.totals.sales ? tax / d.totals.sales * 100 : 0)}</td>
-                  </tr>
                   <tr style={{ background: SAP.shell, color: '#fff', fontWeight: 700, fontSize: 14 }}>
-                    <td style={{ padding: '12px 16px' }}>★ &nbsp;NET PROFIT AFTER TAX (PAT)</td>
-                    <td style={{ ...num, color: pat >= 0 ? '#4ade80' : '#fca5a5' }}>{inr(pat)}</td>
-                    <td style={{ ...num, color: '#9fb4cc' }}>{pctTxt(d.totals.sales ? pat / d.totals.sales * 100 : 0)}</td>
+                    <td style={{ padding: '12px 16px' }}>★ &nbsp;NET PROFIT</td>
+                    <td style={{ ...num, color: d.bridge.netProfit >= 0 ? '#4ade80' : '#fca5a5' }}>{inr(d.bridge.netProfit)}</td>
+                    <td style={{ ...num, color: '#9fb4cc' }}>{pctTxt(d.totals.sales ? d.bridge.netProfit / d.totals.sales * 100 : 0)} of Sales</td>
                   </tr>
                 </tbody>
               </table>
@@ -805,10 +811,10 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
             </div>
           </>}
           {d && view === 'classic' && (
-            <ClassicPnL d={d} cur={cur} mobile={mobile} branch={branch} to={period.to} tax={tax} pat={pat} periodTxt={classicPeriod} />
+            <ClassicPnL d={d} cur={cur} mobile={mobile} branch={branch} to={period.to} periodTxt={classicPeriod} />
           )}
           {d && view === 'vertical' && (
-            <VerticalPnL d={d} cur={cur} mobile={mobile} branch={branch} to={period.to} tax={tax} pat={pat} periodTxt={classicPeriod} />
+            <VerticalPnL d={d} cur={cur} mobile={mobile} branch={branch} to={period.to} periodTxt={classicPeriod} />
           )}
           {d && view === 'drill' && (
             <DrillPnL d={d} cur={cur} branch={branch} periodTxt={classicPeriod} />
@@ -912,7 +918,7 @@ const azByName = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'en', 
 // P&L A/c (indirect expenses + tax + net profit vs GP b/d). Tap any module to
 // reach its booking files → vouchers → edit; tap any expense ledger to drill
 // its postings → voucher → edit. Same live data & editor as the Fiori view.
-function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
+function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
   const [drillModule, setDrillModule] = useState(null);
   // Collapsible indirect tree: Fixed/Variable buckets default expanded; sub-groups
   // default collapsed (click a sub-group to reveal its ledgers).
@@ -985,8 +991,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
         return [ghead, ...[...(g.ledgers || [])].sort((x, y) => azByName(x.name, y.name)).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))];
       })];
     }),
-    ...(tax > 0 ? [{ label: 'Provision for Tax @ 25.17% (est.)', amount: tax }] : []),
-    { label: 'Net Profit (to Capital A/c)', amount: pat, result: true },
+    { label: 'Net Profit (to Capital A/c)', amount: d.bridge?.netProfit ?? 0, result: true },
   ];
   // Indirect Income → group → ledger (drillable), mirroring the expense tree.
   const incomeTreeRows = [...incomeGroups].sort((a, b) => azByName(a.name, b.name)).flatMap((g) => {
@@ -1106,7 +1111,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
       </div>
       <div style={{ background: TALLY.titlebar, color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: `2px solid ${TALLY.head}`, ...mono }}>
         <span>Gross Profit : <span style={{ color: TALLY.green }}>{inr(grossProfit)} ({pctTxt(d.totals.gpPct)})</span></span>
-        <span>Net Profit : <span style={{ color: TALLY.green }}>{inr(pat)} ({pctTxt(nett ? (pat / nett) * 100 : 0)})</span></span>
+        <span>Net Profit : <span style={{ color: TALLY.green }}>{inr(d.bridge?.netProfit ?? 0)} ({pctTxt(nett ? ((d.bridge?.netProfit ?? 0) / nett) * 100 : 0)})</span></span>
         <span>Nett Sales : {inr(nett)}</span>
       </div>
       <div style={{ background: '#d4d4d4', color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: '1px solid #b0b0b0', ...mono }}>
@@ -1119,11 +1124,11 @@ function ClassicPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
 }
 
 /* ── Vertical (single-column, statement-style) P&L view ───────────────────────
-   Renders the SAME `d`, modules, indirect-expense tree, grossProfit and `pat`
+   Renders the SAME `d`, modules, indirect-expense tree, grossProfit and net profit
    that ClassicPnL uses — just flowing top-to-bottom: Income → less COGS →
    Gross Profit → add Other Income → less Indirect Expenses → Net Profit.
    Fully drillable (module / ledger / sub-group) exactly like Classic. */
-function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
+function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
   const [drillModule, setDrillModule] = useState(null);
   const [openSub, setOpenSub] = useState({});
   const isOpen = (key, defOpen) => (openSub[key] === undefined ? defOpen : openSub[key]);
@@ -1263,13 +1268,12 @@ function VerticalPnL({ d, cur, mobile, branch, to, tax, pat, periodTxt }) {
           <Head txt="Less: Indirect Expenses" />
           <Row r={{ label: 'Indirect Expenses', amount: d.indirect.expense, group: true }} neg />
           {expenseRows.map((r, i) => <Row key={'e' + i} r={r} neg />)}
-          {tax > 0 && <Row r={{ label: 'Provision for Tax @ 25.17% (est.)', amount: tax }} neg />}
-          <Result txt="Net Profit (to Capital A/c)" val={pat} />
+          <Result txt="Net Profit (to Capital A/c)" val={d.bridge?.netProfit ?? 0} />
         </tbody>
       </table>
       <div style={{ background: TALLY.titlebar, color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: `2px solid ${TALLY.head}`, ...mono }}>
         <span>Gross Profit : <span style={{ color: TALLY.green }}>{inr(grossProfit)} ({pctTxt(d.totals.gpPct)})</span></span>
-        <span>Net Profit : <span style={{ color: TALLY.green }}>{inr(pat)} ({pctTxt(nett ? (pat / nett) * 100 : 0)})</span></span>
+        <span>Net Profit : <span style={{ color: TALLY.green }}>{inr(d.bridge?.netProfit ?? 0)} ({pctTxt(nett ? ((d.bridge?.netProfit ?? 0) / nett) * 100 : 0)})</span></span>
         <span>Nett Sales : {inr(nett)}</span>
       </div>
       {drillModule && <ModuleVoucherDrill module={drillModule} cur={cur} mobile={mobile} onClose={() => setDrillModule(null)} />}

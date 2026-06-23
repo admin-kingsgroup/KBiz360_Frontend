@@ -7,7 +7,7 @@
    modal; each master is just a field config.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Pencil, Trash2, Download, Printer } from 'lucide-react';
 import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../core/data';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
@@ -64,10 +64,14 @@ function FieldInput({ field, value, onChange, form }) {
   // System-managed fields (e.g. a ledger's auto-generated code) are shown but not
   // editable — render a greyed, read-only box with a hint when there's no value yet.
   if (field.readOnly) {
+    // Use the shared <Input> primitive (carries the design-system base classes) and
+    // overlay the greyed read-only look inline. (Was a raw <input style={{...inp}}>
+    // referencing an `inp` token that isn't imported here — a ReferenceError that
+    // crashed every read-only field, e.g. the auto-generated ledger Code.)
     return (
-      <input type="text" value={value || ''} readOnly disabled
+      <Input type="text" value={value || ''} readOnly disabled
         placeholder={field.placeholder || ''}
-        style={{ ...inp, fontSize: 12.5, background: '#f3f4f8', color: '#6b7280', cursor: 'not-allowed' }} />
+        style={{ background: '#f3f4f8', color: '#6b7280', cursor: 'not-allowed' }} />
     );
   }
   return (
@@ -117,7 +121,7 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   );
 }
 
-export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note, toolbar, rowFilter, mapRow, sortRows, rowStyle }) {
+export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note, toolbar, rowFilter, mapRow, sortRows, rowStyle, initialEditKey }) {
   const list = useMasterList(resource, params);
   const { create, update, remove } = useMasterMutations(resource);
   const [editing, setEditing] = useState(null); // record being edited, or {} for new
@@ -132,6 +136,16 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
 
   const openNew = () => { setErr(''); setEditing({ __new: true, ...blankFromFields(fields) }); };
   const openEdit = (r) => { setErr(''); setEditing({ ...blankFromFields(fields), ...r }); };
+
+  // Deep-link edit: when a caller passes ?edit=<code|id> (e.g. Bank Account Master's
+  // row "Edit" → /masters/ledgers?edit=<code>), auto-open that record's editor once
+  // the list has loaded. Gated on initialEditKey, so other masters are unaffected.
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (autoOpened.current || !initialEditKey || !list.data) return;
+    const row = (list.data || []).find((r) => String(r.code) === String(initialEditKey) || String(r.id) === String(initialEditKey));
+    if (row) { autoOpened.current = true; openEdit(row); }
+  }, [initialEditKey, list.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = (form) => {
     setErr('');
@@ -491,7 +505,10 @@ export const GroupsMaster = ({ branch }) => {
 
   // Never open a locked Primary Group / Primary Sub Group for edit (defence in
   // depth — the locked columns render no pencil, and the backend rejects with 423).
-  const openEdit = (kind, node) => { if (!node || isPrimaryLocked(node)) return; setErr(''); setEditing({ kind, fields: kind === 'ledger' ? LED_FIELDS : SUB_FIELDS, record: { ...node }, label: kind === 'ledger' ? 'Ledger' : 'Sub-Group' }); };
+  // Merge in field defaults before the record (like MasterCrud.openEdit) so any
+  // key missing on an older node renders a controlled input with its default —
+  // not an uncontrolled-`undefined` control that warns and submits blank.
+  const openEdit = (kind, node) => { if (!node || isPrimaryLocked(node)) return; setErr(''); const fields = kind === 'ledger' ? LED_FIELDS : SUB_FIELDS; setEditing({ kind, fields, record: { ...blankFromFields(fields), ...node }, label: kind === 'ledger' ? 'Ledger' : 'Sub-Group' }); };
   const openNew = (what) => {
     setErr('');
     const fields = what === 'ledger' ? LED_FIELDS : what === 'group' ? GROUP_NEW_FIELDS : SUBGROUP_NEW_FIELDS;
@@ -629,6 +646,9 @@ export const SubGroupsMaster = () => {
 
 
 export const LedgersMaster = ({ branch }) => {
+  // Deep-link target for Bank Account Master's row "Edit" (and any ?edit=<code> link):
+  // read once on mount; MasterCrud opens that ledger's editor when the list loads.
+  const [editKey] = useState(() => { try { return new URLSearchParams(window.location.search).get('edit') || ''; } catch { return ''; } });
   // Suggest group names in a dropdown — live from /api/groups (28 Tally + custom),
   // falling back to the 28 Tally names until the list loads.
   const groupsQ = useMasterList('groups');
@@ -654,6 +674,7 @@ export const LedgersMaster = ({ branch }) => {
   // BOM, so default to BOM (the selected branch when one is picked; BOM when the top
   // bar is on "All branches"/unset) rather than the org-wide "All branches" view.
   const [branchView, setBranchView] = useState(() => {
+    if (editKey) return 'ALL';   // deep-link edit (?edit=): fetch all branches so the target ledger is in the list
     const c = branchCode(branch);
     return (!c || c === 'ALL') ? 'BOM' : c;
   });
@@ -704,12 +725,16 @@ export const LedgersMaster = ({ branch }) => {
     <>
       <MasterCrud title="Ledgers" subtitle={`Chart of Accounts — ledger accounts (live)${branchView !== 'ALL' ? ` · ${branchView} + shared` : ''}`}
         resource="ledgers"
+        initialEditKey={editKey}
         params={branchView !== 'ALL' ? { branch: branchView, includeInactive: 'true' } : { includeInactive: 'true' }}
         toolbar={toolbar}
         rowFilter={ledgerRowFilter}
         note="Set Group to the Primary Group / Primary Sub Group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. All ledgers are owned by the BOM branch."
         fields={[
-          { key: 'code', label: 'Code', type: 'text', required: true },
+          // Code is server-allocated (<BRANCH>-MN-NNNN) — read-only, never typed
+          // (matches the Chart-of-Accounts ledger editor). Was editable + required,
+          // which forced the accountant to invent a code and disagreed with the CoA editor.
+          { key: 'code', label: 'Code (auto-generated)', type: 'text', readOnly: true, placeholder: 'Assigned automatically on save' },
           { key: 'name', label: 'Ledger Name', type: 'text', required: true },
           { key: 'group', label: 'Group', type: 'select', options: groupOptions.length ? groupOptions : TALLY_GROUP_NAMES, required: true },
           { key: 'subGroup', label: 'Sub-Group', type: 'select', table: false, emptyLabel: '— None —',

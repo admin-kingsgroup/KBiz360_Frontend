@@ -13,11 +13,14 @@ import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { Input, Button, StatusPill } from '../../../shell/primitives';
 
-export function CurrencyMaster() {
+export function CurrencyMaster({ setRoute }) {
   const [search, setSearch] = useState('');
   // Live currency metadata from /api/app-config/currencies — an object keyed by code:
   // { INR: { symbol, name, toINR }, USD: {...}, ... }. Mapped to table rows here.
-  const { data: meta } = useCurrencies();
+  // This endpoint is read-only; exchange rates are created/edited on the Forex Rates
+  // screen (/masters/forex), so the rate actions navigate there.
+  const { data: meta, refetch, isFetching } = useCurrencies();
+  const go = (r) => setRoute && setRoute(r);
   const rows = useMemo(() => Object.entries(meta || {}).map(([code, m]) => ({
     code,
     name: m?.name || code,
@@ -38,9 +41,9 @@ export function CurrencyMaster() {
     { key: 'name', header: 'Name', className: 'text-navy' },
     { key: 'symbol', header: 'Symbol', align: 'center', className: 'text-sm text-navy' },
     { key: 'dailyRate', header: '1 unit = ₹', num: true, className: 'font-mono font-bold', render: (r, v) => v.toFixed(4) },
-    { key: 'lastUpdated', header: 'Last Updated', className: 'text-ink-muted' },
+    { key: 'lastUpdated', header: 'Last Updated', className: 'text-ink-muted', render: (r, v) => { if (!v) return '—'; const d = new Date(v); return isNaN(d.getTime()) ? v : d.toLocaleDateString('en-IN'); } },
     { key: 'active', header: 'Status', align: 'center', render: (r, v) => <StatusPill tone={v ? 'success' : 'danger'} size="sm">{v ? 'Active' : 'Inactive'}</StatusPill> },
-    { key: '__act', header: 'Action', align: 'center', sortable: false, exportable: false, hideable: false, render: () => <Button variant="secondary" size="xs">Edit Rate</Button> },
+    { key: '__act', header: 'Action', align: 'center', sortable: false, exportable: false, hideable: false, render: (r) => <Button variant="secondary" size="xs" onClick={() => go('/masters/forex')} title={`Manage the ${r.code} exchange rate on the Forex Rates screen`} disabled={r.isBase}>Edit Rate</Button> },
   ];
 
   return (
@@ -49,9 +52,9 @@ export function CurrencyMaster() {
       subtitle="All currencies used by Travkings — daily exchange rates auto-update at 9 AM IST"
       actions={
         <>
-          <Button size="sm" variant="secondary" icon={RefreshCw} className="border-gold text-gold-dark">Refresh Rates</Button>
-          <Button size="sm" variant="secondary" icon={Upload}>Import</Button>
-          <Button size="sm" variant="accent" icon={Plus}>Add Currency</Button>
+          <Button size="sm" variant="secondary" icon={RefreshCw} className="border-gold text-gold-dark" loading={isFetching} onClick={() => refetch()} title="Re-pull the latest exchange rates from the server">Refresh Rates</Button>
+          <Button size="sm" variant="secondary" icon={Upload} onClick={() => go('/import')} title="Bulk import via Data Import">Import</Button>
+          <Button size="sm" variant="accent" icon={Plus} onClick={() => go('/masters/forex')} title="Add / manage currency exchange rates on the Forex Rates screen">Add Currency</Button>
         </>
       }
       filters={<Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code or name…" className="w-auto min-w-[220px] flex-1" />}

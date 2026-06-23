@@ -183,9 +183,9 @@ export function CostCenterMasterLive({ currentUser }) {
                         <span style={{ padding: '2px 8px', background: c.active ? '#eef4ec' : '#f0f1f5', color: c.active ? GREEN : DIM, borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>● {c.active ? 'Active' : 'Inactive'}</span>
                       </td>
                       <td style={{ padding: '6px 14px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <button onClick={() => rename(c)} title="Rename" style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', padding: '3px 8px', marginRight: 5 }}>✎</button>
-                        <button onClick={() => toggleActive(c)} title={c.active ? 'Deactivate' : 'Reactivate'} style={{ ...btn('#fff', c.active ? RED : GREEN), border: '1px solid #d6dbe6', padding: '3px 8px', marginRight: 5 }}>{c.active ? '⏻' : '✓'}</button>
-                        {!c.system && <button onClick={() => del(c)} title="Delete custom cost centre" style={{ ...btn('#fff', RED), border: '1px solid #f3c9c9', padding: '3px 8px' }}>🗑</button>}
+                        <button onClick={() => rename(c)} disabled={updateCc.isPending} title="Rename" style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', padding: '3px 8px', marginRight: 5, opacity: updateCc.isPending ? 0.5 : 1 }}>✎</button>
+                        <button onClick={() => toggleActive(c)} disabled={updateCc.isPending} title={c.active ? 'Deactivate' : 'Reactivate'} style={{ ...btn('#fff', c.active ? RED : GREEN), border: '1px solid #d6dbe6', padding: '3px 8px', marginRight: 5, opacity: updateCc.isPending ? 0.5 : 1 }}>{c.active ? '⏻' : '✓'}</button>
+                        {!c.system && <button onClick={() => del(c)} disabled={deleteCc.isPending} title="Delete custom cost centre" style={{ ...btn('#fff', RED), border: '1px solid #f3c9c9', padding: '3px 8px', opacity: deleteCc.isPending ? 0.5 : 1 }}>🗑</button>}
                       </td>
                     </tr>
                   ))}

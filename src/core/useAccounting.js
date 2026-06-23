@@ -439,6 +439,20 @@ export function useSalesRegister(branch, { from, to } = {}) {
   });
 }
 
+// Server-side total for a register slice (?summary=1) → { count, total, subtotal }.
+// For callers that only need the aggregate (e.g. dashboard "Sales/Purchase this month"
+// tiles) so they don't pull every voucher doc over the throttled Atlas link just to sum
+// `.total`. Mirrors useSalesRegister's filters; pass category 'sale' | 'purchase' | …
+export function useRegisterSummary(branch, { category, from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['vouchers', 'summary', category || 'all', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/vouchers', { branch: code, category, from, to, summary: 1 }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 // Open (unsettled) bills for a party, for the bill-wise allocation panel on the
 // Receipt / Payment vouchers. side 'customer' → debtor's open sale bills (Receipt);
 // side 'supplier' → creditor's open purchase bills (Payment). Returns

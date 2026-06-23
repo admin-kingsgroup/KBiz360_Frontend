@@ -29,6 +29,7 @@ jest.mock('../core/useAccounting', () => ({
   ] }),
   useSalesRegister: () => ({ data: [] }),
   usePurchaseRegister: () => ({ data: [] }),
+  useRegisterSummary: () => ({ data: { count: 0, total: 0, subtotal: 0 } }),
   useConfigValue: () => ({ data: {} }),
   useSaveConfigValue: () => ({ mutate: jest.fn(), isPending: false }),
   useOutstanding: () => ({ data: { onAccountReceipts: [{ party: 'ACME', onAccount: 300 }] } }),
