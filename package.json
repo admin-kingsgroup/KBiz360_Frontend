@@ -18,7 +18,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "rebuild": "npm install && npm run build",
-    "redeploy": "npm install && npm run build && npm run preview"
+    "redeploy": "npm install && npm run build && npm run preview",
+    "demo:invoice": "esbuild scripts/gen-demo-invoice.mjs --bundle --platform=node --format=esm --resolve-extensions=.js,.jsx,.mjs,.json --loader:.js=jsx --define:import.meta.env={} --outfile=scripts/.demo-bundle.mjs && node scripts/.demo-bundle.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.51.1",
