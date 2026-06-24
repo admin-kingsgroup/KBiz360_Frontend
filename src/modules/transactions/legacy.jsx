@@ -1275,8 +1275,8 @@ export function SalesMisc({branch,setRoute}){
    (category 'refund' / 'reissue', type RF / RI) so the Trial Balance, P&L, Balance
    Sheet, Day Book, GST and module GP all update at once.
 
-     Refund     Dr Supplier  | Cr Customer + Cr Service/Markup income + Cr Output GST
-     Reissue    Dr Customer   | Cr Supplier  + Cr Service/Markup income + Cr Output GST
+     Refund     Dr Supplier  | Cr Customer + Cr Service Fee/SVC2 income + Cr Output GST
+     Reissue    Dr Customer   | Cr Supplier  + Cr Service Fee/SVC2 income + Cr Output GST
    ════════════════════════════════════════════════════════════════ */
 
 // Sale voucher `type` → product module key (drives ledger names + strip labels).
