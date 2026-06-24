@@ -348,11 +348,12 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
   const [showNotif, setShowNotif] = useState(false);
   const mobileDrawerRef = useRef(null);
   // Bell badge + critical banner read the live alert feed (same source as the
-  // Alerts Dashboard). `unread` = open (pending) alerts; `critical` = open errors.
+  // Alerts Dashboard). Alerts are branch-specific and auto-resolve, so `open` is
+  // simply the live set; `critical` = open errors. (Consolidated view → empty.)
   const alertsQ = useAlerts(branch);
-  const pendingAlerts = useMemo(() => (alertsQ.data?.alerts || []).filter((a) => (a.status || 'pending') === 'pending'), [alertsQ.data]);
-  const unread = pendingAlerts.length;
-  const critical = useMemo(() => pendingAlerts.filter((a) => a.severity === 'error'), [pendingAlerts]);
+  const openAlerts = useMemo(() => alertsQ.data?.alerts || [], [alertsQ.data]);
+  const unread = openAlerts.length;
+  const critical = useMemo(() => openAlerts.filter((a) => a.severity === 'error'), [openAlerts]);
   const menu = useMemo(() => getMenu(branch, currentUser), [branch, currentUser]);
   const go = (href) => { if (href) setRoute(href); setMobileOpen(false); };
 

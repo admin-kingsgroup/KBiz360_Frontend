@@ -12,7 +12,7 @@ import { setNavFocus } from '../../../../core/ux/navFocus';
  */
 export function CloseChecklist({ items = MONTH_CLOSE_CHECKLIST, defaultCheckedThrough = 5, branch, onGo }) {
   const q = useAlerts(branch);
-  const blockers = (q.data?.alerts || []).filter((a) => a.severity === 'error' && (a.status || 'pending') !== 'finished');
+  const blockers = (q.data?.alerts || []).filter((a) => a.severity === 'error'); // open critical alerts auto-clear when fixed
   const blocked = blockers.length > 0;
 
   return (

@@ -1,79 +1,68 @@
-// Alerts Dashboard UI organization: severity KPI strip (also the severity filter),
-// status tabs, tab-aware domain chips, and the list grouped into domain sections.
-// useAccounting (network) + toast/navFocus are mocked.
+// Alerts Dashboard: severity KPI strip + domain-grouped Open list, a Fixed tab
+// with the auto-resolution audit trail, and the branch-specific (no group) rule.
+// Alerts auto-resolve — there is no manual Finish. useAccounting/toast/navFocus mocked.
 
-const mockSetStatus = jest.fn();
-jest.mock('../../../core/api', () => ({ apiGet: jest.fn(), apiPut: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
+jest.mock('../../../core/api', () => ({ apiGet: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../../../core/ux/navFocus', () => ({ setNavFocus: jest.fn() }));
-jest.mock('../../../core/ux/toast', () => ({ toastInfo: jest.fn(), toastSuccess: jest.fn(), toastError: jest.fn() }));
+jest.mock('../../../core/ux/toast', () => ({ toastInfo: jest.fn() }));
 
-const mockDATA = {
+const mockBRANCH = {
   generatedAt: new Date().toISOString(),
+  branchRequired: false,
   counts: { error: 1, warn: 1, info: 1 },
-  statusCounts: { pending: 3, remind: 0, finished: 1 },
+  statusCounts: { open: 3, fixed: 1 },
   domains: [{ key: 'acct', label: 'Accounting', pending: 1 }, { key: 'recon', label: 'Reconciliation', pending: 1 }, { key: 'tax', label: 'Tax', pending: 1 }],
   alerts: [
-    { key: 'tb:BOM', type: 'tb-unbalanced', domain: 'acct', severity: 'error', status: 'pending', title: 'Trial Balance not balanced', detail: 'out by 500', signature: 's1', magnitude: 1, link: '/trial-balance' },
-    { key: 'rb:BOM', type: 'recon-bank', domain: 'recon', severity: 'warn', status: 'pending', title: 'Bank statement reconciliation pending', detail: '12 open', signature: 's2', magnitude: 12, link: '/bank-reco' },
-    { key: 'gst:BOM', type: 'gst-payable', domain: 'tax', severity: 'info', status: 'pending', title: 'GST payable outstanding', detail: 'deposit & file', signature: 's3', magnitude: 1, link: '/tax/gstr3b' },
-    { key: 'done:BOM', type: 'suspense', domain: 'acct', severity: 'error', status: 'finished', title: 'Suspense balance', detail: 'cleared', signature: 's4', magnitude: 1, link: '/trial-balance' },
+    { key: 'tb:BOM', type: 'tb-unbalanced', domain: 'acct', severity: 'error', title: 'Trial Balance not balanced', detail: 'out by 500', link: '/trial-balance' },
+    { key: 'rb:BOM', type: 'recon-bank', domain: 'recon', severity: 'warn', title: 'Bank statement reconciliation pending', detail: '12 open', link: '/bank-reco' },
+    { key: 'gst:BOM', type: 'gst-payable', domain: 'tax', severity: 'info', title: 'GST payable outstanding', detail: 'deposit & file', link: '/tax/gstr3b' },
+  ],
+  resolved: [
+    { alertKey: 'sus:BOM', type: 'suspense', severity: 'error', title: 'Suspense balance', detail: 'was 12,000', firstSeenAt: '2026-06-22T00:00:00Z', resolvedAt: '2026-06-23T10:00:00Z', openMs: 34 * 3600000, resolvedBy: 'ravi@kbiz', resolvedHow: 'edit voucher V42', link: '/trial-balance' },
   ],
 };
+const mockGROUP = { branchRequired: true, counts: { error: 0, warn: 0, info: 0 }, statusCounts: { open: 0, fixed: 0 }, domains: [], alerts: [], resolved: [] };
 jest.mock('../../../core/useAccounting', () => ({
-  useAlerts: () => ({ data: mockDATA, isLoading: false, isError: false, isFetching: false, refetch: jest.fn() }),
-  useSetAlertStatus: () => ({ mutate: mockSetStatus }),
+  useAlerts: (b) => ({ data: (b && b.code === 'ALL') ? mockGROUP : mockBRANCH, isLoading: false, isError: false, isFetching: false, refetch: jest.fn() }),
 }));
 
 import React from 'react';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { AlertsDashboard } from '../pages/alerts-dashboard';
 
-const renderIt = () => render(<AlertsDashboard branch={{ code: 'BOM' }} setRoute={jest.fn()} />);
+const renderIt = (branch = { code: 'BOM' }) => render(<AlertsDashboard branch={branch} setRoute={jest.fn()} />);
 
-describe('Alerts Dashboard — organized layout', () => {
-  test('renders domain section headers for the pending alerts', () => {
+describe('Alerts Dashboard — Open / Fixed model', () => {
+  test('Open tab groups alerts into domain sections; no Finish action', () => {
     renderIt();
-    // each domain label shows as a filter chip AND a section header
     expect(screen.getAllByText('Accounting').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Reconciliation').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Tax').length).toBeGreaterThan(0);
-    // and the cards under them
     expect(screen.getByText('Trial Balance not balanced')).toBeInTheDocument();
-    expect(screen.getByText('Bank statement reconciliation pending')).toBeInTheDocument();
+    expect(screen.queryByText('Finish')).not.toBeInTheDocument();
+    expect(screen.queryByText('Remind')).not.toBeInTheDocument();
   });
 
-  test('severity KPI strip filters the list', () => {
+  test('severity KPI strip filters the Open list', () => {
     renderIt();
-    // Click the "Critical" KPI card → only the error alert remains
     fireEvent.click(screen.getByRole('button', { name: /Critical/ }));
     expect(screen.getByText('Trial Balance not balanced')).toBeInTheDocument();
     expect(screen.queryByText('GST payable outstanding')).not.toBeInTheDocument();
-    expect(screen.queryByText('Bank statement reconciliation pending')).not.toBeInTheDocument();
   });
 
-  test('switching to Finished tab shows finished alerts only', () => {
+  test('Fixed tab shows the audit trail (what / how long / by whom)', () => {
     renderIt();
-    fireEvent.click(screen.getByText(/Finished/));
+    fireEvent.click(screen.getByText(/Fixed/));
     expect(screen.getByText('Suspense balance')).toBeInTheDocument();
+    expect(screen.getByText(/open for/)).toBeInTheDocument();      // duration
+    expect(screen.getByText('ravi@kbiz')).toBeInTheDocument();     // who
+    expect(screen.getByText(/edit voucher V42/)).toBeInTheDocument(); // how
+    // open alerts not shown on Fixed tab
     expect(screen.queryByText('Trial Balance not balanced')).not.toBeInTheDocument();
   });
 
-  test('domain chip narrows to one section', () => {
-    renderIt();
-    // The "Reconciliation" chip appears both as a chip and a section header; click the chip
-    const reconChips = screen.getAllByText('Reconciliation');
-    fireEvent.click(reconChips[0]);
-    expect(screen.getByText('Bank statement reconciliation pending')).toBeInTheDocument();
+  test('consolidated (All branches) view shows the branch-required message, no issues', () => {
+    renderIt({ code: 'ALL' });
+    expect(screen.getByText(/Select a branch to see its alerts/)).toBeInTheDocument();
     expect(screen.queryByText('Trial Balance not balanced')).not.toBeInTheDocument();
-  });
-
-  test('Finish action fires the lifecycle mutation', () => {
-    renderIt();
-    const card = screen.getByText('Trial Balance not balanced').closest('div.flex-col');
-    fireEvent.click(within(card).getByText('Finish'));
-    expect(mockSetStatus).toHaveBeenCalledWith(
-      expect.objectContaining({ alertKey: 'tb:BOM', status: 'finished' }),
-      expect.anything(),
-    );
   });
 });

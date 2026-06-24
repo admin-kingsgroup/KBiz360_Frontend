@@ -521,17 +521,6 @@ export function useAlerts(branch) {
   });
 }
 
-// Set an alert's lifecycle status (Finish / Remind Later / re-open). Pass the
-// alert's current signature+magnitude so the backend can later detect change /
-// worsening. Invalidates the alerts feed so the dashboard reflects the move.
-export function useSetAlertStatus() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body) => apiPut('/api/alert-states', body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['alerts'] }),
-  });
-}
-
 // Single voucher (drill-down target) — view + edit.
 export function useVoucher(id) {
   return useQuery({
