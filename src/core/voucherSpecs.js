@@ -61,10 +61,10 @@ export const VSPECS = {
   SH: {
     code: 'SH', name: 'Holiday Package', icon: '🌴', headerLabel: 'Destination / Package',
     // Tour-operator package model: 5% GST on the gross package value (no service
-    // charge), + 5% TCS u/s 206C(1G) on International packages.
+    // charge), + 2% TCS u/s 206C(1G) on International packages.
     model: 'package', gstRate: PKG_GST,
-    tax: { kind: 'holiday', rate: 5, tcsRate: 5 },
-    tcs: { rate: 5, intlOnly: true },
+    tax: { kind: 'holiday', rate: 5, tcsRate: 2 },
+    tcs: { rate: 2, intlOnly: true },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'pkg', label: 'Package', kind: 'tkt' }, { key: 'ref', label: 'Ref', kind: 'pnr' },
@@ -100,7 +100,9 @@ export const VSPECS = {
   },
   SI: {
     code: 'SI', name: 'Insurance', icon: '🛡', headerLabel: 'Plan / Insurer',
-    tax: { kind: 'all', rate: 18 },
+    // Agent/service-provider model: GST 18% on the agency's service only (Service Fee +
+    // SVC2 on sale, Supplier Service on purchase) — NOT on the pass-through premium.
+    tax: { kind: 'service', rate: 18 },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'plan', label: 'Plan', kind: 'tkt' }, { key: 'pol', label: 'Policy No', kind: 'pnr' },
@@ -112,7 +114,8 @@ export const VSPECS = {
   },
   SC: {
     code: 'SC', name: 'Car Rental', icon: '🚗', headerLabel: 'Route / Vendor',
-    tax: { kind: 'all', rate: 5 },
+    // Agent/service-provider model: GST 18% on the agency's service only (not the fare).
+    tax: { kind: 'service', rate: 18 },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'veh', label: 'Vehicle', kind: 'tkt' }, { key: 'route', label: 'Route', kind: 'pnr' },
@@ -124,7 +127,8 @@ export const VSPECS = {
   },
   SM: {
     code: 'SM', name: 'Miscellaneous', icon: '📦', headerLabel: 'Service / Vendor',
-    tax: { kind: 'perRow' },
+    // Agent/service-provider model: GST 18% on the agency's service only.
+    tax: { kind: 'service', rate: 18 },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'svc', label: 'Service', kind: 'tkt' }, { key: 'ref', label: 'Ref No', kind: 'pnr' },
