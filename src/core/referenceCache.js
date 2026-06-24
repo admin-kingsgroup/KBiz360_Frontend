@@ -12,6 +12,10 @@
 
 /* ── Minimal bootstrap fallbacks (replaced by API data on hydration) ── */
 const FALLBACK_CURRENCY = { INR: { symbol: '₹', name: 'Indian Rupee', toINR: 1 } };
+// Hard symbol fallbacks so a branch's currency renders correctly even before the
+// live currency metadata hydrates (or if it has no entry for that code). Without
+// this, a USD/Africa branch whose company-profile omits cur_sym fell through to ₹.
+const SYMBOL_FALLBACK = { INR: '₹', USD: '$', EUR: '€', GBP: '£', AED: 'د.إ', KES: 'KSh', TZS: 'TSh', CDF: 'FC' };
 const FALLBACK_BRANCHES = [
   { code: 'TKHO', city: 'Mumbai',        country: 'India',    flag: '🇮🇳', currency: 'INR', currencies: ['INR']                     },
   { code: 'BOM',  city: 'Mumbai',        country: 'India',    flag: '🇮🇳', currency: 'INR', currencies: ['INR']                     },
@@ -77,10 +81,22 @@ export function setBranches(arr) {
 export function getBranches() { return BRANCHES; }
 
 /* ── Per-branch config (from company-profile) ── */
+// Resolve a currency CODE → display symbol: prefer the live currency metadata,
+// then the hard fallback map, then the code itself. Never silently collapses a
+// non-INR currency to ₹ (the old `=== 'USD' ? '$' : '₹'` bug).
+function resolveCurSym(code) {
+  if (!code) return '';
+  const meta = currencySymbolOf(code);
+  if (meta && meta !== code) return meta;
+  return SYMBOL_FALLBACK[code] || code;
+}
 function profileToCfg(p) {
+  // Fall back to the branch record's currency when the profile omits it, so a
+  // USD/Africa branch stays USD even if its seeded profile has no currency field.
+  const code = p.currency || BRANCHES.find((b) => b.code === p.code)?.currency || 'INR';
   return {
-    cur: p.cur_sym || (p.currency === 'USD' ? '$' : '₹'),
-    curCode: p.currency || 'INR',
+    cur: p.cur_sym || resolveCurSym(code),
+    curCode: code,
     taxType: p.taxType || 'GST',
     vatRate: p.vatRate ?? null,
     gstRates: p.gstRates || [],
@@ -113,7 +129,7 @@ function deriveCfgFromBranch(code) {
   const isVat = VAT_RATE[code] != null || /vat/i.test(taxStr);
   const vr = VAT_RATE[code] ?? (parseFloat((taxStr.match(/(\d+(?:\.\d+)?)\s*%/) || [])[1]) || null);
   return {
-    cur: b.currency === 'USD' ? '$' : b.currency === 'INR' ? '₹' : (b.currency || ''),
+    cur: resolveCurSym(b.currency),
     curCode: b.currency || 'INR',
     taxType: isVat ? 'VAT' : 'GST',
     vatRate: isVat ? vr : null,
