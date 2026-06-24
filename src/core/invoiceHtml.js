@@ -226,7 +226,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const sumtbl = isSale
     ? `
     <div class="r"><span class="k">Sub Total</span><span class="v">${cur}${n2(subTotal)}</span></div>
-    ${service ? `<div class="r"><span class="k">Service Charges</span><span class="v">${cur}${n2(service)}</span></div>` : ''}
+    ${service ? `<div class="r"><span class="k">Service Fee</span><span class="v">${cur}${n2(service)}</span></div>` : ''}
     ${gst ? gstRows : ''}${tcsRow}
     <div class="net"><span class="k">NET TOTAL (${esc(cur)})</span><span class="v">${cur}${n2(net)}</span></div>`
     : `

@@ -20,11 +20,14 @@ describe('buildRefundReissueBody', () => {
     });
     // our income legs only added when > 0
     expect(b.lines).toEqual([
-      { ledger: 'Service Charge Income', amt: 250, desc: 'Service charge' },
+      { ledger: 'SVF Income', amt: 250, desc: 'Service Fee' },
       { ledger: 'SVC2 Income', amt: 120, desc: 'Service Charge - 2' },
     ]);
-    // refund customer figure: supplierAmt + supSvc + supGst − ourIncome − taxAmt
-    // ourIncome = 370, taxAmt = 370*18% = 66.6 → 74227 - 370 - 66.6
+    // GST split by component: Service-Fee GST → taxAmt, SVC2 margin GST → otherTaxesGst
+    expect(b.taxAmt).toBe(45);          // 250 × 18%
+    expect(b.otherTaxesGst).toBe(21.6); // 120 × 18% → SVC2 GST ledgers
+    // refund customer figure: supplierAmt − ourIncome − taxAmt − otherTaxesGst
+    // ourIncome = 370, total GST = 66.6 → 74227 - 370 - 45 - 21.6
     expect(b.total).toBe(73790.4);
   });
 

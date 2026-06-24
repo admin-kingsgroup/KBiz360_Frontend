@@ -36,6 +36,42 @@ const GOLD = '#c2a04a', DARK = '#1a1c22', DIM = '#5b616e', RED = '#dc2626', GREE
 const tabPanel = (children) => <div className="min-h-[360px] p-4 tablet:p-5">{children}</div>;
 const SUPPLIER_CATS = ['Airline', 'DMC', 'Hotel', 'Visa', 'Insurance', 'Car', 'Misc'];
 const GST_TREATMENTS = ['', 'Registered — Regular', 'Registered — Composition', 'Unregistered', 'SEZ', 'Overseas'];
+
+// GST place-of-supply (mirrors backend src/shared/util/gstSupplyType.js). A supplier
+// attracts Indian GST/TDS only when it is Indian; CGST+SGST (intra) vs IGST (inter) is
+// then decided by the supplier's state vs the branch's home state.
+const COUNTRIES = ['India', 'United Arab Emirates', 'Singapore', 'Thailand', 'United Kingdom', 'United States', 'Sri Lanka', 'Nepal', 'Maldives', 'Other'];
+const IN_STATES = [
+  ['01', 'Jammu & Kashmir'], ['02', 'Himachal Pradesh'], ['03', 'Punjab'], ['04', 'Chandigarh'],
+  ['05', 'Uttarakhand'], ['06', 'Haryana'], ['07', 'Delhi'], ['08', 'Rajasthan'], ['09', 'Uttar Pradesh'],
+  ['10', 'Bihar'], ['11', 'Sikkim'], ['12', 'Arunachal Pradesh'], ['13', 'Nagaland'], ['14', 'Manipur'],
+  ['15', 'Mizoram'], ['16', 'Tripura'], ['17', 'Meghalaya'], ['18', 'Assam'], ['19', 'West Bengal'],
+  ['20', 'Jharkhand'], ['21', 'Odisha'], ['22', 'Chhattisgarh'], ['23', 'Madhya Pradesh'], ['24', 'Gujarat'],
+  ['26', 'Dadra & Nagar Haveli and Daman & Diu'], ['27', 'Maharashtra'], ['29', 'Karnataka'], ['30', 'Goa'],
+  ['31', 'Lakshadweep'], ['32', 'Kerala'], ['33', 'Tamil Nadu'], ['34', 'Puducherry'],
+  ['35', 'Andaman & Nicobar Islands'], ['36', 'Telangana'], ['37', 'Andhra Pradesh'], ['38', 'Ladakh'],
+];
+const STATE_NAMES = ['', ...IN_STATES.map(([, n]) => n)];
+const HOME_STATE_BY_BRANCH = { BOM: '27', AMD: '24' }; // branch GST registration state
+const isIndiaFE = (c) => { const x = String(c || '').trim().toLowerCase(); return x === '' || x === 'india' || x === 'in' || x === 'bharat'; };
+const isExplicitIndiaFE = (c) => { const x = String(c || '').trim().toLowerCase(); return x === 'india' || x === 'in' || x === 'bharat'; };
+const stateCodeFE = (f) => {
+  const byName = IN_STATES.find(([, n]) => n.toLowerCase() === String(f.state || '').trim().toLowerCase());
+  if (f.stateCode && IN_STATES.some(([c]) => c === f.stateCode)) return f.stateCode;
+  if (byName) return byName[0];
+  const g = String(f.gstin || '').match(/^\d{2}/);
+  return g ? g[0] : '';
+};
+// → { type, label, tone } for the read-only Inter/Intra/Foreign indicator.
+function supplyTypeFE(f = {}) {
+  if (!isIndiaFE(f.country)) return { type: 'foreign', label: 'Overseas supplier — Indian GST / TDS NOT applicable', tone: 'muted' };
+  const sc = stateCodeFE(f);
+  if (!sc) return { type: '', label: 'Select a State to determine Inter / Intra', tone: 'warn' };
+  const home = HOME_STATE_BY_BRANCH[String(f.branch || '').toUpperCase()] || '27';
+  return sc === home
+    ? { type: 'intra', label: 'Intra-state — CGST + SGST', tone: 'ok' }
+    : { type: 'inter', label: 'Inter-state — IGST', tone: 'ok' };
+}
 const MSME_STATUS = ['', 'Not Registered', 'Micro', 'Small', 'Medium'];
 const TDS_SECTIONS = ['', '194C @ 2%', '194J @ 10%', '194I @ 10%', '194H @ 2%', '194O @ 0.1%', 'None'];
 const PAY_TERMS = ['', 'Advance', 'Net 15', 'Net 30', 'Net 45', 'Net 60', 'Net 90'];
@@ -542,7 +578,7 @@ export function SupplierMasterTabbed() {
           <SelectField label="Category" value={f.category} onChange={(v) => set('category', v)} options={SUPPLIER_CATS} />
           <Field label="Type" value={f.type} onChange={(v) => set('type', v)} />
           <SelectField label="Branch" value={f.branch} onChange={(v) => set('branch', v)} options={branchOpts} />
-          <Field label="Country" value={f.country} onChange={(v) => set('country', v)} />
+          <SelectField label="Country" value={f.country || 'India'} onChange={(v) => set('country', v)} options={COUNTRIES} />
           <Field label="Vendor Manager" value={f.vendorManager} onChange={(v) => set('vendorManager', v)} />
           <Field label="Phone" value={f.phone} onChange={(v) => set('phone', v)} />
           <Field label="Email" value={f.email} onChange={(v) => set('email', v)} />
@@ -554,9 +590,9 @@ export function SupplierMasterTabbed() {
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14, marginBottom: 18 }}>
             <Field label="City" value={f.city} onChange={(v) => set('city', v)} />
-            <Field label="Country" value={f.country} onChange={(v) => set('country', v)} />
+            <SelectField label="Country" value={f.country || 'India'} onChange={(v) => set('country', v)} options={COUNTRIES} />
           </div>
-          <EmptyHint>Office / branch addresses</EmptyHint>
+          <EmptyHint>Office / branch addresses · GST place-of-supply is set on the Tax tab.</EmptyHint>
           <ArrayEditor rows={f.addresses} cols={ADDR_COLS} onChange={(v) => set('addresses', v)} addLabel="Add address" />
         </>
       )}
@@ -566,18 +602,57 @@ export function SupplierMasterTabbed() {
       {tab === 'bank' && tabPanel(
         <ArrayEditor rows={f.banks} cols={BANK_COLS} onChange={(v) => set('banks', v)} addLabel="Add Bank Account" />
       )}
-      {tab === 'tax' && tabPanel(
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
-          <Field label="GSTIN" value={f.gstin} onChange={(v) => set('gstin', v)} mono />
-          <Field label="PAN" value={f.pan} onChange={(v) => set('pan', v)} mono />
-          <Field label="TAN" value={f.tan} onChange={(v) => set('tan', v)} mono />
-          <Field label="IATA Code" value={f.iataCode} onChange={(v) => set('iataCode', v)} mono />
-          <Field label="BSP Code" value={f.bspCode} onChange={(v) => set('bspCode', v)} mono />
-          <SelectField label="GST Treatment" value={f.gstTreatment} onChange={(v) => set('gstTreatment', v)} options={GST_TREATMENTS} />
-          <SelectField label="TDS Section" value={f.tdsSection} onChange={(v) => set('tdsSection', v)} options={TDS_SECTIONS} />
-          <SelectField label="MSME Status" value={f.msmeStatus} onChange={(v) => set('msmeStatus', v)} options={MSME_STATUS} />
-        </div>
-      )}
+      {tab === 'tax' && tabPanel((() => {
+        const india = isIndiaFE(f.country);
+        const sup = supplyTypeFE(f);
+        const setState = (name) => {
+          const row = IN_STATES.find(([, n]) => n === name);
+          set('state', name);
+          set('stateCode', row ? row[0] : '');
+        };
+        const toneBg = { ok: '#e9f7ef', warn: '#fdf3e3', muted: '#eef0f4' }[sup.tone] || '#eef0f4';
+        const toneFg = { ok: '#16794c', warn: '#a9690a', muted: '#5b616e' }[sup.tone] || '#5b616e';
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Place of supply — drives whether Indian GST/TDS apply and inter vs intra. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
+              <SelectField label="Country" value={f.country || 'India'} onChange={(v) => set('country', v)} options={COUNTRIES} />
+              {india && (
+                <SelectField label="State (required for India)" value={f.state || ''} onChange={setState} options={STATE_NAMES} />
+              )}
+              <FormField label="GST Supply Type (auto)">
+                <div style={{ padding: '7px 10px', borderRadius: 6, background: toneBg, color: toneFg, fontSize: 12, fontWeight: 700, border: '1px solid #e6e8ec' }}>
+                  {sup.type === 'intra' ? '🟢 ' : sup.type === 'inter' ? '🔵 ' : sup.type === 'foreign' ? '🌐 ' : '⚠ '}{sup.label}
+                </div>
+              </FormField>
+            </div>
+            {isExplicitIndiaFE(f.country) && !stateCodeFE(f) && (
+              <div style={{ padding: '8px 11px', borderRadius: 6, background: '#fdf3e3', color: '#a9690a', fontSize: 11.5, fontWeight: 600 }}>
+                ⚠ State is mandatory for an Indian supplier — it decides CGST/SGST (intra-state) vs IGST (inter-state). Saving without it will be rejected.
+              </div>
+            )}
+            {/* GST / TDS identifiers — only meaningful for an Indian supplier. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
+              {india ? (
+                <>
+                  <Field label="GSTIN" value={f.gstin} onChange={(v) => set('gstin', v)} mono />
+                  <Field label="PAN" value={f.pan} onChange={(v) => set('pan', v)} mono />
+                  <Field label="TAN" value={f.tan} onChange={(v) => set('tan', v)} mono />
+                  <SelectField label="GST Treatment" value={f.gstTreatment} onChange={(v) => set('gstTreatment', v)} options={GST_TREATMENTS} />
+                  <SelectField label="TDS Section" value={f.tdsSection} onChange={(v) => set('tdsSection', v)} options={TDS_SECTIONS} />
+                  <SelectField label="MSME Status" value={f.msmeStatus} onChange={(v) => set('msmeStatus', v)} options={MSME_STATUS} />
+                </>
+              ) : (
+                <div style={{ gridColumn: '1/-1', padding: 12, borderRadius: 6, background: '#f6f8fb', border: '1px solid #e6e8ec', fontSize: 12, color: '#5b616e' }}>
+                  🌐 <b>Overseas supplier</b> — Indian GSTIN / GST Treatment / TDS Section are not applicable. Purchases from this vendor must be booked <b>without</b> CGST/SGST/IGST or TDS (import of service; reverse-charge handled separately if opted).
+                </div>
+              )}
+              <Field label="IATA Code" value={f.iataCode} onChange={(v) => set('iataCode', v)} mono />
+              <Field label="BSP Code" value={f.bspCode} onChange={(v) => set('bspCode', v)} mono />
+            </div>
+          </div>
+        );
+      })())}
       {tab === 'credit' && tabPanel(
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
           <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #e6e8ec' }}>

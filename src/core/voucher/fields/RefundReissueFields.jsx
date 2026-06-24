@@ -7,7 +7,7 @@ import { LedgerPicker } from '../LedgerPicker';
 import { apiGet } from '../../api';
 import { useVoucherPreview } from '../../useAccounting';
 import { money2, r2 } from '../ui';
-import { refundPrefillFromBooking, poSnapForView, splitRefundJv } from './refundPrefill';
+import { refundPrefillFromBooking, poSnapForView, splitRefundJv, consolidateLegs } from './refundPrefill';
 import { buildRefundReissueBody } from './refundBody';
 
 const num = (v) => (Number(v) || 0);
@@ -53,7 +53,9 @@ function SnapGrid({ title, snap, color }) {
 // each side of the booking JV (Sales / Purchase voucher) and each side of the live
 // refund JV (sale-reversal / purchase-reversal).
 function JvTBlock({ title, sub, postings, color }) {
-  const list = (postings || []).filter((p) => num(p && p.debit) || num(p && p.credit));
+  // Consolidate each ledger to a single net Dr/Cr line so the trade party (customer /
+  // supplier) shows once with its final figure, not split across both sides.
+  const list = consolidateLegs(postings);
   if (!list.length) return null;
   const dr = list.filter((p) => num(p.debit)), cr = list.filter((p) => num(p.credit));
   const totDr = r2(dr.reduce((s, p) => s + num(p.debit), 0));
@@ -135,17 +137,25 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   const svc = r2(+state.serviceCharge || 0);
   const markup = r2(+state.markup || 0);
   const ourIncome = r2(svc + markup);
-  const taxAmt = r2(ourIncome * (+state.gstPct || 0) / 100);
+  // GST split by component (mirrors buildRefundReissueBody): Service-Fee GST → regular
+  // output GST; Service Charge-2 (SVC2) GST → the dedicated SVC2 GST ledgers.
+  const gstFrac = (+state.gstPct || 0) / 100;
+  const taxAmt = r2(svc * gstFrac);          // GST on the Service Fee
+  const svc2Gst = r2(markup * gstFrac);      // GST on the SVC2 margin (otherTaxesGst)
   const supSvc = r2(+state.supplierSvc || 0);
   const supGst = r2(+state.supplierGst || 0);
   // Customer refund payable (RF) / amount billed (RI).
   const total = isRefund
-    ? r2(supplierAmt + supSvc + supGst - ourIncome - taxAmt)
-    : r2(supplierAmt - supSvc - supGst + ourIncome + taxAmt);
+    ? r2(supplierAmt + supSvc + supGst - ourIncome - taxAmt - svc2Gst)
+    : r2(supplierAmt - supSvc - supGst + ourIncome + taxAmt + svc2Gst);
 
   // Live, backend-computed JV for THIS refund — same body & engine VoucherShell posts
   // with (deduped by React-Query on an identical key), shown right under the form.
-  const refundPv = useVoucherPreview({ ...buildRefundReissueBody(state, ctx, kind), sourceRef: state.sourceRef || '' }).data || {};
+  // Resolve a concrete branch CODE for the preview so the tax ledgers read "… [BOM]"
+  // and never "… [undefined]" (the body's branch falls back through branchCode → the
+  // branch prop's code → the raw branch string).
+  const branchResolved = branchCode || (branch && (branch.code || branch)) || '';
+  const refundPv = useVoucherPreview({ ...buildRefundReissueBody(state, ctx, kind), branch: branchResolved, sourceRef: state.sourceRef || '' }).data || {};
 
   // GST on the supplier's service fee + the airline cancellation fee auto-calculates
   // at the voucher's GST rate (the "GST on our charges" slab, 18% by default), so the
@@ -250,14 +260,20 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
         <FL label={isRefund ? `Supplier refund (${cur})` : `Supplier fee + fare diff (${cur})`}>
           <input type="number" value={state.supplierAmt} onChange={(e) => patch({ supplierAmt: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right', fontWeight: 700 }} />
         </FL>
-        <FL label={`Our service charge (${cur})`}><input type="number" value={state.serviceCharge} onChange={(e) => patch({ serviceCharge: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+        <FL label={`Our Service Fee (${cur})`}><input type="number" value={state.serviceCharge} onChange={(e) => patch({ serviceCharge: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
         <FL label={`Our Service Charge - 2 (${cur})`}><input type="number" value={state.markup} onChange={(e) => patch({ markup: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
-        <FL label={`GST on Service Charge (${gstRate}%)`}><input value={money2(cur, taxAmt)} readOnly tabIndex={-1} title={`GST at ${gstRate}% on our service charge + Service Charge - 2`} style={{ ...lockedInp, textAlign: 'right' }} /></FL>
+        <FL label={`GST on Service Fee (${gstRate}%)`}><input value={money2(cur, taxAmt)} readOnly tabIndex={-1} title={`GST at ${gstRate}% on the Service Fee → regular ${state.gstMode === 'inter' ? 'IGST' : 'CGST/SGST'} Output`} style={{ ...lockedInp, textAlign: 'right' }} /></FL>
+        <FL label={`SVC2 GST (${gstRate}%)`}><input value={money2(cur, svc2Gst)} readOnly tabIndex={-1} title={`GST at ${gstRate}% on the Service Charge-2 margin → dedicated SVC2 ${state.gstMode === 'inter' ? 'IGST' : 'CGST/SGST'} Output ledgers`} style={{ ...lockedInp, textAlign: 'right' }} /></FL>
+        <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 9, fontSize: 9.5, color: '#9197a3' }}>{state.gstMode === 'inter' ? 'IGST' : 'CGST + SGST'} · SVC2 posts to its own ledgers</div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
         <FL label={`Supplier service charge (${cur}, our cost)`}><input type="number" value={state.supplierSvc} onChange={(e) => patch({ supplierSvc: e.target.value, supplierGst: gstOf(e.target.value) })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
         <FL label={`Supplier GST (${cur}, input credit · auto ${gstRate}%)`}><input type="number" value={state.supplierGst} onChange={(e) => patch({ supplierGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+        <div />
       </div>
 
       {isRefund && (
@@ -276,7 +292,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       )}
 
       <p style={{ margin: '2px 0 12px', fontSize: 10.5, color: '#5a6691' }}>
-        Our income <b>{money2(cur, ourIncome)}</b> · GST <b>{money2(cur, taxAmt)}</b> ·
+        Our income <b>{money2(cur, ourIncome)}</b> · GST <b>{money2(cur, r2(taxAmt + svc2Gst))}</b> <span style={{ color: '#9197a3' }}>(Service Fee {money2(cur, taxAmt)} + SVC2 {money2(cur, svc2Gst)})</span> ·
         {isRefund ? ' Refund payable to customer ' : ' Billed to customer '}
         <b style={{ color: total < 0 ? '#A32D2D' : '#185FA5' }}>{money2(cur, total)}</b>
         {total < 0 && ' — our charges exceed the supplier amount'}

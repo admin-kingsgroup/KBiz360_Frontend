@@ -176,15 +176,15 @@ const SPECS = [
     example: ['DB/26/0001', '2025-06-05', 'BOM', 'Emirates GSA', 'Purchase — Air Tickets', '1000', '180', '1180', 'TKB-0001', 'Ticket void'] },
   // Refund / Reissue raised against a sale. The customer figure is DERIVED so the
   // entry always balances — Original Fare/Cancellation (refund) or Change Fee/Fare
-  // Difference (reissue) drive the supplier leg; Service Charge + Service Charge - 2 + GST
+  // Difference (reissue) drive the supplier leg; Service Fee + Service Charge - 2 + GST
   // are our retained income. Put the original sale's Link No to tie it for invoice GP.
   { group: 'Vouchers', entity: 'refund', label: 'Refund Voucher (against Sale)',
-    desc: 'Cancellation of a sale. Dr supplier (net of its charges) + supplier service charge (to Purchase — <Module>) + Input GST · Cr customer + service charge/Service Charge - 2 + Output GST. The supplier’s service charge is your own cost (reduces GP) and is NOT deducted from the customer: Customer refund = (Original Fare − Cancellation) − Service Charge − Service Charge - 2 − GST. Against Invoice (sale) AND Against Purchase are both required — one voucher settles both sides.',
-    columns: ['Vch No', 'Vch Date', 'Branch', 'Against Invoice', 'Against Purchase', 'Link No', 'Module', 'Place Of Supply', 'Customer Name', 'Customer Group', 'Supplier Name', 'Supplier Group', 'PNR / Ref', 'Ticket No / Ref', 'Original Fare', 'Cancellation Charge', 'Supplier Service Charge', 'Supplier GST', 'Service Charge', 'Service Charge - 2', 'CGST', 'SGST', 'IGST', 'Narration'],
+    desc: 'Cancellation of a sale. Dr supplier (net of its charges) + supplier service charge (to Purchase — <Module>) + Input GST · Cr customer + Service Fee/Service Charge - 2 + Output GST. The supplier’s service charge is your own cost (reduces GP) and is NOT deducted from the customer: Customer refund = (Original Fare − Cancellation) − Service Fee − Service Charge - 2 − GST. Against Invoice (sale) AND Against Purchase are both required — one voucher settles both sides.',
+    columns: ['Vch No', 'Vch Date', 'Branch', 'Against Invoice', 'Against Purchase', 'Link No', 'Module', 'Place Of Supply', 'Customer Name', 'Customer Group', 'Supplier Name', 'Supplier Group', 'PNR / Ref', 'Ticket No / Ref', 'Original Fare', 'Cancellation Charge', 'Supplier Service Charge', 'Supplier GST', 'Service Fee', 'Service Charge - 2', 'CGST', 'SGST', 'IGST', 'Narration'],
     example: ['RF/26/0001', '2025-06-10', 'BOM', 'SF/26/0001', 'PF/26/0001', 'TKB-0001', 'Flight', 'Maharashtra', 'Acme Travels', 'Sundry Debtors', 'Emirates GSA', 'Sundry Creditors', 'ABCDEF', '0987654321098', '11000', '1000', '200', '36', '500', '300', '72', '72', '0', 'Refund of ticket PNR ABCDEF against SF/26/0001'] },
   { group: 'Vouchers', entity: 'reissue', label: 'Reissue Voucher (against Sale)',
-    desc: 'Amendment of a sale. Dr customer + supplier service charge (to Purchase — <Module>) + Input GST · Cr supplier (incl. its charges) + service charge/Service Charge - 2 + Output GST. The supplier’s service charge is your own cost (reduces GP) and is NOT added to the customer: Customer bill = (Change Fee + Fare Difference) + Service Charge + Service Charge - 2 + GST. Against Invoice (sale) AND Against Purchase are both required — one voucher settles both sides.',
-    columns: ['Vch No', 'Vch Date', 'Branch', 'Against Invoice', 'Against Purchase', 'Link No', 'Module', 'Place Of Supply', 'Customer Name', 'Customer Group', 'Supplier Name', 'Supplier Group', 'PNR / Ref', 'Ticket No / Ref', 'Change Fee', 'Fare Difference', 'Supplier Service Charge', 'Supplier GST', 'Service Charge', 'Service Charge - 2', 'CGST', 'SGST', 'IGST', 'Narration'],
+    desc: 'Amendment of a sale. Dr customer + supplier service charge (to Purchase — <Module>) + Input GST · Cr supplier (incl. its charges) + Service Fee/Service Charge - 2 + Output GST. The supplier’s service charge is your own cost (reduces GP) and is NOT added to the customer: Customer bill = (Change Fee + Fare Difference) + Service Fee + Service Charge - 2 + GST. Against Invoice (sale) AND Against Purchase are both required — one voucher settles both sides.',
+    columns: ['Vch No', 'Vch Date', 'Branch', 'Against Invoice', 'Against Purchase', 'Link No', 'Module', 'Place Of Supply', 'Customer Name', 'Customer Group', 'Supplier Name', 'Supplier Group', 'PNR / Ref', 'Ticket No / Ref', 'Change Fee', 'Fare Difference', 'Supplier Service Charge', 'Supplier GST', 'Service Fee', 'Service Charge - 2', 'CGST', 'SGST', 'IGST', 'Narration'],
     example: ['RI/26/0001', '2025-06-12', 'BOM', 'SF/26/0001', 'PF/26/0001', 'TKB-0001', 'Flight', 'Maharashtra', 'Acme Travels', 'Sundry Debtors', 'Emirates GSA', 'Sundry Creditors', 'ABCDEF', '0987654321098', '2000', '1500', '200', '36', '500', '300', '72', '72', '0', 'Reissue of ticket PNR ABCDEF against SF/26/0001'] },
 ];
 
@@ -225,7 +225,7 @@ function makeBookingSpec(code) {
   const idLabels = sp.idCols.map((c) => c.label);
   const sectorLabels = (sp.sectorCols || []).map((c) => c.label);
   const fareLabels = sp.fareCols.map((c) => c.label);
-  const tail = ['Supplier Service', 'Supplier Service GST', 'Service Charge - 2', 'Service Charge - 2 GST', 'Service Charge', 'Service Charge GST'];
+  const tail = ['Supplier Service', 'Supplier Service GST', 'Service Charge - 2', 'Service Charge - 2 GST', 'Service Fee', 'Service Fee GST'];
   const columns = [...header, ...idLabels, ...sectorLabels, ...fareLabels, ...tail];
 
   const seed = (sp.seed && sp.seed[0]) || {};
@@ -241,7 +241,7 @@ function makeBookingSpec(code) {
 
   return {
     group: 'SO/PO/GP Voucher', entity: BOOKING_ENTITY[code], label: `${sp.name} — SO/PO/GP (bulk)`,
-    desc: `One row = one ${code === 'SHT' ? 'guest' : 'passenger'}/line for a ${sp.name} booking (same fields as the SO/PO/GP Voucher screen). Put the SAME Link No on rows of one booking (multi-line); blank = a standalone single-line booking.${sp.sectors ? ' Flight travel detail (Sector / Airline / Flight No / Ticket No / PNR / Travel Date) imports as ONE sector per row; add any extra sectors for a passenger in the voucher screen after import.' : ''} Supplier Service is an agency cost (reduces GP). The three “… GST” columns are optional — blank = auto (Service Charge - 2 GST-inclusive; service & supplier-service @18%), or fill to import the exact GST. Header fields are read from the first row of each Link No. "Without VAT" (Africa/VAT branches only — Yes/No) zero-rates the booking tax, e.g. international air; blank/No uses the branch VAT rate. Imported as PENDING — approve to post the linked Sales & Purchase invoices.`,
+    desc: `One row = one ${code === 'SHT' ? 'guest' : 'passenger'}/line for a ${sp.name} booking (same fields as the SO/PO/GP Voucher screen). Put the SAME Link No on rows of one booking (multi-line); blank = a standalone single-line booking.${sp.sectors ? ' Flight travel detail (Sector / Airline / Flight No / Ticket No / PNR / Travel Date) imports as ONE sector per row; add any extra sectors for a passenger in the voucher screen after import.' : ''} Supplier Service is an agency cost (reduces GP). The three “… GST” columns are optional — blank = auto (Service Charge - 2 GST-inclusive; Service Fee & supplier-service @18%), or fill to import the exact GST. Header fields are read from the first row of each Link No. "Without VAT" (Africa/VAT branches only — Yes/No) zero-rates the booking tax, e.g. international air; blank/No uses the branch VAT rate. Imported as PENDING — approve to post the linked Sales & Purchase invoices.`,
     columns, example,
   };
 }

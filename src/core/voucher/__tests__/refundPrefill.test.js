@@ -1,4 +1,4 @@
-import { refundPrefillFromBooking, poSnapForView, splitRefundJv } from '../fields/refundPrefill';
+import { refundPrefillFromBooking, poSnapForView, splitRefundJv, consolidateLegs } from '../fields/refundPrefill';
 
 // The original SO/PO/GP booking BKG/BOM/26/0357 (BOM intl flight) as the by-link
 // endpoint returns it. PO has no supplier service fee; SO has a 250 service charge
@@ -122,6 +122,42 @@ describe('splitRefundJv — sale-side / purchase-side T-blocks', () => {
     ], { party: P, counterParty: S });
     expect(sale.some((p) => /output/i.test(p.ledger))).toBe(true);
     expect(purchase.some((p) => /input/i.test(p.ledger))).toBe(true);
+  });
+});
+
+describe('consolidateLegs — net each ledger to a single Dr/Cr line', () => {
+  const P = 'Travkings Tours and Travels AMD';
+
+  test('the customer (3 legs) collapses to ONE net credit line', () => {
+    const sale = [
+      { ledger: 'IT-Base Fare', group: 'Sales Accounts', debit: 42485, credit: 0 },
+      { ledger: 'IT-Taxes', group: 'Sales Accounts', debit: 31742, credit: 0 },
+      { ledger: P, group: 'Sundry Debtors', debit: 300.90, credit: 0 },   // handling charge billed
+      { ledger: P, group: 'Sundry Debtors', debit: 300, credit: 0 },      // cancellation recovered
+      { ledger: 'SVF Income', group: 'Indirect Income', debit: 0, credit: 100 },
+      { ledger: 'SVC2 Income', group: 'Indirect Income', debit: 0, credit: 155 },
+      { ledger: 'CGST Output', group: 'Duties & Taxes', debit: 0, credit: 22.95 },
+      { ledger: 'SGST Output', group: 'Duties & Taxes', debit: 0, credit: 22.95 },
+      { ledger: 'Cancellation Charges Recovered', group: 'Indirect Income', debit: 0, credit: 300 },
+      { ledger: P, group: 'Sundry Debtors', debit: 0, credit: 74227 },
+    ];
+    const out = consolidateLegs(sale);
+    const cust = out.filter((l) => l.ledger === P);
+    expect(cust).toHaveLength(1);                       // shown once
+    expect(cust[0]).toMatchObject({ debit: 0, credit: 73626.10 }); // 74227 − 300.90 − 300
+    // side still balances
+    const dr = out.reduce((s, l) => s + l.debit, 0), cr = out.reduce((s, l) => s + l.credit, 0);
+    expect(Math.round(dr * 100) / 100).toBe(74227);
+    expect(Math.round(cr * 100) / 100).toBe(74227);
+  });
+
+  test('single-occurrence ledgers pass through unchanged; net-zero drops out', () => {
+    const out = consolidateLegs([
+      { ledger: 'IT-Base Fare', group: 'Sales Accounts', debit: 1000, credit: 0 },
+      { ledger: 'Wash', group: 'X', debit: 50, credit: 50 },   // nets to zero → dropped
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ ledger: 'IT-Base Fare', debit: 1000, credit: 0 });
   });
 });
 

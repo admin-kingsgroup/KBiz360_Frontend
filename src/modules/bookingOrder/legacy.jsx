@@ -538,7 +538,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <span style={{ fontSize: 10.5, color: '#9A9A9A', fontStyle: 'italic' }}>
             {noVat
               ? 'No VAT calculated on this booking (zero-rated).'
-              : `VAT charged at the branch rate on the service charge / margin.`}
+              : `VAT charged at the branch rate on the Service Fee / margin.`}
           </span>
         </div>
       )}
@@ -563,7 +563,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {interBranch && (
         <div style={{ ...card, background: '#EAF1FB', border: '1px solid #B9D6F2', color: '#185FA5', fontSize: 12, marginBottom: 14 }}>
-          🔁 <b>Inter-Branch sale.</b> Enter the fares in the Purchase Order grid (pass-through at cost) and your margin in the Sales <b>Service Charge</b> column (= the <b>Service Fee</b>). Fares post to <b>Inter-Branch Sales</b>, the Service Fee to <b>Service Fee Income</b>.
+          🔁 <b>Inter-Branch sale.</b> Enter the fares in the Purchase Order grid (pass-through at cost) and your margin in the Sales <b>Service Fee</b> column. Fares post to <b>Inter-Branch Sales</b>, the Service Fee to <b>SVF Income</b>.
           {toBranch && <> Tax: <b>{inbExport ? `Export · zero-rated (${INB_COUNTRY[brCode]}→${INB_COUNTRY[toBranch]})` : 'IGST · inter-state (18% on Service Fee)'}</b>.</>}
           {' '}Do not use Service Charge - 2. Creates an INB Link No the {toBranch || 'buying'} branch fetches on its SO/PO/GP.
         </div>
@@ -645,8 +645,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
               {spec.idCols.map((c) => <th key={c.key} style={{ ...thM, ...thL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
               {spec.fareCols.map((c) => <th key={c.key} style={{ ...thA, width: 95 }}>{c.label}</th>)}
-              <th style={{ ...thM, width: 95 }}>Service Charge - 2</th>{!pkg && <th style={{ ...thM, width: 95 }}>Service Chg</th>}
-              {!pkg && <th style={{ ...thA, width: 95 }}>GST/Service ({activeRate}%)</th>}<th style={{ ...thA, width: 95 }}>GST/Service Charge - 2 ({pkg ? 5 : activeRate}%)</th><th style={{ ...thA, width: 110 }}>Total</th><th style={{ ...thA, width: 45 }}></th>
+              <th style={{ ...thM, width: 95 }}>Service Charge - 2</th>{!pkg && <th style={{ ...thM, width: 95 }}>Service Fee</th>}
+              {!pkg && <th style={{ ...thA, width: 95 }}>GST/Service Fee ({activeRate}%)</th>}<th style={{ ...thA, width: 95 }}>GST/Service Charge - 2 ({pkg ? 5 : activeRate}%)</th><th style={{ ...thA, width: 110 }}>Total</th><th style={{ ...thA, width: 45 }}></th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -1096,7 +1096,7 @@ function WhereItPosts({ approved }) {
   const items = [
     ['Day Book / Ledgers', 'both vouchers appear in the Day Book and each ledger statement (Sundry Debtors, Supplier, every Sales/Purchase component head, GST).'],
     ['Trial Balance', 'every Dr/Cr leg above lands in the Trial Balance under its group.'],
-    ['Profit & Loss', 'each head nests in the Tally chart — Sales Accounts → module sub-group (Ticketing → Domestic/International) → DT-Base Fare / DT-K3-Taxes / DT-SVC2 / DT-Service Charges; Purchase Accounts → … [Pur] incl. Supplier Service (an agency cost that reduces GP). Drill the P&L to see it head-wise.'],
+    ['Profit & Loss', 'each head nests in the Tally chart — Sales Accounts → module sub-group (Ticketing → Domestic/International) → DT-Base Fare / DT-K3-Taxes / DT-SVC2 / DT-SVF; Purchase Accounts → … [Pur] incl. Supplier Service (an agency cost that reduces GP). Drill the P&L to see it head-wise.'],
     ['Balance Sheet', 'customer (Sundry Debtors, asset), supplier (Sundry Creditors, liability), CGST/SGST (Duties & Taxes) and any TCS Payable sit on the Balance Sheet.'],
     ['Sales & Purchase Registers', 'the sale shows in the Sales Register, the purchase in the Purchase Register.'],
     ['Invoice GP / Sales-GP Analytics', 'both are tied by the Link No, so GP is tracked invoice-wise.'],

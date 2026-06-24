@@ -175,7 +175,7 @@ function makeRefundReissue(kind) {
     fromVoucher: (v) => ({
       date: v.date || '', againstInvoice: v.againstInvoice || v.linkNo || '', againstPurchase: v.againstPurchase || '', gstMode: v.gstMode || 'intra',
       party: v.party || '', counterParty: v.counterParty || '', supplierAmt: v.supplierAmt ?? '',
-      serviceCharge: lineAmt(v, 'Service Charge Income'), markup: lineAmt(v, 'SVC2 Income') || lineAmt(v, 'Markup Income'),
+      serviceCharge: lineAmt(v, 'SVF Income') || lineAmt(v, 'Service Charge Income'), markup: lineAmt(v, 'SVC2 Income') || lineAmt(v, 'Markup Income'),
       gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18,
       supplierSvc: v.supplierSvc ?? '', supplierGst: v.supplierGst ?? '',
       supplierCancel: v.supplierCancel ?? '', supplierCancelGst: v.supplierCancelGst ?? '', cancelRecover: v.cancelRecover !== false,

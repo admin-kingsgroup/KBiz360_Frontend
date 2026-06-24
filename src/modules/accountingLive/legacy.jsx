@@ -1330,7 +1330,7 @@ function VoucherDetail({ voucher, cur, onClose }) {
 // captured on the booking at SO/PO/GP time, ONE LINE PER INVOICE:
 //   SPG/Link No · Sales Inv · Purchase Inv · Client Type · Client Ledger · Pax ·
 //   PNR · Ticket No · Final Invoice Value · each component head (IT-Base Fare /
-//   IT-K3-Taxes / IT-Taxes / IT-SVC2 / IT-Service Charges …) · CGST/SGST/IGST
+//   IT-K3-Taxes / IT-Taxes / IT-SVC2 / IT-SVF …) · CGST/SGST/IGST
 //   Output · SVC2 CGST/SGST Output · TCS.
 // The component-head columns are derived dynamically from the posted voucher lines —
 // their ledger names ARE "IT-Base Fare" etc. — so the SAME layout auto-adapts to
@@ -1352,12 +1352,12 @@ function splitGst(amt, gstMode, brCode) {
 }
 
 // Rank a component-head ledger so the head columns sit in a natural reading order
-// (fares → K3 → taxes → SVC2 → service charge → supplier service), regardless
-// of the DT-/IT- prefix or the [Pur] suffix. Tested in order so "SVC2" (and the legacy
-// "Other Taxes") and "K3-Taxes" don't collide with the generic "Taxes" match.
+// (fares → K3 → taxes → SVC2 → service fee → supplier service), regardless
+// of the DT-/IT- prefix or the [Pur] suffix. Tested in order so "SVC2"/"SVF" (and the
+// legacy "Other Taxes"/"Service Charge") and "K3-Taxes" don't collide with the generic "Taxes" match.
 const HEAD_RANK = [
   [/base\s*fare/i, 0], [/land/i, 1], [/room|basic|visa\s*fee|premium|fare/i, 2],
-  [/k3/i, 3], [/svc2|other\s*tax/i, 5], [/service\s*charge/i, 6], [/supplier\s*service/i, 7],
+  [/k3/i, 3], [/svc2|other\s*tax/i, 5], [/\bsvf\b|service\s*charge/i, 6], [/supplier\s*service/i, 7],
   [/tax/i, 4], [/incentive/i, 8], [/tds/i, 9],
 ];
 const headRank = (ledger) => { for (const [re, rk] of HEAD_RANK) if (re.test(ledger)) return rk; return 50; };

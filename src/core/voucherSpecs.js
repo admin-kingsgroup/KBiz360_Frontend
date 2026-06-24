@@ -336,7 +336,7 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     } else {
       addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
       addH(sH, 'markup', 'SVC2', r2(num(l.markup) - c.gstMk));
-      addH(sH, 'ssvc', 'Service Charge', num(l.ssvc));
+      addH(sH, 'ssvc', 'SVF', num(l.ssvc));
     }
     // NOTE: supplier incentive + 2% TDS are NOT posted as cost heads — they ride on
     // po.incentiveAmt / po.incentiveTds and post via the engine's incentivePostings

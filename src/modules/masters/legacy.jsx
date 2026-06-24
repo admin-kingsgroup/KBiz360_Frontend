@@ -265,7 +265,7 @@ export function ChartOfAccounts(){
           "Hotel Sales","Car Rental Income","Visa Service Fee Income",
           "Insurance Premium Income","Miscellaneous Service Income",
           "Commission Income — Air India","Commission Income — Emirates","Commission Income — Other Airlines",
-          "PLACI / Override Commission Income","Service Charge Income","Documentation Fee Income",
+          "PLACI / Override Commission Income","SVF Income","Documentation Fee Income",
           "Cancellation Charge Income","No-Show Charge Income",
           "Forex Gain on Settlement","Interest Income","Late Payment Surcharge"]},
     {id:12,name:"Purchase Accounts",        type:"Expense",   parent:"Primary",
