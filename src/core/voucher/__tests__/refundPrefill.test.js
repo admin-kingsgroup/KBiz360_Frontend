@@ -1,4 +1,4 @@
-import { refundPrefillFromBooking, poSnapForView } from '../fields/refundPrefill';
+import { refundPrefillFromBooking, poSnapForView, splitRefundJv } from '../fields/refundPrefill';
 
 // The original SO/PO/GP booking BKG/BOM/26/0357 (BOM intl flight) as the by-link
 // endpoint returns it. PO has no supplier service fee; SO has a 250 service charge
@@ -69,6 +69,59 @@ describe('refundPrefillFromBooking', () => {
     expect(p.party).toBe('Travkings AMD');
     expect(p.counterParty).toBe('IATA-BSP [Stock]');
     expect(p.gstMode).toBe('inter');
+  });
+});
+
+describe('splitRefundJv — sale-side / purchase-side T-blocks', () => {
+  const P = 'Travkings Tours and Travels AMD', S = 'IATA-BSP [Stock]';
+  const sum = (legs, k) => Math.round(legs.reduce((s, p) => s + (p[k] || 0), 0) * 100) / 100;
+
+  // The 9-leg refund JV (cancellation 300, no GST, Commission Reversal = No).
+  const LEGS = [
+    { ledger: 'IT-Base Fare', group: 'Sales Accounts', debit: 42485, credit: 0 },
+    { ledger: 'IT-Taxes', group: 'Sales Accounts', debit: 31742, credit: 0 },
+    { ledger: 'IT-Base Fare [Pur]', group: 'Purchase Accounts', debit: 0, credit: 42485 },
+    { ledger: 'IT-Taxes [Pur]', group: 'Purchase Accounts', debit: 0, credit: 31742 },
+    { ledger: S, group: 'Sundry Creditors', debit: 73927, credit: 0 },
+    { ledger: 'Cancellation Charges', group: 'Indirect Expenses', debit: 300, credit: 0 },
+    { ledger: 'Cancellation Charges Recovered', group: 'Indirect Income', debit: 0, credit: 300 },
+    { ledger: P, group: 'Sundry Debtors', debit: 0, credit: 74227 },
+    { ledger: P, group: 'Sundry Debtors', debit: 300, credit: 0 },
+  ];
+
+  test('groups by reversed voucher and each side balances', () => {
+    const { sale, purchase } = splitRefundJv(LEGS, { party: P, counterParty: S });
+    expect(sum(sale, 'debit')).toBe(74527);
+    expect(sum(sale, 'credit')).toBe(74527);     // sale side balances
+    expect(sum(purchase, 'debit')).toBe(74227);
+    expect(sum(purchase, 'credit')).toBe(74227); // purchase side balances
+    // customer on sale side, supplier on purchase side
+    expect(sale.filter((p) => p.ledger === P).length).toBe(2);
+    expect(purchase.filter((p) => p.ledger === S).length).toBe(1);
+    // cancellation expense → purchase, recovery → sale
+    expect(purchase.some((p) => p.ledger === 'Cancellation Charges')).toBe(true);
+    expect(sale.some((p) => p.ledger === 'Cancellation Charges Recovered')).toBe(true);
+  });
+
+  test('commission reversal legs land on the purchase side', () => {
+    const withCommission = [
+      ...LEGS,
+      { ledger: 'Commission/Incentive Received', group: 'Indirect Income', debit: 1275, credit: 0 },
+      { ledger: 'TDS Receivable [BOM]', group: 'Current Assets', debit: 0, credit: 25.5 },
+    ];
+    const { sale, purchase } = splitRefundJv(withCommission, { party: P, counterParty: S });
+    expect(purchase.some((p) => /commission/i.test(p.ledger))).toBe(true);
+    expect(purchase.some((p) => /tds/i.test(p.ledger))).toBe(true);
+    expect(sale.some((p) => /commission|tds/i.test(p.ledger))).toBe(false);
+  });
+
+  test('GST output → sale, input credit → purchase', () => {
+    const { sale, purchase } = splitRefundJv([
+      { ledger: 'IGST Output [BOM]', group: 'Duties & Taxes', debit: 0, credit: 45 },
+      { ledger: 'IGST Input [BOM]', group: 'Duties & Taxes', debit: 54, credit: 0 },
+    ], { party: P, counterParty: S });
+    expect(sale.some((p) => /output/i.test(p.ledger))).toBe(true);
+    expect(purchase.some((p) => /input/i.test(p.ledger))).toBe(true);
   });
 });
 

@@ -521,6 +521,27 @@ export function useAlerts(branch) {
   });
 }
 
+// Scrutiny trend for a branch — issues opened vs fixed per week + avg time-to-fix.
+export function useAlertTrend(branch) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['alert-trend', code || 'all'],
+    queryFn: () => apiGet('/api/alert-states/trend', { branch: code }),
+    enabled: enabled() && !!code,
+    staleTime: 60_000,
+  });
+}
+
+// Per-branch open-issue comparison (from each branch's latest scan).
+export function useAlertsByBranch() {
+  return useQuery({
+    queryKey: ['alerts-by-branch'],
+    queryFn: () => apiGet('/api/alert-states/by-branch'),
+    enabled: enabled(),
+    staleTime: 60_000,
+  });
+}
+
 // Single voucher (drill-down target) — view + edit.
 export function useVoucher(id) {
   return useQuery({

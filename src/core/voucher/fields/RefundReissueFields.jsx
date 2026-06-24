@@ -8,7 +8,7 @@ import { useVoucherRef } from '../useVoucherRef';
 import { apiGet } from '../../api';
 import { useVoucherPreview } from '../../useAccounting';
 import { money2, r2 } from '../ui';
-import { refundPrefillFromBooking, poSnapForView } from './refundPrefill';
+import { refundPrefillFromBooking, poSnapForView, splitRefundJv } from './refundPrefill';
 import { buildRefundReissueBody } from './refundBody';
 
 const num = (v) => (Number(v) || 0);
@@ -49,26 +49,40 @@ function SnapGrid({ title, snap, color }) {
   );
 }
 
-// One posted side (Sale or Purchase) of the original booking's JV — the Dr/Cr legs
-// the booking put on the books, shown read-only under the SO/PO/GP grids.
-function JvSide({ side, label, color }) {
-  if (!side || !Array.isArray(side.postings) || side.postings.length === 0) return null;
-  const td = { padding: '3px 8px', fontVariantNumeric: 'tabular-nums', borderBottom: '1px solid #f0f1f4' };
+// A JV side rendered as a side-by-side T-account: all Debit legs in the left pane,
+// all Credit legs in the right pane, with Total Dr / Total Cr at the foot. Used for
+// each side of the booking JV (Sales / Purchase voucher) and each side of the live
+// refund JV (sale-reversal / purchase-reversal).
+function JvTBlock({ title, sub, postings, color }) {
+  const list = (postings || []).filter((p) => num(p && p.debit) || num(p && p.credit));
+  if (!list.length) return null;
+  const dr = list.filter((p) => num(p.debit)), cr = list.filter((p) => num(p.credit));
+  const totDr = r2(dr.reduce((s, p) => s + num(p.debit), 0));
+  const totCr = r2(cr.reduce((s, p) => s + num(p.credit), 0));
+  const bal = Math.abs(totDr - totCr) < 0.01;
+  const head = { padding: '3px 8px', fontSize: 9.5, fontWeight: 700, color: '#5a6691', background: '#eef1f7', letterSpacing: '0.3px' };
+  const leg = (p, key, amtColor) => (
+    <div key={key} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '3px 8px', borderBottom: '1px solid #f2f4f8' }}>
+      <span style={{ minWidth: 0 }}><span style={{ fontWeight: 600, color: '#14161a' }}>{p.ledger}</span><span style={{ display: 'block', fontSize: 9, color: '#9197a3' }}>{p.group || ''}</span></span>
+      <span style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: amtColor }}>{key.startsWith('d') ? fmtN(p.debit) : fmtN(p.credit)}</span>
+    </div>
+  );
+  const foot = { borderTop: '1px solid #e6e8ec', padding: '4px 8px', display: 'flex', justifyContent: 'space-between', fontWeight: 800, background: '#fafbfd' };
   return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ fontSize: 10.5, fontWeight: 700, color, marginBottom: 3 }}>{label}{side.vno ? ` · ${side.vno}` : ''}</div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10.5 }}>
-        <tbody>
-          {side.postings.map((p, i) => (
-            <tr key={i}>
-              <td style={{ ...td, color: '#14161a' }}>{p.ledger}</td>
-              <td style={{ ...td, color: '#9197a3' }}>{p.group || ''}</td>
-              <td style={{ ...td, textAlign: 'right', color: '#185FA5' }}>{num(p.debit) ? fmtN(p.debit) : ''}</td>
-              <td style={{ ...td, textAlign: 'right', color: '#A32D2D' }}>{num(p.credit) ? fmtN(p.credit) : ''}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 4 }}>{title}{sub ? ` · ${sub}` : ''}{!bal && <span style={{ color: '#A32D2D', fontWeight: 700 }}>  (out by {fmtN(totDr - totCr)})</span>}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', border: '1px solid #e6e8ec', borderRadius: 6, overflow: 'hidden', fontSize: 10.5 }}>
+        <div style={{ borderRight: '1px solid #e6e8ec' }}>
+          <div style={head}>Dr · Debit</div>
+          {dr.map((p, i) => leg(p, 'd' + i, '#185FA5'))}
+        </div>
+        <div>
+          <div style={head}>Cr · Credit</div>
+          {cr.map((p, i) => leg(p, 'c' + i, '#A32D2D'))}
+        </div>
+        <div style={{ ...foot, borderRight: '1px solid #e6e8ec', color: '#185FA5' }}><span>Total Dr</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(totDr)}</span></div>
+        <div style={{ ...foot, color: '#A32D2D' }}><span>Total Cr</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(totCr)}</span></div>
+      </div>
     </div>
   );
 }
@@ -208,8 +222,8 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
           {bookingJv && (bookingJv.sale || bookingJv.purchase) && (
             <div style={{ marginTop: 6, paddingTop: 10, borderTop: '1px dashed #dfe3ea' }}>
               <div style={{ fontSize: 11.5, fontWeight: 800, color: '#14161a', marginBottom: 6 }}>JV — Accounting effect of this booking</div>
-              <JvSide side={bookingJv.sale} label="Sales voucher" color="#185FA5" />
-              <JvSide side={bookingJv.purchase} label="Purchase voucher" color="#A32D2D" />
+              <JvTBlock title="Sales voucher" sub={bookingJv.sale?.vno} postings={bookingJv.sale?.postings} color="#185FA5" />
+              <JvTBlock title="Purchase voucher" sub={bookingJv.purchase?.vno} postings={bookingJv.purchase?.postings} color="#A32D2D" />
             </div>
           )}
         </div>
@@ -244,16 +258,15 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
-        <FL label="GST on our charges"><select value={state.gstPct} onChange={(e) => { const g = +e.target.value; patch({ gstPct: g, supplierGst: num(state.supplierSvc) ? r2(num(state.supplierSvc) * g / 100) : state.supplierGst, supplierCancelGst: num(state.supplierCancel) ? r2(num(state.supplierCancel) * g / 100) : state.supplierCancelGst }); }} style={inp}>{GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}</select></FL>
+        <FL label={`GST on our charges (${gstRate}%) · ${money2(cur, taxAmt)}`}><select value={state.gstPct} onChange={(e) => { const g = +e.target.value; patch({ gstPct: g, supplierGst: num(state.supplierSvc) ? r2(num(state.supplierSvc) * g / 100) : state.supplierGst }); }} style={inp}>{GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}</select></FL>
         <FL label={`Supplier service charge (${cur}, our cost)`}><input type="number" value={state.supplierSvc} onChange={(e) => patch({ supplierSvc: e.target.value, supplierGst: gstOf(e.target.value) })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
         <FL label={`Supplier GST (${cur}, input credit · auto ${gstRate}%)`}><input type="number" value={state.supplierGst} onChange={(e) => patch({ supplierGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
       </div>
 
       {isRefund && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
-            <FL label={`Airline cancellation fee (${cur}, supplier kept)`}><input type="number" value={state.supplierCancel} onChange={(e) => patch({ supplierCancel: e.target.value, supplierCancelGst: gstOf(e.target.value) })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
-            <FL label={`Cancellation GST (${cur} · auto ${gstRate}%)`}><input type="number" value={state.supplierCancelGst} onChange={(e) => patch({ supplierCancelGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 6 }}>
+            <FL label={`Airline cancellation fee (${cur}, supplier kept)`}><input type="number" value={state.supplierCancel} onChange={(e) => patch({ supplierCancel: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
             <FL label="Recover cancellation from customer"><label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34 }}><input type="checkbox" checked={state.cancelRecover !== false} onChange={(e) => patch({ cancelRecover: e.target.checked })} /> charge it to the client (pass-through)</label></FL>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
@@ -277,34 +290,28 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
         </p>
       )}
 
-      {/* Live JV for this refund — the actual double-entry that will post (full reversal
-          of the linked sale/purchase + the refund economics), recomputed as you type.
-          Sits right under the amounts so the books effect is visible while entering. */}
-      <div style={{ border: '1px solid #cdd6e6', borderRadius: 10, padding: 12, margin: '4px 0 14px', background: '#f7f9fc' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#14161a' }}>Live JV — this {kind} (where it hits the books)</div>
-          <span style={{ fontSize: 11, fontWeight: 800, color: refundPv.error ? '#A32D2D' : refundPv.balanced ? '#16a34a' : '#A32D2D' }}>
-            {refundPv.error ? '⚠ ' + refundPv.error : refundPv.balanced ? '✓ Balanced' : (refundPv.postings || []).length ? `✗ Out by ${money2(cur, refundPv.diff)}` : ''}
-          </span>
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-          <thead><tr>{['Ledger', 'Group', 'Debit', 'Credit'].map((h, i) => <th key={h} style={{ textAlign: i > 1 ? 'right' : 'left', padding: '4px 8px', color: '#9197a3', fontWeight: 700, borderBottom: '1px solid #e6e8ec' }}>{h}</th>)}</tr></thead>
-          <tbody>
-            {(refundPv.postings || []).map((p, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}>
-                <td style={{ padding: '4px 8px', fontWeight: 600, color: '#14161a' }}>{p.ledger}</td>
-                <td style={{ padding: '4px 8px', color: '#9197a3' }}>{p.group || ''}</td>
-                <td style={{ padding: '4px 8px', textAlign: 'right', color: '#185FA5', fontVariantNumeric: 'tabular-nums' }}>{num(p.debit) ? fmtN(p.debit) : ''}</td>
-                <td style={{ padding: '4px 8px', textAlign: 'right', color: '#A32D2D', fontVariantNumeric: 'tabular-nums' }}>{num(p.credit) ? fmtN(p.credit) : ''}</td>
-              </tr>
-            ))}
-            {!(refundPv.postings || []).length && <tr><td colSpan={4} style={{ padding: 12, textAlign: 'center', color: '#9197a3' }}>Fill the refund (and fetch the Link No) to see the journal effect.</td></tr>}
-          </tbody>
-          {(refundPv.postings || []).length > 0 && (
-            <tfoot><tr style={{ fontWeight: 800, background: '#eef1f7' }}><td style={{ padding: '5px 8px' }} colSpan={2}>Total</td><td style={{ padding: '5px 8px', textAlign: 'right', color: '#185FA5' }}>{fmtN(refundPv.totalDebit)}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: '#A32D2D' }}>{fmtN(refundPv.totalCredit)}</td></tr></tfoot>
-          )}
-        </table>
-      </div>
+      {/* Live JV for this refund — the actual double-entry that will post, split into
+          the sale-reversal and purchase-reversal sides (each a Dr/Cr T-block) and
+          recomputed as you type, right under the amounts. */}
+      {(() => {
+        const sides = splitRefundJv(refundPv.postings, { party: state.party, counterParty: state.counterParty });
+        return (
+          <div style={{ border: '1px solid #cdd6e6', borderRadius: 10, padding: 12, margin: '4px 0 14px', background: '#f7f9fc' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#14161a' }}>Live JV — this {kind} (where it hits the books)</div>
+              <span style={{ fontSize: 11, fontWeight: 800, color: refundPv.error ? '#A32D2D' : refundPv.balanced ? '#16a34a' : '#A32D2D' }}>
+                {refundPv.error ? '⚠ ' + refundPv.error : refundPv.balanced ? '✓ Balanced' : (refundPv.postings || []).length ? `✗ Out by ${money2(cur, refundPv.diff)}` : ''}
+              </span>
+            </div>
+            {(refundPv.postings || []).length ? (
+              <>
+                <JvTBlock title={`${isRefund ? 'Refund' : 'Reissue'} — Sales side`} sub={state.againstInvoice ? `reverses ${state.againstInvoice}` : ''} postings={sides.sale} color="#185FA5" />
+                <JvTBlock title={`${isRefund ? 'Refund' : 'Reissue'} — Purchase side`} sub={state.againstPurchase ? `reverses ${state.againstPurchase}` : ''} postings={sides.purchase} color="#A32D2D" />
+              </>
+            ) : <div style={{ padding: 12, textAlign: 'center', color: '#9197a3', fontSize: 11 }}>Fill the refund (and fetch the Link No) to see the journal effect.</div>}
+          </div>
+        );
+      })()}
 
       <FL label="Narration"><textarea value={state.remarks || ''} onChange={(e) => patch({ remarks: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder={`Being ${kind}${state.againstInvoice ? ` against ${state.againstInvoice}` : ''}`} /></FL>
     </>

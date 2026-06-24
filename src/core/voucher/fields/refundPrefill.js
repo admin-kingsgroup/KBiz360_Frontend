@@ -19,6 +19,35 @@ const num = (v) => (Number(v) || 0);
 // per-line value lives in the booking's `rows` grid. We merge it back so the PO grid
 // matches the booking-entry form (which has a "Supplier Incentive" column). Falls
 // back to the scalar when there's a single line and no rows detail.
+// Split a refund/reissue journal's flat legs into the sale-reversal side and the
+// purchase-reversal side, by what each leg reverses — so the JV can render as two
+// balanced T-blocks (like the original Sales / Purchase vouchers). `party` is the
+// customer (Sundry Debtor), `counterParty` the supplier (Sundry Creditor).
+export function splitRefundJv(postings = [], opts = {}) {
+  const party = opts.party || '', counterParty = opts.counterParty || '';
+  const sale = [], purchase = [];
+  for (const p of postings || []) {
+    const led = String(p && p.ledger || '');
+    const grp = String(p && p.group || '').toLowerCase();
+    const l = led.toLowerCase();
+    let side;
+    if (party && led === party) side = 'sale';                  // the customer
+    else if (counterParty && led === counterParty) side = 'purchase'; // the supplier
+    else if (/sales account/.test(grp)) side = 'sale';
+    else if (/purchase account/.test(grp)) side = 'purchase';
+    else if (/recovered/.test(l)) side = 'sale';                // cancellation recovered from customer
+    else if (/cancellation/.test(l)) side = 'purchase';         // airline cancellation fee (our cost)
+    else if (/output/.test(l)) side = 'sale';                   // output GST → sell side
+    else if (/input/.test(l)) side = 'purchase';                // input-credit GST → cost side
+    else if (/commission|incentive/.test(l)) side = 'purchase'; // supplier commission reversal
+    else if (/tds/.test(l)) side = 'purchase';
+    else if (/service charge income|markup income/.test(l)) side = 'sale'; // retained income
+    else side = 'sale';                                         // fallback (keeps the leg visible)
+    (side === 'sale' ? sale : purchase).push(p);
+  }
+  return { sale, purchase };
+}
+
 export function poSnapForView(po = {}, rows = []) {
   const lines = Array.isArray(po && po.lines) ? po.lines : [];
   const r = Array.isArray(rows) ? rows : [];
