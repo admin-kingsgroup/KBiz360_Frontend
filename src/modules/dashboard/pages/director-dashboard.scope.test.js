@@ -6,7 +6,7 @@
  * had no effect — it kept showing consolidated (= BOM, the only branch with data).
  * Scope must now come ONLY from the shell `branch` prop.
  */
-import { directorScope, branchSpecificScope, scopeBranchArg } from './director-dashboard.scope';
+import { directorScope, branchSpecificScope, branchListForScope, scopeBranchArg } from './director-dashboard.scope';
 
 describe('directorScope — scope comes only from the shell branch selector', () => {
   test("consolidated: branch === 'ALL' → scope 'ALL'", () => {
@@ -39,6 +39,23 @@ describe('branchSpecificScope — Director Dashboard never consolidates', () => 
     expect(branchSpecificScope(undefined)).toBeNull();
     expect(branchSpecificScope(null)).toBeNull();
     expect(branchSpecificScope({})).toBeNull();
+  });
+});
+
+describe('branchListForScope — Owner branch table follows the selector', () => {
+  const BRANCHES = [{ code: 'BOM' }, { code: 'AMD' }, { code: 'NBO' }, { code: 'DAR' }, { code: 'FBM' }];
+
+  test("Group ('ALL') → every branch (consolidated comparison)", () => {
+    expect(branchListForScope('ALL', BRANCHES)).toHaveLength(5);
+  });
+
+  test('a specific branch → only that branch (no cross-branch data)', () => {
+    expect(branchListForScope('NBO', BRANCHES)).toEqual([{ code: 'NBO' }]);
+    expect(branchListForScope('BOM', BRANCHES)).toEqual([{ code: 'BOM' }]);
+  });
+
+  test('empty scope falls back to all (treated as Group)', () => {
+    expect(branchListForScope(null, BRANCHES)).toHaveLength(5);
   });
 });
 

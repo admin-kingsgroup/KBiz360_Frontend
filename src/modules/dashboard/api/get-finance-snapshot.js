@@ -231,16 +231,19 @@ export const getGstrFiling = async (branchCode) => {
 // ⇒ every entry is posted, so the period is effectively closed from a data-entry
 // standpoint. tbClosed/reconciled/approved all reflect that same real signal — never
 // a fabricated tick. (When a true month-end-lock subsystem lands, source it here.)
-export const getPeriodClose = async () => {
+// Period-close status, branch-by-branch. Honours the branch selector: a branchCode
+// → only that branch's row; null (Group) → every branch.
+export const getPeriodClose = async (branchCode) => {
   try {
     const [branches, pending] = await Promise.all([
       apiGet('/api/branches'),
-      apiGet('/api/vouchers', { status: 'pending', from: `${CUR_MONTH}-01`, to: `${CUR_MONTH}-31` }),
+      apiGet('/api/vouchers', { status: 'pending', from: `${CUR_MONTH}-01`, to: `${CUR_MONTH}-31`, branch: branchCode }),
     ]);
     const pendingByBr = {};
     for (const v of (pending || [])) pendingByBr[v.branch] = (pendingByBr[v.branch] || 0) + 1;
     return (branches || [])
       .filter((b) => b && b.code && b.active !== false)
+      .filter((b) => !branchCode || b.code === branchCode)   // selector on a branch ⇒ that branch only
       .map((b) => {
         const done = !(pendingByBr[b.code] > 0); // no pending vouchers ⇒ all posted
         return { branch: b.code, tbClosed: done, reconciled: done, approved: done, status: done ? 'Closed' : 'Open' };

@@ -7,7 +7,7 @@ import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, Layou
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { PERM_MODULES } from './permissions';
 import { getRole } from './referenceCache';
-import { isPageAccessAdmin } from './pageCatalog';
+import { isPageAccessAdmin, isOwnerDashboardUser } from './pageCatalog';
 /* (Removed dead imports of Recruitment from './helpers' and Dashboard from
    '../modules/dashboard' — only their string labels/hrefs are used in the menu
    tree, never the component values. Dropping them also keeps the menu out of
@@ -575,8 +575,9 @@ export function getMenu(branch, currentUser){
   // accountant gets that pill too. Branch scope is still enforced by the top-right
   // switcher (limited to their stored branches).
   if (isAccountant) return applyHidden([accountsMenu, MENU_APPROVALS, taxSection], currentUser);
-  // Owner (by email) gets the extra Owner Dashboard link inside the Dashboards dropdown.
-  const dashboardsMenu = isPageAccessAdmin(currentUser) ? withOwnerDashboard(MENU_DASHBOARDS) : MENU_DASHBOARDS;
+  // The group owner (Super Admin + owner email) gets the extra Owner Dashboard
+  // link inside the Dashboards dropdown — nobody else.
+  const dashboardsMenu = isOwnerDashboardUser(currentUser) ? withOwnerDashboard(MENU_DASHBOARDS) : MENU_DASHBOARDS;
   const top = isDir ? [dashboardsMenu, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
   // 9 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · HR · Admin
   const menus = [...top, accountsMenu, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN];

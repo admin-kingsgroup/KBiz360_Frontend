@@ -33,6 +33,14 @@ export function isPageAccessAdmin(user) {
   return String(user.email || '').toLowerCase() === PAGE_ACCESS_ADMIN_EMAIL;
 }
 
+// The Owner Dashboard (consolidated, all-branch) is for the group owner ONLY:
+// the Super Admin whose email is the owner email. BOTH must hold — a Super Admin
+// with a different email can't see it, and the owner email under any other role
+// can't either. Used to gate the /dashboard/owner route and its menu link.
+export function isOwnerDashboardUser(user) {
+  return isPageAccessAdmin(user) && String(user?.role || '') === 'Super Admin';
+}
+
 // Routes that must NEVER be hidden — hiding them would lock a user out of the
 // app's landing screen, or lock the admin out of this very control. They are
 // excluded from the catalogue (can't be toggled) and never pruned.

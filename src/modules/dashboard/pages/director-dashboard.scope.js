@@ -19,6 +19,14 @@ export const directorScope = (branch) => (branch === 'ALL' ? 'ALL' : (branch?.co
 export const branchSpecificScope = (branch) =>
   (branch && branch !== 'ALL' && branch.code) ? branch.code : null;
 
+/**
+ * Branches to drive the branch-comparison table (Owner Dashboard):
+ *  • scope 'ALL'  → every branch (group comparison).
+ *  • a branch code → ONLY that branch (selector on a branch ⇒ that branch's data only).
+ */
+export const branchListForScope = (scope, branches) =>
+  (!scope || scope === 'ALL') ? branches : branches.filter((b) => b.code === scope);
+
 /** Scope code → the `branch` arg the accounting/booking accessors expect
  *  ('ALL' for consolidated, otherwise { code } so the API sends ?branch=<code>). */
 export const scopeBranchArg = (scope) => (scope && scope !== 'ALL' ? { code: scope } : 'ALL');

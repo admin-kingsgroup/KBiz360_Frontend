@@ -7,8 +7,8 @@ import { CUR_FY } from '../../../core/dates';
 import { PageLayout } from '../../../shell/PageLayout';
 import { ResponsiveGrid } from '../../../shell/primitives';
 import { useDirectorDashboard } from '../hooks/use-director-dashboard';
-import { directorScope, branchSpecificScope, scopeBranchArg } from './director-dashboard.scope';
-import { isPageAccessAdmin } from '../../../core/pageCatalog';
+import { directorScope, branchSpecificScope, branchListForScope, scopeBranchArg } from './director-dashboard.scope';
+import { isOwnerDashboardUser } from '../../../core/pageCatalog';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
 import { useDashboardStore } from '../store/dashboard.store';
 import { PeriodBar, periodRange } from '../../../core/period';
@@ -71,8 +71,10 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch, consolida
     { metric: 'Gross Profit', actual: gpTot?.actual || 0, target: gpTot?.target || 0, unit: cur },
   ].filter((t) => t.target > 0);
 
-  // Live per-branch performance — replaces the old empty BRANCH_PL_HEATMAP seed.
-  const brList = BRANCHES.filter((b) => b.code);
+  // Live per-branch performance. Group scope ('ALL') compares every branch; a
+  // specific branch selection narrows this to that branch only (no cross-branch
+  // data) — so the table honours the top-right branch selector like the KPIs do.
+  const brList = branchListForScope(effScope, BRANCHES.filter((b) => b.code));
   const bq = useQueries({ queries: brList.map((b) => ({ queryKey: ['accounting', 'module-pl', b.code, dates.from, dates.to, 'summary'], queryFn: () => apiGet('/api/accounting/module-pl', { branch: b.code, from: dates.from, to: dates.to, summary: 1 }) })) });
   const branchRows = brList.map((b, i) => { const d = bq[i].data || {}; return { code: b.code, sales: d?.totals?.sales || 0, gp: d?.totals?.gp || 0, net: d?.bridge?.netProfit || 0 }; });
 
@@ -88,7 +90,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch, consolida
   // Director Dashboard with the consolidated view selected → no single branch to
   // show. Prompt to pick one (and point the owner to the consolidated Owner view).
   if (needsBranch) {
-    const isOwner = isPageAccessAdmin(currentUser);
+    const isOwner = isOwnerDashboardUser(currentUser);
     return (
       <PageLayout>
         <DashboardHeader title="Director Dashboard" subtitle="Branch-specific view" user={currentUser} />
@@ -138,8 +140,10 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch, consolida
   const mods = (mpl.modules || []).slice().sort((a, b) => (b.gp || 0) - (a.gp || 0));
 
   const pageTitle = consolidated ? 'Owner Dashboard' : 'Director Dashboard';
+  // Owner follows the top-right selector: Group ⇒ consolidated all-branch; a
+  // specific branch ⇒ that branch only. Director is always single-branch.
   const pageSubtitle = consolidated
-    ? 'Whole-company consolidated — all branches'
+    ? (effScope === 'ALL' ? 'Group view — all branches consolidated' : `Branch view — ${effScope} only`)
     : `Branch-specific view — ${effScope}`;
 
   return (

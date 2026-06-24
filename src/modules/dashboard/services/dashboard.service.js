@@ -26,7 +26,7 @@ export const loadBranchDashboard = async ({ branchCode }) => {
     api.getModulePL({ branchCode, ...p.ytd }),
     api.getAgeingTotals(branchCode),
     api.getSaleVouchers({ branchCode, ...p.month }),
-    api.getActionItems(),
+    api.getActionItems(branchCode),
     api.getUpcomingTravel({ limit: 5, branchCode }),
     api.getBookingSummary(branchCode), // SO/PO/GP pipeline { pending, approved } (whole queue, not date-bound)
   ]);
@@ -114,7 +114,7 @@ export const loadSrFmDashboard = async ({ branchCode } = {}) => {
     await Promise.all([
       api.getCashForecast(branchCode),
       api.getBankAccounts(branchCode),
-      api.getPeriodClose(),
+      api.getPeriodClose(branchCode),
       api.getArAgeingSummary(branchCode),
       api.getApAgeingSummary(branchCode),
       api.getVarianceFlags(branchCode),
@@ -126,7 +126,7 @@ export const loadSrFmDashboard = async ({ branchCode } = {}) => {
 
 export const loadSrAeDashboard = async ({ branchCode } = {}) => {
   const [todayVouchers, reconStatus, topVendorsOverdue] = await Promise.all([
-    api.getTodayVouchersByBranch(),
+    api.getTodayVouchersByBranch(branchCode),
     api.getReconStatus(branchCode),
     api.getTopVendorsOverdue(branchCode),
   ]);
@@ -136,8 +136,8 @@ export const loadSrAeDashboard = async ({ branchCode } = {}) => {
 
 export const loadAcctsExecDashboard = async ({ branchCode } = {}) => {
   const [todayVouchers, recentActivity, arAgeing] = await Promise.all([
-    api.getTodayVouchersByBranch(),
-    api.getRecentActivity(),
+    api.getTodayVouchersByBranch(branchCode),
+    api.getRecentActivity(branchCode),
     api.getArAgeingSummary(branchCode),
   ]);
 

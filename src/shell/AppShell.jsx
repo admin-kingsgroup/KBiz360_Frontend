@@ -24,8 +24,7 @@ import { createPortal } from 'react-dom';
 import { Menu, X, ChevronDown, Bell, Printer, Eye } from 'lucide-react';
 import { KBIZ_LOGO } from '../core/brand';
 import { getMenu } from '../core/menus';
-import { useNotifRefresh } from '../core/hooks';
-import { getUnreadCount } from '../core/business-logic';
+import { useAlerts } from '../core/useAccounting';
 import { openPrintPreview } from '../core/PrintPreview';
 import { useFyStore, FY_OPTIONS } from '../store/fy';
 import { ModuleSearch } from './ModuleSearch';
@@ -348,8 +347,12 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
   const mobileDrawerRef = useRef(null);
-  useNotifRefresh();
-  const unread = getUnreadCount();
+  // Bell badge + critical banner read the live alert feed (same source as the
+  // Alerts Dashboard). `unread` = open (pending) alerts; `critical` = open errors.
+  const alertsQ = useAlerts(branch);
+  const pendingAlerts = useMemo(() => (alertsQ.data?.alerts || []).filter((a) => (a.status || 'pending') === 'pending'), [alertsQ.data]);
+  const unread = pendingAlerts.length;
+  const critical = useMemo(() => pendingAlerts.filter((a) => a.severity === 'error'), [pendingAlerts]);
   const menu = useMemo(() => getMenu(branch, currentUser), [branch, currentUser]);
   const go = (href) => { if (href) setRoute(href); setMobileOpen(false); };
 
@@ -468,6 +471,24 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
           </div>
         )}
         {subBar && <div className="noprint shrink-0">{subBar}</div>}
+        {/* App-wide critical-alert banner — open 🔴 issues for the active branch
+            (Trial Balance out, negative bank, suspense, can't-post vouchers, bounced
+            cheques, ADM window closed). One click jumps to the Alerts Dashboard. */}
+        {critical.length > 0 && route !== '/dashboard/alerts' && (
+          <button
+            type="button"
+            onClick={() => setRoute && setRoute('/dashboard/alerts')}
+            className="noprint flex w-full shrink-0 items-center justify-between gap-3 border-b border-danger/30 bg-danger/[0.08] px-4 py-2 text-left text-[12px] font-semibold text-danger transition-colors hover:bg-danger/[0.12]"
+          >
+            <span className="flex items-center gap-2 min-w-0">
+              <span aria-hidden="true">🔴</span>
+              <span className="truncate">
+                {critical.length} critical issue{critical.length > 1 ? 's' : ''} need attention — {critical.slice(0, 2).map((a) => a.title).join(' · ')}{critical.length > 2 ? ` +${critical.length - 2} more` : ''}
+              </span>
+            </span>
+            <span className="shrink-0 whitespace-nowrap">Review →</span>
+          </button>
+        )}
         <main className="min-h-0 flex-1 overflow-y-auto bg-surface-alt">{children}</main>
       </div>
 
@@ -475,7 +496,7 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
       {showNotif && (
         <>
           <div className="noprint fixed inset-0 z-[599]" onClick={() => setShowNotif(false)} />
-          <NotifPanel onClose={() => setShowNotif(false)} setRoute={(r) => { setRoute && setRoute(r); setShowNotif(false); }} />
+          <NotifPanel branch={branch} onClose={() => setShowNotif(false)} setRoute={(r) => { setRoute && setRoute(r); setShowNotif(false); }} />
         </>
       )}
     </div>

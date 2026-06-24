@@ -15,7 +15,7 @@ import { useMobile } from './core/hooks';
 import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
 import { lazyModule } from './core/lazyModule';
-import { isPageAccessAdmin } from './core/pageCatalog';
+import { isOwnerDashboardUser } from './core/pageCatalog';
 
 /* ── Route-level code-splitting ───────────────────────────────────────────
    Every page component below is loaded via lazyModule() → one dynamic
@@ -54,7 +54,6 @@ const { PageAccessControl } = lazyModule(() => import('./modules/pageAccess'));
 const { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxReco, TaxTdsTcs, TaxVat } = lazyModule(() => import('./modules/taxation'));
 const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, DebitNoteVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, RefundPartialVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
 const { SoPoGpVoucherEntry } = lazyModule(() => import('./modules/bookingOrder'));
-const { InterBranchVoucher } = lazyModule(() => import('./modules/interBranchVoucher'));
 const { InterBranchRegister } = lazyModule(() => import('./modules/interBranchRegister'));
 const { UnifiedApprovals } = lazyModule(() => import('./modules/voucherApprovals'));
 const { ModuleRegister } = lazyModule(() => import('./modules/moduleRegister'));
@@ -441,10 +440,10 @@ export default function KB360App(){
     if(route==="/accounts/suspense")      return <SuspenseClearing branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/month-end")     return <MonthEndChecklist branch={branch} setRoute={navigate}/>;
     if(route==="/dashboard")          return <DashboardRouter branch={branch} setRoute={navigate} currentUser={currentUser}/>;
-    // Owner Dashboard — consolidated whole-company view. Restricted by EMAIL to the
-    // owner (afshin.dhanani@kingsgroupco.com); no role grants it. Mirrors the
-    // Page-Access-admin gate. Non-owners hitting the URL get a "not available" card.
-    if(route==="/dashboard/owner")    return isPageAccessAdmin(currentUser)
+    // Owner Dashboard — consolidated whole-company view. Restricted to the group
+    // owner: the Super Admin whose email is afshin.dhanani@kingsgroupco.com (BOTH
+    // role + email required). Non-owners hitting the URL get a "not available" card.
+    if(route==="/dashboard/owner")    return isOwnerDashboardUser(currentUser)
       ? <OwnerDashboard branch={branch} setRoute={navigate} currentUser={currentUser}/>
       : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",textAlign:"center"}}>
           <div style={{fontSize:42,marginBottom:14}}>🔒</div>
@@ -458,7 +457,7 @@ export default function KB360App(){
     if(/^\/dashboards\/(exec|profitability|cash|cash-forecast|arap|branch|balance-sheet|module-gp|sales|supplier|tax|expenses|audit|sales-target|gp-target|collections-target|budget-expense|yoy|customer-value)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch} setRoute={navigate}/>;
     if(route==="/finance/targets") return <TargetsMaster branch={branch}/>;
     if(route==="/bookings/new")       return <SoPoGpVoucherEntry branch={branch} setRoute={navigate}/>;
-    if(route==="/bookings/inter-branch") return <InterBranchVoucher branch={branch} setRoute={navigate}/>;
+    if(route==="/bookings/inter-branch") return <SoPoGpVoucherEntry branch={branch} setRoute={navigate} interBranch/>;
     // Unified Approvals — SO/PO/GP + Vouchers, each with Pending/Approved/Rejected/Deleted.
     if(route==="/transactions/approvals")          return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="sopogp"/>;
     if(route==="/transactions/voucher-approvals")  return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;

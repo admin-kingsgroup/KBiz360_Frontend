@@ -13,14 +13,6 @@ const SEV = {
   warn: { dot: '#B7791F', bg: '#fbeedb', label: 'Warning' },
   info: { dot: '#2563eb', bg: '#e8f0ff', label: 'To review' },
 };
-const DOMAINS = [
-  ['all', 'All'],
-  ['acct', 'Accounting', ['tb-unbalanced', 'needs-attention', 'pending']],
-  ['masters', 'Masters', ['idle-ledger', 'supplier-credit', 'client-credit', 'company-profile']],
-  ['targets', 'Targets', ['sales-target-missing']],
-  ['tax', 'Tax', ['company-profile']],
-  ['arap', 'AR / AP', ['receivables', 'payables', 'onacc-rcpt', 'onacc-pay']],
-];
 const REMIND_PRESETS = [['1 day', 1], ['3 days', 3], ['Next week', 7], ['2 weeks', 14]];
 
 // Touch-target helpers — content controls get a 44px tap height below tablet.
@@ -49,18 +41,21 @@ export function AlertsDashboard({ branch, setRoute }) {
   const all = data.alerts || [];
   const sc = data.statusCounts || { pending: 0, remind: 0, finished: 0 };
 
-  const domainKeys = useMemo(() => {
-    const d = DOMAINS.find((x) => x[0] === domain);
-    return d && d[2] ? new Set(d[2]) : null;
-  }, [domain]);
+  // Domain filter chips are driven by the backend `domains` summary, so a new
+  // alert type is reachable the moment it's added server-side — nothing can fall
+  // into an unfiltered gap (the old hard-coded lists hid tax dues, suspense, etc.).
+  const domainOpts = useMemo(
+    () => [['all', 'All'], ...(data.domains || []).map((d) => [d.key, d.label])],
+    [data.domains],
+  );
 
   const rows = useMemo(() => all.filter((a) => {
     if ((a.status || 'pending') !== tab) return false;
     if (sev !== 'all' && a.severity !== sev) return false;
-    if (domainKeys && !domainKeys.has(a.type)) return false;
+    if (domain !== 'all' && a.domain !== domain) return false;
     if (search) { const s = search.toLowerCase(); if (!(`${a.title} ${a.detail}`.toLowerCase().includes(s))) return false; }
     return true;
-  }), [all, tab, sev, domainKeys, search]);
+  }), [all, tab, sev, domain, search]);
 
   // User-triggered refresh → confirm with a toast (passive refetches stay silent).
   const onRefresh = () => { toastInfo('Refreshing alerts…'); q.refetch(); };
@@ -116,7 +111,7 @@ export function AlertsDashboard({ branch, setRoute }) {
       {/* domain filter + search */}
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {DOMAINS.map(([k, lab]) => (
+          {domainOpts.map(([k, lab]) => (
             <span key={k} {...clickable(() => setDomain(k))} className={TAP_CHIP} style={chip(domain === k, '#eef0f3', DARK)}>{lab}</span>
           ))}
         </div>

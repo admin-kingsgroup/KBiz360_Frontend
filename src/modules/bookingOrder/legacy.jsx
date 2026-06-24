@@ -18,7 +18,13 @@ import { PeriodBar, periodRange } from '../../core/period';
 import { openPrintPreview } from '../../core/PrintPreview';
 import { buildBookingInvoice } from '../../core/invoiceHtml';
 import { apiGet, apiPost, apiPut } from '../../core/api';
-import { useOpenInb, useBookInb } from '../../core/useInterBranchVoucher';
+import { useOpenInb, useBookInb, useCreateInb } from '../../core/useInterBranchVoucher';
+
+// Inter-branch jurisdiction (mirror of backend): same country (India) = IGST;
+// different country = cross-border export (zero-rated on the seller side).
+const INB_COUNTRY = { BOM: 'IN', AMD: 'IN', TKHO: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'FB' };
+const INB_ALL = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'TKHO'];
+const inbCrossBorder = (from, to) => (INB_COUNTRY[from] || 'IN') !== (INB_COUNTRY[to] || 'IN');
 import { AuditTrail } from '../../core/AuditTrail';
 import { useLedgerRegistry } from '../../core/useReference';
 import { useFormKeys } from '../../core/ux/forms';
@@ -44,6 +50,7 @@ const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || 'BOM'))
 const today = () => new Date().toISOString().slice(0, 10);
 const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 /* shared cell styles */
 const thM = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: '#334155', textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #e2e8f0', background: '#f8fafc' };
@@ -87,7 +94,7 @@ export function rowsForEdit(spec, booking) {
   return [blankLine(spec)];
 }
 
-export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null, initialModule = null }) {
+export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null, initialModule = null, interBranch = false }) {
   const qc = useQueryClient();
   const editing = !!editBooking;
   // Editing keeps the booking's own branch; a fresh voucher uses the top-bar branch.
@@ -164,6 +171,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const [inbId, setInbId] = useState('');         // the InbLink _id (API target)
   const openInbQ = useOpenInb(branch);
   const bookInb = useBookInb();
+  // Inter-branch SALE mode: the customer is a counterparty branch; the SO grid's
+  // fares pass through to Inter-Branch Sales and the Service Charge becomes the
+  // Service Fee (margin). Posts via the INB engine (not the booking pipeline).
+  const createInb = useCreateInb();
+  const [toBranch, setToBranch] = useState('');
+  const inbBranches = INB_ALL.filter((b) => b !== brCode);
+  const inbExport = interBranch && toBranch && inbCrossBorder(brCode, toBranch);
 
   // Switching module reloads the seed grid for that module — never while editing
   // (the module is locked to the existing voucher so its lines aren't wiped).
@@ -248,13 +262,39 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const hasCustLedger = !!(customer.ledgerName || '').trim();
   const hasSuppLedger = !!supplier.name.trim();
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
-  const canSave = !!brCode && !saving && totals.so.total > 0 && customer.name.trim() && hasCustLedger
-    && (isNoSupp || (totals.po.total > 0 && hasSuppLedger));
+  const canSave = interBranch
+    ? (!!brCode && !saving && !!toBranch && totals.so.total > 0)  // INB: just need a counterparty branch + a sale value
+    : (!!brCode && !saving && totals.so.total > 0 && customer.name.trim() && hasCustLedger
+      && (isNoSupp || (totals.po.total > 0 && hasSuppLedger)));
 
   // Saving ALWAYS lands the booking in Pending — there is no save-and-approve from
   // entry (for ANY user, Super Admin included). Approval happens only from the
   // Pending queue, so every voucher's books impact passes the same review gate.
   const save = async () => {
+    // ── Inter-branch SALE: post via the INB engine, not the booking pipeline ──
+    // Fares (the PO/SO fare columns) pass through to Inter-Branch Sales; the SO
+    // Service Charge becomes the Service Fee (margin). IGST for India inter-state;
+    // export zero-rated cross-border (decided server-side).
+    if (interBranch) {
+      if (!toBranch) { setError('Select the counterparty branch'); return; }
+      const fareLines = (spec.fareCols || [])
+        .map((c) => ({ ledger: 'Inter-Branch Sales', amt: round2(lines.reduce((s, l) => s + num(l[c.key]), 0)), desc: c.label }))
+        .filter((l) => l.amt > 0);
+      const serviceFee = round2(lines.reduce((s, l) => s + num(l.ssvc), 0));
+      const pax = lines.map((l) => [l.fn, l.sn].filter(Boolean).join(' ')).filter(Boolean).join(', ');
+      if (!fareLines.length && !serviceFee) { setError('Enter the fares and/or a Service Fee'); return; }
+      setError(''); setSaving(true);
+      createInb.mutate({
+        fromBranch: brCode, toBranch, date, module: moduleCode,
+        packageType: hasPackage ? packageType : '', passenger: pax, reference: saleTallyRef || headerRef,
+        fareLines, serviceFee,
+      }, {
+        onSuccess: (res) => { setResult({ bookingNo: res?.inbLinkNo || '', _approved: false, _inb: true }); toast(`Inter-branch sale posted · ${res?.inbLinkNo || ''}`); qc.invalidateQueries({ queryKey: ['inb'] }); },
+        onError: (e) => { setError(e.message || 'Failed to post'); toast(`Could not post — ${e.message || 'failed'}`, 'error'); },
+        onSettled: () => setSaving(false),
+      });
+      return;
+    }
     // Editing an existing booking requires a reason (saved to the audit trail).
     let editReason = '';
     if (editing) {
@@ -521,6 +561,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         )
       )}
 
+      {interBranch && (
+        <div style={{ ...card, background: '#EAF1FB', border: '1px solid #B9D6F2', color: '#185FA5', fontSize: 12, marginBottom: 14 }}>
+          🔁 <b>Inter-Branch sale.</b> Enter the fares in the Purchase Order grid (pass-through at cost) and your margin in the Sales <b>Service Charge</b> column (= the <b>Service Fee</b>). Fares post to <b>Inter-Branch Sales</b>, the Service Fee to <b>Service Fee Income</b>.
+          {toBranch && <> Tax: <b>{inbExport ? `Export · zero-rated (${INB_COUNTRY[brCode]}→${INB_COUNTRY[toBranch]})` : 'IGST · inter-state (18% on Service Fee)'}</b>.</>}
+          {' '}Do not use Other Taxes. Creates an INB Link No the {toBranch || 'buying'} branch fetches on its SO/PO/GP.
+        </div>
+      )}
+
       {/* Header fields */}
       <div style={{ ...card, marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
@@ -537,6 +585,19 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           {spec.headerLabel && spec.headerLabel !== 'Sector / Airline' && (
             <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
           )}
+          {interBranch ? (
+            <FL label="To Branch (counterparty) *">
+              <select value={toBranch} onChange={(e) => {
+                const tb = e.target.value;
+                setToBranch(tb);
+                if (tb) { setCustomer((c) => ({ ...c, name: `Travkings Tours and Travels ${tb}`, ledgerName: `Travkings Tours and Travels ${tb}`, ledgerGroup: 'Sundry Debtors', group: 'Sundry Debtors' })); setSaleGstMode(inbCrossBorder(brCode, tb) ? 'inter' : 'inter'); }
+              }} style={{ ...inp, ...(toBranch ? {} : { borderColor: '#dc2626' }) }}>
+                <option value="">— Select branch —</option>
+                {inbBranches.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+              {!toBranch && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — the branch you're selling to</span>}
+            </FL>
+          ) : (
           <FL label="Client Ledger *">
             <PartyPicker branch={branch} kind="customer" value={{ name: customer.ledgerName, group: customer.ledgerGroup }} subGroupFilter={clientType}
               onChange={(v) => {
@@ -550,6 +611,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               }} />
             {!hasCustLedger && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — pick the Client Ledger to post & follow for payment</span>}
           </FL>
+          )}
           {isB2C && (
             <FL label="Customer (Bill to) — free text *">
               <input value={customer.name} onChange={(e) => setCustomer((c) => ({ ...c, name: e.target.value }))} placeholder="End-customer name (B2C)" style={inp} />
@@ -557,7 +619,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </FL>
           )}
           <FL label="Sale GST mode"><select value={saleGstMode} onChange={(e) => setSaleGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
-          {!isNoSupp && <FL label="Supplier ledger (Pay to) *">
+          {!isNoSupp && !interBranch && <FL label="Supplier ledger (Pay to) *">
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
               onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
             {!hasSuppLedger && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — pick the Creditor ledger to post & pay against</span>}
