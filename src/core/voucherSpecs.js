@@ -258,10 +258,14 @@ export function lineCalcPackage(spec, l, ctx) {
   const taxable = r2(land + psvc + psvcGst + markup); // full package consideration
   const outGst = r2(taxable * rate);       // single 5% output GST
   const finalSales = r2(taxable + outGst); // TCS added at booking level
-  const finalPurchase = r2(land + psvc + psvcGst); // GROSS cost; incentive netted via incentivePostings on post
+  const finalPurchase = r2(land + psvc + psvcGst); // GROSS payable to supplier (ITC split below)
   const salesGST = outGst;
+  // Tour-operator ITC option (Notif 11/2017-CTR): when availItc is set, the supplier's
+  // 5% GST (psvcGst) is claimable Input, not cost — payable to supplier is unchanged.
+  const availItc = !!(ctx && ctx.availItc) || !!l.availItc;
+  const gstPur = availItc ? psvcGst : 0;
   return {
-    pass: land, gstSvc: 0, gstMk: r2(markup * rate), gstPur: 0, psvcGst, markup, asp: taxable, outGst,
+    pass: land, gstSvc: 0, gstMk: r2(markup * rate), gstPur, psvcGst, markup, asp: taxable, outGst,
     incentive, tds,
     finalSales, finalPurchase, salesGST, gp: r2(markup + incentive),
     gpPct: finalSales > 0 ? r2(((markup + incentive) / finalSales) * 100) : 0,
@@ -299,8 +303,8 @@ export function lineCalc(spec, l, ctx) {
 // po/so carry { lineTotal (net, ex tax), serviceCharge, gst, tcs, total, lines }.
 // gp = sales net − purchase net (= net markup + service charge). The per-line
 // `lines` detail is preserved for the read-only voucher view + voucher meta.
-export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false } = {}) {
-  const ctx = { branch, noVat: !!noVat };
+export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, availItc = false } = {}) {
+  const ctx = { branch, noVat: !!noVat, availItc: !!availItc };
   const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, incentiveAmt: 0, incentiveGst: 0, incentiveTds: 0, total: 0, lines: [] };
   // `otherTaxesGst` = GST carved out of the SVC2 margin (GST-inclusive, so the
   // customer total is unchanged); kept OUT of `gst` so it posts to the dedicated
