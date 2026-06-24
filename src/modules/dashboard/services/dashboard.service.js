@@ -66,7 +66,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
   // NOTE: FY targets and the branch heatmap are rendered LIVE by the page itself
   // (useTargetsVsActual + per-branch module-pl), so we no longer fetch the seed
   // getFyTargets() or getBranchHeatmap() here — they were unused round-trips.
-  const [revenueTrend, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, bookingSummary] =
+  const [revenueTrend, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, bookingSummary, saleVouchers] =
     await Promise.all([
       api.getRevenueTrend(branchCode),
       api.getTopCustomers(branchCode),
@@ -78,6 +78,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
       api.getArAgeingSummary(branchCode),  // branch-scoped: an all-scope Director who selects a
       api.getApAgeingSummary(branchCode),  // branch isn't auto-coerced server-side — must pass it
       api.getBookingSummary(branchCode), // SO/PO/GP pipeline { pending, approved } (not date-bound — whole queue)
+      api.getSaleVouchers({ branchCode, from: dates.from, to: dates.to }), // for the consultant leaderboard (Director ops view)
     ]);
 
   // Key Alerts are computed live from ageing + module P&L + concentration, not seeded.
@@ -88,6 +89,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
 
   return {
     revenueTrend, keyAlerts, topCustomers, topSuppliers, bankAccounts,
+    topConsultants: consultantsFromSales(saleVouchers, mpl?.totals?.gpPct), // team performance (Director)
     pendingBookings: bookingSummary.pending,
     approvedBookings: bookingSummary.approved,
     rejectedBookings: bookingSummary.rejected,
