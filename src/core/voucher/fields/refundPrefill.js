@@ -48,30 +48,9 @@ export function splitRefundJv(postings = [], opts = {}) {
   return { sale, purchase };
 }
 
-// Consolidate a JV side's legs so each ledger shows ONCE, netted to a single Dr or
-// Cr figure (the side its balance falls on) — matching how a ledger/voucher view
-// reads. The trade party (customer under Sundry Debtors / supplier under Sundry
-// Creditors) typically has several legs (refund payable, retained charges, recovered
-// cancellation) that should collapse to one final amount; income/tax/charge ledgers
-// appear once so they're unchanged. First-appearance order is preserved; fully-netted
-// (zero) ledgers drop out.
-export function consolidateLegs(postings = []) {
-  const order = [], byLedger = new Map();
-  for (const p of postings || []) {
-    const key = (p && p.ledger) || '';
-    if (!byLedger.has(key)) { byLedger.set(key, { ledger: key, group: (p && p.group) || '', debit: 0, credit: 0 }); order.push(key); }
-    const e = byLedger.get(key);
-    e.debit += num(p && p.debit); e.credit += num(p && p.credit);
-    if (!e.group && p && p.group) e.group = p.group;
-  }
-  return order.map((k) => {
-    const e = byLedger.get(k);
-    const net = r2(e.debit - e.credit);
-    return net >= 0
-      ? { ledger: e.ledger, group: e.group, debit: net, credit: 0 }
-      : { ledger: e.ledger, group: e.group, debit: 0, credit: r2(-net) };
-  }).filter((e) => e.debit || e.credit);
-}
+// consolidateLegs now lives in ../ui (shared by the one JvBlock renderer used app-wide).
+// Re-exported here for back-compat with existing imports/tests.
+export { consolidateLegs } from '../ui';
 
 export function poSnapForView(po = {}, rows = []) {
   const lines = Array.isArray(po && po.lines) ? po.lines : [];

@@ -18,6 +18,29 @@ export const money2 = (cur, n) =>
 
 export const r2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
 
+// Consolidate JV legs so each ledger shows ONCE, netted to a single Dr or Cr line
+// (the side its net balance falls on) — the trade party that appears across several
+// legs collapses to its final figure; single-occurrence ledgers are unchanged.
+// Shared by the one JvBlock renderer used across every voucher / booking / finance view.
+export function consolidateLegs(postings = []) {
+  const n = (x) => (Number(x) || 0);
+  const order = [], byLedger = new Map();
+  for (const p of postings || []) {
+    const key = (p && p.ledger) || '';
+    if (!byLedger.has(key)) { byLedger.set(key, { ledger: key, group: (p && p.group) || '', debit: 0, credit: 0 }); order.push(key); }
+    const e = byLedger.get(key);
+    e.debit += n(p && p.debit); e.credit += n(p && p.credit);
+    if (!e.group && p && p.group) e.group = p.group;
+  }
+  return order.map((k) => {
+    const e = byLedger.get(k);
+    const net = r2(e.debit - e.credit);
+    return net >= 0
+      ? { ledger: e.ledger, group: e.group, debit: net, credit: 0 }
+      : { ledger: e.ledger, group: e.group, debit: 0, credit: r2(-net) };
+  }).filter((e) => e.debit || e.credit);
+}
+
 // Branch → posting code. A real branch carries .code; "ALL" cannot post.
 export const brCodeOf = (b) => (b && b !== 'ALL') ? (b.code || b) : null;
 

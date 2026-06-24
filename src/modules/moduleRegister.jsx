@@ -38,11 +38,11 @@ function invoiceHtml(b, side, branch) {
   const vno = isSale ? (b.saleVno || '') : (b.purchaseVno || '');
   const title = isSale ? 'TAX INVOICE' : 'PURCHASE VOUCHER';
   const heads = (snap.heads || []).filter((h) => Math.abs(Number(h.amt) || 0) > 0);
-  const net = Math.round((snap.total || 0) - (snap.gst || 0) - (snap.tcs || 0)); // taxable value
+  const net = Math.round((snap.total || 0) - (snap.gst || 0) - (snap.otherTaxesGst || 0) - (snap.tcs || 0)); // taxable value
   const rows = heads.length
     ? heads.map((h) => `<tr><td>${esc(h.label)}</td><td class="r">${money(cur, h.amt)}</td></tr>`).join('')
     : `<tr><td>${esc(spec.name)} — ${esc(b.headerRef || '')}</td><td class="r">${money(cur, net)}</td></tr>`;
-  const taxRows = `${snap.gst ? `<tr><td class="lbl">GST</td><td class="r">${money(cur, snap.gst)}</td></tr>` : ''}${(isSale && snap.tcs) ? `<tr><td class="lbl">TCS</td><td class="r">${money(cur, snap.tcs)}</td></tr>` : ''}`;
+  const taxRows = `${snap.gst ? `<tr><td class="lbl">SVF GST</td><td class="r">${money(cur, snap.gst)}</td></tr>` : ''}${snap.otherTaxesGst ? `<tr><td class="lbl">SVC2 GST</td><td class="r">${money(cur, snap.otherTaxesGst)}</td></tr>` : ''}${(isSale && snap.tcs) ? `<tr><td class="lbl">TCS</td><td class="r">${money(cur, snap.tcs)}</td></tr>` : ''}`;
   const css = `
   .inv *{box-sizing:border-box;margin:0;padding:0}
   .inv{font-family:Arial,Helvetica,sans-serif;font-size:11pt;color:#222}
@@ -170,7 +170,8 @@ export function ModuleRegister({ branch, mode = 'both' }) {
     { key: '__sector', header: 'Sector', sortable: false, className: 'whitespace-nowrap', render: (r) => bookingTravelDetail(r).sectors || '—' },
     ...(showSale ? [
       { key: 'so.total', header: 'Sale (incl GST)', num: true, render: (r) => fmt(r.so?.total) },
-      { key: 'so.gst', header: 'Sale GST', num: true, className: 'text-[#854F0B]', render: (r) => fmt(r.so?.gst) },
+      { key: 'so.gst', header: 'SVF GST', num: true, className: 'text-[#854F0B]', render: (r) => fmt(r.so?.gst) },
+      { key: 'so.otherTaxesGst', header: 'SVC2 GST', num: true, className: 'text-[#854F0B]', render: (r) => fmt(r.so?.otherTaxesGst) },
     ] : []),
     ...(showPur ? [
       { key: 'po.total', header: 'Purchase (incl GST)', num: true, render: (r) => (r.noSupplier ? '—' : fmt(r.po?.total)) },

@@ -216,23 +216,29 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const emptyRow = `<tr><td class="l" colSpan="${isSale ? 7 : 9}" style="text-align:center;color:#9A9A9A;padding:16px">No line detail captured for this booking.</td></tr>`;
 
   // summary from the booked snapshot (ties to the books)
-  const subTotal = r2(snap.lineTotal || 0), service = r2(snap.serviceCharge || 0), gst = r2(snap.gst || 0), tcs = r2(snap.tcs || 0), incentive = r2(snap.incentiveAmt || 0), tds = r2(snap.incentiveTds || 0), net = r2(snap.total || (subTotal + service + gst + tcs));
+  const otGst = r2(snap.otherTaxesGst || 0); // GST on the SVC2 margin — billed separately
+  const subTotal = r2(snap.lineTotal || 0), service = r2(snap.serviceCharge || 0), gst = r2(snap.gst || 0), tcs = r2(snap.tcs || 0), incentive = r2(snap.incentiveAmt || 0), tds = r2(snap.incentiveTds || 0), net = r2(snap.total || (subTotal + service + gst + otGst + tcs));
   const inter = booking.gstMode === 'inter';
-  const half = r2(gst / 2);
-  const gstRows = inter
+  const half = r2(gst / 2), otHalf = r2(otGst / 2);
+  // SVF GST (regular) + SVC2 GST (margin) shown as separate rows so the breakdown
+  // reconciles to the NET total. Intra → CGST/SGST halves; inter → single IGST.
+  const gstRows = (inter
     ? `<div class="r"><span class="k">IGST</span><span class="v">${cur}${n2(gst)}</span></div>`
-    : `<div class="r"><span class="k">CGST</span><span class="v">${cur}${n2(half)}</span></div><div class="r"><span class="k">SGST</span><span class="v">${cur}${n2(r2(gst - half))}</span></div>`;
+    : `<div class="r"><span class="k">CGST</span><span class="v">${cur}${n2(half)}</span></div><div class="r"><span class="k">SGST</span><span class="v">${cur}${n2(r2(gst - half))}</span></div>`)
+    + (otGst ? (inter
+      ? `<div class="r"><span class="k">SVC2 IGST</span><span class="v">${cur}${n2(otGst)}</span></div>`
+      : `<div class="r"><span class="k">SVC2 CGST</span><span class="v">${cur}${n2(otHalf)}</span></div><div class="r"><span class="k">SVC2 SGST</span><span class="v">${cur}${n2(r2(otGst - otHalf))}</span></div>`) : '');
   const tcsRow = tcs ? `<div class="r"><span class="k">TCS</span><span class="v">${cur}${n2(tcs)}</span></div>` : '';
   const sumtbl = isSale
     ? `
     <div class="r"><span class="k">Sub Total</span><span class="v">${cur}${n2(subTotal)}</span></div>
     ${service ? `<div class="r"><span class="k">Service Fee</span><span class="v">${cur}${n2(service)}</span></div>` : ''}
-    ${gst ? gstRows : ''}${tcsRow}
+    ${(gst || otGst) ? gstRows : ''}${tcsRow}
     <div class="net"><span class="k">NET TOTAL (${esc(cur)})</span><span class="v">${cur}${n2(net)}</span></div>`
     : `
     <div class="r"><span class="k">Sub Total (Fares + Svc)</span><span class="v">${cur}${n2(subTotal)}</span></div>
     ${incentive ? `<div class="r" style="color:#A32D2D"><span class="k">Supplier Incentive</span><span class="v">-${cur}${n2(incentive)}</span></div>` : ''}
-    ${gst ? gstRows : ''}
+    ${(gst || otGst) ? gstRows : ''}
     ${tds ? `<div class="r" style="color:#A07828"><span class="k">TDS (2%)</span><span class="v">${cur}${n2(tds)}</span></div>` : ''}
     <div class="net"><span class="k">NET COST (${esc(cur)})</span><span class="v">${cur}${n2(r2(net - incentive + tds))}</span></div>`;
 

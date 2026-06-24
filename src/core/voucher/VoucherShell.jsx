@@ -4,6 +4,7 @@ import { openPrintPreview } from '../PrintPreview';
 import { bc, VWrap, VHead, FL, inp, card, btnG, btnGh } from '../styles';
 import { VOUCHER_REGISTRY } from './registry';
 import { DARK, DIM, BLUE, RED, GREEN, money, brCodeOf, escHtml } from './ui';
+import { JvBlock } from './JvBlock';
 import { useFormKeys } from '../ux/forms';
 import { toast } from '../ux/toast';
 import { Kbd } from '../ux/widgets.jsx';
@@ -141,14 +142,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
           ⚠ Ledger not in Chart of Accounts: <b>{pv.missing.join(', ')}</b>. Create it in Masters first.
         </div>
       )}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-        <thead><tr><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Ledger</th><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Group</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Debit</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Credit</th></tr></thead>
-        <tbody>
-          {(pv.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
-          {!(pv.postings || []).length && <tr><td colSpan={4} style={{ padding: 12, textAlign: 'center', color: DIM }}>Pick ledgers / amounts to see the journal effect.</td></tr>}
-        </tbody>
-        <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money(cur, pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money(cur, pv.totalCredit)}</td></tr></tfoot>
-      </table>
+      <JvBlock postings={pv.postings} />
     </div>
   );
 

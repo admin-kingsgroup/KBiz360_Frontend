@@ -19,6 +19,7 @@ import { PageLayout } from '../shell/PageLayout';
 import { SkeletonTable } from '../shell/primitives';
 import { toastInfo } from '../core/ux/toast';
 import { clickable } from '../core/ux/clickable';
+import { JvBlock } from '../core/voucher/JvBlock';
 
 const DARK = '#1a1c22', DIM = '#5b616e', LINE = '#e6e8ec', HEAD = '#2e323c';
 const money = (n) => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -562,33 +563,7 @@ function JVPostings({ jv }) {
         </div>
       ) : (
         <>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr style={{ background: HEAD }}>
-              <th style={th}>Particulars (Ledger)</th>
-              <th style={{ ...th, textAlign: 'right' }}>Debit</th>
-              <th style={{ ...th, textAlign: 'right' }}>Credit</th>
-            </tr></thead>
-            <tbody>{ordered.map((p, i) => {
-              const isCr = (p.credit || 0) > 0;
-              return (
-                <tr key={i} style={{ borderBottom: '1px solid #f0f2f7' }}>
-                  <td style={tdName}>
-                    <div style={{ fontWeight: 600, color: DARK, paddingLeft: isCr ? 18 : 0 }}>
-                      {isCr ? <span style={{ color: DIM, fontWeight: 700 }}>To </span> : null}{p.ledger}
-                    </div>
-                    {(p.subGroup || p.group) && <div style={{ fontSize: 10, color: DIM, paddingLeft: isCr ? 18 : 0 }}>{p.subGroup || p.group}</div>}
-                  </td>
-                  <td style={{ ...tdNum, color: DR, fontWeight: 600 }}>{p.debit ? money(p.debit) : ''}</td>
-                  <td style={{ ...tdNum, color: CR, fontWeight: 600 }}>{p.credit ? money(p.credit) : ''}</td>
-                </tr>
-              );
-            })}</tbody>
-            <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
-              <td style={{ ...tdName, fontWeight: 800 }}>Total</td>
-              <td style={{ ...tdNum, fontWeight: 800, color: DR }}>{money(jv.totalDebit)}</td>
-              <td style={{ ...tdNum, fontWeight: 800, color: CR }}>{money(jv.totalCredit)}</td>
-            </tr></tfoot>
-          </table>
+          <JvBlock postings={ordered} />
           {!jv.balanced && <div style={{ marginTop: 6, fontSize: 11, color: '#d97706' }}>⚠ This entry does not balance (Debit ≠ Credit){jv.error ? ` — ${jv.error}` : ''}.</div>}
         </>
       )}

@@ -42,6 +42,7 @@ import {
 import { apiGet } from '../../core/api';
 import { LedgerVouchers } from '../pnlTally.jsx';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
+import { JvBlock } from '../../core/voucher/JvBlock';
 import { hasRegistry } from '../../core/voucher/registry';
 import { PageLayout } from '../../shell/PageLayout';
 import { SkeletonTable } from '../../shell/primitives';
@@ -178,7 +179,7 @@ export function VoucherLines({ voucher: v, cur }) {
         <F label="Voucher" val={v.vno} /><F label="Date" val={v.date} /><F label="Branch" val={v.branch} />
         <F label={v.category === 'purchase' ? 'Supplier' : 'Customer'} val={v.party} />
         <F label="Link No" val={v.linkNo} /><F label="Taxable" val={money(cur, v.subtotal)} />
-        <F label="GST" val={money(cur, v.taxAmt)} /><F label="Total" val={money(cur, v.total)} />
+        <F label="SVF GST" val={money(cur, v.taxAmt)} />{Number(v.otherTaxesGst) > 0 && <F label="SVC2 GST" val={money(cur, v.otherTaxesGst)} />}<F label="Total" val={money(cur, v.total)} />
       </div>
       {postings.length > 0 ? (
         // Full journal — every ledger, both sides; a zero side shows ₹0 (dimmed), never hidden.
@@ -187,23 +188,7 @@ export function VoucherLines({ voucher: v, cur }) {
             <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Full Journal Entry — every ledger this hits</div>
             {typeof pv.balanced === 'boolean' && <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.balanced ? '✓ Balanced' : `✗ Out by ${money0(pv.diff)}`}</span>}
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-            <thead><tr><th style={jvTh}>Ledger</th><th style={jvTh}>Group</th><th style={{ ...jvTh, textAlign: 'right' }}>Debit</th><th style={{ ...jvTh, textAlign: 'right' }}>Credit</th></tr></thead>
-            <tbody>
-              {postings.map((p, i) => {
-                const zeroD = !(Number(p.debit) > 0), zeroC = !(Number(p.credit) > 0);
-                return (
-                  <tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}>
-                    <td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td>
-                    <td style={{ padding: '5px 8px', color: DIM }}>{p.group || '—'}</td>
-                    <td style={{ padding: '5px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: zeroD ? '#9aa3bd' : BLUE }}>{money0(p.debit)}</td>
-                    <td style={{ padding: '5px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: zeroC ? '#9aa3bd' : RED }}>{money0(p.credit)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money0(pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money0(pv.totalCredit)}</td></tr></tfoot>
-          </table>
+          <JvBlock postings={postings} />
         </div>
       ) : (
         // Fallback when the preview is unavailable: the captured component-head lines.
@@ -1710,7 +1695,7 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
           <Table pager={summaryPager}>
             <thead><tr style={headRow}>
               <Th>Date</Th><Th>Voucher</Th><Th>Type</Th><Th>{tab === 'sales' ? 'Customer' : 'Supplier'}</Th><Th>Link No</Th>
-              <Th right>Taxable</Th><Th right>GST</Th><Th right>Total</Th>
+              <Th right>Taxable</Th><Th right>{tab === 'sales' ? 'SVF GST' : 'GST'}</Th>{tab === 'sales' && <Th right>SVC2 GST</Th>}<Th right>Total</Th>
             </tr></thead>
             <tbody>
               {summaryPager.pageRows.map((v, i) => (
@@ -1727,6 +1712,7 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, color: '#6b21a8' }}>{v.linkNo || '—'}</td>
                   <td style={{ padding: '8px 12px', ...num }}>{money(cur, v.subtotal)}</td>
                   <td style={{ padding: '8px 12px', ...num, color: '#d97706' }}>{money(cur, v.taxAmt)}</td>
+                  {tab === 'sales' && <td style={{ padding: '8px 12px', ...num, color: '#d97706' }}>{money(cur, v.otherTaxesGst)}</td>}
                   <td style={{ padding: '8px 12px', ...num, fontWeight: 700 }}>{money(cur, v.total)}</td>
                 </tr>
               ))}
@@ -1735,6 +1721,7 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
               <td colSpan={5} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD }}>TOTAL — {rows.length}</td>
               <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, sum('subtotal'))}</td>
               <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, sum('taxAmt'))}</td>
+              {tab === 'sales' && <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, sum('otherTaxesGst'))}</td>}
               <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, sum('total'))}</td>
             </tr></tfoot>
           </Table>

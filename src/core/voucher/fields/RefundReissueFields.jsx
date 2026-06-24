@@ -7,8 +7,9 @@ import { LedgerPicker } from '../LedgerPicker';
 import { apiGet } from '../../api';
 import { useVoucherPreview } from '../../useAccounting';
 import { money2, r2 } from '../ui';
-import { refundPrefillFromBooking, poSnapForView, splitRefundJv, consolidateLegs } from './refundPrefill';
+import { refundPrefillFromBooking, poSnapForView, splitRefundJv } from './refundPrefill';
 import { buildRefundReissueBody } from './refundBody';
+import { JvBlock } from '../JvBlock';
 
 const num = (v) => (Number(v) || 0);
 const fmtN = (v) => num(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -48,45 +49,6 @@ function SnapGrid({ title, snap, color }) {
   );
 }
 
-// A JV side rendered as a side-by-side T-account: all Debit legs in the left pane,
-// all Credit legs in the right pane, with Total Dr / Total Cr at the foot. Used for
-// each side of the booking JV (Sales / Purchase voucher) and each side of the live
-// refund JV (sale-reversal / purchase-reversal).
-function JvTBlock({ title, sub, postings, color }) {
-  // Consolidate each ledger to a single net Dr/Cr line so the trade party (customer /
-  // supplier) shows once with its final figure, not split across both sides.
-  const list = consolidateLegs(postings);
-  if (!list.length) return null;
-  const dr = list.filter((p) => num(p.debit)), cr = list.filter((p) => num(p.credit));
-  const totDr = r2(dr.reduce((s, p) => s + num(p.debit), 0));
-  const totCr = r2(cr.reduce((s, p) => s + num(p.credit), 0));
-  const bal = Math.abs(totDr - totCr) < 0.01;
-  const head = { padding: '3px 8px', fontSize: 9.5, fontWeight: 700, color: '#5a6691', background: '#eef1f7', letterSpacing: '0.3px' };
-  const leg = (p, key, amtColor) => (
-    <div key={key} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '3px 8px', borderBottom: '1px solid #f2f4f8' }}>
-      <span style={{ minWidth: 0 }}><span style={{ fontWeight: 600, color: '#14161a' }}>{p.ledger}</span><span style={{ display: 'block', fontSize: 9, color: '#9197a3' }}>{p.group || ''}</span></span>
-      <span style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: amtColor }}>{key.startsWith('d') ? fmtN(p.debit) : fmtN(p.credit)}</span>
-    </div>
-  );
-  const foot = { borderTop: '1px solid #e6e8ec', padding: '4px 8px', display: 'flex', justifyContent: 'space-between', fontWeight: 800, background: '#fafbfd' };
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 4 }}>{title}{sub ? ` · ${sub}` : ''}{!bal && <span style={{ color: '#A32D2D', fontWeight: 700 }}>  (out by {fmtN(totDr - totCr)})</span>}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', border: '1px solid #e6e8ec', borderRadius: 6, overflow: 'hidden', fontSize: 10.5 }}>
-        <div style={{ borderRight: '1px solid #e6e8ec' }}>
-          <div style={head}>Dr · Debit</div>
-          {dr.map((p, i) => leg(p, 'd' + i, '#185FA5'))}
-        </div>
-        <div>
-          <div style={head}>Cr · Credit</div>
-          {cr.map((p, i) => leg(p, 'c' + i, '#A32D2D'))}
-        </div>
-        <div style={{ ...foot, borderRight: '1px solid #e6e8ec', color: '#185FA5' }}><span>Total Dr</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(totDr)}</span></div>
-        <div style={{ ...foot, color: '#A32D2D' }}><span>Total Cr</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(totCr)}</span></div>
-      </div>
-    </div>
-  );
-}
 
 /**
  * Refund (RF) / Reissue (RI) body — two-party, raised against a sales invoice.
@@ -229,8 +191,8 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
           {bookingJv && (bookingJv.sale || bookingJv.purchase) && (
             <div style={{ marginTop: 6, paddingTop: 10, borderTop: '1px dashed #dfe3ea' }}>
               <div style={{ fontSize: 11.5, fontWeight: 800, color: '#14161a', marginBottom: 6 }}>JV — Accounting effect of this booking</div>
-              <JvTBlock title="Sales voucher" sub={bookingJv.sale?.vno} postings={bookingJv.sale?.postings} color="#185FA5" />
-              <JvTBlock title="Purchase voucher" sub={bookingJv.purchase?.vno} postings={bookingJv.purchase?.postings} color="#A32D2D" />
+              <JvBlock title="Sales voucher" sub={bookingJv.sale?.vno} postings={bookingJv.sale?.postings} color="#185FA5" />
+              <JvBlock title="Purchase voucher" sub={bookingJv.purchase?.vno} postings={bookingJv.purchase?.postings} color="#A32D2D" />
             </div>
           )}
         </div>
@@ -265,7 +227,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
-        <FL label={`GST on Service Fee (${gstRate}%)`}><input value={money2(cur, taxAmt)} readOnly tabIndex={-1} title={`GST at ${gstRate}% on the Service Fee → regular ${state.gstMode === 'inter' ? 'IGST' : 'CGST/SGST'} Output`} style={{ ...lockedInp, textAlign: 'right' }} /></FL>
+        <FL label={`SVF GST (${gstRate}%)`}><input value={money2(cur, taxAmt)} readOnly tabIndex={-1} title={`GST at ${gstRate}% on the Service Fee → regular ${state.gstMode === 'inter' ? 'IGST' : 'CGST/SGST'} Output`} style={{ ...lockedInp, textAlign: 'right' }} /></FL>
         <FL label={`SVC2 GST (${gstRate}%)`}><input value={money2(cur, svc2Gst)} readOnly tabIndex={-1} title={`GST at ${gstRate}% on the Service Charge-2 margin → dedicated SVC2 ${state.gstMode === 'inter' ? 'IGST' : 'CGST/SGST'} Output ledgers`} style={{ ...lockedInp, textAlign: 'right' }} /></FL>
         <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 9, fontSize: 9.5, color: '#9197a3' }}>{state.gstMode === 'inter' ? 'IGST' : 'CGST + SGST'} · SVC2 posts to its own ledgers</div>
       </div>
@@ -292,7 +254,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       )}
 
       <p style={{ margin: '2px 0 12px', fontSize: 10.5, color: '#5a6691' }}>
-        Our income <b>{money2(cur, ourIncome)}</b> · GST <b>{money2(cur, r2(taxAmt + svc2Gst))}</b> <span style={{ color: '#9197a3' }}>(Service Fee {money2(cur, taxAmt)} + SVC2 {money2(cur, svc2Gst)})</span> ·
+        Our income <b>{money2(cur, ourIncome)}</b> · GST <b>{money2(cur, r2(taxAmt + svc2Gst))}</b> <span style={{ color: '#9197a3' }}>(SVF GST {money2(cur, taxAmt)} + SVC2 GST {money2(cur, svc2Gst)})</span> ·
         {isRefund ? ' Refund payable to customer ' : ' Billed to customer '}
         <b style={{ color: total < 0 ? '#A32D2D' : '#185FA5' }}>{money2(cur, total)}</b>
         {total < 0 && ' — our charges exceed the supplier amount'}
@@ -318,8 +280,8 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
             </div>
             {(refundPv.postings || []).length ? (
               <>
-                <JvTBlock title={`${isRefund ? 'Refund' : 'Reissue'} — Sales side`} sub={state.againstInvoice ? `reverses ${state.againstInvoice}` : ''} postings={sides.sale} color="#185FA5" />
-                <JvTBlock title={`${isRefund ? 'Refund' : 'Reissue'} — Purchase side`} sub={state.againstPurchase ? `reverses ${state.againstPurchase}` : ''} postings={sides.purchase} color="#A32D2D" />
+                <JvBlock title={`${isRefund ? 'Refund' : 'Reissue'} — Sales side`} sub={state.againstInvoice ? `reverses ${state.againstInvoice}` : ''} postings={sides.sale} color="#185FA5" />
+                <JvBlock title={`${isRefund ? 'Refund' : 'Reissue'} — Purchase side`} sub={state.againstPurchase ? `reverses ${state.againstPurchase}` : ''} postings={sides.purchase} color="#A32D2D" />
               </>
             ) : <div style={{ padding: 12, textAlign: 'center', color: '#9197a3', fontSize: 11 }}>Fill the refund (and fetch the Link No) to see the journal effect.</div>}
           </div>

@@ -33,6 +33,7 @@ import { NotificationCentre } from '../../shell/NotifPanel';
 import { openPrintPreview } from '../../core/PrintPreview';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
+import { JvBlock } from '../../core/voucher/JvBlock';
 import { clickable } from '../../core/ux/clickable';
 import { listKeyNav } from '../../core/ux/listKeys';
 import { SmartDateInput } from '../../core/ux/SmartDateInput';
@@ -103,37 +104,17 @@ export function VBalanceBar({dr,cr,cur,okPrefix="Balanced",emptyText="Enter amou
 
 // Read-only double-entry preview (Ledger · DR/CR · Amount) — the journal that
 // will post, derived from the form. Mirrors the HTML "Account Entries" table.
-export function VJournalPreview({rows,cur,title="Accounting Effect (Double Entry)"}){
-  const dr=rows.reduce((s,r)=>s+(r.side==="DR"?(+r.amount||0):0),0);
-  const cr=rows.reduce((s,r)=>s+(r.side==="CR"?(+r.amount||0):0),0);
+export function VJournalPreview({rows,title="Accounting Effect (Double Entry)"}){
+  // Map the legacy {ledger, side, amount, note} rows → standard postings and render
+  // through the shared JvBlock so this matches every other JV view in the app.
+  const postings=(rows||[]).map(r=>({
+    ledger:r.ledger||"—", group:r.group||r.note||"",
+    debit:r.side==="DR"?(+r.amount||0):0, credit:r.side==="CR"?(+r.amount||0):0,
+  }));
   return (
     <div style={{marginBottom:12}}>
       <p style={{margin:"0 0 6px",fontSize:10.5,fontWeight:700,color:"#1a1c22"}}>📒 {title}</p>
-      <div style={{...card,padding:0,overflow:"hidden"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr style={{background:"#1a1c22"}}>
-            {["Ledger Account","Dr/Cr",`Amount (${cur})`,"Note"].map((h,i)=>
-              <th key={i} style={{padding:"7px 10px",textAlign:i===2?"right":i===1?"center":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5}}>{h}</th>)}
-          </tr></thead>
-          <tbody>
-            {rows.map((r,i)=>(
-              <tr key={i} style={{borderBottom:"1px solid #f4f5f7",background:r.side==="DR"?"#f0fbf5":"#fdf3f3"}}>
-                <td style={{padding:"7px 10px",fontWeight:500,color:"#1a1c22"}}>{r.ledger||"—"}</td>
-                <td style={{padding:"7px 10px",textAlign:"center"}}>
-                  <span style={{fontSize:9,fontWeight:800,letterSpacing:".5px",padding:"2px 8px",borderRadius:4,color:"#fff",background:r.side==="DR"?V_DR:V_CR}}>{r.side}</span>
-                </td>
-                <td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{vf2(cur,r.amount)}</td>
-                <td style={{padding:"7px 10px",fontSize:10,color:"#5b616e"}}>{r.note||""}</td>
-              </tr>
-            ))}
-            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
-              <td colSpan={2} style={{padding:"7px 10px",fontWeight:800,fontSize:10,color:"#5b616e",textTransform:"uppercase"}}>Total</td>
-              <td style={{padding:"7px 10px",textAlign:"right",fontWeight:800,color:"#1a1c22",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,dr)} / {vf2(cur,cr)}</td>
-              <td/>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <JvBlock postings={postings}/>
     </div>
   );
 }

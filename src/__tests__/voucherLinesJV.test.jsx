@@ -39,10 +39,15 @@ describe('VoucherLines — full JV with zeros shown as ₹0', () => {
     expect(screen.getByText('✓ Balanced')).toBeInTheDocument();
   });
 
-  test('a zero side shows ₹0 (never blank) — multiple zero cells present', () => {
+  test('renders each leg once on its Dr/Cr side (shared T-account, no ₹0 fillers)', () => {
     render(<VoucherLines voucher={voucher} cur="₹" />);
-    // party row credit=0, three head/tax rows debit=0 → at least 4 explicit ₹0 cells.
-    expect(screen.getAllByText('₹0').length).toBeGreaterThanOrEqual(4);
+    // The unified JvBlock shows each ledger once on its side with a 2-decimal amount;
+    // there are no zero-fillers (a leg simply doesn't appear on its empty side).
+    expect(screen.getAllByText('46,284.00').length).toBeGreaterThanOrEqual(1); // party Dr (+ totals)
+    expect(screen.getByText('26,234.00')).toBeInTheDocument();                 // base fare Cr
+    expect(screen.getByText('Dr · Debit')).toBeInTheDocument();
+    expect(screen.getByText('Cr · Credit')).toBeInTheDocument();
+    expect(screen.queryByText('₹0')).toBeNull();
   });
 
   test('does NOT dump raw line meta as "[object Object]" (full JV replaces head-line cards)', () => {

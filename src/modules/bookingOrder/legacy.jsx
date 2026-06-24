@@ -34,6 +34,7 @@ import { clickable } from '../../core/ux/clickable';
 import { listKeyNav } from '../../core/ux/listKeys';
 import { usePager, Pager } from '../../core/ux/pager';
 import { SmartDateInput } from '../../core/ux/SmartDateInput';
+import { JvBlock } from '../../core/voucher/JvBlock';
 import {
   VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc, isVatBranch, rowsFromSnapshots,
 } from '../../core/voucherSpecs.js';
@@ -682,7 +683,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
               <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>
               {!pkg && <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
-              <td style={tfTd} colSpan={pkg ? 1 : 2}>{fmt(totals.so.gst + totals.so.otherTaxesGst)} GST</td>
+              {!pkg && <td style={tfTd}>{fmt(totals.so.gst)}</td>}<td style={tfTd}>{fmt(totals.so.otherTaxesGst)}</td>
               <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd} />
             </tr></tfoot>
           </table>
@@ -774,7 +775,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
             <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
               <th style={{ ...thA, ...thL, width: 140 }}>First Name</th><th style={{ ...thA, ...thL, width: 140 }}>Surname</th>
-              <th style={{ ...thA, width: 110 }}>Final Sales</th><th style={{ ...thA, width: 95 }}>Sales GST ({activeRate}%)</th><th style={{ ...thA, width: 110 }}>Final Purchase</th><th style={{ ...thA, width: 95 }}>Purchase GST ({pkg ? 18 : activeRate}%)</th>
+              <th style={{ ...thA, width: 110 }}>Final Sales</th><th style={{ ...thA, width: 85 }}>SVF GST ({activeRate}%)</th><th style={{ ...thA, width: 85 }}>SVC2 GST ({activeRate}%)</th><th style={{ ...thA, width: 110 }}>Final Purchase</th><th style={{ ...thA, width: 95 }}>Purchase GST ({pkg ? 18 : activeRate}%)</th>
               <th style={{ ...thA, width: 95 }}>Incentive</th><th style={{ ...thA, width: 80 }}>TDS (2%)</th>
               <th style={{ ...thA, width: 110 }}>Gross Profit</th><th style={{ ...thA, width: 80 }}>GP %</th>
             </tr></thead>
@@ -784,7 +785,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 return (
                   <tr key={i}>
                     <td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.fn || '—'}</td><td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.sn || ''}</td>
-                    <td style={{ ...tdAuto, width: 110 }}>{fmt(c.finalSales)}</td><td style={{ ...tdAuto, width: 95 }}>{fmt(c.salesGST)}</td>
+                    <td style={{ ...tdAuto, width: 110 }}>{fmt(c.finalSales)}</td><td style={{ ...tdAuto, width: 85 }}>{fmt(c.gstSvc)}</td><td style={{ ...tdAuto, width: 85 }}>{fmt(c.gstMk)}</td>
                     <td style={{ ...tdAuto, width: 110 }}>{fmt(c.finalPurchase)}</td><td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstPur)}</td>
                     <td style={{ ...tdAuto, width: 95 }}>{fmt(c.incentive)}</td><td style={{ ...tdAuto, width: 80 }}>{fmt(c.tds)}</td>
                     <td style={{ ...tdAuto, fontWeight: 800, color: DR, width: 110 }}>{fmt(c.gp)}</td>
@@ -795,7 +796,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tbody>
             <tfoot><tr>
               <td style={{ ...tfTd, textAlign: 'left' }} colSpan={2}>TOTAL</td>
-              <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd}>{fmt(totals.so.gst + totals.so.otherTaxesGst)}</td>
+              <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd}>{fmt(totals.so.gst)}</td><td style={tfTd}>{fmt(totals.so.otherTaxesGst)}</td>
               <td style={tfTd}>{fmt(totals.po.total)}</td><td style={tfTd}>{fmt(totals.po.gst)}</td>
               <td style={tfTd}>{fmt(totals.po.incentiveAmt)}</td><td style={tfTd}>{fmt(totals.po.incentiveTds)}</td>
               <td style={{ ...tfTd, color: DR }}>{fmt(totals.gp.total)}</td><td style={{ ...tfTd, color: GOLD }}>{totals.gp.pct.toFixed(2)}%</td>
@@ -1023,37 +1024,11 @@ function PartyPicker({ branch, kind, value, onChange, subGroupFilter }) {
 /* ════════════════════════════════════════════════════════════════════════════
    JV / posting detail view (one voucher side)
    ════════════════════════════════════════════════════════════════════════════ */
+// SO/PO/GP booking JV side — now rendered by the shared JvBlock so it matches every
+// other JV view (voucher shell, refund, finance).
 function PostingTable({ side, accent, title }) {
   if (!side) return null;
-  const balanced = Math.abs((side.totalDr || 0) - (side.totalCr || 0)) < 0.01;
-  return (
-    <div style={{ border: '1px solid #e6e8ec', borderRadius: 8, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: accent + '12', borderBottom: '1px solid #e6e8ec' }}>
-        <span style={{ fontSize: 11.5, fontWeight: 800, color: accent }}>{title}</span>
-        <span style={{ fontSize: 10.5, fontFamily: 'monospace', color: '#5b616e' }}>{side.vno} · {side.type}</span>
-      </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead><tr style={{ background: '#f7f8fb' }}>
-          {['Ledger', 'Group', 'Debit', 'Credit'].map((h, i) => <th key={h} style={{ padding: '6px 10px', fontSize: 9.5, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', textAlign: i >= 2 ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>)}
-        </tr></thead>
-        <tbody>
-          {(side.postings || []).map((p, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #f0f2f7' }}>
-              <td style={{ padding: '5px 10px', fontSize: 11.5, fontWeight: 600, color: DARK, paddingLeft: p.credit > 0 ? 22 : 10 }}>{p.ledger}</td>
-              <td style={{ padding: '5px 10px', fontSize: 10.5, color: '#9197a3' }}>{p.group}</td>
-              <td style={{ padding: '5px 10px', fontSize: 11.5, textAlign: 'right', color: DR, fontVariantNumeric: 'tabular-nums' }}>{p.debit > 0 ? fmt(p.debit) : ''}</td>
-              <td style={{ padding: '5px 10px', fontSize: 11.5, textAlign: 'right', color: CR, fontVariantNumeric: 'tabular-nums' }}>{p.credit > 0 ? fmt(p.credit) : ''}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot><tr style={{ borderTop: '1.5px solid ' + DARK, background: '#f7f8fb' }}>
-          <td style={{ padding: '6px 10px', fontSize: 11, fontWeight: 800 }} colSpan={2}>{balanced ? '✓ Balanced' : '⚠ Unbalanced'}</td>
-          <td style={{ padding: '6px 10px', fontSize: 11.5, fontWeight: 800, textAlign: 'right', color: DR }}>{fmt(side.totalDr)}</td>
-          <td style={{ padding: '6px 10px', fontSize: 11.5, fontWeight: 800, textAlign: 'right', color: CR }}>{fmt(side.totalCr)}</td>
-        </tr></tfoot>
-      </table>
-    </div>
-  );
+  return <JvBlock title={title} sub={`${side.vno || ''}${side.type ? ' · ' + side.type : ''}`} postings={side.postings} color={accent} />;
 }
 
 function JournalView({ id, cur }) {

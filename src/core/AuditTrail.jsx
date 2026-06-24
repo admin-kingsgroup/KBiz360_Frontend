@@ -116,7 +116,7 @@ function RecordSummary({ record }) {
     : [
       ['Voucher No', record.vno], ['Type', record.type], ['Category', record.category], ['Branch', record.branch],
       ['Date', record.date], ['Status', record.status], ['Party', record.party || record.billTo],
-      ['Total', money(record.total)], ['GST / Tax', Number(record.taxAmt) ? money(record.taxAmt) : null],
+      ['Total', money(record.total)], ['SVF GST', Number(record.taxAmt) ? money(record.taxAmt) : null], ['SVC2 GST', Number(record.otherTaxesGst) ? money(record.otherTaxesGst) : null],
       ['TCS', Number(record.tcsAmt) ? money(record.tcsAmt) : null], ['TDS', Number(record.tdsAmt) ? money(record.tdsAmt) : null],
       ['Remarks', record.remarks],
     ];
