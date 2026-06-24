@@ -95,6 +95,91 @@ export function rowsForEdit(spec, booking) {
   return [blankLine(spec)];
 }
 
+// ── N-PO (Phase 2): additional purchase legs under one booking/Link No ────────
+// Flight (SF) may add ONE Misc PO; Holiday (SH) may add legs of ANY module type.
+// Each leg carries its own module/supplier/cost-centre/ref/cost grid → its own
+// Purchase voucher on approval; the sale stays single. blank leg → dropped on save.
+const ALLOWED_LEG_MODULES = { SF: ['SM'], SH: ['SF', 'SHT', 'SC', 'SV', 'SI', 'SM'] };
+const newLeg = (module) => ({ module, supplier: { name: '', ledgerGroup: '' }, costCenter: '', purTallyRef: '', gstMode: 'intra', packageType: '', availItc: false, line: blankLine(VSPECS[module] || VSPECS.SM) });
+const legsFromEdit = (booking) => (booking.purchases || []).map((leg) => {
+  const sp = VSPECS[leg.module] || VSPECS.SM;
+  return {
+    module: leg.module, supplier: { name: leg.supplier?.ledgerName || leg.supplier?.name || '', ledgerGroup: leg.supplier?.ledgerGroup || '' },
+    costCenter: leg.costCenter || '', purTallyRef: leg.purTallyRef || '', gstMode: leg.gstMode || 'intra',
+    packageType: leg.packageType || '', availItc: !!leg.availItc,
+    line: (Array.isArray(leg.rows) && leg.rows[0]) ? { ...blankLine(sp), ...leg.rows[0] } : blankLine(sp),
+  };
+});
+function legToPayload(leg, brCode, noVat) {
+  const spec = VSPECS[leg.module] || VSPECS.SM;
+  const { po } = bookingTotals(spec, [leg.line], { branch: brCode, noVat, availItc: leg.availItc, packageType: leg.packageType });
+  return {
+    module: leg.module,
+    supplier: { name: leg.supplier.name, ledgerName: leg.supplier.name, ledgerGroup: leg.supplier.ledgerGroup },
+    costCenter: leg.costCenter, purTallyRef: leg.purTallyRef, gstMode: leg.gstMode,
+    packageType: leg.packageType, availItc: leg.availItc, po: { ...po, gstMode: leg.gstMode }, rows: [leg.line],
+  };
+}
+
+function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange }) {
+  const allowed = ALLOWED_LEG_MODULES[parentModule];
+  if (!allowed) return null;
+  const setLeg = (i, patch) => onChange(legs.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  const setLine = (i, key, val) => setLeg(i, { line: { ...legs[i].line, [key]: val } });
+  const setModule = (i, m) => onChange(legs.map((l, idx) => (idx === i ? { ...newLeg(m), supplier: l.supplier, costCenter: l.costCenter, purTallyRef: l.purTallyRef } : l)));
+  const del = (i) => onChange(legs.filter((_, idx) => idx !== i));
+  const add = () => onChange([...legs, newLeg(allowed[0])]);
+  const cell = { width: 90, padding: '5px 7px', border: '1px solid #e1e3ec', borderRadius: 5, fontSize: 12 };
+  return (
+    <div style={{ ...card, marginTop: 14, borderColor: '#cdb46a' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <strong style={{ fontSize: 13, color: '#6b5a1e' }}>➕ Additional Purchases (N-PO)</strong>
+        <span style={{ fontSize: 11, color: '#9A9A9A' }}>{parentModule === 'SF' ? 'Flight may add a Misc cost leg' : 'Holiday package — add any component (flight/hotel/car/visa/insurance/misc)'} · one Link No, separate supplier invoice each</span>
+        <button type="button" onClick={add} style={{ ...btnGh, marginLeft: 'auto', padding: '5px 11px', fontSize: 11 }}>+ Add PO</button>
+      </div>
+      {legs.length === 0 && <p style={{ margin: 0, fontSize: 11.5, color: '#9A9A9A' }}>No extra purchase legs. The sale stays a single invoice; add a PO to attach another supplier cost under this Link No.</p>}
+      {legs.map((leg, i) => {
+        const spec = VSPECS[leg.module] || VSPECS.SM;
+        const pkg = spec.model === 'package';
+        const po = legToPayload(leg, brCode, noVat).po;
+        return (
+          <div key={i} style={{ padding: 11, marginBottom: 10, background: '#fffdf7', border: '1px solid #eee3cf', borderRadius: 7 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+              <strong style={{ fontSize: 12 }}>PO #{i + 1}</strong>
+              <select value={leg.module} onChange={(e) => setModule(i, e.target.value)} style={{ ...cell, width: 'auto' }}>
+                {allowed.map((m) => <option key={m} value={m}>{VSPECS[m].name}</option>)}
+              </select>
+              <div style={{ minWidth: 220 }}>
+                <PartyPicker branch={branch} kind="supplier" value={{ name: leg.supplier.name, group: leg.supplier.ledgerGroup }}
+                  onChange={(v) => setLeg(i, { supplier: { name: v.name, ledgerGroup: v.group } })} />
+              </div>
+              <input value={leg.costCenter} onChange={(e) => setLeg(i, { costCenter: e.target.value.toUpperCase() })} placeholder="Cost Centre" style={{ ...cell, width: 120 }} />
+              <input value={leg.purTallyRef} onChange={(e) => setLeg(i, { purTallyRef: e.target.value })} placeholder="Supplier Inv. No (Tally ref)" style={{ ...cell, width: 170 }} />
+              <select value={leg.gstMode} onChange={(e) => setLeg(i, { gstMode: e.target.value })} style={{ ...cell, width: 'auto' }}><option value="intra">Intra (CGST+SGST)</option><option value="inter">Inter (IGST)</option></select>
+              <button type="button" onClick={() => del(i)} style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: '#c0392b', fontSize: 16 }} title="Remove leg">×</button>
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              {spec.fareCols.map((fc) => (
+                <label key={fc.key} style={{ fontSize: 10.5, color: '#5b616e' }}>{fc.label}<br />
+                  <input type="number" min="0" value={leg.line[fc.key] ?? ''} onChange={(e) => setLine(i, fc.key, e.target.value)} style={cell} /></label>
+              ))}
+              <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service<br />
+                <input type="number" min="0" value={leg.line.psvc ?? ''} onChange={(e) => setLine(i, 'psvc', e.target.value)} style={cell} /></label>
+              {pkg && <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service GST<br />
+                <input type="number" min="0" value={leg.line.psvcGst ?? ''} onChange={(e) => setLine(i, 'psvcGst', e.target.value)} style={cell} /></label>}
+              <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Incentive<br />
+                <input type="number" min="0" value={leg.line.incentive ?? ''} onChange={(e) => setLine(i, 'incentive', e.target.value)} style={cell} /></label>
+              {pkg && <label style={{ fontSize: 10.5, color: '#6b5a1e', display: 'flex', alignItems: 'center', gap: 5, paddingBottom: 6 }}>
+                <input type="checkbox" checked={!!leg.availItc} onChange={(e) => setLeg(i, { availItc: e.target.checked })} /> Avail ITC (tour-operator GST)</label>}
+              <div style={{ marginLeft: 'auto', paddingBottom: 4, fontSize: 12, fontWeight: 700, color: '#1a1c22' }}>Net payable ₹{fmt(po.total)}{num(po.gst) > 0 ? ` · ITC ₹${fmt(po.gst)}` : ''}</div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null, initialModule = null, interBranch = false }) {
   const qc = useQueryClient();
   const editing = !!editBooking;
@@ -162,6 +247,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Free-text Tally references (optional) → flow to the spawned Sale / Purchase voucher sourceRef.
   const [saleTallyRef, setSaleTallyRef] = useState(editing ? (editBooking.saleTallyRef || '') : '');
   const [purTallyRef, setPurTallyRef] = useState(editing ? (editBooking.purTallyRef || '') : '');
+  // N-PO (Phase 2): additional purchase legs (Flight +Misc / Holiday components).
+  const [extraPOs, setExtraPOs] = useState(editing ? legsFromEdit(editBooking) : []);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -185,7 +272,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Reversal modules (RF/RI) have no fare-grid spec, so there's no seed grid to load —
   // skip the reset for them (the reversal UI is rendered via an early return and never
   // touches `lines`). Resetting here would call blankLine(undefined) → idCols crash.
-  useEffect(() => { if (editing || !VSPECS[moduleCode]) return; setLines([blankLine(VSPECS[moduleCode])]); setNoSupplier(false); setResult(null); setError(''); }, [moduleCode]);
+  useEffect(() => { if (editing || !VSPECS[moduleCode]) return; setLines([blankLine(VSPECS[moduleCode])]); setNoSupplier(false); setResult(null); setError(''); setExtraPOs([]); }, [moduleCode]);
 
   // No-supplier is only offered on Miscellaneous (sell-without-buy: seats / extra
   // services). Any other module always has a supplier (cost) leg.
@@ -320,6 +407,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         po: { ...totals.po, gstMode: purGstMode }, so: { ...totals.so, gstMode: saleGstMode },
         gp: { lines: gpLines, total: totals.gp.total, pct: totals.gp.pct },
         remarks, saleTallyRef, purTallyRef,
+        // N-PO: additional purchase legs (empty unless Flight+Misc / Holiday components).
+        purchases: (isNoSupp ? [] : extraPOs).filter((leg) => num(leg.line.base) > 0 || num(leg.line.psvc) > 0).map((leg) => legToPayload(leg, brCode, effNoVat)),
       };
       const booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, payload)
@@ -379,7 +468,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     return <ReversalEntry moduleCode={moduleCode} changeModule={changeModule} brCode={brCode} cur={cur} editing={editing} editBooking={editBooking} qc={qc} setRoute={setRoute} onDone={onDone} />;
   }
 
-  const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' }); setSupplier({ name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }); setNoSupplier(false); setResult(null); setError(''); setClientType(''); };
+  const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' }); setSupplier({ name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }); setNoSupplier(false); setResult(null); setError(''); setClientType(''); setExtraPOs([]); };
 
   if (result) {
     const approved = result._approved;
@@ -757,6 +846,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           </table>
         </div>
       </Section>
+      )}
+
+      {/* N-PO: additional purchase legs (Flight +Misc / Holiday components) */}
+      {!isNoSupp && ALLOWED_LEG_MODULES[moduleCode] && (
+        <ExtraPurchases parentModule={moduleCode} branch={branch} brCode={brCode} noVat={effNoVat} legs={extraPOs} onChange={setExtraPOs} />
       )}
 
       {/* ③ Gross Profit */}

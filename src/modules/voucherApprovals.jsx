@@ -7,6 +7,7 @@ import React, { useMemo, useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../core/api';
 import { AuditTrail } from '../core/AuditTrail';
+import { JvBlock } from '../core/voucher/JvBlock';
 import { VoucherView } from './pnlTally';
 import { openPrintWindow } from '../core/voucher-print';
 import { useModalEsc } from '../core/ux/useModalEsc';
@@ -241,24 +242,29 @@ export function VoucherApprovals({ branch, currentUser }) {
   const vnoCell = (e, show = true) => <td {...(show ? clickable(() => setViewId(e.id)) : {})} title={show ? 'View full voucher' : ''} style={{ ...flatTd, color: C.blue, fontWeight: 700, cursor: show ? 'pointer' : 'default', textDecoration: show ? 'underline' : 'none', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{show ? e.vno : ''}</td>;
 
   // A single voucher row + the shared header (used by the Voucher-Type-wise groups).
-  const voucherRow = (e, i) => { const x = drCrOf(e); return (
-    <tr key={e.id} style={{ background: i % 2 ? '#fcfdff' : '#fff' }}>
-      <td style={{ ...flatTd, color: C.dim }}>{ckbox(e)}{fmtDate(e.date)}</td>
-      {vnoCell(e)}
-      <td style={{ ...flatTd, color: C.dim }}>{VCH[e.category] || e.type}</td>
-      <td style={flatTd} title={e.party}>{e.party || '—'}</td>
-      <td style={{ ...flatTd, color: C.blue, fontWeight: 600 }} title={x.drLedger}>{x.drLedger}</td>
-      <td style={{ ...flatTd, color: C.red, fontWeight: 600 }} title={x.crLedger}>{x.crLedger}</td>
-      <td style={{ ...flatTd, textAlign: 'right', color: C.blue }}>{x.drAmt ? money(x.drAmt) : ''}</td>
-      <td style={{ ...flatTd, textAlign: 'right', color: C.red }}>{x.crAmt ? money(x.crAmt) : ''}</td>
-      {(() => { const al = alertOf(e), wn = warnOf(e); return (
-        <td style={{ ...flatTd, color: al ? C.red : wn ? '#9a6a00' : C.dim, fontStyle: 'italic' }} title={al || wn || e.narration || ''}>{al ? `⚠ ${al}` : wn ? `⚠ ${wn}` : (e.narration || '—')}</td>
-      ); })()}
-      <td style={{ ...flatTd, textAlign: 'center' }}>{actionCell(e)}</td>
-    </tr>
-  ); };
-  const VHEAD = ['Date', 'Vch No', 'Type', 'Party', 'Debit Ledger', 'Credit Ledger', 'Debit', 'Credit', 'Narration', 'Action'];
-  const voucherHead = <thead><tr>{VHEAD.map((h) => <th key={h} style={{ ...flatTh, textAlign: h === 'Debit' || h === 'Credit' ? 'right' : h === 'Action' ? 'center' : 'left' }}>{h}</th>)}</tr></thead>;
+  // One voucher in the "Voucher" view: a header (select · date · vno · type · party ·
+  // actions) above its full JV rendered by the shared JvBlock T-account — so the
+  // approval list shows the same side-by-side Dr/Cr layout as every other JV view.
+  const voucherJvCard = (e) => {
+    const al = alertOf(e), wn = warnOf(e);
+    const hasLegs = e.postable && e.postings && e.postings.length;
+    return (
+      <div key={e.id} style={{ padding: '10px 12px', borderTop: '1px solid #eef1f6', background: '#fff' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+          {ckbox(e)}
+          <span style={{ color: C.dim, fontSize: 11.5, whiteSpace: 'nowrap' }}>{fmtDate(e.date)}</span>
+          <span {...clickable(() => setViewId(e.id))} title="View full voucher" style={{ color: C.blue, fontWeight: 800, cursor: 'pointer', textDecoration: 'underline', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{e.vno}</span>
+          <span style={{ color: C.dim, fontSize: 11.5 }}>{VCH[e.category] || e.type}</span>
+          <span style={{ fontWeight: 600, color: C.dark }} title={e.party}>{e.party || '—'}</span>
+          <span style={{ marginLeft: 'auto' }}>{actionCell(e)}</span>
+        </div>
+        {(al || wn) && <div style={{ fontSize: 11, color: al ? C.red : '#9a6a00', marginBottom: 6, fontStyle: 'italic' }}>⚠ {al || wn}</div>}
+        {hasLegs
+          ? <JvBlock postings={e.postings} />
+          : <div style={{ fontSize: 11.5, color: C.red, padding: 8, background: '#fff6f6', borderRadius: 6 }}>No postings — {e.error || 'needs attention'}.</div>}
+      </div>
+    );
+  };
 
   // Voucher Type wise — vouchers grouped by type (Receipt / Payment / …), collapsible.
   const TYPE_ORDER = ['receipt', 'payment', 'contra', 'journal', 'credit-note', 'debit-note', 'purchase-expense'];
@@ -282,7 +288,7 @@ export function VoucherApprovals({ branch, currentUser }) {
               <span style={{ fontSize: 11, color: C.dim, fontWeight: 600 }}>· {g.rows.length} voucher{g.rows.length === 1 ? '' : 's'}</span>
               <span style={{ marginLeft: 'auto', ...num }}>{money(g.debit)} Dr · {money(g.credit)} Cr</span>
             </div>
-            {tOpen && <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>{voucherHead}<tbody>{g.rows.map((e, i) => voucherRow(e, i))}</tbody></table>}
+            {tOpen && <div>{g.rows.map((e) => voucherJvCard(e))}</div>}
           </div>
         );
       })}
