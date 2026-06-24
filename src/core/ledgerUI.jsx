@@ -233,10 +233,10 @@ export function LedgerAccountView({
         {q.isLoading && <div className="loading">Loading ledger…</div>}
         {!q.isLoading && view === 'ledger' && d && <LedgerBody d={d} cur={cur} segmented={!hasBranch} showNarr={showNarr} showDetail={showDetail} onPickVoucher={onPickVoucher} onPickInvoice={onPickInvoice} maxHeight={maxHeight} />}
         {!q.isLoading && view === 'bill' && (
-          <BillwiseBody side={side} bills={bills} loading={bw.isLoading} hasBranch={hasBranch} group={group} name={name} maxHeight={maxHeight} />
+          <BillwiseBody side={side} bills={bills} loading={bw.isLoading} hasBranch={hasBranch} group={group} name={name} cur={cur} maxHeight={maxHeight} />
         )}
-        {view === 'cc' && <BreakdownBody title="Cost-Centre Split (Domestic / International)" rows={splitRows} loading={splitQ.isLoading} maxHeight={maxHeight} hint="Module cost-centre split of this ledger (Tally sub-ledger level). Drill the full statement from the Ledger tab." />}
-        {view === 'comp' && <BreakdownBody title="Fare / Charge Components" rows={compRows} loading={compQ.isLoading} maxHeight={maxHeight} hint="Component breakup (Base Fare, K3, Taxes, Service Charge…) summed from each voucher's fare detail." />}
+        {view === 'cc' && <BreakdownBody title="Cost-Centre Split (Domestic / International)" rows={splitRows} loading={splitQ.isLoading} cur={cur} maxHeight={maxHeight} hint="Module cost-centre split of this ledger (Tally sub-ledger level). Drill the full statement from the Ledger tab." />}
+        {view === 'comp' && <BreakdownBody title="Fare / Charge Components" rows={compRows} loading={compQ.isLoading} cur={cur} maxHeight={maxHeight} hint="Component breakup (Base Fare, K3, Taxes, Service Charge…) summed from each voucher's fare detail." />}
       </div>
     </div>
   );
@@ -309,15 +309,15 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
   return (
     <>
       <div className="summary">
-        <div className="scard"><div className="k">Opening Balance</div><div className="v">{fmtB(opSigned)} <span style={{ fontSize: 11, color: '#9A9A9A' }}>{d.opening.side}</span></div></div>
-        <div className="scard dr"><div className="k">Total Debit</div><div className="v">{fmt(d.totalDebit) || '0.00'}</div></div>
-        <div className="scard cr"><div className="k">Total Credit</div><div className="v">{fmt(d.totalCredit) || '0.00'}</div></div>
-        <div className="scard bal"><div className="k">Closing Balance</div><div className="v">{fmtB(closing.amt)} <span style={{ fontSize: 11, color: '#9A9A9A' }}>{closing.side}</span></div></div>
+        <div className="scard"><div className="k">Opening Balance</div><div className="v">{cur}{fmtB(opSigned)} <span style={{ fontSize: 11, color: '#9A9A9A' }}>{d.opening.side}</span></div></div>
+        <div className="scard dr"><div className="k">Total Debit</div><div className="v">{cur}{fmt(d.totalDebit) || '0.00'}</div></div>
+        <div className="scard cr"><div className="k">Total Credit</div><div className="v">{cur}{fmt(d.totalCredit) || '0.00'}</div></div>
+        <div className="scard bal"><div className="k">Closing Balance</div><div className="v">{cur}{fmtB(closing.amt)} <span style={{ fontSize: 11, color: '#9A9A9A' }}>{closing.side}</span></div></div>
       </div>
 
       <div className="tblwrap" style={{ maxHeight, overflowY: 'auto' }}>
         <table>
-          <thead><tr><th className="l">Date</th><th className="l">Particulars</th><th className="l">Vch Type</th><th className="l">Vch No</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead>
+          <thead><tr><th className="l">Date</th><th className="l">Particulars</th><th className="l">Vch Type</th><th className="l">Vch No</th><th>Debit ({cur})</th><th>Credit ({cur})</th><th>Balance ({cur})</th></tr></thead>
           <tbody>
             <tr className="open-row">
               <td className="l" colSpan={4}>Opening Balance{doSegment ? ' (Group)' : ''}</td>
@@ -347,7 +347,7 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
 }
 
 /* ── Bill-wise + ageing body ─────────────────────────────────────────────── */
-function BillwiseBody({ side, bills, loading, hasBranch, group, name, maxHeight }) {
+function BillwiseBody({ side, bills, loading, hasBranch, group, name, cur = '₹', maxHeight }) {
   if (!side) {
     return (
       <>
@@ -373,9 +373,9 @@ function BillwiseBody({ side, bills, loading, hasBranch, group, name, maxHeight 
   return (
     <>
       <div className="summary">
-        <div className="scard"><div className="k">Bills Raised</div><div className="v">{fmt(totAmt) || '0.00'}</div></div>
-        <div className="scard dr"><div className="k">Settled</div><div className="v">{fmt(totSet) || '0.00'}</div></div>
-        <div className="scard bal"><div className="k">Pending (Outstanding)</div><div className="v">{fmt(totPend) || '0.00'}</div></div>
+        <div className="scard"><div className="k">Bills Raised</div><div className="v">{cur}{fmt(totAmt) || '0.00'}</div></div>
+        <div className="scard dr"><div className="k">Settled</div><div className="v">{cur}{fmt(totSet) || '0.00'}</div></div>
+        <div className="scard bal"><div className="k">Pending (Outstanding)</div><div className="v">{cur}{fmt(totPend) || '0.00'}</div></div>
         <div className="scard cr"><div className="k">Overdue Bills</div><div className="v">{overdueCount}</div></div>
       </div>
       <div className="tblwrap" style={{ maxHeight, overflowY: 'auto' }}>
@@ -391,7 +391,7 @@ function BillwiseBody({ side, bills, loading, hasBranch, group, name, maxHeight 
           </div>
         </div>
         <table>
-          <thead><tr><th className="l">Bill Ref</th><th className="l">Bill Date</th><th>Bill Amount</th><th>Settled</th><th>Pending</th><th>Age</th><th className="l">Status</th></tr></thead>
+          <thead><tr><th className="l">Bill Ref</th><th className="l">Bill Date</th><th>Bill Amount ({cur})</th><th>Settled ({cur})</th><th>Pending ({cur})</th><th>Age</th><th className="l">Status</th></tr></thead>
           <tbody>
             {bills.length === 0 && <tr><td className="l" colSpan={7} style={{ textAlign: 'center', padding: 26, color: '#9A9A9A' }}>No outstanding bills.</td></tr>}
             {bills.map((b, i) => {
@@ -422,7 +422,7 @@ function BillwiseBody({ side, bills, loading, hasBranch, group, name, maxHeight 
 }
 
 /* ── Cost-Centre / Components breakdown body (Dr/Cr table, cream-gold theme) ── */
-function BreakdownBody({ title, rows, loading, maxHeight, hint }) {
+function BreakdownBody({ title, rows, loading, cur = '₹', maxHeight, hint }) {
   if (loading) return <div className="loading">Loading…</div>;
   const list = rows || [];
   const grand = list.reduce((s, r) => s + (r.side === 'Cr' ? r.amount : -r.amount), 0);
@@ -430,7 +430,7 @@ function BreakdownBody({ title, rows, loading, maxHeight, hint }) {
     <>
       <div className="tblwrap" style={{ maxHeight, overflowY: 'auto' }}>
         <table>
-          <thead><tr><th className="l">{title}</th><th>Debit</th><th>Credit</th></tr></thead>
+          <thead><tr><th className="l">{title}</th><th>Debit ({cur})</th><th>Credit ({cur})</th></tr></thead>
           <tbody>
             {list.length === 0 && <tr><td className="l" colSpan={3} style={{ textAlign: 'center', padding: 26, color: '#9A9A9A' }}>No breakdown for this ledger / period.</td></tr>}
             {list.map((r, i) => (
@@ -471,8 +471,8 @@ export function printLedgerUI({ d, bills = [], view = 'ledger', group, side, cur
   const m = mapLedger(d);
   const period = `From <b>${from ? dmy(from) : '…'}</b> to <b>${to ? dmy(to) : '…'}</b>`;
   const inner = (view === 'bill')
-    ? billwisePrintHTML({ side, bills, group, name: m.name })
-    : ledgerPrintHTML({ m, showNarr, showDetail });
+    ? billwisePrintHTML({ side, bills, group, name: m.name, cur })
+    : ledgerPrintHTML({ m, showNarr, showDetail, cur });
 
   const html = `<style>${LEDGER_CSS}</style><div class="kbled"><div class="sheet">
     <div class="hdr">
@@ -489,7 +489,7 @@ export function printLedgerUI({ d, bills = [], view = 'ledger', group, side, cur
   openPrintPreview({ title: `Ledger — ${m.name || 'Statement'}`, recommend: view === 'bill' ? 'landscape' : 'portrait', html });
 }
 
-function ledgerPrintHTML({ m, showNarr, showDetail }) {
+function ledgerPrintHTML({ m, showNarr, showDetail, cur = '₹' }) {
   const opSigned = m.opening.side === 'Dr' ? m.opening.amt : -m.opening.amt;
   let bal = opSigned;
   const closing = m.closing;
@@ -533,13 +533,13 @@ function ledgerPrintHTML({ m, showNarr, showDetail }) {
   const clLabel = doSegment ? 'Closing Balance (Group)' : 'Closing Balance';
 
   return `<div class="summary">
-      <div class="scard"><div class="k">Opening Balance</div><div class="v">${fmtB(opSigned)} <span style="font-size:11px;color:#9A9A9A">${esc(m.opening.side)}</span></div></div>
-      <div class="scard dr"><div class="k">Total Debit</div><div class="v">${fmt(m.totalDebit) || '0.00'}</div></div>
-      <div class="scard cr"><div class="k">Total Credit</div><div class="v">${fmt(m.totalCredit) || '0.00'}</div></div>
-      <div class="scard bal"><div class="k">Closing Balance</div><div class="v">${fmtB(closing.amt)} <span style="font-size:11px;color:#9A9A9A">${esc(closing.side)}</span></div></div>
+      <div class="scard"><div class="k">Opening Balance</div><div class="v">${cur}${fmtB(opSigned)} <span style="font-size:11px;color:#9A9A9A">${esc(m.opening.side)}</span></div></div>
+      <div class="scard dr"><div class="k">Total Debit</div><div class="v">${cur}${fmt(m.totalDebit) || '0.00'}</div></div>
+      <div class="scard cr"><div class="k">Total Credit</div><div class="v">${cur}${fmt(m.totalCredit) || '0.00'}</div></div>
+      <div class="scard bal"><div class="k">Closing Balance</div><div class="v">${cur}${fmtB(closing.amt)} <span style="font-size:11px;color:#9A9A9A">${esc(closing.side)}</span></div></div>
     </div>
     <div class="tblwrap"><table>
-      <thead><tr><th class="l">Date</th><th class="l">Particulars</th><th class="l">Vch Type</th><th class="l">Vch No</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead>
+      <thead><tr><th class="l">Date</th><th class="l">Particulars</th><th class="l">Vch Type</th><th class="l">Vch No</th><th>Debit (${cur})</th><th>Credit (${cur})</th><th>Balance (${cur})</th></tr></thead>
       <tbody>
         <tr class="open-row"><td class="l" colspan="4">${opLabel}</td>
           <td class="num">${m.opening.side === 'Dr' ? fmt(m.opening.amt) : ''}</td>

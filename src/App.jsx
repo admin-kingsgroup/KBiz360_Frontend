@@ -500,6 +500,8 @@ export default function KB360App(){
     if(route==="/reports/pay")        return <PayablesLive branch={branch} setRoute={navigate}/>;
     if(route==="/reports/sreg")       return <RegisterLive branch={branch} initial="sales"/>;
     if(route==="/reports/preg")       return <RegisterLive branch={branch} initial="purchase"/>;
+    if(route==="/reports/inb-sreg")   return <RegisterLive branch={branch} initial="sales" inbOnly/>;
+    if(route==="/reports/inb-preg")   return <RegisterLive branch={branch} initial="purchase" inbOnly/>;
     if(route==="/reports/invoice-gp") return <InvoiceGPLive branch={branch}/>;
     if(route==="/reports/sales-gp-analytics") return <SalesGpAnalytics branch={branch}/>;
     if(route==="/reports/branch")     return <ReportBranch/>;

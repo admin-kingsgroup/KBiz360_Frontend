@@ -276,6 +276,8 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   {label:"Sales & Purchase", children:[
     {label:"Sales Register",            href:"/reports/sreg"},
     {label:"Purchase Register",         href:"/reports/preg"},
+    {label:"INB Sales Register",        href:"/reports/inb-sreg"},
+    {label:"INB Purchase Register",     href:"/reports/inb-preg"},
     // Module Sales/Purchase Register, Invoice-wise GP and Sales & GP Analytics
     // moved to the Finance pill (Finance ▸ Registers & Outstanding).
   ]},

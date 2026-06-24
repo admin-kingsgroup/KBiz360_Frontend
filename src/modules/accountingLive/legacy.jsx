@@ -1557,7 +1557,12 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
   );
 }
 
-export function RegisterLive({ branch, initial = 'sales' }) {
+// An inter-branch row: a sale raised as an INB voucher, or a purchase whose party
+// is an inter-branch branch ledger ("Travkings Tours and Travels <BR>").
+const INB_PARTY_RE = /travkings tours and travels\s+(bom|amd|nbo|dar|fbm|tkho)\b/i;
+const isInbRow = (v, tab) => (tab === 'sales' ? v.type === 'INB' : INB_PARTY_RE.test(String(v.party || '')));
+
+export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
   const cur = curOf(branch);
   // Locked per menu: the Sales Register shows ONLY sales, the Purchase Register ONLY
   // purchase — no cross-tab toggle (so each register is its own dataset).
@@ -1594,11 +1599,12 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   }, [allRows]);
   const needle = search.trim().toLowerCase();
   const rows = useMemo(() => allRows
+    .filter((v) => !inbOnly || isInbRow(v, tab)) // INB register → inter-branch rows only
     .filter((v) => product === 'all' || productOf(v) === product)
     // While a search term is active, ignore the date window so a match is found
     // regardless of period (otherwise the default month silently hides older vouchers).
     .filter((v) => !!needle || dateInRange(v.date, from, to))
-    .filter((v) => !needle || voucherHaystack(v).includes(needle)), [allRows, product, from, to, needle]);
+    .filter((v) => !needle || voucherHaystack(v).includes(needle)), [allRows, product, from, to, needle, inbOnly, tab]);
   const sum = (k) => rows.reduce((s, v) => s + (v[k] || 0), 0);
   const summaryPager = usePager(rows); // Summary view paging — sum() above still totals the full set
   const sheet = useMemo(() => vouchersToSheet(rows), [rows]);
@@ -1673,14 +1679,15 @@ export function RegisterLive({ branch, initial = 'sales' }) {
           { ledger: party, amount: total, drCr: 'Cr' },
         ] };
   }), [rows, tab]);
-  useReportExport({ title: tab === 'sales' ? 'Sales Register' : 'Purchase Register', kind: 'vouchers', rows: tallyVouchers, recommend: 'landscape' }, [tallyVouchers, tab]);
+  const regTitle = inbOnly ? (tab === 'sales' ? 'INB Sales Register' : 'INB Purchase Register') : (tab === 'sales' ? 'Sales Register' : 'Purchase Register');
+  useReportExport({ title: regTitle, kind: 'vouchers', rows: tallyVouchers, recommend: 'landscape' }, [tallyVouchers, regTitle]);
   const subHint = view === 'capture' ? 'every SO/PO/GP figure, module-wise — scroll right'
     : view === 'detailed' ? 'every Tally column shown — scroll right'
       : 'click a row for full detail';
   return (
     <Page
       wide={view !== 'summary'}
-      title={tab === 'sales' ? 'Sales Register' : 'Purchase Register'}
+      title={regTitle}
       sub={`${branchLabel(branch)} · ${rows.length} vouchers · Total ${money(cur, sum('total'))} · ${needle ? 'searching all dates' : subHint}`}
       right={<>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Search passenger / party / ticket / link no / voucher…"

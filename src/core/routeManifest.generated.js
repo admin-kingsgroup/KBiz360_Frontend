@@ -214,6 +214,8 @@ export const APP_ROUTES = [
   "/reports/fs-notes",
   "/reports/fx-exposure",
   "/reports/gp",
+  "/reports/inb-preg",
+  "/reports/inb-sreg",
   "/reports/interbranch",
   "/reports/invoice-gp",
   "/reports/meta-demo",
