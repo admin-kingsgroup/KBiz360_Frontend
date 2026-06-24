@@ -206,8 +206,8 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     const desc = `<td class="l desc"><div class="nm">${esc(headerRef || 'Booking')}</div>${idHtml}${secHtml}</td>`;
     if (isSale) {
       const totalFare = base + k3 + tax + markup;
-      // Taxes (YQ/YR) = the pass-through fare taxes; Other Taxes = the agency margin
-      // (hidden income), shown as its own column per the customer-facing layout.
+      // Taxes (YQ/YR) = the pass-through fare taxes; Service Charge - 2 = the agency margin
+      // (retained income), shown as its own column per the customer-facing layout.
       return `<tr>${desc}<td class="l">${esc(sac)}</td><td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td>${n2(markup)}</td><td class="tf">${cur}${n2(totalFare)}</td></tr>`;
     }
     const totalCost = base + k3 + tax + psvc - incentive + tds;
@@ -251,7 +251,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     : `<div class="lab2">Settlement</div><div class="pay">Payable to supplier per agreed credit terms.<br>Input GST credit claimed against supplier GSTIN.<br>Link No referenced for invoice-wise GP.</div>`;
 
   const headCols = isSale
-    ? `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Basic Fare</th><th>K3 Tax</th><th>Taxes (YQ/YR)</th><th>Other Taxes</th><th>Total Fare</th>`
+    ? `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Basic Fare</th><th>K3 Tax</th><th>Taxes (YQ/YR)</th><th>Service Charge - 2</th><th>Total Fare</th>`
     : `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Basic Fare</th><th>K3 Tax</th><th>Taxes (YQ/YR)</th><th>Supplier Svc</th><th>Incentive</th><th>TDS (2%)</th><th>Total Cost</th>`;
 
   const sheet = `<div class="iv"><div class="sheet">

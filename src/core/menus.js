@@ -42,7 +42,7 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
     {label:"Tour Codes", href:"/masters/tour-codes"},
     {label:"Project / Tour Code Master", href:"/masters/projects"},
     {label:"Seat Inventory", href:"/masters/seats"},
-    {label:"Other Taxes Rates", href:"/masters/markup"},
+    {label:"Service Charge - 2 Rates", href:"/masters/markup"},
   ]},
   // Employee Master + 10-Tab View now live under the dedicated HR pill
   // (HR ▸ Employee Master) — removed here to avoid the duplicate entry point.

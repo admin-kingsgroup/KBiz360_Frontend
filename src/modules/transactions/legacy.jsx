@@ -1513,7 +1513,7 @@ function InvoicePaxPanel({inv,cur,label="Invoice",selectable=false,selected,onTo
       ):<div style={{fontSize:10,color:"#9197a3",marginBottom:9}}>No passenger detail recorded on this invoice.</div>}
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
         {chip(selectable?"Selected Fare (excl. svc + GST)":"Original Fare (excl. svc + GST)",selBase,"#16a34a")}
-        {chip("Service Charge + Markup",svc,"#c2a04a")}
+        {chip("Service Charge + Service Charge - 2",svc,"#c2a04a")}
         {chip("GST collected",gst,"#2563eb")}
         {tcs>0&&chip("TCS collected",tcs,"#d97706")}
         {chip("Invoice Total",inv.total,"#1a1c22")}
@@ -1648,7 +1648,7 @@ function RefundReissueVoucher({branch,kind}){
     :[{side:"CR",ledger:"CGST Output",amount:_r2(taxAmt/2),note:"CGST on our charges"},{side:"CR",ledger:"SGST Output",amount:_r2(taxAmt-_r2(taxAmt/2)),note:"SGST on our charges"}]):[];
   const incomeRows=[
     ...(svc>0?[{side:"CR",ledger:"Service Charge Income",amount:svc,note:"retained service charge"}]:[]),
-    ...(markup>0?[{side:"CR",ledger:"Markup Income",amount:markup,note:"retained markup"}]:[]),
+    ...(markup>0?[{side:"CR",ledger:"SVC2 Income",amount:markup,note:"retained Service Charge - 2"}]:[]),
   ];
   // Supplier service charge → our own cost (per-module Purchase head, reduces GP); its
   // GST → claimable Input credit. Both are SEPARATE legs, never netted with the customer.
@@ -1694,7 +1694,7 @@ function RefundReissueVoucher({branch,kind}){
       counterParty:supplierName, counterPartyGroup:supplierGroup, supplierAmt, supplierSvc:supSvc, supplierGst:supGst, supplierSvcLedger:supSvcLedger,
       lines:[
         {ledger:"Service Charge Income", amt:svc, desc:"Retained service charge", drCr:"Cr"},
-        {ledger:"Markup Income", amt:markup, desc:"Retained markup", drCr:"Cr"},
+        {ledger:"SVC2 Income", amt:markup, desc:"Retained Service Charge - 2", drCr:"Cr"},
       ].filter(l=>(+l.amt||0)>0),
       subtotal:_r2(svc+markup), taxAmt, gstMode, total,
       againstInvoice:selInv.vno, againstPurchase:selPur?.vno||"",
@@ -1777,12 +1777,12 @@ function RefundReissueVoucher({branch,kind}){
             </>}
             <RRLine label="Our Service Charge" sub="our income, retained">{num(svc,setSvc)}</RRLine>
             <RRLine label={<>GST on Service @<input type="number" value={gstRateSvc} onChange={e=>setGstRateSvc(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e6e8ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="on service charge" derived><input type="number" value={gstSvc} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
-            <RRLine label="Our Markup" sub="our margin, retained">{num(markup,setMarkup)}</RRLine>
-            <RRLine label={<>GST on Markup @<input type="number" value={gstRateMk} onChange={e=>setGstRateMk(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e6e8ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="on markup" derived><input type="number" value={gstMk} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
+            <RRLine label="Our Service Charge - 2" sub="our margin, retained">{num(markup,setMarkup)}</RRLine>
+            <RRLine label={<>GST on Service Charge - 2 @<input type="number" value={gstRateMk} onChange={e=>setGstRateMk(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e6e8ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="on Service Charge - 2" derived><input type="number" value={gstMk} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
           </div>
           {/* Highlight: amount to / from customer */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginTop:12,padding:"11px 14px",borderRadius:8,background:"#FDFAF4",border:"1px solid "+(chargesExceed?"#f3c9c9":"#EFE7D4")}}>
-            <span style={{fontSize:12.5,fontWeight:800,color:chargesExceed?"#dc2626":"#c2a04a"}}>{isRefund?"Refund to Customer":"Total Billed to Customer"}<span style={{display:"block",fontSize:10,fontWeight:400,color:"#9197a3"}}>{isRefund?"(fare − cancellation) − our charges · excl. supplier svc":"fee + difference + service + markup + GST · excl. supplier svc"}</span></span>
+            <span style={{fontSize:12.5,fontWeight:800,color:chargesExceed?"#dc2626":"#c2a04a"}}>{isRefund?"Refund to Customer":"Total Billed to Customer"}<span style={{display:"block",fontSize:10,fontWeight:400,color:"#9197a3"}}>{isRefund?"(fare − cancellation) − our charges · excl. supplier svc":"fee + difference + service + Service Charge - 2 + GST · excl. supplier svc"}</span></span>
             <span style={{fontSize:17,fontWeight:800,color:chargesExceed?"#dc2626":"#c2a04a",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,isRefund?custRefund:custBill)}</span>
           </div>
         </div>
@@ -1794,7 +1794,7 @@ function RefundReissueVoucher({branch,kind}){
         {/* Gross Profit cards */}
         <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:14}}>
           <div style={{flex:1,minWidth:160,...card,padding:"12px 16px",background:"#f4f5f7"}}>
-            <div style={{fontSize:9,fontWeight:700,letterSpacing:".6px",color:"#5b616e",textTransform:"uppercase"}}>Gross Profit (Service + Markup − Supplier Svc)</div>
+            <div style={{fontSize:9,fontWeight:700,letterSpacing:".6px",color:"#5b616e",textTransform:"uppercase"}}>Gross Profit (Service + Service Charge - 2 − Supplier Svc)</div>
             <div style={{fontSize:18,fontWeight:800,color:gp<0?"#dc2626":"#16a34a",marginTop:3,fontVariantNumeric:"tabular-nums"}}>{vf2(cur,gp)}</div>
           </div>
           <div style={{flex:1,minWidth:160,...card,padding:"12px 16px",background:"#f4f5f7"}}>
@@ -1806,7 +1806,7 @@ function RefundReissueVoucher({branch,kind}){
         <FL label="Narration"><textarea value={narration} onChange={e=>setNarration(e.target.value)} rows={2} style={{...inp,resize:"vertical",marginBottom:12}} placeholder={selInv?`Being ${kind} of ${module.toLowerCase()} booking ${ref1||selInv.vno} against ${selInv.vno}`:`Being ${kind} processed for the selected ${module.toLowerCase()} booking`}/></FL>
 
         <VSaveMsg m={post} okText={`✔ ${title} ${vNo} posted · ${isRefund?`${customerName} refunded ${vf2(cur,custRefund)}`:`${customerName} billed ${vf2(cur,custBill)}`} · against ${selInv?.vno||""} · books refreshed`}/>
-        {chargesExceed&&<div style={{padding:"8px 12px",borderRadius:8,background:"#fbe9e9",fontSize:10.5,color:"#dc2626",fontWeight:600,textAlign:"center",marginBottom:8}}>⚠ Your service charge + markup (+GST) exceed the supplier refund — the customer cannot be refunded a negative amount.</div>}
+        {chargesExceed&&<div style={{padding:"8px 12px",borderRadius:8,background:"#fbe9e9",fontSize:10.5,color:"#dc2626",fontWeight:600,textAlign:"center",marginBottom:8}}>⚠ Your service charge + Service Charge - 2 (+GST) exceed the supplier refund — the customer cannot be refunded a negative amount.</div>}
         {!brPost&&<div style={{padding:"8px 12px",borderRadius:8,background:"#fbeedb",fontSize:10.5,color:"#d97706",fontWeight:600,textAlign:"center",marginBottom:8}}>Select a specific branch (not “All”) to post this voucher.</div>}
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={reset} style={btnGh}>Reset</button>

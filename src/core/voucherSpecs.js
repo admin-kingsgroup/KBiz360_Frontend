@@ -236,13 +236,13 @@ export const gpOf = (spec, l) => r2((finalSales(spec, l) - salesGST(l)) - (final
 export const gpPctOf = (spec, l) => { const fs = finalSales(spec, l); return fs > 0 ? r2((gpOf(spec, l) / fs) * 100) : 0; };
 
 // Holiday "package" model (tour-operator): no service charge; Supplier Service GST
-// is entered; Markup is the net agency margin. Tour-operator 5% scheme (no ITC):
+// is entered; SVC2 is the net agency margin. Tour-operator 5% scheme (no ITC):
 // a SINGLE 5% output GST on the full package consideration (taxable) =
-// Land + Supplier Service + Supplier Service GST + Markup. The markup is taxed ONCE
-// here as part of the taxable value — NOT booked as a separate markup GST AND
+// Land + Supplier Service + Supplier Service GST + SVC2. The SVC2 margin is taxed ONCE
+// here as part of the taxable value — NOT booked as a separate SVC2 GST AND
 // re-taxed inside the base (the old double-count that made GST ~5.41%). TCS (Intl)
 // added at booking level on (taxable + GST). Cost = Land + Supplier Service +
-// Supplier Service GST (no ITC). GP = Markup (net) only.
+// Supplier Service GST (no ITC). GP = SVC2 (net) only.
 export function lineCalcPackage(spec, l, ctx) {
   const rate = pkgRateOf(spec, ctx);
   const land = num(l.base);
@@ -298,13 +298,13 @@ export function lineCalc(spec, l, ctx) {
 export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false } = {}) {
   const ctx = { branch, noVat: !!noVat };
   const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, incentiveAmt: 0, incentiveGst: 0, incentiveTds: 0, total: 0, lines: [] };
-  // `otherTaxesGst` = GST carved out of the Other Taxes margin (GST-inclusive, so the
+  // `otherTaxesGst` = GST carved out of the SVC2 margin (GST-inclusive, so the
   // customer total is unchanged); kept OUT of `gst` so it posts to the dedicated
-  // per-branch "Other Taxes [C/S/I]GST Output" ledgers, separate from the regular GST.
+  // per-branch "SVC2 [C/S/I]GST Output" ledgers, separate from the regular GST.
   const so = { lineTotal: 0, serviceCharge: 0, gst: 0, otherTaxesGst: 0, tcs: 0, total: 0, lines: [] };
   // Per-component ledger heads (ex-GST). Every SO/PO field posts to its OWN ledger
   // under the Sales / Purchase group — pass-through fares + supplier service mirror
-  // on both sides; Markup & Service Charge are sale-only (their GST → Output GST).
+  // on both sides; SVC2 & Service Charge are sale-only (their GST → Output GST).
   const sH = {}, pH = {};
   const addH = (bag, key, label, amt) => { (bag[key] || (bag[key] = { key, label, amt: 0 })).amt += num(amt); };
   (lines || []).forEach((l) => {
@@ -321,21 +321,21 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     so.lineTotal += r2(c.finalSales - c.salesGST);
     so.serviceCharge += num(l.ssvc);
     so.gst += r2(c.salesGST - c.gstMk);   // regular output GST (fares / service charge)
-    so.otherTaxesGst += c.gstMk;          // GST on the Other Taxes margin → separate ledgers
+    so.otherTaxesGst += c.gstMk;          // GST on the SVC2 margin → separate ledgers
     so.total += c.finalSales;
     so.lines.push({ ...id, ...fares, pass: c.pass, markup: num(l.markup), ssvc: num(l.ssvc), gstMk: c.gstMk, gstSvc: c.gstSvc, gst: c.salesGST, total: c.finalSales });
     // heads — pass-through fares (sale = purchase). Package model: Land + Supplier
-    // Service + Supplier Service GST are pass-through (both sides), Markup is sale-only
+    // Service + Supplier Service GST are pass-through (both sides), SVC2 is sale-only
     // income (= GP). Fare model: Supplier Service is purchase-only (agency cost),
-    // Markup (net of embedded GST) + Service Charge are sale-only.
+    // SVC2 (net of embedded GST) + Service Charge are sale-only.
     spec.fareCols.forEach((col) => { addH(sH, col.key, col.label, num(l[col.key])); addH(pH, col.key, col.label, num(l[col.key])); });
     if (isPkg(spec)) {
       addH(sH, 'psvc', 'Supplier Service', num(l.psvc)); addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
       addH(sH, 'psvcGst', 'Supplier Service GST', num(l.psvcGst)); addH(pH, 'psvcGst', 'Supplier Service GST', num(l.psvcGst));
-      addH(sH, 'markup', 'Other Taxes', num(l.markup));
+      addH(sH, 'markup', 'SVC2', num(l.markup));
     } else {
       addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
-      addH(sH, 'markup', 'Other Taxes', r2(num(l.markup) - c.gstMk));
+      addH(sH, 'markup', 'SVC2', r2(num(l.markup) - c.gstMk));
       addH(sH, 'ssvc', 'Service Charge', num(l.ssvc));
     }
     // NOTE: supplier incentive + 2% TDS are NOT posted as cost heads — they ride on

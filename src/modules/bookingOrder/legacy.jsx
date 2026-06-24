@@ -372,7 +372,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   // Reversal modules (Refund / Reissue) render a dedicated entry instead of the fare
   // grid — same module bar, but the original-invoice link + supplier-refund + retained
-  // Other Taxes inputs, spawning ONE RF/RI voucher on approval (reuses the proven
+  // Service Charge - 2 inputs, spawning ONE RF/RI voucher on approval (reuses the proven
   // reversal posting). All hooks above have run, so this early return is safe.
   if (isReversalModule(moduleCode)) {
     return <ReversalEntry moduleCode={moduleCode} changeModule={changeModule} brCode={brCode} cur={cur} editing={editing} editBooking={editBooking} qc={qc} setRoute={setRoute} onDone={onDone} />;
@@ -471,7 +471,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#9197a3' }}>
               {editing
                 ? <>Fix any data-entry mistake — or switch the <b style={{ color: GOLD }}>module</b> if it was booked wrong — then <b style={{ color: GOLD }}>Save changes</b> · {brCode} · returns to Pending; approve it from the Pending queue</>
-                : <>Enter cost + Other Taxes → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
+                : <>Enter cost + Service Charge - 2 → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -565,7 +565,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <div style={{ ...card, background: '#EAF1FB', border: '1px solid #B9D6F2', color: '#185FA5', fontSize: 12, marginBottom: 14 }}>
           🔁 <b>Inter-Branch sale.</b> Enter the fares in the Purchase Order grid (pass-through at cost) and your margin in the Sales <b>Service Charge</b> column (= the <b>Service Fee</b>). Fares post to <b>Inter-Branch Sales</b>, the Service Fee to <b>Service Fee Income</b>.
           {toBranch && <> Tax: <b>{inbExport ? `Export · zero-rated (${INB_COUNTRY[brCode]}→${INB_COUNTRY[toBranch]})` : 'IGST · inter-state (18% on Service Fee)'}</b>.</>}
-          {' '}Do not use Other Taxes. Creates an INB Link No the {toBranch || 'buying'} branch fetches on its SO/PO/GP.
+          {' '}Do not use Service Charge - 2. Creates an INB Link No the {toBranch || 'buying'} branch fetches on its SO/PO/GP.
         </div>
       )}
 
@@ -635,18 +635,18 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', padding: '8px 14px', marginBottom: 12, background: '#FDFAF4', border: '1px solid #eee3cf', borderRadius: 8, flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#fff', border: '1px solid #C49A3C' }} /> Manual — you enter</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#faf7ef', border: '1px dashed #9A9A9A' }} /> Auto — calculated</span>
-        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · {pkg ? 'Holiday package: 5% GST on (Land + Supplier Service + Supplier Service GST + Other Taxes); Intl adds 2% TCS' : 'Other Taxes is GST-inclusive (GST = Other Taxes × 18 ÷ 118), posted to separate GST ledgers'}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · {pkg ? 'Holiday package: 5% GST on (Land + Supplier Service + Supplier Service GST + Service Charge - 2); Intl adds 2% TCS' : 'Service Charge - 2 is GST-inclusive (GST = Service Charge - 2 × 18 ÷ 118), posted to separate GST ledgers'}</span>
       </div>
 
       {/* ① Sales Order */}
-      <Section n="1" name="Sales Order" sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · Other Taxes is GST-inclusive'} accent={BLUE}>
+      <Section n="1" name="Sales Order" sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · Service Charge - 2 is GST-inclusive'} accent={BLUE}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
             <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
               {spec.idCols.map((c) => <th key={c.key} style={{ ...thM, ...thL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
               {spec.fareCols.map((c) => <th key={c.key} style={{ ...thA, width: 95 }}>{c.label}</th>)}
-              <th style={{ ...thM, width: 95 }}>Other Taxes</th>{!pkg && <th style={{ ...thM, width: 95 }}>Service Chg</th>}
-              {!pkg && <th style={{ ...thA, width: 95 }}>GST/Service ({activeRate}%)</th>}<th style={{ ...thA, width: 95 }}>GST/Other Taxes ({pkg ? 5 : activeRate}%)</th><th style={{ ...thA, width: 110 }}>Total</th><th style={{ ...thA, width: 45 }}></th>
+              <th style={{ ...thM, width: 95 }}>Service Charge - 2</th>{!pkg && <th style={{ ...thM, width: 95 }}>Service Chg</th>}
+              {!pkg && <th style={{ ...thA, width: 95 }}>GST/Service ({activeRate}%)</th>}<th style={{ ...thA, width: 95 }}>GST/Service Charge - 2 ({pkg ? 5 : activeRate}%)</th><th style={{ ...thA, width: 110 }}>Total</th><th style={{ ...thA, width: 45 }}></th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -829,7 +829,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 // ─── Refund / Reissue entry (reversal modules) ────────────────────────────────
 // Picked from the SO/PO/GP module bar; references the original sale invoice and, on
 // approval, spawns ONE RF/RI voucher posted via the proven reversal engine. Reuses
-// the RefundReissueFields body; maps its margin input → the booking's Other Taxes.
+// the RefundReissueFields body; maps its margin input → the booking's Service Charge - 2.
 function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBooking, qc, setRoute, onDone }) {
   const kind = moduleCode === 'RF' ? 'refund' : 'reissue';
   const [state, setState] = useState(() => {
@@ -1096,7 +1096,7 @@ function WhereItPosts({ approved }) {
   const items = [
     ['Day Book / Ledgers', 'both vouchers appear in the Day Book and each ledger statement (Sundry Debtors, Supplier, every Sales/Purchase component head, GST).'],
     ['Trial Balance', 'every Dr/Cr leg above lands in the Trial Balance under its group.'],
-    ['Profit & Loss', 'each head nests in the Tally chart — Sales Accounts → module sub-group (Ticketing → Domestic/International) → DT-Base Fare / DT-K3-Taxes / DT-Other Taxes / DT-Service Charges; Purchase Accounts → … [Pur] incl. Supplier Service (an agency cost that reduces GP). Drill the P&L to see it head-wise.'],
+    ['Profit & Loss', 'each head nests in the Tally chart — Sales Accounts → module sub-group (Ticketing → Domestic/International) → DT-Base Fare / DT-K3-Taxes / DT-SVC2 / DT-Service Charges; Purchase Accounts → … [Pur] incl. Supplier Service (an agency cost that reduces GP). Drill the P&L to see it head-wise.'],
     ['Balance Sheet', 'customer (Sundry Debtors, asset), supplier (Sundry Creditors, liability), CGST/SGST (Duties & Taxes) and any TCS Payable sit on the Balance Sheet.'],
     ['Sales & Purchase Registers', 'the sale shows in the Sales Register, the purchase in the Purchase Register.'],
     ['Invoice GP / Sales-GP Analytics', 'both are tied by the Link No, so GP is tracked invoice-wise.'],

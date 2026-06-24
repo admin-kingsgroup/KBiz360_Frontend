@@ -23,7 +23,7 @@ export function buildRefundReissueBody(s, ctx, kind) {
     : r2(supplierAmt - supSvc - supGst + ourIncome + taxAmt);
   const lines = [];
   if (svc > 0) lines.push({ ledger: 'Service Charge Income', amt: svc, desc: 'Service charge' });
-  if (markup > 0) lines.push({ ledger: 'Markup Income', amt: markup, desc: 'Markup' });
+  if (markup > 0) lines.push({ ledger: 'SVC2 Income', amt: markup, desc: 'Service Charge - 2' });
   return {
     type: isRefund ? 'RF' : 'RI', category: kind, branch: ctx.branchCode, date: s.date,
     party: s.party, partyType: 'customer',

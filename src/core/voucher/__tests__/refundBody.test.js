@@ -21,7 +21,7 @@ describe('buildRefundReissueBody', () => {
     // our income legs only added when > 0
     expect(b.lines).toEqual([
       { ledger: 'Service Charge Income', amt: 250, desc: 'Service charge' },
-      { ledger: 'Markup Income', amt: 120, desc: 'Markup' },
+      { ledger: 'SVC2 Income', amt: 120, desc: 'Service Charge - 2' },
     ]);
     // refund customer figure: supplierAmt + supSvc + supGst − ourIncome − taxAmt
     // ourIncome = 370, taxAmt = 370*18% = 66.6 → 74227 - 370 - 66.6

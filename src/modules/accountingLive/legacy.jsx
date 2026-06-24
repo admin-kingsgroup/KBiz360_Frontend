@@ -147,7 +147,7 @@ function ExportBtn({ onClick, disabled, label = 'Export to Excel' }) {
 }
 
 // Reusable per-voucher detail: header chips + every line's full meta breakup
-// (base fare, K3, taxes, service charge, CGST/SGST/IGST, markup, TCS …).
+// (base fare, K3, taxes, service charge, CGST/SGST/IGST, SVC2, TCS …).
 export function VoucherLines({ voucher: v, cur }) {
   // Full-JV preview: the SAME engine the edit screen uses, so the popup shows the
   // COMPLETE balanced journal (party Dr, every component head, GST, TCS/TDS) for both
@@ -1330,8 +1330,8 @@ function VoucherDetail({ voucher, cur, onClose }) {
 // captured on the booking at SO/PO/GP time, ONE LINE PER INVOICE:
 //   SPG/Link No · Sales Inv · Purchase Inv · Client Type · Client Ledger · Pax ·
 //   PNR · Ticket No · Final Invoice Value · each component head (IT-Base Fare /
-//   IT-K3-Taxes / IT-Taxes / IT-Other Taxes / IT-Service Charges …) · CGST/SGST/IGST
-//   Output · Other Taxes CGST/SGST Output · TCS.
+//   IT-K3-Taxes / IT-Taxes / IT-SVC2 / IT-Service Charges …) · CGST/SGST/IGST
+//   Output · SVC2 CGST/SGST Output · TCS.
 // The component-head columns are derived dynamically from the posted voucher lines —
 // their ledger names ARE "IT-Base Fare" etc. — so the SAME layout auto-adapts to
 // every module (Flight/Hotel/Visa/…), Domestic (DT-) or International (IT-), and the
@@ -1352,12 +1352,12 @@ function splitGst(amt, gstMode, brCode) {
 }
 
 // Rank a component-head ledger so the head columns sit in a natural reading order
-// (fares → K3 → taxes → other taxes → service charge → supplier service), regardless
-// of the DT-/IT- prefix or the [Pur] suffix. Tested in order so "Other Taxes" and
-// "K3-Taxes" don't collide with the generic "Taxes" match.
+// (fares → K3 → taxes → SVC2 → service charge → supplier service), regardless
+// of the DT-/IT- prefix or the [Pur] suffix. Tested in order so "SVC2" (and the legacy
+// "Other Taxes") and "K3-Taxes" don't collide with the generic "Taxes" match.
 const HEAD_RANK = [
   [/base\s*fare/i, 0], [/land/i, 1], [/room|basic|visa\s*fee|premium|fare/i, 2],
-  [/k3/i, 3], [/other\s*tax/i, 5], [/service\s*charge/i, 6], [/supplier\s*service/i, 7],
+  [/k3/i, 3], [/svc2|other\s*tax/i, 5], [/service\s*charge/i, 6], [/supplier\s*service/i, 7],
   [/tax/i, 4], [/incentive/i, 8], [/tds/i, 9],
 ];
 const headRank = (ledger) => { for (const [re, rk] of HEAD_RANK) if (re.test(ledger)) return rk; return 50; };
@@ -1424,9 +1424,9 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
   if (anyInter) col('igst', `IGST ${taxWord}${sfx}`, true);
   if (anyVat) col('vat', `VAT ${taxWord}${sfx}`, true);
   if (isSale && anyOther) {
-    if (anyIndia) { col('ocgst', `Other Taxes CGST Output${sfx}`, true); col('osgst', `Other Taxes SGST Output${sfx}`, true); }
-    if (anyInter) col('oigst', `Other Taxes IGST Output${sfx}`, true);
-    if (anyVat) col('ovat', `Other Taxes VAT Output${sfx}`, true);
+    if (anyIndia) { col('ocgst', `SVC2 CGST Output${sfx}`, true); col('osgst', `SVC2 SGST Output${sfx}`, true); }
+    if (anyInter) col('oigst', `SVC2 IGST Output${sfx}`, true);
+    if (anyVat) col('ovat', `SVC2 VAT Output${sfx}`, true);
   }
   if (isSale && anyTcs) col('tcs', 'TCS', true);
   if (!isSale && anyTds) col('tds', 'TDS', true);

@@ -4,7 +4,6 @@ import { todayISO } from '../../dates';
 import { SmartDateInput } from '../../ux/SmartDateInput';
 import { VPlaceOfSupply } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
-import { useVoucherRef } from '../useVoucherRef';
 import { apiGet } from '../../api';
 import { useVoucherPreview } from '../../useAccounting';
 import { money2, r2 } from '../ui';
@@ -92,7 +91,7 @@ function JvTBlock({ title, sub, postings, color }) {
  * `kind` ('refund' | 'reissue') flips the customer/supplier direction:
  *   refund  → supplier (airline) refunds us; we refund the balance to the customer.
  *   reissue → supplier charges a fee + fare difference; we bill the customer.
- * Our retained service charge + Other Taxes (margin) post as income; any charge the
+ * Our retained service charge + Service Charge - 2 (margin) post as income; any charge the
  * supplier levies on us posts as our own cost. The customer figure is derived so
  * the voucher always balances (see posting.builder refundLines/reissueLines).
  *
@@ -105,8 +104,6 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   const { branch, branchCode, cur } = ctx;
   const isRefund = kind === 'refund';
   const patch = (p) => setState((s) => ({ ...s, ...p }));
-  const ref = useVoucherRef();
-  const GST_SLABS = ref.gstSlabs;
 
   const [linkInput, setLinkInput] = useState(state.againstInvoice || '');
   const [booking, setBooking] = useState(null);
@@ -122,7 +119,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       const b = await apiGet('/api/booking-orders/by-link', { link, branch: branchCode || branch });
       setBooking(b);
       // Lock-fill the invoice refs + carry over the refundable amounts (supplier fare,
-      // our Other-Taxes margin, commission reversal) — but NOT our service charge / its
+      // our Service Charge - 2 margin, commission reversal) — but NOT our service charge / its
       // GST nor the supplier service fee / its GST (those are retained, not refunded).
       patch(refundPrefillFromBooking(b, state));   // honours the Commission-Reversal toggle
       // Also pull the original booking's JV (Sale + Purchase posting legs) to show below.
@@ -254,11 +251,11 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
           <input type="number" value={state.supplierAmt} onChange={(e) => patch({ supplierAmt: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right', fontWeight: 700 }} />
         </FL>
         <FL label={`Our service charge (${cur})`}><input type="number" value={state.serviceCharge} onChange={(e) => patch({ serviceCharge: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
-        <FL label={`Our Other Taxes (${cur})`}><input type="number" value={state.markup} onChange={(e) => patch({ markup: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+        <FL label={`Our Service Charge - 2 (${cur})`}><input type="number" value={state.markup} onChange={(e) => patch({ markup: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
-        <FL label={`GST on our charges (${gstRate}%) · ${money2(cur, taxAmt)}`}><select value={state.gstPct} onChange={(e) => { const g = +e.target.value; patch({ gstPct: g, supplierGst: num(state.supplierSvc) ? r2(num(state.supplierSvc) * g / 100) : state.supplierGst }); }} style={inp}>{GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}</select></FL>
+        <FL label={`GST on Service Charge (${gstRate}%)`}><input value={money2(cur, taxAmt)} readOnly tabIndex={-1} title={`GST at ${gstRate}% on our service charge + Service Charge - 2`} style={{ ...lockedInp, textAlign: 'right' }} /></FL>
         <FL label={`Supplier service charge (${cur}, our cost)`}><input type="number" value={state.supplierSvc} onChange={(e) => patch({ supplierSvc: e.target.value, supplierGst: gstOf(e.target.value) })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
         <FL label={`Supplier GST (${cur}, input credit · auto ${gstRate}%)`}><input type="number" value={state.supplierGst} onChange={(e) => patch({ supplierGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
       </div>

@@ -367,7 +367,7 @@ export const ROUTE_TITLES={
   "/reports/customer-360":   "Customer 360° View",
   "/reports/tally-export":   "Tally XML Export",
   "/masters/passports":      "Passport & Document Manager",
-  "/masters/markup":         "Other Taxes / Net Rate Sheet",
+  "/masters/markup":         "Service Charge - 2 / Net Rate Sheet",
   "/masters/vendor-terms":   "Vendor Payment Terms",
   "/purchase/ticket-control":"Air Ticket Control Register",
   "/purchase/bsp-import":    "BSP CSV Import & Reconciliation",

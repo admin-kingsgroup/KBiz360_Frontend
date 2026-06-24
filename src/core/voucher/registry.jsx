@@ -11,7 +11,7 @@ import { RefundPartialFields } from './fields/RefundPartialFields';
 import { AdmAcmFields } from './fields/AdmAcmFields';
 import { r2, allocSummary, pxpTotals, dnTotals } from './ui';
 
-// Recover a saved income line's amount (Service Charge / Markup) for the edit form.
+// Recover a saved income line's amount (Service Charge / SVC2) for the edit form.
 const lineAmt = (v, ledger) => {
   const l = (v.lines || []).find((x) => x.ledger === ledger);
   return l ? (l.amt ?? '') : '';
@@ -156,7 +156,7 @@ function makeRcptPmt(side) {
 
 /**
  * Refund (RF) / Reissue (RI) — two-party, raised against a sales invoice. The
- * supplier (airline) leg is supplierAmt; our retained service charge + markup
+ * supplier (airline) leg is supplierAmt; our retained service charge + Service Charge - 2
  * post as income; the customer figure (`total`) is derived so the voucher always
  * balances. Gated → enters PENDING and posts on approval. See posting.builder.
  */
@@ -167,15 +167,15 @@ function makeRefundReissue(kind) {
     label: isRefund ? 'Refund Voucher' : 'Reissue Voucher',
     icon: isRefund ? '↩️' : '🔁',
     explain: isRefund
-      ? (<><b style={{ color: '#A07828' }}>Refund:</b> cancellation of a sale — the <b>original sale and its purchase are reversed in full</b> (Base Fare / taxes on both Sales &amp; Purchase unwind). We then retain a cancellation service charge + markup (income) and absorb the airline's cancellation fee; the <b>customer is refunded the net balance</b>. Link the related Purchase invoice so the supplier side also reverses.</>)
-      : (<><b style={{ color: '#A07828' }}>Reissue:</b> amendment of a sale. The <b>customer (Debtor) is Debited</b> with the total billed; the <b>supplier/airline (Creditor) is Credited</b> with the fee + fare difference; our service charge + markup are retained as income.</>),
+      ? (<><b style={{ color: '#A07828' }}>Refund:</b> cancellation of a sale — the <b>original sale and its purchase are reversed in full</b> (Base Fare / taxes on both Sales &amp; Purchase unwind). We then retain a cancellation service charge + Service Charge - 2 (income) and absorb the airline's cancellation fee; the <b>customer is refunded the net balance</b>. Link the related Purchase invoice so the supplier side also reverses.</>)
+      : (<><b style={{ color: '#A07828' }}>Reissue:</b> amendment of a sale. The <b>customer (Debtor) is Debited</b> with the total billed; the <b>supplier/airline (Creditor) is Credited</b> with the fee + fare difference; our service charge + Service Charge - 2 are retained as income.</>),
 
     initial: () => ({ date: todayISO(), againstInvoice: '', againstPurchase: '', gstMode: 'intra', party: '', counterParty: '', supplierAmt: '', serviceCharge: '', markup: '', gstPct: 18, supplierSvc: '', supplierGst: '', supplierCancel: '', supplierCancelGst: '', cancelRecover: true, incentiveAmt: '', incentiveGst: '', incentiveTds: '', remarks: '' }),
 
     fromVoucher: (v) => ({
       date: v.date || '', againstInvoice: v.againstInvoice || v.linkNo || '', againstPurchase: v.againstPurchase || '', gstMode: v.gstMode || 'intra',
       party: v.party || '', counterParty: v.counterParty || '', supplierAmt: v.supplierAmt ?? '',
-      serviceCharge: lineAmt(v, 'Service Charge Income'), markup: lineAmt(v, 'Markup Income'),
+      serviceCharge: lineAmt(v, 'Service Charge Income'), markup: lineAmt(v, 'SVC2 Income') || lineAmt(v, 'Markup Income'),
       gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18,
       supplierSvc: v.supplierSvc ?? '', supplierGst: v.supplierGst ?? '',
       supplierCancel: v.supplierCancel ?? '', supplierCancelGst: v.supplierCancelGst ?? '', cancelRecover: v.cancelRecover !== false,

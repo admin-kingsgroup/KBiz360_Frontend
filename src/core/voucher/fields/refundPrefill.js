@@ -41,7 +41,7 @@ export function splitRefundJv(postings = [], opts = {}) {
     else if (/input/.test(l)) side = 'purchase';                // input-credit GST → cost side
     else if (/commission|incentive/.test(l)) side = 'purchase'; // supplier commission reversal
     else if (/tds/.test(l)) side = 'purchase';
-    else if (/service charge income|markup income/.test(l)) side = 'sale'; // retained income
+    else if (/service charge income|svc2 income|markup income/.test(l)) side = 'sale'; // retained income
     else side = 'sale';                                         // fallback (keeps the leg visible)
     (side === 'sale' ? sale : purchase).push(p);
   }
@@ -74,7 +74,7 @@ export function refundPrefillFromBooking(b, state = {}) {
     againstInvoice: b?.saleVno || '',
     againstPurchase: b?.purchaseVno || '',
     supplierAmt: supplierRefund,
-    markup: blank(markupTotal),                            // Our Other Taxes ← original SO markup
+    markup: blank(markupTotal),                            // Our Service Charge - 2 ← original SO margin
     incentiveAmt: reverse ? blank(r2(num(po.incentiveAmt))) : '',   // Commission clawback ← PO incentive
     incentiveGst: reverse ? blank(r2(num(po.incentiveGst))) : '',
     incentiveTds: reverse ? blank(r2(num(po.incentiveTds))) : '',
