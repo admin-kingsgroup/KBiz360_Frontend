@@ -99,7 +99,7 @@ export function rowsForEdit(spec, booking) {
 // Flight (SF) may add ONE Misc PO; Holiday (SH) may add legs of ANY module type.
 // Each leg carries its own module/supplier/cost-centre/ref/cost grid → its own
 // Purchase voucher on approval; the sale stays single. blank leg → dropped on save.
-const ALLOWED_LEG_MODULES = { SF: ['SM'], SH: ['SF', 'SHT', 'SC', 'SV', 'SI', 'SM'] };
+export const ALLOWED_LEG_MODULES = { SF: ['SM'], SH: ['SF', 'SHT', 'SC', 'SV', 'SI', 'SM'] };
 const newLeg = (module) => ({ module, supplier: { name: '', ledgerGroup: '' }, costCenter: '', purTallyRef: '', gstMode: 'intra', packageType: '', availItc: false, line: blankLine(VSPECS[module] || VSPECS.SM) });
 const legsFromEdit = (booking) => (booking.purchases || []).map((leg) => {
   const sp = VSPECS[leg.module] || VSPECS.SM;
@@ -110,7 +110,7 @@ const legsFromEdit = (booking) => (booking.purchases || []).map((leg) => {
     line: (Array.isArray(leg.rows) && leg.rows[0]) ? { ...blankLine(sp), ...leg.rows[0] } : blankLine(sp),
   };
 });
-function legToPayload(leg, brCode, noVat) {
+export function legToPayload(leg, brCode, noVat) {
   const spec = VSPECS[leg.module] || VSPECS.SM;
   const { po } = bookingTotals(spec, [leg.line], { branch: brCode, noVat, availItc: leg.availItc, packageType: leg.packageType });
   return {
