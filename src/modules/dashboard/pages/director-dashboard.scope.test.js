@@ -6,7 +6,7 @@
  * had no effect — it kept showing consolidated (= BOM, the only branch with data).
  * Scope must now come ONLY from the shell `branch` prop.
  */
-import { directorScope, scopeBranchArg } from './director-dashboard.scope';
+import { directorScope, branchSpecificScope, scopeBranchArg } from './director-dashboard.scope';
 
 describe('directorScope — scope comes only from the shell branch selector', () => {
   test("consolidated: branch === 'ALL' → scope 'ALL'", () => {
@@ -22,6 +22,23 @@ describe('directorScope — scope comes only from the shell branch selector', ()
     expect(directorScope(undefined)).toBe('ALL');
     expect(directorScope(null)).toBe('ALL');
     expect(directorScope({})).toBe('ALL');
+  });
+});
+
+describe('branchSpecificScope — Director Dashboard never consolidates', () => {
+  test('a selected branch → that branch code', () => {
+    expect(branchSpecificScope({ code: 'AMD' })).toBe('AMD');
+    expect(branchSpecificScope({ code: 'NBO' })).toBe('NBO');
+  });
+
+  test("consolidated ('ALL') → null (no single branch; show the pick-a-branch notice)", () => {
+    expect(branchSpecificScope('ALL')).toBeNull();
+  });
+
+  test('missing / malformed branch → null (not a blended ALL)', () => {
+    expect(branchSpecificScope(undefined)).toBeNull();
+    expect(branchSpecificScope(null)).toBeNull();
+    expect(branchSpecificScope({})).toBeNull();
   });
 });
 

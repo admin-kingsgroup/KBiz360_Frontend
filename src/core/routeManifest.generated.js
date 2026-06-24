@@ -41,6 +41,7 @@ export const APP_ROUTES = [
   "/contra",
   "/dashboard",
   "/dashboard/alerts",
+  "/dashboard/owner",
   "/dashboards/arap",
   "/dashboards/audit",
   "/dashboards/balance-sheet",

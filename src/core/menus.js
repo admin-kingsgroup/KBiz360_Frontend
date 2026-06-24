@@ -468,6 +468,19 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
   ]},
 ]};
 
+// The Owner Dashboard (consolidated all-branch) is owner-only — injected into the
+// "Overview" group right under "My Dashboard", and ONLY for the owner email (the
+// route itself is email-gated in App.jsx, so this just surfaces the link).
+function withOwnerDashboard(menu){
+  const overview = menu.children[0];
+  const newOverview = {...overview, children:[
+    overview.children[0],                                              // My Dashboard
+    {label:"Owner Dashboard (All Branches)", href:"/dashboard/owner"},
+    ...overview.children.slice(1),
+  ]};
+  return {...menu, children:[newOverview, ...menu.children.slice(1)]};
+}
+
 /* ── Per-user page visibility ─────────────────────────────────────────
    Settings → Page Visibility Control stores, per user, a deny-list of menu
    hrefs (currentUser.hidden). The helpers below strip those nodes from the
@@ -562,7 +575,9 @@ export function getMenu(branch, currentUser){
   // accountant gets that pill too. Branch scope is still enforced by the top-right
   // switcher (limited to their stored branches).
   if (isAccountant) return applyHidden([accountsMenu, MENU_APPROVALS, taxSection], currentUser);
-  const top = isDir ? [MENU_DASHBOARDS, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
+  // Owner (by email) gets the extra Owner Dashboard link inside the Dashboards dropdown.
+  const dashboardsMenu = isPageAccessAdmin(currentUser) ? withOwnerDashboard(MENU_DASHBOARDS) : MENU_DASHBOARDS;
+  const top = isDir ? [dashboardsMenu, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
   // 9 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · HR · Admin
   const menus = [...top, accountsMenu, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN];
   // Strip each user's hidden pages/reports (Settings → Page Visibility Control).

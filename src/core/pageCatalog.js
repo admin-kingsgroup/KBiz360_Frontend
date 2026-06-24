@@ -36,7 +36,9 @@ export function isPageAccessAdmin(user) {
 // Routes that must NEVER be hidden — hiding them would lock a user out of the
 // app's landing screen, or lock the admin out of this very control. They are
 // excluded from the catalogue (can't be toggled) and never pruned.
-export const ALWAYS_VISIBLE = new Set(['/dashboard', '/settings/page-access']);
+// '/dashboard/owner' is gated by EMAIL (owner only) at the route + menu level, not
+// by the page-visibility catalogue — so it's always-visible here (never toggled).
+export const ALWAYS_VISIBLE = new Set(['/dashboard', '/dashboard/owner', '/settings/page-access']);
 
 // Is this value a menu node?  { label, children[] } or a leaf { label, href }.
 function isMenuNode(v) {

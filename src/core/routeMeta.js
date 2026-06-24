@@ -31,6 +31,7 @@ ROOTS.forEach((r) => walk(r, []));
 // A few high-traffic routes that live outside the menu tree (or under aliases).
 const EXTRA = {
   '/dashboard': ['Dashboard'],
+  '/dashboard/owner': ['Dashboards', 'Owner Dashboard'],
   '/ledger': ['Finance', 'Books', 'Ledger Account'],
   '/day-book': ['Finance', 'Books', 'Day Book'],
   '/finance/cash-book': ['Finance', 'Books', 'Cash Book'],

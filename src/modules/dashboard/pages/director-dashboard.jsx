@@ -7,7 +7,8 @@ import { CUR_FY } from '../../../core/dates';
 import { PageLayout } from '../../../shell/PageLayout';
 import { ResponsiveGrid } from '../../../shell/primitives';
 import { useDirectorDashboard } from '../hooks/use-director-dashboard';
-import { directorScope, scopeBranchArg } from './director-dashboard.scope';
+import { directorScope, branchSpecificScope, scopeBranchArg } from './director-dashboard.scope';
+import { isPageAccessAdmin } from '../../../core/pageCatalog';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
 import { useDashboardStore } from '../store/dashboard.store';
 import { PeriodBar, periodRange } from '../../../core/period';
@@ -32,19 +33,25 @@ const td = { padding: '6px 10px', fontSize: 12, borderBottom: '1px solid #f4f5f7
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 const Scroll = ({ children }) => <div style={{ overflowX: 'auto' }}>{children}</div>;
 
-export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
+export function DirectorDashboardPage({ currentUser, setRoute, branch, consolidated = false }) {
   const { navigate } = useDashboardActions(setRoute);
-  const scope = directorScope(branch);
+  // Owner Dashboard ('consolidated') may aggregate ALL branches; the Director
+  // Dashboard is strictly branch-specific — it never blends branches. When the
+  // consolidated/TK HO Group view is selected on the Director Dashboard there is
+  // no single branch to show, so we render a "pick a branch" notice instead.
+  const scope = consolidated ? directorScope(branch) : branchSpecificScope(branch);
+  const needsBranch = !consolidated && !scope;
+  const effScope = scope || 'ALL';
   const compare = useDashboardStore((s) => s.compareLastYear);
   const setCompare = useDashboardStore((s) => s.setCompareLastYear);
   const pinned = useDashboardStore((s) => s.pinnedWidgets);
   const togglePin = useDashboardStore((s) => s.togglePinnedWidget);
 
   // Live owner widgets (GP-by-module, balance sheet, ageing, cash) — respect period + scope.
-  const branchArg = scopeBranchArg(scope);
+  const branchArg = scopeBranchArg(effScope);
   const [period, setPeriod] = React.useState(() => periodRange('all', { branch: branchArg }));
   const dates = period; // { from, to, label }
-  const { data, totalCashInr, isLoading, isError, error, refetch } = useDirectorDashboard({ scope, from: period.from, to: period.to });
+  const { data, totalCashInr, isLoading, isError, error, refetch } = useDirectorDashboard({ scope: effScope, from: period.from, to: period.to });
   // Branch-aware money — uses the active branch's currency symbol (USD branches
   // NBO/DAR/FBM no longer see ₹); falls back to ₹ for the consolidated (ALL) view.
   const cur = bc(branch).cur;
@@ -73,10 +80,37 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
     <div className="mb-3.5 mt-1 flex flex-wrap items-center gap-2.5">
       <PeriodBar branch={branchArg} defaultPreset="all" onChange={setPeriod} />
       <span className="py-1 text-[11px] font-bold text-ink-muted">
-        Scope: {scope === 'ALL' ? 'All branches (Consolidated)' : scope} — set via the branch selector (top-right)
+        Scope: {effScope === 'ALL' ? 'All branches (Consolidated)' : effScope} — set via the branch selector (top-right)
       </span>
     </div>
   );
+
+  // Director Dashboard with the consolidated view selected → no single branch to
+  // show. Prompt to pick one (and point the owner to the consolidated Owner view).
+  if (needsBranch) {
+    const isOwner = isPageAccessAdmin(currentUser);
+    return (
+      <PageLayout>
+        <DashboardHeader title="Director Dashboard" subtitle="Branch-specific view" user={currentUser} />
+        <div className="mx-auto mt-6 max-w-[560px] rounded-brand border border-surface-border bg-surface p-7 text-center shadow-card">
+          <div className="mb-1 text-3xl" aria-hidden="true">🏢</div>
+          <p className="m-0 text-sm font-bold text-ink">Select a branch to view its dashboard</p>
+          <p className="mx-auto mt-1.5 max-w-[440px] text-xs text-ink-muted">
+            The Director Dashboard is branch-specific and never blends branches. Pick a branch from the
+            top-right selector (it currently shows the consolidated <b>TK HO Group</b>).
+          </p>
+          {isOwner && (
+            <button
+              onClick={() => navigate('/dashboard/owner')}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-surface-border bg-white px-4 py-2 text-xs font-bold text-ink max-tablet:min-h-[44px]"
+            >
+              Open Owner Dashboard (all branches) →
+            </button>
+          )}
+        </div>
+      </PageLayout>
+    );
+  }
 
   if (isError && !data) {
     return <DashboardError error={error} onRetry={refetch} title="Could not load the Director Dashboard." />;
@@ -103,9 +137,14 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
   const arOverdue = age?.receivables?.totals?.d90 || 0;
   const mods = (mpl.modules || []).slice().sort((a, b) => (b.gp || 0) - (a.gp || 0));
 
+  const pageTitle = consolidated ? 'Owner Dashboard' : 'Director Dashboard';
+  const pageSubtitle = consolidated
+    ? 'Whole-company consolidated — all branches'
+    : `Branch-specific view — ${effScope}`;
+
   return (
     <PageLayout>
-      <DashboardHeader title="Director Dashboard" subtitle="Whole-company owner view" user={currentUser} onExport={() => openPrintPreview({ selector: 'main', title: 'Director Dashboard', recommend: 'portrait' })} />
+      <DashboardHeader title={pageTitle} subtitle={pageSubtitle} user={currentUser} onExport={() => openPrintPreview({ selector: 'main', title: pageTitle, recommend: 'portrait' })} />
       {Controls}
 
       {/* ── Headline KPIs ── */}
@@ -219,4 +258,14 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
       </div>
     </PageLayout>
   );
+}
+
+/**
+ * Owner Dashboard — the whole-company CONSOLIDATED view (all branches), reusing
+ * the Director Dashboard rendering with `consolidated` on. Access is restricted
+ * to the owner (afshin.dhanani@kingsgroupco.com) at the route level (App.jsx) and
+ * the menu is owner-only (getMenu). The Director Dashboard stays branch-specific.
+ */
+export function OwnerDashboardPage(props) {
+  return <DirectorDashboardPage {...props} consolidated />;
 }

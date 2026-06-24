@@ -556,7 +556,7 @@ function ledgerPrintHTML({ m, showNarr, showDetail, cur = '₹' }) {
     </table></div>`;
 }
 
-function billwisePrintHTML({ side, bills, group, name }) {
+function billwisePrintHTML({ side, bills, group, name, cur = '₹' }) {
   if (!side) return `<div class="tblwrap"><div class="notmaintained">This ledger (<b>${esc(name)}</b>, under ${esc(group || '—')}) is not maintained <b>bill-by-bill</b>.</div></div>`;
   let totAmt = 0, totSet = 0, totPend = 0;
   const rows = bills.map((b) => {
@@ -579,7 +579,7 @@ function billwisePrintHTML({ side, bills, group, name }) {
   return `<div class="tblwrap">
     <div class="ageing"><div class="age-title">Ageing of Outstanding <span>(by days outstanding)</span></div><div class="agebar">${bar}</div><div class="agecards">${cards}</div></div>
     <table>
-      <thead><tr><th class="l">Bill Ref</th><th class="l">Bill Date</th><th>Bill Amount</th><th>Settled</th><th>Pending</th><th>Age</th><th class="l">Status</th></tr></thead>
+      <thead><tr><th class="l">Bill Ref</th><th class="l">Bill Date</th><th>Bill Amount (${cur})</th><th>Settled (${cur})</th><th>Pending (${cur})</th><th>Age</th><th class="l">Status</th></tr></thead>
       <tbody>${rows || '<tr><td class="l" colspan="7" style="text-align:center;padding:26px;color:#9A9A9A">No outstanding bills.</td></tr>'}</tbody>
       <tfoot><tr><td class="l">Total</td><td></td><td>${fmt(totAmt)}</td><td>${fmt(totSet)}</td><td class="pend">${fmt(totPend)}</td><td></td><td></td></tr></tfoot>
     </table></div>`;
