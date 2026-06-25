@@ -4,7 +4,7 @@ import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { useTrialBalance } from '../hooks/use-trial-balance';
 import { useFinanceStore } from '../store/finance.store';
-import { CUR_FY, CUR_QUARTER, CUR_MONTH, todayISO, fmtDate } from '../../../core/dates';
+import { ALL_TIME_FROM, CUR_FY, CUR_QUARTER, CUR_MONTH, todayISO, fmtDate } from '../../../core/dates';
 import { toastError } from '../../../core/ux/toast';
 
 /* Money formatter — Indian grouping, currency symbol from the branch config.
@@ -17,11 +17,12 @@ const money = (cur, n) => (n ? `${cur}${Math.round(n).toLocaleString('en-IN')}` 
  * PageLayout / DataTable. No seed data, no business-entity local state.
  */
 export function TrialBalancePage({ branch }) {
-  const { from, to, view } = useFinanceStore((s) => s.trialBalance);
+  const { from, to, view, includeZero } = useFinanceStore((s) => s.trialBalance);
   const setPeriod = useFinanceStore((s) => s.setTrialBalancePeriod);
   const setView = useFinanceStore((s) => s.setTrialBalanceView);
+  const setIncludeZero = useFinanceStore((s) => s.setTrialBalanceIncludeZero);
 
-  const { data, isLoading, isError, error, refetch, currencySymbol: cur } = useTrialBalance(branch, { from, to });
+  const { data, isLoading, isError, error, refetch, currencySymbol: cur } = useTrialBalance(branch, { from, to, includeZero });
   const rows = data?.rows ?? [];
 
   const sumFooter = (key) => (rs) => money(cur, rs.reduce((s, r) => s + (r[key] || 0), 0));
@@ -51,6 +52,7 @@ export function TrialBalancePage({ branch }) {
   }, [view, cur]);
 
   const presets = [
+    { label: 'All', from: ALL_TIME_FROM, to: todayISO() },
     { label: 'This FY', from: CUR_FY.startISO, to: todayISO() },
     { label: 'This Quarter', from: CUR_QUARTER.startISO, to: CUR_QUARTER.endISO },
     { label: 'This Month', from: `${CUR_MONTH}-01`, to: `${CUR_MONTH}-31` },
@@ -64,6 +66,13 @@ export function TrialBalancePage({ branch }) {
 
   const filters = (
     <>
+      {/* Include zero-balance accounts */}
+      <label className="inline-flex cursor-pointer select-none items-center gap-1.5 rounded-md border border-surface-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors duration-fast hover:bg-surface-alt max-tablet:min-h-[44px]">
+        <input type="checkbox" checked={includeZero} onChange={(e) => setIncludeZero(e.target.checked)}
+          className="h-3.5 w-3.5 accent-navy" />
+        Show nil-balance accounts
+      </label>
+      <span className="mx-1 hidden h-5 w-px bg-surface-border tablet:block" />
       {/* View toggle */}
       <div className="inline-flex overflow-hidden rounded-md border border-surface-border">
         {['detailed', 'summary'].map((v) => (

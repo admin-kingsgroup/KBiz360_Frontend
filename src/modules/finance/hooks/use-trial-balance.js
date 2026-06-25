@@ -10,13 +10,13 @@ import { bc } from '../../../core/styles';
  * and caches independently. UI state (the period itself, the view mode) lives
  * in the zustand store, never here.
  */
-export function useTrialBalance(branch, { from, to } = {}) {
+export function useTrialBalance(branch, { from, to, includeZero } = {}) {
   const code = branchCode(branch);
   const cfg = bc(branch);
 
   const query = useQuery({
-    queryKey: ['finance', 'trial-balance', code || 'all', from || '', to || ''],
-    queryFn: () => loadTrialBalance({ branch: code, from, to }),
+    queryKey: ['finance', 'trial-balance', code || 'all', from || '', to || '', includeZero ? 'z1' : 'z0'],
+    queryFn: () => loadTrialBalance({ branch: code, from, to, includeZero }),
     enabled: !!getAuthToken(),
     staleTime: 30_000,
   });
