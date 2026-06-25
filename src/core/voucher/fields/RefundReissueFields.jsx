@@ -7,7 +7,7 @@ import { LedgerPicker } from '../LedgerPicker';
 import { apiGet } from '../../api';
 import { useVoucherPreview } from '../../useAccounting';
 import { money2, r2 } from '../ui';
-import { refundPrefillFromBooking, poSnapForView, splitRefundJv } from './refundPrefill';
+import { refundPrefillFromBooking, refundPrefillFromLeg, poSnapForView, splitRefundJv } from './refundPrefill';
 import { buildRefundReissueBody } from './refundBody';
 import { JvBlock } from '../JvBlock';
 
@@ -74,6 +74,10 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   const [bookingJv, setBookingJv] = useState(null);
   const [fetching, setFetching] = useState(false);
   const [fetchErr, setFetchErr] = useState('');
+  // N-PO: which leg this refund targets. -1 = the primary leg (today's behaviour);
+  // 0..n-1 = an additional purchase leg. One refund voucher per leg; for a full-folder
+  // refund the preparer processes each leg in turn.
+  const [legIdx, setLegIdx] = useState(-1);
 
   async function fetchLink() {
     const link = linkInput.trim();
@@ -82,6 +86,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
     try {
       const b = await apiGet('/api/booking-orders/by-link', { link, branch: branchCode || branch });
       setBooking(b);
+      setLegIdx(-1); // default to the primary leg
       // Lock-fill the invoice refs + carry over the refundable amounts (supplier fare,
       // our Service Charge - 2 margin, commission reversal) — but NOT our service charge / its
       // GST nor the supplier service fee / its GST (those are retained, not refunded).
@@ -93,6 +98,16 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
     } finally {
       setFetching(false);
     }
+  }
+
+  // Re-target the refund at a folder leg (-1 = primary). Re-prefills the supplier,
+  // refundable amount, commission clawback + the locked againstPurchase from that leg;
+  // the folder SALE (againstInvoice) and customer stay. One RF per leg.
+  function selectLeg(idx) {
+    if (!booking) return;
+    setLegIdx(idx);
+    const fresh = { commissionReversal: reverseCommission };
+    patch(idx < 0 ? refundPrefillFromBooking(booking, fresh) : refundPrefillFromLeg(booking.purchases[idx], booking, fresh));
   }
 
   const supplierAmt = r2(+state.supplierAmt || 0);   // airline refund receivable (RF) / payable (RI)
@@ -160,6 +175,23 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
         </button>
       </div>
       {fetchErr && <p style={{ margin: '-8px 0 12px', fontSize: 11, color: '#A32D2D', fontWeight: 600 }}>⚠ {fetchErr}</p>}
+
+      {/* N-PO: this folder has extra purchase legs — pick which one this refund targets. */}
+      {booking?.purchases?.length > 0 && (
+        <div style={{ marginBottom: 14, padding: 11, background: '#FFFDF7', border: '1px solid #eee3cf', borderRadius: 8 }}>
+          <FL label="Refund which cost leg?">
+            <select value={legIdx} onChange={(e) => selectLeg(Number(e.target.value))} style={inp}>
+              <option value={-1}>Primary — {booking.module} · {booking.supplier?.ledgerName || booking.supplier?.name || '—'} · {booking.purchaseVno}</option>
+              {booking.purchases.map((leg, i) => (
+                <option key={i} value={i}>{leg.module} · {leg.supplier?.ledgerName || leg.supplier?.name || '—'} · {leg.purchaseVno || '(pending)'} (₹{Number(leg.po?.total || 0).toLocaleString('en-IN')})</option>
+              ))}
+            </select>
+          </FL>
+          <p style={{ margin: '6px 0 0', fontSize: 10.5, color: '#9197a3' }}>
+            This folder has {booking.purchases.length} additional purchase leg{booking.purchases.length > 1 ? 's' : ''} under one Link No. Refund <b>one leg</b> here (single / partial); for a <b>full</b> folder refund, process each leg as its own refund voucher.
+          </p>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
         <FL label="Date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>

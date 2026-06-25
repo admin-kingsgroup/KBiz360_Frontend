@@ -65,6 +65,33 @@ export function poSnapForView(po = {}, rows = []) {
   return { ...po, lines: merged };
 }
 
+// N-PO (Phase 4): prefill a refund against ONE additional purchase leg of a folder.
+// Mirrors refundPrefillFromBooking but sourced from the leg: the supplier-refundable
+// amount + the commission clawback come from the LEG's po, the supplier is the leg's
+// supplier, and againstPurchase points at the leg's own Purchase voucher. The folder
+// SALE (againstInvoice) is shared. A leg carries no separate sale margin in this model
+// (it's billed pass-through, e.g. a Misc in SO Taxes, or part of a package), so the
+// retained SVC2 `markup` defaults to 0 — the preparer can still type a retained fee.
+export function refundPrefillFromLeg(leg, b, state = {}) {
+  const po = leg?.po || {};
+  const blank = (n) => (n ? n : '');
+  const supplierRefund = r2(num(po.total) - num(po.serviceCharge) - num(po.gst));
+  const reverse = state.commissionReversal !== false;
+  const sup = leg?.supplier || {};
+  return {
+    againstInvoice: b?.saleVno || '',
+    againstPurchase: leg?.purchaseVno || '',
+    supplierAmt: supplierRefund,
+    markup: '',                                            // leg has no separate sale margin (pass-through)
+    incentiveAmt: reverse ? blank(r2(num(po.incentiveAmt))) : '',
+    incentiveGst: reverse ? blank(r2(num(po.incentiveGst))) : '',
+    incentiveTds: reverse ? blank(r2(num(po.incentiveTds))) : '',
+    ...(state.party ? {} : { party: b?.customer?.ledgerName || b?.customer?.name || '' }),
+    ...(state.counterParty ? {} : { counterParty: sup.ledgerName || sup.name || '' }),
+    ...(state.gstMode ? {} : { gstMode: leg?.gstMode || b?.gstMode || '' }),
+  };
+}
+
 export function refundPrefillFromBooking(b, state = {}) {
   const po = b?.po || {}, so = b?.so || {};
   const soLines = Array.isArray(so.lines) ? so.lines : [];

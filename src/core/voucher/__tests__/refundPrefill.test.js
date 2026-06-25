@@ -194,3 +194,41 @@ describe('poSnapForView — surface Supplier Incentive on the PO grid', () => {
     expect(v.lines[1]).toMatchObject({ incentive: 200, incentiveTds: 4 });
   });
 });
+
+// ── N-PO (Phase 4): refund against one additional leg of a folder ─────────────
+import { refundPrefillFromLeg } from '../fields/refundPrefill';
+
+const FOLDER = {
+  saleVno: 'BOM/0626/SF00911',
+  customer: { name: 'Rahul Sharma', ledgerName: 'Rahul Sharma' },
+  supplier: { name: 'Akbar Travels', ledgerName: 'Akbar Travels' }, // primary
+  purchases: [{
+    module: 'SM', purchaseVno: 'BOM/0626/PM00132', gstMode: 'intra',
+    supplier: { name: 'Skylux Services', ledgerName: 'Skylux Services' },
+    po: { total: 1500, serviceCharge: 0, gst: 0, incentiveAmt: 0, incentiveGst: 0, incentiveTds: 0 },
+  }],
+};
+
+describe('refundPrefillFromLeg (Phase 4)', () => {
+  const leg = FOLDER.purchases[0];
+  test('points againstPurchase at the LEG vno; sale stays the folder sale', () => {
+    const p = refundPrefillFromLeg(leg, FOLDER, {});
+    expect(p.againstInvoice).toBe('BOM/0626/SF00911'); // shared folder sale
+    expect(p.againstPurchase).toBe('BOM/0626/PM00132'); // the leg's purchase
+  });
+  test('supplier = the leg supplier; customer = the folder customer', () => {
+    const p = refundPrefillFromLeg(leg, FOLDER, {});
+    expect(p.counterParty).toBe('Skylux Services');
+    expect(p.party).toBe('Rahul Sharma');
+  });
+  test('supplierAmt from the leg po; no separate sale margin (markup blank)', () => {
+    const p = refundPrefillFromLeg(leg, FOLDER, {});
+    expect(p.supplierAmt).toBe(1500);
+    expect(p.markup).toBe('');
+  });
+  test('respects a preparer-chosen supplier/gstMode (does not clobber)', () => {
+    const p = refundPrefillFromLeg(leg, FOLDER, { counterParty: 'X', gstMode: 'inter' });
+    expect(p.counterParty).toBeUndefined();
+    expect(p.gstMode).toBeUndefined();
+  });
+});
