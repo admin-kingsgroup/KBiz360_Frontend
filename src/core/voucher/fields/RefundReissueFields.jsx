@@ -90,7 +90,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       // Lock-fill the invoice refs + carry over the refundable amounts (supplier fare,
       // our Service Charge - 2 margin, commission reversal) — but NOT our service charge / its
       // GST nor the supplier service fee / its GST (those are retained, not refunded).
-      patch(refundPrefillFromBooking(b, state));   // honours the Commission-Reversal toggle
+      patch(refundPrefillFromBooking(b, state, isRefund));   // honours the Commission-Reversal toggle; refund never retains SO SVC2
       // Also pull the original booking's JV (Sale + Purchase posting legs) to show below.
       if (b?.id) { try { setBookingJv(await apiGet('/api/booking-orders/' + b.id + '/journal')); } catch { setBookingJv(null); } }
     } catch (e) {
@@ -107,7 +107,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
     if (!booking) return;
     setLegIdx(idx);
     const fresh = { commissionReversal: reverseCommission };
-    patch(idx < 0 ? refundPrefillFromBooking(booking, fresh) : refundPrefillFromLeg(booking.purchases[idx], booking, fresh));
+    patch(idx < 0 ? refundPrefillFromBooking(booking, fresh, isRefund) : refundPrefillFromLeg(booking.purchases[idx], booking, fresh));
   }
 
   const supplierAmt = r2(+state.supplierAmt || 0);   // airline refund receivable (RF) / payable (RI)
@@ -125,6 +125,20 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   const total = isRefund
     ? r2(supplierAmt + supSvc + supGst - ourIncome - taxAmt - svc2Gst)
     : r2(supplierAmt - supSvc - supGst + ourIncome + taxAmt + svc2Gst);
+
+  // Original SO SVC2 (Service Charge-2) the client was billed on the SALE + its GST —
+  // refunded back to the client IN FULL on a cancellation (the sale reversal returns
+  // it). Read-only, shown next to "Supplier refund". Source the NET SVC2 from the SO
+  // `heads` (authoritative; the per-line `markup` is stored GST-inclusive), falling
+  // back to (line markup − its GST). Its GST is the SO `otherTaxesGst`.
+  const soSvc2Net = (() => {
+    const heads = Array.isArray(booking?.so?.heads) ? booking.so.heads : [];
+    const h = heads.find((x) => x && x.key === 'markup');
+    if (h) return r2(num(h.amt));
+    const ls = Array.isArray(booking?.so?.lines) ? booking.so.lines : [];
+    return r2(ls.reduce((s, l) => s + (num(l && l.markup) - num(l && l.gstMk)), 0));
+  })();
+  const soSvc2Gst = r2(num(booking?.so?.otherTaxesGst));
 
   // Live, backend-computed JV for THIS refund — same body & engine VoucherShell posts
   // with (deduped by React-Query on an identical key), shown right under the form.
@@ -250,13 +264,37 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
         </FL>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
-        <FL label={isRefund ? `Supplier refund (${cur})` : `Supplier fee + fare diff (${cur})`}>
-          <input type="number" value={state.supplierAmt} onChange={(e) => patch({ supplierAmt: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right', fontWeight: 700 }} />
-        </FL>
-        <FL label={`Our Service Fee (${cur})`}><input type="number" value={state.serviceCharge} onChange={(e) => patch({ serviceCharge: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
-        <FL label={`Our Service Charge - 2 (${cur})`}><input type="number" value={state.markup} onChange={(e) => patch({ markup: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
-      </div>
+      {isRefund ? (
+        <>
+          {/* Refunded back to the client from the SALE: the supplier-returned fare and
+              the original SO SVC2 (+ its GST) — both go to the client on cancellation. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
+            <FL label={`Supplier refund (${cur})`}>
+              <input type="number" value={state.supplierAmt} onChange={(e) => patch({ supplierAmt: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right', fontWeight: 700 }} />
+            </FL>
+            <FL label={`SO SVC2 — refunded to client (${cur})`}>
+              <input value={money2(cur, soSvc2Net)} readOnly tabIndex={-1} title="The Service Charge-2 originally billed to the client on the sale. Refunded back in full on cancellation — the sale reversal returns it to the client (not retained by us)." style={{ ...lockedInp, textAlign: 'right' }} />
+            </FL>
+            <FL label={`SO SVC2 GST (${cur})`}>
+              <input value={money2(cur, soSvc2Gst)} readOnly tabIndex={-1} title="GST on the original SO SVC2 — also refunded to the client with it." style={{ ...lockedInp, textAlign: 'right' }} />
+            </FL>
+          </div>
+          {/* Charges WE levy on this refund (retained income) — separate from the SO SVC2 above. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
+            <FL label={`Our Service Fee (${cur})`}><input type="number" value={state.serviceCharge} onChange={(e) => patch({ serviceCharge: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+            <FL label={`Our Service Charge - 2 (${cur})`}><input type="number" value={state.markup} onChange={(e) => patch({ markup: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+            <div />
+          </div>
+        </>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
+          <FL label={`Supplier fee + fare diff (${cur})`}>
+            <input type="number" value={state.supplierAmt} onChange={(e) => patch({ supplierAmt: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right', fontWeight: 700 }} />
+          </FL>
+          <FL label={`Our Service Fee (${cur})`}><input type="number" value={state.serviceCharge} onChange={(e) => patch({ serviceCharge: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+          <FL label={`Our Service Charge - 2 (${cur})`}><input type="number" value={state.markup} onChange={(e) => patch({ markup: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
         <FL label={`SVF GST (${gstRate}%)`}><input value={money2(cur, taxAmt)} readOnly tabIndex={-1} title={`GST at ${gstRate}% on the Service Fee → regular ${state.gstMode === 'inter' ? 'IGST' : 'CGST/SGST'} Output`} style={{ ...lockedInp, textAlign: 'right' }} /></FL>
