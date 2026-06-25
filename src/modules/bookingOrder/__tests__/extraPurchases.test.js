@@ -19,10 +19,15 @@ const legOf = (module, over = {}) => ({
 });
 
 describe('ALLOWED_LEG_MODULES', () => {
-  test('Flight may add only Misc; Holiday may add any module', () => {
+  test('Flight→Misc; Holiday→any; Visa→2nd-visa/Misc/Insurance', () => {
     expect(ALLOWED_LEG_MODULES.SF).toEqual(['SM']);
     expect(ALLOWED_LEG_MODULES.SH).toEqual(['SF', 'SHT', 'SC', 'SV', 'SI', 'SM']);
-    expect(ALLOWED_LEG_MODULES.SHT).toBeUndefined(); // hotel/visa/car/etc. stay single-PO
+    expect(ALLOWED_LEG_MODULES.SV).toEqual(['SV', 'SM', 'SI']); // multi-country visa + add-ons
+    expect(ALLOWED_LEG_MODULES.SHT).toBeUndefined();            // hotel/car/insurance/misc stay single-PO
+    expect(ALLOWED_LEG_MODULES.SC).toBeUndefined();
+  });
+  test('Visa allows a SAME-MODULE (2nd visa) leg', () => {
+    expect(ALLOWED_LEG_MODULES.SV).toContain('SV');
   });
 });
 
@@ -35,6 +40,13 @@ describe('legToPayload — shapes an N-PO leg for the API', () => {
     expect(p.costCenter).toBe('BOM-MISC');
     expect(p.po.total).toBe(2500);          // Misc basic, no GST on the cost (service model)
     expect(p.po.gstMode).toBe('intra');
+    expect(p.rows).toHaveLength(1);
+  });
+
+  test('Visa same-module (2nd visa) leg → shapes as an SV purchase', () => {
+    const p = legToPayload(legOf('SV', { base: 9000 }), 'BOM', false);
+    expect(p.module).toBe('SV');
+    expect(p.po.total).toBe(9000);
     expect(p.rows).toHaveLength(1);
   });
 

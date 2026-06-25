@@ -96,10 +96,11 @@ export function rowsForEdit(spec, booking) {
 }
 
 // ── N-PO (Phase 2): additional purchase legs under one booking/Link No ────────
-// Flight (SF) may add ONE Misc PO; Holiday (SH) may add legs of ANY module type.
+// Flight (SF) may add ONE Misc PO; Holiday (SH) may add legs of ANY module type;
+// Visa (SV) may add another Visa (multi-country), Misc (courier/VFS) or Insurance.
 // Each leg carries its own module/supplier/cost-centre/ref/cost grid → its own
 // Purchase voucher on approval; the sale stays single. blank leg → dropped on save.
-export const ALLOWED_LEG_MODULES = { SF: ['SM'], SH: ['SF', 'SHT', 'SC', 'SV', 'SI', 'SM'] };
+export const ALLOWED_LEG_MODULES = { SF: ['SM'], SH: ['SF', 'SHT', 'SC', 'SV', 'SI', 'SM'], SV: ['SV', 'SM', 'SI'] };
 const newLeg = (module) => ({ module, supplier: { name: '', ledgerGroup: '' }, costCenter: '', purTallyRef: '', gstMode: 'intra', packageType: '', availItc: false, line: blankLine(VSPECS[module] || VSPECS.SM) });
 const legsFromEdit = (booking) => (booking.purchases || []).map((leg) => {
   const sp = VSPECS[leg.module] || VSPECS.SM;
