@@ -247,7 +247,7 @@ export function AlertsDashboard({ branch, setRoute }) {
         {an.areas.length === 0
           ? <div className="rounded-brand border border-surface-border bg-surface p-5 text-center text-ink-muted shadow-card" style={{ fontSize: 12.5, color: GREEN, fontWeight: 700 }}>✓ All areas clean — nothing to scrutinise for {code}.</div>
           : (
-            <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-3 wide:grid-cols-4">
               {an.areas.map((a) => (
                 <button key={a.key} onClick={() => drillArea(a.key)} className={TAP} style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 12, border: '1px solid ' + LINE, background: '#fff', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 7 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -341,7 +341,7 @@ export function AlertsDashboard({ branch, setRoute }) {
   };
 
   return (
-    <PageLayout maxWidth="mx-auto max-w-[1100px]">
+    <PageLayout>
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
         <div>
