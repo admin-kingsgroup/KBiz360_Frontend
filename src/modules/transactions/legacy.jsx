@@ -645,7 +645,7 @@ export function SalesFlight({branch,setRoute}){
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",fontSize:11.5,borderCollapse:"collapse",minWidth:880}}>
               <thead><tr style={{background:"#f4f5f7"}}>
-                {["#","Passenger","Ticket no.","Airline","Sector","Date","Class","Base fare","K3","Taxes","Other taxes",""].map((h,i)=>(
+                {["#","PAX Name","Ticket no.","Airline","Sector","Date","Class","Base fare","K3","Taxes","Other taxes",""].map((h,i)=>(
                   <th key={i} style={{padding:"7px 8px",textAlign:i>=7&&i<=10?"right":"left",
                     fontSize:10,color:"#5b616e",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
@@ -892,7 +892,7 @@ export function SalesVisa({branch,setRoute}){
       <ARow label="Applicant details" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
-            {["#","Applicant name","Passport no.","Visa country","Visa type","VFS fee ₹","Taxes ₹","Other taxes ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=7}/>)}
+            {["#","PAX Name","Passport no.","Visa country","Visa type","VFS fee ₹","Taxes ₹","Other taxes ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=7}/>)}
           </tr></thead>
           <tbody>{appl.map((a,i)=>(
             <tr key={a.id} style={{borderBottom:"1px solid #e6e8ec"}}>
@@ -982,7 +982,7 @@ export function SalesHotel({branch,setRoute}){
       <ARow label="Accommodation details" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:960}}>
           <thead><tr>
-            {["#","Passenger Name","Check-in","Check-out","Room type","Meal plan","Room fare / Basic fare ₹","Taxes ₹","Other tax ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=6&&i<=9}/>)}
+            {["#","PAX Name","Check-in","Check-out","Room type","Meal plan","Room fare / Basic fare ₹","Taxes ₹","Other tax ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=6&&i<=9}/>)}
           </tr></thead>
           <tbody>{rows.map((r,i)=>{
             const lineTotal=(+r.basic||0)+(+r.taxes||0)+(+r.otherTax||0);
@@ -1471,7 +1471,7 @@ function InvoicePaxPanel({inv,cur,label="Invoice",selectable=false,selected,onTo
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:10.5}}>
             <thead><tr style={{borderBottom:"1px solid #e6e8ec"}}>
               {selectable&&<th style={{padding:"4px 8px",textAlign:"center"}}><input type="checkbox" checked={allSel} onChange={()=>onToggleAll&&onToggleAll(pax,!allSel)} title="Select all"/></th>}
-              {["#","Passenger","Ticket / Ref","Sector","Airline / Operator","Class","Base Fare"].map((h,i)=>(
+              {["#","PAX Name","Ticket / Ref","Sector","Airline / Operator","Class","Base Fare"].map((h,i)=>(
                 <th key={i} style={{textAlign:i===0?"center":i===6?"right":"left",padding:"4px 8px",fontSize:8.5,fontWeight:700,color:"#5b616e",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
@@ -1866,7 +1866,7 @@ export function PurchaseFlight({branch,setRoute}){
       <ARow label="Ticket cost details" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:960}}>
           <thead><tr>
-            {["#","Passenger","Ticket no.","Airline","Sector","Class","Date","Base cost ₹","K3 ₹","Taxes ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=7&&i<=10}/>)}
+            {["#","PAX Name","Ticket no.","Airline","Sector","Class","Date","Base cost ₹","K3 ₹","Taxes ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=7&&i<=10}/>)}
           </tr></thead>
           <tbody>{pax.map((p,i)=>(
             <tr key={p.id} style={{borderBottom:"1px solid #e6e8ec"}}>
@@ -2130,7 +2130,7 @@ export function PurchaseHotelVoucher({branch,setRoute}){
       <ARow label="Hotel purchase lines" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:960}}>
           <thead><tr>
-            {["#","Passenger Name","Check-in","Check-out","Room type","Meal","Room fare / Basic fare ₹","Taxes ₹","Other tax ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=6&&i<=9}/>)}
+            {["#","PAX Name","Check-in","Check-out","Room type","Meal","Room fare / Basic fare ₹","Taxes ₹","Other tax ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=6&&i<=9}/>)}
           </tr></thead>
           <tbody>{rows.map((r,i)=>{
             const lineTotal=(+r.basic||0)+(+r.taxes||0)+(+r.otherTax||0);
@@ -2228,7 +2228,7 @@ export function PurchaseVisa({branch,setRoute}){
       <ARow label="Visa fee payment lines" onAdd={add}>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
-            {["#","Applicant","Passport","Visa country","Visa type","VFS fee ₹","Taxes ₹","Other taxes ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=8}/>)}
+            {["#","PAX Name","Passport","Visa country","Visa type","VFS fee ₹","Taxes ₹","Other taxes ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=8}/>)}
           </tr></thead>
           <tbody>{rows.map((r,i)=>{
             const lineTotal=(+r.vfsFee||0)+(+r.taxes||0)+(+r.otherTax||0);
@@ -2699,7 +2699,7 @@ export function UnmatchedTickets({branch,setRoute}){
             <table style={{width:"100%",fontSize:11.5,borderCollapse:"collapse"}}>
               <thead>
                 <tr style={{background:"#1a1c22"}}>
-                  {["Branch","Date","Passenger","Passport","Ticket no.","Airline","Sector","Class","Sales voucher","Customer","Billed ₹","Action"].map((h,i)=>(
+                  {["Branch","Date","PAX Name","Passport","Ticket no.","Airline","Sector","Class","Sales voucher","Customer","Billed ₹","Action"].map((h,i)=>(
                     <th key={i} style={{textAlign:i>=10&&i<=10?"right":"left",
                       padding:"9px 11px",fontWeight:600,color:"#c2a04a",fontSize:10.5,
                       whiteSpace:"nowrap"}}>{h}</th>
@@ -3059,7 +3059,7 @@ export function AdmRegister({branch}){
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:1100}}>
             <thead>
               <tr style={{background:"#1a1c22"}}>
-                {["ADM Number","Date","Airline","Ticket No.","Passenger","Sector","Reason","Amount","Deadline","Status","Actions"].map((h,i)=>(
+                {["ADM Number","Date","Airline","Ticket No.","PAX Name","Sector","Reason","Amount","Deadline","Status","Actions"].map((h,i)=>(
                   <th key={i} style={{padding:"9px 10px",textAlign:i===7?"right":"left",
                     color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
@@ -3525,7 +3525,7 @@ export function TicketControlRegister({branch}){
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:1000}}>
             <thead><tr style={{background:"#1a1c22"}}>
-              {["Ticket Number","Airline","Passenger","Sector","Class","PNR","Issue Date","Travel Date","Fare","BSP Status","Ticket Status","Actions"].map((h,i)=>(
+              {["Ticket Number","Airline","PAX Name","Sector","Class","PNR","Issue Date","Travel Date","Fare","BSP Status","Ticket Status","Actions"].map((h,i)=>(
                 <th key={i} style={{padding:"9px 10px",textAlign:i===8?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
@@ -3667,7 +3667,7 @@ export function BspCsvImport({branch}){
           <div style={{...card,padding:0,overflow:"hidden"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
               <thead><tr style={{background:"#1a1c22"}}>
-                {["Ticket No.","Airline","Passenger","Sector","Amount","Type","In Books","Status"].map((h,i)=>(
+                {["Ticket No.","Airline","PAX Name","Sector","Amount","Type","In Books","Status"].map((h,i)=>(
                   <th key={i} style={{padding:"9px 11px",textAlign:i===4?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr></thead>

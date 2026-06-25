@@ -90,11 +90,11 @@ const SPECS = [
   // GST (CGST/SGST/IGST) is auto-summed; TOTAL is used as the invoice grand total.
   { group: 'Sales & Purchase', entity: 'ticket-sale', label: 'Tickets — Sale',
     desc: 'Air ticket sale to a client.',
-    columns: ['Vch No', 'Vch Date', 'Branch', 'LINK NO', 'CLIENT Name', 'Place Of Supply', 'Ticket Type', 'PAX Name', 'Ticket No', 'Sector', 'PNR Number', 'Airline', 'BASE FARE', 'K3', 'TAXES', 'OTHER TAXES', 'SERVICE CHARGE', 'CGST', 'SGST', 'IGST'],
+    columns: ['Vch No', 'Vch Date', 'Branch', 'LINK NO', 'CLIENT Name', 'Place Of Supply', 'Ticket Type', 'PAX Name', 'Ticket No', 'Sector', 'PNR Number', 'Airline', 'BASE FARE', 'K3 Tax', 'TAXES', 'OTHER TAXES', 'SERVICE FEE', 'CGST', 'SGST', 'IGST'],
     example: ['SF/26/0001', '2025-06-01', 'BOM', 'TKB-0001', 'Acme Travels', 'Maharashtra', 'Domestic', 'John Doe', '0987654321098', 'BOM-DXB', 'ABCDEF', 'EK', '10000', '200', '800', '0', '500', '315', '315', '0'] },
   { group: 'Sales & Purchase', entity: 'ticket-purchase', label: 'Tickets — Purchase',
     desc: 'Air ticket cost from a supplier/GSA.',
-    columns: ['Vch No', 'Vch Date', 'Branch', 'LINK NO', 'SUPPLIER Name', 'Place Of Supply', 'Ticket Type', 'PAX Name', 'Ticket No', 'Sector', 'PNR Number', 'Airline', 'BASE FARE', 'K3', 'TAXES', 'SERVICE CHARGE', 'CGST', 'SGST', 'IGST'],
+    columns: ['Vch No', 'Vch Date', 'Branch', 'LINK NO', 'SUPPLIER Name', 'Place Of Supply', 'Ticket Type', 'PAX Name', 'Ticket No', 'Sector', 'PNR Number', 'Airline', 'BASE FARE', 'K3 Tax', 'TAXES', 'SERVICE FEE', 'CGST', 'SGST', 'IGST'],
     example: ['PF/26/0001', '2025-06-01', 'BOM', 'TKB-0001', 'Emirates GSA', 'Maharashtra', 'Domestic', 'John Doe', '0987654321098', 'BOM-DXB', 'ABCDEF', 'EK', '8000', '150', '600', '300', '270', '270', '0'] },
   { group: 'Sales & Purchase', entity: 'holiday-sale', label: 'Holiday — Sale',
     desc: 'Holiday package sale.',
