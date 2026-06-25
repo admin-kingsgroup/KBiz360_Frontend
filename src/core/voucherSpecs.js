@@ -52,7 +52,7 @@ export const VSPECS = {
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
     ],
-    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'k3', label: 'K3' }, { key: 'tax', label: 'Taxes' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'k3', label: 'K3 Tax' }, { key: 'tax', label: 'Taxes' }],
     seed: [
       { fn: 'KUNAL', sn: 'CHAUHAN', base: 4000, k3: 800, tax: 287, psvc: 50, markup: 500, ssvc: 100,
         sectors: [{ sector: 'BOM-DXB', airline: 'Emirates', flightNo: 'EK 501', ticketNo: '0981234567801', pnr: 'TJ1021', travelDate: '' }] },
@@ -69,7 +69,7 @@ export const VSPECS = {
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'pkg', label: 'Package', kind: 'tkt' }, { key: 'ref', label: 'Ref', kind: 'pnr' },
     ],
-    fareCols: [{ key: 'base', label: 'Land Package' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }],
     seed: [
       { fn: 'RAHUL', sn: 'MEHTA', pkg: 'Bali 5N', ref: 'HL2201', base: 85000, psvc: 1000, psvcGst: 180, markup: 12000 },
     ],
@@ -78,10 +78,10 @@ export const VSPECS = {
     code: 'SHT', name: 'Hotel', icon: '🏨', headerLabel: 'Hotel / City',
     tax: { kind: 'service', rate: 18 },
     idCols: [
-      { key: 'fn', label: 'Guest First' }, { key: 'sn', label: 'Surname' },
+      { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'htl', label: 'Hotel', kind: 'tkt' }, { key: 'conf', label: 'Conf. No', kind: 'pnr' },
     ],
-    fareCols: [{ key: 'base', label: 'Room / Basic' }, { key: 'tax', label: 'Taxes' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'tax', label: 'Taxes' }],
     seed: [
       { fn: 'PRIYA', sn: 'NAIR', htl: 'Taj Lands End', conf: 'HT5567', base: 18000, tax: 900, psvc: 500, markup: 2000, ssvc: 300 },
     ],
@@ -93,7 +93,7 @@ export const VSPECS = {
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'country', label: 'Country', kind: 'tkt' }, { key: 'pp', label: 'Passport', kind: 'pnr' },
     ],
-    fareCols: [{ key: 'base', label: 'Visa Fee' }, { key: 'tax', label: 'Taxes' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'tax', label: 'Taxes' }],
     seed: [
       { fn: 'AMIT', sn: 'SHAH', country: 'UAE', pp: 'P1234567', base: 4500, tax: 0, psvc: 250, markup: 800, ssvc: 200 },
     ],
@@ -107,7 +107,7 @@ export const VSPECS = {
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'plan', label: 'Plan', kind: 'tkt' }, { key: 'pol', label: 'Policy No', kind: 'pnr' },
     ],
-    fareCols: [{ key: 'base', label: 'Premium' }, { key: 'tax', label: 'Taxes' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'tax', label: 'Taxes' }],
     seed: [
       { fn: 'SARA', sn: 'KHAN', plan: 'Schengen 30D', pol: 'INS8890', base: 1800, tax: 0, psvc: 0, markup: 400, ssvc: 100 },
     ],
@@ -120,7 +120,7 @@ export const VSPECS = {
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'veh', label: 'Vehicle', kind: 'tkt' }, { key: 'route', label: 'Route', kind: 'pnr' },
     ],
-    fareCols: [{ key: 'base', label: 'Basic' }, { key: 'tax', label: 'Taxes' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'tax', label: 'Taxes' }],
     seed: [
       { fn: 'VIKRAM', sn: 'RAO', veh: 'Innova', route: 'BOM-Pune', base: 2800, tax: 0, psvc: 0, markup: 500, ssvc: 100 },
     ],
@@ -133,7 +133,7 @@ export const VSPECS = {
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'svc', label: 'Service', kind: 'tkt' }, { key: 'ref', label: 'Ref No', kind: 'pnr' },
     ],
-    fareCols: [{ key: 'base', label: 'Basic' }, { key: 'tax', label: 'Taxes' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'tax', label: 'Taxes' }],
     seed: [
       { fn: 'NEHA', sn: 'JOSHI', svc: 'Documentation', ref: 'MS1102', base: 900, tax: 0, psvc: 0, markup: 200, ssvc: 100 },
     ],

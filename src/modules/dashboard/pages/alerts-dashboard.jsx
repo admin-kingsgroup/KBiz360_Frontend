@@ -169,8 +169,8 @@ export function AlertsDashboard({ branch, setRoute }) {
     const branches = (branchesQ.data || []).slice();
     const dc = an.dataCapture || {};
     const CAP = [
-      ['Cannot post', dc.unposted], ['Awaiting approval', dc.pendingApproval], ['Masters incomplete', dc.missingMasters],
-      ['Idle ledgers', dc.idleLedgers], ['Unreconciled', dc.unreconciled],
+      ['Cannot post', dc.unposted], ['Awaiting approval', dc.pendingApproval], ['Bad entries', dc.badEntries],
+      ['Masters incomplete', dc.missingMasters], ['Idle ledgers', dc.idleLedgers], ['Unreconciled', dc.unreconciled],
     ];
     return (
       <>
@@ -221,7 +221,7 @@ export function AlertsDashboard({ branch, setRoute }) {
 
         {/* Data-capture completeness */}
         {sectionTitle(Database, 'Data-capture completeness')}
-        <div className="grid grid-cols-2 gap-2.5 tablet:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2.5 tablet:grid-cols-3 desktop:grid-cols-6">
           {CAP.map(([lab, n]) => (
             <div key={lab} style={{ borderRadius: 10, border: '1px solid ' + LINE, background: '#fff', padding: '10px 12px' }}>
               <div style={{ fontSize: 19, fontWeight: 800, color: (n || 0) > 0 ? AMBER : GREEN }}>{n || 0}</div>
