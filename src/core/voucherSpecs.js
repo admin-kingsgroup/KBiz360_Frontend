@@ -338,11 +338,11 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     // SVC2 (net of embedded GST) + Service Charge are sale-only.
     spec.fareCols.forEach((col) => { addH(sH, col.key, col.label, num(l[col.key])); addH(pH, col.key, col.label, num(l[col.key])); });
     if (isPkg(spec)) {
-      addH(sH, 'psvc', 'Supplier Service', num(l.psvc)); addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
-      addH(sH, 'psvcGst', 'Supplier Service GST', num(l.psvcGst)); addH(pH, 'psvcGst', 'Supplier Service GST', num(l.psvcGst));
+      addH(sH, 'psvc', 'Supp SVCHG', num(l.psvc)); addH(pH, 'psvc', 'Supp SVCHG', num(l.psvc));
+      addH(sH, 'psvcGst', 'Supp SVCHG GST', num(l.psvcGst)); addH(pH, 'psvcGst', 'Supp SVCHG GST', num(l.psvcGst));
       addH(sH, 'markup', 'SVC2', num(l.markup));
     } else {
-      addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
+      addH(pH, 'psvc', 'Supp SVCHG', num(l.psvc));
       addH(sH, 'markup', 'SVC2', r2(num(l.markup) - c.gstMk));
       addH(sH, 'ssvc', 'SVF', num(l.ssvc));
     }

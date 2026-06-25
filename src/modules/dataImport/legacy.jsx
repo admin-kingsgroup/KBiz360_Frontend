@@ -225,7 +225,7 @@ function makeBookingSpec(code) {
   const idLabels = sp.idCols.map((c) => c.label);
   const sectorLabels = (sp.sectorCols || []).map((c) => c.label);
   const fareLabels = sp.fareCols.map((c) => c.label);
-  const tail = ['Supplier Service', 'Supplier Service GST', 'Service Charge - 2', 'Service Charge - 2 GST', 'Service Fee', 'Service Fee GST'];
+  const tail = ['Supp SVCHG', 'Supp SVCHG GST', 'Service Charge - 2', 'Service Charge - 2 GST', 'Service Fee', 'Service Fee GST'];
   const columns = [...header, ...idLabels, ...sectorLabels, ...fareLabels, ...tail];
 
   const seed = (sp.seed && sp.seed[0]) || {};

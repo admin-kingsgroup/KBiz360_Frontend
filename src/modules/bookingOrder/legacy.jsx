@@ -163,11 +163,11 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange })
                 <label key={fc.key} style={{ fontSize: 10.5, color: '#5b616e' }}>{fc.label}<br />
                   <input type="number" min="0" value={leg.line[fc.key] ?? ''} onChange={(e) => setLine(i, fc.key, e.target.value)} style={cell} /></label>
               ))}
-              <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service<br />
+              <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service Charge<br />
                 <input type="number" min="0" value={leg.line.psvc ?? ''} onChange={(e) => setLine(i, 'psvc', e.target.value)} style={cell} /></label>
-              {pkg && <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service GST<br />
+              {pkg && <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service Charge GST<br />
                 <input type="number" min="0" value={leg.line.psvcGst ?? ''} onChange={(e) => setLine(i, 'psvcGst', e.target.value)} style={cell} /></label>}
-              <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Incentive<br />
+              <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supp Comm/Inc Rcvd<br />
                 <input type="number" min="0" value={leg.line.incentive ?? ''} onChange={(e) => setLine(i, 'incentive', e.target.value)} style={cell} /></label>
               {pkg && <label style={{ fontSize: 10.5, color: '#6b5a1e', display: 'flex', alignItems: 'center', gap: 5, paddingBottom: 6 }}>
                 <input type="checkbox" checked={!!leg.availItc} onChange={(e) => setLeg(i, { availItc: e.target.checked })} /> Avail ITC (tour-operator GST)</label>}
@@ -725,7 +725,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', padding: '8px 14px', marginBottom: 12, background: '#FDFAF4', border: '1px solid #eee3cf', borderRadius: 8, flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#fff', border: '1px solid #C49A3C' }} /> Manual — you enter</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#faf7ef', border: '1px dashed #9A9A9A' }} /> Auto — calculated</span>
-        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · {pkg ? 'Holiday package: 5% GST on (Land + Supplier Service + Supplier Service GST + Service Charge - 2); Intl adds 2% TCS' : 'Service Charge - 2 is GST-inclusive (GST = Service Charge - 2 × 18 ÷ 118), posted to separate GST ledgers'}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · {pkg ? 'Holiday package: 5% GST on (Base Fare + Supplier Service Charge + Supplier Service Charge GST + Service Charge - 2); Intl adds 2% TCS' : 'Service Charge - 2 is GST-inclusive (GST = Service Charge - 2 × 18 ÷ 118), posted to separate GST ledgers'}</span>
       </div>
 
       {/* ① Sales Order */}
@@ -801,11 +801,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               <th style={{ ...thM, ...thL, width: 140 }}>{spec.idCols[1].label}</th>
               {refKeys.map((c) => <th key={c.key} style={{ ...thA, ...thL, width: 120 }}>{c.label}</th>)}
               {spec.fareCols.map((c) => <th key={c.key} style={{ ...thM, width: 95 }}>{c.label}</th>)}
-              <th style={{ ...thM, width: 95 }}>Supplier Service</th>
+              <th style={{ ...thM, width: 95 }}>Supplier Service Charge</th>
               {pkg
-                ? <th style={{ ...thM, width: 95 }}>Supplier Service GST (18%)</th>
+                ? <th style={{ ...thM, width: 95 }}>Supplier Service Charge GST (18%)</th>
                 : <th style={{ ...thA, width: 95 }}>GST ({activeRate}%)</th>}
-              <th style={{ ...thM, width: 100 }}>Supplier Incentive</th>
+              <th style={{ ...thM, width: 100 }}>Supp Comm/Inc Rcvd</th>
               <th style={{ ...thA, width: 85 }}>TDS (2%)</th>
               <th style={{ ...thA, width: 110 }}>Total</th>
             </tr></thead>
@@ -870,7 +870,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
               <th style={{ ...thA, ...thL, width: 140 }}>First Name</th><th style={{ ...thA, ...thL, width: 140 }}>Surname</th>
               <th style={{ ...thA, width: 110 }}>Final Sales</th><th style={{ ...thA, width: 85 }}>SVF GST ({activeRate}%)</th><th style={{ ...thA, width: 85 }}>SVC2 GST ({activeRate}%)</th><th style={{ ...thA, width: 110 }}>Final Purchase</th><th style={{ ...thA, width: 95 }}>Purchase GST ({pkg ? 18 : activeRate}%)</th>
-              <th style={{ ...thA, width: 95 }}>Incentive</th><th style={{ ...thA, width: 80 }}>TDS (2%)</th>
+              <th style={{ ...thA, width: 95 }}>Supp Comm/Inc Rcvd</th><th style={{ ...thA, width: 80 }}>TDS (2%)</th>
               <th style={{ ...thA, width: 110 }}>Gross Profit</th><th style={{ ...thA, width: 80 }}>GP %</th>
             </tr></thead>
             <tbody>
@@ -1165,7 +1165,7 @@ function WhereItPosts({ approved }) {
   const items = [
     ['Day Book / Ledgers', 'both vouchers appear in the Day Book and each ledger statement (Sundry Debtors, Supplier, every Sales/Purchase component head, GST).'],
     ['Trial Balance', 'every Dr/Cr leg above lands in the Trial Balance under its group.'],
-    ['Profit & Loss', 'each head nests in the Tally chart — Sales Accounts → module sub-group (Ticketing → Domestic/International) → DT-Base Fare / DT-K3-Taxes / DT-SVC2 / DT-SVF; Purchase Accounts → … [Pur] incl. Supplier Service (an agency cost that reduces GP). Drill the P&L to see it head-wise.'],
+    ['Profit & Loss', 'each head nests in the Tally chart — Sales Accounts → module sub-group (Ticketing → Domestic/International) → DT-Base Fare / DT-K3 Tax / DT-SVC2 / DT-SVF; Purchase Accounts → … [Pur] incl. Supp SVCHG (an agency cost that reduces GP). Drill the P&L to see it head-wise.'],
     ['Balance Sheet', 'customer (Sundry Debtors, asset), supplier (Sundry Creditors, liability), CGST/SGST (Duties & Taxes) and any TCS Payable sit on the Balance Sheet.'],
     ['Sales & Purchase Registers', 'the sale shows in the Sales Register, the purchase in the Purchase Register.'],
     ['Invoice GP / Sales-GP Analytics', 'both are tied by the Link No, so GP is tracked invoice-wise.'],

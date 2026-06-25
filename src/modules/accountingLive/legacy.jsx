@@ -1342,7 +1342,7 @@ function splitGst(amt, gstMode, brCode) {
 // legacy "Other Taxes"/"Service Charge") and "K3-Taxes" don't collide with the generic "Taxes" match.
 const HEAD_RANK = [
   [/base\s*fare/i, 0], [/land/i, 1], [/room|basic|visa\s*fee|premium|fare/i, 2],
-  [/k3/i, 3], [/svc2|other\s*tax/i, 5], [/\bsvf\b|service\s*charge/i, 6], [/supplier\s*service/i, 7],
+  [/k3/i, 3], [/svc2|other\s*tax/i, 5], [/\bsvf\b|service\s*charge/i, 6], [/supp\s*svchg|supplier\s*service/i, 7],
   [/tax/i, 4], [/incentive/i, 8], [/tds/i, 9],
 ];
 const headRank = (ledger) => { for (const [re, rk] of HEAD_RANK) if (re.test(ledger)) return rk; return 50; };

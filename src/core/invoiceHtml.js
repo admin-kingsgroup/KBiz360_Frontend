@@ -257,8 +257,8 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     : `<div class="lab2">Settlement</div><div class="pay">Payable to supplier per agreed credit terms.<br>Input GST credit claimed against supplier GSTIN.<br>Link No referenced for invoice-wise GP.</div>`;
 
   const headCols = isSale
-    ? `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Basic Fare</th><th>K3 Tax</th><th>Taxes (YQ/YR)</th><th>Service Charge - 2</th><th>Total Fare</th>`
-    : `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Basic Fare</th><th>K3 Tax</th><th>Taxes (YQ/YR)</th><th>Supplier Svc</th><th>Incentive</th><th>TDS (2%)</th><th>Total Cost</th>`;
+    ? `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Base Fare</th><th>K3 Tax</th><th>Taxes</th><th>Service Charge - 2</th><th>Total Fare</th>`
+    : `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Base Fare</th><th>K3 Tax</th><th>Taxes</th><th>Supplier Service Charge</th><th>Supp Comm/Inc Rcvd</th><th>TDS (2%)</th><th>Total Cost</th>`;
 
   const sheet = `<div class="iv"><div class="sheet">
     <div class="titlebar"><div class="title">${isSale ? 'INVOICE' : 'PURCHASE INVOICE'}</div><img class="iata-badge" src="${IATA_LOGO}" alt="IATA Accredited Agent" /></div><div class="title-rule"></div>
