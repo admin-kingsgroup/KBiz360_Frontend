@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FL, inp } from '../../styles';
 import { todayISO } from '../../dates';
 import { SmartDateInput } from '../../ux/SmartDateInput';
@@ -109,6 +109,28 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
     const fresh = { commissionReversal: reverseCommission };
     patch(idx < 0 ? refundPrefillFromBooking(booking, fresh, isRefund) : refundPrefillFromLeg(booking.purchases[idx], booking, fresh));
   }
+
+  // When opening an EXISTING refund/reissue (againstInvoice already set), auto-load the
+  // linked SO/PO/GP booking for DISPLAY ONLY — so the read-only SO/PO/GP grid and the
+  // "SO SVC2 — refunded to client" column populate without the preparer clicking
+  // "Fetch SO/PO/GP". It deliberately does NOT prefill/clobber the saved form state
+  // (supplierAmt, markup, party…) — that stays the manual button's job for fresh entries.
+  useEffect(() => {
+    const link = (state.againstInvoice || '').trim();
+    if (!link || booking) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const b = await apiGet('/api/booking-orders/by-link', { link, branch: branchCode || branch });
+        if (cancelled || !b) return;
+        setBooking(b);
+        setLinkInput((v) => v || link);
+        if (b.id) { try { const jv = await apiGet('/api/booking-orders/' + b.id + '/journal'); if (!cancelled) setBookingJv(jv); } catch { /* no JV — ignore */ } }
+      } catch { /* no booking behind this sale (pure import) — SO SVC2 stays blank */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.againstInvoice]);
 
   const supplierAmt = r2(+state.supplierAmt || 0);   // airline refund receivable (RF) / payable (RI)
   const svc = r2(+state.serviceCharge || 0);
