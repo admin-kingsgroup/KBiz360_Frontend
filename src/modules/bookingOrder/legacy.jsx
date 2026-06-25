@@ -655,7 +655,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <div style={{ ...card, background: '#EAF1FB', border: '1px solid #B9D6F2', color: '#185FA5', fontSize: 12, marginBottom: 14 }}>
           🔁 <b>Inter-Branch sale.</b> Enter the fares in the Purchase Order grid (pass-through at cost) and your margin in the Sales <b>Service Fee</b> column. Fares post to <b>Inter-Branch Sales</b>, the Service Fee to <b>Service Fee Income</b>.
           {toBranch && <> Tax: <b>{inbExport ? `Export · zero-rated (${INB_COUNTRY[brCode]}→${INB_COUNTRY[toBranch]})` : 'IGST · inter-state (18% on Service Fee)'}</b>.</>}
-          {' '}Do not use Service Charge - 2. Creates an INB Link No the {toBranch || 'buying'} branch fetches on its SO/PO/GP.
+          {' '}Creates an INB Link No the {toBranch || 'buying'} branch fetches on its SO/PO/GP.
         </div>
       )}
 
@@ -735,8 +735,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
               {spec.idCols.map((c) => <th key={c.key} style={{ ...thM, ...thL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
               {spec.fareCols.map((c) => <th key={c.key} style={{ ...thA, width: 95 }}>{c.label}</th>)}
-              <th style={{ ...thM, width: 95 }}>Service Charge - 2</th>{!pkg && <th style={{ ...thM, width: 95 }}>Service Fee</th>}
-              {!pkg && <th style={{ ...thA, width: 95 }}>GST/Service Fee ({activeRate}%)</th>}<th style={{ ...thA, width: 95 }}>GST/Service Charge - 2 ({pkg ? 5 : activeRate}%)</th><th style={{ ...thA, width: 110 }}>Total</th><th style={{ ...thA, width: 45 }}></th>
+              {!interBranch && <th style={{ ...thM, width: 95 }}>Service Charge - 2</th>}{!pkg && <th style={{ ...thM, width: 95 }}>Service Fee</th>}
+              {!pkg && <th style={{ ...thA, width: 95 }}>GST/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...thA, width: 95 }}>GST/Service Charge - 2 ({pkg ? 5 : activeRate}%)</th>}<th style={{ ...thA, width: 110 }}>Total</th><th style={{ ...thA, width: 45 }}></th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -754,10 +754,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                     {spec.fareCols.map((col) => (isNoSupp
                       ? <td key={col.key} style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>
                       : <td key={col.key} style={{ ...tdAuto, width: 95 }}>{fmt(l[col.key])}</td>))}
-                    <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.markup ?? ''} placeholder="0" onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>
+                    {!interBranch && <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.markup ?? ''} placeholder="0" onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>}
                     {!pkg && <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.ssvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
                     {!pkg && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstSvc)}</td>}
-                    <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstMk)}</td>
+                    {!interBranch && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstMk)}</td>}
                     <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef', width: 110 }}>{fmt(c.finalSales)}</td>
                     <td style={{ ...tdC, textAlign: 'center', background: '#faf7ef', padding: 3, width: 45 }}><button onClick={() => delLine(i)} title="Remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={13} /></button></td>
                   </tr>
@@ -770,9 +770,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               <td style={{ ...tfTd, textAlign: 'left' }}>TOTAL</td>
               {spec.idCols.slice(1).map((c) => <td key={c.key} style={tfTd} />)}
               {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
-              <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>
+              {!interBranch && <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>}
               {!pkg && <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
-              {!pkg && <td style={tfTd}>{fmt(totals.so.gst)}</td>}<td style={tfTd}>{fmt(totals.so.otherTaxesGst)}</td>
+              {!pkg && <td style={tfTd}>{fmt(totals.so.gst)}</td>}{!interBranch && <td style={tfTd}>{fmt(totals.so.otherTaxesGst)}</td>}
               <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd} />
             </tr></tfoot>
           </table>
