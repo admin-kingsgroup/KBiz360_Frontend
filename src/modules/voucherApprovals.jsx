@@ -75,7 +75,10 @@ export function VoucherApprovals({ branch, currentUser }) {
   // The period bar still lets you narrow/widen any tab.
   const presetFor = (s) => (s === 'pending' ? 'all' : 'cfy');
   const [range, setRange] = useState(() => periodRange('all', { branch })); // initial tab = pending → All
-  const q = useVoucherApprovals(branch, status, { from: range.from, to: range.to });
+  // PENDING shows every pending voucher with NO date filter and NO period bar — always
+  // "all" regardless of any range left over from another tab. The settled tabs use `range`.
+  const effRange = status === 'pending' ? periodRange('all', { branch }) : range;
+  const q = useVoucherApprovals(branch, status, { from: effRange.from, to: effRange.to });
   const d = q.data || {};
   // Vouchers edited ≥ once (cross-cuts status) — its own source for the Edited tab.
   // Uses the SAME branch resolution as every other voucher query (branchCode →
@@ -399,7 +402,9 @@ export function VoucherApprovals({ branch, currentUser }) {
           <div className="kbiz-page-title">Voucher Approvals</div>
           <div style={{ fontSize: 12, color: C.dim }}>{branchLabel(branch)} · Payment · Receipt · Contra · Journal · Credit/Debit Note · Purchase Expense — manual & bulk post only when approved</div>
         </div>
-        <PeriodBar key={status} branch={branch} compact defaultPreset={presetFor(status)} onChange={setRange} />
+        {status !== 'pending' && (
+          <PeriodBar key={status} branch={branch} compact defaultPreset={presetFor(status)} onChange={setRange} />
+        )}
         {status === 'pending' && counts.pending.n > 0 && (
           <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
             {sel.size > 0 && (
