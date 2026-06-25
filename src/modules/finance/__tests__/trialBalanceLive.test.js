@@ -50,6 +50,12 @@ describe('loadTrialBalance is live + correct', () => {
     expect(out.balanced).toBe(true);
   });
 
+  test('forwards includeZero so nil-balance accounts can be listed', async () => {
+    api.getTrialBalance.mockResolvedValueOnce({ rows: [], totalClosingDebit: 0, totalClosingCredit: 0, balanced: true });
+    await loadTrialBalance({ branch: 'BOM', from: '2000-01-01', to: '2026-06-25', includeZero: true });
+    expect(api.getTrialBalance).toHaveBeenCalledWith({ branch: 'BOM', from: '2000-01-01', to: '2026-06-25', includeZero: true });
+  });
+
   test('empty / nullish response is safe', async () => {
     api.getTrialBalance.mockResolvedValueOnce(null);
     const out = await loadTrialBalance({});
