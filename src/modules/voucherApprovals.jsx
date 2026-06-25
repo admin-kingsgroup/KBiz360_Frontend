@@ -69,9 +69,12 @@ export function VoucherApprovals({ branch, currentUser }) {
   useModalEsc(() => setEditId(null), !!editId);     // Esc closes the edit modal
   const cur = (bc(branch) || {}).cur || '₹';
   // Default to the current FY (not All): the Approved/Deleted tabs can hold thousands
-  // of settled entries, and loading them all-time was ~18-40s. CFY keeps every tab fast;
-  // the period bar still lets you widen to All when you need older entries.
-  const [range, setRange] = useState(() => periodRange('cfy', { branch }));
+  // of settled entries, and loading them all-time was ~18-40s. PENDING defaults to ALL
+  // (no date filter — every pending voucher must be visible for approval, regardless of
+  // its date); the large settled tabs (Approved/Rejected/Deleted) keep CFY for speed.
+  // The period bar still lets you narrow/widen any tab.
+  const presetFor = (s) => (s === 'pending' ? 'all' : 'cfy');
+  const [range, setRange] = useState(() => periodRange('all', { branch })); // initial tab = pending → All
   const q = useVoucherApprovals(branch, status, { from: range.from, to: range.to });
   const d = q.data || {};
   // Vouchers edited ≥ once (cross-cuts status) — its own source for the Edited tab.
@@ -396,7 +399,7 @@ export function VoucherApprovals({ branch, currentUser }) {
           <div className="kbiz-page-title">Voucher Approvals</div>
           <div style={{ fontSize: 12, color: C.dim }}>{branchLabel(branch)} · Payment · Receipt · Contra · Journal · Credit/Debit Note · Purchase Expense — manual & bulk post only when approved</div>
         </div>
-        <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={setRange} />
+        <PeriodBar key={status} branch={branch} compact defaultPreset={presetFor(status)} onChange={setRange} />
         {status === 'pending' && counts.pending.n > 0 && (
           <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
             {sel.size > 0 && (
