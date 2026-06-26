@@ -5,10 +5,15 @@
 // Deliberately OMITS our service charge + its GST (we retain them — never refunded
 // to the client) and the supplier service charge + its GST (the supplier keeps them
 // — never returned to us); those stay blank. Everything else carries over: the
-// airline-refundable fare (PO total less the supplier service fee & its GST), our
-// Other-Taxes margin (from the original sale), and the commission reversal
-// (clawback / GST / TDS). `state` is the current form so we never clobber a
-// customer / supplier / GST-mode the preparer already chose.
+// airline-refundable fare (PO total less the supplier service fee & its GST) and the
+// commission reversal (clawback / GST / TDS).
+//
+// The original SO SVC2 (margin) is handled by `isRefund`: on a REFUND it is refunded
+// to the client IN FULL (the sale reversal returns it), so we must NOT pre-load it as
+// our retained refund-markup — doing so would re-bill the same amount and net the
+// refund to zero. On a REISSUE the original margin carries over to the amendment.
+// `state` is the current form so we never clobber a customer / supplier / GST-mode the
+// preparer already chose.
 import { r2 } from '../ui';
 
 const num = (v) => (Number(v) || 0);
@@ -92,7 +97,7 @@ export function refundPrefillFromLeg(leg, b, state = {}) {
   };
 }
 
-export function refundPrefillFromBooking(b, state = {}) {
+export function refundPrefillFromBooking(b, state = {}, isRefund = true) {
   const po = b?.po || {}, so = b?.so || {};
   const soLines = Array.isArray(so.lines) ? so.lines : [];
   const blank = (n) => (n ? n : '');                       // keep the 0.00 placeholder for empty values
@@ -105,7 +110,10 @@ export function refundPrefillFromBooking(b, state = {}) {
     againstInvoice: b?.saleVno || '',
     againstPurchase: b?.purchaseVno || '',
     supplierAmt: supplierRefund,
-    markup: blank(markupTotal),                            // Our Service Charge - 2 ← original SO margin
+    // REFUND → blank: the original SO SVC2 is refunded to the client in full by the
+    // sale reversal, so it is NOT retained as our refund-markup (that would re-charge
+    // it and net it to zero). REISSUE → carries over the original SO margin.
+    markup: isRefund ? '' : blank(markupTotal),            // Our Service Charge - 2
     incentiveAmt: reverse ? blank(r2(num(po.incentiveAmt))) : '',   // Commission clawback ← PO incentive
     incentiveGst: reverse ? blank(r2(num(po.incentiveGst))) : '',
     incentiveTds: reverse ? blank(r2(num(po.incentiveTds))) : '',

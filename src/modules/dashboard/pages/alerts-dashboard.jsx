@@ -47,6 +47,7 @@ export function AlertsDashboard({ branch, setRoute }) {
   const [sev, setSev] = useState('all');
   const [domain, setDomain] = useState('all');
   const [search, setSearch] = useState('');
+  const [typeSel, setTypeSel] = useState(null);  // {label, types:[]} — drill from an Overview number to its exact issues
 
   const data = q.data || {};
   const branchRequired = !!data.branchRequired;
@@ -70,11 +71,12 @@ export function AlertsDashboard({ branch, setRoute }) {
   const activeDomain = (domain !== 'all' && (domCount[domain] || 0) === 0) ? 'all' : domain;
 
   const openRows = useMemo(() => all.filter((a) => {
+    if (typeSel && !typeSel.types.includes(a.type)) return false;
     if (sev !== 'all' && a.severity !== sev) return false;
     if (activeDomain !== 'all' && a.domain !== activeDomain) return false;
-    if (search) { const s = search.toLowerCase(); if (!(`${a.title} ${a.detail}`.toLowerCase().includes(s))) return false; }
+    if (search) { const s = search.toLowerCase(); if (!(`${a.title} ${a.detail} ${a.why || ''} ${a.suggestion || ''}`.toLowerCase().includes(s))) return false; }
     return true;
-  }), [all, sev, activeDomain, search]);
+  }), [all, sev, activeDomain, search, typeSel]);
 
   const groups = useMemo(() => {
     const order = (data.domains || []).map((d) => d.key);
@@ -94,7 +96,13 @@ export function AlertsDashboard({ branch, setRoute }) {
 
   const onRefresh = () => { toastInfo('Refreshing scrutiny…'); q.refetch(); trendQ.refetch && trendQ.refetch(); branchesQ.refetch && branchesQ.refetch(); };
   const go = (route, focus) => { if (!route) return; setNavFocus(route, focus || {}); if (setRoute) setRoute(route); };
-  const drillArea = (key) => { setDomain(key); setSev('all'); setTab('open'); };
+  // Every Overview number is a drill-in: jump to Open Issues pre-filtered to the
+  // exact set behind the number, where each card explains the issue + the fix.
+  const drillArea = (key) => { setTypeSel(null); setDomain(key); setSev('all'); setSearch(''); setTab('open'); };
+  const drillSev = (k) => { setTypeSel(null); setDomain('all'); setSev(k); setSearch(''); setTab('open'); };
+  const drillTypes = (label, types) => { setTypeSel({ label, types }); setDomain('all'); setSev('all'); setSearch(''); setTab('open'); };
+  const pickSev = (k) => { setTypeSel(null); setSev(k); };
+  const pickDomain = (k) => { setTypeSel(null); setDomain(k); };
 
   const TABS = [['overview', 'Overview'], ['open', 'Open Issues', sc.open], ['fixed', 'Fixed', sc.fixed]];
   const chip = (active, bg, color) => ({ padding: '4px 11px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', border: '1px solid ' + (active ? color : LINE), background: active ? bg : '#fff', color: active ? color : DIM });
@@ -105,23 +113,55 @@ export function AlertsDashboard({ branch, setRoute }) {
     ['info', 'To review', sevCounts.info, SEV.info.bg, SEV.info.dot],
   ];
 
+  const metaBadge = { fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 999, background: '#f1f3f6', color: DARK, whiteSpace: 'nowrap' };
   const renderOpenCard = (a) => {
     const s = SEV[a.severity] || SEV.info;
+    const samples = (Array.isArray(a.sample) ? a.sample : []).filter(Boolean).slice(0, 12);
     return (
-      <div key={a.key} className="flex flex-col gap-3 rounded-brand border border-surface-border bg-surface px-3.5 py-2.5 shadow-card tablet:flex-row tablet:items-start" style={{ borderLeft: `4px solid ${s.dot}` }}>
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <span style={{ width: 9, height: 9, borderRadius: 999, background: s.dot, marginTop: 5, flexShrink: 0 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
+      <div key={a.key} className="rounded-brand border border-surface-border bg-surface shadow-card" style={{ borderLeft: `5px solid ${s.dot}`, padding: '16px 18px' }}>
+        {/* Title row + status badges + action */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ width: 11, height: 11, borderRadius: 999, background: s.dot, marginTop: 6, flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: DARK }}>{a.title}</span>
-              <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 7px', borderRadius: 999, background: s.bg, color: s.dot, textTransform: 'uppercase' }}>{s.label}</span>
+              <span style={{ fontSize: 15.5, fontWeight: 800, color: DARK, lineHeight: 1.25 }}>{a.title}</span>
+              <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 9px', borderRadius: 999, background: s.bg, color: s.dot, textTransform: 'uppercase', letterSpacing: 0.4 }}>{s.label}</span>
             </div>
-            <div style={{ fontSize: 11.5, color: '#5b616e', marginTop: 2 }}>{a.detail}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', marginTop: 7 }}>
+              {a.count != null && <span style={metaBadge}>{a.count} {a.count === 1 ? 'item' : 'items'}</span>}
+              {a.amount ? <span style={{ ...metaBadge, background: s.bg, color: s.dot }}>{money(a.amount)} at stake</span> : null}
+              <span style={{ fontSize: 13, color: '#3a3f4a', lineHeight: 1.55 }}>{a.detail}</span>
+            </div>
           </div>
+          {a.link && (
+            <button onClick={() => go(typeof a.link === 'string' ? a.link : a.link.route, a.focus || { kind: a.type, sample: a.sample })} title="Open the screen where you fix this" className={TAP} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '9px 15px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, background: '#2563eb', color: '#fff' }}>Open &amp; fix <ChevronRight size={15} /></button>
+          )}
         </div>
-        {a.link && (
-          <div className="flex items-center max-tablet:w-full" style={{ flexShrink: 0 }}>
-            <button onClick={() => go(typeof a.link === 'string' ? a.link : a.link.route, a.focus || { kind: a.type, sample: a.sample })} title="Open & fix" className={TAP} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: '#2563eb', color: '#fff' }}>Open &amp; fix <ChevronRight size={13} /></button>
+
+        {/* What this means + What to do — the full narration */}
+        {(a.why || a.suggestion) && (
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }} className="tablet:grid-cols-2">
+            {a.why && (
+              <div style={{ borderRadius: 9, background: '#f7f8fa', border: '1px solid ' + LINE, padding: '10px 12px' }}>
+                <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.6, textTransform: 'uppercase', color: DIM, marginBottom: 3 }}>What this means</div>
+                <div style={{ fontSize: 12.5, color: DARK, lineHeight: 1.55 }}>{a.why}</div>
+              </div>
+            )}
+            {a.suggestion && (
+              <div style={{ borderRadius: 9, background: '#f0f6ff', border: '1px solid #d6e4ff', padding: '10px 12px' }}>
+                <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.6, textTransform: 'uppercase', color: '#2563eb', marginBottom: 3 }}>Suggested action</div>
+                <div style={{ fontSize: 12.5, color: DARK, lineHeight: 1.55 }}>{a.suggestion}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Affected entries */}
+        {samples.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 11 }}>
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4 }}>Affected:</span>
+            {samples.map((x, i) => <span key={i} style={{ fontSize: 11.5, fontWeight: 600, color: DARK, background: '#fff', border: '1px solid ' + LINE, borderRadius: 6, padding: '2px 8px' }}>{x}</span>)}
+            {a.count != null && a.count > samples.length && <span style={{ fontSize: 11, color: DIM, fontWeight: 600 }}>+{a.count - samples.length} more</span>}
           </div>
         )}
       </div>
@@ -169,30 +209,37 @@ export function AlertsDashboard({ branch, setRoute }) {
     const branches = (branchesQ.data || []).slice();
     const dc = an.dataCapture || {};
     const CAP = [
-      ['Cannot post', dc.unposted], ['Awaiting approval', dc.pendingApproval], ['Bad entries', dc.badEntries],
-      ['Masters incomplete', dc.missingMasters], ['Idle ledgers', dc.idleLedgers], ['Unreconciled', dc.unreconciled],
+      ['Cannot post', dc.unposted, ['needs-attention']],
+      ['Awaiting approval', dc.pendingApproval, ['pending']],
+      ['Bad entries', dc.badEntries, ['dup-voucher', 'missing-costcentre', 'booking-unbilled', 'zero-voucher', 'backdated']],
+      ['Masters incomplete', dc.missingMasters, ['supplier-credit', 'client-credit', 'company-profile', 'party-tax-id']],
+      ['Idle ledgers', dc.idleLedgers, ['idle-ledger']],
+      ['Unreconciled', dc.unreconciled, ['recon-bank', 'recon-client', 'recon-supplier', 'recon-tally', 'recon-interbranch', 'recon-tax']],
     ];
+    const allCapTypes = CAP.flatMap((c) => c[2]);
     return (
       <>
+        <div style={{ fontSize: 12, color: DIM, margin: '0 2px 10px', lineHeight: 1.5 }}>Every number below is clickable — tap it to see the exact issues, each with a plain-language explanation and a suggested fix.</div>
         {/* Scrutiny score banner */}
-        <div className="grid grid-cols-2 gap-2.5 tablet:grid-cols-4" style={{ marginBottom: 6 }}>
-          <div style={{ gridColumn: 'span 2', borderRadius: 10, padding: '12px 14px', border: '1px solid ' + LINE, background: '#fff', display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 58, height: 58, borderRadius: 999, border: `4px solid ${scoreColor(an.score)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: 20, fontWeight: 800, color: scoreColor(an.score) }}>{an.score}</span>
+        <div className="grid grid-cols-2 gap-3 tablet:grid-cols-4" style={{ marginBottom: 6 }}>
+          <button onClick={() => drillSev('all')} className={TAP} style={{ textAlign: 'left', cursor: 'pointer', gridColumn: 'span 2', borderRadius: 12, padding: '16px 18px', border: '1px solid ' + LINE, background: '#fff', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ width: 66, height: 66, borderRadius: 999, border: `5px solid ${scoreColor(an.score)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <span style={{ fontSize: 24, fontWeight: 800, color: scoreColor(an.score) }}>{an.score}</span>
             </div>
             <div>
-              <div style={{ fontSize: 12.5, fontWeight: 800, color: DARK }}>Scrutiny score</div>
-              <div style={{ fontSize: 11, color: DIM, marginTop: 1 }}>{sc.open} open issue{sc.open !== 1 ? 's' : ''} · {money(an.exposure)} at stake</div>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: DARK }}>Scrutiny score</div>
+              <div style={{ fontSize: 12.5, color: DIM, marginTop: 2 }}>{sc.open} open issue{sc.open !== 1 ? 's' : ''} · {money(an.exposure)} at stake</div>
+              <div style={{ fontSize: 11, color: '#2563eb', fontWeight: 700, marginTop: 4 }}>View all open issues →</div>
             </div>
-          </div>
-          <div style={{ borderRadius: 10, padding: '11px 13px', border: '1px solid ' + LINE, background: '#fff' }}>
-            <div style={{ fontSize: 21, fontWeight: 800, color: scoreColor(an.dataCapture?.score ?? 100) }}>{an.dataCapture?.score ?? 100}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: DIM }}>Data-capture</div>
-          </div>
-          <div style={{ borderRadius: 10, padding: '11px 13px', border: '1px solid ' + LINE, background: '#fff' }}>
-            <div style={{ fontSize: 21, fontWeight: 800, color: trend.fixedTotal >= trend.openNow ? GREEN : AMBER }}>{trend.avgFixHrs ? `${trend.avgFixHrs}h` : '—'}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: DIM }}>Avg time to fix</div>
-          </div>
+          </button>
+          <button onClick={() => drillTypes('Data-capture issues', allCapTypes)} className={TAP} style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 12, padding: '14px 16px', border: '1px solid ' + LINE, background: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: scoreColor(an.dataCapture?.score ?? 100) }}>{an.dataCapture?.score ?? 100}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: DIM }}>Data-capture</div>
+          </button>
+          <button onClick={() => setTab('fixed')} className={TAP} style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 12, padding: '14px 16px', border: '1px solid ' + LINE, background: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: trend.fixedTotal >= trend.openNow ? GREEN : AMBER }}>{trend.avgFixHrs ? `${trend.avgFixHrs}h` : '—'}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: DIM }}>Avg time to fix</div>
+          </button>
         </div>
 
         {/* Area breakdown */}
@@ -200,20 +247,21 @@ export function AlertsDashboard({ branch, setRoute }) {
         {an.areas.length === 0
           ? <div className="rounded-brand border border-surface-border bg-surface p-5 text-center text-ink-muted shadow-card" style={{ fontSize: 12.5, color: GREEN, fontWeight: 700 }}>✓ All areas clean — nothing to scrutinise for {code}.</div>
           : (
-            <div className="grid grid-cols-1 gap-2.5 tablet:grid-cols-2 desktop:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-3 wide:grid-cols-4">
               {an.areas.map((a) => (
-                <button key={a.key} onClick={() => drillArea(a.key)} className={TAP} style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 10, border: '1px solid ' + LINE, background: '#fff', padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <button key={a.key} onClick={() => drillArea(a.key)} className={TAP} style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 12, border: '1px solid ' + LINE, background: '#fff', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 7 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 800, color: DARK }}>{a.label}</span>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: scoreColor(a.score) }}>{a.score}</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: DARK }}>{a.label}</span>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: scoreColor(a.score) }}>{a.score}</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 11, color: DIM }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', fontSize: 12, color: DIM }}>
                     <span style={{ fontWeight: 700, color: DARK }}>{a.open} open</span>
                     {a.error > 0 && <span style={{ color: RED }}>● {a.error}</span>}
                     {a.warn > 0 && <span style={{ color: AMBER }}>● {a.warn}</span>}
                     {a.info > 0 && <span style={{ color: '#2563eb' }}>● {a.info}</span>}
                     {a.exposure > 0 && <span style={{ marginLeft: 'auto', fontWeight: 700, color: DARK }}>{money(a.exposure)}</span>}
                   </div>
+                  <div style={{ fontSize: 11, color: '#2563eb', fontWeight: 700 }}>See these issues →</div>
                 </button>
               ))}
             </div>
@@ -221,13 +269,16 @@ export function AlertsDashboard({ branch, setRoute }) {
 
         {/* Data-capture completeness */}
         {sectionTitle(Database, 'Data-capture completeness')}
-        <div className="grid grid-cols-2 gap-2.5 tablet:grid-cols-3 desktop:grid-cols-6">
-          {CAP.map(([lab, n]) => (
-            <div key={lab} style={{ borderRadius: 10, border: '1px solid ' + LINE, background: '#fff', padding: '10px 12px' }}>
-              <div style={{ fontSize: 19, fontWeight: 800, color: (n || 0) > 0 ? AMBER : GREEN }}>{n || 0}</div>
-              <div style={{ fontSize: 10.5, fontWeight: 700, color: DIM }}>{lab}</div>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 gap-3 tablet:grid-cols-3 desktop:grid-cols-6">
+          {CAP.map(([lab, n, types]) => {
+            const has = (n || 0) > 0;
+            return (
+              <button key={lab} onClick={() => has && drillTypes(lab, types)} disabled={!has} className={TAP} style={{ textAlign: 'left', cursor: has ? 'pointer' : 'default', borderRadius: 12, border: '1px solid ' + (has ? '#f0e2c4' : LINE), background: has ? '#fffdf7' : '#fff', padding: '13px 14px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ fontSize: 23, fontWeight: 800, color: has ? AMBER : GREEN }}>{n || 0}</div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: DIM, lineHeight: 1.3 }}>{lab}</div>
+              </button>
+            );
+          })}
         </div>
 
         {/* Trend */}
@@ -290,7 +341,7 @@ export function AlertsDashboard({ branch, setRoute }) {
   };
 
   return (
-    <PageLayout maxWidth="mx-auto max-w-[1100px]">
+    <PageLayout>
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
         <div>
@@ -339,33 +390,39 @@ export function AlertsDashboard({ branch, setRoute }) {
           {/* ── Open Issues ── */}
           {!q.isLoading && !q.isError && tab === 'open' && (
             <>
-              <div className="grid grid-cols-2 gap-2.5 tablet:grid-cols-4" style={{ marginBottom: 12 }}>
+              {typeSel && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12, borderRadius: 9, border: '1px solid #d6e4ff', background: '#f0f6ff', padding: '10px 14px' }}>
+                  <span style={{ fontSize: 12.5, color: DARK }}>Showing issues behind <b>{typeSel.label}</b> — <b>{openRows.length}</b> found</span>
+                  <button onClick={() => setTypeSel(null)} className={TAP} style={{ marginLeft: 'auto', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#2563eb', background: '#fff', border: '1px solid #d6e4ff', borderRadius: 7, padding: '5px 11px' }}>Show all open issues ✕</button>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3 tablet:grid-cols-4" style={{ marginBottom: 12 }}>
                 {SEV_CARDS.map(([k, lab, n, bg, color]) => {
-                  const active = sev === k;
+                  const active = sev === k && !typeSel;
                   return (
-                    <button key={k} onClick={() => setSev(k)} aria-pressed={active} className={TAP}
-                      style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 10, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 3, background: active ? bg : '#fff', border: '1px solid ' + (active ? color : LINE), boxShadow: active ? `inset 0 0 0 1px ${color}` : 'none' }}>
-                      <span style={{ fontSize: 21, fontWeight: 800, lineHeight: 1, color: k === 'all' ? DARK : color }}>{n}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: DIM }}>{lab}</span>
+                    <button key={k} onClick={() => pickSev(k)} aria-pressed={active} className={TAP}
+                      style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 4, background: active ? bg : '#fff', border: '1px solid ' + (active ? color : LINE), boxShadow: active ? `inset 0 0 0 1px ${color}` : 'none' }}>
+                      <span style={{ fontSize: 26, fontWeight: 800, lineHeight: 1, color: k === 'all' ? DARK : color }}>{n}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: DIM }}>{lab}</span>
                     </button>
                   );
                 })}
               </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 6 }}>
                 {domainOpts.map(([k, lab, n]) => (
-                  <span key={k} {...clickable(() => setDomain(k))} className={TAP_CHIP} style={chip(activeDomain === k, '#eef0f3', DARK)}>{lab}<span style={{ marginLeft: 5, opacity: 0.55 }}>{n}</span></span>
+                  <span key={k} {...clickable(() => pickDomain(k))} className={TAP_CHIP} style={chip(activeDomain === k && !typeSel, '#eef0f3', DARK)}>{lab}<span style={{ marginLeft: 5, opacity: 0.55 }}>{n}</span></span>
                 ))}
               </div>
               {groups.length === 0
                 ? <div className="rounded-brand border border-surface-border bg-surface p-[30px] text-center text-ink-muted shadow-card" style={{ marginTop: 8 }}>✓ All clear — no open issues for {code}.</div>
                 : groups.map((g) => (
-                  <section key={g.key} style={{ marginBottom: 2 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 2px 8px' }}>
-                      <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', color: DIM }}>{g.label}</span>
-                      <span style={{ fontSize: 10, fontWeight: 800, color: DIM, background: '#eef0f3', borderRadius: 999, padding: '1px 7px' }}>{g.items.length}</span>
+                  <section key={g.key} style={{ marginBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '18px 2px 10px' }}>
+                      <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', color: DIM }}>{g.label}</span>
+                      <span style={{ fontSize: 10.5, fontWeight: 800, color: DIM, background: '#eef0f3', borderRadius: 999, padding: '1px 8px' }}>{g.items.length}</span>
                       <span style={{ flex: 1, height: 1, background: LINE }} />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{g.items.map((a) => renderOpenCard(a))}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{g.items.map((a) => renderOpenCard(a))}</div>
                   </section>
                 ))}
             </>

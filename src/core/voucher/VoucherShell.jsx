@@ -112,10 +112,10 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
       .ve h1{font-size:16px;margin:0 0 2px}
       .ve .meta{font-size:10.5px;color:#5a6691;margin:0 0 4px}
       .ve table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:8px}
-      .ve th{background:#0d1326;color:#d4a437;text-align:left;padding:6px 8px;font-size:9.5px}
+      .ve th{background:#141414;color:#A07828;text-align:left;padding:6px 8px;font-size:9.5px}
       .ve th.r,.ve td.r{text-align:right}
       .ve td{padding:5px 8px;border-bottom:1px solid #eceef4}
-      .ve tfoot td{background:#f3f5f9;font-weight:800;border-top:2px solid #0d1326}
+      .ve tfoot td{background:#FBF3DE;font-weight:800;border-top:2px solid #A07828}
     </style>
     <div class="ve">
       <h1>${escHtml(desc.label)} — ${escHtml(isEdit ? (voucher.vno || '') : 'New')}</h1>
@@ -132,9 +132,9 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
 
   // ── shared live journal table ──────────────────────────────────────
   const journalTable = (
-    <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+    <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #E8D9A8', background: '#FFFDF7' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Accounting Effect — Full Journal (where this hits the books)</div>
+        <div style={{ fontWeight: 700, color: '#6B4E0F', fontSize: 12 }}>Accounting Effect — Full Journal (where this hits the books)</div>
         <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.error ? '⚠ ' + pv.error : pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
       </div>
       {pv.missing?.length > 0 && (
@@ -179,7 +179,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
         {!isEdit && <button onClick={reset} className="max-tablet:min-h-[44px]" style={btnGh}>Reset</button>}
         {isEdit && <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={btnGh}>Back</button>}
-        <button onClick={save} disabled={!canSave} title={viewOnly ? 'View only — changes are not allowed' : 'Save (Ctrl/Cmd+Enter)'} className="max-tablet:min-h-[44px]" style={{ ...btnG, background: canSave ? '#2563eb' : '#cbd0db', opacity: canSave ? 1 : 0.6, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+        <button onClick={save} disabled={!canSave} title={viewOnly ? 'View only — changes are not allowed' : 'Save (Ctrl/Cmd+Enter)'} className="max-tablet:min-h-[44px]" style={{ ...btnG, background: canSave ? '#A07828' : '#cbd0db', opacity: canSave ? 1 : 0.6, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           {desc.icon} Save Voucher {saving ? '…' : val.hint} {!saving && <Kbd>⌃↵</Kbd>}
         </button>
       </div>

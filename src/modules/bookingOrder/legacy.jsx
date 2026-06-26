@@ -41,7 +41,10 @@ import {
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
 import { invalidateBooks } from '../../core/useAccounting';
 
-const GOLD = '#c2a04a', DARK = '#1a1c22', DR = '#16a34a', CR = '#dc2626', BLUE = '#2563eb';
+const GOLD = '#A07828', DARK = '#141414', DR = '#16a34a', CR = '#dc2626', BLUE = '#2563eb';
+// Gold theme tokens + per-section bar accents (SO / PO / GP voucher theme).
+const GOLD_DEEP = '#6B4E0F', GOLD_SOFT = '#FBF3DE', GOLD_LINE = '#E8D9A8';
+const SO_BAR = '#1D4E89', PO_BAR = '#8A1F3D', GP_BAR = GOLD;
 // Reversal modules (Refund / Reissue) act on an existing sale — picked from the same
 // module bar as Flight/Hotel, but they open the reversal entry (ReversalEntry) instead
 // of the fare grid and spawn one RF/RI voucher on approval.
@@ -556,7 +559,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
       {/* Header */}
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
-        <div style={{ padding: '14px 18px', background: DARK, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : 'SO / PO / GP VOUCHER'}</p>
             <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#9197a3' }}>
@@ -577,12 +580,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           </div>
         </div>
         {/* Link band */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: '#1b2138' }}>
-          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#C49A3C', textTransform: 'uppercase' }}>Link No</span>
-          <span style={{ padding: '5px 12px', borderRadius: 4, background: '#11162a', color: '#fff', fontWeight: 800, letterSpacing: '.5px', fontFamily: 'monospace', fontSize: 13 }}>Auto · assigned on save</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: '#1f1f1f' }}>
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: GOLD, textTransform: 'uppercase' }}>Link No</span>
+          <span style={{ padding: '5px 12px', borderRadius: 4, background: GOLD_SOFT, color: GOLD_DEEP, fontWeight: 800, letterSpacing: '.5px', fontFamily: 'monospace', fontSize: 13 }}>Auto · assigned on save</span>
           <span style={{ fontSize: 10.5, color: '#9197a3', fontStyle: 'italic' }}>links the Sales Order, Purchase Order &amp; Gross Profit of this invoice</span>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            {['SO', 'PO', 'GP'].map((c) => <span key={c} style={{ fontSize: 9, fontWeight: 800, padding: '3px 9px', borderRadius: 20, background: '#262c47', color: '#C49A3C' }}>{c}</span>)}
+            {['SO', 'PO', 'GP'].map((c) => <span key={c} style={{ fontSize: 9, fontWeight: 800, padding: '3px 9px', borderRadius: 20, background: GOLD_SOFT, color: GOLD_DEEP }}>{c}</span>)}
           </span>
         </div>
       </div>
@@ -726,7 +729,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       </div>
 
       {/* ① Sales Order */}
-      <Section n="1" name="Sales Order" sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · Service Charge - 2 is GST-inclusive'} accent={BLUE}>
+      <Section n="1" badge="SO" name="Sales Order" sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · Service Charge - 2 is GST-inclusive'} accent={SO_BAR}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
             <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
@@ -779,7 +782,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {/* ② Purchase Order — hidden in no-supplier mode (there's no cost leg). */}
       {!isNoSupp && (
-      <Section n="2" name="Purchase Order" sub="what you pay the airline / supplier · supplier incentive is automatically subtracted, 2% TDS is added" accent={CR}>
+      <Section n="2" badge="PO" name="Purchase Order" sub="what you pay the airline / supplier · supplier incentive is automatically subtracted, 2% TDS is added" accent={PO_BAR}>
         {!editing && (openInbQ.data || []).length > 0 && (
           <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: CR }}>Fetch open INB:</span>
@@ -851,11 +854,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       )}
 
       {/* ③ Gross Profit */}
-      <Section n="3" name="Gross Profit" sub="GP = net sales − net purchase · % on final sales value" accent={DR}>
+      <Section n="3" badge="GP" name="Gross Profit" sub="GP = net sales − net purchase · % on final sales value" accent={GP_BAR}>
         <div className="mb-3 grid grid-cols-1 gap-3 tablet:grid-cols-3">
-          <GpCard k={'Total Sales (incl GST' + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(totals.so.total)} color={DARK} />
-          <GpCard k="Total Purchase (incl GST)" v={cur + ' ' + fmt(totals.po.total)} color={CR} />
-          <GpCard k="Gross Profit" v={cur + ' ' + fmt(totals.gp.total)} color={DR} pct={totals.gp.pct + '% margin'} />
+          <GpCard k={'Total Sales (incl GST' + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(totals.so.total)} color={DARK} bg="#FFFDF7" />
+          <GpCard k="Total Purchase (incl GST)" v={cur + ' ' + fmt(totals.po.total)} color={CR} bg="#FFFAEC" />
+          <GpCard k="Gross Profit" v={cur + ' ' + fmt(totals.gp.total)} color={DR} pct={totals.gp.pct + '% margin'} bg="#FCF3DE" />
         </div>
         {totals.so.tcs > 0 && (
           <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 7, background: '#FFF7E6', border: '1px solid #F0C36D', color: '#7a5b12', fontSize: 11.5 }}>
@@ -999,7 +1002,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
   return (
     <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
-        <div style={{ padding: '14px 18px', background: DARK, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : (kind === 'refund' ? 'REFUND VOUCHER' : 'REISSUE VOUCHER')}</p>
             <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#9197a3' }}>{editing
@@ -1039,25 +1042,25 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
   );
 }
 
-function Section({ n, name, sub, accent, children }) {
+function Section({ n, name, sub, accent, badge, children }) {
   return (
-    <div style={{ ...card, marginBottom: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <span style={{ width: 24, height: 24, borderRadius: '50%', background: DARK, color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{n}</span>
-        <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.5px', color: accent, textTransform: 'uppercase' }}>{name}</span>
-        <span style={{ fontSize: 10.5, color: '#9A9A9A', fontStyle: 'italic' }}>{sub}</span>
+    <div style={{ background: '#fff', border: '1.5px solid ' + accent, borderRadius: 8, overflow: 'hidden', marginBottom: 14, boxShadow: '0 1px 3px rgba(0,0,0,.05)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '8px 14px', background: accent, color: '#fff' }}>
+        <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '1px', padding: '3px 9px', borderRadius: 4, background: 'rgba(255,255,255,.24)' }}>{badge || n}</span>
+        <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '2.5px', textTransform: 'uppercase' }}>{name}</span>
+        <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,.92)', marginLeft: 'auto', fontStyle: 'italic' }}>{sub}</span>
       </div>
-      {children}
+      <div style={{ padding: '14px 16px' }}>{children}</div>
     </div>
   );
 }
 
-function GpCard({ k, v, color, pct }) {
+function GpCard({ k, v, color, pct, bg = '#FFFDF7' }) {
   return (
-    <div style={{ border: '1px solid #e8e2d2', borderRadius: 8, padding: '12px 14px', background: '#faf7ef' }}>
-      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.7px', color: '#9A9A9A', textTransform: 'uppercase' }}>{k}</div>
+    <div style={{ border: '1px solid #F0E4C2', borderRadius: 8, padding: '12px 14px', background: bg }}>
+      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.7px', color: '#9A8138', textTransform: 'uppercase' }}>{k}</div>
       <div style={{ fontSize: 20, fontWeight: 800, marginTop: 4, color }}>{v}</div>
-      {pct && <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginTop: 2 }}>{pct}</div>}
+      {pct && <div style={{ fontSize: 12, fontWeight: 700, color: GOLD_DEEP, marginTop: 2 }}>{pct}</div>}
     </div>
   );
 }

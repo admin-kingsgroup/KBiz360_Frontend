@@ -15,8 +15,8 @@ import { normalizeTrialBalanceRow, trialBalanceTotals, toVoucherRegisterRow } fr
  * flag derived from the FULL set (so a search filter can never falsely report
  * "out of balance").
  */
-export const loadTrialBalance = async ({ branch, from, to } = {}) => {
-  const data = await api.getTrialBalance({ branch, from, to });
+export const loadTrialBalance = async ({ branch, from, to, includeZero } = {}) => {
+  const data = await api.getTrialBalance({ branch, from, to, includeZero });
   const rows = (data?.rows || []).map(normalizeTrialBalanceRow);
   const totals = trialBalanceTotals(rows);
 

@@ -13,5 +13,5 @@ import { apiGet } from '../../../core/api';
  * api/ modules return plain data and never transform — normalisation happens in
  * the service. `branch` is the backend branch code (or undefined for ALL).
  */
-export const getTrialBalance = ({ branch, from, to } = {}) =>
-  apiGet('/api/accounting/trial-balance', { branch, from, to });
+export const getTrialBalance = ({ branch, from, to, includeZero } = {}) =>
+  apiGet('/api/accounting/trial-balance', { branch, from, to, includeZero: includeZero || undefined });

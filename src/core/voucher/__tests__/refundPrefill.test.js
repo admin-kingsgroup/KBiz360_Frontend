@@ -26,12 +26,17 @@ describe('refundPrefillFromBooking', () => {
     expect(p.supplierAmt).toBe(79410); // 80000 - 500 - 90
   });
 
-  test('fills Other Taxes from the SO markup and the full commission reversal', () => {
-    const p = refundPrefillFromBooking(BOOKING, {});
-    expect(p.markup).toBe(120);          // Our Other Taxes ← SO markup
+  test('REFUND does NOT retain the SO SVC2 (markup blank — it is refunded to the client in full)', () => {
+    const p = refundPrefillFromBooking(BOOKING, {});       // isRefund defaults true
+    expect(p.markup).toBe('');           // SO SVC2 returns to the client, never re-billed
     expect(p.incentiveAmt).toBe(1275);   // Commission clawback ← PO incentive
     expect(p.incentiveGst).toBe('');     // 0 → blank (keeps 0.00 placeholder)
     expect(p.incentiveTds).toBe(25.5);
+  });
+
+  test('REISSUE carries the SO SVC2 margin over to the amendment (markup ← SO markup)', () => {
+    const p = refundPrefillFromBooking(BOOKING, {}, false); // isRefund = false
+    expect(p.markup).toBe(120);
   });
 
   test('Commission Reversal OFF → clawback / GST / TDS are NOT filled (blank)', () => {
@@ -39,9 +44,9 @@ describe('refundPrefillFromBooking', () => {
     expect(p.incentiveAmt).toBe('');
     expect(p.incentiveGst).toBe('');
     expect(p.incentiveTds).toBe('');
-    // the rest still fills
+    // the rest still fills (refund: markup blank)
     expect(p.supplierAmt).toBe(74227);
-    expect(p.markup).toBe(120);
+    expect(p.markup).toBe('');
   });
 
   test('Commission Reversal default / Yes → clawback fills as before', () => {
