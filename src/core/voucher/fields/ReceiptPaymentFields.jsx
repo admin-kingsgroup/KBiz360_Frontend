@@ -69,7 +69,7 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
   const mob = false;
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: 14, paddingTop: 10 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <FL label="Date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
           <FL label={isReceipt ? 'Received from (account credited — Cr)' : 'Paid to (account debited — Dr)'}>
@@ -134,7 +134,7 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
       />
       )}
 
-      <FL label="Narration"><textarea value={state.remarks || ''} onChange={(e) => patch({ remarks: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder={state.party ? `Being ${isReceipt ? 'receipt from' : 'payment to'} ${state.party}` : 'Accounting narration...'} /></FL>
+      <div style={{ marginTop: 11 }}><FL label="Narration"><textarea value={state.remarks || ''} onChange={(e) => patch({ remarks: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder={state.party ? `Being ${isReceipt ? 'receipt from' : 'payment to'} ${state.party}` : 'Accounting narration...'} /></FL></div>
     </>
   );
 }

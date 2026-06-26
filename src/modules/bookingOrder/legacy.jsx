@@ -132,7 +132,7 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange })
   const add = () => onChange([...legs, newLeg(allowed[0])]);
   const cell = { width: 90, padding: '5px 7px', border: '1px solid #e1e3ec', borderRadius: 5, fontSize: 12 };
   return (
-    <div style={{ ...card, marginTop: 14, borderColor: '#cdb46a' }}>
+    <div style={{ ...card, marginTop: 14, marginBottom: 14, borderColor: '#cdb46a' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <strong style={{ fontSize: 13, color: '#6b5a1e' }}>➕ Additional Purchases (N-PO)</strong>
         <span style={{ fontSize: 11, color: '#9A9A9A' }}>{parentModule === 'SF' ? 'Flight may add a Misc cost leg' : 'Holiday package — add any component (flight/hotel/car/visa/insurance/misc)'} · one Link No, separate supplier invoice each</span>
@@ -525,24 +525,24 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // read-only ("fetched & locked") on the Sales grid.
   const sectorBlock = (l, li, readOnly, colSpan) => (
     <tr key={'sec-' + li}>
-      <td colSpan={colSpan} style={{ padding: '2px 6px 8px 26px', background: readOnly ? '#faf7ef' : '#fbfcff', borderBottom: '1px solid #eef0f5' }}>
-        <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: '.3px', color: '#9A9A9A', textTransform: 'uppercase', margin: '2px 0' }}>{readOnly ? '▣ Sectors — from Purchase (locked)' : '✎ Sectors — enter each segment'}</div>
+      <td colSpan={colSpan} style={{ padding: '8px 6px 8px 26px', background: readOnly ? '#faf7ef' : '#fbfcff', borderBottom: '1px solid #eef0f5' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.3px', color: '#5b616e', textTransform: 'uppercase', margin: '6px 0' }}>{readOnly ? 'Sectors — from Purchase (locked)' : 'Sectors — enter each segment'}</div>
         <table style={{ borderCollapse: 'collapse' }}>
           <thead><tr>
-            {spec.sectorCols.map((sc) => <th key={sc.key} style={{ ...thA, ...thL, fontSize: 8.5, padding: '3px 6px' }}>{sc.label}</th>)}
+            {spec.sectorCols.map((sc) => <th key={sc.key} style={{ ...thA, ...thL, fontSize: 8.5, padding: '4px 16px' }}>{sc.label}</th>)}
             {!readOnly && <th style={{ ...thA, width: 26 }} />}
           </tr></thead>
           <tbody>
             {(l.sectors || []).map((s, si) => (
               <tr key={si}>
                 {spec.sectorCols.map((sc) => (
-                  <td key={sc.key} style={{ padding: 2 }}>
+                  <td key={sc.key} style={{ padding: '6px 16px' }}>
                     {readOnly
-                      ? <span style={{ fontSize: 11, fontWeight: 600, color: sc.kind === 'pnr' ? GOLD : '#3A3A3A' }}>{s[sc.key] || '—'}</span>
-                      : <input type={sc.type === 'date' ? 'date' : 'text'} value={s[sc.key] ?? ''} onChange={(e) => setSec(li, si, sc.key, e.target.value)} style={{ ...cellTxt, width: sc.type === 'date' ? 124 : 92, color: sc.kind === 'pnr' ? GOLD : DARK }} />}
+                      ? <span style={{ fontSize: 11, fontWeight: 600, color: s[sc.key] ? (sc.kind === 'pnr' ? GOLD : '#3A3A3A') : '#b9b9b9', fontStyle: s[sc.key] ? 'normal' : 'italic' }}>{s[sc.key] || `No ${sc.label}`}</span>
+                      : <input type={sc.type === 'date' ? 'date' : 'text'} value={s[sc.key] ?? ''} onChange={(e) => setSec(li, si, sc.key, e.target.value)} style={{ ...cellTxt, width: sc.type === 'date' ? 140 : 110, color: sc.kind === 'pnr' ? GOLD : DARK }} />}
                   </td>
                 ))}
-                {!readOnly && <td style={{ padding: 2, textAlign: 'center' }}><button onClick={() => delSec(li, si)} title="Remove sector" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={12} /></button></td>}
+                {!readOnly && <td style={{ padding: '6px 16px', textAlign: 'center' }}><button onClick={() => delSec(li, si)} title="Remove sector" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={12} /></button></td>}
               </tr>
             ))}
           </tbody>
@@ -667,7 +667,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <FL label="Travel / Departure Date"><SmartDateInput value={travelDate} onChange={setTravelDate} min={editing ? undefined : todayISO()} style={inp} title="When the customer travels (no past dates) — type e.g. 20.03.2026 → 20/03/2026; drives the Upcoming Travel dashboard" /></FL>
           <FL label="Client Type">
             <select value={clientType} onChange={(e) => handleClientTypeChange(e.target.value)} style={inp}>
-              <option value="">— All Client Types —</option>
+              <option value="">All Client Types</option>
               {clientTypes.map((ct) => (
                 <option key={ct} value={ct}>{ct}</option>
               ))}
@@ -677,16 +677,15 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
           )}
           {interBranch ? (
-            <FL label="To Branch (counterparty) *">
+            <FL label={<>To Branch (counterparty) <span style={{ color: '#dc2626' }}>*</span></>}>
               <select value={toBranch} onChange={(e) => {
                 const tb = e.target.value;
                 setToBranch(tb);
                 if (tb) { setCustomer((c) => ({ ...c, name: `Travkings Tours and Travels ${tb}`, ledgerName: `Travkings Tours and Travels ${tb}`, ledgerGroup: 'Sundry Debtors', group: 'Sundry Debtors' })); setSaleGstMode(inbCrossBorder(brCode, tb) ? 'inter' : 'inter'); }
-              }} style={{ ...inp, ...(toBranch ? {} : { borderColor: '#dc2626' }) }}>
-                <option value="">— Select branch —</option>
+              }} style={inp}>
+                <option value="">Select branch</option>
                 {inbBranches.map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
-              {!toBranch && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — the branch you're selling to</span>}
             </FL>
           ) : (
           <FL label="Client Ledger *">
@@ -700,24 +699,21 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 });
                 if (v.group) setClientType(v.group);
               }} />
-            {!hasCustLedger && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — pick the Client Ledger to post & follow for payment</span>}
           </FL>
           )}
           {isB2C && (
             <FL label="Customer (Bill to) — free text *">
               <input value={customer.name} onChange={(e) => setCustomer((c) => ({ ...c, name: e.target.value }))} placeholder="End-customer name (B2C)" style={inp} />
-              {!customer.name.trim() && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — type the end customer's name for the invoice</span>}
+              {!customer.name.trim()}
             </FL>
           )}
           <FL label="Sale GST mode"><select value={saleGstMode} onChange={(e) => setSaleGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
           {!isNoSupp && !interBranch && <FL label="Supplier ledger (Pay to) *">
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
               onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
-            {!hasSuppLedger && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — pick the Creditor ledger to post & pay against</span>}
           </FL>}
           {!isNoSupp && <FL label="Purchase GST mode"><select value={purGstMode} onChange={(e) => setPurGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>}
-          {hasPackage && <FL label="Package type *"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={{ ...inp, ...(packageType ? {} : { borderColor: '#dc2626' }) }}><option value="">— Select International / Domestic —</option><option value="Domestic">Domestic</option><option value="International">International</option></select>
-            {!packageType && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — sets the cost centre (Int'l/Domestic GP). Must be picked before approving.</span>}
+          {hasPackage && <FL label="Package type *"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={{ ...inp, paddingRight: 26 }}><option value="">Select International / Domestic</option><option value="Domestic">Domestic</option><option value="International">International</option></select>
           </FL>}
         </div>
       </div>
@@ -735,9 +731,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
             <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
               {spec.idCols.map((c) => <th key={c.key} style={{ ...thM, ...thL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
-              {spec.fareCols.map((c) => <th key={c.key} style={{ ...thA, width: 95 }}>{c.label}</th>)}
-              {!interBranch && <th style={{ ...thM, width: 95 }}>Service Charge - 2</th>}{!pkg && <th style={{ ...thM, width: 95 }}>Service Fee</th>}
-              {!pkg && <th style={{ ...thA, width: 95 }}>GST/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...thA, width: 95 }}>GST/Service Charge - 2 ({pkg ? 5 : activeRate}%)</th>}<th style={{ ...thA, width: 110 }}>Total</th><th style={{ ...thA, width: 45 }}></th>
+              {spec.fareCols.map((c) => <th key={c.key} style={{ ...thA, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
+              {!interBranch && <th style={{ ...thM, width: 95, whiteSpace: 'normal' }}>Service Charge - 2</th>}{!pkg && <th style={{ ...thM, width: 95, whiteSpace: 'normal' }}>Service Fee</th>}
+              {!pkg && <th style={{ ...thA, width: 95, whiteSpace: 'normal' }}>GST/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...thA, width: 95, whiteSpace: 'normal' }}>GST/Service Charge - 2 ({pkg ? 5 : activeRate}%)</th>}<th style={{ ...thA, width: 110, whiteSpace: 'normal' }}>Total</th><th style={{ ...thA, width: 45 }}></th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -746,17 +742,17 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                   <React.Fragment key={i}>
                   <tr>
                     {spec.idCols.map((col) => (
-                      <td key={col.key} style={{ ...tdC, textAlign: 'left', padding: 3, width: col.key === 'fn' || col.key === 'sn' ? 140 : 120 }}>
+                      <td key={col.key} style={{ ...tdC, textAlign: 'left', padding: 3, width: col.key === 'fn' || col.key === 'sn' ? 140 : 120, ...(spec.sectors ? { background: '#faf7ef' } : {}) }}>
                         {spec.sectors
-                          ? <span style={{ fontSize: 11.5, fontWeight: 600, color: DARK }}>{l[col.key] || '—'}</span>
+                          ? <span style={{ fontSize: 11.5, fontWeight: 600, color: l[col.key] ? DARK : '#b9b9b9', fontStyle: l[col.key] ? 'normal' : 'italic' }}>{l[col.key] || `No ${col.label}`}</span>
                           : <input value={l[col.key] ?? ''} onChange={(e) => setLine(i, col.key, e.target.value)} style={{ ...cellTxt, color: col.kind === 'pnr' ? GOLD : DARK }} />}
                       </td>
                     ))}
                     {spec.fareCols.map((col) => (isNoSupp
                       ? <td key={col.key} style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>
                       : <td key={col.key} style={{ ...tdAuto, width: 95 }}>{fmt(l[col.key])}</td>))}
-                    {!interBranch && <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.markup ?? ''} placeholder="0" onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>}
-                    {!pkg && <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.ssvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
+                    {!interBranch && <td style={{ padding: 3, width: 95, background: '#faf7ef' }}><input type="number" min="0" value={l.markup ?? ''} placeholder="0" onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>}
+                    {!pkg && <td style={{ padding: 3, width: 95, background: '#faf7ef' }}><input type="number" min="0" value={l.ssvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
                     {!pkg && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstSvc)}</td>}
                     {!interBranch && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstMk)}</td>}
                     <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef', width: 110 }}>{fmt(c.finalSales)}</td>
@@ -816,17 +812,17 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 return (
                   <React.Fragment key={i}>
                   <tr>
-                    <td style={{ ...tdC, textAlign: 'left', padding: 3, width: 140 }}><input value={l.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} style={cellTxt} /></td>
-                    <td style={{ ...tdC, textAlign: 'left', padding: 3, width: 140 }}><input value={l.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} style={cellTxt} /></td>
-                    {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A', width: 120 }}>{l[col.key] || '—'}</td>)}
-                    {spec.fareCols.map((col) => <td key={col.key} style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
-                    <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} /></td>
+                    <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} style={cellTxt} /></td>
+                    <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} style={cellTxt} /></td>
+                    {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A', width: 120, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{l[col.key] || '—'}</td>)}
+                    {spec.fareCols.map((col) => <td key={col.key} style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
+                    <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} /></td>
                     {pkg
-                      ? <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} /></td>
-                      : <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstPur)}</td>}
-                    <td style={{ padding: 3, width: 100 }}><input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} /></td>
-                    <td style={{ ...tdAuto, width: 85 }}>{fmt(c.tds)}</td>
-                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef', width: 110 }}>{fmt(c.finalPurchase)}</td>
+                      ? <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} /></td>
+                      : <td style={{ ...tdAuto, width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.gstPur)}</td>}
+                    <td style={{ padding: '6px 3px', width: 100, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} /></td>
+                    <td style={{ ...tdAuto, width: 85, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.tds)}</td>
+                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef', width: 110, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.finalPurchase)}</td>
                   </tr>
                   {spec.sectors && sectorBlock(l, i, false, poCols)}
                   </React.Fragment>
