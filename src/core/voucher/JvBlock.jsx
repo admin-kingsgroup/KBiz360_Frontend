@@ -20,7 +20,7 @@ const r2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
 
 const HEAD = { padding: '3px 8px', fontSize: 9.5, fontWeight: 700, color: '#5a6691', background: '#eef1f7', letterSpacing: '0.3px' };
 const FOOT = { borderTop: '1px solid #e6e8ec', padding: '4px 8px', display: 'flex', justifyContent: 'space-between', fontWeight: 800, background: '#fafbfd' };
-const DR = '#185FA5', CR = '#A32D2D';
+const DR = '#1A7A42', CR = '#C0392B';
 
 function Leg({ p, side }) {
   return (

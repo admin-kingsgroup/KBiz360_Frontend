@@ -52,6 +52,19 @@ describe('Accounts voucher chrome (VWrap / VoucherShell)', () => {
   test('printed voucher header is dark/gold', () => {
     expect(shell).toContain('background:#141414;color:#A07828');
   });
+
+  test('EDIT opens the same themed window as CREATE (shared editFrame chrome)', () => {
+    // Edit must no longer render the old bare "<div style={{ padding: 14 }}>" header.
+    expect(shell).toContain('const editFrame = (children) =>');
+    // Dark/gold header + gold left border, identical tokens to the create VWrap.
+    expect(shell).toContain("borderLeft: '4px solid #A07828'");
+    expect(shell).toMatch(/background: '#141414', borderBottom: '3px solid #A07828'/);
+    // Both the editable form and the post-save panel reuse the frame.
+    expect(shell).toContain('return editFrame(doneInner)');
+    expect(shell).toMatch(/return editFrame\(\s*<div style=\{\{ padding: '14px 16px' \}\}/);
+    // The stripped-down bare edit header is gone.
+    expect(shell).not.toContain('<div style={{ padding: 14 }}>');
+  });
 });
 
 describe('SO / PO / GP booking voucher (legacy.jsx)', () => {
@@ -89,5 +102,29 @@ describe('SO / PO / GP booking voucher (legacy.jsx)', () => {
   test('GP margin % uses gold-deep accent', () => {
     expect(legacy).toContain(`color: GOLD_DEEP`);
     expect(GOLD_DEEP).toBe('#6B4E0F');
+  });
+
+  test('exact HTML match — muted Dr/Cr + section-tinted tables + 26px GP', () => {
+    // Dr green / Cr red are the template's muted hexes, not the app's bright ones.
+    expect(legacy).toContain("DR = '#1A7A42', CR = '#C0392B'");
+    // SO headers/totals carry blue; PO carry maroon (section colour into the table).
+    expect(legacy).toContain("color: SO_BAR, background: '#EAF1F9'");
+    expect(legacy).toContain("color: SO_BAR, borderTop: '2px solid ' + SO_BAR"); // soTf
+    expect(legacy).toContain("color: PO_BAR, background: '#F9E8EE'");
+    expect(legacy).toContain("color: PO_BAR, borderTop: '2px solid ' + PO_BAR"); // poTf
+    // Net SALE column green, NET COST column red.
+    expect(legacy).toContain('color: DR, background: \'#faf7ef\'');
+    expect(legacy).toContain('color: CR, background: \'#faf7ef\'');
+    // GP value 26px + Helvetica font on the voucher container.
+    expect(legacy).toContain('fontSize: 26, fontWeight: 800');
+    expect(legacy).toContain("fontFamily: HELV");
+  });
+});
+
+describe('Shared journal (JvBlock) Dr/Cr', () => {
+  const jv = read('core/voucher/JvBlock.jsx');
+  test('uses the template green/red (Dr #1A7A42, Cr #C0392B)', () => {
+    expect(jv).toContain("const DR = '#1A7A42', CR = '#C0392B'");
+    expect(jv).not.toContain('#185FA5'); // old blue Dr gone
   });
 });

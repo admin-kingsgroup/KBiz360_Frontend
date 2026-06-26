@@ -7,7 +7,7 @@ import React, { useRef, useState, useEffect, Suspense } from 'react';
 import { Calendar, ChevronRight, Clock, Download, Plus, Save, Search, Trash2, TrendingDown, TrendingUp, User } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from './business-logic';
-import { FX_RATES, INTERBRANCH_ELIMINATIONS, PURCHASE_REGISTRY, TAX_FILING_BOARD, YIELD_BY_CONSULTANT, YIELD_BY_DESTINATION, YIELD_BY_SUPPLIER, YOY_PL } from './data';
+import { FX_RATES, PURCHASE_REGISTRY, TAX_FILING_BOARD } from './data';
 import { branchCfg } from './referenceCache';
 import { useSalespeople } from './useReference';
 import { useQuery } from '@tanstack/react-query';
@@ -228,7 +228,7 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
   const brFlag=branch==="ALL"?"🌐":branch?.flag||"🇮🇳";
   const brCode=branch==="ALL"?"ALL":branch?.code||"BOM";
   return (
-    <div style={{padding:"12px 10px",maxWidth:1160,margin:"0 auto",paddingBottom:80}}>
+    <div style={{padding:"12px 10px",maxWidth:1160,margin:"0 auto",paddingBottom:80,fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif"}}>
       <div style={{background:"#fff",border:"1px solid #e1e3ec",borderLeft:"4px solid #A07828",borderRadius:12,overflow:"hidden",boxShadow:"0 3px 16px rgba(0,0,0,.08)"}}>
 
         {/* Voucher header bar */}

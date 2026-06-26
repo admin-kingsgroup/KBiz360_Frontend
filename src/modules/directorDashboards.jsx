@@ -680,7 +680,9 @@ export function TargetsMaster({ branch }) {
   const [fy, setFy] = useState(fyStr());
   const [metric, setMetric] = useState('sales');
   const [draft, setDraft] = useState({});
-  const cur = '₹';
+  // Currency follows the branch picked in THIS screen's dropdown (brCode), not the
+  // global branch — USD branches (NBO/DAR/FBM) must show $ in the target header.
+  const cur = (branchList().find((b) => b.code === brCode) || {}).cur || '₹';
   const q = useSalesTargets({ code: brCode }, fy, metric);
   const save = useSaveTargets();
   const existing = {}; (q.data || []).forEach((t) => { if ((t.month || 0) === 0) existing[t.module || ''] = t.amount; });

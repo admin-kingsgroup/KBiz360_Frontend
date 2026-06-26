@@ -41,9 +41,10 @@ import {
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
 import { invalidateBooks } from '../../core/useAccounting';
 
-const GOLD = '#A07828', DARK = '#141414', DR = '#16a34a', CR = '#dc2626', BLUE = '#2563eb';
+const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', CR = '#C0392B', BLUE = '#2563eb';
 // Gold theme tokens + per-section bar accents (SO / PO / GP voucher theme).
 const GOLD_DEEP = '#6B4E0F', GOLD_SOFT = '#FBF3DE', GOLD_LINE = '#E8D9A8';
+const HELV = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 const SO_BAR = '#1D4E89', PO_BAR = '#8A1F3D', GP_BAR = GOLD;
 // Reversal modules (Refund / Reissue) act on an existing sale — picked from the same
 // module bar as Flight/Hotel, but they open the reversal entry (ReversalEntry) instead
@@ -66,6 +67,15 @@ const tdTot = { ...tdC, fontWeight: 800, color: DARK };
 const cellInp = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'right', border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s' };
 const cellTxt = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'left', border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', fontFamily: 'inherit', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' };
 const tfTd = { borderTop: '2px solid ' + DARK, padding: '10px 8px', fontWeight: 800, fontSize: 12, background: '#f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: DARK };
+// Per-section column-header + total-row styles — the section colour carries INTO
+// the table (SO blue, PO maroon), matching the SO/PO/GP voucher theme.
+const thBaseHdr = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: 'right' };
+const soHdr = { ...thBaseHdr, color: SO_BAR, background: '#EAF1F9', borderBottom: '2px solid ' + SO_BAR };
+const soHdrL = { ...soHdr, textAlign: 'left' };
+const poHdr = { ...thBaseHdr, color: PO_BAR, background: '#F9E8EE', borderBottom: '2px solid ' + PO_BAR };
+const poHdrL = { ...poHdr, textAlign: 'left' };
+const soTf = { ...tfTd, background: '#DCE8F4', color: SO_BAR, borderTop: '2px solid ' + SO_BAR };
+const poTf = { ...tfTd, background: '#F2D8E0', color: PO_BAR, borderTop: '2px solid ' + PO_BAR };
 
 /* ════════════════════════════════════════════════════════════════════════════
    SO / PO / GP Voucher entry
@@ -556,7 +566,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   );
 
   return (
-    <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
+    <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV }}>
       {/* Header */}
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
         <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
@@ -736,11 +746,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       <Section n="1" badge="SO" name="Sales Order" sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · Service Charge - 2 is GST-inclusive'} accent={SO_BAR}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
-            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-              {spec.idCols.map((c) => <th key={c.key} style={{ ...thM, ...thL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
-              {spec.fareCols.map((c) => <th key={c.key} style={{ ...thA, width: 95 }}>{c.label}</th>)}
-              {!interBranch && <th style={{ ...thM, width: 95 }}>Service Charge - 2</th>}{!pkg && <th style={{ ...thM, width: 95 }}>Service Fee</th>}
-              {!pkg && <th style={{ ...thA, width: 95 }}>GST/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...thA, width: 95 }}>GST/Service Charge - 2 ({pkg ? 5 : activeRate}%)</th>}<th style={{ ...thA, width: 110 }}>Total</th><th style={{ ...thA, width: 45 }}></th>
+            <thead><tr style={{ background: '#EAF1F9', borderBottom: '2px solid ' + SO_BAR }}>
+              {spec.idCols.map((c) => <th key={c.key} style={{ ...soHdrL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
+              {spec.fareCols.map((c) => <th key={c.key} style={{ ...soHdr, width: 95 }}>{c.label}</th>)}
+              {!interBranch && <th style={{ ...soHdr, width: 95 }}>Service Charge - 2</th>}{!pkg && <th style={{ ...soHdr, width: 95 }}>Service Fee</th>}
+              {!pkg && <th style={{ ...soHdr, width: 95 }}>GST/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...soHdr, width: 95 }}>GST/Service Charge - 2 ({pkg ? 5 : activeRate}%)</th>}<th style={{ ...soHdr, width: 110 }}>Total</th><th style={{ ...soHdr, width: 45 }}></th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -762,7 +772,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                     {!pkg && <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.ssvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
                     {!pkg && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstSvc)}</td>}
                     {!interBranch && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstMk)}</td>}
-                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef', width: 110 }}>{fmt(c.finalSales)}</td>
+                    <td style={{ ...tdC, fontWeight: 800, color: DR, background: '#faf7ef', width: 110 }}>{fmt(c.finalSales)}</td>
                     <td style={{ ...tdC, textAlign: 'center', background: '#faf7ef', padding: 3, width: 45 }}><button onClick={() => delLine(i)} title="Remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={13} /></button></td>
                   </tr>
                   {spec.sectors && sectorBlock(l, i, true, soCols)}
@@ -771,13 +781,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               })}
             </tbody>
             <tfoot><tr>
-              <td style={{ ...tfTd, textAlign: 'left' }}>TOTAL</td>
-              {spec.idCols.slice(1).map((c) => <td key={c.key} style={tfTd} />)}
-              {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
-              {!interBranch && <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>}
-              {!pkg && <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
-              {!pkg && <td style={tfTd}>{fmt(totals.so.gst)}</td>}{!interBranch && <td style={tfTd}>{fmt(totals.so.otherTaxesGst)}</td>}
-              <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd} />
+              <td style={{ ...soTf, textAlign: 'left' }}>TOTAL</td>
+              {spec.idCols.slice(1).map((c) => <td key={c.key} style={soTf} />)}
+              {spec.fareCols.map((c) => <td key={c.key} style={soTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
+              {!interBranch && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>}
+              {!pkg && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
+              {!pkg && <td style={soTf}>{fmt(totals.so.gst)}</td>}{!interBranch && <td style={soTf}>{fmt(totals.so.otherTaxesGst)}</td>}
+              <td style={{ ...soTf, color: DR }}>{fmt(totals.so.total)}</td><td style={soTf} />
             </tr></tfoot>
           </table>
         </div>
@@ -800,18 +810,18 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         )}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
-            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-              <th style={{ ...thM, ...thL, width: 140 }}>{spec.idCols[0].label}</th>
-              <th style={{ ...thM, ...thL, width: 140 }}>{spec.idCols[1].label}</th>
-              {refKeys.map((c) => <th key={c.key} style={{ ...thA, ...thL, width: 120 }}>{c.label}</th>)}
-              {spec.fareCols.map((c) => <th key={c.key} style={{ ...thM, width: 95 }}>{c.label}</th>)}
-              <th style={{ ...thM, width: 95 }}>Supplier Service Charge</th>
+            <thead><tr style={{ background: '#F9E8EE', borderBottom: '2px solid ' + PO_BAR }}>
+              <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[0].label}</th>
+              <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[1].label}</th>
+              {refKeys.map((c) => <th key={c.key} style={{ ...poHdrL, width: 120 }}>{c.label}</th>)}
+              {spec.fareCols.map((c) => <th key={c.key} style={{ ...poHdr, width: 95 }}>{c.label}</th>)}
+              <th style={{ ...poHdr, width: 95 }}>Supplier Service Charge</th>
               {pkg
-                ? <th style={{ ...thM, width: 95 }}>Supplier Service Charge GST (18%)</th>
-                : <th style={{ ...thA, width: 95 }}>GST ({activeRate}%)</th>}
-              <th style={{ ...thM, width: 100 }}>Supp Comm/Inc Rcvd</th>
-              <th style={{ ...thA, width: 85 }}>TDS (2%)</th>
-              <th style={{ ...thA, width: 110 }}>Total</th>
+                ? <th style={{ ...poHdr, width: 95 }}>Supplier Service Charge GST (18%)</th>
+                : <th style={{ ...poHdr, width: 95 }}>GST ({activeRate}%)</th>}
+              <th style={{ ...poHdr, width: 100 }}>Supp Comm/Inc Rcvd</th>
+              <th style={{ ...poHdr, width: 85 }}>TDS (2%)</th>
+              <th style={{ ...poHdr, width: 110 }}>Total</th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -829,7 +839,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                       : <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstPur)}</td>}
                     <td style={{ padding: 3, width: 100 }}><input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} /></td>
                     <td style={{ ...tdAuto, width: 85 }}>{fmt(c.tds)}</td>
-                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef', width: 110 }}>{fmt(c.finalPurchase)}</td>
+                    <td style={{ ...tdC, fontWeight: 800, color: CR, background: '#faf7ef', width: 110 }}>{fmt(c.finalPurchase)}</td>
                   </tr>
                   {spec.sectors && sectorBlock(l, i, false, poCols)}
                   </React.Fragment>
@@ -837,15 +847,15 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               })}
             </tbody>
             <tfoot><tr>
-              <td style={{ ...tfTd, textAlign: 'left' }}>TOTAL</td>
-              <td style={tfTd} />
-              {refKeys.map((c) => <td key={c.key} style={tfTd} />)}
-              {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
-              <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
-              <td style={tfTd}>{pkg ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
-              <td style={tfTd}>{fmt(totals.po.incentiveAmt)}</td>
-              <td style={tfTd}>{fmt(totals.po.incentiveTds)}</td>
-              <td style={tfTd}>{fmt(totals.po.total)}</td>
+              <td style={{ ...poTf, textAlign: 'left' }}>TOTAL</td>
+              <td style={poTf} />
+              {refKeys.map((c) => <td key={c.key} style={poTf} />)}
+              {spec.fareCols.map((c) => <td key={c.key} style={poTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
+              <td style={poTf}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
+              <td style={poTf}>{pkg ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
+              <td style={poTf}>{fmt(totals.po.incentiveAmt)}</td>
+              <td style={poTf}>{fmt(totals.po.incentiveTds)}</td>
+              <td style={{ ...poTf, color: CR }}>{fmt(totals.po.total)}</td>
             </tr></tfoot>
           </table>
         </div>
@@ -1004,7 +1014,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
   }
 
   return (
-    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV }}>
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
         <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
@@ -1063,7 +1073,7 @@ function GpCard({ k, v, color, pct, bg = '#FFFDF7' }) {
   return (
     <div style={{ border: '1px solid #F0E4C2', borderRadius: 8, padding: '12px 14px', background: bg }}>
       <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.7px', color: '#9A8138', textTransform: 'uppercase' }}>{k}</div>
-      <div style={{ fontSize: 20, fontWeight: 800, marginTop: 4, color }}>{v}</div>
+      <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-.5px', marginTop: 4, color }}>{v}</div>
       {pct && <div style={{ fontSize: 12, fontWeight: 700, color: GOLD_DEEP, marginTop: 2 }}>{pct}</div>}
     </div>
   );
