@@ -21,28 +21,28 @@ export function openPrintWindow(branch,vNo,title,el){
 
   const css=`
   .vp *{box-sizing:border-box;margin:0;padding:0}
-  .vp{font-family:Arial,Helvetica,sans-serif;font-size:10.5pt;color:#222;background:#fff}
-  .top-bar{background:#0d1326;color:#d4a437;padding:10px 16px;display:flex;
-    justify-content:space-between;align-items:center;font-weight:700;font-size:11pt}
+  .vp{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10.5pt;color:#1F2328;background:#fff}
+  .top-bar{background:#141414;color:#A07828;padding:10px 16px;display:flex;
+    justify-content:space-between;align-items:center;font-weight:700;font-size:11pt;border-bottom:3px solid #A07828}
   .top-bar span{color:#fff;font-size:9pt;font-weight:400}
   .letterhead{display:flex;justify-content:space-between;align-items:flex-start;
-    padding:14px 16px 10px;border-bottom:2px solid #0d1326}
-  .company{font-size:20pt;font-weight:900;color:#0d1326;letter-spacing:-0.5px}
+    padding:14px 16px 10px;border-bottom:2px solid #141414}
+  .company{font-size:20pt;font-weight:900;color:#141414;letter-spacing:-0.5px}
   .company-sub{font-size:9pt;color:#5a6691;margin-top:3px}
   .addr{font-size:8.5pt;color:#5a6691;line-height:1.6;text-align:right}
   .voucher-meta{display:flex;justify-content:space-between;align-items:center;
-    padding:9px 16px;background:#f3f4f8;border-bottom:1px solid #e1e3ec}
-  .voucher-title{font-size:13pt;font-weight:700;color:#0d1326}
+    padding:9px 16px;background:#FAFAF8;border-bottom:1px solid #ECECE8}
+  .voucher-title{font-size:13pt;font-weight:700;color:#141414}
   .voucher-no{font-family:Courier New,monospace;font-size:11pt;font-weight:700;
-    color:#185FA5;background:#E6F1FB;padding:3px 10px;border-radius:5px}
+    color:#6B4E0F;background:#FBF3DE;border:1px solid #E8D9A8;padding:3px 10px;border-radius:5px}
   .content{padding:12px 16px}
   /* Hide interactive elements in print */
   button,select,input[type=button],input[type=submit]{display:none!important}
   input,textarea,select{border:none!important;background:transparent!important;
     outline:none!important;font-size:inherit!important}
-  .footer{margin-top:20px;padding:12px 16px;border-top:2px solid #0d1326;
+  .footer{margin-top:20px;padding:12px 16px;border-top:2px solid #141414;
     display:flex;justify-content:space-between;align-items:flex-end;font-size:8.5pt;color:#5a6691}
-  .sig-box{border-top:1px solid #0d1326;padding-top:6px;min-width:120px;text-align:center;font-size:8pt}
+  .sig-box{border-top:1px solid #141414;padding-top:6px;min-width:120px;text-align:center;font-size:8pt}
   .tax-note{margin-top:10px;padding:8px 12px;background:#f9fafb;border:1px solid #e1e3ec;
     font-size:8pt;color:#5a6691;border-radius:4px}
   .no-print{text-align:center;padding:16px;background:#f3f4f8;border-radius:8px;
@@ -51,7 +51,7 @@ export function openPrintWindow(branch,vNo,title,el){
 
   const content=`<div class="vp">
 <div class="top-bar">
-  <span style="color:#d4a437;font-size:12pt">TRAVKINGS &nbsp;·&nbsp; KBiz360 Smart Travel ERP — The Business Engine</span>
+  <span style="color:#A07828;font-size:12pt">TRAVKINGS &nbsp;·&nbsp; KBiz360 Smart Travel ERP — The Business Engine</span>
   <span>Printed: ${new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}</span>
 </div>
 <div class="letterhead">

@@ -108,7 +108,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
     const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? cur + x.toLocaleString('en-IN') : ''; };
     const rows = (pv.postings || []).map((p) => `<tr><td>${escHtml(p.ledger)}</td><td>${escHtml(p.group || '')}</td><td class="r">${fmt(p.debit)}</td><td class="r">${fmt(p.credit)}</td></tr>`).join('');
     const html = `<style>
-      .ve{font-family:'Segoe UI',Arial,sans-serif;color:#0d1326}
+      .ve{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#141414}
       .ve h1{font-size:16px;margin:0 0 2px}
       .ve .meta{font-size:10.5px;color:#5a6691;margin:0 0 4px}
       .ve table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:8px}

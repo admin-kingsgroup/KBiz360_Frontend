@@ -438,7 +438,8 @@ export const YOY_PL = [];
 export const LEAVE_UTILIZATION = [];
 
 
-export const TAX_FILING_BOARD = [];
+/* TAX_FILING_BOARD removed — the Tax Filing Status Board is now live:
+   useTaxFilingBoard → GET /api/tax-reconciliation/filing-board */
 
 
 export const TAX_CALENDAR_EVENTS = []; /* moved to DB — fetch via API/hook */

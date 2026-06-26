@@ -17,6 +17,19 @@ export function useTaxReco(branch, period, mode) {
   });
 }
 
+// Tax Filing Status Board — entity × return-type matrix for a period (Filed/Pending
+// derived from entered figures). branch omitted/'ALL' → every branch the user may see.
+//   GET /api/tax-reconciliation/filing-board?branch=&period=YYYY-MM
+export function useTaxFilingBoard(branch, period) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['tax-filing-board', code || 'all', period || ''],
+    queryFn: () => apiGet('/api/tax-reconciliation/filing-board', { branch: code, period }),
+    enabled: !!getAuthToken(),
+    staleTime: 30_000,
+  });
+}
+
 export function useUpsertTaxFigure() {
   const qc = useQueryClient();
   return useMutation({

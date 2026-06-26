@@ -54,11 +54,11 @@ export function DebitNoteFields({ state, setState, ctx }) {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
             <thead><tr style={{ background: DARK }}>
-              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 30 }}>#</th>
-              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#d4a437', fontWeight: 700, fontSize: 9.5 }}>Ledger</th>
-              <th style={{ padding: '8px 10px', textAlign: 'center', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 70 }}>Dr / Cr</th>
-              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#d4a437', fontWeight: 700, fontSize: 9.5 }}>Description</th>
-              <th style={{ padding: '8px 10px', textAlign: 'right', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 130 }}>Amount ({cur})</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 30 }}>#</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5 }}>Ledger</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 70 }}>Dr / Cr</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5 }}>Description</th>
+              <th style={{ padding: '8px 10px', textAlign: 'right', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 130 }}>Amount ({cur})</th>
               <th style={{ width: 32 }} />
             </tr></thead>
             <tbody>

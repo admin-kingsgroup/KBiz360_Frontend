@@ -85,8 +85,8 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
               {PMT_MODES_V.map((m) => (
                 <button key={m} onClick={() => patch({ paymentMode: m })} style={{
                   padding: '5px 11px', borderRadius: 6, fontSize: 10.5, fontWeight: 600, cursor: 'pointer',
-                  background: state.paymentMode === m ? '#0d1326' : '#f3f4f8', color: state.paymentMode === m ? '#d4a437' : '#384677',
-                  border: '1.5px solid ' + (state.paymentMode === m ? '#d4a437' : '#e1e3ec'),
+                  background: state.paymentMode === m ? '#141414' : '#f3f4f8', color: state.paymentMode === m ? '#A07828' : '#384677',
+                  border: '1.5px solid ' + (state.paymentMode === m ? '#A07828' : '#e1e3ec'),
                 }}>{m}</button>
               ))}
             </div>

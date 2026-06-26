@@ -541,13 +541,13 @@ function JVPostings({ jv }) {
   const rows = jv && Array.isArray(jv.postings) ? jv.postings : [];
   // Debits first, then credits — the conventional Tally voucher reading order.
   const ordered = [...rows].sort((a, b) => ((b.debit || 0) > 0 ? 1 : 0) - ((a.debit || 0) > 0 ? 1 : 0));
-  const DR = '#2563eb', CR = '#dc2626';
+  const DR = '#1A7A42', CR = '#C0392B';
   const badge = jv && jv.posted
-    ? { t: '● Posted to books', bg: '#E7F3E7', c: '#16a34a' }
+    ? { t: '● Posted to books', bg: '#E7F3E7', c: '#1A7A42' }
     : jv && jv.status === 'deleted'
-      ? { t: '⟲ Reversed out of books (view-only)', bg: '#FBEAEA', c: '#dc2626' }
+      ? { t: '⟲ Reversed out of books (view-only)', bg: '#FBEAEA', c: '#C0392B' }
       : jv && jv.status === 'rejected'
-        ? { t: '✗ Not posted (rejected)', bg: '#FBEAEA', c: '#dc2626' }
+        ? { t: '✗ Not posted (rejected)', bg: '#FBEAEA', c: '#C0392B' }
         : { t: '○ Would-be entry — posts on approval', bg: '#FFF6D6', c: '#d97706' };
   return (
     <div style={{ marginTop: 16 }}>

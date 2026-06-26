@@ -128,3 +128,42 @@ describe('Shared journal (JvBlock) Dr/Cr', () => {
     expect(jv).not.toContain('#185FA5'); // old blue Dr gone
   });
 });
+
+describe('Voucher module internals + print/display (Tier 1 + 2)', () => {
+  test('shared voucher ui.js tokens are the new theme', () => {
+    const ui = read('core/voucher/ui.js');
+    expect(ui).toContain("DARK = '#141414', GOLD = '#A07828'");
+    expect(ui).toContain("V_DR = '#1A7A42', V_CR = '#C0392B'");
+    expect(ui).not.toContain('#c2a04a'); // old gold gone
+    expect(ui).not.toContain('#1a1c22'); // old dark gone
+  });
+
+  test('field-table headers use new gold (no #d4a437)', () => {
+    for (const f of ['JournalFields', 'DebitNoteFields', 'PurchaseExpenseFields']) {
+      const src = read(`core/voucher/fields/${f}.jsx`);
+      expect(src).not.toContain('#d4a437');
+      expect(src).toContain("color: '#A07828'");
+    }
+  });
+
+  test('payment-mode selector is dark/gold', () => {
+    const rp = read('core/voucher/fields/ReceiptPaymentFields.jsx');
+    expect(rp).toContain("? '#141414' :");
+    expect(rp).not.toContain('#0d1326');
+    expect(rp).not.toContain('#d4a437');
+  });
+
+  test('voucher-print PDF template is dark/gold (no old hexes)', () => {
+    const vp = read('core/voucher-print.jsx');
+    expect(vp).toContain('background:#141414;color:#A07828');
+    expect(vp).toContain('color:#6B4E0F;background:#FBF3DE'); // voucher-no chip
+    expect(vp).not.toContain('#0d1326');
+    expect(vp).not.toContain('#d4a437');
+  });
+
+  test('VoucherView journal (pnlTally) Dr/Cr + posted badge are green/red', () => {
+    const pnl = read('modules/pnlTally.jsx');
+    expect(pnl).toContain("const DR = '#1A7A42', CR = '#C0392B'");
+    expect(pnl).toContain("bg: '#E7F3E7', c: '#1A7A42'"); // posted badge
+  });
+});
