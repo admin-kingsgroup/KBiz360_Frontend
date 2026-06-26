@@ -19,7 +19,7 @@ import { CONSOLIDATED_LABEL, BRANCHES as LIVE_BRANCHES } from '../core/data';
 import { liquidityKind, isLiquidRow } from '../core/ledgerKind';
 import { openPrintPreview } from '../core/PrintPreview';
 
-const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#1f7a3d', amber: '#b8860b', dim: '#5a6691', border: '#e1e3ec', bg: '#f3f4f8' };
+const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#1f7a3d', amber: '#b8860b', dim: '#5a6691', border: '#cdd1d8', bg: '#f3f4f8' };
 // Live branch list (code + currency symbol) from the company-config cache, so the
 // dashboards track whatever branches/currencies are configured in company profiles
 // rather than a hardcoded list. Read at render time — referenceCache mutates the
@@ -83,7 +83,7 @@ const Card = ({ title, children, right }) => (
   </div>
 );
 const th = { padding: '8px 12px', background: C.bg, color: C.dim, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', textAlign: 'left', whiteSpace: 'nowrap' };
-const td = { padding: '7px 12px', borderBottom: '1px solid #f2f4f8', fontSize: 12.5 };
+const td = { padding: '7px 12px', borderBottom: '1px solid #dfe2e7', fontSize: 12.5 };
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 
 // usePeriod — holds the active range; the PeriodBar inside Toolbar drives setRange.
@@ -155,7 +155,7 @@ export function ExecutiveOverview({ branch, go }) {
       <Card title="⚠ Attention Needed">
         <div style={{ padding: '6px 0' }}>
           {alerts.map(([tone, msg], i) => (
-            <div key={i} style={{ padding: '7px 14px', fontSize: 12.5, color: tone === 'bad' ? C.red : tone === 'warn' ? C.amber : C.green, borderBottom: i < alerts.length - 1 ? '1px solid #f4f6fa' : 'none' }}>
+            <div key={i} style={{ padding: '7px 14px', fontSize: 12.5, color: tone === 'bad' ? C.red : tone === 'warn' ? C.amber : C.green, borderBottom: i < alerts.length - 1 ? '1px solid #dfe2e7' : 'none' }}>
               {tone === 'bad' ? '🔴' : tone === 'warn' ? '🟡' : '🟢'} {msg}
             </div>
           ))}

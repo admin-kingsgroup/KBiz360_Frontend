@@ -467,7 +467,7 @@ function LedgerConfirmModal({ spec, newLedgers, busy, onYes, onNo }) {
   return (
     <div onClick={onNo} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(580px, 96vw)', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '16px 18px', borderBottom: '1px solid #eef1f6' }}>
+        <div style={{ padding: '16px 18px', borderBottom: '1px solid #dfe2e7' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlertTriangle size={17} style={{ color: '#854F0B' }} />
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: DARK }}>Create {n} new ledger{n > 1 ? 's' : ''}?</h3>
@@ -480,23 +480,23 @@ function LedgerConfirmModal({ spec, newLedgers, busy, onYes, onNo }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: DIM, position: 'sticky', top: 0, background: '#fff' }}>
-                <th style={{ padding: '8px', borderBottom: '1px solid #eef1f6' }}>New Ledger</th>
-                <th style={{ padding: '8px', borderBottom: '1px solid #eef1f6' }}>Group</th>
-                <th style={{ padding: '8px', borderBottom: '1px solid #eef1f6' }}>Sub-Group</th>
+                <th style={{ padding: '8px', borderBottom: '1px solid #dfe2e7' }}>New Ledger</th>
+                <th style={{ padding: '8px', borderBottom: '1px solid #dfe2e7' }}>Group</th>
+                <th style={{ padding: '8px', borderBottom: '1px solid #dfe2e7' }}>Sub-Group</th>
               </tr>
             </thead>
             <tbody>
               {newLedgers.map((l, i) => (
                 <tr key={i}>
-                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #f3f5f9', fontWeight: 600, color: DARK }}>{l.name}</td>
-                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #f3f5f9', color: BLUE, fontWeight: 600 }}>{l.group || '—'}</td>
-                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #f3f5f9', color: DIM }}>{l.subGroup || '—'}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #dfe2e7', fontWeight: 600, color: DARK }}>{l.name}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #dfe2e7', color: BLUE, fontWeight: 600 }}>{l.group || '—'}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #dfe2e7', color: DIM }}>{l.subGroup || '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <div style={{ padding: '12px 18px', borderTop: '1px solid #eef1f6', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div style={{ padding: '12px 18px', borderTop: '1px solid #dfe2e7', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onNo} disabled={busy} style={{ ...btn('#fff', DIM, true), opacity: busy ? 0.5 : 1 }}>Cancel</button>
           <button onClick={onYes} disabled={busy} style={{ ...btn(BLUE, '#fff'), opacity: busy ? 0.6 : 1 }}>
             <CheckCircle2 size={13} /> {busy ? 'Creating…' : `Yes, create & import`}
@@ -517,14 +517,14 @@ function PreviewModal({ spec, data, onClose }) {
   const fmt = (n) => '₹' + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
   const errCount = rows.filter((r) => r.error || r._error).length;
   const missingCount = rows.filter((r) => r.jv?.missing?.length).length;
-  const th = { padding: '7px 8px', borderBottom: '2px solid #e7eaf2', textAlign: 'left', color: DIM, fontWeight: 700, position: 'sticky', top: 0, background: '#fff', whiteSpace: 'nowrap' };
-  const td = { padding: '6px 8px', borderBottom: '1px solid #f3f5f9', whiteSpace: 'nowrap' };
+  const th = { padding: '7px 8px', borderBottom: '2px solid #cdd1d8', textAlign: 'left', color: DIM, fontWeight: 700, position: 'sticky', top: 0, background: '#fff', whiteSpace: 'nowrap' };
+  const td = { padding: '6px 8px', borderBottom: '1px solid #dfe2e7', whiteSpace: 'nowrap' };
   const masterCols = d.kind === 'master' && rows.length ? Object.keys(rows[0]).filter((k) => k !== 'row' && k !== '_error') : [];
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(960px, 97vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid #eef1f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #dfe2e7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: DARK }}>{data.existing ? 'Existing data' : 'Preview'} — {spec.label}</h3>
             <p style={{ margin: '3px 0 0', fontSize: 11, color: DIM }}>
@@ -625,7 +625,7 @@ function PreviewModal({ spec, data, onClose }) {
           )}
         </div>
 
-        <div style={{ padding: '10px 18px', borderTop: '1px solid #eef1f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '10px 18px', borderTop: '1px solid #dfe2e7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 10.5, color: DIM }}>{data.existing ? 'Live data currently in the system (read-only).' : 'This is a preview only — use “Upload CSV” on the card to actually import.'}</span>
           <button onClick={onClose} style={btn(BLUE, '#fff')}>Close</button>
         </div>
@@ -742,7 +742,7 @@ export function DataImportPage({ currentUser }) {
       {/* Tax-regime selector: swaps GST↔VAT tax columns + example branch/currency. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: DIM }}>Template region:</span>
-        <div style={{ display: 'inline-flex', border: '1px solid #d6dbe6', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 8, overflow: 'hidden' }}>
           {REGIMES.map((r) => (
             <button key={r.key} onClick={() => setRegime(r.key)} title={r.hint}
               style={{ padding: '7px 14px', border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 700,

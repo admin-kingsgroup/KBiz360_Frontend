@@ -114,7 +114,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
       .ve table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:8px}
       .ve th{background:#141414;color:#A07828;text-align:left;padding:6px 8px;font-size:9.5px}
       .ve th.r,.ve td.r{text-align:right}
-      .ve td{padding:5px 8px;border-bottom:1px solid #eceef4}
+      .ve td{padding:5px 8px;border-bottom:1px solid #dfe2e7}
       .ve tfoot td{background:#FBF3DE;font-weight:800;border-top:2px solid #A07828}
     </style>
     <div class="ve">
@@ -184,7 +184,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
           <button onClick={printEntry} className="max-tablet:min-h-[44px]" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
           {isEdit
-            ? <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #e6e8ec', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
+            ? <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
             : <button onClick={reset} className="max-tablet:min-h-[44px]" style={{ ...btnG }}>＋ New Voucher</button>}
         </div>
       </div>

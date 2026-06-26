@@ -26,7 +26,7 @@ export function PeriodCloseTable({ rows }) {
       </thead>
       <tbody>
         {(rows || []).map((p) => (
-          <tr key={p.branch} style={{ borderBottom: '1px solid #f0f2f7' }}>
+          <tr key={p.branch} style={{ borderBottom: '1px solid #dfe2e7' }}>
             <td style={{ padding: '7px 8px', fontWeight: 700, color: '#14161a' }}>{p.branch}</td>
             <td style={{ padding: '7px 8px', textAlign: 'center' }}>{p.tbClosed ? '✓' : '○'}</td>
             <td style={{ padding: '7px 8px', textAlign: 'center' }}>{p.reconciled ? '✓' : '○'}</td>

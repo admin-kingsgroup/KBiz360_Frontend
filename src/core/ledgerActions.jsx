@@ -69,7 +69,7 @@ export function LedgerActions({ d, cur, branchLabel = '', from = '', to = '', pa
   const btn = {
     padding: '6px 11px', borderRadius: 6, fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap',
     cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.45 : 1,
-    border: dark ? '1px solid #2a3556' : '1px solid #d6dbe6',
+    border: dark ? '1px solid #2a3556' : '1px solid #cdd1d8',
     background: dark ? 'rgba(255,255,255,0.08)' : '#fff',
     color: dark ? '#e7ecfb' : DARK,
   };

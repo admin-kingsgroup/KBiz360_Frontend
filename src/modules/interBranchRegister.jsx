@@ -7,7 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { bc } from '../core/styles';
 import { useInbReconcile, useInbPnlBreakdown } from '../core/useInterBranchVoucher';
 
-const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec' };
+const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
 const brLabel = (b) => (b === 'ALL' || !b ? 'All Branches' : (b.name || b.code || b));
 const badge = (s) => ({ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 800, color: '#fff', background: s === 'booked' ? C.green : s === 'open' ? C.gold : C.dim, textTransform: 'capitalize' });
@@ -23,7 +23,7 @@ export function InterBranchRegister({ branch }) {
 
   const card = { background: '#fff', border: `1px solid ${C.border}`, borderRadius: 9 };
   const th = { padding: '8px 12px', background: C.dark, color: C.gold, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'left', whiteSpace: 'nowrap' };
-  const td = { padding: '8px 12px', borderBottom: '1px solid #f0f2f7', fontSize: 12.5 };
+  const td = { padding: '8px 12px', borderBottom: '1px solid #dfe2e7', fontSize: 12.5 };
   const rnum = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
   const tile = (label, value, tone, sub) => (
     <div style={{ ...card, padding: '10px 14px', minWidth: 150 }}>

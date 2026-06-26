@@ -31,7 +31,7 @@ export function openPrintWindow(branch,vNo,title,el){
   .company-sub{font-size:9pt;color:#5a6691;margin-top:3px}
   .addr{font-size:8.5pt;color:#5a6691;line-height:1.6;text-align:right}
   .voucher-meta{display:flex;justify-content:space-between;align-items:center;
-    padding:9px 16px;background:#FAFAF8;border-bottom:1px solid #ECECE8}
+    padding:9px 16px;background:#FAFAF8;border-bottom:1px solid #dfe2e7}
   .voucher-title{font-size:13pt;font-weight:700;color:#141414}
   .voucher-no{font-family:Courier New,monospace;font-size:11pt;font-weight:700;
     color:#6B4E0F;background:#FBF3DE;border:1px solid #E8D9A8;padding:3px 10px;border-radius:5px}
@@ -43,7 +43,7 @@ export function openPrintWindow(branch,vNo,title,el){
   .footer{margin-top:20px;padding:12px 16px;border-top:2px solid #141414;
     display:flex;justify-content:space-between;align-items:flex-end;font-size:8.5pt;color:#5a6691}
   .sig-box{border-top:1px solid #141414;padding-top:6px;min-width:120px;text-align:center;font-size:8pt}
-  .tax-note{margin-top:10px;padding:8px 12px;background:#f9fafb;border:1px solid #e1e3ec;
+  .tax-note{margin-top:10px;padding:8px 12px;background:#f9fafb;border:1px solid #cdd1d8;
     font-size:8pt;color:#5a6691;border-radius:4px}
   .no-print{text-align:center;padding:16px;background:#f3f4f8;border-radius:8px;
     margin-bottom:16px;font-size:10pt}

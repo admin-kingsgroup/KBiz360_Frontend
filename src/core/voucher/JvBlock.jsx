@@ -19,12 +19,12 @@ const fmtN = (v) => num(v).toLocaleString('en-IN', { minimumFractionDigits: 2, m
 const r2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
 
 const HEAD = { padding: '3px 8px', fontSize: 9.5, fontWeight: 700, color: '#5a6691', background: '#eef1f7', letterSpacing: '0.3px' };
-const FOOT = { borderTop: '1px solid #e6e8ec', padding: '4px 8px', display: 'flex', justifyContent: 'space-between', fontWeight: 800, background: '#fafbfd' };
+const FOOT = { borderTop: '1px solid #cdd1d8', padding: '4px 8px', display: 'flex', justifyContent: 'space-between', fontWeight: 800, background: '#fafbfd' };
 const DR = '#1A7A42', CR = '#C0392B';
 
 function Leg({ p, side }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '3px 8px', borderBottom: '1px solid #f2f4f8' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '3px 8px', borderBottom: '1px solid #dfe2e7' }}>
       <span style={{ minWidth: 0 }}>
         <span style={{ fontWeight: 600, color: '#14161a' }}>{p.ledger}</span>
         <span style={{ display: 'block', fontSize: 9, color: '#9197a3' }}>{p.group || ''}</span>
@@ -55,8 +55,8 @@ export function JvBlock({ postings, title, sub, color = '#14161a', net = true, e
           {!bal && <span style={{ color: CR, fontWeight: 700 }}>  (out by {fmtN(totDr - totCr)})</span>}
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', border: '1px solid #e6e8ec', borderRadius: 6, overflow: 'hidden', fontSize: 10.5 }}>
-        <div style={{ borderRight: '1px solid #e6e8ec' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', border: '1px solid #cdd1d8', borderRadius: 6, overflow: 'hidden', fontSize: 10.5 }}>
+        <div style={{ borderRight: '1px solid #cdd1d8' }}>
           <div style={HEAD}>Dr · Debit</div>
           {dr.map((p, i) => <Leg key={'d' + i} p={p} side="dr" />)}
         </div>
@@ -64,7 +64,7 @@ export function JvBlock({ postings, title, sub, color = '#14161a', net = true, e
           <div style={HEAD}>Cr · Credit</div>
           {cr.map((p, i) => <Leg key={'c' + i} p={p} side="cr" />)}
         </div>
-        <div style={{ ...FOOT, borderRight: '1px solid #e6e8ec', color: DR }}><span>Total Dr</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(totDr)}</span></div>
+        <div style={{ ...FOOT, borderRight: '1px solid #cdd1d8', color: DR }}><span>Total Dr</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(totDr)}</span></div>
         <div style={{ ...FOOT, color: CR }}><span>Total Cr</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(totCr)}</span></div>
       </div>
     </div>

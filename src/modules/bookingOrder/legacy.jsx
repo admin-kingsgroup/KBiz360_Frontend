@@ -58,14 +58,14 @@ const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 /* shared cell styles */
-const thM = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: '#334155', textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #e2e8f0', background: '#f8fafc' };
+const thM = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: '#334155', textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #cdd1d8', background: '#f8fafc' };
 const thA = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: GOLD, textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #f2e6cc', background: '#fdfbfa' };
 const thL = { textAlign: 'left' };
-const tdC = { padding: '6px 8px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #e2e8f0', fontVariantNumeric: 'tabular-nums', verticalAlign: 'middle' };
+const tdC = { padding: '6px 8px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #cdd1d8', fontVariantNumeric: 'tabular-nums', verticalAlign: 'middle' };
 const tdAuto = { ...tdC, background: '#faf7ef', color: '#5b616e', fontWeight: 600 };
 const tdTot = { ...tdC, fontWeight: 800, color: DARK };
-const cellInp = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'right', border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s' };
-const cellTxt = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'left', border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', fontFamily: 'inherit', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' };
+const cellInp = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'right', border: '1px solid #cdd1d8', borderRadius: 6, background: '#fff', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s' };
+const cellTxt = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'left', border: '1px solid #cdd1d8', borderRadius: 6, background: '#fff', fontFamily: 'inherit', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' };
 const tfTd = { borderTop: '2px solid ' + DARK, padding: '10px 8px', fontWeight: 800, fontSize: 12, background: '#f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: DARK };
 // Per-section column-header + total-row styles — the section colour carries INTO
 // the table (SO blue, PO maroon), matching the SO/PO/GP voucher theme.
@@ -143,7 +143,7 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange })
   const setModule = (i, m) => onChange(legs.map((l, idx) => (idx === i ? { ...newLeg(m), supplier: l.supplier, costCenter: l.costCenter, purTallyRef: l.purTallyRef } : l)));
   const del = (i) => onChange(legs.filter((_, idx) => idx !== i));
   const add = () => onChange([...legs, newLeg(allowed[0])]);
-  const cell = { width: 90, padding: '5px 7px', border: '1px solid #e1e3ec', borderRadius: 5, fontSize: 12 };
+  const cell = { width: 90, padding: '5px 7px', border: '1px solid #cdd1d8', borderRadius: 5, fontSize: 12 };
   return (
     <div style={{ ...card, marginTop: 14, borderColor: '#cdb46a' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -538,7 +538,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // read-only ("fetched & locked") on the Sales grid.
   const sectorBlock = (l, li, readOnly, colSpan) => (
     <tr key={'sec-' + li}>
-      <td colSpan={colSpan} style={{ padding: '2px 6px 8px 26px', background: readOnly ? '#faf7ef' : '#fbfcff', borderBottom: '1px solid #eef0f5' }}>
+      <td colSpan={colSpan} style={{ padding: '2px 6px 8px 26px', background: readOnly ? '#faf7ef' : '#fbfcff', borderBottom: '1px solid #dfe2e7' }}>
         <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: '.3px', color: '#9A9A9A', textTransform: 'uppercase', margin: '2px 0' }}>{readOnly ? '▣ Sectors — from Purchase (locked)' : '✎ Sectors — enter each segment'}</div>
         <table style={{ borderCollapse: 'collapse' }}>
           <thead><tr>
@@ -568,7 +568,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   return (
     <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV, color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
       {/* Header */}
-      <div style={{ ...card, border: '1px solid #DEDEDA', borderLeft: '4px solid ' + GOLD, borderRadius: 4, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
+      <div style={{ ...card, border: '1px solid #dfe2e7', borderLeft: '4px solid ' + GOLD, borderRadius: 4, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
         <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : 'SO / PO / GP VOUCHER'}</p>
@@ -605,7 +605,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {moduleCode === 'SM' && (
         <div style={{ ...card, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: DARK, textTransform: 'uppercase', letterSpacing: '.3px' }}>Supplier</span>
-          <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden' }}>
+          <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
             {[['with', 'With supplier (cost + margin)'], ['without', 'Without supplier (pure income)']].map(([v, l]) => {
               const active = (v === 'without') === noSupplier;
               return (
@@ -629,7 +629,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {isVatBr && (
         <div style={{ ...card, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: DARK, textTransform: 'uppercase', letterSpacing: '.3px' }}>VAT</span>
-          <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden' }}>
+          <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
             {[['with', 'With VAT'], ['without', 'Without VAT']].map(([v, l]) => {
               const active = (v === 'without') === noVat;
               return (
@@ -801,7 +801,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: CR }}>Fetch open INB:</span>
             <select value="" onChange={(e) => { const l = (openInbQ.data || []).find((x) => x.inbLinkNo === e.target.value); if (l) fetchInb(l); }}
-              style={{ padding: '5px 8px', border: '1px solid #e1e3ec', borderRadius: 6, fontSize: 12, minWidth: 340 }}>
+              style={{ padding: '5px 8px', border: '1px solid #cdd1d8', borderRadius: 6, fontSize: 12, minWidth: 340 }}>
               <option value="">Inter-branch legs sent to {brCode}…</option>
               {(openInbQ.data || []).map((l) => <option key={l.inbLinkNo} value={l.inbLinkNo}>{l.inbLinkNo} · from {l.fromBranch} · {l.passenger || '—'} · {fmt(l.total)}</option>)}
             </select>
@@ -881,7 +881,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         )}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
-            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #cdd1d8' }}>
               <th style={{ ...thA, ...thL, width: 140 }}>First Name</th><th style={{ ...thA, ...thL, width: 140 }}>Surname</th>
               <th style={{ ...thA, width: 110 }}>Final Sales</th><th style={{ ...thA, width: 85 }}>SVF GST ({activeRate}%)</th><th style={{ ...thA, width: 85 }}>SVC2 GST ({activeRate}%)</th><th style={{ ...thA, width: 110 }}>Final Purchase</th><th style={{ ...thA, width: 95 }}>Purchase GST ({pkg ? 18 : activeRate}%)</th>
               <th style={{ ...thA, width: 95 }}>Supp Comm/Inc Rcvd</th><th style={{ ...thA, width: 80 }}>TDS (2%)</th>
@@ -916,7 +916,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {error && <div style={{ ...card, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 12, marginBottom: 14 }}>{error}</div>}
 
       {/* Footer */}
-      <div style={{ position: 'sticky', bottom: 0, background: '#FAFAF8', borderTop: '1px solid #ECECE8', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ position: 'sticky', bottom: 0, background: '#FAFAF8', borderTop: '1px solid #dfe2e7', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, color: '#5b616e', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
           {editing ? <><Pencil size={12} /> Editing returns this voucher to Pending — approve it from the Pending queue to post the books.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
         </span>
@@ -1015,7 +1015,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
 
   return (
     <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV, color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
-      <div style={{ ...card, border: '1px solid #DEDEDA', borderLeft: '4px solid ' + GOLD, borderRadius: 4, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
+      <div style={{ ...card, border: '1px solid #dfe2e7', borderLeft: '4px solid ' + GOLD, borderRadius: 4, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
         <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : (kind === 'refund' ? 'REFUND VOUCHER' : 'REISSUE VOUCHER')}</p>
@@ -1111,7 +1111,7 @@ function PartyPicker({ branch, kind, value, onChange, subGroupFilter }) {
         onChange={(e) => { setName(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)} style={inp} />
       {open && matches.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 60, marginTop: 2, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', maxHeight: 220, overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 60, marginTop: 2, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', maxHeight: 220, overflowY: 'auto' }}>
           {matches.map((l) => (
             <div key={l.id} {...clickable(() => pick(l), { role: 'option' })}
               style={{ padding: '7px 11px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5, outline: 'none' }}
@@ -1268,7 +1268,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
             const isOpen = open === b.id;
             return (
               <React.Fragment key={b.id}>
-                <tr onClick={() => setOpen(isOpen ? null : b.id)} style={{ borderBottom: '1px solid #f0f2f7', cursor: 'pointer', background: isOpen ? '#faf7ef' : '#fff' }}>
+                <tr onClick={() => setOpen(isOpen ? null : b.id)} style={{ borderBottom: '1px solid #dfe2e7', cursor: 'pointer', background: isOpen ? '#faf7ef' : '#fff' }}>
                   <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{mode === 'pending' && onToggleSel && <input type="checkbox" checked={!!(sel && sel.has(b.id))} onChange={() => onToggleSel(b.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} />}{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}{mode === 'pending' && b.validation?.hasErrors ? <span title={(b.validation.errors || []).join(' · ')} style={{ marginLeft: 6, color: '#dc2626', fontWeight: 800 }}>⚠</span> : null}</td>
                   {(mode === 'approved' || mode === 'pending') && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5b616e' }}>{b.date || '—'}</td>}
@@ -1343,7 +1343,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
 function GroupByBar({ value, onChange }) {
   const OPTS = [['none', 'Bill wise'], ['client', 'Client wise'], ['supplier', 'Supplier wise'], ['module', 'Module wise']];
   return (
-    <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden', marginBottom: 12 }}>
+    <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden', marginBottom: 12 }}>
       {OPTS.map(([v, l]) => (
         <button key={v} onClick={() => onChange(v)}
           style={{ padding: '6px 12px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: value === v ? BLUE : '#fff', color: value === v ? '#fff' : '#5b616e' }}>{l}</button>
@@ -1594,7 +1594,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
         <button onClick={() => setRoute && setRoute('/bookings/new')} className="max-tablet:min-h-[44px]" style={btnG}><Plus size={14} /> New voucher</button>
       </div>
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 10 }}>
-        <div style={{ display: 'flex', borderBottom: '1px solid #e6e8ec', flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}</div>
+        <div style={{ display: 'flex', borderBottom: '1px solid #cdd1d8', flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}</div>
       </div>
       {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, padding: '8px 12px', color: msg.startsWith('⚠') ? '#dc2626' : '#16a34a', background: msg.startsWith('⚠') ? '#fbe9e9' : '#e8f6ed', border: '1px solid ' + (msg.startsWith('⚠') ? '#f3c9c9' : '#cde3b6') }}>{msg}</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -1617,8 +1617,8 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
 // to its full audit timeline (who/when/why + field-level changes + full snapshot) and
 // the live JV. Cross-cuts status: an approved booking that was later edited shows here.
 function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
-  const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: '2px solid #e6e8ec', whiteSpace: 'nowrap' };
-  const td = { padding: '7px 10px', borderBottom: '1px solid #f4f6fa', fontSize: 12, whiteSpace: 'nowrap' };
+  const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: '2px solid #cdd1d8', whiteSpace: 'nowrap' };
+  const td = { padding: '7px 10px', borderBottom: '1px solid #dfe2e7', fontSize: 12, whiteSpace: 'nowrap' };
   if (isLoading) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#9197a3' }}>Loading edited bookings…</div>;
   if (!rows.length) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#9197a3' }}>No edited bookings in this period.</div>;
   const fmtAt = (s) => { const d = new Date(s); return isNaN(d) ? (s || '—') : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
@@ -1644,7 +1644,7 @@ function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
                   <td style={{ ...td, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', color: '#5b616e' }} title={r.lastReason || ''}>{r.lastReason || (r.preAudit ? '— pre-audit —' : '—')}</td>
                 </tr>
                 {isOpen && (
-                  <tr><td colSpan={10} style={{ padding: 12, background: '#f7f8fb', borderBottom: '1px solid #e6e8ec' }}>
+                  <tr><td colSpan={10} style={{ padding: 12, background: '#f7f8fb', borderBottom: '1px solid #cdd1d8' }}>
                     <div style={{ fontWeight: 800, fontSize: 12, color: DARK, marginBottom: 8 }}>Audit trail — {r.bookingNo}</div>
                     <AuditTrail entityType="booking" entityId={r.id} />
                   </td></tr>

@@ -4,7 +4,7 @@ export function VarianceFlagsPanel({ flags, currency = '₹' }) {
   return (
     <>
       {flags.map((v, i) => (
-        <div key={i} style={{ padding: '7px 0', borderBottom: '1px solid #f0f2f7' }}>
+        <div key={i} style={{ padding: '7px 0', borderBottom: '1px solid #dfe2e7' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <p style={{ margin: 0, fontSize: 11, color: '#14161a', fontWeight: 600 }}>{v.account}</p>
             <p style={{ margin: 0, fontSize: 11, color: '#dc2626', fontWeight: 700 }}>{`${v.pct >= 0 ? '+' : ''}${v.pct}%`}</p>

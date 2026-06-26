@@ -63,13 +63,13 @@ export function DebitNoteFields({ state, setState, ctx }) {
             </tr></thead>
             <tbody>
               {lines.map((l, i) => (
-                <tr key={l._k ?? i} style={{ borderBottom: '1px solid #f3f4f8', background: l.drCr === 'Dr' ? '#f0fbf5' : ((+l.amt || 0) > 0 ? '#fdf3f3' : '#fff') }}>
+                <tr key={l._k ?? i} style={{ borderBottom: '1px solid #dfe2e7', background: l.drCr === 'Dr' ? '#f0fbf5' : ((+l.amt || 0) > 0 ? '#fdf3f3' : '#fff') }}>
                   <td style={{ padding: '4px 8px', textAlign: 'center', fontSize: 10.5, color: DIM }}>{i + 1}</td>
                   <td style={{ padding: '3px 6px', minWidth: 220 }}>
                     <LedgerPicker branch={branch} value={l.ledger} onChange={(v) => updLine(i, 'ledger', v)} placeholder="Purchase — Air Ticket / Hotel..." style={{ minHeight: 30, fontSize: 10.5 }} />
                   </td>
                   <td style={{ padding: '3px 6px' }}>
-                    <div style={{ display: 'flex', border: '1px solid #e1e3ec', borderRadius: 5, overflow: 'hidden', width: 60, margin: '0 auto' }}>
+                    <div style={{ display: 'flex', border: '1px solid #cdd1d8', borderRadius: 5, overflow: 'hidden', width: 60, margin: '0 auto' }}>
                       {['Dr', 'Cr'].map((d) => (
                         <button key={d} onClick={() => updLine(i, 'drCr', d)} style={{ flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 9.5, fontWeight: 800, padding: '6px 0', background: (l.drCr === 'Dr' ? 'Dr' : 'Cr') === d ? (d === 'Dr' ? V_DR : V_CR) : '#fff', color: (l.drCr === 'Dr' ? 'Dr' : 'Cr') === d ? '#fff' : '#9A9A9A' }}>{d.toUpperCase()}</button>
                       ))}
@@ -88,7 +88,7 @@ export function DebitNoteFields({ state, setState, ctx }) {
               ))}
             </tbody>
             <tfoot>
-              <tr style={{ background: '#f3f4f8', borderTop: '2px solid #e1e3ec' }}>
+              <tr style={{ background: '#f3f4f8', borderTop: '2px solid #cdd1d8' }}>
                 <td colSpan={3} style={{ padding: '8px 10px' }}><button onClick={addLine} style={{ ...btnGh, fontSize: 10.5, padding: '4px 12px' }}><Plus size={12} /> Add line</button></td>
                 <td style={{ padding: '8px 6px', textAlign: 'right', fontSize: 9, fontWeight: 700, color: DIM }}>RETURNED (NET)</td>
                 <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, fontSize: 13, color: DARK }}>{money2(cur, t.subtotal)}</td>

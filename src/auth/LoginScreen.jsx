@@ -123,7 +123,7 @@ export function LoginScreen({ onSignIn }) {
               <Users size={14} style={{ position: 'absolute', left: 12, top: 14, color: '#8b94b3' }} />
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@travkings.com" autoComplete="username"
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-                style={{ width: '100%', padding: '12px 14px 12px 36px', border: '1px solid #d8dbe6', borderRadius: 7, fontSize: 13, background: '#fff', color: '#0d1326', outline: 'none', boxSizing: 'border-box', WebkitAppearance: 'none' }}
+                style={{ width: '100%', padding: '12px 14px 12px 36px', border: '1px solid #cdd1d8', borderRadius: 7, fontSize: 13, background: '#fff', color: '#0d1326', outline: 'none', boxSizing: 'border-box', WebkitAppearance: 'none' }}
                 onFocus={(e) => (e.target.style.borderColor = '#d4a437')} onBlur={(e) => (e.target.style.borderColor = '#d8dbe6')} />
             </div>
           </div>
@@ -134,7 +134,7 @@ export function LoginScreen({ onSignIn }) {
               <Lock size={14} style={{ position: 'absolute', left: 12, top: 14, color: '#8b94b3' }} />
               <input type={showPwd ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password"
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-                style={{ width: '100%', padding: '12px 40px 12px 36px', border: '1px solid #d8dbe6', borderRadius: 7, fontSize: 13, background: '#fff', color: '#0d1326', outline: 'none', boxSizing: 'border-box', WebkitAppearance: 'none' }}
+                style={{ width: '100%', padding: '12px 40px 12px 36px', border: '1px solid #cdd1d8', borderRadius: 7, fontSize: 13, background: '#fff', color: '#0d1326', outline: 'none', boxSizing: 'border-box', WebkitAppearance: 'none' }}
                 onFocus={(e) => (e.target.style.borderColor = '#d4a437')} onBlur={(e) => (e.target.style.borderColor = '#d8dbe6')} />
               <button onClick={() => setShowPwd((s) => !s)} style={{ position: 'absolute', right: 8, top: 8, background: 'transparent', border: 'none', padding: 6, cursor: 'pointer', color: '#5a6691', fontSize: 11, fontWeight: 600 }}>{showPwd ? 'Hide' : 'Show'}</button>
             </div>
@@ -149,7 +149,7 @@ export function LoginScreen({ onSignIn }) {
             {signing ? 'Signing in…' : 'Sign In'} →
           </button>
 
-          <div style={{ marginTop: 8, paddingTop: 18, borderTop: '1px solid #e1e3ec', textAlign: 'center' }}>
+          <div style={{ marginTop: 8, paddingTop: 18, borderTop: '1px solid #cdd1d8', textAlign: 'center' }}>
             <p style={{ margin: 0, fontSize: 10, color: '#8b94b3', lineHeight: 1.6 }}>
               © 2026 Travkings Tours &amp; Travels Pvt. Ltd. · All rights reserved.<br />
               Need access? Contact <b style={{ color: '#5a6691' }}>afshin.dhanani@kingsgroupco.com</b>

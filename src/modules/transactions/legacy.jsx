@@ -158,16 +158,16 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
   const ageTone=(d)=>d<=7?["#16a34a","#e8f6ed"]:d<=30?["#d97706","#fbeedb"]:["#dc2626","#fbe9e9"];
 
   return (
-    <div style={{border:"1px solid #e6e8ec",borderRadius:10,overflow:"hidden",marginBottom:12}}>
+    <div style={{border:"1px solid #cdd1d8",borderRadius:10,overflow:"hidden",marginBottom:12}}>
       {/* header + Apply As toggle */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",padding:"10px 14px",background:"#f4f5f7",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",padding:"10px 14px",background:"#f4f5f7",borderBottom:"1px solid #cdd1d8"}}>
         <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
           <span style={{fontSize:10,fontWeight:800,letterSpacing:"0.6px",color:"#c2a04a",textTransform:"uppercase"}}>Bill-wise Allocation</span>
           {party&&<span style={{fontSize:11.5,fontWeight:700,color:"#1a1c22"}}>{party}</span>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.5px",color:"#5b616e",textTransform:"uppercase"}}>Apply As</span>
-          <div style={{display:"inline-flex",border:"1px solid #e6e8ec",borderRadius:6,overflow:"hidden"}}>
+          <div style={{display:"inline-flex",border:"1px solid #cdd1d8",borderRadius:6,overflow:"hidden"}}>
             {[["bills","Against Bills"],["onaccount","On Account"]].map(([m,lab])=>(
               <button key={m} onClick={()=>onMode(m)} style={{border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:10.5,fontWeight:700,padding:"6px 13px",
                 background:mode===m?"#1a1c22":"#fff",color:mode===m?"#c2a04a":"#5b616e"}}>{lab}</button>
@@ -193,7 +193,7 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
           ):(
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-                <thead><tr style={{background:"#fafafa",borderBottom:"1px solid #e6e8ec"}}>
+                <thead><tr style={{background:"#fafafa",borderBottom:"1px solid #cdd1d8"}}>
                   {["Bill No.","Date","Age","Outstanding","Status",`Allocate (${cur})`].map((h,i)=>(
                     <th key={i} style={{padding:"8px 12px",textAlign:i>=3?(i===4?"center":"right"):"left",fontSize:9,fontWeight:700,letterSpacing:"0.4px",color:"#5b616e",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
                   ))}
@@ -202,7 +202,7 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
                   {bills.map(b=>{
                     const [ac,abg]=ageTone(b.ageDays);
                     return (
-                      <tr key={b.billVno} style={{borderBottom:"1px solid #f4f5f7"}}>
+                      <tr key={b.billVno} style={{borderBottom:"1px solid #dfe2e7"}}>
                         <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10.5,fontWeight:700,color:"#1a1c22"}}>{b.billVno}</td>
                         <td style={{padding:"8px 12px",fontSize:10.5,color:"#5b616e"}}>{b.date}</td>
                         <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,fontWeight:700,padding:"2px 7px",borderRadius:999,background:abg,color:ac}}>{b.ageDays}d</span></td>
@@ -339,7 +339,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
         <div style={{display:"flex",gap:7,flexShrink:0}}>
           {isLinked&&(
             <button onClick={()=>onSelect(null)}
-              style={{padding:"5px 10px",background:"transparent",border:"1px solid #e6e8ec",
+              style={{padding:"5px 10px",background:"transparent",border:"1px solid #cdd1d8",
                 borderRadius:7,fontSize:10.5,cursor:"pointer",color:"#5b616e",fontWeight:500}}>
               ✕
             </button>
@@ -391,12 +391,12 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
           </div>
 
           {/* Search */}
-          <div style={{padding:"9px 14px",borderBottom:"1px solid #e6e8ec",flexShrink:0,
+          <div style={{padding:"9px 14px",borderBottom:"1px solid #cdd1d8",flexShrink:0,
             background:"#f9fafb"}}>
             <input autoFocus
               value={search} onChange={e=>setSearch(e.target.value)}
               placeholder={"Search voucher no., supplier, reference, description..."}
-              style={{width:"100%",padding:"7px 12px",border:"1.5px solid #e6e8ec",
+              style={{width:"100%",padding:"7px 12px",border:"1.5px solid #cdd1d8",
                 borderRadius:8,fontSize:11.5,outline:"none",boxSizing:"border-box",
                 background:"#fff"}}
             />
@@ -404,7 +404,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
 
           {/* Stats row */}
           <div style={{display:"flex",gap:12,padding:"7px 16px",
-            borderBottom:"1px solid #e6e8ec",background:"#f9fafb",flexShrink:0}}>
+            borderBottom:"1px solid #cdd1d8",background:"#f9fafb",flexShrink:0}}>
             <span style={{fontSize:10,color:"#5b616e"}}>
               <b style={{color:"#16a34a"}}>{available.length}</b> available to link
             </span>
@@ -442,7 +442,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
                   <div key={i}
                     {...clickable(()=>{onSelect(p);setOpen(false);setSearch("");}, { role:'option' })}
                     style={{
-                      padding:"11px 16px",borderBottom:"1px solid #f4f5f7",
+                      padding:"11px 16px",borderBottom:"1px solid #dfe2e7",
                       cursor:"pointer",transition:"background 0.1s",
                       background:isSelected?"#e8f6ed":"#fff",
                       display:"flex",alignItems:"center",gap:14,
@@ -452,7 +452,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
                   >
                     {/* Left: check/radio indicator */}
                     <div style={{width:18,height:18,borderRadius:"50%",flexShrink:0,
-                      border:isSelected?"none":"2px solid #e6e8ec",
+                      border:isSelected?"none":"2px solid #cdd1d8",
                       background:isSelected?"#16a34a":"transparent",
                       display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff"}}>
                       {isSelected&&"✔"}
@@ -505,7 +505,7 @@ export function PurchaseLinkField({branch,saleMod,saleAmt,onSelect,selected}){
 
           {/* Footer */}
           <div style={{padding:"9px 16px",background:"#f9fafb",
-            borderTop:"1px solid #e6e8ec",flexShrink:0,
+            borderTop:"1px solid #cdd1d8",flexShrink:0,
             display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <p style={{margin:0,fontSize:10,color:"#5b616e"}}>
               {branch==="ALL"?"Switch to a branch to link vouchers."
@@ -556,7 +556,7 @@ export function SalesFlight({branch,setRoute}){
   const isIntl=tripType==="International";
   return (
     <div style={{padding:"12px 10px",maxWidth:1260,margin:"0 auto",paddingBottom:72}}>
-      <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:12,overflow:"hidden"}}>
+      <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:12,overflow:"hidden"}}>
         {/* Header */}
         <div style={{padding:"12px 16px",background:"#1a1c22"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
@@ -607,7 +607,7 @@ export function SalesFlight({branch,setRoute}){
           saleAmt={t.total} selected={linkedPurch} onSelect={setLinkedPurch}/>
 
         {/* Voucher fields */}
-        <div style={{padding:"13px 16px",borderBottom:"1px solid #e6e8ec"}}>
+        <div style={{padding:"13px 16px",borderBottom:"1px solid #cdd1d8"}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
             <FL label="Voucher no."><input value={vNo} readOnly style={{...inp,background:"#f4f5f7",color:"#5b616e"}}/></FL>
             <FL label="Date"><input type="date" defaultValue={todayISO()} style={inp}/></FL>
@@ -618,7 +618,7 @@ export function SalesFlight({branch,setRoute}){
         </div>
 
         {/* Party */}
-        <div style={{padding:"13px 16px",borderBottom:"1px solid #e6e8ec"}}>
+        <div style={{padding:"13px 16px",borderBottom:"1px solid #cdd1d8"}}>
           <p style={{margin:"0 0 8px",fontSize:10,color:"#5b616e",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Customer</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:11}}>
             <FL label="Customer / Party A/c"><input placeholder="Select customer…" style={inp}/></FL>
@@ -635,7 +635,7 @@ export function SalesFlight({branch,setRoute}){
         </div>
 
         {/* Passenger table */}
-        <div style={{padding:"13px 16px",borderBottom:"1px solid #e6e8ec"}}>
+        <div style={{padding:"13px 16px",borderBottom:"1px solid #cdd1d8"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
             <p style={{margin:0,fontSize:10,color:"#5b616e",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Passengers</p>
             <button onClick={add} style={{...btnGh,padding:"5px 11px",fontSize:11,display:"flex",alignItems:"center",gap:5}}>
@@ -651,7 +651,7 @@ export function SalesFlight({branch,setRoute}){
                 ))}
               </tr></thead>
               <tbody>{pax.map((p,i)=>(
-                <tr key={p.id} style={{borderBottom:"1px solid #e6e8ec"}}>
+                <tr key={p.id} style={{borderBottom:"1px solid #cdd1d8"}}>
                   <td style={{padding:"4px 8px",color:"#5b616e"}}>{i+1}</td>
                   <td style={{padding:3}}><input value={p.name} onChange={e=>upd(p.id,"name",e.target.value)} style={{...inp,minWidth:160}}/></td>
                   <td style={{padding:3}}><input value={p.ticket} onChange={e=>upd(p.id,"ticket",e.target.value)} style={{...inp,minWidth:130,fontFamily:"monospace"}}/></td>
@@ -668,7 +668,7 @@ export function SalesFlight({branch,setRoute}){
                   </td>
                 </tr>
               ))}</tbody>
-              <tfoot><tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+              <tfoot><tr style={{background:"#f4f5f7",borderTop:"2px solid #cdd1d8"}}>
                 <td colSpan={7} style={{padding:"7px 8px",fontWeight:700,fontSize:11,color:"#5b616e"}}>Totals</td>
                 <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#2563eb"}}>{fmt(t.base)}</td>
                 <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(t.k3)}</td>
@@ -681,7 +681,7 @@ export function SalesFlight({branch,setRoute}){
         </div>
 
         {/* Tax + Totals */}
-        <div style={{padding:"13px 16px",borderBottom:"1px solid #e6e8ec"}}>
+        <div style={{padding:"13px 16px",borderBottom:"1px solid #cdd1d8"}}>
           <p style={{margin:"0 0 8px",fontSize:10,color:"#5b616e",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>
             {cfg.taxType==="GST"?"Service charge & GST":"Service charge & VAT"}
           </p>
@@ -716,7 +716,7 @@ export function SalesFlight({branch,setRoute}){
                   display:"flex",alignItems:"center",gap:11,flexWrap:"wrap"}}>
                   {qrFile
                     ?<>
-                      <div style={{width:54,height:54,borderRadius:6,background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,border:"1px solid #e6e8ec"}}>▦</div>
+                      <div style={{width:54,height:54,borderRadius:6,background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,border:"1px solid #cdd1d8"}}>▦</div>
                       <div style={{flex:1,minWidth:140}}>
                         <p style={{margin:0,fontSize:11,fontWeight:700,color:"#1a1c22"}}>{qrFile.name}</p>
                         <p style={{margin:"2px 0 0",fontSize:10,color:"#5b616e"}}>{(qrFile.size/1024).toFixed(1)} KB · uploaded</p>
@@ -724,7 +724,7 @@ export function SalesFlight({branch,setRoute}){
                       <button onClick={()=>setQrFile(null)} style={{...btnGh,fontSize:10,padding:"4px 10px",color:"#dc2626",borderColor:"#dc2626"}}>Remove</button>
                     </>
                     :<>
-                      <div style={{width:54,height:54,borderRadius:6,background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#9197a3",border:"1px solid #e6e8ec"}}>▦</div>
+                      <div style={{width:54,height:54,borderRadius:6,background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#9197a3",border:"1px solid #cdd1d8"}}>▦</div>
                       <div style={{flex:1,minWidth:140}}>
                         <p style={{margin:0,fontSize:11,fontWeight:600,color:"#1a1c22"}}>Upload GST e-Invoice QR code</p>
                         <p style={{margin:"2px 0 0",fontSize:9.5,color:"#5b616e"}}>PNG / JPG · signed QR from IRP portal</p>
@@ -739,7 +739,7 @@ export function SalesFlight({branch,setRoute}){
                 </div>
               </div>
             </div>
-            <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:10,padding:14,alignSelf:"start"}}>
+            <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:10,padding:14,alignSelf:"start"}}>
               <TRow l="Base fare" v={cur+" "+fmt(t.base)}/>
               <TRow l="K3 tax" v={cur+" "+fmt(t.k3)}/>
               <TRow l="Taxes" v={cur+" "+fmt(t.tax)}/>
@@ -768,7 +768,7 @@ export function SalesFlight({branch,setRoute}){
       </div>
 
       {/* Sticky footer */}
-      <div style={{position:"sticky",bottom:0,background:"#f4f5f7",borderTop:"1px solid #e6e8ec",
+      <div style={{position:"sticky",bottom:0,background:"#f4f5f7",borderTop:"1px solid #cdd1d8",
         padding:"12px 10px",display:"flex",gap:9,justifyContent:"flex-end"}}>
         <button style={btnGh}>Cancel</button>
         <button
@@ -811,14 +811,14 @@ export function SalesCar({branch,setRoute}){
     <VWrap title="Sales Voucher — Car Rentals" icon="🚗" vNo={vNo} branch={branch} type="sales" saleMod="SC" saleAmt={total||0} setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} name="" gstin={partyGstin} onGstinChange={setPartyGstin}/>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec",overflowX:"auto"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8",overflowX:"auto"}}>
         <p style={{margin:"0 0 8px",fontSize:10,color:"#5b616e",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Vehicle &amp; hire details</p>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:820}}>
           <thead><tr>
             {["#","Vehicle","Pickup","Drop","Days","Basic ₹","Other fare ₹","Service charge ₹","Total ₹"].map((h,i)=><VTH key={i} c={h} r={i>=4&&i<=8}/>)}
           </tr></thead>
           <tbody>
-            <tr style={{borderBottom:"1px solid #e6e8ec"}}>
+            <tr style={{borderBottom:"1px solid #cdd1d8"}}>
               <VTD c={1}/>
               <td style={{padding:3}}>
                 <input value={row.vehicle} onChange={e=>upd("vehicle",e.target.value)} style={{...inp,minHeight:28,fontSize:11}} title="Vehicle type / model"/>
@@ -834,7 +834,7 @@ export function SalesCar({branch,setRoute}){
           </tbody>
         </table>
       </div>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
           <FL label="GST rate"><input value={intra?"5% (CGST 2.5% + SGST 2.5%)":"5% (IGST)"} readOnly style={{...inp,background:"#f4f5f7",color:"#5b616e",fontWeight:600,cursor:"not-allowed"}}/></FL>
           {intra
@@ -895,7 +895,7 @@ export function SalesVisa({branch,setRoute}){
             {["#","PAX Name","Passport no.","Visa country","Visa type","VFS fee ₹","Taxes ₹","Other taxes ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=7}/>)}
           </tr></thead>
           <tbody>{appl.map((a,i)=>(
-            <tr key={a.id} style={{borderBottom:"1px solid #e6e8ec"}}>
+            <tr key={a.id} style={{borderBottom:"1px solid #cdd1d8"}}>
               <VTD c={i+1}/>
               <td style={{padding:3}}><input value={a.name} onChange={e=>upd(a.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:150}}/></td>
               <td style={{padding:3}}><input value={a.pp} onChange={e=>upd(a.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:100}}/></td>
@@ -908,7 +908,7 @@ export function SalesVisa({branch,setRoute}){
             </tr>
           ))}</tbody>
           <tfoot>
-            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #cdd1d8"}}>
               <td colSpan={5} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(vfsTot)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(taxesTot)}</td>
@@ -918,7 +918,7 @@ export function SalesVisa({branch,setRoute}){
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
           <FL label={bc(branch).cur+"Service charge"}>
             <input type="number" value={svc} onChange={e=>setSvc(+e.target.value||0)} style={{...inp,textAlign:"right"}}/>
@@ -987,7 +987,7 @@ export function SalesHotel({branch,setRoute}){
           <tbody>{rows.map((r,i)=>{
             const lineTotal=(+r.basic||0)+(+r.taxes||0)+(+r.otherTax||0);
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #cdd1d8"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.passenger} onChange={e=>upd(r.id,"passenger",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:160}}/></td>
                 <td style={{padding:3}}><SmartDateInput value={r.ci} onChange={(iso)=>upd(r.id,"ci",iso)} style={{...inp,minHeight:28,fontSize:11}}/></td>
@@ -1007,7 +1007,7 @@ export function SalesHotel({branch,setRoute}){
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #cdd1d8"}}>
               <td colSpan={6} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(totTaxes)}</td>
@@ -1018,7 +1018,7 @@ export function SalesHotel({branch,setRoute}){
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
           <FL label={bc(branch).cur+"Service charge"}>
             <input type="number" value={svc} onChange={e=>setSvc(+e.target.value||0)} style={{...inp,textAlign:"right"}}/>
@@ -1085,7 +1085,7 @@ export function SalesInsurance({branch,setRoute}){
           <tbody>{rows.map((r,i)=>{
             const lineTotal=(+r.basic||0)+(+r.otherTax||0)+(+r.svc||0);
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #cdd1d8"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.name} onChange={e=>upd(r.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:180}}/></td>
                 <td style={{padding:3}}><input value={r.pp} onChange={e=>upd(r.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:100}}/></td>
@@ -1099,7 +1099,7 @@ export function SalesInsurance({branch,setRoute}){
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #cdd1d8"}}>
               <td colSpan={4} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(totOther)}</td>
@@ -1110,7 +1110,7 @@ export function SalesInsurance({branch,setRoute}){
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
           <FL label={bc(branch).cur+"Taxable value"}><input value={fmt(taxable)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
           {!isGST
@@ -1185,7 +1185,7 @@ export function SalesMisc({branch,setRoute}){
             const amt=+r.amt||0;
             const g=+(amt*(r.gstPct/100)).toFixed(2);
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #cdd1d8"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.gl} onChange={e=>upd(r.id,"gl",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:220}}/></td>
                 <td style={{padding:3}}><input value={r.sac} onChange={e=>upd(r.id,"sac",e.target.value)} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:90}}/></td>
@@ -1202,7 +1202,7 @@ export function SalesMisc({branch,setRoute}){
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #cdd1d8"}}>
               <td colSpan={3} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(sub)}</td>
               <td/>
@@ -1213,7 +1213,7 @@ export function SalesMisc({branch,setRoute}){
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
         <p style={{margin:"0 0 9px",fontSize:10,color:"#5b616e",letterSpacing:"0.5px",textTransform:"uppercase"}}>GST breakup by rate</p>
         <div style={{display:"flex",gap:9,flexWrap:"wrap"}}>
           {Object.entries(gstByRate).map(([rate,vals])=>(
@@ -1395,11 +1395,11 @@ function InvoiceSelect({invoices,value,onChange,cur,loading,placeholder,noun="sa
   };
   const menu=open&&rect&&createPortal(
     <div ref={menuRef} style={{position:"fixed",top:rect.bottom+4,left:rect.left,width:Math.max(rect.width,330),zIndex:4000,background:"#fff",
-      border:"1px solid #e6e8ec",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.18)",overflow:"hidden"}}>
+      border:"1px solid #cdd1d8",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.18)",overflow:"hidden"}}>
       <div style={{position:"relative"}}>
         <Search size={13} style={{position:"absolute",left:10,top:9,color:"#9197a3"}}/>
         <input autoFocus value={q} onChange={e=>setQ(e.target.value)} onKeyDown={onKeyNav} placeholder="Search by invoice no, party, pax, ticket, PNR or sector…  (↑ ↓ to move · Enter to select)"
-          style={{width:"100%",border:"none",borderBottom:"1px solid #e6e8ec",padding:"8px 12px 8px 30px",fontSize:11,outline:"none",boxSizing:"border-box"}}/>
+          style={{width:"100%",border:"none",borderBottom:"1px solid #cdd1d8",padding:"8px 12px 8px 30px",fontSize:11,outline:"none",boxSizing:"border-box"}}/>
       </div>
       <div style={{maxHeight:300,overflowY:"auto"}}>
         {filtered.map((inv,idx)=>{
@@ -1408,7 +1408,7 @@ function InvoiceSelect({invoices,value,onChange,cur,loading,placeholder,noun="sa
           return (
             <div key={inv.id} ref={el=>{ if(active&&el) el.scrollIntoView({block:"nearest"}); }}
               {...clickable(()=>{onChange(inv.id);setOpen(false);}, { role:'option' })} onMouseEnter={()=>setActiveIdx(idx)}
-              style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #f4f5f7",background:active?"#eaf0ff":"transparent"}}>
+              style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #dfe2e7",background:active?"#eaf0ff":"transparent"}}>
 
               <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"baseline"}}>
                 <span style={{fontFamily:"monospace",fontSize:10.5,fontWeight:700,color:"#2563eb"}}>{inv.vno}</span>
@@ -1425,7 +1425,7 @@ function InvoiceSelect({invoices,value,onChange,cur,loading,placeholder,noun="sa
         })}
         {filtered.length===0&&<div style={{padding:"12px",fontSize:11,color:"#5b616e"}}>{loading?`Loading ${nounPlural}…`:`No matching ${noun}`}</div>}
       </div>
-      <div style={{padding:"6px 10px",borderTop:"1px solid #f4f5f7",fontSize:9.5,color:"#5b616e"}}>{invoices.length} {nounPlural} · type to filter</div>
+      <div style={{padding:"6px 10px",borderTop:"1px solid #dfe2e7",fontSize:9.5,color:"#5b616e"}}>{invoices.length} {nounPlural} · type to filter</div>
     </div>, document.body);
   return (
     <div ref={ref} style={{position:"relative"}}>
@@ -1455,7 +1455,7 @@ function InvoicePaxPanel({inv,cur,label="Invoice",selectable=false,selected,onTo
   const svc=invServiceCharge(inv);
   const gst=_r2(inv.taxAmt||inv.gstAmt||0), tcs=_r2(inv.tcsAmt||0);
   const chip=(l,v,c)=>(
-    <div style={{flex:1,minWidth:118,padding:"7px 11px",borderRadius:7,background:"#f4f5f7",border:"1px solid #e6e8ec"}}>
+    <div style={{flex:1,minWidth:118,padding:"7px 11px",borderRadius:7,background:"#f4f5f7",border:"1px solid #cdd1d8"}}>
       <div style={{fontSize:8.5,fontWeight:700,letterSpacing:".5px",color:"#5b616e",textTransform:"uppercase"}}>{l}</div>
       <div style={{fontSize:13,fontWeight:800,marginTop:2,color:c||"#1a1c22",fontVariantNumeric:"tabular-nums"}}>{vf2(cur,v)}</div>
     </div>
@@ -1469,7 +1469,7 @@ function InvoicePaxPanel({inv,cur,label="Invoice",selectable=false,selected,onTo
       {pax.length>0?(
         <div style={{overflowX:"auto",marginBottom:9}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:10.5}}>
-            <thead><tr style={{borderBottom:"1px solid #e6e8ec"}}>
+            <thead><tr style={{borderBottom:"1px solid #cdd1d8"}}>
               {selectable&&<th style={{padding:"4px 8px",textAlign:"center"}}><input type="checkbox" checked={allSel} onChange={()=>onToggleAll&&onToggleAll(pax,!allSel)} title="Select all"/></th>}
               {["#","PAX Name","Ticket / Ref","Sector","Airline / Operator","Class","Base Fare"].map((h,i)=>(
                 <th key={i} style={{textAlign:i===0?"center":i===6?"right":"left",padding:"4px 8px",fontSize:8.5,fontWeight:700,color:"#5b616e",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
@@ -1478,7 +1478,7 @@ function InvoicePaxPanel({inv,cur,label="Invoice",selectable=false,selected,onTo
             <tbody>{pax.map((p,i)=>{
               const sel=isSel(p,i);
               return (
-              <tr key={i} style={{borderBottom:".5px solid #f4f5f7",opacity:selectable&&!sel?0.4:1}}>
+              <tr key={i} style={{borderBottom:".5px solid #dfe2e7",opacity:selectable&&!sel?0.4:1}}>
                 {selectable&&<td style={{padding:"4px 8px",textAlign:"center"}}><input type="checkbox" checked={sel} onChange={()=>onToggle&&onToggle(paxKey(p,i))}/></td>}
                 <td style={{padding:"4px 8px",textAlign:"center",color:"#9197a3"}}>{i+1}</td>
                 <td style={{padding:"4px 8px",fontWeight:600,color:"#1a1c22",whiteSpace:"nowrap"}}>{p.name||"—"}</td>
@@ -1700,7 +1700,7 @@ function RefundReissueVoucher({branch,kind}){
         </VExplain>
 
         {/* Module strip — mirrors the mockup tabs */}
-        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14,borderBottom:"1px solid #e6e8ec",paddingBottom:10}}>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14,borderBottom:"1px solid #cdd1d8",paddingBottom:10}}>
           {RR_ORDER.map(m=>(
             <button key={m} onClick={()=>setModule(m)} style={{padding:"6px 13px",borderRadius:7,fontSize:10.5,fontWeight:700,cursor:"pointer",textTransform:"uppercase",letterSpacing:".3px",
               background:module===m?"#1a1c22":"#f4f5f7",color:module===m?"#c2a04a":"#5b616e",border:"1.5px solid "+(module===m?"#c2a04a":"#e6e8ec")}}>{RR_MODULES[m].tab}</button>
@@ -1728,7 +1728,7 @@ function RefundReissueVoucher({branch,kind}){
           ? <InvoicePaxPanel inv={selPur} cur={cur} label="Purchase Invoice · auto-linked" selectable selected={purPaxSel} onToggle={togglePax(setPurPaxSel)} onToggleAll={toggleAllPax(setPurPaxSel)}/>
           : selInv
             ? <div style={{padding:"10px 13px",borderRadius:8,background:"#fbe9e9",border:"1px solid #f3c9c9",fontSize:10.5,color:"#dc2626",fontWeight:600,marginBottom:14}}>⚠ No purchase invoice is linked to {selInv.vno}{selInv.linkNo?` (Link No ${selInv.linkNo})`:" — the sale has no Link No"}{purchQ.isLoading?" · loading purchases…":""}. A refund/reissue must settle the linked purchase — check the purchase exists with the same Link No.</div>
-            : <div style={{padding:"10px 13px",borderRadius:8,background:"#f4f5f7",border:"1px solid #e6e8ec",fontSize:10.5,color:"#5b616e",marginBottom:14}}>Pick a sales invoice above — its linked purchase invoice loads automatically.</div>}
+            : <div style={{padding:"10px 13px",borderRadius:8,background:"#f4f5f7",border:"1px solid #cdd1d8",fontSize:10.5,color:"#5b616e",marginBottom:14}}>Pick a sales invoice above — its linked purchase invoice loads automatically.</div>}
 
         <div style={{display:"grid",gridTemplateColumns:mob?"1fr 1fr":"repeat(4,1fr)",gap:12,marginBottom:14}}>
           <FL label={cfgM.ref1}><input value={ref1} onChange={e=>setRef1(e.target.value)} style={inp} placeholder={cfgM.ref1}/></FL>
@@ -1745,21 +1745,21 @@ function RefundReissueVoucher({branch,kind}){
               <RRLine label="Original Fare" sub={selPur?`from purchase ${selPur.vno} (excl. svc + GST)`:`paid to ${cfgM.sup}`}>{num(origFare,setOrigFare)}</RRLine>
               <RRLine label={cfgM.rfCancel} sub={`${cfgM.sup} retains`}>{num(supCancel,setSupCancel)}</RRLine>
               <RRLine label="Supplier Service Charge" sub={`our cost → ${supSvcLedger} (reduces GP)`}>{num(supSvc,setSupSvc)}</RRLine>
-              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e6e8ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="input credit (claimable)" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
+              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #cdd1d8",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="input credit (claimable)" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
               <RRLine label="Supplier Refund to Us" sub="fare − cancellation − supplier charges" derived><input type="number" value={supRefund} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
               <div/>
             </>:<>
               <RRLine label={cfgM.riFee} sub={`charged by ${cfgM.sup}`}>{num(changeFee,setChangeFee)}</RRLine>
               <RRLine label={cfgM.diff} sub="new − old">{num(fareDiff,setFareDiff)}</RRLine>
               <RRLine label="Supplier Service Charge" sub={`our cost → ${supSvcLedger} (reduces GP)`}>{num(supSvc,setSupSvc)}</RRLine>
-              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e6e8ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="input credit (claimable)" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
+              <RRLine label={<>GST on Supplier Charge @<input type="number" value={supGstRate} onChange={e=>setSupGstRate(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #cdd1d8",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="input credit (claimable)" derived><input type="number" value={supGst} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
               <RRLine label="Payable to Supplier" sub="fee + difference + supplier charges" derived><input type="number" value={supPayable} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
               <div/>
             </>}
             <RRLine label="Our Service Fee" sub="our income, retained">{num(svc,setSvc)}</RRLine>
-            <RRLine label={<>GST on Service Fee @<input type="number" value={gstRateSvc} onChange={e=>setGstRateSvc(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e6e8ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="on Service Fee" derived><input type="number" value={gstSvc} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
+            <RRLine label={<>GST on Service Fee @<input type="number" value={gstRateSvc} onChange={e=>setGstRateSvc(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #cdd1d8",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="on Service Fee" derived><input type="number" value={gstSvc} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
             <RRLine label="Our Service Charge - 2" sub="our margin, retained">{num(markup,setMarkup)}</RRLine>
-            <RRLine label={<>GST on Service Charge - 2 @<input type="number" value={gstRateMk} onChange={e=>setGstRateMk(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #e6e8ec",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="on Service Charge - 2" derived><input type="number" value={gstMk} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
+            <RRLine label={<>GST on Service Charge - 2 @<input type="number" value={gstRateMk} onChange={e=>setGstRateMk(+e.target.value||0)} style={{width:42,padding:"2px 4px",border:"1px solid #cdd1d8",borderRadius:4,fontSize:11,textAlign:"right"}}/>%</>} sub="on Service Charge - 2" derived><input type="number" value={gstMk} disabled style={{...inp,textAlign:"right",fontWeight:700,background:"#f4f5f7",color:"#5b616e"}}/></RRLine>
           </div>
           {/* Highlight: amount to / from customer */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginTop:12,padding:"11px 14px",borderRadius:8,background:"#FDFAF4",border:"1px solid "+(chargesExceed?"#f3c9c9":"#EFE7D4")}}>
@@ -1803,7 +1803,7 @@ function RefundReissueVoucher({branch,kind}){
 // One calculation row inside the Refund / Reissue calc grid.
 function RRLine({label,sub,children,derived}){
   return (
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,padding:"7px 0",borderBottom:".5px solid #f4f5f7"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,padding:"7px 0",borderBottom:".5px solid #dfe2e7"}}>
       <label style={{fontSize:11.5,fontWeight:600,color:derived?"#5b616e":"#14161a"}}>{label}<span style={{display:"block",fontSize:9.5,fontWeight:400,color:"#9197a3",marginTop:1}}>{sub}</span></label>
       <div style={{width:128,flexShrink:0}}>{children}</div>
     </div>
@@ -1834,7 +1834,7 @@ export function PurchaseFlight({branch,setRoute}){
       <VHead vNo={vNo}/>
 
       {/* Trip type + IRN strip */}
-      <div style={{padding:"10px 16px",background:"#1a1c22",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{padding:"10px 16px",background:"#1a1c22",borderBottom:"1px solid #cdd1d8"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
           <div style={{display:"flex",gap:0,borderRadius:999,overflow:"hidden",border:"1px solid #2e323c"}}>
             <button onClick={()=>setTripType("Domestic")}
@@ -1869,7 +1869,7 @@ export function PurchaseFlight({branch,setRoute}){
             {["#","PAX Name","Ticket no.","Airline","Sector","Class","Date","Base cost ₹","K3 ₹","Taxes ₹","Total ₹",""].map((h,i)=><VTH key={i} c={h} r={i>=7&&i<=10}/>)}
           </tr></thead>
           <tbody>{pax.map((p,i)=>(
-            <tr key={p.id} style={{borderBottom:"1px solid #e6e8ec"}}>
+            <tr key={p.id} style={{borderBottom:"1px solid #cdd1d8"}}>
               <VTD c={i+1}/>
               <td style={{padding:3}}><input value={p.name} onChange={e=>upd(p.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
               <td style={{padding:3}}><input value={p.ticket} onChange={e=>upd(p.id,"ticket",e.target.value)} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace"}}/></td>
@@ -1889,7 +1889,7 @@ export function PurchaseFlight({branch,setRoute}){
             </tr>
           ))}</tbody>
           <tfoot>
-            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #cdd1d8"}}>
               <td colSpan={7} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totalBase)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(totalK3)}</td>
@@ -1900,7 +1900,7 @@ export function PurchaseFlight({branch,setRoute}){
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:9}}>
           <div style={{padding:"8px 12px",background:"#e8f6ed",borderRadius:8,fontSize:11.5,color:"#16a34a"}}>
             Accounting: <b>Dr Flight Ticket Purchase</b> &nbsp;|&nbsp; <b>Cr BSP India / Airline ledger</b>. Base fare and taxes are both cost — no GST on ticket purchase side.
@@ -1914,7 +1914,7 @@ export function PurchaseFlight({branch,setRoute}){
       </div>
 
       {/* Terms & GST QR upload */}
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
         <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:14}}>
           <FL label="Terms & Conditions">
             <textarea rows={5} value={terms} onChange={e=>setTerms(e.target.value)} style={{...inp,resize:"vertical",fontSize:10.5,lineHeight:1.45}}/>
@@ -1925,7 +1925,7 @@ export function PurchaseFlight({branch,setRoute}){
               display:"flex",alignItems:"center",gap:11,flexWrap:"wrap"}}>
               {qrFile
                 ?<>
-                  <div style={{width:54,height:54,borderRadius:6,background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,border:"1px solid #e6e8ec"}}>▦</div>
+                  <div style={{width:54,height:54,borderRadius:6,background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,border:"1px solid #cdd1d8"}}>▦</div>
                   <div style={{flex:1,minWidth:140}}>
                     <p style={{margin:0,fontSize:11,fontWeight:700,color:"#1a1c22"}}>{qrFile.name}</p>
                     <p style={{margin:"2px 0 0",fontSize:10,color:"#5b616e"}}>{(qrFile.size/1024).toFixed(1)} KB · uploaded</p>
@@ -1933,7 +1933,7 @@ export function PurchaseFlight({branch,setRoute}){
                   <button onClick={()=>setQrFile(null)} style={{...btnGh,fontSize:10,padding:"4px 10px",color:"#dc2626",borderColor:"#dc2626"}}>Remove</button>
                 </>
                 :<>
-                  <div style={{width:54,height:54,borderRadius:6,background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#9197a3",border:"1px solid #e6e8ec"}}>▦</div>
+                  <div style={{width:54,height:54,borderRadius:6,background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#9197a3",border:"1px solid #cdd1d8"}}>▦</div>
                   <div style={{flex:1,minWidth:140}}>
                     <p style={{margin:0,fontSize:11,fontWeight:600,color:"#1a1c22"}}>Upload supplier GST QR code</p>
                     <p style={{margin:"2px 0 0",fontSize:9.5,color:"#5b616e"}}>PNG / JPG · signed QR from BSP / airline e-invoice</p>
@@ -2035,35 +2035,35 @@ export function PurchaseHoliday({branch,setRoute}){
               ))}
             </tr></thead>
             <tbody>
-              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fff"}}>
+              <tr style={{borderBottom:"1px solid #dfe2e7",background:"#fff"}}>
                 <td style={{padding:"4px 10px",textAlign:"center",color:"#5b616e",fontSize:10}}>1</td>
                 <td style={{padding:"4px 10px",fontWeight:700,color:"#1a1c22",fontSize:11}}>Basic</td>
                 <td style={{padding:"3px 6px"}}><input value={basic.desc} onChange={e=>updBasic("desc",e.target.value)} style={{...inp,minHeight:28,fontSize:10.5,minWidth:200}}/></td>
                 <td style={{padding:"3px 6px"}}><input value={basic.sac} onChange={e=>updBasic("sac",e.target.value)} style={{...inp,minHeight:28,fontSize:10,fontFamily:"monospace",width:90}}/></td>
                 <td style={{padding:"3px 6px"}}><input type="number" value={basic.amt} onChange={e=>updBasic("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#dc2626"}}/></td>
               </tr>
-              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fafafa"}}>
+              <tr style={{borderBottom:"1px solid #dfe2e7",background:"#fafafa"}}>
                 <td style={{padding:"4px 10px",textAlign:"center",color:"#5b616e",fontSize:10}}>2</td>
                 <td style={{padding:"4px 10px",fontWeight:700,color:"#1a1c22",fontSize:11}}>Service</td>
                 <td style={{padding:"3px 6px"}}><input value={service.desc} onChange={e=>updService("desc",e.target.value)} style={{...inp,minHeight:28,fontSize:10.5,minWidth:200}}/></td>
                 <td style={{padding:"3px 6px"}}><input value={service.sac} onChange={e=>updService("sac",e.target.value)} style={{...inp,minHeight:28,fontSize:10,fontFamily:"monospace",width:90}}/></td>
                 <td style={{padding:"3px 6px"}}><input type="number" value={service.amt} onChange={e=>updService("amt",+e.target.value)} style={{...inp,minHeight:28,textAlign:"right",fontSize:11,fontWeight:600,color:"#dc2626"}}/></td>
               </tr>
-              <tr style={{borderBottom:"1px solid #e6e8ec",background:"#f4f5f7"}}>
+              <tr style={{borderBottom:"1px solid #cdd1d8",background:"#f4f5f7"}}>
                 <td style={{padding:"6px 10px",textAlign:"center",color:"#1a1c22",fontSize:10,fontWeight:700}}>3</td>
                 <td style={{padding:"6px 10px",fontWeight:800,color:"#1a1c22",fontSize:11.5}}>Total</td>
                 <td style={{padding:"6px 10px",fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>Basic + Service</td>
                 <td style={{padding:"6px 10px"}}></td>
                 <td style={{padding:"6px 10px",textAlign:"right",fontWeight:800,fontSize:12,color:"#1a1c22",fontVariantNumeric:"tabular-nums"}}>{fmt(subTotal)}</td>
               </tr>
-              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fff"}}>
+              <tr style={{borderBottom:"1px solid #dfe2e7",background:"#fff"}}>
                 <td style={{padding:"6px 10px",textAlign:"center",color:"#d97706",fontSize:10,fontWeight:700}}>4</td>
                 <td style={{padding:"6px 10px",fontWeight:700,color:"#d97706",fontSize:11}}>GST (5%)</td>
                 <td style={{padding:"6px 10px",fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>5% on (Basic + Service)</td>
                 <td style={{padding:"6px 10px",fontSize:10,fontFamily:"monospace",color:"#5b616e"}}>—</td>
                 <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#d97706",fontVariantNumeric:"tabular-nums"}}>{fmt(gstAmt)}</td>
               </tr>
-              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fafafa",opacity:isIntl?1:0.45}}>
+              <tr style={{borderBottom:"1px solid #dfe2e7",background:"#fafafa",opacity:isIntl?1:0.45}}>
                 <td style={{padding:"6px 10px",textAlign:"center",color:"#2563eb",fontSize:10,fontWeight:700}}>5</td>
                 <td style={{padding:"6px 10px",fontWeight:700,color:"#2563eb",fontSize:11}}>TCS (2%) {!isIntl&&<span style={{fontSize:9,color:"#5b616e",fontWeight:500}}>— N/A (Domestic)</span>}</td>
                 <td style={{padding:"6px 10px",fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>2% on (Basic + Service + GST) — international only</td>
@@ -2135,7 +2135,7 @@ export function PurchaseHotelVoucher({branch,setRoute}){
           <tbody>{rows.map((r,i)=>{
             const lineTotal=(+r.basic||0)+(+r.taxes||0)+(+r.otherTax||0);
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #cdd1d8"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.passenger} onChange={e=>upd(r.id,"passenger",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:160}}/></td>
                 <td style={{padding:3}}><SmartDateInput value={r.ci} onChange={(iso)=>upd(r.id,"ci",iso)} style={{...inp,minHeight:28,fontSize:11}}/></td>
@@ -2155,7 +2155,7 @@ export function PurchaseHotelVoucher({branch,setRoute}){
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #cdd1d8"}}>
               <td colSpan={6} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(totTaxes)}</td>
@@ -2166,7 +2166,7 @@ export function PurchaseHotelVoucher({branch,setRoute}){
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
           <FL label={bc(branch).cur+"Service charge"}>
             <input type="number" value={svc} onChange={e=>setSvc(+e.target.value||0)} style={{...inp,textAlign:"right"}}/>
@@ -2233,7 +2233,7 @@ export function PurchaseVisa({branch,setRoute}){
           <tbody>{rows.map((r,i)=>{
             const lineTotal=(+r.vfsFee||0)+(+r.taxes||0)+(+r.otherTax||0);
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #cdd1d8"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.name} onChange={e=>upd(r.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:150}}/></td>
                 <td style={{padding:3}}><input value={r.pp} onChange={e=>upd(r.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:100}}/></td>
@@ -2248,7 +2248,7 @@ export function PurchaseVisa({branch,setRoute}){
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #cdd1d8"}}>
               <td colSpan={5} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(vfsTotal)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(taxesTotal)}</td>
@@ -2259,7 +2259,7 @@ export function PurchaseVisa({branch,setRoute}){
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
           <FL label={bc(branch).cur+"Service charge"}>
             <input type="number" value={svc} onChange={e=>setSvc(+e.target.value||0)} style={{...inp,textAlign:"right"}}/>
@@ -2314,14 +2314,14 @@ export function PurchaseCar({branch,setRoute}){
     <VWrap title="Purchase Voucher — Car Rentals" icon="🚗" vNo={vNo} branch={branch} type="purchase" setRoute={setRoute}>
       <VHead vNo={vNo}/>
       <VParty branch={branch} label="Supplier / Transport Co." name={row.vendor} gstin={partyGstin} onGstinChange={setPartyGstin}/>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec",overflowX:"auto"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8",overflowX:"auto"}}>
         <p style={{margin:"0 0 8px",fontSize:10,color:"#5b616e",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>Vehicle hire details</p>
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:880}}>
           <thead><tr>
             {["#","Vendor","Vehicle","Pickup","Drop","Days","Basic ₹","Other fare ₹","Service charge ₹","Total ₹"].map((h,i)=><VTH key={i} c={h} r={i>=5&&i<=9}/>)}
           </tr></thead>
           <tbody>
-            <tr style={{borderBottom:"1px solid #e6e8ec"}}>
+            <tr style={{borderBottom:"1px solid #cdd1d8"}}>
               <VTD c={1}/>
               <td style={{padding:3}}><input value={row.vendor} onChange={e=>upd("vendor",e.target.value)} style={{...inp,minHeight:28,fontSize:11}}/></td>
               <td style={{padding:3}}>
@@ -2338,7 +2338,7 @@ export function PurchaseCar({branch,setRoute}){
           </tbody>
         </table>
       </div>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11}}>
           <FL label="Input GST rate"><input value={intra?"5% (CGST 2.5% + SGST 2.5%)":"5% (IGST)"} readOnly style={{...inp,background:"#f4f5f7",color:"#5b616e",fontWeight:600,cursor:"not-allowed"}}/></FL>
           {intra
@@ -2395,7 +2395,7 @@ export function PurchaseInsurance({branch,setRoute}){
           <tbody>{rows.map((r,i)=>{
             const lineTotal=(+r.basic||0)+(+r.otherTax||0)+(+r.svc||0);
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #cdd1d8"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.name} onChange={e=>upd(r.id,"name",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:180}}/></td>
                 <td style={{padding:3}}><input value={r.pp} onChange={e=>upd(r.id,"pp",e.target.value.toUpperCase())} style={{...inp,minHeight:28,fontSize:11,fontFamily:"monospace",width:100}}/></td>
@@ -2409,7 +2409,7 @@ export function PurchaseInsurance({branch,setRoute}){
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #cdd1d8"}}>
               <td colSpan={4} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(totBasic)}</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5,color:"#d97706"}}>{fmt(totOther)}</td>
@@ -2420,7 +2420,7 @@ export function PurchaseInsurance({branch,setRoute}){
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:11,marginBottom:9}}>
           <FL label={bc(branch).cur+"Taxable value"}><input value={fmt(taxable)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
           <FL label="Input GST 18% ₹"><input value={fmt(inputGst)} readOnly style={{...inp,textAlign:"right",background:"#f4f5f7",color:"#5b616e"}}/></FL>
@@ -2483,7 +2483,7 @@ export function PurchaseMisc({branch,setRoute}){
             const gst=+(amt*r.gstPct/100).toFixed(2);
             const tdsLine=r.tds?+(amt*0.02).toFixed(2):0;
             return (
-              <tr key={r.id} style={{borderBottom:"1px solid #e6e8ec"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #cdd1d8"}}>
                 <VTD c={i+1}/>
                 <td style={{padding:3}}><input value={r.vendor} onChange={e=>upd(r.id,"vendor",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:160}}/></td>
                 <td style={{padding:3}}><input value={r.gl} onChange={e=>upd(r.id,"gl",e.target.value)} style={{...inp,minHeight:28,fontSize:11,minWidth:200}}/></td>
@@ -2507,7 +2507,7 @@ export function PurchaseMisc({branch,setRoute}){
             );
           })}</tbody>
           <tfoot>
-            <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+            <tr style={{background:"#f4f5f7",borderTop:"2px solid #cdd1d8"}}>
               <td colSpan={4} style={{padding:"7px 8px",fontWeight:600,fontSize:11.5}}>Totals</td>
               <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",fontSize:11.5}}>{fmt(sub)}</td>
               <td/>
@@ -2519,7 +2519,7 @@ export function PurchaseMisc({branch,setRoute}){
           </tfoot>
         </table>
       </ARow>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
         <p style={{margin:"0 0 9px",fontSize:10,color:"#5b616e",letterSpacing:"0.5px",textTransform:"uppercase"}}>Input GST breakup &amp; TDS summary</p>
         <div style={{display:"flex",gap:9,flexWrap:"wrap",marginBottom:9}}>
           {Object.entries(gstByRate).map(([rate,vals])=>(
@@ -2622,7 +2622,7 @@ export function UnmatchedTickets({branch,setRoute}){
         <div style={{background:"#fbe9e9",border:"1px solid #f3c9c9",borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:9.5,color:"#dc2626",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px"}}>Unmatched tickets</p><p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#dc2626",fontVariantNumeric:"tabular-nums"}}>{unmatched.length}</p></div>
           <div style={{background:"#fbeedb",border:"1px solid #f3d9a8",borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:9.5,color:"#d97706",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px"}}>Sale value at risk</p><p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#d97706",fontVariantNumeric:"tabular-nums"}}>{cfg.cur+fmt(totalAmt)}</p></div>
           <div style={{background:"#e8f0ff",border:"1px solid #cfe0f8",borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:9.5,color:"#2563eb",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px"}}>Airlines affected</p><p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#2563eb",fontVariantNumeric:"tabular-nums"}}>{new Set(unmatched.map(t=>t.airline)).size}</p></div>
-          <div style={{background:"#f4f5f7",border:"1px solid #e6e8ec",borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:9.5,color:"#2e323c",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px"}}>Branches affected</p><p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#2e323c",fontVariantNumeric:"tabular-nums"}}>{new Set(unmatched.map(t=>t.branch)).size}</p></div>
+          <div style={{background:"#f4f5f7",border:"1px solid #cdd1d8",borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:9.5,color:"#2e323c",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px"}}>Branches affected</p><p style={{margin:"4px 0 0",fontSize:mob?18:22,fontWeight:800,color:"#2e323c",fontVariantNumeric:"tabular-nums"}}>{new Set(unmatched.map(t=>t.branch)).size}</p></div>
       </div>
 
       {/* What this means */}
@@ -2639,7 +2639,7 @@ export function UnmatchedTickets({branch,setRoute}){
         <span style={{fontSize:11,color:"#5b616e",fontWeight:500}}>Filter by airline:</span>
         {["All",...airlines].map(a=>(
           <button key={a} onClick={()=>setFilter(a)}
-            style={{padding:"4px 10px",borderRadius:7,border:"1px solid #e6e8ec",fontSize:11,
+            style={{padding:"4px 10px",borderRadius:7,border:"1px solid #cdd1d8",fontSize:11,
               background:filter===a?"#1a1c22":"#fff",
               color:filter===a?"#fff":"#5b616e",cursor:"pointer"}}>
             {a}
@@ -2746,7 +2746,7 @@ export function UnmatchedTickets({branch,setRoute}){
                 ))}
               </tbody>
               <tfoot>
-                <tr style={{background:"#f4f5f7",borderTop:"2px solid #e6e8ec"}}>
+                <tr style={{background:"#f4f5f7",borderTop:"2px solid #cdd1d8"}}>
                   <td colSpan={10} style={{padding:"9px 11px",fontWeight:700,color:"#dc2626"}}>
                     Total exposure — {rows.length} unmatched ticket{rows.length!==1?"s":""}
                   </td>
@@ -2845,7 +2845,7 @@ export function SalesCancellation({branch}){
             ))}
           </tr></thead>
           <tbody>{cancellations.map((c,i)=>(
-            <tr key={c.id} style={{borderBottom:"1px solid #f4f5f7",background:i%2===0?"#fff":"#fafafa"}}>
+            <tr key={c.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
               <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:9.5,color:"#dc2626"}}>{c.id}</td>
               <td style={{padding:"8px 10px",fontSize:10,color:"#5b616e"}}>{c.date}</td>
               <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:9.5,color:"#d97706"}}>{c.origVno}</td>
@@ -2912,7 +2912,7 @@ export function PurchaseRefunds({branch}){
             ))}
           </tr></thead>
           <tbody>{refunds.map((r,i)=>(
-            <tr key={r.id} style={{borderBottom:"1px solid #f4f5f7",background:i%2===0?"#fff":"#fafafa"}}>
+            <tr key={r.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
               <td style={{padding:"9px 12px",fontFamily:"monospace",fontSize:10,color:"#2563eb"}}>{r.id}</td>
               <td style={{padding:"9px 12px",fontSize:10.5,color:"#5b616e"}}>{r.date}</td>
               <td style={{padding:"9px 12px",fontWeight:600,color:"#1a1c22"}}>{r.supplier}</td>
@@ -3072,7 +3072,7 @@ export function AdmRegister({branch}){
                 const isUrgent=dl>=0&&dl<=7&&!["Accepted","Rejected","Disputed"].includes(a.status);
                 const rc=ADM_REASON_CODES[a.reasonCode]||{code:a.reasonCode,label:a.reasonCode,desc:""};
                 return (
-                  <tr key={a.id} style={{borderBottom:"1px solid #f4f5f7",
+                  <tr key={a.id} style={{borderBottom:"1px solid #dfe2e7",
                     background:isOverdue?"#fff5f5":isUrgent?"#fffaf0":i%2===0?"#fff":"#fafafa"}}>
                     <td style={{padding:"8px 10px"}}>
                       <p style={{margin:0,fontFamily:"monospace",fontSize:10,color:"#dc2626",fontWeight:700}}>{a.id}</p>
@@ -3143,7 +3143,7 @@ export function AdmRegister({branch}){
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:560,maxHeight:"90vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e6e8ec",position:"sticky",top:0,background:"#1a1c22",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",position:"sticky",top:0,background:"#1a1c22",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#c2a04a"}}>Record New ADM</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#9197a3"}}>✕</button>
             </div>
@@ -3175,7 +3175,7 @@ export function AdmRegister({branch}){
                 Response deadline: 30 days from today — {new Date(Date.now()+30*86400000).toISOString().slice(0,10)}. Failure to dispute = auto-accepted and BSP debit raised.
               </div>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e6e8ec",display:"flex",justifyContent:"flex-end",gap:8,position:"sticky",bottom:0,background:"#fff"}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8,position:"sticky",bottom:0,background:"#fff"}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
               <button onClick={addAdm} style={{...btnG,background:"#dc2626"}}>💾 Record ADM</button>
             </div>
@@ -3187,7 +3187,7 @@ export function AdmRegister({branch}){
       {disputeModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:500,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e6e8ec",background:"#fbe9e9",borderRadius:"14px 14px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",background:"#fbe9e9",borderRadius:"14px 14px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
                 <p style={{margin:0,fontSize:13,fontWeight:700,color:"#dc2626"}}>Dispute ADM — {disputeModal.id}</p>
                 <p style={{margin:"2px 0 0",fontSize:10,color:"#dc2626"}}>{disputeModal.airline} · {disputeModal.currency}{Number(disputeModal.amount).toLocaleString()} · Due {disputeModal.responseDeadline}</p>
@@ -3209,7 +3209,7 @@ export function AdmRegister({branch}){
                 Dispute will be filed via BSP Link within 24 hours. Airline has 60 days to respond. Track status in ADM Register.
               </div>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e6e8ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setDisputeModal(null)} style={btnGh}>Cancel</button>
               <button disabled={disputeM.isPending} onClick={()=>{
                 disputeM.mutate({id:disputeModal.id,note:disputeNote||"Dispute filed via BSP Link — awaiting airline response"},{
@@ -3344,7 +3344,7 @@ export function BspSummary({branch}){
           <tbody>
             {rows.map((r,i)=>(
               <tr key={i} style={{
-                borderBottom:"1px solid #f4f5f7",
+                borderBottom:"1px solid #dfe2e7",
                 background:r.type==="total"?"#1a1c22":r.type==="section"?"#f0f4ff":i%2===0?"#fff":"#fafafa"
               }}>
                 <td style={{padding:"11px 16px",fontWeight:r.bold?700:400,
@@ -3382,7 +3382,7 @@ export function BspSummary({branch}){
           :stmtQ.isError
           ?<div style={{padding:"20px",textAlign:"center",color:"#dc2626",fontSize:12}}>⚠ Couldn't load BSP ledger — {stmtQ.error?.message||"check your connection"}</div>
           :(<>
-            <div style={{padding:"8px 16px",background:"#f4f5f7",borderBottom:"1px solid #e6e8ec",display:"flex",justifyContent:"space-between",fontSize:11,flexWrap:"wrap",gap:6}}>
+            <div style={{padding:"8px 16px",background:"#f4f5f7",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between",fontSize:11,flexWrap:"wrap",gap:6}}>
               <span style={{color:"#5b616e"}}>Opening: {f(stmt?.openingBalance)} {stmt?.openingSide||"Cr"}</span>
               <span style={{color:"#5b616e"}}>Period: Dr {f(stmt?.totalDebit)} · Cr {f(stmt?.totalCredit)}</span>
             </div>
@@ -3396,7 +3396,7 @@ export function BspSummary({branch}){
                 <tbody>
                   {stmtLines.length===0&&<tr><td colSpan={6} style={{padding:"24px",textAlign:"center",color:"#5b616e",fontSize:11.5}}>No BSP postings in {PERIODS.find(p=>p.v===period)?.l}. Book a flight purchase or BSP payment against {bspLedgerName}.</td></tr>}
                   {stmtLines.map((e,i)=>(
-                    <tr key={i} style={{borderBottom:"1px solid #f4f5f7",background:i%2===0?"#fff":"#fafafa"}}>
+                    <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                       <td style={{padding:"7px 12px",color:"#5b616e",whiteSpace:"nowrap"}}>{e.date}</td>
                       <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:10,color:"#2563eb"}}>{e.vno}</td>
                       <td style={{padding:"7px 12px",color:"#2e323c"}}>
@@ -3428,7 +3428,7 @@ export function BspSummary({branch}){
           {admList.length===0
             ?<p style={{margin:0,fontSize:11,color:"#5b616e"}}>No ADMs this period</p>
             :admList.map(a=>(
-              <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f4f5f7",fontSize:11}}>
+              <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11}}>
                 <div>
                   <p style={{margin:0,fontWeight:600,color:"#1a1c22",fontSize:10.5}}>{a.id}</p>
                   <p style={{margin:0,fontSize:9.5,color:"#5b616e"}}>{a.airline} · {ADM_REASON_CODES[a.reasonCode]?.label}</p>
@@ -3446,7 +3446,7 @@ export function BspSummary({branch}){
           {acmList.length===0
             ?<p style={{margin:0,fontSize:11,color:"#5b616e"}}>No ACMs this period</p>
             :acmList.map(a=>(
-              <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f4f5f7",fontSize:11}}>
+              <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11}}>
                 <div>
                   <p style={{margin:0,fontWeight:600,color:"#1a1c22",fontSize:10.5}}>{a.id}</p>
                   <p style={{margin:0,fontSize:9.5,color:"#5b616e"}}>{a.airline} · {ACM_REASON_CODES[a.reasonCode]?.label}</p>
@@ -3530,7 +3530,7 @@ export function TicketControlRegister({branch}){
               ))}
             </tr></thead>
             <tbody>{filtered.map((t,i)=>(
-              <tr key={t.id} style={{borderBottom:"1px solid #f4f5f7",background:i%2===0?"#fff":"#fafafa"}}>
+              <tr key={t.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:10,color:"#2563eb",fontWeight:700}}>{t.ticket}</td>
                 <td style={{padding:"8px 10px",fontWeight:600,color:"#1a1c22"}}>{t.airline}</td>
                 <td style={{padding:"8px 10px",color:"#2e323c"}}>{t.pax}</td>
@@ -3547,7 +3547,7 @@ export function TicketControlRegister({branch}){
                 <td style={{padding:"8px 10px"}}>
                   {t.status==="Open"&&(
                     <select onChange={e=>{if(e.target.value)setTickets(ts=>ts.map(x=>x.id===t.id?{...x,status:e.target.value,bspStatus:e.target.value}:x));}}
-                      style={{fontSize:9.5,border:"1px solid #e6e8ec",borderRadius:5,padding:"2px 5px",background:"#f9fafb"}}>
+                      style={{fontSize:9.5,border:"1px solid #cdd1d8",borderRadius:5,padding:"2px 5px",background:"#f9fafb"}}>
                       <option value="">Update...</option>
                       <option>Used</option><option>Voided</option><option>Refunded</option><option>Exchanged</option><option>Reissued</option>
                     </select>
@@ -3672,7 +3672,7 @@ export function BspCsvImport({branch}){
                 ))}
               </tr></thead>
               <tbody>{matched.map((r,i)=>(
-                <tr key={i} style={{borderBottom:"1px solid #f4f5f7",background:!r.inBooks?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
+                <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:!r.inBooks?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:9.5,color:"#2563eb"}}>{r.ticketNo}</td>
                   <td style={{padding:"8px 11px",fontWeight:600,color:"#1a1c22"}}>{r.airline}</td>
                   <td style={{padding:"8px 11px",color:"#2e323c"}}>{r.pax}</td>
@@ -3942,7 +3942,7 @@ export function SalesHoliday({branch,setRoute}){
             </tr></thead>
             <tbody>
               {/* 1. Basic */}
-              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fff"}}>
+              <tr style={{borderBottom:"1px solid #dfe2e7",background:"#fff"}}>
                 <td style={{padding:"4px 10px",textAlign:"center",color:"#5b616e",fontSize:10}}>1</td>
                 <td style={{padding:"4px 10px",fontWeight:700,color:"#1a1c22",fontSize:11}}>Basic</td>
                 <td style={{padding:"3px 6px"}}>
@@ -3956,7 +3956,7 @@ export function SalesHoliday({branch,setRoute}){
                 </td>
               </tr>
               {/* 2. Service */}
-              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fafafa"}}>
+              <tr style={{borderBottom:"1px solid #dfe2e7",background:"#fafafa"}}>
                 <td style={{padding:"4px 10px",textAlign:"center",color:"#5b616e",fontSize:10}}>2</td>
                 <td style={{padding:"4px 10px",fontWeight:700,color:"#1a1c22",fontSize:11}}>Service</td>
                 <td style={{padding:"3px 6px"}}>
@@ -3970,7 +3970,7 @@ export function SalesHoliday({branch,setRoute}){
                 </td>
               </tr>
               {/* 3. Total (subtotal) */}
-              <tr style={{borderBottom:"1px solid #e6e8ec",background:"#f4f5f7"}}>
+              <tr style={{borderBottom:"1px solid #cdd1d8",background:"#f4f5f7"}}>
                 <td style={{padding:"6px 10px",textAlign:"center",color:"#1a1c22",fontSize:10,fontWeight:700}}>3</td>
                 <td style={{padding:"6px 10px",fontWeight:800,color:"#1a1c22",fontSize:11.5}}>Total</td>
                 <td style={{padding:"6px 10px",fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>Basic + Service</td>
@@ -3978,7 +3978,7 @@ export function SalesHoliday({branch,setRoute}){
                 <td style={{padding:"6px 10px",textAlign:"right",fontWeight:800,fontSize:12,color:"#1a1c22",fontVariantNumeric:"tabular-nums"}}>{f(subTotal)}</td>
               </tr>
               {/* 4. GST 5% */}
-              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fff"}}>
+              <tr style={{borderBottom:"1px solid #dfe2e7",background:"#fff"}}>
                 <td style={{padding:"6px 10px",textAlign:"center",color:"#d97706",fontSize:10,fontWeight:700}}>4</td>
                 <td style={{padding:"6px 10px",fontWeight:700,color:"#d97706",fontSize:11}}>GST (5%)</td>
                 <td style={{padding:"6px 10px",fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>5% on (Basic + Service)</td>
@@ -3986,7 +3986,7 @@ export function SalesHoliday({branch,setRoute}){
                 <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,fontSize:11.5,color:"#d97706",fontVariantNumeric:"tabular-nums"}}>{f(gstAmt)}</td>
               </tr>
               {/* 5. TCS 2% */}
-              <tr style={{borderBottom:"1px solid #f4f5f7",background:"#fafafa",opacity:isIntl?1:0.45}}>
+              <tr style={{borderBottom:"1px solid #dfe2e7",background:"#fafafa",opacity:isIntl?1:0.45}}>
                 <td style={{padding:"6px 10px",textAlign:"center",color:"#2563eb",fontSize:10,fontWeight:700}}>5</td>
                 <td style={{padding:"6px 10px",fontWeight:700,color:"#2563eb",fontSize:11}}>TCS (2%) {!isIntl&&<span style={{fontSize:9,color:"#5b616e",fontWeight:500}}>— N/A (Domestic)</span>}</td>
                 <td style={{padding:"6px 10px",fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>2% on (Basic + Service + GST) — international only</td>
@@ -4063,7 +4063,7 @@ export function RecurringVouchers({branch}){
             ))}
           </tr></thead>
           <tbody>{templates.map((t,i)=>(
-            <tr key={t.id} style={{borderBottom:"1px solid #f4f5f7",background:t.nextRun<=TODAY?"#fffaf0":i%2===0?"#fff":"#fafafa",opacity:t.active?1:0.5}}>
+            <tr key={t.id} style={{borderBottom:"1px solid #dfe2e7",background:t.nextRun<=TODAY?"#fffaf0":i%2===0?"#fff":"#fafafa",opacity:t.active?1:0.5}}>
               <td style={{padding:"8px 12px",fontWeight:600,color:"#1a1c22"}}>{t.name}</td>
               <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#e8f0ff",color:"#2563eb",fontWeight:700}}>{t.type}</span></td>
               <td style={{padding:"8px 12px",color:"#2e323c",fontSize:10.5}}>{t.freq}</td>
@@ -4086,7 +4086,7 @@ export function RecurringVouchers({branch}){
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:480,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e6e8ec",display:"flex",justifyContent:"space-between"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>New Recurring Template</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5b616e"}}>✕</button>
             </div>
@@ -4103,7 +4103,7 @@ export function RecurringVouchers({branch}){
               </div>
               <FL label="Amount (₹)"><input type="number" value={form.amt} onChange={e=>setForm(f=>({...f,amt:+e.target.value}))} style={inp}/></FL>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e6e8ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
               <button onClick={()=>{const id=`REC${String(templates.length+1).padStart(3,"0")}`;setTemplates(ts=>[...ts,{...form,id,lastRun:"—",nextRun:`2026-06-${String(form.day).padStart(2,"0")}`,active:true}]);setModal(false);}} style={btnG}>Create Template</button>
             </div>
@@ -4330,7 +4330,7 @@ export function QuickPOS({branch,setRoute}){
           <p style={{margin:"0 0 4px",fontSize:16,fontWeight:800,color:"#16a34a"}}>Booking Confirmed!</p>
           <p style={{margin:"0 0 14px",fontSize:11,color:"#5b616e"}}>Receipt #{vNo} · {client.name} · {service} · {f(amount)}</p>
           <div style={{padding:"12px 14px",borderRadius:9,background:"#f4f5f7",marginBottom:14,textAlign:"left"}}>
-            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e6e8ec"}}><span style={{color:"#5b616e"}}>Voucher No.</span><span style={{fontWeight:600}}>{vNo}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e6e8ec"}}><span style={{color:"#5b616e"}}>Client</span><span style={{fontWeight:600}}>{client.name}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #e6e8ec"}}><span style={{color:"#5b616e"}}>Service</span><span style={{fontWeight:600}}>{service}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11}}><span style={{color:"#5b616e"}}>Branch</span><span style={{fontWeight:600}}>{bc(branch).voucherPrefix}</span></div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #cdd1d8"}}><span style={{color:"#5b616e"}}>Voucher No.</span><span style={{fontWeight:600}}>{vNo}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #cdd1d8"}}><span style={{color:"#5b616e"}}>Client</span><span style={{fontWeight:600}}>{client.name}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11,borderBottom:"1px solid #cdd1d8"}}><span style={{color:"#5b616e"}}>Service</span><span style={{fontWeight:600}}>{service}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11}}><span style={{color:"#5b616e"}}>Branch</span><span style={{fontWeight:600}}>{bc(branch).voucherPrefix}</span></div>
           </div>
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>openPrintPreview({ selector:'main', title:`Receipt ${vNo}`, recommend:'portrait' })} style={{...btnG,flex:1}}><Printer size={13}/> Print Receipt</button>
@@ -4350,8 +4350,8 @@ export function VoucherEntryTabbed(){
   const tabs=[{id:"entry",label:"1. Entry"},{id:"lines",label:"2. Line Items"},{id:"tax",label:"3. Tax Computation"},{id:"attach",label:"4. Attachments"},{id:"approval",label:"5. Approvals"},{id:"audit",label:"6. Audit Trail"},{id:"related",label:"7. Related Vouchers"},{id:"notes",label:"8. Notes"}];
   return TAB_Page("Receipt Voucher", "Standardised 8-tab structure",
     {user:"",date:"",created:""},
-    <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden"}}>
-      <div style={{display:"flex",borderBottom:"1px solid #e6e8ec",overflowX:"auto",background:"#fafbfd"}}>{tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}</div>
+    <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
+      <div style={{display:"flex",borderBottom:"1px solid #cdd1d8",overflowX:"auto",background:"#fafbfd"}}>{tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}</div>
       {tab==="entry"&&tabPanel(
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:14}}>
           <FL label="Voucher No."><input defaultValue="RV-BOM/2026/4521" readOnly style={{...inpStd,fontFamily:"monospace",background:"#fafbfd"}}/></FL>
@@ -4371,8 +4371,8 @@ export function VoucherEntryTabbed(){
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead style={{background:"#f7f8fb"}}><tr>{["#","Invoice Ref","Invoice Date","Invoice Amt","Outstanding","Allocated","Balance"].map((h,i)=><th key={h} style={{padding:"9px 12px",textAlign:i<2?"left":"right",fontSize:10.5,color:"#5b616e",fontWeight:700,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
             <tbody>
-              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"10px 12px"}}>1</td><td style={{padding:"10px 12px",fontFamily:"monospace",fontWeight:600}}>INV-BOM/2026/8721</td><td style={{padding:"10px 12px",textAlign:"right",color:"#5b616e"}}>2026-05-15</td><td style={{padding:"10px 12px",textAlign:"right"}}>₹3,25,000</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700}}>₹3,25,000</td><td style={{padding:"10px 12px",textAlign:"right"}}><input defaultValue="325000" type="number" style={{...inpStd,textAlign:"right",fontWeight:700,maxWidth:120,marginLeft:"auto"}}/></td><td style={{padding:"10px 12px",textAlign:"right",color:"#16a34a",fontWeight:700}}>₹0</td></tr>
-              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"10px 12px"}}>2</td><td style={{padding:"10px 12px",fontFamily:"monospace",fontWeight:600}}>INV-BOM/2026/8688</td><td style={{padding:"10px 12px",textAlign:"right",color:"#5b616e"}}>2026-05-08</td><td style={{padding:"10px 12px",textAlign:"right"}}>₹1,85,000</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700}}>₹1,85,000</td><td style={{padding:"10px 12px",textAlign:"right"}}><input defaultValue="160000" type="number" style={{...inpStd,textAlign:"right",fontWeight:700,maxWidth:120,marginLeft:"auto"}}/></td><td style={{padding:"10px 12px",textAlign:"right",color:"#dc2626",fontWeight:700}}>₹25,000</td></tr>
+              <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={{padding:"10px 12px"}}>1</td><td style={{padding:"10px 12px",fontFamily:"monospace",fontWeight:600}}>INV-BOM/2026/8721</td><td style={{padding:"10px 12px",textAlign:"right",color:"#5b616e"}}>2026-05-15</td><td style={{padding:"10px 12px",textAlign:"right"}}>₹3,25,000</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700}}>₹3,25,000</td><td style={{padding:"10px 12px",textAlign:"right"}}><input defaultValue="325000" type="number" style={{...inpStd,textAlign:"right",fontWeight:700,maxWidth:120,marginLeft:"auto"}}/></td><td style={{padding:"10px 12px",textAlign:"right",color:"#16a34a",fontWeight:700}}>₹0</td></tr>
+              <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={{padding:"10px 12px"}}>2</td><td style={{padding:"10px 12px",fontFamily:"monospace",fontWeight:600}}>INV-BOM/2026/8688</td><td style={{padding:"10px 12px",textAlign:"right",color:"#5b616e"}}>2026-05-08</td><td style={{padding:"10px 12px",textAlign:"right"}}>₹1,85,000</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700}}>₹1,85,000</td><td style={{padding:"10px 12px",textAlign:"right"}}><input defaultValue="160000" type="number" style={{...inpStd,textAlign:"right",fontWeight:700,maxWidth:120,marginLeft:"auto"}}/></td><td style={{padding:"10px 12px",textAlign:"right",color:"#dc2626",fontWeight:700}}>₹25,000</td></tr>
               <tr style={{background:"#1a1c22",color:"#c2a04a"}}><td colSpan={5} style={{padding:"10px 12px",fontWeight:700,textAlign:"right"}}>TOTAL ALLOCATED</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,fontSize:13,fontFamily:"monospace"}}>₹4,85,000</td><td style={{padding:"10px 12px",textAlign:"right",fontFamily:"monospace"}}>₹25,000</td></tr>
             </tbody>
           </table>
@@ -4384,10 +4384,10 @@ export function VoucherEntryTabbed(){
           <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22",marginBottom:10}}>Tax Computation (for Receipt Voucher — typically nil)</p>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <tbody>
-              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",color:"#5b616e"}}>Gross Receipt</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace"}}>₹4,85,000</td></tr>
-              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",color:"#5b616e"}}>Less: TDS u/s 194C (deducted by L&T)</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",color:"#dc2626"}}>(–) ₹9,700</td></tr>
-              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",color:"#5b616e"}}>Net Receipt</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",fontWeight:700}}>₹4,75,300</td></tr>
-              <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",color:"#5b616e"}}>TDS Certificate Received?</td><td style={{padding:"9px 12px",textAlign:"right"}}><span style={{padding:"2px 8px",background:"#fbeedb",color:"#d97706",borderRadius:3,fontSize:10,fontWeight:700}}>Pending — Q1 26-27</span></td></tr>
+              <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={{padding:"9px 12px",color:"#5b616e"}}>Gross Receipt</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace"}}>₹4,85,000</td></tr>
+              <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={{padding:"9px 12px",color:"#5b616e"}}>Less: TDS u/s 194C (deducted by L&T)</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",color:"#dc2626"}}>(–) ₹9,700</td></tr>
+              <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={{padding:"9px 12px",color:"#5b616e"}}>Net Receipt</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",fontWeight:700}}>₹4,75,300</td></tr>
+              <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={{padding:"9px 12px",color:"#5b616e"}}>TDS Certificate Received?</td><td style={{padding:"9px 12px",textAlign:"right"}}><span style={{padding:"2px 8px",background:"#fbeedb",color:"#d97706",borderRadius:3,fontSize:10,fontWeight:700}}>Pending — Q1 26-27</span></td></tr>
               <tr><td style={{padding:"9px 12px",color:"#5b616e"}}>GST Impact</td><td style={{padding:"9px 12px",textAlign:"right",color:"#5b616e"}}>Nil (Receipt — already accounted at invoice stage)</td></tr>
             </tbody>
           </table>
@@ -4395,7 +4395,7 @@ export function VoucherEntryTabbed(){
       )}
       {tab==="attach"&&tabPanel(
         <div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:14}}>{[{n:"NEFT Confirmation",sz:"245 KB",ty:"pdf"},{n:"Customer Email Confirmation",sz:"82 KB",ty:"eml"}].map((f,i)=>(<div key={i} style={{padding:14,background:"#fafbfd",border:"1px solid #e6e8ec",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:30}}>{f.ty==="pdf"?"📄":"📧"}</p><p style={{margin:"6px 0 2px",fontSize:11,color:"#1a1c22",fontWeight:600}}>{f.n}</p><p style={{margin:0,fontSize:10,color:"#5b616e"}}>{f.sz} · {f.ty.toUpperCase()}</p><button style={{marginTop:6,padding:"3px 10px",background:"transparent",border:"1px solid #c2a04a",color:"#c2a04a",borderRadius:4,fontSize:10,cursor:"pointer",fontWeight:600}}>↓ Download</button></div>))}</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:14}}>{[{n:"NEFT Confirmation",sz:"245 KB",ty:"pdf"},{n:"Customer Email Confirmation",sz:"82 KB",ty:"eml"}].map((f,i)=>(<div key={i} style={{padding:14,background:"#fafbfd",border:"1px solid #cdd1d8",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:30}}>{f.ty==="pdf"?"📄":"📧"}</p><p style={{margin:"6px 0 2px",fontSize:11,color:"#1a1c22",fontWeight:600}}>{f.n}</p><p style={{margin:0,fontSize:10,color:"#5b616e"}}>{f.sz} · {f.ty.toUpperCase()}</p><button style={{marginTop:6,padding:"3px 10px",background:"transparent",border:"1px solid #c2a04a",color:"#c2a04a",borderRadius:4,fontSize:10,cursor:"pointer",fontWeight:600}}>↓ Download</button></div>))}</div>
           <div style={{padding:30,border:"2px dashed #c2a04a",borderRadius:8,textAlign:"center",background:"#fafbfd"}}><p style={{margin:0,fontSize:36}}>📂</p><p style={{margin:"6px 0 2px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>Drag & drop or browse</p><p style={{margin:0,fontSize:11,color:"#5b616e"}}>PDF, image, eml — max 10 MB per file</p></div>
         </div>
       )}
@@ -4403,7 +4403,7 @@ export function VoucherEntryTabbed(){
         <div>
           <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>Approval Workflow</p>
           {[].map((s,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 14px",background:"#fafbfd",borderRadius:6,marginBottom:8,border:"1px solid #e6e8ec"}}>
+            <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 14px",background:"#fafbfd",borderRadius:6,marginBottom:8,border:"1px solid #cdd1d8"}}>
               <div style={{width:32,height:32,borderRadius:"50%",background:s.status==="done"?"#16a34a":s.status==="skip"?"#cbd0dc":"#c2a04a",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:14}}>{s.status==="done"?"✓":s.status==="skip"?"⊘":"○"}</div>
               <div style={{flex:1}}><p style={{margin:0,fontSize:12.5,fontWeight:700,color:"#1a1c22"}}>{s.step}</p><p style={{margin:"2px 0 0",fontSize:11,color:"#5b616e"}}>by {s.by} · {s.ts}</p></div>
               <span style={{padding:"3px 10px",background:s.status==="done"?"#e8f6ed":s.status==="skip"?"#e2e3e5":"#fbeedb",color:s.status==="done"?"#16a34a":s.status==="skip"?"#383d41":"#d97706",borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px"}}>{s.status.toUpperCase()}</span>
@@ -4411,18 +4411,18 @@ export function VoucherEntryTabbed(){
         </div>
       )}
       {tab==="audit"&&tabPanel(
-        <div>{[].map((h,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 12px",borderBottom:"1px solid #f0f2f7"}}><span style={{fontFamily:"monospace",fontSize:10.5,color:"#5b616e",minWidth:130}}>{h.ts}</span><span style={{fontSize:11.5,color:"#1a1c22",fontWeight:600,minWidth:110}}>{h.u}</span><span style={{padding:"2px 8px",background:h.a==="POSTED"||h.a==="APPROVED"?"#e8f6ed":h.a==="CREATED"?"#cfe2ff":"#fbeedb",color:h.a==="POSTED"||h.a==="APPROVED"?"#16a34a":h.a==="CREATED"?"#004085":"#d97706",borderRadius:3,fontSize:9.5,fontWeight:700,minWidth:80,textAlign:"center"}}>{h.a}</span><span style={{fontSize:11.5,color:"#5b616e"}}>{h.d}</span></div>))}</div>
+        <div>{[].map((h,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 12px",borderBottom:"1px solid #dfe2e7"}}><span style={{fontFamily:"monospace",fontSize:10.5,color:"#5b616e",minWidth:130}}>{h.ts}</span><span style={{fontSize:11.5,color:"#1a1c22",fontWeight:600,minWidth:110}}>{h.u}</span><span style={{padding:"2px 8px",background:h.a==="POSTED"||h.a==="APPROVED"?"#e8f6ed":h.a==="CREATED"?"#cfe2ff":"#fbeedb",color:h.a==="POSTED"||h.a==="APPROVED"?"#16a34a":h.a==="CREATED"?"#004085":"#d97706",borderRadius:3,fontSize:9.5,fontWeight:700,minWidth:80,textAlign:"center"}}>{h.a}</span><span style={{fontSize:11.5,color:"#5b616e"}}>{h.d}</span></div>))}</div>
       )}
       {tab==="related"&&tabPanel(
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead style={{background:"#f7f8fb"}}><tr>{["Voucher","Type","Date","Amount","Relationship"].map((h,i)=><th key={h} style={{padding:"9px 12px",textAlign:i===3?"right":"left",fontSize:10.5,color:"#5b616e",fontWeight:700,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-          <tbody>{[{v:"INV-BOM/2026/8721",t:"Tax Invoice",d:"2026-05-15",a:325000,r:"Settled (full)"},{v:"INV-BOM/2026/8688",t:"Tax Invoice",d:"2026-05-08",a:185000,r:"Partially settled (₹1.60L of ₹1.85L)"}].map(r=>(<tr key={r.v} style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"10px 12px",fontFamily:"monospace",fontWeight:600}}>{r.v}</td><td style={{padding:"10px 12px"}}>{r.t}</td><td style={{padding:"10px 12px",color:"#5b616e"}}>{r.d}</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700}}>₹{r.a.toLocaleString("en-IN")}</td><td style={{padding:"10px 12px",fontSize:11.5,color:"#5b616e"}}>{r.r}</td></tr>))}</tbody>
+          <tbody>{[{v:"INV-BOM/2026/8721",t:"Tax Invoice",d:"2026-05-15",a:325000,r:"Settled (full)"},{v:"INV-BOM/2026/8688",t:"Tax Invoice",d:"2026-05-08",a:185000,r:"Partially settled (₹1.60L of ₹1.85L)"}].map(r=>(<tr key={r.v} style={{borderBottom:"1px solid #dfe2e7"}}><td style={{padding:"10px 12px",fontFamily:"monospace",fontWeight:600}}>{r.v}</td><td style={{padding:"10px 12px"}}>{r.t}</td><td style={{padding:"10px 12px",color:"#5b616e"}}>{r.d}</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700}}>₹{r.a.toLocaleString("en-IN")}</td><td style={{padding:"10px 12px",fontSize:11.5,color:"#5b616e"}}>{r.r}</td></tr>))}</tbody>
         </table>
       )}
       {tab==="notes"&&tabPanel(
         <div>
-          {[].map((c,i)=>(<div key={i} style={{display:"flex",gap:10,marginBottom:10,flexDirection:c.me?"row-reverse":"row"}}><div style={{width:32,height:32,borderRadius:"50%",background:c.me?"#2F7A8E":"#6B4C8B",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:11,flexShrink:0}}>{c.u.substring(0,2).toUpperCase()}</div><div style={{maxWidth:"70%",padding:"8px 12px",background:c.me?"#1a1c22":"#fafbfd",color:c.me?"#fff":"#1a1c22",borderRadius:c.me?"8px 8px 2px 8px":"8px 8px 8px 2px",border:c.me?"none":"1px solid #e6e8ec"}}><p style={{margin:0,fontSize:11,opacity:0.7,fontWeight:600}}>{c.u}</p><p style={{margin:"3px 0",fontSize:12,lineHeight:1.45}}>{c.txt}</p><p style={{margin:0,fontSize:9.5,opacity:0.6}}>{c.ts}</p></div></div>))}
-          <div style={{marginTop:10,display:"flex",gap:8}}><input placeholder="Add comment..." style={{flex:1,padding:9,border:"1px solid #e6e8ec",borderRadius:6,fontSize:12}}/><button style={{padding:"9px 18px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:12,cursor:"pointer",fontWeight:700}}>Send</button></div>
+          {[].map((c,i)=>(<div key={i} style={{display:"flex",gap:10,marginBottom:10,flexDirection:c.me?"row-reverse":"row"}}><div style={{width:32,height:32,borderRadius:"50%",background:c.me?"#2F7A8E":"#6B4C8B",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:11,flexShrink:0}}>{c.u.substring(0,2).toUpperCase()}</div><div style={{maxWidth:"70%",padding:"8px 12px",background:c.me?"#1a1c22":"#fafbfd",color:c.me?"#fff":"#1a1c22",borderRadius:c.me?"8px 8px 2px 8px":"8px 8px 8px 2px",border:c.me?"none":"1px solid #cdd1d8"}}><p style={{margin:0,fontSize:11,opacity:0.7,fontWeight:600}}>{c.u}</p><p style={{margin:"3px 0",fontSize:12,lineHeight:1.45}}>{c.txt}</p><p style={{margin:0,fontSize:9.5,opacity:0.6}}>{c.ts}</p></div></div>))}
+          <div style={{marginTop:10,display:"flex",gap:8}}><input placeholder="Add comment..." style={{flex:1,padding:9,border:"1px solid #cdd1d8",borderRadius:6,fontSize:12}}/><button style={{padding:"9px 18px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:12,cursor:"pointer",fontWeight:700}}>Send</button></div>
         </div>
       )}
     </div>
@@ -4441,16 +4441,16 @@ export function MultiCurrencyVoucher(){
   const costINR=Math.round(costAmt);
   const gpINR=saleINR-costINR;
   const gpPct=(gpINR/saleINR*100).toFixed(1);
-  const inp={padding:"7px 10px",border:"1px solid #e6e8ec",borderRadius:5,fontSize:12};
+  const inp={padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12};
 
   return (
     <PHASE2_Page title="Gross Profit Voucher" subtitle="Single voucher · sale and cost in INR · auto GP calculation">
       <div style={{padding:12,background:"#e8f0ff",border:"1px solid #cfe0f8",borderLeft:"3px solid #2563eb",borderRadius:6,marginBottom:14,fontSize:11.5,color:"#2e323c"}}>
         <b>How it works:</b> Enter the sale amount billed to the customer and the cost paid to the supplier — both in INR. KBiz360 calculates gross profit and GP% automatically.
       </div>
-      <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,padding:20}}>
+      <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:20}}>
         {/* Header */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:14,marginBottom:18,paddingBottom:14,borderBottom:"1px solid #f0f2f7"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:14,marginBottom:18,paddingBottom:14,borderBottom:"1px solid #dfe2e7"}}>
           <div><label style={{fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Voucher Type</label><select style={{...inp,width:"100%"}}><option>Sales Voucher</option><option>Mixed Purchase-Sale</option></select></div>
           <div><label style={{fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Date</label><input type="date" defaultValue={todayISO()} style={{...inp,width:"100%"}}/></div>
           <div><label style={{fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Branch</label><select style={{...inp,width:"100%"}}><option>TKHO</option><option>BOM</option><option>AMD</option></select></div>
@@ -4494,15 +4494,15 @@ export function MultiCurrencyVoucher(){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5,marginBottom:14}}>
           <thead style={{background:"#f7f8fb"}}><tr><th style={RPT_thStyle}>Ledger</th><th style={RPT_thStyle}>Narration</th><th style={{...RPT_thStyle,textAlign:"right"}}>Debit (₹)</th><th style={{...RPT_thStyle,textAlign:"right"}}>Credit (₹)</th></tr></thead>
           <tbody>
-            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Customer (Receivable)</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Sample package</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
-            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Sales — Bali Holidays</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Package sale</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td></tr>
-            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Tour Cost — Hotels</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Supplier cost</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
-            <tr style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>Marriott Group (Payable)</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Marriott Bali, 3 nights</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td></tr>
+            <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>Customer (Receivable)</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Sample package</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
+            <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>Sales — Bali Holidays</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Package sale</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td></tr>
+            <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>Tour Cost — Hotels</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Supplier cost</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
+            <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>Marriott Group (Payable)</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Marriott Bali, 3 nights</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td></tr>
           </tbody>
-          <tfoot style={{background:"#fafbfd",fontWeight:700}}><tr><td style={{...RPT_tdStyle,fontWeight:700}}>TOTAL</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,borderTop:"2px solid #e6e8ec"}}>{(saleINR+costINR).toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,borderTop:"2px solid #e6e8ec"}}>{(saleINR+costINR).toLocaleString("en-IN")}</td></tr></tfoot>
+          <tfoot style={{background:"#fafbfd",fontWeight:700}}><tr><td style={{...RPT_tdStyle,fontWeight:700}}>TOTAL</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,borderTop:"2px solid #cdd1d8"}}>{(saleINR+costINR).toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,borderTop:"2px solid #cdd1d8"}}>{(saleINR+costINR).toLocaleString("en-IN")}</td></tr></tfoot>
         </table>
         <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
-          <button style={{padding:"8px 16px",background:"#fff",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Print Preview</button>
+          <button style={{padding:"8px 16px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Print Preview</button>
           <button style={{padding:"8px 16px",background:"#1a1c22",color:"#c2a04a",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>Submit for Approval</button>
           <button style={{padding:"8px 18px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Voucher</button>
         </div>
@@ -4526,19 +4526,19 @@ export function VoucherCommentsDemo(){
       <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1.7fr",gap:14}}>
         {/* Voucher summary panel */}
         <div>
-          <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,padding:16,marginBottom:12}}>
+          <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:16,marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>Voucher Details</p>
               <span style={{padding:"3px 10px",background:"#e8f6ed",color:"#16a34a",borderRadius:4,fontSize:10.5,fontWeight:700}}>✓ Approved</span>
             </div>
             {[{l:"Voucher No.",v:voucherInfo.no},{l:"Date",v:voucherInfo.date},{l:"Type",v:voucherInfo.type},{l:"Party",v:voucherInfo.party},{l:"Amount",v:fmtINR(voucherInfo.amount)}].map((f,i)=>(
-              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f0f2f7"}}>
+              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7"}}>
                 <span style={{fontSize:11,color:"#5b616e",fontWeight:600}}>{f.l}</span>
                 <span style={{fontSize:11.5,color:"#1a1c22",fontWeight:600,fontFamily:f.l.includes("No.")||f.l==="Amount"?"monospace":"inherit"}}>{f.v}</span>
               </div>
             ))}
           </div>
-          <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,padding:14}}>
+          <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:14}}>
             <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#1a1c22"}}>Approval Timeline</p>
             {[].map((t,i)=>(
               <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:10}}>
@@ -4553,8 +4553,8 @@ export function VoucherCommentsDemo(){
         </div>
 
         {/* Comments thread */}
-        <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,display:"flex",flexDirection:"column"}}>
-          <div style={{padding:"12px 16px",borderBottom:"1px solid #e6e8ec",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,display:"flex",flexDirection:"column"}}>
+          <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>💬 Comment Thread</p>
             <span style={{fontSize:11,color:"#5b616e"}}>{THREAD.length} messages · 1 day ago</span>
           </div>
@@ -4572,7 +4572,7 @@ export function VoucherCommentsDemo(){
                     <div style={{padding:"10px 12px",background:i%2===0?"#f7f8fb":"#f0f4f8",borderRadius:6,fontSize:12,color:"#1a1c22",lineHeight:1.5,borderLeft:"3px solid "+c.color}}>
                       {c.msg}
                       {c.attachment&&(
-                        <div style={{marginTop:8,padding:"5px 8px",background:"#fff",borderRadius:4,border:"1px solid #e6e8ec",display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer"}}>
+                        <div style={{marginTop:8,padding:"5px 8px",background:"#fff",borderRadius:4,border:"1px solid #cdd1d8",display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer"}}>
                           <span>📎</span><span style={{fontSize:10.5,color:"#c2a04a",fontWeight:600}}>{c.attachment}</span>
                         </div>
                       )}
@@ -4582,9 +4582,9 @@ export function VoucherCommentsDemo(){
               </div>
             ))}
           </div>
-          <div style={{padding:"10px 14px",borderTop:"1px solid #e6e8ec"}}>
+          <div style={{padding:"10px 14px",borderTop:"1px solid #cdd1d8"}}>
             <div style={{display:"flex",gap:8}}>
-              <textarea value={comment} onChange={e=>setComment(e.target.value)} placeholder="Add a comment… (Shift+Enter for new line, Enter to send)" rows={2} style={{flex:1,padding:"8px 10px",border:"1px solid #e6e8ec",borderRadius:6,fontSize:12,resize:"none",fontFamily:"inherit"}}/>
+              <textarea value={comment} onChange={e=>setComment(e.target.value)} placeholder="Add a comment… (Shift+Enter for new line, Enter to send)" rows={2} style={{flex:1,padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,resize:"none",fontFamily:"inherit"}}/>
               <button className="max-tablet:min-h-[44px]" style={{padding:"8px 14px",background:"#1a1c22",color:"#c2a04a",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",alignSelf:"flex-end"}}>Send</button>
             </div>
             <p style={{margin:"5px 0 0",fontSize:10,color:"#5b616e"}}>📎 Attach file · @mention · All comments are audit-logged</p>
@@ -4603,12 +4603,12 @@ export function PrintPreviewDemo(){
   const [show,setShow]=useState(true);
   const voucher={no:"PV-BOM/2026/0893",date:"20 May 2026",type:"Payment Voucher",branch:"BOM — Mumbai",payTo:"Air India Ltd. (BSP)",bank:"HDFC Bank BOM A/c ...4321",mode:"NEFT",refNo:"NEFT2605120024",amount:285000,amountWords:"Indian Rupees Two Lakhs Eighty-Five Thousand Only",narration:"BSP settlement April 2026 — SURC included as per Board minute 2026-03-15",lines:[{ledger:"Air India BSP Payable",dr:285000,cr:0},{ledger:"HDFC Bank BOM Current A/c",dr:0,cr:285000}]};
 
-  const printPage = {background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,maxWidth:740,margin:"0 auto",padding:"30px 36px",fontFamily:"Georgia, serif"};
+  const printPage = {background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,maxWidth:740,margin:"0 auto",padding:"30px 36px",fontFamily:"Georgia, serif"};
 
   return (
     <PHASE2_Page title="Print Preview Before Saving" subtitle="Review the formatted voucher before committing · matches the actual printout">
       <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
-        <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>← Edit Voucher</button>
+        <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>← Edit Voucher</button>
         <button onClick={()=>openPrintPreview({ selector:'main', title:'Voucher', recommend:'portrait' })} style={{padding:"7px 14px",background:"#fff",border:"1px solid #1a1c22",color:"#1a1c22",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>🖨 Print</button>
         <button style={{padding:"7px 14px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>✓ Save & Post</button>
       </div>
@@ -4642,7 +4642,7 @@ export function PrintPreviewDemo(){
         </div>
 
         {/* Amount */}
-        <div style={{padding:14,background:"#f7f8fb",border:"1px solid #e6e8ec",borderRadius:6,marginBottom:18,textAlign:"center"}}>
+        <div style={{padding:14,background:"#f7f8fb",border:"1px solid #cdd1d8",borderRadius:6,marginBottom:18,textAlign:"center"}}>
           <p style={{margin:0,fontSize:11,color:"#5b616e",textTransform:"uppercase",letterSpacing:"0.5px"}}>Amount</p>
           <p style={{margin:"4px 0 2px",fontSize:28,fontWeight:700,color:"#1a1c22",fontFamily:"Georgia"}}>₹ {voucher.amount.toLocaleString("en-IN")}</p>
           <p style={{margin:0,fontSize:11.5,color:"#1a1c22",fontStyle:"italic"}}>( {voucher.amountWords} )</p>
@@ -4652,7 +4652,7 @@ export function PrintPreviewDemo(){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,marginBottom:14}}>
           <thead><tr style={{background:"#1a1c22",color:"#fff"}}><th style={{padding:"8px 12px",textAlign:"left",fontWeight:600}}>Ledger Account</th><th style={{padding:"8px 12px",textAlign:"right",fontWeight:600}}>Debit (₹)</th><th style={{padding:"8px 12px",textAlign:"right",fontWeight:600}}>Credit (₹)</th></tr></thead>
           <tbody>
-            {voucher.lines.map((l,i)=><tr key={i} style={{borderBottom:"1px solid #e6e8ec"}}><td style={{padding:"8px 12px"}}>{l.ledger}</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{l.dr>0?l.dr.toLocaleString("en-IN"):"—"}</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{l.cr>0?l.cr.toLocaleString("en-IN"):"—"}</td></tr>)}
+            {voucher.lines.map((l,i)=><tr key={i} style={{borderBottom:"1px solid #cdd1d8"}}><td style={{padding:"8px 12px"}}>{l.ledger}</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{l.dr>0?l.dr.toLocaleString("en-IN"):"—"}</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{l.cr>0?l.cr.toLocaleString("en-IN"):"—"}</td></tr>)}
           </tbody>
           <tfoot><tr style={{fontWeight:700,borderTop:"2px solid #1a1c22"}}><td style={{padding:"8px 12px"}}>Total</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{voucher.amount.toLocaleString("en-IN")}</td><td style={{padding:"8px 12px",textAlign:"right",fontFamily:"monospace"}}>{voucher.amount.toLocaleString("en-IN")}</td></tr></tfoot>
         </table>
@@ -4660,7 +4660,7 @@ export function PrintPreviewDemo(){
         <p style={{fontSize:11.5,color:"#1a1c22",marginBottom:28}}><b>Narration:</b> {voucher.narration}</p>
 
         {/* Signatories */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:20,marginTop:28,paddingTop:14,borderTop:"1px solid #e6e8ec"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:20,marginTop:28,paddingTop:14,borderTop:"1px solid #cdd1d8"}}>
           {["Prepared by","Checked by","Authorised by"].map(s=>(
             <div key={s} style={{textAlign:"center"}}>
               <div style={{height:40,borderBottom:"1px solid #1a1c22",marginBottom:4}}/>
@@ -4697,12 +4697,12 @@ export function AutoLinkedVouchers(){
       {/* Cycle selector */}
       <div style={{display:"flex",gap:8,marginBottom:14}}>
         {[{k:"sale",label:"Sale ↔ Receipt cycle"},{k:"purchase",label:"Purchase ↔ Payment cycle"}].map(b=>(
-          <button key={b.k} onClick={()=>setCycle(b.k)} style={{padding:"8px 18px",border:cycle===b.k?"2px solid #1a1c22":"1px solid #e6e8ec",background:cycle===b.k?"#1a1c22":"#fff",color:cycle===b.k?"#c2a04a":"#5b616e",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>{b.label}</button>
+          <button key={b.k} onClick={()=>setCycle(b.k)} style={{padding:"8px 18px",border:cycle===b.k?"2px solid #1a1c22":"1px solid #cdd1d8",background:cycle===b.k?"#1a1c22":"#fff",color:cycle===b.k?"#c2a04a":"#5b616e",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>{b.label}</button>
         ))}
       </div>
 
       {/* Flow visualization */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:0,marginBottom:18,padding:"24px 20px",background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflowX:"auto"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:0,marginBottom:18,padding:"24px 20px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflowX:"auto"}}>
         {steps.map((s,i)=>(
           <div key={s.step} style={{display:"flex",alignItems:"center"}}>
             <div style={{width:200,padding:14,background:"#fff",border:"2px solid "+s.color,borderRadius:8,textAlign:"center",position:"relative"}}>
@@ -4724,15 +4724,15 @@ export function AutoLinkedVouchers(){
       </div>
 
       {/* Linked vouchers table */}
-      <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden"}}>
-        <div style={{padding:"10px 14px",borderBottom:"1px solid #e6e8ec",background:"#fafbfd",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
+        <div style={{padding:"10px 14px",borderBottom:"1px solid #cdd1d8",background:"#fafbfd",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <p style={{margin:0,fontSize:12.5,fontWeight:700,color:"#1a1c22"}}>Linked Voucher Register</p>
-          <button style={{padding:"5px 12px",background:"#fff",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer"}}>📤 Export</button>
+          <button style={{padding:"5px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer"}}>📤 Export</button>
         </div>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Invoice / Purchase</th><th style={RPT_thStyle}>Receipt / Payment</th><th style={RPT_thStyle}>Party</th><th style={{...RPT_thStyle,textAlign:"right"}}>Amount</th><th style={RPT_thStyle}>Settled On</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
           <tbody>{LINK_TABLE.map((r,i)=>(
-            <tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}>
+            <tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}>
               <td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:600,fontSize:11}}>{r.sale}</td>
               <td style={{...RPT_tdStyle,fontFamily:"monospace",color:r.receipt==="—"?"#dc2626":"#16a34a",fontWeight:r.receipt==="—"?400:600,fontSize:11}}>{r.receipt}</td>
               <td style={RPT_tdStyle}>{r.party}</td>

@@ -334,12 +334,12 @@ export function BankReco({branch}){
       {summary?.bankBalanceDerived&&<p style={{margin:"-6px 0 10px",fontSize:9.5,color:"#5a6691"}}>* Bank Balance derived from book opening + statement movement (no running-balance column was imported).</p>}
 
       {/* Tabs */}
-      <div style={{display:"flex",gap:0,background:"#f3f4f8",borderRadius:"9px 9px 0 0",border:"1px solid #e1e3ec"}}>
+      <div style={{display:"flex",gap:0,background:"#f3f4f8",borderRadius:"9px 9px 0 0",border:"1px solid #cdd1d8"}}>
         <button onClick={()=>setTab("reco")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="reco"?700:500,background:tab==="reco"?"#fff":"transparent",borderRadius:6,fontSize:11}}>🔄 Reconciliation</button><button onClick={()=>setTab("brs")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="brs"?700:500,background:tab==="brs"?"#fff":"transparent",borderRadius:6,fontSize:11}}>🧾 BRS Report</button><button onClick={()=>setTab("pdc")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="pdc"?700:500,background:tab==="pdc"?"#fff":"transparent",borderRadius:6,fontSize:11}}>📑 PDC Register</button><button onClick={()=>setTab("bounce")} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontWeight:tab==="bounce"?700:500,background:tab==="bounce"?"#fff":"transparent",borderRadius:6,fontSize:11}}>🔴 Bounce / Returns</button>
       </div>
 
       {tab==="reco"&&(
-        <div style={{border:"1px solid #e1e3ec",borderTop:"none",borderRadius:"0 0 9px 9px",background:"#fff",padding:12}}>
+        <div style={{border:"1px solid #cdd1d8",borderTop:"none",borderRadius:"0 0 9px 9px",background:"#fff",padding:12}}>
           {/* Toolbar */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:10}}>
             <div style={{display:"flex",alignItems:"center",gap:6,background:"#f3f4f8",borderRadius:8,padding:"4px 8px"}}>
@@ -382,7 +382,7 @@ export function BankReco({branch}){
                       const net=l.debit-l.credit;
                       return (
                         <tr key={l.bookKey} {...(!l.reconciled ? clickable(()=>{ setSelBook(sel?null:{bookKey:l.bookKey,vno:l.vno,debit:l.debit,credit:l.credit}); }) : {})}
-                          style={{borderBottom:"1px solid #f3f4f8",cursor:l.reconciled?"default":"pointer",background:sel?"#FFF4D6":l.reconciled?"#EAF3DE":i%2===0?"#fff":"#fafafa"}}>
+                          style={{borderBottom:"1px solid #dfe2e7",cursor:l.reconciled?"default":"pointer",background:sel?"#FFF4D6":l.reconciled?"#EAF3DE":i%2===0?"#fff":"#fafafa"}}>
                           <td style={{padding:"6px 9px",color:"#5a6691",fontSize:10,whiteSpace:"nowrap"}}>{fmtDate?fmtDate(l.date):l.date}</td>
                           <td style={{padding:"6px 9px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{l.vno}</td>
                           {view!=="minimal"&&<td style={{padding:"6px 9px",fontSize:10.5,color:"#384677",maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={l.narration}>{l.narration||l.party}</td>}
@@ -415,7 +415,7 @@ export function BankReco({branch}){
                       const open=l.status==="unreconciled"||l.status==="exception";
                       return (
                         <tr key={l.id} {...(open ? clickable(()=>{ setSelStmt(sel?null:l); }) : {})}
-                          style={{borderBottom:"1px solid #f3f4f8",cursor:open?"pointer":"default",background:sel?"#FFF4D6":l.status==="reconciled"?"#EAF3DE":l.status==="partial"?"#E6F1FB":l.status==="exception"?"#FCEBEB":i%2===0?"#fff":"#fafafa"}}>
+                          style={{borderBottom:"1px solid #dfe2e7",cursor:open?"pointer":"default",background:sel?"#FFF4D6":l.status==="reconciled"?"#EAF3DE":l.status==="partial"?"#E6F1FB":l.status==="exception"?"#FCEBEB":i%2===0?"#fff":"#fafafa"}}>
                           <td style={{padding:"6px 9px",color:"#5a6691",fontSize:10,whiteSpace:"nowrap"}}>{fmtDate?fmtDate(l.date):l.date}</td>
                           {view!=="minimal"&&<td style={{padding:"6px 9px",fontFamily:"monospace",fontSize:9,color:"#185FA5",maxWidth:110,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={ref}>{ref}</td>}
                           <td style={{padding:"6px 9px",fontSize:10.5,color:"#384677",maxWidth:view==="minimal"?180:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={l.description}>{l.description}</td>
@@ -457,10 +457,10 @@ export function BankReco({branch}){
             <tbody>
               <tr style={{borderBottom:"2px solid #0d1326"}}><td style={{padding:"7px 10px",fontWeight:700}}>Balance as per Books</td><td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(brs.bookBalance)}</td></tr>
               <tr><td colSpan={2} style={{padding:"8px 10px 2px",fontSize:10.5,fontWeight:700,color:"#27500A",textTransform:"uppercase"}}>Add: Credits in bank not in books / Less: charges ({brs.counts.bankOnly})</td></tr>
-              {brs.bankOnly.map((l,i)=>(<tr key={"bk"+i} style={{borderBottom:"1px solid #f3f4f8"}}><td style={{padding:"5px 10px 5px 22px",color:"#5a6691"}}>{l.date} · {l.description||l.reference||"—"} <span style={{fontSize:9.5,color:"#8893b8"}}>({l.kind})</span></td><td style={{padding:"5px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:l.signed<0?"#A32D2D":"#27500A"}}>{f(l.signed)}</td></tr>))}
+              {brs.bankOnly.map((l,i)=>(<tr key={"bk"+i} style={{borderBottom:"1px solid #dfe2e7"}}><td style={{padding:"5px 10px 5px 22px",color:"#5a6691"}}>{l.date} · {l.description||l.reference||"—"} <span style={{fontSize:9.5,color:"#8893b8"}}>({l.kind})</span></td><td style={{padding:"5px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:l.signed<0?"#A32D2D":"#27500A"}}>{f(l.signed)}</td></tr>))}
               {brs.bankOnly.length===0&&<tr><td colSpan={2} style={{padding:"4px 22px",color:"#8893b8",fontSize:11}}>None</td></tr>}
               <tr><td colSpan={2} style={{padding:"8px 10px 2px",fontSize:10.5,fontWeight:700,color:"#A32D2D",textTransform:"uppercase"}}>Less: Entries in books not yet in bank ({brs.counts.bookOnly})</td></tr>
-              {brs.bookOnly.map((l,i)=>(<tr key={"bo"+i} style={{borderBottom:"1px solid #f3f4f8"}}><td style={{padding:"5px 10px 5px 22px",color:"#5a6691"}}>{l.date} · {l.vno} · {l.narration||"—"} <span style={{fontSize:9.5,color:"#8893b8"}}>({l.kind})</span></td><td style={{padding:"5px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:l.signed<0?"#A32D2D":"#27500A"}}>{f(-l.signed)}</td></tr>))}
+              {brs.bookOnly.map((l,i)=>(<tr key={"bo"+i} style={{borderBottom:"1px solid #dfe2e7"}}><td style={{padding:"5px 10px 5px 22px",color:"#5a6691"}}>{l.date} · {l.vno} · {l.narration||"—"} <span style={{fontSize:9.5,color:"#8893b8"}}>({l.kind})</span></td><td style={{padding:"5px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:l.signed<0?"#A32D2D":"#27500A"}}>{f(-l.signed)}</td></tr>))}
               {brs.bookOnly.length===0&&<tr><td colSpan={2} style={{padding:"4px 22px",color:"#8893b8",fontSize:11}}>None</td></tr>}
               <tr style={{borderTop:"2px solid #0d1326"}}><td style={{padding:"7px 10px",fontWeight:700}}>Derived Balance as per Bank</td><td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(brs.derivedBankBalance)}</td></tr>
               <tr><td style={{padding:"7px 10px",color:"#5a6691"}}>Actual Balance per Bank Statement{brs.bankBalanceDerived?" (derived)":""}</td><td style={{padding:"7px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(brs.bankBalance)}</td></tr>
@@ -477,7 +477,7 @@ export function BankReco({branch}){
             <span style={{fontSize:10.5,fontWeight:700,color:"#185FA5"}}>Pending: {pdcSummary?.counts?.pending ?? pdcs.filter(p=>p.status==="Pending").length} · Due to deposit: {pdcSummary?.dueToDeposit ?? 0}</span>
           </div>
           {/* Add a PDC */}
-          <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",padding:"10px 14px",borderBottom:"1px solid #eef0f6"}}>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",padding:"10px 14px",borderBottom:"1px solid #dfe2e7"}}>
             <input value={pdcForm.party} onChange={e=>setPdcForm(s=>({...s,party:e.target.value}))} placeholder="Client" style={{...inp,minWidth:160}}/>
             <input value={pdcForm.chequeNo} onChange={e=>setPdcForm(s=>({...s,chequeNo:e.target.value}))} placeholder="Cheque No." style={{...inp,width:120}}/>
             <input value={pdcForm.bank} onChange={e=>setPdcForm(s=>({...s,bank:e.target.value}))} placeholder="Drawee bank" style={{...inp,width:130}}/>
@@ -494,7 +494,7 @@ export function BankReco({branch}){
             <tbody>
               {pdcs.length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691"}}>No post-dated cheques on record.</td></tr>}
               {pdcs.map((p,i)=>(
-              <tr key={p.id} style={{borderBottom:"1px solid #f3f4f8",background:p.status==="Bounced"?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
+              <tr key={p.id} style={{borderBottom:"1px solid #dfe2e7",background:p.status==="Bounced"?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{p.party}</td>
                 <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10.5}}>{p.chequeNo||"—"}</td>
                 <td style={{padding:"8px 12px",color:"#5a6691"}}>{p.bank||"—"}</td>
@@ -594,7 +594,7 @@ function ImportPanel({ledger,code,from,to,onClose,importMut,clearMut}){
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
               <thead><tr style={{background:"#0d1326"}}>{["Date","Ref","Cheque","UTR","Description","Debit","Credit","Balance"].map((h,i)=><th key={i} style={{padding:"5px 8px",textAlign:["Debit","Credit","Balance"].includes(h)?"right":"left",color:"#d4a437",fontSize:8.5}}>{h}</th>)}</tr></thead>
               <tbody>{valid.slice(0,8).map((r,i)=>(
-                <tr key={i} style={{borderBottom:"1px solid #f3f4f8"}}>
+                <tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}>
                   <td style={{padding:"4px 8px"}}>{r.date}</td><td style={{padding:"4px 8px"}}>{r.reference}</td><td style={{padding:"4px 8px"}}>{r.chequeNo}</td><td style={{padding:"4px 8px"}}>{r.utr}</td>
                   <td style={{padding:"4px 8px",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.description}</td>
                   <td style={{padding:"4px 8px",textAlign:"right"}}>{r.debit||""}</td><td style={{padding:"4px 8px",textAlign:"right"}}>{r.credit||""}</td><td style={{padding:"4px 8px",textAlign:"right"}}>{r.balance??""}</td>
@@ -673,7 +673,7 @@ export function DayBook({branch}){
           <tbody>
             {entries.length===0&&<tr><td colSpan={6} style={{padding:"28px",textAlign:"center",color:"#5a6691",fontSize:12}}>No entries for {date}. Try a date like 2026-05-05 or 2026-05-07.</td></tr>}
             {entries.map((e,i)=>(
-              <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+              <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{e.vno}</td>
                 <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,fontWeight:700,background:(TYPE_CLR[e.type]||"#384677")+"22",color:TYPE_CLR[e.type]||"#384677"}}>{e.type}</span></td>
                 <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{e.party}</td>
@@ -751,7 +751,7 @@ export function LedgerAc({branch}){
         </div>
       </div>
       <div style={{...card,padding:0,overflow:"hidden"}}>
-        <div style={{padding:"10px 14px",background:"#f3f4f8",borderBottom:"1px solid #e1e3ec",
+        <div style={{padding:"10px 14px",background:"#f3f4f8",borderBottom:"1px solid #cdd1d8",
           display:"flex",justifyContent:"space-between"}}>
           <span style={{fontSize:11,color:"#5a6691"}}>Opening balance: {f(Math.abs(openingBal))} {openingBal>=0?"Dr":"Cr"}</span>
           <span style={{fontSize:11,fontWeight:700,color:closingBal>=0?"#185FA5":"#A32D2D"}}>
@@ -767,7 +767,7 @@ export function LedgerAc({branch}){
           <tbody>
             {enriched.length===0&&<tr><td colSpan={6} style={{padding:"28px",textAlign:"center",color:"#5a6691"}}>No entries found. Select a different ledger or date range.</td></tr>}
             {enriched.map((e,i)=>(
-              <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+              <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"8px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{e.date}</td>
                 <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{e.vno}</td>
                 <td style={{padding:"8px 12px",color:"#384677"}}>{e.narr}</td>
@@ -892,8 +892,8 @@ export function TrialBalanceLegacy({branch}){
               const grpDr=grpLedgers.reduce((s,l)=>s+l.dr,0);
               const grpCr=grpLedgers.reduce((s,l)=>s+l.cr,0);
               return grpLedgers.map((l,i)=>(
-                <tr key={l.name} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-                  {i===0&&<td rowSpan={grpLedgers.length} style={{padding:"9px 14px",fontWeight:700,color:"#0d1326",borderRight:"2px solid #e1e3ec",verticalAlign:"top",fontSize:10.5,background:"#f9fafb"}}>{grp}</td>}
+                <tr key={l.name} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
+                  {i===0&&<td rowSpan={grpLedgers.length} style={{padding:"9px 14px",fontWeight:700,color:"#0d1326",borderRight:"2px solid #cdd1d8",verticalAlign:"top",fontSize:10.5,background:"#f9fafb"}}>{grp}</td>}
                   <td style={{padding:"9px 14px",color:"#384677"}}>{l.name}</td>
                   <td style={{padding:"9px 14px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:l.dr>0?"#0d1326":"#bfc3d6"}}>{f(l.dr)}</td>
                   <td style={{padding:"9px 14px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:l.cr>0?"#0d1326":"#bfc3d6"}}>{f(l.cr)}</td>
@@ -917,7 +917,7 @@ export function AdvanceDepositLedger({branch}){
   const { data } = useAdvances(branch);
   const rows=(data&&data.rows)||[];
   const t=(data&&data.totals)||{customer:0,supplier:0,total:0};
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
   const kc=(label,val,col)=>(<div style={{...card,borderTop:`3px solid ${col}`}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>{label}</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:col}}>{cur+fmt(val)}</p></div>);
   return(
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
@@ -933,7 +933,7 @@ export function AdvanceDepositLedger({branch}){
               <th style={{padding:"9px 8px",textAlign:"left"}}>Date</th><th style={{padding:"9px 8px",textAlign:"left"}}>Vch No</th><th style={{padding:"9px 8px",textAlign:"left"}}>Party</th><th style={{padding:"9px 8px",textAlign:"left"}}>Side</th><th style={{padding:"9px 8px",textAlign:"right"}}>On-Account</th>
             </tr></thead>
             <tbody>
-              {rows.map((r,i)=>(<tr key={r.id} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #e1e3ec"}}>
+              {rows.map((r,i)=>(<tr key={r.id} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #cdd1d8"}}>
                 <td style={{padding:"7px 8px",color:"#5a6691"}}>{r.date}</td>
                 <td style={{padding:"7px 8px",fontFamily:"monospace"}}>{r.vno}</td>
                 <td style={{padding:"7px 8px",fontWeight:600}}>{r.party||"-"}</td>
@@ -965,7 +965,7 @@ export function CashFlowForecast({branch}){
   rows.forEach(r=>{ const w=wk(r.date); if(w>=0&&w<13){ if(r.kind==="inflow")weeks[w].inflow+=r.amount||0; else weeks[w].outflow+=r.amount||0; } });
   let bal=openingCash; const wrows=weeks.map(w=>{ const net=w.inflow-w.outflow; bal+=net; const d=new Date(today.getTime()+w.i*7*86400000); return {...w,net,bal,label:d.toISOString().slice(5,10)}; });
   const totIn=weeks.reduce((s,w)=>s+w.inflow,0),totOut=weeks.reduce((s,w)=>s+w.outflow,0);
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
   const ip={...inp,minHeight:30,fontSize:11,width:"100%"};
   const kc=(label,val,col)=>(<div style={{...card,borderTop:`3px solid ${col}`}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>{label}</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:col}}>{cur+fmt(val)}</p></div>);
   return(
@@ -992,7 +992,7 @@ export function CashFlowForecast({branch}){
               <th style={{padding:"9px 8px",textAlign:"left"}}>Week of</th><th style={{padding:"9px 8px",textAlign:"right"}}>Inflow</th><th style={{padding:"9px 8px",textAlign:"right"}}>Outflow</th><th style={{padding:"9px 8px",textAlign:"right"}}>Net</th><th style={{padding:"9px 8px",textAlign:"right"}}>Running Balance</th>
             </tr></thead>
             <tbody>
-              {wrows.map((w)=>(<tr key={w.i} style={{borderBottom:"1px solid #e1e3ec"}}>
+              {wrows.map((w)=>(<tr key={w.i} style={{borderBottom:"1px solid #cdd1d8"}}>
                 <td style={{padding:"6px 8px"}}>W{w.i+1} ({w.label})</td>
                 <td style={{padding:"6px 8px",textAlign:"right",color:"#27500A"}}>{w.inflow?cur+fmt(w.inflow):"-"}</td>
                 <td style={{padding:"6px 8px",textAlign:"right",color:"#A32D2D"}}>{w.outflow?cur+fmt(w.outflow):"-"}</td>
@@ -1008,7 +1008,7 @@ export function CashFlowForecast({branch}){
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
             <thead style={{background:"#f3f4f8"}}><tr><th style={{padding:"7px 8px",textAlign:"left"}}>Date</th><th style={{padding:"7px 8px",textAlign:"left"}}>Kind</th><th style={{padding:"7px 8px",textAlign:"left"}}>Category</th><th style={{padding:"7px 8px",textAlign:"right"}}>Amount</th><th style={{padding:"7px 8px"}}></th></tr></thead>
             <tbody>
-              {rows.map((r)=>(<tr key={r.id} style={{borderBottom:"1px solid #f0f2f7"}}>
+              {rows.map((r)=>(<tr key={r.id} style={{borderBottom:"1px solid #dfe2e7"}}>
                 <td style={{padding:"6px 8px"}}>{r.date}</td><td style={{padding:"6px 8px"}}>{r.kind}</td><td style={{padding:"6px 8px"}}>{r.category||"-"}</td>
                 <td style={{padding:"6px 8px",textAlign:"right",fontWeight:600,color:r.kind==="inflow"?"#27500A":"#A32D2D"}}>{cur+fmt(r.amount)}</td>
                 <td style={{padding:"6px 8px",textAlign:"center"}}><button onClick={()=>remove.mutate(r.id)} style={{background:"none",border:"none",color:"#A32D2D",cursor:"pointer",fontWeight:700}}>x</button></td>
@@ -1089,7 +1089,7 @@ export function CashBookReport({branch}){
           </tr></thead>
           <tbody>
             {/* Opening balance row */}
-            <tr style={{background:"#f9fafb",borderBottom:"1px solid #f3f4f8"}}>
+            <tr style={{background:"#f9fafb",borderBottom:"1px solid #dfe2e7"}}>
               <td style={{padding:"8px 12px",color:"#5a6691",fontSize:10}}>—</td>
               <td colSpan={4} style={{padding:"8px 12px",fontWeight:700,color:"#185FA5"}}>Opening Balance b/d</td>
               <td style={{padding:"8px 12px",textAlign:"right"}}/>
@@ -1098,7 +1098,7 @@ export function CashBookReport({branch}){
             {entries.map((e,i)=>{
               running+=e.dr-e.cr;
               return(
-                <tr key={e.id} style={{borderBottom:"1px solid #f3f4f8",background:e.type==="Receipt"?"#f0fff4":i%2===0?"#fff":"#fafafa"}}>
+                <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:e.type==="Receipt"?"#f0fff4":i%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"7px 12px",color:"#5a6691",fontSize:10}}>{i+1}</td>
                   <td style={{padding:"7px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:e.type==="Receipt"?"#EAF3DE":"#FCEBEB",color:e.type==="Receipt"?"#27500A":"#A32D2D"}}>{e.type}</span></td>
                   <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{e.ref}</td>
@@ -1196,7 +1196,7 @@ export function YearEndClose({branch}){
           <div>
             <p style={{margin:"0 0 12px",fontSize:10.5,color:"#5a6691"}}>Complete all items before proceeding to closing entries</p>
             {steps[0].items.map((it,i)=>(
-              <label key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #f3f4f8",cursor:"pointer"}}>
+              <label key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #dfe2e7",cursor:"pointer"}}>
                 <input type="checkbox" defaultChecked={it.done} style={{cursor:"pointer",accentColor:"#27500A"}}/>
                 <span style={{fontSize:11,color:it.done?"#27500A":"#A32D2D",fontWeight:it.done?400:600}}>{it.label}</span>
                 {it.done&&<span style={{fontSize:9.5,color:"#27500A"}}>✔</span>}
@@ -1209,7 +1209,7 @@ export function YearEndClose({branch}){
           <div>
             <p style={{margin:"0 0 12px",fontSize:10.5,color:"#5a6691"}}>{steps[1].desc}</p>
             {steps[1].entries.map((e,i)=>(
-              <div key={i} style={{marginBottom:10,padding:"10px 12px",borderRadius:8,background:"#f3f4f8",border:"1px solid #e1e3ec"}}>
+              <div key={i} style={{marginBottom:10,padding:"10px 12px",borderRadius:8,background:"#f3f4f8",border:"1px solid #cdd1d8"}}>
                 <div style={{display:"flex",gap:10,marginBottom:4,fontSize:11}}>
                   <span style={{color:"#185FA5",fontWeight:700,fontFamily:"monospace",width:24}}>Dr</span>
                   <span style={{flex:1,color:"#0d1326"}}>{e.dr}</span>
@@ -1230,7 +1230,7 @@ export function YearEndClose({branch}){
           <div>
             <p style={{margin:"0 0 12px",fontSize:10.5,color:"#5a6691"}}>{steps[2].desc}</p>
             {steps[2].accounts.map((a,i)=>(
-              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #f3f4f8",fontSize:11}}>
+              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #dfe2e7",fontSize:11}}>
                 <span style={{color:"#0d1326",fontWeight:500}}>{a.name}</span>
                 <div style={{display:"flex",gap:10,alignItems:"center"}}>
                   <span style={{fontSize:9.5,padding:"1px 6px",borderRadius:999,background:"#E6F1FB",color:"#185FA5"}}>{a.type}</span>
@@ -1280,7 +1280,7 @@ export function LoanEmiRegister({branch}){
   const set=(k)=>(e)=>setF(s=>({...s,[k]:e.target.value}));
   const add=()=>{ if(!brCode){ toast('Select a specific branch (not All) before adding.','error'); return; } if(!f.lender){return;} create.mutate({branch:brCode,lender:f.lender,type:f.type,purpose:f.purpose,principal:Number(f.principal)||0,rate:Number(f.rate)||0,tenure:Number(f.tenure)||0,emi:Number(f.emi)||0,balance:Number(f.balance)||Number(f.principal)||0,nextDue:f.nextDue,status:'active'},{onSuccess:()=>setF(blank)}); };
   const totP=rows.reduce((s,l)=>s+(l.principal||0),0),totB=rows.reduce((s,l)=>s+(l.balance||0),0),totE=rows.reduce((s,l)=>s+(l.emi||0),0);
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
   const ip={...inp,minHeight:30,fontSize:11,width:"100%"};
   const kc=(label,val,col)=>(<div style={{...card,borderTop:`3px solid ${col}`}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>{label}</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:col}}>{cur+fmt(val)}</p></div>);
   return(
@@ -1310,7 +1310,7 @@ export function LoanEmiRegister({branch}){
               <th style={{padding:"9px 8px",textAlign:"left"}}>Lender / Type</th><th style={{padding:"9px 8px",textAlign:"right"}}>Principal</th><th style={{padding:"9px 8px",textAlign:"center"}}>Rate</th><th style={{padding:"9px 8px",textAlign:"center"}}>Tenure</th><th style={{padding:"9px 8px",textAlign:"right"}}>EMI</th><th style={{padding:"9px 8px",textAlign:"right"}}>Balance</th><th style={{padding:"9px 8px",textAlign:"center"}}>Next Due</th><th style={{padding:"9px 8px"}}></th>
             </tr></thead>
             <tbody>
-              {rows.map((l,i)=>(<tr key={l.id} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #e1e3ec"}}>
+              {rows.map((l,i)=>(<tr key={l.id} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #cdd1d8"}}>
                 <td style={{padding:"7px 8px",fontWeight:600}}>{l.lender}<div style={{fontSize:9.5,color:"#5a6691",fontWeight:400}}>{l.type}{l.purpose?(" - "+l.purpose):''}</div></td>
                 <td style={{padding:"7px 8px",textAlign:"right"}}>{cur+fmt(l.principal)}</td>
                 <td style={{padding:"7px 8px",textAlign:"center",color:"#854F0B"}}>{l.rate}%</td>
@@ -1346,7 +1346,7 @@ export function WorkingCapitalDashboard({branch,setRoute}){
   const prev=TREND[TREND.length-2];
 
   const cycle=curr.dso-curr.dpo;
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
@@ -1404,7 +1404,7 @@ export function WorkingCapitalDashboard({branch,setRoute}){
             </tr></thead>
             <tbody>
               {TREND.map((r,i)=>(
-                <tr key={r.month} style={{background:i===TREND.length-1?"#FAEEDA":i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #e1e3ec",fontWeight:i===TREND.length-1?700:400}}>
+                <tr key={r.month} style={{background:i===TREND.length-1?"#FAEEDA":i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8",fontWeight:i===TREND.length-1?700:400}}>
                   <td style={{padding:"7px 8px"}}>{r.month}</td>
                   <td style={{padding:"7px 8px",textAlign:"right"}}>{cur+fmt(r.ar)}</td>
                   <td style={{padding:"7px 8px",textAlign:"right"}}>{cur+fmt(r.inv)}</td>
@@ -1464,11 +1464,11 @@ export function CashFlowDirect({branch,setRoute}){
   const Section=({title,rows,color})=>(
     <div style={{marginBottom:14}}>
       <h3 style={{margin:"0 0 6px",fontSize:13,color}}>{title}</h3>
-      <div style={{background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",overflow:"hidden"}}>
+      <div style={{background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
           <tbody>
             {rows.map((r,i)=>(
-              <tr key={i} style={{background:r.total?"#FAEEDA":r.subtotal?"#f3f4f8":"#fff",borderBottom:"1px solid #e1e3ec"}}>
+              <tr key={i} style={{background:r.total?"#FAEEDA":r.subtotal?"#f3f4f8":"#fff",borderBottom:"1px solid #cdd1d8"}}>
                 <td style={{padding:"8px 10px",fontWeight:r.total?700:r.subtotal?600:400}}>{r.label}</td>
                 <td style={{padding:"8px 10px",textAlign:"right",fontWeight:r.total?700:r.subtotal?600:400,color:r.value<0?"#A32D2D":r.value>0?(r.total?color:"#27500A"):"#5a6691"}}>{r.value<0?`(${cur+fmt(Math.abs(r.value))})`:cur+fmt(r.value)}</td>
               </tr>
@@ -1531,7 +1531,7 @@ export function BankBalanceDashboard(){
   return(
     <PHASE2_Page title="Bank Balance Dashboard"
       subtitle="Live cash & bank balances from the books · shows 0 until entries are posted"
-      toolbar={<select value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>
+      toolbar={<select value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>
         <option value="ALL">All branches</option>
         {BRANCH_CODES.map(b=><option key={b}>{b}</option>)}
       </select>}>
@@ -1546,7 +1546,7 @@ export function BankBalanceDashboard(){
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr><th style={RPT_thStyle}>Ledger</th><th style={RPT_thStyle}>Group</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance (INR)</th></tr></thead>
             <tbody>
-              {rows.map((r,i)=>(<tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}><td style={{...RPT_tdStyle,fontWeight:600}}>{r.ledger}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{r.group}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:bal(r)<0?"#A32D2D":"#0d1326"}}>{fmtINR(bal(r))}</td></tr>))}
+              {rows.map((r,i)=>(<tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}><td style={{...RPT_tdStyle,fontWeight:600}}>{r.ledger}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{r.group}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:bal(r)<0?"#A32D2D":"#0d1326"}}>{fmtINR(bal(r))}</td></tr>))}
               {rows.length===0&&<tr><td colSpan={3} style={{...RPT_tdStyle,textAlign:"center",color:"#5a6691",padding:20}}>No cash/bank balances yet — post receipts/payments and they appear here.</td></tr>}
             </tbody>
           </table>
@@ -1572,7 +1572,7 @@ export function TDSCalculator(){
   const tdsAmt=Math.round(amount*rate/100);
   const netPayable=amount-tdsAmt;
   const aboveThreshold=amount>sec.threshold;
-  const inp={padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12.5,width:"100%"};
+  const inp={padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12.5,width:"100%"};
 
   return(
     <PHASE2_Page title="TDS Auto-Calculator" subtitle="Section auto-selected · rate auto-applied based on PAN availability · threshold check">
@@ -1628,7 +1628,7 @@ export function TDSCalculator(){
                 {label:"TDS Amount",val:"₹ "+tdsAmt.toLocaleString("en-IN"),mono:true,bold:true,color:"#A32D2D"},
                 {label:"Net Payable to Vendor",val:"₹ "+netPayable.toLocaleString("en-IN"),mono:true,bold:true,color:"#22c55e"},
               ].map((r,i)=>(
-                <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #f0f2f7"}}>
+                <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #dfe2e7"}}>
                   <span style={{fontSize:11.5,color:"#5a6691"}}>{r.label}</span>
                   <span style={{fontSize:r.bold?14:12,fontWeight:r.bold?700:500,color:r.color||"#0d1326",fontFamily:r.mono?"monospace":"inherit"}}>{r.val}</span>
                 </div>
@@ -1673,7 +1673,7 @@ export function InterestCalculator(){
   const [dueDate,setDueDate]=useState("2026-04-01");
   const [calcDate,setCalcDate]=useState(todayISO());
   const [mode,setMode]=useState("simple");
-  const inp={padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12.5,width:"100%"};
+  const inp={padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12.5,width:"100%"};
 
   const msPerDay=86400000;
   const days=Math.max(0,Math.round((new Date(calcDate)-new Date(dueDate))/msPerDay));
@@ -1710,7 +1710,7 @@ export function InterestCalculator(){
               <input type="number" step="0.5" value={rate} onChange={e=>setRate(+e.target.value)} style={{...inp,fontFamily:"monospace",fontSize:14,fontWeight:700}}/></div>
             <div style={{display:"flex",gap:8}}>
               {["simple","compound"].map(m=>(
-                <button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"9px",border:mode===m?"2px solid #d4a437":"1px solid #e1e3ec",background:mode===m?"#fff8e8":"#fff",color:mode===m?"#0d1326":"#5a6691",borderRadius:6,fontSize:12,fontWeight:mode===m?700:500,cursor:"pointer",textTransform:"capitalize"}}>{m} Interest</button>
+                <button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"9px",border:mode===m?"2px solid #d4a437":"1px solid #cdd1d8",background:mode===m?"#fff8e8":"#fff",color:mode===m?"#0d1326":"#5a6691",borderRadius:6,fontSize:12,fontWeight:mode===m?700:500,cursor:"pointer",textTransform:"capitalize"}}>{m} Interest</button>
               ))}
             </div>
           </div>
@@ -1741,7 +1741,7 @@ export function InterestCalculator(){
                 <th style={{...RPT_thStyle,textAlign:"right"}}>Cumul. Int.</th>
               </tr></thead>
               <tbody>{monthly.map(r=>(
-                <tr key={r.m} style={{borderBottom:"1px solid #f0f2f7"}}>
+                <tr key={r.m} style={{borderBottom:"1px solid #dfe2e7"}}>
                   <td style={{...RPT_tdStyle,fontWeight:600}}>Month {r.m}</td>
                   <td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{fmtINR(r.opening)}</td>
                   <td style={{...RPT_tdStyle,textAlign:"right",color:"#f97316",fontWeight:700,fontFamily:"monospace"}}>{fmtINR(r.interest)}</td>
@@ -1769,7 +1769,7 @@ export function InvestmentRegister({branch}){
   const set=(k)=>(e)=>setF(s=>({...s,[k]:e.target.value}));
   const add=()=>{ if(!brCode){ toast('Select a specific branch (not All) before adding.','error'); return; } if(!f.instrument){return;} create.mutate({branch:brCode,instrument:f.instrument,type:f.type,institution:f.institution,amount:Number(f.amount)||0,rate:Number(f.rate)||0,maturityDate:f.maturityDate,maturityValue:Number(f.maturityValue)||0,status:f.status},{onSuccess:()=>setF(blank)}); };
   const totA=rows.reduce((s,i)=>s+(i.amount||0),0),totM=rows.reduce((s,i)=>s+(i.maturityValue||0),0);
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
   const ip={...inp,minHeight:30,fontSize:11,width:"100%"};
   const kc=(label,val,col)=>(<div style={{...card,borderTop:`3px solid ${col}`}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>{label}</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:col}}>{cur+fmt(val)}</p></div>);
   return(
@@ -1799,7 +1799,7 @@ export function InvestmentRegister({branch}){
               <th style={{padding:"9px 8px",textAlign:"left"}}>Instrument</th><th style={{padding:"9px 8px",textAlign:"left"}}>Type</th><th style={{padding:"9px 8px",textAlign:"left"}}>Institution</th><th style={{padding:"9px 8px",textAlign:"right"}}>Amount</th><th style={{padding:"9px 8px",textAlign:"center"}}>Rate</th><th style={{padding:"9px 8px",textAlign:"center"}}>Maturity</th><th style={{padding:"9px 8px",textAlign:"right"}}>Maturity Val</th><th style={{padding:"9px 8px",textAlign:"center"}}>Status</th><th style={{padding:"9px 8px"}}></th>
             </tr></thead>
             <tbody>
-              {rows.map((iv,i)=>(<tr key={iv.id} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #e1e3ec"}}>
+              {rows.map((iv,i)=>(<tr key={iv.id} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #cdd1d8"}}>
                 <td style={{padding:"7px 8px",fontWeight:600}}>{iv.instrument}</td>
                 <td style={{padding:"7px 8px"}}>{iv.type}</td>
                 <td style={{padding:"7px 8px",color:"#5a6691"}}>{iv.institution||"-"}</td>
@@ -1825,7 +1825,7 @@ export function LoanAmortization(){
   const [tenureMonths,setTenureMonths]=useState(60);
   const [startDate,setStartDate]=useState("2026-06-01");
   const [showAll,setShowAll]=useState(false);
-  const inp={padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12.5,width:"100%"};
+  const inp={padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12.5,width:"100%"};
 
   const r=annualRate/100/12;
   const emi=principal>0&&r>0&&tenureMonths>0
@@ -1898,17 +1898,17 @@ export function LoanAmortization(){
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Amortization Schedule</p>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>setShowAll(!showAll)} style={{padding:"5px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer"}}>{showAll?"Show first 12":"Show all "+tenureMonths}</button>
-              <button style={{padding:"5px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer"}}>📥 Excel</button>
+              <button onClick={()=>setShowAll(!showAll)} style={{padding:"5px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer"}}>{showAll?"Show first 12":"Show all "+tenureMonths}</button>
+              <button style={{padding:"5px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer"}}>📥 Excel</button>
             </div>
           </div>
-          <div style={{maxHeight:480,overflowY:"auto",border:"1px solid #e1e3ec",borderRadius:6}}>
+          <div style={{maxHeight:480,overflowY:"auto",border:"1px solid #cdd1d8",borderRadius:6}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
               <thead style={{background:"#f7f8fb",position:"sticky",top:0}}>
                 <tr><th style={RPT_thStyle}>#</th><th style={RPT_thStyle}>Date</th><th style={{...RPT_thStyle,textAlign:"right"}}>Opening</th><th style={{...RPT_thStyle,textAlign:"right"}}>EMI</th><th style={{...RPT_thStyle,textAlign:"right",color:"#f97316"}}>Interest</th><th style={{...RPT_thStyle,textAlign:"right",color:"#22c55e"}}>Principal</th><th style={{...RPT_thStyle,textAlign:"right"}}>Closing</th></tr>
               </thead>
               <tbody>{display.map(r=>(
-                <tr key={r.m} style={{borderBottom:"1px solid #f0f2f7",background:r.m%2===0?"#fafbfd":"#fff"}}>
+                <tr key={r.m} style={{borderBottom:"1px solid #dfe2e7",background:r.m%2===0?"#fafbfd":"#fff"}}>
                   <td style={{...RPT_tdStyle,color:"#5a6691"}}>{r.m}</td>
                   <td style={{...RPT_tdStyle,fontFamily:"monospace"}}>{r.date}</td>
                   <td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{fmtINR(r.opening)}</td>
@@ -1934,7 +1934,7 @@ export function LoanAmortization(){
 export function ReconciliationQueue({branch,setRoute}){
   const { data } = useBankLedgers(branch);
   const ledgers=data||[];
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
   return(
     <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
       <h2 style={{margin:0,fontSize:19,fontWeight:800,color:"#0d1326"}}>Reconciliation Queue</h2>
@@ -1946,7 +1946,7 @@ export function ReconciliationQueue({branch,setRoute}){
               <th style={{padding:"9px 10px",textAlign:"left"}}>Bank Ledger</th><th style={{padding:"9px 10px",textAlign:"left"}}>Group</th><th style={{padding:"9px 10px",textAlign:"center"}}>Action</th>
             </tr></thead>
             <tbody>
-              {ledgers.map((l,i)=>(<tr key={l.code||l.name||i} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #e1e3ec"}}>
+              {ledgers.map((l,i)=>(<tr key={l.code||l.name||i} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #cdd1d8"}}>
                 <td style={{padding:"8px 10px",fontWeight:600}}>{l.name||l.ledger||l}</td>
                 <td style={{padding:"8px 10px",color:"#5a6691"}}>{l.group||"Bank Accounts"}</td>
                 <td style={{padding:"8px 10px",textAlign:"center"}}><button onClick={()=>setRoute&&setRoute('/bank-reco')} style={{...btnGh,minHeight:28,fontSize:11}}>Reconcile</button></td>
@@ -1964,7 +1964,7 @@ export function InvestmentDeclaration(){
   const [vals,setVals]=useState(Object.fromEntries(INVESTMENT_SECTIONS.map(s=>[s.section,s.declared])));
   const totalDeclared=Object.values(vals).reduce((s,v)=>s+v,0);
   const estimatedTax=Math.max(0,Math.round((totalDeclared>500000?(totalDeclared-500000)*0.2:0)-totalDeclared*0.05));
-  const inp={padding:"7px 8px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"monospace",width:120};
+  const inp={padding:"7px 8px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,textAlign:"right",fontFamily:"monospace",width:120};
   return(
     <PHASE2_Page title="Investment Declaration — FY 2026-27" subtitle="Declare your tax-saving investments · used for TDS calculation">
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14}}>
@@ -1973,10 +1973,10 @@ export function InvestmentDeclaration(){
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Section & Description</th><th style={{...RPT_thStyle,textAlign:"right"}}>Max Limit</th><th style={{...RPT_thStyle,textAlign:"right"}}>Amount Declared</th><th style={RPT_thStyle}>Proof Required</th></tr></thead>
             <tbody>{INVESTMENT_SECTIONS.map(s=>(
-              <tr key={s.section} style={{borderBottom:"1px solid #f0f2f7"}}>
+              <tr key={s.section} style={{borderBottom:"1px solid #dfe2e7"}}>
                 <td style={{...RPT_tdStyle,fontWeight:600}}>{s.label}</td>
                 <td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:"#5a6691"}}>{s.limit>0?fmtINR(s.limit):"No limit"}</td>
-                <td style={{padding:"6px 12px",borderBottom:"1px solid #f0f2f7",textAlign:"right"}}>
+                <td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7",textAlign:"right"}}>
                   <input type="number" value={vals[s.section]||""} onChange={e=>setVals(v=>({...v,[s.section]:+e.target.value}))} style={{...inp,borderColor:s.limit>0&&(vals[s.section]||0)>s.limit?"#A32D2D":"#e1e3ec"}}/>
                   {s.limit>0&&(vals[s.section]||0)>s.limit&&<p style={{margin:"2px 0 0",fontSize:9.5,color:"#A32D2D"}}>Exceeds limit</p>}
                 </td>
@@ -1985,7 +1985,7 @@ export function InvestmentDeclaration(){
             ))}</tbody>
           </table>
           <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:14}}>
-            <button style={{padding:"8px 16px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Save Draft</button>
+            <button style={{padding:"8px 16px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Save Draft</button>
             <button style={{padding:"8px 18px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>Submit Declaration</button>
           </div>
         </div>
@@ -2002,7 +2002,7 @@ export function InvestmentDeclaration(){
               <span style={{color:"#22c55e",fontFamily:"monospace"}}>{fmtINR(Math.round(totalDeclared*0.2))}</span>
             </div>
           </div>
-          <div style={{padding:12,background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,fontSize:11,color:"#5a6691"}}>
+          <div style={{padding:12,background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,fontSize:11,color:"#5a6691"}}>
             <p style={{margin:"0 0 6px",fontWeight:700,color:"#0d1326",fontSize:12}}>⚠ Important</p>
             <p style={{margin:0}}>• Submit actual proof documents by 31-Jan-2027<br/>• Declarations must be submitted by 15-Apr-2026<br/>• False declarations attract tax + penalty<br/>• Consult your CA for complex scenarios</p>
           </div>

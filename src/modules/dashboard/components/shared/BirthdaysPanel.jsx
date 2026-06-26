@@ -9,7 +9,7 @@ export function BirthdaysPanel({ birthdays }) {
       {birthdays.map((b) => (
         <div
           key={b.name}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #f0f2f7' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #dfe2e7' }}
         >
           <div
             style={{

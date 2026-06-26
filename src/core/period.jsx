@@ -61,7 +61,7 @@ export function useInception(branch) {
   });
 }
 
-const C = { dark: '#0d1326', gold: '#d4a437', dim: '#5a6691', border: '#d6dbe6' };
+const C = { dark: '#0d1326', gold: '#d4a437', dim: '#5a6691', border: '#cdd1d8' };
 
 // Drop-in selector. Owns preset + custom dates; calls onChange({from,to,label,preset})
 // whenever the effective range changes (incl. on mount). Date inputs stay editable.

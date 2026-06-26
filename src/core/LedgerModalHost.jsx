@@ -105,7 +105,7 @@ export function LedgerModalHost({ branch: shellBranch }) {
       {voucher && (
         <div onMouseDown={(e) => { e.stopPropagation(); setVoucher(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(17,17,17,0.5)', zIndex: 8900, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
           <div onMouseDown={(e) => e.stopPropagation()} style={{ width: 'min(880px, 96vw)', maxHeight: '92vh', overflowY: 'auto', background: '#fff', borderRadius: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <strong style={{ fontSize: 13, color: '#0d1326' }}>{job.name} · {voucher.vno}</strong>
               <button onClick={() => setVoucher(null)} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18 }}>✕</button>
             </div>

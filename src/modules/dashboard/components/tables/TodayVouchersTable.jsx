@@ -17,7 +17,7 @@ export function TodayVouchersTable({ data, formatMoney = fmtINR }) {
       </thead>
       <tbody>
         {Object.entries(data || {}).map(([br, v]) => (
-          <tr key={br} style={{ borderBottom: '1px solid #f0f2f7' }}>
+          <tr key={br} style={{ borderBottom: '1px solid #dfe2e7' }}>
             <td style={{ padding: '7px 8px', fontWeight: 700, color: '#14161a' }}>{br}</td>
             <td style={{ padding: '7px 6px', textAlign: 'center' }}>{v.receipt}</td>
             <td style={{ padding: '7px 6px', textAlign: 'center' }}>{v.payment}</td>

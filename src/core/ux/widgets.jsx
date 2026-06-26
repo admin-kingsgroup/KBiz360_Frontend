@@ -60,7 +60,7 @@ export function Combobox({ items, value, onChange, placeholder = 'Search…', wi
       </button>
       {open && !disabled && (
         <div style={{ position: 'absolute', zIndex: 9200, top: 'calc(100% + 4px)', left: 0, width: Math.max(width, 240), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 8, boxShadow: '0 10px 30px rgba(13,19,38,.18)', overflow: 'hidden' }}>
-          <div style={{ padding: 7, borderBottom: '1px solid #eef0f6' }}>
+          <div style={{ padding: 7, borderBottom: '1px solid #dfe2e7' }}>
             <input ref={inputRef} autoFocus={autoFocus} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey} placeholder={placeholder}
               style={{ width: '100%', boxSizing: 'border-box', padding: '6px 9px', fontSize: 12, border: `1px solid ${LINE}`, borderRadius: 5, outline: 'none' }} />
           </div>

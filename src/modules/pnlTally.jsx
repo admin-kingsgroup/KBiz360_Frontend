@@ -174,7 +174,7 @@ export function GroupSummary({ frame, onPick }) {
         {items.map((it, i) => {
           const drillable = it.isGroup || it.ledger || !!it.name;
           return (
-            <tr key={i} {...clickable(() => drillable && onPick(it))} style={{ cursor: drillable ? 'pointer' : 'default', borderBottom: '1px solid #f0f2f7' }}
+            <tr key={i} {...clickable(() => drillable && onPick(it))} style={{ cursor: drillable ? 'pointer' : 'default', borderBottom: '1px solid #dfe2e7' }}
               onMouseEnter={(e) => drillable && (e.currentTarget.style.background = '#eef4ff')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
               <td style={{ ...tdName, fontWeight: it.isGroup ? 700 : 400, color: it.isGroup ? DARK : '#2563eb' }}>
@@ -217,7 +217,7 @@ function LedgerComponents({ name, costCenter, branch, from, to, onPick }) {
       <tbody>
         {rows.map((r, i) => (
           <tr key={i} {...clickable(() => onPick({ kind: 'vouchers', name, costCenter, title: r.label }))}
-            style={{ cursor: 'pointer', borderBottom: '1px solid #f0f2f7' }}
+            style={{ cursor: 'pointer', borderBottom: '1px solid #dfe2e7' }}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
             <td style={{ ...tdName, fontWeight: 600, color: '#2563eb' }}>{r.label}<ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9197a3' }} /></td>
@@ -257,7 +257,7 @@ function LedgerDrill({ name, branch, from, to, onPick }) {
       <tbody>
         {rows.map((r, i) => (
           <tr key={i} {...clickable(() => onPick({ kind: 'ledger', name, costCenter: r.costCenter, title: r.label }))}
-            style={{ cursor: 'pointer', borderBottom: '1px solid #f0f2f7' }}
+            style={{ cursor: 'pointer', borderBottom: '1px solid #dfe2e7' }}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
             <td style={{ ...tdName, fontWeight: 700, color: DARK }}>{r.label}<ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9197a3' }} /></td>
@@ -353,7 +353,7 @@ export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
             {(d.lines || []).map((ln, i) => (
               <React.Fragment key={i}>
                 <tr {...clickable(() => ln.voucherId && onPick({ kind: 'voucher', id: ln.voucherId, vno: ln.vno }))}
-                  style={{ cursor: ln.voucherId ? 'pointer' : 'default', borderBottom: showNarration ? 'none' : '1px solid #f0f2f7' }}
+                  style={{ cursor: ln.voucherId ? 'pointer' : 'default', borderBottom: showNarration ? 'none' : '1px solid #dfe2e7' }}
                   onMouseEnter={(e) => ln.voucherId && (e.currentTarget.style.background = '#eef4ff')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
                   <td style={{ ...tdName, color: DIM, whiteSpace: 'nowrap' }}>{dmy(ln.date)}</td>
@@ -365,7 +365,7 @@ export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
                   <td style={{ ...tdNum, color: DIM }}>{money(Math.abs(ln.balance))} {ln.balanceSide}</td>
                 </tr>
                 {showNarration && (ln.narration || ln.entryNarration) && (
-                  <tr style={{ borderBottom: '1px solid #f0f2f7' }}>
+                  <tr style={{ borderBottom: '1px solid #dfe2e7' }}>
                     <td />
                     <td colSpan={6} style={{ ...tdName, color: DIM, fontStyle: 'italic', fontSize: 11, paddingTop: 0 }}>{ln.narration || ln.entryNarration}</td>
                   </tr>
@@ -406,7 +406,7 @@ function LedgerBillwise({ name, branch, side }) {
       </tr></thead>
       <tbody>
         {bills.map((b, i) => (
-          <tr key={i} style={{ borderBottom: '1px solid #f0f2f7' }}>
+          <tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}>
             <td style={{ ...tdName, color: DIM, whiteSpace: 'nowrap' }}>{dmy(b.date)}</td>
             <td style={{ ...tdName, fontWeight: 600, fontFamily: 'monospace', fontSize: 11 }}>{b.billVno}</td>
             <td style={{ ...tdName, color: DIM, whiteSpace: 'nowrap' }}>{b.creditDays ? dmy(addDaysStr(b.date, b.creditDays)) : '—'}</td>
@@ -505,7 +505,7 @@ export function VoucherView({ id, cur }) {
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr style={{ background: HEAD }}><th style={th}>Particulars</th><th style={{ ...th, textAlign: 'right' }}>Amount</th></tr></thead>
         <tbody>{particulars.map((p, i) => (
-          <tr key={i} style={{ borderBottom: '1px solid #f0f2f7' }}>
+          <tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}>
             <td style={{ ...tdName, fontWeight: 700, color: p.tax ? '#d97706' : DARK }}>{p.label}</td>
             <td style={{ ...tdNum, fontWeight: 600 }}>{money(p.amount)}</td>
           </tr>

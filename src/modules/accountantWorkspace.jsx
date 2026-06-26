@@ -42,10 +42,10 @@ import {
 } from 'lucide-react';
 import { PageLayout } from '../shell/PageLayout';
 
-const C = { dark: '#1a1c22', gold: '#c2a04a', blue: '#2563eb', red: '#dc2626', green: '#16a34a', dim: '#5b616e', border: '#e6e8ec', amber: '#d97706' };
+const C = { dark: '#1a1c22', gold: '#c2a04a', blue: '#2563eb', red: '#dc2626', green: '#16a34a', dim: '#5b616e', border: '#cdd1d8', amber: '#d97706' };
 // Design-system card values (brand radius + soft elevation + subtle border), so every
 // `{...card}` surface in this workspace adopts the premium look without structural change.
-const card = { background: '#fff', border: '1px solid #e6e8ec', borderRadius: 12, boxShadow: '0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)' };
+const card = { background: '#fff', border: '1px solid #cdd1d8', borderRadius: 12, boxShadow: '0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
 const brLabel = (b) => (b === 'ALL' || !b ? 'All Branches' : (b.name || b.code || b));
 
@@ -73,7 +73,7 @@ const Shell = ({ title, sub, right, children }) => (
   </PageLayout>
 );
 const th = { padding: '8px 12px', background: C.dark, color: C.gold, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'left', whiteSpace: 'nowrap' };
-const td = { padding: '8px 12px', borderBottom: '1px solid #f0f2f7', fontSize: 12.5 };
+const td = { padding: '8px 12px', borderBottom: '1px solid #dfe2e7', fontSize: 12.5 };
 const rnum = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 // `pager` (from usePager) renders the infinite-scroll sentinel INSIDE this scroll
 // box, right after the table — so it only triggers a load when you scroll to the
@@ -108,7 +108,7 @@ const Row = ({ children }) => <div style={{ display: 'flex', gap: 12, flexWrap: 
 function AgeBucketRow({ label, totals = {}, cur, tone, onClick }) {
   const cell = (v, red) => <td style={{ padding: '7px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: red && v > 0 ? C.red : C.dark, whiteSpace: 'nowrap' }}>{v ? money(cur, v) : '—'}</td>;
   return (
-    <tr {...(onClick ? clickable(onClick) : {})} style={{ cursor: onClick ? 'pointer' : 'default', borderTop: '1px solid #f0f2f7' }}>
+    <tr {...(onClick ? clickable(onClick) : {})} style={{ cursor: onClick ? 'pointer' : 'default', borderTop: '1px solid #dfe2e7' }}>
       <td style={{ padding: '7px 10px', fontWeight: 700, color: tone, whiteSpace: 'nowrap' }}>{label}</td>
       {cell(totals.d0)}{cell(totals.d30)}{cell(totals.d60)}{cell(totals.d90, true)}
       <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: tone, fontVariantNumeric: 'tabular-nums' }}>{money(cur, totals.total || 0)}{onClick && <ArrowRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4 }} />}</td>
@@ -123,7 +123,7 @@ function MiniList({ title, rows, cur, valueKey, tone, actionLabel, onAction }) {
       <div style={{ fontSize: 12, fontWeight: 800, color: C.dark, marginBottom: 8 }}>{title}</div>
       {rows.length === 0 && <div style={{ fontSize: 11.5, color: C.green }}>✓ Nothing here.</div>}
       {rows.map((r, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderTop: i ? '1px solid #f3f4f8' : 'none' }}>
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
           <span style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.party}</span>
           <span style={{ fontSize: 12, fontWeight: 800, color: tone, fontVariantNumeric: 'tabular-nums' }}>{money(cur, r[valueKey])}</span>
           {onAction && <button onClick={() => onAction(r)} style={{ ...aBtn(tone), padding: '3px 8px', fontSize: 10 }}>{actionLabel}</button>}
@@ -412,7 +412,7 @@ export function DashboardAccountant({ branch, setRoute }) {
               </div>
               {top5rec.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 10 }}>✓ No overdue debtors outstanding.</div>}
               {top5rec.map((r, i) => (
-                <div key={i} style={{ padding: '8px 0', borderTop: i ? '1px solid #f3f4f8' : 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div key={i} style={{ padding: '8px 0', borderTop: i ? '1px solid #dfe2e7' : 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 12, color: C.dark, fontWeight: 700 }}>{r.party}</span>
                     <span style={{ fontSize: 12, fontWeight: 800, color: C.red }}>{money(cur, r.overdue)}</span>
@@ -446,7 +446,7 @@ export function DashboardAccountant({ branch, setRoute }) {
               </div>
               {top5pay.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 10 }}>✓ No outstanding bills to pay.</div>}
               {top5pay.map((r, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: i ? '1px solid #f3f4f8' : 'none' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
                   <span style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600 }}>{r.party}</span>
                   <span style={{ fontSize: 12, fontWeight: 800, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{money(cur, r.total)}</span>
                   <button onClick={() => go('/payments')} style={{ ...aBtn(C.amber), padding: '3px 8px', fontSize: 10 }}>Pay</button>
@@ -539,14 +539,14 @@ export function DashboardAccountant({ branch, setRoute }) {
           {/* Month-End Close progress checklist embedded */}
           <SecTitle>Month-End Checklist / Close Verification</SecTitle>
           <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f2f7', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafbff' }}>
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid #dfe2e7', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafbff' }}>
               <span style={{ fontSize: 12.5, fontWeight: 700, color: C.dark }}>Auto and manual checks for month closing ({period})</span>
               <span style={{ fontSize: 12, fontWeight: 800, color: checklistDone === checklistItems.length ? C.green : C.amber }}>{checklistDone}/{checklistItems.length} tasks completed</span>
             </div>
             {checklistItems.map((it, i) => {
               const ok = it.manualOnly ? !!manualChecklist[it.key] : it.auto;
               return (
-                <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderTop: i ? '1px solid #f0f2f7' : 'none' }}>
+                <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
                   <span {...(it.manualOnly ? clickable(() => toggleManualCheck(it.key)) : {})}
                     style={{ width: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? 'pointer' : 'default', background: ok ? C.green : (it.manualOnly ? '#cbd0db' : C.amber), fontSize: 11 }}>
                     {ok ? '✓' : (it.manualOnly ? '' : '!')}
@@ -734,7 +734,7 @@ export function CollectionsFollowup({ branch, setRoute }) {
                           <div style={{ fontSize: 11, fontWeight: 800, color: C.dim, marginBottom: 6 }}>CONTACT HISTORY ({(f.contactLog || []).length})</div>
                           {(f.contactLog || []).length === 0 ? <div style={{ fontSize: 12, color: C.dim }}>No contact logged yet.</div> :
                             (f.contactLog || []).map((c, j) => (
-                              <div key={j} style={{ fontSize: 11.5, padding: '4px 0', borderBottom: '1px solid #eef1f8' }}>
+                              <div key={j} style={{ fontSize: 11.5, padding: '4px 0', borderBottom: '1px solid #dfe2e7' }}>
                                 <b style={{ color: C.dark }}>{fmtWhen(c.at)}</b> · {c.channel} · {c.by} {c.note ? `— ${c.note}` : ''} {c.outcome ? <span style={{ color: C.green }}>({c.outcome})</span> : null}
                               </div>
                             ))}
@@ -1380,7 +1380,7 @@ export function MonthEndChecklist({ branch, setRoute }) {
         {items.map((it, i) => {
           const ok = it.manualOnly ? !!manual[it.key] : it.auto;
           return (
-            <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderTop: i ? '1px solid #f0f2f7' : 'none' }}>
+            <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
               <span {...(it.manualOnly ? clickable(() => toggleManual(it.key)) : {})}
                 style={{ width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? 'pointer' : 'default', background: ok ? C.green : (it.manualOnly ? '#cbd0db' : C.amber) }}>
                 {ok ? '✓' : (it.manualOnly ? '' : '!')}

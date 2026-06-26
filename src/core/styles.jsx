@@ -144,7 +144,7 @@ export function VLinked({branch,type,vNo,setRoute}){
   if(!matchedPurchases.length && !thisEntry) return null;
 
   return (
-    <div style={{padding:"10px 16px",borderTop:"1px solid #e1e3ec",
+    <div style={{padding:"10px 16px",borderTop:"1px solid #cdd1d8",
       background:"#f9fafb"}}>
       <p style={{margin:"0 0 7px",fontSize:9.5,color:"#5a6691",fontWeight:700,
         textTransform:"uppercase",letterSpacing:"0.4px"}}>
@@ -212,7 +212,7 @@ export function LiveDateTime({compact=false}){
     return ()=>clearInterval(id);
   },[]);
   return (
-    <span title="Current date & time" style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:"#5a6691",fontWeight:600,background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:compact?"3px 8px":"5px 10px"}}>
+    <span title="Current date & time" style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:"#5a6691",fontWeight:600,background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:compact?"3px 8px":"5px 10px"}}>
       <Clock size={13}/> {now}
     </span>
   );
@@ -230,7 +230,7 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
   const brCode=branch==="ALL"?"ALL":branch?.code||"BOM";
   return (
     <div style={{padding:"12px 10px",maxWidth:1160,margin:"0 auto",paddingBottom:80,fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif",color:"#1F2328",WebkitFontSmoothing:"antialiased"}}>
-      <div style={{background:"#fff",border:"1px solid #DEDEDA",borderLeft:"4px solid #A07828",borderRadius:4,overflow:"hidden",boxShadow:"0 3px 16px rgba(0,0,0,.10)"}}>
+      <div style={{background:"#fff",border:"1px solid #dfe2e7",borderLeft:"4px solid #A07828",borderRadius:4,overflow:"hidden",boxShadow:"0 3px 16px rgba(0,0,0,.10)"}}>
 
         {/* Voucher header bar */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 16px",background:"#141414",borderBottom:"3px solid #A07828",flexWrap:"wrap",gap:8}}>
@@ -271,7 +271,7 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
       </div>
 
       {/* Sticky footer */}
-      <div style={{position:"sticky",bottom:0,background:"#FAFAF8",borderTop:"1px solid #ECECE8",padding:"12px 0",marginTop:14,display:"flex",gap:9,justifyContent:"flex-end"}}>
+      <div style={{position:"sticky",bottom:0,background:"#FAFAF8",borderTop:"1px solid #dfe2e7",padding:"12px 0",marginTop:14,display:"flex",gap:9,justifyContent:"flex-end"}}>
         <button style={{...btnGh,background:"#FBF3DE",color:"#6B4E0F",borderColor:"#E8D9A8"}}>Cancel</button>
         <button
           disabled={!canSave}
@@ -305,7 +305,7 @@ export function VHead({vNo,branch,salesperson=true}){
   const cfg=bc(branch);
   const isIndia=cfg.taxType==="GST";
   return (
-    <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+    <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(155px,1fr))",gap:11}}>
           <FL label="Voucher no.">
             <input value={vNo} readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontFamily:"monospace",fontWeight:700}}/>
@@ -342,7 +342,7 @@ export function VParty({label,name,gstin,branch:branchProp,onGstinChange}){
   const isIndia=cfg.taxType==="GST";
   const controlled=typeof onGstinChange==="function";
   return (
-    <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+    <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
       <p style={{margin:"0 0 9px",fontSize:10,color:"#5a6691",letterSpacing:"0.5px",textTransform:"uppercase"}}>{label||"Customer"} details</p>
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:11}}>
         <FL label="Party A/c">
@@ -371,7 +371,7 @@ export function VTot({lines,gstLbl,gst,tcs,tcsAmt,total,branch}){
   const isIndia=cfg.taxType==="GST";
   const tcsLabel=isIndia?"TCS 5%":"Withholding tax";
   return (
-    <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:10,padding:14}}>
+    <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:10,padding:14}}>
       {(lines||[]).map((r,i)=>(
         <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",fontSize:11}}>
           <span style={{color:"#5a6691"}}>{r.l}</span>
@@ -386,7 +386,7 @@ export function VTot({lines,gstLbl,gst,tcs,tcsAmt,total,branch}){
         <span style={{color:"#5a6691"}}>{tcsLabel}</span>
         <span>{cur+fmt(tcsAmt)}</span>
       </div>}
-      <div style={{borderTop:"1px solid #e1e3ec",margin:"8px 0"}}/>
+      <div style={{borderTop:"1px solid #cdd1d8",margin:"8px 0"}}/>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <span style={{fontSize:13,fontWeight:600}}>Invoice total</span>
         <span style={{fontSize:18,fontWeight:700,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{cur+fmt(total||0)}</span>
@@ -411,10 +411,10 @@ export function VNarr({def,children}){
 
 export function ARow({label,onAdd,children}){
   return (
-    <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+    <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
         <p style={{margin:0,fontSize:10,color:"#5a6691",letterSpacing:"0.5px",textTransform:"uppercase"}}>{label}</p>
-        <button onClick={onAdd} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",border:"1px solid #e1e3ec",borderRadius:7,fontSize:11,background:"#fff",cursor:"pointer"}}><Plus size={12}/> Add row</button>
+        <button onClick={onAdd} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",border:"1px solid #cdd1d8",borderRadius:7,fontSize:11,background:"#fff",cursor:"pointer"}}><Plus size={12}/> Add row</button>
       </div>
       <div style={{overflowX:"auto"}}>{children}</div>
     </div>
@@ -432,14 +432,14 @@ export function AgeTable({data}){
     <div style={{...card,padding:0,overflow:"hidden"}}>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",fontSize:11.5,borderCollapse:"collapse"}}>
-          <thead><tr style={{background:"#f3f4f8",borderBottom:"2px solid #e1e3ec"}}>
+          <thead><tr style={{background:"#f3f4f8",borderBottom:"2px solid #cdd1d8"}}>
             <th style={{textAlign:"left",padding:"9px 11px",fontWeight:600,color:"#384677",fontSize:11}}>Party</th>
             <th style={{textAlign:"right",padding:"9px 11px",fontWeight:600,color:"#384677",fontSize:11}}>{"Total ₹"}</th>
             {AGE_H.map((h,i)=><th key={i} style={{textAlign:"right",padding:"9px 11px",fontWeight:600,color:AGE_C[i],fontSize:11}}>{h}</th>)}
           </tr></thead>
           <tbody>
             {data.map((r,i)=>(
-              <tr key={i} style={{borderBottom:"1px solid #e1e3ec"}}
+              <tr key={i} style={{borderBottom:"1px solid #cdd1d8"}}
                 onMouseEnter={e=>e.currentTarget.style.background="#f9fafb"}
                 onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <td style={{padding:"9px 11px",fontWeight:500}}>{r.party}</td>
@@ -447,7 +447,7 @@ export function AgeTable({data}){
                 {AGE_COLS.map((c,ci)=><td key={ci} style={{padding:"9px 11px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:r[c]>0?AGE_C[ci]:"#bfc3d6"}}>{r[c]>0?fmt(r[c]):"—"}</td>)}
               </tr>
             ))}
-            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+            <tr style={{background:"#f3f4f8",borderTop:"2px solid #cdd1d8"}}>
               <td style={{padding:"9px 11px",fontWeight:700}}>Total</td>
               <td style={{padding:"9px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{fmt(data.reduce((s,r)=>s+r.total,0))}</td>
               {AGE_COLS.map((c,ci)=><td key={ci} style={{padding:"9px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:AGE_C[ci]}}>{fmt(tot(c))}</td>)}
@@ -472,7 +472,7 @@ export function AgeTable({data}){
 
 /* ── UserSwitcher (demo simulator — switch viewing identity) ── */
 
-const PREMIUM_CARD={...cardStyle,border:"1px solid #e6e8ec",borderRadius:12,boxShadow:"0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)"};
+const PREMIUM_CARD={...cardStyle,border:"1px solid #cdd1d8",borderRadius:12,boxShadow:"0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)"};
 
 export function WidgetCard({title,subtitle,children,onPin,pinned,onDrill}){
   return (
@@ -484,7 +484,7 @@ export function WidgetCard({title,subtitle,children,onPin,pinned,onDrill}){
         </div>
         <div style={{display:"flex",gap:6,flexShrink:0}}>
           {onPin&&<button onClick={onPin} title={pinned?"Unpin":"Pin"} className="inline-flex items-center justify-center max-tablet:min-h-[44px] max-tablet:min-w-[44px]" style={{padding:"3px 6px",background:"transparent",border:"none",cursor:"pointer",color:pinned?"#c2a04a":"#cdd1d8",fontSize:14}}>★</button>}
-          {onDrill&&<button onClick={onDrill} className="inline-flex items-center justify-center max-tablet:min-h-[44px]" style={{padding:"4px 9px",background:"transparent",border:"1px solid #e6e8ec",borderRadius:6,color:"#5b616e",cursor:"pointer",fontSize:10,fontWeight:600}}>Drill ↗</button>}
+          {onDrill&&<button onClick={onDrill} className="inline-flex items-center justify-center max-tablet:min-h-[44px]" style={{padding:"4px 9px",background:"transparent",border:"1px solid #cdd1d8",borderRadius:6,color:"#5b616e",cursor:"pointer",fontSize:10,fontWeight:600}}>Drill ↗</button>}
         </div>
       </div>
       {children}
@@ -514,16 +514,16 @@ export function KPICard({label,value,delta,color,onClick}){
 export function RPT_Page({title,subtitle,toolbar,children}){
   return (
     <div style={{padding:18,maxWidth:1400,margin:"0 auto"}}>
-      <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:14,marginBottom:14,paddingBottom:12,borderBottom:"1px solid #e1e3ec"}}>
+      <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:14,marginBottom:14,paddingBottom:12,borderBottom:"1px solid #cdd1d8"}}>
         <div>
           <h2 style={{margin:0,fontSize:20,color:"#0d1326",fontWeight:700}}>{title}</h2>
           <p style={{margin:"3px 0 0",fontSize:12,color:"#5a6691"}}>{subtitle}</p>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           {toolbar}
-          <button onClick={()=>openPrintPreview({ selector: 'main', title: 'Report', recommend: 'portrait' })} style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📄 PDF</button>
-          <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📊 Excel</button>
-          <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📋 CSV</button>
+          <button onClick={()=>openPrintPreview({ selector: 'main', title: 'Report', recommend: 'portrait' })} style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📄 PDF</button>
+          <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📊 Excel</button>
+          <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📋 CSV</button>
         </div>
       </div>
       {children}
@@ -633,9 +633,9 @@ export function RPT_AuditTrail(){
   return (
     <RPT_Page title="Audit Trail Report" subtitle="Who changed what, when · filterable by user, action, module">
       <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-        <input placeholder="Search description..." value={search} onChange={e=>setSearch(e.target.value)} style={{flex:"1 1 250px",padding:"8px 11px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12}}/>
-        <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} style={{padding:"8px 11px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All users</option>{users.map(u=><option key={u} value={u}>{u}</option>)}</select>
-        <select value={filterAction} onChange={e=>setFilterAction(e.target.value)} style={{padding:"8px 11px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All actions</option>{actions.map(a=><option key={a} value={a}>{a}</option>)}</select>
+        <input placeholder="Search description..." value={search} onChange={e=>setSearch(e.target.value)} style={{flex:"1 1 250px",padding:"8px 11px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12}}/>
+        <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} style={{padding:"8px 11px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All users</option>{users.map(u=><option key={u} value={u}>{u}</option>)}</select>
+        <select value={filterAction} onChange={e=>setFilterAction(e.target.value)} style={{padding:"8px 11px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All actions</option>{actions.map(a=><option key={a} value={a}>{a}</option>)}</select>
       </div>
       <div style={cardStyle}>
         <p style={{margin:0,fontSize:11,color:"#5a6691",marginBottom:10}}>{filtered.length} entries</p>
@@ -863,7 +863,7 @@ export function RPT_ABCAnalysis({ branch }){
   return (
     <RPT_Page title="ABC Analysis (Pareto)"
       subtitle="80/15/5 split based on contribution to value — live from posted bills"
-      toolbar={<div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><ReportDateBar value={range} onChange={setRange}/><select value={dim} onChange={e=>setDim(e.target.value)} style={{padding:"7px 11px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,background:"#fff"}}><option value="customers">By Customer (LTV)</option><option value="suppliers">By Supplier (Spend)</option><option value="destinations">By Destination (Revenue)</option></select></div>}>
+      toolbar={<div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><ReportDateBar value={range} onChange={setRange}/><select value={dim} onChange={e=>setDim(e.target.value)} style={{padding:"7px 11px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:11.5,background:"#fff"}}><option value="customers">By Customer (LTV)</option><option value="suppliers">By Supplier (Spend)</option><option value="destinations">By Destination (Revenue)</option></select></div>}>
       <RptState q={q} empty={data.length===0} label="contribution data">
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
         {["A","B","C"].map(c=>{const cl=classes[c]||{count:0,value:0,share:0};return (<div key={c} style={{...cardStyle,borderTop:"4px solid "+(c==="A"?"#d4a437":c==="B"?"#3b82f6":"#5a6691")}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><span style={{padding:"4px 10px",borderRadius:4,fontSize:13,fontWeight:700,letterSpacing:"0.5px",...grpStyle(c)}}>CLASS {c}</span><span style={{fontSize:11,color:"#5a6691"}}>{cl.count} items · {cl.share}% of total</span></div><p style={{margin:0,fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(cl.value)}</p><p style={{margin:"3px 0 0",fontSize:10.5,color:"#5a6691"}}>{c==="A"?"Top contributors — focus & nurture":c==="B"?"Mid-tier — opportunity to grow":"Long tail — automate / rationalise"}</p></div>);})}
@@ -936,7 +936,7 @@ export function RPT_LeaveUtilization(){
       <div style={cardStyle}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Employee</th><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"right"}}>Entitled</th><th style={{...RPT_thStyle,textAlign:"right"}}>Used</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th><th style={{...RPT_thStyle,textAlign:"right"}}>CL</th><th style={{...RPT_thStyle,textAlign:"right"}}>SL</th><th style={{...RPT_thStyle,textAlign:"right"}}>EL</th><th style={{...RPT_thStyle,textAlign:"center"}}>Utilization</th></tr></thead>
-          <tbody>{LEAVE_UTILIZATION.length===0&&(<tr><td colSpan={9} style={{...RPT_tdStyle,textAlign:"center",color:"#8b94b3"}}>No employees yet.</td></tr>)}{LEAVE_UTILIZATION.map(l=>(<tr key={l.empId}><td style={{...RPT_tdStyle,fontWeight:600}}>{l.name}</td><td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{l.branch}</span></td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.entitled}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{l.used}</td><td style={{...RPT_tdStyle,textAlign:"right",color:l.balance<5?"#A32D2D":"#0d1326"}}>{l.balance}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.casual}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.sick}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.earned}</td><td style={{padding:"6px 12px",borderBottom:"1px solid #f0f2f7"}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{flex:1,height:6,background:"#f0f2f7",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:l.utilPct+"%",background:l.utilPct>75?"#A32D2D":l.utilPct>50?"#d4a437":"#22c55e",borderRadius:3}}/></div><span style={{fontSize:10.5,fontWeight:700,color:l.utilPct>75?"#A32D2D":"#0d1326",minWidth:36,textAlign:"right"}}>{l.utilPct.toFixed(0)}%</span></div></td></tr>))}</tbody>
+          <tbody>{LEAVE_UTILIZATION.length===0&&(<tr><td colSpan={9} style={{...RPT_tdStyle,textAlign:"center",color:"#8b94b3"}}>No employees yet.</td></tr>)}{LEAVE_UTILIZATION.map(l=>(<tr key={l.empId}><td style={{...RPT_tdStyle,fontWeight:600}}>{l.name}</td><td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{l.branch}</span></td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.entitled}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{l.used}</td><td style={{...RPT_tdStyle,textAlign:"right",color:l.balance<5?"#A32D2D":"#0d1326"}}>{l.balance}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.casual}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.sick}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.earned}</td><td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7"}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{flex:1,height:6,background:"#f0f2f7",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:l.utilPct+"%",background:l.utilPct>75?"#A32D2D":l.utilPct>50?"#d4a437":"#22c55e",borderRadius:3}}/></div><span style={{fontSize:10.5,fontWeight:700,color:l.utilPct>75?"#A32D2D":"#0d1326",minWidth:36,textAlign:"right"}}>{l.utilPct.toFixed(0)}%</span></div></td></tr>))}</tbody>
         </table>
       </div>
     </RPT_Page>
@@ -957,12 +957,12 @@ export function RPT_BirthdayCalendar(){
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326",marginBottom:12}}>🎂 Upcoming Birthdays</p>
           {(stats.birthdays||[]).length===0&&<p style={{color:"#5a6691",fontSize:12}}>{statsQ.isLoading?"Loading…":"No upcoming birthdays"}</p>}
-          {(stats.birthdays||[]).map(b=>(<div key={b.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #f0f2f7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#d4a437",display:"flex",alignItems:"center",justifyContent:"center",color:"#0d1326",fontSize:14,fontWeight:700}}>{b.name.substring(0,2).toUpperCase()}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{b.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{b.branch} · {b.date}</p></div><button style={{padding:"5px 12px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Send wish</button></div>))}
+          {(stats.birthdays||[]).map(b=>(<div key={b.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #dfe2e7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#d4a437",display:"flex",alignItems:"center",justifyContent:"center",color:"#0d1326",fontSize:14,fontWeight:700}}>{b.name.substring(0,2).toUpperCase()}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{b.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{b.branch} · {b.date}</p></div><button style={{padding:"5px 12px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Send wish</button></div>))}
         </div>
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326",marginBottom:12}}>🎉 Work Anniversaries</p>
           {(stats.anniversaries||[]).length===0&&<p style={{color:"#5a6691",fontSize:12}}>{statsQ.isLoading?"Loading…":"No upcoming anniversaries"}</p>}
-          {(stats.anniversaries||[]).map(a=>(<div key={a.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #f0f2f7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#6B4C8B",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:14,fontWeight:700}}>{a.years}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{a.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{a.branch} · {a.years} year{a.years!==1?"s":""} on {a.date}</p></div><button style={{padding:"5px 12px",background:"#6B4C8B",color:"#fff",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Acknowledge</button></div>))}
+          {(stats.anniversaries||[]).map(a=>(<div key={a.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #dfe2e7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#6B4C8B",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:14,fontWeight:700}}>{a.years}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{a.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{a.branch} · {a.years} year{a.years!==1?"s":""} on {a.date}</p></div><button style={{padding:"5px 12px",background:"#6B4C8B",color:"#fff",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Acknowledge</button></div>))}
         </div>
       </div>
     </RPT_Page>
@@ -1013,7 +1013,7 @@ export function RPT_TaxFilingBoard({ branch }){
   return (
     <RPT_Page title="Tax Filing Status Board" subtitle="GSTR / TDS / VAT — filed vs pending per branch, derived live from entered return figures"
       toolbar={<label style={{display:"flex",alignItems:"center",gap:6,fontSize:11.5,color:"#5a6691",fontWeight:600}}>Period
-        <input type="month" value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"4px 8px",border:"1px solid #d8dce8",borderRadius:4,fontSize:12}}/></label>}>
+        <input type="month" value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"4px 8px",border:"1px solid #cdd1d8",borderRadius:4,fontSize:12}}/></label>}>
       <RptState q={q} empty={entities.length===0} label="branches">
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
         <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Returns Tracked</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{t.returns}</p></div>
@@ -1023,7 +1023,7 @@ export function RPT_TaxFilingBoard({ branch }){
       <div style={cardStyle}>
         <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={{...RPT_thStyle,minWidth:180}}>Entity</th>{allTaxes.map(t=><th key={t} style={{...RPT_thStyle,textAlign:"center",minWidth:100}}>{t}</th>)}</tr></thead>
-          <tbody>{entities.map(e=>(<tr key={e.entity}><td style={{...RPT_tdStyle,fontWeight:700}}>{e.entity}</td>{allTaxes.map(t=>{const tax=e.taxes[t];if(!tax) return <td key={t} style={{...RPT_tdStyle,textAlign:"center",color:"#cbd0dc"}}>—</td>;return (<td key={t} style={{padding:"8px 6px",textAlign:"center",borderBottom:"1px solid #f0f2f7"}}><span style={{display:"inline-block",padding:"3px 10px",borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px",background:tax.status==="Filed"?"#d4edda":"#f8d7da",color:tax.status==="Filed"?"#155724":"#721c24"}}>{tax.status==="Filed"?"✓ Filed":"○ Pending"}</span>{tax.date!=="—"&&<p style={{margin:"3px 0 0",fontSize:9,color:"#5a6691",fontFamily:"monospace"}}>{tax.date}</p>}</td>);})}</tr>))}</tbody>
+          <tbody>{entities.map(e=>(<tr key={e.entity}><td style={{...RPT_tdStyle,fontWeight:700}}>{e.entity}</td>{allTaxes.map(t=>{const tax=e.taxes[t];if(!tax) return <td key={t} style={{...RPT_tdStyle,textAlign:"center",color:"#cbd0dc"}}>—</td>;return (<td key={t} style={{padding:"8px 6px",textAlign:"center",borderBottom:"1px solid #dfe2e7"}}><span style={{display:"inline-block",padding:"3px 10px",borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px",background:tax.status==="Filed"?"#d4edda":"#f8d7da",color:tax.status==="Filed"?"#155724":"#721c24"}}>{tax.status==="Filed"?"✓ Filed":"○ Pending"}</span>{tax.date!=="—"&&<p style={{margin:"3px 0 0",fontSize:9,color:"#5a6691",fontFamily:"monospace"}}>{tax.date}</p>}</td>);})}</tr>))}</tbody>
         </table></div>
       </div>
       </RptState>
@@ -1081,7 +1081,7 @@ export const tabBtnStyle = (active) => ({
 });
 
 
-export const inpStd = {padding:"8px 10px",width:"100%",border:"1px solid #e6e8ec",borderRadius:8,fontSize:12,boxSizing:"border-box",color:"#14161a"};
+export const inpStd = {padding:"8px 10px",width:"100%",border:"1px solid #cdd1d8",borderRadius:8,fontSize:12,boxSizing:"border-box",color:"#14161a"};
 
 /* ════════════════════════════════════════════════════════════════════
    1. CUSTOMER MASTER (12 tabs) — L&T Limited demo

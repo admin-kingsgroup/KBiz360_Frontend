@@ -336,11 +336,11 @@ export function AlertsDashboard({ branch, setRoute }) {
                     const here = b.branch === code;
                     return (
                       <tr key={b.branch} style={{ background: here ? '#f0f4ff' : '#fff' }}>
-                        <td style={{ padding: '7px 12px', fontSize: 12, fontWeight: here ? 800 : 600, color: DARK, borderBottom: '1px solid #f4f5f7' }}>{b.branch}{here ? ' ·' : ''}</td>
-                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', fontWeight: 700, borderBottom: '1px solid #f4f5f7' }}>{b.open}</td>
-                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', color: b.critical ? RED : DIM, fontWeight: 700, borderBottom: '1px solid #f4f5f7' }}>{b.critical}</td>
-                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', color: b.warning ? AMBER : DIM, borderBottom: '1px solid #f4f5f7' }}>{b.warning}</td>
-                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #f4f5f7' }}>{fmtMoney(symOf({ code: b.branch }), b.exposure)}</td>
+                        <td style={{ padding: '7px 12px', fontSize: 12, fontWeight: here ? 800 : 600, color: DARK, borderBottom: '1px solid #dfe2e7' }}>{b.branch}{here ? ' ·' : ''}</td>
+                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', fontWeight: 700, borderBottom: '1px solid #dfe2e7' }}>{b.open}</td>
+                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', color: b.critical ? RED : DIM, fontWeight: 700, borderBottom: '1px solid #dfe2e7' }}>{b.critical}</td>
+                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', color: b.warning ? AMBER : DIM, borderBottom: '1px solid #dfe2e7' }}>{b.warning}</td>
+                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #dfe2e7' }}>{fmtMoney(symOf({ code: b.branch }), b.exposure)}</td>
                       </tr>
                     );
                   })}

@@ -28,7 +28,7 @@ export function TopEntitiesTable({
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
       <tbody>
         {rows.map((row, i) => (
-          <tr key={row.name} style={{ borderBottom: '1px solid #f0f2f7' }}>
+          <tr key={row.name} style={{ borderBottom: '1px solid #dfe2e7' }}>
             <td style={{ padding: '6px 4px', color: '#5b616e', width: 24 }}>{i + 1}.</td>
             <td style={{ padding: '6px 4px' }}>
               <p style={{ margin: 0, color: '#14161a', fontWeight: 600 }}>{row.name}</p>
