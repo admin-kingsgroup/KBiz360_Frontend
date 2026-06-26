@@ -225,31 +225,29 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
   const cfg=bc(branch);
   const isIndia=cfg.taxType==="GST";
   const taxBadge=isIndia?"GST":"VAT "+cfg.vatRate+"%";
-  const taxBg=isIndia?"#E6F1FB":"#EAF3DE";
-  const taxC=isIndia?"#185FA5":"#27500A";
   const brFlag=branch==="ALL"?"🌐":branch?.flag||"🇮🇳";
   const brCode=branch==="ALL"?"ALL":branch?.code||"BOM";
   return (
     <div style={{padding:"12px 10px",maxWidth:1160,margin:"0 auto",paddingBottom:80}}>
-      <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:12,overflow:"hidden"}}>
+      <div style={{background:"#fff",border:"1px solid #e1e3ec",borderLeft:"4px solid #A07828",borderRadius:12,overflow:"hidden",boxShadow:"0 3px 16px rgba(0,0,0,.08)"}}>
 
         {/* Voucher header bar */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",background:"#f3f4f8",borderBottom:"1px solid #e1e3ec",flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 16px",background:"#141414",borderBottom:"3px solid #A07828",flexWrap:"wrap",gap:8}}>
           <div style={{display:"flex",alignItems:"center",gap:11}}>
-            <div style={{width:38,height:38,borderRadius:9,background:"#E6F1FB",color:"#185FA5",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19}}>{icon}</div>
+            <div style={{width:38,height:38,borderRadius:9,background:"rgba(160,120,40,0.18)",color:"#A07828",border:"1px solid rgba(160,120,40,0.40)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19}}>{icon}</div>
             <div>
-              <p style={{margin:0,fontSize:15,fontWeight:700,color:"#0d1326"}}>{title}</p>
-              <p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{"Voucher · "+brCode+" · "+vNo}</p>
+              <p style={{margin:0,fontSize:15,fontWeight:800,letterSpacing:"0.3px",color:"#fff"}}>{title}</p>
+              <p style={{margin:0,fontSize:10.5,color:"#8A8A84",letterSpacing:"0.3px"}}>{"Voucher · "+brCode+" · "+vNo}</p>
             </div>
           </div>
           <div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
             <LiveDateTime/>
             {/* Branch tax badge */}
-            <span style={{fontSize:10,padding:"3px 9px",borderRadius:999,background:taxBg,color:taxC,fontWeight:700,border:"1px solid "+taxBg,letterSpacing:"0.04em"}}>
+            <span style={{fontSize:10,padding:"3px 9px",borderRadius:999,background:"#FBF3DE",color:"#6B4E0F",fontWeight:800,border:"1px solid #E8D9A8",letterSpacing:"0.04em"}}>
               {brFlag} {cfg.curCode} · {taxBadge}
             </span>
-            <button onClick={()=>openPrintWindow(branch,vNo,title,printRef.current)} style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",border:"1px solid #e1e3ec",borderRadius:8,fontSize:11.5,background:"#fff",cursor:"pointer",color:"#0d1326"}}><Download size={13}/> Download PDF</button>
-            <button style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",border:"1px solid #e1e3ec",borderRadius:8,fontSize:11.5,background:"#fff",cursor:"pointer"}}><Save size={13}/> Draft</button>
+            <button onClick={()=>openPrintWindow(branch,vNo,title,printRef.current)} style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",border:"1px solid #3a3a36",borderRadius:8,fontSize:11.5,background:"#1f1f1f",cursor:"pointer",color:"#e7d9ad"}}><Download size={13}/> Download PDF</button>
+            <button style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",border:"1px solid #3a3a36",borderRadius:8,fontSize:11.5,background:"#1f1f1f",cursor:"pointer",color:"#e7d9ad"}}><Save size={13}/> Draft</button>
           </div>
         </div>
 
@@ -273,11 +271,11 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
 
       {/* Sticky footer */}
       <div style={{position:"sticky",bottom:0,background:"#f3f4f8",borderTop:"1px solid #e1e3ec",padding:"12px 0",marginTop:14,display:"flex",gap:9,justifyContent:"flex-end"}}>
-        <button style={btnGh}>Cancel</button>
+        <button style={{...btnGh,background:"#FBF3DE",color:"#6B4E0F",borderColor:"#E8D9A8"}}>Cancel</button>
         <button
           disabled={!canSave}
           style={{...btnG,
-            background:canSave?"#0d1326":"#9ca3af",
+            background:canSave?"#A07828":"#9ca3af",
             cursor:canSave?"pointer":"not-allowed",
             opacity:canSave?1:0.6,
             userSelect:"none",
