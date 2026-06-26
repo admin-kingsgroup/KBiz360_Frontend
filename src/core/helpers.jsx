@@ -1700,10 +1700,12 @@ export function abcOf(items, valueKey){
 export const ATTRITION_DATA = [];
 
 
-export const STATUTORY_DUES = [];
+/* STATUTORY_DUES removed — the Statutory Dues Calendar is now live:
+   useStatutoryDues → GET /api/tax-calendar/dues */
 
 
-export const FX_EXPOSURE = [];
+/* FX_EXPOSURE removed — the Currency Exposure report is now live:
+   useFxExposure → GET /api/accounting/fx-exposure */
 
 /* ════════════════════════════════════════════════════════════════════
    FINANCIAL REPORTS (4)

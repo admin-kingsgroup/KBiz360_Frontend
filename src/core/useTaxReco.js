@@ -30,6 +30,19 @@ export function useTaxFilingBoard(branch, period) {
   });
 }
 
+// Statutory Dues Calendar — compliance dates enriched server-side with authority,
+// days-left and a derived Overdue/Pending/Upcoming/Filed status. Org-wide (the
+// calendar master has no branch), so no branch param.
+//   GET /api/tax-calendar/dues
+export function useStatutoryDues() {
+  return useQuery({
+    queryKey: ['tax-calendar', 'dues'],
+    queryFn: () => apiGet('/api/tax-calendar/dues'),
+    enabled: !!getAuthToken(),
+    staleTime: 60_000,
+  });
+}
+
 export function useUpsertTaxFigure() {
   const qc = useQueryClient();
   return useMutation({

@@ -19,9 +19,9 @@ import { buildLeaveUtilization, buildAttrition, lastMonths } from '../modules/hr
 import { fmt, fmtINR } from './format';
 import { todayISO, nowLabel, CUR_FY } from './dates';
 import { openPrintPreview } from './PrintPreview';
-import { AUDIT_TRAIL_DATA, BANK_ACCOUNTS_DATA, CUSTOMER_LTV_DATA, FS_NOTES, FX_EXPOSURE, STATUTORY_DUES, TOP_SUPPLIERS_DATA, abcOf, cardStyle } from './helpers';
-import { useGpBills, useProfitAndLoss, useYieldByDestination, useCustomerLtv, useAbcAnalysis, useYearOverYear } from './useAccounting';
-import { useTaxFilingBoard } from './useTaxReco';
+import { AUDIT_TRAIL_DATA, BANK_ACCOUNTS_DATA, CUSTOMER_LTV_DATA, FS_NOTES, TOP_SUPPLIERS_DATA, abcOf, cardStyle } from './helpers';
+import { useGpBills, useProfitAndLoss, useYieldByDestination, useCustomerLtv, useAbcAnalysis, useYearOverYear, useFxExposure } from './useAccounting';
+import { useTaxFilingBoard, useStatutoryDues } from './useTaxReco';
 import { ReportDateBar, resolveReportRange } from './reportDateBar';
 import { triggerSaveRefresh, useMobile } from './hooks';
 import { openPrintWindow } from './voucher-print';
@@ -976,23 +976,27 @@ export function RPT_BirthdayCalendar(){
 /* 14. Statutory Dues Calendar */
 
 export function RPT_StatutoryDues(){
-  const overdue=STATUTORY_DUES.filter(d=>d.status==="Overdue");
-  const pending=STATUTORY_DUES.filter(d=>d.status==="Pending");
-  const upcoming=STATUTORY_DUES.filter(d=>d.status==="Upcoming");
+  // Live from the compliance calendar (GET /api/tax-calendar/dues); status +
+  // days-left are derived server-side so they match the dashboard alerts.
+  const q=useStatutoryDues();
+  const rows=q.data?.rows||[];
+  const t=q.data?.totals||{overdue:0,pending:0,upcoming:0,dueValue:0};
   return (
     <RPT_Page title="Statutory Dues Calendar" subtitle="All compliance dates · filing status &amp; reminders">
+      <RptState q={q} empty={rows.length===0} label="statutory dues">
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Overdue</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#A32D2D"}}>{overdue.length}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Pending</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#f97316"}}>{pending.length}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Upcoming</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#d4a437"}}>{upcoming.length}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Total Due Value</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(STATUTORY_DUES.reduce((s,d)=>s+d.amount,0))}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Overdue</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#A32D2D"}}>{t.overdue}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Pending</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#f97316"}}>{t.pending}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Upcoming</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#d4a437"}}>{t.upcoming}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Total Due Value</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(t.dueValue)}</p></div>
       </div>
       <div style={cardStyle}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Due Date</th><th style={RPT_thStyle}>Authority</th><th style={RPT_thStyle}>Filing</th><th style={RPT_thStyle}>Entity</th><th style={{...RPT_thStyle,textAlign:"right"}}>Amount</th><th style={{...RPT_thStyle,textAlign:"center"}}>Days Left</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
-          <tbody>{STATUTORY_DUES.map((d,i)=>(<tr key={i}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:600}}>{d.due}</td><td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700,color:"#0d1326"}}>{d.authority}</span></td><td style={{...RPT_tdStyle,fontWeight:600}}>{d.filing}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{d.entity}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{d.amount>0?fmtINR(d.amount):"—"}</td><td style={{...RPT_tdStyle,textAlign:"center",fontWeight:700,color:d.daysLeft<=0?"#A32D2D":d.daysLeft<=7?"#f97316":d.daysLeft<=30?"#d4a437":"#5a6691"}}>{d.daysLeft<=0?"DUE NOW":d.daysLeft+"d"}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"3px 10px",borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px",background:d.status==="Filed"?"#d4edda":d.status==="Pending"?"#f8d7da":d.status==="Upcoming"?"#fff3cd":"#f8d7da",color:d.status==="Filed"?"#155724":d.status==="Pending"?"#721c24":d.status==="Upcoming"?"#856404":"#721c24"}}>{d.status}</span></td></tr>))}</tbody>
+          <tbody>{rows.map((d,i)=>(<tr key={d.id||i}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:600}}>{d.due}</td><td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700,color:"#0d1326"}}>{d.authority}</span></td><td style={{...RPT_tdStyle,fontWeight:600}}>{d.filing}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{d.entity}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{d.amount>0?fmtINR(d.amount):"—"}</td><td style={{...RPT_tdStyle,textAlign:"center",fontWeight:700,color:d.daysLeft<=0?"#A32D2D":d.daysLeft<=7?"#f97316":d.daysLeft<=30?"#d4a437":"#5a6691"}}>{d.status==="Filed"?"—":d.daysLeft<=0?"DUE NOW":d.daysLeft+"d"}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"3px 10px",borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px",background:d.status==="Filed"?"#d4edda":d.status==="Pending"?"#f8d7da":d.status==="Upcoming"?"#fff3cd":"#f8d7da",color:d.status==="Filed"?"#155724":d.status==="Pending"?"#721c24":d.status==="Upcoming"?"#856404":"#721c24"}}>{d.status}</span></td></tr>))}</tbody>
         </table>
       </div>
+      </RptState>
     </RPT_Page>
   );
 }
@@ -1029,21 +1033,31 @@ export function RPT_TaxFilingBoard({ branch }){
 
 /* 16. Currency Exposure */
 
-export function RPT_CurrencyExposure(){
-  const totalUnhedged=FX_EXPOSURE.reduce((s,c)=>s+c.unhedgedINR,0);
+export function RPT_CurrencyExposure({ branch }){
+  // Live foreign-currency exposure (GET /api/accounting/fx-exposure): each non-INR
+  // branch's receivables/payables/cash, grouped by currency, converted to INR at the
+  // latest forex rate. Hedge columns are intentionally absent — the system has no FX
+  // hedge/forward data, so showing them would be fabricated.
+  const q=useFxExposure(branch);
+  const rows=q.data?.rows||[];
+  const t=q.data?.totals||{currencies:0,inrEquivalent:0,missingRates:0};
+  const n=(v)=>Number(v||0).toLocaleString("en-IN");
   return (
-    <RPT_Page title="Currency Exposure Report" subtitle="Open positions per currency · hedged vs unhedged · INR equivalent at-risk">
+    <RPT_Page title="Currency Exposure Report" subtitle="Open foreign-currency positions per currency · net exposure & INR equivalent (live from posted books)">
+      <RptState q={q} empty={rows.length===0} label="foreign-currency exposure">
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Currencies in Use</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{FX_EXPOSURE.length}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Total Unhedged INR Eq.</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#A32D2D"}}>{fmtINR(totalUnhedged)}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Hedge Coverage</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#d4a437"}}>{((FX_EXPOSURE.reduce((s,c)=>s+c.hedged,0)/FX_EXPOSURE.reduce((s,c)=>s+c.netExposure,0))*100).toFixed(0)}%</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Currencies in Use</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{t.currencies}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Net INR Equivalent</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(t.inrEquivalent)}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Currencies w/o Rate</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:t.missingRates>0?"#A32D2D":"#155724"}}>{t.missingRates}</p></div>
       </div>
       <div style={cardStyle}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Currency</th><th style={{...RPT_thStyle,textAlign:"right"}}>Receivables</th><th style={{...RPT_thStyle,textAlign:"right"}}>Payables</th><th style={{...RPT_thStyle,textAlign:"right"}}>Cash Held</th><th style={{...RPT_thStyle,textAlign:"right"}}>Net Exposure</th><th style={{...RPT_thStyle,textAlign:"right"}}>Hedged</th><th style={{...RPT_thStyle,textAlign:"right"}}>Unhedged</th><th style={{...RPT_thStyle,textAlign:"right"}}>Unhedged INR Eq</th><th style={{...RPT_thStyle,textAlign:"center"}}>Risk</th></tr></thead>
-          <tbody>{FX_EXPOSURE.map(c=>{const hedgePct=c.netExposure>0?c.hedged/c.netExposure*100:100;const risk=hedgePct>=80?"Low":hedgePct>=40?"Medium":"High";return (<tr key={c.currency}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:700}}>{c.currency}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{c.receivables.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{c.payables.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{c.cashHeld.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:700}}>{c.netExposure.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:"#22c55e"}}>{c.hedged.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:"#A32D2D",fontWeight:700}}>{c.unhedged.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#A32D2D"}}>{fmtINR(c.unhedgedINR)}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"3px 10px",borderRadius:3,fontSize:10,fontWeight:700,background:risk==="Low"?"#d4edda":risk==="Medium"?"#fff3cd":"#f8d7da",color:risk==="Low"?"#155724":risk==="Medium"?"#856404":"#721c24"}}>{risk}</span></td></tr>);})}</tbody>
-        </table>
+        <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
+          <thead><tr><th style={RPT_thStyle}>Currency</th><th style={RPT_thStyle}>Branches</th><th style={{...RPT_thStyle,textAlign:"right"}}>Receivables</th><th style={{...RPT_thStyle,textAlign:"right"}}>Payables</th><th style={{...RPT_thStyle,textAlign:"right"}}>Cash Held</th><th style={{...RPT_thStyle,textAlign:"right"}}>Net Exposure</th><th style={{...RPT_thStyle,textAlign:"right"}}>Rate → INR</th><th style={{...RPT_thStyle,textAlign:"right"}}>INR Equivalent</th></tr></thead>
+          <tbody>{rows.map(c=>(<tr key={c.currency}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:700}}>{c.currency}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{(c.branches||[]).join(", ")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{n(c.receivables)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{n(c.payables)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{n(c.cashHeld)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:700}}>{n(c.netExposure)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:c.rateStale?"#A32D2D":"#5a6691"}}>{c.rateStale?"no rate":c.rate}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:c.inrEquivalent==null?"#A32D2D":"#0d1326"}}>{c.inrEquivalent==null?"rate missing":fmtINR(c.inrEquivalent)}</td></tr>))}</tbody>
+        </table></div>
       </div>
+      <p style={{margin:"10px 2px 0",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>Amounts shown in each foreign currency; INR equivalent uses the latest forex rate on file. Hedged/unhedged positions are not shown — the system does not yet track FX hedges or forward contracts, so this reflects open exposure only.</p>
+      </RptState>
     </RPT_Page>
   );
 }

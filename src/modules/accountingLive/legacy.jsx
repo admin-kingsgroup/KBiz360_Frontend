@@ -43,6 +43,7 @@ import { apiGet } from '../../core/api';
 import { LedgerVouchers } from '../pnlTally.jsx';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { JvBlock } from '../../core/voucher/JvBlock';
+import { editorVoucherTotal } from '../../core/voucher/ui';
 import { hasRegistry } from '../../core/voucher/registry';
 import { PageLayout } from '../../shell/PageLayout';
 import { SkeletonTable } from '../../shell/primitives';
@@ -877,7 +878,9 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   // balances it against this total, so the figure must carry it or the journal is out
   // by exactly the TCS amount. TDS is NOT added: on a sale it posts only when the
   // customer withholds at receipt time, so it never affects the bill total here.
-  const total = r2(subtotal + (Number(form?.taxAmt) || 0) + (Number(form?.tcsAmt) || 0));
+  // otherTaxesGst (the SVC2 margin GST) ALSO posts to its own Output head, so it must
+  // ride inside total too — see editorVoucherTotal — else SVC2 sales read "out by" it.
+  const total = editorVoucherTotal({ subtotal, taxAmt: form?.taxAmt, otherTaxesGst: v?.otherTaxesGst, tcsAmt: form?.tcsAmt });
   const previewBody = (v && form) ? {
     ...v, branch: form.branch, party: form.party, taxAmt: Number(form.taxAmt) || 0,
     tdsAmt: Number(form.tdsAmt) || 0, tcsAmt: Number(form.tcsAmt) || 0, subtotal, total,
@@ -1054,6 +1057,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 18, marginTop: 6, fontSize: 12 }}>
           <span style={{ color: DIM }}>Lines subtotal: <b style={{ color: DARK }}>{money(cur, subtotal)}</b></span>
           <span style={{ color: DIM }}>+ Tax: <b style={{ color: DARK }}>{money(cur, Number(form.taxAmt) || 0)}</b></span>
+          {(Number(v?.otherTaxesGst) || 0) > 0 && <span style={{ color: DIM }}>+ SVC2 GST: <b style={{ color: DARK }}>{money(cur, Number(v.otherTaxesGst) || 0)}</b></span>}
           {(Number(form.tcsAmt) || 0) > 0 && <span style={{ color: DIM }}>+ TCS: <b style={{ color: DARK }}>{money(cur, Number(form.tcsAmt) || 0)}</b></span>}
           <span style={{ color: DIM }}>= Total: <b style={{ color: DARK }}>{money(cur, total)}</b></span>
         </div>

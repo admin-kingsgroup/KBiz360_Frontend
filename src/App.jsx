@@ -363,7 +363,7 @@ export default function KB360App(){
     if(route==="/reports/tax-summary")    return <RPT_TaxSummary branch={branch}/>;
     if(route==="/reports/statutory-dues") return <RPT_StatutoryDues/>;
     if(route==="/reports/tax-board")      return <RPT_TaxFilingBoard branch={branch}/>;
-    if(route==="/reports/fx-exposure")    return <RPT_CurrencyExposure/>;
+    if(route==="/reports/fx-exposure")    return <RPT_CurrencyExposure branch={branch}/>;
                         /* HR Self-Service */
         /* HO Control Center */
         /* Authority Configuration */
