@@ -228,8 +228,8 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
   const brFlag=branch==="ALL"?"🌐":branch?.flag||"🇮🇳";
   const brCode=branch==="ALL"?"ALL":branch?.code||"BOM";
   return (
-    <div style={{padding:"12px 10px",maxWidth:1160,margin:"0 auto",paddingBottom:80,fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif"}}>
-      <div style={{background:"#fff",border:"1px solid #e1e3ec",borderLeft:"4px solid #A07828",borderRadius:12,overflow:"hidden",boxShadow:"0 3px 16px rgba(0,0,0,.08)"}}>
+    <div style={{padding:"12px 10px",maxWidth:1160,margin:"0 auto",paddingBottom:80,fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif",color:"#1F2328",WebkitFontSmoothing:"antialiased"}}>
+      <div style={{background:"#fff",border:"1px solid #DEDEDA",borderLeft:"4px solid #A07828",borderRadius:4,overflow:"hidden",boxShadow:"0 3px 16px rgba(0,0,0,.10)"}}>
 
         {/* Voucher header bar */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 16px",background:"#141414",borderBottom:"3px solid #A07828",flexWrap:"wrap",gap:8}}>
@@ -270,7 +270,7 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
       </div>
 
       {/* Sticky footer */}
-      <div style={{position:"sticky",bottom:0,background:"#f3f4f8",borderTop:"1px solid #e1e3ec",padding:"12px 0",marginTop:14,display:"flex",gap:9,justifyContent:"flex-end"}}>
+      <div style={{position:"sticky",bottom:0,background:"#FAFAF8",borderTop:"1px solid #ECECE8",padding:"12px 0",marginTop:14,display:"flex",gap:9,justifyContent:"flex-end"}}>
         <button style={{...btnGh,background:"#FBF3DE",color:"#6B4E0F",borderColor:"#E8D9A8"}}>Cancel</button>
         <button
           disabled={!canSave}

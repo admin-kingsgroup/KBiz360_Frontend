@@ -156,7 +156,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
     const cfg = (B && B[branchCode]) || {};
     const taxBadge = cfg.taxType === 'GST' ? 'GST' : ('VAT ' + (cfg.vatRate || 0) + '%');
     return (
-      <div style={{ background: '#fff', overflow: 'hidden', borderLeft: '4px solid #A07828', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+      <div style={{ background: '#fff', overflow: 'hidden', borderLeft: '4px solid #A07828', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', background: '#141414', borderBottom: '3px solid #A07828', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
             <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(160,120,40,0.18)', color: '#A07828', border: '1px solid rgba(160,120,40,0.40)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{desc.icon}</div>

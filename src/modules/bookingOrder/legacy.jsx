@@ -69,7 +69,7 @@ const cellTxt = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fo
 const tfTd = { borderTop: '2px solid ' + DARK, padding: '10px 8px', fontWeight: 800, fontSize: 12, background: '#f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: DARK };
 // Per-section column-header + total-row styles — the section colour carries INTO
 // the table (SO blue, PO maroon), matching the SO/PO/GP voucher theme.
-const thBaseHdr = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: 'right' };
+const thBaseHdr = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: 'right' };
 const soHdr = { ...thBaseHdr, color: SO_BAR, background: '#EAF1F9', borderBottom: '2px solid ' + SO_BAR };
 const soHdrL = { ...soHdr, textAlign: 'left' };
 const poHdr = { ...thBaseHdr, color: PO_BAR, background: '#F9E8EE', borderBottom: '2px solid ' + PO_BAR };
@@ -566,13 +566,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   );
 
   return (
-    <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV }}>
+    <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV, color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
       {/* Header */}
-      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
+      <div style={{ ...card, border: '1px solid #DEDEDA', borderLeft: '4px solid ' + GOLD, borderRadius: 4, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
         <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : 'SO / PO / GP VOUCHER'}</p>
-            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#9197a3' }}>
+            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#8A8A84' }}>
               {editing
                 ? <>Fix any data-entry mistake — or switch the <b style={{ color: GOLD }}>module</b> if it was booked wrong — then <b style={{ color: GOLD }}>Save changes</b> · {brCode} · returns to Pending; approve it from the Pending queue</>
                 : <>Enter cost + Service Charge - 2 → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
@@ -916,7 +916,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {error && <div style={{ ...card, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 12, marginBottom: 14 }}>{error}</div>}
 
       {/* Footer */}
-      <div style={{ position: 'sticky', bottom: 0, background: '#f3f4f8', borderTop: '1px solid #e6e8ec', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ position: 'sticky', bottom: 0, background: '#FAFAF8', borderTop: '1px solid #ECECE8', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, color: '#5b616e', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
           {editing ? <><Pencil size={12} /> Editing returns this voucher to Pending — approve it from the Pending queue to post the books.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
         </span>
@@ -1014,8 +1014,8 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
   }
 
   return (
-    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV }}>
-      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV, color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
+      <div style={{ ...card, border: '1px solid #DEDEDA', borderLeft: '4px solid ' + GOLD, borderRadius: 4, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
         <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : (kind === 'refund' ? 'REFUND VOUCHER' : 'REISSUE VOUCHER')}</p>
@@ -1058,7 +1058,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
 
 function Section({ n, name, sub, accent, badge, children }) {
   return (
-    <div style={{ background: '#fff', border: '1.5px solid ' + accent, borderRadius: 8, overflow: 'hidden', marginBottom: 14, boxShadow: '0 1px 3px rgba(0,0,0,.05)' }}>
+    <div style={{ background: '#fff', border: '1.5px solid ' + accent, borderRadius: 6, overflow: 'hidden', marginBottom: 13, boxShadow: '0 1px 3px rgba(0,0,0,.05)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '8px 14px', background: accent, color: '#fff' }}>
         <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '1px', padding: '3px 9px', borderRadius: 4, background: 'rgba(255,255,255,.24)' }}>{badge || n}</span>
         <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '2.5px', textTransform: 'uppercase' }}>{name}</span>
@@ -1074,7 +1074,7 @@ function GpCard({ k, v, color, pct, bg = '#FFFDF7' }) {
     <div style={{ border: '1px solid #F0E4C2', borderRadius: 8, padding: '12px 14px', background: bg }}>
       <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.7px', color: '#9A8138', textTransform: 'uppercase' }}>{k}</div>
       <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-.5px', marginTop: 4, color }}>{v}</div>
-      {pct && <div style={{ fontSize: 12, fontWeight: 700, color: GOLD_DEEP, marginTop: 2 }}>{pct}</div>}
+      {pct && <div style={{ fontSize: 12, fontWeight: 700, color: '#A88E48', marginTop: 2 }}>{pct}</div>}
     </div>
   );
 }
