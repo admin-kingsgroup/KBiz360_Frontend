@@ -58,22 +58,22 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
             <thead><tr style={{ background: DARK }}>
-              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 30 }}>#</th>
-              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#d4a437', fontWeight: 700, fontSize: 9.5 }}>Ledger</th>
-              <th style={{ padding: '8px 10px', textAlign: 'center', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 70 }}>Dr / Cr</th>
-              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#d4a437', fontWeight: 700, fontSize: 9.5 }}>Description</th>
-              <th style={{ padding: '8px 10px', textAlign: 'right', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 130 }}>Amount ({cur})</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 30 }}>#</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5 }}>Ledger</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 70 }}>Dr / Cr</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5 }}>Description</th>
+              <th style={{ padding: '8px 10px', textAlign: 'right', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 130 }}>Amount ({cur})</th>
               <th style={{ width: 32 }} />
             </tr></thead>
             <tbody>
               {lines.map((l, i) => (
-                <tr key={l._k ?? i} style={{ borderBottom: '1px solid #f3f4f8', background: l.drCr === 'Cr' ? '#fdf3f3' : ((+l.amt || 0) > 0 ? '#f0fbf5' : '#fff') }}>
+                <tr key={l._k ?? i} style={{ borderBottom: '1px solid #dfe2e7', background: l.drCr === 'Cr' ? '#fdf3f3' : ((+l.amt || 0) > 0 ? '#f0fbf5' : '#fff') }}>
                   <td style={{ padding: '4px 8px', textAlign: 'center', fontSize: 10.5, color: DIM }}>{i + 1}</td>
                   <td style={{ padding: '3px 6px', minWidth: 220 }}>
                     <LedgerPicker branch={branch} value={l.ledger} onChange={(v) => updLine(i, 'ledger', v)} placeholder="Office Rent / Discount Received..." style={{ minHeight: 30, fontSize: 10.5 }} />
                   </td>
                   <td style={{ padding: '3px 6px' }}>
-                    <div style={{ display: 'flex', border: '1px solid #e1e3ec', borderRadius: 5, overflow: 'hidden', width: 60, margin: '0 auto' }}>
+                    <div style={{ display: 'flex', border: '1px solid #cdd1d8', borderRadius: 5, overflow: 'hidden', width: 60, margin: '0 auto' }}>
                       {['Dr', 'Cr'].map((d) => (
                         <button key={d} onClick={() => updLine(i, 'drCr', d)} style={{ flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 9.5, fontWeight: 800, padding: '6px 0', background: l.drCr === d ? (d === 'Dr' ? V_DR : V_CR) : '#fff', color: l.drCr === d ? '#fff' : '#9A9A9A' }}>{d.toUpperCase()}</button>
                       ))}
@@ -92,7 +92,7 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
               ))}
             </tbody>
             <tfoot>
-              <tr style={{ background: '#f3f4f8', borderTop: '2px solid #e1e3ec' }}>
+              <tr style={{ background: '#f3f4f8', borderTop: '2px solid #cdd1d8' }}>
                 <td colSpan={3} style={{ padding: '8px 10px' }}><button onClick={addLine} style={{ ...btnGh, fontSize: 10.5, padding: '4px 12px' }}><Plus size={12} /> Add line</button></td>
                 <td style={{ padding: '8px 6px', textAlign: 'right', fontSize: 9, fontWeight: 700, color: DIM }}>TAXABLE</td>
                 <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, fontSize: 13, color: DARK }}>{money2(cur, t.taxable)}</td>

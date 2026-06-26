@@ -5,6 +5,7 @@ import { setNavFocus } from '../../../core/ux/navFocus';
 import { PageLayout } from '../../../shell/PageLayout';
 import { toastInfo } from '../../../core/ux/toast';
 import { clickable } from '../../../core/ux/clickable';
+import { bc } from '../../../core/styleTokens';
 
 const DARK = '#14161a', DIM = '#5b616e', LINE = '#e6e8ec', GREEN = '#16a34a', AMBER = '#B7791F', RED = '#dc2626';
 const SEV = {
@@ -30,16 +31,28 @@ const fmtDur = (ms) => {
   const d = Math.floor(h / 24); const rh = h % 24;
   return rh ? `${d}d ${rh}h` : `${d}d`;
 };
-const money = (n) => {
+// Branch-aware money. INR branches keep Cr/L + Indian grouping; USD branches
+// (NBO/DAR/FBM, cur='$') use K/M/B short scale + en-US grouping.
+const fmtMoney = (cur, n) => {
+  cur = cur || '₹';
   const v = Math.round(Number(n) || 0); const a = Math.abs(v);
+  if (cur === '$') {
+    if (a >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+    if (a >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
+    if (a >= 1e3) return `$${(v / 1e3).toFixed(2)}K`;
+    return `$${v.toLocaleString('en-US')}`;
+  }
   if (a >= 1e7) return `₹${(v / 1e7).toFixed(2)}Cr`;
   if (a >= 1e5) return `₹${(v / 1e5).toFixed(2)}L`;
   return `₹${v.toLocaleString('en-IN')}`;
 };
+const symOf = (b) => (bc(b) || {}).cur || '₹';
 const scoreColor = (s) => (s >= 80 ? GREEN : s >= 50 ? AMBER : RED);
 
 export function AlertsDashboard({ branch, setRoute }) {
   const code = branchCodeOf(branch);
+  const cur = symOf(branch);                 // active branch currency (₹ India · $ NBO/DAR/FBM)
+  const money = (n) => fmtMoney(cur, n);
   const q = useAlerts(branch);
   const trendQ = useAlertTrend(branch);
   const branchesQ = useAlertsByBranch();
@@ -323,11 +336,11 @@ export function AlertsDashboard({ branch, setRoute }) {
                     const here = b.branch === code;
                     return (
                       <tr key={b.branch} style={{ background: here ? '#f0f4ff' : '#fff' }}>
-                        <td style={{ padding: '7px 12px', fontSize: 12, fontWeight: here ? 800 : 600, color: DARK, borderBottom: '1px solid #f4f5f7' }}>{b.branch}{here ? ' ·' : ''}</td>
-                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', fontWeight: 700, borderBottom: '1px solid #f4f5f7' }}>{b.open}</td>
-                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', color: b.critical ? RED : DIM, fontWeight: 700, borderBottom: '1px solid #f4f5f7' }}>{b.critical}</td>
-                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', color: b.warning ? AMBER : DIM, borderBottom: '1px solid #f4f5f7' }}>{b.warning}</td>
-                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #f4f5f7' }}>{money(b.exposure)}</td>
+                        <td style={{ padding: '7px 12px', fontSize: 12, fontWeight: here ? 800 : 600, color: DARK, borderBottom: '1px solid #dfe2e7' }}>{b.branch}{here ? ' ·' : ''}</td>
+                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', fontWeight: 700, borderBottom: '1px solid #dfe2e7' }}>{b.open}</td>
+                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', color: b.critical ? RED : DIM, fontWeight: 700, borderBottom: '1px solid #dfe2e7' }}>{b.critical}</td>
+                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', color: b.warning ? AMBER : DIM, borderBottom: '1px solid #dfe2e7' }}>{b.warning}</td>
+                        <td style={{ padding: '7px 12px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #dfe2e7' }}>{fmtMoney(symOf({ code: b.branch }), b.exposure)}</td>
                       </tr>
                     );
                   })}

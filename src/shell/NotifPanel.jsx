@@ -60,8 +60,8 @@ export function NotifPanel({ onClose, setRoute, branch }) {
     <div ref={panelRef} role="dialog" aria-label="Alerts" className="animate-kb-rise"
       style={{ position: 'fixed', top: 52, right: 8, width: 360, maxHeight: 'calc(100vh - 70px)', overflowY: 'auto',
         background: '#fff', borderRadius: 14, boxShadow: '0 16px 40px -12px rgba(16,18,22,0.20), 0 2px 8px -4px rgba(16,18,22,0.10)',
-        zIndex: 600, border: '1px solid #e6e8ec' }}>
-      <div style={{ padding: '12px 14px', borderBottom: '1px solid #e6e8ec', position: 'sticky', top: 0, background: '#fff', zIndex: 1,
+        zIndex: 600, border: '1px solid #cdd1d8' }}>
+      <div style={{ padding: '12px 14px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff', zIndex: 1,
         display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#14161a' }}>Alerts</p>
@@ -88,7 +88,7 @@ export function NotifPanel({ onClose, setRoute, branch }) {
       {!branchRequired && open.map((a) => {
         const s = sevOf(a.severity);
         return (
-          <div key={a.key} style={{ padding: '10px 14px', borderBottom: '1px solid #f1f2f4', borderLeft: `3px solid ${s.clr}`, display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+          <div key={a.key} style={{ padding: '10px 14px', borderBottom: '1px solid #dfe2e7', borderLeft: `3px solid ${s.clr}`, display: 'flex', gap: 9, alignItems: 'flex-start' }}>
             <div aria-hidden="true" style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{s.icon}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <button type="button" onClick={() => a.link && openAlert(a, setRoute, onClose)} title={a.link ? 'Open & fix' : undefined}
@@ -103,7 +103,7 @@ export function NotifPanel({ onClose, setRoute, branch }) {
       })}
 
       <button type="button" onClick={() => { setRoute?.('/dashboard/alerts'); onClose?.(); }}
-        style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '11px', border: 'none', borderTop: '1px solid #e6e8ec', background: '#fafbfd', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, color: '#2563eb', position: 'sticky', bottom: 0 }}>
+        style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '11px', border: 'none', borderTop: '1px solid #cdd1d8', background: '#fafbfd', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, color: '#2563eb', position: 'sticky', bottom: 0 }}>
         Open Alerts Dashboard <ChevronRight size={13} />
       </button>
     </div>
@@ -159,7 +159,7 @@ export function NotificationCentre({ branch, setRoute }) {
       ) : (
         <>
           {/* tabs */}
-          <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e6e8ec', marginBottom: 10, overflowX: 'auto' }}>
+          <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #cdd1d8', marginBottom: 10, overflowX: 'auto' }}>
             {TABS.map(([k, lab, n]) => (
               <button key={k} onClick={() => setTab(k)} style={{ padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: tab === k ? '#14161a' : '#5a6691', borderBottom: '2px solid ' + (tab === k ? '#2563eb' : 'transparent'), marginBottom: -2, flexShrink: 0 }}>{lab} <span style={{ fontSize: 10.5, color: '#5a6691' }}>({n})</span></button>
             ))}

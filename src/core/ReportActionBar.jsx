@@ -93,7 +93,7 @@ export function ReportActionBar({ route, branch }) {
       className="noprint"
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8,
-        padding: '7px 12px', background: '#fff', borderBottom: '1px solid #e1e3ec',
+        padding: '7px 12px', background: '#fff', borderBottom: '1px solid #cdd1d8',
         position: 'sticky', top: 0, zIndex: 40, flexWrap: 'wrap',
       }}
     >
@@ -110,15 +110,15 @@ export function ReportActionBar({ route, branch }) {
           📤 Tally Export ▾
         </button>
         {open && (
-          <div style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', border: '1px solid #e1e3ec', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.14)', width: 240, zIndex: 100, overflow: 'hidden' }}>
-            <p style={{ margin: 0, padding: '8px 12px', fontSize: 10, color: '#5a6691', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, borderBottom: '1px solid #eef0f6' }}>
+          <div style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.14)', width: 240, zIndex: 100, overflow: 'hidden' }}>
+            <p style={{ margin: 0, padding: '8px 12px', fontSize: 10, color: '#5a6691', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, borderBottom: '1px solid #dfe2e7' }}>
               Tally XML · Import into Tally
             </p>
             <button onClick={exportTally} style={ddItem} onMouseEnter={hov} onMouseLeave={unhov}>
               <span style={{ fontSize: 15, width: 20 }}>📒</span>
               <div><div style={{ fontWeight: 700, color: '#0d1326' }}>Download Tally XML</div><div style={{ fontSize: 10, color: '#5a6691' }}>Ledgers / vouchers from this report</div></div>
             </button>
-            <div style={{ padding: '7px 12px', fontSize: 10, color: '#8b94b3', borderTop: '1px solid #eef0f6', lineHeight: 1.5 }}>
+            <div style={{ padding: '7px 12px', fontSize: 10, color: '#8b94b3', borderTop: '1px solid #dfe2e7', lineHeight: 1.5 }}>
               Gateway of Tally → Import → XML → pick the file.
             </div>
           </div>
@@ -132,7 +132,7 @@ export function ReportActionBar({ route, branch }) {
   );
 }
 
-const btn = { padding: PAD, background: '#fff', color: '#0d1326', border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 };
+const btn = { padding: PAD, background: '#fff', color: '#0d1326', border: '1px solid #cdd1d8', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 };
 const ddItem = { display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', fontSize: 12 };
 const hov = (e) => { e.currentTarget.style.background = '#f7f8fb'; };
 const unhov = (e) => { e.currentTarget.style.background = ''; };

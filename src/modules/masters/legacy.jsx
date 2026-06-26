@@ -34,7 +34,7 @@ export function ExportBtn({ name, columns, rows, label = "📤 Export" }) {
   return (
     <button onClick={() => exportToExcel(name, columns, rows || [])} disabled={empty} title="Export to Excel"
       className="max-tablet:min-h-[44px]"
-      style={{ padding: "8px 14px", background: "#fff", border: "1px solid #e6e8ec", borderRadius: 6, fontSize: 12, cursor: empty ? "not-allowed" : "pointer", opacity: empty ? 0.5 : 1 }}>
+      style={{ padding: "8px 14px", background: "#fff", border: "1px solid #cdd1d8", borderRadius: 6, fontSize: 12, cursor: empty ? "not-allowed" : "pointer", opacity: empty ? 0.5 : 1 }}>
       {label}
     </button>
   );
@@ -95,7 +95,7 @@ export function MastersForex(){
             // crash on .toFixed and blank the whole screen.
             const rate=Number(r.rate)||0;
             return (
-            <tr key={r._id||`${r.date}-${r.from}-${r.to}-${i}`} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+            <tr key={r._id||`${r.date}-${r.from}-${r.to}-${i}`} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
               <td style={{padding:"9px 14px",fontFamily:"monospace",fontSize:10.5,color:"#5b616e"}}>{r.date}</td>
               <td style={{padding:"9px 14px"}}>
                 <span style={{fontSize:13,fontWeight:800,color:"#2563eb",background:"#e8f0ff",padding:"3px 10px",borderRadius:999}}>{r.from}</span>
@@ -113,7 +113,7 @@ export function MastersForex(){
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e6e8ec",display:"flex",justifyContent:"space-between"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>Add Exchange Rate</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5b616e"}}>✕</button>
             </div>
@@ -125,7 +125,7 @@ export function MastersForex(){
               <FL label="Exchange rate"><input type="number" step="0.01" value={form.rate} onChange={e=>setForm(f=>({...f,rate:+e.target.value}))} style={inp} placeholder="e.g. 83.42"/></FL>
               <FL label="Source"><select value={form.source} onChange={e=>setForm(f=>({...f,source:e.target.value}))} style={inp}><option>RBI</option><option>CBK</option><option>BOT</option><option>DGI</option><option>Manual</option><option>Bank Rate</option></select></FL>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e6e8ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
               <button onClick={save} disabled={create.isPending} style={{...btnG, opacity: create.isPending ? 0.6 : 1, cursor: create.isPending ? 'not-allowed' : 'pointer'}}>{create.isPending ? 'Saving…' : '💾 Save Rate'}</button>
             </div>
@@ -195,7 +195,7 @@ export function VendorTermsMaster({branch}){
             const tdsHold=t.tds!=="None"?Math.round(t.dueAmt*t.tdsRate/100):0;
             const netPay=t.dueAmt-tdsHold;
             return (
-              <tr key={t.id} style={{borderBottom:"1px solid #f3f4f8",background:dl<=0?"#fff5f5":dl<=7?"#fffaf0":i%2===0?"#fff":"#fafafa"}}>
+              <tr key={t.id} style={{borderBottom:"1px solid #dfe2e7",background:dl<=0?"#fff5f5":dl<=7?"#fffaf0":i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"8px 11px",fontWeight:600,color:"#1a1c22"}}>{t.supplier}</td>
                 <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#e8f0ff",color:"#2563eb",fontWeight:700}}>{t.type}</span></td>
                 <td style={{padding:"8px 11px",color:"#5b616e",fontSize:10.5}}>{t.terms}</td>
@@ -327,7 +327,7 @@ export function ChartOfAccounts(){
             </div>
             <div style={{padding:"8px 14px"}}>
               {g.sub.map((s,i)=>(
-                <div key={i} style={{padding:"4px 0",borderBottom:i<g.sub.length-1?"1px solid #f3f4f8":"none",
+                <div key={i} style={{padding:"4px 0",borderBottom:i<g.sub.length-1?"1px solid #dfe2e7":"none",
                   fontSize:10.5,color:s.startsWith("Auto-created")?"#cbd0db":s.startsWith("Accum")?"#d97706":"#2e323c",
                   fontStyle:s.startsWith("Auto-created")?"italic":"normal",
                   ...(search&&s.toLowerCase().includes(search.toLowerCase())?{background:"#fffdf0",fontWeight:700}:{})}}>
@@ -341,7 +341,7 @@ export function ChartOfAccounts(){
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:440,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e6e8ec",display:"flex",justifyContent:"space-between"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>Add Account Group</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5b616e"}}>✕</button>
             </div>
@@ -352,7 +352,7 @@ export function ChartOfAccounts(){
                 {["Primary","Capital Account","Current Assets","Current Liabilities","Sales Accounts","Purchase Accounts","Indirect Expenses"].map(p=><option key={p}>{p}</option>)}
               </select></FL>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e6e8ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
               <button onClick={()=>setModal(false)} style={btnG}>Add Group</button>
             </div>
@@ -396,7 +396,7 @@ export function MastersLedgers(){
             ))}
           </tr></thead>
           <tbody>{filtered.map((l,i)=>(
-            <tr key={l.id} style={{borderBottom:"1px solid #f3f4f8",
+            <tr key={l.id} style={{borderBottom:"1px solid #dfe2e7",
               background:i%2===0?"#fff":"#fafafa"}}>
               <td style={{padding:"8px 12px",fontWeight:600,color:"#1a1c22"}}>{l.name}</td>
               <td style={{padding:"8px 12px",color:"#5b616e",fontSize:11}}>{l.group}</td>
@@ -595,7 +595,7 @@ export function MastersCustomers(){
                 No {tab} customers found. {search&&"Try clearing your search."}
               </td></tr>
             ):filtered.map((r,i)=>(
-              <tr key={r.id} style={{borderBottom:"1px solid #f3f4f8",
+              <tr key={r.id} style={{borderBottom:"1px solid #dfe2e7",
                 background:i%2===0?"#fff":"#fafafa",cursor:"pointer"}}
                 onMouseEnter={e=>e.currentTarget.style.background="#f0f4ff"}
                 onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#fff":"#fafafa"}>
@@ -666,7 +666,7 @@ export function MastersCustomers(){
             ))}
           </tbody>
           {filtered.length>0&&(
-            <tfoot><tr style={{background:"#f9fafb",borderTop:"2px solid #e6e8ec"}}>
+            <tfoot><tr style={{background:"#f9fafb",borderTop:"2px solid #cdd1d8"}}>
               <td colSpan={3} style={{padding:"8px 12px",fontWeight:700,fontSize:11,color:"#2e323c"}}>
                 {filtered.length} {tab} customer{filtered.length!==1?"s":""}
                 {search&&` matching "${search}"`}
@@ -692,7 +692,7 @@ export function MastersCustomers(){
             maxHeight:"90vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
 
             {/* Modal header */}
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e6e8ec",
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",
               position:"sticky",top:0,background:"#fff",zIndex:1,
               display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -799,7 +799,7 @@ export function MastersCustomers(){
             )}
 
             {/* Footer */}
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e6e8ec",
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",
               display:"flex",justifyContent:"flex-end",gap:8,
               position:"sticky",bottom:0,background:"#fff"}}>
               <button onClick={()=>{setModal(false);setEditRec(null);}} style={btnGh}>Cancel</button>
@@ -847,7 +847,7 @@ export function MastersSuppliers(){
             ))}
           </tr></thead>
           <tbody>{filtered.map((s,i)=>(
-            <tr key={s.id} style={{borderBottom:"1px solid #f3f4f8",
+            <tr key={s.id} style={{borderBottom:"1px solid #dfe2e7",
               background:i%2===0?"#fff":"#fafafa"}}>
               <td style={{padding:"8px 12px",fontWeight:600,color:"#1a1c22"}}>{s.name}</td>
               <td style={{padding:"8px 12px"}}>
@@ -919,7 +919,7 @@ export function MastersAirlines(){
             ))}
           </tr></thead>
           <tbody>{filtered.map((a,i)=>(
-            <tr key={a.id} style={{borderBottom:"1px solid #f3f4f8",
+            <tr key={a.id} style={{borderBottom:"1px solid #dfe2e7",
               background:i%2===0?"#fff":"#fafafa"}}>
               <td style={{padding:"8px 10px",fontFamily:"monospace",fontWeight:800,
                 color:"#2563eb",fontSize:13}}>{a.iata}</td>
@@ -986,7 +986,7 @@ export function MastersHotels(){
   return (
     <MstrShell title="Hotels & DMCs" icon="🏨"
       actions={[
-        <div key="tabs" style={{display:"flex",borderRadius:8,overflow:"hidden",border:"1px solid #e6e8ec"}}>
+        <div key="tabs" style={{display:"flex",borderRadius:8,overflow:"hidden",border:"1px solid #cdd1d8"}}>
           {["hotels","dmcs"].map(t=><button key={t} onClick={()=>setTab(t)}
             style={{padding:"6px 14px",border:"none",cursor:"pointer",fontSize:11,fontWeight:tab===t?700:400,
               background:tab===t?"#1a1c22":"#fff",color:tab===t?"#c2a04a":"#5b616e"}}>
@@ -1012,7 +1012,7 @@ export function MastersHotels(){
               ))}
             </tr></thead>
             <tbody>{filt_h.map((h,i)=>(
-              <tr key={h.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+              <tr key={h.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"8px 12px",fontWeight:600,color:"#1a1c22"}}>{h.name}</td>
                 <td style={{padding:"8px 12px",color:"#5b616e"}}>{h.city}</td>
                 <td style={{padding:"8px 12px",textAlign:"center",color:"#c2a04a",fontSize:13}}>
@@ -1051,7 +1051,7 @@ export function MastersHotels(){
               ))}
             </tr></thead>
             <tbody>{filt_d.map((d,i)=>(
-              <tr key={d.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+              <tr key={d.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"8px 12px",fontWeight:600,color:"#1a1c22"}}>{d.name}</td>
                 <td style={{padding:"8px 12px",color:"#5b616e"}}>{d.country}</td>
                 <td style={{padding:"8px 12px"}}>
@@ -1140,27 +1140,27 @@ export function CostCenterMaster(){
     <>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
         <input type="text" placeholder="Search code, name, manager..." value={search} onChange={e=>setSearch(e.target.value)}
-          style={{flex:"1 1 280px",minWidth:200,padding:"8px 11px",border:"1px solid #e6e8ec",borderRadius:6,fontSize:12.5}}/>
-        <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e6e8ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
+          style={{flex:"1 1 280px",minWidth:200,padding:"8px 11px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12.5}}/>
+        <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
         <ExportBtn name="cost-centers" rows={filtered} columns={[{key:"code",label:"Code"},{key:"name",label:"Name"},{key:"parent",label:"Parent"},{key:"manager",label:"Manager"},{key:"desc",label:"Description"},{key:"active",label:"Active"}]}/>
         <button style={{padding:"8px 16px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Cost Center</button>
       </div>
-      <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden"}}>
+      <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
           <thead style={{background:"#f7f8fb"}}>
             <tr>
-              <th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Code</th>
-              <th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Name</th>
-              <th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Parent</th>
-              <th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Manager</th>
-              <th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Description</th>
-              <th style={{padding:"10px 12px",textAlign:"center",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Status</th>
-              <th style={{padding:"10px 12px",textAlign:"center",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Action</th>
+              <th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Code</th>
+              <th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Name</th>
+              <th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Parent</th>
+              <th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Manager</th>
+              <th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Description</th>
+              <th style={{padding:"10px 12px",textAlign:"center",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Status</th>
+              <th style={{padding:"10px 12px",textAlign:"center",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Action</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map(c=>(
-              <tr key={c.code} style={{borderBottom:"1px solid #f0f2f7",background:c.parent==="—"?"#fafbfd":"#fff"}}>
+              <tr key={c.code} style={{borderBottom:"1px solid #dfe2e7",background:c.parent==="—"?"#fafbfd":"#fff"}}>
                 <td style={{padding:"9px 12px",fontFamily:"monospace",fontWeight:600,color:"#1a1c22"}}>{c.code}</td>
                 <td style={{padding:"9px 12px",color:"#1a1c22",fontWeight:c.parent==="—"?700:400,paddingLeft:c.parent==="—"?12:28}}>{c.name}</td>
                 <td style={{padding:"9px 12px",color:"#5b616e",fontFamily:"monospace"}}>{c.parent}</td>
@@ -1208,7 +1208,7 @@ export function ApprovalLimitsMaster(){
         <button style={{padding:"8px 16px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Limit Rule</button>
       </div>
       {Object.entries(groupByType).map(([type,rules])=>(
-        <div key={type} style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden",marginBottom:12}}>
+        <div key={type} style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden",marginBottom:12}}>
           <div style={{padding:"10px 14px",background:"#1a1c22",color:"#fff"}}>
             <p style={{margin:0,fontSize:13,fontWeight:700,letterSpacing:"0.3px"}}>{type}</p>
             <p style={{margin:"2px 0 0",fontSize:11,color:"#c2a04a"}}>{rules.length} threshold tier{rules.length!==1?"s":""}</p>
@@ -1216,16 +1216,16 @@ export function ApprovalLimitsMaster(){
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead style={{background:"#f7f8fb"}}>
               <tr>
-                <th style={{padding:"10px 14px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Approver Role</th>
-                <th style={{padding:"10px 14px",textAlign:"right",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>From (≥)</th>
-                <th style={{padding:"10px 14px",textAlign:"right",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>To (≤)</th>
-                <th style={{padding:"10px 14px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Backup Approver</th>
-                <th style={{padding:"10px 14px",textAlign:"center",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Action</th>
+                <th style={{padding:"10px 14px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Approver Role</th>
+                <th style={{padding:"10px 14px",textAlign:"right",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>From (≥)</th>
+                <th style={{padding:"10px 14px",textAlign:"right",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>To (≤)</th>
+                <th style={{padding:"10px 14px",textAlign:"left",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Backup Approver</th>
+                <th style={{padding:"10px 14px",textAlign:"center",fontWeight:700,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase"}}>Action</th>
               </tr>
             </thead>
             <tbody>
               {rules.map(r=>(
-                <tr key={r.id} style={{borderBottom:"1px solid #f0f2f7"}}>
+                <tr key={r.id} style={{borderBottom:"1px solid #dfe2e7"}}>
                   <td style={{padding:"9px 14px",fontWeight:600,color:"#1a1c22"}}>{r.role}</td>
                   <td style={{padding:"9px 14px",textAlign:"right",fontFamily:"monospace",color:"#1a1c22"}}>{fmt(r.minAmount)}</td>
                   <td style={{padding:"9px 14px",textAlign:"right",fontFamily:"monospace",color:"#1a1c22"}}>{fmt(r.maxAmount)}</td>
@@ -1273,7 +1273,7 @@ export function CustomerMasterDetail(){
     {key:"bank",label:"Bank"},{key:"tax",label:"Tax"},{key:"documents",label:"Documents"},
     {key:"notes",label:"Notes"},{key:"history",label:"History"},{key:"linked",label:"Linked Txns"},{key:"custom",label:"Custom Fields"}
   ];
-  const inp = {padding:"7px 10px",border:"1px solid #e6e8ec",borderRadius:5,fontSize:12,width:"100%"};
+  const inp = {padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"};
   const labelStyle = {fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",marginBottom:4,display:"block"};
   const CMDLabel = ({label:l,children}) => <div><label style={labelStyle}>{l}</label>{children}</div>;
 
@@ -1285,8 +1285,8 @@ export function CustomerMasterDetail(){
           <input type="checkbox" checked={active} onChange={e=>setActive(e.target.checked)}/>
           <span style={{fontWeight:700,color:active?"#16a34a":"#dc2626"}}>{active?"Active":"Inactive"}</span>
         </label>
-        <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e6e8ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5b616e"}}>Merge with…</button>
-        <button onClick={()=>setShowDupWarning(!showDupWarning)} style={{padding:"7px 12px",background:"#fff",border:"1px solid #e6e8ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5b616e"}}>Check Duplicates</button>
+        <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5b616e"}}>Merge with…</button>
+        <button onClick={()=>setShowDupWarning(!showDupWarning)} style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5b616e"}}>Check Duplicates</button>
         <button style={{padding:"7px 14px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save</button>
       </>}>
 
@@ -1304,8 +1304,8 @@ export function CustomerMasterDetail(){
         </div>
       )}
 
-      <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden"}}>
-        <div style={{display:"flex",borderBottom:"1px solid #e6e8ec",overflowX:"auto",background:"#fafbfd"}}>
+      <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
+        <div style={{display:"flex",borderBottom:"1px solid #cdd1d8",overflowX:"auto",background:"#fafbfd"}}>
           {tabs.map(t=><button key={t.key} onClick={()=>setTab(t.key)} style={tabBtnStyle(tab===t.key)}>{t.label}</button>)}
         </div>
 
@@ -1329,7 +1329,7 @@ export function CustomerMasterDetail(){
                 <button style={{padding:"5px 11px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>+ Add Address</button>
               </div>
               {[{type:"Registered Office",addr:"L&T House, Ballard Estate, Mumbai 400001"},{type:"Billing Address",addr:"L&T Towers, Powai, Mumbai 400072"},{type:"Shipping Address",addr:"L&T HRD Centre, Lonavla 410401"}].map((a,i)=>(
-                <div key={i} style={{padding:12,border:"1px solid #e6e8ec",borderRadius:6,marginBottom:8}}>
+                <div key={i} style={{padding:12,border:"1px solid #cdd1d8",borderRadius:6,marginBottom:8}}>
                   <p style={{margin:0,fontSize:12,fontWeight:700,color:"#1a1c22"}}>{a.type}{i===0&&<span style={{marginLeft:8,padding:"1px 7px",background:"#c2a04a",color:"#1a1c22",borderRadius:3,fontSize:9,fontWeight:700}}>DEFAULT</span>}</p>
                   <p style={{margin:"3px 0 0",fontSize:11.5,color:"#5b616e"}}>{a.addr}</p>
                 </div>
@@ -1340,7 +1340,7 @@ export function CustomerMasterDetail(){
             <div>
               <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>3 contact persons</p>
               {[].map((c,i)=>(
-                <div key={i} style={{padding:10,border:"1px solid #e6e8ec",borderRadius:6,marginBottom:6,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:10,alignItems:"center"}}>
+                <div key={i} style={{padding:10,border:"1px solid #cdd1d8",borderRadius:6,marginBottom:6,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:10,alignItems:"center"}}>
                   <div><p style={{margin:0,fontSize:12,fontWeight:600,color:"#1a1c22"}}>{c.name}</p><p style={{margin:0,fontSize:10.5,color:"#5b616e"}}>{c.role}</p></div>
                   <div style={{fontSize:11,color:"#5b616e"}}>{c.email}</div>
                   <div style={{fontSize:11,color:"#5b616e",fontFamily:"monospace"}}>{c.phone}</div>
@@ -1372,11 +1372,11 @@ export function CustomerMasterDetail(){
             <div>
               <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>4 documents uploaded</p>
               {[{name:"GST Certificate.pdf",size:"285 KB",when:"2024-04-10"},{name:"PAN Card.pdf",size:"142 KB",when:"2024-04-10"},{name:"Cancelled Cheque.pdf",size:"98 KB",when:"2024-04-10"},{name:"Annual Agreement 2026.pdf",size:"1.4 MB",when:"2026-04-01"}].map((d,i)=>(
-                <div key={i} style={{padding:10,border:"1px solid #e6e8ec",borderRadius:6,marginBottom:6,display:"flex",alignItems:"center",gap:10}}>
+                <div key={i} style={{padding:10,border:"1px solid #cdd1d8",borderRadius:6,marginBottom:6,display:"flex",alignItems:"center",gap:10}}>
                   <span style={{fontSize:18}}>📎</span>
                   <div style={{flex:1}}><p style={{margin:0,fontSize:12,fontWeight:600,color:"#1a1c22"}}>{d.name}</p><p style={{margin:0,fontSize:10.5,color:"#5b616e"}}>{d.size} · uploaded {d.when}</p></div>
-                  <button style={{padding:"3px 10px",background:"transparent",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:4,fontSize:10.5,cursor:"pointer"}}>View</button>
-                  <button style={{padding:"3px 10px",background:"transparent",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:4,fontSize:10.5,cursor:"pointer"}}>Download</button>
+                  <button style={{padding:"3px 10px",background:"transparent",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:4,fontSize:10.5,cursor:"pointer"}}>View</button>
+                  <button style={{padding:"3px 10px",background:"transparent",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:4,fontSize:10.5,cursor:"pointer"}}>Download</button>
                 </div>
               ))}
               <button style={{marginTop:8,padding:"7px 14px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>📤 Upload Document</button>
@@ -1391,7 +1391,7 @@ export function CustomerMasterDetail(){
             <div>
               <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>Last 6 changes (inline audit history)</p>
               {[].map((h,i)=>(
-                <div key={i} style={{display:"flex",gap:10,padding:"6px 0",borderBottom:"1px solid #f0f2f7"}}>
+                <div key={i} style={{display:"flex",gap:10,padding:"6px 0",borderBottom:"1px solid #dfe2e7"}}>
                   <span style={{fontSize:10.5,fontFamily:"monospace",color:"#5b616e",minWidth:120}}>{h.ts}</span>
                   <span style={{fontSize:11.5,fontWeight:600,color:"#1a1c22",minWidth:110}}>{h.user}</span>
                   <span style={{fontSize:11.5,color:"#1a1c22"}}>{h.action}</span>
@@ -1426,7 +1426,7 @@ export function CustomerMasterDetail(){
       </div>
 
       {/* Last-modified footer */}
-      <div style={{marginTop:14,padding:"10px 14px",background:"#fff",border:"1px solid #e6e8ec",borderRadius:6,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,color:"#5b616e"}}>
+      <div style={{marginTop:14,padding:"10px 14px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:6,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,color:"#5b616e"}}>
         <span>Created by <b style={{color:"#1a1c22"}}>AD</b> on 2024-04-10 12:00</span>
         <span>Last modified by <b style={{color:"#1a1c22"}}>—</b></span>
         <span>Record ID: <span style={{fontFamily:"monospace"}}>CUST-BOM-00142</span></span>
@@ -1444,12 +1444,12 @@ export function BulkImportMaster(){
   const [step, setStep] = useState(1);
   const [importType, setImportType] = useState("Customers");
   const types = ["Customers","Suppliers","Sub-Agents","Employees","Chart of Accounts","Tax Codes","Forex Rates","Numbering Series"];
-  const inp = {padding:"7px 10px",border:"1px solid #e6e8ec",borderRadius:5,fontSize:12,width:"100%"};
+  const inp = {padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"};
 
   return (
     <PHASE2_Page title="Bulk Import Master Data" subtitle="Upload Excel/CSV files to create master records in bulk — works for any master type">
       {/* Stepper */}
-      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18,padding:"14px 18px",background:"#fff",border:"1px solid #e6e8ec",borderRadius:8}}>
+      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18,padding:"14px 18px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:8}}>
         {[{n:1,label:"Select Type"},{n:2,label:"Download Template / Upload File"},{n:3,label:"Preview & Validate"}].map((s,i,arr)=>(
           <div key={s.n} style={{display:"flex",alignItems:"center",gap:10,flex:1}}>
             <div style={{width:32,height:32,borderRadius:"50%",background:step>=s.n?"#c2a04a":"#e6e8ec",color:step>=s.n?"#1a1c22":"#5b616e",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:13}}>{step>s.n?"✓":s.n}</div>
@@ -1460,11 +1460,11 @@ export function BulkImportMaster(){
       </div>
 
       {step===1 && (
-        <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,padding:20}}>
+        <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:20}}>
           <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>Which master are you importing?</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:10}}>
             {types.map(t=>(
-              <label key={t} style={{padding:14,border:importType===t?"2px solid #c2a04a":"1px solid #e6e8ec",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",gap:10,background:importType===t?"#fff8e8":"#fff"}}>
+              <label key={t} style={{padding:14,border:importType===t?"2px solid #c2a04a":"1px solid #cdd1d8",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",gap:10,background:importType===t?"#fff8e8":"#fff"}}>
                 <input type="radio" checked={importType===t} onChange={()=>setImportType(t)}/>
                 <span style={{fontSize:12,fontWeight:600,color:"#1a1c22"}}>{t}</span>
               </label>
@@ -1477,7 +1477,7 @@ export function BulkImportMaster(){
       )}
 
       {step===2 && (
-        <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,padding:20}}>
+        <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:20}}>
           <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>Importing: <span style={{color:"#c2a04a"}}>{importType}</span></p>
           <div style={{padding:16,background:"#fafbfd",border:"1px dashed #cbd0dc",borderRadius:6,marginBottom:14}}>
             <p style={{margin:0,fontSize:12,fontWeight:700,color:"#1a1c22"}}>📥 Download Template First</p>
@@ -1491,14 +1491,14 @@ export function BulkImportMaster(){
             <button style={{marginTop:12,padding:"8px 16px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>📁 Browse Files</button>
           </div>
           <div style={{marginTop:20,display:"flex",justifyContent:"space-between"}}>
-            <button onClick={()=>setStep(1)} style={{padding:"9px 18px",background:"#fff",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>← Back</button>
+            <button onClick={()=>setStep(1)} style={{padding:"9px 18px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>← Back</button>
             <button onClick={()=>setStep(3)} style={{padding:"9px 22px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>Preview & Validate →</button>
           </div>
         </div>
       )}
 
       {step===3 && (
-        <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,padding:20}}>
+        <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:20}}>
           <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>Validation Preview</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,150px),1fr))",gap:10,marginBottom:14}}>
             <div style={{padding:12,background:"#e8f6ed",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:24,fontWeight:700,color:"#16a34a"}}>48</p><p style={{margin:0,fontSize:11,color:"#16a34a",fontWeight:600}}>Valid rows</p></div>
@@ -1506,17 +1506,17 @@ export function BulkImportMaster(){
             <div style={{padding:12,background:"#fbe9e9",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:24,fontWeight:700,color:"#dc2626"}}>2</p><p style={{margin:0,fontSize:11,color:"#dc2626",fontWeight:600}}>Errors (will skip)</p></div>
             <div style={{padding:12,background:"#e6e8ec",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:24,fontWeight:700,color:"#1a1c22"}}>53</p><p style={{margin:0,fontSize:11,color:"#1a1c22",fontWeight:600}}>Total in file</p></div>
           </div>
-          <div style={{maxHeight:280,overflowY:"auto",border:"1px solid #e6e8ec",borderRadius:6}}>
+          <div style={{maxHeight:280,overflowY:"auto",border:"1px solid #cdd1d8",borderRadius:6}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
               <thead style={{background:"#f7f8fb",position:"sticky",top:0}}><tr><th style={RPT_thStyle}>Row</th><th style={RPT_thStyle}>Code</th><th style={RPT_thStyle}>Name</th><th style={RPT_thStyle}>GSTIN</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
               <tbody>
                 {[].map(row=>(
-                  <tr key={row.r} style={{background:row.status==="error"?"#fff5f5":row.status==="warning"?"#fffbed":"#fff",borderBottom:"1px solid #f0f2f7"}}>
+                  <tr key={row.r} style={{background:row.status==="error"?"#fff5f5":row.status==="warning"?"#fffbed":"#fff",borderBottom:"1px solid #dfe2e7"}}>
                     <td style={{...RPT_tdStyle,color:"#5b616e"}}>{row.r}</td>
                     <td style={{...RPT_tdStyle,fontFamily:"monospace"}}>{row.code}</td>
                     <td style={RPT_tdStyle}>{row.name||<span style={{color:"#dc2626"}}>—</span>}</td>
                     <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5}}>{row.gst}</td>
-                    <td style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #f0f2f7"}}>
+                    <td style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #dfe2e7"}}>
                       {row.status==="valid"&&<span style={{padding:"2px 8px",background:"#e8f6ed",color:"#16a34a",borderRadius:3,fontSize:10,fontWeight:700}}>✓ Valid</span>}
                       {row.status==="warning"&&<span title={row.msg} style={{padding:"2px 8px",background:"#fbeedb",color:"#d97706",borderRadius:3,fontSize:10,fontWeight:700}}>⚠ {row.msg}</span>}
                       {row.status==="error"&&<span title={row.msg} style={{padding:"2px 8px",background:"#fbe9e9",color:"#dc2626",borderRadius:3,fontSize:10,fontWeight:700}}>✗ {row.msg}</span>}
@@ -1527,9 +1527,9 @@ export function BulkImportMaster(){
             </table>
           </div>
           <div style={{marginTop:20,display:"flex",justifyContent:"space-between"}}>
-            <button onClick={()=>setStep(2)} style={{padding:"9px 18px",background:"#fff",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>← Back</button>
+            <button onClick={()=>setStep(2)} style={{padding:"9px 18px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>← Back</button>
             <div style={{display:"flex",gap:8}}>
-              <button style={{padding:"9px 18px",background:"#fff",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>📥 Download Error Report</button>
+              <button style={{padding:"9px 18px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>📥 Download Error Report</button>
               <button style={{padding:"9px 22px",background:"#16a34a",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>✓ Import 48 Valid Rows</button>
             </div>
           </div>
@@ -1537,7 +1537,7 @@ export function BulkImportMaster(){
       )}
 
       {/* Recent imports */}
-      <div style={{marginTop:18,padding:14,background:"#fff",border:"1px solid #e6e8ec",borderRadius:8}}>
+      <div style={{marginTop:18,padding:14,background:"#fff",border:"1px solid #cdd1d8",borderRadius:8}}>
         <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#1a1c22"}}>Recent imports</p>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Date</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>By</th><th style={{...RPT_thStyle,textAlign:"right"}}>Rows</th><th style={{...RPT_thStyle,textAlign:"right"}}>Imported</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
@@ -1557,7 +1557,7 @@ export function MergeRecordsUtility(){
   const [masterType, setMasterType] = useState("Customers");
   const [source, setSource] = useState("L T Group (CUST-AMD-00012)");
   const [target, setTarget] = useState("");
-  const inp = {padding:"7px 10px",border:"1px solid #e6e8ec",borderRadius:5,fontSize:12,width:"100%"};
+  const inp = {padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"};
 
   return (
     <PHASE2_Page title="Merge Records Utility"
@@ -1567,7 +1567,7 @@ export function MergeRecordsUtility(){
         <p style={{margin:"3px 0 0",fontSize:11,color:"#d97706"}}>All transactions, addresses, contacts, and documents from the Source record will be transferred to the Target record. The Source record will be marked inactive but kept for audit. Only Director or Senior Finance Manager can perform merge.</p>
       </div>
 
-      <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,padding:20,marginBottom:14}}>
+      <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:20,marginBottom:14}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:14,marginBottom:18}}>
           <div>
             <label style={{fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",marginBottom:4,display:"block"}}>Master Type</label>
@@ -1590,7 +1590,7 @@ export function MergeRecordsUtility(){
         </div>
 
         {/* Comparison preview */}
-        <div style={{border:"1px solid #e6e8ec",borderRadius:6,overflow:"hidden"}}>
+        <div style={{border:"1px solid #cdd1d8",borderRadius:6,overflow:"hidden"}}>
           <div style={{padding:"10px 14px",background:"#1a1c22",color:"#fff",fontSize:12,fontWeight:700}}>Comparison Preview</div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Field</th><th style={{...RPT_thStyle,color:"#dc2626"}}>Source (out)</th><th style={{...RPT_thStyle,color:"#16a34a"}}>Target (kept)</th><th style={{...RPT_thStyle,textAlign:"center"}}>After Merge</th></tr></thead>
@@ -1605,7 +1605,7 @@ export function MergeRecordsUtility(){
                 {field:"Linked Transactions",src:"18 vouchers (₹4.8L)",tgt:"142 vouchers (₹2.85Cr)",result:"160 vouchers (₹2.90Cr) → all under Target"},
                 {field:"Created",src:"2022-06-08",tgt:"2024-04-10",result:"Target's date kept"},
               ].map((row,i)=>(
-                <tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}>
+                <tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}>
                   <td style={{...RPT_tdStyle,fontWeight:700}}>{row.field}</td>
                   <td style={{...RPT_tdStyle,color:"#dc2626",textDecoration:"line-through",opacity:0.7}}>{row.src}</td>
                   <td style={{...RPT_tdStyle,color:"#16a34a"}}>{row.tgt}</td>
@@ -1624,13 +1624,13 @@ export function MergeRecordsUtility(){
         </div>
 
         <div style={{marginTop:18,display:"flex",justifyContent:"flex-end",gap:8}}>
-          <button style={{padding:"9px 18px",background:"#fff",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+          <button style={{padding:"9px 18px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
           <button style={{padding:"9px 22px",background:"#dc2626",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>⚠ Confirm Merge</button>
         </div>
       </div>
 
       {/* Recent merges */}
-      <div style={{padding:14,background:"#fff",border:"1px solid #e6e8ec",borderRadius:8}}>
+      <div style={{padding:14,background:"#fff",border:"1px solid #cdd1d8",borderRadius:8}}>
         <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#1a1c22"}}>Recent merges (audit history)</p>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Date</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>Source → Target</th><th style={RPT_thStyle}>By</th><th style={{...RPT_thStyle,textAlign:"right"}}>Txns Moved</th></tr></thead>
@@ -1660,7 +1660,7 @@ export function MasterChangeQueue(){
   return(
     <PHASE2_Page title="Master Data Change Request Queue"
       subtitle="All master-data change requests requiring approval · vendor bank/PAN, credit limits, user permissions, CoA, etc."
-      toolbar={<select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e6e8ec",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All statuses</option>{statuses.map(s=><option key={s}>{s}</option>)}</select>}>
+      toolbar={<select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All statuses</option>{statuses.map(s=><option key={s}>{s}</option>)}</select>}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,150px),1fr))",gap:10,marginBottom:14}}>
         {[{l:"Pending Approval",v:pending,c:"#d97706"},{l:"Approved (MTD)",v:approved,c:"#16a34a"},{l:"Rejected (MTD)",v:rejected,c:"#dc2626"},{l:"High-Risk Pending",v:MASTER_CHANGE_QUEUE.filter(q=>q.status==="Pending Approval"&&/high/i.test(q.risk||q.riskLevel||q.priority||"")).length,c:"#dc2626"}].map(k=>(
           <div key={k.l} style={{...cardStyle,borderTop:"3px solid "+k.c}}><p style={{margin:0,fontSize:10,color:"#5b616e",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:k.c}}>{k.v}</p></div>
@@ -1679,7 +1679,7 @@ export function MasterChangeQueue(){
             <th style={{...RPT_thStyle,textAlign:"center"}}>Action</th>
           </tr></thead>
           <tbody>{filtered.map(q=>(
-            <tr key={q.id} style={{borderBottom:"1px solid #f0f2f7",background:q.priority==="High"?"#fff5f5":"#fff"}}>
+            <tr key={q.id} style={{borderBottom:"1px solid #dfe2e7",background:q.priority==="High"?"#fff5f5":"#fff"}}>
               <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#5b616e"}}>{q.id}</td>
               <td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:q.priority==="High"?"#fbe9e9":"#e6e8f1",color:q.priority==="High"?"#dc2626":"#1a1c22",borderRadius:3,fontSize:10.5,fontWeight:700}}>{q.type}</span></td>
               <td style={{...RPT_tdStyle,fontWeight:700}}>{q.entity}</td>
@@ -1693,7 +1693,7 @@ export function MasterChangeQueue(){
                     <button style={{padding:"3px 8px",background:"#16a34a",color:"#fff",border:"none",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>Approve</button>
                     <button style={{padding:"3px 8px",background:"#dc2626",color:"#fff",border:"none",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>Reject</button>
                   </div>
-                ):<button style={{padding:"3px 8px",background:"transparent",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:3,fontSize:10,cursor:"pointer"}}>View Log</button>}
+                ):<button style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:3,fontSize:10,cursor:"pointer"}}>View Log</button>}
               </td>
             </tr>
           ))}</tbody>
@@ -1774,7 +1774,7 @@ export function PassportManager({branch}){
             const dl=daysToExpiry(p.expiry);
             const st=expStatus(p.expiry);
             return (
-              <tr key={p.id} style={{borderBottom:"1px solid #f3f4f8",background:dl<0?"#fff5f5":dl<90?"#fffaf0":i%2===0?"#fff":"#fafafa"}}>
+              <tr key={p.id} style={{borderBottom:"1px solid #dfe2e7",background:dl<0?"#fff5f5":dl<90?"#fffaf0":i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"8px 11px",fontWeight:600,color:"#1a1c22"}}>{p.person}</td>
                 <td style={{padding:"8px 11px",color:"#2e323c"}}>{p.client}</td>
                 <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:10,color:"#2563eb",fontWeight:700}}>{p.passport}</td>
@@ -1793,7 +1793,7 @@ export function PassportManager({branch}){
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:480,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e6e8ec",display:"flex",justifyContent:"space-between"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>Add Passport Record</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5b616e"}}>✕</button>
             </div>
@@ -1812,7 +1812,7 @@ export function PassportManager({branch}){
               </div>
               <FL label="Branch"><select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))} style={inp}>{BRANCH_CODES.map(b=><option key={b}>{b}</option>)}</select></FL>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e6e8ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
               <button onClick={()=>{
                 const id=`PP${String(passports.length+1).padStart(3,"0")}`;

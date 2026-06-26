@@ -106,12 +106,12 @@ export function PrintPreviewHost() {
   const close = () => setJob(null);
   const doPrint = () => { const f = frameRef.current; if (f && f.contentWindow) { f.contentWindow.focus(); f.contentWindow.print(); } };
 
-  const seg = (active) => ({ padding: '5px 11px', fontSize: 11.5, fontWeight: 600, border: '1px solid #c8cee0', background: active ? '#185FA5' : '#fff', color: active ? '#fff' : '#5a6691', cursor: 'pointer' });
+  const seg = (active) => ({ padding: '5px 11px', fontSize: 11.5, fontWeight: 600, border: '1px solid #cdd1d8', background: active ? '#185FA5' : '#fff', color: active ? '#fff' : '#5a6691', cursor: 'pointer' });
   const wideRecommended = job.recommend === 'landscape';
 
   return (
     <div onClick={close} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.55)', zIndex: 9000, display: 'flex', flexDirection: 'column' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderBottom: '1px solid #d8dcec', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderBottom: '1px solid #cdd1d8', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <strong style={{ fontSize: 14, color: '#0d1326' }}>🖨 Print Preview — {job.title}</strong>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#5a6691' }}>Orientation
           <span style={{ display: 'inline-flex', borderRadius: 6, overflow: 'hidden' }}>
@@ -121,17 +121,17 @@ export function PrintPreviewHost() {
           <span style={{ fontSize: 10.5, color: '#8b94b3' }}>· recommended: <b style={{ color: '#185FA5' }}>{wideRecommended ? 'Landscape' : 'Portrait'}</b></span>
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#5a6691' }}>Paper
-          <select value={paper} onChange={(e) => setPaper(e.target.value)} style={{ padding: '4px 6px', fontSize: 11.5, border: '1px solid #c8cee0', borderRadius: 5 }}><option>A4</option><option>Letter</option></select>
+          <select value={paper} onChange={(e) => setPaper(e.target.value)} style={{ padding: '4px 6px', fontSize: 11.5, border: '1px solid #cdd1d8', borderRadius: 5 }}><option>A4</option><option>Letter</option></select>
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#5a6691' }}>Margins
-          <select value={margin} onChange={(e) => setMargin(e.target.value)} style={{ padding: '4px 6px', fontSize: 11.5, border: '1px solid #c8cee0', borderRadius: 5 }}><option>Normal</option><option>Narrow</option><option>None</option></select>
+          <select value={margin} onChange={(e) => setMargin(e.target.value)} style={{ padding: '4px 6px', fontSize: 11.5, border: '1px solid #cdd1d8', borderRadius: 5 }}><option>Normal</option><option>Narrow</option><option>None</option></select>
         </span>
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#5a6691', cursor: 'pointer' }}>
           <input type="checkbox" checked={fit} onChange={(e) => setFit(e.target.checked)} /> Shrink to fit
         </label>
         <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
           <button onClick={doPrint} style={{ padding: '7px 16px', fontSize: 12, fontWeight: 700, background: '#185FA5', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>🖨 Print / Save PDF</button>
-          <button onClick={close} style={{ padding: '7px 14px', fontSize: 12, fontWeight: 600, background: '#fff', color: '#5a6691', border: '1px solid #c8cee0', borderRadius: 6, cursor: 'pointer' }}>Close</button>
+          <button onClick={close} style={{ padding: '7px 14px', fontSize: 12, fontWeight: 600, background: '#fff', color: '#5a6691', border: '1px solid #cdd1d8', borderRadius: 6, cursor: 'pointer' }}>Close</button>
         </div>
       </div>
       <iframe ref={frameRef} title="print-preview" onClick={(e) => e.stopPropagation()} style={{ flex: 1, width: '100%', border: 'none', background: '#9aa0ad' }} />

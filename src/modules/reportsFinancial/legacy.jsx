@@ -41,7 +41,7 @@ import { CONSOLIDATED_LABEL } from '../../core/data';
 
 /* ── palette (SAP Fiori) ─────────────────────────────────────────────── */
 const SAP = {
-  shell: '#1d2d3e', border: '#d9d9d9', borderLt: '#ededed',
+  shell: '#1d2d3e', border: '#cdd1d8', borderLt: '#dfe2e7',
   text: '#32363a', sec: '#6a6d70', label: '#8696a9',
   blue: '#2563eb', blueBg: '#e8f0ff', green: '#16a34a', greenBg: '#e8f6ed', greenDk: '#15803d',
   red: '#bb0000', teal: '#04838f', purple: '#5c30a2', orange: '#e9730c', gold: '#c87b00',
@@ -1033,7 +1033,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
   };
 
   const Cell = ({ r, side }) => {
-    const sep = side === 'cr' ? { borderLeft: '1px solid #d6d6d6' } : {};
+    const sep = side === 'cr' ? { borderLeft: '1px solid #cdd1d8' } : {};
     if (!r) return (<><td style={{ ...mono, ...sep }} /><td style={{ ...mono }} /></>);
     const clickable = !!(r.module || r.ledger || r.expandable);
     const bold = !!(r.group || r.bucket || r.sub || r.costCentre || r.result); // groups, sub-groups & cost-centres bold
@@ -1066,7 +1066,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
             <td style={{ padding: '5px 12px', borderLeft: '1px solid #a9c2e0', ...mono }}>Particulars (Cr)</td><td style={{ padding: '5px 12px', textAlign: 'right', ...mono }}>Amount</td>
           </tr>
           {Array.from({ length: n }).map((_, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #f4f4f4' }}><Cell r={left[i]} /><Cell r={right[i]} side="cr" /></tr>
+            <tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}><Cell r={left[i]} /><Cell r={right[i]} side="cr" /></tr>
           ))}
           <tr style={{ color: TALLY.head, fontWeight: 700, borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}>
             <td style={{ padding: '6px 12px', ...mono }}>Total</td><td style={{ padding: '6px 12px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(total)}</td>
@@ -1098,7 +1098,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
         <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{periodTxt}</div>
       </div>
       {allKeys.length > 0 && (
-        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #e3e9f2', background: '#fafbfe' }}>
+        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #cdd1d8', background: '#fafbfe' }}>
           <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
           <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
         </div>
@@ -1207,7 +1207,7 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
     const pad = r.component ? 64 : r.ledgerHead ? 46 : r.leaf ? 50 : r.costCentre ? 42 : r.sub ? 34 : r.bucket ? 24 : 14;
     const amt = neg ? -Math.abs(r.amount) : r.amount;
     return (
-      <tr style={{ borderBottom: '1px solid #f4f4f4' }}>
+      <tr style={{ borderBottom: '1px solid #dfe2e7' }}>
         <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})} className={clickable ? 'cl-drill' : undefined}
           style={{ padding: '3px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
           {r.expandable ? <span onClick={(e) => { e.stopPropagation(); toggle(r); }} style={{ color: TALLY.gold, marginRight: 4, cursor: 'pointer' }}>{r.open ? '▾' : '▸'}</span> : null}
@@ -1218,7 +1218,7 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
     );
   };
   const Head = ({ txt }) => (<tr style={{ background: '#f0f4fa', color: TALLY.head, borderBottom: `2px solid ${TALLY.head}` }}><td colSpan={2} style={{ padding: '7px 12px', fontWeight: 800, letterSpacing: 0.4, ...mono }}>{txt}</td></tr>);
-  const Sub = ({ txt, val, neg }) => (<tr style={{ borderTop: '1px solid #c8c8c8', background: '#fafbfe' }}><td style={{ padding: '6px 12px', fontWeight: 700, color: TALLY.head, ...mono }}>{txt}</td><td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 700, ...mono }}>{inr(neg ? -Math.abs(val) : val)}</td></tr>);
+  const Sub = ({ txt, val, neg }) => (<tr style={{ borderTop: '1px solid #cdd1d8', background: '#fafbfe' }}><td style={{ padding: '6px 12px', fontWeight: 700, color: TALLY.head, ...mono }}>{txt}</td><td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 700, ...mono }}>{inr(neg ? -Math.abs(val) : val)}</td></tr>);
   const Result = ({ txt, val }) => (<tr style={{ borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}><td style={{ padding: '8px 12px', fontWeight: 800, color: TALLY.head, ...mono }}>{txt}</td><td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: TALLY.green, ...mono }}>{inr(val)}</td></tr>);
 
   return (
@@ -1240,7 +1240,7 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
         <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{periodTxt}</div>
       </div>
       {allKeys.length > 0 && (
-        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #e3e9f2', background: '#fafbfe' }}>
+        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #cdd1d8', background: '#fafbfe' }}>
           <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
           <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
         </div>
@@ -1319,7 +1319,7 @@ function DrillPnL({ d, cur, branch, periodTxt }) {
     const color = r.component ? '#6a6a6a' : (lvl === 0 || r.costCentre) ? TALLY.head : isLedger ? '#1f3a8a' : '#1a1a1a';
     const amt = neg ? -Math.abs(r.amount) : r.amount;
     return (
-      <tr style={{ borderBottom: '1px solid #f5f5f5' }}>
+      <tr style={{ borderBottom: '1px solid #dfe2e7' }}>
         {Array.from({ length: LABEL_COLS }).map((_, c) => (
           <td key={c} {...(c === lvl && clickable ? keyActivate(() => onRowClick(r)) : {})}
             className={c === lvl && clickable ? 'cl-drill' : undefined}
@@ -1371,7 +1371,7 @@ function DrillPnL({ d, cur, branch, periodTxt }) {
         <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{periodTxt}</div>
       </div>
       {allKeys.length > 0 && (
-        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #e3e9f2', background: '#fafbfe' }}>
+        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #cdd1d8', background: '#fafbfe' }}>
           <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
           <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
         </div>
@@ -1824,7 +1824,7 @@ function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
         <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{curLabel}</div>
       </div>
       {allKeys.length > 0 && (
-        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #e3e9f2', background: '#fafbfe' }}>
+        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #cdd1d8', background: '#fafbfe' }}>
           <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
           <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
         </div>
@@ -1836,7 +1836,7 @@ function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
             <td style={{ padding: '5px 12px', ...mono }}>Assets</td><td style={{ padding: '5px 12px', textAlign: 'right', ...mono }}>{curLabel}</td>
           </tr>
           {Array.from({ length: n }).map((_, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}><Cell r={left[i]} /><Cell r={right[i]} /></tr>
+            <tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}><Cell r={left[i]} /><Cell r={right[i]} /></tr>
           ))}
           <tr style={{ color: TALLY.head, fontWeight: 700, borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}>
             <td style={{ padding: '6px 12px', ...mono }}>Total</td><td style={{ padding: '6px 12px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(d.totalLiabilities)}</td>
@@ -1884,7 +1884,7 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
     const color = (r.group || r.sub) ? TALLY.head : '#444';
     const pad = r.group ? 16 : r.sub ? 32 : 50;
     return (
-      <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+      <tr style={{ borderBottom: '1px solid #dfe2e7' }}>
         <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})} className={clickable ? 'cl-drill' : undefined}
           style={{ padding: '3px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
           {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}{r.label}{r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
@@ -1925,7 +1925,7 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
         <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{curLabel}</div>
       </div>
       {allKeys.length > 0 && (
-        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #e3e9f2', background: '#fafbfe' }}>
+        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #cdd1d8', background: '#fafbfe' }}>
           <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
           <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
         </div>

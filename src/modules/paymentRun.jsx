@@ -9,11 +9,11 @@ import { useOutstanding, usePaymentRun } from '../core/useAccounting';
 import { buildPaymentRunPayload, paymentRunSummary } from './paymentRunPayload';
 import { Wallet, CheckSquare, Square, ArrowRight } from 'lucide-react';
 
-const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec', amber: '#854F0B' };
+const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8', amber: '#854F0B' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
 const brLabel = (b) => (b === 'ALL' || !b ? 'All Branches' : (b.name || b.code || b));
 const th = { padding: '8px 12px', background: C.dark, color: C.gold, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'left', whiteSpace: 'nowrap' };
-const td = { padding: '8px 12px', borderBottom: '1px solid #f0f2f7', fontSize: 12.5 };
+const td = { padding: '8px 12px', borderBottom: '1px solid #dfe2e7', fontSize: 12.5 };
 const rnum = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 const fld = { padding: '6px 10px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12.5 };
 

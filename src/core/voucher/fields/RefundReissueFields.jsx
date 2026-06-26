@@ -24,8 +24,8 @@ function SnapGrid({ title, snap, color }) {
   const cols = [];
   for (const r of lines) for (const k of Object.keys(r || {})) if (!cols.includes(k)) cols.push(k);
   const scalars = Object.entries(snap).filter(([k, v]) => k !== 'lines' && (typeof v !== 'object' || v === null));
-  const th = { padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#5a6691', borderBottom: '1px solid #e6e8ec', whiteSpace: 'nowrap' };
-  const td = { padding: '4px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', borderBottom: '1px solid #f0f1f4' };
+  const th = { padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#5a6691', borderBottom: '1px solid #cdd1d8', whiteSpace: 'nowrap' };
+  const td = { padding: '4px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', borderBottom: '1px solid #dfe2e7' };
   const cell = (v) => (v === null || v === undefined ? '' : (typeof v === 'number' ? fmtN(v) : (typeof v === 'object' ? JSON.stringify(v) : String(v))));
   return (
     <div style={{ marginBottom: 12 }}>
@@ -238,7 +238,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
 
       {/* Read-only SO/PO/GP voucher view — every column, incl. 0 amounts */}
       {booking && (
-        <div style={{ border: '1px solid #dfe3ea', borderRadius: 10, padding: 14, marginBottom: 16, background: '#fbfcfe' }}>
+        <div style={{ border: '1px solid #dfe2e7', borderRadius: 10, padding: 14, marginBottom: 16, background: '#fbfcfe' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
             <div style={{ fontSize: 12.5, fontWeight: 800, color: '#14161a' }}>SO/PO/GP voucher — {booking.bookingNo} <span style={{ color: '#9197a3', fontWeight: 600 }}>({booking.module} · {booking.status})</span></div>
             <button type="button" onClick={() => { setBooking(null); setBookingJv(null); }} style={{ border: 'none', background: 'none', color: '#9197a3', cursor: 'pointer', fontSize: 11 }}>hide ✕</button>
@@ -363,7 +363,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       {(() => {
         const sides = splitRefundJv(refundPv.postings, { party: state.party, counterParty: state.counterParty });
         return (
-          <div style={{ border: '1px solid #cdd6e6', borderRadius: 10, padding: 12, margin: '4px 0 14px', background: '#f7f9fc' }}>
+          <div style={{ border: '1px solid #cdd1d8', borderRadius: 10, padding: 12, margin: '4px 0 14px', background: '#f7f9fc' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: '#14161a' }}>Live JV — this {kind} (where it hits the books)</div>
               <span style={{ fontSize: 11, fontWeight: 800, color: refundPv.error ? '#A32D2D' : refundPv.balanced ? '#16a34a' : '#A32D2D' }}>

@@ -58,7 +58,7 @@ export function GlobalSearch({setRoute}){
             <tbody>{results.map((r,i)=>{
               const bc2=cfg2(r.branch);
               return (
-                <tr key={r.id+'_'+i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa",cursor:"pointer"}}
+                <tr key={r.id+'_'+i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa",cursor:"pointer"}}
                   onMouseEnter={e=>e.currentTarget.style.background="#f0f4ff"}
                   onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#fff":"#fafafa"}
                   onClick={()=>setRoute(MOD_ROUTES[r.mod]||"/sales/flight")}>

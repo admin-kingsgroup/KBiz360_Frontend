@@ -200,7 +200,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
       return v ?? '';
     };
     const head = cols.map((f) => `<th style="text-align:${f.type === 'number' ? 'right' : 'left'};padding:6px 9px;border-bottom:2px solid #0d1326;font-size:9pt;text-transform:uppercase;letter-spacing:.4px;color:#0d1326;white-space:nowrap">${esc(f.label)}</th>`).join('');
-    const body = rows.map((r, i) => `<tr style="background:${i % 2 ? '#f7f8fb' : '#fff'}">${cols.map((f) => `<td style="text-align:${f.type === 'number' ? 'right' : 'left'};padding:5px 9px;border-bottom:1px solid #e5e9f0;font-size:9pt;color:#222">${esc(txt(r, f))}</td>`).join('')}</tr>`).join('');
+    const body = rows.map((r, i) => `<tr style="background:${i % 2 ? '#f7f8fb' : '#fff'}">${cols.map((f) => `<td style="text-align:${f.type === 'number' ? 'right' : 'left'};padding:5px 9px;border-bottom:1px solid #cdd1d8;font-size:9pt;color:#222">${esc(txt(r, f))}</td>`).join('')}</tr>`).join('');
     const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#222">
       <div style="margin-bottom:10px">
         <div style="font-size:16pt;font-weight:800;color:#0d1326">${esc(title)}</div>
@@ -245,8 +245,8 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
         <div className="kb-sticky rounded-brand border border-surface-border bg-surface shadow-card" style={{ '--stick-head': '#f3f5f9', maxHeight: 'calc(100vh - 220px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead><tr style={{ background: '#f3f5f9' }}>
-              {cols.map((f) => <th key={f.key} style={{ textAlign: f.type === 'number' ? 'right' : 'left', padding: '10px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #e6e8ec' }}>{f.label}</th>)}
-              <th style={{ width: 84, padding: '10px 13px', borderBottom: '1px solid #e6e8ec' }} />
+              {cols.map((f) => <th key={f.key} style={{ textAlign: f.type === 'number' ? 'right' : 'left', padding: '10px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #cdd1d8' }}>{f.label}</th>)}
+              <th style={{ width: 84, padding: '10px 13px', borderBottom: '1px solid #cdd1d8' }} />
             </tr></thead>
             <tbody>
               {rows.length === 0 && <tr><td colSpan={cols.length + 1} style={{ padding: 28, textAlign: 'center', color: DIM }}>No records yet — click “New” to add one.</td></tr>}
@@ -254,7 +254,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
                 // rowStyle lets a view emphasize certain rows (e.g. a tinted,
                 // bold band on each primary Tally group). Cell weight inherits
                 // from the row so a bold rowStyle cascades to the text.
-                <tr key={r.id} style={{ borderBottom: '1px solid #f1f3f8', ...(rowStyle ? rowStyle(r) : null) }}>
+                <tr key={r.id} style={{ borderBottom: '1px solid #dfe2e7', ...(rowStyle ? rowStyle(r) : null) }}>
                   {cols.map((f) => <td key={f.key} style={{ padding: '9px 13px', textAlign: f.type === 'number' ? 'right' : 'left', color: '#334155', fontWeight: f.key === 'name' ? 700 : 'inherit' }}>{cell(r, f)}</td>)}
                   <td style={{ padding: '9px 13px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {readOnly || (lockedRow && lockedRow(r))
@@ -547,7 +547,7 @@ export const GroupsMaster = ({ branch }) => {
     rows.map((r) => ({ tallyParent: r.tallyParent, tallySub: r.tallySub, erpGroup: r.erpGroup, erpSub: r.erpSub, ledgerName: r.ledgerName })));
   const subGroupCount = groups.filter((g) => !g.system).length;
   const loading = groupsQ.isLoading || ledgersQ.isLoading;
-  const th = { textAlign: 'left', padding: '10px 12px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #e6e8ec', whiteSpace: 'nowrap' };
+  const th = { textAlign: 'left', padding: '10px 12px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #cdd1d8', whiteSpace: 'nowrap' };
   const pencilBtn = { background: 'none', border: 'none', cursor: 'pointer', color: BLUE, padding: 2, marginLeft: 6, verticalAlign: 'middle' };
 
   return (
@@ -591,7 +591,7 @@ export const GroupsMaster = ({ branch }) => {
             <tbody>
               {rows.length === 0 && <tr><td colSpan={COLS.length} style={{ padding: 28, textAlign: 'center', color: DIM }}>No accounts yet.</td></tr>}
               {rows.map((r) => (
-                <tr key={r.key} style={{ borderBottom: '1px solid #f1f3f8' }}>
+                <tr key={r.key} style={{ borderBottom: '1px solid #dfe2e7' }}>
                   {COLS.map((c) => {
                     const v = r[c.key];
                     const node = c.node ? r[c.node] : null;

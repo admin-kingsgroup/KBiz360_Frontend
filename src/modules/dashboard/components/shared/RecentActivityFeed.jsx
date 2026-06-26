@@ -5,7 +5,7 @@ export function RecentActivityFeed({ entries, formatMoney = fmtINR }) {
   return (
     <>
       {entries.map((a, i) => (
-        <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid #f0f2f7' }}>
+        <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid #dfe2e7' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <p style={{ margin: 0, fontSize: 11.5, color: '#14161a', fontWeight: 600 }}>{a.action}</p>
             {a.amount > 0 && (

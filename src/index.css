@@ -18,8 +18,9 @@
   --kb-surface:       #ffffff;
   --kb-surface-alt:   #f4f5f7;
   --kb-elevated:      #ffffff;
-  --kb-border:        #e6e8ec;
-  --kb-border-strong: #d6d9df;
+  --kb-border:        #cdd1d8;   /* standard, clearly-visible structural border */
+  --kb-border-strong: #bcc1cb;   /* heavy section rule */
+  --kb-divider:       #dfe2e7;   /* lighter inner row divider (still visible) */
 
   --kb-fg:            #14161a;
   --kb-fg-muted:      #5b616e;

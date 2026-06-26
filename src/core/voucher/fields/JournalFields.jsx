@@ -38,19 +38,19 @@ export function JournalFields({ state, setState, ctx }) {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
             <thead><tr style={{ background: DARK }}>
-              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#d4a437', fontWeight: 700, fontSize: 9.5 }}>Ledger Account</th>
-              <th style={{ padding: '8px 10px', textAlign: 'center', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 74 }}>Dr / Cr</th>
-              <th style={{ padding: '8px 10px', textAlign: 'right', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 150 }}>Amount ({cur})</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5 }}>Ledger Account</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 74 }}>Dr / Cr</th>
+              <th style={{ padding: '8px 10px', textAlign: 'right', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 150 }}>Amount ({cur})</th>
               <th style={{ width: 38 }} />
             </tr></thead>
             <tbody>
               {lines.map((l, i) => (
-                <tr key={l._k ?? i} style={{ borderBottom: '1px solid #f3f4f8', background: l.drCr === 'Cr' ? '#fdf3f3' : '#f0fbf5' }}>
+                <tr key={l._k ?? i} style={{ borderBottom: '1px solid #dfe2e7', background: l.drCr === 'Cr' ? '#fdf3f3' : '#f0fbf5' }}>
                   <td style={{ padding: '4px 8px', minWidth: 240 }}>
                     <LedgerPicker branch={branch} value={l.ledger} onChange={(v) => upd(i, 'ledger', v)} placeholder="Select ledger..." style={{ minHeight: 30, fontSize: 11 }} />
                   </td>
                   <td style={{ padding: '4px 8px' }}>
-                    <div style={{ display: 'flex', border: '1px solid #e1e3ec', borderRadius: 5, overflow: 'hidden', width: 64, margin: '0 auto' }}>
+                    <div style={{ display: 'flex', border: '1px solid #cdd1d8', borderRadius: 5, overflow: 'hidden', width: 64, margin: '0 auto' }}>
                       {['Dr', 'Cr'].map((t) => (
                         <button key={t} onClick={() => upd(i, 'drCr', t)} style={{
                           flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 9.5, fontWeight: 800, padding: '6px 0',
@@ -69,7 +69,7 @@ export function JournalFields({ state, setState, ctx }) {
               ))}
             </tbody>
             <tfoot>
-              <tr style={{ background: '#f3f4f8', borderTop: '2px solid #e1e3ec' }}>
+              <tr style={{ background: '#f3f4f8', borderTop: '2px solid #cdd1d8' }}>
                 <td style={{ padding: '8px 10px' }}><button onClick={add} style={{ ...btnGh, fontSize: 10.5, padding: '4px 12px' }}><Plus size={12} /> Add Entry Line</button></td>
                 <td style={{ padding: '8px 6px', textAlign: 'right', fontSize: 9, fontWeight: 700, color: DIM }}>TOTAL</td>
                 <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, fontSize: 13, fontVariantNumeric: 'tabular-nums', color: DARK }}>{money2(cur, tDr)} / {money2(cur, tCr)}</td>

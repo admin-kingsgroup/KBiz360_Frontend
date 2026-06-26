@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useVoucherPreview, useCreateVoucher, useUpdateVoucher } from '../useAccounting';
 import { openPrintPreview } from '../PrintPreview';
-import { bc, VWrap, VHead, FL, inp, card, btnG, btnGh } from '../styles';
+import { B, bc, VWrap, VHead, FL, inp, card, btnG, btnGh } from '../styles';
 import { VOUCHER_REGISTRY } from './registry';
 import { DARK, DIM, BLUE, RED, GREEN, money, brCodeOf, escHtml } from './ui';
 import { JvBlock } from './JvBlock';
@@ -108,13 +108,13 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
     const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? cur + x.toLocaleString('en-IN') : ''; };
     const rows = (pv.postings || []).map((p) => `<tr><td>${escHtml(p.ledger)}</td><td>${escHtml(p.group || '')}</td><td class="r">${fmt(p.debit)}</td><td class="r">${fmt(p.credit)}</td></tr>`).join('');
     const html = `<style>
-      .ve{font-family:'Segoe UI',Arial,sans-serif;color:#0d1326}
+      .ve{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#141414}
       .ve h1{font-size:16px;margin:0 0 2px}
       .ve .meta{font-size:10.5px;color:#5a6691;margin:0 0 4px}
       .ve table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:8px}
       .ve th{background:#141414;color:#A07828;text-align:left;padding:6px 8px;font-size:9.5px}
       .ve th.r,.ve td.r{text-align:right}
-      .ve td{padding:5px 8px;border-bottom:1px solid #eceef4}
+      .ve td{padding:5px 8px;border-bottom:1px solid #dfe2e7}
       .ve tfoot td{background:#FBF3DE;font-weight:800;border-top:2px solid #A07828}
     </style>
     <div class="ve">
@@ -146,6 +146,32 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
     </div>
   );
 
+  // ── edit-mode chrome ───────────────────────────────────────────────
+  // Editing opens the SAME voucher window as create: the dark/gold themed
+  // header (icon · label · branch/tax badge) + gold left border. One frame,
+  // reused by both the editable form and the post-save panel, so every place
+  // that opens an edit (ledger/day-book/cash-book drills, P&L, approvals)
+  // shows an identical-looking window to the create screen.
+  const editFrame = (children) => {
+    const cfg = (B && B[branchCode]) || {};
+    const taxBadge = cfg.taxType === 'GST' ? 'GST' : ('VAT ' + (cfg.vatRate || 0) + '%');
+    return (
+      <div style={{ background: '#fff', overflow: 'hidden', borderLeft: '4px solid #A07828', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', background: '#141414', borderBottom: '3px solid #A07828', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(160,120,40,0.18)', color: '#A07828', border: '1px solid rgba(160,120,40,0.40)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{desc.icon}</div>
+            <div>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 800, letterSpacing: '0.3px', color: '#fff' }}>{desc.label}</p>
+              <p style={{ margin: 0, fontSize: 10.5, color: '#8A8A84', letterSpacing: '0.3px' }}>{(voucher?.vno || '') + ' · ' + (branchCode || '') + ' · ' + (voucher?.type || '') + ' - ' + (voucher?.category || category)}</p>
+            </div>
+          </div>
+          <span style={{ fontSize: 10, padding: '3px 9px', borderRadius: 999, background: '#FBF3DE', color: '#6B4E0F', fontWeight: 800, border: '1px solid #E8D9A8', letterSpacing: '0.04em' }}>{(cfg.curCode || cur) + ' · ' + taxBadge}</span>
+        </div>
+        {children}
+      </div>
+    );
+  };
+
   // ── post-save preview (Print / Close|New) ──────────────────────────
   if (done) {
     const doneInner = (
@@ -158,12 +184,12 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
           <button onClick={printEntry} className="max-tablet:min-h-[44px]" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
           {isEdit
-            ? <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #e6e8ec', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
+            ? <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
             : <button onClick={reset} className="max-tablet:min-h-[44px]" style={{ ...btnG }}>＋ New Voucher</button>}
         </div>
       </div>
     );
-    if (isEdit) return doneInner;
+    if (isEdit) return editFrame(doneInner);
     return <VWrap title={desc.label} icon={desc.icon} vNo="Auto" branch={branch}>{doneInner}</VWrap>;
   }
 
@@ -187,13 +213,8 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   );
 
   if (isEdit) {
-    return (
-      <div style={{ padding: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div style={{ fontWeight: 800, color: DARK, fontSize: 14 }}>{voucher.vno} <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>{voucher.type} - {voucher.category}</span></div>
-        </div>
-        <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown}>{formInner}</div>
-      </div>
+    return editFrame(
+      <div style={{ padding: '14px 16px' }} ref={formKeys.ref} onKeyDown={formKeys.onKeyDown}>{formInner}</div>
     );
   }
   return (

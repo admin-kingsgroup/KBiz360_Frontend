@@ -51,7 +51,7 @@ function invoiceHtml(b, side, branch) {
   .inv .lh{display:flex;justify-content:space-between;padding:12px 14px;border-bottom:2px solid #0d1326}
   .inv .co{font-size:18pt;font-weight:900;color:#0d1326}
   .inv .addr{font-size:8.5pt;color:#5a6691;text-align:right;line-height:1.5}
-  .inv .meta{display:flex;justify-content:space-between;padding:8px 14px;background:#f3f4f8;border-bottom:1px solid #e1e3ec;font-size:9.5pt}
+  .inv .meta{display:flex;justify-content:space-between;padding:8px 14px;background:#f3f4f8;border-bottom:1px solid #cdd1d8;font-size:9.5pt}
   .inv .ttl{font-size:13pt;font-weight:800;color:#0d1326}
   .inv .lk{font-family:Courier New,monospace;font-weight:700;color:#185FA5;background:#E6F1FB;padding:2px 8px;border-radius:5px}
   .inv .billto{padding:10px 14px;font-size:9.5pt}

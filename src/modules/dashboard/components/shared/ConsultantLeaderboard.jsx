@@ -17,7 +17,7 @@ export function ConsultantLeaderboard({ consultants, formatMoney, onViewAll }) {
           <div
             key={c.name}
             className="flex items-center gap-2.5 py-1.5"
-            style={{ borderBottom: i < consultants.length - 1 ? '1px solid #f4f5f7' : 'none' }}
+            style={{ borderBottom: i < consultants.length - 1 ? '1px solid #dfe2e7' : 'none' }}
           >
             <span className="w-6 text-base">{MEDALS[i] || String(i + 1)}</span>
             <span className="flex-1 text-[11.5px] font-semibold text-ink">{c.name}</span>

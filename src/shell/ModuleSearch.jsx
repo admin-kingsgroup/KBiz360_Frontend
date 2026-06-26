@@ -190,7 +190,7 @@ export function ModuleSearch({ branch, currentUser, setRoute, bar = false }) {
       <div onMouseDown={(e) => { e.preventDefault(); setRoute('/search'); setQ(''); setOpen(false); }}
         style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '9px 11px', marginTop: 4,
-          borderTop: '1px solid #eef0f3', cursor: 'pointer', color: TEXT, fontSize: 11.5, fontWeight: 600,
+          borderTop: '1px solid #dfe2e7', cursor: 'pointer', color: TEXT, fontSize: 11.5, fontWeight: 600,
         }}>
         <Search size={13} style={{ color: DIM }} />
         Search vouchers, clients &amp; records in Global Search
@@ -215,7 +215,7 @@ export function ModuleSearch({ branch, currentUser, setRoute, bar = false }) {
         position: 'fixed', top: 8, left: 8, right: 8, zIndex: 99999, background: '#fff', borderRadius: 14,
         boxShadow: '0 24px 48px rgba(16,18,22,0.20)', overflow: 'hidden',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px 8px 12px', borderBottom: '1px solid #eef0f3' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px 8px 12px', borderBottom: '1px solid #dfe2e7' }}>
           <Search size={16} style={{ flexShrink: 0, color: DIM }} />
           <input ref={inputRef} autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown}
             placeholder="Search modules & pages…" aria-label="Search modules and pages"
@@ -238,13 +238,13 @@ export function ModuleSearch({ branch, currentUser, setRoute, bar = false }) {
         {scrollStyles}
         <button type="button" onClick={openSearch} aria-label="Search modules and pages"
           style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 44, padding: '0 12px',
-            background: '#f4f5f7', border: '1px solid #e6e8ec', borderRadius: 10, cursor: 'pointer',
+            background: '#f4f5f7', border: '1px solid #cdd1d8', borderRadius: 10, cursor: 'pointer',
             transition: 'border-color .14s, box-shadow .14s' }}
           onFocus={(e) => { e.currentTarget.style.borderColor = BLUE; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)'; }}
           onBlur={(e) => { e.currentTarget.style.borderColor = '#e6e8ec'; e.currentTarget.style.boxShadow = 'none'; }}>
           <Search size={17} style={{ flexShrink: 0, color: DIM }} />
           <span style={{ flex: 1, textAlign: 'left', fontSize: 13.5, fontWeight: 500, color: DIM }}>Search modules &amp; pages…</span>
-          <kbd style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, color: DIM, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 4, padding: '2px 6px' }}>⌘K</kbd>
+          <kbd style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, color: DIM, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 4, padding: '2px 6px' }}>⌘K</kbd>
         </button>
         {mobileOverlay}
       </div>
@@ -283,13 +283,13 @@ export function ModuleSearch({ branch, currentUser, setRoute, bar = false }) {
           style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: DARK, minWidth: 0 }} />
         {q
           ? <X size={14} style={{ flexShrink: 0, color: DIM, cursor: 'pointer' }} onMouseDown={(e) => { e.preventDefault(); setQ(''); inputRef.current?.focus(); }} />
-          : <kbd style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, color: DIM, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 4, padding: '1px 5px' }}>⌘K</kbd>}
+          : <kbd style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, color: DIM, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 4, padding: '1px 5px' }}>⌘K</kbd>}
       </div>
 
       {open && q.trim() && pos && createPortal(
         <div data-modsearch style={{
           position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 99999,
-          background: '#fff', border: '1px solid #e6e8ec', borderRadius: 10,
+          background: '#fff', border: '1px solid #cdd1d8', borderRadius: 10,
           boxShadow: '0 20px 40px rgba(0,0,0,0.12)', overflow: 'hidden',
         }}>
           {ResultsList}

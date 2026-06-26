@@ -7,6 +7,14 @@ import {
   buildKeyAlerts,
 } from '../utils/transformers';
 import { growthPct } from '../utils/helpers';
+import { bc } from '../../../core/styleTokens';
+import { compactAmt } from '../../../core/format';
+
+// Branch-aware compact money for alert text ($ for NBO/DAR/FBM, ₹ otherwise).
+const moneyFor = (branchCode) => {
+  const cur = (bc({ code: branchCode }) || {}).cur || '₹';
+  return (n) => compactAmt(n, { currency: cur });
+};
 
 /**
  * Dashboard service — the only place that orchestrates `api/*` accessors and
@@ -85,6 +93,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
   const keyAlerts = buildKeyAlerts({
     arAgeing, apAgeing, mpl, topCustomers,
     figures: { netProfit: mpl?.bridge?.netProfit, gpPct: mpl?.totals?.gpPct },
+    fmtMoney: moneyFor(branchCode),
   });
 
   return {

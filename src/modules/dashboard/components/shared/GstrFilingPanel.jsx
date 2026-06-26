@@ -8,7 +8,7 @@ export function GstrFilingPanel({ rows, formatMoney = fmtINR }) {
   return (
     <>
       {rows.map((g) => (
-        <div key={g.entity} style={{ padding: '8px 0', borderBottom: '1px solid #f0f2f7' }}>
+        <div key={g.entity} style={{ padding: '8px 0', borderBottom: '1px solid #dfe2e7' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
             <p style={{ margin: 0, fontSize: 11.5, color: '#14161a', fontWeight: 600 }}>{g.entity}</p>
             {g.net != null && <span style={{ fontSize: 11, fontWeight: 700, color: g.net > 0 ? '#dc2626' : '#16a34a' }}>{formatMoney(g.net)}</span>}

@@ -55,7 +55,7 @@ export const VTD=({c,r})=><td style={{padding:"4px 7px",textAlign:r?"right":"lef
 export const HExportBtn=({name,columns,rows,label="📤 Export"})=>{
   const empty=!rows||rows.length===0;
   return <button onClick={()=>exportToExcel(name,columns,rows||[])} disabled={empty} title="Export to Excel"
-    style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11,cursor:empty?"not-allowed":"pointer",opacity:empty?0.5:1}}>{label}</button>;
+    style={{padding:"8px 14px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:6,fontSize:11,cursor:empty?"not-allowed":"pointer",opacity:empty?0.5:1}}>{label}</button>;
 };
 
 export const BANK_LIST_V=[
@@ -325,7 +325,7 @@ export function MarkupRateSheet({branch}){
             ))}
           </tr></thead>
           <tbody>{rules.map((r,i)=>(
-            <tr key={r.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+            <tr key={r.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
               <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{r.id}</td>
               <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{r.client}</td>
               <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{r.type}</span></td>
@@ -343,7 +343,7 @@ export function MarkupRateSheet({branch}){
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:460,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Add Service Charge - 2 Rule</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
             </div>
@@ -362,7 +362,7 @@ export function MarkupRateSheet({branch}){
               </div>
               <FL label="Note"><input value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} style={inp}/></FL>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
               <button onClick={()=>{
                 const id=`MR${String(rules.length+1).padStart(3,"0")}`;
@@ -441,7 +441,7 @@ export function TdsCertRegister({branch}){
           <tbody>{filtered.map((c,i)=>{
             const dl=daysLeft(c.dueDate);
             return (
-              <tr key={c.id} style={{borderBottom:"1px solid #f3f4f8",background:c.status==="Pending"&&dl&&dl<14?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
+              <tr key={c.id} style={{borderBottom:"1px solid #dfe2e7",background:c.status==="Pending"&&dl&&dl<14?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{c.id}</td>
                 <td style={{padding:"8px 11px",fontWeight:600,color:"#0d1326"}}>{c.vendor}</td>
                 <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:9.5,color:"#5a6691"}}>{c.pan}</td>
@@ -544,7 +544,7 @@ export function ColVisToggle({tableId,columns,style:{}}){
         <>
           <div style={{position:"fixed",inset:0,zIndex:498}} onClick={()=>setOpen(false)}/>
           <div style={{position:"absolute",right:0,top:36,zIndex:499,background:"#fff",borderRadius:10,
-            boxShadow:"0 8px 24px rgba(0,0,0,0.15)",border:"1px solid #e1e3ec",padding:"8px 0",minWidth:160}}>
+            boxShadow:"0 8px 24px rgba(0,0,0,0.15)",border:"1px solid #cdd1d8",padding:"8px 0",minWidth:160}}>
             {columns.map(col=>(
               <label key={col} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",cursor:"pointer",fontSize:11,color:"#384677"}}
                 onMouseEnter={e=>e.currentTarget.style.background="#f3f4f8"}
@@ -638,9 +638,9 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}
     // pick (via clickable), Esc closes — ↓ from the search input lands on the first option.
     <div ref={menuRef} onKeyDown={listKeyNav({ onEscape:()=>setOpen(false) })}
       style={{position:"fixed",top:rect.bottom+4,left:rect.left,width:rect.width,zIndex:4000,background:"#fff",
-      border:"1px solid #e1e3ec",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.18)",overflow:"hidden"}}>
+      border:"1px solid #cdd1d8",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.18)",overflow:"hidden"}}>
       <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Type to search..."
-        style={{width:"100%",border:"none",borderBottom:"1px solid #e1e3ec",padding:"8px 12px",
+        style={{width:"100%",border:"none",borderBottom:"1px solid #cdd1d8",padding:"8px 12px",
           fontSize:11,outline:"none",boxSizing:"border-box"}}/>
       <div style={{maxHeight:220,overflowY:"auto"}}>
         {filtered.map(l=>(
@@ -656,7 +656,7 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}
         ))}
         {filtered.length===0&&<div style={{padding:"10px 12px",fontSize:11,color:"#5a6691"}}>No ledger found</div>}
       </div>
-      <div style={{padding:"6px 10px",borderTop:"1px solid #f3f4f8",fontSize:9.5,color:"#5a6691"}}>
+      <div style={{padding:"6px 10px",borderTop:"1px solid #dfe2e7",fontSize:9.5,color:"#5a6691"}}>
         {matches.length>filtered.length
           ? `Showing ${filtered.length} of ${matches.length} matches · Type to narrow`
           : `${LEDGER_REGISTRY.length} ledgers · Type to filter`}
@@ -719,14 +719,14 @@ export function MstrModal({title,onClose,children}){
       <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:560,
         maxHeight:"90vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-          padding:"14px 18px",borderBottom:"1px solid #e1e3ec",position:"sticky",top:0,
+          padding:"14px 18px",borderBottom:"1px solid #cdd1d8",position:"sticky",top:0,
           background:"#fff",zIndex:1}}>
           <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326"}}>{title}</p>
           <button onClick={onClose} style={{background:"transparent",border:"none",
             cursor:"pointer",fontSize:20,color:"#5a6691",lineHeight:1}}>✕</button>
         </div>
         <div style={{padding:"16px 18px"}}>{children}</div>
-        <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",
+        <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",
           display:"flex",justifyContent:"flex-end",gap:8,position:"sticky",bottom:0,background:"#fff"}}>
           <button onClick={onClose} style={btnGh}>Cancel</button>
           <button onClick={onClose} style={btnG}>Save</button>
@@ -808,7 +808,7 @@ export function PackagePnL({branch}){
             ))}
           </tr></thead>
           <tbody>{rows.map((r,i)=>(
-            <tr key={r.code} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+            <tr key={r.code} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
               <td style={{padding:"8px 12px",fontFamily:"monospace",fontWeight:700,color:"#185FA5"}}>{r.code}</td>
               <td style={{padding:"8px 12px",fontWeight:500,color:"#0d1326"}}>{r.dest}</td>
               <td style={{padding:"8px 12px",textAlign:"right"}}>{r.bks}</td>
@@ -911,7 +911,7 @@ export function Recruitment({branch}){
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:520,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Post a Job Opening</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
             </div>
@@ -926,7 +926,7 @@ export function Recruitment({branch}){
               <FL label="Opened on"><input type="date" value={form.posted} onChange={e=>setForm(f=>({...f,posted:e.target.value}))} style={inp}/></FL>
               <div style={{gridColumn:"1/-1"}}><FL label="Skills"><input value={form.skills} onChange={e=>setForm(f=>({...f,skills:e.target.value}))} placeholder="GDS, ticketing, holiday packages" style={inp}/></FL></div>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
               <button onClick={postJob} disabled={create.isPending} style={btnG}>{create.isPending?"Posting…":"Post Job"}</button>
             </div>
@@ -979,7 +979,7 @@ export function TrainingRecords({branch}){
             <tbody>{emps.map((e,i)=>{
               const scores=[true,i<6,true,i<7,i<4]; // simulate completion
               return(
-                <tr key={e.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+                <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{e.name}<br/><span style={{fontSize:9,color:"#5a6691"}}>{e.branch}</span></td>
                   {TRAININGS.map((t,j)=>(
                     <td key={j} style={{padding:"8px 10px",textAlign:"center"}}>
@@ -1052,7 +1052,7 @@ export function BudgetPlanning({branch}){
             const expectedPct=Math.round(MONTHS/12*100);
             const good=(r.cat==="Income"&&variance>=0)||(r.cat!=="Income"&&variance<=0);
             return(
-              <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+              <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:r.cat==="Income"?"#E6F1FB":r.cat==="Direct Cost"?"#FCEBEB":"#f3f4f8",color:r.cat==="Income"?"#185FA5":r.cat==="Direct Cost"?"#A32D2D":"#384677"}}>{r.cat}</span></td>
                 <td style={{padding:"8px 12px",fontWeight:500,color:"#0d1326"}}>{r.gl}</td>
                 <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(r.budget)}</td>
@@ -1143,7 +1143,7 @@ export function SeatInventory({branch}){
               const soldPct=Math.round(cls.sold/cls.total*100);
               const heldPct=Math.round(cls.held/cls.total*100);
               return(
-                <div key={cls.cls} style={{flex:1,minWidth:160,padding:"10px 12px",borderRadius:9,border:"1px solid #e1e3ec",background:"#fafafa"}}>
+                <div key={cls.cls} style={{flex:1,minWidth:160,padding:"10px 12px",borderRadius:9,border:"1px solid #cdd1d8",background:"#fafafa"}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
                     <span style={{fontWeight:700,fontSize:11,color:"#0d1326"}}>{cls.cls}</span>
                     <span style={{fontSize:10.5,fontWeight:600,color:cls.avail===0?"#A32D2D":cls.avail<=10?"#854F0B":"#27500A"}}>{cls.avail} avail</span>
@@ -1229,7 +1229,7 @@ export function GratuityRegister({branch}){
           <tbody>{data.map((e,i)=>{
             const g=GRATUITY(e);
             return(
-              <tr key={e.id} style={{borderBottom:"1px solid #f3f4f8",background:g.eligible?"#f0fff4":i%2===0?"#fff":"#fafafa"}}>
+              <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:g.eligible?"#f0fff4":i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{e.name}</td>
                 <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 6px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{e.branch}</span></td>
                 <td style={{padding:"8px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{e.joined||"2021-04-01"}</td>
@@ -1278,7 +1278,7 @@ export function FxRevaluation({branch,setRoute}){
   const totLoss=rows.reduce((s,r)=>s+(r.fxGain<0?Math.abs(r.fxGain):0),0);
   const net=totGain-totLoss;
 
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
@@ -1288,7 +1288,7 @@ export function FxRevaluation({branch,setRoute}){
           <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Mark foreign-currency balances to month-end rate · Auto-posts FX gain/loss JV · AS 11 / Ind AS 21</p>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:7,fontSize:11.5}}>
+          <select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:7,fontSize:11.5}}>
             {MONTH_OPTIONS.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
           <button style={{padding:"7px 14px",border:"none",background:"#d4a437",color:"#0d1326",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer"}}>📒 Post Revaluation JV</button>
@@ -1313,7 +1313,7 @@ export function FxRevaluation({branch,setRoute}){
             </tr></thead>
             <tbody>
               {rows.map((r,i)=>(
-                <tr key={i} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #e1e3ec"}}>
+                <tr key={i} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
                   <td style={{padding:"7px 8px",fontWeight:600}}>{r.ledger}<div style={{fontSize:9.5,color:"#5a6691",fontWeight:400}}>{r.branch}</div></td>
                   <td style={{padding:"7px 8px",textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:10,fontSize:9.5,fontWeight:700,background:"#E6F1FB",color:"#185FA5"}}>{r.ccy}</span></td>
                   <td style={{padding:"7px 8px",textAlign:"right"}}>{fmt(r.origAmt)}</td>
@@ -1360,7 +1360,7 @@ export function MsmeTracker({branch,setRoute}){
   const watch=bills.filter(b=>b.ageDays<30);
   const totalAtRisk=critical.reduce((s,b)=>s+b.outstanding,0);
   const totalDisallow=Math.round(totalAtRisk*0.3); // potential income-tax disallowance
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
@@ -1390,7 +1390,7 @@ export function MsmeTracker({branch,setRoute}){
             </tr></thead>
             <tbody>
               {bills.sort((a,b)=>b.ageDays-a.ageDays).map((b,i)=>(
-                <tr key={b.id} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #e1e3ec"}}>
+                <tr key={b.id} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
                   <td style={{padding:"7px 8px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{b.id}</td>
                   <td style={{padding:"7px 8px",fontWeight:600}}>{b.supplier}</td>
                   <td style={{padding:"7px 8px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{b.msmeNo}</td>
@@ -1438,7 +1438,7 @@ export function PendingApprovals({branch,setRoute}){
   const visible=filter==="All"?PENDING_APPROVALS_DATA:PENDING_APPROVALS_DATA.filter(p=>p.priority===filter);
   const totValue=visible.filter(p=>p.amount>0).reduce((s,p)=>s+p.amount,0);
   const high=PENDING_APPROVALS_DATA.filter(p=>p.priority==="High").length;
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
@@ -1474,7 +1474,7 @@ export function PendingApprovals({branch,setRoute}){
             </tr></thead>
             <tbody>
               {visible.map((p,i)=>(
-                <tr key={p.id} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #e1e3ec"}}>
+                <tr key={p.id} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
                   <td style={{padding:"7px 8px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{p.id}</td>
                   <td style={{padding:"7px 8px",fontSize:10.5}}>{p.type}</td>
                   <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600}}>{p.amount>0?cur+fmt(p.amount):"—"}</td>
@@ -1547,13 +1547,13 @@ export function DocumentTypeMaster(){
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
         <p style={{margin:0,fontSize:12,color:"#5a6691"}}>{rows.length} document templates configured · {rows.filter(d=>d.active).length} active</p>
         <div style={{flex:1}}/>
-        <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
+        <button style={{padding:"8px 14px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,cursor:"pointer"}}>📥 Import</button>
         <HExportBtn name="document-types" rows={rows} columns={[{key:"type",label:"Document Type"},{key:"layout",label:"Layout"},{key:"header",label:"Header"},{key:"footer",label:"Footer"},{key:"numberingSeries",label:"Numbering Series"},{key:"active",label:"Active"}]}/>
         <button style={{padding:"8px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>+ Add Document Type</button>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(360px,1fr))",gap:12}}>
         {rows.map(d=>(
-          <div key={d.id} style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:14}}>
+          <div key={d.id} style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
               <p style={{margin:0,fontSize:13.5,fontWeight:700,color:"#0d1326"}}>{d.type}</p>
               <span style={{padding:"2px 7px",background:d.active?"#d4edda":"#f8d7da",color:d.active?"#155724":"#721c24",borderRadius:3,fontSize:10.5,fontWeight:600}}>{d.active?"Active":"Inactive"}</span>
@@ -1566,7 +1566,7 @@ export function DocumentTypeMaster(){
             </div>
             <div style={{display:"flex",gap:6}}>
               <button style={{padding:"5px 10px",background:"transparent",border:"1px solid #d4a437",color:"#d4a437",borderRadius:4,fontSize:11,cursor:"pointer",fontWeight:600,flex:1}}>Edit Layout</button>
-              <button style={{padding:"5px 10px",background:"transparent",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:4,fontSize:11,cursor:"pointer",fontWeight:600}}>Preview</button>
+              <button style={{padding:"5px 10px",background:"transparent",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:4,fontSize:11,cursor:"pointer",fontWeight:600}}>Preview</button>
             </div>
           </div>
         ))}
@@ -1623,7 +1623,7 @@ export const PERIOD_OPTIONS = ["Today","Week","Month","Quarter","YTD","Custom"];
 
 export function PeriodSelector({period,setPeriod}){
   return (
-    <div className="max-tablet:w-full max-tablet:flex-wrap" style={{display:"flex",gap:4,padding:3,background:"#f4f5f7",borderRadius:7,border:"1px solid #e6e8ec"}}>
+    <div className="max-tablet:w-full max-tablet:flex-wrap" style={{display:"flex",gap:4,padding:3,background:"#f4f5f7",borderRadius:7,border:"1px solid #cdd1d8"}}>
       {PERIOD_OPTIONS.map(p=>(
         <button key={p} onClick={()=>setPeriod(p)}
           className="max-tablet:flex-1 max-tablet:min-h-[44px]"
@@ -1638,21 +1638,21 @@ export function PeriodSelector({period,setPeriod}){
 
 export function DashboardHeader({title,subtitle,user,period,setPeriod,onExport}){
   return (
-    <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:14,marginBottom:18,paddingBottom:14,borderBottom:"1px solid #e6e8ec"}}>
+    <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:14,marginBottom:18,paddingBottom:14,borderBottom:"1px solid #cdd1d8"}}>
       <div style={{minWidth:0}}>
         <h2 style={{margin:0,fontSize:20,letterSpacing:"-0.02em",color:"#14161a",fontWeight:700}}>{title}</h2>
         <p style={{margin:"3px 0 0",fontSize:12.5,color:"#5b616e"}}>{subtitle} · <span style={{color:"#98792c",fontWeight:600}}>{user.name}</span></p>
       </div>
       <div className="max-tablet:w-full" style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
         {period && setPeriod && <PeriodSelector period={period} setPeriod={setPeriod}/>}
-        <button onClick={onExport} className="inline-flex items-center max-tablet:min-h-[44px]" style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 14px",background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,fontSize:12,cursor:"pointer",fontWeight:600,color:"#5b616e"}}>📄 Export PDF</button>
+        <button onClick={onExport} className="inline-flex items-center max-tablet:min-h-[44px]" style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 14px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,fontSize:12,cursor:"pointer",fontWeight:600,color:"#5b616e"}}>📄 Export PDF</button>
       </div>
     </div>
   );
 }
 
 
-export const cardStyle={background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:14,position:"relative"};
+export const cardStyle={background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:14,position:"relative"};
 
 export function DashboardRouter({branch,setRoute,currentUser}){
   const role = currentUser?.role || "Super Admin";
@@ -1700,10 +1700,12 @@ export function abcOf(items, valueKey){
 export const ATTRITION_DATA = [];
 
 
-export const STATUTORY_DUES = [];
+/* STATUTORY_DUES removed — the Statutory Dues Calendar is now live:
+   useStatutoryDues → GET /api/tax-calendar/dues */
 
 
-export const FX_EXPOSURE = [];
+/* FX_EXPOSURE removed — the Currency Exposure report is now live:
+   useFxExposure → GET /api/accounting/fx-exposure */
 
 /* ════════════════════════════════════════════════════════════════════
    FINANCIAL REPORTS (4)
@@ -1713,19 +1715,19 @@ export const FX_EXPOSURE = [];
 
 export const TAB_Page = (title, subtitle, audit, children) => (
   <div style={{padding:18,maxWidth:1400,margin:"0 auto"}}>
-    <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:14,marginBottom:14,paddingBottom:12,borderBottom:"1px solid #e1e3ec"}}>
+    <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:14,marginBottom:14,paddingBottom:12,borderBottom:"1px solid #cdd1d8"}}>
       <div>
         <h2 style={{margin:0,fontSize:20,color:"#0d1326",fontWeight:700}}>{title}</h2>
         <p style={{margin:"3px 0 0",fontSize:12,color:"#5a6691"}}>{subtitle}</p>
       </div>
       <div style={{display:"flex",gap:8}}>
-        <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,fontWeight:600,color:"#5a6691",cursor:"pointer"}}>← Back</button>
+        <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:6,fontSize:11.5,fontWeight:600,color:"#5a6691",cursor:"pointer"}}>← Back</button>
         <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #d4a437",borderRadius:6,fontSize:11.5,fontWeight:600,color:"#d4a437",cursor:"pointer"}}>📋 Duplicate</button>
         <button style={{padding:"7px 14px",background:"#d4a437",border:"none",borderRadius:6,fontSize:11.5,fontWeight:700,color:"#0d1326",cursor:"pointer"}}>💾 Save</button>
       </div>
     </div>
     {children}
-    {audit&&<div style={{padding:"10px 18px",marginTop:14,background:"#fafbfd",border:"1px solid #e1e3ec",borderRadius:6,fontSize:10.5,color:"#5a6691",textAlign:"center"}}>
+    {audit&&<div style={{padding:"10px 18px",marginTop:14,background:"#fafbfd",border:"1px solid #cdd1d8",borderRadius:6,fontSize:10.5,color:"#5a6691",textAlign:"center"}}>
       Last modified by <b style={{color:"#0d1326"}}>{audit.user}</b> on <b style={{color:"#0d1326"}}>{audit.date}</b> · Record created on <b style={{color:"#0d1326"}}>{audit.created}</b>
     </div>}
   </div>
@@ -1788,12 +1790,12 @@ export function DrillModal({branch,metric,value,onClose}){
             <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326"}}>Drill-down: {branch} — {metric}</p>
             <p style={{margin:"2px 0 0",fontSize:11.5,color:"#5a6691"}}>Total: <b style={{color:"#d4a437"}}>{fmtINR(value)}</b> · May 2026 · click any row to open voucher</p>
           </div>
-          <button onClick={onClose} style={{width:28,height:28,borderRadius:"50%",border:"1px solid #e1e3ec",background:"#f7f8fb",cursor:"pointer",fontSize:14,fontWeight:700,color:"#5a6691"}}>✕</button>
+          <button onClick={onClose} style={{width:28,height:28,borderRadius:"50%",border:"1px solid #cdd1d8",background:"#f7f8fb",cursor:"pointer",fontSize:14,fontWeight:700,color:"#5a6691"}}>✕</button>
         </div>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
           <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Voucher</th><th style={RPT_thStyle}>Date</th><th style={RPT_thStyle}>Party</th><th style={{...RPT_thStyle,textAlign:"right"}}>Amount</th></tr></thead>
           <tbody>{rows.map((r,i)=>(
-            <tr key={i} style={{borderBottom:"1px solid #f0f2f7",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background="#fff8e8"} onMouseLeave={e=>e.currentTarget.style.background=""}>
+            <tr key={i} style={{borderBottom:"1px solid #dfe2e7",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background="#fff8e8"} onMouseLeave={e=>e.currentTarget.style.background=""}>
               <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#d4a437",fontWeight:600}}>{r.vno}</td>
               <td style={RPT_tdStyle}>{r.date}</td>
               <td style={{...RPT_tdStyle,fontWeight:600}}>{r.party}</td>
@@ -1802,7 +1804,7 @@ export function DrillModal({branch,metric,value,onClose}){
           ))}</tbody>
         </table>
         <div style={{marginTop:12,display:"flex",justifyContent:"flex-end",gap:8}}>
-          <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📊 Full Report</button>
+          <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📊 Full Report</button>
           <button onClick={onClose} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>Close</button>
         </div>
       </div>
@@ -1827,8 +1829,8 @@ export function ExportDropdown(){
         📤 Export ▾
       </button>
       {open&&(
-        <div style={{position:"absolute",top:"110%",right:0,background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.12)",width:220,zIndex:100}} onMouseLeave={()=>setOpen(false)}>
-          <p style={{margin:0,padding:"8px 14px",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",borderBottom:"1px solid #e1e3ec"}}>Export as</p>
+        <div style={{position:"absolute",top:"110%",right:0,background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.12)",width:220,zIndex:100}} onMouseLeave={()=>setOpen(false)}>
+          <p style={{margin:0,padding:"8px 14px",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",borderBottom:"1px solid #cdd1d8"}}>Export as</p>
           {formats.map(f=>(
             <button key={f.fmt} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",background:"transparent",border:"none",width:"100%",textAlign:"left",cursor:"pointer",fontSize:12}} onMouseEnter={e=>e.currentTarget.style.background="#f7f8fb"} onMouseLeave={e=>e.currentTarget.style.background=""} onClick={()=>setOpen(false)}>
               <span style={{fontSize:16,width:22}}>{f.icon}</span>

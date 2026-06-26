@@ -33,9 +33,9 @@ import { openPrintPreview } from '../../../core/PrintPreview';
  *   • Group (TK HO Group) ⇒ all-branch CONSOLIDATED performance + a branch
  *     performance scoreboard (league table) comparing every branch.
  */
-const C = { dark: '#14161a', dim: '#5b616e', green: '#16a34a', red: '#dc2626', gold: '#b45309', border: '#e6e8ec' };
+const C = { dark: '#14161a', dim: '#5b616e', green: '#16a34a', red: '#dc2626', gold: '#b45309', border: '#cdd1d8' };
 const th = { padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' };
-const td = { padding: '6px 10px', fontSize: 12, borderBottom: '1px solid #f4f5f7' };
+const td = { padding: '6px 10px', fontSize: 12, borderBottom: '1px solid #dfe2e7' };
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 const Scroll = ({ children }) => <div style={{ overflowX: 'auto' }}>{children}</div>;
 

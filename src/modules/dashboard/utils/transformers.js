@@ -107,7 +107,9 @@ const SEV_RANK = { high: 0, med: 1, low: 2 };
 const pickBucket = (buckets, test) => (buckets || []).find((b) => test(b.bucket)) || { amount: 0, count: 0 };
 const parties = (n) => `${n} ${n === 1 ? 'party' : 'parties'}`;
 
-export const buildKeyAlerts = ({ arAgeing = [], apAgeing = [], mpl, topCustomers = [], figures = {} } = {}) => {
+// `fmtMoney` lets the caller format alert amounts in the active branch's currency
+// (USD branches → $). Defaults to ₹ (fmtINR) for back-compat / consolidated views.
+export const buildKeyAlerts = ({ arAgeing = [], apAgeing = [], mpl, topCustomers = [], figures = {}, fmtMoney = fmtINR } = {}) => {
   const alerts = [];
   const asOf = fmtDate(todayISO());
 
@@ -115,28 +117,28 @@ export const buildKeyAlerts = ({ arAgeing = [], apAgeing = [], mpl, topCustomers
   const ar90 = pickBucket(arAgeing, (l) => /90\s*\+/.test(l));
   if (ar90.amount > 0)
     alerts.push({ severity: 'high', type: 'Receivables', date: asOf, route: '/reports/rec',
-      title: `${fmtINR(ar90.amount)} receivables overdue 90+ days · ${parties(ar90.count)}` });
+      title: `${fmtMoney(ar90.amount)} receivables overdue 90+ days · ${parties(ar90.count)}` });
   const ar60 = pickBucket(arAgeing, (l) => /^\s*61/.test(l));
   if (ar60.amount > 0)
     alerts.push({ severity: 'med', type: 'Receivables', date: asOf, route: '/reports/rec',
-      title: `${fmtINR(ar60.amount)} receivables ageing 61–90 days · ${parties(ar60.count)}` });
+      title: `${fmtMoney(ar60.amount)} receivables ageing 61–90 days · ${parties(ar60.count)}` });
 
   // Payables we're sitting on past 90 days (supplier-relationship / cash risk).
   const ap90 = pickBucket(apAgeing, (l) => /90\s*\+/.test(l));
   if (ap90.amount > 0)
     alerts.push({ severity: 'med', type: 'Payables', date: asOf, route: '/reports/pay',
-      title: `${fmtINR(ap90.amount)} payables overdue 90+ days · ${parties(ap90.count)}` });
+      title: `${fmtMoney(ap90.amount)} payables overdue 90+ days · ${parties(ap90.count)}` });
 
   // Net loss for the selected period.
   if (typeof figures.netProfit === 'number' && figures.netProfit < 0)
     alerts.push({ severity: 'high', type: 'Profitability', date: asOf, route: '/reports/pnl',
-      title: `Net loss this period: ${fmtINR(figures.netProfit)}` });
+      title: `Net loss this period: ${fmtMoney(figures.netProfit)}` });
 
   // Modules earning revenue but bleeding GP.
   for (const m of gpByModuleFromMpl(mpl))
     if (m.gp < 0)
       alerts.push({ severity: 'high', type: 'Module P&L', date: asOf, route: '/reports/gp',
-        title: `${m.mod} running at a loss · ${fmtINR(m.gp)} GP` });
+        title: `${m.mod} running at a loss · ${fmtMoney(m.gp)} GP` });
 
   // Over-reliance on a single customer.
   const top = topCustomers[0];

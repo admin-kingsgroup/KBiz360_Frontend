@@ -12,7 +12,7 @@ export function BankReconStatusPanel({ rows }) {
         const total = r.matched + r.unmatched;
         const ratio = total > 0 ? r.matched / total : 0;
         return (
-          <div key={r.bank} style={{ padding: '6px 0', borderBottom: '1px solid #f0f2f7' }}>
+          <div key={r.bank} style={{ padding: '6px 0', borderBottom: '1px solid #dfe2e7' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
               <span style={{ fontSize: 11, color: '#14161a', fontWeight: 600 }}>{r.bank}</span>
               <span style={{ fontSize: 10, color: statusColor(r.status), fontWeight: 700 }}>

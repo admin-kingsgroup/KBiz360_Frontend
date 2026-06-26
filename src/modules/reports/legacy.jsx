@@ -49,7 +49,7 @@ function _ReportPackagePnL_legacy(){
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",fontSize:11.5,borderCollapse:"collapse"}}>
-            <thead><tr style={{background:"#f3f4f8",borderBottom:"2px solid #e6e8ec"}}>
+            <thead><tr style={{background:"#f3f4f8",borderBottom:"2px solid #cdd1d8"}}>
               {["File no.","Customer","Package","Dept.","Sale ₹","Cost ₹","GST ₹","Net Profit ₹","Margin %","Status"].map((h,i)=>(
                 <th key={i} style={{textAlign:i>=4&&i<=8?"right":"left",padding:"9px 11px",fontWeight:600,color:"#2e323c",fontSize:11}}>{h}</th>
               ))}
@@ -57,7 +57,7 @@ function _ReportPackagePnL_legacy(){
             <tbody>{rows.map((r,i)=>{
               const sc=PKG_SC[r.status]||PKG_SC.Tentative;
               return (
-                <tr key={i} style={{borderBottom:"1px solid #e6e8ec",opacity:r.status==="Cancelled"?0.5:1}}
+                <tr key={i} style={{borderBottom:"1px solid #cdd1d8",opacity:r.status==="Cancelled"?0.5:1}}
                   onMouseEnter={e=>e.currentTarget.style.background="#f9fafb"}
                   onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <td style={{padding:"9px 11px",fontFamily:"monospace",fontSize:11,color:"#2563eb"}}>{r.file}</td>
@@ -187,7 +187,7 @@ function _IntercompanyBilling_legacy({branch}){
                 ))}
               </tr></thead>
               <tbody>{IC_ENTRIES.map((e,i)=>(
-                <tr key={e.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+                <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:10,color:"#2563eb"}}>{e.id}</td>
                   <td style={{padding:"8px 11px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:800,background:(BRANCH_CLR[e.from]||"#2e323c")+"22",color:BRANCH_CLR[e.from]||"#2e323c"}}>{e.from}</span></td>
                   <td style={{padding:"8px 11px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:800,background:(BRANCH_CLR[e.to]||"#2e323c")+"22",color:BRANCH_CLR[e.to]||"#2e323c"}}>{e.to}</span></td>
@@ -262,7 +262,7 @@ function _VarianceAnalysis_legacy({branch,setRoute}){
   const totalEbitda=VARIANCES[VARIANCES.length-1];
   const revVarPct=((totalRev.actual-totalRev.budget)/totalRev.budget*100);
   const ebVarPct=((totalEbitda.actual-totalEbitda.budget)/totalEbitda.budget*100);
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e6e8ec",padding:"12px 14px"};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
@@ -271,7 +271,7 @@ function _VarianceAnalysis_legacy({branch,setRoute}){
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#1a1c22"}}>📈 Variance Analysis Report</h2>
           <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5b616e"}}>Actual vs Budget vs Forecast vs Prior Year · Ranked by largest swing</p>
         </div>
-        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e6e8ec",borderRadius:7,fontSize:11.5}}>
+        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:7,fontSize:11.5}}>
           {MONTH_OPTIONS.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
         </select>
       </div>
@@ -304,7 +304,7 @@ function _VarianceAnalysis_legacy({branch,setRoute}){
                 const vFc=r.actual-r.forecast;
                 const vYoY=((r.actual-r.priorYear)/r.priorYear*100);
                 return(
-                  <tr key={i} style={{background:isTotal?"#fbeedb":i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #e6e8ec",fontWeight:isTotal?700:400}}>
+                  <tr key={i} style={{background:isTotal?"#fbeedb":i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8",fontWeight:isTotal?700:400}}>
                     <td style={{padding:"7px 8px",paddingLeft:isSub?22:10}}>{r.head.trim()}</td>
                     <td style={{padding:"7px 8px",textAlign:"right",fontWeight:isTotal?700:500}}>{cur+fmt(r.actual)}</td>
                     <td style={{padding:"7px 8px",textAlign:"right",color:"#5b616e"}}>{cur+fmt(r.budget)}</td>
@@ -333,12 +333,12 @@ function _ReportViewerTabbed_legacy(){
   const tabs=[{id:"view",label:"1. View"},{id:"filter",label:"2. Filter"},{id:"group",label:"3. Group By"},{id:"sort",label:"4. Sort"},{id:"compare",label:"5. Compare"},{id:"format",label:"6. Format"},{id:"export",label:"7. Export"},{id:"schedule",label:"8. Schedule"},{id:"share",label:"9. Share"}];
   return TAB_Page("Profit & Loss Statement — May 2026", "Generic 9-tab Report Viewer · applies to any report in the system",
     {user:"",date:"",created:""},
-    <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden"}}>
-      <div style={{display:"flex",borderBottom:"1px solid #e6e8ec",overflowX:"auto",background:"#fafbfd"}}>{tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}</div>
+    <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
+      <div style={{display:"flex",borderBottom:"1px solid #cdd1d8",overflowX:"auto",background:"#fafbfd"}}>{tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}</div>
       {tab==="view"&&tabPanel(
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
           <thead style={{background:"#f7f8fb"}}><tr><th style={{padding:"9px 12px",textAlign:"left",fontSize:10.5,color:"#5b616e",fontWeight:700,textTransform:"uppercase"}}>Particulars</th><th style={{padding:"9px 12px",textAlign:"right",fontSize:10.5,color:"#5b616e",fontWeight:700,textTransform:"uppercase"}}>May 2026</th></tr></thead>
-          <tbody>{[{l:"Revenue from Operations",v:26800000,b:true},{l:"  Flight Sales",v:14250000},{l:"  Holiday Sales",v:6450000},{l:"  Hotel Sales",v:3850000},{l:"  Other Revenue",v:2250000},{l:"Total Revenue",v:26800000,b:true,bg:true},{l:"Cost of Sales",v:-22550000},{l:"Gross Profit",v:4250000,b:true,bg:true},{l:"Operating Expenses",v:-1450000},{l:"Net Profit",v:2800000,b:true,bg:true}].map((r,i)=>(<tr key={i} style={{borderBottom:"1px solid #f0f2f7",background:r.bg?"#fafbfd":"#fff",fontWeight:r.b?700:400}}><td style={{padding:"9px 12px",paddingLeft:r.l.startsWith(" ")?28:12}}>{r.l.trim()}</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",color:r.v<0?"#dc2626":"#1a1c22"}}>{r.v<0?"(":""}₹{Math.abs(r.v).toLocaleString("en-IN")}{r.v<0?")":""}</td></tr>))}</tbody>
+          <tbody>{[{l:"Revenue from Operations",v:26800000,b:true},{l:"  Flight Sales",v:14250000},{l:"  Holiday Sales",v:6450000},{l:"  Hotel Sales",v:3850000},{l:"  Other Revenue",v:2250000},{l:"Total Revenue",v:26800000,b:true,bg:true},{l:"Cost of Sales",v:-22550000},{l:"Gross Profit",v:4250000,b:true,bg:true},{l:"Operating Expenses",v:-1450000},{l:"Net Profit",v:2800000,b:true,bg:true}].map((r,i)=>(<tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:r.bg?"#fafbfd":"#fff",fontWeight:r.b?700:400}}><td style={{padding:"9px 12px",paddingLeft:r.l.startsWith(" ")?28:12}}>{r.l.trim()}</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",color:r.v<0?"#dc2626":"#1a1c22"}}>{r.v<0?"(":""}₹{Math.abs(r.v).toLocaleString("en-IN")}{r.v<0?")":""}</td></tr>))}</tbody>
         </table>
       )}
       {tab==="filter"&&tabPanel(
@@ -358,9 +358,9 @@ function _ReportViewerTabbed_legacy(){
         <>
           <p style={{margin:"0 0 12px",fontSize:11.5,color:"#5b616e"}}>Drag fields to columns to pivot the report</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:14}}>
-            <div style={{padding:14,background:"#fafbfd",borderRadius:6,border:"1px solid #e6e8ec"}}>
+            <div style={{padding:14,background:"#fafbfd",borderRadius:6,border:"1px solid #cdd1d8"}}>
               <p style={{margin:0,fontSize:11,fontWeight:700,color:"#c2a04a",textTransform:"uppercase"}}>Available Fields</p>
-              <div style={{marginTop:10,display:"flex",flexWrap:"wrap",gap:6}}>{["Branch","Product","Customer","Consultant","Month","Quarter","Cost Center","Currency"].map(f=><span key={f} style={{padding:"5px 10px",background:"#fff",border:"1px solid #e6e8ec",borderRadius:4,fontSize:11,cursor:"grab"}}>⋮⋮ {f}</span>)}</div>
+              <div style={{marginTop:10,display:"flex",flexWrap:"wrap",gap:6}}>{["Branch","Product","Customer","Consultant","Month","Quarter","Cost Center","Currency"].map(f=><span key={f} style={{padding:"5px 10px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:4,fontSize:11,cursor:"grab"}}>⋮⋮ {f}</span>)}</div>
             </div>
             <div style={{padding:14,background:"#1a1c22",borderRadius:6}}>
               <p style={{margin:0,fontSize:11,fontWeight:700,color:"#c2a04a",textTransform:"uppercase"}}>Active Group Columns (in order)</p>
@@ -372,13 +372,13 @@ function _ReportViewerTabbed_legacy(){
       )}
       {tab==="sort"&&tabPanel(
         <div>
-          {[{c:"Revenue",d:"DESC",p:1},{c:"Branch",d:"ASC",p:2}].map((s,i)=>(<div key={i} style={{display:"grid",gridTemplateColumns:"40px 1fr 120px 80px",gap:10,alignItems:"center",padding:"10px 12px",background:"#fafbfd",borderRadius:6,marginBottom:8,border:"1px solid #e6e8ec"}}><span style={{padding:"4px 10px",background:"#c2a04a",color:"#1a1c22",borderRadius:3,fontSize:11,fontWeight:700,textAlign:"center"}}>{s.p}</span><select defaultValue={s.c} style={inpStd}><option>Revenue</option><option>Branch</option><option>Customer</option><option>Date</option><option>Amount</option></select><select defaultValue={s.d} style={inpStd}><option>ASC</option><option>DESC</option></select><button style={{padding:"6px 10px",background:"transparent",border:"1px solid #dc2626",color:"#dc2626",borderRadius:4,fontSize:11,cursor:"pointer",fontWeight:600}}>Remove</button></div>))}
+          {[{c:"Revenue",d:"DESC",p:1},{c:"Branch",d:"ASC",p:2}].map((s,i)=>(<div key={i} style={{display:"grid",gridTemplateColumns:"40px 1fr 120px 80px",gap:10,alignItems:"center",padding:"10px 12px",background:"#fafbfd",borderRadius:6,marginBottom:8,border:"1px solid #cdd1d8"}}><span style={{padding:"4px 10px",background:"#c2a04a",color:"#1a1c22",borderRadius:3,fontSize:11,fontWeight:700,textAlign:"center"}}>{s.p}</span><select defaultValue={s.c} style={inpStd}><option>Revenue</option><option>Branch</option><option>Customer</option><option>Date</option><option>Amount</option></select><select defaultValue={s.d} style={inpStd}><option>ASC</option><option>DESC</option></select><button style={{padding:"6px 10px",background:"transparent",border:"1px solid #dc2626",color:"#dc2626",borderRadius:4,fontSize:11,cursor:"pointer",fontWeight:600}}>Remove</button></div>))}
           <button style={{padding:"7px 14px",background:"transparent",border:"1px dashed #c2a04a",color:"#c2a04a",borderRadius:5,fontSize:11.5,cursor:"pointer",fontWeight:600}}>+ Add sort level</button>
         </div>
       )}
       {tab==="compare"&&tabPanel(
         <>
-          <div style={{padding:14,background:"#fafbfd",borderRadius:6,border:"1px solid #e6e8ec",marginBottom:14}}>
+          <div style={{padding:14,background:"#fafbfd",borderRadius:6,border:"1px solid #cdd1d8",marginBottom:14}}>
             <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}><input type="checkbox" defaultChecked/><span style={{fontSize:12.5,fontWeight:600}}>Show comparison column</span></label>
             <div style={{marginTop:10,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:10}}>
               <FL label="Compare to"><select style={inpStd}><option>Previous Period (Apr 2026)</option><option>Same period last year (May 2025)</option><option>Budget</option><option>Forecast</option><option>Custom period</option></select></FL>
@@ -396,11 +396,11 @@ function _ReportViewerTabbed_legacy(){
       )}
       {tab==="format"&&tabPanel(
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:14}}>
-          <div style={{padding:14,background:"#fafbfd",borderRadius:6,border:"1px solid #e6e8ec"}}>
+          <div style={{padding:14,background:"#fafbfd",borderRadius:6,border:"1px solid #cdd1d8"}}>
             <p style={{margin:0,fontSize:11,fontWeight:700,color:"#c2a04a",textTransform:"uppercase"}}>Visible Columns</p>
             <div style={{marginTop:10}}>{["Particulars","Amount","% of Revenue","Variance","Notes","Last Updated"].map(c=>(<label key={c} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",cursor:"pointer"}}><input type="checkbox" defaultChecked={["Particulars","Amount","Variance"].includes(c)}/><span style={{fontSize:11.5}}>{c}</span></label>))}</div>
           </div>
-          <div style={{padding:14,background:"#fafbfd",borderRadius:6,border:"1px solid #e6e8ec"}}>
+          <div style={{padding:14,background:"#fafbfd",borderRadius:6,border:"1px solid #cdd1d8"}}>
             <p style={{margin:0,fontSize:11,fontWeight:700,color:"#c2a04a",textTransform:"uppercase"}}>Number Format</p>
             <div style={{marginTop:10,display:"grid",gap:10}}>
               <FL label="Display Unit"><select style={inpStd}><option>Lakhs (L)</option><option>Crores (Cr)</option><option>Actual</option><option>Thousands (K)</option></select></FL>
@@ -413,24 +413,24 @@ function _ReportViewerTabbed_legacy(){
       )}
       {tab==="export"&&tabPanel(
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,150px),1fr))",gap:12}}>
-          {[{n:"PDF",ic:"📄",d:"Print-ready report with letterhead",c:"#dc2626"},{n:"Excel",ic:"📊",d:"Editable with formulas preserved",c:"#16a34a"},{n:"CSV",ic:"📋",d:"Plain tabular for analysis tools",c:"#5b616e"},{n:"JSON",ic:"{ }",d:"For API/integration consumption",c:"#6B4C8B"},{n:"Word",ic:"📝",d:"Formatted report for editing",c:"#1a1c22"},{n:"HTML",ic:"🌐",d:"Email-friendly with styling",c:"#c2a04a"},{n:"Image (PNG)",ic:"🖼️",d:"Snapshot of chart/table",c:"#d97706"},{n:"ZIP",ic:"📦",d:"Multi-format bundle",c:"#2F7A8E"}].map(f=>(<button key={f.n} style={{padding:18,background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,borderTop:"3px solid "+f.c}}><span style={{fontSize:30}}>{f.ic}</span><span style={{fontWeight:700,fontSize:12.5,color:"#1a1c22"}}>{f.n}</span><span style={{fontSize:10,color:"#5b616e",textAlign:"center"}}>{f.d}</span></button>))}
+          {[{n:"PDF",ic:"📄",d:"Print-ready report with letterhead",c:"#dc2626"},{n:"Excel",ic:"📊",d:"Editable with formulas preserved",c:"#16a34a"},{n:"CSV",ic:"📋",d:"Plain tabular for analysis tools",c:"#5b616e"},{n:"JSON",ic:"{ }",d:"For API/integration consumption",c:"#6B4C8B"},{n:"Word",ic:"📝",d:"Formatted report for editing",c:"#1a1c22"},{n:"HTML",ic:"🌐",d:"Email-friendly with styling",c:"#c2a04a"},{n:"Image (PNG)",ic:"🖼️",d:"Snapshot of chart/table",c:"#d97706"},{n:"ZIP",ic:"📦",d:"Multi-format bundle",c:"#2F7A8E"}].map(f=>(<button key={f.n} style={{padding:18,background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,borderTop:"3px solid "+f.c}}><span style={{fontSize:30}}>{f.ic}</span><span style={{fontWeight:700,fontSize:12.5,color:"#1a1c22"}}>{f.n}</span><span style={{fontSize:10,color:"#5b616e",textAlign:"center"}}>{f.d}</span></button>))}
         </div>
       )}
       {tab==="schedule"&&tabPanel(
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:14}}>
-          <div style={{padding:14,background:"#fafbfd",borderRadius:6,border:"1px solid #e6e8ec"}}>
+          <div style={{padding:14,background:"#fafbfd",borderRadius:6,border:"1px solid #cdd1d8"}}>
             <p style={{margin:0,fontSize:11,fontWeight:700,color:"#c2a04a",textTransform:"uppercase"}}>Setup Auto-Email</p>
             <div style={{marginTop:14,display:"grid",gap:10}}>
               <FL label="Frequency"><select style={inpStd}><option>Daily (9 AM)</option><option>Weekly (Monday 9 AM)</option><option>Monthly (1st of month)</option><option>Quarterly</option><option>Custom CRON</option></select></FL>
               <FL label="Recipients (comma-separated)"><input defaultValue="afshin@travkings.com, faiz.fm@travkings.com" style={inpStd}/></FL>
-              <FL label="Format"><div style={{display:"flex",gap:8}}>{["PDF","Excel","Both"].map(f=><label key={f} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",border:"1px solid #e6e8ec",borderRadius:5,cursor:"pointer"}}><input type="radio" name="fmt" defaultChecked={f==="PDF"}/><span style={{fontSize:11.5}}>{f}</span></label>)}</div></FL>
+              <FL label="Format"><div style={{display:"flex",gap:8}}>{["PDF","Excel","Both"].map(f=><label key={f} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",border:"1px solid #cdd1d8",borderRadius:5,cursor:"pointer"}}><input type="radio" name="fmt" defaultChecked={f==="PDF"}/><span style={{fontSize:11.5}}>{f}</span></label>)}</div></FL>
               <FL label="Subject Template"><input defaultValue="P&L Report — {{period}} — Travkings" style={{...inpStd,fontFamily:"monospace",fontSize:11}}/></FL>
               <button style={{marginTop:6,padding:"9px 18px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Schedule This Report</button>
             </div>
           </div>
           <div style={cardStyle}>
             <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22",marginBottom:10}}>Active Schedules</p>
-            {[{n:"Monthly P&L",f:"Monthly",r:"Director, Sr.FM"},{n:"Weekly Cash",f:"Weekly",r:"Sr.FM"}].map(s=>(<div key={s.n} style={{padding:"8px 0",borderBottom:"1px solid #f0f2f7"}}><p style={{margin:0,fontSize:11.5,fontWeight:600,color:"#1a1c22"}}>{s.n}</p><p style={{margin:"2px 0 0",fontSize:10,color:"#5b616e"}}>{s.f} · to {s.r}</p></div>))}
+            {[{n:"Monthly P&L",f:"Monthly",r:"Director, Sr.FM"},{n:"Weekly Cash",f:"Weekly",r:"Sr.FM"}].map(s=>(<div key={s.n} style={{padding:"8px 0",borderBottom:"1px solid #dfe2e7"}}><p style={{margin:0,fontSize:11.5,fontWeight:600,color:"#1a1c22"}}>{s.n}</p><p style={{margin:"2px 0 0",fontSize:10,color:"#5b616e"}}>{s.f} · to {s.r}</p></div>))}
           </div>
         </div>
       )}
@@ -490,13 +490,13 @@ function _CustomReportBuilder_legacy(){
       subtitle="Select fields · add filters · reorder columns · save as a named view">
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:14,marginBottom:14}}>
         {/* Field catalog */}
-        <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden",maxHeight:520,overflowY:"auto"}}>
-          <p style={{margin:0,padding:"10px 12px",fontSize:12,fontWeight:700,color:"#1a1c22",borderBottom:"1px solid #e6e8ec",background:"#fafbfd"}}>Available Fields</p>
+        <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden",maxHeight:520,overflowY:"auto"}}>
+          <p style={{margin:0,padding:"10px 12px",fontSize:12,fontWeight:700,color:"#1a1c22",borderBottom:"1px solid #cdd1d8",background:"#fafbfd"}}>Available Fields</p>
           {Object.entries(BUILDER_FIELD_CATALOG).map(([cat,fields])=>(
             <div key={cat}>
               <p style={{margin:0,padding:"6px 12px",fontSize:10,fontWeight:700,color:"#5b616e",textTransform:"uppercase",letterSpacing:"0.4px",background:"#f7f8fb"}}>{cat}</p>
               {fields.map(f=>(
-                <div key={f} {...clickable(()=>addField(f))} style={{padding:"7px 12px",fontSize:11.5,cursor:"pointer",color:selected.includes(f)?"#5b616e":"#1a1c22",background:selected.includes(f)?"#f0f2f7":"#fff",borderBottom:"1px solid #f7f8fb",display:"flex",justifyContent:"space-between",alignItems:"center"}}
+                <div key={f} {...clickable(()=>addField(f))} style={{padding:"7px 12px",fontSize:11.5,cursor:"pointer",color:selected.includes(f)?"#5b616e":"#1a1c22",background:selected.includes(f)?"#f0f2f7":"#fff",borderBottom:"1px solid #dfe2e7",display:"flex",justifyContent:"space-between",alignItems:"center"}}
                   onMouseEnter={e=>{if(!selected.includes(f))e.currentTarget.style.background="#fff8e8";}}
                   onMouseLeave={e=>{if(!selected.includes(f))e.currentTarget.style.background="#fff";}}>
                   {f}
@@ -510,8 +510,8 @@ function _CustomReportBuilder_legacy(){
         {/* Builder canvas */}
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {/* Selected columns */}
-          <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden"}}>
-            <p style={{margin:0,padding:"10px 14px",fontSize:12,fontWeight:700,color:"#1a1c22",borderBottom:"1px solid #e6e8ec",background:"#fafbfd"}}>Selected Columns ({selected.length}) — click + to add from catalog, drag to reorder</p>
+          <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
+            <p style={{margin:0,padding:"10px 14px",fontSize:12,fontWeight:700,color:"#1a1c22",borderBottom:"1px solid #cdd1d8",background:"#fafbfd"}}>Selected Columns ({selected.length}) — click + to add from catalog, drag to reorder</p>
             <div style={{padding:12,display:"flex",flexWrap:"wrap",gap:8,minHeight:52}}>
               {selected.map((f,i)=>(
                 <div key={f} style={{display:"flex",alignItems:"center",gap:4,padding:"5px 8px",background:"#1a1c22",borderRadius:5,fontSize:11.5,color:"#fff",fontWeight:600}}>
@@ -526,21 +526,21 @@ function _CustomReportBuilder_legacy(){
           </div>
 
           {/* Filters */}
-          <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden"}}>
-            <div style={{padding:"10px 14px",borderBottom:"1px solid #e6e8ec",background:"#fafbfd",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
+            <div style={{padding:"10px 14px",borderBottom:"1px solid #cdd1d8",background:"#fafbfd",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <p style={{margin:0,fontSize:12,fontWeight:700,color:"#1a1c22"}}>Filters ({filters.length})</p>
               <button onClick={addFilter} style={{padding:"4px 10px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Add Filter</button>
             </div>
             <div style={{padding:12,display:"flex",flexDirection:"column",gap:8}}>
               {filters.map(f=>(
                 <div key={f.id} style={{display:"flex",alignItems:"center",gap:8}}>
-                  <select defaultValue={f.field} style={{padding:"6px 8px",border:"1px solid #e6e8ec",borderRadius:5,fontSize:11.5,flex:2}}>
+                  <select defaultValue={f.field} style={{padding:"6px 8px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:11.5,flex:2}}>
                     {Object.values(BUILDER_FIELD_CATALOG).flat().map(x=><option key={x}>{x}</option>)}
                   </select>
-                  <select defaultValue={f.op} style={{padding:"6px 8px",border:"1px solid #e6e8ec",borderRadius:5,fontSize:11.5,flex:1}}>
+                  <select defaultValue={f.op} style={{padding:"6px 8px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:11.5,flex:1}}>
                     {ops.map(o=><option key={o}>{o}</option>)}
                   </select>
-                  <input defaultValue={f.val} style={{padding:"6px 8px",border:"1px solid #e6e8ec",borderRadius:5,fontSize:11.5,flex:2}} placeholder="Value…"/>
+                  <input defaultValue={f.val} style={{padding:"6px 8px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:11.5,flex:2}} placeholder="Value…"/>
                   <button onClick={()=>removeFilter(f.id)} style={{padding:"5px 8px",background:"transparent",border:"1px solid #fbe9e9",color:"#dc2626",borderRadius:4,fontSize:12,fontWeight:700,cursor:"pointer"}}>✕</button>
                 </div>
               ))}
@@ -550,7 +550,7 @@ function _CustomReportBuilder_legacy(){
 
           {/* Save bar */}
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            <input value={viewName} onChange={e=>{setViewName(e.target.value);setSaved(false);}} placeholder="Name this report view…" style={{flex:1,padding:"8px 11px",border:"1px solid #e6e8ec",borderRadius:6,fontSize:12.5}}/>
+            <input value={viewName} onChange={e=>{setViewName(e.target.value);setSaved(false);}} placeholder="Name this report view…" style={{flex:1,padding:"8px 11px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12.5}}/>
             <button onClick={()=>setSaved(true)} style={{padding:"8px 18px",background:"#1a1c22",color:"#c2a04a",border:"none",borderRadius:6,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>💾 Save View</button>
             {saved&&<span style={{fontSize:11.5,color:"#16a34a",fontWeight:700}}>✓ Saved to My Views</span>}
           </div>
@@ -559,8 +559,8 @@ function _CustomReportBuilder_legacy(){
 
       {/* Preview */}
       {selected.length>0&&(
-        <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden"}}>
-          <div style={{padding:"10px 14px",borderBottom:"1px solid #e6e8ec",background:"#fafbfd",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
+          <div style={{padding:"10px 14px",borderBottom:"1px solid #cdd1d8",background:"#fafbfd",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <p style={{margin:0,fontSize:12,fontWeight:700,color:"#1a1c22"}}>Preview — {viewName} (sample data)</p>
             <ExportDropdown/>
           </div>
@@ -568,7 +568,7 @@ function _CustomReportBuilder_legacy(){
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
               <thead><tr>{selected.map(f=><th key={f} style={RPT_thStyle}>{f}</th>)}</tr></thead>
               <tbody>{previewData.map((row,i)=>(
-                <tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}>
+                <tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}>
                   {selected.map(f=><td key={f} style={RPT_tdStyle}>{row[f]??<span style={{color:"#5b616e"}}>—</span>}</td>)}
                 </tr>
               ))}</tbody>
@@ -597,12 +597,12 @@ function _SavedReportViews_legacy(){
       toolbar={<button style={{padding:"8px 16px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ New Report</button>}>
       <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
         {types.map(t=>(
-          <button key={t} onClick={()=>setFilter(t)} style={{padding:"6px 14px",border:filter===t?"2px solid #1a1c22":"1px solid #e6e8ec",background:filter===t?"#1a1c22":"#fff",color:filter===t?"#c2a04a":"#5b616e",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>{t}</button>
+          <button key={t} onClick={()=>setFilter(t)} style={{padding:"6px 14px",border:filter===t?"2px solid #1a1c22":"1px solid #cdd1d8",background:filter===t?"#1a1c22":"#fff",color:filter===t?"#c2a04a":"#5b616e",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>{t}</button>
         ))}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(100%,340px),1fr))",gap:12}}>
         {filtered.map(v=>(
-          <div key={v.id} style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,padding:14}}>
+          <div key={v.id} style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:14}}>
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <span style={{fontSize:22}}>{v.icon}</span>
@@ -629,9 +629,9 @@ function _SavedReportViews_legacy(){
             </div>
             <div style={{display:"flex",gap:6}}>
               <button style={{flex:1,padding:"6px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>▶ Run</button>
-              <button style={{padding:"6px 10px",background:"transparent",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:5,fontSize:11,cursor:"pointer"}}>Edit</button>
-              <button style={{padding:"6px 10px",background:"transparent",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:5,fontSize:11,cursor:"pointer"}}>Clone</button>
-              <button style={{padding:"6px 10px",background:"transparent",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:5,fontSize:11,cursor:"pointer"}}>⏰</button>
+              <button style={{padding:"6px 10px",background:"transparent",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:5,fontSize:11,cursor:"pointer"}}>Edit</button>
+              <button style={{padding:"6px 10px",background:"transparent",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:5,fontSize:11,cursor:"pointer"}}>Clone</button>
+              <button style={{padding:"6px 10px",background:"transparent",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:5,fontSize:11,cursor:"pointer"}}>⏰</button>
             </div>
           </div>
         ))}
@@ -651,7 +651,7 @@ function _ScheduledReports_legacy(){
   const [schedules,setSchedules]=useState(SCHEDULED_REPORTS_DATA);
   const toggleStatus=id=>setSchedules(s=>s.map(r=>r.id===id?{...r,status:r.status==="Active"?"Paused":"Active"}:r));
   const activeCount=schedules.filter(s=>s.status==="Active").length;
-  const inp={padding:"7px 10px",border:"1px solid #e6e8ec",borderRadius:5,fontSize:12,width:"100%"};
+  const inp={padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"};
 
   return(
     <PHASE2_Page title="Scheduled Email Reports"
@@ -663,7 +663,7 @@ function _ScheduledReports_legacy(){
         ))}
       </div>
 
-      <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden",marginBottom:14}}>
+      <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden",marginBottom:14}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr>
             <th style={RPT_thStyle}>Report</th><th style={RPT_thStyle}>Frequency</th>
@@ -674,7 +674,7 @@ function _ScheduledReports_legacy(){
             <th style={{...RPT_thStyle,textAlign:"center"}}>Action</th>
           </tr></thead>
           <tbody>{schedules.map(s=>(
-            <tr key={s.id} style={{borderBottom:"1px solid #f0f2f7",opacity:s.status==="Paused"?0.65:1}}>
+            <tr key={s.id} style={{borderBottom:"1px solid #dfe2e7",opacity:s.status==="Paused"?0.65:1}}>
               <td style={{...RPT_tdStyle,fontWeight:700}}>{s.report}</td>
               <td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#e6e8ec",borderRadius:3,fontSize:10.5,fontWeight:700}}>{s.freq}</span></td>
               <td style={{...RPT_tdStyle,fontSize:11}}>{s.day} · {s.time}</td>
@@ -688,10 +688,10 @@ function _ScheduledReports_legacy(){
               <td style={{...RPT_tdStyle,textAlign:"center"}}>
                 <span style={{padding:"3px 10px",borderRadius:3,fontSize:10.5,fontWeight:700,background:s.status==="Active"?"#e8f6ed":"#e2e3e5",color:s.status==="Active"?"#16a34a":"#383d41"}}>{s.status}</span>
               </td>
-              <td style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #f0f2f7"}}>
+              <td style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #dfe2e7"}}>
                 <div style={{display:"flex",gap:4,justifyContent:"center"}}>
                   <button onClick={()=>toggleStatus(s.id)} style={{padding:"3px 8px",background:"transparent",border:"1px solid "+(s.status==="Active"?"#d97706":"#16a34a"),color:s.status==="Active"?"#d97706":"#16a34a",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>{s.status==="Active"?"Pause":"Resume"}</button>
-                  <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #e6e8ec",color:"#5b616e",borderRadius:3,fontSize:10,fontWeight:600,cursor:"pointer"}}>Edit</button>
+                  <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:3,fontSize:10,fontWeight:600,cursor:"pointer"}}>Edit</button>
                   <button style={{padding:"3px 8px",background:"#c2a04a",border:"none",color:"#1a1c22",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>▶ Now</button>
                 </div>
               </td>
@@ -701,7 +701,7 @@ function _ScheduledReports_legacy(){
       </div>
 
       {/* Add new schedule form */}
-      <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,padding:16}}>
+      <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:16}}>
         <p style={{margin:"0 0 12px",fontSize:12.5,fontWeight:700,color:"#1a1c22"}}>Add New Schedule</p>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,140px),1fr))",gap:10,marginBottom:10}}>
           <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Report</label><select style={inp}>{SAVED_VIEWS_DATA.map(v=><option key={v.id}>{v.name}</option>)}</select></div>
@@ -739,7 +739,7 @@ function _ReportsMetaDemo_legacy(){
       {drillData&&<DrillModal branch={drillData.branch} metric={drillData.metric} value={drillData.value} onClose={()=>setDrillData(null)}/>}
 
       {/* Feature toggles */}
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"12px 16px",background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,flexWrap:"wrap"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"12px 16px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,flexWrap:"wrap"}}>
         <p style={{margin:0,fontSize:11.5,fontWeight:700,color:"#1a1c22",marginRight:4}}>Active features:</p>
         {[{key:"comp",label:"Comparative columns",state:showComparative,toggle:()=>setShowComparative(v=>!v)},
           {key:"spark",label:"Sparkline charts",state:showSparklines,toggle:()=>setShowSparklines(v=>!v)},
@@ -754,7 +754,7 @@ function _ReportsMetaDemo_legacy(){
       </div>
 
       {/* The report */}
-      <div style={{background:"#fff",border:"1px solid #e6e8ec",borderRadius:8,overflow:"hidden"}}>
+      <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
         <div style={{padding:"10px 14px",background:"#1a1c22",color:"#fff",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div>
             <p style={{margin:0,fontSize:13,fontWeight:700}}>Branch Revenue Report</p>
@@ -781,7 +781,7 @@ function _ReportsMetaDemo_legacy(){
                 const gpVar=r.cy_gp-r.ly_gp;
                 const gpPct=r.ly_gp>0?((gpVar/r.ly_gp)*100).toFixed(1):"—";
                 return(
-                  <tr key={r.branch} style={{borderBottom:"1px solid #f0f2f7"}}>
+                  <tr key={r.branch} style={{borderBottom:"1px solid #dfe2e7"}}>
                     <td style={{...RPT_tdStyle,fontWeight:700}}><span style={{padding:"2px 7px",background:"#1a1c22",color:"#c2a04a",borderRadius:3,fontSize:10.5,fontWeight:700}}>{r.branch}</span></td>
                     <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>
                       <span {...clickable(()=>setDrillData({branch:r.branch,metric:"Revenue",value:r.cy_rev}))}
@@ -843,7 +843,7 @@ function _ReportsMetaDemo_legacy(){
             </tbody>
           </table>
         </div>
-        <div style={{padding:"8px 14px",background:"#fafbfd",borderTop:"1px solid #e6e8ec",fontSize:10.5,color:"#5b616e",display:"flex",gap:16}}>
+        <div style={{padding:"8px 14px",background:"#fafbfd",borderTop:"1px solid #cdd1d8",fontSize:10.5,color:"#5b616e",display:"flex",gap:16}}>
           {showComparative&&<span>📊 Comparative mode ON — showing May-26 vs May-25</span>}
           {showSparklines&&<span>✦ Sparklines show 12-month revenue trend (Jun-25 to May-26)</span>}
           <span>↗ Dotted-underline values are drill-down enabled</span>

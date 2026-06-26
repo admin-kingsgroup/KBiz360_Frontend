@@ -5,7 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { useTaxReco, useUpsertTaxFigure } from '../../core/useTaxReco';
 import { bc } from '../../core/styles';
 
-const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec' };
+const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
 const thisYM = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 
@@ -43,7 +43,7 @@ export function TaxReco({ branch }) {
 
   const card = { background: '#fff', border: `1px solid ${C.border}`, borderRadius: 9 };
   const th = { padding: '8px 12px', background: C.dark, color: C.gold, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'left', whiteSpace: 'nowrap' };
-  const td = { padding: '8px 12px', borderBottom: '1px solid #f0f2f7', fontSize: 12.5 };
+  const td = { padding: '8px 12px', borderBottom: '1px solid #dfe2e7', fontSize: 12.5 };
   const rnum = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
   const inp = { padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12 };
 

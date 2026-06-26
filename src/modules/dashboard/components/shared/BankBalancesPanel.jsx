@@ -6,7 +6,7 @@ export function BankBalancesPanel({ accounts, limit = 7 }) {
       {accounts.slice(0, limit).map((b) => (
         <div
           key={b.id}
-          style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f2f7' }}
+          style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #dfe2e7' }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
             <p

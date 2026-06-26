@@ -12,7 +12,7 @@ export function TopVendorsOverdueTable({ suppliers, formatMoney = fmtINR }) {
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
       <tbody>
         {suppliers.map((s, i) => (
-          <tr key={s.name} style={{ borderBottom: '1px solid #f0f2f7' }}>
+          <tr key={s.name} style={{ borderBottom: '1px solid #dfe2e7' }}>
             <td style={{ padding: '7px 4px', color: '#5b616e', width: 20 }}>{i + 1}</td>
             <td style={{ padding: '7px 4px' }}>
               <p style={{ margin: 0, color: '#14161a', fontWeight: 600, fontSize: 11 }}>{s.name}</p>

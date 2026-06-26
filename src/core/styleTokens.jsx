@@ -26,13 +26,13 @@ export function bcfmt(branch,n){ const b=bc(branch); return b.cur+Number(n).toLo
 
 /* ── Form / control style objects (KBiz360 Pro tokens) ── */
 export const inp={
-  width:"100%",padding:"8px 11px",border:"1px solid #e6e8ec",
+  width:"100%",padding:"8px 11px",border:"1px solid #cdd1d8",
   borderRadius:8,fontSize:12,outline:"none",color:"#14161a",
   boxSizing:"border-box",background:"#fff",
 };
 
 export const card={
-  background:"#fff",border:"1px solid #e6e8ec",
+  background:"#fff",border:"1px solid #cdd1d8",
   borderRadius:12,padding:"14px 16px",
   boxShadow:"0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)",
 };
@@ -47,7 +47,7 @@ export const btnG={
 export const btnGh={
   display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,
   padding:"7px 15px",background:"#fff",color:"#1a1c22",
-  border:"1px solid #e6e8ec",borderRadius:8,fontSize:12.5,fontWeight:600,
+  border:"1px solid #cdd1d8",borderRadius:8,fontSize:12.5,fontWeight:600,
   cursor:"pointer",whiteSpace:"nowrap",
 };
 
@@ -76,8 +76,8 @@ export function FL({label,children}){
 }
 
 /* ── Report table cell styles ── */
-export const RPT_thStyle={padding:"10px 12px",textAlign:"left",fontWeight:600,color:"#5b616e",borderBottom:"1px solid #e6e8ec",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase",background:"#f4f5f7"};
-export const RPT_tdStyle={padding:"8px 12px",fontSize:12,color:"#14161a",borderBottom:"1px solid #eef0f3"};
+export const RPT_thStyle={padding:"10px 12px",textAlign:"left",fontWeight:600,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase",background:"#f4f5f7"};
+export const RPT_tdStyle={padding:"8px 12px",fontSize:12,color:"#14161a",borderBottom:"1px solid #dfe2e7"};
 
 /* ── KPI summary card ── */
 export function KpiCard({label,value,subtitle,trend,Icon,accent="neutral",onClick}){

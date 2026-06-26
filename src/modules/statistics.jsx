@@ -30,7 +30,7 @@ const num = (n) => (n == null ? '—' : Number(n).toLocaleString('en-IN'));
 
 function MasterRow({ label, value, indent, onClick }) {
   return (
-    <tr style={{ borderBottom: '1px solid #f1f3f8', cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
+    <tr style={{ borderBottom: '1px solid #dfe2e7', cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
       <td style={{ padding: '7px 13px', color: indent ? DIM : '#334155', paddingLeft: indent ? 30 : 13, fontWeight: indent ? 400 : 600 }}>{label}</td>
       <td style={{ padding: '7px 13px', textAlign: 'right', fontWeight: 700, color: onClick ? BLUE : DARK }}>{value}</td>
     </tr>
@@ -43,7 +43,7 @@ export function Statistics({ branch, setRoute }) {
   const m = data?.masters || {};
   const vouchers = data?.vouchers || [];
   const totals = data?.totals;
-  const th = { textAlign: 'left', padding: '9px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #e5e9f0' };
+  const th = { textAlign: 'left', padding: '9px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #cdd1d8' };
   const tdN = { padding: '8px 13px', textAlign: 'right', color: '#334155' };
 
   return (
@@ -98,7 +98,7 @@ export function Statistics({ branch, setRoute }) {
                 {vouchers.map((v) => {
                   const href = voucherRegister(v.category);
                   return (
-                    <tr key={v.category} style={{ borderBottom: '1px solid #f1f3f8', cursor: href ? 'pointer' : 'default' }} onClick={() => go(href)} title={href ? 'Open register' : ''}>
+                    <tr key={v.category} style={{ borderBottom: '1px solid #dfe2e7', cursor: href ? 'pointer' : 'default' }} onClick={() => go(href)} title={href ? 'Open register' : ''}>
                       <td style={{ padding: '8px 13px', fontWeight: 600, color: href ? BLUE : '#334155' }}>{v.label}</td>
                       <td style={tdN}>{num(v.posted)}</td>
                       <td style={{ ...tdN, color: v.pending ? '#A06A00' : '#c2c8d6' }}>{v.pending ? num(v.pending) : '—'}</td>
@@ -108,7 +108,7 @@ export function Statistics({ branch, setRoute }) {
                   );
                 })}
                 {totals && (
-                  <tr style={{ background: '#f7f8fb', borderTop: '2px solid #e5e9f0' }}>
+                  <tr style={{ background: '#f7f8fb', borderTop: '2px solid #cdd1d8' }}>
                     <td style={{ padding: '9px 13px', fontWeight: 800, color: DARK }}>TOTAL</td>
                     <td style={{ ...tdN, fontWeight: 800 }}>{num(totals.posted)}</td>
                     <td style={{ ...tdN, fontWeight: 800 }}>{num(totals.pending)}</td>

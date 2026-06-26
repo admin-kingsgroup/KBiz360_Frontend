@@ -8,7 +8,7 @@ import { bc } from '../core/styles';
 import { useCreateInb, useOpenInb } from '../core/useInterBranchVoucher';
 import { toast } from '../core/ux/toast';
 
-const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec' };
+const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
 const ALL_BRANCHES = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'TKHO'];
 // Tax jurisdiction per branch (mirror of the backend). Same country (India) =
 // IGST taxable; different country = cross-border export (zero-rated).

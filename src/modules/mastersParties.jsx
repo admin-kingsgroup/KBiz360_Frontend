@@ -255,7 +255,7 @@ function LinkedVouchersTab({ q }) {
       <tbody>{rows.map((r) => {
         const paid = /clear|paid|approv|post/i.test(r.status || '');
         return (
-          <tr key={r.id} style={{ borderBottom: '1px solid #f0f2f7' }}>
+          <tr key={r.id} style={{ borderBottom: '1px solid #dfe2e7' }}>
             <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontWeight: 600 }}>{r.vno || '—'}</td>
             <td style={{ padding: '9px 12px', color: DIM }}>{r.date || '—'}</td>
             <td style={{ padding: '9px 12px' }}>{r.type || r.category || '—'}</td>
@@ -287,7 +287,7 @@ function OutstandingTab({ q, side }) {
         <tbody>{bills.map((b) => {
           const overdue = b.creditDays != null && b.ageDays > b.creditDays;
           return (
-            <tr key={b.billId} style={{ borderBottom: '1px solid #f0f2f7' }}>
+            <tr key={b.billId} style={{ borderBottom: '1px solid #dfe2e7' }}>
               <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600 }}>{b.billVno}</td>
               <td style={{ padding: '8px 12px', color: DIM }}>{b.date}</td>
               <td style={{ padding: '8px 12px', textAlign: 'right' }}>{rupee(b.total)}</td>
@@ -326,7 +326,7 @@ function HistoryTab({ q }) {
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,150px),1fr))', gap: 10, marginBottom: 14 }}>
         {kpis.map((k) => (
-          <div key={k.l} style={{ padding: 12, background: '#fafbfd', borderRadius: 6, border: '1px solid #e6e8ec', borderTop: '3px solid ' + k.c }}>
+          <div key={k.l} style={{ padding: 12, background: '#fafbfd', borderRadius: 6, border: '1px solid #cdd1d8', borderTop: '3px solid ' + k.c }}>
             <p style={{ margin: 0, fontSize: 10, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>{k.l}</p>
             <p style={{ margin: '3px 0 0', fontSize: 20, fontWeight: 700, color: DARK }}>{k.v}</p>
           </div>
@@ -511,7 +511,7 @@ export function CustomerMasterTabbed() {
       )}
       {tab === 'credit' && tabPanel(
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
-          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #e6e8ec' }}>
+          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #cdd1d8' }}>
             <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase' }}>Credit Configuration</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10, marginTop: 10 }}>
               <Field label="Credit Limit (₹)" type="number" value={f.creditLimit} onChange={(v) => set('creditLimit', v)} />
@@ -520,7 +520,7 @@ export function CustomerMasterTabbed() {
               <Field label="Late Payment Interest" value={f.interestRate} onChange={(v) => set('interestRate', v)} placeholder="e.g. 18% pa" />
             </div>
           </div>
-          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #e6e8ec' }}>
+          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #cdd1d8' }}>
             <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase' }}>Current Exposure</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10, marginTop: 10 }}>
               <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Outstanding</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: DARK }}>{f.out || rupee(0)}</p></div>
@@ -621,7 +621,7 @@ export function SupplierMasterTabbed() {
                 <SelectField label="State (required for India)" value={f.state || ''} onChange={setState} options={STATE_NAMES} />
               )}
               <FormField label="GST Supply Type (auto)">
-                <div style={{ padding: '7px 10px', borderRadius: 6, background: toneBg, color: toneFg, fontSize: 12, fontWeight: 700, border: '1px solid #e6e8ec' }}>
+                <div style={{ padding: '7px 10px', borderRadius: 6, background: toneBg, color: toneFg, fontSize: 12, fontWeight: 700, border: '1px solid #cdd1d8' }}>
                   {sup.type === 'intra' ? '🟢 ' : sup.type === 'inter' ? '🔵 ' : sup.type === 'foreign' ? '🌐 ' : '⚠ '}{sup.label}
                 </div>
               </FormField>
@@ -643,7 +643,7 @@ export function SupplierMasterTabbed() {
                   <SelectField label="MSME Status" value={f.msmeStatus} onChange={(v) => set('msmeStatus', v)} options={MSME_STATUS} />
                 </>
               ) : (
-                <div style={{ gridColumn: '1/-1', padding: 12, borderRadius: 6, background: '#f6f8fb', border: '1px solid #e6e8ec', fontSize: 12, color: '#5b616e' }}>
+                <div style={{ gridColumn: '1/-1', padding: 12, borderRadius: 6, background: '#f6f8fb', border: '1px solid #cdd1d8', fontSize: 12, color: '#5b616e' }}>
                   🌐 <b>Overseas supplier</b> — Indian GSTIN / GST Treatment / TDS Section are not applicable. Purchases from this vendor must be booked <b>without</b> CGST/SGST/IGST or TDS (import of service; reverse-charge handled separately if opted).
                 </div>
               )}
@@ -655,7 +655,7 @@ export function SupplierMasterTabbed() {
       })())}
       {tab === 'credit' && tabPanel(
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
-          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #e6e8ec' }}>
+          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #cdd1d8' }}>
             <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase' }}>Payment Configuration</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10, marginTop: 10 }}>
               <SelectField label="Settlement Cycle" value={f.settlementCycle} onChange={(v) => set('settlementCycle', v)} options={SETTLE_CYCLES} />

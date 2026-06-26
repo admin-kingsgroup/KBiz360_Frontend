@@ -64,7 +64,7 @@ export function SettingsBranches(){
   const BranchCard=({b})=>(
     <div {...clickable(()=>setSel(sel===b.code?null:b.code))} style={{
       ...card,cursor:"pointer",padding:0,overflow:"hidden",
-      border:sel===b.code?"2px solid #d4a437":"1px solid #e1e3ec",
+      border:sel===b.code?"2px solid #d4a437":"1px solid #cdd1d8",
       transform:sel===b.code?"translateY(-2px)":"none",
       transition:"all 0.15s",boxShadow:sel===b.code?"0 6px 20px rgba(0,0,0,0.12)":"none"}}>
       <div style={{padding:"11px 14px",background:sel===b.code?"#0d1326":"#f9fafb",
@@ -85,8 +85,8 @@ export function SettingsBranches(){
         </div>
       </div>
       {/* Quick stats row */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",borderTop:"1px solid #f3f4f8"}}>
-        <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #e1e3ec",fontSize:11}}><span style={{color:"#5a6691"}}>Currency</span><span style={{fontWeight:600}}>{b.currency}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #e1e3ec",fontSize:11}}><span style={{color:"#5a6691"}}>Staff</span><span style={{fontWeight:600}}>{String(b.staff)}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #e1e3ec",fontSize:11}}><span style={{color:"#5a6691"}}>FY Start</span><span style={{fontWeight:600}}>{b.fyStart}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",fontSize:11}}><span style={{color:"#5a6691"}}>Voucher Prefix</span><span style={{fontWeight:600}}>{b.voucherPrefix}</span></div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",borderTop:"1px solid #dfe2e7"}}>
+        <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #cdd1d8",fontSize:11}}><span style={{color:"#5a6691"}}>Currency</span><span style={{fontWeight:600}}>{b.currency}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #cdd1d8",fontSize:11}}><span style={{color:"#5a6691"}}>Staff</span><span style={{fontWeight:600}}>{String(b.staff)}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #cdd1d8",fontSize:11}}><span style={{color:"#5a6691"}}>FY Start</span><span style={{fontWeight:600}}>{b.fyStart}</span></div><div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",fontSize:11}}><span style={{color:"#5a6691"}}>Voucher Prefix</span><span style={{fontWeight:600}}>{b.voucherPrefix}</span></div>
       </div>
     </div>
   );
@@ -133,7 +133,7 @@ export function SettingsBranches(){
       {selBranch&&(
         <div style={{...card,padding:0,overflow:"hidden"}}>
           {/* Detail tabs */}
-          <div style={{display:"flex",gap:0,background:"#f3f4f8",borderBottom:"1px solid #e1e3ec",overflowX:"auto"}}>
+          <div style={{display:"flex",gap:0,background:"#f3f4f8",borderBottom:"1px solid #cdd1d8",overflowX:"auto"}}>
             <button onClick={()=>setTab("overview")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="overview"?700:400,background:tab==="overview"?"#fff":"transparent",borderRadius:6}}>📋 Overview</button><button onClick={()=>setTab("identity")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="identity"?700:400,background:tab==="identity"?"#fff":"transparent",borderRadius:6}}>🏢 Identity & Tax</button><button onClick={()=>setTab("compliance")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="compliance"?700:400,background:tab==="compliance"?"#fff":"transparent",borderRadius:6}}>📋 Compliance</button><button onClick={()=>setTab("bank")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="bank"?700:400,background:tab==="bank"?"#fff":"transparent",borderRadius:6}}>🏦 Bank Details</button><button onClick={()=>setTab("vouchers")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="vouchers"?700:400,background:tab==="vouchers"?"#fff":"transparent",borderRadius:6}}>🔢 Voucher Series</button>
           </div>
 
@@ -153,7 +153,7 @@ export function SettingsBranches(){
                     {l:"Email",v:selBranch.email},
                     {l:"Website",v:selBranch.website||"—"},
                   ].map((r,i)=>(
-                    <div key={i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid #f3f4f8"}}>
+                    <div key={i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid #dfe2e7"}}>
                       <span style={{fontSize:10.5,color:"#5a6691",minWidth:130,flexShrink:0}}>{r.l}</span>
                       <span style={{fontSize:10.5,color:"#0d1326",fontWeight:500}}>{r.v}</span>
                     </div>
@@ -172,7 +172,7 @@ export function SettingsBranches(){
                     {l:"Staff Count",v:String(selBranch.staff)},
                     {l:"Status",v:selBranch.active?"Active ●":"Inactive ●"},
                   ].map((r,i)=>(
-                    <div key={i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid #f3f4f8"}}>
+                    <div key={i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid #dfe2e7"}}>
                       <span style={{fontSize:10.5,color:"#5a6691",minWidth:130,flexShrink:0}}>{r.l}</span>
                       <span style={{fontSize:10.5,color:"#0d1326",fontWeight:500}}>{r.v}</span>
                     </div>
@@ -203,7 +203,7 @@ export function SettingsBranches(){
                       {l:"VAT / Tax Number",v:selBranch.gstin,bold:true,mono:true},
                     ]),
                   ].map((r,i)=>(
-                    <div key={i} style={{display:"flex",gap:8,padding:"8px 0",borderBottom:"1px solid #f3f4f8"}}>
+                    <div key={i} style={{display:"flex",gap:8,padding:"8px 0",borderBottom:"1px solid #dfe2e7"}}>
                       <span style={{fontSize:10.5,color:"#5a6691",minWidth:140,flexShrink:0}}>{r.l}</span>
                       <span style={{fontSize:r.mono?11:10.5,fontFamily:r.mono?"monospace":"inherit",
                         color:"#0d1326",fontWeight:r.bold?700:500}}>{r.v}</span>
@@ -219,7 +219,7 @@ export function SettingsBranches(){
                     {l:"Authorised Signatory",v:selBranch.authSignatory},
                     {l:"Designation",v:selBranch.authDesignation},
                   ].map((r,i)=>(
-                    <div key={i} style={{display:"flex",gap:8,padding:"8px 0",borderBottom:"1px solid #f3f4f8"}}>
+                    <div key={i} style={{display:"flex",gap:8,padding:"8px 0",borderBottom:"1px solid #dfe2e7"}}>
                       <span style={{fontSize:10.5,color:"#5a6691",minWidth:140,flexShrink:0}}>{r.l}</span>
                       <span style={{fontSize:r.mono?11:10.5,fontFamily:r.mono?"monospace":"inherit",
                         color:"#0d1326",fontWeight:r.bold?700:500}}>{r.v}</span>
@@ -243,7 +243,7 @@ export function SettingsBranches(){
                       {l:"IATA Accreditation No.",v:selBranch.iataAccredNo},
                       {l:"IATA Expiry",v:selBranch.iataAccredExpiry},
                     ].map((r,i)=>(
-                      <div key={i} style={{padding:"8px 12px",borderRadius:8,background:"#fff",border:"1px solid #e1e3ec"}}>
+                      <div key={i} style={{padding:"8px 12px",borderRadius:8,background:"#fff",border:"1px solid #cdd1d8"}}>
                         <p style={{margin:0,fontSize:9,color:"#5a6691",textTransform:"uppercase"}}>{r.l}</p>
                         <p style={{margin:"2px 0 0",fontSize:12,fontWeight:700,color:"#0d1326",fontFamily:"monospace"}}>{r.v}</p>
                       </div>
@@ -331,7 +331,7 @@ export function SettingsBranches(){
                   ].map((v,i)=>{
                     const CAT_CLR={Sales:"#185FA5",Purchase:"#854F0B",Finance:"#27500A"};
                     return (
-                      <div key={i} style={{padding:"8px 12px",borderRadius:8,background:"#fff",border:"1px solid #e1e3ec",
+                      <div key={i} style={{padding:"8px 12px",borderRadius:8,background:"#fff",border:"1px solid #cdd1d8",
                         display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                         <div>
                           <p style={{margin:0,fontSize:9,color:"#5a6691"}}>{v.label}</p>
@@ -472,7 +472,7 @@ export function SettingsUsers(){
             ))}
           </tr></thead>
           <tbody>{filteredUsers.map((u,i)=>(
-            <tr key={u.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+            <tr key={u.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
               <td style={{padding:"8px 12px"}}>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   <div style={{width:30,height:30,borderRadius:"50%",background:ROLE_BG[u.role]||"#f3f4f8",
@@ -633,7 +633,7 @@ export function SettingsUsers(){
                     {PERM_MODULES.map((grp,gi)=>(
                       <>
                         {/* Group header row */}
-                        <tr key={`grp-${gi}`} style={{background:"#f3f4f8",borderBottom:"1px solid #e1e3ec"}}>
+                        <tr key={`grp-${gi}`} style={{background:"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
                           <td style={{padding:"6px 14px",fontWeight:800,color:"#384677",fontSize:10.5}}>
                             {grp.icon} {grp.group}
                           </td>
@@ -655,7 +655,7 @@ export function SettingsUsers(){
                         </tr>
                         {/* Module rows */}
                         {grp.mods.map((mod,mi)=>(
-                          <tr key={`mod-${mod.id}`} style={{borderBottom:"1px solid #f3f4f8",
+                          <tr key={`mod-${mod.id}`} style={{borderBottom:"1px solid #dfe2e7",
                             background:mi%2===0?"#fff":"#fafafa"}}>
                             <td style={{padding:"6px 14px 6px 26px",color:"#384677",fontSize:10.5}}>
                               {mod.label}
@@ -683,7 +683,7 @@ export function SettingsUsers(){
           </div>
 
           {/* Footer save */}
-          <div style={{position:"sticky",bottom:0,background:"#fff",borderTop:"1px solid #e1e3ec",
+          <div style={{position:"sticky",bottom:0,background:"#fff",borderTop:"1px solid #cdd1d8",
             padding:"12px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",
             boxShadow:"0 -4px 12px rgba(0,0,0,0.08)"}}>
             <p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>
@@ -744,7 +744,7 @@ export function SettingsUsers(){
               })}
             </div>
           </div>
-          <div style={{padding:"8px 14px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end"}}>
+          <div style={{padding:"8px 14px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end"}}>
             <button onClick={()=>{setTab("users");}} style={{...btnGh,fontSize:10,padding:"3px 10px"}}>View Users →</button>
           </div>
         </div>
@@ -795,7 +795,7 @@ export function SettingsUsers(){
       {newUserModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:500,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Add New User</p>
               <button onClick={()=>setNewUserModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
             </div>
@@ -832,7 +832,7 @@ export function SettingsUsers(){
                 Role template <b>{newUserForm.role}</b> will be applied. You can customise individual permissions after creation.
               </div>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setNewUserModal(false)} style={btnGh}>Cancel</button>
               <button disabled={createUserMut.isPending} onClick={()=>{
                 if(!newUserForm.name.trim()||!newUserForm.email.trim()){ toast("Name and email are required","error"); return; }
@@ -885,7 +885,7 @@ export function DocTemplateEditor(){
   const docs=["Tax Invoice","Payment Voucher","Receipt Voucher","Credit Note","Quotation","Hotel Voucher","Transfer Voucher","Visa Cover Letter"];
   return(
     <PHASE2_Page title="Document Template Editor" subtitle="Customise invoice and voucher layouts · header · footer · logo · colours · font"
-      toolbar={<><select value={selDoc} onChange={e=>setSelDoc(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{docs.map(d=><option key={d}>{d}</option>)}</select><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Template</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>Reset to Default</button></>}>
+      toolbar={<><select value={selDoc} onChange={e=>setSelDoc(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{docs.map(d=><option key={d}>{d}</option>)}</select><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Template</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>Reset to Default</button></>}>
       <div style={{display:"grid",gridTemplateColumns:"300px 1fr",gap:14}}>
         {/* Controls */}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -902,17 +902,17 @@ export function DocTemplateEditor(){
           </div>
           <div style={cardStyle}>
             <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Header</p>
-            <textarea value={header} onChange={e=>setHeader(e.target.value)} rows={3} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%",fontFamily:"inherit",resize:"none"}}/>
+            <textarea value={header} onChange={e=>setHeader(e.target.value)} rows={3} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%",fontFamily:"inherit",resize:"none"}}/>
           </div>
           <div style={cardStyle}>
             <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Footer</p>
-            <textarea value={footer} onChange={e=>setFooter(e.target.value)} rows={2} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%",fontFamily:"inherit",resize:"none"}}/>
+            <textarea value={footer} onChange={e=>setFooter(e.target.value)} rows={2} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%",fontFamily:"inherit",resize:"none"}}/>
           </div>
           <div style={cardStyle}>
             <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Brand Color</p>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
-              <input type="color" value={color} onChange={e=>setColor(e.target.value)} style={{width:40,height:34,border:"1px solid #e1e3ec",borderRadius:4,cursor:"pointer",padding:2}}/>
-              <input value={color} onChange={e=>setColor(e.target.value)} style={{flex:1,padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,fontFamily:"monospace"}}/>
+              <input type="color" value={color} onChange={e=>setColor(e.target.value)} style={{width:40,height:34,border:"1px solid #cdd1d8",borderRadius:4,cursor:"pointer",padding:2}}/>
+              <input value={color} onChange={e=>setColor(e.target.value)} style={{flex:1,padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,fontFamily:"monospace"}}/>
             </div>
             <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
               {["#0d1326","#d4a437","#A32D2D","#2F7A8E","#22c55e","#3b82f6"].map(c=>(
@@ -922,10 +922,10 @@ export function DocTemplateEditor(){
           </div>
         </div>
         {/* Live preview */}
-        <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
-          <div style={{padding:"8px 14px",background:"#fafbfd",borderBottom:"1px solid #e1e3ec",fontSize:11,color:"#5a6691"}}>Live Preview — {selDoc}</div>
+        <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
+          <div style={{padding:"8px 14px",background:"#fafbfd",borderBottom:"1px solid #cdd1d8",fontSize:11,color:"#5a6691"}}>Live Preview — {selDoc}</div>
           <div style={{padding:20}}>
-            <div style={{border:"1px solid #e1e3ec",borderRadius:4,overflow:"hidden"}}>
+            <div style={{border:"1px solid #cdd1d8",borderRadius:4,overflow:"hidden"}}>
               {/* Header */}
               <div style={{padding:"14px 18px",background:color,color:"#fff",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div>
@@ -947,7 +947,7 @@ export function DocTemplateEditor(){
                 <div style={{display:"flex",justifyContent:"flex-end",fontSize:12,fontWeight:700,color:color}}>Total: ₹4,85,000</div>
               </div>
               {/* Footer */}
-              <div style={{padding:"8px 14px",background:"#f7f8fb",borderTop:"1px solid #e1e3ec",fontSize:9.5,color:"#5a6691",textAlign:"center"}}>{footer}</div>
+              <div style={{padding:"8px 14px",background:"#f7f8fb",borderTop:"1px solid #cdd1d8",fontSize:9.5,color:"#5a6691",textAlign:"center"}}>{footer}</div>
             </div>
           </div>
         </div>
@@ -970,13 +970,13 @@ export function EmailSMSTemplates(){
   const tokens=["{CustomerName}","{BookingRef}","{TripName}","{Amount}","{DueDate}","{VoucherNo}","{ConsultantName}","{BranchPhone}","{InvoiceNo}","{Date}"];
   return(
     <PHASE2_Page title="Email / SMS Template Editor" subtitle="Customise communication templates · token substitution · channel-specific"
-      toolbar={<><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Template</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>Send Test</button></>}>
+      toolbar={<><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Template</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>Send Test</button></>}>
       <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:14}}>
         {/* Template list */}
         <div style={cardStyle} onKeyDown={listKeyNav()}>
           <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Templates ({templates.length})</p>
           {templates.map((tmpl,i)=>(
-            <div key={tmpl.id} {...clickable(()=>{setSel(i);setEditBody(tmpl.body);},{role:'option'})} style={{padding:"9px 10px",border:sel===i?"2px solid #d4a437":"1px solid #e1e3ec",borderRadius:6,marginBottom:6,cursor:"pointer",background:sel===i?"#fff8e8":"#fff"}}>
+            <div key={tmpl.id} {...clickable(()=>{setSel(i);setEditBody(tmpl.body);},{role:'option'})} style={{padding:"9px 10px",border:sel===i?"2px solid #d4a437":"1px solid #cdd1d8",borderRadius:6,marginBottom:6,cursor:"pointer",background:sel===i?"#fff8e8":"#fff"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                 <p style={{margin:0,fontSize:11.5,fontWeight:700,color:"#0d1326"}}>{tmpl.name}</p>
                 <span style={{padding:"1px 6px",background:tmpl.channel==="SMS"?"#fff3cd":"#cfe2ff",color:tmpl.channel==="SMS"?"#856404":"#004085",borderRadius:3,fontSize:9.5,fontWeight:700}}>{tmpl.channel}</span>
@@ -991,12 +991,12 @@ export function EmailSMSTemplates(){
           <div style={cardStyle}>
             <p style={{margin:"0 0 12px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Edit — {t.name}</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:12}}>
-              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Trigger</label><input defaultValue={t.trigger} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%"}}/></div>
-              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Channel</label><select defaultValue={t.channel} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%"}}><option>Email</option><option>SMS</option><option>Both</option></select></div>
-              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Status</label><select defaultValue={t.active?"Active":"Inactive"} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%"}}><option>Active</option><option>Inactive</option></select></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Trigger</label><input defaultValue={t.trigger} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}/></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Channel</label><select defaultValue={t.channel} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}><option>Email</option><option>SMS</option><option>Both</option></select></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Status</label><select defaultValue={t.active?"Active":"Inactive"} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}><option>Active</option><option>Inactive</option></select></div>
             </div>
-            {t.channel==="Email"&&<div style={{marginBottom:10}}><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Subject</label><input defaultValue={t.subject} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%"}}/></div>}
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Body {t.channel==="SMS"&&<span style={{fontWeight:400,color:"#5a6691"}}>({editBody.length}/160 chars)</span>}</label><textarea value={editBody} onChange={e=>setEditBody(e.target.value)} rows={8} style={{padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%",fontFamily:"monospace",resize:"vertical"}}/></div>
+            {t.channel==="Email"&&<div style={{marginBottom:10}}><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Subject</label><input defaultValue={t.subject} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}/></div>}
+            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Body {t.channel==="SMS"&&<span style={{fontWeight:400,color:"#5a6691"}}>({editBody.length}/160 chars)</span>}</label><textarea value={editBody} onChange={e=>setEditBody(e.target.value)} rows={8} style={{padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%",fontFamily:"monospace",resize:"vertical"}}/></div>
           </div>
           <div style={cardStyle}>
             <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Available Tokens</p>
@@ -1025,29 +1025,29 @@ export function ApprovalMatrixBuilder(){
   const groupByType={};
   rules.forEach(r=>{if(!groupByType[r.voucherType])groupByType[r.voucherType]=[];groupByType[r.voucherType].push(r);});
   const fmt=n=>n>=999999999?"Unlimited":"₹"+n.toLocaleString("en-IN");
-  const inp={padding:"7px 8px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:11.5,width:"100%"};
+  const inp={padding:"7px 8px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:11.5,width:"100%"};
   return(
     <PHASE2_Page title="Approval Matrix Builder" subtitle="Preview — drag-and-configure per-role, per-voucher-type thresholds (server save not enabled on this screen yet)"
-      toolbar={<button disabled title="Saving the approval matrix isn’t available on this screen yet" style={{padding:"7px 14px",background:"#eef0f6",color:"#9aa3bd",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,fontWeight:700,cursor:"not-allowed"}}>💾 Save & Publish</button>}>
+      toolbar={<button disabled title="Saving the approval matrix isn’t available on this screen yet" style={{padding:"7px 14px",background:"#eef0f6",color:"#9aa3bd",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,fontWeight:700,cursor:"not-allowed"}}>💾 Save & Publish</button>}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:14}}>
         <div>
           {Object.entries(groupByType).map(([type,typeRules])=>(
-            <div key={type} style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden",marginBottom:12}}>
+            <div key={type} style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden",marginBottom:12}}>
               <div style={{padding:"9px 14px",background:"#0d1326",color:"#fff",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <p style={{margin:0,fontSize:12.5,fontWeight:700}}>{type}</p>
                 <button onClick={()=>setRules(r=>r.filter(x=>x.voucherType!==type||x.id!==typeRules[typeRules.length-1].id))} style={{padding:"2px 8px",background:"transparent",border:"1px solid rgba(255,255,255,0.3)",color:"#fff",borderRadius:3,fontSize:10,cursor:"pointer"}}>Remove last tier</button>
               </div>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
                 <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Approver Role</th><th style={{...RPT_thStyle,textAlign:"right"}}>From (₹)</th><th style={{...RPT_thStyle,textAlign:"right"}}>To (₹)</th><th style={RPT_thStyle}>Backup</th><th style={{...RPT_thStyle,textAlign:"center"}}>↕</th></tr></thead>
-                <tbody>{typeRules.map((r,i)=>(<tr key={r.id} style={{borderBottom:"1px solid #f0f2f7"}}>
+                <tbody>{typeRules.map((r,i)=>(<tr key={r.id} style={{borderBottom:"1px solid #dfe2e7"}}>
                   <td style={RPT_tdStyle}><select defaultValue={r.role} style={{...inp,width:"auto"}}><option>Accounts Executive</option><option>Sr. Accounts Executive</option><option>Senior Finance Manager</option><option>Director</option></select></td>
-                  <td style={{padding:"6px 12px",borderBottom:"1px solid #f0f2f7"}}><input type="number" defaultValue={r.minAmount} style={{...inp,textAlign:"right",fontFamily:"monospace",width:100}}/></td>
-                  <td style={{padding:"6px 12px",borderBottom:"1px solid #f0f2f7"}}><input type="number" defaultValue={r.maxAmount<999999999?r.maxAmount:""} placeholder="Unlimited" style={{...inp,textAlign:"right",fontFamily:"monospace",width:100}}/></td>
+                  <td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7"}}><input type="number" defaultValue={r.minAmount} style={{...inp,textAlign:"right",fontFamily:"monospace",width:100}}/></td>
+                  <td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7"}}><input type="number" defaultValue={r.maxAmount<999999999?r.maxAmount:""} placeholder="Unlimited" style={{...inp,textAlign:"right",fontFamily:"monospace",width:100}}/></td>
                   <td style={RPT_tdStyle}><input defaultValue={r.backup} style={{...inp,width:"auto"}}/></td>
-                  <td style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #f0f2f7"}}>
+                  <td style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #dfe2e7"}}>
                     <div style={{display:"flex",gap:2,justifyContent:"center"}}>
-                      {i>0&&<button style={{padding:"2px 6px",background:"#f7f8fb",border:"1px solid #e1e3ec",borderRadius:2,cursor:"pointer",fontSize:11}}>▲</button>}
-                      {i<typeRules.length-1&&<button style={{padding:"2px 6px",background:"#f7f8fb",border:"1px solid #e1e3ec",borderRadius:2,cursor:"pointer",fontSize:11}}>▼</button>}
+                      {i>0&&<button style={{padding:"2px 6px",background:"#f7f8fb",border:"1px solid #cdd1d8",borderRadius:2,cursor:"pointer",fontSize:11}}>▲</button>}
+                      {i<typeRules.length-1&&<button style={{padding:"2px 6px",background:"#f7f8fb",border:"1px solid #cdd1d8",borderRadius:2,cursor:"pointer",fontSize:11}}>▼</button>}
                     </div>
                   </td>
                 </tr>))}</tbody>
@@ -1084,22 +1084,22 @@ export function CustomFieldsManager(){
   const filtered=master==="ALL"?all:all.filter(f=>f.master===master);
   return(
     <PHASE2_Page title="Custom Fields Manager" subtitle="Add fields to any master without code changes · applies across all branches"
-      toolbar={<><select value={master} onChange={e=>setMaster(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{masters.map(m=><option key={m}>{m}</option>)}</select><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Add Field</button></>}>
+      toolbar={<><select value={master} onChange={e=>setMaster(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{masters.map(m=><option key={m}>{m}</option>)}</select><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Add Field</button></>}>
       <div style={cardStyle}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Master</th><th style={RPT_thStyle}>Field Label</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>Options / Format</th><th style={{...RPT_thStyle,textAlign:"center"}}>Required</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th><th style={{...RPT_thStyle,textAlign:"center"}}>Action</th></tr></thead>
           <tbody>{filtered.map(f=>(
-            <tr key={f.id} style={{borderBottom:"1px solid #f0f2f7"}}>
+            <tr key={f.id} style={{borderBottom:"1px solid #dfe2e7"}}>
               <td style={RPT_tdStyle}><span style={{padding:"2px 7px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{f.master}</span></td>
               <td style={{...RPT_tdStyle,fontWeight:700}}>{f.label}</td>
-              <td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#fafbfd",border:"1px solid #e1e3ec",borderRadius:3,fontSize:11}}>{f.type}</span></td>
+              <td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#fafbfd",border:"1px solid #cdd1d8",borderRadius:3,fontSize:11}}>{f.type}</span></td>
               <td style={{...RPT_tdStyle,color:"#5a6691",fontSize:11}}>{f.options||"—"}</td>
               <td style={{...RPT_tdStyle,textAlign:"center"}}>{f.required?<span style={{color:"#A32D2D",fontWeight:700}}>Yes</span>:"—"}</td>
               <td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:3,fontSize:10,fontWeight:700,background:f.active?"#d4edda":"#e2e3e5",color:f.active?"#155724":"#383d41"}}>{f.active?"Active":"Inactive"}</span></td>
               <td style={{...RPT_tdStyle,textAlign:"center"}}>
                 <div style={{display:"flex",gap:4,justifyContent:"center"}}>
                   <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #d4a437",color:"#d4a437",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>Edit</button>
-                  <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:3,fontSize:10,cursor:"pointer"}}>↕</button>
+                  <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:3,fontSize:10,cursor:"pointer"}}>↕</button>
                 </div>
               </td>
             </tr>
@@ -1133,13 +1133,13 @@ export function FieldAccessControl(){
             </thead>
             <tbody>
               {accessRows.map((row,i)=>(
-                <tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}>
+                <tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}>
                   <td style={{...RPT_tdStyle,fontWeight:700}}>{row.field}</td>
                   <td style={{...RPT_tdStyle,color:"#5a6691"}}>{row.module}</td>
                   {PERM_ROLES.map(r=>{
                     const access=row.roles[r]||"Hidden";
                     return(
-                      <td key={r} style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #f0f2f7"}}>
+                      <td key={r} style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #dfe2e7"}}>
                         <select defaultValue={access} style={{padding:"3px 6px",border:"1px solid "+(accessColor[access]||"#e1e3ec"),borderRadius:4,fontSize:10.5,background:"#fff",color:accessColor[access]||"#5a6691",fontWeight:700,cursor:"pointer"}}>
                           <option>View+Edit</option><option>View Only</option><option>Hidden</option>
                         </select>
@@ -1173,7 +1173,7 @@ export function BulkUserOperations(){
   return(
     <PHASE2_Page title="Bulk User Operations" subtitle="Select multiple users · apply role change · reset password · activate / deactivate">
       {/* Action bar */}
-      <div style={{padding:"10px 14px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,marginBottom:12,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+      <div style={{padding:"10px 14px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,marginBottom:12,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
         <span style={{fontSize:12,fontWeight:700,color:"#0d1326"}}>{selCount} user{selCount!==1?"s":""} selected</span>
         <div style={{flex:1}}/>
         {[{l:"Change Role",c:"#0d1326",t:"#d4a437"},{l:"Activate",c:"#22c55e",t:"#fff"},{l:"Deactivate",c:"#f97316",t:"#fff"},{l:"Reset Password",c:"#3b82f6",t:"#fff"},{l:"Change Branch",c:"#6B4C8B",t:"#fff"}].map(btn=>(
@@ -1187,8 +1187,8 @@ export function BulkUserOperations(){
             <th style={RPT_thStyle}>User</th><th style={RPT_thStyle}>Email</th><th style={RPT_thStyle}>Role</th><th style={RPT_thStyle}>Branches</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th><th style={RPT_thStyle}>Last Login</th>
           </tr></thead>
           <tbody>{_USERS_DATA.map(u=>(
-            <tr key={u.id} style={{borderBottom:"1px solid #f0f2f7",background:selected[u.id]?"#fff8e8":"#fff"}}>
-              <td style={{padding:"8px 12px",borderBottom:"1px solid #f0f2f7"}}><input type="checkbox" checked={!!selected[u.id]} onChange={()=>toggle(u.id)}/></td>
+            <tr key={u.id} style={{borderBottom:"1px solid #dfe2e7",background:selected[u.id]?"#fff8e8":"#fff"}}>
+              <td style={{padding:"8px 12px",borderBottom:"1px solid #dfe2e7"}}><input type="checkbox" checked={!!selected[u.id]} onChange={()=>toggle(u.id)}/></td>
               <td style={RPT_tdStyle}><p style={{margin:0,fontWeight:700}}>{u.name}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>{u.id}</p></td>
               <td style={{...RPT_tdStyle,fontSize:11,color:"#5a6691"}}>{u.email}</td>
               <td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#e6e8f1",borderRadius:3,fontSize:10.5,fontWeight:600}}>{u.role}</span></td>
@@ -1223,7 +1223,7 @@ export function PermissionsMatrix(){
   };
   return(
     <PHASE2_Page title="Permissions Matrix" subtitle="Role × Module × Action — full visibility grid · click any cell to toggle"
-      toolbar={<div style={{display:"flex",gap:6}}>{PERM_ROLES.map(r=><button key={r} onClick={()=>setSelRole(r)} style={{padding:"5px 12px",border:selRole===r?"2px solid #0d1326":"1px solid #e1e3ec",background:selRole===r?"#0d1326":"#fff",color:selRole===r?"#d4a437":"#5a6691",borderRadius:5,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{r}</button>)}</div>}>
+      toolbar={<div style={{display:"flex",gap:6}}>{PERM_ROLES.map(r=><button key={r} onClick={()=>setSelRole(r)} style={{padding:"5px 12px",border:selRole===r?"2px solid #0d1326":"1px solid #cdd1d8",background:selRole===r?"#0d1326":"#fff",color:selRole===r?"#d4a437":"#5a6691",borderRadius:5,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{r}</button>)}</div>}>
       <div style={cardStyle}>
         <p style={{margin:"0 0 12px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Permissions for: <span style={{color:"#d4a437"}}>{selRole}</span></p>
         <div style={{overflowX:"auto"}}>
@@ -1233,12 +1233,12 @@ export function PermissionsMatrix(){
               {PERM_ACTIONS.map(a=><th key={a} style={{...RPT_thStyle,textAlign:"center",minWidth:70}}>{a}</th>)}
             </tr></thead>
             <tbody>{PERM_MODULES_P2.map(mod=>(
-              <tr key={mod} style={{borderBottom:"1px solid #f0f2f7"}}>
+              <tr key={mod} style={{borderBottom:"1px solid #dfe2e7"}}>
                 <td style={{...RPT_tdStyle,fontWeight:700}}>{mod}</td>
                 {PERM_ACTIONS.map(action=>{
                   const ok=hasAccess(selRole,mod,action);
                   return(
-                    <td key={action} style={{padding:"8px",textAlign:"center",borderBottom:"1px solid #f0f2f7",cursor:"pointer"}}
+                    <td key={action} style={{padding:"8px",textAlign:"center",borderBottom:"1px solid #dfe2e7",cursor:"pointer"}}
                       title={ok?"Click to revoke":"Click to grant"}>
                       {ok
                         ?<span style={{width:22,height:22,borderRadius:"50%",background:"#22c55e",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",fontWeight:700}}>✓</span>
@@ -1268,7 +1268,7 @@ export function PermissionsMatrix(){
 export function BrandingSettings(){
   const [brand,setBrand]=useState({companyName:"Travkings Tours & Travels Pvt. Ltd.",tagline:"Your Journey, Our Passion",primaryEmail:"accounts@travkings.com",supportPhone:"+91 22 6654 8800",primaryColor:"#0d1326",accentColor:"#d4a437",website:"www.travkings.com"});
   const upd=k=>e=>setBrand(b=>({...b,[k]:e.target.value}));
-  const inp={padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12.5,width:"100%"};
+  const inp={padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12.5,width:"100%"};
   return(
     <PHASE2_Page title="Branding Settings" subtitle="Logo · brand colours · company name · contact details · used across all documents and emails"
       toolbar={<button style={{padding:"8px 18px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Branding</button>}>
@@ -1289,7 +1289,7 @@ export function BrandingSettings(){
                 <div key={c.k}>
                   <label style={{fontSize:11,color:"#5a6691",fontWeight:700,display:"block",marginBottom:4}}>{c.l}</label>
                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                    <input type="color" value={brand[c.k]} onChange={upd(c.k)} style={{width:44,height:38,border:"1px solid #e1e3ec",borderRadius:4,cursor:"pointer",padding:3}}/>
+                    <input type="color" value={brand[c.k]} onChange={upd(c.k)} style={{width:44,height:38,border:"1px solid #cdd1d8",borderRadius:4,cursor:"pointer",padding:3}}/>
                     <input value={brand[c.k]} onChange={upd(c.k)} style={{...inp,fontFamily:"monospace",width:100}}/>
                   </div>
                 </div>
@@ -1309,7 +1309,7 @@ export function BrandingSettings(){
         {/* Live preview */}
         <div style={cardStyle}>
           <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Live Preview</p>
-          <div style={{border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden",marginBottom:12}}>
+          <div style={{border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden",marginBottom:12}}>
             {/* Header bar */}
             <div style={{padding:"12px 16px",background:brand.primaryColor,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1328,7 +1328,7 @@ export function BrandingSettings(){
             </div>
           </div>
           {/* Email preview */}
-          <div style={{border:"1px solid #e1e3ec",borderRadius:6,overflow:"hidden"}}>
+          <div style={{border:"1px solid #cdd1d8",borderRadius:6,overflow:"hidden"}}>
             <div style={{padding:"8px 12px",background:brand.primaryColor,textAlign:"center"}}>
               <p style={{margin:0,fontSize:11,color:brand.accentColor,fontWeight:700}}>Email Header</p>
             </div>

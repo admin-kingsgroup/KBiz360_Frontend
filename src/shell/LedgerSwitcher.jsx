@@ -55,7 +55,7 @@ export function LedgerSwitcher({ branch }) {
   return (
     <div onMouseDown={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', zIndex: 9300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh' }}>
       <div onMouseDown={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: '#fff', borderRadius: 12, boxShadow: '0 24px 70px rgba(13,19,38,.4)', overflow: 'hidden' }}>
-        <div style={{ padding: 12, borderBottom: '1px solid #eef0f6', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ padding: 12, borderBottom: '1px solid #dfe2e7', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 14 }}>📒</span>
           <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey}
             placeholder="Switch ledger — type to search…  (↑ ↓ · Enter)"

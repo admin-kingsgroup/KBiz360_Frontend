@@ -341,6 +341,18 @@ export function useYearOverYear(branch, { from, to } = {}) {
   });
 }
 
+// Foreign-currency exposure per currency (non-INR branches → INR equivalent at the
+// latest forex rate). GET /api/accounting/fx-exposure.
+export function useFxExposure(branch) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'fx-exposure', code || 'all'],
+    queryFn: () => apiGet('/api/accounting/fx-exposure', { branch: code }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 // AR / AP ageing (receivables & payables, bill-wise / no FIFO). Each party row
 // carries age buckets + onAccount + net. Optional `asOf` (YYYY-MM-DD) ages the
 // books as of that cut-off date instead of today. GET /api/accounting/ageing.

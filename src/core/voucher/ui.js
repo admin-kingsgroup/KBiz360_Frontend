@@ -2,9 +2,9 @@
    Kept dependency-free so both the shell and the field modules can import it
    without creating an import cycle through transactions.jsx. */
 
-export const DARK = '#1a1c22', GOLD = '#c2a04a', DIM = '#5b616e',
-  BLUE = '#2563eb', RED = '#dc2626', GREEN = '#16a34a',
-  V_DR = '#16a34a', V_CR = '#dc2626';
+export const DARK = '#141414', GOLD = '#A07828', DIM = '#5b616e',
+  BLUE = '#2563eb', RED = '#C0392B', GREEN = '#1A7A42',
+  V_DR = '#1A7A42', V_CR = '#C0392B';
 
 // Whole-rupee (no decimals) money formatter used across the voucher journal view.
 export const money = (cur, n) => {
@@ -72,6 +72,19 @@ export function pxpTotals(s) {
   const tds = r2(+s.tdsAmt || 0);
   const total = r2(taxable + gstAmt);
   return { drSum, crSum, taxable, gstAmt, tds, total };
+}
+
+// Generic voucher-editor total (the Sale / Purchase / Receipt / Payment / Contra /
+// Journal rows edited in the accountingLive grid). The party leg the posting engine
+// debits/credits is the FULL bill value, so the total must carry EVERY component that
+// hits the books:
+//   subtotal (Σ lines, Dr +ve / Cr −ve) + taxAmt (regular GST) + otherTaxesGst (the
+//   SVC2 margin GST — a SEPARATE per-branch Output head) + tcsAmt (collected/recoverable,
+//   rides inside total).
+// Omitting otherTaxesGst made every SVC2-bearing sale read "✗ Out by <SVC2 GST>" in the
+// live preview and blocked the edit from saving, even though the saved books balance.
+export function editorVoucherTotal({ subtotal, taxAmt, otherTaxesGst, tcsAmt } = {}) {
+  return r2((Number(subtotal) || 0) + (Number(taxAmt) || 0) + (Number(otherTaxesGst) || 0) + (Number(tcsAmt) || 0));
 }
 
 // Debit-Note totals — a purchase return with per-line Dr/Cr (like Purchase-Expense).

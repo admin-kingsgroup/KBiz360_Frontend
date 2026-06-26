@@ -41,9 +41,10 @@ import {
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
 import { invalidateBooks } from '../../core/useAccounting';
 
-const GOLD = '#A07828', DARK = '#141414', DR = '#16a34a', CR = '#dc2626', BLUE = '#2563eb';
+const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', CR = '#C0392B', BLUE = '#2563eb';
 // Gold theme tokens + per-section bar accents (SO / PO / GP voucher theme).
 const GOLD_DEEP = '#6B4E0F', GOLD_SOFT = '#FBF3DE', GOLD_LINE = '#E8D9A8';
+const HELV = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 const SO_BAR = '#1D4E89', PO_BAR = '#8A1F3D', GP_BAR = GOLD;
 // Reversal modules (Refund / Reissue) act on an existing sale — picked from the same
 // module bar as Flight/Hotel, but they open the reversal entry (ReversalEntry) instead
@@ -57,15 +58,24 @@ const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 /* shared cell styles */
-const thM = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: '#334155', textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #e2e8f0', background: '#f8fafc' };
+const thM = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: '#334155', textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #cdd1d8', background: '#f8fafc' };
 const thA = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: GOLD, textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #f2e6cc', background: '#fdfbfa' };
 const thL = { textAlign: 'left' };
-const tdC = { padding: '6px 8px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #e2e8f0', fontVariantNumeric: 'tabular-nums', verticalAlign: 'middle' };
+const tdC = { padding: '6px 8px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #cdd1d8', fontVariantNumeric: 'tabular-nums', verticalAlign: 'middle' };
 const tdAuto = { ...tdC, background: '#faf7ef', color: '#5b616e', fontWeight: 600 };
 const tdTot = { ...tdC, fontWeight: 800, color: DARK };
-const cellInp = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'right', border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s' };
-const cellTxt = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'left', border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', fontFamily: 'inherit', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' };
+const cellInp = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'right', border: '1px solid #cdd1d8', borderRadius: 6, background: '#fff', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s' };
+const cellTxt = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'left', border: '1px solid #cdd1d8', borderRadius: 6, background: '#fff', fontFamily: 'inherit', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' };
 const tfTd = { borderTop: '2px solid ' + DARK, padding: '10px 8px', fontWeight: 800, fontSize: 12, background: '#f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: DARK };
+// Per-section column-header + total-row styles — the section colour carries INTO
+// the table (SO blue, PO maroon), matching the SO/PO/GP voucher theme.
+const thBaseHdr = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: 'right' };
+const soHdr = { ...thBaseHdr, color: SO_BAR, background: '#EAF1F9', borderBottom: '2px solid ' + SO_BAR };
+const soHdrL = { ...soHdr, textAlign: 'left' };
+const poHdr = { ...thBaseHdr, color: PO_BAR, background: '#F9E8EE', borderBottom: '2px solid ' + PO_BAR };
+const poHdrL = { ...poHdr, textAlign: 'left' };
+const soTf = { ...tfTd, background: '#DCE8F4', color: SO_BAR, borderTop: '2px solid ' + SO_BAR };
+const poTf = { ...tfTd, background: '#F2D8E0', color: PO_BAR, borderTop: '2px solid ' + PO_BAR };
 
 /* ════════════════════════════════════════════════════════════════════════════
    SO / PO / GP Voucher entry
@@ -133,7 +143,7 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange })
   const setModule = (i, m) => onChange(legs.map((l, idx) => (idx === i ? { ...newLeg(m), supplier: l.supplier, costCenter: l.costCenter, purTallyRef: l.purTallyRef } : l)));
   const del = (i) => onChange(legs.filter((_, idx) => idx !== i));
   const add = () => onChange([...legs, newLeg(allowed[0])]);
-  const cell = { width: 90, padding: '5px 7px', border: '1px solid #e1e3ec', borderRadius: 5, fontSize: 12 };
+  const cell = { width: 90, padding: '5px 7px', border: '1px solid #cdd1d8', borderRadius: 5, fontSize: 12 };
   return (
     <div style={{ ...card, marginTop: 14, marginBottom: 14, borderColor: '#cdb46a' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -528,7 +538,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // read-only ("fetched & locked") on the Sales grid.
   const sectorBlock = (l, li, readOnly, colSpan) => (
     <tr key={'sec-' + li}>
-      <td colSpan={colSpan} style={{ padding: '8px 6px 8px 26px', background: readOnly ? '#faf7ef' : '#fbfcff', borderBottom: '1px solid #eef0f5' }}>
+      <td colSpan={colSpan} style={{ padding: '8px 6px 8px 26px', background: readOnly ? '#faf7ef' : '#fbfcff', borderBottom: '1px solid #dfe2e7' }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.3px', color: '#5b616e', textTransform: 'uppercase', margin: '6px 0' }}>{readOnly ? 'Sectors — from Purchase (locked)' : 'Sectors — enter each segment'}</div>
         <table style={{ borderCollapse: 'collapse' }}>
           <thead><tr>
@@ -556,13 +566,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   );
 
   return (
-    <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
+    <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV, color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
       {/* Header */}
-      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
+      <div style={{ ...card, border: '1px solid #dfe2e7', borderLeft: '4px solid ' + GOLD, borderRadius: 4, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
         <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : 'SO / PO / GP VOUCHER'}</p>
-            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#9197a3' }}>
+            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#8A8A84' }}>
               {editing
                 ? <>Fix any data-entry mistake — or switch the <b style={{ color: GOLD }}>module</b> if it was booked wrong — then <b style={{ color: GOLD }}>Save changes</b> · {brCode} · returns to Pending; approve it from the Pending queue</>
                 : <>Enter cost + Service Charge - 2 → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
@@ -595,7 +605,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {moduleCode === 'SM' && (
         <div style={{ ...card, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: DARK, textTransform: 'uppercase', letterSpacing: '.3px' }}>Supplier</span>
-          <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden' }}>
+          <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
             {[['with', 'With supplier (cost + margin)'], ['without', 'Without supplier (pure income)']].map(([v, l]) => {
               const active = (v === 'without') === noSupplier;
               return (
@@ -619,7 +629,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {isVatBr && (
         <div style={{ ...card, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: DARK, textTransform: 'uppercase', letterSpacing: '.3px' }}>VAT</span>
-          <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden' }}>
+          <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
             {[['with', 'With VAT'], ['without', 'Without VAT']].map(([v, l]) => {
               const active = (v === 'without') === noVat;
               return (
@@ -732,11 +742,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       <Section n="1" badge="SO" name="Sales Order" sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · Service Charge - 2 is GST-inclusive'} accent={SO_BAR}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
-            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-              {spec.idCols.map((c) => <th key={c.key} style={{ ...thM, ...thL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
-              {spec.fareCols.map((c) => <th key={c.key} style={{ ...thA, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
-              {!interBranch && <th style={{ ...thM, width: 95, whiteSpace: 'normal' }}>Service Charge - 2</th>}{!pkg && <th style={{ ...thM, width: 95, whiteSpace: 'normal' }}>Service Fee</th>}
-              {!pkg && <th style={{ ...thA, width: 95, whiteSpace: 'normal' }}>GST/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...thA, width: 95, whiteSpace: 'normal' }}>GST/Service Charge - 2 ({pkg ? 5 : activeRate}%)</th>}<th style={{ ...thA, width: 110, whiteSpace: 'normal' }}>Total</th><th style={{ ...thA, width: 45 }}></th>
+            <thead><tr style={{ background: '#EAF1F9', borderBottom: '2px solid ' + SO_BAR }}>
+              {spec.idCols.map((c) => <th key={c.key} style={{ ...soHdrL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
+              {spec.fareCols.map((c) => <th key={c.key} style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
+              {!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Charge - 2</th>}{!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Fee</th>}
+              {!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>GST/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>GST/Service Charge - 2 ({pkg ? 5 : activeRate}%)</th>}<th style={{ ...soHdr, width: 110, whiteSpace: 'normal' }}>Total</th><th style={{ ...soHdr, width: 45 }}></th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -758,7 +768,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                     {!pkg && <td style={{ padding: 3, width: 95, background: '#faf7ef' }}><input type="number" min="0" value={l.ssvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
                     {!pkg && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstSvc)}</td>}
                     {!interBranch && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstMk)}</td>}
-                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef', width: 110 }}>{fmt(c.finalSales)}</td>
+                    <td style={{ ...tdC, fontWeight: 800, color: DR, background: '#faf7ef', width: 110 }}>{fmt(c.finalSales)}</td>
                     <td style={{ ...tdC, textAlign: 'center', background: '#faf7ef', padding: 3, width: 45 }}><button onClick={() => delLine(i)} title="Remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={13} /></button></td>
                   </tr>
                   {spec.sectors && sectorBlock(l, i, true, soCols)}
@@ -767,13 +777,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               })}
             </tbody>
             <tfoot><tr>
-              <td style={{ ...tfTd, textAlign: 'left' }}>TOTAL</td>
-              {spec.idCols.slice(1).map((c) => <td key={c.key} style={tfTd} />)}
-              {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
-              {!interBranch && <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>}
-              {!pkg && <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
-              {!pkg && <td style={tfTd}>{fmt(totals.so.gst)}</td>}{!interBranch && <td style={tfTd}>{fmt(totals.so.otherTaxesGst)}</td>}
-              <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd} />
+              <td style={{ ...soTf, textAlign: 'left' }}>TOTAL</td>
+              {spec.idCols.slice(1).map((c) => <td key={c.key} style={soTf} />)}
+              {spec.fareCols.map((c) => <td key={c.key} style={soTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
+              {!interBranch && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>}
+              {!pkg && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
+              {!pkg && <td style={soTf}>{fmt(totals.so.gst)}</td>}{!interBranch && <td style={soTf}>{fmt(totals.so.otherTaxesGst)}</td>}
+              <td style={{ ...soTf, color: DR }}>{fmt(totals.so.total)}</td><td style={soTf} />
             </tr></tfoot>
           </table>
         </div>
@@ -787,7 +797,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: CR }}>Fetch open INB:</span>
             <select value="" onChange={(e) => { const l = (openInbQ.data || []).find((x) => x.inbLinkNo === e.target.value); if (l) fetchInb(l); }}
-              style={{ padding: '5px 8px', border: '1px solid #e1e3ec', borderRadius: 6, fontSize: 12, minWidth: 340 }}>
+              style={{ padding: '5px 8px', border: '1px solid #cdd1d8', borderRadius: 6, fontSize: 12, minWidth: 340 }}>
               <option value="">Inter-branch legs sent to {brCode}…</option>
               {(openInbQ.data || []).map((l) => <option key={l.inbLinkNo} value={l.inbLinkNo}>{l.inbLinkNo} · from {l.fromBranch} · {l.passenger || '—'} · {fmt(l.total)}</option>)}
             </select>
@@ -796,18 +806,18 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         )}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
-            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-              <th style={{ ...thM, ...thL, width: 140 }}>{spec.idCols[0].label}</th>
-              <th style={{ ...thM, ...thL, width: 140 }}>{spec.idCols[1].label}</th>
-              {refKeys.map((c) => <th key={c.key} style={{ ...thA, ...thL, width: 120 }}>{c.label}</th>)}
-              {spec.fareCols.map((c) => <th key={c.key} style={{ ...thM, width: 95 }}>{c.label}</th>)}
-              <th style={{ ...thM, width: 95 }}>Supplier Service Charge</th>
+            <thead><tr style={{ background: '#F9E8EE', borderBottom: '2px solid ' + PO_BAR }}>
+              <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[0].label}</th>
+              <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[1].label}</th>
+              {refKeys.map((c) => <th key={c.key} style={{ ...poHdrL, width: 120 }}>{c.label}</th>)}
+              {spec.fareCols.map((c) => <th key={c.key} style={{ ...poHdr, width: 95 }}>{c.label}</th>)}
+              <th style={{ ...poHdr, width: 95 }}>Supplier Service Charge</th>
               {pkg
-                ? <th style={{ ...thM, width: 95 }}>Supplier Service Charge GST (18%)</th>
-                : <th style={{ ...thA, width: 95 }}>GST ({activeRate}%)</th>}
-              <th style={{ ...thM, width: 100 }}>Supp Comm/Inc Rcvd</th>
-              <th style={{ ...thA, width: 85 }}>TDS (2%)</th>
-              <th style={{ ...thA, width: 110 }}>Total</th>
+                ? <th style={{ ...poHdr, width: 95 }}>Supplier Service Charge GST (18%)</th>
+                : <th style={{ ...poHdr, width: 95 }}>GST ({activeRate}%)</th>}
+              <th style={{ ...poHdr, width: 100 }}>Supp Comm/Inc Rcvd</th>
+              <th style={{ ...poHdr, width: 85 }}>TDS (2%)</th>
+              <th style={{ ...poHdr, width: 110 }}>Total</th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -825,7 +835,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                       : <td style={{ ...tdAuto, width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.gstPur)}</td>}
                     <td style={{ padding: '6px 3px', width: 100, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} /></td>
                     <td style={{ ...tdAuto, width: 85, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.tds)}</td>
-                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef', width: 110, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.finalPurchase)}</td>
+                    <td style={{ ...tdC, fontWeight: 800, color: CR, background: '#faf7ef', width: 110, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.finalPurchase)}</td>
                   </tr>
                   {spec.sectors && sectorBlock(l, i, false, poCols)}
                   </React.Fragment>
@@ -833,15 +843,15 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               })}
             </tbody>
             <tfoot><tr>
-              <td style={{ ...tfTd, textAlign: 'left' }}>TOTAL</td>
-              <td style={tfTd} />
-              {refKeys.map((c) => <td key={c.key} style={tfTd} />)}
-              {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
-              <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
-              <td style={tfTd}>{pkg ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
-              <td style={tfTd}>{fmt(totals.po.incentiveAmt)}</td>
-              <td style={tfTd}>{fmt(totals.po.incentiveTds)}</td>
-              <td style={tfTd}>{fmt(totals.po.total)}</td>
+              <td style={{ ...poTf, textAlign: 'left' }}>TOTAL</td>
+              <td style={poTf} />
+              {refKeys.map((c) => <td key={c.key} style={poTf} />)}
+              {spec.fareCols.map((c) => <td key={c.key} style={poTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
+              <td style={poTf}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
+              <td style={poTf}>{pkg ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
+              <td style={poTf}>{fmt(totals.po.incentiveAmt)}</td>
+              <td style={poTf}>{fmt(totals.po.incentiveTds)}</td>
+              <td style={{ ...poTf, color: CR }}>{fmt(totals.po.total)}</td>
             </tr></tfoot>
           </table>
         </div>
@@ -867,7 +877,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         )}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
-            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #cdd1d8' }}>
               <th style={{ ...thA, ...thL, width: 140 }}>First Name</th><th style={{ ...thA, ...thL, width: 140 }}>Surname</th>
               <th style={{ ...thA, width: 110 }}>Final Sales</th><th style={{ ...thA, width: 85 }}>SVF GST ({activeRate}%)</th><th style={{ ...thA, width: 85 }}>SVC2 GST ({activeRate}%)</th><th style={{ ...thA, width: 110 }}>Final Purchase</th><th style={{ ...thA, width: 95 }}>Purchase GST ({pkg ? 18 : activeRate}%)</th>
               <th style={{ ...thA, width: 95 }}>Supp Comm/Inc Rcvd</th><th style={{ ...thA, width: 80 }}>TDS (2%)</th>
@@ -902,7 +912,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {error && <div style={{ ...card, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 12, marginBottom: 14 }}>{error}</div>}
 
       {/* Footer */}
-      <div style={{ position: 'sticky', bottom: 0, background: '#f3f4f8', borderTop: '1px solid #e6e8ec', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ position: 'sticky', bottom: 0, background: '#FAFAF8', borderTop: '1px solid #dfe2e7', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, color: '#5b616e', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
           {editing ? <><Pencil size={12} /> Editing returns this voucher to Pending — approve it from the Pending queue to post the books.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
         </span>
@@ -1000,8 +1010,8 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
   }
 
   return (
-    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
-      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV, color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
+      <div style={{ ...card, border: '1px solid #dfe2e7', borderLeft: '4px solid ' + GOLD, borderRadius: 4, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
         <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : (kind === 'refund' ? 'REFUND VOUCHER' : 'REISSUE VOUCHER')}</p>
@@ -1044,7 +1054,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
 
 function Section({ n, name, sub, accent, badge, children }) {
   return (
-    <div style={{ background: '#fff', border: '1.5px solid ' + accent, borderRadius: 8, overflow: 'hidden', marginBottom: 14, boxShadow: '0 1px 3px rgba(0,0,0,.05)' }}>
+    <div style={{ background: '#fff', border: '1.5px solid ' + accent, borderRadius: 6, overflow: 'hidden', marginBottom: 13, boxShadow: '0 1px 3px rgba(0,0,0,.05)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '8px 14px', background: accent, color: '#fff' }}>
         <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '1px', padding: '3px 9px', borderRadius: 4, background: 'rgba(255,255,255,.24)' }}>{badge || n}</span>
         <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '2.5px', textTransform: 'uppercase' }}>{name}</span>
@@ -1059,8 +1069,8 @@ function GpCard({ k, v, color, pct, bg = '#FFFDF7' }) {
   return (
     <div style={{ border: '1px solid #F0E4C2', borderRadius: 8, padding: '12px 14px', background: bg }}>
       <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.7px', color: '#9A8138', textTransform: 'uppercase' }}>{k}</div>
-      <div style={{ fontSize: 20, fontWeight: 800, marginTop: 4, color }}>{v}</div>
-      {pct && <div style={{ fontSize: 12, fontWeight: 700, color: GOLD_DEEP, marginTop: 2 }}>{pct}</div>}
+      <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-.5px', marginTop: 4, color }}>{v}</div>
+      {pct && <div style={{ fontSize: 12, fontWeight: 700, color: '#A88E48', marginTop: 2 }}>{pct}</div>}
     </div>
   );
 }
@@ -1097,7 +1107,7 @@ function PartyPicker({ branch, kind, value, onChange, subGroupFilter }) {
         onChange={(e) => { setName(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)} style={inp} />
       {open && matches.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 60, marginTop: 2, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', maxHeight: 220, overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 60, marginTop: 2, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', maxHeight: 220, overflowY: 'auto' }}>
           {matches.map((l) => (
             <div key={l.id} {...clickable(() => pick(l), { role: 'option' })}
               style={{ padding: '7px 11px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5, outline: 'none' }}
@@ -1254,7 +1264,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
             const isOpen = open === b.id;
             return (
               <React.Fragment key={b.id}>
-                <tr onClick={() => setOpen(isOpen ? null : b.id)} style={{ borderBottom: '1px solid #f0f2f7', cursor: 'pointer', background: isOpen ? '#faf7ef' : '#fff' }}>
+                <tr onClick={() => setOpen(isOpen ? null : b.id)} style={{ borderBottom: '1px solid #dfe2e7', cursor: 'pointer', background: isOpen ? '#faf7ef' : '#fff' }}>
                   <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{mode === 'pending' && onToggleSel && <input type="checkbox" checked={!!(sel && sel.has(b.id))} onChange={() => onToggleSel(b.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} />}{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}{mode === 'pending' && b.validation?.hasErrors ? <span title={(b.validation.errors || []).join(' · ')} style={{ marginLeft: 6, color: '#dc2626', fontWeight: 800 }}>⚠</span> : null}</td>
                   {(mode === 'approved' || mode === 'pending') && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5b616e' }}>{b.date || '—'}</td>}
@@ -1329,7 +1339,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
 function GroupByBar({ value, onChange }) {
   const OPTS = [['none', 'Bill wise'], ['client', 'Client wise'], ['supplier', 'Supplier wise'], ['module', 'Module wise']];
   return (
-    <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden', marginBottom: 12 }}>
+    <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden', marginBottom: 12 }}>
       {OPTS.map(([v, l]) => (
         <button key={v} onClick={() => onChange(v)}
           style={{ padding: '6px 12px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: value === v ? BLUE : '#fff', color: value === v ? '#fff' : '#5b616e' }}>{l}</button>
@@ -1580,7 +1590,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
         <button onClick={() => setRoute && setRoute('/bookings/new')} className="max-tablet:min-h-[44px]" style={btnG}><Plus size={14} /> New voucher</button>
       </div>
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 10 }}>
-        <div style={{ display: 'flex', borderBottom: '1px solid #e6e8ec', flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}</div>
+        <div style={{ display: 'flex', borderBottom: '1px solid #cdd1d8', flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}</div>
       </div>
       {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, padding: '8px 12px', color: msg.startsWith('⚠') ? '#dc2626' : '#16a34a', background: msg.startsWith('⚠') ? '#fbe9e9' : '#e8f6ed', border: '1px solid ' + (msg.startsWith('⚠') ? '#f3c9c9' : '#cde3b6') }}>{msg}</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -1603,8 +1613,8 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
 // to its full audit timeline (who/when/why + field-level changes + full snapshot) and
 // the live JV. Cross-cuts status: an approved booking that was later edited shows here.
 function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
-  const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: '2px solid #e6e8ec', whiteSpace: 'nowrap' };
-  const td = { padding: '7px 10px', borderBottom: '1px solid #f4f6fa', fontSize: 12, whiteSpace: 'nowrap' };
+  const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: '2px solid #cdd1d8', whiteSpace: 'nowrap' };
+  const td = { padding: '7px 10px', borderBottom: '1px solid #dfe2e7', fontSize: 12, whiteSpace: 'nowrap' };
   if (isLoading) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#9197a3' }}>Loading edited bookings…</div>;
   if (!rows.length) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#9197a3' }}>No edited bookings in this period.</div>;
   const fmtAt = (s) => { const d = new Date(s); return isNaN(d) ? (s || '—') : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
@@ -1630,7 +1640,7 @@ function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
                   <td style={{ ...td, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', color: '#5b616e' }} title={r.lastReason || ''}>{r.lastReason || (r.preAudit ? '— pre-audit —' : '—')}</td>
                 </tr>
                 {isOpen && (
-                  <tr><td colSpan={10} style={{ padding: 12, background: '#f7f8fb', borderBottom: '1px solid #e6e8ec' }}>
+                  <tr><td colSpan={10} style={{ padding: 12, background: '#f7f8fb', borderBottom: '1px solid #cdd1d8' }}>
                     <div style={{ fontWeight: 800, fontSize: 12, color: DARK, marginBottom: 8 }}>Audit trail — {r.bookingNo}</div>
                     <AuditTrail entityType="booking" entityId={r.id} />
                   </td></tr>

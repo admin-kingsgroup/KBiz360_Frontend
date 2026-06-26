@@ -52,7 +52,7 @@ export class ErrorBoundary extends React.Component {
                 {this.state.showDetails ? 'Hide technical details' : 'Show technical details'}
               </button>
               {this.state.showDetails && (
-                <pre style={{ textAlign: 'left', background: '#fff', border: '1px solid #e1e3ec', borderRadius: 8, padding: 12, fontSize: 11, color: '#A32D2D', overflowX: 'auto', marginTop: 10 }}>
+                <pre style={{ textAlign: 'left', background: '#fff', border: '1px solid #cdd1d8', borderRadius: 8, padding: 12, fontSize: 11, color: '#A32D2D', overflowX: 'auto', marginTop: 10 }}>
                   {String(this.state.error?.message || this.state.error)}
                 </pre>
               )}

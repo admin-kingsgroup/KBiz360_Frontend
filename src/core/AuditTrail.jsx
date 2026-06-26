@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from './api';
 
-const C = { dark: '#0d1326', blue: '#185FA5', red: '#A32D2D', green: '#27500A', gold: '#d4a437', dim: '#5a6691', border: '#e1e3ec' };
+const C = { dark: '#0d1326', blue: '#185FA5', red: '#A32D2D', green: '#27500A', gold: '#d4a437', dim: '#5a6691', border: '#cdd1d8' };
 
 const ACTION = {
   create:  { label: 'Created',  bg: '#EAF3DE', fg: '#27500A' },
@@ -170,7 +170,7 @@ function EventCard({ ev }) {
               </tr></thead>
               <tbody>
                 {changes.map((c, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}>
+                  <tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}>
                     <td style={{ padding: '5px 8px', fontWeight: 600, color: C.dark, verticalAlign: 'top', whiteSpace: 'nowrap' }}>{labelOf(c.field)}</td>
                     <td style={{ padding: '5px 8px', verticalAlign: 'top', color: C.red }}><ValueView field={c.field} value={c.from} /></td>
                     <td style={{ padding: '5px 8px', verticalAlign: 'top', color: C.green }}><ValueView field={c.field} value={c.to} /></td>

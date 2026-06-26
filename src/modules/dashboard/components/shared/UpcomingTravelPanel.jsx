@@ -18,7 +18,7 @@ export function UpcomingTravelPanel({ bookings, onViewAll }) {
         <div
           key={b.id || i}
           className="py-2"
-          style={{ borderBottom: i < bookings.length - 1 ? '1px solid #f4f5f7' : 'none' }}
+          style={{ borderBottom: i < bookings.length - 1 ? '1px solid #dfe2e7' : 'none' }}
         >
           <div className="flex items-center justify-between">
             <div>

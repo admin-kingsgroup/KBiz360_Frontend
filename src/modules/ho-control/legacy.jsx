@@ -124,7 +124,7 @@ export function GroupDashboard(){
           </thead>
           <tbody>
             {branchData.map((b,i)=>(
-              <tr key={b.code} style={{borderBottom:"1px solid #f3f4f8",background:"#fff"}}>
+              <tr key={b.code} style={{borderBottom:"1px solid #dfe2e7",background:"#fff"}}>
                 <td style={{padding:"11px 14px"}}>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                     <span style={{fontSize:20}}>{b.flag}</span>
@@ -198,7 +198,7 @@ export function GroupDashboard(){
               {l:"Indirect Expenses",key:"exp",bold:false,rate:true},
               {l:"NET PROFIT",key:"npINR",bold:true},
             ].map((row,ri)=>(
-              <tr key={ri} style={{borderBottom:"1px solid #f3f4f8",background:row.bold?"#f9fafb":"#fff"}}>
+              <tr key={ri} style={{borderBottom:"1px solid #dfe2e7",background:row.bold?"#f9fafb":"#fff"}}>
                 <td style={{padding:"9px 12px",fontWeight:row.bold?700:400,color:row.bold?"#0d1326":"#384677",fontSize:row.bold?12:11.5}}>{row.l}</td>
                 {branchData.map(b=>{
                   const v=row.pct?b[row.key]:(row.rate?Math.round(b[row.key]*b.rate):Math.round(b[row.key]));
@@ -314,7 +314,7 @@ export function GroupBookings({branch,setRoute}){
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
               <thead><tr style={{background:"#0d1326"}}>{["#","Guest Name","Room Type","Check-in","Check-out","Notes"].map((h,i)=><th key={i} style={{padding:"7px 12px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>{h}</th>)}</tr></thead>
               <tbody>{Array.from({length:Math.min(selGrp.pax,6)}).map((_,i)=>(
-                <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+                <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"7px 12px",color:"#5a6691"}}>{i+1}</td>
                   <td style={{padding:"7px 12px"}}><input defaultValue={`Guest ${i+1}`} style={{...inp,minHeight:28,fontSize:10.5,padding:"3px 8px"}}/></td>
                   <td style={{padding:"7px 12px"}}><select style={{...inp,minHeight:28,fontSize:10.5}}>{selGrp.rooms.map(r=><option key={r.type}>{r.type}</option>)}</select></td>
@@ -336,7 +336,7 @@ export function GroupBookings({branch,setRoute}){
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:500,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>New Group Booking</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
             </div>
@@ -352,7 +352,7 @@ export function GroupBookings({branch,setRoute}){
               </div>
               <FL label="Group leader / contact"><input style={inp}/></FL>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
               <button onClick={()=>setModal(false)} style={btnG}>Create Group</button>
             </div>
@@ -371,7 +371,7 @@ export function PeriodLocking({branch,setRoute}){
   const locked=PERIOD_LOCK_DATA.filter(p=>p.status==="Locked").length;
   const open=PERIOD_LOCK_DATA.filter(p=>p.status==="Open").length;
   const soft=PERIOD_LOCK_DATA.filter(p=>p.status==="Soft Lock").length;
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
@@ -399,7 +399,7 @@ export function PeriodLocking({branch,setRoute}){
             </tr></thead>
             <tbody>
               {PERIOD_LOCK_DATA.map((p,i)=>(
-                <tr key={i} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #e1e3ec"}}>
+                <tr key={i} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
                   <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700}}>{p.branch}</td>
                   <td style={{padding:"7px 8px",textAlign:"center",fontFamily:"monospace"}}>{p.period}</td>
                   <td style={{padding:"7px 8px",textAlign:"center"}}>
@@ -432,7 +432,7 @@ export function BankingApiSettings({branch,setRoute}){
   const mob=useMobile();
   const BANK_INTEGRATIONS=[];
   const connected=BANK_INTEGRATIONS.filter(b=>b.status==="Connected").length;
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
@@ -460,7 +460,7 @@ export function BankingApiSettings({branch,setRoute}){
             </tr></thead>
             <tbody>
               {BANK_INTEGRATIONS.map((b,i)=>(
-                <tr key={i} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #e1e3ec"}}>
+                <tr key={i} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
                   <td style={{padding:"7px 8px",fontWeight:600}}>{b.bank}</td>
                   <td style={{padding:"7px 8px",textAlign:"center",fontSize:10}}>{b.branch}</td>
                   <td style={{padding:"7px 8px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{b.account}</td>
@@ -496,13 +496,13 @@ export function HOAssetProcurement(){
   const filtered=filter==="ALL"?HO_ASSET_REQUESTS:HO_ASSET_REQUESTS.filter(r=>r.stage===filter);
   const totalPending=HO_ASSET_REQUESTS.filter(r=>!["Approved","Ordered","Delivered"].includes(r.stage)).reduce((s,r)=>s+r.amount,0);
   const totalGSTRecoverable=HO_ASSET_REQUESTS.reduce((s,r)=>s+r.gst,0);
-  const inp={padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%"};
+  const inp={padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"};
 
   return(
     <PHASE2_Page title="HO Asset Procurement — Central Workflow"
       subtitle="All high-value assets routed through HO · consolidated GST input credit · vendor discount leverage"
       toolbar={<>
-        <select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>
+        <select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>
           <option value="ALL">All stages</option>{stages.map(s=><option key={s}>{s}</option>)}
         </select>
         <button onClick={()=>setShowForm(!showForm)} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ New Asset Request</button>
@@ -531,7 +531,7 @@ export function HOAssetProcurement(){
             <b>Approval routing:</b> Up to ₹2L → Sughra Sayed · ₹2L-₹25L → Faiz Patel · Above ₹25L → Director Afshin Dhanani approval mandatory
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
-            <button onClick={()=>setShowForm(false)} style={{padding:"8px 16px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+            <button onClick={()=>setShowForm(false)} style={{padding:"8px 16px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
             <button style={{padding:"8px 18px",background:"#0d1326",color:"#d4a437",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>Submit Request</button>
           </div>
         </div>
@@ -552,7 +552,7 @@ export function HOAssetProcurement(){
               <th style={{...RPT_thStyle,textAlign:"center"}}>Action</th>
             </tr></thead>
             <tbody>{filtered.map(r=>(
-              <tr key={r.id} style={{borderBottom:"1px solid #f0f2f7"}}>
+              <tr key={r.id} style={{borderBottom:"1px solid #dfe2e7"}}>
                 <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{r.id}</td>
                 <td style={RPT_tdStyle}><span style={{padding:"2px 7px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{r.branch}</span></td>
                 <td style={{...RPT_tdStyle,fontSize:11}}>{r.requestedBy}</td>
@@ -564,10 +564,10 @@ export function HOAssetProcurement(){
                 <td style={{...RPT_tdStyle,textAlign:"center"}}>
                   <span style={{padding:"3px 9px",borderRadius:3,fontSize:10,fontWeight:700,background:(stageColors[r.stage]||"#5a6691")+"22",color:stageColors[r.stage]||"#0d1326"}}>{r.stage}</span>
                 </td>
-                <td style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #f0f2f7"}}>
+                <td style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #dfe2e7"}}>
                   <div style={{display:"flex",gap:4,justifyContent:"center"}}>
                     {!["Approved","Ordered","Delivered"].includes(r.stage)&&<button style={{padding:"3px 8px",background:"#22c55e",color:"#fff",border:"none",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>Approve</button>}
-                    <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:3,fontSize:10,cursor:"pointer"}}>View</button>
+                    <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:3,fontSize:10,cursor:"pointer"}}>View</button>
                   </div>
                 </td>
               </tr>
@@ -593,7 +593,7 @@ export function HOVendorMasterLock(){
   return(
     <PHASE2_Page title="Centralized Vendor Master — HO Lock Control"
       subtitle="Critical vendor master data locked at HO · branches read-only on PAN, Bank A/c & Credit Terms"
-      toolbar={<><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Lock New Vendor</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Locked List</button></>}>
+      toolbar={<><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Lock New Vendor</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Locked List</button></>}>
 
       <div style={{padding:14,background:"#fff5f5",border:"1px solid #fecaca",borderLeft:"3px solid #A32D2D",borderRadius:6,marginBottom:14,fontSize:11.5,color:"#721c24"}}>
         <p style={{margin:"0 0 4px",fontWeight:700,fontSize:12.5,color:"#A32D2D"}}>🔒 Why these vendors are locked at HO</p>
@@ -620,7 +620,7 @@ export function HOVendorMasterLock(){
               <th style={RPT_thStyle}>Last Change Attempt</th>
             </tr></thead>
             <tbody>{HO_LOCKED_VENDORS.map(v=>(
-              <tr key={v.id} style={{borderBottom:"1px solid #f0f2f7"}}>
+              <tr key={v.id} style={{borderBottom:"1px solid #dfe2e7"}}>
                 <td style={{...RPT_tdStyle,fontWeight:700}}>{v.name}</td>
                 <td style={{...RPT_tdStyle,fontSize:11,color:"#5a6691"}}>{v.category}</td>
                 <td style={{...RPT_tdStyle,textAlign:"center",fontFamily:"monospace",fontSize:11}}>{v.pan!=="-"?v.pan:<span style={{color:"#5a6691"}}>—</span>}</td>
@@ -688,7 +688,7 @@ export function HOBankingControl(){
               <th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th>
             </tr></thead>
             <tbody>{HO_BANK_CONTROL.map((b,i)=>(
-              <tr key={i} style={{borderBottom:"1px solid #f0f2f7",background:b.controlLevel==="HO-Locked"?"#fff5f5":"#fff"}}>
+              <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:b.controlLevel==="HO-Locked"?"#fff5f5":"#fff"}}>
                 <td style={RPT_tdStyle}><p style={{margin:0,fontWeight:700}}>{b.bank}</p><p style={{margin:0,fontSize:10,fontFamily:"monospace",color:"#5a6691"}}>{b.acct}</p></td>
                 <td style={RPT_tdStyle}><span style={{padding:"2px 7px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{b.branch}</span></td>
                 <td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:700}}>{b.currency}</td>
@@ -739,7 +739,7 @@ export function GroupMonthlyDashboard(){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"right"}}>Revenue</th><th style={{...RPT_thStyle,textAlign:"right"}}>Cost</th><th style={{...RPT_thStyle,textAlign:"right"}}>GP</th><th style={{...RPT_thStyle,textAlign:"right"}}>GP %</th><th style={{...RPT_thStyle,textAlign:"right"}}>Bookings</th></tr></thead>
           <tbody>{pnlByBranch.map(b=>(
-            <tr key={b.branch} style={{borderBottom:"1px solid #f0f2f7",background:"#fff"}}>
+            <tr key={b.branch} style={{borderBottom:"1px solid #dfe2e7",background:"#fff"}}>
               <td style={{...RPT_tdStyle,fontWeight:700}}><span style={{padding:"2px 7px",background:"#0d1326",color:"#d4a437",borderRadius:3,fontSize:10.5,fontWeight:700}}>{b.branch}</span></td>
               <td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(b.revenue)}</td>
               <td style={{...RPT_tdStyle,textAlign:"right",color:"#5a6691"}}>{fmtINR(b.cost)}</td>
@@ -765,7 +765,7 @@ export function GroupMonthlyDashboard(){
         <div style={cardStyle}>
           <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>2️⃣ GP by Branch (live)</p>
           {g.rows.slice().sort((a,b)=>b.gpINR-a.gpINR).map((c,i)=>(
-            <div key={c.code} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f0f2f7"}}>
+            <div key={c.code} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #dfe2e7"}}>
               <div><span style={{fontSize:11,color:"#5a6691",fontWeight:700,marginRight:8}}>#{i+1}</span><span style={{fontSize:12,fontWeight:600,color:"#0d1326"}}>{c.flag} {c.code} · {c.city}</span></div>
               <div style={{textAlign:"right"}}><p style={{margin:0,fontSize:12,fontWeight:700,color:c.gpINR>=0?"#22c55e":"#A32D2D"}}>{fmtINR(c.gpINR)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>{c.books} bookings</p></div>
             </div>
@@ -775,7 +775,7 @@ export function GroupMonthlyDashboard(){
         <div style={cardStyle}>
           <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>3️⃣ Top Customers (Revenue · live)</p>
           {g.topCustomers.map((c,i)=>(
-            <div key={c.name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f0f2f7"}}>
+            <div key={c.name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #dfe2e7"}}>
               <div><span style={{fontSize:11,color:"#5a6691",fontWeight:700,marginRight:8}}>#{i+1}</span><span style={{fontSize:12,fontWeight:600,color:"#0d1326"}}>{c.name}</span></div>
               <div style={{textAlign:"right"}}><p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{fmtINR(c.revenue)}</p></div>
             </div>
@@ -789,7 +789,7 @@ export function GroupMonthlyDashboard(){
         <div style={cardStyle}>
           <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>4️⃣ Group Cash Position</p>
           {[{cur:"INR",amt:g.cash,sym:"₹"}].map(c=>(
-            <div key={c.cur} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f0f2f7"}}>
+            <div key={c.cur} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #dfe2e7"}}>
               <span style={{fontSize:12,color:"#0d1326",fontWeight:600}}>{c.cur}</span>
               <span style={{fontSize:12,fontWeight:700,color:"#0d1326",fontFamily:"monospace"}}>{c.sym} {c.amt.toLocaleString("en-IN")}</span>
             </div>
@@ -803,7 +803,7 @@ export function GroupMonthlyDashboard(){
             {label:"TDS Q4 Returns",  due:"2026-05-31",amt:0},
             {label:"Adv Tax Q1",      due:"2026-06-15",amt:1850000},
           ].map((s,i)=>(
-            <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f0f2f7"}}>
+            <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #dfe2e7"}}>
               <span style={{fontSize:11.5,color:"#0d1326"}}>{s.label}<span style={{marginLeft:8,fontSize:10,color:"#A32D2D"}}>{s.due}</span></span>
               <span style={{fontSize:12,fontWeight:700,color:"#A32D2D",fontFamily:"monospace"}}>{s.amt>0?fmtINR(s.amt):"—"}</span>
             </div>
@@ -833,7 +833,7 @@ export function StatutoryFilingRegister(){
   return(
     <PHASE2_Page title="Statutory Filing Register — HO Ownership"
       subtitle="All statutory filings owned & filed by HO finance · branches contribute data, HO files · single source of truth"
-      toolbar={<><select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All statuses</option>{statuses.map(s=><option key={s}>{s}</option>)}</select><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Register</button></>}>
+      toolbar={<><select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All statuses</option>{statuses.map(s=><option key={s}>{s}</option>)}</select><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Register</button></>}>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
         {[{l:"Filed (Month)",v:filed,c:"#22c55e"},{l:"In Progress",v:pending,c:"#3b82f6"},{l:"Due Today",v:dueToday,c:"#A32D2D"},{l:"Filing Owner",v:"Faiz / Sughra",c:"#0d1326",small:true}].map(k=>(
@@ -855,7 +855,7 @@ export function StatutoryFilingRegister(){
             <th style={{...RPT_thStyle,textAlign:"center"}}>Action</th>
           </tr></thead>
           <tbody>{filtered.map(f=>(
-            <tr key={f.id} style={{borderBottom:"1px solid #f0f2f7",background:f.status==="Due Today"?"#fff8e8":"#fff"}}>
+            <tr key={f.id} style={{borderBottom:"1px solid #dfe2e7",background:f.status==="Due Today"?"#fff8e8":"#fff"}}>
               <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{f.id}</td>
               <td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#e6e8f1",borderRadius:3,fontSize:10.5,fontWeight:700}}>{f.type}</span></td>
               <td style={{...RPT_tdStyle,fontWeight:600}}>{f.entity}</td>
@@ -866,7 +866,7 @@ export function StatutoryFilingRegister(){
               <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:f.ack!=="-"?"#22c55e":"#5a6691",fontWeight:600}}>{f.ack}</td>
               <td style={{...RPT_tdStyle,textAlign:"center"}}>
                 {f.status==="Filed"?
-                  <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:3,fontSize:10,cursor:"pointer"}}>View</button>:
+                  <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:3,fontSize:10,cursor:"pointer"}}>View</button>:
                   <button style={{padding:"3px 10px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>File Now</button>}
               </td>
             </tr>
@@ -913,14 +913,14 @@ export function PeriodLockControl(){
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead><tr><th style={RPT_thStyle}>Branch</th>{months.map(m=><th key={m} style={{...RPT_thStyle,textAlign:"center"}}>{m}</th>)}</tr></thead>
             <tbody>{branches.map(b=>(
-              <tr key={b} style={{borderBottom:"1px solid #f0f2f7"}}>
+              <tr key={b} style={{borderBottom:"1px solid #dfe2e7"}}>
                 <td style={{...RPT_tdStyle,fontWeight:700}}><span style={{padding:"2px 7px",background:"#0d1326",color:"#d4a437",borderRadius:3,fontSize:10.5,fontWeight:700}}>{b}</span></td>
                 {months.map(m=>{
                   const state=periods[b][m];
                   const bg=state==="open"?"#d4edda":state==="soft"?"#fff3cd":"#f8d7da";
                   const col=state==="open"?"#155724":state==="soft"?"#856404":"#721c24";
                   const lbl=state==="open"?"🟢 Open":state==="soft"?"🟡 Soft":"🔴 Hard";
-                  return(<td key={m} style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #f0f2f7",cursor:"pointer"}} {...clickable(()=>cycle(b,m))}>
+                  return(<td key={m} style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #dfe2e7",cursor:"pointer"}} {...clickable(()=>cycle(b,m))}>
                     <span style={{padding:"4px 12px",background:bg,color:col,borderRadius:4,fontSize:10.5,fontWeight:700,display:"inline-block",minWidth:70}}>{lbl}</span>
                   </td>);
                 })}
@@ -936,7 +936,7 @@ export function PeriodLockControl(){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Override Date</th><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Period</th><th style={RPT_thStyle}>Requested By</th><th style={RPT_thStyle}>Reason</th><th style={RPT_thStyle}>Approved By</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
           <tbody>{[].map((o,i)=>(
-            <tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}>
+            <tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}>
               <td style={{...RPT_tdStyle,fontFamily:"monospace"}}>{o.date}</td>
               <td style={RPT_tdStyle}><span style={{padding:"1px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{o.branch}</span></td>
               <td style={{...RPT_tdStyle,fontFamily:"monospace"}}>{o.period}</td>
@@ -970,7 +970,7 @@ export function CentralAuditQueue(){
   return(
     <PHASE2_Page title="Central Audit Review Queue — 100% Voucher Audit"
       subtitle="HO finance reviews 100% of branch vouchers · risk-based prioritization · findings discussed in monthly branch-leads call"
-      toolbar={<><select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All statuses</option>{statuses.map(s=><option key={s}>{s}</option>)}</select><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Findings</button></>}>
+      toolbar={<><select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All statuses</option>{statuses.map(s=><option key={s}>{s}</option>)}</select><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Findings</button></>}>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
         <div style={{...cardStyle,borderTop:"3px solid #f97316"}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Pending Review</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#f97316"}}>{pending}</p></div>
@@ -1015,7 +1015,7 @@ export function CentralAuditQueue(){
           <tbody>{filtered.map(v=>{
             const isAudited=audited[v.id]||v.status==="Reviewed";
             return(
-              <tr key={v.id} style={{borderBottom:"1px solid #f0f2f7",background:v.status==="Flagged"?"#fff5f5":(audited[v.id]?"#f0fff4":"#fff")}}>
+              <tr key={v.id} style={{borderBottom:"1px solid #dfe2e7",background:v.status==="Flagged"?"#fff5f5":(audited[v.id]?"#f0fff4":"#fff")}}>
                 <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#d4a437",fontWeight:600}}>{v.vno}</td>
                 <td style={RPT_tdStyle}><span style={{padding:"2px 7px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{v.branch}</span></td>
                 <td style={{...RPT_tdStyle,fontSize:11}}>{v.date}</td>
@@ -1029,7 +1029,7 @@ export function CentralAuditQueue(){
                   {v.reviewedBy&&<p style={{margin:"2px 0 0",fontSize:10,color:"#5a6691"}}>by {v.reviewedBy}</p>}
                   {v.note&&<p style={{margin:"2px 0 0",fontSize:10,color:"#A32D2D",fontStyle:"italic"}}>{v.note}</p>}
                 </td>
-                <td style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #f0f2f7"}}>
+                <td style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #dfe2e7"}}>
                   {v.status==="Pending Review"&&!audited[v.id]&&(
                     <div style={{display:"flex",gap:4,justifyContent:"center"}}>
                       <button onClick={()=>setAudited(p=>({...p,[v.id]:true}))} style={{padding:"3px 8px",background:"#22c55e",color:"#fff",border:"none",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>✓ Clear</button>
@@ -1092,7 +1092,7 @@ export function AuthorityConfigCenter(){
     {key:"afshin", name:"Afshin (Director)",tier:"Final", color:"#3C1B14"},
   ];
 
-  const inp={padding:"6px 8px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11.5,width:"100%",fontFamily:"monospace",textAlign:"right"};
+  const inp={padding:"6px 8px",border:"1px solid #cdd1d8",borderRadius:4,fontSize:11.5,width:"100%",fontFamily:"monospace",textAlign:"right"};
 
   const updateTxn = (i, field, value) => {
     setTxn(t => t.map((r, idx) => idx === i ? {...r, [field]: value} : r));
@@ -1108,7 +1108,7 @@ export function AuthorityConfigCenter(){
       subtitle="Faiz Patel · Sr. Finance Manager · Configure approval limits · master-data permissions · branch isolation · time-based controls"
       toolbar={<>
         {saved && <span style={{padding:"5px 12px",background:"#FAEEDA",color:"#854F0B",borderRadius:4,fontSize:11,fontWeight:700}} title="Server persistence for this screen isn’t wired yet — changes are held in this session only.">⚠ Captured in this session — not yet saved to the server</span>}
-        <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Matrix</button>
+        <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Matrix</button>
         <button onClick={()=>setSaved(true)} title="Holds your changes for this session — server save is not enabled on this screen yet" style={{padding:"7px 16px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save All Changes</button>
       </>}>
 
@@ -1131,7 +1131,7 @@ export function AuthorityConfigCenter(){
       </div>
 
       {/* Tabs */}
-      <div style={{display:"flex",borderBottom:"1px solid #e1e3ec",marginBottom:14,background:"#fff",border:"1px solid #e1e3ec",borderRadius:"8px 8px 0 0",overflow:"hidden",flexWrap:"wrap"}}>
+      <div style={{display:"flex",borderBottom:"1px solid #cdd1d8",marginBottom:14,background:"#fff",border:"1px solid #cdd1d8",borderRadius:"8px 8px 0 0",overflow:"hidden",flexWrap:"wrap"}}>
         {tabs.map(t=>(
           <button key={t.k} onClick={()=>setTab(t.k)} style={tabBtnStyle(tab===t.k)}>{t.l}</button>
         ))}
@@ -1158,19 +1158,19 @@ export function AuthorityConfigCenter(){
               </thead>
               <tbody>
                 {txn.map((r,i)=>(
-                  <tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}>
+                  <tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}>
                     <td style={{...RPT_tdStyle,fontWeight:700,fontSize:12}}>{r.type}</td>
-                    <td style={{padding:"6px 12px",borderBottom:"1px solid #f0f2f7"}}>
+                    <td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7"}}>
                       <input type="number" value={r.ae} onChange={e=>updateTxn(i,"ae",+e.target.value)} style={inp}/>
                     </td>
-                    <td style={{padding:"6px 12px",borderBottom:"1px solid #f0f2f7"}}>
+                    <td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7"}}>
                       <input type="number" value={r.sughra} onChange={e=>updateTxn(i,"sughra",+e.target.value)} style={inp}/>
                     </td>
-                    <td style={{padding:"6px 12px",borderBottom:"1px solid #f0f2f7"}}>
+                    <td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7"}}>
                       <input type="number" value={r.faiz} onChange={e=>updateTxn(i,"faiz",+e.target.value)} style={inp}/>
                     </td>
-                    <td style={{padding:"6px 12px",borderBottom:"1px solid #f0f2f7",textAlign:"center"}}>
-                      <select value={r.afshin} onChange={e=>updateTxn(i,"afshin",e.target.value)} style={{padding:"6px 8px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11.5,fontWeight:700,color:"#3C1B14",background:"#fff8e8",cursor:"pointer"}}>
+                    <td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7",textAlign:"center"}}>
+                      <select value={r.afshin} onChange={e=>updateTxn(i,"afshin",e.target.value)} style={{padding:"6px 8px",border:"1px solid #cdd1d8",borderRadius:4,fontSize:11.5,fontWeight:700,color:"#3C1B14",background:"#fff8e8",cursor:"pointer"}}>
                         <option>Above</option>
                         <option>Any</option>
                       </select>
@@ -1207,15 +1207,15 @@ export function AuthorityConfigCenter(){
               </thead>
               <tbody>
                 {master.map((row,i)=>(
-                  <tr key={i} style={{borderBottom:"1px solid #f0f2f7",background:row.change.includes("Bank A/c")||row.change.includes("Approval Matrix")?"#fff5f5":"#fff"}}>
+                  <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:row.change.includes("Bank A/c")||row.change.includes("Approval Matrix")?"#fff5f5":"#fff"}}>
                     <td style={{...RPT_tdStyle,fontWeight:700,fontSize:12}}>{row.change}<p style={{margin:"2px 0 0",fontSize:10,color:"#5a6691",fontStyle:"italic",fontWeight:400}}>{row.note}</p></td>
                     {["ae","sughra","faiz"].map(role=>(
-                      <td key={"req"+role} style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #f0f2f7",background:"#f0f7ff"}}>
+                      <td key={"req"+role} style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #dfe2e7",background:"#f0f7ff"}}>
                         <input type="checkbox" checked={row.req[role]} onChange={()=>toggleMaster(i,"req",role)} style={{width:18,height:18,cursor:"pointer",accentColor:"#3b82f6"}}/>
                       </td>
                     ))}
                     {["sughra","faiz","afshin"].map(role=>(
-                      <td key={"appr"+role} style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #f0f2f7",background:"#f0fff4"}}>
+                      <td key={"appr"+role} style={{padding:"6px 8px",textAlign:"center",borderBottom:"1px solid #dfe2e7",background:"#f0fff4"}}>
                         <input type="checkbox" checked={row.appr[role]} onChange={()=>toggleMaster(i,"appr",role)} style={{width:18,height:18,cursor:"pointer",accentColor:"#22c55e"}}/>
                       </td>
                     ))}
@@ -1238,7 +1238,7 @@ export function AuthorityConfigCenter(){
               {key:"interbranchJournal", label:"Inter-branch journals: AE initiates, Sughra approves", desc:"Per your spec — AE can initiate inter-branch entries, but Sughra must approve before posting."},
               {key:"twoBranchReason",    label:"Transactions touching 2+ branches require 'Reason' field", desc:"Reason text visible in consolidated reports."},
             ].map(r=>(
-              <label key={r.key} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 0",borderBottom:"1px solid #f0f2f7",cursor:"pointer"}}>
+              <label key={r.key} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 0",borderBottom:"1px solid #dfe2e7",cursor:"pointer"}}>
                 <input type="checkbox" checked={branchRules[r.key]} onChange={()=>{setBranchRules(b=>({...b,[r.key]:!b[r.key]}));setSaved(false);}} style={{width:18,height:18,marginTop:2,cursor:"pointer",accentColor:"#d4a437"}}/>
                 <div style={{flex:1}}>
                   <p style={{margin:0,fontSize:12.5,fontWeight:600,color:"#0d1326"}}>{r.label}</p>
@@ -1257,7 +1257,7 @@ export function AuthorityConfigCenter(){
                 {key:"ae",       label:"Accounts Executive",  default:false},
                 {key:"hrMgr",    label:"HR Manager",          default:false},
               ].map(r=>(
-                <label key={r.key} style={{display:"flex",alignItems:"center",gap:8,padding:"10px",border:"1px solid #e1e3ec",borderRadius:5,cursor:"pointer",background:branchRules.consolidatedAccess[r.key]?"#fff8e8":"#fff"}}>
+                <label key={r.key} style={{display:"flex",alignItems:"center",gap:8,padding:"10px",border:"1px solid #cdd1d8",borderRadius:5,cursor:"pointer",background:branchRules.consolidatedAccess[r.key]?"#fff8e8":"#fff"}}>
                   <input type="checkbox" checked={branchRules.consolidatedAccess[r.key]} onChange={()=>{setBranchRules(b=>({...b,consolidatedAccess:{...b.consolidatedAccess,[r.key]:!b.consolidatedAccess[r.key]}}));setSaved(false);}} style={{width:16,height:16,cursor:"pointer",accentColor:"#d4a437"}}/>
                   <span style={{fontSize:11.5,fontWeight:600,color:"#0d1326"}}>{r.label}</span>
                 </label>
@@ -1275,12 +1275,12 @@ export function AuthorityConfigCenter(){
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <div>
                 <label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Soft-Lock Day (of following month)</label>
-                <input type="number" min="1" max="31" value={exceptions.softLockDay} onChange={e=>{setExceptions({...exceptions,softLockDay:+e.target.value});setSaved(false);}} style={{padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:13,fontWeight:700,width:100,fontFamily:"monospace"}}/>
+                <input type="number" min="1" max="31" value={exceptions.softLockDay} onChange={e=>{setExceptions({...exceptions,softLockDay:+e.target.value});setSaved(false);}} style={{padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:13,fontWeight:700,width:100,fontFamily:"monospace"}}/>
                 <p style={{margin:"4px 0 0",fontSize:10.5,color:"#5a6691"}}>After this day, prior period soft-locks. Sughra approval needed for entries.</p>
               </div>
               <div>
                 <label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Hard-Lock After (days post period-end)</label>
-                <input type="number" min="1" value={exceptions.hardLockDays} onChange={e=>{setExceptions({...exceptions,hardLockDays:+e.target.value});setSaved(false);}} style={{padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:13,fontWeight:700,width:100,fontFamily:"monospace"}}/>
+                <input type="number" min="1" value={exceptions.hardLockDays} onChange={e=>{setExceptions({...exceptions,hardLockDays:+e.target.value});setSaved(false);}} style={{padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:13,fontWeight:700,width:100,fontFamily:"monospace"}}/>
                 <p style={{margin:"4px 0 0",fontSize:10.5,color:"#5a6691"}}>After {exceptions.hardLockDays} days, period hard-locks. Only Faiz/Afshin override.</p>
               </div>
             </div>
@@ -1290,12 +1290,12 @@ export function AuthorityConfigCenter(){
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <div>
                 <label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Dual-Control Triggered Above (₹)</label>
-                <input type="number" value={exceptions.dualThreshold} onChange={e=>{setExceptions({...exceptions,dualThreshold:+e.target.value});setSaved(false);}} style={{padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:13,fontWeight:700,width:160,fontFamily:"monospace"}}/>
+                <input type="number" value={exceptions.dualThreshold} onChange={e=>{setExceptions({...exceptions,dualThreshold:+e.target.value});setSaved(false);}} style={{padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:13,fontWeight:700,width:160,fontFamily:"monospace"}}/>
                 <p style={{margin:"4px 0 0",fontSize:10.5,color:"#5a6691"}}>= {fmtINR(exceptions.dualThreshold)}. Vouchers above this need extra approval.</p>
               </div>
               <div>
                 <label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Extra Approver Required</label>
-                <select value={exceptions.dualApprover} onChange={e=>{setExceptions({...exceptions,dualApprover:e.target.value});setSaved(false);}} style={{padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12.5,width:200,background:"#fff"}}>
+                <select value={exceptions.dualApprover} onChange={e=>{setExceptions({...exceptions,dualApprover:e.target.value});setSaved(false);}} style={{padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12.5,width:200,background:"#fff"}}>
                   <option>Afshin only</option>
                   <option>Sughra OR Afshin</option>
                   <option>Both Sughra AND Afshin</option>
@@ -1306,7 +1306,7 @@ export function AuthorityConfigCenter(){
           </div>
           <div style={cardStyle}>
             <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Weekend / After-Hours Controls</p>
-            <label style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 0",borderBottom:"1px solid #f0f2f7",cursor:"pointer"}}>
+            <label style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 0",borderBottom:"1px solid #dfe2e7",cursor:"pointer"}}>
               <input type="checkbox" checked={exceptions.weekendFlag} onChange={()=>{setExceptions({...exceptions,weekendFlag:!exceptions.weekendFlag});setSaved(false);}} style={{width:18,height:18,marginTop:2,cursor:"pointer",accentColor:"#d4a437"}}/>
               <div style={{flex:1}}>
                 <p style={{margin:0,fontSize:12.5,fontWeight:600,color:"#0d1326"}}>Flag vouchers posted on Sundays, public holidays, or after-hours for next-day review</p>
@@ -1316,11 +1316,11 @@ export function AuthorityConfigCenter(){
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginTop:12}}>
               <div>
                 <label style={{fontSize:11,color:"#5a6691",fontWeight:700,display:"block",marginBottom:4}}>After-Hours Cutoff Time</label>
-                <input type="time" value={exceptions.afterHoursTime} onChange={e=>{setExceptions({...exceptions,afterHoursTime:e.target.value});setSaved(false);}} style={{padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:13,fontWeight:700,width:140,fontFamily:"monospace"}}/>
+                <input type="time" value={exceptions.afterHoursTime} onChange={e=>{setExceptions({...exceptions,afterHoursTime:e.target.value});setSaved(false);}} style={{padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:13,fontWeight:700,width:140,fontFamily:"monospace"}}/>
               </div>
               <div>
                 <label style={{fontSize:11,color:"#5a6691",fontWeight:700,display:"block",marginBottom:4}}>Reviewed By</label>
-                <select value={exceptions.afterHoursReviewer} onChange={e=>{setExceptions({...exceptions,afterHoursReviewer:e.target.value});setSaved(false);}} style={{padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12.5,width:200,background:"#fff"}}>
+                <select value={exceptions.afterHoursReviewer} onChange={e=>{setExceptions({...exceptions,afterHoursReviewer:e.target.value});setSaved(false);}} style={{padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12.5,width:200,background:"#fff"}}>
                   <option>Sughra Sayed</option>
                   <option>Faiz Patel</option>
                 </select>
@@ -1358,7 +1358,7 @@ export function AuthorityConfigCenter(){
               </tr></thead>
               <tbody>
                 {ACTIVE_DELEGATIONS.map(d=>(
-                  <tr key={d.id} style={{borderBottom:"1px solid #f0f2f7"}}>
+                  <tr key={d.id} style={{borderBottom:"1px solid #dfe2e7"}}>
                     <td style={{...RPT_tdStyle,fontWeight:700}}>{d.delegator}</td>
                     <td style={{...RPT_tdStyle,fontWeight:700,color:"#d4a437"}}>→ {d.delegatee}</td>
                     <td style={{...RPT_tdStyle,fontSize:11}}>{d.scope}</td>
@@ -1367,7 +1367,7 @@ export function AuthorityConfigCenter(){
                     <td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"3px 9px",borderRadius:3,fontSize:10,fontWeight:700,background:d.status==="Approved"?"#d4edda":"#fff3cd",color:d.status==="Approved"?"#155724":"#856404"}}>{d.status}</span></td>
                     <td style={{...RPT_tdStyle,textAlign:"center"}}>
                       <div style={{display:"flex",gap:4,justifyContent:"center"}}>
-                        <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #e1e3ec",color:"#5a6691",borderRadius:3,fontSize:10,cursor:"pointer"}}>Edit</button>
+                        <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:3,fontSize:10,cursor:"pointer"}}>Edit</button>
                         <button style={{padding:"3px 8px",background:"#A32D2D",color:"#fff",border:"none",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>Revoke</button>
                       </div>
                     </td>
@@ -1379,14 +1379,14 @@ export function AuthorityConfigCenter(){
           <div style={cardStyle}>
             <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Create New Delegation</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:10}}>
-              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Delegator (you)</label><select style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%",background:"#fff"}}><option>Faiz Patel</option><option>Sughra Sayed</option><option>Afshin Dhanani</option></select></div>
-              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Delegatee</label><select style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%",background:"#fff"}}><option>Sughra Sayed</option><option>Afshin Dhanani</option></select></div>
-              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>From Date</label><input type="date" style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%"}}/></div>
-              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>To Date</label><input type="date" style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%"}}/></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Delegator (you)</label><select style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%",background:"#fff"}}><option>Faiz Patel</option><option>Sughra Sayed</option><option>Afshin Dhanani</option></select></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Delegatee</label><select style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%",background:"#fff"}}><option>Sughra Sayed</option><option>Afshin Dhanani</option></select></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>From Date</label><input type="date" style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}/></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>To Date</label><input type="date" style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}/></div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:10,marginBottom:10}}>
-              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Authority Scope</label><select style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%",background:"#fff"}}><option>Approvals up to ₹10L</option><option>All checker duties</option><option>Full Sr. FM authority (Afshin must approve)</option></select></div>
-              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Reason</label><input style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%"}} placeholder="e.g. Annual leave / sick / training"/></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Authority Scope</label><select style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%",background:"#fff"}}><option>Approvals up to ₹10L</option><option>All checker duties</option><option>Full Sr. FM authority (Afshin must approve)</option></select></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Reason</label><input style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}} placeholder="e.g. Annual leave / sick / training"/></div>
             </div>
             <div style={{display:"flex",justifyContent:"flex-end"}}>
               <button style={{padding:"8px 18px",background:"#0d1326",color:"#d4a437",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>Submit for Approval</button>
@@ -1423,7 +1423,7 @@ export function DelegationsManager(){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>ID</th><th style={RPT_thStyle}>From</th><th style={RPT_thStyle}>To</th><th style={RPT_thStyle}>Scope</th><th style={RPT_thStyle}>Period</th><th style={RPT_thStyle}>Reason</th><th style={RPT_thStyle}>Approved By</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
           <tbody>{all.map(d=>(
-            <tr key={d.id} style={{borderBottom:"1px solid #f0f2f7"}}>
+            <tr key={d.id} style={{borderBottom:"1px solid #dfe2e7"}}>
               <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{d.id}</td>
               <td style={{...RPT_tdStyle,fontWeight:700}}>{d.delegator}</td>
               <td style={{...RPT_tdStyle,fontWeight:700,color:"#d4a437"}}>→ {d.delegatee}</td>

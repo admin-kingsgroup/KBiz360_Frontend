@@ -267,7 +267,7 @@ export default function KB360App(){
     if(route!=="/dashboard" && route!=="/settings/page-access" && hiddenPages.includes(route)){
       return (
         <div style={{padding:30,maxWidth:560,margin:"40px auto",
-          background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",textAlign:"center"}}>
+          background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
           <div style={{fontSize:42,marginBottom:14}}>🚫</div>
           <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Page not available</h2>
           <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>
@@ -303,7 +303,7 @@ export default function KB360App(){
     if(routeModule && !canAccessModule(currentUser, routeModule)){
       return (
         <div style={{padding:30,maxWidth:600,margin:"40px auto",
-          background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",
+          background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",
           textAlign:"center"}}>
           <div style={{fontSize:42,marginBottom:14}}>🔒</div>
           <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Access restricted</h2>
@@ -362,8 +362,8 @@ export default function KB360App(){
     /* New Compliance Reports */
     if(route==="/reports/tax-summary")    return <RPT_TaxSummary branch={branch}/>;
     if(route==="/reports/statutory-dues") return <RPT_StatutoryDues/>;
-    if(route==="/reports/tax-board")      return <RPT_TaxFilingBoard/>;
-    if(route==="/reports/fx-exposure")    return <RPT_CurrencyExposure/>;
+    if(route==="/reports/tax-board")      return <RPT_TaxFilingBoard branch={branch}/>;
+    if(route==="/reports/fx-exposure")    return <RPT_CurrencyExposure branch={branch}/>;
                         /* HR Self-Service */
         /* HO Control Center */
         /* Authority Configuration */
@@ -445,7 +445,7 @@ export default function KB360App(){
     // role + email required). Non-owners hitting the URL get a "not available" card.
     if(route==="/dashboard/owner")    return isOwnerDashboardUser(currentUser)
       ? <OwnerDashboard branch={branch} setRoute={navigate} currentUser={currentUser}/>
-      : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",textAlign:"center"}}>
+      : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
           <div style={{fontSize:42,marginBottom:14}}>🔒</div>
           <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Owner Dashboard</h2>
           <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>This consolidated all-branch dashboard is restricted to the group owner.</p>
