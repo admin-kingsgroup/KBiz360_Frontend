@@ -102,7 +102,7 @@ function Leaf({ node, route, go }) {
     // royal-blue group title, bold, in champagne gold — with a hairline rule
     // separating consecutive sub-sections (reset for the first one).
     return (
-      <div className="mt-2 border-t border-surface-border/70 px-2.5 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-wide text-gold-dark first:mt-0 first:border-t-0 first:pt-0">
+      <div className="mt-2 border-t border-surface-border/70 px-2.5 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-wide text-gold-dark underline decoration-1 underline-offset-[3px] first:mt-0 first:border-t-0 first:pt-0">
         {node.label}
       </div>
     );
@@ -110,7 +110,7 @@ function Leaf({ node, route, go }) {
   if (node.children) {
     return (
       <div className="pt-1">
-        <div className="px-2.5 pb-1 text-[10.5px] font-bold uppercase tracking-wider text-gold-dark">{node.label}</div>
+        <div className="px-2.5 pb-1 text-[10.5px] font-bold uppercase tracking-wider text-gold-dark underline decoration-1 underline-offset-[3px]">{node.label}</div>
         <div className="space-y-0.5">{node.children.map((c, i) => <Leaf key={i} node={c} route={route} go={go} />)}</div>
       </div>
     );
