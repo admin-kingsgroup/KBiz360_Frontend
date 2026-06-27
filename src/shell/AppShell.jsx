@@ -98,11 +98,11 @@ function packColumns(groups, k) {
 function Leaf({ node, route, go }) {
   if (!node) return null;
   if (node.divider) {
-    // Second-tier label (a sub-section inside a boxed group). Kept deliberately
-    // quieter than the navy boxed group title — muted, smaller, with a hairline
-    // rule separating consecutive sub-sections (reset for the first one).
+    // Second-tier label (a sub-section inside a boxed group). Smaller than the
+    // royal-blue group title, bold, in champagne gold — with a hairline rule
+    // separating consecutive sub-sections (reset for the first one).
     return (
-      <div className="mt-2 border-t border-surface-border/70 px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-ink-subtle first:mt-0 first:border-t-0 first:pt-0">
+      <div className="mt-2 border-t border-surface-border/70 px-2.5 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-wide text-gold-dark first:mt-0 first:border-t-0 first:pt-0">
         {node.label}
       </div>
     );
@@ -110,7 +110,7 @@ function Leaf({ node, route, go }) {
   if (node.children) {
     return (
       <div className="pt-1">
-        <div className="px-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-ink-subtle">{node.label}</div>
+        <div className="px-2.5 pb-1 text-[10.5px] font-bold uppercase tracking-wider text-gold-dark">{node.label}</div>
         <div className="space-y-0.5">{node.children.map((c, i) => <Leaf key={i} node={c} route={route} go={go} />)}</div>
       </div>
     );
@@ -124,7 +124,7 @@ function Leaf({ node, route, go }) {
       className={cn(
         'group/leaf flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] transition',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50',
-        active ? 'bg-navy/5 font-semibold text-navy' : 'font-medium text-ink-muted hover:bg-navy/5 hover:text-navy',
+        active ? 'bg-navy/5 font-semibold text-navy' : 'font-medium text-ink hover:bg-navy/5 hover:text-navy',
       )}
     >
       <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full transition', active ? 'bg-gold' : 'bg-transparent group-hover/leaf:bg-gold/60')} />
@@ -237,7 +237,8 @@ function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave, autoFocus
               <div key={ci} className="flex flex-1 flex-col gap-2.5" style={{ minWidth: 0 }}>
                 {colGroups.map((col, gi) => (
                   <section key={gi} className="rounded-xl border border-surface-border bg-surface-alt/50 p-2.5">
-                    <div className="border-b border-surface-border px-2.5 pb-1.5 text-[11px] font-bold uppercase tracking-wide text-navy">
+                    {/* Primary tier — larger, bold, UNDERLINED, royal-blue group title. */}
+                    <div className="px-2.5 pb-1.5 text-sm font-bold uppercase tracking-wide text-[#2f54d6] underline decoration-2 underline-offset-4">
                       {col.title}
                     </div>
                     <div className="mt-1.5 space-y-0.5">
