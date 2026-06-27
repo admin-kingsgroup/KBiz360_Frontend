@@ -9,8 +9,9 @@ import { useVoucherRegister } from '../hooks/use-voucher-register';
 import { useFinanceStore } from '../store/finance.store';
 import { useFyStore } from '../../../store/fy';
 import { fmtDate } from '../../../core/dates';
+import { localeOf } from '../../../core/format';
 
-const money = (cur, n) => (n ? `${cur}${Math.round(n).toLocaleString('en-IN')}` : '—');
+const money = (cur, n) => (n ? `${cur}${Math.round(n).toLocaleString(localeOf(cur))}` : '—');
 
 const STATUS_TONE = { approved: 'success', pending: 'warning', rejected: 'danger', deleted: 'neutral' };
 function StatusChip({ status }) {

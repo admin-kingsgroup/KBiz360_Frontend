@@ -50,3 +50,27 @@ describe('resolveLedgerSelection — picker state machine', () => {
     expect(s.dirty).toBe(true);
   });
 });
+
+// The Ledger Account screen calls the helper WITHOUT a fallback: nothing is shown
+// on open, and the statement only appears after the user selects a ledger AND
+// presses "View" (which turns green while a fresh pick is pending).
+describe('resolveLedgerSelection — no-default gating (View flow)', () => {
+  test('on open: nothing picked/shown → panel stays empty, View idle (grey)', () => {
+    const s = resolveLedgerSelection({ pick: '', shown: '' });
+    expect(s.display).toBeFalsy(); // no statement rendered
+    expect(s.dirty).toBe(false);   // View not armed
+  });
+
+  test('selecting a ledger arms View (green) but the panel is still empty', () => {
+    const s = resolveLedgerSelection({ pick: CC, shown: '' });
+    expect(s.selected).toBe(CC);
+    expect(s.display).toBeFalsy(); // nothing shown until View is pressed
+    expect(s.dirty).toBe(true);    // View green
+  });
+
+  test('after View: the picked ledger renders, View goes idle', () => {
+    const s = resolveLedgerSelection({ pick: CC, shown: CC });
+    expect(s.display).toBe(CC);
+    expect(s.dirty).toBe(false);
+  });
+});

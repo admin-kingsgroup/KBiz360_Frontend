@@ -15,6 +15,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { card, inp, bc } from '../../core/styles';
+import { localeOf } from '../../core/format';
 import { exportToExcel, vouchersToSheet } from '../../core/exportExcel';
 import { voucherHaystack, bookingTravelDetail } from '../../core/registerSearch';
 import { isVatBranch } from '../../core/voucherSpecs';
@@ -23,6 +24,7 @@ import { buildBookingInvoice } from '../../core/invoiceHtml';
 import { useReportExport } from '../../core/reportExportContext';
 import { LedgerAccountView } from '../../core/ledgerUI';
 import { resolveLedgerSelection } from '../../core/ledgerPicker';
+import { LedgerPicker } from '../../core/voucher/LedgerPicker';
 import { openLedgerModal } from '../../core/LedgerModalHost';
 import { usePrefs } from '../../core/prefs';
 import { pushModal } from '../../core/ux/modalStore';
@@ -51,7 +53,7 @@ import { SkeletonTable } from '../../shell/primitives';
 
 const DARK = '#1a1c22', GOLD = '#c2a04a', DIM = '#5b616e', BLUE = '#2563eb', RED = '#dc2626', GREEN = '#16a34a';
 const curOf = (branch) => bc(branch).cur;
-const money = (cur, n) => { const v = Math.round(Number(n) || 0); return v ? cur + v.toLocaleString('en-IN') : '—'; };
+const money = (cur, n) => { const v = Math.round(Number(n) || 0); return v ? cur + v.toLocaleString(localeOf(cur)) : '—'; };
 const branchLabel = (branch) => (!branch || branch === 'ALL' ? CONSOLIDATED_LABEL : (branch.code || branch));
 
 /* ── shared chrome ──────────────────────────────────────────────────── */
@@ -160,7 +162,7 @@ export function VoucherLines({ voucher: v, cur }) {
   if (!v) return null;
   // The shared `money` renders 0 as '—'; the JV must show a real ₹0 on the empty side
   // so EVERY ledger is visible with an explicit amount.
-  const money0 = (n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
+  const money0 = (n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
   const F = ({ label, val }) => (
     <div style={{ minWidth: 110 }}>
       <div style={{ fontSize: 9, color: DIM, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{label}</div>
@@ -765,26 +767,16 @@ export function DayBookLive({ branch }) {
    every drill — one design, live data, identical print. */
 export function LedgerAcLive({ branch }) {
   const cur = curOf(branch);
-  const chart = useChartOfAccounts(branch);
-  const ledgers = chart.data || [];
-  const { prefs, setPref } = usePrefs();
-  // One flat list of EVERY ledger in this branch — no Group/Sub-group pre-filter.
-  // Sorted A→Z (numeric-aware), matching the other ERP ledger pickers.
-  const options = useMemo(
-    () => [...ledgers].sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true, sensitivity: 'base' })),
-    [ledgers],
-  );
-  const fallback = prefs.lastLedger || options[0]?.name || '';
-  // Selection (the dropdown) is decoupled from what's displayed: the statement only
-  // updates when the user presses "Show". This kills the old controlled-<select>
-  // desync where filtering left `selected` pointing at a ledger no longer in the
-  // option list, so the dropdown VISUALLY showed one ledger while the panel below
-  // still rendered the stale one (e.g. picking ICICI Credit Card but seeing ICICI
-  // Bank's statement).
-  const [pick, setPick] = useState('');     // current dropdown choice (not yet shown)
+  const { setPref } = usePrefs();
+  // The ledger is chosen via a searchable combobox (type to filter, scroll the
+  // matches) and the statement renders ONLY after "View" is pressed — nothing is
+  // shown on open. Selection (`pick`) is decoupled from what's displayed (`shown`),
+  // so the picker can never desync from the panel below (the old ICICI Bank vs
+  // Credit-Card bug).
+  const [pick, setPick] = useState('');     // combobox choice (not yet viewed)
   const [shown, setShown] = useState('');   // ledger actually fetched + rendered below
-  const { selected, display, dirty } = resolveLedgerSelection({ pick, shown, fallback });
-  const show = () => { if (selected) { setShown(selected); setPref('lastLedger', selected); } };
+  const { selected, display, dirty } = resolveLedgerSelection({ pick, shown });
+  const view = () => { if (selected) { setShown(selected); setPref('lastLedger', selected); } };
   // "Open ledger" from any screen (legacy in-page event) opens it immediately.
   useEffect(() => {
     const onOpen = (e) => { const n = e.detail?.name; if (n) { setPick(n); setShown(n); setPref('lastLedger', n); } };
@@ -798,21 +790,23 @@ export function LedgerAcLive({ branch }) {
   return (
     <Page
       title="Ledger Account"
-      sub={display}
+      sub={display || 'Select a ledger'}
       wide
       right={<>
-        <select value={selected} onChange={(e) => setPick(e.target.value)} title="Select a ledger" className="max-tablet:min-h-[44px] max-tablet:w-full" style={{ ...inp, width: 260, minHeight: 32, fontSize: 11 }}>
-          {options.length === 0 && <option value="">{'Loading…'}</option>}
-          {options.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
-        </select>
-        <button onClick={show} disabled={!dirty} title="Show this ledger's account statement" className="max-tablet:min-h-[44px]"
-          style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, cursor: dirty ? 'pointer' : 'default', background: dirty ? BLUE : '#eef1f6', color: dirty ? '#fff' : DIM, borderColor: dirty ? BLUE : '#e6e8ec' }}>
-          Show
+        <LedgerPicker value={pick} onChange={setPick} branch={branch} placeholder="Search ledger…" style={{ width: 260, fontSize: 11 }} />
+        {/* "View" arms green once a ledger is selected (and differs from what's shown). */}
+        <button onClick={view} disabled={!dirty} title="View this ledger's account statement" className="max-tablet:min-h-[44px]"
+          style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, cursor: dirty ? 'pointer' : 'default', background: dirty ? GREEN : '#eef1f6', color: dirty ? '#fff' : DIM, borderColor: dirty ? GREEN : '#e6e8ec' }}>
+          View
         </button>
       </>}
     >
       <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-        <LedgerAccountView name={display} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} maxHeight="calc(100vh - 330px)" />
+        {display
+          ? <LedgerAccountView name={display} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} maxHeight="calc(100vh - 330px)" />
+          : <div style={{ padding: '64px 24px', textAlign: 'center', color: DIM, fontSize: 13, lineHeight: 1.7 }}>
+              Search and select a ledger above, then press <b style={{ color: GREEN }}>View</b><br />to open its account statement.
+            </div>}
       </div>
       {voucher && (
         <div onClick={closeVoucher} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
@@ -915,7 +909,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   };
   // Build a printable A4 view of the full journal entry and hand it to the print preview.
   const printEntry = () => {
-    const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? cur + x.toLocaleString('en-IN') : ''; };
+    const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? cur + x.toLocaleString(localeOf(cur)) : ''; };
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
     const rows = (pv.postings || []).map((p) => `<tr>
       <td>${esc(p.ledger)}</td><td>${esc(p.group || '')}</td>

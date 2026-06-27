@@ -12,7 +12,7 @@ import { ACTIVE_CURRENCIES, ADM_DATA, BRANCH_CODES, CASH, CUSTOMERS, FOREX_RATES
 import { useNumberingSeries, useApprovalLimits } from '../../core/useReference';
 import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { apiPost, apiPut } from '../../core/api';
-import { fmt, fmtINR } from '../../core/format';
+import { fmt, fmtINR, localeOf } from '../../core/format';
 import { exportToExcel } from '../../core/exportExcel';
 import { ACM_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, _PASSPORTS, cardStyle, tabPanel } from '../../core/helpers';
 // MstrShell / MstrModal modernized (responsive header + shared Modal) — same props.
@@ -164,7 +164,7 @@ export function VendorTermsMaster({branch}){
   const totTds=terms.filter(t=>t.tds!=="None").reduce((s,t)=>s+Math.round(t.dueAmt*t.tdsRate/100),0);
   const STATUS_CLR={"Due Today":"#dc2626","Due Soon":"#d97706","Upcoming":"#16a34a","Overdue":"#7B1F1F"};
   const STATUS_BG={"Due Today":"#fbe9e9","Due Soon":"#fbeedb","Upcoming":"#e8f6ed","Overdue":"#fbe9e9"};
-  const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
+  const f=n=>cur+Number(Math.round(n)).toLocaleString(localeOf(cur));
   return (
     <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:14,flexWrap:"wrap"}}>

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../../core/styles.jsx';
+import { localeOf } from '../../core/format';
 import { todayISO } from '../../core/dates';
 import { PeriodBar, periodRange } from '../../core/period';
 import { openPrintPreview } from '../../core/PrintPreview';
@@ -1633,7 +1634,7 @@ function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
                   <td style={{ ...td, fontFamily: 'monospace', color: '#5b616e' }}>{r.linkNo || '—'}</td>
                   <td style={td}>{r.module}</td>
                   <td style={{ ...td, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.customer || '—'}</td>
-                  <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{cur} {Math.round(r.saleTotal || 0).toLocaleString('en-IN')}</td>
+                  <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{cur} {Math.round(r.saleTotal || 0).toLocaleString(localeOf(cur))}</td>
                   <td style={td}><span style={{ fontSize: 10.5, fontWeight: 700, color: '#5b616e', textTransform: 'capitalize' }}>{r.status}</span></td>
                   <td style={{ ...td, textAlign: 'center' }}><span style={{ fontSize: 10.5, fontWeight: 800, padding: '2px 8px', borderRadius: 20, background: '#FFF6D6', color: '#8a6d12' }}>{r.edits}{r.preAudit ? '*' : ''}</span></td>
                   <td style={td}>{r.lastBy || 'unknown'} · {fmtAt(r.lastAt)}</td>

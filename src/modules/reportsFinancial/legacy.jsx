@@ -21,6 +21,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { card, inp, bc } from '../../core/styles';
+import { localeOf } from '../../core/format';
 import { periodRange } from '../../core/period';
 import { useModulePL, useBalanceSheet, useLedgerStatement, useAgeing, branchCode } from '../../core/useAccounting';
 import { computeNetAgeing } from './netAgeing';
@@ -61,6 +62,15 @@ const compact = (cur, n) => {
   if (a >= 1e7) return `${cur}${(v / 1e7).toFixed(2)} Cr`;
   if (a >= 1e5) return `${cur}${(v / 1e5).toFixed(2)} L`;
   return `${cur}${Math.round(v).toLocaleString('en-IN')}`;
+};
+// Branch-locale variant of `compact` for the operational AR/AP screens. Keeps the
+// Cr/L Indian compaction (it's a magnitude grouping, not a tax/value change) but
+// groups the plain-number tail in the branch's currency locale.
+const compactCur = (cur, n) => {
+  const v = Number(n) || 0, a = Math.abs(v);
+  if (a >= 1e7) return `${cur}${(v / 1e7).toFixed(2)} Cr`;
+  if (a >= 1e5) return `${cur}${(v / 1e5).toFixed(2)} L`;
+  return `${cur}${Math.round(v).toLocaleString(localeOf(cur))}`;
 };
 const pctTxt = (p) => `${(Number(p) || 0).toFixed(2)}%`;
 const gpColor = (p) => (p >= 13 ? SAP.greenDk : p >= 8 ? SAP.gold : SAP.orange);
@@ -1994,6 +2004,12 @@ const bucketColor = (k) => ({ d0: SAP.greenDk, d30: SAP.gold, d60: SAP.orange, d
 
 function AgeingReport({ branch, side, setRoute, onAdjustAdvance }) {
   const cur = curOf(branch);
+  // Branch-aware number grouping for this operational AR/AP screen — the file-level
+  // `inr`/`compact` are en-IN (shared with P&L/BS); here amounts follow the branch's
+  // currency locale so a USD branch reads $1,234.56-style grouping. Value unchanged.
+  const loc = localeOf(cur);
+  const inrL = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : '—'; };
+  const compactL = (n) => compactCur(cur, n);
   const mobile = useMobile();
   const [asOf, setAsOf] = useState(''); // '' = today; otherwise YYYY-MM-DD cut-off
   const q = useAgeing(branch, asOf);
@@ -2029,12 +2045,12 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance }) {
       <div style={{ background: SAP.pageBg, padding: 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
         <StateBox q={q} empty={!data || rows.length === 0}>
           <KpiGrid>
-            <Kpi tone="blue" label="Open Bills (gross)" value={compact(cur, totals.total)} sub={`${rows.length} ${partyLabel.toLowerCase()}s`} />
-            <Kpi tone="green" label="Current (0–30)" value={compact(cur, totals.d0)} sub={pctTxt(share(totals.d0))} />
-            <Kpi tone="orange" label="Overdue (>30 days)" value={compact(cur, overdue)} sub={pctTxt(share(overdue))} />
-            <Kpi tone="red" label="Critical (90+ days)" value={compact(cur, totals.d90)} sub={pctTxt(share(totals.d90))} />
-            <Kpi tone="purple" label="On-Account (unapplied)" value={compact(cur, totals.onAccount || 0)} sub={`${isRec ? 'advances in' : 'advances out'} · settle bill-wise`} />
-            <Kpi tone="teal" label="Net Exposure" value={compact(cur, netTotal)} sub="open bills − on-account" />
+            <Kpi tone="blue" label="Open Bills (gross)" value={compactL(totals.total)} sub={`${rows.length} ${partyLabel.toLowerCase()}s`} />
+            <Kpi tone="green" label="Current (0–30)" value={compactL(totals.d0)} sub={pctTxt(share(totals.d0))} />
+            <Kpi tone="orange" label="Overdue (>30 days)" value={compactL(overdue)} sub={pctTxt(share(overdue))} />
+            <Kpi tone="red" label="Critical (90+ days)" value={compactL(totals.d90)} sub={pctTxt(share(totals.d90))} />
+            <Kpi tone="purple" label="On-Account (unapplied)" value={compactL(totals.onAccount || 0)} sub={`${isRec ? 'advances in' : 'advances out'} · settle bill-wise`} />
+            <Kpi tone="teal" label="Net Exposure" value={compactL(netTotal)} sub="open bills − on-account" />
           </KpiGrid>
 
           <FCard title={`${partyLabel}-wise Ageing`} sub="Tap a row to drill into the ledger and edit its vouchers"
@@ -2053,24 +2069,24 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance }) {
                             style={{ marginLeft: 8, padding: '1px 7px', fontSize: 10.5, fontWeight: 700, border: `1px solid ${SAP.border}`, borderRadius: 10, background: SAP.blueBg, color: SAP.blue, cursor: 'pointer' }}>360°</button>
                         )}
                       </td>
-                      {BUCKETS.map(([k]) => <td key={k} style={{ ...num, color: r[k] ? bucketColor(k) : SAP.label }}>{inr(r[k])}</td>)}
-                      <td style={{ ...num, fontWeight: 700, color: SAP.text }}>{inr(r.total)}</td>
-                      <td style={{ ...num, color: r.onAccount ? SAP.purple : SAP.label }}>{inr(r.onAccount || 0)}
+                      {BUCKETS.map(([k]) => <td key={k} style={{ ...num, color: r[k] ? bucketColor(k) : SAP.label }}>{inrL(r[k])}</td>)}
+                      <td style={{ ...num, fontWeight: 700, color: SAP.text }}>{inrL(r.total)}</td>
+                      <td style={{ ...num, color: r.onAccount ? SAP.purple : SAP.label }}>{inrL(r.onAccount || 0)}
                         {onAdjustAdvance && r.onAccount > 0.01 && (
                           <button className="noprint" title="Adjust this advance against an open bill"
                             onClick={(e) => { e.stopPropagation(); onAdjustAdvance(r.party); }}
                             style={{ marginLeft: 6, padding: '1px 6px', fontSize: 10, fontWeight: 700, border: `1px solid ${SAP.border}`, borderRadius: 9, background: '#fff', color: SAP.purple, cursor: 'pointer' }}>Adjust ▸</button>
                         )}
                       </td>
-                      <td style={{ ...num, fontWeight: 700, color: SAP.text }}>{inr(rowNet(r))}</td>
+                      <td style={{ ...num, fontWeight: 700, color: SAP.text }}>{inrL(rowNet(r))}</td>
                     </tr>
                   ))}
                   <tr style={{ background: SAP.shell, color: '#fff', fontWeight: 700, borderTop: `2px solid ${SAP.blue}` }}>
                     <td style={{ padding: '10px 16px' }}>TOTAL</td>
-                    {BUCKETS.map(([k]) => <td key={k} style={num}>{inr(totals[k])}</td>)}
-                    <td style={num}>{inr(totals.total)}</td>
-                    <td style={num}>{inr(totals.onAccount || 0)}</td>
-                    <td style={num}>{inr(netTotal)}</td>
+                    {BUCKETS.map(([k]) => <td key={k} style={num}>{inrL(totals[k])}</td>)}
+                    <td style={num}>{inrL(totals.total)}</td>
+                    <td style={num}>{inrL(totals.onAccount || 0)}</td>
+                    <td style={num}>{inrL(netTotal)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -2085,6 +2101,10 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance }) {
 
 function NetAgeingView({ branch }) {
   const cur = curOf(branch);
+  // Branch-aware grouping for this operational net-exposure screen (see AgeingReport).
+  const loc = localeOf(cur);
+  const inrL = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : '—'; };
+  const compactL = (n) => compactCur(cur, n);
   const [asOf, setAsOf] = useState('');
   const q = useAgeing(branch, asOf);
   const d = q.data;
@@ -2105,9 +2125,9 @@ function NetAgeingView({ branch }) {
       <div style={{ background: SAP.pageBg, padding: 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
         <StateBox q={q} empty={!d || rows.length === 0}>
           <KpiGrid>
-            <Kpi tone="green" label="Total Receivable" value={compact(cur, totals.receivable)} sub="net of advances in" />
-            <Kpi tone="orange" label="Total Payable" value={compact(cur, totals.payable)} sub="net of advances out" />
-            <Kpi tone={totals.net >= 0 ? 'blue' : 'red'} label="Net Position" value={compact(cur, totals.net)} sub={totals.net >= 0 ? 'net receivable' : 'net payable'} />
+            <Kpi tone="green" label="Total Receivable" value={compactL(totals.receivable)} sub="net of advances in" />
+            <Kpi tone="orange" label="Total Payable" value={compactL(totals.payable)} sub="net of advances out" />
+            <Kpi tone={totals.net >= 0 ? 'blue' : 'red'} label="Net Position" value={compactL(totals.net)} sub={totals.net >= 0 ? 'net receivable' : 'net payable'} />
           </KpiGrid>
           <FCard title="Net exposure by party" sub="Tap a row to drill into the ledger · positive = they owe us, negative = we owe them"
             badge={<Badge bg={SAP.blueBg} c={SAP.blue} bd="#b8d6ff">{rows.length} parties</Badge>}>
@@ -2119,16 +2139,16 @@ function NetAgeingView({ branch }) {
                     <tr key={r.party + i} {...keyActivate(() => openLedgerModal(r.party))}
                       style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: 'pointer' }}>
                       <td style={{ padding: '7px 16px', color: SAP.text, fontWeight: 600 }}>{r.party}<span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span></td>
-                      <td style={{ ...num, color: r.receivable ? SAP.greenDk : SAP.label }}>{inr(r.receivable)}</td>
-                      <td style={{ ...num, color: r.payable ? SAP.orange : SAP.label }}>{inr(r.payable)}</td>
-                      <td style={{ ...num, fontWeight: 700, color: r.net >= 0 ? SAP.greenDk : SAP.red }}>{inr(r.net)}</td>
+                      <td style={{ ...num, color: r.receivable ? SAP.greenDk : SAP.label }}>{inrL(r.receivable)}</td>
+                      <td style={{ ...num, color: r.payable ? SAP.orange : SAP.label }}>{inrL(r.payable)}</td>
+                      <td style={{ ...num, fontWeight: 700, color: r.net >= 0 ? SAP.greenDk : SAP.red }}>{inrL(r.net)}</td>
                     </tr>
                   ))}
                   <tr style={{ background: SAP.shell, color: '#fff', fontWeight: 700, borderTop: `2px solid ${SAP.blue}` }}>
                     <td style={{ padding: '10px 16px' }}>TOTAL</td>
-                    <td style={num}>{inr(totals.receivable)}</td>
-                    <td style={num}>{inr(totals.payable)}</td>
-                    <td style={num}>{inr(totals.net)}</td>
+                    <td style={num}>{inrL(totals.receivable)}</td>
+                    <td style={num}>{inrL(totals.payable)}</td>
+                    <td style={num}>{inrL(totals.net)}</td>
                   </tr>
                 </tbody>
               </table>
