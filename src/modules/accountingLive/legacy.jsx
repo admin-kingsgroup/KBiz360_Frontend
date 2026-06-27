@@ -22,6 +22,7 @@ import { openPrintPreview } from '../../core/PrintPreview';
 import { buildBookingInvoice } from '../../core/invoiceHtml';
 import { useReportExport } from '../../core/reportExportContext';
 import { LedgerAccountView } from '../../core/ledgerUI';
+import { resolveLedgerSelection } from '../../core/ledgerPicker';
 import { openLedgerModal } from '../../core/LedgerModalHost';
 import { usePrefs } from '../../core/prefs';
 import { pushModal } from '../../core/ux/modalStore';
@@ -767,19 +768,26 @@ export function LedgerAcLive({ branch }) {
   const chart = useChartOfAccounts(branch);
   const ledgers = chart.data || [];
   const { prefs, setPref } = usePrefs();
-  const [name, setName] = useState('');
-  // Selection priority: explicit pick → last-opened (per-user pref) → first ledger.
-  const selected = name || prefs.lastLedger || ledgers[0]?.name || '';
-  const pickLedger = (n) => { setName(n); if (n) setPref('lastLedger', n); };
-  // Group + cascading Sub-Group filter to narrow the (long) ledger dropdown.
-  const [groupFilter, setGroupFilter] = useState('');
-  const [subGroupFilter, setSubGroupFilter] = useState('');
-  const allGroups = useMemo(() => [...new Set(ledgers.map((l) => l.group).filter(Boolean))].sort(), [ledgers]);
-  const subOptions = useMemo(() => (groupFilter ? [...new Set(ledgers.filter((l) => l.group === groupFilter).map((l) => l.subGroup).filter(Boolean))].sort() : []), [ledgers, groupFilter]);
-  const pickable = useMemo(() => ledgers.filter((l) => (!groupFilter || l.group === groupFilter) && (!subGroupFilter || l.subGroup === subGroupFilter)), [ledgers, groupFilter, subGroupFilter]);
-  // "Open ledger" from any screen (legacy in-page event) switches the ledger live.
+  // One flat list of EVERY ledger in this branch — no Group/Sub-group pre-filter.
+  // Sorted A→Z (numeric-aware), matching the other ERP ledger pickers.
+  const options = useMemo(
+    () => [...ledgers].sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true, sensitivity: 'base' })),
+    [ledgers],
+  );
+  const fallback = prefs.lastLedger || options[0]?.name || '';
+  // Selection (the dropdown) is decoupled from what's displayed: the statement only
+  // updates when the user presses "Show". This kills the old controlled-<select>
+  // desync where filtering left `selected` pointing at a ledger no longer in the
+  // option list, so the dropdown VISUALLY showed one ledger while the panel below
+  // still rendered the stale one (e.g. picking ICICI Credit Card but seeing ICICI
+  // Bank's statement).
+  const [pick, setPick] = useState('');     // current dropdown choice (not yet shown)
+  const [shown, setShown] = useState('');   // ledger actually fetched + rendered below
+  const { selected, display, dirty } = resolveLedgerSelection({ pick, shown, fallback });
+  const show = () => { if (selected) { setShown(selected); setPref('lastLedger', selected); } };
+  // "Open ledger" from any screen (legacy in-page event) opens it immediately.
   useEffect(() => {
-    const onOpen = (e) => { const n = e.detail?.name; if (n) { setName(n); setPref('lastLedger', n); } };
+    const onOpen = (e) => { const n = e.detail?.name; if (n) { setPick(n); setShown(n); setPref('lastLedger', n); } };
     window.addEventListener('kb:open-ledger', onOpen);
     return () => window.removeEventListener('kb:open-ledger', onOpen);
   }, [setPref]);
@@ -790,33 +798,27 @@ export function LedgerAcLive({ branch }) {
   return (
     <Page
       title="Ledger Account"
-      sub={selected}
+      sub={display}
       wide
       right={<>
-        <select value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setSubGroupFilter(''); }} title="Filter ledgers by group" className="max-tablet:min-h-[44px] max-tablet:flex-1" style={{ ...inp, width: 'auto', minWidth: 130, minHeight: 32, fontSize: 11 }}>
-          <option value="">All groups</option>
-          {allGroups.map((g) => <option key={g} value={g}>{g}</option>)}
+        <select value={selected} onChange={(e) => setPick(e.target.value)} title="Select a ledger" className="max-tablet:min-h-[44px] max-tablet:w-full" style={{ ...inp, width: 260, minHeight: 32, fontSize: 11 }}>
+          {options.length === 0 && <option value="">{'Loading…'}</option>}
+          {options.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
         </select>
-        {groupFilter && (
-          <select value={subGroupFilter} onChange={(e) => setSubGroupFilter(e.target.value)} title="Filter by sub-group" className="max-tablet:min-h-[44px] max-tablet:flex-1" style={{ ...inp, width: 'auto', minWidth: 130, minHeight: 32, fontSize: 11 }}>
-            <option value="">All sub-groups</option>
-            {subOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        )}
-        <select value={selected} onChange={(e) => pickLedger(e.target.value)} className="max-tablet:min-h-[44px] max-tablet:w-full" style={{ ...inp, width: 240, minHeight: 32, fontSize: 11 }}>
-          {pickable.length === 0 && <option value="">{ledgers.length ? 'No ledgers in this group' : 'Loading…'}</option>}
-          {pickable.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
-        </select>
+        <button onClick={show} disabled={!dirty} title="Show this ledger's account statement" className="max-tablet:min-h-[44px]"
+          style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, cursor: dirty ? 'pointer' : 'default', background: dirty ? BLUE : '#eef1f6', color: dirty ? '#fff' : DIM, borderColor: dirty ? BLUE : '#e6e8ec' }}>
+          Show
+        </button>
       </>}
     >
       <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-        <LedgerAccountView name={selected} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} maxHeight="calc(100vh - 330px)" />
+        <LedgerAccountView name={display} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} maxHeight="calc(100vh - 330px)" />
       </div>
       {voucher && (
         <div onClick={closeVoucher} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
           <div onClick={(ev) => ev.stopPropagation()} style={{ ...card, width: 'min(820px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
-              <Crumb items={[{ label: selected || 'Ledger', onClick: closeVoucher }, { label: voucher.vno }]} />
+              <Crumb items={[{ label: display || 'Ledger', onClick: closeVoucher }, { label: voucher.vno }]} />
               <button onClick={closeVoucher} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
             </div>
             <VoucherEditor voucherId={voucher.id} cur={cur} onBack={closeVoucher} onClose={closeVoucher} />

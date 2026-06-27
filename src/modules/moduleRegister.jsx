@@ -12,6 +12,7 @@ import { filterBookingsForRegister, bookingTravelDetail } from '../core/register
 import { consumePendingRegisterSearch } from '../core/registerNav';
 import { companyProfile } from '../core/referenceCache';
 import { bc } from '../core/styles';
+import { localeOf } from '../core/format';
 import { PeriodBar, periodRange } from '../core/period';
 import { openPrintPreview } from '../core/PrintPreview';
 import { buildBookingInvoice } from '../core/invoiceHtml';
@@ -21,7 +22,7 @@ import { PageLayout } from '../shell/PageLayout';
 import { DataTable } from '../shell/DataTable';
 import { Button, Select, Input } from '../shell/primitives';
 
-const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
+const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
 const MODS = ['SF', 'SH', 'SHT', 'SV', 'SI', 'SC', 'SM'];
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -109,7 +110,8 @@ export function ModuleRegister({ branch, mode = 'both' }) {
     () => filterBookingsForRegister(data, { mod, from: range.from, to: range.to, needle }),
     [data, mod, range.from, range.to, needle],
   );
-  const fmt = (n) => (bc(branch).cur) + Math.round(Number(n) || 0).toLocaleString('en-IN');
+  const cur = bc(branch)?.cur || '₹';
+  const fmt = (n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
   const custs = useQuery({ queryKey: ['customers'], queryFn: () => apiGet('/api/customers') }).data || [];
   const sups = useQuery({ queryKey: ['suppliers'], queryFn: () => apiGet('/api/suppliers') }).data || [];
   const byName = (arr) => { const m = {}; (arr || []).forEach((x) => { if (x && x.name) m[String(x.name).toLowerCase().trim()] = x; }); return m; };
