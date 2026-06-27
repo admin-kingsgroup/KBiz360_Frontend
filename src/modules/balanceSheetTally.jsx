@@ -14,6 +14,7 @@ import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { apiGet } from '../core/api';
 import { bc } from '../core/styles.jsx';
 import { localeOf } from '../core/format';
+import { CONSOLIDATED_LABEL } from '../core/data';
 import { PeriodBar } from '../core/period';
 import { PLSide, GroupSummary, LedgerVouchers, VoucherView } from './pnlTally.jsx';
 import { openLedgerModal } from '../core/LedgerModalHost';
@@ -27,6 +28,11 @@ const DARK = '#1a1c22', DIM = '#5b616e', LINE = '#e6e8ec';
 // is rendered separately by the caller. ALL/consolidated → bc returns ₹ → en-IN.
 const money = (n, cur = '₹') => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString(localeOf(cur), { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
+// Per-branch currency + label for the consolidated (ALL) breakdown. A byBranch slice
+// carries a bare branch CODE (string); bc() expects an object with `.code`, so wrap it.
+const brObj = (code) => ({ code: String(code || 'BOM') });
+const curOf = (code) => bc(brObj(code)).cur;
+const branchLabel = (b) => (!b || b === 'ALL' ? CONSOLIDATED_LABEL : (b.code || b));
 // Open by default (inception → today): a Balance Sheet must accumulate every
 // posting up to the as-at date, so an FY-bound `from` would drop prior-year
 // movement. The PeriodBar (defaultPreset="all") refines `from` to inception.
@@ -41,6 +47,10 @@ export function BalanceSheetTallyLive({ branch }) {
   const [stack, setStack] = useState([{ kind: 'bs' }]);
   const top = stack[stack.length - 1];
   const asAt = `as at ${dmy(range.to)}`;
+  // Consolidated = all-branches scope: render EACH branch as its own Balance Sheet
+  // section in its OWN currency — never a merged cross-currency total. Driven by the
+  // BE `byBranch` slice that carries the same shape as the merged top-level payload.
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
 
   const { data: bs, isLoading, error, refetch } = useQuery({
     queryKey: ['bs-tally', brCodeOf(branch), range.from, range.to, showZero],
@@ -61,6 +71,23 @@ export function BalanceSheetTallyLive({ branch }) {
       {i > 0 && <ChevronRight size={12} style={{ color: '#9197a3', margin: '0 2px' }} />}
       <button onClick={() => goto(i)} className="inline-flex items-center max-tablet:min-h-[44px]" style={{ background: 'none', border: 'none', cursor: 'pointer', color: i === stack.length - 1 ? DARK : '#2563eb', fontWeight: i === stack.length - 1 ? 700 : 600, fontSize: 12, padding: '2px 4px' }}>{label}</button>
     </span>
+  );
+
+  // One branch's Balance Sheet body (Liabilities | Assets + footer) in its OWN currency.
+  // `sd` is a byBranch slice; `sBranch` is the branch object (so PLSide formats in its
+  // currency) and `sCur` its currency. Totals only ITS OWN figures — never summed across
+  // branches. The single-branch path keeps the original inline markup unchanged.
+  const renderBS = (sd, sBranch, sCur) => (
+    <div style={{ overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 0 }}>
+        <PLSide title="Liabilities" lines={sd.liabilities} total={sd.total} periodLabel={asAt} onPick={pick} branch={sBranch} />
+        <div style={{ width: 1, background: LINE }} />
+        <PLSide title="Assets" lines={sd.assets} total={sd.total} periodLabel={asAt} onPick={pick} branch={sBranch} />
+      </div>
+      <div style={{ padding: '8px 16px', background: '#f7f8fb', fontSize: 11.5, color: DIM, borderTop: '1px solid ' + LINE }}>
+        {sd.balanced ? '✔ Balanced' : '⚠ Difference'} · Total <b style={{ color: DARK }}>{sCur} {money(sd.total, sCur)}</b> · click any group or ledger to drill down.
+      </div>
+    </div>
   );
 
   return (
@@ -95,7 +122,21 @@ export function BalanceSheetTallyLive({ branch }) {
           </div>
         )}
 
-        {!isLoading && !error && top.kind === 'bs' && bs && (
+        {/* Consolidated (ALL): one Balance Sheet section PER branch, each in its OWN
+            currency — never a merged cross-currency total. Single-branch path unchanged. */}
+        {!isLoading && !error && top.kind === 'bs' && bs && isAll && Array.isArray(bs.byBranch) ? (
+          bs.byBranch.length === 0
+            ? <div style={{ padding: 24, textAlign: 'center', color: DIM, fontSize: 12.5 }}>No balances in any branch.</div>
+            : bs.byBranch.map((b) => (
+              <div key={b.branch} style={{ marginBottom: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '10px 16px 6px', borderBottom: '2px solid ' + DARK }}>
+                  <span style={{ fontWeight: 800, fontSize: 13.5, color: DARK }}>{branchLabel(b.branch)}</span>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: DIM }}>· {curOf(b.branch)}</span>
+                </div>
+                {renderBS(b, brObj(b.branch), curOf(b.branch))}
+              </div>
+            ))
+        ) : (!isLoading && !error && top.kind === 'bs' && bs && (
           <div style={{ overflowX: 'auto' }}>
             <div style={{ display: 'flex', gap: 0 }}>
               <PLSide title="Liabilities" lines={bs.liabilities} total={bs.total} periodLabel={asAt} onPick={pick} />
@@ -106,7 +147,7 @@ export function BalanceSheetTallyLive({ branch }) {
               {bs.balanced ? '✔ Balanced' : '⚠ Difference'} · Total <b style={{ color: DARK }}>{cur} {money(bs.total, cur)}</b> · click any group or ledger to drill down.
             </div>
           </div>
-        )}
+        ))}
 
         {top.kind === 'group' && (
           <div style={{ overflowX: 'auto' }}>

@@ -1,13 +1,15 @@
 // Director suite: KPI tiles drill into the matching report, and every dashboard
 // has an Export control that fires the app-wide `kb:print` event.
 jest.mock('../../core/useAccounting', () => ({
-  useProfitAndLoss: jest.fn(() => ({ data: {} })),
-  useModulePL: jest.fn(() => ({ data: { totals: { sales: 100, gp: 30, gpPct: 30 } } })),
-  useBalanceSheet: jest.fn(() => ({ data: {} })),
-  useAgeing: jest.fn(() => ({ data: {} })),
+  // Group/ALL scope ⇒ ExecutiveOverview renders money KPIs PER BRANCH from each hook's
+  // `byBranch` slice (each in its own currency), never a merged cross-branch total.
+  useProfitAndLoss: jest.fn(() => ({ data: { netProfit: 25, byBranch: [{ branch: 'BOM', netProfit: 25 }] } })),
+  useModulePL: jest.fn(() => ({ data: { totals: { sales: 100, gp: 30, gpPct: 30 }, byBranch: [{ branch: 'BOM', totals: { sales: 100, gp: 30, gpPct: 30 } }] } })),
+  useBalanceSheet: jest.fn(() => ({ data: { byBranch: [{ branch: 'BOM', assets: [], liabilities: [] }] } })),
+  useAgeing: jest.fn(() => ({ data: { byBranch: [{ branch: 'BOM', receivables: { totals: {} }, payables: { totals: {} } }] } })),
   useInvoiceGP: jest.fn(() => ({ data: {} })),
-  useTaxSummary: jest.fn(() => ({ data: { output: { total: 50 }, input: { total: 20 }, netPayable: 30 } })),
-  useTrialBalance: jest.fn(() => ({ data: {} })),
+  useTaxSummary: jest.fn(() => ({ data: { output: { total: 50 }, input: { total: 20 }, netPayable: 30, byBranch: [{ branch: 'BOM', netPayable: 30 }] } })),
+  useTrialBalance: jest.fn(() => ({ data: { byBranch: [{ branch: 'BOM', rows: [] }] } })),
   useVoucherApprovals: jest.fn(() => ({ data: {} })),
   useYearOverYear: jest.fn(() => ({ data: {} })),
   useBudgetVsActual: jest.fn(() => ({ data: {} })),

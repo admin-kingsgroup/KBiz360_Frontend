@@ -17,6 +17,17 @@ import { normalizeTrialBalanceRow, trialBalanceTotals, toVoucherRegisterRow } fr
  */
 export const loadTrialBalance = async ({ branch, from, to, includeZero } = {}) => {
   const data = await api.getTrialBalance({ branch, from, to, includeZero });
+  return shapeTrialBalance(data);
+};
+
+/**
+ * Normalise ONE trial-balance scope (the merged top level, or a single per-branch
+ * slice — both share the same backend shape) into the UI-ready envelope. When the
+ * server returns a consolidated `byBranch` breakdown (branch='ALL'), each slice is
+ * shaped recursively + tagged with its branch code so the page can render every
+ * branch as its OWN section in its OWN currency — never a cross-currency total.
+ */
+function shapeTrialBalance(data) {
   const rows = (data?.rows || []).map(normalizeTrialBalanceRow);
   const totals = trialBalanceTotals(rows);
 
@@ -25,14 +36,21 @@ export const loadTrialBalance = async ({ branch, from, to, includeZero } = {}) =
   const grandDr = data?.totalClosingDebit ?? data?.totalDebit ?? totals.closingDebit;
   const grandCr = data?.totalClosingCredit ?? data?.totalCredit ?? totals.closingCredit;
 
-  return {
+  const out = {
     rows,
     totals,
     grandClosingDebit: Math.round(grandDr || 0),
     grandClosingCredit: Math.round(grandCr || 0),
     balanced: data?.balanced ?? Math.abs((grandDr || 0) - (grandCr || 0)) < 1,
   };
-};
+
+  // Consolidated view: carry the per-branch breakdown through, each slice shaped
+  // the same way (so a branch section totals only itself, in its own currency).
+  if (Array.isArray(data?.byBranch)) {
+    out.byBranch = data.byBranch.map((b) => ({ branch: b?.branch, ...shapeTrialBalance(b) }));
+  }
+  return out;
+}
 
 /**
  * Load a voucher register (receipt / payment / contra / journal) for a branch +

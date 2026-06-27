@@ -46,12 +46,17 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch }) {
   const pinned = useDashboardStore((s) => s.pinnedWidgets);
   const togglePin = useDashboardStore((s) => s.togglePinnedWidget);
 
+  // Consolidated = Group/ALL scope: render money KPIs PER BRANCH (each in its own
+  // currency), never one merged cross-branch ₹ total.
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL' || effScope === 'ALL';
   const branchArg = scopeBranchArg(effScope);
   const [period, setPeriod] = React.useState(() => periodRange('all', { branch: branchArg }));
   const dates = period;
   const { data, totalCashInr, isLoading, isError, error, refetch } = useDirectorDashboard({ scope: effScope, from: period.from, to: period.to });
   const cur = bc(branch).cur;
   const m0 = (n) => compactAmt(Math.round(Number(n) || 0), { currency: cur });
+  // Per-branch money formatter — value in the given branch CODE's own currency.
+  const mB = (code, n) => compactAmt(Math.round(Number(n) || 0), { currency: bc({ code }).cur });
   const mpl = useModulePL(branchArg, { ...dates, summary: true }).data || {};
   const bs = useBalanceSheet(branchArg, { to: dates.to }).data || {};
   const age = useAgeing(branchArg).data || {};
@@ -104,6 +109,46 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch }) {
   const arOverdue = age?.receivables?.totals?.d90 || 0;
   const mods = (mpl.modules || []).slice().sort((a, b) => (b.gp || 0) - (a.gp || 0));
 
+  // ── Per-branch headline KPIs (Group/ALL scope only) ──
+  // Stitch each money KPI from the matching hook's `byBranch` slice so every branch's
+  // Cash & Bank / Revenue / GP / NP / Receivables / Payables / Tax prints in its OWN
+  // currency — never a merged cross-currency ₹ sum. Keyed by branch code.
+  const liquidOf = (rows) => (rows || []).filter(isLiquidRow).reduce((s, r) => s + ((r.closingDebit || 0) - (r.closingCredit || 0)), 0);
+  const perBranchKpis = React.useMemo(() => {
+    if (!isAll) return [];
+    const codes = [...new Set([
+      ...(Array.isArray(mpl.byBranch) ? mpl.byBranch : []).map((b) => b.branch),
+      ...(Array.isArray(trial.byBranch) ? trial.byBranch : []).map((b) => b.branch),
+      ...(Array.isArray(bs.byBranch) ? bs.byBranch : []).map((b) => b.branch),
+      ...(Array.isArray(age.byBranch) ? age.byBranch : []).map((b) => b.branch),
+    ])].filter(Boolean).sort();
+    const byCode = (arr, code) => (Array.isArray(arr) ? arr.find((x) => x.branch === code) : null) || {};
+    return codes.map((code) => {
+      const p = byCode(mpl.byBranch, code);
+      const tr = byCode(trial.byBranch, code);
+      const b = byCode(bs.byBranch, code);
+      const a = byCode(age.byBranch, code);
+      const tx = byCode(tax.byBranch, code);
+      const sales = p?.totals?.sales || 0, gp = p?.totals?.gp || 0, gpPct = sales ? (gp / sales) * 100 : 0;
+      const net = p?.bridge?.netProfit || 0;
+      // Cash & bank: prefer the branch trial-balance liquid rows; else fall back to BS assets liquid groups.
+      const liquid = Array.isArray(tr?.rows)
+        ? liquidOf(tr.rows)
+        : (b.assets || []).filter((g) => /cash|bank/i.test(g.group || '')).reduce((s, g) => s + (g.amount || 0), 0);
+      return {
+        code,
+        liquid,
+        revenue: sales,
+        gp, gpPct,
+        net,
+        outstanding: a?.receivables?.totals?.total || 0,
+        arOverdue: a?.receivables?.totals?.d90 || 0,
+        payable: a?.payables?.totals?.total || 0,
+        taxNet: tx?.netPayable || 0,
+      };
+    });
+  }, [isAll, mpl.byBranch, trial.byBranch, bs.byBranch, age.byBranch, tax.byBranch]);
+
   const pageSubtitle = effScope === 'ALL' ? 'Group view — all branches consolidated' : `Branch view — ${effScope} only`;
 
   return (
@@ -111,17 +156,47 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch }) {
       <DashboardHeader title="Owner Dashboard" subtitle={pageSubtitle} user={currentUser} onExport={() => openPrintPreview({ selector: 'main', title: 'Owner Dashboard', recommend: 'portrait' })} />
       {Controls}
 
-      {/* ── Headline KPIs ── */}
-      <ResponsiveGrid min="180px" gap="md" className="mb-4">
-        <KPICard label="Cash & Bank" value={m0(liquid)} delta={liquid < 0 ? 'overdrawn' : 'liquid'} color={liquid < 0 ? C.red : '#16a34a'} onClick={() => navigate('/dashboards/cash')} />
-        <KPICard label={`Revenue · ${rangeShort}`} value={m0(fig.revenue)} delta="" color="#c2a04a" onClick={() => navigate('/reports/pnl')} />
-        <KPICard label="Gross Profit" value={m0(fig.gp)} delta={fig.gpPct ? `${fig.gpPct}% GP` : ''} color="#16a34a" onClick={() => navigate('/reports/gp')} />
-        <KPICard label="Net Profit" value={m0(fig.netProfit)} delta={fig.revenue ? `${((fig.netProfit / fig.revenue) * 100).toFixed(1)}% margin` : ''} color={fig.netProfit >= 0 ? C.green : C.red} onClick={() => navigate('/reports/pnl')} />
-        <KPICard label="Receivables" value={m0(fig.outstanding)} delta={arOverdue ? `${m0(arOverdue)} overdue 90+` : 'to collect'} color={arOverdue ? C.red : C.gold} onClick={() => navigate('/dashboards/arap')} />
-        <KPICard label="Payables" value={m0(fig.payable)} delta="to pay" color={C.red} onClick={() => navigate('/dashboards/arap')} />
-        <KPICard label="GST / Tax Net" value={m0(tax.netPayable || 0)} delta={(tax.netPayable || 0) >= 0 ? 'payable' : 'refundable'} color="#2563eb" onClick={() => navigate('/taxation')} />
-        <KPICard label="Pending Approvals" value={m0(pb.sales)} delta={`${pb.count} awaiting`} color={pb.count ? '#d97706' : '#16a34a'} onClick={() => navigate('/transactions/approvals')} />
-      </ResponsiveGrid>
+      {/* ── Headline KPIs ──
+          Group/ALL ⇒ money KPIs rendered PER BRANCH (each in its own currency); never a
+          merged cross-branch ₹ total. Single-branch ⇒ the original consolidated cards. */}
+      {isAll ? (
+        <div className="mb-4">
+          <div className="mb-1.5 text-xs font-semibold text-ink-muted">
+            Group money KPIs — per branch, each in its own currency · <span className="font-normal">no cross-currency total</span>
+          </div>
+          {perBranchKpis.length === 0 && (
+            <div className="rounded-brand border border-surface-border bg-surface px-3.5 py-4 text-xs text-ink-muted">No branch data for this period.</div>
+          )}
+          {perBranchKpis.map((r) => (
+            <div key={r.code} className="mb-3">
+              <div className="mb-1.5 flex items-baseline gap-2 border-b-2 pb-1" style={{ borderColor: '#185FA5' }}>
+                <span className="text-sm font-extrabold text-ink">{r.code}</span>
+                <span className="text-[11px] font-bold text-ink-muted">· {bc({ code: r.code }).cur}</span>
+              </div>
+              <ResponsiveGrid min="180px" gap="md">
+                <KPICard label="Cash & Bank" value={mB(r.code, r.liquid)} delta={r.liquid < 0 ? 'overdrawn' : 'liquid'} color={r.liquid < 0 ? C.red : '#16a34a'} onClick={() => navigate('/dashboards/cash')} />
+                <KPICard label={`Revenue · ${rangeShort}`} value={mB(r.code, r.revenue)} delta="" color="#c2a04a" onClick={() => navigate('/reports/pnl')} />
+                <KPICard label="Gross Profit" value={mB(r.code, r.gp)} delta={r.gpPct ? `${r.gpPct.toFixed(1)}% GP` : ''} color="#16a34a" onClick={() => navigate('/reports/gp')} />
+                <KPICard label="Net Profit" value={mB(r.code, r.net)} delta={r.revenue ? `${((r.net / r.revenue) * 100).toFixed(1)}% margin` : ''} color={r.net >= 0 ? C.green : C.red} onClick={() => navigate('/reports/pnl')} />
+                <KPICard label="Receivables" value={mB(r.code, r.outstanding)} delta={r.arOverdue ? `${mB(r.code, r.arOverdue)} overdue 90+` : 'to collect'} color={r.arOverdue ? C.red : C.gold} onClick={() => navigate('/dashboards/arap')} />
+                <KPICard label="Payables" value={mB(r.code, r.payable)} delta="to pay" color={C.red} onClick={() => navigate('/dashboards/arap')} />
+                <KPICard label="GST / Tax Net" value={mB(r.code, r.taxNet)} delta={r.taxNet >= 0 ? 'payable' : 'refundable'} color="#2563eb" onClick={() => navigate('/taxation')} />
+              </ResponsiveGrid>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <ResponsiveGrid min="180px" gap="md" className="mb-4">
+          <KPICard label="Cash & Bank" value={m0(liquid)} delta={liquid < 0 ? 'overdrawn' : 'liquid'} color={liquid < 0 ? C.red : '#16a34a'} onClick={() => navigate('/dashboards/cash')} />
+          <KPICard label={`Revenue · ${rangeShort}`} value={m0(fig.revenue)} delta="" color="#c2a04a" onClick={() => navigate('/reports/pnl')} />
+          <KPICard label="Gross Profit" value={m0(fig.gp)} delta={fig.gpPct ? `${fig.gpPct}% GP` : ''} color="#16a34a" onClick={() => navigate('/reports/gp')} />
+          <KPICard label="Net Profit" value={m0(fig.netProfit)} delta={fig.revenue ? `${((fig.netProfit / fig.revenue) * 100).toFixed(1)}% margin` : ''} color={fig.netProfit >= 0 ? C.green : C.red} onClick={() => navigate('/reports/pnl')} />
+          <KPICard label="Receivables" value={m0(fig.outstanding)} delta={arOverdue ? `${m0(arOverdue)} overdue 90+` : 'to collect'} color={arOverdue ? C.red : C.gold} onClick={() => navigate('/dashboards/arap')} />
+          <KPICard label="Payables" value={m0(fig.payable)} delta="to pay" color={C.red} onClick={() => navigate('/dashboards/arap')} />
+          <KPICard label="GST / Tax Net" value={m0(tax.netPayable || 0)} delta={(tax.netPayable || 0) >= 0 ? 'payable' : 'refundable'} color="#2563eb" onClick={() => navigate('/taxation')} />
+          <KPICard label="Pending Approvals" value={m0(pb.sales)} delta={`${pb.count} awaiting`} color={pb.count ? '#d97706' : '#16a34a'} onClick={() => navigate('/transactions/approvals')} />
+        </ResponsiveGrid>
+      )}
 
       {/* ── Bookings pipeline (condensed) ── */}
       <div className="mb-1.5 text-xs font-semibold text-ink-muted">SO/PO/GP Pipeline · {rangeShort}</div>

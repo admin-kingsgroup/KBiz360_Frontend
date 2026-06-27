@@ -14,6 +14,7 @@ import { openLedgerModal } from '../core/LedgerModalHost';
 import { useLedgerMeta, SourceBadge } from '../core/LedgerLabel';
 import { bc } from '../core/styles.jsx';
 import { localeOf } from '../core/format';
+import { CONSOLIDATED_LABEL } from '../core/data';
 import { PeriodBar } from '../core/period';
 import { LedgerActions } from '../core/ledgerActions';
 import { PageLayout } from '../shell/PageLayout';
@@ -29,6 +30,11 @@ const DARK = '#1a1c22', DIM = '#5b616e', LINE = '#e6e8ec', HEAD = '#2e323c';
 // consolidated/ALL view (bc → ₹) and any un-threaded caller on en-IN, unchanged.
 const money = (n, cur = '₹') => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString(localeOf(cur), { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
+// Per-branch currency + label for the consolidated (ALL) breakdown. A byBranch slice
+// carries a bare branch CODE (string); bc() expects an object with `.code`, so wrap it.
+const brObj = (code) => ({ code: String(code || 'BOM') });
+const curOf = (code) => bc(brObj(code)).cur;
+const branchLabel = (b) => (!b || b === 'ALL' ? CONSOLIDATED_LABEL : (b.code || b));
 // Open by default (inception → today): the books may have no postings in the
 // current FY yet, so an FY-bound default would render an empty statement. The
 // PeriodBar (defaultPreset="all") refines `from` to the real inception on mount.
@@ -591,6 +597,10 @@ export function PnLTallyLive({ branch }) {
   const [stack, setStack] = useState([{ kind: 'pl' }]);
   const top = stack[stack.length - 1];
   const periodLabel = `${dmy(range.from)} to ${dmy(range.to)}`;
+  // Consolidated = all-branches scope: render EACH branch as its own P&L section in its
+  // OWN currency — never a merged cross-currency total. Driven by the BE `byBranch` slice
+  // that carries the same shape (trading / pl / grossProfit / netProfit …) as the merged top.
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
 
   const { data: pl, isLoading, error, refetch } = useQuery({
     queryKey: ['pl-tally', brCodeOf(branch), range.from, range.to, showZero],
@@ -611,6 +621,29 @@ export function PnLTallyLive({ branch }) {
       {i > 0 && <ChevronRight size={12} style={{ color: '#9197a3', margin: '0 2px' }} />}
       <button onClick={() => goto(i)} className="inline-flex items-center max-tablet:min-h-[44px]" style={{ background: 'none', border: 'none', cursor: 'pointer', color: i === stack.length - 1 ? DARK : '#2563eb', fontWeight: i === stack.length - 1 ? 700 : 600, fontSize: 12, padding: '2px 4px' }}>{label}</button>
     </span>
+  );
+
+  // One branch's P&L body (Trading a/c + P&L a/c + footer) in its OWN currency. `sd` is a
+  // byBranch slice; `sBranch` is the branch object (so PLSide formats in its currency) and
+  // `sCur` its currency. Totals only ITS OWN figures — never summed across branches.
+  const renderPL = (sd, sBranch, sCur) => (
+    <div style={{ overflowX: 'auto' }}>
+      {/* Trading account */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid ' + DARK }}>
+        <PLSide lines={sd.trading.debit} total={sd.trading.total} periodLabel={periodLabel} onPick={pick} branch={sBranch} from={range.from} to={range.to} />
+        <div style={{ width: 1, background: LINE }} />
+        <PLSide lines={sd.trading.credit} total={sd.trading.total} periodLabel={periodLabel} onPick={pick} branch={sBranch} from={range.from} to={range.to} />
+      </div>
+      {/* P&L account */}
+      <div style={{ display: 'flex', gap: 0 }}>
+        <PLSide lines={sd.pl.debit} total={sd.pl.total} periodLabel={periodLabel} onPick={pick} branch={sBranch} from={range.from} to={range.to} />
+        <div style={{ width: 1, background: LINE }} />
+        <PLSide lines={sd.pl.credit} total={sd.pl.total} periodLabel={periodLabel} onPick={pick} branch={sBranch} from={range.from} to={range.to} />
+      </div>
+      <div style={{ padding: '8px 16px', background: '#f7f8fb', fontSize: 11.5, color: DIM, borderTop: '1px solid ' + LINE }}>
+        {sd.grossResult}: <b style={{ color: DARK }}>{sCur} {money(sd.grossProfit, sCur)}</b> &nbsp;·&nbsp; {sd.result}: <b style={{ color: sd.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>{sCur} {money(Math.abs(sd.netProfit), sCur)}</b> &nbsp;· tap ▸ to reveal a group’s ledgers → captured fares inline, or click any name to drill down.
+      </div>
+    </div>
   );
 
   return (
@@ -648,7 +681,21 @@ export function PnLTallyLive({ branch }) {
           </div>
         )}
 
-        {!isLoading && !error && top.kind === 'pl' && pl && (
+        {/* Consolidated (ALL): one P&L section PER branch, each in its OWN currency —
+            never a merged cross-currency total. Single-branch path unchanged. */}
+        {!isLoading && !error && top.kind === 'pl' && pl && isAll && Array.isArray(pl.byBranch) ? (
+          pl.byBranch.length === 0
+            ? <div style={{ padding: 24, textAlign: 'center', color: DIM, fontSize: 12.5 }}>No P&amp;L activity in any branch.</div>
+            : pl.byBranch.map((b) => (
+              <div key={b.branch} style={{ marginBottom: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '10px 16px 6px', borderBottom: '2px solid ' + DARK }}>
+                  <span style={{ fontWeight: 800, fontSize: 13.5, color: DARK }}>{branchLabel(b.branch)}</span>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: DIM }}>· {curOf(b.branch)}</span>
+                </div>
+                {renderPL(b, brObj(b.branch), curOf(b.branch))}
+              </div>
+            ))
+        ) : (!isLoading && !error && top.kind === 'pl' && pl && (
           <div style={{ overflowX: 'auto' }}>
             {/* Trading account */}
             <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid ' + DARK }}>
@@ -666,7 +713,7 @@ export function PnLTallyLive({ branch }) {
               {pl.grossResult}: <b style={{ color: DARK }}>{cur} {money(pl.grossProfit, cur)}</b> &nbsp;·&nbsp; {pl.result}: <b style={{ color: pl.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>{cur} {money(Math.abs(pl.netProfit), cur)}</b> &nbsp;· tap ▸ to reveal a group’s ledgers → captured fares inline, or click any name to drill down.
             </div>
           </div>
-        )}
+        ))}
 
         {top.kind === 'group' && (
           <div style={{ overflowX: 'auto' }}>

@@ -53,7 +53,10 @@ const SHADOW = '0 1px 4px rgba(0,0,0,0.12), 0 0 1px rgba(0,0,0,0.08)';
 const TALLY = { head: '#14396b', titlebar: '#dbe7f5', gold: '#b8860b', green: '#1a7a1a' };
 
 /* ── number/format helpers ───────────────────────────────────────────── */
-const curOf = (branch) => bc(branch).cur;
+// `bc()` resolves currency off `branch.code` (with an 'ALL' special-case), so a bare
+// branch-code string ('NBO') would fall back to BOM/₹. Normalise a string code into
+// `{ code }` first so per-branch sections in the consolidated view get their OWN currency.
+const curOf = (branch) => bc(typeof branch === 'string' && branch !== 'ALL' ? { code: branch } : branch).cur;
 const branchLabel = (branch) => (!branch || branch === 'ALL' ? CONSOLIDATED_LABEL : (branch.code || branch));
 const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : '—'; };
 const paren = (n) => { const v = Math.round(Number(n) || 0); return v ? `(${v.toLocaleString('en-IN')})` : '—'; };
@@ -555,6 +558,71 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
   const d = q.data;
   const prev = showPY ? qP.data : null;
 
+  // Consolidated = all-branches scope: render each branch as its own P&L section in
+  // its OWN currency — never a merged cross-branch / cross-currency total. Driven by
+  // the BE `byBranch` slice (same shape as the merged top-level module-PL payload).
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
+
+  const periodTxt = period.note || period.label || 'all periods';
+  const classicPeriod = period.from ? `${asOn(period.from)} to ${asOn(period.to)}` : 'All periods';
+
+  return (
+    <Wrap>
+      <FioriHead
+        system="KBiz360 · Finance"
+        title="Profit & Loss — Module-wise Gross Profit"
+        sub={isAll && !isMatrix
+          ? <><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; each branch in its own currency · <strong>no cross-currency total</strong> &nbsp;|&nbsp; {periodTxt} &nbsp;|&nbsp; Tally double-entry · live</>
+          : <><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} INR (excl. GST) &nbsp;|&nbsp; {isMatrix ? `FY ${fy} · ${mode === 'month' ? 'month-wise' : 'quarter-wise'}` : periodTxt} &nbsp;|&nbsp; Tally double-entry · live</>}
+      />
+      <PnlPeriodBar
+        mode={mode} setMode={setMode} fy={fy} setFy={setFy}
+        compare={compare} setCompare={setCompare} custom={custom} setCustom={setCustom}
+        view={view} setView={setView} showView={!isMatrix && !hideSwitcher}
+        showZero={showZero} setShowZero={setShowZero}
+        canExport={!isMatrix && !!d} onExport={() => exportDetail(d, period, cur)}
+      />
+      {focus && (
+        <div style={{ background: '#eef4fb', padding: '8px 16px', fontSize: 12, color: SAP.subText, display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${SAP.border}`, borderTop: 'none' }}>
+          <button onClick={() => setFocus(null)} style={toolBtn}>← Back to {mode === 'month' ? 'monthly' : 'quarterly'} matrix</button>
+          <span>Showing detail for <strong>{focus.label}</strong> · {focus.note}</span>
+        </div>
+      )}
+      <div style={{ background: SAP.pageBg, padding: (!isMatrix && view === 'classic') ? 0 : 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+        {isMatrix ? (
+          <PnLMatrix branch={branch} cur={cur} fy={fy} grain={mode} onFocus={setFocus} />
+        ) : isAll && Array.isArray(d?.byBranch) ? (
+          <StateBox q={q} empty={!d}>
+            {d.byBranch.length === 0
+              ? <div style={{ padding: 20, textAlign: 'center', color: SAP.label }}>No data in any branch for this period.</div>
+              : d.byBranch.map((b) => {
+                const sPrev = Array.isArray(prev?.byBranch) ? prev.byBranch.find((x) => x.branch === b.branch) : null;
+                return (
+                  <div key={b.branch} style={{ marginBottom: 24 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: (view === 'classic') ? '12px 12px 4px' : '2px 2px 10px', borderBottom: `2px solid ${SAP.blue}`, paddingBottom: 4 }}>
+                      <span style={{ fontWeight: 800, fontSize: 14, color: SAP.text }}>{branchLabel(b.branch)}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: SAP.sec }}>· {curOf(b.branch)}</span>
+                    </div>
+                    <PnLBody d={b} prev={sPrev} cur={curOf(b.branch)} branch={b.branch} period={period} view={view} mobile={mobile} classicPeriod={classicPeriod} />
+                  </div>
+                );
+              })}
+          </StateBox>
+        ) : (
+        <StateBox q={q} empty={!d || (!(d.modules || []).length && !d.indirect?.expense && !d.bridge?.indirectIncome && !d.bridge?.netProfit)}>
+          <PnLBody d={d} prev={prev} cur={cur} branch={branch} period={period} view={view} mobile={mobile} classicPeriod={classicPeriod} />
+        </StateBox>
+        )}
+      </div>
+    </Wrap>
+  );
+}
+
+/* ── One scope's P&L body (KPIs + Sections A/B/C + ranking/ratios, or the
+   Classic/Vertical/Drill view) in ONE branch's currency. Owns its own expand
+   state + voucher/ledger drills, so each per-branch section in the consolidated
+   view drills independently. `d` is a byBranch slice or the merged top-level. */
+function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) {
   const [openMod, setOpenMod] = useState({});
   const [openSub, setOpenSub] = useState({});
   const [openHead, setOpenHead] = useState({});   // Section A: ledger → component drill per module
@@ -593,34 +661,10 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
       ['Break-even GP needed', compact(cur, d.indirect.expense)],
     ];
   }, [d, cur]);
-  const periodTxt = period.note || period.label || 'all periods';
-  const classicPeriod = period.from ? `${asOn(period.from)} to ${asOn(period.to)}` : 'All periods';
 
+  if (!d) return null;
   return (
-    <Wrap>
-      <FioriHead
-        system="KBiz360 · Finance"
-        title="Profit & Loss — Module-wise Gross Profit"
-        sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} INR (excl. GST) &nbsp;|&nbsp; {isMatrix ? `FY ${fy} · ${mode === 'month' ? 'month-wise' : 'quarter-wise'}` : periodTxt} &nbsp;|&nbsp; Tally double-entry · live</>}
-      />
-      <PnlPeriodBar
-        mode={mode} setMode={setMode} fy={fy} setFy={setFy}
-        compare={compare} setCompare={setCompare} custom={custom} setCustom={setCustom}
-        view={view} setView={setView} showView={!isMatrix && !hideSwitcher}
-        showZero={showZero} setShowZero={setShowZero}
-        canExport={!isMatrix && !!d} onExport={() => exportDetail(d, period, cur)}
-      />
-      {focus && (
-        <div style={{ background: '#eef4fb', padding: '8px 16px', fontSize: 12, color: SAP.subText, display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${SAP.border}`, borderTop: 'none' }}>
-          <button onClick={() => setFocus(null)} style={toolBtn}>← Back to {mode === 'month' ? 'monthly' : 'quarterly'} matrix</button>
-          <span>Showing detail for <strong>{focus.label}</strong> · {focus.note}</span>
-        </div>
-      )}
-      <div style={{ background: SAP.pageBg, padding: (!isMatrix && view === 'classic') ? 0 : 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
-        {isMatrix ? (
-          <PnLMatrix branch={branch} cur={cur} fy={fy} grain={mode} onFocus={setFocus} />
-        ) : (
-        <StateBox q={q} empty={!d || (!(d.modules || []).length && !d.indirect?.expense && !d.bridge?.indirectIncome && !d.bridge?.netProfit)}>
+    <>
           {d && view === 'fiori' && <>
             {/* KPIs */}
             <KpiGrid>
@@ -829,12 +873,9 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
           {d && view === 'drill' && (
             <DrillPnL d={d} cur={cur} branch={branch} periodTxt={classicPeriod} />
           )}
-        </StateBox>
-        )}
-      </div>
       {drillFile && <FileVoucherDrill file={drillFile} cur={cur} mobile={mobile} onClose={() => setDrillFile(null)} />}
       {drillLedger && <LedgerVoucherDrill ledger={drillLedger} branch={branch} to={period.to} cur={cur} mobile={mobile} onClose={() => setDrillLedger(null)} />}
-    </Wrap>
+    </>
   );
 }
 
@@ -1592,6 +1633,11 @@ export function ReportBSLive({ branch, forceView, hideSwitcher }) {
   const curLabel = `as at ${asOn(to)}`;
   const prevLabel = `as at ${asOn(toPrev)}`;
 
+  // Consolidated = all-branches scope: render each branch as its own Balance Sheet
+  // section in its OWN currency — never a merged cross-currency total. Driven by the
+  // BE `byBranch` slice that carries the same shape as the merged top-level payload.
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
+
   const doExcel = () => {
     if (!d) return;
     const cols = [{ key: 'side', label: 'Side' }, { key: 'level', label: 'Level' }, { key: 'name', label: 'Particulars' }, { key: 'amount', label: `Amount ${curLabel} (${cur})` }];
@@ -1601,12 +1647,25 @@ export function ReportBSLive({ branch, forceView, hideSwitcher }) {
   const doPrint = () => { if (d) { toast('Opening print view…', 'info'); openPrintPreview({ selector: 'main', title: 'Balance Sheet', recommend: 'landscape' }); } };
   const expBtn = (dis) => ({ padding: '6px 11px', fontSize: 11, fontWeight: 600, border: '1px solid rgba(255,255,255,0.3)', borderRadius: 5, cursor: dis ? 'default' : 'pointer', background: 'rgba(255,255,255,0.1)', color: '#fff', opacity: dis ? 0.45 : 1 });
 
+  // One branch's Balance Sheet body (the chosen view), in that branch's currency.
+  // `sd` is a byBranch slice (or the merged top-level `d` in single-branch mode).
+  const renderBody = (sd, sPrev, sBranch, sCur) => {
+    const sPrevMap = {}; [...(sPrev?.liabilities || []), ...(sPrev?.assets || [])].forEach((g) => { sPrevMap[g.group] = g.amount; });
+    return view === 'fiori'
+      ? <FioriBS d={sd} prev={sPrev} prevMap={sPrevMap} cur={sCur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} branch={sBranch} to={to} mobile={mobile} detail={detail} />
+      : view === 'vertical'
+      ? <VerticalBS d={sd} cur={sCur} curLabel={curLabel} detail={detail} branch={sBranch} to={to} mobile={mobile} />
+      : <ClassicBS d={sd} cur={sCur} curLabel={curLabel} detail={detail} branch={sBranch} to={to} mobile={mobile} />;
+  };
+
   return (
     <Wrap>
       <FioriHead
         system="KBiz360 · Finance"
         title={`Balance Sheet — ${curLabel}`}
-        sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} INR (excl. GST) &nbsp;|&nbsp; Tally 28-Group Master &nbsp;|&nbsp; balances from inception up to {asOn(to)}</>}
+        sub={isAll
+          ? <><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; each branch in its own currency · <strong>no cross-currency total</strong> &nbsp;|&nbsp; Tally 28-Group Master &nbsp;|&nbsp; balances up to {asOn(to)}</>
+          : <><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} INR (excl. GST) &nbsp;|&nbsp; Tally 28-Group Master &nbsp;|&nbsp; balances from inception up to {asOn(to)}</>}
         right={<>
           {!hideSwitcher && <Segmented dark value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic'], ['vertical', '▤ Vertical']]} />}
           <button onClick={doPrint} disabled={!d} style={expBtn(!d)}>⤓ PDF</button>
@@ -1623,11 +1682,22 @@ export function ReportBSLive({ branch, forceView, hideSwitcher }) {
       />
       <div style={{ background: SAP.pageBg, padding: (view === 'classic' || view === 'vertical') ? 0 : 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
         <StateBox q={q} empty={!d}>
-          {d && (view === 'fiori'
-            ? <FioriBS d={d} prev={prev} prevMap={prevMap} cur={cur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} branch={branch} to={to} mobile={mobile} detail={detail} />
-            : view === 'vertical'
-            ? <VerticalBS d={d} cur={cur} curLabel={curLabel} detail={detail} branch={branch} to={to} mobile={mobile} />
-            : <ClassicBS d={d} cur={cur} curLabel={curLabel} detail={detail} branch={branch} to={to} mobile={mobile} />)}
+          {d && isAll && Array.isArray(d.byBranch)
+            ? (d.byBranch.length === 0
+              ? <div style={{ padding: 20, textAlign: 'center', color: SAP.label }}>No balances in any branch.</div>
+              : d.byBranch.map((b) => {
+                const sPrev = Array.isArray(prev?.byBranch) ? prev.byBranch.find((x) => x.branch === b.branch) : null;
+                return (
+                  <div key={b.branch} style={{ marginBottom: 24 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: (view === 'classic' || view === 'vertical') ? '12px 12px 4px' : '2px 2px 10px', borderBottom: `2px solid ${SAP.blue}`, paddingBottom: 4 }}>
+                      <span style={{ fontWeight: 800, fontSize: 14, color: SAP.text }}>{branchLabel(b.branch)}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: SAP.sec }}>· {curOf(b.branch)}</span>
+                    </div>
+                    {renderBody(b, sPrev, b.branch, curOf(b.branch))}
+                  </div>
+                );
+              }))
+            : (d && renderBody(d, prev, branch, cur))}
         </StateBox>
       </div>
     </Wrap>

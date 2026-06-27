@@ -115,20 +115,18 @@ function TkfStatement({ title, badge, branch, period, kpis = [], sections, resul
 }
 
 /* ── TKF Profit & Loss (vertical) ────────────────────────────────────────── */
-function TkfPnL({ branch, from, to }) {
-  const cur = bc(branch).cur;
-  // The TKF statement reads only totals + indirect + per-module fare-component `heads`
-  // (never the per-booking file drill), so use the fast summary+heads mode — heads are
-  // computed server-side via aggregation instead of scanning every voucher.
-  const q = useModulePL(branch, { from, to, summary: true, withHeads: true });
-  const d = q.data;
-  const c = (n) => cur + fmt(n, cur);
-  if (q.isLoading) return <div className="kbled"><style>{LEDGER_CSS}</style><div style={{ padding: 16 }}>{Array.from({ length: 9 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.08) }} />)}</div></div>;
-  if (!d) return <div className="kbled"><style>{LEDGER_CSS}</style><div className="loading">No data for this period.</div></div>;
+// Per-branch currency helper + label (consolidated path renders each branch in
+// its OWN currency — never a merged cross-currency money total).
+const curOf = (br) => bc(br).cur;
 
-  const buckets = (Array.isArray(d.indirect?.buckets) && d.indirect.buckets.length)
-    ? d.indirect.buckets
-    : [{ name: 'Indirect Expenses', amount: d.indirect?.expense || 0, groups: d.indirect?.groups || [] }];
+// Build the TKF P&L statement props (kpis / sections / result) for ONE data
+// slice in its OWN currency. `sd` is a byBranch slice when consolidated, or the
+// merged top-level `d` in single-branch mode — both carry the same shape.
+function tkfPnLStatement(sd, sCur) {
+  const c = (n) => sCur + fmt(n, sCur);
+  const buckets = (Array.isArray(sd.indirect?.buckets) && sd.indirect.buckets.length)
+    ? sd.indirect.buckets
+    : [{ name: 'Indirect Expenses', amount: sd.indirect?.expense || 0, groups: sd.indirect?.groups || [] }];
 
   // Each module, then the GL ledgers it posts to (clickable → ledger modal) and
   // the fare/charge components captured on the entry (Base Fare, K3, Taxes …).
@@ -137,28 +135,28 @@ function TkfPnL({ branch, from, to }) {
     const rows = [{ label: m.name, amount: side === 'sales' ? m.sales : m.cogs }];
     for (const h of ((m.heads && m.heads[side]) || [])) {
       rows.push({ label: h.ledger, amount: h.amount, ledger: h.ledger, indent: 1 });
-      for (const c of (h.components || [])) rows.push({ label: c.label, amount: c.amount, indent: 2 });
+      for (const comp of (h.components || [])) rows.push({ label: comp.label, amount: comp.amount, indent: 2 });
     }
     return rows;
   };
   const incomeRows = [
-    ...(d.modules || []).flatMap((m) => moduleStmtRows(m, 'sales')),
-    { label: 'Total Revenue (Sales)', amount: d.totals.sales, subtotal: true },
+    ...(sd.modules || []).flatMap((m) => moduleStmtRows(m, 'sales')),
+    { label: 'Total Revenue (Sales)', amount: sd.totals.sales, subtotal: true },
   ];
   // Module rows foot to the operating GP (Sales − COGS); the full Tally Gross
   // Profit also adds Direct Income (and other trading items). Show that bridge so
   // the statement foots: Operating GP + Direct Income = GROSS PROFIT.
-  const operatingGP = d.totals.operatingGP != null ? d.totals.operatingGP : (d.totals.sales - d.totals.cogs);
+  const operatingGP = sd.totals.operatingGP != null ? sd.totals.operatingGP : (sd.totals.sales - sd.totals.cogs);
   const cogsRows = [
-    ...(d.modules || []).flatMap((m) => moduleStmtRows(m, 'cogs')),
-    { label: 'Total Direct Cost (COGS)', amount: d.totals.cogs, subtotal: true },
-    ...(d.totals.tradingOther
+    ...(sd.modules || []).flatMap((m) => moduleStmtRows(m, 'cogs')),
+    { label: 'Total Direct Cost (COGS)', amount: sd.totals.cogs, subtotal: true },
+    ...(sd.totals.tradingOther
       ? [
         { label: 'Operating Gross Profit (Sales − COGS)', amount: operatingGP, subtotal: true },
-        { label: 'Add: Direct Income', amount: d.totals.tradingOther },
+        { label: 'Add: Direct Income', amount: sd.totals.tradingOther },
       ]
       : []),
-    { label: 'GROSS PROFIT', amount: d.totals.gp, subtotal: true, bold: true },
+    { label: 'GROSS PROFIT', amount: sd.totals.gp, subtotal: true, bold: true },
   ];
   const expRows = [];
   buckets.forEach((b) => {
@@ -168,11 +166,11 @@ function TkfPnL({ branch, from, to }) {
       (g.ledgers || []).forEach((l) => expRows.push({ label: l.name, amount: l.amount, ledger: l.name, indent: 2 }));
     });
   });
-  expRows.push({ label: 'Total Indirect Expenses', amount: d.indirect?.expense || 0, subtotal: true });
+  expRows.push({ label: 'Total Indirect Expenses', amount: sd.indirect?.expense || 0, subtotal: true });
   const otherRows = [];
-  const incomeGroups = d.indirect?.incomeGroups || [];
+  const incomeGroups = sd.indirect?.incomeGroups || [];
   const allIncomeLedgers = incomeGroups.flatMap((g) => g.ledgers || []);
-  const indIncomeTotal = d.indirect?.income || d.bridge?.indirectIncome || 0;
+  const indIncomeTotal = sd.indirect?.income || sd.bridge?.indirectIncome || 0;
   if (allIncomeLedgers.length === 1) {
     // One income ledger → the "Indirect Income" line opens it directly.
     otherRows.push({ label: 'Indirect Income', amount: indIncomeTotal, ledger: allIncomeLedgers[0].name });
@@ -182,8 +180,8 @@ function TkfPnL({ branch, from, to }) {
       (g.ledgers || []).forEach((l) => otherRows.push({ label: l.name, amount: l.amount, ledger: l.name, indent: 1 }));
     });
     otherRows.push({ label: 'Total Indirect Income', amount: indIncomeTotal, subtotal: true });
-  } else if (d.bridge?.indirectIncome) {
-    otherRows.push({ label: 'Indirect Income', amount: d.bridge.indirectIncome, ledger: 'Indirect Income' });
+  } else if (sd.bridge?.indirectIncome) {
+    otherRows.push({ label: 'Indirect Income', amount: sd.bridge.indirectIncome, ledger: 'Indirect Income' });
   }
 
   const sections = [
@@ -193,18 +191,63 @@ function TkfPnL({ branch, from, to }) {
   ];
   if (otherRows.length) sections.push({ title: 'Add: Indirect Income', rows: otherRows });
 
+  return {
+    kpis: [
+      { label: 'Total Sales', value: c(sd.totals.sales) },
+      { label: 'Gross Profit', tone: 'dr', value: c(sd.totals.gp) },
+      { label: 'Indirect Exp.', tone: 'cr', value: c(sd.indirect?.expense || 0) },
+      { label: 'Net Profit', tone: 'bal', value: c(sd.bridge?.netProfit || 0) },
+    ],
+    sections,
+    result: { label: sd.bridge?.netProfit >= 0 ? 'NET PROFIT' : 'NET LOSS', amount: sd.bridge?.netProfit || 0 },
+  };
+}
+
+function TkfPnL({ branch, from, to }) {
+  const cur = bc(branch).cur;
+  // The TKF statement reads only totals + indirect + per-module fare-component `heads`
+  // (never the per-booking file drill), so use the fast summary+heads mode — heads are
+  // computed server-side via aggregation instead of scanning every voucher.
+  const q = useModulePL(branch, { from, to, summary: true, withHeads: true });
+  const d = q.data;
+  // Consolidated = all-branches scope: render each branch as its own TKF P&L
+  // section in its OWN currency — never a merged cross-currency total. Driven by
+  // the BE `byBranch` slice that carries the same shape as the merged top-level.
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
+  if (q.isLoading) return <div className="kbled"><style>{LEDGER_CSS}</style><div style={{ padding: 16 }}>{Array.from({ length: 9 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.08) }} />)}</div></div>;
+  if (!d) return <div className="kbled"><style>{LEDGER_CSS}</style><div className="loading">No data for this period.</div></div>;
+
+  const period = <>Profit &amp; Loss A/c<br />From <b>{from ? dmy(from) : '…'}</b> to <b>{to ? dmy(to) : '…'}</b></>;
+
+  if (isAll && Array.isArray(d.byBranch)) {
+    if (d.byBranch.length === 0) return <div className="kbled"><style>{LEDGER_CSS}</style><div className="loading">No data for any branch this period.</div></div>;
+    return (
+      <>
+        {d.byBranch.map((b) => {
+          const sCur = curOf(b.branch);
+          const st = tkfPnLStatement(b, sCur);
+          return (
+            <div key={b.branch} style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '2px 2px 10px', borderBottom: `2px solid ${GOLD}`, paddingBottom: 4 }}>
+                <span style={{ fontWeight: 800, fontSize: 14, color: GOLD }}>{branchLabelOf(b.branch)}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#9A9A9A' }}>· {sCur}</span>
+              </div>
+              <TkfStatement title="PROFIT &amp; LOSS" badge="TKF Statement" branch={b.branch} period={period} kpis={st.kpis} sections={st.sections} result={st.result} />
+            </div>
+          );
+        })}
+      </>
+    );
+  }
+
+  const st = tkfPnLStatement(d, cur);
   return (
     <TkfStatement
       title="PROFIT &amp; LOSS" badge="TKF Statement" branch={branch}
-      period={<>Profit &amp; Loss A/c<br />From <b>{from ? dmy(from) : '…'}</b> to <b>{to ? dmy(to) : '…'}</b></>}
-      kpis={[
-        { label: 'Total Sales', value: c(d.totals.sales) },
-        { label: 'Gross Profit', tone: 'dr', value: c(d.totals.gp) },
-        { label: 'Indirect Exp.', tone: 'cr', value: c(d.indirect?.expense || 0) },
-        { label: 'Net Profit', tone: 'bal', value: c(d.bridge?.netProfit || 0) },
-      ]}
-      sections={sections}
-      result={{ label: d.bridge?.netProfit >= 0 ? 'NET PROFIT' : 'NET LOSS', amount: d.bridge?.netProfit || 0 }}
+      period={period}
+      kpis={st.kpis}
+      sections={st.sections}
+      result={st.result}
     />
   );
 }
