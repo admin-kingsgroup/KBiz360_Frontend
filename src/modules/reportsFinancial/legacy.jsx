@@ -2004,8 +2004,9 @@ function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
   const onRowClick = (r) => { if (r.ledger) setDrillLedger(r.ledger); else if (r.expandable) setOpenSub((s) => ({ ...s, [r.ekey]: !r.open })); };
 
   const divCol = { borderLeft: '2px solid #cdd1d8' };
+  const base = Math.abs(d.totalAssets || d.totalLiabilities || 0);
   const Cell = ({ r, divider }) => {
-    if (!r) return (<><td style={divider ? divCol : undefined} /><td /></>);
+    if (!r) return (<><td style={divider ? divCol : undefined} /><td /><td /></>);
     const clickable = !!(r.ledger || r.expandable);
     const bold = !!(r.group || r.sub);
     const color = (r.group || r.sub) ? TALLY.head : '#444';
@@ -2017,6 +2018,7 @@ function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
           {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}{r.label}{r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
         <td style={{ padding: '2px 14px', textAlign: 'right', color: r.result ? TALLY.green : '#1a1a1a', fontWeight: (r.result || r.sub) ? 700 : 400, ...mono }}>{inr(r.amount)}</td>
+        <td style={{ padding: '2px 10px', textAlign: 'right', color: SAP.sec, fontSize: 11, ...mono }}>{share(r.amount, base) >= 0.05 ? `${share(r.amount, base).toFixed(1)}%` : ''}</td>
       </>
     );
   };
@@ -2048,18 +2050,18 @@ function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
         </div>
       )}
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-        <colgroup><col /><col style={{ width: 150 }} /><col /><col style={{ width: 150 }} /></colgroup>
+        <colgroup><col /><col style={{ width: 130 }} /><col style={{ width: 56 }} /><col /><col style={{ width: 130 }} /><col style={{ width: 56 }} /></colgroup>
         <tbody>
           <tr style={{ color: TALLY.head, fontWeight: 700, background: '#f0f4fa', borderBottom: `2px solid ${TALLY.head}` }}>
-            <td style={{ padding: '6px 14px', ...mono }}>Liabilities</td><td style={{ padding: '6px 14px', textAlign: 'right', ...mono }}>{curLabel}</td>
-            <td style={{ padding: '6px 14px', ...divCol, ...mono }}>Assets</td><td style={{ padding: '6px 14px', textAlign: 'right', ...mono }}>{curLabel}</td>
+            <td style={{ padding: '6px 14px', ...mono }}>Liabilities</td><td style={{ padding: '6px 14px', textAlign: 'right', ...mono }}>{curLabel}</td><td style={{ padding: '6px 10px', textAlign: 'right', fontSize: 11, ...mono }}>% Tot</td>
+            <td style={{ padding: '6px 14px', ...divCol, ...mono }}>Assets</td><td style={{ padding: '6px 14px', textAlign: 'right', ...mono }}>{curLabel}</td><td style={{ padding: '6px 10px', textAlign: 'right', fontSize: 11, ...mono }}>% Tot</td>
           </tr>
           {Array.from({ length: n }).map((_, i) => (
             <tr key={i} style={{ borderBottom: '1px solid #dfe2e7', background: i % 2 ? '#fbfcfe' : '#fff' }}><Cell r={left[i]} /><Cell r={right[i]} divider /></tr>
           ))}
           <tr style={{ color: TALLY.head, fontWeight: 700, borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}>
-            <td style={{ padding: '7px 14px', ...mono }}>Total</td><td style={{ padding: '7px 14px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(d.totalLiabilities)}</td>
-            <td style={{ padding: '7px 14px', ...divCol, ...mono }}>Total</td><td style={{ padding: '7px 14px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(d.totalAssets)}</td>
+            <td style={{ padding: '7px 14px', ...mono }}>Total</td><td style={{ padding: '7px 14px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(d.totalLiabilities)}</td><td style={{ padding: '7px 10px', ...mono }} />
+            <td style={{ padding: '7px 14px', ...divCol, ...mono }}>Total</td><td style={{ padding: '7px 14px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(d.totalAssets)}</td><td style={{ padding: '7px 10px', ...mono }} />
           </tr>
         </tbody>
       </table>
