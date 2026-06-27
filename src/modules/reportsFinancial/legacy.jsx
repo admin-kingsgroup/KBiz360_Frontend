@@ -155,9 +155,9 @@ const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', padding: '
 
 // Proportion bar — visualises a row's share so the freed horizontal band on the
 // statement views carries information instead of whitespace. tone 'cogs' = warm.
-function MiniBar({ pct, tone }) {
+function MiniBar({ pct, tone, color }) {
   const w = Math.max(0, Math.min(100, Math.abs(Number(pct) || 0)));
-  const fill = tone === 'cogs' ? 'linear-gradient(90deg,#f0a35e,#d97706)' : 'linear-gradient(90deg,#3b82f6,#1d4ed8)';
+  const fill = color || (tone === 'cogs' ? 'linear-gradient(90deg,#f0a35e,#d97706)' : 'linear-gradient(90deg,#3b82f6,#1d4ed8)');
   return <div style={{ height: 8, borderRadius: 5, background: '#eef1f5', overflow: 'hidden' }}><div style={{ height: '100%', width: `${w}%`, borderRadius: 5, background: fill }} /></div>;
 }
 // Insights-rail primitives (Vertical P&L + Balance Sheet) — a compact dashboard
@@ -502,6 +502,8 @@ function PnLMatrix({ branch, cur, fy, grain, onFocus }) {
     { label: 'Net Profit %', get: (d) => pctSafe(d.bridge.netProfit, d.totals.sales), total: pctSafe(agg.net, agg.sales), pct: true },
   ];
   const fmtCell = (m, d) => (!d ? '—' : (m.pct ? pctTxt(m.get(d)) : inr(m.get(d))));
+  // Margin %-row cells get a performance tint so good/poor periods pop at a glance.
+  const pctTint = (v) => (v >= 13 ? '#e7f6ec' : v >= 8 ? '#fef6e0' : v >= 0 ? '#fdeee0' : '#fdecea');
 
   const doExport = () => {
     const columns = [{ key: 'metric', label: grain === 'month' ? 'Metric / Month' : 'Metric / Quarter' }, ...cols.map((c) => ({ key: c.key, label: c.label })), { key: 'fytotal', label: 'FY Total' }];
@@ -550,9 +552,9 @@ function PnLMatrix({ branch, cur, fy, grain, onFocus }) {
                 <tr key={m.label} style={{ background: m.strong ? SAP.greenBg : (ri % 2 ? SAP.rowAlt : '#fff'), borderBottom: `1px solid ${SAP.borderLt}` }}>
                   <td style={{ padding: '7px 14px', fontWeight: m.strong ? 700 : 500, color: m.strong ? SAP.greenDk : SAP.text }}>{m.label}</td>
                   {cols.map((c, i) => (
-                    <td key={c.key} style={{ ...num, padding: '7px 12px', fontWeight: m.strong ? 700 : 400, color: m.good ? SAP.greenDk : (m.neg ? SAP.red : SAP.text) }}>{fmtCell(m, datas[i])}</td>
+                    <td key={c.key} style={{ ...num, padding: '7px 12px', fontWeight: m.strong ? 700 : 400, color: m.good ? SAP.greenDk : (m.neg ? SAP.red : SAP.text), background: m.pct && datas[i] ? pctTint(m.get(datas[i])) : undefined }}>{fmtCell(m, datas[i])}</td>
                   ))}
-                  <td style={{ ...num, padding: '7px 12px', fontWeight: 700, color: m.good ? SAP.greenDk : (m.neg ? SAP.red : SAP.text), background: m.strong ? '#dff5df' : SAP.headerBg }}>
+                  <td style={{ ...num, padding: '7px 12px', fontWeight: 700, color: m.good ? SAP.greenDk : (m.neg ? SAP.red : SAP.text), background: m.pct ? pctTint(m.total) : (m.strong ? '#dff5df' : SAP.headerBg) }}>
                     {m.pct ? pctTxt(m.total) : inr(m.total)}
                   </td>
                 </tr>
@@ -1550,7 +1552,7 @@ function DrillPnL({ d, cur, branch, periodTxt }) {
           <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
         </div>
       )}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, maxWidth: 920, margin: '0 auto', ...mono }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, maxWidth: 1600, margin: '0 auto', ...mono }}>
         <colgroup><col style={{ width: 28 }} /><col style={{ width: 200 }} /><col style={{ width: 220 }} /><col /><col style={{ width: 130 }} /></colgroup>
         <tbody>
           <GroupHead txt="Sales Accounts" val={d.totals.sales} />
@@ -2247,7 +2249,7 @@ function ArApScreen({ branch, side, setRoute, initialTab }) {
   });
   return (
     <>
-      <div className="noprint" style={{ maxWidth: 1180, margin: '0 auto', padding: '8px 6px 0', display: 'flex', gap: 6 }}>
+      <div className="noprint" style={{ maxWidth: 1600, margin: '0 auto', padding: '8px 6px 0', display: 'flex', gap: 6 }}>
         {TABS.map(([id, label]) => <button key={id} onClick={() => setTab(id)} style={tabBtn(tab === id)}>{label}</button>)}
       </div>
       {tab === 'ageing'
@@ -2313,7 +2315,7 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfP
         badge={<Badge bg={SAP.blueBg} c={SAP.blue} bd="#b8d6ff">{rows.length} {partyLabel.toLowerCase()}s</Badge>}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-            <thead><tr><Th w="26%">{partyLabel}</Th>{BUCKETS.map(([, lbl]) => <Th key={lbl} right>{lbl}</Th>)}<Th right>Open Bills</Th><Th right>On-Account</Th><Th right>Net</Th></tr></thead>
+            <thead><tr><Th w="22%">{partyLabel}</Th>{BUCKETS.map(([, lbl]) => <Th key={lbl} right>{lbl}</Th>)}<Th right>Open Bills</Th><Th right>On-Account</Th><Th right>Net</Th><Th right w="13%">Share of Open</Th></tr></thead>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={r.party + i} {...keyActivate(() => openLedgerModal(r.party))}
@@ -2335,6 +2337,12 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfP
                     )}
                   </td>
                   <td style={{ ...num, fontWeight: 700, color: SAP.text }}>{inrL(rowNet(r))}</td>
+                  <td style={{ padding: '7px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, color: SAP.sec, width: 42, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{pctTxt(share(r.total))}</span>
+                      <div style={{ flex: 1, minWidth: 36 }}><MiniBar pct={share(r.total)} /></div>
+                    </div>
+                  </td>
                 </tr>
               ))}
               <tr style={{ background: SAP.shell, color: '#fff', fontWeight: 700, borderTop: `2px solid ${SAP.blue}` }}>
@@ -2343,6 +2351,7 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfP
                 <td style={num}>{inrL(totals.total)}</td>
                 <td style={num}>{inrL(totals.onAccount || 0)}</td>
                 <td style={num}>{inrL(netTotal)}</td>
+                <td style={num}>100%</td>
               </tr>
             </tbody>
           </table>
@@ -2358,7 +2367,7 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfP
   }
 
   const dateControl = (
-    <div className="noprint" style={{ maxWidth: 1180, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+    <div className="noprint" style={{ maxWidth: 1600, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
       <span style={{ color: SAP.sec, fontWeight: 600 }}>Age as on</span>
       <input type="date" value={asOfState} onChange={(e) => setAsOf(e.target.value)}
         style={{ padding: '4px 8px', border: `1px solid ${SAP.border}`, borderRadius: 6, fontSize: 12 }} />
@@ -2371,7 +2380,7 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfP
   // never a merged cross-branch / cross-currency total. Driven by the BE `byBranch`.
   if (isAll && Array.isArray(d?.byBranch)) {
     return (
-      <Wrap>
+      <Wrap wide>
         <FioriHead system="KBiz360 · Finance"
           title={isRec ? 'Accounts Receivable — Ageing · All Branches' : 'Accounts Payable — Ageing · All Branches'}
           sub={<>Consolidated — each branch shown separately in its own currency · <strong>no cross-currency total</strong> &nbsp;|&nbsp; as of {d?.asOf || '—'}</>}
@@ -2394,7 +2403,7 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfP
   }
 
   return (
-    <Wrap>
+    <Wrap wide>
       <FioriHead
         system="KBiz360 · Finance"
         title={isRec ? 'Accounts Receivable — Ageing' : 'Accounts Payable — Ageing'}
@@ -2424,6 +2433,7 @@ function NetAgeingView({ branch }) {
     const inrL = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : '—'; };
     const compactL = (n) => compactCur(sCur, n);
     const { rows, totals } = computeNetAgeing(data);
+    const maxAbs = Math.max(1, ...rows.map((r) => Math.abs(r.net)));
     return (
       <>
         <KpiGrid>
@@ -2435,7 +2445,7 @@ function NetAgeingView({ branch }) {
           badge={<Badge bg={SAP.blueBg} c={SAP.blue} bd="#b8d6ff">{rows.length} parties</Badge>}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-              <thead><tr><Th w="40%">Party</Th><Th right>Receivable</Th><Th right>Payable</Th><Th right>Net</Th></tr></thead>
+              <thead><tr><Th w="34%">Party</Th><Th right>Receivable</Th><Th right>Payable</Th><Th right>Net</Th><Th right w="22%">Direction</Th></tr></thead>
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={r.party + i} {...keyActivate(() => openLedgerModal(r.party))}
@@ -2444,6 +2454,12 @@ function NetAgeingView({ branch }) {
                     <td style={{ ...num, color: r.receivable ? SAP.greenDk : SAP.label }}>{inrL(r.receivable)}</td>
                     <td style={{ ...num, color: r.payable ? SAP.orange : SAP.label }}>{inrL(r.payable)}</td>
                     <td style={{ ...num, fontWeight: 700, color: r.net >= 0 ? SAP.greenDk : SAP.red }}>{inrL(r.net)}</td>
+                    <td style={{ padding: '7px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: r.net >= 0 ? SAP.greenDk : SAP.red, width: 38, flexShrink: 0 }}>{r.net >= 0 ? 'owes us' : 'we owe'}</span>
+                        <div style={{ flex: 1, minWidth: 36 }}><MiniBar pct={(Math.abs(r.net) / maxAbs) * 100} color={r.net >= 0 ? 'linear-gradient(90deg,#22c55e,#15803d)' : 'linear-gradient(90deg,#f87171,#bb0000)'} /></div>
+                      </div>
+                    </td>
                   </tr>
                 ))}
                 <tr style={{ background: SAP.shell, color: '#fff', fontWeight: 700, borderTop: `2px solid ${SAP.blue}` }}>
@@ -2451,6 +2467,7 @@ function NetAgeingView({ branch }) {
                   <td style={num}>{inrL(totals.receivable)}</td>
                   <td style={num}>{inrL(totals.payable)}</td>
                   <td style={num}>{inrL(totals.net)}</td>
+                  <td />
                 </tr>
               </tbody>
             </table>
@@ -2461,7 +2478,7 @@ function NetAgeingView({ branch }) {
   };
 
   const dateControl = (
-    <div className="noprint" style={{ maxWidth: 1180, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+    <div className="noprint" style={{ maxWidth: 1600, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
       <span style={{ color: SAP.sec, fontWeight: 600 }}>Age as on</span>
       <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)}
         style={{ padding: '4px 8px', border: `1px solid ${SAP.border}`, borderRadius: 6, fontSize: 12 }} />
@@ -2472,7 +2489,7 @@ function NetAgeingView({ branch }) {
   // Consolidated: each branch netted within itself, shown separately in its own currency.
   if (isAll && Array.isArray(d?.byBranch)) {
     return (
-      <Wrap>
+      <Wrap wide>
         <FioriHead system="KBiz360 · Finance"
           title="Net Ageing — Debtors − Creditors · All Branches"
           sub={<>Consolidated — each branch netted within itself, in its own currency · <strong>no cross-currency total</strong> &nbsp;|&nbsp; as of {d?.asOf || '—'}</>}
@@ -2495,7 +2512,7 @@ function NetAgeingView({ branch }) {
   }
 
   return (
-    <Wrap>
+    <Wrap wide>
       <FioriHead
         system="KBiz360 · Finance"
         title="Net Ageing — Debtors − Creditors (same party)"

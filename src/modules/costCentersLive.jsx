@@ -97,7 +97,7 @@ export function CostCenterMasterLive({ currentUser }) {
     centers.map((c) => ({ code: c.code, name: c.name, module: c.module, branch: c.branch, kind: c.system ? 'Standard' : 'Custom', status: c.active ? 'Active' : 'Inactive' })));
 
   return (
-    <div style={{ maxWidth: 1040, margin: '0 auto', padding: '12px 10px' }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>Cost Centre Master</h2>

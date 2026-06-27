@@ -22,7 +22,7 @@ import { SampleBanner } from '../../core/ux/SampleBanner';
 
 export function TaxShell({title,subtitle,children,action}){
   return (
-    <div style={{padding:"12px 10px",maxWidth:1260,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:14,flexWrap:"wrap",gap:10}}>
         <div>
           <p style={{margin:0,fontSize:9.5,color:"#5a6691",letterSpacing:"0.5px",textTransform:"uppercase"}}>Taxation</p>
@@ -65,7 +65,7 @@ export function TaxGstr1({branch}){
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>GSTR-1 — Outward Supplies</h2>
@@ -172,7 +172,7 @@ export function TaxGstr3b({branch}){
   ];
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:900,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>GSTR-3B — Monthly Summary</h2>
@@ -239,7 +239,7 @@ export function TaxRcm({branch}){
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>RCM Register — Reverse Charge</h2>
@@ -305,7 +305,7 @@ export function TaxVat({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>VAT Returns</h2>
@@ -443,7 +443,7 @@ export function TaxCalendar(){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1000,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📅</div>
@@ -510,7 +510,7 @@ export function GstrRecon({branch}){
   const f=n=>"₹"+Number(Math.round(n||0)).toLocaleString("en-IN");
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔄</div>
@@ -702,7 +702,7 @@ export function TaxTdsTcs({branch}){
   const markDeposited=(id)=>setTdsEntries(ts=>ts.map(t=>t.id===id?{...t,status:"Deposited",challanDate:"2026-05-"+new Date().getDate().toString().padStart(2,"0"),challanBsr:"0600115",challanSerial:String(Math.floor(Math.random()*90000)+10000)}:t));
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📋</div>
@@ -896,7 +896,7 @@ export function Form26AS({branch}){
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📑</div>
@@ -966,7 +966,7 @@ export function EWayBill({branch}){
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <SampleBanner note="e-way bills shown here are sample data, not live." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1076,7 +1076,7 @@ export function Gstr9c({branch,setRoute}){
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <SampleBanner note="GSTR-9C books-vs-returns reconciliation isn’t wired to live data yet." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
@@ -1186,7 +1186,7 @@ export function TaxAudit3CD({branch,setRoute}){
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <SampleBanner note="these cash-payment audit flags are sample data, not live." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
@@ -1284,7 +1284,7 @@ export function Gstr2aReco({branch,setRoute}){
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <SampleBanner note="GSTR-2A / 2B ITC matching isn’t wired to live data yet." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>

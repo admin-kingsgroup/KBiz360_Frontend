@@ -1514,6 +1514,90 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
             />
           </div>
 
+          {/* Client headline totals — Sales Bills vs Receipts. Summed from the SAME
+              bill-wise receivables rows that feed the party-wise panel below, so the
+              four tiles tie back exactly to that table's TOTAL footer. */}
+          <SecTitle>Clients — Sales Bills vs Receipts</SecTitle>
+          {(() => {
+            const rr = age.receivables?.rows || [];
+            const rt = rr.reduce((a, r) => ({
+              billed: a.billed + (r.billed || 0),
+              settled: a.settled + (r.settled || 0),
+              unsettled: a.unsettled + (r.total || 0),
+              net: a.net + (r.net || 0),
+            }), { billed: 0, settled: 0, unsettled: 0, net: 0 });
+            const lbl = { fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 };
+            const big = { fontSize: 22, fontWeight: 800, marginTop: 4, fontVariantNumeric: 'tabular-nums' };
+            const sub = { fontSize: 11, color: C.dim, marginTop: 2 };
+            const tile = (border) => ({ ...card, padding: 14, borderLeft: `4px solid ${border}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' });
+            return (
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+                <div {...clickable(() => go('/reports/sreg'))} style={tile(C.dark)}>
+                  <div style={lbl}>Total Sales Bills</div>
+                  <div style={{ ...big, color: C.dark }}>{money(cur, rt.billed)}</div>
+                  <div style={sub}>{rr.length} client(s) · gross billed <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+                <div {...clickable(() => go('/finance/receipt-register'))} style={tile(C.green)}>
+                  <div style={lbl}>Total Receipts</div>
+                  <div style={{ ...big, color: C.green }}>{money(cur, rt.settled)}</div>
+                  <div style={sub}>received against bills <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+                <div {...clickable(() => go('/reports/rec'))} style={tile(C.blue)}>
+                  <div style={lbl}>Total Unsettled Sales Bills</div>
+                  <div style={{ ...big, color: C.blue }}>{money(cur, rt.unsettled)}</div>
+                  <div style={sub}>open bill value <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+                <div {...clickable(() => go('/reports/rec'))} style={tile(rt.net >= 0 ? C.blue : C.red)}>
+                  <div style={lbl}>Client Net Due Receivable</div>
+                  <div style={{ ...big, color: rt.net >= 0 ? C.blue : C.red }}>{money(cur, rt.net)}</div>
+                  <div style={sub}>{rt.net >= 0 ? 'net to collect' : 'net advance held'} · open receivables <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Supplier headline totals — Purchase Bills vs Payments. Summed from the
+              SAME bill-wise payables rows that feed the party-wise panel below, so the
+              four tiles tie back exactly to that table's TOTAL footer. */}
+          <SecTitle>Suppliers — Purchase Bills vs Payments</SecTitle>
+          {(() => {
+            const pr = age.payables?.rows || [];
+            const pt = pr.reduce((a, r) => ({
+              billed: a.billed + (r.billed || 0),
+              settled: a.settled + (r.settled || 0),
+              unsettled: a.unsettled + (r.total || 0),
+              net: a.net + (r.net || 0),
+            }), { billed: 0, settled: 0, unsettled: 0, net: 0 });
+            const lbl = { fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 };
+            const big = { fontSize: 22, fontWeight: 800, marginTop: 4, fontVariantNumeric: 'tabular-nums' };
+            const sub = { fontSize: 11, color: C.dim, marginTop: 2 };
+            const tile = (border) => ({ ...card, padding: 14, borderLeft: `4px solid ${border}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' });
+            return (
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+                <div {...clickable(() => go('/reports/preg'))} style={tile(C.dark)}>
+                  <div style={lbl}>Total Purchase Bills</div>
+                  <div style={{ ...big, color: C.dark }}>{money(cur, pt.billed)}</div>
+                  <div style={sub}>{pr.length} supplier(s) · gross billed <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+                <div {...clickable(() => go('/finance/payment-register'))} style={tile(C.green)}>
+                  <div style={lbl}>Total Payments</div>
+                  <div style={{ ...big, color: C.green }}>{money(cur, pt.settled)}</div>
+                  <div style={sub}>paid against bills <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+                <div {...clickable(() => go('/reports/pay'))} style={tile(C.amber)}>
+                  <div style={lbl}>Total Unsettled Purchase Bills</div>
+                  <div style={{ ...big, color: C.amber }}>{money(cur, pt.unsettled)}</div>
+                  <div style={sub}>open bill value <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+                <div {...clickable(() => go('/reports/pay'))} style={tile(pt.net >= 0 ? C.red : C.green)}>
+                  <div style={lbl}>Supplier Net Due Payable</div>
+                  <div style={{ ...big, color: pt.net >= 0 ? C.red : C.green }}>{money(cur, pt.net)}</div>
+                  <div style={sub}>{pt.net >= 0 ? 'net to pay' : 'net advance'} · open payables <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Party-wise settlement — clients | suppliers, side by side */}
           <SecTitle>Settlement — Bills vs Receipts &amp; Payments (party-wise)</SecTitle>
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>

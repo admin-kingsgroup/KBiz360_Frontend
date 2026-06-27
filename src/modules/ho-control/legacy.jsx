@@ -76,7 +76,7 @@ export function GroupDashboard(){
   ];
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"linear-gradient(135deg,#0d1326,#185FA5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🌍</div>
@@ -242,7 +242,7 @@ export function GroupBookings({branch,setRoute}){
   const selGrp=sel?groups.find(g=>g.id===sel):null;
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>👨‍👩‍👧‍👦</div>
@@ -374,7 +374,7 @@ export function PeriodLocking({branch,setRoute}){
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>🔒 Period Locking</h2>
       <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Prevent backdated postings into closed accounting periods · Per-branch · Admin-only unlock</p>
 
@@ -435,7 +435,7 @@ export function BankingApiSettings({branch,setRoute}){
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>🏦 Banking API Integration</h2>
       <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Real-time bank balance · Auto-reconciliation · Bulk NEFT/RTGS initiation</p>
 

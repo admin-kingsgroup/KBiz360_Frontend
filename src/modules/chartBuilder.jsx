@@ -206,7 +206,7 @@ export function AccountsTreeView({ branch }) {
   const scopePill = (k, l) => <button key={k} onClick={() => setScope(k)} className="max-tablet:min-h-[44px]" style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: scope === k ? BLUE : '#fff', color: scope === k ? '#fff' : DIM }}>{l}</button>;
 
   return (
-    <div style={{ padding: '12px 14px', maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: '12px 14px', maxWidth: 1600, margin: '0 auto' }}>
       <FocusBanner />
       <div style={{ marginBottom: 8 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK }}>Accounts Tree View</h2>

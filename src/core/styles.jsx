@@ -511,9 +511,15 @@ export function KPICard({label,value,delta,color,onClick}){
 }
 
 
+// Standard widescreen page/report container width. Registers, reports and list
+// screens center their content at this cap so wide monitors aren't wasted on
+// empty gutters (matches the SO/PO/GP booking screens, already on 1600). The
+// P&L / Balance Sheet statements run slightly wider (1640) to fit their rail.
+export const PAGE_MAX = 1600;
+
 export function RPT_Page({title,subtitle,toolbar,children}){
   return (
-    <div style={{padding:18,maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:18,maxWidth:PAGE_MAX,margin:"0 auto"}}>
       <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:14,marginBottom:14,paddingBottom:12,borderBottom:"1px solid #cdd1d8"}}>
         <div>
           <h2 style={{margin:0,fontSize:20,color:"#0d1326",fontWeight:700}}>{title}</h2>

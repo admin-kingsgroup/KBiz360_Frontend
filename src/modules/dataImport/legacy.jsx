@@ -728,7 +728,7 @@ export function DataImportPage({ currentUser }) {
   };
 
   return (
-    <div style={{ padding: '12px 14px', maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: '12px 14px', maxWidth: 1600, margin: '0 auto' }}>
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK }}>Data Import — Tally Migration</h2>
         <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>

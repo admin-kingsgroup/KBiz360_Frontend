@@ -67,7 +67,7 @@ export function ExpenseBudget({branch,setRoute}){
   const ff=n=>n>0?cur+Number(n).toLocaleString(localeOf(cur)):"—";
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -259,7 +259,7 @@ export function HrEmployees({branch}){
   const net=e=>gross(e)-deductions(e);
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
         flexWrap:"wrap",gap:10,marginBottom:14}}>
@@ -517,7 +517,7 @@ export function HrAttendance({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
         flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -700,7 +700,7 @@ export function HrPayroll({branch}){
   const jDr=journalEntries.filter(e=>e.side==="Dr").reduce((s,e)=>s+e.amount,0);
   const jCr=journalEntries.filter(e=>e.side==="Cr").reduce((s,e)=>s+e.amount,0);
   const balDiff=jDr-jCr; const balanced=balDiff>=-0.01&&balDiff<=0.01;
-  const hrpContainerStyle={padding:"12px 10px",maxWidth:1300,margin:"0 auto"};
+  const hrpContainerStyle={padding:"12px 10px",maxWidth:1600,margin:"0 auto"};
 
   return (
     <div style={hrpContainerStyle}>
@@ -960,7 +960,7 @@ export function HrPayslips({branch}){
   const net=gross-deductions;
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:900,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       {/* Controls */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
         flexWrap:"wrap",gap:10,marginBottom:16}}>
@@ -1140,7 +1140,7 @@ export function HrLeave({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🌴</div>
@@ -1274,7 +1274,7 @@ export function HrExpenses({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>💳</div>
@@ -1395,7 +1395,7 @@ export function SalaryRevision({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📈</div>
@@ -1559,7 +1559,7 @@ export function PfEsiChallan({branch}){
   const [challanESI,setChallanESI]=useState({bsr:"",date:"",trn:"",status:"Pending"});
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📋</div>
@@ -1729,7 +1729,7 @@ export function EmployeeAdvances({branch,setRoute}){
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>👤 Employee Loans &amp; Salary Advances</h2>
