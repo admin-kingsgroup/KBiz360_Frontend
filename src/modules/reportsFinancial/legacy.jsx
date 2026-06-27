@@ -1918,7 +1918,7 @@ function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
             <td style={{ padding: '6px 14px', ...divCol, ...mono }}>Assets</td><td style={{ padding: '6px 14px', textAlign: 'right', ...mono }}>{curLabel}</td>
           </tr>
           {Array.from({ length: n }).map((_, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #eef0f3', background: i % 2 ? '#fbfcfe' : '#fff' }}><Cell r={left[i]} /><Cell r={right[i]} divider /></tr>
+            <tr key={i} style={{ borderBottom: '1px solid #dfe2e7', background: i % 2 ? '#fbfcfe' : '#fff' }}><Cell r={left[i]} /><Cell r={right[i]} divider /></tr>
           ))}
           <tr style={{ color: TALLY.head, fontWeight: 700, borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}>
             <td style={{ padding: '7px 14px', ...mono }}>Total</td><td style={{ padding: '7px 14px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(d.totalLiabilities)}</td>
@@ -1966,7 +1966,7 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
     const color = (r.group || r.sub) ? TALLY.head : '#444';
     const pad = r.group ? 16 : r.sub ? 32 : 50;
     return (
-      <tr style={{ borderBottom: '1px solid #eef0f3', background: r.group ? '#fbfcfe' : '#fff' }}>
+      <tr style={{ borderBottom: '1px solid #dfe2e7', background: r.group ? '#fbfcfe' : '#fff' }}>
         <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})} className={clickable ? 'cl-drill' : undefined}
           style={{ padding: '4px 14px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
           {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}{r.label}{r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}

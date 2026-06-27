@@ -8,7 +8,9 @@ describe('Accounts ▸ Daily Entry ordering', () => {
   });
 
   it('lists SO/PO/GP Voucher as the 1st option', () => {
-    const first = dailyEntry.children[0];
+    // Daily Entry is now segmented by divider section-headers ("Sales & Inter-Branch"
+    // etc.); the FIRST ACTIONABLE option (first non-divider) must still be SO/PO/GP.
+    const first = dailyEntry.children.find((c) => !c.divider);
     expect(first.label).toBe('SO/PO/GP Voucher');
     expect(first.href).toBe('/bookings/new');
   });
