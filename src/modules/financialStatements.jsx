@@ -122,7 +122,7 @@ function TkfPnL({ branch, from, to }) {
   // computed server-side via aggregation instead of scanning every voucher.
   const q = useModulePL(branch, { from, to, summary: true, withHeads: true });
   const d = q.data;
-  const c = (n) => cur + fmt(n);
+  const c = (n) => cur + fmt(n, cur);
   if (q.isLoading) return <div className="kbled"><style>{LEDGER_CSS}</style><div style={{ padding: 16 }}>{Array.from({ length: 9 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.08) }} />)}</div></div>;
   if (!d) return <div className="kbled"><style>{LEDGER_CSS}</style><div className="loading">No data for this period.</div></div>;
 
@@ -214,7 +214,7 @@ function TkfBS({ branch, to }) {
   const cur = bc(branch).cur;
   const q = useBalanceSheet(branch, { to });
   const d = q.data;
-  const c = (n) => cur + fmt(n);
+  const c = (n) => cur + fmt(n, cur);
   if (q.isLoading) return <div className="kbled"><style>{LEDGER_CSS}</style><div style={{ padding: 16 }}>{Array.from({ length: 9 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.08) }} />)}</div></div>;
   if (!d) return <div className="kbled"><style>{LEDGER_CSS}</style><div className="loading">No data as on this date.</div></div>;
 
