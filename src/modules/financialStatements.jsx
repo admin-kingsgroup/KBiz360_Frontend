@@ -14,6 +14,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 import React, { useMemo, useState } from 'react';
 import { bc } from '../core/styles';
+import { localeOf } from '../core/format';
 import { PeriodBar } from '../core/period';
 import { useModulePL, useBalanceSheet } from '../core/useAccounting';
 import { LEDGER_CSS } from '../core/ledgerUI';
@@ -27,8 +28,11 @@ import { CONSOLIDATED_LABEL } from '../core/data';
 
 const GOLD = '#A07828';
 const branchLabelOf = (b) => (!b || b === 'ALL' ? CONSOLIDATED_LABEL : (b.code || b));
-const fmt = (n) => (n ? Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
-const fmtB = (n) => Math.abs(Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Grouping locale follows the branch currency symbol (Indian lakh/crore for ₹,
+// Western thousands for USD branches); the symbol is rendered separately by the
+// caller. Default ₹ keeps consolidated/ALL views (bc → ₹) on en-IN, unchanged.
+const fmt = (n, cur = '₹') => (n ? Number(n).toLocaleString(localeOf(cur), { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
+const fmtB = (n, cur = '₹') => Math.abs(Number(n) || 0).toLocaleString(localeOf(cur), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dmy = (s) => (s ? String(s).slice(0, 10).split('-').reverse().join('-') : '');
 
 /* ── shared view switcher (segmented, cream/gold) ──────────────────────────
@@ -55,6 +59,7 @@ function StmtSwitcher({ value, onChange, options }) {
    Renders structured sections; ledger rows are clickable → unified modal.
    ════════════════════════════════════════════════════════════════════════ */
 function TkfStatement({ title, badge, branch, period, kpis = [], sections, result }) {
+  const cur = bc(branch).cur;
   return (
     <div className="kbled">
       <style>{LEDGER_CSS}</style>
@@ -89,7 +94,7 @@ function TkfStatement({ title, badge, branch, period, kpis = [], sections, resul
                           ? <span className="vlink" {...clickable(() => openLedgerModal(r.ledger, { invoiceToRegister: true }))} title="Open Ledger Account — an invoice inside opens its Sales/Purchase Register">{r.label}</span>
                           : r.label}
                       </td>
-                      <td className="num">{fmt(r.amount)}</td>
+                      <td className="num">{fmt(r.amount, cur)}</td>
                     </tr>
                   ))}
                 </React.Fragment>
@@ -98,7 +103,7 @@ function TkfStatement({ title, badge, branch, period, kpis = [], sections, resul
             {result && (
               <tfoot><tr className="close-row">
                 <td className="l" style={{ color: GOLD, textTransform: 'uppercase', fontSize: 12, letterSpacing: '.4px' }}>{result.label}</td>
-                <td className="bal">{fmtB(result.amount)}<span className="sd">{result.note || ''}</span></td>
+                <td className="bal">{fmtB(result.amount, cur)}<span className="sd">{result.note || ''}</span></td>
               </tr></tfoot>
             )}
           </table>

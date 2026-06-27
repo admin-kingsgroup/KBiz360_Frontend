@@ -9,7 +9,7 @@
 
 import React, { useState } from 'react';
 import { Plus, TrendingDown, Landmark } from 'lucide-react';
-import { fmt } from '../core/format';
+import { fmt, localeOf } from '../core/format';
 import { ACM_REASON_CODES } from '../core/helpers';
 import { useAssetCategories } from '../core/useReference';
 import { useMasterList } from '../core/useMasters';
@@ -63,7 +63,7 @@ export function AcmRegister({ branch }) {
 
   const totPending = filtered.filter((a) => !['Accepted', 'Rejected'].includes(a.status)).reduce((s, a) => s + (a.amount || 0), 0);
   const totAccepted = filtered.filter((a) => a.status === 'Accepted').reduce((s, a) => s + (a.amount || 0), 0);
-  const f = (n) => cur + Number(Math.round(n)).toLocaleString('en-IN');
+  const f = (n) => cur + Number(Math.round(n)).toLocaleString(localeOf(cur));
 
   const addAcm = () => {
     createM.mutate({ kind: 'acm', ...form, branch: form.branch }, {

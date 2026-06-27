@@ -1386,24 +1386,25 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
   // 2) Assemble columns: fixed lead → component heads → taxes → final value.
   const columns = [];
   const col = (key, label, isNum) => columns.push({ key, label, num: !!isNum });
-  col('bookingNo', 'Booking No');
-  col('linkNo', 'SPG / Link No');
+  // Lead columns, fixed business order: Date ▸ Sales Type ▸ Ledger ▸ Invoice Value
+  // ▸ Link No ▸ Sales Invoice No ▸ Purchase Invoice No. Everything else trails after.
   col('saleDate', isSale ? 'Sale Date' : 'Purchase Date');
+  col('salesType', isSale ? 'Sales Type' : 'Purchase Type'); // always shown (the register's type)
+  col('clientLedger', isSale ? 'Client Ledger' : 'Vendor Ledger'); // the accounting ledger
+  col('finalValue', isSale ? 'Final Invoice Value' : 'Final Bill Value', true);
+  col('linkNo', 'SPG / Link No');
   col('saleVno', 'Sales Invoice No');
-  col('saleTallyRef', 'Sales Tally Ref');
   col('purVno', 'Purchase Invoice No');
+  // ── the rest ──
+  col('bookingNo', 'Booking No');
+  col('saleTallyRef', 'Sales Tally Ref');   // kept with the purchase ref, beside each other
   col('purTallyRef', 'Purchase Tally Ref');
   if (!tag) col('branch', 'Branch');
-  // When viewing All modules together, surface which module each row belongs to —
-  // shown immediately before Client/Vendor Type so the mixed list stays readable.
-  if (showType) col('salesType', isSale ? 'Sales Type' : 'Purchase Type');
-  if (showType) col('intDom', 'INT / DOM'); // International vs Domestic, beside Sales Type
+  if (showType) col('intDom', 'INT / DOM'); // International vs Domestic (All-modules view only)
   col('clientType', isSale ? 'Client Type' : 'Vendor Type');
-  col('clientLedger', isSale ? 'Client Ledger' : 'Vendor Ledger');
   col('pax', 'Pax Details');
   col('pnr', 'PNR');
   col('ticket', 'Ticket No');
-  col('finalValue', isSale ? 'Final Invoice Value' : 'Final Bill Value', true);
   for (const lg of headLedgers) col(`head:${lg}`, lg, true);
   if (anyIndia) { col('cgst', `CGST ${taxWord}${sfx}`, true); col('sgst', `SGST ${taxWord}${sfx}`, true); }
   if (anyInter) col('igst', `IGST ${taxWord}${sfx}`, true);
@@ -1589,7 +1590,17 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
     // While a search term is active, ignore the date window so a match is found
     // regardless of period (otherwise the default month silently hides older vouchers).
     .filter((v) => !!needle || dateInRange(v.date, from, to))
-    .filter((v) => !needle || voucherHaystack(v).includes(needle)), [allRows, product, from, to, needle, inbOnly, tab]);
+    .filter((v) => !needle || voucherHaystack(v).includes(needle))
+    // Default ordering = Date ascending (chronological, like a Tally register). Tally
+    // dates are mixed-format strings, so normalise via parseAnyDate; rows whose date
+    // can't be parsed sink to the bottom rather than being dropped.
+    .sort((a, b) => {
+      const da = parseAnyDate(a.date), db = parseAnyDate(b.date);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da - db;
+    }), [allRows, product, from, to, needle, inbOnly, tab]);
   const sum = (k) => rows.reduce((s, v) => s + (v[k] || 0), 0);
   const summaryPager = usePager(rows); // Summary view paging — sum() above still totals the full set
   const sheet = useMemo(() => vouchersToSheet(rows), [rows]);

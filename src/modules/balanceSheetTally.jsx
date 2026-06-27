@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { apiGet } from '../core/api';
 import { bc } from '../core/styles.jsx';
+import { localeOf } from '../core/format';
 import { PeriodBar } from '../core/period';
 import { PLSide, GroupSummary, LedgerVouchers, VoucherView } from './pnlTally.jsx';
 import { openLedgerModal } from '../core/LedgerModalHost';
@@ -21,7 +22,10 @@ import { SkeletonTable } from '../shell/primitives';
 import { toastInfo } from '../core/ux/toast';
 
 const DARK = '#1a1c22', DIM = '#5b616e', LINE = '#e6e8ec';
-const money = (n) => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+// Branch-statement number. Grouping locale follows the branch currency symbol
+// (Indian lakh/crore for ₹, Western thousands for USD branches); the symbol itself
+// is rendered separately by the caller. ALL/consolidated → bc returns ₹ → en-IN.
+const money = (n, cur = '₹') => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString(localeOf(cur), { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
 // Open by default (inception → today): a Balance Sheet must accumulate every
 // posting up to the as-at date, so an FY-bound `from` would drop prior-year
@@ -99,7 +103,7 @@ export function BalanceSheetTallyLive({ branch }) {
               <PLSide title="Assets" lines={bs.assets} total={bs.total} periodLabel={asAt} onPick={pick} />
             </div>
             <div style={{ padding: '8px 16px', background: '#f7f8fb', fontSize: 11.5, color: DIM, borderTop: '1px solid ' + LINE }}>
-              {bs.balanced ? '✔ Balanced' : '⚠ Difference'} · Total <b style={{ color: DARK }}>{cur} {money(bs.total)}</b> · click any group or ledger to drill down.
+              {bs.balanced ? '✔ Balanced' : '⚠ Difference'} · Total <b style={{ color: DARK }}>{cur} {money(bs.total, cur)}</b> · click any group or ledger to drill down.
             </div>
           </div>
         )}
@@ -107,7 +111,7 @@ export function BalanceSheetTallyLive({ branch }) {
         {top.kind === 'group' && (
           <div style={{ overflowX: 'auto' }}>
             <div style={{ padding: '8px 14px', fontSize: 12.5, fontWeight: 700, color: DARK, background: '#fcfdff', borderBottom: '1px solid ' + LINE }}>{top.title} <span style={{ color: DIM, fontWeight: 400 }}>· {brCodeOf(branch)} (Branch) · Closing Balance</span></div>
-            <GroupSummary frame={top} onPick={pick} />
+            <GroupSummary frame={top} onPick={pick} cur={cur} />
           </div>
         )}
 

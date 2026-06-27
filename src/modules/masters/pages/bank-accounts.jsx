@@ -15,6 +15,11 @@ import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { Input, Select, Button, StatusPill, ResponsiveGrid } from '../../../shell/primitives';
 
+// Each bank account is grouped in ITS OWN currency's locale (Indian lakh/crore for
+// INR, Western thousands for USD/EUR/etc.) — a cosmetic grouping choice, not a value
+// or rate change. Row/summary carry an ISO currency code, so map the code → locale.
+const localeOfCcy = (ccy) => (String(ccy || '').toUpperCase() === 'INR' ? 'en-IN' : 'en-US');
+
 export function BankAccountMaster({ branch, setRoute }) {
   const [search, setSearch] = useState('');
   const [filterBranch, setFilterBranch] = useState(branch === 'ALL' ? 'ALL' : branch?.code || 'ALL');
@@ -51,8 +56,8 @@ export function BankAccountMaster({ branch, setRoute }) {
     { key: 'accountNo', header: 'Account No.', className: 'font-mono text-navy' },
     { key: 'ifsc', header: 'IFSC / SWIFT', className: 'font-mono text-ink-muted' },
     { key: 'type', header: 'Type', className: 'text-ink-muted', render: (r, v) => `${v} · ${r.currency}` },
-    { key: 'openingBal', header: 'Opening Bal', num: true, className: 'font-bold', render: (r, v) => `${r.currency} ${v.toLocaleString('en-IN')}` },
-    { key: 'limit', header: 'Limit', num: true, className: 'text-ink-muted', render: (r, v) => `${r.currency} ${v.toLocaleString('en-IN')}` },
+    { key: 'openingBal', header: 'Opening Bal', num: true, className: 'font-bold', render: (r, v) => `${r.currency} ${v.toLocaleString(localeOfCcy(r.currency))}` },
+    { key: 'limit', header: 'Limit', num: true, className: 'text-ink-muted', render: (r, v) => `${r.currency} ${v.toLocaleString(localeOfCcy(r.currency))}` },
     { key: 'status', header: 'Status', align: 'center', render: (r, v) => <StatusPill tone={v === 'Active' ? 'success' : 'danger'} size="sm">{v}</StatusPill> },
     { key: '__act', header: 'Action', align: 'center', sortable: false, exportable: false, hideable: false, render: (r) => <Button variant="secondary" size="xs" onClick={() => setRoute && setRoute(`/masters/ledgers?edit=${encodeURIComponent(r.code)}`)} title="Edit this account (a ledger under Bank Accounts)" disabled={!r.code}>Edit</Button> },
   ];
@@ -82,7 +87,7 @@ export function BankAccountMaster({ branch, setRoute }) {
           {Object.entries(totalByCurrency).map(([ccy, amt]) => (
             <div key={ccy} className="rounded-brand border border-surface-border bg-surface px-3.5 py-2.5">
               <p className="text-[10.5px] font-bold uppercase tracking-wide text-ink-muted">Cash + Bank — {ccy}</p>
-              <p className="mt-1 text-lg font-bold tabular-nums text-navy">{ccy} {amt.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+              <p className="mt-1 text-lg font-bold tabular-nums text-navy">{ccy} {amt.toLocaleString(localeOfCcy(ccy), { maximumFractionDigits: 0 })}</p>
             </div>
           ))}
         </ResponsiveGrid>

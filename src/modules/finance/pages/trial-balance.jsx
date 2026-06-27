@@ -6,10 +6,12 @@ import { useTrialBalance } from '../hooks/use-trial-balance';
 import { useFinanceStore } from '../store/finance.store';
 import { ALL_TIME_FROM, CUR_FY, CUR_QUARTER, CUR_MONTH, todayISO, fmtDate } from '../../../core/dates';
 import { toastError } from '../../../core/ux/toast';
+import { localeOf } from '../../../core/format';
 
-/* Money formatter — Indian grouping, currency symbol from the branch config.
+/* Money formatter — currency symbol + grouping locale from the branch config
+   (Indian lakh/crore for ₹, Western thousands for USD branches).
    Zero/empty renders as an em-dash so the grid reads cleanly. */
-const money = (cur, n) => (n ? `${cur}${Math.round(n).toLocaleString('en-IN')}` : '—');
+const money = (cur, n) => (n ? `${cur}${Math.round(n).toLocaleString(localeOf(cur))}` : '—');
 
 /**
  * Trial Balance — LIVE from the double-entry engine (GET /api/accounting/trial-balance).

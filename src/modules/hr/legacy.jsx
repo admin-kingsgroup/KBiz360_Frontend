@@ -8,7 +8,7 @@ import { AlertTriangle, BarChart2, Calendar, Check, Download, Lock, Plus, Save, 
 import { openPrintPreview } from '../../core/PrintPreview';
 import { Legend, Line } from 'recharts';
 import { BRANCHES, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../../core/data';
-import { fmt, fmtINR, compactAmt } from '../../core/format';
+import { fmt, fmtINR, compactAmt, localeOf } from '../../core/format';
 import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, _LEAVE_BALANCES, cardStyle, tabPanel } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
@@ -64,7 +64,7 @@ export function ExpenseBudget({branch,setRoute}){
   const updM=(id,v)=>setDraft(d=>({...d,[id]:{...d[id],monthly:+v,yearly:Math.round(+v*12)}}));
   const updY=(id,v)=>setDraft(d=>({...d,[id]:{...d[id],yearly:+v,monthly:Math.round(+v/12)}}));
   const f=n=>compactAmt(n,{currency:'',dash:true}); // canonical compact (fixes 1–10 lakh shown as "K")
-  const ff=n=>n>0?cur+Number(n).toLocaleString("en-IN"):"—";
+  const ff=n=>n>0?cur+Number(n).toLocaleString(localeOf(cur)):"—";
 
   return (
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
@@ -162,8 +162,8 @@ export function ExpenseBudget({branch,setRoute}){
             })}</tbody>
             <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
               <td colSpan={2} style={{padding:"11px 14px",fontWeight:700,color:"#d4a437",fontSize:12}}>TOTAL — {fyObj.l} · {brCode}</td>
-              <td style={{padding:"11px 14px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:14}}>{cur+Number(totM).toLocaleString("en-IN")}/mo</td>
-              <td style={{padding:"11px 14px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums",fontSize:14}}>{cur+Number(totY).toLocaleString("en-IN")}/yr</td>
+              <td style={{padding:"11px 14px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:14}}>{cur+Number(totM).toLocaleString(localeOf(cur))}/mo</td>
+              <td style={{padding:"11px 14px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums",fontSize:14}}>{cur+Number(totY).toLocaleString(localeOf(cur))}/yr</td>
               {tab==="monthly"&&<td style={{padding:"11px 14px",textAlign:"right",color:"#d4a437",fontWeight:700}}>100%</td>}
             </tr></tfoot>
           </table>

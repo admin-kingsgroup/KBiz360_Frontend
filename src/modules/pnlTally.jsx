@@ -13,6 +13,7 @@ import { apiGet } from '../core/api';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { useLedgerMeta, SourceBadge } from '../core/LedgerLabel';
 import { bc } from '../core/styles.jsx';
+import { localeOf } from '../core/format';
 import { PeriodBar } from '../core/period';
 import { LedgerActions } from '../core/ledgerActions';
 import { PageLayout } from '../shell/PageLayout';
@@ -22,7 +23,11 @@ import { clickable } from '../core/ux/clickable';
 import { JvBlock } from '../core/voucher/JvBlock';
 
 const DARK = '#1a1c22', DIM = '#5b616e', LINE = '#e6e8ec', HEAD = '#2e323c';
-const money = (n) => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+// Branch-statement number. Grouping locale follows the branch currency symbol
+// (Indian lakh/crore for ₹, Western thousands for USD branches); the currency symbol
+// itself is rendered separately by the caller. Defaulting cur to ₹ keeps every
+// consolidated/ALL view (bc → ₹) and any un-threaded caller on en-IN, unchanged.
+const money = (n, cur = '₹') => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString(localeOf(cur), { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
 // Open by default (inception → today): the books may have no postings in the
 // current FY yet, so an FY-bound default would render an empty statement. The
@@ -36,6 +41,7 @@ const tdNum = { padding: '5px 12px', fontSize: 12, textAlign: 'right', fontVaria
 
 /* ── One column of a section (Debit OR Credit) with inner (item) + outer (group) amounts ── */
 export function PLSide({ lines, total, periodLabel, onPick, title = 'Particulars', branch, from, to }) {
+  const cur = bc(branch).cur;
   return (
     <div style={{ flex: 1, minWidth: 360 }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -50,7 +56,7 @@ export function PLSide({ lines, total, periodLabel, onPick, title = 'Particulars
         <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
           <td style={{ ...tdName, fontWeight: 800 }}>Total</td>
           <td />
-          <td style={{ ...tdNum, fontWeight: 800, color: DARK }}>{money(total)}</td>
+          <td style={{ ...tdNum, fontWeight: 800, color: DARK }}>{money(total, cur)}</td>
         </tr></tfoot>
       </table>
     </div>
@@ -62,6 +68,7 @@ export function PLSide({ lines, total, periodLabel, onPick, title = 'Particulars
    drill uses, so an expanded ledger shows Base Fare / K3 / Taxes … without leaving
    the page. Falls back to a note when a ledger carries no component meta. */
 function LedgerComponentsInline({ name, branch, from, to }) {
+  const cur = bc(branch).cur;
   const { data, isLoading } = useQuery({
     queryKey: ['ledger-components', name, brCodeOf(branch), from, to],
     queryFn: () => apiGet('/api/accounting/ledger-components/' + encodeURIComponent(name), { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from, to }),
@@ -75,7 +82,7 @@ function LedgerComponentsInline({ name, branch, from, to }) {
       {rows.map((r, i) => (
         <tr key={i} style={{ background: '#fafbff' }}>
           <td style={{ ...tdName, paddingLeft: 54, color: DIM, fontSize: 11.5, fontStyle: 'italic' }}>{r.label}</td>
-          <td style={{ ...tdNum, color: DIM, fontSize: 11.5 }}>{money(r.amount)}</td>
+          <td style={{ ...tdNum, color: DIM, fontSize: 11.5 }}>{money(r.amount, cur)}</td>
           <td />
         </tr>
       ))}
@@ -88,6 +95,7 @@ function LedgerComponentsInline({ name, branch, from, to }) {
    look is unchanged until you ask for it); each ledger in turn expands to the fare
    components captured on the entry. Clicking a name still drills the stack. */
 function PLLines({ line, onPick, branch, from, to }) {
+  const cur = bc(branch).cur;
   const [openLedgers, setOpenLedgers] = useState(false);
   const [openComp, setOpenComp] = useState({});
   const metaOf = useLedgerMeta();
@@ -96,7 +104,7 @@ function PLLines({ line, onPick, branch, from, to }) {
   if (line.isCarry || line.isResult) {
     return (
       <tr><td style={{ ...tdName, fontStyle: 'italic', fontWeight: 700, color: line.isResult ? '#dc2626' : DARK }}>{line.name}</td>
-        <td /><td style={{ ...tdNum, fontWeight: 700, fontStyle: 'italic' }}>{money(line.amount)}</td></tr>
+        <td /><td style={{ ...tdNum, fontWeight: 700, fontStyle: 'italic' }}>{money(line.amount, cur)}</td></tr>
     );
   }
   const items = line.items || [];
@@ -116,8 +124,8 @@ function PLLines({ line, onPick, branch, from, to }) {
           )}
           {line.name}{line.isGroup && <ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9197a3' }} />}
         </td>
-        <td style={tdNum}>{line.isGroup ? '' : money(line.amount)}</td>
-        <td style={{ ...tdNum, fontWeight: 700 }}>{line.isGroup ? money(line.amount) : ''}</td>
+        <td style={tdNum}>{line.isGroup ? '' : money(line.amount, cur)}</td>
+        <td style={{ ...tdNum, fontWeight: 700 }}>{line.isGroup ? money(line.amount, cur) : ''}</td>
       </tr>
       {/* Sub-group breakup stays inline (drills on click), exactly as Tally does. */}
       {line.isGroup && subGroups.map((it, j) => (
@@ -127,7 +135,7 @@ function PLLines({ line, onPick, branch, from, to }) {
           <td style={{ ...tdName, paddingLeft: 30, color: DARK, fontWeight: 600 }}>
             {it.name}<ChevronRight size={10} style={{ verticalAlign: 'middle', marginLeft: 3, color: '#9197a3' }} />
           </td>
-          <td style={tdNum}>{money(it.amount)}</td>
+          <td style={tdNum}>{money(it.amount, cur)}</td>
           <td />
         </tr>
       ))}
@@ -147,7 +155,7 @@ function PLLines({ line, onPick, branch, from, to }) {
                 <span {...clickable(() => openLedgerModal(led))} style={{ cursor: 'pointer' }} title="Open ledger account">{it.name}</span>
                 {badge(it.name)}
               </td>
-              <td style={tdNum}>{money(it.amount)}</td>
+              <td style={tdNum}>{money(it.amount, cur)}</td>
               <td />
             </tr>
             {co && <LedgerComponentsInline name={led} branch={branch} from={from} to={to} />}
@@ -159,7 +167,7 @@ function PLLines({ line, onPick, branch, from, to }) {
 }
 
 /* ── View 2/3: Group Summary (a node's children, Closing Dr | Cr) ── */
-export function GroupSummary({ frame, onPick }) {
+export function GroupSummary({ frame, onPick, cur = '₹' }) {
   const items = frame.items || [];
   const metaOf = useLedgerMeta();
   const grand = items.reduce((s, i) => s + (i.side === 'Cr' ? i.amount : -i.amount), 0);
@@ -181,16 +189,16 @@ export function GroupSummary({ frame, onPick }) {
                 {it.name}{it.isGroup && <ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9197a3' }} />}
                 {!it.isGroup && (() => { const m = metaOf(it.name); return m ? <>{m.locked && <span title="Locked — super-admin only" style={{ marginLeft: 4 }}>🔒</span>}<SourceBadge source={m.source} compact /></> : null; })()}
               </td>
-              <td style={tdNum}>{it.side === 'Dr' ? money(it.amount) : ''}</td>
-              <td style={tdNum}>{it.side === 'Cr' ? money(it.amount) : ''}</td>
+              <td style={tdNum}>{it.side === 'Dr' ? money(it.amount, cur) : ''}</td>
+              <td style={tdNum}>{it.side === 'Cr' ? money(it.amount, cur) : ''}</td>
             </tr>
           );
         })}
       </tbody>
       <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
         <td style={{ ...tdName, fontWeight: 800 }}>Grand Total</td>
-        <td style={{ ...tdNum, fontWeight: 800 }}>{grand < 0 ? money(-grand) : ''}</td>
-        <td style={{ ...tdNum, fontWeight: 800 }}>{grand >= 0 ? money(grand) : ''}</td>
+        <td style={{ ...tdNum, fontWeight: 800 }}>{grand < 0 ? money(-grand, cur) : ''}</td>
+        <td style={{ ...tdNum, fontWeight: 800 }}>{grand >= 0 ? money(grand, cur) : ''}</td>
       </tr></tfoot>
     </table>
   );
@@ -199,6 +207,7 @@ export function GroupSummary({ frame, onPick }) {
 /* ── Fare/charge component breakdown (DT-Base Fare, DT-Taxes …) — the Tally
    sub-ledger level. Falls back to the vouchers when a ledger has no breakup. ── */
 function LedgerComponents({ name, costCenter, branch, from, to, onPick }) {
+  const cur = bc(branch).cur;
   const { data, isLoading } = useQuery({
     queryKey: ['ledger-components', name, costCenter || '', brCodeOf(branch), from, to],
     queryFn: () => apiGet('/api/accounting/ledger-components/' + encodeURIComponent(name), { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from, to, ...(costCenter ? { costCenter } : {}) }),
@@ -221,15 +230,15 @@ function LedgerComponents({ name, costCenter, branch, from, to, onPick }) {
             onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
             <td style={{ ...tdName, fontWeight: 600, color: '#2563eb' }}>{r.label}<ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9197a3' }} /></td>
-            <td style={tdNum}>{r.side === 'Dr' ? money(r.amount) : ''}</td>
-            <td style={tdNum}>{r.side === 'Cr' ? money(r.amount) : ''}</td>
+            <td style={tdNum}>{r.side === 'Dr' ? money(r.amount, cur) : ''}</td>
+            <td style={tdNum}>{r.side === 'Cr' ? money(r.amount, cur) : ''}</td>
           </tr>
         ))}
       </tbody>
       <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
         <td style={{ ...tdName, fontWeight: 800 }}>Grand Total</td>
-        <td style={{ ...tdNum, fontWeight: 800 }}>{grand < 0 ? money(-grand) : ''}</td>
-        <td style={{ ...tdNum, fontWeight: 800 }}>{grand >= 0 ? money(grand) : ''}</td>
+        <td style={{ ...tdNum, fontWeight: 800 }}>{grand < 0 ? money(-grand, cur) : ''}</td>
+        <td style={{ ...tdNum, fontWeight: 800 }}>{grand >= 0 ? money(grand, cur) : ''}</td>
       </tr></tfoot>
     </table>
   );
@@ -238,6 +247,7 @@ function LedgerComponents({ name, costCenter, branch, from, to, onPick }) {
 /* ── Domestic / International (cost-centre) split — Tally sub-level for Flights &
    Holidays. Drills straight to the component breakdown when there is no split. ── */
 function LedgerDrill({ name, branch, from, to, onPick }) {
+  const cur = bc(branch).cur;
   const { data, isLoading } = useQuery({
     queryKey: ['ledger-split', name, brCodeOf(branch), from, to],
     queryFn: () => apiGet('/api/accounting/ledger-split/' + encodeURIComponent(name), { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from, to }),
@@ -261,15 +271,15 @@ function LedgerDrill({ name, branch, from, to, onPick }) {
             onMouseEnter={(e) => (e.currentTarget.style.background = '#eef4ff')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
             <td style={{ ...tdName, fontWeight: 700, color: DARK }}>{r.label}<ChevronRight size={11} style={{ verticalAlign: 'middle', marginLeft: 4, color: '#9197a3' }} /></td>
-            <td style={tdNum}>{r.side === 'Dr' ? money(r.amount) : ''}</td>
-            <td style={tdNum}>{r.side === 'Cr' ? money(r.amount) : ''}</td>
+            <td style={tdNum}>{r.side === 'Dr' ? money(r.amount, cur) : ''}</td>
+            <td style={tdNum}>{r.side === 'Cr' ? money(r.amount, cur) : ''}</td>
           </tr>
         ))}
       </tbody>
       <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
         <td style={{ ...tdName, fontWeight: 800 }}>Grand Total</td>
-        <td style={{ ...tdNum, fontWeight: 800 }}>{grand < 0 ? money(-grand) : ''}</td>
-        <td style={{ ...tdNum, fontWeight: 800 }}>{grand >= 0 ? money(grand) : ''}</td>
+        <td style={{ ...tdNum, fontWeight: 800 }}>{grand < 0 ? money(-grand, cur) : ''}</td>
+        <td style={{ ...tdNum, fontWeight: 800 }}>{grand >= 0 ? money(grand, cur) : ''}</td>
       </tr></tfoot>
     </table>
   );
@@ -291,6 +301,7 @@ const contraLabel = (ln) => {
 };
 
 export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
+  const cur = bc(branch).cur;
   const [range, setRange] = useState({ from, to });
   const [showNarration, setShowNarration] = useState(false);
   const [tab, setTab] = useState('ledger'); // 'ledger' | 'billwise'
@@ -328,7 +339,7 @@ export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
               <button style={tabBtn(tab === 'billwise')} onClick={() => setTab('billwise')}>Bill-wise</button>
             </div>
           )}
-          {!showBillwise && <LedgerActions d={d} cur={bc(branch).cur} branchLabel={brCodeOf(branch)} from={range.from} to={range.to} particulars={contraLabel} />}
+          {!showBillwise && <LedgerActions d={d} cur={cur} branchLabel={brCodeOf(branch)} from={range.from} to={range.to} particulars={contraLabel} />}
         </div>
       </div>
 
@@ -346,9 +357,9 @@ export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
           <tbody>
             <tr style={{ background: '#f7f8fb' }}>
               <td style={tdName} colSpan={4}><b>Opening Balance</b></td>
-              <td style={tdNum}>{d.openingSide === 'Dr' ? money(d.openingBalance) : ''}</td>
-              <td style={tdNum}>{d.openingSide === 'Cr' ? money(d.openingBalance) : ''}</td>
-              <td style={{ ...tdNum, fontWeight: 700 }}>{money(d.openingBalance)} {d.openingSide}</td>
+              <td style={tdNum}>{d.openingSide === 'Dr' ? money(d.openingBalance, cur) : ''}</td>
+              <td style={tdNum}>{d.openingSide === 'Cr' ? money(d.openingBalance, cur) : ''}</td>
+              <td style={{ ...tdNum, fontWeight: 700 }}>{money(d.openingBalance, cur)} {d.openingSide}</td>
             </tr>
             {(d.lines || []).map((ln, i) => (
               <React.Fragment key={i}>
@@ -360,9 +371,9 @@ export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
                   <td style={{ ...tdName, fontWeight: 600 }}>{contraLabel(ln)}</td>
                   <td style={{ ...tdName, textTransform: 'capitalize' }}>{ln.category || ''}</td>
                   <td style={{ ...tdName, fontFamily: 'monospace', fontSize: 11 }}>{ln.vno}</td>
-                  <td style={tdNum}>{ln.debit ? money(ln.debit) : ''}</td>
-                  <td style={tdNum}>{ln.credit ? money(ln.credit) : ''}</td>
-                  <td style={{ ...tdNum, color: DIM }}>{money(Math.abs(ln.balance))} {ln.balanceSide}</td>
+                  <td style={tdNum}>{ln.debit ? money(ln.debit, cur) : ''}</td>
+                  <td style={tdNum}>{ln.credit ? money(ln.credit, cur) : ''}</td>
+                  <td style={{ ...tdNum, color: DIM }}>{money(Math.abs(ln.balance), cur)} {ln.balanceSide}</td>
                 </tr>
                 {showNarration && (ln.narration || ln.entryNarration) && (
                   <tr style={{ borderBottom: '1px solid #dfe2e7' }}>
@@ -375,9 +386,9 @@ export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
           </tbody>
           <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
             <td style={{ ...tdName, fontWeight: 800 }} colSpan={4}>Current Total / Closing</td>
-            <td style={{ ...tdNum, fontWeight: 800 }}>{money(d.totalDebit)}</td>
-            <td style={{ ...tdNum, fontWeight: 800 }}>{money(d.totalCredit)}</td>
-            <td style={{ ...tdNum, fontWeight: 800 }}>{money(d.closingBalance)} {d.closingSide}</td>
+            <td style={{ ...tdNum, fontWeight: 800 }}>{money(d.totalDebit, cur)}</td>
+            <td style={{ ...tdNum, fontWeight: 800 }}>{money(d.totalCredit, cur)}</td>
+            <td style={{ ...tdNum, fontWeight: 800 }}>{money(d.closingBalance, cur)} {d.closingSide}</td>
           </tr></tfoot>
         </table>
       )}
@@ -388,6 +399,7 @@ export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
 /* ── Bill-wise outstanding for a party ledger (Tally "Bill-wise details").
    Reuses the existing receipt/payment allocation sub-ledger via /open-bills. ── */
 function LedgerBillwise({ name, branch, side }) {
+  const cur = bc(branch).cur;
   const { data, isLoading } = useQuery({
     queryKey: ['ledger-billwise', name, brCodeOf(branch), side],
     queryFn: () => apiGet('/api/vouchers/open-bills', { party: name, branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), side }),
@@ -410,9 +422,9 @@ function LedgerBillwise({ name, branch, side }) {
             <td style={{ ...tdName, color: DIM, whiteSpace: 'nowrap' }}>{dmy(b.date)}</td>
             <td style={{ ...tdName, fontWeight: 600, fontFamily: 'monospace', fontSize: 11 }}>{b.billVno}</td>
             <td style={{ ...tdName, color: DIM, whiteSpace: 'nowrap' }}>{b.creditDays ? dmy(addDaysStr(b.date, b.creditDays)) : '—'}</td>
-            <td style={tdNum}>{money(b.total)}</td>
-            <td style={{ ...tdNum, color: DIM }}>{b.allocated ? money(b.allocated) : ''}</td>
-            <td style={{ ...tdNum, fontWeight: 700 }}>{money(b.outstanding)}</td>
+            <td style={tdNum}>{money(b.total, cur)}</td>
+            <td style={{ ...tdNum, color: DIM }}>{b.allocated ? money(b.allocated, cur) : ''}</td>
+            <td style={{ ...tdNum, fontWeight: 700 }}>{money(b.outstanding, cur)}</td>
             <td style={{ ...tdName, fontWeight: 600, color: ageColor(b.ageDays) }}>{b.ageDays}d</td>
           </tr>
         ))}
@@ -420,13 +432,13 @@ function LedgerBillwise({ name, branch, side }) {
       <tfoot>
         <tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
           <td style={{ ...tdName, fontWeight: 800 }} colSpan={5}>Total Outstanding</td>
-          <td style={{ ...tdNum, fontWeight: 800 }}>{money(totalOut)}</td>
+          <td style={{ ...tdNum, fontWeight: 800 }}>{money(totalOut, cur)}</td>
           <td />
         </tr>
         {advances > 0.01 && (
           <tr style={{ background: '#fff' }}>
             <td style={{ ...tdName, color: DIM, fontStyle: 'italic' }} colSpan={5}>On-Account (advance, unallocated)</td>
-            <td style={{ ...tdNum, color: DIM, fontStyle: 'italic' }}>{money(advances)}</td>
+            <td style={{ ...tdNum, color: DIM, fontStyle: 'italic' }}>{money(advances, cur)}</td>
             <td />
           </tr>
         )}
@@ -498,7 +510,7 @@ export function VoucherView({ id, cur }) {
   return (
     <div style={{ padding: 14 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid ' + LINE }}>
-        {[['Voucher', v.vno], ['Tally Ref', v.sourceRef], ['Date', dmy(v.date)], [v.category === 'purchase' ? 'Supplier' : 'Party', v.party], ['Type', `${v.type} · ${v.category}`], ['Link No', v.linkNo], ['Total', cur + ' ' + money(v.total)]].map(([k, val]) => (
+        {[['Voucher', v.vno], ['Tally Ref', v.sourceRef], ['Date', dmy(v.date)], [v.category === 'purchase' ? 'Supplier' : 'Party', v.party], ['Type', `${v.type} · ${v.category}`], ['Link No', v.linkNo], ['Total', cur + ' ' + money(v.total, cur)]].map(([k, val]) => (
           <div key={k}><div style={{ fontSize: 9, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>{k}</div><div style={{ fontSize: 12.5, fontWeight: 600, color: DARK }}>{val || '—'}</div></div>
         ))}
       </div>
@@ -507,12 +519,12 @@ export function VoucherView({ id, cur }) {
         <tbody>{particulars.map((p, i) => (
           <tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}>
             <td style={{ ...tdName, fontWeight: 700, color: p.tax ? '#d97706' : DARK }}>{p.label}</td>
-            <td style={{ ...tdNum, fontWeight: 600 }}>{money(p.amount)}</td>
+            <td style={{ ...tdNum, fontWeight: 600 }}>{p.tax ? money(p.amount) : money(p.amount, cur)}</td>
           </tr>
         ))}</tbody>
         <tfoot><tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
           <td style={{ ...tdName, fontWeight: 800 }}>Total</td>
-          <td style={{ ...tdNum, fontWeight: 800 }}>{money(partTotal)}</td>
+          <td style={{ ...tdNum, fontWeight: 800 }}>{money(partTotal, cur)}</td>
         </tr></tfoot>
       </table>
 
@@ -651,7 +663,7 @@ export function PnLTallyLive({ branch }) {
               <PLSide lines={pl.pl.credit} total={pl.pl.total} periodLabel={periodLabel} onPick={pick} branch={branch} from={range.from} to={range.to} />
             </div>
             <div style={{ padding: '8px 16px', background: '#f7f8fb', fontSize: 11.5, color: DIM, borderTop: '1px solid ' + LINE }}>
-              {pl.grossResult}: <b style={{ color: DARK }}>{cur} {money(pl.grossProfit)}</b> &nbsp;·&nbsp; {pl.result}: <b style={{ color: pl.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>{cur} {money(Math.abs(pl.netProfit))}</b> &nbsp;· tap ▸ to reveal a group’s ledgers → captured fares inline, or click any name to drill down.
+              {pl.grossResult}: <b style={{ color: DARK }}>{cur} {money(pl.grossProfit, cur)}</b> &nbsp;·&nbsp; {pl.result}: <b style={{ color: pl.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>{cur} {money(Math.abs(pl.netProfit), cur)}</b> &nbsp;· tap ▸ to reveal a group’s ledgers → captured fares inline, or click any name to drill down.
             </div>
           </div>
         )}
@@ -659,7 +671,7 @@ export function PnLTallyLive({ branch }) {
         {top.kind === 'group' && (
           <div style={{ overflowX: 'auto' }}>
             <div style={{ padding: '8px 14px', fontSize: 12.5, fontWeight: 700, color: DARK, background: '#fcfdff', borderBottom: '1px solid ' + LINE }}>{top.title} <span style={{ color: DIM, fontWeight: 400 }}>· {brCodeOf(branch)} (Branch) · Closing Balance</span></div>
-            <GroupSummary frame={top} onPick={pick} />
+            <GroupSummary frame={top} onPick={pick} cur={cur} />
           </div>
         )}
 
