@@ -15,6 +15,7 @@ import { useModalEsc } from '../../core/ux/useModalEsc';
 import { clickable } from '../../core/ux/clickable';
 import { listKeyNav } from '../../core/ux/listKeys';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, tabBtnStyle } from '../../core/styles';
+import { MiniBar, share, pctText } from '../../core/insightsUI';
 import { TDS_SECTIONS } from '../finance';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { openPrintPreview } from '../../core/PrintPreview';
@@ -193,7 +194,9 @@ export function TaxGstr3b({branch}){
         <div style={{...card,borderTop:"3px solid #185FA5",padding:"11px 13px",background:"#E6F1FB"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#185FA5",textTransform:"uppercase"}}>CGST</p><p style={{margin:"4px 0 0",fontSize:19,fontWeight:800,color:"#0d1326"}}>{f(cgst)}</p></div>
         <div style={{...card,borderTop:"3px solid #185FA5",padding:"11px 13px",background:"#E6F1FB"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#185FA5",textTransform:"uppercase"}}>SGST</p><p style={{margin:"4px 0 0",fontSize:19,fontWeight:800,color:"#0d1326"}}>{f(sgst)}</p></div>
       </div>
-      {rows.map((sec,si)=>(
+      {rows.map((sec,si)=>{
+        const secTotal=sec.items.find(x=>x.bold)?.v||sec.items.reduce((s,x)=>s+(x.v||0),0);
+        return (
         <div key={si} style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
           <div style={{padding:"9px 14px",background:"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
             <p style={{margin:0,fontSize:11,fontWeight:700,color:"#384677"}}>{sec.section}</p>
@@ -206,11 +209,18 @@ export function TaxGstr3b({branch}){
                 <td style={{padding:"9px 14px",textAlign:"right",fontWeight:r.bold?800:500,
                   fontVariantNumeric:"tabular-nums",color:r.bold?"#A32D2D":"#384677",
                   fontSize:r.bold?13:11.5}}>₹{Number(Math.round(r.v)).toLocaleString("en-IN")}</td>
+                <td style={{padding:"9px 14px",width:160}}>{!r.bold&&secTotal?(
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:10,color:"#5a6691",width:38,textAlign:"right",flexShrink:0,fontVariantNumeric:"tabular-nums"}}>{pctText(share(r.v,secTotal))}</span>
+                    <div style={{flex:1,minWidth:30}}><MiniBar pct={share(r.v,secTotal)} tone="cogs"/></div>
+                  </div>
+                ):null}</td>
               </tr>
             ))}</tbody>
           </table>
         </div>
-      ))}
+        );
+      })}
       <div style={{...card,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:10,color:"#185FA5"}}>
         Interest 18% p.a. if payment is late. Penalty ₹50/day per return (CGST+SGST) for late filing.
         Ensure GSTR-1 is filed before GSTR-3B so buyers&apos; ITC is auto-populated in their GSTR-2B.
@@ -255,12 +265,12 @@ export function TaxRcm({branch}){
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#0d1326"}}>
-            {["Date","Voucher No.","Overseas Supplier","Description","Taxable (₹)","IGST RCM (18%)","ITC Claimable","Status"].map((h,i)=>(
+            {["Date","Voucher No.","Overseas Supplier","Description","Taxable (₹)","IGST RCM (18%)","ITC Claimable","Status","Share of RCM"].map((h,i)=>(
               <th key={i} style={{padding:"9px 11px",textAlign:i>=4&&i<=5?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
           <tbody>
-            {rcmEntries.length===0&&<tr><td colSpan={8} style={{padding:"24px",textAlign:"center",color:"#5a6691"}}>No RCM entries for this period</td></tr>}
+            {rcmEntries.length===0&&<tr><td colSpan={9} style={{padding:"24px",textAlign:"center",color:"#5a6691"}}>No RCM entries for this period</td></tr>}
             {rcmEntries.map((r,i)=>(
               <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"9px 11px",color:"#5a6691"}}>{r.date}</td>
@@ -271,6 +281,12 @@ export function TaxRcm({branch}){
                 <td style={{padding:"9px 11px",textAlign:"right",fontWeight:700,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{f(r.igst)}</td>
                 <td style={{padding:"9px 11px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700}}>Yes</span></td>
                 <td style={{padding:"9px 11px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700}}>{r.status}</span></td>
+                <td style={{padding:"9px 11px",minWidth:130}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:10,color:"#5a6691",width:40,textAlign:"right",flexShrink:0,fontVariantNumeric:"tabular-nums"}}>{pctText(share(r.igst,tot))}</span>
+                    <div style={{flex:1,minWidth:36}}><MiniBar pct={share(r.igst,tot)} tone="cogs"/></div>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -279,6 +295,7 @@ export function TaxRcm({branch}){
             <td style={{padding:"9px 11px",textAlign:"right",fontWeight:700,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(rcmEntries.reduce((s,r)=>s+r.taxable,0))}</td>
             <td style={{padding:"9px 11px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(tot)}</td>
             <td colSpan={2}/>
+            <td style={{padding:"9px 11px",textAlign:"right",fontWeight:700,color:"#d4a437"}}>100%</td>
           </tr></tfoot>}
         </table>
       </div>
