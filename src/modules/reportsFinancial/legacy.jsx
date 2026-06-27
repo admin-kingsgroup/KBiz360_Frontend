@@ -1258,7 +1258,7 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
     const pad = r.component ? 64 : r.ledgerHead ? 46 : r.leaf ? 50 : r.costCentre ? 42 : r.sub ? 34 : r.bucket ? 24 : 14;
     const amt = neg ? -Math.abs(r.amount) : r.amount;
     return (
-      <tr style={{ borderBottom: '1px solid #dfe2e7' }}>
+      <tr style={{ borderBottom: '1px solid #dfe2e7', background: r.group ? '#fbfcfe' : '#fff' }}>
         <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})} className={clickable ? 'cl-drill' : undefined}
           style={{ padding: '3px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
           {r.expandable ? <span onClick={(e) => { e.stopPropagation(); toggle(r); }} style={{ color: TALLY.gold, marginRight: 4, cursor: 'pointer' }}>{r.open ? '▾' : '▸'}</span> : null}
@@ -1273,13 +1273,13 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
   const Result = ({ txt, val }) => (<tr style={{ borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}><td style={{ padding: '8px 12px', fontWeight: 800, color: TALLY.head, ...mono }}>{txt}</td><td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: TALLY.green, ...mono }}>{inr(val)}</td></tr>);
 
   return (
-    <div className="tally-print-doc" style={{ background: '#fff', border: '1px solid #b0b0b0', borderRadius: 4, overflow: 'hidden', margin: 12, ...mono }}>
+    <div className="tally-print-doc" style={{ background: '#fff', border: '1px solid #b0b0b0', borderRadius: 4, overflow: 'hidden', boxShadow: SHADOW, maxWidth: 860, margin: '12px auto', ...mono }}>
       <style>{`.cl-drill:hover{background:#eef4fb;text-decoration:underline}
 @media print {
   @page { size: A4 portrait; margin: 8mm; }
   body * { visibility: hidden !important; }
   .tally-print-doc, .tally-print-doc * { visibility: visible !important; }
-  .tally-print-doc { position: absolute !important; left: 0; top: 0; width: 100% !important; margin: 0 !important; border: none !important; border-radius: 0 !important; }
+  .tally-print-doc { position: absolute !important; left: 0; top: 0; width: 100% !important; max-width: none !important; margin: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; }
   .tally-print-doc .cl-noprint { display: none !important; }
 }`}</style>
       <div style={{ background: TALLY.titlebar, color: TALLY.head, padding: '5px 12px', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #a9c2e0' }}>
@@ -1296,7 +1296,8 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
           <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
         </div>
       )}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, maxWidth: 760, margin: '0 auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <colgroup><col /><col style={{ width: 180 }} /></colgroup>
         <tbody>
           <Head txt="Income" />
           <Row r={{ label: 'Revenue from Operations (Sales)', amount: d.totals.sales, group: true }} />
