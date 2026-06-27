@@ -70,6 +70,14 @@ export function MisReport({ branch }) {
   const pct = (val, total) => (total > 0 ? Math.round(val / total * 100) : 0);
   const periodLabel = PERIODS.find((p) => p.v === period)?.l;
 
+  // Loading / error states so a failed or in-flight fetch never renders a full page of
+  // ₹0 (indistinguishable from a genuinely empty month). Gate on the PERIOD-INDEPENDENT
+  // primary data (GP bills + ageing) — modulePL is period-keyed and already falls back
+  // to 0 — so switching the period doesn't blank the page.
+  const isError = gpQ.isError || agQ.isError || plQ.isError;
+  const isLoading = gpQ.isLoading || agQ.isLoading;
+  const retry = () => { gpQ.refetch(); plQ.refetch(); agQ.refetch(); };
+
   const KPI = ({ label, value, sub, growth, color }) => (
     <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{ borderTopColor: color || '#2563eb' }}>
       <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: color || '#2563eb' }}>{label}</p>
@@ -82,6 +90,25 @@ export function MisReport({ branch }) {
       )}
     </div>
   );
+
+  if (isError) {
+    return (
+      <PageLayout title="Management Information System" subtitle={`${brCode || CONSOLIDATED_LABEL} · Monday Morning Report`}>
+        <div className="rounded-brand border border-surface-border bg-surface px-4 py-8 text-center">
+          <p className="text-sm font-semibold text-maroon">Could not load the MIS report.</p>
+          <p className="mt-1 text-[12px] text-ink-muted">The figures below would otherwise read as ₹0, which isn’t a real zero.</p>
+          <Button size="sm" variant="primary" className="mt-3" onClick={retry}>Retry</Button>
+        </div>
+      </PageLayout>
+    );
+  }
+  if (isLoading) {
+    return (
+      <PageLayout title="Management Information System" subtitle={`${brCode || CONSOLIDATED_LABEL} · Monday Morning Report`}>
+        <div className="rounded-brand border border-surface-border bg-surface px-4 py-10 text-center text-[12.5px] text-ink-muted">Loading live figures…</div>
+      </PageLayout>
+    );
+  }
 
   return (
     <PageLayout
@@ -153,8 +180,9 @@ export function MisReport({ branch }) {
           {topClients.length === 0 && <p className="text-[11px] text-ink-muted">No data for this period.</p>}
         </PageSection>
 
-        {/* Overdue receivables */}
-        <PageSection title="⚠ Overdue Receivables" className="border-t-[3px] border-t-maroon">
+        {/* Overdue receivables — ageing is always as-of-today (not period-scoped); the
+            label makes that explicit so it doesn't look like it disagrees with the rest. */}
+        <PageSection title="⚠ Overdue Receivables (as of today)" className="border-t-[3px] border-t-maroon">
           {overdueClients.slice(0, 4).map((c) => (
             <div key={c.client} className="flex justify-between border-b border-surface-alt py-1.5"><span className="text-[10.5px] text-navy">{c.client}</span><span className="text-[11px] font-bold text-maroon">{f(c.outstanding)}</span></div>
           ))}

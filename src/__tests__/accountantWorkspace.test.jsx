@@ -127,24 +127,34 @@ describe('accountant workspace — screens render', () => {
     expect(screen.getByText(/I can approve/)).toBeInTheDocument();       // checker bucket
     expect(screen.getByText(/My own — needs approver/)).toBeInTheDocument(); // maker bucket
 
-    // Tab 2 — Collections & Payables: ageing buckets + net working position (1700 − 800 = 900)
+    // Tab 2 — Collections & Payables: combined snapshot (both sides + net 1700 − 800 = 900)
     fireEvent.click(screen.getByText('2. Collections & Payables'));
-    expect(screen.getByText('Debtors (Receivable)')).toBeInTheDocument();
-    expect(screen.getByText('Creditors (Payable)')).toBeInTheDocument();
+    expect(screen.getByText('Accounts Receivable (Debtors)')).toBeInTheDocument();
+    expect(screen.getByText('Accounts Payable (Creditors)')).toBeInTheDocument();
     expect(screen.getByText('Net Working Position')).toBeInTheDocument();
     expect(screen.getByText('₹900')).toBeInTheDocument();
 
-    // Tab 2 — Settlement panels: clients (bills vs receipts) + suppliers (bills vs payments)
+    // Tab 2 → AR sub-tab is the default: debtors ageing + clients settlement + customer
+    // advances + refunds worklist. The payable-side panels are NOT mounted yet.
+    expect(screen.getByText('Debtors (Receivable)')).toBeInTheDocument();
     expect(screen.getByText('Clients — unsettled bills vs receipts')).toBeInTheDocument();
-    expect(screen.getByText('Suppliers — unsettled bills vs payments')).toBeInTheDocument();
-    expect(screen.getAllByText('₹2,500').length).toBeGreaterThan(0);   // ACME gross billed (row + total)
-    expect(screen.getAllByText('₹800').length).toBeGreaterThan(0);     // ACME gross received / TBO open
-
-    // Tab 2 — Tier 2 additions: advances/unapplied credits (both sides) + refunds worklist
-    expect(screen.getByText('Advances & Unapplied Credits')).toBeInTheDocument();
+    expect(screen.getByText('Customer Advances & Unapplied Receipts')).toBeInTheDocument();
     expect(screen.getByText('Customer credits — unapplied receipts')).toBeInTheDocument();
-    expect(screen.getByText('Supplier advances — unapplied payments')).toBeInTheDocument();
     expect(screen.getByText('Refunds & adjustments pending')).toBeInTheDocument();
+    expect(screen.getAllByText('₹2,500').length).toBeGreaterThan(0);   // ACME gross billed (row + total)
+    expect(screen.queryByText('Creditors (Payable)')).toBeNull();
+    expect(screen.queryByText('Suppliers — unsettled bills vs payments')).toBeNull();
+
+    // Tab 2 → switch to the Accounts Payable sub-tab: creditors ageing + suppliers
+    // settlement + supplier advances, and the receivable-side panels go away.
+    fireEvent.click(screen.getByText('Accounts Payable'));
+    expect(screen.getByText('Creditors (Payable)')).toBeInTheDocument();
+    expect(screen.getByText('Suppliers — unsettled bills vs payments')).toBeInTheDocument();
+    expect(screen.getByText('Supplier Advances & Unapplied Payments')).toBeInTheDocument();
+    expect(screen.getByText('Supplier advances — unapplied payments')).toBeInTheDocument();
+    expect(screen.getByText('Top creditors — reconcile & pay')).toBeInTheDocument();
+    expect(screen.queryByText('Debtors (Receivable)')).toBeNull();
+    expect(screen.queryByText('Clients — unsettled bills vs receipts')).toBeNull();
 
     // Tab 3 — Month-End & Compliance: statutory tiles + GST/ITC + P&L snapshot + master health
     fireEvent.click(screen.getByText('3. Month-End & Compliance'));

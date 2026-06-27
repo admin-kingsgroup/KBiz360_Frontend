@@ -395,7 +395,10 @@ function RefundsWorklist({ branch, cur, go }) {
 // yet applied to invoices, and supplier advances not yet applied to bills. Both must
 // be cleared so the ageing is real and prepaid money isn't lost. Settle from the
 // receivables / payables screens.
-function AdvancesPanel({ branch, cur, go }) {
+// `side` scopes the panel to one ledger side so it can live under the AR or AP
+// sub-tab: 'rec' → customer credits only, 'pay' → supplier advances only, 'both'
+// → the original two-up layout (kept as the default so any other caller is unchanged).
+function AdvancesPanel({ branch, cur, go, side = 'both' }) {
   const out = useOutstanding(branch).data || {};
   const recs = out.onAccountReceipts || [];
   const pays = out.onAccountPayments || [];
@@ -420,8 +423,8 @@ function AdvancesPanel({ branch, cur, go }) {
   );
   return (
     <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
-      {block('Customer credits — unapplied receipts', recs, recTot, C.blue, '/reports/rec')}
-      {block('Supplier advances — unapplied payments', pays, payTot, C.amber, '/reports/pay')}
+      {side !== 'pay' && block('Customer credits — unapplied receipts', recs, recTot, C.blue, '/reports/rec')}
+      {side !== 'rec' && block('Supplier advances — unapplied payments', pays, payTot, C.amber, '/reports/pay')}
     </div>
   );
 }
@@ -561,6 +564,9 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
   const { data: taxEvents } = useTaxCalendar();
 
   const [activeTab, setActiveTab] = useState('daily');
+  // Within Collections & Payables, keep Accounts Receivable and Accounts Payable on
+  // their own sub-tab so each side is read & worked in isolation (no interleaving).
+  const [arApTab, setArApTab] = useState('ar');
   const [selectedBank, setSelectedBank] = useState('');
 
   // Auto-select first bank ledger once loaded
@@ -614,8 +620,8 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
     { n: pendCount, label: 'to approve & post', onClick: () => go('/transactions/approvals') },
     { n: suspense.length, label: 'in suspense', onClick: () => go('/accounts/suspense') },
     { n: onAcct.length, label: 'receipts to allocate', onClick: () => go('/reports/rec') },
-    { n: overdueDebtorsCount, label: 'overdue debtors', onClick: () => setActiveTab('collections') },
-    { n: refundsPendingCount, label: 'refunds pending', onClick: () => setActiveTab('collections') },
+    { n: overdueDebtorsCount, label: 'overdue debtors', onClick: () => { setActiveTab('collections'); setArApTab('ar'); } },
+    { n: refundsPendingCount, label: 'refunds pending', onClick: () => { setActiveTab('collections'); setArApTab('ar'); } },
   ];
   const heroTotal = heroItems.reduce((s, it) => s + it.n, 0);
 
@@ -661,6 +667,25 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
     transition: 'all 0.2s ease',
     marginRight: '6px',
     outline: 'none',
+  });
+
+  // Pill-style sub-tab for the AR / AP split inside Collections & Payables. Takes the
+  // side's accent (blue = receivable, amber = payable) so the active pill reads as
+  // "this side" at a glance.
+  const subTabStyle = (active, accent) => ({
+    padding: '7px 16px',
+    cursor: 'pointer',
+    fontWeight: 700,
+    fontSize: '12px',
+    color: active ? '#fff' : C.dim,
+    background: active ? accent : '#fff',
+    borderTop: `1px solid ${active ? accent : C.border}`,
+    borderBottom: `1px solid ${active ? accent : C.border}`,
+    borderLeft: `1px solid ${active ? accent : C.border}`,
+    borderRight: `1px solid ${active ? accent : C.border}`,
+    borderRadius: 999,
+    outline: 'none',
+    transition: 'all 0.15s ease',
   });
 
   const alerts = alertsRes?.alerts || [];
@@ -817,108 +842,160 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
         </>
       )}
 
-      {/* TAB 2: COLLECTIONS & PAYABLES */}
+      {/* TAB 2: COLLECTIONS & PAYABLES — split into Accounts Receivable / Accounts Payable */}
       {activeTab === 'collections' && (
         <>
-          <SecTitle>Ageing Position &amp; Net Capital ({age.asOf ? `as on ${age.asOf}` : 'live'})</SecTitle>
-          <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead><tr>
-                <th style={th}>Ageing</th><th style={{ ...th, ...rnum }}>0–30</th><th style={{ ...th, ...rnum }}>31–60</th><th style={{ ...th, ...rnum }}>61–90</th><th style={{ ...th, ...rnum }}>90+</th><th style={{ ...th, ...rnum }}>Total</th>
-              </tr></thead>
-              <tbody>
-                <AgeBucketRow label="Debtors (Receivable)" totals={rec} cur={cur} tone={C.blue} onClick={() => go('/reports/rec')} />
-                <AgeBucketRow label="Creditors (Payable)" totals={pay} cur={cur} tone={C.amber} onClick={() => go('/reports/pay')} />
-                <tr {...clickable(() => go('/accounts/net-ageing'))} style={{ borderTop: `2px solid ${C.border}`, background: '#fafbff', cursor: 'pointer' }}>
-                  <td style={{ padding: '7px 10px', fontWeight: 800, color: C.dark }}>Net Working Position</td>
-                  <td colSpan={4} />
-                  <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: recNet >= 0 ? C.green : C.red, fontVariantNumeric: 'tabular-nums' }}>{money(cur, recNet)} <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Bills-vs-settlement: what was billed to each party against what's actually
-              been received / paid, with the unsettled balance still to clear. */}
-          <SecTitle>Settlement — Bills vs Receipts &amp; Payments</SecTitle>
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
-            <SettlementPanel
-              title="Clients — unsettled bills vs receipts"
-              sub="Billed to customer vs received · net still to collect"
-              rows={age.receivables?.rows || []}
-              cur={cur} tone={C.blue} partyLabel="Customer" settleLabel="Receipts"
-              drillLabel="Receivables" onDrill={() => go('/reports/rec')}
-            />
-            <SettlementPanel
-              title="Suppliers — unsettled bills vs payments"
-              sub="Billed by supplier vs paid · net still to pay"
-              rows={age.payables?.rows || []}
-              cur={cur} tone={C.amber} partyLabel="Supplier" settleLabel="Payments"
-              drillLabel="Payables" onDrill={() => go('/reports/pay')}
-            />
-          </div>
-
-          {/* Tier 2.6 — money on account not yet settled bill-wise (both sides) */}
-          <SecTitle>Advances &amp; Unapplied Credits</SecTitle>
-          <AdvancesPanel branch={branch} cur={cur} go={go} />
-
-          {/* Tier 2.5 — refunds / reissues / ADM / ACM awaiting posting */}
-          <SecTitle>Refunds &amp; Adjustments</SecTitle>
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
-            <RefundsWorklist branch={branch} cur={cur} go={go} />
-          </div>
-
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-            {/* Top overdue debtors collection board with INLINE notes */}
-            <div style={{ ...card, padding: 12, flex: '1 1 400px', minWidth: 320 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Top overdue debtors — collections followup</span>
-                <button onClick={() => go('/accounts/collections')} style={{ ...aBtn(C.blue), padding: '3px 8px', fontSize: 10 }}>View All Tracker</button>
-              </div>
-              {top5rec.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 10 }}>✓ No overdue debtors outstanding.</div>}
-              {top5rec.map((r, i) => (
-                <div key={i} style={{ padding: '8px 0', borderTop: i ? '1px solid #dfe2e7' : 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 12, color: C.dark, fontWeight: 700 }}>{r.party}</span>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: C.red }}>{money(cur, r.overdue)}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input 
-                      type="text" 
-                      value={editingNotes[r.party] !== undefined ? editingNotes[r.party] : (savedNotes[r.party] || '')}
-                      onChange={(e) => setEditingNotes({ ...editingNotes, [r.party]: e.target.value })}
-                      onBlur={() => {
-                        const val = editingNotes[r.party];
-                        if (val !== undefined && val !== (savedNotes[r.party] || '')) {
-                          const next = { ...savedNotes, [r.party]: val };
-                          saveNoteMutation.mutate({ key: `followup-notes:${branchCode(branch) || 'ALL'}`, value: next, description: `Save note for ${r.party}` });
-                        }
-                      }}
-                      placeholder="Add follow-up notes (auto-saves on focus out)..."
-                      style={{ flex: 1, padding: '4px 8px', fontSize: 11.5, borderRadius: 4, border: `1px solid ${C.border}`, outline: 'none' }}
-                    />
-                    <button onClick={() => go('/receipts')} style={{ ...aBtn(C.green), padding: '3px 8px', fontSize: 10 }}>Receipt</button>
-                  </div>
-                </div>
-              ))}
+          {/* Combined snapshot: both sides + net at a glance, each card jumping to its side */}
+          <SecTitle>Net Working Position ({age.asOf ? `as on ${age.asOf}` : 'live'})</SecTitle>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+            <div {...clickable(() => setArApTab('ar'))} style={{ ...card, padding: 14, borderLeft: `4px solid ${C.blue}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' }}>
+              <div style={{ fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Accounts Receivable (Debtors)</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: C.blue, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{money(cur, rec.total || 0)}</div>
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{overdueDebtorsCount} overdue · view AR <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
             </div>
-
-            {/* Top creditors to reconcile and pay */}
-            <div style={{ ...card, padding: 12, flex: '1 1 350px', minWidth: 300 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Top creditors — reconcile &amp; pay</span>
-                <button onClick={() => go('/accounts/supplier-reco')} style={{ ...aBtn(C.amber), padding: '3px 8px', fontSize: 10 }}>Supplier Reco</button>
-              </div>
-              {top5pay.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 10 }}>✓ No outstanding bills to pay.</div>}
-              {top5pay.map((r, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
-                  <span style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600 }}>{r.party}</span>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{money(cur, r.total)}</span>
-                  <button onClick={() => go('/payments')} style={{ ...aBtn(C.amber), padding: '3px 8px', fontSize: 10 }}>Pay</button>
-                </div>
-              ))}
+            <div {...clickable(() => setArApTab('ap'))} style={{ ...card, padding: 14, borderLeft: `4px solid ${C.amber}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' }}>
+              <div style={{ fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Accounts Payable (Creditors)</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: C.amber, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{money(cur, pay.total || 0)}</div>
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{(age.payables?.rows || []).length} supplier(s) · view AP <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+            </div>
+            <div {...clickable(() => go('/accounts/net-ageing'))} style={{ ...card, padding: 14, borderLeft: `4px solid ${recNet >= 0 ? C.green : C.red}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' }}>
+              <div style={{ fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Net Working Position</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: recNet >= 0 ? C.green : C.red, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{money(cur, recNet)}</div>
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{recNet >= 0 ? 'net receivable' : 'net payable'} · full net ageing <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
             </div>
           </div>
+
+          {/* Sub-tabs: keep Accounts Receivable and Accounts Payable fully separate */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+            <button onClick={() => setArApTab('ar')} style={subTabStyle(arApTab === 'ar', C.blue)}>Accounts Receivable</button>
+            <button onClick={() => setArApTab('ap')} style={subTabStyle(arApTab === 'ap', C.amber)}>Accounts Payable</button>
+          </div>
+
+          {/* ─────────── ACCOUNTS RECEIVABLE ─────────── */}
+          {arApTab === 'ar' && (
+            <>
+              <SecTitle>Debtors ageing — Receivable</SecTitle>
+              <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead><tr>
+                    <th style={th}>Ageing</th><th style={{ ...th, ...rnum }}>0–30</th><th style={{ ...th, ...rnum }}>31–60</th><th style={{ ...th, ...rnum }}>61–90</th><th style={{ ...th, ...rnum }}>90+</th><th style={{ ...th, ...rnum }}>Total</th>
+                  </tr></thead>
+                  <tbody>
+                    <AgeBucketRow label="Debtors (Receivable)" totals={rec} cur={cur} tone={C.blue} onClick={() => go('/reports/rec')} />
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Bills-vs-settlement on the receivable side: billed vs received, net to collect */}
+              <SecTitle>Settlement — Bills vs Receipts</SecTitle>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+                <SettlementPanel
+                  title="Clients — unsettled bills vs receipts"
+                  sub="Billed to customer vs received · net still to collect"
+                  rows={age.receivables?.rows || []}
+                  cur={cur} tone={C.blue} partyLabel="Customer" settleLabel="Receipts"
+                  drillLabel="Receivables" onDrill={() => go('/reports/rec')}
+                />
+              </div>
+
+              {/* Tier 2.6 — customer money on account not yet applied bill-wise */}
+              <SecTitle>Customer Advances &amp; Unapplied Receipts</SecTitle>
+              <AdvancesPanel branch={branch} cur={cur} go={go} side="rec" />
+
+              {/* Tier 2.5 — refunds / reissues / ADM / ACM awaiting posting (customer adjustments) */}
+              <SecTitle>Refunds &amp; Adjustments</SecTitle>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+                <RefundsWorklist branch={branch} cur={cur} go={go} />
+              </div>
+
+              {/* Top overdue debtors collection board with INLINE notes */}
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                <div style={{ ...card, padding: 12, flex: '1 1 400px', minWidth: 320 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Top overdue debtors — collections followup</span>
+                    <button onClick={() => go('/accounts/collections')} style={{ ...aBtn(C.blue), padding: '3px 8px', fontSize: 10 }}>View All Tracker</button>
+                  </div>
+                  {top5rec.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 10 }}>✓ No overdue debtors outstanding.</div>}
+                  {top5rec.map((r, i) => (
+                    <div key={i} style={{ padding: '8px 0', borderTop: i ? '1px solid #dfe2e7' : 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 12, color: C.dark, fontWeight: 700 }}>{r.party}</span>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: C.red }}>{money(cur, r.overdue)}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input
+                          type="text"
+                          value={editingNotes[r.party] !== undefined ? editingNotes[r.party] : (savedNotes[r.party] || '')}
+                          onChange={(e) => setEditingNotes({ ...editingNotes, [r.party]: e.target.value })}
+                          onBlur={() => {
+                            const val = editingNotes[r.party];
+                            if (val !== undefined && val !== (savedNotes[r.party] || '')) {
+                              const next = { ...savedNotes, [r.party]: val };
+                              saveNoteMutation.mutate({ key: `followup-notes:${branchCode(branch) || 'ALL'}`, value: next, description: `Save note for ${r.party}` });
+                            }
+                          }}
+                          placeholder="Add follow-up notes (auto-saves on focus out)..."
+                          style={{ flex: 1, padding: '4px 8px', fontSize: 11.5, borderRadius: 4, border: `1px solid ${C.border}`, outline: 'none' }}
+                        />
+                        <button onClick={() => go('/receipts')} style={{ ...aBtn(C.green), padding: '3px 8px', fontSize: 10 }}>Receipt</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ─────────── ACCOUNTS PAYABLE ─────────── */}
+          {arApTab === 'ap' && (
+            <>
+              <SecTitle>Creditors ageing — Payable</SecTitle>
+              <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead><tr>
+                    <th style={th}>Ageing</th><th style={{ ...th, ...rnum }}>0–30</th><th style={{ ...th, ...rnum }}>31–60</th><th style={{ ...th, ...rnum }}>61–90</th><th style={{ ...th, ...rnum }}>90+</th><th style={{ ...th, ...rnum }}>Total</th>
+                  </tr></thead>
+                  <tbody>
+                    <AgeBucketRow label="Creditors (Payable)" totals={pay} cur={cur} tone={C.amber} onClick={() => go('/reports/pay')} />
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Bills-vs-settlement on the payable side: billed vs paid, net to pay */}
+              <SecTitle>Settlement — Bills vs Payments</SecTitle>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+                <SettlementPanel
+                  title="Suppliers — unsettled bills vs payments"
+                  sub="Billed by supplier vs paid · net still to pay"
+                  rows={age.payables?.rows || []}
+                  cur={cur} tone={C.amber} partyLabel="Supplier" settleLabel="Payments"
+                  drillLabel="Payables" onDrill={() => go('/reports/pay')}
+                />
+              </div>
+
+              {/* Tier 2.6 — supplier money on account not yet applied bill-wise */}
+              <SecTitle>Supplier Advances &amp; Unapplied Payments</SecTitle>
+              <AdvancesPanel branch={branch} cur={cur} go={go} side="pay" />
+
+              {/* Top creditors to reconcile and pay */}
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                <div style={{ ...card, padding: 12, flex: '1 1 350px', minWidth: 300 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Top creditors — reconcile &amp; pay</span>
+                    <button onClick={() => go('/accounts/supplier-reco')} style={{ ...aBtn(C.amber), padding: '3px 8px', fontSize: 10 }}>Supplier Reco</button>
+                  </div>
+                  {top5pay.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 10 }}>✓ No outstanding bills to pay.</div>}
+                  {top5pay.map((r, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
+                      <span style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600 }}>{r.party}</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{money(cur, r.total)}</span>
+                      <button onClick={() => go('/payments')} style={{ ...aBtn(C.amber), padding: '3px 8px', fontSize: 10 }}>Pay</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </>
       )}
 

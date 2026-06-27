@@ -496,23 +496,20 @@ export function GstrRecon({branch}){
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
 
-  /* Simulate GSTR-2B data vs books */
+  /* A TRUE GSTR-2B reconciliation needs the taxpayer's DOWNLOADED 2B JSON imported,
+     which the ERP doesn't yet hold. So we do NOT fabricate the 2B side (the old code
+     simulated a 1-in-3 mismatch and raised a bogus "reverse ITC before filing"
+     warning off invented numbers). The books-side ITC below is a real estimate from
+     posted purchase bills; the 2B column stays blank until a 2B import lands. */
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&["BSP India","Emirates GSA","Bali Tours DMC"].includes(b.supplier));
-  const recon=bills.map((b,i)=>{
-    const itcBooks=Math.round(b.cost/(1+0.18)*0.18);
-    const gstr2bAmt=i%3===1?Math.round(itcBooks*0.85):itcBooks; // simulate 1-in-3 mismatch
-    const diff=itcBooks-gstr2bAmt;
-    return {
-      supplier:b.supplier,gstin:"07AABCX****1Z5",invoiceNo:b.id,period:b.date,
-      itcBooks,gstr2bAmt,diff,
-      status:Math.abs(diff)<10?"Matched":diff>0?"Excess in Books":"Excess in 2B",
-    };
-  });
-
-  const matched=recon.filter(r=>r.status==="Matched").length;
-  const excess=recon.filter(r=>r.status==="Excess in Books").reduce((s,r)=>s+r.diff,0);
-  const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
+  const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&(+b.cost||0)>0);
+  const recon=bills.map((b)=>({
+    supplier:b.supplier||'—', gstin:'—', invoiceNo:b.id, period:b.date,
+    itcBooks:Math.round((+b.cost||0)/(1+0.18)*0.18), gstr2bAmt:null, diff:null,
+    status:'2B not imported',
+  }));
+  const itcBooksTotal=recon.reduce((s,r)=>s+r.itcBooks,0);
+  const f=n=>"₹"+Number(Math.round(n||0)).toLocaleString("en-IN");
 
   return (
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
@@ -529,16 +526,15 @@ export function GstrRecon({branch}){
         </select>
       </div>
 
-      {excess>0&&<div style={{marginBottom:12,padding:"10px 14px",borderRadius:9,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:10.5,color:"#A32D2D",fontWeight:600,display:"flex",gap:8}}>
-        <AlertTriangle size={15}/> ₹{excess.toLocaleString()} ITC excess claimed in books vs GSTR-2B — reverse this before filing GSTR-3B to avoid notices.
-      </div>}
+      <div style={{marginBottom:12,padding:"10px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775",fontSize:10.5,color:"#854F0B",fontWeight:600,display:"flex",gap:8}}>
+        <AlertTriangle size={15}/> GSTR-2B is not yet imported, so this is NOT a reconciliation — the “ITC in 2B” / difference / match columns are blank. The “ITC in books” below is an estimate from posted purchase bills. Import the downloaded 2B JSON to reconcile.
+      </div>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-        {[{l:"Total Entries",v:String(recon.length),c:"#384677",bg:"#f3f4f8"},
-          {l:"Matched",v:String(matched),c:"#27500A",bg:"#EAF3DE"},
-          {l:"Mismatched",v:String(recon.length-matched),c:"#A32D2D",bg:"#FCEBEB"},
-          {l:"Excess ITC Claimed",v:f(Math.max(excess,0)),c:"#A32D2D",bg:"#FCEBEB"},
-          {l:"ITC Reversal Required",v:f(Math.max(excess,0)),c:"#854F0B",bg:"#FAEEDA"},
+        {[{l:"Purchase Bills (period)",v:String(recon.length),c:"#384677",bg:"#f3f4f8"},
+          {l:"ITC in Books (est.)",v:f(itcBooksTotal),c:"#27500A",bg:"#EAF3DE"},
+          {l:"ITC in GSTR-2B",v:"— import 2B",c:"#5a6691",bg:"#f3f4f8"},
+          {l:"Reconciliation",v:"Pending 2B import",c:"#854F0B",bg:"#FAEEDA"},
         ].map((k,i)=>(
           <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"11px 13px",background:k.bg}}>
             <p style={{margin:0,fontSize:9,fontWeight:700,color:k.c,textTransform:"uppercase"}}>{k.l}</p>
@@ -561,16 +557,12 @@ export function GstrRecon({branch}){
               <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{r.invoiceNo}</td>
               <td style={{padding:"8px 11px",color:"#5a6691"}}>{r.period}</td>
               <td style={{padding:"8px 11px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(r.itcBooks)}</td>
-              <td style={{padding:"8px 11px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(r.gstr2bAmt)}</td>
-              <td style={{padding:"8px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:Math.abs(r.diff)>10?"#A32D2D":"#27500A"}}>{r.diff>0?"+":""}{f(r.diff)}</td>
+              <td style={{padding:"8px 11px",textAlign:"right",color:"#5a6691"}}>—</td>
+              <td style={{padding:"8px 11px",textAlign:"right",color:"#5a6691"}}>—</td>
               <td style={{padding:"8px 11px"}}>
-                <span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,
-                  background:r.status==="Matched"?"#EAF3DE":"#FCEBEB",
-                  color:r.status==="Matched"?"#27500A":"#A32D2D"}}>{r.status}</span>
+                <span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}>{r.status}</span>
               </td>
-              <td style={{padding:"8px 11px"}}>
-                {r.status!=="Matched"&&<button style={{...btnGh,padding:"2px 8px",fontSize:9.5,color:"#854F0B"}}>Reverse ITC</button>}
-              </td>
+              <td style={{padding:"8px 11px",color:"#5a6691",fontSize:9.5}}>—</td>
             </tr>
           ))}</tbody>
         </table>
@@ -1299,7 +1291,7 @@ export function Gstr2aReco({branch,setRoute}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>🔁 GSTR-2A vs Purchase Register</h2>
-          <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Live supplier-by-supplier reconciliation · Chase missing ITC · Pre-filing check</p>
+          <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Supplier-by-supplier reconciliation (sample — not yet wired) · Chase missing ITC · Pre-filing check</p>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:7,fontSize:11.5}}>
