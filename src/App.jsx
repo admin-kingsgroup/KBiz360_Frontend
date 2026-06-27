@@ -428,7 +428,7 @@ export default function KB360App(){
     if(route==="/masters/approval-limits")return <ApprovalLimitsMaster/>;
     if(route==="/masters/numbering")      return <NumberingSeriesMaster branch={branch}/>;
     // ── Accounts — branch accountant workspace (new screens) ──
-    if(route==="/accounts/dashboard")     return <DashboardAccountant branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/dashboard")     return <DashboardAccountant branch={branch} setRoute={navigate} currentUser={currentUser}/>;
     if(route==="/accounts/net-ageing")    return <PayablesLive branch={branch} setRoute={navigate} initialTab="net"/>;
     if(route==="/accounts/collections")   return <CollectionsFollowup branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/supplier-reco") return <SupplierReco branch={branch} setRoute={navigate}/>;

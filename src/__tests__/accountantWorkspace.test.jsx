@@ -7,10 +7,10 @@ jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 const AGE = {
   asOf: '2026-06-18',
   receivables: { rows: [
-    { party: 'ACME', d0: 1000, d30: 500, d60: 0, d90: 200, total: 1700 },
-    { party: 'Globe', d0: 0, d30: 0, d60: 0, d90: 0, total: 0 }, // not overdue / zero
-  ], totals: { d0: 1000, d30: 500, d60: 0, d90: 200, total: 1700 } },
-  payables: { rows: [{ party: 'TBO', d0: 800, d30: 0, d60: 0, d90: 0, total: 800 }], totals: { d0: 800, d30: 0, d60: 0, d90: 0, total: 800 } },
+    { party: 'ACME', d0: 1000, d30: 500, d60: 0, d90: 200, billed: 2500, settled: 800, total: 1700, onAccount: 0, net: 1700 },
+    { party: 'Globe', d0: 0, d30: 0, d60: 0, d90: 0, billed: 0, settled: 0, total: 0, onAccount: 0, net: 0 }, // not overdue / zero
+  ], totals: { d0: 1000, d30: 500, d60: 0, d90: 200, billed: 2500, settled: 800, total: 1700, onAccount: 0, net: 1700 } },
+  payables: { rows: [{ party: 'TBO', d0: 800, d30: 0, d60: 0, d90: 0, billed: 1100, settled: 300, total: 800, onAccount: 0, net: 800 }], totals: { d0: 800, d30: 0, d60: 0, d90: 0, billed: 1100, settled: 300, total: 800, onAccount: 0, net: 800 } },
 };
 jest.mock('../core/useAccounting', () => ({
   branchCode: (b) => (b === 'ALL' || !b ? '' : (b.code || b)),
@@ -32,9 +32,27 @@ jest.mock('../core/useAccounting', () => ({
   useRegisterSummary: () => ({ data: { count: 0, total: 0, subtotal: 0 } }),
   useConfigValue: () => ({ data: {} }),
   useSaveConfigValue: () => ({ mutate: jest.fn(), isPending: false }),
-  useOutstanding: () => ({ data: { onAccountReceipts: [{ party: 'ACME', onAccount: 300 }] } }),
+  useOutstanding: () => ({ data: {
+    onAccountReceipts: [{ party: 'ACME', vno: 'R1', onAccount: 300, ageDays: 5 }],
+    onAccountPayments: [{ party: 'TBO', vno: 'P9', onAccount: 700, ageDays: 12 }],
+    totals: { onAccountReceipts: 300, onAccountPayments: 700 },
+  } }),
   useDayBook: () => ({ data: [{ category: 'receipt', totalDebit: 1200 }, { category: 'payment', totalDebit: 400 }] }),
   useAlerts: () => ({ data: { alerts: [] } }),
+  // New live panels: cash outlook (forecast) + branch P&L snapshot + RCM.
+  useCashForecast: () => ({ data: [{ week: 'W1', inflow: 5000, outflow: 2000, closing: 8000 }] }),
+  useModulePL: () => ({ data: { totals: { sales: 100000, cogs: 70000, gp: 30000, gpPct: 30 }, indirect: { expense: 5000 }, bridge: { netProfit: 25000 } } }),
+  useRcmLiability: () => ({ data: { igst: 1800, taxable: 10000, count: 2 } }),
+}));
+// PDC tracker pulls its own engine.
+jest.mock('../core/usePDC', () => ({
+  usePDCSummary: () => ({ data: { counts: { pending: 2, deposited: 0, cleared: 0, bounced: 1, total: 3 }, amounts: { pending: 5000, deposited: 0, cleared: 0, bounced: 1000 }, dueToDeposit: 1 } }),
+}));
+// Master-data health: server-computed defect counts per master.
+jest.mock('../core/useMasters', () => ({
+  useMasterHealth: (resource) => ({ data: resource === 'suppliers'
+    ? { total: 10, noGstin: 1, noPan: 0, noState: 2, foreign: 1 }
+    : { total: 20, noTaxId: 3, noState: 1 } }),
 }));
 // Collections workspace reads its own board endpoint + mutation hooks.
 jest.mock('../core/useCollections', () => ({
@@ -95,10 +113,19 @@ describe('accountant workspace — screens render', () => {
   test('Dashboard cockpit: three workspace tabs (daily money · collections ageing · compliance)', () => {
     render(<DashboardAccountant branch={{ code: 'BOM' }} setRoute={() => {}} />);
     // Tab 1 — Daily Operations (default): money position + worklist
-    expect(screen.getByText('₹5,000')).toBeInTheDocument();   // cash
+    expect(screen.getAllByText('₹5,000').length).toBeGreaterThan(0);   // cash (also PDC pending / forecast inflow)
     expect(screen.getByText('₹90,000')).toBeInTheDocument();  // bank (Bank Account only, not Bank Charges)
     expect(screen.getByText('Collected Today')).toBeInTheDocument();
     expect(screen.getByText('Month-End Progress')).toBeInTheDocument();
+    // Tier 1 additions: forward cash outlook, PDC tracker, approval split
+    expect(screen.getByText(/Cash-flow Outlook/)).toBeInTheDocument();
+    expect(screen.getByText('Post-Dated Cheques (PDC)')).toBeInTheDocument();
+    expect(screen.getByText(/Approve & Post — worklist/)).toBeInTheDocument();
+    expect(screen.getByText('Received — Pending')).toBeInTheDocument();
+    // Hero worklist + maker/checker split
+    expect(screen.getByText(/to approve & post/)).toBeInTheDocument();   // hero chip
+    expect(screen.getByText(/I can approve/)).toBeInTheDocument();       // checker bucket
+    expect(screen.getByText(/My own — needs approver/)).toBeInTheDocument(); // maker bucket
 
     // Tab 2 — Collections & Payables: ageing buckets + net working position (1700 − 800 = 900)
     fireEvent.click(screen.getByText('2. Collections & Payables'));
@@ -107,10 +134,31 @@ describe('accountant workspace — screens render', () => {
     expect(screen.getByText('Net Working Position')).toBeInTheDocument();
     expect(screen.getByText('₹900')).toBeInTheDocument();
 
-    // Tab 3 — Month-End & Compliance: statutory tiles + GST netPayable
+    // Tab 2 — Settlement panels: clients (bills vs receipts) + suppliers (bills vs payments)
+    expect(screen.getByText('Clients — unsettled bills vs receipts')).toBeInTheDocument();
+    expect(screen.getByText('Suppliers — unsettled bills vs payments')).toBeInTheDocument();
+    expect(screen.getAllByText('₹2,500').length).toBeGreaterThan(0);   // ACME gross billed (row + total)
+    expect(screen.getAllByText('₹800').length).toBeGreaterThan(0);     // ACME gross received / TBO open
+
+    // Tab 2 — Tier 2 additions: advances/unapplied credits (both sides) + refunds worklist
+    expect(screen.getByText('Advances & Unapplied Credits')).toBeInTheDocument();
+    expect(screen.getByText('Customer credits — unapplied receipts')).toBeInTheDocument();
+    expect(screen.getByText('Supplier advances — unapplied payments')).toBeInTheDocument();
+    expect(screen.getByText('Refunds & adjustments pending')).toBeInTheDocument();
+
+    // Tab 3 — Month-End & Compliance: statutory tiles + GST/ITC + P&L snapshot + master health
     fireEvent.click(screen.getByText('3. Month-End & Compliance'));
     expect(screen.getByText('TDS Payable')).toBeInTheDocument();
-    expect(screen.getByText('₹1,500')).toBeInTheDocument();   // GST netPayable
+    expect(screen.getAllByText('₹1,500').length).toBeGreaterThan(0);   // GST netPayable (tile + ITC panel)
+    expect(screen.getByText('Input Credit (ITC)')).toBeInTheDocument();
+    expect(screen.getByText('RCM (Reverse Charge)')).toBeInTheDocument();      // foreign-supplier reverse charge
+    expect(screen.getByText('₹1,800')).toBeInTheDocument();                    // RCM IGST from mock
+    expect(screen.getByText(/Match ITC vs GSTR-2B/)).toBeInTheDocument();
+    expect(screen.getByText('Indian suppliers missing GSTIN')).toBeInTheDocument(); // master-health (server counts)
+    expect(screen.getByText(/Branch P&L snapshot/)).toBeInTheDocument();
+    expect(screen.getByText('Net Profit')).toBeInTheDocument();
+    expect(screen.getByText('₹25,000')).toBeInTheDocument();           // net profit from module-PL
+    expect(screen.getByText(/Master-data health/)).toBeInTheDocument();
   });
 
   test('Month-End checklist renders with auto-checks (trial balance / suspense)', () => {

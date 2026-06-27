@@ -14,6 +14,19 @@ export function useMasterList(resource, params = {}) {
   });
 }
 
+// Tax-readiness defect COUNTS for a master (suppliers / customers), computed
+// server-side over the editable master rows so the dashboard never pulls the full
+// list just to count gaps. `resource` is 'suppliers' or 'customers'.
+export function useMasterHealth(resource, branch) {
+  const code = branch === 'ALL' || !branch ? '' : (branch.code || branch);
+  return useQuery({
+    queryKey: ['master-health', resource, code || 'all'],
+    queryFn: () => apiGet(`/api/${resource}/health`, { branch: code }),
+    enabled: !!getAuthToken(),
+    staleTime: 60_000,
+  });
+}
+
 // A few masters are ALSO read live under OTHER query roots, so invalidating only
 // ['master', resource] leaves those stale until their staleTime lapses (the
 // "new sub-group / ledger doesn't show up in the chart / picker / reports until

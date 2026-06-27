@@ -10,9 +10,11 @@ import { usePager, Pager } from '../core/ux/pager';
 import { bc } from '../core/styles';
 import {
   branchCode, useAgeing, useTaxSummary, useTrialBalance, useVoucherApprovals,
-  useBookingOrders, useRegisterSummary, useConfigValue, useSaveConfigValue,
-  useOutstanding, useDayBook, useAlerts,
+  useBookingOrders, useConfigValue, useSaveConfigValue,
+  useOutstanding, useDayBook, useAlerts, useCashForecast, useModulePL, useRcmLiability,
 } from '../core/useAccounting';
+import { usePDCSummary } from '../core/usePDC';
+import { useMasterHealth } from '../core/useMasters';
 import { useTaxCalendar } from '../core/useReference';
 import { useBankLedgers, useBankReconSummary } from '../core/useBankReco';
 import {
@@ -133,7 +135,397 @@ function MiniList({ title, rows, cur, valueKey, tone, actionLabel, onAction }) {
   );
 }
 
-export function DashboardAccountant({ branch, setRoute }) {
+// Settlement panel: per-party "bills vs receipts/payments" — gross billed, gross
+// received/paid, what's still on account (unapplied advance) and the net balance
+// due. Sourced from the SAME bill-wise ageing engine as the rest of the workspace
+// (rows now carry `billed`/`settled`), so every figure ties back to the registers.
+// Shows the top parties by net balance; the header links to the full report.
+function SettlementPanel({ title, sub, rows, cur, tone, partyLabel, settleLabel, drillLabel, onDrill }) {
+  const top = [...(rows || [])].sort((a, b) => Math.abs(b.net || 0) - Math.abs(a.net || 0)).slice(0, 12);
+  const t = (rows || []).reduce((a, r) => ({
+    billed: a.billed + (r.billed || 0), settled: a.settled + (r.settled || 0),
+    total: a.total + (r.total || 0), net: a.net + (r.net || 0),
+  }), { billed: 0, settled: 0, total: 0, net: 0 });
+  const sh = { ...th, background: 'transparent' };
+  const num = { ...td, ...rnum };
+  return (
+    <div style={{ ...card, padding: 0, overflow: 'hidden', flex: '1 1 480px', minWidth: 340 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 14px', borderBottom: `1px solid ${C.border}` }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.dark }}>{title}</div>
+          <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{sub}</div>
+        </div>
+        {onDrill && <button onClick={onDrill} style={{ ...aBtn(tone), padding: '4px 9px', fontSize: 10.5 }}>{drillLabel} <ArrowRight size={11} /></button>}
+      </div>
+      <div style={{ maxHeight: 360, overflow: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead><tr style={{ background: C.dark }}>
+            <th style={sh}>{partyLabel}</th>
+            <th style={{ ...sh, ...rnum }}>Bills</th>
+            <th style={{ ...sh, ...rnum }}>{settleLabel}</th>
+            <th style={{ ...sh, ...rnum }}>Unsettled</th>
+            <th style={{ ...sh, ...rnum }}>Net Due</th>
+          </tr></thead>
+          <tbody>
+            {top.length === 0 && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.green, padding: 18 }}>✓ Nothing unsettled.</td></tr>}
+            {top.map((r, i) => (
+              <tr key={i} style={{ background: i % 2 ? '#fafbff' : '#fff' }}>
+                <td style={{ ...td, fontWeight: 600, color: C.dark, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.party}</td>
+                <td style={num}>{money(cur, r.billed || 0)}</td>
+                <td style={{ ...num, color: C.green }}>{money(cur, r.settled || 0)}</td>
+                <td style={{ ...num, color: (r.total || 0) > 0.5 ? tone : C.dim, fontWeight: 700 }}>{money(cur, r.total || 0)}</td>
+                <td style={{ ...num, fontWeight: 800, color: (r.net || 0) >= 0 ? C.dark : C.green }}>{money(cur, r.net || 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+          {top.length > 0 && (
+            <tfoot><tr style={{ position: 'sticky', bottom: 0 }}>
+              <td style={{ ...td, background: C.dark, color: C.gold, fontWeight: 800 }}>TOTAL · {(rows || []).length}</td>
+              <td style={{ ...td, ...rnum, background: C.dark, color: '#fff', fontWeight: 800 }}>{money(cur, t.billed)}</td>
+              <td style={{ ...td, ...rnum, background: C.dark, color: '#fff', fontWeight: 800 }}>{money(cur, t.settled)}</td>
+              <td style={{ ...td, ...rnum, background: C.dark, color: '#fff', fontWeight: 800 }}>{money(cur, t.total)}</td>
+              <td style={{ ...td, ...rnum, background: C.dark, color: '#fff', fontWeight: 800 }}>{money(cur, t.net)}</td>
+            </tr></tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// Month-to-date window (ISO) — shared by the live snapshot panels below.
+const mtdWindow = () => { const ym = thisYM(); return { from: `${ym}-01`, to: new Date().toISOString().slice(0, 10) }; };
+
+// ── Tier 1.1 · Short-term cash outlook ───────────────────────────────────────
+// Forward view (the rest of Daily Ops is backward-looking): expected inflows vs
+// outflows and the projected closing for the coming weeks, from the same cash-flow
+// forecast engine as Finance ▸ Cash-flow Forecast. A projected NEGATIVE closing is
+// flagged red — the branch can't cover that week's commitments.
+function CashOutlookCard({ branch, cur, go }) {
+  const q = useCashForecast(branch);
+  const weeks = (q.data || []).slice(0, 4);
+  return (
+    <>
+      <SecTitle>Cash-flow Outlook — next {weeks.length || 4} weeks</SecTitle>
+      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead><tr style={{ background: C.dark }}>
+            <th style={{ ...th, background: 'transparent' }}>Week</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Expected In</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Expected Out</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Net</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Proj. Closing</th>
+          </tr></thead>
+          <tbody>
+            {q.isLoading && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.dim, padding: 16 }}>Loading forecast…</td></tr>}
+            {!q.isLoading && weeks.length === 0 && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.dim, padding: 16 }}>No upcoming due-dated bills to forecast.</td></tr>}
+            {weeks.map((w, i) => {
+              const net = (w.inflow || 0) - (w.outflow || 0);
+              return (
+                <tr key={i} style={{ background: i % 2 ? '#fafbff' : '#fff' }}>
+                  <td style={{ ...td, fontWeight: 700 }}>{w.week || `W${i + 1}`}</td>
+                  <td style={{ ...td, ...rnum, color: C.green }}>{money(cur, w.inflow || 0)}</td>
+                  <td style={{ ...td, ...rnum, color: C.amber }}>{money(cur, w.outflow || 0)}</td>
+                  <td style={{ ...td, ...rnum, fontWeight: 700, color: net >= 0 ? C.dark : C.red }}>{money(cur, net)}</td>
+                  <td style={{ ...td, ...rnum, fontWeight: 800, color: (w.closing || 0) >= 0 ? C.dark : C.red }}>{money(cur, w.closing || 0)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 12px', borderTop: `1px solid ${C.border}` }}>
+          <button onClick={() => go('/reports/cashflow-forecast')} style={{ ...aBtn(C.blue), padding: '4px 9px', fontSize: 10.5 }}>13-Week Forecast <ArrowRight size={11} /></button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Tier 1.2 · Post-dated cheque (PDC) tracker ───────────────────────────────
+// Cheques received (inbound) and issued (outbound), from the PDC register. Surfaces
+// what's due to bank, on-hand pending and — most importantly — bounced cheques that
+// need re-presentation or follow-up. Manage on the Bank Reco screen's PDC tab.
+function PdcTracker({ branch, cur, go }) {
+  const inb = usePDCSummary(branch, { direction: 'inbound' }).data;
+  const out = usePDCSummary(branch, { direction: 'outbound' }).data;
+  const ic = inb?.counts || {}, ia = inb?.amounts || {};
+  const oc = out?.counts || {}, oa = out?.amounts || {};
+  const bouncedN = (ic.bounced || 0) + (oc.bounced || 0);
+  const bouncedAmt = (ia.bounced || 0) + (oa.bounced || 0);
+  return (
+    <>
+      <SecTitle>Post-Dated Cheques (PDC)</SecTitle>
+      <Row>
+        <Tile icon={<ReceiptText size={13} />} label="Received — Pending" value={money(cur, ia.pending || 0)} sub={`${ic.pending || 0} cheque(s)${inb?.dueToDeposit ? ` · ${inb.dueToDeposit} due to bank` : ''}`} tone={C.green} onClick={() => go('/bank-reco')} />
+        <Tile icon={<CreditCard size={13} />} label="Issued — Pending" value={money(cur, oa.pending || 0)} sub={`${oc.pending || 0} cheque(s)${out?.dueToDeposit ? ` · ${out.dueToDeposit} due` : ''}`} tone={C.amber} onClick={() => go('/bank-reco')} />
+        <Tile icon={<Landmark size={13} />} label="Deposited (in clearing)" value={money(cur, (ia.deposited || 0) + (oa.deposited || 0))} sub={`${(ic.deposited || 0) + (oc.deposited || 0)} awaiting clearance`} tone={C.blue} onClick={() => go('/bank-reco')} />
+        <Tile icon={<AlertTriangle size={13} />} label="Bounced" value={bouncedN} sub={bouncedN ? `${money(cur, bouncedAmt)} · re-present / follow up` : 'none dishonoured'} tone={bouncedN ? C.red : C.green} onClick={() => go('/bank-reco')} />
+      </Row>
+    </>
+  );
+}
+
+// ── Tier 1.3 · Approval worklist split ───────────────────────────────────────
+// A single branch accountant needs to know what they can clear NOW vs what is stuck.
+// Split the pending queue by the verification gate: `postable` entries are ready to
+// approve & post; the rest are blocked and carry the reason (missing ledger, unbalanced,
+// future date…). Blocked items are listed with their first error so they can be fixed.
+function ApprovalSplit({ branch, cur, go, currentUser }) {
+  const q = useVoucherApprovals(branch, 'pending');
+  const entries = q.data?.entries || [];
+  const sum = (arr) => arr.reduce((s, e) => s + (Number(e.total) || 0), 0);
+  // Maker ≠ checker: a voucher this accountant entered can't be self-approved — it
+  // needs another approver (Director). Match the entry's submittedBy to the current
+  // user (name / email / id). No user → everything postable counts as actionable.
+  const me = [currentUser?.name, currentUser?.email, currentUser?.id].filter(Boolean).map((s) => String(s).toLowerCase());
+  const isMine = (e) => !!e.submittedBy && me.includes(String(e.submittedBy).toLowerCase());
+  const postable = entries.filter((e) => e.postable);
+  const mine = postable.filter(isMine);                 // I entered it → blocked on another approver
+  const ready = postable.filter((e) => !isMine(e));     // I may approve & post
+  const blocked = entries.filter((e) => !e.postable);   // fails a verification check
+  return (
+    <>
+      <SecTitle>Approve &amp; Post — worklist</SecTitle>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+        <div style={{ ...card, padding: 12, flex: '1 1 260px', minWidth: 240, borderLeft: `4px solid ${C.green}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: C.dark }}>I can approve · {ready.length}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: C.green }}>{money(cur, sum(ready))}</span>
+          </div>
+          <div style={{ fontSize: 11, color: C.dim, marginBottom: 8 }}>Passes every check &amp; entered by someone else — approve &amp; post.</div>
+          <button onClick={() => go('/transactions/approvals')} style={{ ...aBtn(C.green), padding: '4px 10px', fontSize: 11 }} disabled={!ready.length}>Open approvals <ArrowRight size={11} /></button>
+        </div>
+        <div style={{ ...card, padding: 12, flex: '1 1 260px', minWidth: 240, borderLeft: `4px solid ${mine.length ? C.amber : C.green}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: C.dark }}>My own — needs approver · {mine.length}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: mine.length ? C.amber : C.green }}>{money(cur, sum(mine))}</span>
+          </div>
+          {mine.length === 0
+            ? <div style={{ fontSize: 11.5, color: C.green }}>✓ None of yours awaiting another approver.</div>
+            : <div style={{ fontSize: 11, color: C.dim }}>You entered these — a second person (Director) must approve. Maker ≠ checker.</div>}
+        </div>
+        <div style={{ ...card, padding: 12, flex: '1 1 320px', minWidth: 280, borderLeft: `4px solid ${blocked.length ? C.red : C.green}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: C.dark }}>Blocked — needs fixing · {blocked.length}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: blocked.length ? C.red : C.green }}>{money(cur, sum(blocked))}</span>
+          </div>
+          {blocked.length === 0 && <div style={{ fontSize: 11.5, color: C.green }}>✓ Nothing blocked.</div>}
+          {blocked.slice(0, 3).map((e, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
+              <span style={{ flex: 1, fontSize: 11.5, color: C.dark, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <b style={{ fontFamily: 'monospace' }}>{e.vno || 'Draft'}</b> {e.party || e.category}
+                <span style={{ color: C.red, fontWeight: 600 }}> · {(e.errors && e.errors[0]) || e.error || 'cannot post'}</span>
+              </span>
+            </div>
+          ))}
+          {blocked.length > 0 && <button onClick={() => go('/transactions/approvals')} style={{ ...aBtn(C.red), padding: '4px 10px', fontSize: 11, marginTop: 8 }}>Fix &amp; clear <ArrowRight size={11} /></button>}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Tier 2.4 · GST / Input-Tax-Credit position ───────────────────────────────
+// Output tax vs claimable Input Tax Credit (ITC) → net liability for the month, live
+// from the books (same source as the Tax Summary report). The "ITC match" drill opens
+// GSTR-2B reconciliation, where 2B is matched against the purchase register.
+function GstItcPanel({ branch, cur, go }) {
+  const w = mtdWindow();
+  const tax = useTaxSummary(branch, { from: w.from, to: w.to }).data || {};
+  const rcm = useRcmLiability(branch, { from: w.from, to: w.to }).data || {};
+  const regime = (tax.regime || 'GST');
+  const output = tax.output?.total || 0;
+  const input = tax.input?.total || 0;     // claimable ITC
+  const net = (typeof tax.netPayable === 'number') ? tax.netPayable : (output - input);
+  const rcmIgst = rcm.igst || 0;
+  return (
+    <>
+      <SecTitle>{regime} / Input-Tax-Credit position (this month)</SecTitle>
+      <Row>
+        <Tile icon={<TrendingUp size={13} />} label="Output Tax (on sales)" value={money(cur, output)} sub="Open tax summary" tone={C.blue} onClick={() => go('/reports/tax-summary')} />
+        <Tile icon={<TrendingDown size={13} />} label="Input Credit (ITC)" value={money(cur, input)} sub="claimable on purchases" tone={C.green} onClick={() => go('/reports/tax-summary')} />
+        <Tile icon={<Scale size={13} />} label={net >= 0 ? 'Net Payable' : 'Net Refundable'} value={money(cur, Math.abs(net))} sub="due 20th · cash to pay" tone={net > 0 ? C.amber : C.green} onClick={() => go('/reports/tax-summary')} />
+        {/* Reverse charge on foreign-supplier purchases — pay in cash (3.1(d)) + claim ITC (4A) */}
+        <Tile icon={<ReceiptText size={13} />} label="RCM (Reverse Charge)" value={money(cur, rcmIgst)} sub={rcm.count ? `${rcm.count} foreign bill(s) · pay + claim ITC` : 'no foreign-supplier purchases'} tone={rcmIgst > 0 ? C.amber : C.green} onClick={() => go('/tax/rcm')} />
+      </Row>
+      {/* GSTR-2B ITC match is a true reconciliation against downloaded 2B — open the
+          2B screen to match it line-wise against the purchase register. */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -4, marginBottom: 12 }}>
+        <button onClick={() => go('/tax/gstr2b')} style={{ ...aBtn(C.dark), padding: '4px 9px', fontSize: 10.5 }}>Match ITC vs GSTR-2B <ArrowRight size={11} /></button>
+      </div>
+    </>
+  );
+}
+
+// ── Tier 2.5 · Refunds & adjustments worklist ────────────────────────────────
+// Travel-specific adjustment vouchers (Refund / Reissue / ADM / ACM) still pending
+// approval. These reverse or amend a booking and must be posted promptly so AR/AP
+// reflects reality. Listed straight from the pending approval queue.
+const ADJ_CATS = ['refund', 'reissue', 'adm', 'acm'];
+const ADJ_LABEL = { refund: 'Refund', reissue: 'Reissue', adm: 'ADM', acm: 'ACM' };
+function RefundsWorklist({ branch, cur, go }) {
+  const q = useVoucherApprovals(branch, 'pending');
+  const rows = (q.data?.entries || []).filter((e) => ADJ_CATS.includes(e.category));
+  const total = rows.reduce((s, e) => s + (Number(e.total) || 0), 0);
+  return (
+    <div style={{ ...card, padding: 12, flex: '1 1 360px', minWidth: 300 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span>Refunds &amp; adjustments pending</span>
+        <span style={{ fontSize: 11.5, fontWeight: 800, color: rows.length ? C.amber : C.green }}>{rows.length} · {money(cur, total)}</span>
+      </div>
+      {rows.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 8 }}>✓ No RF / RI / ADM / ACM pending.</div>}
+      {rows.slice(0, 8).map((e, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
+          <span style={{ padding: '1px 6px', borderRadius: 4, background: '#f1f5f9', fontSize: 9.5, fontWeight: 800, textTransform: 'uppercase', color: C.dim }}>{ADJ_LABEL[e.category] || e.category}</span>
+          <span style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.party || e.vno}</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: C.dark, fontVariantNumeric: 'tabular-nums' }}>{money(cur, e.total || 0)}</span>
+          {!e.postable && <span style={{ fontSize: 9.5, fontWeight: 800, color: C.red }}>blocked</span>}
+        </div>
+      ))}
+      {rows.length > 0 && <button onClick={() => go('/transactions/approvals')} style={{ ...aBtn(C.blue), padding: '4px 9px', fontSize: 10.5, marginTop: 8 }}>Open approvals <ArrowRight size={11} /></button>}
+    </div>
+  );
+}
+
+// ── Tier 2.6 · Advances & unapplied credits (both sides) ─────────────────────
+// Money sitting on account that hasn't been settled bill-wise: customer receipts not
+// yet applied to invoices, and supplier advances not yet applied to bills. Both must
+// be cleared so the ageing is real and prepaid money isn't lost. Settle from the
+// receivables / payables screens.
+function AdvancesPanel({ branch, cur, go }) {
+  const out = useOutstanding(branch).data || {};
+  const recs = out.onAccountReceipts || [];
+  const pays = out.onAccountPayments || [];
+  const recTot = out.totals?.onAccountReceipts ?? recs.reduce((s, r) => s + (Number(r.onAccount) || 0), 0);
+  const payTot = out.totals?.onAccountPayments ?? pays.reduce((s, r) => s + (Number(r.onAccount) || 0), 0);
+  const block = (title, list, tot, tone, route) => (
+    <div style={{ ...card, padding: 12, flex: '1 1 340px', minWidth: 300 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+        <span>{title}</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: tone }}>{money(cur, tot)}</span>
+      </div>
+      {list.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 6 }}>✓ Nothing unapplied.</div>}
+      {list.slice(0, 6).map((r, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
+          <span style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.party}{r.vno ? <span style={{ color: C.dim, fontWeight: 500 }}> · {r.vno}</span> : ''}</span>
+          {r.ageDays != null && <span style={{ fontSize: 10.5, color: C.dim }}>{r.ageDays}d</span>}
+          <span style={{ fontSize: 12, fontWeight: 800, color: tone, fontVariantNumeric: 'tabular-nums' }}>{money(cur, r.onAccount || 0)}</span>
+        </div>
+      ))}
+      {list.length > 0 && <button onClick={() => go(route)} style={{ ...aBtn(tone), padding: '4px 9px', fontSize: 10.5, marginTop: 8 }}>Settle bill-wise <ArrowRight size={11} /></button>}
+    </div>
+  );
+  return (
+    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+      {block('Customer credits — unapplied receipts', recs, recTot, C.blue, '/reports/rec')}
+      {block('Supplier advances — unapplied payments', pays, payTot, C.amber, '/reports/pay')}
+    </div>
+  );
+}
+
+// ── Tier 3.7 · Branch P&L snapshot ───────────────────────────────────────────
+// One health read for the month: revenue, purchase (COGS), gross profit (with %),
+// indirect expenses and the net profit — live from the module-wise P&L engine.
+function BranchPnlSnapshot({ branch, cur, go }) {
+  const w = mtdWindow();
+  const q = useModulePL(branch, { from: w.from, to: w.to, summary: true });
+  const t = q.data?.totals || {}; const ind = q.data?.indirect || {}; const br = q.data?.bridge || {};
+  const np = br.netProfit || 0;
+  return (
+    <>
+      <SecTitle>Branch P&amp;L snapshot (this month)</SecTitle>
+      <Row>
+        <Tile icon={<TrendingUp size={13} />} label="Revenue" value={money(cur, t.sales || 0)} sub="Open P&L" tone={C.green} onClick={() => go('/reports/pnl')} loading={q.isLoading} />
+        <Tile icon={<TrendingDown size={13} />} label="Purchase (COGS)" value={money(cur, t.cogs || 0)} sub="cost of sales" tone={C.amber} onClick={() => go('/reports/pnl')} loading={q.isLoading} />
+        <Tile icon={<Coins size={13} />} label="Gross Profit" value={money(cur, t.gp || 0)} sub={`${(t.gpPct || 0).toFixed(1)}% margin`} tone={C.blue} onClick={() => go('/reports/invoice-gp')} loading={q.isLoading} />
+        <Tile icon={<ReceiptText size={13} />} label="Expenses" value={money(cur, ind.expense || 0)} sub="indirect expenses" tone={C.dim} onClick={() => go('/reports/pnl')} loading={q.isLoading} />
+        <Tile icon={<Scale size={13} />} label="Net Profit" value={money(cur, np)} sub={np >= 0 ? 'profit' : 'loss'} tone={np >= 0 ? C.green : C.red} onClick={() => go('/reports/pnl')} loading={q.isLoading} />
+      </Row>
+    </>
+  );
+}
+
+// ── Tier 3.8 · All-banks reconciliation roll-up ──────────────────────────────
+// One row per bank ledger so nothing slips: book balance, unreconciled difference and
+// open unmatched counts at a glance (vs the single-bank detail card). Each row queries
+// its own reco summary (deduped with the detail card by React-Query key).
+function BankRecoRow({ ledger, branch, cur, go }) {
+  const w = mtdWindow();
+  const s = useBankReconSummary(ledger, branch, { from: w.from, to: w.to }).data;
+  const diff = s?.differenceAmount ?? null;
+  const open = (s?.counts?.bookUnreconciled || 0) + (s?.counts?.statementUnreconciled || 0);
+  return (
+    <tr {...clickable(() => go('/bank-reco'))} style={{ cursor: 'pointer', borderTop: '1px solid #dfe2e7' }}>
+      <td style={{ ...td, fontWeight: 600 }}>{ledger}</td>
+      <td style={{ ...td, ...rnum }}>{s ? money(cur, s.bookBalance || 0) : '…'}</td>
+      <td style={{ ...td, ...rnum }}>{s ? money(cur, s.bankBalance || 0) : '…'}</td>
+      <td style={{ ...td, ...rnum, fontWeight: 800, color: diff == null ? C.dim : (Math.abs(diff) < 1 ? C.green : C.red) }}>{diff == null ? '…' : money(cur, diff)}</td>
+      <td style={{ ...td, ...rnum, fontWeight: 700, color: open > 0 ? C.amber : C.green }}>{s ? open : '…'}</td>
+    </tr>
+  );
+}
+function BankRecoRollup({ branch, cur, go }) {
+  const ledgers = useBankLedgers(branch).data || [];
+  if (!ledgers.length) return null;
+  return (
+    <>
+      <SecTitle>Bank Reconciliation — all accounts</SecTitle>
+      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead><tr style={{ background: C.dark }}>
+            <th style={{ ...th, background: 'transparent' }}>Bank Ledger</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Book Bal</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Statement</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Difference</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Open Lines</th>
+          </tr></thead>
+          <tbody>
+            {ledgers.map((lg) => <BankRecoRow key={lg.name} ledger={lg.name} branch={branch} cur={cur} go={go} />)}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+// ── Tier 3.9 · Master-data health ────────────────────────────────────────────
+// Tax-relevant gaps in the customer / supplier masters that silently drive WRONG GST
+// or TDS: an Indian supplier with no GSTIN can't pass on ITC; no PAN means TDS at the
+// higher default rate. Foreign suppliers (country ≠ India) are correctly NOT flagged
+// for GSTIN. Counts only — drill into the master to fix.
+function MasterHealth({ branch, go }) {
+  const sup = useMasterHealth('suppliers', branch).data || {};
+  const cust = useMasterHealth('customers', branch).data || {};
+  const item = (label, n, route, hint) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderTop: '1px solid #dfe2e7' }}>
+      <span style={{ width: 22, textAlign: 'center', fontWeight: 800, color: n ? C.red : C.green }}>{n || '✓'}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: C.dark }}>{label}</div>
+        <div style={{ fontSize: 11, color: C.dim }}>{hint}</div>
+      </div>
+      <button onClick={() => go(route)} style={{ ...aBtn(n ? C.amber : C.blue), padding: '3px 8px', fontSize: 10 }}>Open</button>
+    </div>
+  );
+  return (
+    <>
+      <SecTitle>Master-data health (tax readiness)</SecTitle>
+      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+        {item('Indian suppliers missing GSTIN', sup.noGstin || 0, '/masters/suppliers', 'Cannot claim input tax credit on their bills')}
+        {item('Indian suppliers missing PAN', sup.noPan || 0, '/masters/suppliers', 'TDS deducted at the higher default rate')}
+        {item('Suppliers missing place-of-supply (state)', sup.noState || 0, '/masters/suppliers', 'CGST/SGST vs IGST cannot be decided')}
+        {item('Customers missing GSTIN & PAN', cust.noTaxId || 0, '/masters/customers', 'Incomplete tax identity on the invoice')}
+        {item('Customers missing place-of-supply (state)', cust.noState || 0, '/masters/customers', 'Place of supply unknown on the invoice')}
+      </div>
+    </>
+  );
+}
+
+export function DashboardAccountant({ branch: branchProp, setRoute, currentUser }) {
+  // One accountant per branch: never a consolidated ALL view — coerce to the
+  // accountant's own branch (from their profile) so every figure is theirs to act on.
+  // Falls back to the selector value when the user carries no branch (e.g. an admin).
+  const ownCode = currentUser?.branches?.[0];
+  const branch = (branchProp && branchProp !== 'ALL') ? branchProp : (ownCode || branchProp);
   const cur = (bc(branch) || {}).cur || '₹';
   const go = (r) => setRoute && setRoute(r);
   const ym = thisYM();
@@ -150,11 +542,9 @@ export function DashboardAccountant({ branch, setRoute }) {
   // `.data || []` then `.length` yielded undefined → pendCount became NaN (tile showed
   // "NaN" and the "all posted" check never went green). Use the entries[] array.
   const pendVQ = useVoucherApprovals(branch, 'pending'); const pendVouchers = pendVQ.data?.entries || [];
-  // Dashboard only shows THIS MONTH's sales/purchase TOTALS — fetch the server-side
-  // aggregate (?summary=1 → {count,total}) for the month instead of pulling every
-  // voucher doc just to sum it client-side (a few bytes vs ~MB over the Atlas link).
-  const salesSumQ = useRegisterSummary(branch, { category: 'sale', from: monthFrom, to: today });
-  const purchSumQ = useRegisterSummary(branch, { category: 'purchase', from: monthFrom, to: today });
+  // Month sales/purchase + GP/net-profit now come from the richer Branch P&L snapshot
+  // (BranchPnlSnapshot · module-PL engine) on the compliance tab — no separate
+  // register-summary round-trips needed here.
   const outQ = useOutstanding(branch); const out = outQ.data || {};
   const dayQ = useDayBook(branch, { from: today, to: today }); const day = dayQ.data || [];
   // True only during an actual fetch with no data yet (React Query v5: isPending && isFetching),
@@ -200,7 +590,9 @@ export function DashboardAccountant({ branch, setRoute }) {
     .filter((r) => r.overdue > 0.5).sort((a, b) => b.overdue - a.overdue).slice(0, 5);
   const top5pay = [...(age.payables?.rows || [])].sort((a, b) => (b.total || 0) - (a.total || 0)).slice(0, 5);
   const netGst = (typeof tax.netPayable === 'number') ? tax.netPayable : null;
-  const tds = tax.wht?.payable || 0;
+  // Tax summary exposes withholding under `withholding` (the Tax Summary report reads
+  // the same key); the old `tax.wht` was always undefined → the TDS tile showed 0.
+  const tds = tax.withholding?.payable || 0;
   const tcs = tax.tcs?.payable || 0;
   const onAcct = out.onAccountReceipts || [];
   const onAcctSum = onAcct.reduce((s, r) => s + (Number(r.onAccount) || 0), 0);
@@ -210,6 +602,19 @@ export function DashboardAccountant({ branch, setRoute }) {
   const tbCr = tb.reduce((s, r) => s + (Number(r.closingCredit ?? r.credit) || 0), 0);
   const tbBalanced = tb.length > 0 && Math.abs(tbDr - tbCr) < 1;
   const qa = (label, route, bg = C.blue) => <button key={route} onClick={() => go(route)} style={aBtn(bg)}><Plus size={13} />{label}</button>;
+
+  // ── Single hero worklist: every "needs action" signal aggregated into one number,
+  // so the accountant's day starts from one figure with a one-click jump to each.
+  const overdueDebtorsCount = (age.receivables?.rows || []).filter((r) => ((r.d30 || 0) + (r.d60 || 0) + (r.d90 || 0)) > 0.5).length;
+  const refundsPendingCount = pendVouchers.filter((e) => ADJ_CATS.includes(e.category)).length;
+  const heroItems = [
+    { n: pendCount, label: 'to approve & post', onClick: () => go('/transactions/approvals') },
+    { n: suspense.length, label: 'in suspense', onClick: () => go('/accounts/suspense') },
+    { n: onAcct.length, label: 'receipts to allocate', onClick: () => go('/reports/rec') },
+    { n: overdueDebtorsCount, label: 'overdue debtors', onClick: () => setActiveTab('collections') },
+    { n: refundsPendingCount, label: 'refunds pending', onClick: () => setActiveTab('collections') },
+  ];
+  const heroTotal = heroItems.reduce((s, it) => s + it.n, 0);
 
   // Checklist handler inside compliance tab
   const period = thisYM();
@@ -270,6 +675,21 @@ export function DashboardAccountant({ branch, setRoute }) {
         <button onClick={() => setActiveTab('compliance')} style={tabStyle(activeTab === 'compliance')}>3. Month-End &amp; Compliance</button>
       </div>
 
+      {/* Single hero worklist — the one number to start the day, with a jump to each source */}
+      <div style={{ ...card, padding: '12px 16px', marginBottom: 16, borderLeft: `4px solid ${heroTotal ? C.amber : C.green}`, display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+          <span style={{ fontSize: 30, fontWeight: 800, color: heroTotal ? C.amber : C.green, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{heroTotal}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: C.dim }}>{heroTotal ? <>items need<br />your action</> : <>all clear —<br />nothing pending</>}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1 }}>
+          {heroItems.filter((it) => it.n > 0).map((it, i) => (
+            <button key={i} {...clickable(it.onClick)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 999, border: `1px solid ${C.border}`, background: '#fff', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, color: C.dark }}>
+              <span style={{ fontWeight: 800, color: C.amber }}>{it.n}</span> {it.label} <ArrowRight size={11} style={{ color: C.dim }} />
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* TAB 1: DAILY OPERATIONS */}
       {activeTab === 'daily' && (
         <>
@@ -285,6 +705,12 @@ export function DashboardAccountant({ branch, setRoute }) {
               {banks.map((b, i) => <span key={i} style={{ fontSize: 11.5, color: C.dim }}>{b.name}: <b style={{ color: b.bal >= 0 ? C.dark : C.red }}>{money(cur, b.bal)}</b></span>)}
             </div>
           )}
+
+          {/* Tier 1.1 — forward cash outlook (the tiles above are backward-looking) */}
+          <CashOutlookCard branch={branch} cur={cur} go={go} />
+
+          {/* Tier 1.2 — post-dated cheque tracker */}
+          <PdcTracker branch={branch} cur={cur} go={go} />
 
           {/* New Bank Reconciliation summary card */}
           <SecTitle>Bank Reconciliation status</SecTitle>
@@ -343,6 +769,9 @@ export function DashboardAccountant({ branch, setRoute }) {
             )}
           </div>
 
+          {/* Tier 3.8 — every bank's reco status at a glance (vs the single-bank detail above) */}
+          <BankRecoRollup branch={branch} cur={cur} go={go} />
+
           <SecTitle>Worklist — needs action</SecTitle>
           <Row>
             <Tile icon={<CheckSquare size={13} />} label="Pending to Approve & Post" value={pendCount} sub="Open approvals" tone={C.amber} onClick={() => go('/transactions/approvals')} loading={txnLoading} />
@@ -350,6 +779,9 @@ export function DashboardAccountant({ branch, setRoute }) {
             <Tile icon={<AlertTriangle size={13} />} label="Suspense / To Fix" value={suspense.length} sub="Clear suspense" tone={C.red} onClick={() => go('/accounts/suspense')} loading={bookingsQ.isLoading} />
             <Tile icon={<ListChecks size={13} />} label="Month-End Progress" value={`${checklistDone}/6`} sub="Open close checklist" tone={checklistDone === 6 ? C.green : C.dark} onClick={() => setActiveTab('compliance')} loading={txnLoading || tbQ.isLoading} />
           </Row>
+
+          {/* Tier 1.3 — approval queue split: I-can-approve vs my-own vs blocked */}
+          <ApprovalSplit branch={branch} cur={cur} go={go} currentUser={currentUser} />
 
           {/* Today's posted transactions book feed */}
           <SecTitle>Posted Today ({day.length})</SecTitle>
@@ -401,6 +833,36 @@ export function DashboardAccountant({ branch, setRoute }) {
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          {/* Bills-vs-settlement: what was billed to each party against what's actually
+              been received / paid, with the unsettled balance still to clear. */}
+          <SecTitle>Settlement — Bills vs Receipts &amp; Payments</SecTitle>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+            <SettlementPanel
+              title="Clients — unsettled bills vs receipts"
+              sub="Billed to customer vs received · net still to collect"
+              rows={age.receivables?.rows || []}
+              cur={cur} tone={C.blue} partyLabel="Customer" settleLabel="Receipts"
+              drillLabel="Receivables" onDrill={() => go('/reports/rec')}
+            />
+            <SettlementPanel
+              title="Suppliers — unsettled bills vs payments"
+              sub="Billed by supplier vs paid · net still to pay"
+              rows={age.payables?.rows || []}
+              cur={cur} tone={C.amber} partyLabel="Supplier" settleLabel="Payments"
+              drillLabel="Payables" onDrill={() => go('/reports/pay')}
+            />
+          </div>
+
+          {/* Tier 2.6 — money on account not yet settled bill-wise (both sides) */}
+          <SecTitle>Advances &amp; Unapplied Credits</SecTitle>
+          <AdvancesPanel branch={branch} cur={cur} go={go} />
+
+          {/* Tier 2.5 — refunds / reissues / ADM / ACM awaiting posting */}
+          <SecTitle>Refunds &amp; Adjustments</SecTitle>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+            <RefundsWorklist branch={branch} cur={cur} go={go} />
           </div>
 
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
@@ -500,6 +962,9 @@ export function DashboardAccountant({ branch, setRoute }) {
             <Tile icon={<CheckSquare size={13} />} label="Trial Balance" value={tbBalanced ? '✓ Balanced' : (tb.length ? '✗ Out' : '—')} sub={tb.length && !tbBalanced ? `out by ${money(cur, Math.abs(tbDr - tbCr))}` : 'open trial balance'} tone={tbBalanced ? C.green : (tb.length ? C.red : C.dim)} onClick={() => go('/finance/trial-balance')} loading={tbQ.isLoading} />
           </Row>
 
+          {/* Tier 2.4 — output tax vs input credit → net liability + 2B match */}
+          <GstItcPanel branch={branch} cur={cur} go={go} />
+
           {/* New tax events compliance list */}
           {taxEvents && taxEvents.length > 0 && (
             <>
@@ -529,12 +994,11 @@ export function DashboardAccountant({ branch, setRoute }) {
             </>
           )}
 
-          <SecTitle>Performance Metrics (This Month)</SecTitle>
-          <Row>
-            <Tile icon={<TrendingUp size={13} />} label="Sales (this month)" value={money(cur, salesSumQ.data?.total || 0)} sub="Open Sales Register" tone={C.green} onClick={() => go('/reports/sreg')} loading={salesSumQ.isLoading} />
-            <Tile icon={<TrendingDown size={13} />} label="Purchase (this month)" value={money(cur, purchSumQ.data?.total || 0)} sub="Open Purchase Register" tone={C.amber} onClick={() => go('/reports/preg')} loading={purchSumQ.isLoading} />
-            <Tile icon={<ReceiptText size={13} />} label="Invoice-wise GP" value="View" sub="Open GP report" tone={C.dark} onClick={() => go('/reports/invoice-gp')} />
-          </Row>
+          {/* Tier 3.7 — full P&L snapshot (revenue · COGS · GP · expenses · net profit) */}
+          <BranchPnlSnapshot branch={branch} cur={cur} go={go} />
+
+          {/* Tier 3.9 — tax-readiness gaps in the customer / supplier masters */}
+          <MasterHealth branch={branch} go={go} />
 
           {/* Month-End Close progress checklist embedded */}
           <SecTitle>Month-End Checklist / Close Verification</SecTitle>
