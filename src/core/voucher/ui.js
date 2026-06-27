@@ -6,15 +6,19 @@ export const DARK = '#141414', GOLD = '#A07828', DIM = '#5b616e',
   BLUE = '#2563eb', RED = '#C0392B', GREEN = '#1A7A42',
   V_DR = '#1A7A42', V_CR = '#C0392B';
 
-// Whole-rupee (no decimals) money formatter used across the voucher journal view.
+// Digit-grouping locale per currency: ₹ → Indian lakh/crore grouping, otherwise
+// Western thousands (so a USD/VAT-branch voucher isn't shown as $1,23,456).
+const localeOf = (cur) => (cur === '₹' || cur === '₨' || cur === 'Rs' ? 'en-IN' : 'en-US');
+
+// Whole-unit (no decimals) money formatter used across the voucher journal view.
 export const money = (cur, n) => {
   const v = Math.round(Number(n) || 0);
-  return (cur || '₹') + v.toLocaleString('en-IN');
+  return (cur || '₹') + v.toLocaleString(localeOf(cur || '₹'));
 };
 
 // Two-decimal formatter for totals/amounts shown to the user.
 export const money2 = (cur, n) =>
-  (cur || '₹') + (Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  (cur || '₹') + (Number(n) || 0).toLocaleString(localeOf(cur || '₹'), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const r2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
 

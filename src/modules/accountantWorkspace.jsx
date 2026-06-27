@@ -201,9 +201,12 @@ const mtdWindow = () => { const ym = thisYM(); return { from: `${ym}-01`, to: ne
 // outflows and the projected closing for the coming weeks, from the same cash-flow
 // forecast engine as Finance ▸ Cash-flow Forecast. A projected NEGATIVE closing is
 // flagged red — the branch can't cover that week's commitments.
-function CashOutlookCard({ branch, cur, go }) {
+export function CashOutlookCard({ branch, cur, go }) {
   const q = useCashForecast(branch);
-  const weeks = (q.data || []).slice(0, 4);
+  // The forecast endpoint returns an OBJECT { opening, rows } — NOT a bare array.
+  // Reading `q.data || []` then `.slice` threw "(…).slice is not a function" because
+  // the truthy object skipped the `|| []` fallback. The weekly series lives in `.rows`.
+  const weeks = (q.data?.rows || []).slice(0, 4);
   return (
     <>
       <SecTitle>Cash-flow Outlook — next {weeks.length || 4} weeks</SecTitle>
