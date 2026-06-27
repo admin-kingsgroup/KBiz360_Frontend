@@ -49,4 +49,26 @@ describe('computeNetAgeing — same-party netting', () => {
   test('handles empty/undefined input', () => {
     expect(computeNetAgeing(undefined)).toEqual({ rows: [], totals: { receivable: 0, payable: 0, net: 0 } });
   });
+
+  // Consolidated Net Ageing renders one section PER BRANCH from the ageing `byBranch`
+  // breakdown. Each byBranch entry has the same {receivables,payables} shape, so the
+  // per-branch Net section is just computeNetAgeing(entry) — netted WITHIN that branch,
+  // never across branches/currencies. This locks that in.
+  test('per-branch byBranch entry nets within the branch only (consolidated section math)', () => {
+    const byBranch = [
+      { branch: 'BOM', receivables: make([{ party: 'Acme', total: 1000, onAccount: 0, net: 1000 }]),
+                       payables:    make([{ party: 'Acme', total: 400,  onAccount: 0, net: 400 }]) },
+      { branch: 'NBO', receivables: make([{ party: 'Inaysha', total: 500, onAccount: 0, net: 500 }]),
+                       payables:    make([]) },
+    ];
+    const bom = computeNetAgeing(byBranch[0]);
+    const nbo = computeNetAgeing(byBranch[1]);
+    // BOM nets its own Acme (1000 − 400 = 600); NBO is a separate branch, untouched.
+    expect(bom.totals).toMatchObject({ receivable: 1000, payable: 400, net: 600 });
+    expect(nbo.totals).toMatchObject({ receivable: 500, payable: 0, net: 500 });
+    // No cross-branch merge: the same party in two branches is NOT combined here —
+    // each section is computed from only its own branch's rows.
+    expect(bom.rows.map((r) => r.party)).toEqual(['Acme']);
+    expect(nbo.rows.map((r) => r.party)).toEqual(['Inaysha']);
+  });
 });

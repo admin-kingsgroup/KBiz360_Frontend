@@ -2002,7 +2002,7 @@ export function PayablesLive({ branch, setRoute, initialTab }) { return <ArApScr
 const BUCKETS = [['d0', '0–30'], ['d30', '31–60'], ['d60', '61–90'], ['d90', '90+']];
 const bucketColor = (k) => ({ d0: SAP.greenDk, d30: SAP.gold, d60: SAP.orange, d90: SAP.red }[k] || SAP.text);
 
-function AgeingReport({ branch, side, setRoute, onAdjustAdvance }) {
+function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfProp }) {
   const cur = curOf(branch);
   // Branch-aware number grouping for this operational AR/AP screen — the file-level
   // `inr`/`compact` are en-IN (shared with P&L/BS); here amounts follow the branch's
@@ -2011,7 +2011,10 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance }) {
   const inrL = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : '—'; };
   const compactL = (n) => compactCur(cur, n);
   const mobile = useMobile();
-  const [asOf, setAsOf] = useState(''); // '' = today; otherwise YYYY-MM-DD cut-off
+  // `embedded` = a per-branch section inside the consolidated view: it hides the big
+  // header + date control and takes the as-of cut-off from the parent (asOfProp).
+  const [asOfState, setAsOf] = useState(''); // '' = today; otherwise YYYY-MM-DD cut-off
+  const asOf = embedded ? (asOfProp || '') : asOfState;
   const q = useAgeing(branch, asOf);
   const d = q.data;
   const data = d ? d[side] : null;
@@ -2020,6 +2023,9 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance }) {
   const [drillLedger, setDrillLedger] = useState(null);
 
   const isRec = side === 'receivables';
+  // Consolidated = the all-branches scope. Render branch-wise (never merge currencies),
+  // but only at the top level — an embedded per-branch section is always single-branch.
+  const isAll = !embedded && (!branch || branch === 'ALL' || branch?.code === 'ALL');
   const partyLabel = isRec ? 'Customer' : 'Supplier';
   const overdue = totals.d30 + totals.d60 + totals.d90;
   const share = (x) => (totals.total > 0 ? (x / totals.total) * 100 : 0);
@@ -2028,6 +2034,102 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance }) {
   const netTotal = totals.net != null ? totals.net : (totals.total - (totals.onAccount || 0));
   const rowNet = (r) => (r.net != null ? r.net : (r.total - (r.onAccount || 0)));
 
+  // The KPIs + party-wise ageing table for THIS scope, in THIS branch's currency.
+  const body = (
+    <StateBox q={q} empty={!data || rows.length === 0}>
+      <KpiGrid>
+        <Kpi tone="blue" label="Open Bills (gross)" value={compactL(totals.total)} sub={`${rows.length} ${partyLabel.toLowerCase()}s`} />
+        <Kpi tone="green" label="Current (0–30)" value={compactL(totals.d0)} sub={pctTxt(share(totals.d0))} />
+        <Kpi tone="orange" label="Overdue (>30 days)" value={compactL(overdue)} sub={pctTxt(share(overdue))} />
+        <Kpi tone="red" label="Critical (90+ days)" value={compactL(totals.d90)} sub={pctTxt(share(totals.d90))} />
+        <Kpi tone="purple" label="On-Account (unapplied)" value={compactL(totals.onAccount || 0)} sub={`${isRec ? 'advances in' : 'advances out'} · settle bill-wise`} />
+        <Kpi tone="teal" label="Net Exposure" value={compactL(netTotal)} sub="open bills − on-account" />
+      </KpiGrid>
+
+      <FCard title={`${partyLabel}-wise Ageing`} sub="Tap a row to drill into the ledger and edit its vouchers"
+        badge={<Badge bg={SAP.blueBg} c={SAP.blue} bd="#b8d6ff">{rows.length} {partyLabel.toLowerCase()}s</Badge>}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <thead><tr><Th w="26%">{partyLabel}</Th>{BUCKETS.map(([, lbl]) => <Th key={lbl} right>{lbl}</Th>)}<Th right>Open Bills</Th><Th right>On-Account</Th><Th right>Net</Th></tr></thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={r.party + i} {...keyActivate(() => openLedgerModal(r.party))}
+                  style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: 'pointer' }}>
+                  <td style={{ padding: '7px 16px', color: SAP.text, fontWeight: 600 }}>{r.party}<span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span>
+                    {setRoute && (
+                      <button className="noprint" title={`Open ${partyLabel} 360° View`}
+                        onClick={(e) => { e.stopPropagation(); setRoute(`/reports/${isRec ? 'customer' : 'supplier'}-360?party=${encodeURIComponent(r.party)}`); }}
+                        style={{ marginLeft: 8, padding: '1px 7px', fontSize: 10.5, fontWeight: 700, border: `1px solid ${SAP.border}`, borderRadius: 10, background: SAP.blueBg, color: SAP.blue, cursor: 'pointer' }}>360°</button>
+                    )}
+                  </td>
+                  {BUCKETS.map(([k]) => <td key={k} style={{ ...num, color: r[k] ? bucketColor(k) : SAP.label }}>{inrL(r[k])}</td>)}
+                  <td style={{ ...num, fontWeight: 700, color: SAP.text }}>{inrL(r.total)}</td>
+                  <td style={{ ...num, color: r.onAccount ? SAP.purple : SAP.label }}>{inrL(r.onAccount || 0)}
+                    {onAdjustAdvance && r.onAccount > 0.01 && (
+                      <button className="noprint" title="Adjust this advance against an open bill"
+                        onClick={(e) => { e.stopPropagation(); onAdjustAdvance(r.party); }}
+                        style={{ marginLeft: 6, padding: '1px 6px', fontSize: 10, fontWeight: 700, border: `1px solid ${SAP.border}`, borderRadius: 9, background: '#fff', color: SAP.purple, cursor: 'pointer' }}>Adjust ▸</button>
+                    )}
+                  </td>
+                  <td style={{ ...num, fontWeight: 700, color: SAP.text }}>{inrL(rowNet(r))}</td>
+                </tr>
+              ))}
+              <tr style={{ background: SAP.shell, color: '#fff', fontWeight: 700, borderTop: `2px solid ${SAP.blue}` }}>
+                <td style={{ padding: '10px 16px' }}>TOTAL</td>
+                {BUCKETS.map(([k]) => <td key={k} style={num}>{inrL(totals[k])}</td>)}
+                <td style={num}>{inrL(totals.total)}</td>
+                <td style={num}>{inrL(totals.onAccount || 0)}</td>
+                <td style={num}>{inrL(netTotal)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </FCard>
+    </StateBox>
+  );
+
+  // Embedded per-branch section (inside the consolidated view): just the body — the
+  // parent owns the header + date control + the per-branch label.
+  if (embedded) {
+    return <>{body}{drillLedger && <LedgerVoucherDrill ledger={drillLedger} branch={branch} to="" cur={cur} mobile={mobile} onClose={() => setDrillLedger(null)} />}</>;
+  }
+
+  const dateControl = (
+    <div className="noprint" style={{ maxWidth: 1180, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+      <span style={{ color: SAP.sec, fontWeight: 600 }}>Age as on</span>
+      <input type="date" value={asOfState} onChange={(e) => setAsOf(e.target.value)}
+        style={{ padding: '4px 8px', border: `1px solid ${SAP.border}`, borderRadius: 6, fontSize: 12 }} />
+      {asOfState && <button onClick={() => setAsOf('')} style={{ padding: '4px 10px', border: `1px solid ${SAP.border}`, borderRadius: 6, background: '#fff', color: SAP.blue, fontWeight: 700, cursor: 'pointer' }}>Today</button>}
+      <span style={{ color: SAP.label }}>{asOfState ? 'historic snapshot' : 'live · today'}</span>
+    </div>
+  );
+
+  // Consolidated (all-branches): show each branch SEPARATELY in its own currency —
+  // never a merged cross-branch / cross-currency total. Driven by the BE `byBranch`.
+  if (isAll && Array.isArray(d?.byBranch)) {
+    return (
+      <Wrap>
+        <FioriHead system="KBiz360 · Finance"
+          title={isRec ? 'Accounts Receivable — Ageing · All Branches' : 'Accounts Payable — Ageing · All Branches'}
+          sub={<>Consolidated — each branch shown separately in its own currency · <strong>no cross-currency total</strong> &nbsp;|&nbsp; as of {d?.asOf || '—'}</>}
+        />
+        {dateControl}
+        <div style={{ background: SAP.pageBg, padding: 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+          {d.byBranch.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: SAP.label }}>Nothing outstanding in any branch.</div>}
+          {d.byBranch.map((b) => (
+            <div key={b.branch} style={{ marginBottom: 22 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '2px 2px 8px', borderBottom: `2px solid ${SAP.blue}`, paddingBottom: 4 }}>
+                <span style={{ fontWeight: 800, fontSize: 14, color: SAP.text }}>{branchLabel(b.branch)}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: SAP.sec }}>· {curOf(b.branch)}</span>
+              </div>
+              <AgeingReport branch={b.branch} side={side} setRoute={setRoute} onAdjustAdvance={onAdjustAdvance} embedded asOfProp={asOf} />
+            </div>
+          ))}
+        </div>
+      </Wrap>
+    );
+  }
+
   return (
     <Wrap>
       <FioriHead
@@ -2035,64 +2137,9 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance }) {
         title={isRec ? 'Accounts Receivable — Ageing' : 'Accounts Payable — Ageing'}
         sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} incl. GST &nbsp;|&nbsp; as of {d?.asOf || '—'} &nbsp;|&nbsp; bill-wise · no FIFO · live double-entry</>}
       />
-      <div className="noprint" style={{ maxWidth: 1180, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-        <span style={{ color: SAP.sec, fontWeight: 600 }}>Age as on</span>
-        <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)}
-          style={{ padding: '4px 8px', border: `1px solid ${SAP.border}`, borderRadius: 6, fontSize: 12 }} />
-        {asOf && <button onClick={() => setAsOf('')} style={{ padding: '4px 10px', border: `1px solid ${SAP.border}`, borderRadius: 6, background: '#fff', color: SAP.blue, fontWeight: 700, cursor: 'pointer' }}>Today</button>}
-        <span style={{ color: SAP.label }}>{asOf ? 'historic snapshot' : 'live · today'}</span>
-      </div>
+      {dateControl}
       <div style={{ background: SAP.pageBg, padding: 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
-        <StateBox q={q} empty={!data || rows.length === 0}>
-          <KpiGrid>
-            <Kpi tone="blue" label="Open Bills (gross)" value={compactL(totals.total)} sub={`${rows.length} ${partyLabel.toLowerCase()}s`} />
-            <Kpi tone="green" label="Current (0–30)" value={compactL(totals.d0)} sub={pctTxt(share(totals.d0))} />
-            <Kpi tone="orange" label="Overdue (>30 days)" value={compactL(overdue)} sub={pctTxt(share(overdue))} />
-            <Kpi tone="red" label="Critical (90+ days)" value={compactL(totals.d90)} sub={pctTxt(share(totals.d90))} />
-            <Kpi tone="purple" label="On-Account (unapplied)" value={compactL(totals.onAccount || 0)} sub={`${isRec ? 'advances in' : 'advances out'} · settle bill-wise`} />
-            <Kpi tone="teal" label="Net Exposure" value={compactL(netTotal)} sub="open bills − on-account" />
-          </KpiGrid>
-
-          <FCard title={`${partyLabel}-wise Ageing`} sub="Tap a row to drill into the ledger and edit its vouchers"
-            badge={<Badge bg={SAP.blueBg} c={SAP.blue} bd="#b8d6ff">{rows.length} {partyLabel.toLowerCase()}s</Badge>}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                <thead><tr><Th w="26%">{partyLabel}</Th>{BUCKETS.map(([, lbl]) => <Th key={lbl} right>{lbl}</Th>)}<Th right>Open Bills</Th><Th right>On-Account</Th><Th right>Net</Th></tr></thead>
-                <tbody>
-                  {rows.map((r, i) => (
-                    <tr key={r.party + i} {...keyActivate(() => openLedgerModal(r.party))}
-                      style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: 'pointer' }}>
-                      <td style={{ padding: '7px 16px', color: SAP.text, fontWeight: 600 }}>{r.party}<span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span>
-                        {setRoute && (
-                          <button className="noprint" title={`Open ${partyLabel} 360° View`}
-                            onClick={(e) => { e.stopPropagation(); setRoute(`/reports/${isRec ? 'customer' : 'supplier'}-360?party=${encodeURIComponent(r.party)}`); }}
-                            style={{ marginLeft: 8, padding: '1px 7px', fontSize: 10.5, fontWeight: 700, border: `1px solid ${SAP.border}`, borderRadius: 10, background: SAP.blueBg, color: SAP.blue, cursor: 'pointer' }}>360°</button>
-                        )}
-                      </td>
-                      {BUCKETS.map(([k]) => <td key={k} style={{ ...num, color: r[k] ? bucketColor(k) : SAP.label }}>{inrL(r[k])}</td>)}
-                      <td style={{ ...num, fontWeight: 700, color: SAP.text }}>{inrL(r.total)}</td>
-                      <td style={{ ...num, color: r.onAccount ? SAP.purple : SAP.label }}>{inrL(r.onAccount || 0)}
-                        {onAdjustAdvance && r.onAccount > 0.01 && (
-                          <button className="noprint" title="Adjust this advance against an open bill"
-                            onClick={(e) => { e.stopPropagation(); onAdjustAdvance(r.party); }}
-                            style={{ marginLeft: 6, padding: '1px 6px', fontSize: 10, fontWeight: 700, border: `1px solid ${SAP.border}`, borderRadius: 9, background: '#fff', color: SAP.purple, cursor: 'pointer' }}>Adjust ▸</button>
-                        )}
-                      </td>
-                      <td style={{ ...num, fontWeight: 700, color: SAP.text }}>{inrL(rowNet(r))}</td>
-                    </tr>
-                  ))}
-                  <tr style={{ background: SAP.shell, color: '#fff', fontWeight: 700, borderTop: `2px solid ${SAP.blue}` }}>
-                    <td style={{ padding: '10px 16px' }}>TOTAL</td>
-                    {BUCKETS.map(([k]) => <td key={k} style={num}>{inrL(totals[k])}</td>)}
-                    <td style={num}>{inrL(totals.total)}</td>
-                    <td style={num}>{inrL(totals.onAccount || 0)}</td>
-                    <td style={num}>{inrL(netTotal)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </FCard>
-        </StateBox>
+        {body}
         {drillLedger && <LedgerVoucherDrill ledger={drillLedger} branch={branch} to="" cur={cur} mobile={mobile} onClose={() => setDrillLedger(null)} />}
       </div>
     </Wrap>
@@ -2101,14 +2148,89 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance }) {
 
 function NetAgeingView({ branch }) {
   const cur = curOf(branch);
-  // Branch-aware grouping for this operational net-exposure screen (see AgeingReport).
-  const loc = localeOf(cur);
-  const inrL = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : '—'; };
-  const compactL = (n) => compactCur(cur, n);
   const [asOf, setAsOf] = useState('');
   const q = useAgeing(branch, asOf);
   const d = q.data;
-  const { rows, totals } = computeNetAgeing(d);
+  // Consolidated = all-branches: render branch-wise, never merge currencies.
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
+
+  // Net-exposure KPIs + by-party table for ONE scope's data, in `sCur`. Net Ageing is
+  // same-party only (never cross-party / cross-branch), so each branch nets within itself.
+  const section = (data, sCur) => {
+    const loc = localeOf(sCur);
+    const inrL = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : '—'; };
+    const compactL = (n) => compactCur(sCur, n);
+    const { rows, totals } = computeNetAgeing(data);
+    return (
+      <>
+        <KpiGrid>
+          <Kpi tone="green" label="Total Receivable" value={compactL(totals.receivable)} sub="net of advances in" />
+          <Kpi tone="orange" label="Total Payable" value={compactL(totals.payable)} sub="net of advances out" />
+          <Kpi tone={totals.net >= 0 ? 'blue' : 'red'} label="Net Position" value={compactL(totals.net)} sub={totals.net >= 0 ? 'net receivable' : 'net payable'} />
+        </KpiGrid>
+        <FCard title="Net exposure by party" sub="Tap a row to drill into the ledger · positive = they owe us, negative = we owe them"
+          badge={<Badge bg={SAP.blueBg} c={SAP.blue} bd="#b8d6ff">{rows.length} parties</Badge>}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead><tr><Th w="40%">Party</Th><Th right>Receivable</Th><Th right>Payable</Th><Th right>Net</Th></tr></thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={r.party + i} {...keyActivate(() => openLedgerModal(r.party))}
+                    style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: 'pointer' }}>
+                    <td style={{ padding: '7px 16px', color: SAP.text, fontWeight: 600 }}>{r.party}<span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span></td>
+                    <td style={{ ...num, color: r.receivable ? SAP.greenDk : SAP.label }}>{inrL(r.receivable)}</td>
+                    <td style={{ ...num, color: r.payable ? SAP.orange : SAP.label }}>{inrL(r.payable)}</td>
+                    <td style={{ ...num, fontWeight: 700, color: r.net >= 0 ? SAP.greenDk : SAP.red }}>{inrL(r.net)}</td>
+                  </tr>
+                ))}
+                <tr style={{ background: SAP.shell, color: '#fff', fontWeight: 700, borderTop: `2px solid ${SAP.blue}` }}>
+                  <td style={{ padding: '10px 16px' }}>TOTAL</td>
+                  <td style={num}>{inrL(totals.receivable)}</td>
+                  <td style={num}>{inrL(totals.payable)}</td>
+                  <td style={num}>{inrL(totals.net)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </FCard>
+      </>
+    );
+  };
+
+  const dateControl = (
+    <div className="noprint" style={{ maxWidth: 1180, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+      <span style={{ color: SAP.sec, fontWeight: 600 }}>Age as on</span>
+      <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)}
+        style={{ padding: '4px 8px', border: `1px solid ${SAP.border}`, borderRadius: 6, fontSize: 12 }} />
+      {asOf && <button onClick={() => setAsOf('')} style={{ padding: '4px 10px', border: `1px solid ${SAP.border}`, borderRadius: 6, background: '#fff', color: SAP.blue, fontWeight: 700, cursor: 'pointer' }}>Today</button>}
+    </div>
+  );
+
+  // Consolidated: each branch netted within itself, shown separately in its own currency.
+  if (isAll && Array.isArray(d?.byBranch)) {
+    return (
+      <Wrap>
+        <FioriHead system="KBiz360 · Finance"
+          title="Net Ageing — Debtors − Creditors · All Branches"
+          sub={<>Consolidated — each branch netted within itself, in its own currency · <strong>no cross-currency total</strong> &nbsp;|&nbsp; as of {d?.asOf || '—'}</>}
+        />
+        {dateControl}
+        <div style={{ background: SAP.pageBg, padding: 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+          {d.byBranch.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: SAP.label }}>Nothing to net in any branch.</div>}
+          {d.byBranch.map((b) => (
+            <div key={b.branch} style={{ marginBottom: 22 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '2px 2px 8px', borderBottom: `2px solid ${SAP.blue}`, paddingBottom: 4 }}>
+                <span style={{ fontWeight: 800, fontSize: 14, color: SAP.text }}>{branchLabel(b.branch)}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: SAP.sec }}>· {curOf(b.branch)}</span>
+              </div>
+              {section(b, curOf(b.branch))}
+            </div>
+          ))}
+        </div>
+      </Wrap>
+    );
+  }
+
   return (
     <Wrap>
       <FioriHead
@@ -2116,44 +2238,10 @@ function NetAgeingView({ branch }) {
         title="Net Ageing — Debtors − Creditors (same party)"
         sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} &nbsp;|&nbsp; as of {d?.asOf || '—'} &nbsp;|&nbsp; net of on-account · same-party only</>}
       />
-      <div className="noprint" style={{ maxWidth: 1180, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-        <span style={{ color: SAP.sec, fontWeight: 600 }}>Age as on</span>
-        <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)}
-          style={{ padding: '4px 8px', border: `1px solid ${SAP.border}`, borderRadius: 6, fontSize: 12 }} />
-        {asOf && <button onClick={() => setAsOf('')} style={{ padding: '4px 10px', border: `1px solid ${SAP.border}`, borderRadius: 6, background: '#fff', color: SAP.blue, fontWeight: 700, cursor: 'pointer' }}>Today</button>}
-      </div>
+      {dateControl}
       <div style={{ background: SAP.pageBg, padding: 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
-        <StateBox q={q} empty={!d || rows.length === 0}>
-          <KpiGrid>
-            <Kpi tone="green" label="Total Receivable" value={compactL(totals.receivable)} sub="net of advances in" />
-            <Kpi tone="orange" label="Total Payable" value={compactL(totals.payable)} sub="net of advances out" />
-            <Kpi tone={totals.net >= 0 ? 'blue' : 'red'} label="Net Position" value={compactL(totals.net)} sub={totals.net >= 0 ? 'net receivable' : 'net payable'} />
-          </KpiGrid>
-          <FCard title="Net exposure by party" sub="Tap a row to drill into the ledger · positive = they owe us, negative = we owe them"
-            badge={<Badge bg={SAP.blueBg} c={SAP.blue} bd="#b8d6ff">{rows.length} parties</Badge>}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                <thead><tr><Th w="40%">Party</Th><Th right>Receivable</Th><Th right>Payable</Th><Th right>Net</Th></tr></thead>
-                <tbody>
-                  {rows.map((r, i) => (
-                    <tr key={r.party + i} {...keyActivate(() => openLedgerModal(r.party))}
-                      style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: 'pointer' }}>
-                      <td style={{ padding: '7px 16px', color: SAP.text, fontWeight: 600 }}>{r.party}<span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span></td>
-                      <td style={{ ...num, color: r.receivable ? SAP.greenDk : SAP.label }}>{inrL(r.receivable)}</td>
-                      <td style={{ ...num, color: r.payable ? SAP.orange : SAP.label }}>{inrL(r.payable)}</td>
-                      <td style={{ ...num, fontWeight: 700, color: r.net >= 0 ? SAP.greenDk : SAP.red }}>{inrL(r.net)}</td>
-                    </tr>
-                  ))}
-                  <tr style={{ background: SAP.shell, color: '#fff', fontWeight: 700, borderTop: `2px solid ${SAP.blue}` }}>
-                    <td style={{ padding: '10px 16px' }}>TOTAL</td>
-                    <td style={num}>{inrL(totals.receivable)}</td>
-                    <td style={num}>{inrL(totals.payable)}</td>
-                    <td style={num}>{inrL(totals.net)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </FCard>
+        <StateBox q={q} empty={!d || computeNetAgeing(d).rows.length === 0}>
+          {section(d, cur)}
         </StateBox>
       </div>
     </Wrap>

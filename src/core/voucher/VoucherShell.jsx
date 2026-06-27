@@ -9,6 +9,8 @@ import { useFormKeys } from '../ux/forms';
 import { toast } from '../ux/toast';
 import { Kbd } from '../ux/widgets.jsx';
 import { isViewOnly } from '../api';
+import { triggerSaveRefresh } from '../hooks';
+import { useVNo } from '../useNextNo';
 
 /**
  * Unified voucher form (Option C).
@@ -32,6 +34,9 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   const cur = curProp || bc(branch)?.cur || '₹';
   const editId = isEdit ? (voucherId || voucher?.id || voucher?._id) : undefined;
   const ctx = { branch: isEdit ? (voucher?.branch || branch) : branch, branchCode, cur, editId };
+  // Live "next number" preview shown in place of the old static "Auto" (create mode).
+  // Advisory — the server assigns the guaranteed-unique number atomically at save.
+  const vNo = useVNo(branchCode, desc?.type);
 
   const [state, setState] = useState(() => {
     const s = isEdit && voucher ? desc.fromVoucher(voucher, ctx) : desc.initial(ctx);
@@ -64,6 +69,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
     const base = { ...desc.toBody(state, ctx), sourceRef: state.sourceRef || '' };
     const ok = (vno) => {
       toast(`${desc.label} saved${vno ? ` — ${vno}` : ''}`);
+      triggerSaveRefresh(); // advance the "next number" preview to the following one
       // Rapid-entry vouchers (e.g. Debit Note) close the saved-confirmation panel and
       // drop straight back to a fresh blank voucher for the next entry (Tally-style);
       // every other type still shows the Print / ＋ New Voucher panel.
@@ -190,7 +196,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
       </div>
     );
     if (isEdit) return editFrame(doneInner);
-    return <VWrap title={desc.label} icon={desc.icon} vNo="Auto" branch={branch}>{doneInner}</VWrap>;
+    return <VWrap title={desc.label} icon={desc.icon} vNo={vNo} branch={branch}>{doneInner}</VWrap>;
   }
 
   // ── the editable form ──────────────────────────────────────────────
@@ -218,8 +224,8 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
     );
   }
   return (
-    <VWrap title={desc.label} icon={desc.icon} vNo="Auto" branch={branch}>
-      <VHead vNo="Auto" />
+    <VWrap title={desc.label} icon={desc.icon} vNo={vNo} branch={branch}>
+      <VHead vNo={vNo} />
       <div style={{ padding: '14px 16px' }}>
         {desc.explain && <div style={{ marginBottom: 12 }}>{desc.explain}</div>}
         <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown}>{formInner}</div>

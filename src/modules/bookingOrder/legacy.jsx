@@ -20,6 +20,7 @@ import { openPrintPreview } from '../../core/PrintPreview';
 import { buildBookingInvoice } from '../../core/invoiceHtml';
 import { apiGet, apiPost, apiPut } from '../../core/api';
 import { useOpenInb, useBookInb, useCreateInb } from '../../core/useInterBranchVoucher';
+import { useVNo } from '../../core/useNextNo';
 
 // Inter-branch jurisdiction (mirror of backend): same country (India) = IGST;
 // different country = cross-border export (zero-rated on the seller side).
@@ -201,6 +202,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Editing keeps the booking's own branch; a fresh voucher uses the top-bar branch.
   const brCode = editing ? (editBooking.branch || brCodeOf(branch)) : brCodeOf(branch);
   const cur = bc(editing ? { code: editBooking.branch } : branch).cur;
+  // Live preview of the next Link No (LK series) shown in the Link band instead of the
+  // old static "Auto" — advisory; the real Link No is assigned atomically on save.
+  const nextLinkNo = useVNo(editing ? { code: editBooking.branch } : branch, 'LK');
 
   const initModule = (editing && (VSPECS[editBooking.module] || isReversalModule(editBooking.module))) ? editBooking.module
     : (initialModule && (VSPECS[initialModule] || isReversalModule(initialModule))) ? initialModule : 'SF';
@@ -593,7 +597,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         {/* Link band */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: '#1f1f1f' }}>
           <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: GOLD, textTransform: 'uppercase' }}>Link No</span>
-          <span style={{ padding: '5px 12px', borderRadius: 4, background: GOLD_SOFT, color: GOLD_DEEP, fontWeight: 800, letterSpacing: '.5px', fontFamily: 'monospace', fontSize: 13 }}>Auto · assigned on save</span>
+          <span style={{ padding: '5px 12px', borderRadius: 4, background: GOLD_SOFT, color: GOLD_DEEP, fontWeight: 800, letterSpacing: '.5px', fontFamily: 'monospace', fontSize: 13 }}>{editing ? (editBooking.linkNo || '—') : `${nextLinkNo} · on save`}</span>
           <span style={{ fontSize: 10.5, color: '#9197a3', fontStyle: 'italic' }}>links the Sales Order, Purchase Order &amp; Gross Profit of this invoice</span>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
             {['SO', 'PO', 'GP'].map((c) => <span key={c} style={{ fontSize: 9, fontWeight: 800, padding: '3px 9px', borderRadius: 20, background: GOLD_SOFT, color: GOLD_DEEP }}>{c}</span>)}

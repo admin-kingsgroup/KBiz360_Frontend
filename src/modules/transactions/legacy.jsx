@@ -22,7 +22,8 @@ import { useLivePurchaseRegistry, useLiveSalesTickets } from '../../core/useVouc
 import { fmt, fmtINR } from '../../core/format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS } from '../../core/dates';
 import { ACM_DATA, ACM_REASON_CODES, LedgerSelect, RECURRING_DATA, REFUNDS_DATA, Recruitment, STATUS_FLOW, TAB_Page, TRow, TrainingRecords, VTD, VTH, _ACM_LIST, _ADM_LIST, _TICKET_CTRL, cardStyle, tabPanel } from '../../core/helpers';
-import { triggerSaveRefresh, useMobile, useVNo } from '../../core/hooks';
+import { triggerSaveRefresh, useMobile } from '../../core/hooks';
+import { useVNo } from '../../core/useNextNo';
 import { ARow, B, DBtn, FL, RPT_tdStyle, RPT_thStyle, SalespersonField, VHead, VNarr, VParty, VTot, VWrap, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../../core/styles';
 import { Dashboard } from '../dashboard';
 import { TDS_SECTIONS } from '../finance';
