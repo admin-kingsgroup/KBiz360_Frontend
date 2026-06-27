@@ -1866,8 +1866,9 @@ function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
   const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
   const onRowClick = (r) => { if (r.ledger) setDrillLedger(r.ledger); else if (r.expandable) setOpenSub((s) => ({ ...s, [r.ekey]: !r.open })); };
 
-  const Cell = ({ r }) => {
-    if (!r) return (<><td /><td /></>);
+  const divCol = { borderLeft: '2px solid #cdd1d8' };
+  const Cell = ({ r, divider }) => {
+    if (!r) return (<><td style={divider ? divCol : undefined} /><td /></>);
     const clickable = !!(r.ledger || r.expandable);
     const bold = !!(r.group || r.sub);
     const color = (r.group || r.sub) ? TALLY.head : '#444';
@@ -1875,10 +1876,10 @@ function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
     return (
       <>
         <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})} className={clickable ? 'cl-drill' : undefined}
-          style={{ padding: '2px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
+          style={{ padding: '2px 14px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...(divider ? divCol : {}), ...mono }}>
           {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}{r.label}{r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
-        <td style={{ padding: '2px 12px', textAlign: 'right', color: r.result ? TALLY.green : '#1a1a1a', fontWeight: (r.result || r.sub) ? 700 : 400, ...mono }}>{inr(r.amount)}</td>
+        <td style={{ padding: '2px 14px', textAlign: 'right', color: r.result ? TALLY.green : '#1a1a1a', fontWeight: (r.result || r.sub) ? 700 : 400, ...mono }}>{inr(r.amount)}</td>
       </>
     );
   };
@@ -1910,17 +1911,18 @@ function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
         </div>
       )}
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <colgroup><col /><col style={{ width: 150 }} /><col /><col style={{ width: 150 }} /></colgroup>
         <tbody>
           <tr style={{ color: TALLY.head, fontWeight: 700, background: '#f0f4fa', borderBottom: `2px solid ${TALLY.head}` }}>
-            <td style={{ padding: '5px 12px', ...mono }}>Liabilities</td><td style={{ padding: '5px 12px', textAlign: 'right', ...mono }}>{curLabel}</td>
-            <td style={{ padding: '5px 12px', ...mono }}>Assets</td><td style={{ padding: '5px 12px', textAlign: 'right', ...mono }}>{curLabel}</td>
+            <td style={{ padding: '6px 14px', ...mono }}>Liabilities</td><td style={{ padding: '6px 14px', textAlign: 'right', ...mono }}>{curLabel}</td>
+            <td style={{ padding: '6px 14px', ...divCol, ...mono }}>Assets</td><td style={{ padding: '6px 14px', textAlign: 'right', ...mono }}>{curLabel}</td>
           </tr>
           {Array.from({ length: n }).map((_, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}><Cell r={left[i]} /><Cell r={right[i]} /></tr>
+            <tr key={i} style={{ borderBottom: '1px solid #eef0f3', background: i % 2 ? '#fbfcfe' : '#fff' }}><Cell r={left[i]} /><Cell r={right[i]} divider /></tr>
           ))}
           <tr style={{ color: TALLY.head, fontWeight: 700, borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}>
-            <td style={{ padding: '6px 12px', ...mono }}>Total</td><td style={{ padding: '6px 12px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(d.totalLiabilities)}</td>
-            <td style={{ padding: '6px 12px', ...mono }}>Total</td><td style={{ padding: '6px 12px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(d.totalAssets)}</td>
+            <td style={{ padding: '7px 14px', ...mono }}>Total</td><td style={{ padding: '7px 14px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(d.totalLiabilities)}</td>
+            <td style={{ padding: '7px 14px', ...divCol, ...mono }}>Total</td><td style={{ padding: '7px 14px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(d.totalAssets)}</td>
           </tr>
         </tbody>
       </table>
@@ -1964,36 +1966,36 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
     const color = (r.group || r.sub) ? TALLY.head : '#444';
     const pad = r.group ? 16 : r.sub ? 32 : 50;
     return (
-      <tr style={{ borderBottom: '1px solid #dfe2e7' }}>
+      <tr style={{ borderBottom: '1px solid #eef0f3', background: r.group ? '#fbfcfe' : '#fff' }}>
         <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})} className={clickable ? 'cl-drill' : undefined}
-          style={{ padding: '3px 12px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
+          style={{ padding: '4px 14px', paddingLeft: pad, color, fontWeight: bold ? 700 : 400, textDecoration: r.group ? 'underline' : 'none', cursor: clickable ? 'pointer' : 'default', whiteSpace: 'nowrap', ...mono }}>
           {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}{r.label}{r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
-        <td style={{ padding: '3px 12px', textAlign: 'right', color: r.result ? TALLY.green : '#1a1a1a', fontWeight: (r.result || r.sub) ? 700 : 400, ...mono }}>{inr(r.amount)}</td>
+        <td style={{ padding: '4px 14px', textAlign: 'right', color: r.result ? TALLY.green : '#1a1a1a', fontWeight: (r.result || r.sub) ? 700 : 400, ...mono }}>{inr(r.amount)}</td>
       </tr>
     );
   };
   const sectionHead = (txt) => (
     <tr style={{ background: '#f0f4fa', color: TALLY.head, borderBottom: `2px solid ${TALLY.head}` }}>
-      <td style={{ padding: '7px 12px', fontWeight: 800, letterSpacing: 0.4, ...mono }}>{txt}</td>
-      <td style={{ padding: '7px 12px', textAlign: 'right', ...mono }}>{curLabel}</td>
+      <td style={{ padding: '7px 14px', fontWeight: 800, letterSpacing: 0.4, ...mono }}>{txt}</td>
+      <td style={{ padding: '7px 14px', textAlign: 'right', fontWeight: 700, ...mono }}>Amount ({cur})</td>
     </tr>
   );
   const totalRow = (txt, val) => (
     <tr style={{ color: TALLY.head, fontWeight: 700, borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}>
-      <td style={{ padding: '8px 12px', ...mono }}>{txt}</td>
-      <td style={{ padding: '8px 12px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(val)}</td>
+      <td style={{ padding: '8px 14px', ...mono }}>{txt}</td>
+      <td style={{ padding: '8px 14px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(val)}</td>
     </tr>
   );
   const ca = sumGroups(d.assets, CURRENT_ASSETS), cl = sumGroups(d.liabilities, CURRENT_LIABS);
   return (
-    <div className="tally-print-doc" style={{ background: '#fff', border: '1px solid #b0b0b0', borderRadius: 4, overflow: 'hidden', ...mono, margin: 12 }}>
+    <div className="tally-print-doc" style={{ background: '#fff', border: '1px solid #b0b0b0', borderRadius: 4, overflow: 'hidden', boxShadow: SHADOW, ...mono, maxWidth: 860, margin: '12px auto' }}>
       <style>{`.cl-drill:hover{background:#eef4fb;text-decoration:underline}
 @media print {
   @page { size: A4 portrait; margin: 8mm; }
   body * { visibility: hidden !important; }
   .tally-print-doc, .tally-print-doc * { visibility: visible !important; }
-  .tally-print-doc { position: absolute !important; left: 0; top: 0; width: 100% !important; margin: 0 !important; border: none !important; border-radius: 0 !important; }
+  .tally-print-doc { position: absolute !important; left: 0; top: 0; width: 100% !important; max-width: none !important; margin: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; }
   .tally-print-doc .cl-noprint { display: none !important; }
 }`}</style>
       <div style={{ background: TALLY.titlebar, color: TALLY.head, padding: '5px 12px', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #a9c2e0' }}>
@@ -2010,11 +2012,13 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
           <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
         </div>
       )}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, maxWidth: 760, margin: '0 auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <colgroup><col /><col style={{ width: 180 }} /></colgroup>
         <tbody>
           {sectionHead('I.  Equity & Liabilities')}
           {left.map((r, i) => <Row key={'L' + i} r={r} />)}
           {totalRow('Total — Equity & Liabilities', d.totalLiabilities)}
+          <tr><td colSpan={2} style={{ height: 10, background: '#fff' }} /></tr>
           {sectionHead('II. Assets')}
           {right.map((r, i) => <Row key={'A' + i} r={r} />)}
           {totalRow('Total — Assets', d.totalAssets)}

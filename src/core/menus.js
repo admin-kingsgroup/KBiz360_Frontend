@@ -251,28 +251,43 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
 /* ── ACCOUNTS — branch accountant workspace ──────────────────── */
 // One operate-from-here pill for the branch accountant. Branch-scoped via the
 // top-right selector. Every item below REUSES an existing route — no new screens.
-// The 6 planned new screens (Dashboard Accountant, Collections, Supplier Reco, Net
-// Ageing, Month-End, Suspense) are kept commented until built, so there are NO dead
-// links. Uncomment each line as its screen ships.
+//
+// The groups below are ordered to follow an accountant's actual workflow, so the
+// mega-panel reads left-to-right as a narrative instead of a flat dump:
+//   1. ENTRY        — Daily Entry (vouchers, now segmented by voucher family)
+//   2. TRANSACTIONS — Sales & Purchase · BSP & Airline registers
+//   3. OUTSTANDING  — Receivables · Payables · Cash & Bank · Reconciliation
+//   4. REPORTING    — Books & Scrutiny · Branch MIS (financial statements)
+//   5. CLOSE/MASTER — Period Close · Accounts Master
+// Dashboard Accountant stays a title-less leaf → renders as a featured pill on top.
 export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   {label:"Dashboard Accountant", href:"/accounts/dashboard"},
+
+  /* ── 1 · ENTRY ───────────────────────────────────────────── */
+  // The 13 voucher types are split by family (Sales · Receipts/Payments · Journal/
+  // Expense · Refunds/Memos) so the tall column scans as labelled sub-blocks rather
+  // than one undifferentiated list. "Approve & Post" → the top-level Approvals pill.
   {label:"Daily Entry", children:[
+    {divider:true, label:"Sales & Inter-Branch"},
     {label:"SO/PO/GP Voucher",         href:"/bookings/new"},
     {label:"Inter-Branch (INB) Voucher", href:"/bookings/inter-branch"},
+    {divider:true, label:"Receipts, Payments & Contra"},
     {label:"Receipt Voucher",          href:"/receipts"},
     {label:"Payment Voucher",          href:"/payments"},
     {label:"Contra Entry",             href:"/contra"},
+    {divider:true, label:"Journal & Expense"},
     {label:"Journal Entry",            href:"/journal"},
     {label:"Purchase Expense Voucher", href:"/purchase-expense"},
     {label:"Debit Note (Purchase Return)", href:"/debit-note"},
+    {divider:true, label:"Refunds, Reissue & Memos"},
     {label:"Refund (against Sale)",    href:"/finance/refund"},
     {label:"Refund Partial (against Sale)", href:"/finance/refund-partial"},
     {label:"Reissue (against Sale)",   href:"/finance/reissue"},
     {label:"ADM Voucher",              href:"/finance/adm-voucher"},
     {label:"ACM Voucher",              href:"/finance/acm-voucher"},
   ]},
-  // "Approve & Post" → the top-level Approvals pill (single home for
-  // /transactions/approvals); accountants get that pill too (see getMenu).
+
+  /* ── 2 · TRANSACTION REGISTERS ───────────────────────────── */
   {label:"Sales & Purchase", children:[
     {label:"Sales Register",            href:"/reports/sreg"},
     {label:"Purchase Register",         href:"/reports/preg"},
@@ -281,6 +296,15 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     // Module Sales/Purchase Register, Invoice-wise GP and Sales & GP Analytics
     // moved to the Finance pill (Finance ▸ Registers & Outstanding).
   ]},
+  {label:"BSP & Airline", children:[
+    {label:"BSP Summary",             href:"/purchase/bsp-summary"},
+    {label:"BSP Statement Import",    href:"/purchase/bsp-import"},
+    {label:"Ticket Control Register", href:"/purchase/ticket-control"},
+    {label:"ADM — Agent Debit Memos", href:"/purchase/adm"},
+    {label:"ACM — Agent Credit Memos",href:"/purchase/acm"},
+  ]},
+
+  /* ── 3 · OUTSTANDING & TREASURY ──────────────────────────── */
   {label:"Receivables & Collections", children:[
     {label:"Receivables (Ageing + Settle)",     href:"/reports/rec"},
     {label:"Client Statement",                  href:"/reports/client-statement"},
@@ -322,6 +346,8 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {divider:true, label:"Tally"},
     {label:"Tally Reconciliation (ERP vs Tally)", href:"/accounts/tally-reco"},
   ]},
+
+  /* ── 4 · BOOKS & REPORTING ───────────────────────────────── */
   {label:"Books & Scrutiny", children:[
     {label:"Statistics",       href:"/accounts/statistics"},
     {label:"Day Book",         href:"/day-book"},
@@ -330,10 +356,24 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Journal Register", href:"/finance/journal-register"},
     {label:"Audit Trail",      href:"/reports/audit-trail"},
   ]},
+  {label:"Branch MIS", children:[
+    {label:"Profit & Loss",         href:"/reports/pnl"},
+    {label:"Balance Sheet",         href:"/reports/bs"},
+    {label:"Cash Position Summary", href:"/reports/cash-position"},
+  ]},
+
+  /* ── 5 · PERIOD CLOSE & MASTERS ──────────────────────────── */
+  {label:"Period Close", children:[
+    {label:"Month-End Checklist / Day-Close", href:"/accounts/month-end"},
+    {label:"Suspense / Unspecified Clearing", href:"/accounts/suspense"},
+    {label:"Recurring Vouchers", href:"/accounting/recurring"},
+    {label:"Year-End Close (HO)", href:"/accounting/year-close"},
+  ]},
   // Accounts Master — the Chart-of-Accounts masters now live under THIS Accounts
   // header (moved out of the standalone Masters pill). Cost Centres are Super-Admin-
   // only (branch-wise master) — their writes 403 for a Branch Accountant, who can
-  // still open the screen to view.
+  // still open the screen to view. Tax & Statutory moved to the Taxation header (see
+  // TAX_INDIA / TAX_AFRICA / TAX_ALL in core/data.js) — no longer under Accounts.
   {label:"Accounts Master", children:[
     {divider:true, label:"Chart of Accounts"},
     {label:"Accounts Tree View (read-only)", href:"/masters/accounts-tree"},
@@ -350,26 +390,6 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {divider:true, label:"Planning"},
     {label:"Budgets", href:"/masters/budgets"},
     {label:"Scenarios", href:"/masters/scenarios"},
-  ]},
-  // Tax & Statutory moved to the Taxation header (see TAX_INDIA / TAX_AFRICA /
-  // TAX_ALL in core/data.js) — it no longer lives under the Accounts pill.
-  {label:"BSP & Airline", children:[
-    {label:"BSP Summary",             href:"/purchase/bsp-summary"},
-    {label:"BSP Statement Import",    href:"/purchase/bsp-import"},
-    {label:"Ticket Control Register", href:"/purchase/ticket-control"},
-    {label:"ADM — Agent Debit Memos", href:"/purchase/adm"},
-    {label:"ACM — Agent Credit Memos",href:"/purchase/acm"},
-  ]},
-  {label:"Period Close", children:[
-    {label:"Month-End Checklist / Day-Close", href:"/accounts/month-end"},
-    {label:"Suspense / Unspecified Clearing", href:"/accounts/suspense"},
-    {label:"Recurring Vouchers", href:"/accounting/recurring"},
-    {label:"Year-End Close (HO)", href:"/accounting/year-close"},
-  ]},
-  {label:"Branch MIS", children:[
-    {label:"Profit & Loss",         href:"/reports/pnl"},
-    {label:"Balance Sheet",         href:"/reports/bs"},
-    {label:"Cash Position Summary", href:"/reports/cash-position"},
   ]},
 ]};
 

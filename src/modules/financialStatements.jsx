@@ -2,28 +2,22 @@
 // UNIFIED FINANCIAL STATEMENTS — one Profit & Loss screen and one Balance Sheet
 // screen, each with a single view switcher. No more duplicate menu entries.
 //
-//   Profit & Loss   : Fiori · Classic · Vertical · Tally · TKF
-//   Balance Sheet   : Fiori · Classic · Vertical · Tally · TKF · Schedule III · Consolidated
+//   Profit & Loss   : Fiori · Classic · Vertical
+//   Balance Sheet   : Fiori · Classic · Vertical
 //
-// Fiori/Classic/Vertical reuse ReportPnLLive / ReportBSLive (pinned via forceView,
-// internal switcher hidden). Tally reuses the T-account screens. TKF is a new
-// TravKings-branded vertical statement in the SAME cream/gold theme as the unified
-// Ledger UI — so Ledger, P&L and Balance Sheet share one visual language. EVERY
-// ledger click everywhere opens the one unified ledger modal (openLedgerModal),
-// scoped to the top-right global branch.
+// Both screens reuse ReportPnLLive / ReportBSLive (pinned via forceView, internal
+// switcher hidden). EVERY ledger click everywhere opens the one unified ledger
+// modal (openLedgerModal), scoped to the top-right global branch.
 // ───────────────────────────────────────────────────────────────────────────
 import React, { useMemo, useState } from 'react';
 import { bc } from '../core/styles';
 import { localeOf } from '../core/format';
-import { PeriodBar } from '../core/period';
-import { useModulePL, useBalanceSheet } from '../core/useAccounting';
+import { useModulePL } from '../core/useAccounting';
 import { LEDGER_CSS } from '../core/ledgerUI';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { clickable } from '../core/ux/clickable';
 import { ReportPnLLive, ReportBSLive } from './reportsFinancial';
 import { PnLTallyLive } from './pnlTally';
-import { BalanceSheetTallyLive } from './balanceSheetTally';
-import { ScheduleIIIBS, ConsolidatedBS } from './reports';
 import { CONSOLIDATED_LABEL } from '../core/data';
 
 const GOLD = '#A07828';
@@ -252,48 +246,6 @@ function TkfPnL({ branch, from, to }) {
   );
 }
 
-/* ── TKF Balance Sheet (vertical) ────────────────────────────────────────── */
-function TkfBS({ branch, to }) {
-  const cur = bc(branch).cur;
-  const q = useBalanceSheet(branch, { to });
-  const d = q.data;
-  const c = (n) => cur + fmt(n, cur);
-  if (q.isLoading) return <div className="kbled"><style>{LEDGER_CSS}</style><div style={{ padding: 16 }}>{Array.from({ length: 9 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.08) }} />)}</div></div>;
-  if (!d) return <div className="kbled"><style>{LEDGER_CSS}</style><div className="loading">No data as on this date.</div></div>;
-
-  const sideRows = (groups) => {
-    const rows = [];
-    (groups || []).forEach((g) => {
-      rows.push({ label: g.group, amount: g.amount, bold: true });
-      (g.ledgers || []).forEach((l) => rows.push({ label: l.name, amount: l.amount, ledger: l.name, indent: 1 }));
-    });
-    return rows;
-  };
-  // The backend already injects the Profit & Loss A/c into d.liabilities (a net
-  // profit, Cr) or d.assets (a net loss, Dr) and folds it into d.totalLiabilities /
-  // d.totalAssets — so sideRows() renders it once on the correct side. Do NOT add it
-  // again here, or a profit double-counts on Liabilities and a loss shows as a bogus
-  // negative liability (the statement stops footing).
-  const liabRows = sideRows(d.liabilities);
-  liabRows.push({ label: 'TOTAL LIABILITIES', amount: d.totalLiabilities, subtotal: true });
-  const assetRows = sideRows(d.assets);
-  assetRows.push({ label: 'TOTAL ASSETS', amount: d.totalAssets, subtotal: true });
-
-  return (
-    <TkfStatement
-      title="BALANCE SHEET" badge="TKF Statement" branch={branch}
-      period={<>Balance Sheet<br />As on <b>{to ? dmy(to) : 'latest'}</b></>}
-      kpis={[
-        { label: 'Total Liabilities', tone: 'cr', value: c(d.totalLiabilities) },
-        { label: 'Total Assets', tone: 'dr', value: c(d.totalAssets) },
-        { label: 'Net Profit', tone: 'bal', value: c(d.netProfit) },
-        { label: 'Status', value: d.balanced ? 'Balanced' : 'Out of balance' },
-      ]}
-      sections={[{ title: 'Liabilities', rows: liabRows }, { title: 'Assets', rows: assetRows }]}
-    />
-  );
-}
-
 /* ════════════════════════════════════════════════════════════════════════
    MERGED SCREENS — one P&L, one Balance Sheet, with a single switcher.
    ════════════════════════════════════════════════════════════════════════ */
@@ -314,19 +266,14 @@ export function ProfitAndLossUnified({ branch }) {
 }
 
 export function BalanceSheetUnified({ branch }) {
-  const [view, setView] = useState('tkf');
-  const [tkfTo, setTkfTo] = useState('');
+  // Balance Sheet keeps the same three views as P&L — Fiori · Classic · Vertical.
+  const [view, setView] = useState('fiori');
   return (
     <div className={WRAP_CLS}>
       <div className={BAR_CLS}>
-        <StmtSwitcher value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic'], ['vertical', '▤ Vertical'], ['tally', '𝚺 Tally'], ['tkf', '◆ TKF'], ['schedule3', '§ Schedule III'], ['consolidated', '⛁ Consolidated']]} />
-        {view === 'tkf' && <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setTkfTo(r.to)} />}
+        <StmtSwitcher value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic'], ['vertical', '▤ Vertical']]} />
       </div>
-      {view === 'tally' ? <BalanceSheetTallyLive branch={branch} />
-        : view === 'tkf' ? <TkfBS branch={branch} to={tkfTo} />
-          : view === 'schedule3' ? <ScheduleIIIBS branch={branch} setRoute={() => {}} />
-            : view === 'consolidated' ? <ConsolidatedBS />
-              : <ReportBSLive branch={branch} forceView={view} hideSwitcher />}
+      <ReportBSLive branch={branch} forceView={view} hideSwitcher />
     </div>
   );
 }
