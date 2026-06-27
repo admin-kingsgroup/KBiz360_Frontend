@@ -22,6 +22,7 @@ import { toast } from '../../core/ux/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPut, getAuthToken } from '../../core/api';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../../core/styles';
+import { MiniBar } from '../../core/insightsUI';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 
 export function ExpenseBudget({branch,setRoute}){
@@ -743,7 +744,7 @@ export function HrPayroll({branch}){
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:1000}}>
               <thead><tr style={{background:"#0d1326"}}>
-                {["Employee","Basic","HRA","Special","LWP","Gross","PF (E)","ESI (E)","Prof Tax","TDS","Net Pay"].map((h,i)=>(
+                {["Employee","Basic","HRA","Special","LWP","Gross","PF (E)","ESI (E)","Prof Tax","TDS","Net Pay","Take-home %"].map((h,i)=>(
                   <th key={i} style={{padding:"8px 10px",textAlign:i>1?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr></thead>
@@ -761,6 +762,14 @@ export function HrPayroll({branch}){
                     <td style={{padding:"8px 10px",textAlign:"right",color:"#854F0B",fontVariantNumeric:"tabular-nums"}}>{e.profTax>0?f(e.profTax):"—"}</td>
                     <td style={{padding:"8px 10px",textAlign:"right",color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{e.tds>0?f(e.tds):"—"}</td>
                     <td style={{padding:"8px 10px",textAlign:"right",fontWeight:700,color:"#27500A",fontVariantNumeric:"tabular-nums"}}>{f(e.net)}</td>
+                    <td style={{padding:"8px 10px",minWidth:120}}>
+                      {(()=>{const th=e.gross>0?(e.net/e.gross)*100:0;return(
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:10,color:"#5a6691",width:34,textAlign:"right",flexShrink:0,fontVariantNumeric:"tabular-nums"}}>{th.toFixed(0)}%</span>
+                          <div style={{flex:1,minWidth:36}}><MiniBar pct={th} color={th>=85?"linear-gradient(90deg,#22c55e,#15803d)":th>=70?"linear-gradient(90deg,#3b82f6,#1d4ed8)":"linear-gradient(90deg,#f0a35e,#d97706)"} /></div>
+                        </div>
+                      );})()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -769,6 +778,7 @@ export function HrPayroll({branch}){
                 {[totals.gross*0.5,totals.gross*0.2,totals.gross*0.3,0,totals.gross,totals.empPF,totals.empESI,totals.profTax,totals.tds,totals.net].map((v,i)=>(
                   <td key={i} style={{padding:"8px 10px",textAlign:"right",fontWeight:700,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:11}}>{v>0?f(v):"—"}</td>
                 ))}
+                <td style={{padding:"8px 10px",textAlign:"right",fontWeight:700,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:11}}>{totals.gross>0?`${Math.round(totals.net/totals.gross*100)}%`:"—"}</td>
                 </tr>
               </tfoot>
             </table>

@@ -237,8 +237,9 @@ function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave, autoFocus
               <div key={ci} className="flex flex-1 flex-col gap-2.5" style={{ minWidth: 0 }}>
                 {colGroups.map((col, gi) => (
                   <section key={gi} className="rounded-xl border border-surface-border bg-surface-alt/50 p-2.5">
-                    {/* Primary tier — larger, bold, UNDERLINED, royal-blue group title. */}
-                    <div className="px-2.5 pb-1.5 text-sm font-bold uppercase tracking-wide text-[#2f54d6] underline decoration-2 underline-offset-4">
+                    {/* Primary tier — larger, bold, UNDERLINED group title in the
+                        on-theme deep-teal brand colour (pairs with the gold sub-sections). */}
+                    <div className="px-2.5 pb-1.5 text-sm font-bold uppercase tracking-wide text-[#2F7A8E] underline decoration-2 underline-offset-4">
                       {col.title}
                     </div>
                     <div className="mt-1.5 space-y-0.5">

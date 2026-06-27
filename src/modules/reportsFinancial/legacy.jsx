@@ -27,6 +27,7 @@ import { useModulePL, useBalanceSheet, useLedgerStatement, useAgeing, branchCode
 import { computeNetAgeing } from './netAgeing';
 import { splitSubGroups, bsFioriExpandKeys, pnlFioriExpandKeys } from './fioriExpand';
 import { share, topByGP, lowestGp } from './statementInsights';
+import { MiniBar, RailCard, Stat } from '../../core/insightsUI';
 import { apiGet, getAuthToken } from '../../core/api';
 import { exportToExcel } from '../../core/exportExcel';
 import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../../core/dates';
@@ -153,31 +154,7 @@ const Badge = ({ children, bg = SAP.greenBg, c = SAP.greenDk, bd = '#b8ecb8' }) 
 const Toggle = ({ open }) => <span style={{ display: 'inline-flex', width: 14, height: 14, border: '1px solid currentColor', borderRadius: 3, fontSize: 9, alignItems: 'center', justifyContent: 'center', marginRight: 7, opacity: 0.7 }}>{open ? '−' : '+'}</span>;
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', padding: '7px 20px 7px 16px' };
 
-// Proportion bar — visualises a row's share so the freed horizontal band on the
-// statement views carries information instead of whitespace. tone 'cogs' = warm.
-function MiniBar({ pct, tone, color }) {
-  const w = Math.max(0, Math.min(100, Math.abs(Number(pct) || 0)));
-  const fill = color || (tone === 'cogs' ? 'linear-gradient(90deg,#f0a35e,#d97706)' : 'linear-gradient(90deg,#3b82f6,#1d4ed8)');
-  return <div style={{ height: 8, borderRadius: 5, background: '#eef1f5', overflow: 'hidden' }}><div style={{ height: '100%', width: `${w}%`, borderRadius: 5, background: fill }} /></div>;
-}
-// Insights-rail primitives (Vertical P&L + Balance Sheet) — a compact dashboard
-// that fills the space freed by widening, beside the statement.
-function RailCard({ title, children }) {
-  return (
-    <div className="noprint" style={{ border: `1px solid ${SAP.border}`, borderRadius: 10, overflow: 'hidden', boxShadow: SHADOW }}>
-      <div style={{ padding: '9px 14px', fontSize: 12, fontWeight: 800, background: '#f6f8fb', color: SAP.grpText, borderBottom: `1px solid ${SAP.borderLt}` }}>{title}</div>
-      <div style={{ padding: '8px 14px', display: 'flex', flexDirection: 'column', gap: 2 }}>{children}</div>
-    </div>
-  );
-}
-function Stat({ label, value, tone, last }) {
-  const c = tone === 'pos' ? SAP.greenDk : tone === 'neg' ? SAP.red : tone === 'warn' ? SAP.orange : SAP.text;
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '6px 0', borderBottom: last ? 'none' : '1px dashed #e6e9ee', fontSize: 12.5 }}>
-      <span style={{ color: SAP.sec }}>{label}</span><b style={{ fontSize: 13.5, color: c }}>{value}</b>
-    </div>
-  );
-}
+// MiniBar / RailCard / Stat now live in core/insightsUI (shared across modules).
 // Statement grid: KPI ribbon (screen only) over a [ statement | insights rail ]
 // two-column layout that collapses to one column on narrower screens.
 const STMT_GRID_CSS = '@media (max-width:1180px){.stmt-grid{grid-template-columns:1fr !important}.stmt-rail{order:-1}}';
