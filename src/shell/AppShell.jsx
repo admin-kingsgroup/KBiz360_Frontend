@@ -61,11 +61,51 @@ function buildColumns(children = []) {
   return cols;
 }
 
+/* Pack the (already-built) titled groups into `k` balanced columns WITHOUT
+   splitting a group and WITHOUT reordering — so the workflow clusters stay in
+   reading order while column heights stay as even as possible. Classic "split a
+   sequence into k contiguous segments minimising the tallest segment" DP (n and k
+   are tiny here, so the O(n²·k) cost is irrelevant). Returns an array of columns,
+   each an array of groups. Replaces the old CSS-masonry flow, which merged
+   unrelated groups in one column and produced ragged, unbalanced heights. */
+function packColumns(groups, k) {
+  const n = groups.length;
+  const parts = Math.max(1, Math.min(k, n));
+  if (parts >= n) return groups.map((g) => [g]);
+  // weight ≈ rendered height: one row per item (leaves + sub-dividers) + a header.
+  const w = groups.map((g) => (g.items?.length || 0) + 1);
+  const prefix = [0];
+  for (let i = 0; i < n; i++) prefix.push(prefix[i] + w[i]);
+  const segSum = (a, b) => prefix[b] - prefix[a]; // weight of groups [a, b)
+  const dp = Array.from({ length: parts + 1 }, () => Array(n + 1).fill(Infinity));
+  const cut = Array.from({ length: parts + 1 }, () => Array(n + 1).fill(0));
+  dp[0][0] = 0;
+  for (let p = 1; p <= parts; p++) {
+    for (let i = 1; i <= n; i++) {
+      for (let j = p - 1; j < i; j++) {
+        const val = Math.max(dp[p - 1][j], segSum(j, i));
+        if (val < dp[p][i]) { dp[p][i] = val; cut[p][i] = j; }
+      }
+    }
+  }
+  const bounds = [];
+  let i = n;
+  for (let p = parts; p >= 1; p--) { bounds.unshift([cut[p][i], i]); i = cut[p][i]; }
+  return bounds.map(([a, b]) => groups.slice(a, b));
+}
+
 /* A single leaf link inside a mega-menu / accordion. */
 function Leaf({ node, route, go }) {
   if (!node) return null;
   if (node.divider) {
-    return <div className="px-2.5 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-ink-subtle">{node.label}</div>;
+    // Second-tier label (a sub-section inside a boxed group). Kept deliberately
+    // quieter than the navy boxed group title — muted, smaller, with a hairline
+    // rule separating consecutive sub-sections (reset for the first one).
+    return (
+      <div className="mt-2 border-t border-surface-border/70 px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-ink-subtle first:mt-0 first:border-t-0 first:pt-0">
+        {node.label}
+      </div>
+    );
   }
   if (node.children) {
     return (
@@ -161,7 +201,7 @@ function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave, autoFocus
   // Balanced, contained sizing. Pick a column count from the group count, capped at
   // 5 and by what the viewport can actually fit, then derive a fixed panel width.
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
-  const COL_W = 220, COL_GAP = 24, PAD = 16;
+  const COL_W = 248, COL_GAP = 16, PAD = 16; // wider columns → long labels stop ellipsing
   const fitCols = Math.max(1, Math.floor((vw - 16 - 2 * PAD + COL_GAP) / (COL_W + COL_GAP)));
   const colCount = Math.max(1, Math.min(groups.length || 1, 5, fitCols));
   const panelW = Math.min(colCount * COL_W + (colCount - 1) * COL_GAP + 2 * PAD, vw - 16);
@@ -188,15 +228,23 @@ function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave, autoFocus
           </div>
         )}
         {groups.length > 0 && (
-          <div style={{ columnCount: colCount, columnGap: COL_GAP }}>
-            {groups.map((col, ci) => (
-              <div key={ci} className="mb-4" style={{ breakInside: 'avoid' }}>
-                <div className="mb-1.5 border-b border-surface-border px-2.5 pb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-ink-subtle">
-                  {col.title}
-                </div>
-                <div className="space-y-0.5">
-                  {col.items.map((c, i) => <Leaf key={i} node={c} route={route} go={go} />)}
-                </div>
+          // Balanced, order-preserving columns. Each group is a self-contained
+          // CARD so stacked groups read as distinct units (the old masonry let
+          // unrelated groups bleed into one another). The navy boxed title is the
+          // primary tier; sub-section dividers inside are the muted second tier.
+          <div className="flex items-start" style={{ gap: COL_GAP }}>
+            {packColumns(groups, colCount).map((colGroups, ci) => (
+              <div key={ci} className="flex flex-1 flex-col gap-2.5" style={{ minWidth: 0 }}>
+                {colGroups.map((col, gi) => (
+                  <section key={gi} className="rounded-xl border border-surface-border bg-surface-alt/50 p-2.5">
+                    <div className="border-b border-surface-border px-2.5 pb-1.5 text-[11px] font-bold uppercase tracking-wide text-navy">
+                      {col.title}
+                    </div>
+                    <div className="mt-1.5 space-y-0.5">
+                      {col.items.map((c, i) => <Leaf key={i} node={c} route={route} go={go} />)}
+                    </div>
+                  </section>
+                ))}
               </div>
             ))}
           </div>
