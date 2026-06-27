@@ -3,6 +3,10 @@
 // so the screens render against fixed data with no network.
 jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
+// Real period engine (pure) but stub the inception query (it would hit the network).
+jest.mock('../core/period', () => ({ ...jest.requireActual('../core/period'), useInception: () => ({ data: { from: '2024-04-01' } }) }));
+// PnlTrend uses useQueries — return an empty array so it renders nothing harmlessly.
+jest.mock('@tanstack/react-query', () => ({ ...jest.requireActual('@tanstack/react-query'), useQueries: () => [] }));
 
 const AGE = {
   asOf: '2026-06-18',
@@ -45,6 +49,9 @@ jest.mock('../core/useAccounting', () => ({
   useCashForecast: () => ({ data: [{ week: 'W1', inflow: 5000, outflow: 2000, closing: 8000 }] }),
   useModulePL: () => ({ data: { totals: { sales: 100000, cogs: 70000, gp: 30000, gpPct: 30 }, indirect: { expense: 5000 }, bridge: { netProfit: 25000 } } }),
   useRcmLiability: () => ({ data: { igst: 1800, taxable: 10000, count: 2 } }),
+  // Period control + Performance budget vs actual.
+  useInception: () => ({ data: { from: '2024-04-01' } }),
+  useBudgetVsActual: () => ({ data: { rows: [] } }),
 }));
 // PDC tracker pulls its own engine.
 jest.mock('../core/usePDC', () => ({
@@ -69,7 +76,7 @@ jest.mock('../core/useCollections', () => ({
   useReminderRun: () => ({ mutate: jest.fn() }),
 }));
 // The redesigned dashboard also pulls the tax calendar and bank-reco summary.
-jest.mock('../core/useReference', () => ({ useTaxCalendar: () => ({ data: [] }) }));
+jest.mock('../core/useReference', () => ({ useTaxCalendar: () => ({ data: [] }), useExpenseBudgets: () => ({ data: [] }) }));
 jest.mock('../core/useBankReco', () => ({
   useBankLedgers: () => ({ data: [] }),
   useBankReconSummary: () => ({ data: null }),
@@ -112,50 +119,47 @@ describe('accountant workspace — screens render', () => {
     expect(screen.queryByText('Globe')).toBeNull();             // board already excludes current ones
   });
 
-  test('Dashboard cockpit: three workspace tabs (daily money · collections ageing · compliance)', () => {
+  test('Dashboard cockpit: five workspace tabs + global period bar', () => {
     render(<DashboardAccountant branch={{ code: 'BOM' }} setRoute={() => {}} />);
-    // Tab 1 — Daily Operations (default): money position + worklist
-    expect(screen.getAllByText('₹5,000').length).toBeGreaterThan(0);   // cash (also PDC pending / forecast inflow)
-    expect(screen.getByText('₹90,000')).toBeInTheDocument();  // bank (Bank Account only, not Bank Charges)
-    expect(screen.getByText('Collected Today')).toBeInTheDocument();
-    expect(screen.getByText('Month-End Progress')).toBeInTheDocument();
-    // Tier 1 additions: forward cash outlook, PDC tracker, approval split
-    expect(screen.getByText(/Cash-flow Outlook/)).toBeInTheDocument();
-    expect(screen.getByText('Post-Dated Cheques (PDC)')).toBeInTheDocument();
-    expect(screen.getByText(/Approve & Post — worklist/)).toBeInTheDocument();
-    expect(screen.getByText('Received — Pending')).toBeInTheDocument();
-    // Hero worklist + maker/checker split
-    expect(screen.getByText(/to approve & post/)).toBeInTheDocument();   // hero chip
-    expect(screen.getByText(/I can approve/)).toBeInTheDocument();       // checker bucket
-    expect(screen.getByText(/My own — needs approver/)).toBeInTheDocument(); // maker bucket
 
-    // Tab 2 — Collections & Payables: headline snapshot (both sides + net 1700 − 800 = 900)
-    fireEvent.click(screen.getByText('2. Collections & Payables'));
+    // Global period bar present (preset buttons).
+    expect(screen.getByText('CFY')).toBeInTheDocument();
+    expect(screen.getByText('LFY')).toBeInTheDocument();
+
+    // Tab 1 — Overview (default): branch health rollup + approval status + headline tile
+    expect(screen.getByText(/Branch Health/)).toBeInTheDocument();          // traffic-light card
+    expect(screen.getByText(/Approval & posting status/)).toBeInTheDocument(); // status section
+    expect(screen.getByText('Blocked')).toBeInTheDocument();                // status stat card
+    expect(screen.getByText('Sales')).toBeInTheDocument();                  // performance headline tile
+    expect(screen.getByText('Exception Radar')).toBeInTheDocument();
+    expect(screen.getByText(/to approve & post/)).toBeInTheDocument();      // hero chip
+
+    // Tab 4 — Receivable & Payable: keep the full R&P content
+    fireEvent.click(screen.getByText('4. Receivable & Payable'));
     expect(screen.getByText('Accounts Receivable (Debtors)')).toBeInTheDocument();
     expect(screen.getByText('Accounts Payable (Creditors)')).toBeInTheDocument();
     expect(screen.getAllByText('Net Working Position').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('₹900').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('₹900').length).toBeGreaterThan(0);         // net = 1700 − 800
 
-    // Receivable vs Payable comparison table — BOTH sides on ONE screen (no sub-tabs).
-    // The receivable column must render (the reported bug): Total Billed R = ₹2,500.
+    // Receivable vs Payable comparison table — BOTH sides on ONE screen.
     expect(screen.getByText(/Receivable vs Payable/)).toBeInTheDocument();
     expect(screen.getByText('Total Billed')).toBeInTheDocument();
     expect(screen.getByText('Unsettled Bills (open)')).toBeInTheDocument();
     expect(screen.getByText('Unallocated / On-Account')).toBeInTheDocument();
-    expect(screen.getAllByText('₹2,500').length).toBeGreaterThan(0);   // receivable Total Billed shows
-    expect(screen.getAllByText('₹1,100').length).toBeGreaterThan(0);   // payable Total Billed shows
+    expect(screen.getAllByText('₹2,500').length).toBeGreaterThan(0);       // receivable Total Billed
+    expect(screen.getAllByText('₹1,100').length).toBeGreaterThan(0);       // payable Total Billed
 
-    // Both ageing rows visible together (comparable), not behind tabs.
+    // Both ageing rows visible together.
     expect(screen.getByText('Debtors (Receivable)')).toBeInTheDocument();
     expect(screen.getByText('Creditors (Payable)')).toBeInTheDocument();
 
-    // Both bill-wise panels visible together: open sales bills AND open purchase bills.
+    // Both bill-wise panels visible together.
     expect(screen.getByText('Open sales bills — awaiting receipt')).toBeInTheDocument();
     expect(screen.getByText('SF/001')).toBeInTheDocument();
     expect(screen.getByText('Open purchase bills — awaiting payment')).toBeInTheDocument();
     expect(screen.getByText('PB/009')).toBeInTheDocument();
 
-    // Both settlement panels + both on-account sides + worklists, all on the one view.
+    // Both settlement panels + both on-account sides + worklists.
     expect(screen.getByText('Clients — unsettled bills vs receipts')).toBeInTheDocument();
     expect(screen.getByText('Suppliers — unsettled bills vs payments')).toBeInTheDocument();
     expect(screen.getByText('Customer credits — unapplied receipts')).toBeInTheDocument();
@@ -163,19 +167,24 @@ describe('accountant workspace — screens render', () => {
     expect(screen.getByText('Refunds & adjustments pending')).toBeInTheDocument();
     expect(screen.getByText('Top creditors — reconcile & pay')).toBeInTheDocument();
 
-    // Tab 3 — Month-End & Compliance: statutory tiles + GST/ITC + P&L snapshot + master health
-    fireEvent.click(screen.getByText('3. Month-End & Compliance'));
+    // Tab 5 — Compliance: statutory tiles + GST/ITC + master health + RCM
+    fireEvent.click(screen.getByText('5. Compliance'));
     expect(screen.getByText('TDS Payable')).toBeInTheDocument();
-    expect(screen.getAllByText('₹1,500').length).toBeGreaterThan(0);   // GST netPayable (tile + ITC panel)
     expect(screen.getByText('Input Credit (ITC)')).toBeInTheDocument();
-    expect(screen.getByText('RCM (Reverse Charge)')).toBeInTheDocument();      // foreign-supplier reverse charge
-    expect(screen.getByText('₹1,800')).toBeInTheDocument();                    // RCM IGST from mock
-    expect(screen.getByText(/Match ITC vs GSTR-2B/)).toBeInTheDocument();
-    expect(screen.getByText('Indian suppliers missing GSTIN')).toBeInTheDocument(); // master-health (server counts)
-    expect(screen.getByText(/Branch P&L snapshot/)).toBeInTheDocument();
-    expect(screen.getByText('Net Profit')).toBeInTheDocument();
-    expect(screen.getByText('₹25,000')).toBeInTheDocument();           // net profit from module-PL
+    expect(screen.getByText('RCM (Reverse Charge)')).toBeInTheDocument();
     expect(screen.getByText(/Master-data health/)).toBeInTheDocument();
+
+    // Tab 2 — Performance: P&L snapshot + targets + budget
+    fireEvent.click(screen.getByText('2. Performance'));
+    expect(screen.getAllByText(/Revenue|Net Profit/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Targets vs Actual/)).toBeInTheDocument();        // FY targets panel
+    expect(screen.getAllByText('no target set').length).toBeGreaterThan(0);   // config empty → unset
+    expect(screen.getByText(/Budget vs Actual/)).toBeInTheDocument();
+
+    // Tab 3 — Cash & Bank: cash + PDC
+    fireEvent.click(screen.getByText('3. Cash & Bank'));
+    expect(screen.getAllByText('Cash in Hand').length).toBeGreaterThan(0);
+    expect(screen.getByText('Post-Dated Cheques (PDC)')).toBeInTheDocument();
   });
 
   test('Month-End checklist renders with auto-checks (trial balance / suspense)', () => {

@@ -502,11 +502,14 @@ export function useOpenBills(party, branch, side = 'customer', excludeId) {
 // Whole-book unsettled bills + on-account advances (the Outstanding & On-Account
 // dashboard). Bills settle ONLY by explicit allocation — no FIFO. Returns
 // { salesBills, purchaseBills, onAccountReceipts, onAccountPayments, totals }.
-export function useOutstanding(branch) {
+// Optional `asOf` (YYYY-MM-DD) snapshots the outstanding position as of that
+// cut-off date instead of today. Backward compatible: no asOf → same as before.
+export function useOutstanding(branch, { asOf } = {}) {
   const code = branchCode(branch);
+  const cut = asOf || '';
   return useQuery({
-    queryKey: ['vouchers', 'outstanding', code || 'all'],
-    queryFn: () => apiGet('/api/vouchers/outstanding', { branch: code }),
+    queryKey: ['vouchers', 'outstanding', code || 'all', cut || 'today'],
+    queryFn: () => apiGet('/api/vouchers/outstanding', { branch: code, ...(cut ? { asOf: cut } : {}) }),
     enabled: enabled(),
     staleTime: 20_000,
   });
