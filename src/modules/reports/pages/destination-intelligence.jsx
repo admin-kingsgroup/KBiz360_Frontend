@@ -29,9 +29,9 @@ export function DestinationIntelligence({ branch }) {
     bills.forEach((b) => {
       const d = b.dest || 'Other';
       if (!destMap[d]) destMap[d] = { dest: d, rev: 0, cost: 0, bks: 0, mods: {}, months: {} };
-      destMap[d].rev += b.sell; destMap[d].cost += b.cost; destMap[d].bks++;
+      destMap[d].rev += (+b.sell || 0); destMap[d].cost += (+b.cost || 0); destMap[d].bks++;
       destMap[d].mods[b.mod] = (destMap[d].mods[b.mod] || 0) + 1;
-      const m = b.date.slice(0, 7); destMap[d].months[m] = (destMap[d].months[m] || 0) + b.sell - b.cost;
+      const m = String(b.date || '').slice(0, 7); destMap[d].months[m] = (destMap[d].months[m] || 0) + (+b.sell || 0) - (+b.cost || 0);
     });
     return Object.values(destMap).map((d) => ({
       ...d, gp: d.rev - d.cost, gpPct: d.rev > 0 ? +((d.rev - d.cost) / d.rev * 100).toFixed(1) : 0,

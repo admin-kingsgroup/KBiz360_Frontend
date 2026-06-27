@@ -395,7 +395,8 @@ export function useBackfillCostCenters() {
 // (the master screen), else only active centres are returned.
 export function useCostCenters(branch, { includeInactive = false } = {}) {
   const params = new URLSearchParams();
-  if (branch && branch !== 'ALL') params.set('branch', branch);
+  const code = branchCode(branch); // normalise: accept the branch object OR a bare code string (was emitting [object Object])
+  if (code && code !== 'ALL') params.set('branch', code);
   if (includeInactive) params.set('includeInactive', 'true');
   const qs = params.toString();
   return useQuery({

@@ -28,12 +28,14 @@ export function ReportCommission({ branch }) {
   const rows = useMemo(() => {
     const suppMap = {};
     bills.forEach((b) => {
-      if (!suppMap[b.supplier]) suppMap[b.supplier] = { supplier: b.supplier, mod: b.mod, bookings: 0, revenue: 0, commRate: 0, commission: 0 };
+      const sup = b.supplier || '—';                 // falsy supplier names must not collapse under one undefined key
+      if (!suppMap[sup]) suppMap[sup] = { supplier: sup, mod: b.mod, bookings: 0, revenue: 0, commRate: 0, commission: 0 };
       const rate = RATE(b.mod);
-      suppMap[b.supplier].bookings++;
-      suppMap[b.supplier].revenue += b.sell;
-      suppMap[b.supplier].commRate = rate;
-      suppMap[b.supplier].commission += Math.round(b.sell * rate / 100);
+      const sell = +b.sell || 0;                      // coerce — a malformed bill must not turn the table into ₹NaN
+      suppMap[sup].bookings++;
+      suppMap[sup].revenue += sell;
+      suppMap[sup].commRate = rate;
+      suppMap[sup].commission += Math.round(sell * rate / 100);
     });
     return Object.values(suppMap).sort((a, b) => b.commission - a.commission);
   }, [bills]);

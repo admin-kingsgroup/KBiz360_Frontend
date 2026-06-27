@@ -33,9 +33,11 @@ jest.mock('../core/useAccounting', () => ({
   useConfigValue: () => ({ data: {} }),
   useSaveConfigValue: () => ({ mutate: jest.fn(), isPending: false }),
   useOutstanding: () => ({ data: {
+    salesBills: [{ party: 'ACME', billVno: 'SF/001', date: '2026-05-01', total: 1700, settled: 0, outstanding: 1700, ageDays: 40 }],
+    purchaseBills: [{ party: 'TBO', billVno: 'PB/009', date: '2026-05-03', total: 800, settled: 0, outstanding: 800, ageDays: 30 }],
     onAccountReceipts: [{ party: 'ACME', vno: 'R1', onAccount: 300, ageDays: 5 }],
     onAccountPayments: [{ party: 'TBO', vno: 'P9', onAccount: 700, ageDays: 12 }],
-    totals: { onAccountReceipts: 300, onAccountPayments: 700 },
+    totals: { onAccountReceipts: 300, onAccountPayments: 700, salesOutstanding: 1700, purchaseOutstanding: 800 },
   } }),
   useDayBook: () => ({ data: [{ category: 'receipt', totalDebit: 1200 }, { category: 'payment', totalDebit: 400 }] }),
   useAlerts: () => ({ data: { alerts: [] } }),
@@ -134,26 +136,32 @@ describe('accountant workspace — screens render', () => {
     expect(screen.getByText('Net Working Position')).toBeInTheDocument();
     expect(screen.getByText('₹900')).toBeInTheDocument();
 
-    // Tab 2 → AR sub-tab is the default: debtors ageing + clients settlement + customer
-    // advances + refunds worklist. The payable-side panels are NOT mounted yet.
+    // Tab 2 → AR sub-tab is the default: debtors ageing + bill-wise open sales bills +
+    // clients settlement + on-account receipts + refunds. Payable-side panels NOT mounted.
     expect(screen.getByText('Debtors (Receivable)')).toBeInTheDocument();
+    expect(screen.getByText('Open sales bills — awaiting receipt')).toBeInTheDocument(); // bill-wise list
+    expect(screen.getByText('SF/001')).toBeInTheDocument();                              // the exact open bill
     expect(screen.getByText('Clients — unsettled bills vs receipts')).toBeInTheDocument();
-    expect(screen.getByText('Customer Advances & Unapplied Receipts')).toBeInTheDocument();
+    expect(screen.getByText('On-Account Receipts — Customer Advances & Unapplied Credits')).toBeInTheDocument();
     expect(screen.getByText('Customer credits — unapplied receipts')).toBeInTheDocument();
     expect(screen.getByText('Refunds & adjustments pending')).toBeInTheDocument();
     expect(screen.getAllByText('₹2,500').length).toBeGreaterThan(0);   // ACME gross billed (row + total)
     expect(screen.queryByText('Creditors (Payable)')).toBeNull();
+    expect(screen.queryByText('Open purchase bills — awaiting payment')).toBeNull();
     expect(screen.queryByText('Suppliers — unsettled bills vs payments')).toBeNull();
 
-    // Tab 2 → switch to the Accounts Payable sub-tab: creditors ageing + suppliers
-    // settlement + supplier advances, and the receivable-side panels go away.
+    // Tab 2 → switch to the Accounts Payable sub-tab: creditors ageing + bill-wise open
+    // purchase bills + suppliers settlement + on-account payments. AR-side panels go away.
     fireEvent.click(screen.getByText('Accounts Payable'));
     expect(screen.getByText('Creditors (Payable)')).toBeInTheDocument();
+    expect(screen.getByText('Open purchase bills — awaiting payment')).toBeInTheDocument(); // bill-wise list
+    expect(screen.getByText('PB/009')).toBeInTheDocument();                                 // the exact open bill
     expect(screen.getByText('Suppliers — unsettled bills vs payments')).toBeInTheDocument();
-    expect(screen.getByText('Supplier Advances & Unapplied Payments')).toBeInTheDocument();
+    expect(screen.getByText('On-Account Payments — Supplier Advances & Unapplied Credits')).toBeInTheDocument();
     expect(screen.getByText('Supplier advances — unapplied payments')).toBeInTheDocument();
     expect(screen.getByText('Top creditors — reconcile & pay')).toBeInTheDocument();
     expect(screen.queryByText('Debtors (Receivable)')).toBeNull();
+    expect(screen.queryByText('Open sales bills — awaiting receipt')).toBeNull();
     expect(screen.queryByText('Clients — unsettled bills vs receipts')).toBeNull();
 
     // Tab 3 — Month-End & Compliance: statutory tiles + GST/ITC + P&L snapshot + master health

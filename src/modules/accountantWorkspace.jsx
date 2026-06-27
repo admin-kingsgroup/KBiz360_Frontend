@@ -140,7 +140,9 @@ function MiniList({ title, rows, cur, valueKey, tone, actionLabel, onAction }) {
 // due. Sourced from the SAME bill-wise ageing engine as the rest of the workspace
 // (rows now carry `billed`/`settled`), so every figure ties back to the registers.
 // Shows the top parties by net balance; the header links to the full report.
-function SettlementPanel({ title, sub, rows, cur, tone, partyLabel, settleLabel, drillLabel, onDrill }) {
+// `drill360` + `go` make each party row tappable → that party's 360° worktop, so the
+// accountant lands on the exact account from the dashboard (works on touch & keyboard).
+function SettlementPanel({ title, sub, rows, cur, tone, partyLabel, settleLabel, drillLabel, onDrill, drill360, go }) {
   const top = [...(rows || [])].sort((a, b) => Math.abs(b.net || 0) - Math.abs(a.net || 0)).slice(0, 12);
   const t = (rows || []).reduce((a, r) => ({
     billed: a.billed + (r.billed || 0), settled: a.settled + (r.settled || 0),
@@ -168,15 +170,17 @@ function SettlementPanel({ title, sub, rows, cur, tone, partyLabel, settleLabel,
           </tr></thead>
           <tbody>
             {top.length === 0 && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.green, padding: 18 }}>✓ Nothing unsettled.</td></tr>}
-            {top.map((r, i) => (
-              <tr key={i} style={{ background: i % 2 ? '#fafbff' : '#fff' }}>
-                <td style={{ ...td, fontWeight: 600, color: C.dark, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.party}</td>
+            {top.map((r, i) => {
+              const rowDrill = (drill360 && go && r.party) ? clickable(() => go(`${drill360}?party=${encodeURIComponent(r.party)}`)) : {};
+              return (
+              <tr key={i} {...rowDrill} style={{ background: i % 2 ? '#fafbff' : '#fff', cursor: rowDrill.onClick ? 'pointer' : 'default' }}>
+                <td style={{ ...td, fontWeight: 600, color: C.dark, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.party}{rowDrill.onClick && <span style={{ color: tone, fontWeight: 800, marginLeft: 5 }}>›</span>}</td>
                 <td style={num}>{money(cur, r.billed || 0)}</td>
                 <td style={{ ...num, color: C.green }}>{money(cur, r.settled || 0)}</td>
                 <td style={{ ...num, color: (r.total || 0) > 0.5 ? tone : C.dim, fontWeight: 700 }}>{money(cur, r.total || 0)}</td>
                 <td style={{ ...num, fontWeight: 800, color: (r.net || 0) >= 0 ? C.dark : C.green }}>{money(cur, r.net || 0)}</td>
               </tr>
-            ))}
+            ); })}
           </tbody>
           {top.length > 0 && (
             <tfoot><tr style={{ position: 'sticky', bottom: 0 }}>
@@ -185,6 +189,62 @@ function SettlementPanel({ title, sub, rows, cur, tone, partyLabel, settleLabel,
               <td style={{ ...td, ...rnum, background: C.dark, color: '#fff', fontWeight: 800 }}>{money(cur, t.settled)}</td>
               <td style={{ ...td, ...rnum, background: C.dark, color: '#fff', fontWeight: 800 }}>{money(cur, t.total)}</td>
               <td style={{ ...td, ...rnum, background: C.dark, color: '#fff', fontWeight: 800 }}>{money(cur, t.net)}</td>
+            </tr></tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Unsettled bills — bill-wise (not party-level) ─────────────────────────────
+// The open documents themselves: every unsettled sales / purchase bill with its age
+// and outstanding amount, sourced from the SAME outstanding engine as Finance ▸
+// Receivables/Payables (`salesBills` / `purchaseBills`). Party-level settlement tells
+// you WHO; this tells you WHICH BILL — so the accountant acts on the exact invoice.
+// Each row taps through to that party's 360° worktop; the action opens receipt/payment.
+function UnsettledBills({ title, bills, cur, tone, drill360, actionLabel, actionRoute, onDrillAll, go }) {
+  const top = [...(bills || [])].sort((a, b) => (b.outstanding || 0) - (a.outstanding || 0)).slice(0, 12);
+  const tot = (bills || []).reduce((s, b) => s + (Number(b.outstanding) || 0), 0);
+  const sh = { ...th, background: 'transparent' };
+  const num = { ...td, ...rnum };
+  return (
+    <div style={{ ...card, padding: 0, overflow: 'hidden', flex: '1 1 480px', minWidth: 320 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 14px', borderBottom: `1px solid ${C.border}` }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.dark }}>{title}</div>
+          <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{(bills || []).length} open bill(s) · {money(cur, tot)} outstanding</div>
+        </div>
+        {onDrillAll && <button onClick={onDrillAll} style={{ ...aBtn(tone), padding: '4px 9px', fontSize: 10.5 }}>View all <ArrowRight size={11} /></button>}
+      </div>
+      <div style={{ maxHeight: 360, overflow: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead><tr style={{ background: C.dark }}>
+            <th style={sh}>Party</th>
+            <th style={sh}>Bill No</th>
+            <th style={{ ...sh, ...rnum }}>Age</th>
+            <th style={{ ...sh, ...rnum }}>Outstanding</th>
+            <th style={{ ...sh, textAlign: 'center' }}>Action</th>
+          </tr></thead>
+          <tbody>
+            {top.length === 0 && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.green, padding: 18 }}>✓ Nothing unsettled.</td></tr>}
+            {top.map((b, i) => (
+              <tr key={b.billVno || i} {...clickable(() => go(`${drill360}?party=${encodeURIComponent(b.party)}`))} style={{ cursor: 'pointer', background: i % 2 ? '#fafbff' : '#fff' }}>
+                <td style={{ ...td, fontWeight: 600, color: C.dark, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.party}<span style={{ color: tone, fontWeight: 800, marginLeft: 5 }}>›</span></td>
+                <td style={{ ...td, fontFamily: 'monospace', color: tone, fontWeight: 700, whiteSpace: 'nowrap' }}>{b.billVno || '—'}</td>
+                <td style={{ ...num, color: (b.ageDays || 0) > 90 ? C.red : C.dim }}>{b.ageDays != null ? `${b.ageDays}d` : '—'}</td>
+                <td style={{ ...num, fontWeight: 800, color: tone }}>{money(cur, b.outstanding || 0)}</td>
+                <td style={{ ...td, textAlign: 'center' }}>
+                  <button onClick={(e) => { e.stopPropagation(); go(actionRoute); }} style={{ ...aBtn(tone), padding: '3px 8px', fontSize: 10 }}>{actionLabel}</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          {top.length > 0 && (
+            <tfoot><tr style={{ position: 'sticky', bottom: 0 }}>
+              <td colSpan={3} style={{ ...td, background: C.dark, color: C.gold, fontWeight: 800 }}>TOTAL · {(bills || []).length} bill(s)</td>
+              <td style={{ ...td, ...rnum, background: C.dark, color: '#fff', fontWeight: 800 }}>{money(cur, tot)}</td>
+              <td style={{ background: C.dark }} />
             </tr></tfoot>
           )}
         </table>
@@ -404,7 +464,9 @@ function AdvancesPanel({ branch, cur, go, side = 'both' }) {
   const pays = out.onAccountPayments || [];
   const recTot = out.totals?.onAccountReceipts ?? recs.reduce((s, r) => s + (Number(r.onAccount) || 0), 0);
   const payTot = out.totals?.onAccountPayments ?? pays.reduce((s, r) => s + (Number(r.onAccount) || 0), 0);
-  const block = (title, list, tot, tone, route) => (
+  // `drill360` makes each on-account row tap through to that party's 360° worktop,
+  // so the accountant can allocate the advance against the party's open bills.
+  const block = (title, list, tot, tone, route, drill360) => (
     <div style={{ ...card, padding: 12, flex: '1 1 340px', minWidth: 300 }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
         <span>{title}</span>
@@ -412,8 +474,8 @@ function AdvancesPanel({ branch, cur, go, side = 'both' }) {
       </div>
       {list.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 6 }}>✓ Nothing unapplied.</div>}
       {list.slice(0, 6).map((r, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
-          <span style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.party}{r.vno ? <span style={{ color: C.dim, fontWeight: 500 }}> · {r.vno}</span> : ''}</span>
+        <div key={i} {...clickable(() => go(`${drill360}?party=${encodeURIComponent(r.party)}`))} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
+          <span style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.party}<span style={{ color: tone, fontWeight: 800, marginLeft: 4 }}>›</span>{r.vno ? <span style={{ color: C.dim, fontWeight: 500 }}> · {r.vno}</span> : ''}</span>
           {r.ageDays != null && <span style={{ fontSize: 10.5, color: C.dim }}>{r.ageDays}d</span>}
           <span style={{ fontSize: 12, fontWeight: 800, color: tone, fontVariantNumeric: 'tabular-nums' }}>{money(cur, r.onAccount || 0)}</span>
         </div>
@@ -423,8 +485,8 @@ function AdvancesPanel({ branch, cur, go, side = 'both' }) {
   );
   return (
     <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
-      {side !== 'pay' && block('Customer credits — unapplied receipts', recs, recTot, C.blue, '/reports/rec')}
-      {side !== 'rec' && block('Supplier advances — unapplied payments', pays, payTot, C.amber, '/reports/pay')}
+      {side !== 'pay' && block('Customer credits — unapplied receipts', recs, recTot, C.blue, '/reports/rec', '/reports/customer-360')}
+      {side !== 'rec' && block('Supplier advances — unapplied payments', pays, payTot, C.amber, '/reports/pay', '/reports/supplier-360')}
     </div>
   );
 }
@@ -886,20 +948,33 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
                 </table>
               </div>
 
+              {/* Bill-wise open sales bills — the exact invoices still awaiting receipt */}
+              <SecTitle>Unsettled Client Bills (bill-wise)</SecTitle>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+                <UnsettledBills
+                  title="Open sales bills — awaiting receipt"
+                  bills={out.salesBills || []}
+                  cur={cur} tone={C.blue} drill360="/reports/customer-360"
+                  actionLabel="Receipt" actionRoute="/receipts"
+                  onDrillAll={() => go('/reports/rec')} go={go}
+                />
+              </div>
+
               {/* Bills-vs-settlement on the receivable side: billed vs received, net to collect */}
-              <SecTitle>Settlement — Bills vs Receipts</SecTitle>
+              <SecTitle>Settlement — Bills vs Receipts (party-wise)</SecTitle>
               <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
                 <SettlementPanel
                   title="Clients — unsettled bills vs receipts"
-                  sub="Billed to customer vs received · net still to collect"
+                  sub="Billed to customer vs received · net still to collect · tap a row to open the client"
                   rows={age.receivables?.rows || []}
                   cur={cur} tone={C.blue} partyLabel="Customer" settleLabel="Receipts"
                   drillLabel="Receivables" onDrill={() => go('/reports/rec')}
+                  drill360="/reports/customer-360" go={go}
                 />
               </div>
 
               {/* Tier 2.6 — customer money on account not yet applied bill-wise */}
-              <SecTitle>Customer Advances &amp; Unapplied Receipts</SecTitle>
+              <SecTitle>On-Account Receipts — Customer Advances &amp; Unapplied Credits</SecTitle>
               <AdvancesPanel branch={branch} cur={cur} go={go} side="rec" />
 
               {/* Tier 2.5 — refunds / reissues / ADM / ACM awaiting posting (customer adjustments) */}
@@ -961,20 +1036,33 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
                 </table>
               </div>
 
+              {/* Bill-wise open purchase bills — the exact bills still awaiting payment */}
+              <SecTitle>Unsettled Supplier Bills (bill-wise)</SecTitle>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+                <UnsettledBills
+                  title="Open purchase bills — awaiting payment"
+                  bills={out.purchaseBills || []}
+                  cur={cur} tone={C.amber} drill360="/reports/supplier-360"
+                  actionLabel="Pay" actionRoute="/payments"
+                  onDrillAll={() => go('/reports/pay')} go={go}
+                />
+              </div>
+
               {/* Bills-vs-settlement on the payable side: billed vs paid, net to pay */}
-              <SecTitle>Settlement — Bills vs Payments</SecTitle>
+              <SecTitle>Settlement — Bills vs Payments (party-wise)</SecTitle>
               <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
                 <SettlementPanel
                   title="Suppliers — unsettled bills vs payments"
-                  sub="Billed by supplier vs paid · net still to pay"
+                  sub="Billed by supplier vs paid · net still to pay · tap a row to open the supplier"
                   rows={age.payables?.rows || []}
                   cur={cur} tone={C.amber} partyLabel="Supplier" settleLabel="Payments"
                   drillLabel="Payables" onDrill={() => go('/reports/pay')}
+                  drill360="/reports/supplier-360" go={go}
                 />
               </div>
 
               {/* Tier 2.6 — supplier money on account not yet applied bill-wise */}
-              <SecTitle>Supplier Advances &amp; Unapplied Payments</SecTitle>
+              <SecTitle>On-Account Payments — Supplier Advances &amp; Unapplied Credits</SecTitle>
               <AdvancesPanel branch={branch} cur={cur} go={go} side="pay" />
 
               {/* Top creditors to reconcile and pay */}

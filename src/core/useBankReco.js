@@ -95,8 +95,8 @@ export const useSetReconStatus = () =>
   useReconMutation(({ id, status }) => apiPost(`/api/bank-reconciliation/status/${id}`, { status }));
 
 export const useClearStatement = () =>
-  useReconMutation(({ ledger, from, to }) =>
-    apiDelete(`/api/bank-reconciliation/statement?${new URLSearchParams({ ledger, ...(from ? { from } : {}), ...(to ? { to } : {}) })}`));
+  useReconMutation(({ ledger, branch, from, to }) =>
+    apiDelete(`/api/bank-reconciliation/statement?${new URLSearchParams({ ledger, ...(branch ? { branch } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) })}`));
 
 export const useDeleteStatementLine = () =>
   useReconMutation(({ id }) => apiDelete(`/api/bank-reconciliation/line/${id}`));

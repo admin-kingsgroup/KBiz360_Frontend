@@ -1178,7 +1178,7 @@ export function GratuityRegister({branch}){
   /* Live, branch-scoped employees; gratuity provision is computed from Basic+DA
      and length of service per the Payment of Gratuity Act. */
   const emps=((useMasterList('employees', brScope?{branch:brScope}:{}).data)||[]).map(fromEmpDTO);
-  const DOJ_TO_YEARS=doj=>{const d=new Date(doj);const n=new Date("2026-05-19");return+((n-d)/(365.25*86400000)).toFixed(2);};
+  const DOJ_TO_YEARS=doj=>{const d=new Date(doj);const n=new Date();return+((n-d)/(365.25*86400000)).toFixed(2);};
   const GRATUITY=e=>{
     const yrs=DOJ_TO_YEARS(e.joined||"2021-04-01");
     if(yrs<5)return{eligible:false,yrs:yrs,amount:0,note:"<5 years service"};

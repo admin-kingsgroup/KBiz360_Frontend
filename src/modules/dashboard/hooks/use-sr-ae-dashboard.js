@@ -2,11 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { loadSrAeDashboard } from '../services/dashboard.service';
 import { sumVoucherTotals } from '../utils/transformers';
+import { getAuthToken } from '../../../core/api';
 
 export function useSrAeDashboard(branchCode) {
   const query = useQuery({
     queryKey: ['dashboard', 'sr-ae', branchCode || 'all'],
     queryFn: () => loadSrAeDashboard({ branchCode }),
+    enabled: !!getAuthToken(),
+    staleTime: 30_000,
   });
 
   const totals = useMemo(() => {
