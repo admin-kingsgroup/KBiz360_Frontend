@@ -129,40 +129,39 @@ describe('accountant workspace — screens render', () => {
     expect(screen.getByText(/I can approve/)).toBeInTheDocument();       // checker bucket
     expect(screen.getByText(/My own — needs approver/)).toBeInTheDocument(); // maker bucket
 
-    // Tab 2 — Collections & Payables: combined snapshot (both sides + net 1700 − 800 = 900)
+    // Tab 2 — Collections & Payables: headline snapshot (both sides + net 1700 − 800 = 900)
     fireEvent.click(screen.getByText('2. Collections & Payables'));
     expect(screen.getByText('Accounts Receivable (Debtors)')).toBeInTheDocument();
     expect(screen.getByText('Accounts Payable (Creditors)')).toBeInTheDocument();
-    expect(screen.getByText('Net Working Position')).toBeInTheDocument();
-    expect(screen.getByText('₹900')).toBeInTheDocument();
+    expect(screen.getAllByText('Net Working Position').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('₹900').length).toBeGreaterThan(0);
 
-    // Tab 2 → AR sub-tab is the default: debtors ageing + bill-wise open sales bills +
-    // clients settlement + on-account receipts + refunds. Payable-side panels NOT mounted.
+    // Receivable vs Payable comparison table — BOTH sides on ONE screen (no sub-tabs).
+    // The receivable column must render (the reported bug): Total Billed R = ₹2,500.
+    expect(screen.getByText(/Receivable vs Payable/)).toBeInTheDocument();
+    expect(screen.getByText('Total Billed')).toBeInTheDocument();
+    expect(screen.getByText('Unsettled Bills (open)')).toBeInTheDocument();
+    expect(screen.getByText('Unallocated / On-Account')).toBeInTheDocument();
+    expect(screen.getAllByText('₹2,500').length).toBeGreaterThan(0);   // receivable Total Billed shows
+    expect(screen.getAllByText('₹1,100').length).toBeGreaterThan(0);   // payable Total Billed shows
+
+    // Both ageing rows visible together (comparable), not behind tabs.
     expect(screen.getByText('Debtors (Receivable)')).toBeInTheDocument();
-    expect(screen.getByText('Open sales bills — awaiting receipt')).toBeInTheDocument(); // bill-wise list
-    expect(screen.getByText('SF/001')).toBeInTheDocument();                              // the exact open bill
-    expect(screen.getByText('Clients — unsettled bills vs receipts')).toBeInTheDocument();
-    expect(screen.getByText('On-Account Receipts — Customer Advances & Unapplied Credits')).toBeInTheDocument();
-    expect(screen.getByText('Customer credits — unapplied receipts')).toBeInTheDocument();
-    expect(screen.getByText('Refunds & adjustments pending')).toBeInTheDocument();
-    expect(screen.getAllByText('₹2,500').length).toBeGreaterThan(0);   // ACME gross billed (row + total)
-    expect(screen.queryByText('Creditors (Payable)')).toBeNull();
-    expect(screen.queryByText('Open purchase bills — awaiting payment')).toBeNull();
-    expect(screen.queryByText('Suppliers — unsettled bills vs payments')).toBeNull();
-
-    // Tab 2 → switch to the Accounts Payable sub-tab: creditors ageing + bill-wise open
-    // purchase bills + suppliers settlement + on-account payments. AR-side panels go away.
-    fireEvent.click(screen.getByText('Accounts Payable'));
     expect(screen.getByText('Creditors (Payable)')).toBeInTheDocument();
-    expect(screen.getByText('Open purchase bills — awaiting payment')).toBeInTheDocument(); // bill-wise list
-    expect(screen.getByText('PB/009')).toBeInTheDocument();                                 // the exact open bill
+
+    // Both bill-wise panels visible together: open sales bills AND open purchase bills.
+    expect(screen.getByText('Open sales bills — awaiting receipt')).toBeInTheDocument();
+    expect(screen.getByText('SF/001')).toBeInTheDocument();
+    expect(screen.getByText('Open purchase bills — awaiting payment')).toBeInTheDocument();
+    expect(screen.getByText('PB/009')).toBeInTheDocument();
+
+    // Both settlement panels + both on-account sides + worklists, all on the one view.
+    expect(screen.getByText('Clients — unsettled bills vs receipts')).toBeInTheDocument();
     expect(screen.getByText('Suppliers — unsettled bills vs payments')).toBeInTheDocument();
-    expect(screen.getByText('On-Account Payments — Supplier Advances & Unapplied Credits')).toBeInTheDocument();
+    expect(screen.getByText('Customer credits — unapplied receipts')).toBeInTheDocument();
     expect(screen.getByText('Supplier advances — unapplied payments')).toBeInTheDocument();
+    expect(screen.getByText('Refunds & adjustments pending')).toBeInTheDocument();
     expect(screen.getByText('Top creditors — reconcile & pay')).toBeInTheDocument();
-    expect(screen.queryByText('Debtors (Receivable)')).toBeNull();
-    expect(screen.queryByText('Open sales bills — awaiting receipt')).toBeNull();
-    expect(screen.queryByText('Clients — unsettled bills vs receipts')).toBeNull();
 
     // Tab 3 — Month-End & Compliance: statutory tiles + GST/ITC + P&L snapshot + master health
     fireEvent.click(screen.getByText('3. Month-End & Compliance'));

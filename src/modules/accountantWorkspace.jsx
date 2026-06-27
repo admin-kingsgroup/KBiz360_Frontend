@@ -626,9 +626,6 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
   const { data: taxEvents } = useTaxCalendar();
 
   const [activeTab, setActiveTab] = useState('daily');
-  // Within Collections & Payables, keep Accounts Receivable and Accounts Payable on
-  // their own sub-tab so each side is read & worked in isolation (no interleaving).
-  const [arApTab, setArApTab] = useState('ar');
   const [selectedBank, setSelectedBank] = useState('');
 
   // Auto-select first bank ledger once loaded
@@ -682,8 +679,8 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
     { n: pendCount, label: 'to approve & post', onClick: () => go('/transactions/approvals') },
     { n: suspense.length, label: 'in suspense', onClick: () => go('/accounts/suspense') },
     { n: onAcct.length, label: 'receipts to allocate', onClick: () => go('/reports/rec') },
-    { n: overdueDebtorsCount, label: 'overdue debtors', onClick: () => { setActiveTab('collections'); setArApTab('ar'); } },
-    { n: refundsPendingCount, label: 'refunds pending', onClick: () => { setActiveTab('collections'); setArApTab('ar'); } },
+    { n: overdueDebtorsCount, label: 'overdue debtors', onClick: () => setActiveTab('collections') },
+    { n: refundsPendingCount, label: 'refunds pending', onClick: () => setActiveTab('collections') },
   ];
   const heroTotal = heroItems.reduce((s, it) => s + it.n, 0);
 
@@ -731,26 +728,28 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
     outline: 'none',
   });
 
-  // Pill-style sub-tab for the AR / AP split inside Collections & Payables. Takes the
-  // side's accent (blue = receivable, amber = payable) so the active pill reads as
-  // "this side" at a glance.
-  const subTabStyle = (active, accent) => ({
-    padding: '7px 16px',
-    cursor: 'pointer',
-    fontWeight: 700,
-    fontSize: '12px',
-    color: active ? '#fff' : C.dim,
-    background: active ? accent : '#fff',
-    borderTop: `1px solid ${active ? accent : C.border}`,
-    borderBottom: `1px solid ${active ? accent : C.border}`,
-    borderLeft: `1px solid ${active ? accent : C.border}`,
-    borderRight: `1px solid ${active ? accent : C.border}`,
-    borderRadius: 999,
-    outline: 'none',
-    transition: 'all 0.15s ease',
-  });
-
   const alerts = alertsRes?.alerts || [];
+
+  // ── Receivable vs Payable comparison metrics ──────────────────────────────
+  // Both sides computed from the SAME live engines (ageing totals carry billed &
+  // settled; outstanding carries open-bill & on-account totals) so the two columns
+  // are directly comparable. Falls back to summing the row arrays if a totals field
+  // is absent, so the receivable column never goes blank when the data is present.
+  const recBilled = age.receivables?.totals?.billed || 0;
+  const recSettled = age.receivables?.totals?.settled || 0;
+  const payBilled = age.payables?.totals?.billed || 0;
+  const paySettled = age.payables?.totals?.settled || 0;
+  const recOpenBills = out.totals?.salesOutstanding ?? (out.salesBills || []).reduce((s, b) => s + (Number(b.outstanding) || 0), 0);
+  const payOpenBills = out.totals?.purchaseOutstanding ?? (out.purchaseBills || []).reduce((s, b) => s + (Number(b.outstanding) || 0), 0);
+  const recOnAccount = out.totals?.onAccountReceipts ?? (out.onAccountReceipts || []).reduce((s, r) => s + (Number(r.onAccount) || 0), 0);
+  const payOnAccount = out.totals?.onAccountPayments ?? (out.onAccountPayments || []).reduce((s, r) => s + (Number(r.onAccount) || 0), 0);
+  const compareRows = [
+    { label: 'Total Billed', sub: 'gross sales vs purchases', r: recBilled, p: payBilled },
+    { label: 'Settled', sub: 'received vs paid', r: recSettled, p: paySettled },
+    { label: 'Unsettled Bills (open)', sub: 'bill-wise outstanding', r: recOpenBills, p: payOpenBills },
+    { label: 'Unallocated / On-Account', sub: 'receipts vs payments not yet applied', r: recOnAccount, p: payOnAccount },
+    { label: 'Net Outstanding', sub: 'debtors vs creditors', r: rec.total || 0, p: pay.total || 0, strong: true },
+  ];
 
   return (
     <Shell
@@ -904,21 +903,21 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
         </>
       )}
 
-      {/* TAB 2: COLLECTIONS & PAYABLES — split into Accounts Receivable / Accounts Payable */}
+      {/* TAB 2: COLLECTIONS & PAYABLES — Receivable & Payable side-by-side for comparison */}
       {activeTab === 'collections' && (
         <>
-          {/* Combined snapshot: both sides + net at a glance, each card jumping to its side */}
+          {/* Headline snapshot: both sides + net, each card drilling to its register */}
           <SecTitle>Net Working Position ({age.asOf ? `as on ${age.asOf}` : 'live'})</SecTitle>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-            <div {...clickable(() => setArApTab('ar'))} style={{ ...card, padding: 14, borderLeft: `4px solid ${C.blue}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' }}>
+            <div {...clickable(() => go('/reports/rec'))} style={{ ...card, padding: 14, borderLeft: `4px solid ${C.blue}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' }}>
               <div style={{ fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Accounts Receivable (Debtors)</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: C.blue, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{money(cur, rec.total || 0)}</div>
-              <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{overdueDebtorsCount} overdue · view AR <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{overdueDebtorsCount} overdue · open receivables <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
             </div>
-            <div {...clickable(() => setArApTab('ap'))} style={{ ...card, padding: 14, borderLeft: `4px solid ${C.amber}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' }}>
+            <div {...clickable(() => go('/reports/pay'))} style={{ ...card, padding: 14, borderLeft: `4px solid ${C.amber}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' }}>
               <div style={{ fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Accounts Payable (Creditors)</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: C.amber, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{money(cur, pay.total || 0)}</div>
-              <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{(age.payables?.rows || []).length} supplier(s) · view AP <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{(age.payables?.rows || []).length} supplier(s) · open payables <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
             </div>
             <div {...clickable(() => go('/accounts/net-ageing'))} style={{ ...card, padding: 14, borderLeft: `4px solid ${recNet >= 0 ? C.green : C.red}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' }}>
               <div style={{ fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Net Working Position</div>
@@ -927,163 +926,155 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
             </div>
           </div>
 
-          {/* Sub-tabs: keep Accounts Receivable and Accounts Payable fully separate */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-            <button onClick={() => setArApTab('ar')} style={subTabStyle(arApTab === 'ar', C.blue)}>Accounts Receivable</button>
-            <button onClick={() => setArApTab('ap')} style={subTabStyle(arApTab === 'ap', C.amber)}>Accounts Payable</button>
+          {/* ── Receivable vs Payable — one comparison table, every metric side by side.
+              This is what the separate AR/AP tabs made impossible: read both columns at
+              once. The Receivable column shows total billed, settled, open bills and
+              unallocated receipts next to the Payable equivalents. */}
+          <SecTitle>Receivable vs Payable — side-by-side comparison ({age.asOf ? `as on ${age.asOf}` : 'live'})</SecTitle>
+          <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 18 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead><tr style={{ background: C.dark }}>
+                <th style={{ ...th, background: 'transparent' }}>Metric</th>
+                <th style={{ ...th, background: 'transparent', ...rnum }}>Receivable (Customers)</th>
+                <th style={{ ...th, background: 'transparent', ...rnum }}>Payable (Suppliers)</th>
+                <th style={{ ...th, background: 'transparent', ...rnum }}>Net (R − P)</th>
+              </tr></thead>
+              <tbody>
+                {compareRows.map((m, i) => {
+                  const net = (m.r || 0) - (m.p || 0);
+                  return (
+                    <tr key={m.label} style={{ borderTop: '1px solid #dfe2e7', background: m.strong ? '#fafbff' : (i % 2 ? '#fafbff' : '#fff') }}>
+                      <td style={{ ...td, fontWeight: m.strong ? 800 : 700, color: C.dark }}>{m.label}<div style={{ fontSize: 10.5, color: C.dim, fontWeight: 500 }}>{m.sub}</div></td>
+                      <td {...clickable(() => go('/reports/rec'))} style={{ ...td, ...rnum, cursor: 'pointer', color: C.blue, fontWeight: m.strong ? 800 : 700 }}>{money(cur, m.r || 0)}</td>
+                      <td {...clickable(() => go('/reports/pay'))} style={{ ...td, ...rnum, cursor: 'pointer', color: C.amber, fontWeight: m.strong ? 800 : 700 }}>{money(cur, m.p || 0)}</td>
+                      <td style={{ ...td, ...rnum, fontWeight: 800, color: net >= 0 ? C.green : C.red }}>{money(cur, net)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
-          {/* ─────────── ACCOUNTS RECEIVABLE ─────────── */}
-          {arApTab === 'ar' && (
-            <>
-              <SecTitle>Debtors ageing — Receivable</SecTitle>
-              <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 16 }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                  <thead><tr>
-                    <th style={th}>Ageing</th><th style={{ ...th, ...rnum }}>0–30</th><th style={{ ...th, ...rnum }}>31–60</th><th style={{ ...th, ...rnum }}>61–90</th><th style={{ ...th, ...rnum }}>90+</th><th style={{ ...th, ...rnum }}>Total</th>
-                  </tr></thead>
-                  <tbody>
-                    <AgeBucketRow label="Debtors (Receivable)" totals={rec} cur={cur} tone={C.blue} onClick={() => go('/reports/rec')} />
-                  </tbody>
-                </table>
+          {/* Ageing buckets — debtors AND creditors in ONE table so the buckets line up */}
+          <SecTitle>Ageing — Debtors vs Creditors</SecTitle>
+          <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 18 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead><tr>
+                <th style={th}>Ageing</th><th style={{ ...th, ...rnum }}>0–30</th><th style={{ ...th, ...rnum }}>31–60</th><th style={{ ...th, ...rnum }}>61–90</th><th style={{ ...th, ...rnum }}>90+</th><th style={{ ...th, ...rnum }}>Total</th>
+              </tr></thead>
+              <tbody>
+                <AgeBucketRow label="Debtors (Receivable)" totals={rec} cur={cur} tone={C.blue} onClick={() => go('/reports/rec')} />
+                <AgeBucketRow label="Creditors (Payable)" totals={pay} cur={cur} tone={C.amber} onClick={() => go('/reports/pay')} />
+                <tr {...clickable(() => go('/accounts/net-ageing'))} style={{ borderTop: `2px solid ${C.border}`, background: '#fafbff', cursor: 'pointer' }}>
+                  <td style={{ padding: '7px 10px', fontWeight: 800, color: C.dark }}>Net Working Position</td>
+                  <td colSpan={4} />
+                  <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: recNet >= 0 ? C.green : C.red, fontVariantNumeric: 'tabular-nums' }}>{money(cur, recNet)} <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Bill-wise open documents — sales bills | purchase bills, side by side */}
+          <SecTitle>Unsettled Bills (bill-wise) — Client vs Supplier</SecTitle>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
+            <UnsettledBills
+              title="Open sales bills — awaiting receipt"
+              bills={out.salesBills || []}
+              cur={cur} tone={C.blue} drill360="/reports/customer-360"
+              actionLabel="Receipt" actionRoute="/receipts"
+              onDrillAll={() => go('/reports/rec')} go={go}
+            />
+            <UnsettledBills
+              title="Open purchase bills — awaiting payment"
+              bills={out.purchaseBills || []}
+              cur={cur} tone={C.amber} drill360="/reports/supplier-360"
+              actionLabel="Pay" actionRoute="/payments"
+              onDrillAll={() => go('/reports/pay')} go={go}
+            />
+          </div>
+
+          {/* Party-wise settlement — clients | suppliers, side by side */}
+          <SecTitle>Settlement — Bills vs Receipts &amp; Payments (party-wise)</SecTitle>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
+            <SettlementPanel
+              title="Clients — unsettled bills vs receipts"
+              sub="Billed to customer vs received · net to collect · tap a row to open the client"
+              rows={age.receivables?.rows || []}
+              cur={cur} tone={C.blue} partyLabel="Customer" settleLabel="Receipts"
+              drillLabel="Receivables" onDrill={() => go('/reports/rec')}
+              drill360="/reports/customer-360" go={go}
+            />
+            <SettlementPanel
+              title="Suppliers — unsettled bills vs payments"
+              sub="Billed by supplier vs paid · net to pay · tap a row to open the supplier"
+              rows={age.payables?.rows || []}
+              cur={cur} tone={C.amber} partyLabel="Supplier" settleLabel="Payments"
+              drillLabel="Payables" onDrill={() => go('/reports/pay')}
+              drill360="/reports/supplier-360" go={go}
+            />
+          </div>
+
+          {/* On-account / unallocated — receipts | payments, side by side */}
+          <SecTitle>On-Account / Unallocated — Receipts vs Payments</SecTitle>
+          <AdvancesPanel branch={branch} cur={cur} go={go} side="both" />
+
+          {/* Refunds / reissues / ADM / ACM awaiting posting */}
+          <SecTitle>Refunds &amp; Adjustments</SecTitle>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
+            <RefundsWorklist branch={branch} cur={cur} go={go} />
+          </div>
+
+          {/* Action boards — overdue debtors (collect) | top creditors (pay), side by side */}
+          <SecTitle>Worklist — Collect vs Pay</SecTitle>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+            <div style={{ ...card, padding: 12, flex: '1 1 400px', minWidth: 320 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Top overdue debtors — collections followup</span>
+                <button onClick={() => go('/accounts/collections')} style={{ ...aBtn(C.blue), padding: '3px 8px', fontSize: 10 }}>View All Tracker</button>
               </div>
-
-              {/* Bill-wise open sales bills — the exact invoices still awaiting receipt */}
-              <SecTitle>Unsettled Client Bills (bill-wise)</SecTitle>
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
-                <UnsettledBills
-                  title="Open sales bills — awaiting receipt"
-                  bills={out.salesBills || []}
-                  cur={cur} tone={C.blue} drill360="/reports/customer-360"
-                  actionLabel="Receipt" actionRoute="/receipts"
-                  onDrillAll={() => go('/reports/rec')} go={go}
-                />
-              </div>
-
-              {/* Bills-vs-settlement on the receivable side: billed vs received, net to collect */}
-              <SecTitle>Settlement — Bills vs Receipts (party-wise)</SecTitle>
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
-                <SettlementPanel
-                  title="Clients — unsettled bills vs receipts"
-                  sub="Billed to customer vs received · net still to collect · tap a row to open the client"
-                  rows={age.receivables?.rows || []}
-                  cur={cur} tone={C.blue} partyLabel="Customer" settleLabel="Receipts"
-                  drillLabel="Receivables" onDrill={() => go('/reports/rec')}
-                  drill360="/reports/customer-360" go={go}
-                />
-              </div>
-
-              {/* Tier 2.6 — customer money on account not yet applied bill-wise */}
-              <SecTitle>On-Account Receipts — Customer Advances &amp; Unapplied Credits</SecTitle>
-              <AdvancesPanel branch={branch} cur={cur} go={go} side="rec" />
-
-              {/* Tier 2.5 — refunds / reissues / ADM / ACM awaiting posting (customer adjustments) */}
-              <SecTitle>Refunds &amp; Adjustments</SecTitle>
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
-                <RefundsWorklist branch={branch} cur={cur} go={go} />
-              </div>
-
-              {/* Top overdue debtors collection board with INLINE notes */}
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                <div style={{ ...card, padding: 12, flex: '1 1 400px', minWidth: 320 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span>Top overdue debtors — collections followup</span>
-                    <button onClick={() => go('/accounts/collections')} style={{ ...aBtn(C.blue), padding: '3px 8px', fontSize: 10 }}>View All Tracker</button>
+              {top5rec.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 10 }}>✓ No overdue debtors outstanding.</div>}
+              {top5rec.map((r, i) => (
+                <div key={i} style={{ padding: '8px 0', borderTop: i ? '1px solid #dfe2e7' : 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span {...clickable(() => go(`/reports/customer-360?party=${encodeURIComponent(r.party)}`))} style={{ fontSize: 12, color: C.dark, fontWeight: 700, cursor: 'pointer' }}>{r.party}<span style={{ color: C.blue, fontWeight: 800, marginLeft: 4 }}>›</span></span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: C.red }}>{money(cur, r.overdue)}</span>
                   </div>
-                  {top5rec.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 10 }}>✓ No overdue debtors outstanding.</div>}
-                  {top5rec.map((r, i) => (
-                    <div key={i} style={{ padding: '8px 0', borderTop: i ? '1px solid #dfe2e7' : 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 12, color: C.dark, fontWeight: 700 }}>{r.party}</span>
-                        <span style={{ fontSize: 12, fontWeight: 800, color: C.red }}>{money(cur, r.overdue)}</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input
-                          type="text"
-                          value={editingNotes[r.party] !== undefined ? editingNotes[r.party] : (savedNotes[r.party] || '')}
-                          onChange={(e) => setEditingNotes({ ...editingNotes, [r.party]: e.target.value })}
-                          onBlur={() => {
-                            const val = editingNotes[r.party];
-                            if (val !== undefined && val !== (savedNotes[r.party] || '')) {
-                              const next = { ...savedNotes, [r.party]: val };
-                              saveNoteMutation.mutate({ key: `followup-notes:${branchCode(branch) || 'ALL'}`, value: next, description: `Save note for ${r.party}` });
-                            }
-                          }}
-                          placeholder="Add follow-up notes (auto-saves on focus out)..."
-                          style={{ flex: 1, padding: '4px 8px', fontSize: 11.5, borderRadius: 4, border: `1px solid ${C.border}`, outline: 'none' }}
-                        />
-                        <button onClick={() => go('/receipts')} style={{ ...aBtn(C.green), padding: '3px 8px', fontSize: 10 }}>Receipt</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ─────────── ACCOUNTS PAYABLE ─────────── */}
-          {arApTab === 'ap' && (
-            <>
-              <SecTitle>Creditors ageing — Payable</SecTitle>
-              <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 16 }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                  <thead><tr>
-                    <th style={th}>Ageing</th><th style={{ ...th, ...rnum }}>0–30</th><th style={{ ...th, ...rnum }}>31–60</th><th style={{ ...th, ...rnum }}>61–90</th><th style={{ ...th, ...rnum }}>90+</th><th style={{ ...th, ...rnum }}>Total</th>
-                  </tr></thead>
-                  <tbody>
-                    <AgeBucketRow label="Creditors (Payable)" totals={pay} cur={cur} tone={C.amber} onClick={() => go('/reports/pay')} />
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Bill-wise open purchase bills — the exact bills still awaiting payment */}
-              <SecTitle>Unsettled Supplier Bills (bill-wise)</SecTitle>
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
-                <UnsettledBills
-                  title="Open purchase bills — awaiting payment"
-                  bills={out.purchaseBills || []}
-                  cur={cur} tone={C.amber} drill360="/reports/supplier-360"
-                  actionLabel="Pay" actionRoute="/payments"
-                  onDrillAll={() => go('/reports/pay')} go={go}
-                />
-              </div>
-
-              {/* Bills-vs-settlement on the payable side: billed vs paid, net to pay */}
-              <SecTitle>Settlement — Bills vs Payments (party-wise)</SecTitle>
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
-                <SettlementPanel
-                  title="Suppliers — unsettled bills vs payments"
-                  sub="Billed by supplier vs paid · net still to pay · tap a row to open the supplier"
-                  rows={age.payables?.rows || []}
-                  cur={cur} tone={C.amber} partyLabel="Supplier" settleLabel="Payments"
-                  drillLabel="Payables" onDrill={() => go('/reports/pay')}
-                  drill360="/reports/supplier-360" go={go}
-                />
-              </div>
-
-              {/* Tier 2.6 — supplier money on account not yet applied bill-wise */}
-              <SecTitle>On-Account Payments — Supplier Advances &amp; Unapplied Credits</SecTitle>
-              <AdvancesPanel branch={branch} cur={cur} go={go} side="pay" />
-
-              {/* Top creditors to reconcile and pay */}
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                <div style={{ ...card, padding: 12, flex: '1 1 350px', minWidth: 300 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span>Top creditors — reconcile &amp; pay</span>
-                    <button onClick={() => go('/accounts/supplier-reco')} style={{ ...aBtn(C.amber), padding: '3px 8px', fontSize: 10 }}>Supplier Reco</button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="text"
+                      value={editingNotes[r.party] !== undefined ? editingNotes[r.party] : (savedNotes[r.party] || '')}
+                      onChange={(e) => setEditingNotes({ ...editingNotes, [r.party]: e.target.value })}
+                      onBlur={() => {
+                        const val = editingNotes[r.party];
+                        if (val !== undefined && val !== (savedNotes[r.party] || '')) {
+                          const next = { ...savedNotes, [r.party]: val };
+                          saveNoteMutation.mutate({ key: `followup-notes:${branchCode(branch) || 'ALL'}`, value: next, description: `Save note for ${r.party}` });
+                        }
+                      }}
+                      placeholder="Add follow-up notes (auto-saves on focus out)..."
+                      style={{ flex: 1, padding: '4px 8px', fontSize: 11.5, borderRadius: 4, border: `1px solid ${C.border}`, outline: 'none' }}
+                    />
+                    <button onClick={() => go('/receipts')} style={{ ...aBtn(C.green), padding: '3px 8px', fontSize: 10 }}>Receipt</button>
                   </div>
-                  {top5pay.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 10 }}>✓ No outstanding bills to pay.</div>}
-                  {top5pay.map((r, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
-                      <span style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600 }}>{r.party}</span>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{money(cur, r.total)}</span>
-                      <button onClick={() => go('/payments')} style={{ ...aBtn(C.amber), padding: '3px 8px', fontSize: 10 }}>Pay</button>
-                    </div>
-                  ))}
                 </div>
+              ))}
+            </div>
+
+            <div style={{ ...card, padding: 12, flex: '1 1 350px', minWidth: 300 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Top creditors — reconcile &amp; pay</span>
+                <button onClick={() => go('/accounts/supplier-reco')} style={{ ...aBtn(C.amber), padding: '3px 8px', fontSize: 10 }}>Supplier Reco</button>
               </div>
-            </>
-          )}
+              {top5pay.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 10 }}>✓ No outstanding bills to pay.</div>}
+              {top5pay.map((r, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
+                  <span {...clickable(() => go(`/reports/supplier-360?party=${encodeURIComponent(r.party)}`))} style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600, cursor: 'pointer' }}>{r.party}<span style={{ color: C.amber, fontWeight: 800, marginLeft: 4 }}>›</span></span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{money(cur, r.total)}</span>
+                  <button onClick={() => go('/payments')} style={{ ...aBtn(C.amber), padding: '3px 8px', fontSize: 10 }}>Pay</button>
+                </div>
+              ))}
+            </div>
+          </div>
         </>
       )}
 
