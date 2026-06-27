@@ -85,21 +85,30 @@ export function PaymentRun({ branch, setRoute }) {
             {['NEFT', 'RTGS', 'UPI', 'Cheque', 'Cash'].map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
         </label>
-        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 18 }}>
           {outQ.isLoading ? (
             <>
-              <div className="kb-skeleton" style={{ height: 11, width: 120, borderRadius: 5, marginLeft: 'auto' }} />
-              <div className="kb-skeleton" style={{ height: 20, width: 110, borderRadius: 6, marginTop: 6, marginLeft: 'auto' }} />
+              <div className="kb-skeleton" style={{ height: 30, width: 130, borderRadius: 6 }} />
+              <div className="kb-skeleton" style={{ height: 40, width: 150, borderRadius: 8 }} />
             </>
           ) : (
             <>
-              <div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>{summary.bills} bills · {summary.suppliers} supplier{summary.suppliers === 1 ? '' : 's'}</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: C.dark }}>{money(cur, summary.total)}</div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>{summary.bills} bills · {summary.suppliers} supplier{summary.suppliers === 1 ? '' : 's'}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: C.dark }}>{money(cur, summary.total)}</div>
+              </div>
+              <button disabled={!summary.bills || run.isPending} onClick={submit}
+                style={{
+                  padding: '11px 22px', fontSize: 13.5, fontWeight: 800, border: 'none', borderRadius: 8,
+                  cursor: summary.bills ? 'pointer' : 'not-allowed', color: '#fff', background: C.amber,
+                  opacity: !summary.bills || run.isPending ? 0.6 : 1,
+                  boxShadow: summary.bills && !run.isPending ? '0 3px 10px rgba(133,79,11,0.35)' : 'none',
+                  display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap', transition: 'transform .1s, box-shadow .1s',
+                }}>
+                {run.isPending ? 'Posting…' : <>Post {summary.suppliers} payment{summary.suppliers === 1 ? '' : 's'} <ArrowRight size={14} /></>}
+              </button>
             </>
           )}
-          <button disabled={!summary.bills || run.isPending} onClick={submit}
-            style={{ marginTop: 6, padding: '8px 16px', fontSize: 13, fontWeight: 800, border: 'none', borderRadius: 6, cursor: summary.bills ? 'pointer' : 'not-allowed', color: '#fff', background: C.amber, opacity: !summary.bills || run.isPending ? 0.6 : 1 }}>
-            {run.isPending ? 'Posting…' : `Post ${summary.suppliers} payment${summary.suppliers === 1 ? '' : 's'}`}</button>
         </div>
       </div>
 

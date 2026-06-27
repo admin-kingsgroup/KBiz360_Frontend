@@ -26,10 +26,10 @@ export function InterBranchRegister({ branch }) {
   const td = { padding: '8px 12px', borderBottom: '1px solid #dfe2e7', fontSize: 12.5 };
   const rnum = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
   const tile = (label, value, tone, sub) => (
-    <div style={{ ...card, padding: '10px 14px', minWidth: 150 }}>
-      <div style={{ fontSize: 11, color: tone, fontWeight: 700 }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 800, color: tone }}>{value}</div>
-      {sub && <div style={{ fontSize: 10.5, color: C.dim }}>{sub}</div>}
+    <div style={{ ...card, flex: 1, minWidth: 150, padding: '14px 16px', borderTop: `3px solid ${tone}` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: tone, marginTop: 4 }}>{value}</div>
+      {sub && <div style={{ fontSize: 10.5, color: C.dim, marginTop: 2 }}>{sub}</div>}
     </div>
   );
 
@@ -40,7 +40,7 @@ export function InterBranchRegister({ branch }) {
         <div style={{ fontSize: 12, color: C.dim }}>{brLabel(branch)} · every inter-branch leg by INB Link No · open legs are awaiting the other branch's booking</div>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 12 }}>
         {tile('Total Legs', data.totals?.total || 0, C.dark)}
         {tile('Matched (booked)', data.totals?.booked || 0, C.green, 'both sides entered')}
         {tile('Open (unbooked)', data.totals?.open || 0, C.gold, 'awaiting buyer PO')}

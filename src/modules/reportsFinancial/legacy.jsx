@@ -2019,7 +2019,7 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance }) {
         title={isRec ? 'Accounts Receivable — Ageing' : 'Accounts Payable — Ageing'}
         sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} incl. GST &nbsp;|&nbsp; as of {d?.asOf || '—'} &nbsp;|&nbsp; bill-wise · no FIFO · live double-entry</>}
       />
-      <div className="noprint" style={{ maxWidth: 1180, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+      <div className="noprint" style={{ background: '#fff', border: `1px solid ${SAP.border}`, borderTop: 'none', borderBottom: 'none', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
         <span style={{ color: SAP.sec, fontWeight: 600 }}>Age as on</span>
         <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)}
           style={{ padding: '4px 8px', border: `1px solid ${SAP.border}`, borderRadius: 6, fontSize: 12 }} />
@@ -2096,7 +2096,7 @@ function NetAgeingView({ branch }) {
         title="Net Ageing — Debtors − Creditors (same party)"
         sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} &nbsp;|&nbsp; as of {d?.asOf || '—'} &nbsp;|&nbsp; net of on-account · same-party only</>}
       />
-      <div className="noprint" style={{ maxWidth: 1180, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+      <div className="noprint" style={{ background: '#fff', border: `1px solid ${SAP.border}`, borderTop: 'none', borderBottom:'none', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
         <span style={{ color: SAP.sec, fontWeight: 600 }}>Age as on</span>
         <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)}
           style={{ padding: '4px 8px', border: `1px solid ${SAP.border}`, borderRadius: 6, fontSize: 12 }} />

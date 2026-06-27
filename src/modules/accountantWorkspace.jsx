@@ -4,7 +4,7 @@
 // balance, tax) — these screens compose & focus that data; they post nothing new.
 // Branch-scoped via the top-right selector (the `branch` prop), exactly like every
 // other live screen. Cards/links jump into the existing working screens via setRoute.
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { clickable } from '../core/ux/clickable';
 import { usePager, Pager } from '../core/ux/pager';
 import { bc } from '../core/styles';
@@ -38,7 +38,7 @@ import { useCollectionsBoard, useUpsertFollowup, useAddContact, useReminderRun }
 import {
   Wallet, Landmark, CheckSquare, TrendingUp, TrendingDown, ReceiptText, AlertTriangle,
   ListChecks, ArrowRight, Plus, RefreshCw, Calendar, History, AlertCircle, CheckCircle2,
-  Scale, Coins, CreditCard,
+  Scale, Coins, CreditCard, ChevronDown, Check,
 } from 'lucide-react';
 import { PageLayout } from '../shell/PageLayout';
 
@@ -638,6 +638,50 @@ const STATUS_C = { open: C.dim, promised: C.green, escalated: C.red, closed: C.b
 const dunBadge = (s) => ({ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 800, color: '#fff', background: STATUS_C[s] || C.dim, textTransform: 'capitalize' });
 const fmtWhen = (d) => (d ? String(d).slice(0, 10) : '');
 
+// Custom status picker — a native <select>'s dropdown can't be themed (square
+// corners, OS-default option rows), so this renders the same DUN_STATUS choices
+// as a small rounded popover with colour-dot options instead.
+function StatusMenu({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        style={{ ...dunBadge(value), border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        {value}
+        <ChevronDown size={10} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      </button>
+      {open && (
+        <div role="menu" style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 50, minWidth: 130,
+          background: '#fff', borderRadius: 12, border: `1px solid ${C.border}`,
+          boxShadow: '0 10px 28px rgba(13,19,38,0.16)', padding: 5, overflow: 'hidden',
+        }}>
+          {DUN_STATUS.map((s) => (
+            <button key={s} type="button" onClick={() => { onChange(s); setOpen(false); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                padding: '7px 9px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: s === value ? '#EEF3FF' : 'transparent',
+                fontSize: 12, fontWeight: s === value ? 700 : 500, color: C.dark, textTransform: 'capitalize',
+              }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_C[s] || C.dim, flexShrink: 0 }} />
+              <span style={{ flex: 1 }}>{s}</span>
+              {s === value && <Check size={12} color={C.blue} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CollectionsFollowup({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const boardQ = useCollectionsBoard(branch);
@@ -693,10 +737,7 @@ export function CollectionsFollowup({ branch, setRoute }) {
                   {AGE_COLS.map(([k]) => <td key={k} style={{ ...td, ...rnum, color: k === 'd90' && r[k] > 0 ? C.red : C.dark }}>{r[k] ? money(cur, r[k]) : '—'}</td>)}
                   <td style={{ ...td, ...rnum, fontWeight: 800, color: C.red }}>{money(cur, r.overdue)}</td>
                   <td style={td}>
-                    <select value={f.status || 'open'} onChange={(e) => save(r.party, { status: e.target.value })}
-                      style={{ ...dunBadge(f.status || 'open'), border: 'none', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
-                      {DUN_STATUS.map((s) => <option key={s} value={s} style={{ color: '#000', background: '#fff' }}>{s}</option>)}
-                    </select>
+                    <StatusMenu value={f.status || 'open'} onChange={(s) => save(r.party, { status: s })} />
                   </td>
                   <td style={td}>
                     <input type="date" value={fmtWhen(f.promisedDate)} onChange={(e) => save(r.party, { promisedDate: e.target.value, status: e.target.value ? 'promised' : (f.status || 'open') })}

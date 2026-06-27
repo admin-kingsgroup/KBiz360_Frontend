@@ -69,13 +69,15 @@ export function Customer360({ branch }) {
       title="Customer 360° View"
       subtitle="Complete customer profile — sales, GP, outstanding receivable and ageing"
       filters={
-        <>
-          <ReportSearch value={search} onChange={setSearch} placeholder="Voucher / module / destination…" />
+        <div className="flex w-full flex-wrap items-center gap-3">
+          <div className="flex flex-1 items-center gap-2">
+            <div className="flex-1"><ReportSearch value={search} onChange={setSearch} placeholder="Voucher / module / destination…" width="100%" /></div>
+            <Select value={selClient} onChange={(e) => setClient(e.target.value)} disabled={!ALL_CLIENTS.length} className="flex-1">
+              {ALL_CLIENTS.length ? ALL_CLIENTS.map((s) => <option key={s}>{s}</option>) : <option value="">No customer data yet</option>}
+            </Select>
+          </div>
           <ReportDateBar value={range} onChange={setRange} branch={branch} />
-          <Select value={selClient} onChange={(e) => setClient(e.target.value)} disabled={!ALL_CLIENTS.length} className="w-auto min-w-[200px]">
-            {ALL_CLIENTS.length ? ALL_CLIENTS.map((s) => <option key={s}>{s}</option>) : <option value="">No customer data yet</option>}
-          </Select>
-        </>
+        </div>
       }
     >
       {gpQ.isError && (
@@ -116,7 +118,7 @@ export function Customer360({ branch }) {
           <DataTable columns={histColumns} rows={displayHist} getRowKey={(r) => r.id} dense exportName={`customer-${selClient || 'none'}`} emptyMessage="No sales for this customer." />
         </div>
         <div className="flex flex-col gap-3">
-          <PageSection title="Receivable Ageing" className="border-t-[3px] border-t-[#185FA5]">
+          <PageSection title="Receivable Ageing" className="border-t-[3px] border-t-[#185FA5] mt-6">
             {!ageRow.party ? <p className="text-[11px] text-ink-muted">No open receivable for this customer.</p> : (
               <div className="text-[11px]">
                 {AGE_BUCKETS.map(([k, lbl]) => (
