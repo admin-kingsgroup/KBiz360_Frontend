@@ -21,7 +21,7 @@ import {
 import { usePDCSummary } from '../core/usePDC';
 import { useMasterHealth } from '../core/useMasters';
 import { useTaxCalendar, useExpenseBudgets } from '../core/useReference';
-import { useBankLedgers, useBankReconSummary } from '../core/useBankReco';
+import { useBankLedgers, useBankReconSummary, useBankReconAggregate } from '../core/useBankReco';
 import {
   useSupplierBook, useSupplierStatement, useSupplierReconSummary,
   useImportSupplierStatement, useSupplierAutoMatch, useSupplierManualMatch,
@@ -690,7 +690,7 @@ function PnlTrend({ branch }) {
 // dashboard's selected period, so the bars always read "FY-to-date vs FY target".
 // An inline editor writes the three numbers; a role-gated PUT surfaces a message,
 // never crashes. Unset / 0 target → an honest "no target set".
-function TargetsVsActual({ branch, cur, fyActual }) {
+function TargetsVsActual({ branch, cur, fyActual, fyModules = [] }) {
   const code = branchCode(branch);
   const fyKey = `targets:${code || 'ALL'}:${CUR_FY.label}`;
   const saved = useConfigValue(fyKey).data || {};
@@ -701,13 +701,19 @@ function TargetsVsActual({ branch, cur, fyActual }) {
   const sales = Number(saved.salesYearly) || 0;
   const gp = Number(saved.gpYearly) || 0;
   const np = Number(saved.npYearly) || 0;
+  const savedMods = saved.modules || {};
+  // FY actual sales per module (cost-centre P&L pivot), biggest first.
+  const mods = [...(fyModules || [])].sort((a, b) => (b.sales || 0) - (a.sales || 0));
 
   const save = () => {
     setErr('');
     const value = {
-      salesYearly: Number(draft?.salesYearly) || 0,
-      gpYearly: Number(draft?.gpYearly) || 0,
-      npYearly: Number(draft?.npYearly) || 0,
+      salesYearly: Number(t.salesYearly) || 0,
+      gpYearly: Number(t.gpYearly) || 0,
+      npYearly: Number(t.npYearly) || 0,
+      // Per-module Sales targets (only non-zero kept), keyed by module key.
+      modules: Object.fromEntries(Object.entries(t.modules || {})
+        .map(([k, v]) => [k, Number(v) || 0]).filter(([, v]) => v > 0)),
     };
     saveCfg.mutate(
       { key: fyKey, value, description: `FY targets ${CUR_FY.label} · ${code || 'ALL'}` },
@@ -742,6 +748,15 @@ function TargetsVsActual({ branch, cur, fyActual }) {
       onChange={(e) => setDraft({ ...t, [k]: e.target.value })}
       style={{ width: 120, padding: '5px 8px', fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 6, outline: 'none' }} />
   );
+  // Per-module target input edits t.modules[key] (preserved across the draft).
+  const mInp = (key) => {
+    const m = t.modules || {};
+    return (
+      <input type="number" value={m[key] ?? ''} placeholder="0"
+        onChange={(e) => setDraft({ ...t, modules: { ...m, [key]: e.target.value } })}
+        style={{ width: 110, padding: '4px 7px', fontSize: 11.5, border: `1px solid ${C.border}`, borderRadius: 6, outline: 'none', textAlign: 'right' }} />
+    );
+  };
 
   return (
     <>
@@ -750,7 +765,43 @@ function TargetsVsActual({ branch, cur, fyActual }) {
         {bar('Sales', fyActual.sales, sales, C.green)}
         {bar('Gross Profit', fyActual.gp, gp, C.blue)}
         {bar('Net Profit', fyActual.np, np, C.dark)}
-        <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 6, paddingTop: 10, display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+
+        {/* Per-module Sales target vs FY actual — set a target per Flight / Holiday /
+            Hotel … so the branch can steer each line, not just the top line. */}
+        {mods.length > 0 && (
+          <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 6, paddingTop: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>Module-wise Sales targets (FY)</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead><tr>
+                <th style={{ ...th, background: 'transparent', color: C.dim }}>Module</th>
+                <th style={{ ...th, background: 'transparent', color: C.dim, ...rnum }}>FY Actual</th>
+                <th style={{ ...th, background: 'transparent', color: C.dim, ...rnum }}>Target</th>
+                <th style={{ ...th, background: 'transparent', color: C.dim, ...rnum }}>%</th>
+                <th style={{ ...th, background: 'transparent', color: C.dim, width: 130 }}>Set target</th>
+              </tr></thead>
+              <tbody>
+                {mods.map((m) => {
+                  const act = m.sales || 0;
+                  const tgt = Number(savedMods[m.key]) || 0;
+                  const has = tgt > 0;
+                  const pct = has ? (act / tgt) * 100 : 0;
+                  const met = has && act >= tgt;
+                  return (
+                    <tr key={m.key} style={{ borderTop: '1px solid #eef0f4' }}>
+                      <td style={{ ...td, fontWeight: 600 }}>{m.icon ? `${m.icon} ` : ''}{m.name || m.key}</td>
+                      <td style={{ ...td, ...rnum, fontWeight: 700 }}>{money(cur, act)}</td>
+                      <td style={{ ...td, ...rnum, color: C.dim }}>{has ? money(cur, tgt) : '—'}</td>
+                      <td style={{ ...td, ...rnum, fontWeight: 800, color: !has ? C.dim : (met ? C.green : C.amber) }}>{has ? `${pct.toFixed(0)}%` : '—'}</td>
+                      <td style={{ ...td }}>{mInp(m.key)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 10, paddingTop: 10, display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: C.dim }}>Sales target<br />{nInp('salesYearly')}</label>
           <label style={{ fontSize: 11, fontWeight: 700, color: C.dim }}>GP target<br />{nInp('gpYearly')}</label>
           <label style={{ fontSize: 11, fontWeight: 700, color: C.dim }}>NP target<br />{nInp('npYearly')}</label>
@@ -1070,18 +1121,17 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
     { label: 'Compliance — no overdue tax', ok: !taxEvents?.some((e) => e.active && e.date && e.date < today), critical: false },
   ];
   // Exception Radar — only non-zero rows render (handled inside the component).
-  // Bank reco difference (selected bank): a non-zero unreconciled difference is a
-  // live signal worth surfacing. A full all-accounts aggregate needs a per-ledger
-  // query; the selected-bank signal is live & acceptable — labelled with the bank.
-  const recoDiff = Number(recoSummary?.differenceAmount) || 0;
-  const recoOpenLines = (recoSummary?.counts?.bookUnreconciled || 0) + (recoSummary?.counts?.statementUnreconciled || 0);
+  // Bank reco differences are aggregated across EVERY bank ledger of the branch (not
+  // just the one selected on the Cash & Bank tab), so a stray difference on any account
+  // surfaces here. The per-ledger queries dedupe with the all-accounts roll-up.
+  const bankRecoAgg = useBankReconAggregate(branch, { from: monthFrom, to: today });
   const exceptionRows = [
     { n: blockedCount, label: 'Blocked vouchers — needs fixing', route: '/transactions/approvals' },
     { n: suspense.length, label: 'Bookings in suspense', route: '/accounts/suspense' },
     { n: (supHealth.noGstin || 0) + (supHealth.noPan || 0), label: 'Suppliers missing GSTIN / PAN', route: '/masters/suppliers' },
     { n: bouncedPdc, label: 'Bounced cheques (PDC)', route: '/bank-reco' },
     { n: gpNegative, label: 'Bookings with GP ≤ 0', route: '/transactions/approvals' },
-    ...(Math.abs(recoDiff) > 0.5 ? [{ n: recoOpenLines || 1, label: `Bank reco difference — ${selectedBank}`, route: '/bank-reco' }] : []),
+    { n: bankRecoAgg.diffCount, label: `Bank accounts with a reconciliation difference${bankRecoAgg.diffCount ? ` · ${money(cur, bankRecoAgg.diffAmount)}` : ''}`, route: '/bank-reco' },
   ];
 
   // Checklist handler inside compliance tab
@@ -1249,7 +1299,7 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
       {activeTab === 'performance' && (
         <>
           <BranchPnlSnapshot branch={branch} cur={cur} go={go} from={from} to={to} prior={priorPl} />
-          <TargetsVsActual branch={branch} cur={cur} fyActual={fyActual} />
+          <TargetsVsActual branch={branch} cur={cur} fyActual={fyActual} fyModules={cfyPl.modules || []} />
           <PnlTrend branch={branch} />
           <BudgetVsActual branch={branch} cur={cur} go={go} from={from} to={to} />
         </>

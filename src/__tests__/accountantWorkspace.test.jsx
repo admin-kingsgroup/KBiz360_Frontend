@@ -80,6 +80,7 @@ jest.mock('../core/useReference', () => ({ useTaxCalendar: () => ({ data: [] }),
 jest.mock('../core/useBankReco', () => ({
   useBankLedgers: () => ({ data: [] }),
   useBankReconSummary: () => ({ data: null }),
+  useBankReconAggregate: () => ({ ledgerCount: 0, diffCount: 0, diffAmount: 0, openLines: 0, isLoading: false }),
 }));
 
 import React from 'react';
