@@ -25,6 +25,7 @@ import { localeOf } from '../../core/format';
 import { periodRange } from '../../core/period';
 import { useModulePL, useBalanceSheet, useLedgerStatement, useAgeing, branchCode } from '../../core/useAccounting';
 import { computeNetAgeing } from './netAgeing';
+import { splitSubGroups, bsFioriExpandKeys, pnlFioriExpandKeys } from './fioriExpand';
 import { apiGet, getAuthToken } from '../../core/api';
 import { exportToExcel } from '../../core/exportExcel';
 import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../../core/dates';
@@ -642,6 +643,24 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
     const groups = d.indirect.groups || [];
     return groups.length ? [{ name: 'Indirect Expenses', amount: d.indirect.expense, pctOfSales: d.totals.sales ? (d.indirect.expense / d.totals.sales) * 100 : 0, groups }] : [];
   }, [d]);
+  // Fiori "Expand all / Collapse all" — covers Section A (modules → sub-centres →
+  // ledger-composition heads) and Section B (Fixed/Variable buckets → sub-groups).
+  // Section B defaults expanded, so Collapse must pin those keys false explicitly.
+  const fioriKeys = useMemo(() => pnlFioriExpandKeys(d, expBuckets), [d, expBuckets]);
+  const hasFioriExpand = fioriKeys.modKeys.length > 0 || fioriKeys.bucketKeys.length > 0;
+  const expandAllFiori = () => {
+    setExpDetail('detailed');
+    setOpenMod(Object.fromEntries(fioriKeys.modKeys.map((k) => [k, true])));
+    setOpenSub(Object.fromEntries(fioriKeys.subKeys.map((k) => [k, true])));
+    setOpenHead(Object.fromEntries(fioriKeys.headKeys.map((k) => [k, true])));
+    setOpenBucket(Object.fromEntries(fioriKeys.bucketKeys.map((k) => [k, true])));
+    setOpenExp(Object.fromEntries(fioriKeys.expKeys.map((k) => [k, true])));
+  };
+  const collapseAllFiori = () => {
+    setOpenMod({}); setOpenSub({}); setOpenHead({});
+    setOpenBucket(Object.fromEntries(fioriKeys.bucketKeys.map((k) => [k, false])));
+    setOpenExp(Object.fromEntries(fioriKeys.expKeys.map((k) => [k, false])));
+  };
   // Bottom line is Net Profit (Gross − overheads). Per the honest-data policy in this
   // file's header, there is NO fabricated "Provision for Tax @ 25.17%" / PAT line —
   // any real tax flows through indirect expenses, and the Balance Sheet posts this same
@@ -677,6 +696,8 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
               <Kpi tone="teal" label="Net Profit" value={compact(cur, d.bridge.netProfit)}
                 trend={prev && <Trend cur={d.bridge.netProfit} prev={prev.bridge?.netProfit} />} sub={`NPM ${pctTxt(d.totals.sales ? d.bridge.netProfit / d.totals.sales * 100 : 0)}`} />
             </KpiGrid>
+
+            {hasFioriExpand && <FioriExpandBar onExpand={expandAllFiori} onCollapse={collapseAllFiori} />}
 
             {/* Section A — module / sub-centre GP (cost-centre driven) */}
             <FCard title="Section A — Module-wise Sales, COGS & Gross Profit"
@@ -1705,6 +1726,19 @@ export function ReportBSLive({ branch, forceView, hideSwitcher }) {
   );
 }
 
+/* ── Fiori "Expand all / Collapse all" control — shared by the Fiori P&L and
+   Balance Sheet so all three views (Fiori · Classic · Vertical) offer the same
+   bulk expand/collapse. Classic & Vertical carry their own equivalent buttons. */
+function FioriExpandBar({ onExpand, onCollapse }) {
+  const btn = { padding: '5px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', border: `1px solid ${SAP.blue}`, borderRadius: 6, background: '#fff', color: SAP.blue };
+  return (
+    <div className="noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 12 }}>
+      <button type="button" onClick={onExpand} style={btn}>⊞ Expand all</button>
+      <button type="button" onClick={onCollapse} style={btn}>⊟ Collapse all</button>
+    </div>
+  );
+}
+
 /* ── Fiori vertical view ─────────────────────────────────────────────── */
 function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, to, mobile, detail }) {
   const netWorth = netWorthOf(d);
@@ -1712,6 +1746,14 @@ function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, t
   const workingCap = ca - cl;
   const ratio = cl > 0 ? (ca / cl).toFixed(2) : '—';
   const [drillLedger, setDrillLedger] = useState(null);
+  // Shared expand state for BOTH side cards, so one control expands/collapses the
+  // whole statement (Liabilities + Assets) — mirroring Classic/Vertical.
+  const [open, setOpen] = useState({});
+  const [openSub, setOpenSub] = useState({});
+  const summary = detail === 'summary';
+  const { groupKeys, subKeys } = bsFioriExpandKeys(d, summary);
+  const expandAll = () => { setOpen(Object.fromEntries(groupKeys.map((k) => [k, true]))); setOpenSub(Object.fromEntries(subKeys.map((k) => [k, true]))); };
+  const collapseAll = () => { setOpen({}); setOpenSub({}); };
   return (
     <>
       <div style={{ background: d.balanced ? SAP.greenBg : '#fff3f3', border: `1px solid ${d.balanced ? '#b8ecb8' : '#ffb3b3'}`, borderRadius: 8, padding: '11px 18px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12, fontSize: 12.5, fontWeight: 600, color: d.balanced ? SAP.greenDk : SAP.red }}>
@@ -1726,10 +1768,14 @@ function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, t
         <Kpi tone="purple" label="Current Ratio" value={ratio} sub={`CA ${compact(cur, ca)} / CL ${compact(cur, cl)}`} />
       </KpiGrid>
 
+      {!summary && groupKeys.length > 0 && <FioriExpandBar onExpand={expandAll} onCollapse={collapseAll} />}
+
       <BSSideCard title="Liabilities — Tally Groups" rows={d.liabilities} total={d.totalLiabilities} totalLabel="TOTAL LIABILITIES"
-        prevMap={prevMap} prevTotal={prev?.totalLiabilities} cur={cur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} detail={detail} onPickLedger={detail === 'detailed' ? setDrillLedger : null} />
+        prevMap={prevMap} prevTotal={prev?.totalLiabilities} cur={cur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} detail={detail} onPickLedger={detail === 'detailed' ? setDrillLedger : null}
+        open={open} setOpen={setOpen} openSub={openSub} setOpenSub={setOpenSub} />
       <BSSideCard title="Assets — Tally Groups" rows={d.assets} total={d.totalAssets} totalLabel="TOTAL ASSETS"
-        prevMap={prevMap} prevTotal={prev?.totalAssets} cur={cur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} detail={detail} onPickLedger={detail === 'detailed' ? setDrillLedger : null} />
+        prevMap={prevMap} prevTotal={prev?.totalAssets} cur={cur} showPY={showPY} curLabel={curLabel} prevLabel={prevLabel} detail={detail} onPickLedger={detail === 'detailed' ? setDrillLedger : null}
+        open={open} setOpen={setOpen} openSub={openSub} setOpenSub={setOpenSub} />
 
       <div style={{ background: '#fff', border: `1px solid ${SAP.border}`, borderRadius: 8, padding: '10px 18px', fontSize: 11, color: SAP.sec, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, boxShadow: SHADOW }}>
         <span><strong style={{ color: SAP.text }}>Group Master:</strong> Tally Default 28 Groups &nbsp;|&nbsp; <strong style={{ color: SAP.text }}>Net Profit:</strong> {cur}{inr(d.netProfit)} (from P&amp;L A/c) &nbsp;|&nbsp; <strong style={{ color: SAP.text }}>Tax:</strong> Excl. GST</span>
@@ -1738,23 +1784,6 @@ function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, t
     </>
   );
 }
-// Split a group's ledgers into named Tally sub-groups (carried on each ledger's
-// `subGroup`) and the ledgers that hang directly under the 28-group head.
-function splitSubGroups(ledgers) {
-  const direct = [];
-  const map = new Map(); // subGroup name → { name, amount, ledgers }
-  for (const l of (ledgers || [])) {
-    const s = (l.subGroup || '').trim();
-    if (!s) { direct.push(l); continue; }
-    if (!map.has(s)) map.set(s, { name: s, amount: 0, ledgers: [] });
-    const sg = map.get(s);
-    sg.amount += l.amount || 0;
-    sg.ledgers.push(l);
-  }
-  const subs = [...map.values()].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
-  return { subs, direct };
-}
-
 // A single leaf-ledger row (tap → drill into its postings → voucher → edit).
 function bsLedgerRow(l, i, indent, onPickLedger, showPY) {
   return (
@@ -1767,9 +1796,15 @@ function bsLedgerRow(l, i, indent, onPickLedger, showPY) {
   );
 }
 
-function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, showPY, curLabel, prevLabel, onPickLedger, detail }) {
-  const [open, setOpen] = useState({});
-  const [openSub, setOpenSub] = useState({});
+function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, showPY, curLabel, prevLabel, onPickLedger, detail, open: openProp, setOpen: setOpenProp, openSub: openSubProp, setOpenSub: setOpenSubProp }) {
+  // Controlled by FioriBS (shared across both side cards) when props are passed;
+  // otherwise self-managed, so the card still works standalone.
+  const [openLocal, setOpenLocal] = useState({});
+  const [openSubLocal, setOpenSubLocal] = useState({});
+  const open = openProp || openLocal;
+  const setOpen = setOpenProp || setOpenLocal;
+  const openSub = openSubProp || openSubLocal;
+  const setOpenSub = setOpenSubProp || setOpenSubLocal;
   const summary = detail === 'summary';
   return (
     <FCard title={title} sub={summary ? 'Major Tally groups — high-level position' : 'Click a group → sub-group (if any) → ledger → voucher'} badge={<Badge bg="#fef0e0" c={SAP.orange} bd="#ffcf9e">Tally Logic</Badge>}>
