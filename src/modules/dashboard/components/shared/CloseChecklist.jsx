@@ -10,7 +10,9 @@ import { setNavFocus } from '../../../../core/ux/navFocus';
  * no backend period-lock yet, so it surfaces and blocks the action, it does not
  * prevent posting into the period.
  */
-export function CloseChecklist({ items = MONTH_CLOSE_CHECKLIST, defaultCheckedThrough = 5, branch, onGo }) {
+// defaultCheckedThrough is 0 — manual checklist items start UNticked (they have no live
+// status backing; pre-ticking the first 5 falsely implied those steps were already done).
+export function CloseChecklist({ items = MONTH_CLOSE_CHECKLIST, defaultCheckedThrough = 0, branch, onGo }) {
   const q = useAlerts(branch);
   const blockers = (q.data?.alerts || []).filter((a) => a.severity === 'error'); // open critical alerts auto-clear when fixed
   const blocked = blockers.length > 0;

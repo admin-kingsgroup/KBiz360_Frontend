@@ -15,7 +15,7 @@ import { DataTable } from '../shell/DataTable';
 import { Modal, Button, Input, ResponsiveGrid, LoadingState, ErrorState } from '../shell/primitives';
 
 const RED = '#A32D2D', GREEN = '#27500A', GOLD = '#A07828', BLUE = '#185FA5', DIM = '#5a6691';
-const money = (cur, n) => { const v = Math.round(Number(n) || 0); return (v < 0 ? '-' : '') + cur + Math.abs(v).toLocaleString('en-IN'); };
+const money = (cur, n) => { const v = Math.round(Number(n) || 0); const loc = (cur === '₹' || cur === '₨' || cur === 'Rs') ? 'en-IN' : 'en-US'; return (v < 0 ? '-' : '') + cur + Math.abs(v).toLocaleString(loc); };
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const ageColor = (d) => (d > 90 ? RED : d > 30 ? '#854F0B' : DIM);
 

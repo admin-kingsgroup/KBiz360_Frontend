@@ -30,7 +30,7 @@ const branchList = () => (LIVE_BRANCHES || []).filter((b) => b && b.code && b.co
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const r0 = (n) => Math.round(Number(n) || 0);
-const money = (cur, n) => (n < 0 ? '-' : '') + (cur || '₹') + Math.abs(r0(n)).toLocaleString('en-IN');
+const money = (cur, n) => { const c = cur || '₹'; const loc = (c === '₹' || c === '₨' || c === 'Rs') ? 'en-IN' : 'en-US'; return (n < 0 ? '-' : '') + c + Math.abs(r0(n)).toLocaleString(loc); };
 const pct = (n) => (Number(n) || 0).toFixed(1) + '%';
 const pad2 = (n) => String(n).padStart(2, '0');
 const iso = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;

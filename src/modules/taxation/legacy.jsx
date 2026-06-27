@@ -5,7 +5,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, Calendar, Download, Plus, Settings, Users } from 'lucide-react';
-import { useGpBills } from '../../core/useAccounting';
+import { useGpBills, useRcmLiability } from '../../core/useAccounting';
 import { useTaxCalendar } from '../../core/useReference';
 import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY, fyOptions, rangeNote } from '../../core/dates';
 import { fmt, fmtINR } from '../../core/format';
@@ -225,19 +225,17 @@ export function TaxRcm({branch}){
   const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
-  const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
 
-  /* Identify RCM entries: overseas DMC purchases + GDS charges */
-  const rcmEntries=useMemo(()=>{
-    const OVERSEAS_SUPPLIERS=[]; // TODO: flag overseas suppliers in the supplier master
-    return GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&
-      OVERSEAS_SUPPLIERS.some(s=>(b.supplier||'').includes(s.split(" ")[0]))).map(b=>{
-      const igst=Math.round(b.cost/(1+0.18)*0.18);
-      return {date:b.date,party:b.supplier,desc:`${b.mod} — ${b.dest}`,taxable:Math.round(b.cost/(1+0.18)),igst,status:"Paid",vno:b.id};
-    });
-  },[GP,brCode,period]); // GP must be a dep — else the register never recomputes once bills load
+  /* LIVE: reverse-charge liability on foreign-supplier purchases, from the books
+     (/api/accounting/rcm). Foreign suppliers are identified by their master country
+     (!= India) — replacing the old non-functional OVERSEAS_SUPPLIERS=[] stub. */
+  const monthEnd=(k)=>{const[y,m]=String(k).split('-').map(Number);return`${k}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;};
+  const rcm=useRcmLiability(branch,{from:`${period}-01`,to:monthEnd(period)}).data||{};
+  const rcmEntries=(rcm.entries||[]).map(e=>({
+    date:e.date,party:e.party,desc:e.country,taxable:e.taxable,igst:e.igst,status:"Liability",vno:e.vno,
+  }));
 
-  const tot=rcmEntries.reduce((s,r)=>s+r.igst,0);
+  const tot=rcm.igst||0;
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
 
   return (

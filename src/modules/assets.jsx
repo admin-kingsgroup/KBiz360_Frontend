@@ -336,11 +336,11 @@ export function AssetDisposal({ branch }) {
   const cfg = bc(branch);
   const cur = cfg.cur;
 
-  const DISPOSALS = [
-    { id: 'DSP-001', assetId: 'FA-BOM-0099', name: 'Old HP Printer', disposalDate: '2026-03-15', reason: 'Sale', bookValue: 8500, saleValue: 12000, gain: 3500, buyer: 'Office Solutions Pvt Ltd', method: 'Sold' },
-    { id: 'DSP-002', assetId: 'FA-AMD-0045', name: 'Dell Workstation (4 yrs)', disposalDate: '2026-02-20', reason: 'Sale', bookValue: 15000, saleValue: 8000, gain: -7000, buyer: 'Cash buyer', method: 'Sold' },
-    { id: 'DSP-004', assetId: 'FA-BOM-0067', name: 'Conference Room Projector', disposalDate: '2025-12-05', reason: 'Transfer', bookValue: 18000, saleValue: 18000, gain: 0, buyer: 'Internal transfer', method: 'Transferred' },
-  ];
+  // No live asset-disposal register exists yet (the fixed-assets master tracks assets,
+  // not disposals). Previously this held 3 fabricated rows whose gains fed the
+  // Capital-Gain-YTD / Net-P&L KPIs as if real — emptied so the KPIs read an honest ₹0
+  // until a disposal source is wired. (Other screens in this file are already live.)
+  const DISPOSALS = [];
 
   const totGain = DISPOSALS.reduce((s, d) => s + (d.gain > 0 ? d.gain : 0), 0);
   const totLoss = DISPOSALS.reduce((s, d) => s + (d.gain < 0 ? Math.abs(d.gain) : 0), 0);

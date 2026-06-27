@@ -69,6 +69,14 @@ export function MisReport({ branch }) {
   const f = (n) => compactAmt(n, { currency: cur }); // canonical compact (branch currency)
   const pct = (val, total) => (total > 0 ? Math.round(val / total * 100) : 0);
   const periodLabel = PERIODS.find((p) => p.v === period)?.l;
+  // GSTR-3B is due the 20th of the month AFTER the return period — derive it from the
+  // selected period instead of a hardcoded "20 May/Jun 2026" string.
+  const gstr3bDue = (() => {
+    const [y, m] = period.split('-').map(Number);
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+    return `20 ${MON[nm - 1]} ${ny}`;
+  })();
 
   // Loading / error states so a failed or in-flight fetch never renders a full page of
   // ₹0 (indistinguishable from a genuinely empty month). Gate on the PERIOD-INDEPENDENT
@@ -194,7 +202,7 @@ export function MisReport({ branch }) {
         <PageSection title="📋 Action Items This Week" className="border-t-[3px] border-t-[#d97706]">
           {[
             { icon: '💳', text: 'BSP payment due Monday — check BSP Summary', urgent: true },
-            { icon: '📋', text: `GSTR-3B filing — ${period === '2026-05' ? '20 Jun 2026' : '20 May 2026'}`, urgent: false },
+            { icon: '📋', text: `GSTR-3B filing — ${gstr3bDue}`, urgent: false },
             { icon: '📞', text: `Follow up: ${overdueClients[0]?.client || '—'} overdue`, urgent: overdueClients.length > 0 },
             { icon: '👥', text: `${prev.length} bookings in pipeline from last month`, urgent: false },
           ].map((item, i) => (

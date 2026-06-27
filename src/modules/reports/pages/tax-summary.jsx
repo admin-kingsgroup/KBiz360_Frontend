@@ -26,7 +26,7 @@ export function RPT_TaxSummary({ branch }) {
   const cur = cfg.cur || '₹';
   const regime = d?.regime || (cfg.taxType === 'VAT' ? 'VAT' : 'GST');
   const isVat = regime === 'VAT';
-  const f = (n) => cur + ' ' + Number(Math.round(n || 0)).toLocaleString('en-IN');
+  const f = (n) => cur + ' ' + Number(Math.round(n || 0)).toLocaleString((cur === '₹' || cur === '₨' || cur === 'Rs') ? 'en-IN' : 'en-US');
   const brLabel = (!branch || branch === 'ALL') ? CONSOLIDATED_LABEL : (branch.code || branch);
 
   const out = d?.output || { total: 0, lines: [] };
