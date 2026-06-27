@@ -137,7 +137,7 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
     {label:"Group Dashboard", href:"/group-dashboard"},
   ]},
   // Sales/Purchase Register + Client Statement are account reports — see
-  // Accounts ▸ Sales & Purchase / Receivables & Collections.
+  // Accounts ▸ Sales & Purchase / Receivables & Clients.
   {label:"Operational", children:[
     {label:"Consultant Report", href:"/reports/consultant"},
     {label:"Destination Intel", href:"/reports/destination"},
@@ -305,7 +305,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   ]},
 
   /* ── 3 · OUTSTANDING & TREASURY ──────────────────────────── */
-  {label:"Receivables & Collections", children:[
+  {label:"Receivables & Clients", children:[
     {label:"Receivables (Ageing + Settle)",     href:"/reports/rec"},
     {label:"Client Statement",                  href:"/reports/client-statement"},
     {label:"Customer 360 View",                 href:"/reports/customer-360"},

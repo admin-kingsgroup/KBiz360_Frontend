@@ -249,7 +249,7 @@ function TkfPnL({ branch, from, to }) {
 /* ════════════════════════════════════════════════════════════════════════
    MERGED SCREENS — one P&L, one Balance Sheet, with a single switcher.
    ════════════════════════════════════════════════════════════════════════ */
-const WRAP_CLS = 'mx-auto max-w-[1320px] px-2.5 pb-10 pt-2.5 tablet:px-4';
+const WRAP_CLS = 'mx-auto max-w-[1640px] px-2.5 pb-10 pt-2.5 tablet:px-4';
 const BAR_CLS = 'flex flex-wrap items-center gap-3 px-1 pb-3 pt-2';
 
 export function ProfitAndLossUnified({ branch }) {

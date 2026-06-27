@@ -26,6 +26,7 @@ import { periodRange } from '../../core/period';
 import { useModulePL, useBalanceSheet, useLedgerStatement, useAgeing, branchCode } from '../../core/useAccounting';
 import { computeNetAgeing } from './netAgeing';
 import { splitSubGroups, bsFioriExpandKeys, pnlFioriExpandKeys } from './fioriExpand';
+import { share, topByGP, lowestGp } from './statementInsights';
 import { apiGet, getAuthToken } from '../../core/api';
 import { exportToExcel } from '../../core/exportExcel';
 import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../../core/dates';
@@ -91,8 +92,10 @@ const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct
 const asOn = (iso) => { if (!iso) return 'latest'; const d = new Date(iso); return `${String(d.getDate()).padStart(2, '0')}-${MON[d.getMonth()]}-${d.getFullYear()}`; };
 
 /* ── tiny shared chrome ──────────────────────────────────────────────── */
-function Wrap({ children }) {
-  return <div style={{ maxWidth: 1180, margin: '0 auto', padding: '4px 6px 28px' }}>{children}</div>;
+function Wrap({ children, wide }) {
+  // `wide` (P&L / Balance Sheet statements) uses far more of the screen so the
+  // single-column views don't sit as a skinny ribbon in a sea of whitespace.
+  return <div style={{ maxWidth: wide ? 1640 : 1180, margin: '0 auto', padding: '4px 6px 28px' }}>{children}</div>;
 }
 function FioriHead({ system, title, sub, right }) {
   return (
@@ -149,6 +152,35 @@ const Badge = ({ children, bg = SAP.greenBg, c = SAP.greenDk, bd = '#b8ecb8' }) 
 );
 const Toggle = ({ open }) => <span style={{ display: 'inline-flex', width: 14, height: 14, border: '1px solid currentColor', borderRadius: 3, fontSize: 9, alignItems: 'center', justifyContent: 'center', marginRight: 7, opacity: 0.7 }}>{open ? '−' : '+'}</span>;
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', padding: '7px 20px 7px 16px' };
+
+// Proportion bar — visualises a row's share so the freed horizontal band on the
+// statement views carries information instead of whitespace. tone 'cogs' = warm.
+function MiniBar({ pct, tone }) {
+  const w = Math.max(0, Math.min(100, Math.abs(Number(pct) || 0)));
+  const fill = tone === 'cogs' ? 'linear-gradient(90deg,#f0a35e,#d97706)' : 'linear-gradient(90deg,#3b82f6,#1d4ed8)';
+  return <div style={{ height: 8, borderRadius: 5, background: '#eef1f5', overflow: 'hidden' }}><div style={{ height: '100%', width: `${w}%`, borderRadius: 5, background: fill }} /></div>;
+}
+// Insights-rail primitives (Vertical P&L + Balance Sheet) — a compact dashboard
+// that fills the space freed by widening, beside the statement.
+function RailCard({ title, children }) {
+  return (
+    <div className="noprint" style={{ border: `1px solid ${SAP.border}`, borderRadius: 10, overflow: 'hidden', boxShadow: SHADOW }}>
+      <div style={{ padding: '9px 14px', fontSize: 12, fontWeight: 800, background: '#f6f8fb', color: SAP.grpText, borderBottom: `1px solid ${SAP.borderLt}` }}>{title}</div>
+      <div style={{ padding: '8px 14px', display: 'flex', flexDirection: 'column', gap: 2 }}>{children}</div>
+    </div>
+  );
+}
+function Stat({ label, value, tone, last }) {
+  const c = tone === 'pos' ? SAP.greenDk : tone === 'neg' ? SAP.red : tone === 'warn' ? SAP.orange : SAP.text;
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '6px 0', borderBottom: last ? 'none' : '1px dashed #e6e9ee', fontSize: 12.5 }}>
+      <span style={{ color: SAP.sec }}>{label}</span><b style={{ fontSize: 13.5, color: c }}>{value}</b>
+    </div>
+  );
+}
+// Statement grid: KPI ribbon (screen only) over a [ statement | insights rail ]
+// two-column layout that collapses to one column on narrower screens.
+const STMT_GRID_CSS = '@media (max-width:1180px){.stmt-grid{grid-template-columns:1fr !important}.stmt-rail{order:-1}}';
 // Booking-file drill rows (shared by single-leaf modules and sub-centres).
 // Clickable when the file carries editable vouchers → opens the voucher drill.
 function FileRows({ files, indent = 48, onPick }) {
@@ -568,7 +600,7 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
   const classicPeriod = period.from ? `${asOn(period.from)} to ${asOn(period.to)}` : 'All periods';
 
   return (
-    <Wrap>
+    <Wrap wide>
       <FioriHead
         system="KBiz360 · Finance"
         title="Profit & Loss — Module-wise Gross Profit"
@@ -1106,7 +1138,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
 
   const Cell = ({ r, side }) => {
     const sep = side === 'cr' ? { borderLeft: '1px solid #cdd1d8' } : {};
-    if (!r) return (<><td style={{ ...mono, ...sep }} /><td style={{ ...mono }} /></>);
+    if (!r) return (<><td style={{ ...mono, ...sep }} /><td style={{ ...mono }} /><td style={{ ...mono }} /></>);
     const clickable = !!(r.module || r.ledger || r.expandable);
     const bold = !!(r.group || r.bucket || r.sub || r.costCentre || r.result); // groups, sub-groups & cost-centres bold
     const color = r.component ? '#6a6a6a'
@@ -1123,6 +1155,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
         </td>
         <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})}
           style={{ padding: '2px 12px', textAlign: 'right', color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', cursor: clickable ? 'pointer' : 'default', ...mono }}>{inr(r.amount)}</td>
+        <td style={{ padding: '2px 10px', textAlign: 'right', color: SAP.sec, fontSize: 11, ...mono }}>{!r.component && share(r.amount, nett) >= 0.05 ? `${share(r.amount, nett).toFixed(1)}%` : ''}</td>
       </>
     );
   };
@@ -1131,18 +1164,18 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
     const n = Math.max(left.length, right.length);
     return (
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, ...mono }}>
-        <colgroup><col style={{ width: '34%' }} /><col style={{ width: '16%' }} /><col style={{ width: '34%' }} /><col style={{ width: '16%' }} /></colgroup>
+        <colgroup><col style={{ width: '30%' }} /><col style={{ width: '14%' }} /><col style={{ width: '6%' }} /><col style={{ width: '30%' }} /><col style={{ width: '14%' }} /><col style={{ width: '6%' }} /></colgroup>
         <tbody>
           <tr style={{ color: TALLY.head, fontWeight: 700, background: '#f0f4fa', borderBottom: `2px solid ${TALLY.head}` }}>
-            <td style={{ padding: '5px 12px', ...mono }}>Particulars (Dr)</td><td style={{ padding: '5px 12px', textAlign: 'right', ...mono }}>Amount</td>
-            <td style={{ padding: '5px 12px', borderLeft: '1px solid #a9c2e0', ...mono }}>Particulars (Cr)</td><td style={{ padding: '5px 12px', textAlign: 'right', ...mono }}>Amount</td>
+            <td style={{ padding: '5px 12px', ...mono }}>Particulars (Dr)</td><td style={{ padding: '5px 12px', textAlign: 'right', ...mono }}>Amount</td><td style={{ padding: '5px 10px', textAlign: 'right', fontSize: 11, ...mono }}>%</td>
+            <td style={{ padding: '5px 12px', borderLeft: '1px solid #a9c2e0', ...mono }}>Particulars (Cr)</td><td style={{ padding: '5px 12px', textAlign: 'right', ...mono }}>Amount</td><td style={{ padding: '5px 10px', textAlign: 'right', fontSize: 11, ...mono }}>%</td>
           </tr>
           {Array.from({ length: n }).map((_, i) => (
             <tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}><Cell r={left[i]} /><Cell r={right[i]} side="cr" /></tr>
           ))}
           <tr style={{ color: TALLY.head, fontWeight: 700, borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}>
-            <td style={{ padding: '6px 12px', ...mono }}>Total</td><td style={{ padding: '6px 12px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(total)}</td>
-            <td style={{ padding: '6px 12px', borderLeft: '1px solid #a9c2e0', ...mono }}>Total</td><td style={{ padding: '6px 12px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(total)}</td>
+            <td style={{ padding: '6px 12px', ...mono }}>Total</td><td style={{ padding: '6px 12px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(total)}</td><td style={{ padding: '6px 10px', ...mono }} />
+            <td style={{ padding: '6px 12px', borderLeft: '1px solid #a9c2e0', ...mono }}>Total</td><td style={{ padding: '6px 12px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(total)}</td><td style={{ padding: '6px 10px', ...mono }} />
           </tr>
         </tbody>
       </table>
@@ -1272,12 +1305,14 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
   const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
   const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
 
+  const pctCell = (v, bold) => <td style={{ padding: '3px 10px', textAlign: 'right', color: SAP.sec, fontSize: 11.5, fontWeight: bold ? 700 : 400, ...mono }}>{share(v, nett) >= 0.05 ? `${share(v, nett).toFixed(1)}%` : ''}</td>;
   const Row = ({ r, neg }) => {
     const clickable = !!(r.module || r.ledger || r.expandable);
     const bold = !!(r.group || r.bucket || r.sub || r.costCentre || r.result);
     const color = r.component ? '#6a6a6a' : r.result ? TALLY.green : (r.group || r.bucket || r.sub || r.costCentre) ? TALLY.head : '#1a1a1a';
     const pad = r.component ? 64 : r.ledgerHead ? 46 : r.leaf ? 50 : r.costCentre ? 42 : r.sub ? 34 : r.bucket ? 24 : 14;
     const amt = neg ? -Math.abs(r.amount) : r.amount;
+    const structural = !!(r.group || r.bucket || r.sub || r.module) && !r.component;
     return (
       <tr style={{ borderBottom: '1px solid #dfe2e7', background: r.group ? '#fbfcfe' : '#fff' }}>
         <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})} className={clickable ? 'cl-drill' : undefined}
@@ -1286,16 +1321,54 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
           {r.icon ? <span style={{ marginRight: 5 }}>{r.icon}</span> : null}{r.label}{r.module ? <span onClick={(e) => { e.stopPropagation(); setDrillModule(r.module); }} style={{ color: TALLY.gold, fontWeight: 700, cursor: 'pointer' }} title="Show booking files → vouchers"> ›</span> : r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
         <td style={{ padding: '3px 12px', textAlign: 'right', color, fontWeight: bold ? 700 : 400, fontSize: r.component ? 12 : 13, fontStyle: r.component ? 'italic' : 'normal', ...mono }}>{inr(amt)}</td>
+        {r.component ? <td /> : pctCell(r.amount, bold)}
+        <td style={{ padding: '3px 14px 3px 6px' }}>{structural ? <MiniBar pct={share(r.amount, nett)} tone={neg ? 'cogs' : 'sales'} /> : null}</td>
       </tr>
     );
   };
-  const Head = ({ txt }) => (<tr style={{ background: '#f0f4fa', color: TALLY.head, borderBottom: `2px solid ${TALLY.head}` }}><td colSpan={2} style={{ padding: '7px 12px', fontWeight: 800, letterSpacing: 0.4, ...mono }}>{txt}</td></tr>);
-  const Sub = ({ txt, val, neg }) => (<tr style={{ borderTop: '1px solid #cdd1d8', background: '#fafbfe' }}><td style={{ padding: '6px 12px', fontWeight: 700, color: TALLY.head, ...mono }}>{txt}</td><td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 700, ...mono }}>{inr(neg ? -Math.abs(val) : val)}</td></tr>);
-  const Result = ({ txt, val }) => (<tr style={{ borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}><td style={{ padding: '8px 12px', fontWeight: 800, color: TALLY.head, ...mono }}>{txt}</td><td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: TALLY.green, ...mono }}>{inr(val)}</td></tr>);
+  const Head = ({ txt }) => (
+    <tr style={{ background: '#f0f4fa', color: TALLY.head, borderBottom: `2px solid ${TALLY.head}` }}>
+      <td style={{ padding: '7px 12px', fontWeight: 800, letterSpacing: 0.4, ...mono }}>{txt}</td>
+      <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, ...mono }}>Amount</td>
+      <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, fontSize: 11, ...mono }}>% Rev</td>
+      <td />
+    </tr>
+  );
+  const Sub = ({ txt, val, neg }) => (
+    <tr style={{ borderTop: '1px solid #cdd1d8', background: '#fafbfe' }}>
+      <td style={{ padding: '6px 12px', fontWeight: 700, color: TALLY.head, ...mono }}>{txt}</td>
+      <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 700, ...mono }}>{inr(neg ? -Math.abs(val) : val)}</td>
+      {pctCell(val, true)}
+      <td />
+    </tr>
+  );
+  const Result = ({ txt, val }) => (
+    <tr style={{ borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}>
+      <td style={{ padding: '8px 12px', fontWeight: 800, color: TALLY.head, ...mono }}>{txt}</td>
+      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: TALLY.green, ...mono }}>{inr(val)}</td>
+      {pctCell(val, true)}
+      <td />
+    </tr>
+  );
 
+  const netProfit = d.bridge?.netProfit ?? 0;
+  const npm = nett ? (netProfit / nett) * 100 : 0;
+  const indOfGp = grossProfit ? (d.indirect.expense / grossProfit) * 100 : 0;
+  const top = topByGP(modules, 5);
+  const lo = lowestGp(modules);
   return (
-    <div className="tally-print-doc" style={{ background: '#fff', border: '1px solid #b0b0b0', borderRadius: 4, overflow: 'hidden', boxShadow: SHADOW, maxWidth: 860, margin: '12px auto', ...mono }}>
-      <style>{`.cl-drill:hover{background:#eef4fb;text-decoration:underline}
+    <div>
+      <style>{STMT_GRID_CSS}</style>
+      <KpiGrid>
+        <Kpi tone="blue" label="Total Sales" value={compact(cur, d.totals.sales)} sub={`${modules.length} modules`} />
+        <Kpi tone="red" label="Total COGS" value={compact(cur, d.totals.cogs)} sub={`${pctTxt(share(d.totals.cogs, d.totals.sales))} of sales`} />
+        <Kpi tone="green" label="Gross Profit" value={compact(cur, grossProfit)} sub={`GP ${pctTxt(d.totals.gpPct)}`} />
+        <Kpi tone="orange" label="Indirect Exp." value={compact(cur, d.indirect.expense)} sub={`${pctTxt(share(d.indirect.expense, d.totals.sales))} of sales`} />
+        <Kpi tone="teal" label="Net Profit" value={compact(cur, netProfit)} sub={`NPM ${pctTxt(npm)}`} />
+      </KpiGrid>
+      <div className="stmt-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 320px', gap: 18, alignItems: 'start' }}>
+        <div className="tally-print-doc" style={{ background: '#fff', border: '1px solid #b0b0b0', borderRadius: 4, overflow: 'hidden', boxShadow: SHADOW, ...mono }}>
+          <style>{`.cl-drill:hover{background:#eef4fb;text-decoration:underline}
 @media print {
   @page { size: A4 portrait; margin: 8mm; }
   body * { visibility: hidden !important; }
@@ -1303,51 +1376,79 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
   .tally-print-doc { position: absolute !important; left: 0; top: 0; width: 100% !important; max-width: none !important; margin: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; }
   .tally-print-doc .cl-noprint { display: none !important; }
 }`}</style>
-      <div style={{ background: TALLY.titlebar, color: TALLY.head, padding: '5px 12px', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #a9c2e0' }}>
-        <span>KBiz360 Books — {company}</span><span style={{ color: TALLY.gold }}>Profit &amp; Loss A/c · Vertical</span>
-      </div>
-      <div style={{ textAlign: 'center', padding: '10px 8px 8px', borderBottom: `2px solid ${TALLY.head}` }}>
-        <div style={{ color: TALLY.head, fontSize: 16, fontWeight: 700 }}>{company}</div>
-        <div style={{ fontSize: 13 }}>Profit &amp; Loss A/c (Vertical)</div>
-        <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{periodTxt}</div>
-      </div>
-      {allKeys.length > 0 && (
-        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #cdd1d8', background: '#fafbfe' }}>
-          <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
-          <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
+          <div style={{ background: TALLY.titlebar, color: TALLY.head, padding: '5px 12px', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #a9c2e0' }}>
+            <span>KBiz360 Books — {company}</span><span style={{ color: TALLY.gold }}>Profit &amp; Loss A/c · Vertical</span>
+          </div>
+          <div style={{ textAlign: 'center', padding: '10px 8px 8px', borderBottom: `2px solid ${TALLY.head}` }}>
+            <div style={{ color: TALLY.head, fontSize: 16, fontWeight: 700 }}>{company}</div>
+            <div style={{ fontSize: 13 }}>Profit &amp; Loss A/c (Vertical)</div>
+            <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{periodTxt}</div>
+          </div>
+          {allKeys.length > 0 && (
+            <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #cdd1d8', background: '#fafbfe' }}>
+              <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
+              <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
+            </div>
+          )}
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <colgroup><col /><col style={{ width: 150 }} /><col style={{ width: 64 }} /><col style={{ width: 210 }} /></colgroup>
+            <tbody>
+              <Head txt="Income" />
+              <Row r={{ label: 'Revenue from Operations (Sales)', amount: d.totals.sales, group: true }} />
+              {modules.flatMap((m) => moduleBlock(m, 'sales')).map((r, i) => <Row key={'s' + i} r={r} />)}
+              {incentive > 0 && <Row r={{ label: 'Supplier Incentive (Direct Income)', amount: incentive }} />}
+              <Sub txt="Total Revenue (Trading)" val={revenueTrading} />
+              <Head txt="Less: Cost of Sales (COGS)" />
+              <Row r={{ label: 'Purchase Accounts (COGS)', amount: d.totals.cogs, group: true }} neg />
+              {modules.flatMap((m) => moduleBlock(m, 'cogs')).map((r, i) => <Row key={'c' + i} r={r} neg />)}
+              <Sub txt="Total Cost of Sales" val={d.totals.cogs} neg />
+              <Result txt="Gross Profit" val={grossProfit} />
+              {indIncome > 0 && (oneIncomeLedger
+                ? <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome, ledger: allIncomeLedgers[0].name, leaf: true }} />
+                : incomeGroups.length
+                  ? <>
+                      <Head txt="Add: Other Income (Indirect Income)" />
+                      {incomeRows.map((r, i) => <Row key={'ii' + i} r={r} />)}
+                    </>
+                  : <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome, ledger: 'Indirect Income', leaf: true }} />)}
+              <Head txt="Less: Indirect Expenses" />
+              <Row r={{ label: 'Indirect Expenses', amount: d.indirect.expense, group: true }} neg />
+              {expenseRows.map((r, i) => <Row key={'e' + i} r={r} neg />)}
+              <Result txt="Net Profit (to Capital A/c)" val={netProfit} />
+            </tbody>
+          </table>
+          <div style={{ background: TALLY.titlebar, color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: `2px solid ${TALLY.head}`, ...mono }}>
+            <span>Gross Profit : <span style={{ color: TALLY.green }}>{inr(grossProfit)} ({pctTxt(d.totals.gpPct)})</span></span>
+            <span>Net Profit : <span style={{ color: TALLY.green }}>{inr(netProfit)} ({pctTxt(npm)})</span></span>
+            <span>Nett Sales : {inr(nett)}</span>
+          </div>
         </div>
-      )}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-        <colgroup><col /><col style={{ width: 180 }} /></colgroup>
-        <tbody>
-          <Head txt="Income" />
-          <Row r={{ label: 'Revenue from Operations (Sales)', amount: d.totals.sales, group: true }} />
-          {modules.flatMap((m) => moduleBlock(m, 'sales')).map((r, i) => <Row key={'s' + i} r={r} />)}
-          {incentive > 0 && <Row r={{ label: 'Supplier Incentive (Direct Income)', amount: incentive }} />}
-          <Sub txt="Total Revenue (Trading)" val={revenueTrading} />
-          <Head txt="Less: Cost of Sales (COGS)" />
-          <Row r={{ label: 'Purchase Accounts (COGS)', amount: d.totals.cogs, group: true }} neg />
-          {modules.flatMap((m) => moduleBlock(m, 'cogs')).map((r, i) => <Row key={'c' + i} r={r} neg />)}
-          <Sub txt="Total Cost of Sales" val={d.totals.cogs} neg />
-          <Result txt="Gross Profit" val={grossProfit} />
-          {indIncome > 0 && (oneIncomeLedger
-            ? <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome, ledger: allIncomeLedgers[0].name, leaf: true }} />
-            : incomeGroups.length
-              ? <>
-                  <Head txt="Add: Other Income (Indirect Income)" />
-                  {incomeRows.map((r, i) => <Row key={'ii' + i} r={r} />)}
-                </>
-              : <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome, ledger: 'Indirect Income', leaf: true }} />)}
-          <Head txt="Less: Indirect Expenses" />
-          <Row r={{ label: 'Indirect Expenses', amount: d.indirect.expense, group: true }} neg />
-          {expenseRows.map((r, i) => <Row key={'e' + i} r={r} neg />)}
-          <Result txt="Net Profit (to Capital A/c)" val={d.bridge?.netProfit ?? 0} />
-        </tbody>
-      </table>
-      <div style={{ background: TALLY.titlebar, color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: `2px solid ${TALLY.head}`, ...mono }}>
-        <span>Gross Profit : <span style={{ color: TALLY.green }}>{inr(grossProfit)} ({pctTxt(d.totals.gpPct)})</span></span>
-        <span>Net Profit : <span style={{ color: TALLY.green }}>{inr(d.bridge?.netProfit ?? 0)} ({pctTxt(nett ? ((d.bridge?.netProfit ?? 0) / nett) * 100 : 0)})</span></span>
-        <span>Nett Sales : {inr(nett)}</span>
+
+        <aside className="stmt-rail" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <RailCard title="Profitability">
+            <Stat label="Gross margin" value={pctTxt(d.totals.gpPct)} tone={d.totals.gpPct >= 0 ? 'pos' : 'neg'} />
+            <Stat label="Net margin" value={pctTxt(npm)} tone={npm >= 0 ? 'pos' : 'neg'} />
+            <Stat label="Indirect exp / GP" value={grossProfit ? pctTxt(indOfGp) : '—'} />
+            <Stat label="Break-even GP needed" value={compact(cur, d.indirect.expense)} last />
+          </RailCard>
+          {top.length > 0 && (
+            <RailCard title="Top GP contributors">
+              {top.map((m, i) => (
+                <div key={i} style={{ fontSize: 12, padding: '5px 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: SAP.text }}>{m.icon ? m.icon + ' ' : ''}{m.name}</span>
+                    <b style={{ color: SAP.greenDk }}>{compact(cur, m.gp)} <span style={{ color: gpColor(m.gpPct) }}>({pctTxt(m.gpPct)})</span></b>
+                  </div>
+                  <MiniBar pct={m.bar} />
+                </div>
+              ))}
+            </RailCard>
+          )}
+          <RailCard title="Watchlist">
+            {lo ? <Stat label={`Lowest GP% · ${lo.name}`} value={pctTxt(lo.gpPct)} tone="warn" /> : null}
+            <Stat label="Net profit" value={compact(cur, netProfit)} tone={netProfit >= 0 ? 'pos' : 'neg'} last />
+          </RailCard>
+        </aside>
       </div>
       {drillModule && <ModuleVoucherDrill module={drillModule} cur={cur} mobile={mobile} onClose={() => setDrillModule(null)} />}
     </div>
@@ -1681,7 +1782,7 @@ export function ReportBSLive({ branch, forceView, hideSwitcher }) {
   };
 
   return (
-    <Wrap>
+    <Wrap wide>
       <FioriHead
         system="KBiz360 · Finance"
         title={`Balance Sheet — ${curLabel}`}
@@ -1995,12 +2096,20 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
   const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
   const onRowClick = (r) => { if (r.ledger) setDrillLedger(r.ledger); else if (r.expandable) setOpenSub((s) => ({ ...s, [r.ekey]: !r.open })); };
 
+  const ca = sumGroups(d.assets, CURRENT_ASSETS), cl = sumGroups(d.liabilities, CURRENT_LIABS);
+  const netWorth = netWorthOf(d);
+  const ratio = cl > 0 ? (ca / cl).toFixed(2) : '—';
+  const base = Math.abs(d.totalAssets || d.totalLiabilities || 0);
+  const bsTop = [...(d.assets || [])].filter((g) => Math.abs(g.amount) > 0).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 5);
+  const bsMax = Math.abs(bsTop[0]?.amount) || 1;
+  const pctCell = (v, bold) => <td style={{ padding: '4px 10px', textAlign: 'right', color: SAP.sec, fontSize: 11.5, fontWeight: bold ? 700 : 400, ...mono }}>{share(v, base) >= 0.05 ? `${share(v, base).toFixed(1)}%` : ''}</td>;
   const Row = ({ r }) => {
     if (!r) return null;
     const clickable = !!(r.ledger || r.expandable);
     const bold = !!(r.group || r.sub);
     const color = (r.group || r.sub) ? TALLY.head : '#444';
     const pad = r.group ? 16 : r.sub ? 32 : 50;
+    const structural = !!(r.group || r.sub);
     return (
       <tr style={{ borderBottom: '1px solid #dfe2e7', background: r.group ? '#fbfcfe' : '#fff' }}>
         <td {...(clickable ? keyActivate(() => onRowClick(r)) : {})} className={clickable ? 'cl-drill' : undefined}
@@ -2008,6 +2117,8 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
           {r.expandable ? <span style={{ color: TALLY.gold, marginRight: 4 }}>{r.open ? '▾' : '▸'}</span> : null}{r.label}{r.ledger ? <span style={{ color: TALLY.gold, fontWeight: 700 }}> ›</span> : null}
         </td>
         <td style={{ padding: '4px 14px', textAlign: 'right', color: r.result ? TALLY.green : '#1a1a1a', fontWeight: (r.result || r.sub) ? 700 : 400, ...mono }}>{inr(r.amount)}</td>
+        {pctCell(r.amount, r.sub)}
+        <td style={{ padding: '4px 14px 4px 6px' }}>{structural ? <MiniBar pct={share(r.amount, base)} tone="sales" /> : null}</td>
       </tr>
     );
   };
@@ -2015,18 +2126,30 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
     <tr style={{ background: '#f0f4fa', color: TALLY.head, borderBottom: `2px solid ${TALLY.head}` }}>
       <td style={{ padding: '7px 14px', fontWeight: 800, letterSpacing: 0.4, ...mono }}>{txt}</td>
       <td style={{ padding: '7px 14px', textAlign: 'right', fontWeight: 700, ...mono }}>Amount ({cur})</td>
+      <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, fontSize: 11, ...mono }}>% Tot</td>
+      <td />
     </tr>
   );
   const totalRow = (txt, val) => (
     <tr style={{ color: TALLY.head, fontWeight: 700, borderTop: `2px solid ${TALLY.head}`, borderBottom: `3px double ${TALLY.head}`, background: '#f0f4fa' }}>
       <td style={{ padding: '8px 14px', ...mono }}>{txt}</td>
       <td style={{ padding: '8px 14px', textAlign: 'right', color: TALLY.gold, ...mono }}>{inr(val)}</td>
+      <td style={{ padding: '8px 10px', textAlign: 'right', color: SAP.sec, fontSize: 11.5, fontWeight: 700, ...mono }}>{share(val, base) >= 0.05 ? `${share(val, base).toFixed(1)}%` : ''}</td>
+      <td />
     </tr>
   );
-  const ca = sumGroups(d.assets, CURRENT_ASSETS), cl = sumGroups(d.liabilities, CURRENT_LIABS);
   return (
-    <div className="tally-print-doc" style={{ background: '#fff', border: '1px solid #b0b0b0', borderRadius: 4, overflow: 'hidden', boxShadow: SHADOW, ...mono, maxWidth: 860, margin: '12px auto' }}>
-      <style>{`.cl-drill:hover{background:#eef4fb;text-decoration:underline}
+    <div>
+      <style>{STMT_GRID_CSS}</style>
+      <KpiGrid>
+        <Kpi tone="blue" label="Balance Sheet Total" value={compact(cur, d.totalAssets)} sub="Assets = Liabilities" />
+        <Kpi tone="green" label="Net Worth" value={compact(cur, netWorth)} sub="Capital + P&L A/c" />
+        <Kpi tone="teal" label="Working Capital" value={compact(cur, ca - cl)} sub="CA − CL" />
+        <Kpi tone="purple" label="Current Ratio" value={ratio} sub={`CA ${compact(cur, ca)} / CL ${compact(cur, cl)}`} />
+      </KpiGrid>
+      <div className="stmt-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 320px', gap: 18, alignItems: 'start' }}>
+        <div className="tally-print-doc" style={{ background: '#fff', border: '1px solid #b0b0b0', borderRadius: 4, overflow: 'hidden', boxShadow: SHADOW, ...mono }}>
+          <style>{`.cl-drill:hover{background:#eef4fb;text-decoration:underline}
 @media print {
   @page { size: A4 portrait; margin: 8mm; }
   body * { visibility: hidden !important; }
@@ -2034,36 +2157,64 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
   .tally-print-doc { position: absolute !important; left: 0; top: 0; width: 100% !important; max-width: none !important; margin: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; }
   .tally-print-doc .cl-noprint { display: none !important; }
 }`}</style>
-      <div style={{ background: TALLY.titlebar, color: TALLY.head, padding: '5px 12px', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #a9c2e0' }}>
-        <span>KBiz360 Books — {branchLabelClassic(d)}</span><span style={{ color: TALLY.gold }}>Balance Sheet · Vertical</span>
-      </div>
-      <div style={{ textAlign: 'center', padding: '10px 8px 8px', borderBottom: `2px solid ${TALLY.head}` }}>
-        <div style={{ color: TALLY.head, fontSize: 16, fontWeight: 700 }}>{branchLabelClassic(d)}</div>
-        <div style={{ fontSize: 13 }}>Balance Sheet (Vertical)</div>
-        <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{curLabel}</div>
-      </div>
-      {allKeys.length > 0 && (
-        <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #cdd1d8', background: '#fafbfe' }}>
-          <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
-          <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
+          <div style={{ background: TALLY.titlebar, color: TALLY.head, padding: '5px 12px', fontSize: 12, fontWeight: 700, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #a9c2e0' }}>
+            <span>KBiz360 Books — {branchLabelClassic(d)}</span><span style={{ color: TALLY.gold }}>Balance Sheet · Vertical</span>
+          </div>
+          <div style={{ textAlign: 'center', padding: '10px 8px 8px', borderBottom: `2px solid ${TALLY.head}` }}>
+            <div style={{ color: TALLY.head, fontSize: 16, fontWeight: 700 }}>{branchLabelClassic(d)}</div>
+            <div style={{ fontSize: 13 }}>Balance Sheet (Vertical)</div>
+            <div style={{ color: TALLY.gold, fontSize: 11, fontWeight: 700 }}>{curLabel}</div>
+          </div>
+          {allKeys.length > 0 && (
+            <div className="cl-noprint" style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #cdd1d8', background: '#fafbfe' }}>
+              <button onClick={expandAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊞ Expand all</button>
+              <button onClick={collapseAll} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${TALLY.head}`, borderRadius: 5, background: '#fff', color: TALLY.head }}>⊟ Collapse all</button>
+            </div>
+          )}
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <colgroup><col /><col style={{ width: 150 }} /><col style={{ width: 64 }} /><col style={{ width: 210 }} /></colgroup>
+            <tbody>
+              {sectionHead('I.  Equity & Liabilities')}
+              {left.map((r, i) => <Row key={'L' + i} r={r} />)}
+              {totalRow('Total — Equity & Liabilities', d.totalLiabilities)}
+              <tr><td colSpan={4} style={{ height: 10, background: '#fff' }} /></tr>
+              {sectionHead('II. Assets')}
+              {right.map((r, i) => <Row key={'A' + i} r={r} />)}
+              {totalRow('Total — Assets', d.totalAssets)}
+            </tbody>
+          </table>
+          <div style={{ background: TALLY.titlebar, color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: `2px solid ${TALLY.head}`, ...mono }}>
+            <span>Working Capital : <span style={{ color: TALLY.green }}>{inr(ca - cl)}</span></span>
+            <span>Net Profit : <span style={{ color: TALLY.green }}>{inr(d.netProfit)}</span></span>
+            <span>Diff in Op Balance : <span style={{ color: TALLY.green }}>{d.balanced ? '0.00' : inr(d.totalLiabilities - d.totalAssets)}</span></span>
+          </div>
         </div>
-      )}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-        <colgroup><col /><col style={{ width: 180 }} /></colgroup>
-        <tbody>
-          {sectionHead('I.  Equity & Liabilities')}
-          {left.map((r, i) => <Row key={'L' + i} r={r} />)}
-          {totalRow('Total — Equity & Liabilities', d.totalLiabilities)}
-          <tr><td colSpan={2} style={{ height: 10, background: '#fff' }} /></tr>
-          {sectionHead('II. Assets')}
-          {right.map((r, i) => <Row key={'A' + i} r={r} />)}
-          {totalRow('Total — Assets', d.totalAssets)}
-        </tbody>
-      </table>
-      <div style={{ background: TALLY.titlebar, color: TALLY.head, fontSize: 11, fontWeight: 700, padding: '4px 12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, borderTop: `2px solid ${TALLY.head}`, ...mono }}>
-        <span>Working Capital : <span style={{ color: TALLY.green }}>{inr(ca - cl)}</span></span>
-        <span>Net Profit : <span style={{ color: TALLY.green }}>{inr(d.netProfit)}</span></span>
-        <span>Diff in Op Balance : <span style={{ color: TALLY.green }}>{d.balanced ? '0.00' : inr(d.totalLiabilities - d.totalAssets)}</span></span>
+
+        <aside className="stmt-rail" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <RailCard title="Composition">
+            <Stat label="Current Assets" value={compact(cur, ca)} />
+            <Stat label="Current Liabilities" value={compact(cur, cl)} />
+            <Stat label="Net Worth" value={compact(cur, netWorth)} tone="pos" />
+            <Stat label="Net Profit (P&L)" value={compact(cur, d.netProfit)} tone={d.netProfit >= 0 ? 'pos' : 'neg'} last />
+          </RailCard>
+          {bsTop.length > 0 && (
+            <RailCard title="Largest asset groups">
+              {bsTop.map((g, i) => (
+                <div key={i} style={{ fontSize: 12, padding: '5px 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: SAP.text }}>{g.group}</span><b>{compact(cur, g.amount)}</b>
+                  </div>
+                  <MiniBar pct={(Math.abs(g.amount) / bsMax) * 100} />
+                </div>
+              ))}
+            </RailCard>
+          )}
+          <RailCard title="Health">
+            <Stat label="Current ratio" value={ratio} tone={cl > 0 && ca / cl >= 1 ? 'pos' : 'warn'} />
+            <Stat label="Working capital" value={compact(cur, ca - cl)} tone={ca - cl >= 0 ? 'pos' : 'neg'} />
+            <Stat label="Status" value={d.balanced ? 'Balanced ✓' : 'Out of balance'} tone={d.balanced ? 'pos' : 'neg'} last />
+          </RailCard>
+        </aside>
       </div>
       {drillLedger && <LedgerVoucherDrill ledger={drillLedger} branch={branch} to={to} cur={cur} mobile={mobile} onClose={() => setDrillLedger(null)} />}
     </div>

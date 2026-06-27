@@ -19,7 +19,7 @@ describe('Accounts pill — reorganized layout', () => {
       'Daily Entry',
       'Sales & Purchase',
       'BSP & Airline',
-      'Receivables & Collections',
+      'Receivables & Clients',
       'Payables & Suppliers',
       'Cash & Bank',
       'Reconciliation',
