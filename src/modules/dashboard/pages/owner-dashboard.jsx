@@ -198,14 +198,37 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch }) {
         </ResponsiveGrid>
       )}
 
-      {/* ── Bookings pipeline (condensed) ── */}
+      {/* ── Bookings pipeline (condensed) ── on Group/ALL: per branch, each in its own
+          currency (Sales/GP money never summed across branches). */}
       <div className="mb-1.5 text-xs font-semibold text-ink-muted">SO/PO/GP Pipeline · {rangeShort}</div>
-      <ResponsiveGrid min="180px" gap="md" className="mb-4">
-        <KPICard label="Approved Sales" value={m0(ab.sales)} delta={`${ab.count} posted`} color="#c2a04a" onClick={() => navigate('/transactions/approvals')} />
-        <KPICard label="Approved GP" value={m0(ab.gp)} delta={ab.sales > 0 ? `${((ab.gp / ab.sales) * 100).toFixed(1)}% GP` : ''} color="#16a34a" onClick={() => navigate('/transactions/approvals')} />
-        <KPICard label="Pending Sales" value={m0(pb.sales)} delta={`${pb.count} to approve`} color="#d97706" onClick={() => navigate('/transactions/approvals')} />
-        <KPICard label="Pending GP" value={m0(pb.gp)} delta="not yet posted" color="#d97706" onClick={() => navigate('/transactions/approvals')} />
-      </ResponsiveGrid>
+      {isAll && Array.isArray(data.bookingsByBranch) ? (
+        <div className="mb-4">
+          {data.bookingsByBranch.length === 0 && (
+            <div className="rounded-brand border border-surface-border bg-surface px-3.5 py-4 text-xs text-ink-muted">No pipeline bookings in any branch.</div>
+          )}
+          {data.bookingsByBranch.map((b) => (
+            <div key={b.branch} className="mb-3">
+              <div className="mb-1.5 flex items-baseline gap-2 border-b-2 pb-1" style={{ borderColor: '#185FA5' }}>
+                <span className="text-sm font-extrabold text-ink">{b.branch}</span>
+                <span className="text-[11px] font-bold text-ink-muted">· {bc({ code: b.branch }).cur}</span>
+              </div>
+              <ResponsiveGrid min="180px" gap="md">
+                <KPICard label="Approved Sales" value={mB(b.branch, b.approved.sales)} delta={`${b.approved.count} posted`} color="#c2a04a" onClick={() => navigate('/transactions/approvals')} />
+                <KPICard label="Approved GP" value={mB(b.branch, b.approved.gp)} delta={b.approved.sales > 0 ? `${((b.approved.gp / b.approved.sales) * 100).toFixed(1)}% GP` : ''} color="#16a34a" onClick={() => navigate('/transactions/approvals')} />
+                <KPICard label="Pending Sales" value={mB(b.branch, b.pending.sales)} delta={`${b.pending.count} to approve`} color="#d97706" onClick={() => navigate('/transactions/approvals')} />
+                <KPICard label="Pending GP" value={mB(b.branch, b.pending.gp)} delta="not yet posted" color="#d97706" onClick={() => navigate('/transactions/approvals')} />
+              </ResponsiveGrid>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <ResponsiveGrid min="180px" gap="md" className="mb-4">
+          <KPICard label="Approved Sales" value={m0(ab.sales)} delta={`${ab.count} posted`} color="#c2a04a" onClick={() => navigate('/transactions/approvals')} />
+          <KPICard label="Approved GP" value={m0(ab.gp)} delta={ab.sales > 0 ? `${((ab.gp / ab.sales) * 100).toFixed(1)}% GP` : ''} color="#16a34a" onClick={() => navigate('/transactions/approvals')} />
+          <KPICard label="Pending Sales" value={m0(pb.sales)} delta={`${pb.count} to approve`} color="#d97706" onClick={() => navigate('/transactions/approvals')} />
+          <KPICard label="Pending GP" value={m0(pb.gp)} delta="not yet posted" color="#d97706" onClick={() => navigate('/transactions/approvals')} />
+        </ResponsiveGrid>
+      )}
 
       {/* ── Trend + Targets ── */}
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 desktop:grid-cols-[2fr_1fr]">

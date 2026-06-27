@@ -32,10 +32,16 @@ describe('Accounts ▸ Reconciliation head', () => {
     );
   });
 
-  test('it is split into Client / Bank / Supplier / Tax sections (dividers)', () => {
+  test('it is split into Client / Bank / Supplier sections (dividers)', () => {
     const dividers = recon.children.filter((c) => c.divider).map((c) => c.label);
     expect(dividers).toEqual(expect.arrayContaining(['Client', 'Bank', 'Supplier']));
-    expect(dividers.some((d) => /tax/i.test(d))).toBe(true);
+  });
+
+  test('no tax/GST reconciliation links remain under the Accounts pill', () => {
+    const all = allHrefs(MENU_ACCOUNTS);
+    ['/tax/reconciliation', '/tax/gstr2b', '/tax/gstr2a', '/tax/gstr9c'].forEach((h) => {
+      expect(all).not.toContain(h);
+    });
   });
 
   test('moved items are not duplicated in their old groups', () => {
@@ -64,27 +70,22 @@ describe('Accounts ▸ Reconciliation head', () => {
   });
 });
 
-describe('Accounts ▸ Reconciliation ▸ Tax pointer is regime-aware (getMenu)', () => {
+describe('Accounts ▸ Reconciliation carries NO tax links in any regime (getMenu)', () => {
   const accountsRecon = (branch) => {
     const menu = getMenu(branch, { role: 'Super Admin' });
     const accounts = menu.find((m) => m.label === 'Accounts');
     return hrefs(groupByLabel(accounts, 'Reconciliation'));
   };
+  const GST = ['/tax/gstr2b', '/tax/gstr2a', '/tax/gstr9c', '/tax/reconciliation'];
 
-  test('India branch (BOM) keeps the GST recon links under Accounts', () => {
-    expect(accountsRecon({ code: 'BOM' })).toEqual(expect.arrayContaining(['/tax/gstr2b', '/tax/gstr2a', '/tax/gstr9c']));
-  });
-
-  test('consolidated ("ALL") view keeps the GST recon links', () => {
-    expect(accountsRecon('ALL')).toEqual(expect.arrayContaining(['/tax/gstr2b']));
-  });
-
-  test('pure VAT branch (NBO) does NOT show GST recon links under Accounts', () => {
-    const h = accountsRecon({ code: 'NBO' });
-    expect(h).not.toContain('/tax/gstr2b');
-    expect(h).not.toContain('/tax/gstr2a');
-    expect(h).not.toContain('/tax/gstr9c');
-    // but the non-tax recons are still there
+  test.each([
+    ['India branch (BOM)', { code: 'BOM' }],
+    ['consolidated ("ALL")', 'ALL'],
+    ['pure VAT branch (NBO)', { code: 'NBO' }],
+  ])('%s shows only non-tax recons under Accounts', (_name, branch) => {
+    const h = accountsRecon(branch);
+    GST.forEach((g) => expect(h).not.toContain(g));
+    // the non-tax recons are still there
     expect(h).toEqual(expect.arrayContaining(['/accounts/client-reco', '/bank-reco', '/accounts/supplier-reco']));
   });
 });
