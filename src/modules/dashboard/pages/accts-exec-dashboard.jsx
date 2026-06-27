@@ -7,7 +7,6 @@ import { PageLayout } from '../../../shell/PageLayout';
 import { ResponsiveGrid } from '../../../shell/primitives';
 import { useAcctsExecDashboard } from '../hooks/use-accts-exec-dashboard';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
-import { useDashboardStore } from '../store/dashboard.store';
 import { PostShortcutTiles } from '../components/shared/PostShortcutTiles';
 import { RecentActivityFeed } from '../components/shared/RecentActivityFeed';
 import { AgeingBuckets } from '../components/shared/AgeingBuckets';
@@ -21,8 +20,6 @@ export function AcctsExecDashboardPage({ currentUser, setRoute, branch }) {
   const ownBranch = (branch && branch !== 'ALL' && branch.code) || currentUser?.branches?.[0] || null;
   const { data, branchData, isLoading, isError, error, refetch } = useAcctsExecDashboard(ownBranch);
   const { navigate } = useDashboardActions(setRoute);
-  const period = useDashboardStore((s) => s.period);
-  const setPeriod = useDashboardStore((s) => s.setPeriod);
   // Branch-aware money (USD branches no longer forced to ₹).
   const cur = bc(branch).cur;
   const money = (n) => compactAmt(n, { currency: cur });
@@ -42,8 +39,6 @@ export function AcctsExecDashboardPage({ currentUser, setRoute, branch }) {
         title={`Accounts Executive Dashboard — ${ownBranch}`}
         subtitle="Branch-scoped maker view · post vouchers · cannot approve own"
         user={currentUser}
-        period={period}
-        setPeriod={setPeriod}
         onExport={() => openPrintPreview({ selector: 'main', title: 'Accounts Executive Dashboard', recommend: 'portrait' })}
       />
 

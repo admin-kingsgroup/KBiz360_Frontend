@@ -511,9 +511,15 @@ export function KPICard({label,value,delta,color,onClick}){
 }
 
 
+// Standard widescreen page/report container width. Registers, reports and list
+// screens center their content at this cap so wide monitors aren't wasted on
+// empty gutters (matches the SO/PO/GP booking screens, already on 1600). The
+// P&L / Balance Sheet statements run slightly wider (1640) to fit their rail.
+export const PAGE_MAX = 1600;
+
 export function RPT_Page({title,subtitle,toolbar,children}){
   return (
-    <div style={{padding:18,maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:18,maxWidth:PAGE_MAX,margin:"0 auto"}}>
       <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:14,marginBottom:14,paddingBottom:12,borderBottom:"1px solid #cdd1d8"}}>
         <div>
           <h2 style={{margin:0,fontSize:20,color:"#0d1326",fontWeight:700}}>{title}</h2>
@@ -543,19 +549,21 @@ export function RPT_CashPosition({branch}){
     if(!groupByBranch[b.branch]) groupByBranch[b.branch]=[];
     groupByBranch[b.branch].push(b);
   });
+  // Each currency/branch balance is shown in its OWN native currency only — no
+  // cross-currency conversion and no INR-equivalent grand total (a sum across
+  // currencies is meaningless and is intentionally not shown here).
   const groupByCurrency={};
   BANK_ACCOUNTS_DATA.forEach(b=>{
-    if(!groupByCurrency[b.currency]) groupByCurrency[b.currency]={total:0,count:0,inINR:0};
-    const rate=FX_RATES[b.currency]||1;
+    if(!groupByCurrency[b.currency]) groupByCurrency[b.currency]={total:0,count:0};
     groupByCurrency[b.currency].total+=b.openingBal;
     groupByCurrency[b.currency].count+=1;
-    groupByCurrency[b.currency].inINR+=b.openingBal*rate;
   });
-  const grandTotal=Object.values(groupByCurrency).reduce((s,c)=>s+c.inINR,0);
+  // Per-branch native balances per currency it holds (branches are usually single-
+  // currency; mixed branches list each currency on its own line — never summed).
+  const branchCurTotals=(accts)=>{const m={};accts.forEach(a=>{m[a.currency]=(m[a.currency]||0)+a.openingBal;});return m;};
   return (
-    <RPT_Page title="Cash Position Summary" subtitle="All bank balances + petty cash · real-time · all branches">
+    <RPT_Page title="Cash Position Summary" subtitle="All bank balances + petty cash · real-time · each branch in its own currency">
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,marginBottom:14}}>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Grand Total (INR equiv)</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(grandTotal)}</p></div>
         <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Bank Accounts</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{BANK_ACCOUNTS_DATA.filter(b=>b.type!=="Cash").length}</p></div>
         <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Currencies</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{Object.keys(groupByCurrency).length}</p></div>
         <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Branches</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{Object.keys(groupByBranch).length}</p></div>
@@ -564,23 +572,23 @@ export function RPT_CashPosition({branch}){
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>By Currency</p>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Currency</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th><th style={{...RPT_thStyle,textAlign:"right"}}>INR Equiv</th></tr></thead>
-            <tbody>{Object.entries(groupByCurrency).map(([cur,d])=>(<tr key={cur}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:700}}>{cur} <span style={{color:"#5a6691",fontWeight:400,fontSize:10}}>({d.count})</span></td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{cur} {d.total.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(d.inINR)}</td></tr>))}</tbody>
+            <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Currency</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th></tr></thead>
+            <tbody>{Object.entries(groupByCurrency).map(([cur,d])=>(<tr key={cur}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:700}}>{cur} <span style={{color:"#5a6691",fontWeight:400,fontSize:10}}>({d.count})</span></td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{cur} {d.total.toLocaleString("en-IN")}</td></tr>))}</tbody>
           </table>
         </div>
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>By Branch</p>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"center"}}>A/cs</th><th style={{...RPT_thStyle,textAlign:"right"}}>Total INR Equiv</th></tr></thead>
-            <tbody>{Object.entries(groupByBranch).map(([br,accts])=>{const total=accts.reduce((s,a)=>{const rate=1;return s+a.openingBal*rate;},0);return (<tr key={br}><td style={{...RPT_tdStyle,fontWeight:700}}>{br}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{accts.length}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(total)}</td></tr>);})}</tbody>
+            <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"center"}}>A/cs</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance (native)</th></tr></thead>
+            <tbody>{Object.entries(groupByBranch).map(([br,accts])=>{const cm=branchCurTotals(accts);return (<tr key={br}><td style={{...RPT_tdStyle,fontWeight:700}}>{br}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{accts.length}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:700}}>{Object.entries(cm).map(([cur,v])=>`${cur} ${v.toLocaleString("en-IN")}`).join(" · ")}</td></tr>);})}</tbody>
           </table>
         </div>
       </div>
       <div style={cardStyle}>
         <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>Detail — All Accounts</p>
         <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Bank · Account</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>Currency</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th><th style={{...RPT_thStyle,textAlign:"right"}}>INR Equiv</th><th style={{...RPT_thStyle,textAlign:"right"}}>% of Limit</th></tr></thead>
-          <tbody>{BANK_ACCOUNTS_DATA.map(b=>{const rate=FX_RATES[b.currency]||1;const pct=Math.round(b.openingBal/b.limit*100);return (<tr key={b.id}><td style={RPT_tdStyle}>{b.branch}</td><td style={RPT_tdStyle}>{b.bank} · <span style={{fontFamily:"monospace",color:"#5a6691"}}>...{b.accountNo.slice(-6)}</span></td><td style={RPT_tdStyle}>{b.type}</td><td style={{...RPT_tdStyle,fontFamily:"monospace"}}>{b.currency}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{b.openingBal.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(b.openingBal*rate)}</td><td style={{...RPT_tdStyle,textAlign:"right",color:pct>80?"#A32D2D":"#0d1326",fontWeight:600}}>{pct}%</td></tr>);})}</tbody>
+          <thead><tr><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Bank · Account</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>Currency</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th><th style={{...RPT_thStyle,textAlign:"right"}}>% of Limit</th></tr></thead>
+          <tbody>{BANK_ACCOUNTS_DATA.map(b=>{const pct=Math.round(b.openingBal/b.limit*100);return (<tr key={b.id}><td style={RPT_tdStyle}>{b.branch}</td><td style={RPT_tdStyle}>{b.bank} · <span style={{fontFamily:"monospace",color:"#5a6691"}}>...{b.accountNo.slice(-6)}</span></td><td style={RPT_tdStyle}>{b.type}</td><td style={{...RPT_tdStyle,fontFamily:"monospace"}}>{b.currency}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{b.currency} {b.openingBal.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",color:pct>80?"#A32D2D":"#0d1326",fontWeight:600}}>{pct}%</td></tr>);})}</tbody>
         </table></div>
       </div>
     </RPT_Page>

@@ -8,7 +8,7 @@ import { AlertTriangle, BarChart2, Calendar, Check, Download, Lock, Plus, Save, 
 import { openPrintPreview } from '../../core/PrintPreview';
 import { Legend, Line } from 'recharts';
 import { BRANCHES, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../../core/data';
-import { fmt, fmtINR, compactAmt } from '../../core/format';
+import { fmt, fmtINR, compactAmt, localeOf } from '../../core/format';
 import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, _LEAVE_BALANCES, cardStyle, tabPanel } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
@@ -22,6 +22,7 @@ import { toast } from '../../core/ux/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPut, getAuthToken } from '../../core/api';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../../core/styles';
+import { MiniBar } from '../../core/insightsUI';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 
 export function ExpenseBudget({branch,setRoute}){
@@ -64,10 +65,10 @@ export function ExpenseBudget({branch,setRoute}){
   const updM=(id,v)=>setDraft(d=>({...d,[id]:{...d[id],monthly:+v,yearly:Math.round(+v*12)}}));
   const updY=(id,v)=>setDraft(d=>({...d,[id]:{...d[id],yearly:+v,monthly:Math.round(+v/12)}}));
   const f=n=>compactAmt(n,{currency:'',dash:true}); // canonical compact (fixes 1–10 lakh shown as "K")
-  const ff=n=>n>0?cur+Number(n).toLocaleString("en-IN"):"—";
+  const ff=n=>n>0?cur+Number(n).toLocaleString(localeOf(cur)):"—";
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -162,8 +163,8 @@ export function ExpenseBudget({branch,setRoute}){
             })}</tbody>
             <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
               <td colSpan={2} style={{padding:"11px 14px",fontWeight:700,color:"#d4a437",fontSize:12}}>TOTAL — {fyObj.l} · {brCode}</td>
-              <td style={{padding:"11px 14px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:14}}>{cur+Number(totM).toLocaleString("en-IN")}/mo</td>
-              <td style={{padding:"11px 14px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums",fontSize:14}}>{cur+Number(totY).toLocaleString("en-IN")}/yr</td>
+              <td style={{padding:"11px 14px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:14}}>{cur+Number(totM).toLocaleString(localeOf(cur))}/mo</td>
+              <td style={{padding:"11px 14px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums",fontSize:14}}>{cur+Number(totY).toLocaleString(localeOf(cur))}/yr</td>
               {tab==="monthly"&&<td style={{padding:"11px 14px",textAlign:"right",color:"#d4a437",fontWeight:700}}>100%</td>}
             </tr></tfoot>
           </table>
@@ -259,7 +260,7 @@ export function HrEmployees({branch}){
   const net=e=>gross(e)-deductions(e);
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
         flexWrap:"wrap",gap:10,marginBottom:14}}>
@@ -517,7 +518,7 @@ export function HrAttendance({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
         flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -700,7 +701,7 @@ export function HrPayroll({branch}){
   const jDr=journalEntries.filter(e=>e.side==="Dr").reduce((s,e)=>s+e.amount,0);
   const jCr=journalEntries.filter(e=>e.side==="Cr").reduce((s,e)=>s+e.amount,0);
   const balDiff=jDr-jCr; const balanced=balDiff>=-0.01&&balDiff<=0.01;
-  const hrpContainerStyle={padding:"12px 10px",maxWidth:1300,margin:"0 auto"};
+  const hrpContainerStyle={padding:"12px 10px",maxWidth:1600,margin:"0 auto"};
 
   return (
     <div style={hrpContainerStyle}>
@@ -743,7 +744,7 @@ export function HrPayroll({branch}){
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:1000}}>
               <thead><tr style={{background:"#0d1326"}}>
-                {["Employee","Basic","HRA","Special","LWP","Gross","PF (E)","ESI (E)","Prof Tax","TDS","Net Pay"].map((h,i)=>(
+                {["Employee","Basic","HRA","Special","LWP","Gross","PF (E)","ESI (E)","Prof Tax","TDS","Net Pay","Take-home %"].map((h,i)=>(
                   <th key={i} style={{padding:"8px 10px",textAlign:i>1?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr></thead>
@@ -761,6 +762,14 @@ export function HrPayroll({branch}){
                     <td style={{padding:"8px 10px",textAlign:"right",color:"#854F0B",fontVariantNumeric:"tabular-nums"}}>{e.profTax>0?f(e.profTax):"—"}</td>
                     <td style={{padding:"8px 10px",textAlign:"right",color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{e.tds>0?f(e.tds):"—"}</td>
                     <td style={{padding:"8px 10px",textAlign:"right",fontWeight:700,color:"#27500A",fontVariantNumeric:"tabular-nums"}}>{f(e.net)}</td>
+                    <td style={{padding:"8px 10px",minWidth:120}}>
+                      {(()=>{const th=e.gross>0?(e.net/e.gross)*100:0;return(
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:10,color:"#5a6691",width:34,textAlign:"right",flexShrink:0,fontVariantNumeric:"tabular-nums"}}>{th.toFixed(0)}%</span>
+                          <div style={{flex:1,minWidth:36}}><MiniBar pct={th} color={th>=85?"linear-gradient(90deg,#22c55e,#15803d)":th>=70?"linear-gradient(90deg,#3b82f6,#1d4ed8)":"linear-gradient(90deg,#f0a35e,#d97706)"} /></div>
+                        </div>
+                      );})()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -769,6 +778,7 @@ export function HrPayroll({branch}){
                 {[totals.gross*0.5,totals.gross*0.2,totals.gross*0.3,0,totals.gross,totals.empPF,totals.empESI,totals.profTax,totals.tds,totals.net].map((v,i)=>(
                   <td key={i} style={{padding:"8px 10px",textAlign:"right",fontWeight:700,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:11}}>{v>0?f(v):"—"}</td>
                 ))}
+                <td style={{padding:"8px 10px",textAlign:"right",fontWeight:700,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:11}}>{totals.gross>0?`${Math.round(totals.net/totals.gross*100)}%`:"—"}</td>
                 </tr>
               </tfoot>
             </table>
@@ -960,7 +970,7 @@ export function HrPayslips({branch}){
   const net=gross-deductions;
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:900,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       {/* Controls */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
         flexWrap:"wrap",gap:10,marginBottom:16}}>
@@ -1140,7 +1150,7 @@ export function HrLeave({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🌴</div>
@@ -1274,7 +1284,7 @@ export function HrExpenses({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>💳</div>
@@ -1395,7 +1405,7 @@ export function SalaryRevision({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📈</div>
@@ -1559,7 +1569,7 @@ export function PfEsiChallan({branch}){
   const [challanESI,setChallanESI]=useState({bsr:"",date:"",trn:"",status:"Pending"});
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📋</div>
@@ -1729,7 +1739,7 @@ export function EmployeeAdvances({branch,setRoute}){
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>👤 Employee Loans &amp; Salary Advances</h2>

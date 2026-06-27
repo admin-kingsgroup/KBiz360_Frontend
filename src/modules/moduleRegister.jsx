@@ -12,6 +12,7 @@ import { filterBookingsForRegister, bookingTravelDetail } from '../core/register
 import { consumePendingRegisterSearch } from '../core/registerNav';
 import { companyProfile } from '../core/referenceCache';
 import { bc } from '../core/styles';
+import { localeOf } from '../core/format';
 import { PeriodBar, periodRange } from '../core/period';
 import { openPrintPreview } from '../core/PrintPreview';
 import { buildBookingInvoice } from '../core/invoiceHtml';
@@ -21,7 +22,7 @@ import { PageLayout } from '../shell/PageLayout';
 import { DataTable } from '../shell/DataTable';
 import { Button, Select, Input } from '../shell/primitives';
 
-const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
+const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
 const MODS = ['SF', 'SH', 'SHT', 'SV', 'SI', 'SC', 'SM'];
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -109,7 +110,8 @@ export function ModuleRegister({ branch, mode = 'both' }) {
     () => filterBookingsForRegister(data, { mod, from: range.from, to: range.to, needle }),
     [data, mod, range.from, range.to, needle],
   );
-  const fmt = (n) => (bc(branch).cur) + Math.round(Number(n) || 0).toLocaleString('en-IN');
+  const cur = bc(branch)?.cur || '₹';
+  const fmt = (n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
   const custs = useQuery({ queryKey: ['customers'], queryFn: () => apiGet('/api/customers') }).data || [];
   const sups = useQuery({ queryKey: ['suppliers'], queryFn: () => apiGet('/api/suppliers') }).data || [];
   const byName = (arr) => { const m = {}; (arr || []).forEach((x) => { if (x && x.name) m[String(x.name).toLowerCase().trim()] = x; }); return m; };
@@ -155,42 +157,56 @@ export function ModuleRegister({ branch, mode = 'both' }) {
     return out;
   }, [rows, showSale, showPur]);
   useReportExport({ title: heading, kind: 'vouchers', rows: tallyVouchers, recommend: 'landscape' }, [tallyVouchers, heading]);
-  const showMod = mod === 'ALL';
 
-  const columns = useMemo(() => [
-    { key: 'bookingNo', header: 'Booking No', className: 'font-mono font-semibold whitespace-nowrap' },
-    { key: 'linkNo', header: 'Link No', className: 'font-mono text-[#185FA5]', render: (r) => r.linkNo || '—' },
-    { key: 'date', header: 'Date', className: 'whitespace-nowrap text-ink-muted' },
-    ...(showMod ? [{ key: 'module', header: 'Module', className: 'whitespace-nowrap', render: (r) => `${VSPECS[r.module]?.icon || ''} ${VSPECS[r.module]?.name || r.module}` }] : []),
-    { key: 'customer.name', header: 'Customer', render: (r) => r.customer?.name || '—' },
-    { key: 'supplier.name', header: 'Service / Vendor', render: (r) => (r.noSupplier ? '—' : (r.supplier?.name || '—')) },
-    { key: '__pax', header: 'Passenger / Name', sortable: false, render: (r) => bookingTravelDetail(r).passengers || '—' },
-    { key: '__tkt', header: 'Ticket No', sortable: false, className: 'font-mono text-[11px]', render: (r) => bookingTravelDetail(r).tickets || '—' },
-    { key: '__pnr', header: 'PNR', sortable: false, className: 'font-mono text-[11px] text-gold-dark', render: (r) => bookingTravelDetail(r).pnrs || '—' },
-    { key: '__sector', header: 'Sector', sortable: false, className: 'whitespace-nowrap', render: (r) => bookingTravelDetail(r).sectors || '—' },
-    ...(showSale ? [
-      { key: 'so.total', header: 'Sale (incl GST)', num: true, render: (r) => fmt(r.so?.total) },
-      { key: 'so.gst', header: 'SVF GST', num: true, className: 'text-[#854F0B]', render: (r) => fmt(r.so?.gst) },
-      { key: 'so.otherTaxesGst', header: 'SVC2 GST', num: true, className: 'text-[#854F0B]', render: (r) => fmt(r.so?.otherTaxesGst) },
-    ] : []),
-    ...(showPur ? [
-      { key: 'po.total', header: 'Purchase (incl GST)', num: true, render: (r) => (r.noSupplier ? '—' : fmt(r.po?.total)) },
-      { key: 'po.gst', header: 'Purchase GST', num: true, className: 'text-[#854F0B]', render: (r) => (r.noSupplier ? '—' : fmt(r.po?.gst)) },
-    ] : []),
-    { key: 'gp.total', header: 'Gross Profit', num: true, className: 'font-bold text-success', render: (r) => <>{fmt(r.gp?.total)} <span className="font-semibold text-ink-muted">({r.gp?.pct ?? 0}%)</span></> },
-    ...(showSale ? [{ key: 'saleVno', header: 'Sales Invoice', className: 'font-mono text-[11px] text-ink-muted', render: (r) => r.saleVno || '—' }] : []),
-    ...(showPur ? [{ key: 'purchaseVno', header: 'Purchase Invoice', className: 'font-mono text-[11px] text-ink-muted', render: (r) => (r.noSupplier ? '—' : (r.purchaseVno || '—')) }] : []),
-    {
-      key: '__inv', header: 'Invoice', align: 'center', sortable: false, hideable: false,
-      render: (r) => (
-        <div className="flex justify-center gap-1.5 whitespace-nowrap">
-          {showSale && <Button variant="secondary" size="xs" icon={Receipt} onClick={() => print(r, 'sale')}>Sales</Button>}
-          {showPur && !r.noSupplier && <Button variant="secondary" size="xs" icon={FileText} onClick={() => print(r, 'purchase')}>Purchase</Button>}
-        </div>
-      ),
-    },
+  // Column order requested by the business: Date ▸ Sales Type ▸ Ledger Name ▸ Invoice
+  // Value ▸ Link No ▸ Sales Invoice No ▸ Purchase Invoice No, then the rest. Default
+  // sort is Date ascending (chronological, like a Tally register). The "Ledger Name"
+  // is the accounting party of the register it's viewed in — the customer (debtor) on
+  // the sales side, the vendor (creditor) on the purchase side; the opposite party is
+  // kept in the trailing columns so no detail is lost.
+  const columns = useMemo(() => {
+    const ledgerCol = mode === 'purchase'
+      ? { key: 'supplier.name', header: 'Ledger Name', render: (r) => (r.noSupplier ? '—' : (r.supplier?.name || '—')) }
+      : { key: 'customer.name', header: 'Ledger Name', render: (r) => r.customer?.name || '—' };
+    const otherPartyCol = mode === 'purchase'
+      ? { key: 'customer.name', header: 'Customer', render: (r) => r.customer?.name || '—' }
+      : { key: 'supplier.name', header: 'Service / Vendor', render: (r) => (r.noSupplier ? '—' : (r.supplier?.name || '—')) };
+    return [
+      { key: 'date', header: 'Date', className: 'whitespace-nowrap text-ink-muted' },
+      { key: 'module', header: 'Sales Type', className: 'whitespace-nowrap', render: (r) => `${VSPECS[r.module]?.icon || ''} ${VSPECS[r.module]?.name || r.module}` },
+      ledgerCol,
+      ...(showSale ? [{ key: 'so.total', header: mode === 'both' ? 'Sale (incl GST)' : 'Invoice Value', num: true, render: (r) => fmt(r.so?.total) }] : []),
+      ...(showPur ? [{ key: 'po.total', header: mode === 'both' ? 'Purchase (incl GST)' : 'Invoice Value', num: true, render: (r) => (r.noSupplier ? '—' : fmt(r.po?.total)) }] : []),
+      { key: 'linkNo', header: 'Link No', className: 'font-mono text-[#185FA5]', render: (r) => r.linkNo || '—' },
+      { key: 'saleVno', header: 'Sales Invoice No', className: 'font-mono text-[11px] text-ink-muted', render: (r) => r.saleVno || '—' },
+      { key: 'purchaseVno', header: 'Purchase Invoice No', className: 'font-mono text-[11px] text-ink-muted', render: (r) => (r.noSupplier ? '—' : (r.purchaseVno || '—')) },
+      // ── the rest ──
+      { key: 'bookingNo', header: 'Booking No', className: 'font-mono font-semibold whitespace-nowrap' },
+      otherPartyCol,
+      { key: '__pax', header: 'Passenger / Name', sortable: false, render: (r) => bookingTravelDetail(r).passengers || '—' },
+      { key: '__tkt', header: 'Ticket No', sortable: false, className: 'font-mono text-[11px]', render: (r) => bookingTravelDetail(r).tickets || '—' },
+      { key: '__pnr', header: 'PNR', sortable: false, className: 'font-mono text-[11px] text-gold-dark', render: (r) => bookingTravelDetail(r).pnrs || '—' },
+      { key: '__sector', header: 'Sector', sortable: false, className: 'whitespace-nowrap', render: (r) => bookingTravelDetail(r).sectors || '—' },
+      ...(showSale ? [
+        { key: 'so.gst', header: 'SVF GST', num: true, className: 'text-[#854F0B]', render: (r) => fmt(r.so?.gst) },
+        { key: 'so.otherTaxesGst', header: 'SVC2 GST', num: true, className: 'text-[#854F0B]', render: (r) => fmt(r.so?.otherTaxesGst) },
+      ] : []),
+      ...(showPur ? [
+        { key: 'po.gst', header: 'Purchase GST', num: true, className: 'text-[#854F0B]', render: (r) => (r.noSupplier ? '—' : fmt(r.po?.gst)) },
+      ] : []),
+      { key: 'gp.total', header: 'Gross Profit', num: true, className: 'font-bold text-success', render: (r) => <>{fmt(r.gp?.total)} <span className="font-semibold text-ink-muted">({r.gp?.pct ?? 0}%)</span></> },
+      {
+        key: '__inv', header: 'Invoice', align: 'center', sortable: false, hideable: false,
+        render: (r) => (
+          <div className="flex justify-center gap-1.5 whitespace-nowrap">
+            {showSale && <Button variant="secondary" size="xs" icon={Receipt} onClick={() => print(r, 'sale')}>Sales</Button>}
+            {showPur && !r.noSupplier && <Button variant="secondary" size="xs" icon={FileText} onClick={() => print(r, 'purchase')}>Purchase</Button>}
+          </div>
+        ),
+      },
+    ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [showMod, showSale, showPur, branch]);
+  }, [mode, showSale, showPur, branch]);
 
   const emptyMsg = needle
     ? `No deals match “${q.trim()}”.`
@@ -231,6 +247,7 @@ export function ModuleRegister({ branch, mode = 'both' }) {
         getRowKey={(b) => b.id}
         loading={isLoading}
         emptyMessage={emptyMsg}
+        initialSort={{ key: 'date', dir: 'asc' }}
         stickyHeader
         stickyFirstColumn
         showColumnToggle

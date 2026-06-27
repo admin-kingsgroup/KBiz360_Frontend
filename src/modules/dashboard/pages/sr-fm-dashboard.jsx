@@ -8,7 +8,6 @@ import { PageLayout } from '../../../shell/PageLayout';
 import { ResponsiveGrid } from '../../../shell/primitives';
 import { useSrFmDashboard } from '../hooks/use-sr-fm-dashboard';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
-import { useDashboardStore } from '../store/dashboard.store';
 import { CashForecastChart } from '../components/shared/CashForecastChart';
 import { BankBalancesPanel } from '../components/shared/BankBalancesPanel';
 import { PeriodCloseTable } from '../components/tables/PeriodCloseTable';
@@ -23,8 +22,6 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
   const branchCode = branch === 'ALL' ? null : branch?.code;
   const { data, isLoading, isError, error, refetch } = useSrFmDashboard(branchCode);
   const { navigate } = useDashboardActions(setRoute);
-  const period = useDashboardStore((s) => s.period);
-  const setPeriod = useDashboardStore((s) => s.setPeriod);
   const money = (n) => compactAmt(n, { currency: bc(branch).cur });
 
   if (isError && !data) {
@@ -51,8 +48,6 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
         title="Senior Finance Manager Dashboard"
         subtitle="Operational finance · all branches"
         user={currentUser}
-        period={period}
-        setPeriod={setPeriod}
         onExport={() => openPrintPreview({ selector: 'main', title: 'Senior Finance Manager Dashboard', recommend: 'portrait' })}
       />
 

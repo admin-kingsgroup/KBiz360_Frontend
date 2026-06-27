@@ -47,7 +47,7 @@ export function Statistics({ branch, setRoute }) {
   const tdN = { padding: '8px 13px', textAlign: 'right', color: '#334155' };
 
   return (
-    <div style={{ padding: '12px 10px', maxWidth: 980, margin: '0 auto' }}>
+    <div style={{ padding: '12px 10px', maxWidth: 1600, margin: '0 auto' }}>
       <div style={{ marginBottom: 14 }}>
         <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>Statistics</h2>
         <p style={{ margin: '2px 0 0', fontSize: 10.5, color: DIM }}>Masters &amp; voucher counts {data?.branch && data.branch !== 'ALL' ? `· ${data.branch}` : '· All branches'} · live</p>

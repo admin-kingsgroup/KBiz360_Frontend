@@ -12,7 +12,7 @@
 //   POST /api/bank-reconciliation/import | auto-match | match/:id | unmatch/:id | status/:id
 //   DEL  /api/bank-reconciliation/statement | line/:id
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost, apiDelete, getAuthToken } from './api';
 import { branchCode } from './useAccounting';
 
@@ -69,6 +69,35 @@ export function useBankReconSummary(ledger, branch, { from, to } = {}) {
   });
 }
 
+// Aggregate reconciliation health across EVERY bank ledger of the branch — how many
+// accounts carry an unreconciled difference, the total of those differences, and the
+// open (unmatched) line count. Powers the dashboard's Exception Radar without the user
+// picking a single bank. Each per-ledger query shares the exact key of
+// useBankReconSummary, so the all-accounts rollup and this aggregate dedupe (no extra
+// network round-trips).
+export function useBankReconAggregate(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  const ledgers = useBankLedgers(branch).data || [];
+  const results = useQueries({
+    queries: ledgers.map((lg) => ({
+      queryKey: ['bank-reco', 'summary', lg.name || '', code || 'all', from || '', to || ''],
+      queryFn: () => apiGet('/api/bank-reconciliation/summary', { ledger: lg.name, branch: code, from, to }),
+      enabled: enabled() && !!lg.name,
+      staleTime: 15_000,
+    })),
+  });
+  const summaries = results.map((r) => r.data).filter(Boolean);
+  const withDiff = summaries.filter((s) => Math.abs(Number(s.differenceAmount) || 0) >= 1);
+  const openLines = summaries.reduce((n, s) => n + ((s.counts?.bookUnreconciled || 0) + (s.counts?.statementUnreconciled || 0)), 0);
+  return {
+    ledgerCount: ledgers.length,
+    diffCount: withDiff.length,
+    diffAmount: withDiff.reduce((sum, s) => sum + Math.abs(Number(s.differenceAmount) || 0), 0),
+    openLines,
+    isLoading: results.some((r) => r.isLoading),
+  };
+}
+
 // Every mutation invalidates the whole 'bank-reco' tree so book + statement +
 // summary all re-fetch and stay consistent after any reconciliation action.
 function useReconMutation(mutationFn) {
@@ -95,8 +124,8 @@ export const useSetReconStatus = () =>
   useReconMutation(({ id, status }) => apiPost(`/api/bank-reconciliation/status/${id}`, { status }));
 
 export const useClearStatement = () =>
-  useReconMutation(({ ledger, from, to }) =>
-    apiDelete(`/api/bank-reconciliation/statement?${new URLSearchParams({ ledger, ...(from ? { from } : {}), ...(to ? { to } : {}) })}`));
+  useReconMutation(({ ledger, branch, from, to }) =>
+    apiDelete(`/api/bank-reconciliation/statement?${new URLSearchParams({ ledger, ...(branch ? { branch } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) })}`));
 
 export const useDeleteStatementLine = () =>
   useReconMutation(({ id }) => apiDelete(`/api/bank-reconciliation/line/${id}`));

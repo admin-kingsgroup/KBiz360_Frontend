@@ -12,7 +12,7 @@ import { ACTIVE_CURRENCIES, ADM_DATA, BRANCH_CODES, CASH, CUSTOMERS, FOREX_RATES
 import { useNumberingSeries, useApprovalLimits } from '../../core/useReference';
 import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { apiPost, apiPut } from '../../core/api';
-import { fmt, fmtINR } from '../../core/format';
+import { fmt, fmtINR, localeOf } from '../../core/format';
 import { exportToExcel } from '../../core/exportExcel';
 import { ACM_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, _PASSPORTS, cardStyle, tabPanel } from '../../core/helpers';
 // MstrShell / MstrModal modernized (responsive header + shared Modal) — same props.
@@ -69,7 +69,7 @@ export function MastersForex(){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:36,height:36,borderRadius:9,background:"#fbeedb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>💱</div>
@@ -164,9 +164,9 @@ export function VendorTermsMaster({branch}){
   const totTds=terms.filter(t=>t.tds!=="None").reduce((s,t)=>s+Math.round(t.dueAmt*t.tdsRate/100),0);
   const STATUS_CLR={"Due Today":"#dc2626","Due Soon":"#d97706","Upcoming":"#16a34a","Overdue":"#7B1F1F"};
   const STATUS_BG={"Due Today":"#fbe9e9","Due Soon":"#fbeedb","Upcoming":"#e8f6ed","Overdue":"#fbe9e9"};
-  const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
+  const f=n=>cur+Number(Math.round(n)).toLocaleString(localeOf(cur));
   return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:14,flexWrap:"wrap"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#fbeedb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>⏰</div>
@@ -300,7 +300,7 @@ export function ChartOfAccounts(){
   const totalLedgers=COA_GROUPS.reduce((s,g)=>s+g.sub.length,0);
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#e8f6ed",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🗄</div>
@@ -511,7 +511,7 @@ export function MastersCustomers(){
   const outFmt=n=>n>=100000?(n/100000).toFixed(1)+"L":n>=1000?(n/1000).toFixed(0)+"K":n>0?String(n):"Nil";
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1260,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
 
       {/* Page header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
@@ -1726,7 +1726,7 @@ export function PassportManager({branch}){
   const expiringSoon=filtered.filter(p=>daysToExpiry(p.expiry)<180&&daysToExpiry(p.expiry)>0);
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#e8f6ed",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🛂</div>

@@ -62,6 +62,49 @@ describe('loadTrialBalance is live + correct', () => {
     expect(out.rows).toEqual([]);
     expect(out.balanced).toBe(true);
   });
+
+  test('consolidated → carries a per-branch breakdown, each slice shaped + totalled on its OWN', async () => {
+    // branch='ALL' → the BE appends `byBranch`, each slice the SAME shape as the merged
+    // top level. The service must pass it through normalised so the page can render each
+    // branch as its own section in its own currency — NEVER a cross-branch merged total.
+    api.getTrialBalance.mockResolvedValueOnce({
+      rows: [
+        { ledger: 'Cash', code: 'L1', group: 'Cash-in-Hand', closingDebit: 500, closingCredit: 0 },
+        { ledger: 'Cash NBO', code: 'L9', group: 'Cash-in-Hand', closingDebit: 300, closingCredit: 0 },
+      ],
+      totalClosingDebit: 800, totalClosingCredit: 800, balanced: true,
+      byBranch: [
+        { branch: 'BOM', rows: [{ ledger: 'Cash', code: 'L1', group: 'Cash-in-Hand', closingDebit: 500, closingCredit: 0 }], totalClosingDebit: 500, totalClosingCredit: 500, balanced: true },
+        { branch: 'NBO', rows: [{ ledger: 'Cash NBO', code: 'L9', group: 'Cash-in-Hand', closingDebit: 300, closingCredit: 0 }], totalClosingDebit: 300, totalClosingCredit: 300, balanced: true },
+      ],
+    });
+
+    const out = await loadTrialBalance({ branch: 'ALL' });
+
+    expect(Array.isArray(out.byBranch)).toBe(true);
+    expect(out.byBranch).toHaveLength(2);
+    // each slice keeps its branch tag + is normalised to the same UI envelope, and
+    // totals ONLY itself — there is no cross-branch (cross-currency) sum on a slice.
+    const [bom, nbo] = out.byBranch;
+    expect(bom.branch).toBe('BOM');
+    expect(bom.rows).toHaveLength(1);
+    expect(bom.grandClosingDebit).toBe(500);
+    expect(nbo.branch).toBe('NBO');
+    expect(nbo.grandClosingDebit).toBe(300);
+    expect(nbo.balanced).toBe(true);
+    // the merged top level still exists untouched for back-compat.
+    expect(out.grandClosingDebit).toBe(800);
+  });
+
+  test('single-branch response has NO byBranch (nothing to split)', async () => {
+    api.getTrialBalance.mockResolvedValueOnce({
+      rows: [{ ledger: 'Cash', code: 'L1', group: 'Cash-in-Hand', closingDebit: 500, closingCredit: 0 }],
+      totalClosingDebit: 500, totalClosingCredit: 500, balanced: true,
+    });
+    const out = await loadTrialBalance({ branch: 'BOM' });
+    expect(out.byBranch).toBeUndefined();
+    expect(out.grandClosingDebit).toBe(500);
+  });
 });
 
 describe('transformers stay numeric-safe', () => {

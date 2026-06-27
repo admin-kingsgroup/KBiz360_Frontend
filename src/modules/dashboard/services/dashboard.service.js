@@ -47,6 +47,7 @@ export const loadBranchDashboard = async ({ branchCode }) => {
     approvedBookings: bookingSummary.approved,
     rejectedBookings: bookingSummary.rejected,
     deletedBookings: bookingSummary.deleted,
+    bookingsByBranch: bookingSummary.byBranch || null, // per-branch SO/PO/GP pipeline (consolidated only)
     kpis: {
       revenue: cur.totals.sales,
       cost: cur.totals.cogs,
@@ -103,6 +104,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
     approvedBookings: bookingSummary.approved,
     rejectedBookings: bookingSummary.rejected,
     deletedBookings: bookingSummary.deleted,
+    bookingsByBranch: bookingSummary.byBranch || null, // per-branch SO/PO/GP pipeline (consolidated only)
     rangeLabel: dates.label,
     figures: {
       revenue: mpl.totals.sales,

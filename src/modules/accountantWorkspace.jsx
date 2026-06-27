@@ -5,16 +5,23 @@
 // Branch-scoped via the top-right selector (the `branch` prop), exactly like every
 // other live screen. Cards/links jump into the existing working screens via setRoute.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueries } from '@tanstack/react-query';
 import { clickable } from '../core/ux/clickable';
 import { usePager, Pager } from '../core/ux/pager';
 import { bc } from '../core/styles';
+import { apiGet } from '../core/api';
+import { periodRange, useInception } from '../core/period';
+import { CUR_FY } from '../core/dates';
 import {
   branchCode, useAgeing, useTaxSummary, useTrialBalance, useVoucherApprovals,
-  useBookingOrders, useRegisterSummary, useConfigValue, useSaveConfigValue,
-  useOutstanding, useDayBook, useAlerts,
+  useBookingOrders, useConfigValue, useSaveConfigValue,
+  useOutstanding, useDayBook, useAlerts, useCashForecast, useModulePL, useRcmLiability,
+  useBudgetVsActual,
 } from '../core/useAccounting';
-import { useTaxCalendar } from '../core/useReference';
-import { useBankLedgers, useBankReconSummary } from '../core/useBankReco';
+import { usePDCSummary } from '../core/usePDC';
+import { useMasterHealth } from '../core/useMasters';
+import { useTaxCalendar, useExpenseBudgets } from '../core/useReference';
+import { useBankLedgers, useBankReconSummary, useBankReconAggregate } from '../core/useBankReco';
 import {
   useSupplierBook, useSupplierStatement, useSupplierReconSummary,
   useImportSupplierStatement, useSupplierAutoMatch, useSupplierManualMatch,
@@ -46,7 +53,7 @@ const C = { dark: '#1a1c22', gold: '#c2a04a', blue: '#2563eb', red: '#dc2626', g
 // Design-system card values (brand radius + soft elevation + subtle border), so every
 // `{...card}` surface in this workspace adopts the premium look without structural change.
 const card = { background: '#fff', border: '1px solid #cdd1d8', borderRadius: 12, boxShadow: '0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)' };
-const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
+const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString((cur === '₹' || cur === '₨' || cur === 'Rs') ? 'en-IN' : 'en-US');
 const brLabel = (b) => (b === 'ALL' || !b ? 'All Branches' : (b.name || b.code || b));
 
 // Year-month of a voucher date — handles ISO (YYYY-MM-DD) and DD/MM/YYYY (migrated).
@@ -104,6 +111,16 @@ const Tile = ({ icon, label, value, sub, tone = C.dark, onClick, loading }) => (
 const SecTitle = ({ children }) => <div style={{ fontSize: 11, fontWeight: 800, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.5, margin: '4px 2px 8px' }}>{children}</div>;
 const Row = ({ children }) => <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>{children}</div>;
 
+// Period-over-period delta chip: ▲ up (green) / ▼ down (red) / — when the prior
+// window is empty so the % is meaningless. Pure presentation; `cur`/`prev` are numbers.
+const Delta = ({ cur, prev }) => {
+  const p = Number(prev) || 0;
+  if (!p) return <span style={{ fontSize: 10.5, color: C.dim, fontWeight: 700 }}>—</span>;
+  const pct = ((Number(cur) || 0) - p) / Math.abs(p) * 100;
+  const up = pct >= 0;
+  return <span style={{ fontSize: 10.5, fontWeight: 800, color: up ? C.green : C.red }}>{up ? '▲' : '▼'} {Math.abs(pct).toFixed(0)}%</span>;
+};
+
 // One ageing row (Debtors or Creditors): the four buckets + total, clickable to its full report.
 function AgeBucketRow({ label, totals = {}, cur, tone, onClick }) {
   const cell = (v, red) => <td style={{ padding: '7px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: red && v > 0 ? C.red : C.dark, whiteSpace: 'nowrap' }}>{v ? money(cur, v) : '—'}</td>;
@@ -133,30 +150,888 @@ function MiniList({ title, rows, cur, valueKey, tone, actionLabel, onAction }) {
   );
 }
 
-export function DashboardAccountant({ branch, setRoute }) {
+// Settlement panel: per-party "bills vs receipts/payments" — gross billed, gross
+// received/paid, what's still on account (unapplied advance) and the net balance
+// due. Sourced from the SAME bill-wise ageing engine as the rest of the workspace
+// (rows now carry `billed`/`settled`), so every figure ties back to the registers.
+// Shows the top parties by net balance; the header links to the full report.
+// `drill360` + `go` make each party row tappable → that party's 360° worktop, so the
+// accountant lands on the exact account from the dashboard (works on touch & keyboard).
+function SettlementPanel({ title, sub, rows, cur, tone, partyLabel, settleLabel, drillLabel, onDrill, drill360, go }) {
+  const top = [...(rows || [])].sort((a, b) => Math.abs(b.net || 0) - Math.abs(a.net || 0)).slice(0, 12);
+  const t = (rows || []).reduce((a, r) => ({
+    billed: a.billed + (r.billed || 0), settled: a.settled + (r.settled || 0),
+    total: a.total + (r.total || 0), net: a.net + (r.net || 0),
+  }), { billed: 0, settled: 0, total: 0, net: 0 });
+  const sh = { ...th, background: 'transparent' };
+  const num = { ...td, ...rnum };
+  return (
+    <div style={{ ...card, padding: 0, overflow: 'hidden', flex: '1 1 480px', minWidth: 340 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 14px', borderBottom: `1px solid ${C.border}` }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.dark }}>{title}</div>
+          <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{sub}</div>
+        </div>
+        {onDrill && <button onClick={onDrill} style={{ ...aBtn(tone), padding: '4px 9px', fontSize: 10.5 }}>{drillLabel} <ArrowRight size={11} /></button>}
+      </div>
+      <div style={{ maxHeight: 360, overflow: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead><tr style={{ background: C.dark }}>
+            <th style={sh}>{partyLabel}</th>
+            <th style={{ ...sh, ...rnum }}>Bills</th>
+            <th style={{ ...sh, ...rnum }}>{settleLabel}</th>
+            <th style={{ ...sh, ...rnum }}>Unsettled</th>
+            <th style={{ ...sh, ...rnum }}>Net Due</th>
+          </tr></thead>
+          <tbody>
+            {top.length === 0 && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.green, padding: 18 }}>✓ Nothing unsettled.</td></tr>}
+            {top.map((r, i) => {
+              const rowDrill = (drill360 && go && r.party) ? clickable(() => go(`${drill360}?party=${encodeURIComponent(r.party)}`)) : {};
+              return (
+              <tr key={i} {...rowDrill} style={{ background: i % 2 ? '#fafbff' : '#fff', cursor: rowDrill.onClick ? 'pointer' : 'default' }}>
+                <td style={{ ...td, fontWeight: 600, color: C.dark, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.party}{rowDrill.onClick && <span style={{ color: tone, fontWeight: 800, marginLeft: 5 }}>›</span>}</td>
+                <td style={num}>{money(cur, r.billed || 0)}</td>
+                <td style={{ ...num, color: C.green }}>{money(cur, r.settled || 0)}</td>
+                <td style={{ ...num, color: (r.total || 0) > 0.5 ? tone : C.dim, fontWeight: 700 }}>{money(cur, r.total || 0)}</td>
+                <td style={{ ...num, fontWeight: 800, color: (r.net || 0) >= 0 ? C.dark : C.green }}>{money(cur, r.net || 0)}</td>
+              </tr>
+            ); })}
+          </tbody>
+          {top.length > 0 && (
+            <tfoot><tr style={{ position: 'sticky', bottom: 0 }}>
+              <td style={{ ...td, background: C.dark, color: C.gold, fontWeight: 800 }}>TOTAL · {(rows || []).length}</td>
+              <td style={{ ...td, ...rnum, background: C.dark, color: '#fff', fontWeight: 800 }}>{money(cur, t.billed)}</td>
+              <td style={{ ...td, ...rnum, background: C.dark, color: '#fff', fontWeight: 800 }}>{money(cur, t.settled)}</td>
+              <td style={{ ...td, ...rnum, background: C.dark, color: '#fff', fontWeight: 800 }}>{money(cur, t.total)}</td>
+              <td style={{ ...td, ...rnum, background: C.dark, color: '#fff', fontWeight: 800 }}>{money(cur, t.net)}</td>
+            </tr></tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Unsettled bills — bill-wise (not party-level) ─────────────────────────────
+// The open documents themselves: every unsettled sales / purchase bill with its age
+// and outstanding amount, sourced from the SAME outstanding engine as Finance ▸
+// Receivables/Payables (`salesBills` / `purchaseBills`). Party-level settlement tells
+// you WHO; this tells you WHICH BILL — so the accountant acts on the exact invoice.
+// Each row taps through to that party's 360° worktop; the action opens receipt/payment.
+function UnsettledBills({ title, bills, cur, tone, drill360, actionLabel, actionRoute, onDrillAll, go }) {
+  const top = [...(bills || [])].sort((a, b) => (b.outstanding || 0) - (a.outstanding || 0)).slice(0, 12);
+  const tot = (bills || []).reduce((s, b) => s + (Number(b.outstanding) || 0), 0);
+  const sh = { ...th, background: 'transparent' };
+  const num = { ...td, ...rnum };
+  return (
+    <div style={{ ...card, padding: 0, overflow: 'hidden', flex: '1 1 480px', minWidth: 320 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 14px', borderBottom: `1px solid ${C.border}` }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.dark }}>{title}</div>
+          <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{(bills || []).length} open bill(s) · {money(cur, tot)} outstanding</div>
+        </div>
+        {onDrillAll && <button onClick={onDrillAll} style={{ ...aBtn(tone), padding: '4px 9px', fontSize: 10.5 }}>View all <ArrowRight size={11} /></button>}
+      </div>
+      <div style={{ maxHeight: 360, overflow: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead><tr style={{ background: C.dark }}>
+            <th style={sh}>Party</th>
+            <th style={sh}>Bill No</th>
+            <th style={{ ...sh, ...rnum }}>Age</th>
+            <th style={{ ...sh, ...rnum }}>Outstanding</th>
+            <th style={{ ...sh, textAlign: 'center' }}>Action</th>
+          </tr></thead>
+          <tbody>
+            {top.length === 0 && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.green, padding: 18 }}>✓ Nothing unsettled.</td></tr>}
+            {top.map((b, i) => (
+              <tr key={b.billVno || i} {...clickable(() => go(`${drill360}?party=${encodeURIComponent(b.party)}`))} style={{ cursor: 'pointer', background: i % 2 ? '#fafbff' : '#fff' }}>
+                <td style={{ ...td, fontWeight: 600, color: C.dark, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.party}<span style={{ color: tone, fontWeight: 800, marginLeft: 5 }}>›</span></td>
+                <td style={{ ...td, fontFamily: 'monospace', color: tone, fontWeight: 700, whiteSpace: 'nowrap' }}>{b.billVno || '—'}</td>
+                <td style={{ ...num, color: (b.ageDays || 0) > 90 ? C.red : C.dim }}>{b.ageDays != null ? `${b.ageDays}d` : '—'}</td>
+                <td style={{ ...num, fontWeight: 800, color: tone }}>{money(cur, b.outstanding || 0)}</td>
+                <td style={{ ...td, textAlign: 'center' }}>
+                  <button onClick={(e) => { e.stopPropagation(); go(actionRoute); }} style={{ ...aBtn(tone), padding: '3px 8px', fontSize: 10 }}>{actionLabel}</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          {top.length > 0 && (
+            <tfoot><tr style={{ position: 'sticky', bottom: 0 }}>
+              <td colSpan={3} style={{ ...td, background: C.dark, color: C.gold, fontWeight: 800 }}>TOTAL · {(bills || []).length} bill(s)</td>
+              <td style={{ ...td, ...rnum, background: C.dark, color: '#fff', fontWeight: 800 }}>{money(cur, tot)}</td>
+              <td style={{ background: C.dark }} />
+            </tr></tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// Month-to-date window (ISO) — shared by the live snapshot panels below.
+const mtdWindow = () => { const ym = thisYM(); return { from: `${ym}-01`, to: new Date().toISOString().slice(0, 10) }; };
+
+// ── Tier 1.1 · Short-term cash outlook ───────────────────────────────────────
+// Forward view (the rest of Daily Ops is backward-looking): expected inflows vs
+// outflows and the projected closing for the coming weeks, from the same cash-flow
+// forecast engine as Finance ▸ Cash-flow Forecast. A projected NEGATIVE closing is
+// flagged red — the branch can't cover that week's commitments.
+export function CashOutlookCard({ branch, cur, go }) {
+  const q = useCashForecast(branch);
+  // The forecast endpoint returns an OBJECT { opening, rows } — NOT a bare array.
+  // Reading `q.data || []` then `.slice` threw "(…).slice is not a function" because
+  // the truthy object skipped the `|| []` fallback. The weekly series lives in `.rows`.
+  const weeks = (q.data?.rows || []).slice(0, 4);
+  return (
+    <>
+      <SecTitle>Cash-flow Outlook — next {weeks.length || 4} weeks</SecTitle>
+      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead><tr style={{ background: C.dark }}>
+            <th style={{ ...th, background: 'transparent' }}>Week</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Expected In</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Expected Out</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Net</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Proj. Closing</th>
+          </tr></thead>
+          <tbody>
+            {q.isLoading && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.dim, padding: 16 }}>Loading forecast…</td></tr>}
+            {!q.isLoading && weeks.length === 0 && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.dim, padding: 16 }}>No upcoming due-dated bills to forecast.</td></tr>}
+            {weeks.map((w, i) => {
+              const net = (w.inflow || 0) - (w.outflow || 0);
+              return (
+                <tr key={i} style={{ background: i % 2 ? '#fafbff' : '#fff' }}>
+                  <td style={{ ...td, fontWeight: 700 }}>{w.week || `W${i + 1}`}</td>
+                  <td style={{ ...td, ...rnum, color: C.green }}>{money(cur, w.inflow || 0)}</td>
+                  <td style={{ ...td, ...rnum, color: C.amber }}>{money(cur, w.outflow || 0)}</td>
+                  <td style={{ ...td, ...rnum, fontWeight: 700, color: net >= 0 ? C.dark : C.red }}>{money(cur, net)}</td>
+                  <td style={{ ...td, ...rnum, fontWeight: 800, color: (w.closing || 0) >= 0 ? C.dark : C.red }}>{money(cur, w.closing || 0)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 12px', borderTop: `1px solid ${C.border}` }}>
+          <button onClick={() => go('/reports/cashflow-forecast')} style={{ ...aBtn(C.blue), padding: '4px 9px', fontSize: 10.5 }}>13-Week Forecast <ArrowRight size={11} /></button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Tier 1.2 · Post-dated cheque (PDC) tracker ───────────────────────────────
+// Cheques received (inbound) and issued (outbound), from the PDC register. Surfaces
+// what's due to bank, on-hand pending and — most importantly — bounced cheques that
+// need re-presentation or follow-up. Manage on the Bank Reco screen's PDC tab.
+function PdcTracker({ branch, cur, go }) {
+  const inb = usePDCSummary(branch, { direction: 'inbound' }).data;
+  const out = usePDCSummary(branch, { direction: 'outbound' }).data;
+  const ic = inb?.counts || {}, ia = inb?.amounts || {};
+  const oc = out?.counts || {}, oa = out?.amounts || {};
+  const bouncedN = (ic.bounced || 0) + (oc.bounced || 0);
+  const bouncedAmt = (ia.bounced || 0) + (oa.bounced || 0);
+  return (
+    <>
+      <SecTitle>Post-Dated Cheques (PDC)</SecTitle>
+      <Row>
+        <Tile icon={<ReceiptText size={13} />} label="Received — Pending" value={money(cur, ia.pending || 0)} sub={`${ic.pending || 0} cheque(s)${inb?.dueToDeposit ? ` · ${inb.dueToDeposit} due to bank` : ''}`} tone={C.green} onClick={() => go('/bank-reco')} />
+        <Tile icon={<CreditCard size={13} />} label="Issued — Pending" value={money(cur, oa.pending || 0)} sub={`${oc.pending || 0} cheque(s)${out?.dueToDeposit ? ` · ${out.dueToDeposit} due` : ''}`} tone={C.amber} onClick={() => go('/bank-reco')} />
+        <Tile icon={<Landmark size={13} />} label="Deposited (in clearing)" value={money(cur, (ia.deposited || 0) + (oa.deposited || 0))} sub={`${(ic.deposited || 0) + (oc.deposited || 0)} awaiting clearance`} tone={C.blue} onClick={() => go('/bank-reco')} />
+        <Tile icon={<AlertTriangle size={13} />} label="Bounced" value={bouncedN} sub={bouncedN ? `${money(cur, bouncedAmt)} · re-present / follow up` : 'none dishonoured'} tone={bouncedN ? C.red : C.green} onClick={() => go('/bank-reco')} />
+      </Row>
+    </>
+  );
+}
+
+// ── Tier 1.3 · Approval worklist split ───────────────────────────────────────
+// A single branch accountant needs to know what they can clear NOW vs what is stuck.
+// Split the pending queue by the verification gate: `postable` entries are ready to
+// approve & post; the rest are blocked and carry the reason (missing ledger, unbalanced,
+// future date…). Blocked items are listed with their first error so they can be fixed.
+function ApprovalSplit({ branch, cur, go, currentUser }) {
+  const q = useVoucherApprovals(branch, 'pending');
+  const entries = q.data?.entries || [];
+  const sum = (arr) => arr.reduce((s, e) => s + (Number(e.total) || 0), 0);
+  // Maker ≠ checker: a voucher this accountant entered can't be self-approved — it
+  // needs another approver (Director). Match the entry's submittedBy to the current
+  // user (name / email / id). No user → everything postable counts as actionable.
+  const me = [currentUser?.name, currentUser?.email, currentUser?.id].filter(Boolean).map((s) => String(s).toLowerCase());
+  const isMine = (e) => !!e.submittedBy && me.includes(String(e.submittedBy).toLowerCase());
+  const postable = entries.filter((e) => e.postable);
+  const mine = postable.filter(isMine);                 // I entered it → blocked on another approver
+  const ready = postable.filter((e) => !isMine(e));     // I may approve & post
+  const blocked = entries.filter((e) => !e.postable);   // fails a verification check
+  return (
+    <>
+      <SecTitle>Approve &amp; Post — worklist</SecTitle>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+        <div style={{ ...card, padding: 12, flex: '1 1 260px', minWidth: 240, borderLeft: `4px solid ${C.green}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: C.dark }}>I can approve · {ready.length}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: C.green }}>{money(cur, sum(ready))}</span>
+          </div>
+          <div style={{ fontSize: 11, color: C.dim, marginBottom: 8 }}>Passes every check &amp; entered by someone else — approve &amp; post.</div>
+          <button onClick={() => go('/transactions/approvals')} style={{ ...aBtn(C.green), padding: '4px 10px', fontSize: 11 }} disabled={!ready.length}>Open approvals <ArrowRight size={11} /></button>
+        </div>
+        <div style={{ ...card, padding: 12, flex: '1 1 260px', minWidth: 240, borderLeft: `4px solid ${mine.length ? C.amber : C.green}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: C.dark }}>My own — needs approver · {mine.length}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: mine.length ? C.amber : C.green }}>{money(cur, sum(mine))}</span>
+          </div>
+          {mine.length === 0
+            ? <div style={{ fontSize: 11.5, color: C.green }}>✓ None of yours awaiting another approver.</div>
+            : <div style={{ fontSize: 11, color: C.dim }}>You entered these — a second person (Director) must approve. Maker ≠ checker.</div>}
+        </div>
+        <div style={{ ...card, padding: 12, flex: '1 1 320px', minWidth: 280, borderLeft: `4px solid ${blocked.length ? C.red : C.green}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: C.dark }}>Blocked — needs fixing · {blocked.length}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: blocked.length ? C.red : C.green }}>{money(cur, sum(blocked))}</span>
+          </div>
+          {blocked.length === 0 && <div style={{ fontSize: 11.5, color: C.green }}>✓ Nothing blocked.</div>}
+          {blocked.slice(0, 3).map((e, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
+              <span style={{ flex: 1, fontSize: 11.5, color: C.dark, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <b style={{ fontFamily: 'monospace' }}>{e.vno || 'Draft'}</b> {e.party || e.category}
+                <span style={{ color: C.red, fontWeight: 600 }}> · {(e.errors && e.errors[0]) || e.error || 'cannot post'}</span>
+              </span>
+            </div>
+          ))}
+          {blocked.length > 0 && <button onClick={() => go('/transactions/approvals')} style={{ ...aBtn(C.red), padding: '4px 10px', fontSize: 11, marginTop: 8 }}>Fix &amp; clear <ArrowRight size={11} /></button>}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Tier 2.4 · GST / Input-Tax-Credit position ───────────────────────────────
+// Output tax vs claimable Input Tax Credit (ITC) → net liability for the month, live
+// from the books (same source as the Tax Summary report). The "ITC match" drill opens
+// GSTR-2B reconciliation, where 2B is matched against the purchase register.
+function GstItcPanel({ branch, cur, go, from, to }) {
+  const w = mtdWindow();
+  const f = from || w.from, t2 = to || w.to;
+  const tax = useTaxSummary(branch, { from: f, to: t2 }).data || {};
+  const rcm = useRcmLiability(branch, { from: f, to: t2 }).data || {};
+  const regime = (tax.regime || 'GST');
+  const output = tax.output?.total || 0;
+  const input = tax.input?.total || 0;     // claimable ITC
+  const net = (typeof tax.netPayable === 'number') ? tax.netPayable : (output - input);
+  const rcmIgst = rcm.igst || 0;
+  return (
+    <>
+      <SecTitle>{regime} / Input-Tax-Credit position{from ? '' : ' (this month)'}</SecTitle>
+      <Row>
+        <Tile icon={<TrendingUp size={13} />} label="Output Tax (on sales)" value={money(cur, output)} sub="Open tax summary" tone={C.blue} onClick={() => go('/reports/tax-summary')} />
+        <Tile icon={<TrendingDown size={13} />} label="Input Credit (ITC)" value={money(cur, input)} sub="claimable on purchases" tone={C.green} onClick={() => go('/reports/tax-summary')} />
+        <Tile icon={<Scale size={13} />} label={net >= 0 ? 'Net Payable' : 'Net Refundable'} value={money(cur, Math.abs(net))} sub="due 20th · cash to pay" tone={net > 0 ? C.amber : C.green} onClick={() => go('/reports/tax-summary')} />
+        {/* Reverse charge on foreign-supplier purchases — pay in cash (3.1(d)) + claim ITC (4A) */}
+        <Tile icon={<ReceiptText size={13} />} label="RCM (Reverse Charge)" value={money(cur, rcmIgst)} sub={rcm.count ? `${rcm.count} foreign bill(s) · pay + claim ITC` : 'no foreign-supplier purchases'} tone={rcmIgst > 0 ? C.amber : C.green} onClick={() => go('/tax/rcm')} />
+      </Row>
+      {/* GSTR-2B ITC match is a true reconciliation against downloaded 2B — open the
+          2B screen to match it line-wise against the purchase register. */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -4, marginBottom: 12 }}>
+        <button onClick={() => go('/tax/gstr2b')} style={{ ...aBtn(C.dark), padding: '4px 9px', fontSize: 10.5 }}>Match ITC vs GSTR-2B <ArrowRight size={11} /></button>
+      </div>
+    </>
+  );
+}
+
+// ── Tier 2.5 · Refunds & adjustments worklist ────────────────────────────────
+// Travel-specific adjustment vouchers (Refund / Reissue / ADM / ACM) still pending
+// approval. These reverse or amend a booking and must be posted promptly so AR/AP
+// reflects reality. Listed straight from the pending approval queue.
+const ADJ_CATS = ['refund', 'reissue', 'adm', 'acm'];
+const ADJ_LABEL = { refund: 'Refund', reissue: 'Reissue', adm: 'ADM', acm: 'ACM' };
+function RefundsWorklist({ branch, cur, go }) {
+  const q = useVoucherApprovals(branch, 'pending');
+  const rows = (q.data?.entries || []).filter((e) => ADJ_CATS.includes(e.category));
+  const total = rows.reduce((s, e) => s + (Number(e.total) || 0), 0);
+  return (
+    <div style={{ ...card, padding: 12, flex: '1 1 360px', minWidth: 300 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span>Refunds &amp; adjustments pending</span>
+        <span style={{ fontSize: 11.5, fontWeight: 800, color: rows.length ? C.amber : C.green }}>{rows.length} · {money(cur, total)}</span>
+      </div>
+      {rows.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 8 }}>✓ No RF / RI / ADM / ACM pending.</div>}
+      {rows.slice(0, 8).map((e, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
+          <span style={{ padding: '1px 6px', borderRadius: 4, background: '#f1f5f9', fontSize: 9.5, fontWeight: 800, textTransform: 'uppercase', color: C.dim }}>{ADJ_LABEL[e.category] || e.category}</span>
+          <span style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.party || e.vno}</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: C.dark, fontVariantNumeric: 'tabular-nums' }}>{money(cur, e.total || 0)}</span>
+          {!e.postable && <span style={{ fontSize: 9.5, fontWeight: 800, color: C.red }}>blocked</span>}
+        </div>
+      ))}
+      {rows.length > 0 && <button onClick={() => go('/transactions/approvals')} style={{ ...aBtn(C.blue), padding: '4px 9px', fontSize: 10.5, marginTop: 8 }}>Open approvals <ArrowRight size={11} /></button>}
+    </div>
+  );
+}
+
+// ── Tier 2.6 · Advances & unapplied credits (both sides) ─────────────────────
+// Money sitting on account that hasn't been settled bill-wise: customer receipts not
+// yet applied to invoices, and supplier advances not yet applied to bills. Both must
+// be cleared so the ageing is real and prepaid money isn't lost. Settle from the
+// receivables / payables screens.
+// `side` scopes the panel to one ledger side so it can live under the AR or AP
+// sub-tab: 'rec' → customer credits only, 'pay' → supplier advances only, 'both'
+// → the original two-up layout (kept as the default so any other caller is unchanged).
+function AdvancesPanel({ branch, cur, go, side = 'both' }) {
+  const out = useOutstanding(branch).data || {};
+  const recs = out.onAccountReceipts || [];
+  const pays = out.onAccountPayments || [];
+  const recTot = out.totals?.onAccountReceipts ?? recs.reduce((s, r) => s + (Number(r.onAccount) || 0), 0);
+  const payTot = out.totals?.onAccountPayments ?? pays.reduce((s, r) => s + (Number(r.onAccount) || 0), 0);
+  // `drill360` makes each on-account row tap through to that party's 360° worktop,
+  // so the accountant can allocate the advance against the party's open bills.
+  const block = (title, list, tot, tone, route, drill360) => (
+    <div style={{ ...card, padding: 12, flex: '1 1 340px', minWidth: 300 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+        <span>{title}</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: tone }}>{money(cur, tot)}</span>
+      </div>
+      {list.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 6 }}>✓ Nothing unapplied.</div>}
+      {list.slice(0, 6).map((r, i) => (
+        <div key={i} {...clickable(() => go(`${drill360}?party=${encodeURIComponent(r.party)}`))} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
+          <span style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.party}<span style={{ color: tone, fontWeight: 800, marginLeft: 4 }}>›</span>{r.vno ? <span style={{ color: C.dim, fontWeight: 500 }}> · {r.vno}</span> : ''}</span>
+          {r.ageDays != null && <span style={{ fontSize: 10.5, color: C.dim }}>{r.ageDays}d</span>}
+          <span style={{ fontSize: 12, fontWeight: 800, color: tone, fontVariantNumeric: 'tabular-nums' }}>{money(cur, r.onAccount || 0)}</span>
+        </div>
+      ))}
+      {list.length > 0 && <button onClick={() => go(route)} style={{ ...aBtn(tone), padding: '4px 9px', fontSize: 10.5, marginTop: 8 }}>Settle bill-wise <ArrowRight size={11} /></button>}
+    </div>
+  );
+  return (
+    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+      {side !== 'pay' && block('Customer credits — unapplied receipts', recs, recTot, C.blue, '/reports/rec', '/reports/customer-360')}
+      {side !== 'rec' && block('Supplier advances — unapplied payments', pays, payTot, C.amber, '/reports/pay', '/reports/supplier-360')}
+    </div>
+  );
+}
+
+// ── Tier 3.7 · Branch P&L snapshot ───────────────────────────────────────────
+// One health read for the month: revenue, purchase (COGS), gross profit (with %),
+// indirect expenses and the net profit — live from the module-wise P&L engine.
+function BranchPnlSnapshot({ branch, cur, go, from, to, prior }) {
+  const w = mtdWindow();
+  const f = from || w.from, t2 = to || w.to;
+  const q = useModulePL(branch, { from: f, to: t2, summary: true });
+  const t = q.data?.totals || {}; const ind = q.data?.indirect || {}; const br = q.data?.bridge || {};
+  const np = br.netProfit || 0;
+  // Prior-window totals (passed in) → period-over-period delta chips on the three
+  // headline figures (revenue · gross profit · net profit).
+  const pt = prior?.totals || {}; const pbr = prior?.bridge || {};
+  return (
+    <>
+      <SecTitle>Branch P&amp;L snapshot{from ? '' : ' (this month)'}</SecTitle>
+      <Row>
+        <Tile icon={<TrendingUp size={13} />} label="Revenue" value={money(cur, t.sales || 0)} sub={prior ? <>vs prior <Delta cur={t.sales || 0} prev={pt.sales || 0} /></> : 'Open P&L'} tone={C.green} onClick={() => go('/reports/pnl')} loading={q.isLoading} />
+        <Tile icon={<TrendingDown size={13} />} label="Purchase (COGS)" value={money(cur, t.cogs || 0)} sub="cost of sales" tone={C.amber} onClick={() => go('/reports/pnl')} loading={q.isLoading} />
+        <Tile icon={<Coins size={13} />} label="Gross Profit" value={money(cur, t.gp || 0)} sub={prior ? <>{(t.gpPct || 0).toFixed(1)}% · <Delta cur={t.gp || 0} prev={pt.gp || 0} /></> : `${(t.gpPct || 0).toFixed(1)}% margin`} tone={C.blue} onClick={() => go('/reports/invoice-gp')} loading={q.isLoading} />
+        <Tile icon={<ReceiptText size={13} />} label="Expenses" value={money(cur, ind.expense || 0)} sub="indirect expenses" tone={C.dim} onClick={() => go('/reports/pnl')} loading={q.isLoading} />
+        <Tile icon={<Scale size={13} />} label="Net Profit" value={money(cur, np)} sub={prior ? <><Delta cur={np} prev={pbr.netProfit || 0} /></> : (np >= 0 ? 'profit' : 'loss')} tone={np >= 0 ? C.green : C.red} onClick={() => go('/reports/pnl')} loading={q.isLoading} />
+      </Row>
+    </>
+  );
+}
+
+// ── Tier 3.8 · All-banks reconciliation roll-up ──────────────────────────────
+// One row per bank ledger so nothing slips: book balance, unreconciled difference and
+// open unmatched counts at a glance (vs the single-bank detail card). Each row queries
+// its own reco summary (deduped with the detail card by React-Query key).
+function BankRecoRow({ ledger, branch, cur, go }) {
+  const w = mtdWindow();
+  const s = useBankReconSummary(ledger, branch, { from: w.from, to: w.to }).data;
+  const diff = s?.differenceAmount ?? null;
+  const open = (s?.counts?.bookUnreconciled || 0) + (s?.counts?.statementUnreconciled || 0);
+  return (
+    <tr {...clickable(() => go('/bank-reco'))} style={{ cursor: 'pointer', borderTop: '1px solid #dfe2e7' }}>
+      <td style={{ ...td, fontWeight: 600 }}>{ledger}</td>
+      <td style={{ ...td, ...rnum }}>{s ? money(cur, s.bookBalance || 0) : '…'}</td>
+      <td style={{ ...td, ...rnum }}>{s ? money(cur, s.bankBalance || 0) : '…'}</td>
+      <td style={{ ...td, ...rnum, fontWeight: 800, color: diff == null ? C.dim : (Math.abs(diff) < 1 ? C.green : C.red) }}>{diff == null ? '…' : money(cur, diff)}</td>
+      <td style={{ ...td, ...rnum, fontWeight: 700, color: open > 0 ? C.amber : C.green }}>{s ? open : '…'}</td>
+    </tr>
+  );
+}
+function BankRecoRollup({ branch, cur, go }) {
+  const ledgers = useBankLedgers(branch).data || [];
+  if (!ledgers.length) return null;
+  return (
+    <>
+      <SecTitle>Bank Reconciliation — all accounts</SecTitle>
+      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead><tr style={{ background: C.dark }}>
+            <th style={{ ...th, background: 'transparent' }}>Bank Ledger</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Book Bal</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Statement</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Difference</th>
+            <th style={{ ...th, background: 'transparent', ...rnum }}>Open Lines</th>
+          </tr></thead>
+          <tbody>
+            {ledgers.map((lg) => <BankRecoRow key={lg.name} ledger={lg.name} branch={branch} cur={cur} go={go} />)}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+// ── Tier 3.9 · Master-data health ────────────────────────────────────────────
+// Tax-relevant gaps in the customer / supplier masters that silently drive WRONG GST
+// or TDS: an Indian supplier with no GSTIN can't pass on ITC; no PAN means TDS at the
+// higher default rate. Foreign suppliers (country ≠ India) are correctly NOT flagged
+// for GSTIN. Counts only — drill into the master to fix.
+function MasterHealth({ branch, go }) {
+  const sup = useMasterHealth('suppliers', branch).data || {};
+  const cust = useMasterHealth('customers', branch).data || {};
+  const item = (label, n, route, hint) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderTop: '1px solid #dfe2e7' }}>
+      <span style={{ width: 22, textAlign: 'center', fontWeight: 800, color: n ? C.red : C.green }}>{n || '✓'}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: C.dark }}>{label}</div>
+        <div style={{ fontSize: 11, color: C.dim }}>{hint}</div>
+      </div>
+      <button onClick={() => go(route)} style={{ ...aBtn(n ? C.amber : C.blue), padding: '3px 8px', fontSize: 10 }}>Open</button>
+    </div>
+  );
+  return (
+    <>
+      <SecTitle>Master-data health (tax readiness)</SecTitle>
+      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+        {item('Indian suppliers missing GSTIN', sup.noGstin || 0, '/masters/suppliers', 'Cannot claim input tax credit on their bills')}
+        {item('Indian suppliers missing PAN', sup.noPan || 0, '/masters/suppliers', 'TDS deducted at the higher default rate')}
+        {item('Suppliers missing place-of-supply (state)', sup.noState || 0, '/masters/suppliers', 'CGST/SGST vs IGST cannot be decided')}
+        {item('Customers missing GSTIN & PAN', cust.noTaxId || 0, '/masters/customers', 'Incomplete tax identity on the invoice')}
+        {item('Customers missing place-of-supply (state)', cust.noState || 0, '/masters/customers', 'Place of supply unknown on the invoice')}
+      </div>
+    </>
+  );
+}
+
+// ── ISO date math (string in → string out, no timezone drift) ────────────────
+const addDaysISO = (iso, n) => { const d = new Date(`${iso}T00:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const daysBetween = (a, b) => Math.round((new Date(`${b}T00:00:00`) - new Date(`${a}T00:00:00`)) / 86400000);
+
+// ── Inline SVG sparkline ──────────────────────────────────────────────────────
+// Renders a tiny trend line for a numeric series; harmless (empty box) when the
+// series is empty or all-zero, so the component never crashes on missing data.
+function Sparkline({ values = [], color = C.blue, w = 150, h = 34 }) {
+  const nums = (values || []).map((v) => Number(v) || 0);
+  const max = Math.max(1, ...nums), min = Math.min(0, ...nums);
+  const span = (max - min) || 1;
+  const pts = nums.map((v, i) => {
+    const x = nums.length > 1 ? (i / (nums.length - 1)) * (w - 4) + 2 : w / 2;
+    const y = h - 2 - ((v - min) / span) * (h - 4);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  return (
+    <svg width={w} height={h} style={{ display: 'block' }}>
+      {pts.length > 1 && <polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />}
+      {pts.map((p, i) => { const [x, y] = p.split(','); return <circle key={i} cx={x} cy={y} r={1.6} fill={color} />; })}
+    </svg>
+  );
+}
+
+// ── Performance · 6-month P&L trend ───────────────────────────────────────────
+// Last 6 calendar-month windows, each fetched from the module-PL engine, drawn as
+// three sparklines (sales · gross profit · net profit). Only mounts when the
+// Performance tab is active. Renders harmlessly when every window returns empty.
+function PnlTrend({ branch }) {
+  const code = branchCode(branch);
+  const months = useMemo(() => {
+    const out = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const from = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      const to = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+      out.push({ label: from.slice(0, 7), from, to });
+    }
+    return out;
+  }, []);
+  const results = useQueries({
+    queries: months.map((m) => ({
+      queryKey: ['accounting', 'module-pl', code || 'all', m.from, m.to, false, true, false],
+      queryFn: () => apiGet('/api/accounting/module-pl', { branch: code, from: m.from, to: m.to, summary: 1 }),
+      staleTime: 60_000,
+    })),
+  });
+  const sales = results.map((r) => r.data?.totals?.sales || 0);
+  const gp = results.map((r) => r.data?.totals?.gp || 0);
+  const np = results.map((r) => r.data?.bridge?.netProfit || 0);
+  const cur = (bc(branch) || {}).cur || '₹';
+  const block = (label, vals, color) => (
+    <div style={{ ...card, padding: 12, flex: '1 1 220px', minWidth: 200 }}>
+      <div style={{ fontSize: 11, fontWeight: 800, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 6 }}>{label} — 6 mo</div>
+      <Sparkline values={vals} color={color} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10.5, color: C.dim }}>
+        <span>{months[0]?.label}</span><span style={{ fontWeight: 800, color }}>{money(cur, vals[vals.length - 1] || 0)}</span>
+      </div>
+    </div>
+  );
+  return (
+    <>
+      <SecTitle>Trend — last 6 months</SecTitle>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+        {block('Sales', sales, C.green)}
+        {block('Gross Profit', gp, C.blue)}
+        {block('Net Profit', np, C.dark)}
+      </div>
+    </>
+  );
+}
+
+// ── Performance · Targets vs Actual (FY) ─────────────────────────────────────
+// Director-set yearly targets (Sales / GP / NP) vs the FY-to-date actuals, as three
+// progress bars. Targets persist in app-config (key targets:<branch>:<fy>) via the
+// generic config hooks — NO new backend. Actuals come from the module-PL engine over
+// the whole current financial year (inception-of-FY → today), independent of the
+// dashboard's selected period, so the bars always read "FY-to-date vs FY target".
+// An inline editor writes the three numbers; a role-gated PUT surfaces a message,
+// never crashes. Unset / 0 target → an honest "no target set".
+function TargetsVsActual({ branch, cur, fyActual, fyModules = [] }) {
+  const code = branchCode(branch);
+  const fyKey = `targets:${code || 'ALL'}:${CUR_FY.label}`;
+  const saved = useConfigValue(fyKey).data || {};
+  const saveCfg = useSaveConfigValue();
+  const [draft, setDraft] = useState(null);            // null → show saved; object → editing
+  const [err, setErr] = useState('');
+  const t = draft || saved;
+  const sales = Number(saved.salesYearly) || 0;
+  const gp = Number(saved.gpYearly) || 0;
+  const np = Number(saved.npYearly) || 0;
+  const savedMods = saved.modules || {};
+  // FY actual sales per module (cost-centre P&L pivot), biggest first.
+  const mods = [...(fyModules || [])].sort((a, b) => (b.sales || 0) - (a.sales || 0));
+
+  const save = () => {
+    setErr('');
+    const value = {
+      salesYearly: Number(t.salesYearly) || 0,
+      gpYearly: Number(t.gpYearly) || 0,
+      npYearly: Number(t.npYearly) || 0,
+      // Per-module Sales targets (only non-zero kept), keyed by module key.
+      modules: Object.fromEntries(Object.entries(t.modules || {})
+        .map(([k, v]) => [k, Number(v) || 0]).filter(([, v]) => v > 0)),
+    };
+    saveCfg.mutate(
+      { key: fyKey, value, description: `FY targets ${CUR_FY.label} · ${code || 'ALL'}` },
+      { onSuccess: () => setDraft(null), onError: (e) => setErr(e?.message || 'Could not save (permission?)') },
+    );
+  };
+
+  const bar = (label, actual, target, tone) => {
+    const has = target > 0;
+    const pct = has ? (actual / target) * 100 : 0;
+    const met = has && actual >= target;
+    const toGo = Math.max(0, target - actual);
+    return (
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.dark }}>{label}</span>
+          {has
+            ? <span style={{ fontSize: 11.5, color: C.dim }}><b style={{ color: tone }}>{money(cur, actual)}</b> of <b>{money(cur, target)}</b> · <b style={{ color: met ? C.green : C.dark }}>{pct.toFixed(0)}%</b></span>
+            : <span style={{ fontSize: 11.5, color: C.dim }}>no target set</span>}
+        </div>
+        <div style={{ height: 12, borderRadius: 6, background: '#eef0f4', overflow: 'hidden', marginTop: 6 }}>
+          <div style={{ height: '100%', width: `${has ? Math.min(100, Math.max(0, pct)) : 0}%`, background: met ? C.green : tone, borderRadius: 6 }} />
+        </div>
+        <div style={{ fontSize: 10.5, color: met ? C.green : C.dim, marginTop: 3, fontWeight: 700 }}>
+          {has ? (met ? 'target met' : `${money(cur, toGo)} to go`) : 'set a target below'}
+        </div>
+      </div>
+    );
+  };
+  const nInp = (k) => (
+    <input type="number" value={t[k] ?? ''} placeholder="0"
+      onChange={(e) => setDraft({ ...t, [k]: e.target.value })}
+      style={{ width: 120, padding: '5px 8px', fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 6, outline: 'none' }} />
+  );
+  // Per-module target input edits t.modules[key] (preserved across the draft).
+  const mInp = (key) => {
+    const m = t.modules || {};
+    return (
+      <input type="number" value={m[key] ?? ''} placeholder="0"
+        onChange={(e) => setDraft({ ...t, modules: { ...m, [key]: e.target.value } })}
+        style={{ width: 110, padding: '4px 7px', fontSize: 11.5, border: `1px solid ${C.border}`, borderRadius: 6, outline: 'none', textAlign: 'right' }} />
+    );
+  };
+
+  return (
+    <>
+      <SecTitle>Targets vs Actual (FY {CUR_FY.label})</SecTitle>
+      <div style={{ ...card, padding: 14, marginBottom: 16 }}>
+        {bar('Sales', fyActual.sales, sales, C.green)}
+        {bar('Gross Profit', fyActual.gp, gp, C.blue)}
+        {bar('Net Profit', fyActual.np, np, C.dark)}
+
+        {/* Per-module Sales target vs FY actual — set a target per Flight / Holiday /
+            Hotel … so the branch can steer each line, not just the top line. */}
+        {mods.length > 0 && (
+          <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 6, paddingTop: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>Module-wise Sales targets (FY)</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead><tr>
+                <th style={{ ...th, background: 'transparent', color: C.dim }}>Module</th>
+                <th style={{ ...th, background: 'transparent', color: C.dim, ...rnum }}>FY Actual</th>
+                <th style={{ ...th, background: 'transparent', color: C.dim, ...rnum }}>Target</th>
+                <th style={{ ...th, background: 'transparent', color: C.dim, ...rnum }}>%</th>
+                <th style={{ ...th, background: 'transparent', color: C.dim, width: 130 }}>Set target</th>
+              </tr></thead>
+              <tbody>
+                {mods.map((m) => {
+                  const act = m.sales || 0;
+                  const tgt = Number(savedMods[m.key]) || 0;
+                  const has = tgt > 0;
+                  const pct = has ? (act / tgt) * 100 : 0;
+                  const met = has && act >= tgt;
+                  return (
+                    <tr key={m.key} style={{ borderTop: '1px solid #eef0f4' }}>
+                      <td style={{ ...td, fontWeight: 600 }}>{m.icon ? `${m.icon} ` : ''}{m.name || m.key}</td>
+                      <td style={{ ...td, ...rnum, fontWeight: 700 }}>{money(cur, act)}</td>
+                      <td style={{ ...td, ...rnum, color: C.dim }}>{has ? money(cur, tgt) : '—'}</td>
+                      <td style={{ ...td, ...rnum, fontWeight: 800, color: !has ? C.dim : (met ? C.green : C.amber) }}>{has ? `${pct.toFixed(0)}%` : '—'}</td>
+                      <td style={{ ...td }}>{mInp(m.key)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 10, paddingTop: 10, display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: C.dim }}>Sales target<br />{nInp('salesYearly')}</label>
+          <label style={{ fontSize: 11, fontWeight: 700, color: C.dim }}>GP target<br />{nInp('gpYearly')}</label>
+          <label style={{ fontSize: 11, fontWeight: 700, color: C.dim }}>NP target<br />{nInp('npYearly')}</label>
+          <button onClick={save} disabled={!draft || saveCfg.isPending} style={{ ...aBtn(C.blue), opacity: (!draft || saveCfg.isPending) ? 0.6 : 1 }}>{saveCfg.isPending ? 'Saving…' : 'Save targets'}</button>
+          {err && <span style={{ fontSize: 11, color: C.red, fontWeight: 700 }}>{err}</span>}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Performance · Budget vs Actual (indirect expenses) ───────────────────────
+// Actual indirect spend (budget-vs-actual engine) against the branch's monthly
+// expense budgets scaled to the selected period. A simple utilisation bar; empty
+// budgets → an honest "no budget set" instead of a misleading 0%.
+function BudgetVsActual({ branch, cur, go, from, to }) {
+  const bva = useBudgetVsActual(branch, { from, to }).data || {};
+  const budgets = useExpenseBudgets().data || [];
+  const code = branchCode(branch);
+  const actual = (bva.rows || []).reduce((s, r) => s + (Number(r.actual) || 0), 0);
+  // Calendar months spanned by [from,to] inclusive, from the YYYY-MM parts —
+  // e.g. 2026-04-01 → 2026-06-27 = 3 months (not ~88/30 ≈ 3, but exact across
+  // any day-of-month). Clamp to >= 1 so a same-month window still bills 1 month.
+  const monthSpan = (a, b) => {
+    const [ya, ma] = String(a || '').split('-').map(Number);
+    const [yb, mb] = String(b || '').split('-').map(Number);
+    if (!ya || !ma || !yb || !mb) return 1;
+    return Math.max(1, (yb - ya) * 12 + (mb - ma) + 1);
+  };
+  const months = monthSpan(from, to);
+  const monthlyBudget = (budgets || [])
+    .filter((b) => !code || !b.branch || String(b.branch) === String(code))
+    .reduce((s, b) => s + (Number(b.monthly) || 0), 0);
+  const budget = monthlyBudget * months;
+  const hasBudget = budget > 0;
+  const util = hasBudget ? (actual / budget) * 100 : 0;
+  const over = util > 100;
+  return (
+    <>
+      <SecTitle>Budget vs Actual — indirect expenses{from ? '' : ' (this month)'}</SecTitle>
+      <div style={{ ...card, padding: 14, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: C.dark }}>
+            Actual <b style={{ color: C.amber }}>{money(cur, actual)}</b>{hasBudget ? <> of budget <b>{money(cur, budget)}</b> <span style={{ fontSize: 11, color: C.dim }}>({months} mo)</span></> : <span style={{ color: C.dim }}> · no budget set</span>}
+          </div>
+          {hasBudget && <span style={{ fontSize: 13, fontWeight: 800, color: over ? C.red : C.green }}>{util.toFixed(0)}% used</span>}
+        </div>
+        {hasBudget && (
+          <div style={{ height: 12, borderRadius: 6, background: '#eef0f4', overflow: 'hidden', marginTop: 8 }}>
+            <div style={{ height: '100%', width: `${Math.min(100, util)}%`, background: over ? C.red : C.green, borderRadius: 6 }} />
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+          <button onClick={() => go('/reports/expense-budget')} style={{ ...aBtn(C.blue), padding: '4px 9px', fontSize: 10.5 }}>View by head <ArrowRight size={11} /></button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Overview · Branch Health traffic-light rollup ────────────────────────────
+// One green/amber/red verdict from four sub-checks (approvals clear · TB balanced ·
+// GP healthy · compliance ok). Red if any CRITICAL check fails, amber on a minor
+// miss, green when all pass. Each sub-check shows its own tick/cross.
+function BranchHealth({ checks }) {
+  const fails = checks.filter((c) => !c.ok);
+  const critFail = fails.some((c) => c.critical);
+  const tone = critFail ? C.red : (fails.length ? C.amber : C.green);
+  const verdict = critFail ? 'Needs attention' : (fails.length ? 'Minor issues' : 'Healthy');
+  return (
+    <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 16, borderLeft: `4px solid ${tone}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: `1px solid ${C.border}` }}>
+        <span style={{ width: 14, height: 14, borderRadius: 999, background: tone, flexShrink: 0 }} />
+        <div style={{ fontSize: 14, fontWeight: 800, color: C.dark }}>Branch Health — {verdict}</div>
+        <div style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 700, color: C.dim }}>{checks.length - fails.length}/{checks.length} checks pass</div>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+        {checks.map((c, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', flex: '1 1 240px', minWidth: 220, borderTop: '1px solid #eef0f4' }}>
+            <span style={{ width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 11, background: c.ok ? C.green : (c.critical ? C.red : C.amber) }}>{c.ok ? '✓' : '✕'}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.dark }}>{c.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Overview · Exception Radar ───────────────────────────────────────────────
+// Aggregated "things that are wrong right now": only the rows with a non-zero count
+// show, each with a one-click drill; a green "all clear" when nothing fires.
+function ExceptionRadar({ rows, go }) {
+  const live = (rows || []).filter((r) => (r.n || 0) > 0);
+  return (
+    <>
+      <SecTitle>Exception Radar</SecTitle>
+      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+        {live.length === 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', color: C.green }}>
+            <CheckCircle2 size={16} /><span style={{ fontSize: 12.5, fontWeight: 700 }}>All clear — no exceptions detected.</span>
+          </div>
+        )}
+        {live.map((r, i) => (
+          <div key={i} {...(r.route ? clickable(() => go(r.route)) : {})} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderTop: i ? '1px solid #eef0f4' : 'none', cursor: r.route ? 'pointer' : 'default' }}>
+            <span style={{ width: 26, textAlign: 'center', fontWeight: 800, color: C.red, fontVariantNumeric: 'tabular-nums' }}>{r.n}</span>
+            <span style={{ flex: 1, fontSize: 12.5, fontWeight: 700, color: C.dark }}>{r.label}</span>
+            {r.route && <button onClick={(e) => { e.stopPropagation(); go(r.route); }} style={{ ...aBtn(C.amber), padding: '3px 8px', fontSize: 10 }}>Open <ArrowRight size={10} /></button>}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ── R&P · DSO / DPO / CCC strip ──────────────────────────────────────────────
+// Working-capital velocity: Days Sales Outstanding, Days Payables Outstanding and
+// the Cash Conversion Cycle. Guards divide-by-zero (no sales/cogs → "—").
+function DsoDpoStrip({ cur, rec, pay, periodSales, periodCogs }) {
+  const dso = periodSales > 0 ? (rec.total || 0) / (periodSales / 365) : null;
+  const dpo = periodCogs > 0 ? (pay.total || 0) / (periodCogs / 365) : null;
+  const ccc = (dso != null && dpo != null) ? dso - dpo : null;
+  const tile = (label, v, hint, tone) => (
+    <div style={{ ...card, padding: 14, flex: '1 1 200px', minWidth: 180, borderLeft: `4px solid ${tone}` }}>
+      <div style={{ fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>{label}</div>
+      <div style={{ fontSize: 21, fontWeight: 800, color: tone, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>{v == null ? '—' : `${Math.round(v)} d`}</div>
+      <div style={{ fontSize: 11, color: C.dim, marginTop: 3 }}>{hint}</div>
+    </div>
+  );
+  return (
+    <>
+      <SecTitle>Working-capital velocity</SecTitle>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+        {tile('DSO — days sales outstanding', dso, 'avg days to collect a sale', C.blue)}
+        {tile('DPO — days payables outstanding', dpo, 'avg days we take to pay', C.amber)}
+        {tile('CCC — cash conversion cycle', ccc, 'DSO − DPO · lower is better', (ccc != null && ccc <= 0) ? C.green : C.dark)}
+      </div>
+    </>
+  );
+}
+
+// ── R&P · stacked ageing bars ────────────────────────────────────────────────
+// Horizontal stacked bar of the four ageing buckets for one side, with a legend.
+const AGE_SEGMENTS = [['d0', '0–30', C.green], ['d30', '31–60', C.blue], ['d60', '61–90', C.amber], ['d90', '90+', C.red]];
+function AgeingBars({ cur, rec, pay }) {
+  const bar = (label, t, tone) => {
+    const total = (t.d0 || 0) + (t.d30 || 0) + (t.d60 || 0) + (t.d90 || 0);
+    return (
+      <div style={{ ...card, padding: 14, flex: '1 1 360px', minWidth: 320 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.dark }}>{label}</span>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: tone }}>{money(cur, total)}</span>
+        </div>
+        <div style={{ display: 'flex', height: 16, borderRadius: 6, overflow: 'hidden', background: '#eef0f4' }}>
+          {total > 0 && AGE_SEGMENTS.map(([k, , col]) => (t[k] || 0) > 0 ? <div key={k} title={`${k}: ${money(cur, t[k])}`} style={{ width: `${((t[k] || 0) / total) * 100}%`, background: col }} /> : null)}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
+          {AGE_SEGMENTS.map(([k, lbl, col]) => (
+            <span key={k} style={{ fontSize: 10.5, color: C.dim, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 9, height: 9, borderRadius: 2, background: col }} />{lbl}: <b style={{ color: C.dark }}>{money(cur, t[k] || 0)}</b>
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  return (
+    <>
+      <SecTitle>Ageing distribution — Debtors vs Creditors</SecTitle>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+        {bar('Debtors ageing', rec, C.blue)}
+        {bar('Creditors ageing', pay, C.amber)}
+      </div>
+    </>
+  );
+}
+
+export function DashboardAccountant({ branch: branchProp, setRoute, currentUser }) {
+  // One accountant per branch: never a consolidated ALL view — coerce to the
+  // accountant's own branch (from their profile) so every figure is theirs to act on.
+  // Falls back to the selector value when the user carries no branch (e.g. an admin).
+  const ownCode = currentUser?.branches?.[0];
+  const branch = (branchProp && branchProp !== 'ALL') ? branchProp : (ownCode || branchProp);
   const cur = (bc(branch) || {}).cur || '₹';
   const go = (r) => setRoute && setRoute(r);
   const ym = thisYM();
   const monthFrom = `${ym}-01`;
   const today = new Date().toISOString().slice(0, 10);
+
+  // ── Global period control ───────────────────────────────────────────────────
+  // Drives FLOW figures (P&L, tax, collected/paid) only; balances & ageing stay
+  // as-of `to`, the pending-approval worklist stays live. Custom range overrides
+  // the preset; CM is the 'mtd' preset.
+  const [pp, setPp] = useState('cfy');
+  const [customRange, setCustomRange] = useState(null);
+  const inc = useInception(branch).data?.from;
+  const range = customRange?.from && customRange?.to ? { ...customRange, label: 'Custom' } : periodRange(pp, { branch, inception: inc });
+  const from = range.from, to = range.to;
+  // Prior comparable window (same length, ending the day before `from`).
+  const priorTo = addDaysISO(from, -1);
+  const priorFrom = addDaysISO(priorTo, -Math.max(0, daysBetween(from, to)));
+
   // Keep the query objects (not just .data) so tiles can show a skeleton while their
   // source query is loading instead of flashing a 0 / blank number.
-  const ageQ = useAgeing(branch); const age = ageQ.data || {};
-  // GST is a PERIODIC return — scope to the current month (a bare call is inception-to-date).
-  const taxQ = useTaxSummary(branch, { from: monthFrom, to: today }); const tax = taxQ.data || {};
+  const ageQ = useAgeing(branch, to); const age = ageQ.data || {};
+  // GST is a PERIODIC return — scope to the selected period (a bare call is inception-to-date).
+  const taxQ = useTaxSummary(branch, { from, to }); const tax = taxQ.data || {};
+  // Period P&L headline + the prior-window comparison for the delta chips.
+  const plQ = useModulePL(branch, { from, to, summary: true }); const pl = plQ.data || {};
+  const priorPl = useModulePL(branch, { from: priorFrom, to: priorTo, summary: true }).data || {};
+  // FY-to-date actuals for the Targets-vs-Actual panel — always the WHOLE current
+  // financial year (CFY start → today), regardless of the selected period, so the
+  // target bars read true FY progress. Same module-PL engine as the snapshot above.
+  const cfyFrom = periodRange('cfy', { branch, inception: inc }).from;
+  const cfyPl = useModulePL(branch, { from: cfyFrom, to: today, summary: true }).data || {};
+  const fyActual = { sales: cfyPl.totals?.sales || 0, gp: cfyPl.totals?.gp || 0, np: cfyPl.bridge?.netProfit || 0 };
   const tbQ = useTrialBalance(branch); const tb = tbQ.data?.rows || []; // bare = cumulative closing = current balance
   const bookingsQ = useBookingOrders(branch, { status: 'pending' }); const bookings = bookingsQ.data || []; // only pending is used here (stuck/suspense/counts)
   // /api/vouchers/approvals returns an OBJECT { counts, entries } — NOT an array. Reading
   // `.data || []` then `.length` yielded undefined → pendCount became NaN (tile showed
   // "NaN" and the "all posted" check never went green). Use the entries[] array.
   const pendVQ = useVoucherApprovals(branch, 'pending'); const pendVouchers = pendVQ.data?.entries || [];
-  // Dashboard only shows THIS MONTH's sales/purchase TOTALS — fetch the server-side
-  // aggregate (?summary=1 → {count,total}) for the month instead of pulling every
-  // voucher doc just to sum it client-side (a few bytes vs ~MB over the Atlas link).
-  const salesSumQ = useRegisterSummary(branch, { category: 'sale', from: monthFrom, to: today });
-  const purchSumQ = useRegisterSummary(branch, { category: 'purchase', from: monthFrom, to: today });
-  const outQ = useOutstanding(branch); const out = outQ.data || {};
+  // Month sales/purchase + GP/net-profit now come from the richer Branch P&L snapshot
+  // (BranchPnlSnapshot · module-PL engine) on the compliance tab — no separate
+  // register-summary round-trips needed here.
+  // R&P unsettled/total snapshot follows the selected period end (the labels say
+  // "as on <to>"); passing the period `to` ages the outstanding to that cut-off.
+  const outQ = useOutstanding(branch, { asOf: to }); const out = outQ.data || {};
   const dayQ = useDayBook(branch, { from: today, to: today }); const day = dayQ.data || [];
+  // Collected / Paid follow the selected PERIOD (the "Posted Today" feed stays today-only).
+  const periodDayQ = useDayBook(branch, { from, to }); const periodDay = periodDayQ.data || [];
   // True only during an actual fetch with no data yet (React Query v5: isPending && isFetching),
   // so skeletons show on first load / branch switch but not on background refetches.
   const txnLoading = bookingsQ.isLoading || pendVQ.isLoading;
@@ -167,7 +1042,7 @@ export function DashboardAccountant({ branch, setRoute }) {
   const { data: bankLedgers } = useBankLedgers(branch);
   const { data: taxEvents } = useTaxCalendar();
 
-  const [activeTab, setActiveTab] = useState('daily');
+  const [activeTab, setActiveTab] = useState('overview');
   const [selectedBank, setSelectedBank] = useState('');
 
   // Auto-select first bank ledger once loaded
@@ -200,16 +1075,64 @@ export function DashboardAccountant({ branch, setRoute }) {
     .filter((r) => r.overdue > 0.5).sort((a, b) => b.overdue - a.overdue).slice(0, 5);
   const top5pay = [...(age.payables?.rows || [])].sort((a, b) => (b.total || 0) - (a.total || 0)).slice(0, 5);
   const netGst = (typeof tax.netPayable === 'number') ? tax.netPayable : null;
-  const tds = tax.wht?.payable || 0;
+  // Tax summary exposes withholding under `withholding` (the Tax Summary report reads
+  // the same key); the old `tax.wht` was always undefined → the TDS tile showed 0.
+  const tds = tax.withholding?.payable || 0;
   const tcs = tax.tcs?.payable || 0;
   const onAcct = out.onAccountReceipts || [];
   const onAcctSum = onAcct.reduce((s, r) => s + (Number(r.onAccount) || 0), 0);
-  const collectedToday = day.filter((j) => j.category === 'receipt').reduce((s, j) => s + (Number(j.totalDebit) || 0), 0);
-  const paidToday = day.filter((j) => j.category === 'payment').reduce((s, j) => s + (Number(j.totalDebit) || 0), 0);
+  const collectedToday = periodDay.filter((j) => j.category === 'receipt').reduce((s, j) => s + (Number(j.totalDebit) || 0), 0);
+  const paidToday = periodDay.filter((j) => j.category === 'payment').reduce((s, j) => s + (Number(j.totalDebit) || 0), 0);
   const tbDr = tb.reduce((s, r) => s + (Number(r.closingDebit ?? r.debit) || 0), 0);
   const tbCr = tb.reduce((s, r) => s + (Number(r.closingCredit ?? r.credit) || 0), 0);
   const tbBalanced = tb.length > 0 && Math.abs(tbDr - tbCr) < 1;
   const qa = (label, route, bg = C.blue) => <button key={route} onClick={() => go(route)} style={aBtn(bg)}><Plus size={13} />{label}</button>;
+
+  // ── Single hero worklist: every "needs action" signal aggregated into one number,
+  // so the accountant's day starts from one figure with a one-click jump to each.
+  const overdueDebtorsCount = (age.receivables?.rows || []).filter((r) => ((r.d30 || 0) + (r.d60 || 0) + (r.d90 || 0)) > 0.5).length;
+  const refundsPendingCount = pendVouchers.filter((e) => ADJ_CATS.includes(e.category)).length;
+  const heroItems = [
+    { n: pendCount, label: 'to approve & post', onClick: () => go('/transactions/approvals') },
+    { n: suspense.length, label: 'in suspense', onClick: () => go('/accounts/suspense') },
+    { n: onAcct.length, label: 'receipts to allocate', onClick: () => go('/reports/rec') },
+    { n: overdueDebtorsCount, label: 'overdue debtors', onClick: () => setActiveTab('rp') },
+    { n: refundsPendingCount, label: 'refunds pending', onClick: () => setActiveTab('rp') },
+  ];
+  const heroTotal = heroItems.reduce((s, it) => s + it.n, 0);
+
+  // ── Period P&L figures (FLOW) + approval status split (LIVE) ────────────────
+  const periodSales = pl.totals?.sales || 0;
+  const periodGp = pl.totals?.gp || 0;
+  const periodNp = pl.bridge?.netProfit || 0;
+  const periodCogs = pl.totals?.cogs || 0;
+  const blockedCount = pendVouchers.filter((e) => !e.postable).length;
+  const supHealth = useMasterHealth('suppliers', branch).data || {};
+  const bouncedPdc = (usePDCSummary(branch, { direction: 'inbound' }).data?.counts?.bounced || 0)
+    + (usePDCSummary(branch, { direction: 'outbound' }).data?.counts?.bounced || 0);
+  const gpNegative = pendBookings.filter((b) => (Number(b.gp ?? b.grossProfit) || 0) <= 0 && (b.gp != null || b.grossProfit != null)).length;
+  // Branch Health rollup — approvals clear & TB balanced are CRITICAL.
+  const healthChecks = [
+    { label: 'Approvals clear', ok: pendCount === 0, critical: true },
+    { label: 'Trial Balance balanced', ok: tbBalanced, critical: true },
+    { label: 'Gross profit healthy', ok: periodGp > 0, critical: false },
+    // Overdue tax = any ACTIVE statutory-calendar event whose due date is strictly
+    // before today (live from the tax calendar). No events / none past-due → ok.
+    { label: 'Compliance — no overdue tax', ok: !taxEvents?.some((e) => e.active && e.date && e.date < today), critical: false },
+  ];
+  // Exception Radar — only non-zero rows render (handled inside the component).
+  // Bank reco differences are aggregated across EVERY bank ledger of the branch (not
+  // just the one selected on the Cash & Bank tab), so a stray difference on any account
+  // surfaces here. The per-ledger queries dedupe with the all-accounts roll-up.
+  const bankRecoAgg = useBankReconAggregate(branch, { from: monthFrom, to: today });
+  const exceptionRows = [
+    { n: blockedCount, label: 'Blocked vouchers — needs fixing', route: '/transactions/approvals' },
+    { n: suspense.length, label: 'Bookings in suspense', route: '/accounts/suspense' },
+    { n: (supHealth.noGstin || 0) + (supHealth.noPan || 0), label: 'Suppliers missing GSTIN / PAN', route: '/masters/suppliers' },
+    { n: bouncedPdc, label: 'Bounced cheques (PDC)', route: '/bank-reco' },
+    { n: gpNegative, label: 'Bookings with GP ≤ 0', route: '/transactions/approvals' },
+    { n: bankRecoAgg.diffCount, label: `Bank accounts with a reconciliation difference${bankRecoAgg.diffCount ? ` · ${money(cur, bankRecoAgg.diffAmount)}` : ''}`, route: '/bank-reco' },
+  ];
 
   // Checklist handler inside compliance tab
   const period = thisYM();
@@ -257,34 +1180,152 @@ export function DashboardAccountant({ branch, setRoute }) {
 
   const alerts = alertsRes?.alerts || [];
 
+  // ── Receivable vs Payable comparison metrics ──────────────────────────────
+  // Both sides computed from the SAME live engines (ageing totals carry billed &
+  // settled; outstanding carries open-bill & on-account totals) so the two columns
+  // are directly comparable. Falls back to summing the row arrays if a totals field
+  // is absent, so the receivable column never goes blank when the data is present.
+  const recBilled = age.receivables?.totals?.billed || 0;
+  const recSettled = age.receivables?.totals?.settled || 0;
+  const payBilled = age.payables?.totals?.billed || 0;
+  const paySettled = age.payables?.totals?.settled || 0;
+  const recOpenBills = out.totals?.salesOutstanding ?? (out.salesBills || []).reduce((s, b) => s + (Number(b.outstanding) || 0), 0);
+  const payOpenBills = out.totals?.purchaseOutstanding ?? (out.purchaseBills || []).reduce((s, b) => s + (Number(b.outstanding) || 0), 0);
+  const recOnAccount = out.totals?.onAccountReceipts ?? (out.onAccountReceipts || []).reduce((s, r) => s + (Number(r.onAccount) || 0), 0);
+  const payOnAccount = out.totals?.onAccountPayments ?? (out.onAccountPayments || []).reduce((s, r) => s + (Number(r.onAccount) || 0), 0);
+  const compareRows = [
+    { label: 'Total Billed', sub: 'gross sales vs purchases', r: recBilled, p: payBilled },
+    { label: 'Settled', sub: 'received vs paid', r: recSettled, p: paySettled },
+    { label: 'Unsettled Bills (open)', sub: 'bill-wise outstanding', r: recOpenBills, p: payOpenBills },
+    { label: 'Unallocated / On-Account', sub: 'receipts vs payments not yet applied', r: recOnAccount, p: payOnAccount },
+    { label: 'Net Outstanding', sub: 'debtors vs creditors', r: rec.total || 0, p: pay.total || 0, strong: true },
+  ];
+
   return (
     <Shell
       title="Branch Accountant Portal"
       sub={`${brLabel(branch)} · workspace and accounts control${age.asOf ? ` · as on ${age.asOf}` : ''}`}
-      right={<>{qa('Receipt', '/receipts')}{qa('Payment', '/payments', C.amber)}{qa('Contra', '/contra', '#6b4c8b')}{qa('Journal', '/journal', C.dark)}{qa('Purchase Expense', '/purchase-expense', C.amber)}</>}
+      right={<>{qa('Receipt', '/receipts')}{qa('Payment', '/payments', C.amber)}{qa('Contra', '/contra', '#6b4c8b')}{qa('Journal', '/journal', C.dark)}{qa('Purchase Expense', '/purchase-expense', C.amber)}<button key="print" onClick={() => window.print()} style={aBtn('#475569')}><ReceiptText size={13} />Print / PDF</button></>}
     >
       {/* Workspace Tabs Navigation */}
-      <div style={{ display: 'flex', borderBottom: `2px solid ${C.border}`, marginBottom: 16 }}>
-        <button onClick={() => setActiveTab('daily')} style={tabStyle(activeTab === 'daily')}>1. Daily Operations</button>
-        <button onClick={() => setActiveTab('collections')} style={tabStyle(activeTab === 'collections')}>2. Collections &amp; Payables</button>
-        <button onClick={() => setActiveTab('compliance')} style={tabStyle(activeTab === 'compliance')}>3. Month-End &amp; Compliance</button>
+      <div style={{ display: 'flex', borderBottom: `2px solid ${C.border}`, marginBottom: 10, flexWrap: 'wrap' }}>
+        <button onClick={() => setActiveTab('overview')} style={tabStyle(activeTab === 'overview')}>1. Overview</button>
+        <button onClick={() => setActiveTab('performance')} style={tabStyle(activeTab === 'performance')}>2. Performance</button>
+        <button onClick={() => setActiveTab('cash')} style={tabStyle(activeTab === 'cash')}>3. Cash &amp; Bank</button>
+        <button onClick={() => setActiveTab('rp')} style={tabStyle(activeTab === 'rp')}>4. Receivable &amp; Payable</button>
+        <button onClick={() => setActiveTab('compliance')} style={tabStyle(activeTab === 'compliance')}>5. Compliance</button>
       </div>
 
-      {/* TAB 1: DAILY OPERATIONS */}
-      {activeTab === 'daily' && (
+      {/* Global period bar — drives FLOW figures (P&L · tax · collected/paid). Balances
+          and ageing stay as-of the period `to`; the approval worklist stays live. */}
+      {(() => {
+        const pBtn = (active) => ({ padding: '4px 11px', fontSize: 11.5, fontWeight: 700, border: 'none', borderRadius: 6, cursor: 'pointer', background: active ? C.dark : 'transparent', color: active ? C.gold : C.dim });
+        const isCustom = !!(customRange?.from && customRange?.to);
+        const dInp = { padding: '4px 7px', fontSize: 11.5, border: `1px solid ${C.border}`, borderRadius: 6, outline: 'none' };
+        const setPreset = (p) => { setCustomRange(null); setPp(p); };
+        const setDate = (k, v) => setCustomRange((c) => ({ from: k === 'from' ? v : (c?.from || from), to: k === 'to' ? v : (c?.to || to) }));
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16, padding: '8px 12px', borderRadius: 10, background: C.dark }}>
+            <div style={{ display: 'inline-flex', gap: 3, background: '#fff', borderRadius: 8, padding: 3 }}>
+              {[['all', 'All'], ['lfy', 'LFY'], ['cfy', 'CFY'], ['mtd', 'CM']].map(([k, l]) => (
+                <button key={k} onClick={() => setPreset(k)} style={pBtn(pp === k && !isCustom)}>{l}</button>
+              ))}
+            </div>
+            <input type="date" value={from || ''} onChange={(e) => setDate('from', e.target.value)} style={dInp} />
+            <span style={{ color: C.gold }}>→</span>
+            <input type="date" value={to || ''} onChange={(e) => setDate('to', e.target.value)} style={dInp} />
+            <span style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 800, color: C.gold }}>{range.label} · {from} → {to}</span>
+          </div>
+        );
+      })()}
+
+      {/* TAB 1: OVERVIEW */}
+      {activeTab === 'overview' && (
+        <>
+          {/* (a) Branch Health traffic-light rollup */}
+          <BranchHealth checks={healthChecks} />
+
+          {/* (b) Approval STATUS — four stat cards */}
+          <SecTitle>Approval &amp; posting status (live)</SecTitle>
+          <Row>
+            <Tile icon={<CheckCircle2 size={13} />} label="Approved & Posted" value={periodDay.length} sub={`posted in ${range.label}`} tone={C.green} onClick={() => go('/finance/day-book')} loading={periodDayQ.isLoading} />
+            <Tile icon={<CheckSquare size={13} />} label="Pending" value={pendCount} sub="awaiting approval" tone={C.amber} onClick={() => go('/transactions/approvals')} loading={txnLoading} />
+            <Tile icon={<AlertTriangle size={13} />} label="Blocked" value={blockedCount} sub="fails a check" tone={blockedCount ? C.red : C.green} onClick={() => go('/transactions/approvals')} loading={txnLoading} />
+            <Tile icon={<AlertCircle size={13} />} label="Suspense" value={suspense.length} sub="missing ledger / data" tone={suspense.length ? C.red : C.green} onClick={() => go('/accounts/suspense')} loading={bookingsQ.isLoading} />
+          </Row>
+
+          {/* Actionable breakdown of the queue: I-can-approve vs my-own vs blocked (maker ≠ checker) */}
+          <ApprovalSplit branch={branch} cur={cur} go={go} currentUser={currentUser} />
+
+          {/* (c) Performance headline — Sales / GP / NP with period-over-period delta */}
+          <SecTitle>Performance ({range.label})</SecTitle>
+          <Row>
+            <Tile icon={<TrendingUp size={13} />} label="Sales" value={money(cur, periodSales)} sub={<>vs prior <Delta cur={periodSales} prev={priorPl.totals?.sales || 0} /></>} tone={C.green} onClick={() => go('/reports/pnl')} loading={plQ.isLoading} />
+            <Tile icon={<Coins size={13} />} label="Gross Profit" value={money(cur, periodGp)} sub={<>vs prior <Delta cur={periodGp} prev={priorPl.totals?.gp || 0} /></>} tone={C.blue} onClick={() => go('/reports/invoice-gp')} loading={plQ.isLoading} />
+            <Tile icon={<Scale size={13} />} label="Net Profit" value={money(cur, periodNp)} sub={<>vs prior <Delta cur={periodNp} prev={priorPl.bridge?.netProfit || 0} /></>} tone={periodNp >= 0 ? C.green : C.red} onClick={() => go('/reports/pnl')} loading={plQ.isLoading} />
+          </Row>
+
+          {/* (d) Money & working capital */}
+          <SecTitle>Money &amp; working capital (as on {to})</SecTitle>
+          <Row>
+            <Tile icon={<Wallet size={13} />} label="Cash + Bank" value={money(cur, cash + bankTotal)} sub="liquid balances" tone={C.green} onClick={() => go('/finance/bank-balance')} loading={tbQ.isLoading} />
+            <Tile icon={<TrendingUp size={13} />} label="Receivable" value={money(cur, rec.total || 0)} sub="open debtors" tone={C.blue} onClick={() => go('/reports/rec')} loading={ageQ.isLoading} />
+            <Tile icon={<TrendingDown size={13} />} label="Payable" value={money(cur, pay.total || 0)} sub="open creditors" tone={C.amber} onClick={() => go('/reports/pay')} loading={ageQ.isLoading} />
+            <Tile icon={<Scale size={13} />} label="Net Position" value={money(cur, recNet)} sub={recNet >= 0 ? 'net receivable' : 'net payable'} tone={recNet >= 0 ? C.green : C.red} onClick={() => go('/accounts/net-ageing')} loading={ageQ.isLoading} />
+          </Row>
+
+          {/* (e) Exception Radar */}
+          <ExceptionRadar rows={exceptionRows} go={go} />
+
+          {/* (f) Single hero worklist — the one number to start the day */}
+          <SecTitle>Worklist — needs action (live)</SecTitle>
+          <div style={{ ...card, padding: '12px 16px', marginBottom: 16, borderLeft: `4px solid ${heroTotal ? C.amber : C.green}`, display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+              <span style={{ fontSize: 30, fontWeight: 800, color: heroTotal ? C.amber : C.green, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{heroTotal}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: C.dim }}>{heroTotal ? <>items need<br />your action</> : <>all clear —<br />nothing pending</>}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1 }}>
+              {heroItems.filter((it) => it.n > 0).map((it, i) => (
+                <button key={i} {...clickable(it.onClick)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 999, border: `1px solid ${C.border}`, background: '#fff', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, color: C.dark }}>
+                  <span style={{ fontWeight: 800, color: C.amber }}>{it.n}</span> {it.label} <ArrowRight size={11} style={{ color: C.dim }} />
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* TAB 2: PERFORMANCE */}
+      {activeTab === 'performance' && (
+        <>
+          <BranchPnlSnapshot branch={branch} cur={cur} go={go} from={from} to={to} prior={priorPl} />
+          <TargetsVsActual branch={branch} cur={cur} fyActual={fyActual} fyModules={cfyPl.modules || []} />
+          <PnlTrend branch={branch} />
+          <BudgetVsActual branch={branch} cur={cur} go={go} from={from} to={to} />
+        </>
+      )}
+
+      {/* TAB 3: CASH & BANK */}
+      {activeTab === 'cash' && (
         <>
           <SecTitle>Money Position</SecTitle>
           <Row>
             <Tile icon={<Wallet size={13} />} label="Cash in Hand" value={money(cur, cash)} sub="Open Cash Book" tone={C.green} onClick={() => go('/finance/cash-book')} loading={tbQ.isLoading} />
             <Tile icon={<Landmark size={13} />} label={`Bank Balance${banks.length > 1 ? ` (${banks.length} a/c)` : ''}`} value={money(cur, bankTotal)} sub="Open bank balances" tone={C.blue} onClick={() => go('/finance/bank-balance')} loading={tbQ.isLoading} />
-            <Tile icon={<TrendingUp size={13} />} label="Collected Today" value={money(cur, collectedToday)} sub="Receipts posted today" tone={C.green} onClick={() => go('/finance/receipt-register')} loading={dayQ.isLoading} />
-            <Tile icon={<TrendingDown size={13} />} label="Paid Today" value={money(cur, paidToday)} sub="Payments posted today" tone={C.amber} onClick={() => go('/finance/payment-register')} loading={dayQ.isLoading} />
+            <Tile icon={<TrendingUp size={13} />} label="Collected" value={money(cur, collectedToday)} sub={`receipts · ${range.label}`} tone={C.green} onClick={() => go('/finance/receipt-register')} loading={periodDayQ.isLoading} />
+            <Tile icon={<TrendingDown size={13} />} label="Paid" value={money(cur, paidToday)} sub={`payments · ${range.label}`} tone={C.amber} onClick={() => go('/finance/payment-register')} loading={periodDayQ.isLoading} />
           </Row>
           {banks.length > 1 && (
             <div style={{ ...card, padding: '8px 12px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
               {banks.map((b, i) => <span key={i} style={{ fontSize: 11.5, color: C.dim }}>{b.name}: <b style={{ color: b.bal >= 0 ? C.dark : C.red }}>{money(cur, b.bal)}</b></span>)}
             </div>
           )}
+
+          {/* Tier 1.1 — forward cash outlook (the tiles above are backward-looking) */}
+          <CashOutlookCard branch={branch} cur={cur} go={go} />
+
+          {/* Tier 1.2 — post-dated cheque tracker */}
+          <PdcTracker branch={branch} cur={cur} go={go} />
 
           {/* New Bank Reconciliation summary card */}
           <SecTitle>Bank Reconciliation status</SecTitle>
@@ -343,13 +1384,8 @@ export function DashboardAccountant({ branch, setRoute }) {
             )}
           </div>
 
-          <SecTitle>Worklist — needs action</SecTitle>
-          <Row>
-            <Tile icon={<CheckSquare size={13} />} label="Pending to Approve & Post" value={pendCount} sub="Open approvals" tone={C.amber} onClick={() => go('/transactions/approvals')} loading={txnLoading} />
-            <Tile icon={<ReceiptText size={13} />} label="Unallocated Receipts" value={money(cur, onAcctSum)} sub={`${onAcct.length} on-account · settle bills`} tone={C.blue} onClick={() => go('/reports/rec')} loading={outQ.isLoading} />
-            <Tile icon={<AlertTriangle size={13} />} label="Suspense / To Fix" value={suspense.length} sub="Clear suspense" tone={C.red} onClick={() => go('/accounts/suspense')} loading={bookingsQ.isLoading} />
-            <Tile icon={<ListChecks size={13} />} label="Month-End Progress" value={`${checklistDone}/6`} sub="Open close checklist" tone={checklistDone === 6 ? C.green : C.dark} onClick={() => setActiveTab('compliance')} loading={txnLoading || tbQ.isLoading} />
-          </Row>
+          {/* Tier 3.8 — every bank's reco status at a glance (vs the single-bank detail above) */}
+          <BankRecoRollup branch={branch} cur={cur} go={go} />
 
           {/* Today's posted transactions book feed */}
           <SecTitle>Posted Today ({day.length})</SecTitle>
@@ -382,11 +1418,67 @@ export function DashboardAccountant({ branch, setRoute }) {
         </>
       )}
 
-      {/* TAB 2: COLLECTIONS & PAYABLES */}
-      {activeTab === 'collections' && (
+      {/* TAB 4: RECEIVABLE & PAYABLE — Receivable & Payable side-by-side for comparison */}
+      {activeTab === 'rp' && (
         <>
-          <SecTitle>Ageing Position &amp; Net Capital ({age.asOf ? `as on ${age.asOf}` : 'live'})</SecTitle>
-          <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
+          {/* Working-capital velocity (DSO / DPO / CCC) — period sales/cogs from P&L */}
+          <DsoDpoStrip cur={cur} rec={rec} pay={pay} periodSales={periodSales} periodCogs={periodCogs} />
+
+          {/* Stacked ageing distribution bars — debtors vs creditors */}
+          <AgeingBars cur={cur} rec={rec} pay={pay} />
+
+          {/* Headline snapshot: both sides + net, each card drilling to its register */}
+          <SecTitle>Net Working Position ({age.asOf ? `as on ${age.asOf}` : 'live'})</SecTitle>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+            <div {...clickable(() => go('/reports/rec'))} style={{ ...card, padding: 14, borderLeft: `4px solid ${C.blue}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' }}>
+              <div style={{ fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Accounts Receivable (Debtors)</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: C.blue, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{money(cur, rec.total || 0)}</div>
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{overdueDebtorsCount} overdue · open receivables <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+            </div>
+            <div {...clickable(() => go('/reports/pay'))} style={{ ...card, padding: 14, borderLeft: `4px solid ${C.amber}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' }}>
+              <div style={{ fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Accounts Payable (Creditors)</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: C.amber, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{money(cur, pay.total || 0)}</div>
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{(age.payables?.rows || []).length} supplier(s) · open payables <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+            </div>
+            <div {...clickable(() => go('/accounts/net-ageing'))} style={{ ...card, padding: 14, borderLeft: `4px solid ${recNet >= 0 ? C.green : C.red}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' }}>
+              <div style={{ fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Net Working Position</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: recNet >= 0 ? C.green : C.red, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{money(cur, recNet)}</div>
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{recNet >= 0 ? 'net receivable' : 'net payable'} · full net ageing <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+            </div>
+          </div>
+
+          {/* ── Receivable vs Payable — one comparison table, every metric side by side.
+              This is what the separate AR/AP tabs made impossible: read both columns at
+              once. The Receivable column shows total billed, settled, open bills and
+              unallocated receipts next to the Payable equivalents. */}
+          <SecTitle>Receivable vs Payable — side-by-side comparison ({age.asOf ? `as on ${age.asOf}` : 'live'})</SecTitle>
+          <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 18 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead><tr style={{ background: C.dark }}>
+                <th style={{ ...th, background: 'transparent' }}>Metric</th>
+                <th style={{ ...th, background: 'transparent', ...rnum }}>Receivable (Customers)</th>
+                <th style={{ ...th, background: 'transparent', ...rnum }}>Payable (Suppliers)</th>
+                <th style={{ ...th, background: 'transparent', ...rnum }}>Net (R − P)</th>
+              </tr></thead>
+              <tbody>
+                {compareRows.map((m, i) => {
+                  const net = (m.r || 0) - (m.p || 0);
+                  return (
+                    <tr key={m.label} style={{ borderTop: '1px solid #dfe2e7', background: m.strong ? '#fafbff' : (i % 2 ? '#fafbff' : '#fff') }}>
+                      <td style={{ ...td, fontWeight: m.strong ? 800 : 700, color: C.dark }}>{m.label}<div style={{ fontSize: 10.5, color: C.dim, fontWeight: 500 }}>{m.sub}</div></td>
+                      <td {...clickable(() => go('/reports/rec'))} style={{ ...td, ...rnum, cursor: 'pointer', color: C.blue, fontWeight: m.strong ? 800 : 700 }}>{money(cur, m.r || 0)}</td>
+                      <td {...clickable(() => go('/reports/pay'))} style={{ ...td, ...rnum, cursor: 'pointer', color: C.amber, fontWeight: m.strong ? 800 : 700 }}>{money(cur, m.p || 0)}</td>
+                      <td style={{ ...td, ...rnum, fontWeight: 800, color: net >= 0 ? C.green : C.red }}>{money(cur, net)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Ageing buckets — debtors AND creditors in ONE table so the buckets line up */}
+          <SecTitle>Ageing — Debtors vs Creditors</SecTitle>
+          <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 18 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead><tr>
                 <th style={th}>Ageing</th><th style={{ ...th, ...rnum }}>0–30</th><th style={{ ...th, ...rnum }}>31–60</th><th style={{ ...th, ...rnum }}>61–90</th><th style={{ ...th, ...rnum }}>90+</th><th style={{ ...th, ...rnum }}>Total</th>
@@ -403,8 +1495,143 @@ export function DashboardAccountant({ branch, setRoute }) {
             </table>
           </div>
 
+          {/* Bill-wise open documents — sales bills | purchase bills, side by side */}
+          <SecTitle>Unsettled Bills (bill-wise) — Client vs Supplier</SecTitle>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
+            <UnsettledBills
+              title="Open sales bills — awaiting receipt"
+              bills={out.salesBills || []}
+              cur={cur} tone={C.blue} drill360="/reports/customer-360"
+              actionLabel="Receipt" actionRoute="/receipts"
+              onDrillAll={() => go('/reports/rec')} go={go}
+            />
+            <UnsettledBills
+              title="Open purchase bills — awaiting payment"
+              bills={out.purchaseBills || []}
+              cur={cur} tone={C.amber} drill360="/reports/supplier-360"
+              actionLabel="Pay" actionRoute="/payments"
+              onDrillAll={() => go('/reports/pay')} go={go}
+            />
+          </div>
+
+          {/* Client headline totals — Sales Bills vs Receipts. Summed from the SAME
+              bill-wise receivables rows that feed the party-wise panel below, so the
+              four tiles tie back exactly to that table's TOTAL footer. */}
+          <SecTitle>Clients — Sales Bills vs Receipts</SecTitle>
+          {(() => {
+            const rr = age.receivables?.rows || [];
+            const rt = rr.reduce((a, r) => ({
+              billed: a.billed + (r.billed || 0),
+              settled: a.settled + (r.settled || 0),
+              unsettled: a.unsettled + (r.total || 0),
+              net: a.net + (r.net || 0),
+            }), { billed: 0, settled: 0, unsettled: 0, net: 0 });
+            const lbl = { fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 };
+            const big = { fontSize: 22, fontWeight: 800, marginTop: 4, fontVariantNumeric: 'tabular-nums' };
+            const sub = { fontSize: 11, color: C.dim, marginTop: 2 };
+            const tile = (border) => ({ ...card, padding: 14, borderLeft: `4px solid ${border}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' });
+            return (
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+                <div {...clickable(() => go('/reports/sreg'))} style={tile(C.dark)}>
+                  <div style={lbl}>Total Sales Bills</div>
+                  <div style={{ ...big, color: C.dark }}>{money(cur, rt.billed)}</div>
+                  <div style={sub}>{rr.length} client(s) · gross billed <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+                <div {...clickable(() => go('/finance/receipt-register'))} style={tile(C.green)}>
+                  <div style={lbl}>Total Receipts</div>
+                  <div style={{ ...big, color: C.green }}>{money(cur, rt.settled)}</div>
+                  <div style={sub}>received against bills <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+                <div {...clickable(() => go('/reports/rec'))} style={tile(C.blue)}>
+                  <div style={lbl}>Total Unsettled Sales Bills</div>
+                  <div style={{ ...big, color: C.blue }}>{money(cur, rt.unsettled)}</div>
+                  <div style={sub}>open bill value <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+                <div {...clickable(() => go('/reports/rec'))} style={tile(rt.net >= 0 ? C.blue : C.red)}>
+                  <div style={lbl}>Client Net Due Receivable</div>
+                  <div style={{ ...big, color: rt.net >= 0 ? C.blue : C.red }}>{money(cur, rt.net)}</div>
+                  <div style={sub}>{rt.net >= 0 ? 'net to collect' : 'net advance held'} · open receivables <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Supplier headline totals — Purchase Bills vs Payments. Summed from the
+              SAME bill-wise payables rows that feed the party-wise panel below, so the
+              four tiles tie back exactly to that table's TOTAL footer. */}
+          <SecTitle>Suppliers — Purchase Bills vs Payments</SecTitle>
+          {(() => {
+            const pr = age.payables?.rows || [];
+            const pt = pr.reduce((a, r) => ({
+              billed: a.billed + (r.billed || 0),
+              settled: a.settled + (r.settled || 0),
+              unsettled: a.unsettled + (r.total || 0),
+              net: a.net + (r.net || 0),
+            }), { billed: 0, settled: 0, unsettled: 0, net: 0 });
+            const lbl = { fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 };
+            const big = { fontSize: 22, fontWeight: 800, marginTop: 4, fontVariantNumeric: 'tabular-nums' };
+            const sub = { fontSize: 11, color: C.dim, marginTop: 2 };
+            const tile = (border) => ({ ...card, padding: 14, borderLeft: `4px solid ${border}`, flex: '1 1 220px', minWidth: 200, cursor: 'pointer' });
+            return (
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+                <div {...clickable(() => go('/reports/preg'))} style={tile(C.dark)}>
+                  <div style={lbl}>Total Purchase Bills</div>
+                  <div style={{ ...big, color: C.dark }}>{money(cur, pt.billed)}</div>
+                  <div style={sub}>{pr.length} supplier(s) · gross billed <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+                <div {...clickable(() => go('/finance/payment-register'))} style={tile(C.green)}>
+                  <div style={lbl}>Total Payments</div>
+                  <div style={{ ...big, color: C.green }}>{money(cur, pt.settled)}</div>
+                  <div style={sub}>paid against bills <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+                <div {...clickable(() => go('/reports/pay'))} style={tile(C.amber)}>
+                  <div style={lbl}>Total Unsettled Purchase Bills</div>
+                  <div style={{ ...big, color: C.amber }}>{money(cur, pt.unsettled)}</div>
+                  <div style={sub}>open bill value <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+                <div {...clickable(() => go('/reports/pay'))} style={tile(pt.net >= 0 ? C.red : C.green)}>
+                  <div style={lbl}>Supplier Net Due Payable</div>
+                  <div style={{ ...big, color: pt.net >= 0 ? C.red : C.green }}>{money(cur, pt.net)}</div>
+                  <div style={sub}>{pt.net >= 0 ? 'net to pay' : 'net advance'} · open payables <ArrowRight size={11} style={{ verticalAlign: 'middle' }} /></div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Party-wise settlement — clients | suppliers, side by side */}
+          <SecTitle>Settlement — Bills vs Receipts &amp; Payments (party-wise)</SecTitle>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
+            <SettlementPanel
+              title="Clients — unsettled bills vs receipts"
+              sub="Billed to customer vs received · net to collect · tap a row to open the client"
+              rows={age.receivables?.rows || []}
+              cur={cur} tone={C.blue} partyLabel="Customer" settleLabel="Receipts"
+              drillLabel="Receivables" onDrill={() => go('/reports/rec')}
+              drill360="/reports/customer-360" go={go}
+            />
+            <SettlementPanel
+              title="Suppliers — unsettled bills vs payments"
+              sub="Billed by supplier vs paid · net to pay · tap a row to open the supplier"
+              rows={age.payables?.rows || []}
+              cur={cur} tone={C.amber} partyLabel="Supplier" settleLabel="Payments"
+              drillLabel="Payables" onDrill={() => go('/reports/pay')}
+              drill360="/reports/supplier-360" go={go}
+            />
+          </div>
+
+          {/* On-account / unallocated — receipts | payments, side by side */}
+          <SecTitle>On-Account / Unallocated — Receipts vs Payments</SecTitle>
+          <AdvancesPanel branch={branch} cur={cur} go={go} side="both" />
+
+          {/* Refunds / reissues / ADM / ACM awaiting posting */}
+          <SecTitle>Refunds &amp; Adjustments</SecTitle>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
+            <RefundsWorklist branch={branch} cur={cur} go={go} />
+          </div>
+
+          {/* Action boards — overdue debtors (collect) | top creditors (pay), side by side */}
+          <SecTitle>Worklist — Collect vs Pay</SecTitle>
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-            {/* Top overdue debtors collection board with INLINE notes */}
             <div style={{ ...card, padding: 12, flex: '1 1 400px', minWidth: 320 }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span>Top overdue debtors — collections followup</span>
@@ -414,12 +1641,12 @@ export function DashboardAccountant({ branch, setRoute }) {
               {top5rec.map((r, i) => (
                 <div key={i} style={{ padding: '8px 0', borderTop: i ? '1px solid #dfe2e7' : 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 12, color: C.dark, fontWeight: 700 }}>{r.party}</span>
+                    <span {...clickable(() => go(`/reports/customer-360?party=${encodeURIComponent(r.party)}`))} style={{ fontSize: 12, color: C.dark, fontWeight: 700, cursor: 'pointer' }}>{r.party}<span style={{ color: C.blue, fontWeight: 800, marginLeft: 4 }}>›</span></span>
                     <span style={{ fontSize: 12, fontWeight: 800, color: C.red }}>{money(cur, r.overdue)}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={editingNotes[r.party] !== undefined ? editingNotes[r.party] : (savedNotes[r.party] || '')}
                       onChange={(e) => setEditingNotes({ ...editingNotes, [r.party]: e.target.value })}
                       onBlur={() => {
@@ -438,7 +1665,6 @@ export function DashboardAccountant({ branch, setRoute }) {
               ))}
             </div>
 
-            {/* Top creditors to reconcile and pay */}
             <div style={{ ...card, padding: 12, flex: '1 1 350px', minWidth: 300 }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span>Top creditors — reconcile &amp; pay</span>
@@ -447,7 +1673,7 @@ export function DashboardAccountant({ branch, setRoute }) {
               {top5pay.length === 0 && <div style={{ fontSize: 12, color: C.green, padding: 10 }}>✓ No outstanding bills to pay.</div>}
               {top5pay.map((r, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
-                  <span style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600 }}>{r.party}</span>
+                  <span {...clickable(() => go(`/reports/supplier-360?party=${encodeURIComponent(r.party)}`))} style={{ flex: 1, fontSize: 12, color: C.dark, fontWeight: 600, cursor: 'pointer' }}>{r.party}<span style={{ color: C.amber, fontWeight: 800, marginLeft: 4 }}>›</span></span>
                   <span style={{ fontSize: 12, fontWeight: 800, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{money(cur, r.total)}</span>
                   <button onClick={() => go('/payments')} style={{ ...aBtn(C.amber), padding: '3px 8px', fontSize: 10 }}>Pay</button>
                 </div>
@@ -457,7 +1683,7 @@ export function DashboardAccountant({ branch, setRoute }) {
         </>
       )}
 
-      {/* TAB 3: MONTH-END & COMPLIANCE */}
+      {/* TAB 5: COMPLIANCE */}
       {activeTab === 'compliance' && (
         <>
           {/* New Live Self-Audit Warning Alerts */}
@@ -500,6 +1726,9 @@ export function DashboardAccountant({ branch, setRoute }) {
             <Tile icon={<CheckSquare size={13} />} label="Trial Balance" value={tbBalanced ? '✓ Balanced' : (tb.length ? '✗ Out' : '—')} sub={tb.length && !tbBalanced ? `out by ${money(cur, Math.abs(tbDr - tbCr))}` : 'open trial balance'} tone={tbBalanced ? C.green : (tb.length ? C.red : C.dim)} onClick={() => go('/finance/trial-balance')} loading={tbQ.isLoading} />
           </Row>
 
+          {/* Tier 2.4 — output tax vs input credit → net liability + 2B match */}
+          <GstItcPanel branch={branch} cur={cur} go={go} from={from} to={to} />
+
           {/* New tax events compliance list */}
           {taxEvents && taxEvents.length > 0 && (
             <>
@@ -529,12 +1758,11 @@ export function DashboardAccountant({ branch, setRoute }) {
             </>
           )}
 
-          <SecTitle>Performance Metrics (This Month)</SecTitle>
-          <Row>
-            <Tile icon={<TrendingUp size={13} />} label="Sales (this month)" value={money(cur, salesSumQ.data?.total || 0)} sub="Open Sales Register" tone={C.green} onClick={() => go('/reports/sreg')} loading={salesSumQ.isLoading} />
-            <Tile icon={<TrendingDown size={13} />} label="Purchase (this month)" value={money(cur, purchSumQ.data?.total || 0)} sub="Open Purchase Register" tone={C.amber} onClick={() => go('/reports/preg')} loading={purchSumQ.isLoading} />
-            <Tile icon={<ReceiptText size={13} />} label="Invoice-wise GP" value="View" sub="Open GP report" tone={C.dark} onClick={() => go('/reports/invoice-gp')} />
-          </Row>
+          {/* Tier 3.7 — full P&L snapshot (revenue · COGS · GP · expenses · net profit) */}
+          <BranchPnlSnapshot branch={branch} cur={cur} go={go} />
+
+          {/* Tier 3.9 — tax-readiness gaps in the customer / supplier masters */}
+          <MasterHealth branch={branch} go={go} />
 
           {/* Month-End Close progress checklist embedded */}
           <SecTitle>Month-End Checklist / Close Verification</SecTitle>

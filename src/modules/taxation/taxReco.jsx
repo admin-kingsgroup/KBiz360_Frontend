@@ -6,7 +6,7 @@ import { useTaxReco, useUpsertTaxFigure } from '../../core/useTaxReco';
 import { bc } from '../../core/styles';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
-const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
+const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString((cur === '₹' || cur === '₨' || cur === 'Rs') ? 'en-IN' : 'en-US');
 const thisYM = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 
 // India branches see the GST/TDS modes; Africa (VAT) branches see VAT vs books.

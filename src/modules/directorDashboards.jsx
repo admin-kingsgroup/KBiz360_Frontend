@@ -30,7 +30,7 @@ const branchList = () => (LIVE_BRANCHES || []).filter((b) => b && b.code && b.co
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const r0 = (n) => Math.round(Number(n) || 0);
-const money = (cur, n) => (n < 0 ? '-' : '') + (cur || '₹') + Math.abs(r0(n)).toLocaleString('en-IN');
+const money = (cur, n) => { const c = cur || '₹'; const loc = (c === '₹' || c === '₨' || c === 'Rs') ? 'en-IN' : 'en-US'; return (n < 0 ? '-' : '') + c + Math.abs(r0(n)).toLocaleString(loc); };
 const pct = (n) => (Number(n) || 0).toFixed(1) + '%';
 const pad2 = (n) => String(n).padStart(2, '0');
 const iso = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -96,6 +96,9 @@ function usePeriod(def = 'all') {
 export function ExecutiveOverview({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
+  // Consolidated = Group/ALL scope: render the money KPIs PER BRANCH (each in its own
+  // currency), never one merged cross-branch ₹ total. Driven by each hook's `byBranch`.
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
   const plQ = useProfitAndLoss(branch, range); const pl = plQ.data || {};
   const mplQ = useModulePL(branch, { ...range, summary: true }); const mpl = mplQ.data || {};
   const bsQ = useBalanceSheet(branch, { to: range.to }); const bs = bsQ.data || {};
@@ -138,9 +141,73 @@ export function ExecutiveOverview({ branch, go }) {
     else alerts.push(['good', 'No exceptions — books look healthy for this period.']);
   }
 
+  // ── Per-branch money KPIs (Group/ALL scope only) ──
+  // Stitch each money KPI from the matching hook's `byBranch` slice so every branch's
+  // Revenue/GP/NP/Cash/Receivables/Payables/Tax prints in its OWN currency — never a
+  // merged cross-currency ₹ sum. Keyed by branch code.
+  const liquidOf = (rows) => (rows || []).filter(isLiquidRow).reduce((s, r) => s + ((r.closingDebit || 0) - (r.closingCredit || 0)), 0);
+  const perBranchKpis = useMemo(() => {
+    if (!isAll) return [];
+    const find = (arr, code) => (Array.isArray(arr) ? arr.find((x) => x.branch === code) : null) || {};
+    const codes = [...new Set([
+      ...(Array.isArray(mpl.byBranch) ? mpl.byBranch : []).map((b) => b.branch),
+      ...(Array.isArray(pl.byBranch) ? pl.byBranch : []).map((b) => b.branch),
+      ...(Array.isArray(trial.byBranch) ? trial.byBranch : []).map((b) => b.branch),
+      ...(Array.isArray(bs.byBranch) ? bs.byBranch : []).map((b) => b.branch),
+      ...(Array.isArray(age.byBranch) ? age.byBranch : []).map((b) => b.branch),
+    ])].filter(Boolean).sort();
+    return codes.map((code) => {
+      const m = find(mpl.byBranch, code);
+      const p2 = find(pl.byBranch, code);
+      const tr = find(trial.byBranch, code);
+      const b = find(bs.byBranch, code);
+      const a = find(age.byBranch, code);
+      const tx = find(tax.byBranch, code);
+      const bSales = m?.totals?.sales || 0, bGp = m?.totals?.gp || 0;
+      const bLiquid = Array.isArray(tr?.rows)
+        ? liquidOf(tr.rows)
+        : (b.assets || []).filter((g) => /cash|bank/i.test(g.group || '')).reduce((s, g) => s + (g.amount || 0), 0);
+      return {
+        code, cur: (bc({ code }) || {}).cur || '₹',
+        sales: bSales, gp: bGp,
+        net: p2?.netProfit || 0,
+        cash: bLiquid,
+        ar: a?.receivables?.totals?.total || 0,
+        arOverdue: a?.receivables?.totals?.d90 || 0,
+        ap: a?.payables?.totals?.total || 0,
+        taxNet: tx?.netPayable || 0,
+      };
+    });
+  }, [isAll, mpl.byBranch, pl.byBranch, trial.byBranch, bs.byBranch, age.byBranch, tax.byBranch]);
+
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Executive Overview" sub={`Whole-company snapshot · ${range.label}`} branch={branch} p={p} />
+      {isAll ? (
+        <>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: C.dim, margin: '2px 2px 8px' }}>
+            Group money KPIs — per branch, each in its own currency · no cross-currency total
+          </div>
+          {perBranchKpis.length === 0 && <div style={{ padding: '14px 2px', fontSize: 12.5, color: C.dim }}>No branch data for this period.</div>}
+          {perBranchKpis.map((r) => (
+            <div key={r.code} style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '2px 2px 8px', borderBottom: `2px solid ${C.blue}`, paddingBottom: 4 }}>
+                <span style={{ fontWeight: 800, fontSize: 14, color: C.dark }}>{r.code}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.dim }}>· {r.cur}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <KPI label="Revenue" value={money(r.cur, r.sales)} onClick={go && (() => go('/dashboards/sales'))} />
+                <KPI label="Gross Profit" value={money(r.cur, r.gp)} sub={pct(r.sales ? (r.gp / r.sales) * 100 : 0) + ' margin'} tone={r.gp < 0 ? 'bad' : 'good'} onClick={go && (() => go('/dashboards/module-gp'))} />
+                <KPI label="Net Profit" value={money(r.cur, r.net)} tone={r.net < 0 ? 'bad' : 'good'} onClick={go && (() => go('/dashboards/profitability'))} />
+                <KPI label="Cash & Bank" value={money(r.cur, r.cash)} tone={r.cash < 0 ? 'bad' : undefined} onClick={go && (() => go('/dashboards/cash'))} />
+                <KPI label="Receivables" value={money(r.cur, r.ar)} sub={r.arOverdue ? `${money(r.cur, r.arOverdue)} overdue 90+` : 'current'} tone={r.arOverdue ? 'bad' : undefined} onClick={go && (() => go('/dashboards/arap'))} />
+                <KPI label="Payables" value={money(r.cur, r.ap)} onClick={go && (() => go('/dashboards/arap'))} />
+                <KPI label="GST/VAT Net" value={money(r.cur, r.taxNet)} sub={r.taxNet >= 0 ? 'payable' : 'refundable'} onClick={go && (() => go('/dashboards/tax'))} />
+              </div>
+            </div>
+          ))}
+        </>
+      ) : (
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <KPI label="Revenue" value={money(cur, sales)} delta={dSales} onClick={go && (() => go('/dashboards/sales'))} />
         <KPI label="Gross Profit" value={money(cur, gp)} sub={pct(sales ? (gp / sales) * 100 : 0) + ' margin'} tone={gp < 0 ? 'bad' : 'good'} onClick={go && (() => go('/dashboards/module-gp'))} />
@@ -151,6 +218,7 @@ export function ExecutiveOverview({ branch, go }) {
         <KPI label="GST/VAT Net" value={money(cur, tax?.netPayable || 0)} sub={(tax?.netPayable || 0) >= 0 ? 'payable' : 'refundable'} onClick={go && (() => go('/dashboards/tax'))} />
         <KPI label="Pending Approvals" value={String(pend)} sub={money(cur, pendAmt)} tone={pend ? 'bad' : 'good'} onClick={go && (() => go('/dashboards/audit'))} />
       </div>
+      )}
 
       <Card title="⚠ Attention Needed">
         <div style={{ padding: '6px 0' }}>

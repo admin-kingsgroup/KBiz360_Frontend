@@ -6,23 +6,26 @@ import { useTrialBalance } from '../hooks/use-trial-balance';
 import { useFinanceStore } from '../store/finance.store';
 import { ALL_TIME_FROM, CUR_FY, CUR_QUARTER, CUR_MONTH, todayISO, fmtDate } from '../../../core/dates';
 import { toastError } from '../../../core/ux/toast';
+import { localeOf } from '../../../core/format';
+import { bc } from '../../../core/styleTokens';
 
-/* Money formatter — Indian grouping, currency symbol from the branch config.
+/* Money formatter — currency symbol + grouping locale from the branch config
+   (Indian lakh/crore for ₹, Western thousands for USD branches).
    Zero/empty renders as an em-dash so the grid reads cleanly. */
-const money = (cur, n) => (n ? `${cur}${Math.round(n).toLocaleString('en-IN')}` : '—');
+const money = (cur, n) => (n ? `${cur}${Math.round(n).toLocaleString(localeOf(cur))}` : '—');
+
+/* Currency symbol for a branch CODE (per-branch consolidated sections derive it
+   from the code; the top-level single-branch view gets it from the hook). */
+const curOfCode = (code) => bc({ code }).cur;
 
 /**
- * Trial Balance — LIVE from the double-entry engine (GET /api/accounting/trial-balance).
- * Thin page: orchestrates the server-state hook + the UI store + the reusable
- * PageLayout / DataTable. No seed data, no business-entity local state.
+ * Trial Balance for ONE scope (a single branch, or one branch-slice of the
+ * consolidated view) — the balanced banner + the ledger DataTable, all money in
+ * THIS scope's currency `cur`. Reused verbatim by the single-branch view and by
+ * every per-branch section, so the visuals/footers never diverge. A scope totals
+ * ONLY itself — there is never a cross-branch / cross-currency sum.
  */
-export function TrialBalancePage({ branch }) {
-  const { from, to, view, includeZero } = useFinanceStore((s) => s.trialBalance);
-  const setPeriod = useFinanceStore((s) => s.setTrialBalancePeriod);
-  const setView = useFinanceStore((s) => s.setTrialBalanceView);
-  const setIncludeZero = useFinanceStore((s) => s.setTrialBalanceIncludeZero);
-
-  const { data, isLoading, isError, error, refetch, currencySymbol: cur } = useTrialBalance(branch, { from, to, includeZero });
+function TrialBalanceScope({ data, cur, view, from, to, isLoading, isError, error, refetch }) {
   const rows = data?.rows ?? [];
 
   const sumFooter = (key) => (rs) => money(cur, rs.reduce((s, r) => s + (r[key] || 0), 0));
@@ -51,6 +54,74 @@ export function TrialBalancePage({ branch }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, cur]);
 
+  const balanced = data?.balanced ?? true;
+  const subtitle = data
+    ? `${data.rows.length} ledgers · Closing Dr ${money(cur, data.grandClosingDebit)} = Cr ${money(cur, data.grandClosingCredit)}`
+    : 'Live from the double-entry engine';
+
+  return (
+    <>
+      {/* Balanced banner — reflects the FULL trial balance for THIS scope */}
+      {data && (
+        balanced ? (
+          <div className="mb-3 flex items-center gap-2 rounded-brand border border-success/40 bg-success-soft px-3 py-2 text-xs font-semibold text-success">
+            <CheckCircle2 className="h-4 w-4" />
+            Trial Balance tallied — Dr {money(cur, data.grandClosingDebit)} = Cr {money(cur, data.grandClosingCredit)}
+          </div>
+        ) : (
+          <div className="mb-3 flex items-center gap-2 rounded-brand border border-danger/40 bg-danger-soft px-3 py-2 text-xs font-semibold text-danger">
+            <AlertTriangle className="h-4 w-4" />
+            Out of balance — Dr {money(cur, data.grandClosingDebit)} vs Cr {money(cur, data.grandClosingCredit)}
+          </div>
+        )
+      )}
+
+      <DataTable
+        columns={columns}
+        rows={rows}
+        loading={isLoading}
+        isError={isError}
+        error={error}
+        onRetry={() => Promise.resolve(refetch?.()).catch(() => toastError('Retry failed — still unable to load the trial balance.'))}
+        searchable
+        searchPlaceholder="Search ledger / group / code…"
+        stickyHeader
+        stickyFirstColumn
+        showColumnToggle
+        showDensityToggle
+        exportName={`trial-balance-${from}_${to}`}
+        printTitle="Trial Balance"
+        printSubtitle={subtitle}
+        dense
+        initialSort={{ key: 'group', dir: 'asc' }}
+        getRowKey={(r) => `${r.group}|${r.ledger}|${r.code}`}
+        emptyMessage="No ledger balances for this period."
+        emptyHint="Post some vouchers, or widen the date range."
+        title="Ledger balances"
+        subtitle={subtitle}
+      />
+    </>
+  );
+}
+
+/**
+ * Trial Balance — LIVE from the double-entry engine (GET /api/accounting/trial-balance).
+ * Thin page: orchestrates the server-state hook + the UI store + the reusable
+ * PageLayout / DataTable. No seed data, no business-entity local state.
+ */
+export function TrialBalancePage({ branch }) {
+  const { from, to, view, includeZero } = useFinanceStore((s) => s.trialBalance);
+  const setPeriod = useFinanceStore((s) => s.setTrialBalancePeriod);
+  const setView = useFinanceStore((s) => s.setTrialBalanceView);
+  const setIncludeZero = useFinanceStore((s) => s.setTrialBalanceIncludeZero);
+
+  const { data, isLoading, isError, error, refetch, currencySymbol: cur } = useTrialBalance(branch, { from, to, includeZero });
+
+  // Consolidated = the all-branches scope. Render branch-wise (each branch its own
+  // section in its own currency — never a merged cross-currency total), driven by the
+  // BE `byBranch` breakdown. Single-branch view is byte-for-byte the original path.
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
+
   const presets = [
     { label: 'All', from: ALL_TIME_FROM, to: todayISO() },
     { label: 'This FY', from: CUR_FY.startISO, to: todayISO() },
@@ -58,11 +129,6 @@ export function TrialBalancePage({ branch }) {
     { label: 'This Month', from: `${CUR_MONTH}-01`, to: `${CUR_MONTH}-31` },
   ];
   const isActivePreset = (p) => p.from === from && p.to === to;
-
-  const balanced = data?.balanced ?? true;
-  const subtitle = data
-    ? `${data.rows.length} ledgers · Closing Dr ${money(cur, data.grandClosingDebit)} = Cr ${money(cur, data.grandClosingCredit)}`
-    : 'Live from the double-entry engine';
 
   const filters = (
     <>
@@ -99,47 +165,39 @@ export function TrialBalancePage({ branch }) {
     </>
   );
 
+  const scopeProps = { view, from, to, isLoading, isError, error, refetch };
+
+  // Consolidated (all-branches): render EACH branch as its own section in its own
+  // currency. No money is ever summed across branches/currencies — each section
+  // totals only itself. Falls through to the single merged view if the BE didn't
+  // send a per-branch breakdown (older backend / single posted branch).
+  if (isAll && Array.isArray(data?.byBranch)) {
+    return (
+      <PageLayout title="Trial Balance" subtitle={`Live · ${fmtDate(from)} → ${fmtDate(to)} · All Branches`} filters={filters}>
+        <div className="mb-4 text-xs font-medium text-ink-subtle">
+          Consolidated — each branch shown separately in its own currency · <span className="font-semibold">no cross-currency total</span>
+        </div>
+        {data.byBranch.length === 0 && (
+          <div className="rounded-brand border border-surface-border bg-surface px-4 py-8 text-center text-sm text-ink-muted">
+            No ledger balances in any branch for this period.
+          </div>
+        )}
+        {data.byBranch.map((b) => (
+          <div key={b.branch} className="mb-8">
+            <div className="mb-2 flex items-baseline gap-2 border-b-2 border-navy pb-1">
+              <span className="text-sm font-extrabold text-ink">{b.branch || '—'}</span>
+              <span className="text-xs font-bold text-ink-muted">· {curOfCode(b.branch)}</span>
+            </div>
+            <TrialBalanceScope data={b} cur={curOfCode(b.branch)} {...scopeProps} />
+          </div>
+        ))}
+      </PageLayout>
+    );
+  }
+
   return (
     <PageLayout title="Trial Balance" subtitle={`Live · ${fmtDate(from)} → ${fmtDate(to)}`} filters={filters}>
-      {/* Balanced banner — reflects the FULL trial balance from the server */}
-      {data && (
-        balanced ? (
-          <div className="mb-3 flex items-center gap-2 rounded-brand border border-success/40 bg-success-soft px-3 py-2 text-xs font-semibold text-success">
-            <CheckCircle2 className="h-4 w-4" />
-            Trial Balance tallied — Dr {money(cur, data.grandClosingDebit)} = Cr {money(cur, data.grandClosingCredit)}
-          </div>
-        ) : (
-          <div className="mb-3 flex items-center gap-2 rounded-brand border border-danger/40 bg-danger-soft px-3 py-2 text-xs font-semibold text-danger">
-            <AlertTriangle className="h-4 w-4" />
-            Out of balance — Dr {money(cur, data.grandClosingDebit)} vs Cr {money(cur, data.grandClosingCredit)}
-          </div>
-        )
-      )}
-
-      <DataTable
-        columns={columns}
-        rows={rows}
-        loading={isLoading}
-        isError={isError}
-        error={error}
-        onRetry={() => Promise.resolve(refetch()).catch(() => toastError('Retry failed — still unable to load the trial balance.'))}
-        searchable
-        searchPlaceholder="Search ledger / group / code…"
-        stickyHeader
-        stickyFirstColumn
-        showColumnToggle
-        showDensityToggle
-        exportName={`trial-balance-${from}_${to}`}
-        printTitle="Trial Balance"
-        printSubtitle={subtitle}
-        dense
-        initialSort={{ key: 'group', dir: 'asc' }}
-        getRowKey={(r) => `${r.group}|${r.ledger}|${r.code}`}
-        emptyMessage="No ledger balances for this period."
-        emptyHint="Post some vouchers, or widen the date range."
-        title="Ledger balances"
-        subtitle={subtitle}
-      />
+      <TrialBalanceScope data={data} cur={cur} {...scopeProps} />
     </PageLayout>
   );
 }

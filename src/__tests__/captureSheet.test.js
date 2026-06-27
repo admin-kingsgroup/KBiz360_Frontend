@@ -23,17 +23,32 @@ const saleVoucher = {
 const keyset = (sheet) => sheet.columns.map((c) => c.key);
 
 describe('buildCaptureSheet — register capture columns & row refs', () => {
-  test('All modules: Sales Type then INT/DOM sit (in order) before Client Type', () => {
+  test('Lead columns follow the fixed business order (Date ▸ Sales Type ▸ Ledger ▸ Invoice Value ▸ Link No ▸ Sales Invoice No ▸ Purchase Invoice No)', () => {
+    const sheet = buildCaptureSheet([saleVoucher], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: true });
+    expect(keyset(sheet).slice(0, 7)).toEqual([
+      'saleDate', 'salesType', 'clientLedger', 'finalValue', 'linkNo', 'saleVno', 'purVno',
+    ]);
+    expect(sheet.rows[0].salesType).toBe('Flight'); // productOf(SF)
+  });
+
+  test('Purchase register: same lead order, labelled for the purchase side', () => {
+    const purVoucher = { ...saleVoucher, vno: 'PF1', type: 'PF' };
+    const sheet = buildCaptureSheet([purVoucher], { tab: 'purchase', tag: 'BOM', linkIndex, bookingByLink, showType: true });
+    expect(keyset(sheet).slice(0, 7)).toEqual([
+      'saleDate', 'salesType', 'clientLedger', 'finalValue', 'linkNo', 'saleVno', 'purVno',
+    ]);
+    expect(sheet.columns.find((c) => c.key === 'saleDate').label).toBe('Purchase Date');
+    expect(sheet.columns.find((c) => c.key === 'salesType').label).toBe('Purchase Type');
+    expect(sheet.columns.find((c) => c.key === 'clientLedger').label).toBe('Vendor Ledger');
+    expect(sheet.columns.find((c) => c.key === 'finalValue').label).toBe('Final Bill Value');
+  });
+
+  test('All modules: INT/DOM is present and carries the route class', () => {
     const sheet = buildCaptureSheet([saleVoucher], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: true });
     const keys = keyset(sheet);
-    expect(keys).toContain('salesType');
     expect(keys).toContain('intDom');
-    // order: salesType → intDom → clientType
-    expect(keys.indexOf('salesType')).toBe(keys.indexOf('intDom') - 1);
-    expect(keys.indexOf('intDom')).toBe(keys.indexOf('clientType') - 1);
-    expect(sheet.columns.find((c) => c.key === 'salesType').label).toBe('Sales Type');
+    expect(keys.indexOf('intDom')).toBe(keys.indexOf('clientType') - 1); // INT/DOM still sits just before Client Type
     expect(sheet.columns.find((c) => c.key === 'intDom').label).toBe('INT / DOM');
-    expect(sheet.rows[0].salesType).toBe('Flight'); // productOf(SF)
     expect(sheet.rows[0].intDom).toBe('INT');         // IT- ledger prefix
   });
 
@@ -43,10 +58,11 @@ describe('buildCaptureSheet — register capture columns & row refs', () => {
     expect(sheet.rows[0].intDom).toBe('DOM');
   });
 
-  test('Single module (showType false): no Sales Type / INT-DOM columns', () => {
+  test('Single module (showType false): Sales Type stays (always shown), only INT/DOM drops', () => {
     const sheet = buildCaptureSheet([saleVoucher], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: false });
-    expect(keyset(sheet)).not.toContain('salesType');
-    expect(keyset(sheet)).not.toContain('intDom');
+    expect(keyset(sheet)).toContain('salesType');     // Sales Type is now always the 2nd column
+    expect(keyset(sheet)[1]).toBe('salesType');
+    expect(keyset(sheet)).not.toContain('intDom');    // INT/DOM remains All-modules only
   });
 
   test('Refund (RF) / Reissue (RI) vouchers label as Refund / Reissue in the type column', () => {
@@ -76,12 +92,11 @@ describe('buildCaptureSheet — register capture columns & row refs', () => {
     expect(pur.rows[0].saleDate).toBe('16-Mar-26');
   });
 
-  test('Tally Ref columns sit beside each invoice no and carry sourceRef (sale + purchase)', () => {
+  test('Tally Ref columns sit together (sale then purchase) and carry sourceRef', () => {
     // Sale tab: own sourceRef → saleTallyRef; linked purchase's → purTallyRef.
     const sale = buildCaptureSheet([{ ...saleVoucher, sourceRef: 'IS/01' }], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: true });
     const keys = keyset(sale);
-    expect(keys.indexOf('saleTallyRef')).toBe(keys.indexOf('saleVno') + 1);
-    expect(keys.indexOf('purTallyRef')).toBe(keys.indexOf('purVno') + 1);
+    expect(keys.indexOf('purTallyRef')).toBe(keys.indexOf('saleTallyRef') + 1); // refs are adjacent in the trailing block
     expect(sale.columns.find((c) => c.key === 'saleTallyRef').label).toBe('Sales Tally Ref');
     expect(sale.columns.find((c) => c.key === 'purTallyRef').label).toBe('Purchase Tally Ref');
     expect(sale.rows[0].saleTallyRef).toBe('IS/01');           // own voucher

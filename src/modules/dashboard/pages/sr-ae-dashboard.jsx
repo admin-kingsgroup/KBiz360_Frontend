@@ -8,7 +8,6 @@ import { PageLayout } from '../../../shell/PageLayout';
 import { ResponsiveGrid } from '../../../shell/primitives';
 import { useSrAeDashboard } from '../hooks/use-sr-ae-dashboard';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
-import { useDashboardStore } from '../store/dashboard.store';
 import { TodayVouchersTable } from '../components/tables/TodayVouchersTable';
 import { BankReconStatusPanel } from '../components/shared/BankReconStatusPanel';
 import { CloseChecklist } from '../components/shared/CloseChecklist';
@@ -21,8 +20,6 @@ export function SrAeDashboardPage({ currentUser, setRoute, branch }) {
   const branchCode = branch === 'ALL' ? null : branch?.code;
   const { data, todayTotal, todayValue, isLoading, isError, error, refetch } = useSrAeDashboard(branchCode);
   const { navigate } = useDashboardActions(setRoute);
-  const period = useDashboardStore((s) => s.period);
-  const setPeriod = useDashboardStore((s) => s.setPeriod);
   const money = (n) => compactAmt(n, { currency: bc(branch).cur });
 
   if (isError && !data) {
@@ -40,8 +37,6 @@ export function SrAeDashboardPage({ currentUser, setRoute, branch }) {
         title="Senior Accounts Executive Dashboard"
         subtitle="Throughput · approvals · close progress"
         user={currentUser}
-        period={period}
-        setPeriod={setPeriod}
         onExport={() => openPrintPreview({ selector: 'main', title: 'Senior Accounts Executive Dashboard', recommend: 'portrait' })}
       />
 

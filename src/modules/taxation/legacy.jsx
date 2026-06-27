@@ -5,7 +5,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, Calendar, Download, Plus, Settings, Users } from 'lucide-react';
-import { useGpBills } from '../../core/useAccounting';
+import { useGpBills, useRcmLiability } from '../../core/useAccounting';
 import { useTaxCalendar } from '../../core/useReference';
 import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY, fyOptions, rangeNote } from '../../core/dates';
 import { fmt, fmtINR } from '../../core/format';
@@ -15,6 +15,7 @@ import { useModalEsc } from '../../core/ux/useModalEsc';
 import { clickable } from '../../core/ux/clickable';
 import { listKeyNav } from '../../core/ux/listKeys';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, tabBtnStyle } from '../../core/styles';
+import { MiniBar, share, pctText } from '../../core/insightsUI';
 import { TDS_SECTIONS } from '../finance';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { openPrintPreview } from '../../core/PrintPreview';
@@ -22,7 +23,7 @@ import { SampleBanner } from '../../core/ux/SampleBanner';
 
 export function TaxShell({title,subtitle,children,action}){
   return (
-    <div style={{padding:"12px 10px",maxWidth:1260,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:14,flexWrap:"wrap",gap:10}}>
         <div>
           <p style={{margin:0,fontSize:9.5,color:"#5a6691",letterSpacing:"0.5px",textTransform:"uppercase"}}>Taxation</p>
@@ -65,7 +66,7 @@ export function TaxGstr1({branch}){
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>GSTR-1 — Outward Supplies</h2>
@@ -172,7 +173,7 @@ export function TaxGstr3b({branch}){
   ];
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:900,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>GSTR-3B — Monthly Summary</h2>
@@ -193,7 +194,9 @@ export function TaxGstr3b({branch}){
         <div style={{...card,borderTop:"3px solid #185FA5",padding:"11px 13px",background:"#E6F1FB"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#185FA5",textTransform:"uppercase"}}>CGST</p><p style={{margin:"4px 0 0",fontSize:19,fontWeight:800,color:"#0d1326"}}>{f(cgst)}</p></div>
         <div style={{...card,borderTop:"3px solid #185FA5",padding:"11px 13px",background:"#E6F1FB"}}><p style={{margin:0,fontSize:9,fontWeight:700,color:"#185FA5",textTransform:"uppercase"}}>SGST</p><p style={{margin:"4px 0 0",fontSize:19,fontWeight:800,color:"#0d1326"}}>{f(sgst)}</p></div>
       </div>
-      {rows.map((sec,si)=>(
+      {rows.map((sec,si)=>{
+        const secTotal=sec.items.find(x=>x.bold)?.v||sec.items.reduce((s,x)=>s+(x.v||0),0);
+        return (
         <div key={si} style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
           <div style={{padding:"9px 14px",background:"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
             <p style={{margin:0,fontSize:11,fontWeight:700,color:"#384677"}}>{sec.section}</p>
@@ -206,11 +209,18 @@ export function TaxGstr3b({branch}){
                 <td style={{padding:"9px 14px",textAlign:"right",fontWeight:r.bold?800:500,
                   fontVariantNumeric:"tabular-nums",color:r.bold?"#A32D2D":"#384677",
                   fontSize:r.bold?13:11.5}}>₹{Number(Math.round(r.v)).toLocaleString("en-IN")}</td>
+                <td style={{padding:"9px 14px",width:160}}>{!r.bold&&secTotal?(
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:10,color:"#5a6691",width:38,textAlign:"right",flexShrink:0,fontVariantNumeric:"tabular-nums"}}>{pctText(share(r.v,secTotal))}</span>
+                    <div style={{flex:1,minWidth:30}}><MiniBar pct={share(r.v,secTotal)} tone="cogs"/></div>
+                  </div>
+                ):null}</td>
               </tr>
             ))}</tbody>
           </table>
         </div>
-      ))}
+        );
+      })}
       <div style={{...card,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:10,color:"#185FA5"}}>
         Interest 18% p.a. if payment is late. Penalty ₹50/day per return (CGST+SGST) for late filing.
         Ensure GSTR-1 is filed before GSTR-3B so buyers&apos; ITC is auto-populated in their GSTR-2B.
@@ -225,23 +235,21 @@ export function TaxRcm({branch}){
   const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
-  const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
 
-  /* Identify RCM entries: overseas DMC purchases + GDS charges */
-  const rcmEntries=useMemo(()=>{
-    const OVERSEAS_SUPPLIERS=[]; // TODO: flag overseas suppliers in the supplier master
-    return GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&
-      OVERSEAS_SUPPLIERS.some(s=>(b.supplier||'').includes(s.split(" ")[0]))).map(b=>{
-      const igst=Math.round(b.cost/(1+0.18)*0.18);
-      return {date:b.date,party:b.supplier,desc:`${b.mod} — ${b.dest}`,taxable:Math.round(b.cost/(1+0.18)),igst,status:"Paid",vno:b.id};
-    });
-  },[GP,brCode,period]); // GP must be a dep — else the register never recomputes once bills load
+  /* LIVE: reverse-charge liability on foreign-supplier purchases, from the books
+     (/api/accounting/rcm). Foreign suppliers are identified by their master country
+     (!= India) — replacing the old non-functional OVERSEAS_SUPPLIERS=[] stub. */
+  const monthEnd=(k)=>{const[y,m]=String(k).split('-').map(Number);return`${k}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;};
+  const rcm=useRcmLiability(branch,{from:`${period}-01`,to:monthEnd(period)}).data||{};
+  const rcmEntries=(rcm.entries||[]).map(e=>({
+    date:e.date,party:e.party,desc:e.country,taxable:e.taxable,igst:e.igst,status:"Liability",vno:e.vno,
+  }));
 
-  const tot=rcmEntries.reduce((s,r)=>s+r.igst,0);
+  const tot=rcm.igst||0;
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>RCM Register — Reverse Charge</h2>
@@ -257,12 +265,12 @@ export function TaxRcm({branch}){
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#0d1326"}}>
-            {["Date","Voucher No.","Overseas Supplier","Description","Taxable (₹)","IGST RCM (18%)","ITC Claimable","Status"].map((h,i)=>(
+            {["Date","Voucher No.","Overseas Supplier","Description","Taxable (₹)","IGST RCM (18%)","ITC Claimable","Status","Share of RCM"].map((h,i)=>(
               <th key={i} style={{padding:"9px 11px",textAlign:i>=4&&i<=5?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
           <tbody>
-            {rcmEntries.length===0&&<tr><td colSpan={8} style={{padding:"24px",textAlign:"center",color:"#5a6691"}}>No RCM entries for this period</td></tr>}
+            {rcmEntries.length===0&&<tr><td colSpan={9} style={{padding:"24px",textAlign:"center",color:"#5a6691"}}>No RCM entries for this period</td></tr>}
             {rcmEntries.map((r,i)=>(
               <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"9px 11px",color:"#5a6691"}}>{r.date}</td>
@@ -273,6 +281,12 @@ export function TaxRcm({branch}){
                 <td style={{padding:"9px 11px",textAlign:"right",fontWeight:700,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{f(r.igst)}</td>
                 <td style={{padding:"9px 11px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700}}>Yes</span></td>
                 <td style={{padding:"9px 11px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700}}>{r.status}</span></td>
+                <td style={{padding:"9px 11px",minWidth:130}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:10,color:"#5a6691",width:40,textAlign:"right",flexShrink:0,fontVariantNumeric:"tabular-nums"}}>{pctText(share(r.igst,tot))}</span>
+                    <div style={{flex:1,minWidth:36}}><MiniBar pct={share(r.igst,tot)} tone="cogs"/></div>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -281,6 +295,7 @@ export function TaxRcm({branch}){
             <td style={{padding:"9px 11px",textAlign:"right",fontWeight:700,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(rcmEntries.reduce((s,r)=>s+r.taxable,0))}</td>
             <td style={{padding:"9px 11px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(tot)}</td>
             <td colSpan={2}/>
+            <td style={{padding:"9px 11px",textAlign:"right",fontWeight:700,color:"#d4a437"}}>100%</td>
           </tr></tfoot>}
         </table>
       </div>
@@ -307,7 +322,7 @@ export function TaxVat({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>VAT Returns</h2>
@@ -445,7 +460,7 @@ export function TaxCalendar(){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1000,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📅</div>
@@ -496,26 +511,23 @@ export function GstrRecon({branch}){
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
 
-  /* Simulate GSTR-2B data vs books */
+  /* A TRUE GSTR-2B reconciliation needs the taxpayer's DOWNLOADED 2B JSON imported,
+     which the ERP doesn't yet hold. So we do NOT fabricate the 2B side (the old code
+     simulated a 1-in-3 mismatch and raised a bogus "reverse ITC before filing"
+     warning off invented numbers). The books-side ITC below is a real estimate from
+     posted purchase bills; the 2B column stays blank until a 2B import lands. */
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&["BSP India","Emirates GSA","Bali Tours DMC"].includes(b.supplier));
-  const recon=bills.map((b,i)=>{
-    const itcBooks=Math.round(b.cost/(1+0.18)*0.18);
-    const gstr2bAmt=i%3===1?Math.round(itcBooks*0.85):itcBooks; // simulate 1-in-3 mismatch
-    const diff=itcBooks-gstr2bAmt;
-    return {
-      supplier:b.supplier,gstin:"07AABCX****1Z5",invoiceNo:b.id,period:b.date,
-      itcBooks,gstr2bAmt,diff,
-      status:Math.abs(diff)<10?"Matched":diff>0?"Excess in Books":"Excess in 2B",
-    };
-  });
-
-  const matched=recon.filter(r=>r.status==="Matched").length;
-  const excess=recon.filter(r=>r.status==="Excess in Books").reduce((s,r)=>s+r.diff,0);
-  const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
+  const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&(+b.cost||0)>0);
+  const recon=bills.map((b)=>({
+    supplier:b.supplier||'—', gstin:'—', invoiceNo:b.id, period:b.date,
+    itcBooks:Math.round((+b.cost||0)/(1+0.18)*0.18), gstr2bAmt:null, diff:null,
+    status:'2B not imported',
+  }));
+  const itcBooksTotal=recon.reduce((s,r)=>s+r.itcBooks,0);
+  const f=n=>"₹"+Number(Math.round(n||0)).toLocaleString("en-IN");
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔄</div>
@@ -529,16 +541,15 @@ export function GstrRecon({branch}){
         </select>
       </div>
 
-      {excess>0&&<div style={{marginBottom:12,padding:"10px 14px",borderRadius:9,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:10.5,color:"#A32D2D",fontWeight:600,display:"flex",gap:8}}>
-        <AlertTriangle size={15}/> ₹{excess.toLocaleString()} ITC excess claimed in books vs GSTR-2B — reverse this before filing GSTR-3B to avoid notices.
-      </div>}
+      <div style={{marginBottom:12,padding:"10px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775",fontSize:10.5,color:"#854F0B",fontWeight:600,display:"flex",gap:8}}>
+        <AlertTriangle size={15}/> GSTR-2B is not yet imported, so this is NOT a reconciliation — the “ITC in 2B” / difference / match columns are blank. The “ITC in books” below is an estimate from posted purchase bills. Import the downloaded 2B JSON to reconcile.
+      </div>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-        {[{l:"Total Entries",v:String(recon.length),c:"#384677",bg:"#f3f4f8"},
-          {l:"Matched",v:String(matched),c:"#27500A",bg:"#EAF3DE"},
-          {l:"Mismatched",v:String(recon.length-matched),c:"#A32D2D",bg:"#FCEBEB"},
-          {l:"Excess ITC Claimed",v:f(Math.max(excess,0)),c:"#A32D2D",bg:"#FCEBEB"},
-          {l:"ITC Reversal Required",v:f(Math.max(excess,0)),c:"#854F0B",bg:"#FAEEDA"},
+        {[{l:"Purchase Bills (period)",v:String(recon.length),c:"#384677",bg:"#f3f4f8"},
+          {l:"ITC in Books (est.)",v:f(itcBooksTotal),c:"#27500A",bg:"#EAF3DE"},
+          {l:"ITC in GSTR-2B",v:"— import 2B",c:"#5a6691",bg:"#f3f4f8"},
+          {l:"Reconciliation",v:"Pending 2B import",c:"#854F0B",bg:"#FAEEDA"},
         ].map((k,i)=>(
           <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"11px 13px",background:k.bg}}>
             <p style={{margin:0,fontSize:9,fontWeight:700,color:k.c,textTransform:"uppercase"}}>{k.l}</p>
@@ -561,16 +572,12 @@ export function GstrRecon({branch}){
               <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{r.invoiceNo}</td>
               <td style={{padding:"8px 11px",color:"#5a6691"}}>{r.period}</td>
               <td style={{padding:"8px 11px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(r.itcBooks)}</td>
-              <td style={{padding:"8px 11px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(r.gstr2bAmt)}</td>
-              <td style={{padding:"8px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:Math.abs(r.diff)>10?"#A32D2D":"#27500A"}}>{r.diff>0?"+":""}{f(r.diff)}</td>
+              <td style={{padding:"8px 11px",textAlign:"right",color:"#5a6691"}}>—</td>
+              <td style={{padding:"8px 11px",textAlign:"right",color:"#5a6691"}}>—</td>
               <td style={{padding:"8px 11px"}}>
-                <span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,
-                  background:r.status==="Matched"?"#EAF3DE":"#FCEBEB",
-                  color:r.status==="Matched"?"#27500A":"#A32D2D"}}>{r.status}</span>
+                <span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}>{r.status}</span>
               </td>
-              <td style={{padding:"8px 11px"}}>
-                {r.status!=="Matched"&&<button style={{...btnGh,padding:"2px 8px",fontSize:9.5,color:"#854F0B"}}>Reverse ITC</button>}
-              </td>
+              <td style={{padding:"8px 11px",color:"#5a6691",fontSize:9.5}}>—</td>
             </tr>
           ))}</tbody>
         </table>
@@ -712,7 +719,7 @@ export function TaxTdsTcs({branch}){
   const markDeposited=(id)=>setTdsEntries(ts=>ts.map(t=>t.id===id?{...t,status:"Deposited",challanDate:"2026-05-"+new Date().getDate().toString().padStart(2,"0"),challanBsr:"0600115",challanSerial:String(Math.floor(Math.random()*90000)+10000)}:t));
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📋</div>
@@ -906,7 +913,7 @@ export function Form26AS({branch}){
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📑</div>
@@ -976,7 +983,7 @@ export function EWayBill({branch}){
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <SampleBanner note="e-way bills shown here are sample data, not live." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1086,7 +1093,7 @@ export function Gstr9c({branch,setRoute}){
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <SampleBanner note="GSTR-9C books-vs-returns reconciliation isn’t wired to live data yet." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
@@ -1196,7 +1203,7 @@ export function TaxAudit3CD({branch,setRoute}){
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <SampleBanner note="these cash-payment audit flags are sample data, not live." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
@@ -1294,12 +1301,12 @@ export function Gstr2aReco({branch,setRoute}){
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <SampleBanner note="GSTR-2A / 2B ITC matching isn’t wired to live data yet." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>🔁 GSTR-2A vs Purchase Register</h2>
-          <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Live supplier-by-supplier reconciliation · Chase missing ITC · Pre-filing check</p>
+          <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Supplier-by-supplier reconciliation (sample — not yet wired) · Chase missing ITC · Pre-filing check</p>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:7,fontSize:11.5}}>

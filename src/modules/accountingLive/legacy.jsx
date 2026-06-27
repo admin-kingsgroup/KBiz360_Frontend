@@ -15,6 +15,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { card, inp, bc } from '../../core/styles';
+import { localeOf } from '../../core/format';
 import { exportToExcel, vouchersToSheet } from '../../core/exportExcel';
 import { voucherHaystack, bookingTravelDetail } from '../../core/registerSearch';
 import { isVatBranch } from '../../core/voucherSpecs';
@@ -22,6 +23,8 @@ import { openPrintPreview } from '../../core/PrintPreview';
 import { buildBookingInvoice } from '../../core/invoiceHtml';
 import { useReportExport } from '../../core/reportExportContext';
 import { LedgerAccountView } from '../../core/ledgerUI';
+import { resolveLedgerSelection } from '../../core/ledgerPicker';
+import { LedgerPicker } from '../../core/voucher/LedgerPicker';
 import { openLedgerModal } from '../../core/LedgerModalHost';
 import { usePrefs } from '../../core/prefs';
 import { pushModal } from '../../core/ux/modalStore';
@@ -50,7 +53,7 @@ import { SkeletonTable } from '../../shell/primitives';
 
 const DARK = '#1a1c22', GOLD = '#c2a04a', DIM = '#5b616e', BLUE = '#2563eb', RED = '#dc2626', GREEN = '#16a34a';
 const curOf = (branch) => bc(branch).cur;
-const money = (cur, n) => { const v = Math.round(Number(n) || 0); return v ? cur + v.toLocaleString('en-IN') : '—'; };
+const money = (cur, n) => { const v = Math.round(Number(n) || 0); return v ? cur + v.toLocaleString(localeOf(cur)) : '—'; };
 const branchLabel = (branch) => (!branch || branch === 'ALL' ? CONSOLIDATED_LABEL : (branch.code || branch));
 
 /* ── shared chrome ──────────────────────────────────────────────────── */
@@ -159,7 +162,7 @@ export function VoucherLines({ voucher: v, cur }) {
   if (!v) return null;
   // The shared `money` renders 0 as '—'; the JV must show a real ₹0 on the empty side
   // so EVERY ledger is visible with an explicit amount.
-  const money0 = (n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
+  const money0 = (n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
   const F = ({ label, val }) => (
     <div style={{ minWidth: 110 }}>
       <div style={{ fontSize: 9, color: DIM, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{label}</div>
@@ -807,22 +810,19 @@ export function DayBookLive({ branch }) {
    every drill — one design, live data, identical print. */
 export function LedgerAcLive({ branch }) {
   const cur = curOf(branch);
-  const chart = useChartOfAccounts(branch);
-  const ledgers = chart.data || [];
-  const { prefs, setPref } = usePrefs();
-  const [name, setName] = useState('');
-  // Selection priority: explicit pick → last-opened (per-user pref) → first ledger.
-  const selected = name || prefs.lastLedger || ledgers[0]?.name || '';
-  const pickLedger = (n) => { setName(n); if (n) setPref('lastLedger', n); };
-  // Group + cascading Sub-Group filter to narrow the (long) ledger dropdown.
-  const [groupFilter, setGroupFilter] = useState('');
-  const [subGroupFilter, setSubGroupFilter] = useState('');
-  const allGroups = useMemo(() => [...new Set(ledgers.map((l) => l.group).filter(Boolean))].sort(), [ledgers]);
-  const subOptions = useMemo(() => (groupFilter ? [...new Set(ledgers.filter((l) => l.group === groupFilter).map((l) => l.subGroup).filter(Boolean))].sort() : []), [ledgers, groupFilter]);
-  const pickable = useMemo(() => ledgers.filter((l) => (!groupFilter || l.group === groupFilter) && (!subGroupFilter || l.subGroup === subGroupFilter)), [ledgers, groupFilter, subGroupFilter]);
-  // "Open ledger" from any screen (legacy in-page event) switches the ledger live.
+  const { setPref } = usePrefs();
+  // The ledger is chosen via a searchable combobox (type to filter, scroll the
+  // matches) and the statement renders ONLY after "View" is pressed — nothing is
+  // shown on open. Selection (`pick`) is decoupled from what's displayed (`shown`),
+  // so the picker can never desync from the panel below (the old ICICI Bank vs
+  // Credit-Card bug).
+  const [pick, setPick] = useState('');     // combobox choice (not yet viewed)
+  const [shown, setShown] = useState('');   // ledger actually fetched + rendered below
+  const { selected, display, dirty } = resolveLedgerSelection({ pick, shown });
+  const view = () => { if (selected) { setShown(selected); setPref('lastLedger', selected); } };
+  // "Open ledger" from any screen (legacy in-page event) opens it immediately.
   useEffect(() => {
-    const onOpen = (e) => { const n = e.detail?.name; if (n) { setName(n); setPref('lastLedger', n); } };
+    const onOpen = (e) => { const n = e.detail?.name; if (n) { setPick(n); setShown(n); setPref('lastLedger', n); } };
     window.addEventListener('kb:open-ledger', onOpen);
     return () => window.removeEventListener('kb:open-ledger', onOpen);
   }, [setPref]);
@@ -833,33 +833,29 @@ export function LedgerAcLive({ branch }) {
   return (
     <Page
       title="Ledger Account"
-      sub={selected}
+      sub={display || 'Select a ledger'}
       wide
       right={<>
-        <select value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setSubGroupFilter(''); }} title="Filter ledgers by group" className="max-tablet:min-h-[44px] max-tablet:flex-1" style={{ ...inp, width: 'auto', minWidth: 130, minHeight: 32, fontSize: 11 }}>
-          <option value="">All groups</option>
-          {allGroups.map((g) => <option key={g} value={g}>{g}</option>)}
-        </select>
-        {groupFilter && (
-          <select value={subGroupFilter} onChange={(e) => setSubGroupFilter(e.target.value)} title="Filter by sub-group" className="max-tablet:min-h-[44px] max-tablet:flex-1" style={{ ...inp, width: 'auto', minWidth: 130, minHeight: 32, fontSize: 11 }}>
-            <option value="">All sub-groups</option>
-            {subOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        )}
-        <select value={selected} onChange={(e) => pickLedger(e.target.value)} className="max-tablet:min-h-[44px] max-tablet:w-full" style={{ ...inp, width: 240, minHeight: 32, fontSize: 11 }}>
-          {pickable.length === 0 && <option value="">{ledgers.length ? 'No ledgers in this group' : 'Loading…'}</option>}
-          {pickable.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
-        </select>
+        <LedgerPicker value={pick} onChange={setPick} branch={branch} placeholder="Search ledger…" style={{ width: 260, fontSize: 11 }} />
+        {/* "View" arms green once a ledger is selected (and differs from what's shown). */}
+        <button onClick={view} disabled={!dirty} title="View this ledger's account statement" className="max-tablet:min-h-[44px]"
+          style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, cursor: dirty ? 'pointer' : 'default', background: dirty ? GREEN : '#eef1f6', color: dirty ? '#fff' : DIM, borderColor: dirty ? GREEN : '#e6e8ec' }}>
+          View
+        </button>
       </>}
     >
       <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-        <LedgerAccountView name={selected} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} maxHeight="calc(100vh - 330px)" />
+        {display
+          ? <LedgerAccountView name={display} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} maxHeight="calc(100vh - 330px)" />
+          : <div style={{ padding: '64px 24px', textAlign: 'center', color: DIM, fontSize: 13, lineHeight: 1.7 }}>
+              Search and select a ledger above, then press <b style={{ color: GREEN }}>View</b><br />to open its account statement.
+            </div>}
       </div>
       {voucher && (
         <div onClick={closeVoucher} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
           <div onClick={(ev) => ev.stopPropagation()} style={{ ...card, width: 'min(820px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
-              <Crumb items={[{ label: selected || 'Ledger', onClick: closeVoucher }, { label: voucher.vno }]} />
+              <Crumb items={[{ label: display || 'Ledger', onClick: closeVoucher }, { label: voucher.vno }]} />
               <button onClick={closeVoucher} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
             </div>
             <VoucherEditor voucherId={voucher.id} cur={cur} onBack={closeVoucher} onClose={closeVoucher} />
@@ -956,7 +952,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   };
   // Build a printable A4 view of the full journal entry and hand it to the print preview.
   const printEntry = () => {
-    const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? cur + x.toLocaleString('en-IN') : ''; };
+    const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? cur + x.toLocaleString(localeOf(cur)) : ''; };
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
     const rows = (pv.postings || []).map((p) => `<tr>
       <td>${esc(p.ledger)}</td><td>${esc(p.group || '')}</td>
@@ -1433,24 +1429,25 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
   // 2) Assemble columns: fixed lead → component heads → taxes → final value.
   const columns = [];
   const col = (key, label, isNum) => columns.push({ key, label, num: !!isNum });
-  col('bookingNo', 'Booking No');
-  col('linkNo', 'SPG / Link No');
+  // Lead columns, fixed business order: Date ▸ Sales Type ▸ Ledger ▸ Invoice Value
+  // ▸ Link No ▸ Sales Invoice No ▸ Purchase Invoice No. Everything else trails after.
   col('saleDate', isSale ? 'Sale Date' : 'Purchase Date');
+  col('salesType', isSale ? 'Sales Type' : 'Purchase Type'); // always shown (the register's type)
+  col('clientLedger', isSale ? 'Client Ledger' : 'Vendor Ledger'); // the accounting ledger
+  col('finalValue', isSale ? 'Final Invoice Value' : 'Final Bill Value', true);
+  col('linkNo', 'SPG / Link No');
   col('saleVno', 'Sales Invoice No');
-  col('saleTallyRef', 'Sales Tally Ref');
   col('purVno', 'Purchase Invoice No');
+  // ── the rest ──
+  col('bookingNo', 'Booking No');
+  col('saleTallyRef', 'Sales Tally Ref');   // kept with the purchase ref, beside each other
   col('purTallyRef', 'Purchase Tally Ref');
   if (!tag) col('branch', 'Branch');
-  // When viewing All modules together, surface which module each row belongs to —
-  // shown immediately before Client/Vendor Type so the mixed list stays readable.
-  if (showType) col('salesType', isSale ? 'Sales Type' : 'Purchase Type');
-  if (showType) col('intDom', 'INT / DOM'); // International vs Domestic, beside Sales Type
+  if (showType) col('intDom', 'INT / DOM'); // International vs Domestic (All-modules view only)
   col('clientType', isSale ? 'Client Type' : 'Vendor Type');
-  col('clientLedger', isSale ? 'Client Ledger' : 'Vendor Ledger');
   col('pax', 'Pax Details');
   col('pnr', 'PNR');
   col('ticket', 'Ticket No');
-  col('finalValue', isSale ? 'Final Invoice Value' : 'Final Bill Value', true);
   for (const lg of headLedgers) col(`head:${lg}`, lg, true);
   if (anyIndia) { col('cgst', `CGST ${taxWord}${sfx}`, true); col('sgst', `SGST ${taxWord}${sfx}`, true); }
   if (anyInter) col('igst', `IGST ${taxWord}${sfx}`, true);
@@ -1636,7 +1633,17 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
     // While a search term is active, ignore the date window so a match is found
     // regardless of period (otherwise the default month silently hides older vouchers).
     .filter((v) => !!needle || dateInRange(v.date, from, to))
-    .filter((v) => !needle || voucherHaystack(v).includes(needle)), [allRows, product, from, to, needle, inbOnly, tab]);
+    .filter((v) => !needle || voucherHaystack(v).includes(needle))
+    // Default ordering = Date ascending (chronological, like a Tally register). Tally
+    // dates are mixed-format strings, so normalise via parseAnyDate; rows whose date
+    // can't be parsed sink to the bottom rather than being dropped.
+    .sort((a, b) => {
+      const da = parseAnyDate(a.date), db = parseAnyDate(b.date);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da - db;
+    }), [allRows, product, from, to, needle, inbOnly, tab]);
   const sum = (k) => rows.reduce((s, v) => s + (v[k] || 0), 0);
   const summaryPager = usePager(rows); // Summary view paging — sum() above still totals the full set
   const sheet = useMemo(() => vouchersToSheet(rows), [rows]);

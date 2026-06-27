@@ -6,7 +6,6 @@ import { PageLayout } from '../../../shell/PageLayout';
 import { ResponsiveGrid } from '../../../shell/primitives';
 import { useHrMgrDashboard } from '../hooks/use-hr-mgr-dashboard';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
-import { useDashboardStore } from '../store/dashboard.store';
 import { BirthdaysPanel } from '../components/shared/BirthdaysPanel';
 import { AnniversariesPanel } from '../components/shared/AnniversariesPanel';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
@@ -16,8 +15,6 @@ import { openPrintPreview } from '../../../core/PrintPreview';
 export function HrMgrDashboardPage({ currentUser, setRoute }) {
   const { data: stats, isLoading, isError, error, refetch } = useHrMgrDashboard();
   const { navigate } = useDashboardActions(setRoute);
-  const period = useDashboardStore((s) => s.period);
-  const setPeriod = useDashboardStore((s) => s.setPeriod);
 
   if (isError && !stats) {
     return <DashboardError error={error} onRetry={refetch} title="Could not load the HR Manager Dashboard." />;
@@ -34,8 +31,6 @@ export function HrMgrDashboardPage({ currentUser, setRoute }) {
         title="HR Manager Dashboard"
         subtitle="People · attendance · payroll"
         user={currentUser}
-        period={period}
-        setPeriod={setPeriod}
         onExport={() => openPrintPreview({ selector: 'main', title: 'HR Manager Dashboard', recommend: 'portrait' })}
       />
 

@@ -22,7 +22,8 @@ import { useLivePurchaseRegistry, useLiveSalesTickets } from '../../core/useVouc
 import { fmt, fmtINR } from '../../core/format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS } from '../../core/dates';
 import { ACM_DATA, ACM_REASON_CODES, LedgerSelect, RECURRING_DATA, REFUNDS_DATA, Recruitment, STATUS_FLOW, TAB_Page, TRow, TrainingRecords, VTD, VTH, _ACM_LIST, _ADM_LIST, _TICKET_CTRL, cardStyle, tabPanel } from '../../core/helpers';
-import { triggerSaveRefresh, useMobile, useVNo } from '../../core/hooks';
+import { triggerSaveRefresh, useMobile } from '../../core/hooks';
+import { useVNo } from '../../core/useNextNo';
 import { ARow, B, DBtn, FL, RPT_tdStyle, RPT_thStyle, SalespersonField, VHead, VNarr, VParty, VTot, VWrap, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../../core/styles';
 import { Dashboard } from '../dashboard';
 import { TDS_SECTIONS } from '../finance';
@@ -555,7 +556,7 @@ export function SalesFlight({branch,setRoute}){
   const cur=cfg.cur;
   const isIntl=tripType==="International";
   return (
-    <div style={{padding:"12px 10px",maxWidth:1260,margin:"0 auto",paddingBottom:72}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto",paddingBottom:72}}>
       <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:12,overflow:"hidden"}}>
         {/* Header */}
         <div style={{padding:"12px 16px",background:"#1a1c22"}}>
@@ -2587,7 +2588,7 @@ export function UnmatchedTickets({branch,setRoute}){
   const totalAmt=rows.reduce((s,t)=>s+t.saleAmt,0);
 
   return (
-    <div style={{padding:mob?"10px 8px":"14px 16px",maxWidth:1260,margin:"0 auto"}}>
+    <div style={{padding:mob?"10px 8px":"14px 16px",maxWidth:1600,margin:"0 auto"}}>
 
       {/* Header */}
       <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",
@@ -2813,7 +2814,7 @@ export function SalesCancellation({branch}){
   const totRefund    =cancellations.reduce((s,c)=>s+c.refundToClient,0);
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:36,height:36,borderRadius:9,background:"#fbe9e9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>❌</div>
@@ -2882,7 +2883,7 @@ export function PurchaseRefunds({branch}){
   const pending=refunds.filter(r=>r.status==="Applied").reduce((s,r)=>s+r.refundReq,0);
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <SampleBanner note="purchase refunds shown here are sample data, not live." />
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
         <div style={{width:36,height:36,borderRadius:9,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>💫</div>
@@ -2996,7 +2997,7 @@ export function AdmRegister({branch}){
   const rejectAdm=(m)=>rejectM.mutate({id:m.id},{onSuccess:()=>toast("ADM rejected"),onError:(e)=>toast(e.message,"error")});
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1360,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
 
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:14}}>
@@ -3300,7 +3301,7 @@ export function BspSummary({branch}){
   const TYPE_CLR={credit:"#16a34a",debit:"#dc2626",neutral:"#1a1c22",section:"#2563eb",total:"#1a1c22"};
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:900,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🏦</div>
@@ -3492,7 +3493,7 @@ export function TicketControlRegister({branch}){
   STATUSES.slice(1).forEach(s=>totByStatus[s]=tickets.filter(t=>(!brCode||t.branch===brCode)&&t.status===s).length);
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🎫</div>
@@ -3630,7 +3631,7 @@ export function BspCsvImport({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1000,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
         <div style={{width:40,height:40,borderRadius:10,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📂</div>
         <div>
@@ -4037,7 +4038,7 @@ export function RecurringVouchers({branch}){
   const run=id=>setTemplates(ts=>ts.map(t=>t.id===id?{...t,lastRun:TODAY,nextRun:TODAY.replace(/-\d\d$/,"-01").replace(/\d{4}/,(y)=>t.freq==="Monthly"?y:String(parseInt(y)+1))}:t));
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔄</div>
@@ -4126,7 +4127,7 @@ export function RefundTracker({branch,setRoute}){
   const advance=id=>setRefunds(rs=>rs.map(r=>r.id===id?{...r,status:STATUS_FLOW[Math.min(STATUS_FLOW.indexOf(r.status)+1,STATUS_FLOW.length-1)]}:r));
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#fbe9e9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>↩</div>

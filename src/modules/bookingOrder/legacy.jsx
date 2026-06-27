@@ -13,12 +13,14 @@ import {
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../../core/styles.jsx';
+import { localeOf } from '../../core/format';
 import { todayISO } from '../../core/dates';
 import { PeriodBar, periodRange } from '../../core/period';
 import { openPrintPreview } from '../../core/PrintPreview';
 import { buildBookingInvoice } from '../../core/invoiceHtml';
 import { apiGet, apiPost, apiPut } from '../../core/api';
 import { useOpenInb, useBookInb, useCreateInb } from '../../core/useInterBranchVoucher';
+import { useVNo } from '../../core/useNextNo';
 
 // Inter-branch jurisdiction (mirror of backend): same country (India) = IGST;
 // different country = cross-border export (zero-rated on the seller side).
@@ -200,6 +202,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Editing keeps the booking's own branch; a fresh voucher uses the top-bar branch.
   const brCode = editing ? (editBooking.branch || brCodeOf(branch)) : brCodeOf(branch);
   const cur = bc(editing ? { code: editBooking.branch } : branch).cur;
+  // Live preview of the next Link No (LK series) shown in the Link band instead of the
+  // old static "Auto" — advisory; the real Link No is assigned atomically on save.
+  const nextLinkNo = useVNo(editing ? { code: editBooking.branch } : branch, 'LK');
 
   const initModule = (editing && (VSPECS[editBooking.module] || isReversalModule(editBooking.module))) ? editBooking.module
     : (initialModule && (VSPECS[initialModule] || isReversalModule(initialModule))) ? initialModule : 'SF';
@@ -592,7 +597,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         {/* Link band */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: '#1f1f1f' }}>
           <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: GOLD, textTransform: 'uppercase' }}>Link No</span>
-          <span style={{ padding: '5px 12px', borderRadius: 4, background: GOLD_SOFT, color: GOLD_DEEP, fontWeight: 800, letterSpacing: '.5px', fontFamily: 'monospace', fontSize: 13 }}>Auto · assigned on save</span>
+          <span style={{ padding: '5px 12px', borderRadius: 4, background: GOLD_SOFT, color: GOLD_DEEP, fontWeight: 800, letterSpacing: '.5px', fontFamily: 'monospace', fontSize: 13 }}>{editing ? (editBooking.linkNo || '—') : `${nextLinkNo} · on save`}</span>
           <span style={{ fontSize: 10.5, color: '#9197a3', fontStyle: 'italic' }}>links the Sales Order, Purchase Order &amp; Gross Profit of this invoice</span>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
             {['SO', 'PO', 'GP'].map((c) => <span key={c} style={{ fontSize: 9, fontWeight: 800, padding: '3px 9px', borderRadius: 20, background: GOLD_SOFT, color: GOLD_DEEP }}>{c}</span>)}
@@ -1633,7 +1638,7 @@ function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
                   <td style={{ ...td, fontFamily: 'monospace', color: '#5b616e' }}>{r.linkNo || '—'}</td>
                   <td style={td}>{r.module}</td>
                   <td style={{ ...td, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.customer || '—'}</td>
-                  <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{cur} {Math.round(r.saleTotal || 0).toLocaleString('en-IN')}</td>
+                  <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{cur} {Math.round(r.saleTotal || 0).toLocaleString(localeOf(cur))}</td>
                   <td style={td}><span style={{ fontSize: 10.5, fontWeight: 700, color: '#5b616e', textTransform: 'capitalize' }}>{r.status}</span></td>
                   <td style={{ ...td, textAlign: 'center' }}><span style={{ fontSize: 10.5, fontWeight: 800, padding: '2px 8px', borderRadius: 20, background: '#FFF6D6', color: '#8a6d12' }}>{r.edits}{r.preAudit ? '*' : ''}</span></td>
                   <td style={td}>{r.lastBy || 'unknown'} · {fmtAt(r.lastAt)}</td>

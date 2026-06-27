@@ -262,6 +262,7 @@ export function VoucherApprovals({ branch, currentUser }) {
           <span {...clickable(() => setViewId(e.id))} title="View full voucher" style={{ color: C.blue, fontWeight: 800, cursor: 'pointer', textDecoration: 'underline', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{e.vno}</span>
           <span style={{ color: C.dim, fontSize: 11.5 }}>{VCH[e.category] || e.type}</span>
           <span style={{ fontWeight: 600, color: C.dark }} title={e.party}>{e.party || '—'}</span>
+          {e.submittedBy && <span style={{ color: C.dim, fontSize: 10.5, fontStyle: 'italic', whiteSpace: 'nowrap' }} title="Entered by">✎ {e.submittedBy}</span>}
           <span style={{ marginLeft: 'auto' }}>{actionCell(e)}</span>
         </div>
         {(al || wn) && <div style={{ fontSize: 11, color: al ? C.red : '#9a6a00', marginBottom: 6, fontStyle: 'italic' }}>⚠ {al || wn}</div>}
@@ -304,7 +305,7 @@ export function VoucherApprovals({ branch, currentUser }) {
   // Entry wise — one row per Dr/Cr posting leg (grouped under its voucher).
   const entryWise = () => (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-      <thead><tr>{['Date', 'Vch No', 'Type', 'Ledger', 'Group', 'Sub-group', 'Debit', 'Credit', 'Narration', 'Action'].map((h) => <th key={h} style={{ ...flatTh, textAlign: h === 'Debit' || h === 'Credit' ? 'right' : h === 'Action' ? 'center' : 'left' }}>{h}</th>)}</tr></thead>
+      <thead><tr>{['Date', 'Vch No', 'Type', 'Entered by', 'Ledger', 'Group', 'Sub-group', 'Debit', 'Credit', 'Narration', 'Action'].map((h) => <th key={h} style={{ ...flatTh, textAlign: h === 'Debit' || h === 'Credit' ? 'right' : h === 'Action' ? 'center' : 'left' }}>{h}</th>)}</tr></thead>
       <tbody>
         {flatEntries.flatMap((e) => {
           const legs = (e.postable && e.postings && e.postings.length) ? e.postings : [{ ledger: e.party || '—', group: '⚠ Needs attention', subGroup: '', debit: 0, credit: 0, narration: e.error || '' }];
@@ -313,6 +314,7 @@ export function VoucherApprovals({ branch, currentUser }) {
               <td style={{ ...flatTd, color: C.dim }}>{li === 0 ? <>{ckbox(e)}{fmtDate(e.date)}</> : ''}</td>
               {li === 0 ? vnoCell(e) : <td style={flatTd}></td>}
               <td style={{ ...flatTd, color: C.dim }}>{li === 0 ? (VCH[e.category] || e.type) : ''}</td>
+              <td style={{ ...flatTd, color: C.dim }} title={li === 0 ? `Entered by ${e.submittedBy || '—'}` : ''}>{li === 0 ? (e.submittedBy || '—') : ''}</td>
               <td style={{ ...flatTd, fontWeight: 600, color: C.dark }} title={p.ledger}>{p.ledger}</td>
               <td style={{ ...flatTd, color: C.dim }} title={p.group}>{p.group}</td>
               <td style={{ ...flatTd, color: C.dim }} title={p.subGroup || p.group}>{p.subGroup || p.group}</td>
@@ -324,7 +326,7 @@ export function VoucherApprovals({ branch, currentUser }) {
           ));
         })}
       </tbody>
-      {totalsFoot(6)}
+      {totalsFoot(7)}
     </table>
   );
 
