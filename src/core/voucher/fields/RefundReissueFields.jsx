@@ -231,8 +231,8 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
         <FL label="Date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
-        <FL label="Against sales invoice 🔒"><input value={state.againstInvoice || ''} readOnly tabIndex={-1} style={lockedInp} placeholder="— fetch by Link No —" title="Locked — set by Link No lookup" /></FL>
-        <FL label="Related purchase invoice 🔒"><input value={state.againstPurchase || ''} readOnly tabIndex={-1} style={lockedInp} placeholder="— fetch by Link No —" title="Locked — set by Link No lookup" /></FL>
+        <FL label="Against sales invoice 🔒"><input value={state.againstInvoice || ''} readOnly tabIndex={-1} style={lockedInp} placeholder="fetch by Link No" title="Locked — set by Link No lookup" /></FL>
+        <FL label="Related purchase invoice 🔒"><input value={state.againstPurchase || ''} readOnly tabIndex={-1} style={lockedInp} placeholder="fetch by Link No" title="Locked — set by Link No lookup" /></FL>
         <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} />
       </div>
 
@@ -302,14 +302,14 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
             </FL>
           </div>
           {/* Charges WE levy on this refund (retained income) — separate from the SO SVC2 above. */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 10, marginBottom: 6 }}>
             <FL label={`Our Service Fee (${cur})`}><input type="number" value={state.serviceCharge} onChange={(e) => patch({ serviceCharge: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
             <FL label={`Our Service Charge - 2 (${cur})`}><input type="number" value={state.markup} onChange={(e) => patch({ markup: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
-            <div />
+            <FL label={`Supplier GST (${cur}, input credit · auto ${gstRate}%)`}><input type="number" value={state.supplierGst} onChange={(e) => patch({ supplierGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
           </div>
         </>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 10, marginBottom: 6 }}>
           <FL label={`Supplier fee + fare diff (${cur})`}>
             <input type="number" value={state.supplierAmt} onChange={(e) => patch({ supplierAmt: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right', fontWeight: 700 }} />
           </FL>
@@ -318,25 +318,21 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isRefund ? '1fr 1fr 1fr' : '1fr 1fr 1fr 1fr', gap: 12, marginTop: 10, marginBottom: 4 }}>
         <FL label={`SVF GST (${gstRate}%)`}><input value={money2(cur, taxAmt)} readOnly tabIndex={-1} title={`GST at ${gstRate}% on the Service Fee → regular ${state.gstMode === 'inter' ? 'IGST' : 'CGST/SGST'} Output`} style={{ ...lockedInp, textAlign: 'right' }} /></FL>
         <FL label={`SVC2 GST (${gstRate}%)`}><input value={money2(cur, svc2Gst)} readOnly tabIndex={-1} title={`GST at ${gstRate}% on the Service Charge-2 margin → dedicated SVC2 ${state.gstMode === 'inter' ? 'IGST' : 'CGST/SGST'} Output ledgers`} style={{ ...lockedInp, textAlign: 'right' }} /></FL>
-        <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 9, fontSize: 9.5, color: '#9197a3' }}>{state.gstMode === 'inter' ? 'IGST' : 'CGST + SGST'} · SVC2 posts to its own ledgers</div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
         <FL label={`Supplier service charge (${cur}, our cost)`}><input type="number" value={state.supplierSvc} onChange={(e) => patch({ supplierSvc: e.target.value, supplierGst: gstOf(e.target.value) })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
-        <FL label={`Supplier GST (${cur}, input credit · auto ${gstRate}%)`}><input type="number" value={state.supplierGst} onChange={(e) => patch({ supplierGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
-        <div />
+        {!isRefund && <FL label={`Supplier GST (${cur}, input credit · auto ${gstRate}%)`}><input type="number" value={state.supplierGst} onChange={(e) => patch({ supplierGst: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>}
       </div>
+      <p style={{ margin: '0 0 6px', fontSize: 9.5, color: '#9197a3' }}>{state.gstMode === 'inter' ? 'IGST' : 'CGST + SGST'} · SVC2 posts to its own ledgers</p>
 
       {isRefund && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10, marginBottom: 6 }}>
             <FL label={`Airline cancellation fee (${cur}, supplier kept)`}><input type="number" value={state.supplierCancel} onChange={(e) => patch({ supplierCancel: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right' }} /></FL>
             <FL label="Recover cancellation from customer"><label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34 }}><input type="checkbox" checked={state.cancelRecover !== false} onChange={(e) => patch({ cancelRecover: e.target.checked })} /> charge it to the client (pass-through)</label></FL>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 10, marginBottom: 6 }}>
             <FL label={`Commission clawback (${cur})`}><input type="number" value={reverseCommission ? state.incentiveAmt : 0} disabled={!reverseCommission} onChange={(e) => patch({ incentiveAmt: e.target.value })} placeholder="0.00" style={{ ...(reverseCommission ? inp : lockedInp), textAlign: 'right' }} /></FL>
             <FL label={`Commission GST (${cur})`}><input type="number" value={reverseCommission ? state.incentiveGst : 0} disabled={!reverseCommission} onChange={(e) => patch({ incentiveGst: e.target.value })} placeholder="0.00" style={{ ...(reverseCommission ? inp : lockedInp), textAlign: 'right' }} /></FL>
             <FL label={`TDS reversed (${cur})`}><input type="number" value={reverseCommission ? state.incentiveTds : 0} disabled={!reverseCommission} onChange={(e) => patch({ incentiveTds: e.target.value })} placeholder="0.00" style={{ ...(reverseCommission ? inp : lockedInp), textAlign: 'right' }} /></FL>

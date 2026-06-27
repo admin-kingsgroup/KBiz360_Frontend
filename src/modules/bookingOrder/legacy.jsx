@@ -1046,7 +1046,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
           )}
           <button disabled={!ready} onClick={() => save()} className="max-tablet:min-h-[44px]" style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Save size={14} /> Save (Pending)</button>
         </div>
-        {!ready && <p style={{ margin: '8px 0 0', fontSize: 10.5, color: '#9197a3' }}>Need: original invoice, customer, supplier/airline &amp; a supplier amount &gt; 0.</p>}
+        {!ready && <p style={{ margin: '8px 0 0', padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#854F0B' }}>Need: original invoice, customer, supplier/airline &amp; a supplier amount &gt; 0.</p>}
       </div>
     </div>
   );

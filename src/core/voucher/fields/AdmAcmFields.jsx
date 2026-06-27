@@ -41,7 +41,7 @@ export function AdmAcmFields({ state, setState, ctx, kind }) {
         </FL>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 5 }}>
         <FL label="Airline / BSP (Creditor)">
           <LedgerPicker branch={branch} value={state.counterParty} onChange={(v) => patch({ counterParty: v })} filter={(l) => l.type === 'Creditor'} placeholder="Select airline / BSP..." />
         </FL>
