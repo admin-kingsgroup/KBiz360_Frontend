@@ -234,6 +234,18 @@ export function useDeleteVoucher() {
     onSuccess: () => invalidateBooks(qc),
   });
 }
+// Revoke (un-approve) a posted voucher → back to Pending (un-posts, keeps the vno).
+// Approver-only on the server; the FE also gates the button. Invalidates BOTH books
+// roots so the approval queue + every register/report refresh.
+export function useRevokeVoucher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }) => apiPost(`/api/vouchers/${id}/revoke`, { reason }),
+    onSuccess: (_d, { id }) => { invalidateBooks(qc); qc.invalidateQueries({ queryKey: ['voucher', id] }); },
+  });
+}
+// On-demand preflight (blocks + warnings + journal rows) for the revoke confirm dialog.
+export const fetchRevokeCheck = (id) => apiGet(`/api/vouchers/${id}/revoke-check`);
 export function useApproveMany() {
   const qc = useQueryClient();
   return useMutation({
@@ -567,6 +579,19 @@ export function useAlertsByBranch() {
     queryFn: () => apiGet('/api/alert-states/by-branch'),
     enabled: enabled(),
     staleTime: 60_000,
+  });
+}
+
+// Capital-vs-Investment analysis (capital employed, blocked vs in-flow working
+// capital, GP yield) — from the posted Balance Sheet + P&L. Same source as the
+// Capital vs Investment screen; exposed as a hook so dashboards can compose it.
+export function useCapitalAnalysis(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'capital-analysis', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/capital-analysis', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
   });
 }
 

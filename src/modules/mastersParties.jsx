@@ -21,6 +21,8 @@ import { Plus, X } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
 import { apiGet, getAuthToken } from '../core/api';
+import { bc } from '../core/styles';
+import { localeOf } from '../core/format';
 import { BRANCH_CODES } from '../core/data';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { useHotkey } from '../core/ux/hotkeys';
@@ -80,7 +82,10 @@ const PAY_METHODS = ['', 'Bank Transfer', 'BSP NEFT', 'NEFT/RTGS', 'Cheque', 'UP
 const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD'];
 const ADDR_TYPES = ['Billing', 'Shipping', 'Registered Office', 'Head Office', 'Branch', 'Other'];
 
-const rupee = (n) => '₹' + (Number(n) || 0).toLocaleString('en-IN');
+// Branch-aware full amount: ₹ + Indian grouping for India branches, $ + Western
+// grouping for USD branches (NBO/DAR/FBM). `branchCode` defaults to the ₹ home branch.
+const curOfBranch = (branchCode) => (bc({ code: branchCode }) || {}).cur || '₹';
+const rupee = (n, branchCode) => { const c = curOfBranch(branchCode); return c + (Number(n) || 0).toLocaleString(localeOf(c)); };
 const numOf = (s) => Number(String(s == null ? '' : s).replace(/[^0-9.-]/g, '')) || 0;
 
 /* ── Live data hooks (party-scoped, only fire once a record is chosen) ─────── */
@@ -260,7 +265,7 @@ function LinkedVouchersTab({ q }) {
             <td style={{ padding: '9px 12px', color: DIM }}>{r.date || '—'}</td>
             <td style={{ padding: '9px 12px' }}>{r.type || r.category || '—'}</td>
             <td style={{ padding: '9px 12px' }}><span style={{ padding: '2px 6px', background: '#e6e8f1', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{r.branch || '—'}</span></td>
-            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700 }}>{rupee(r.total)}</td>
+            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700 }}>{rupee(r.total, r.branch)}</td>
             <td style={{ padding: '9px 12px', textAlign: 'center' }}><span style={{ padding: '2px 8px', background: paid ? '#e8f6ed' : '#fbeedb', color: paid ? '#16a34a' : '#d97706', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{r.status || '—'}</span></td>
           </tr>
         );
@@ -270,7 +275,8 @@ function LinkedVouchersTab({ q }) {
 }
 
 // Outstanding — live open bills (unsettled) for the party.
-function OutstandingTab({ q, side }) {
+function OutstandingTab({ q, side, branch }) {
+  const fmt = (n) => rupee(n, branch);
   if (q.isLoading) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>Loading open bills…</p>);
   if (q.isError) return tabPanel(<p style={{ color: RED, fontSize: 12 }}>⚠ {q.error?.message || 'Failed to load open bills'}</p>);
   const data = q.data || { bills: [], advances: 0 };
@@ -290,25 +296,26 @@ function OutstandingTab({ q, side }) {
             <tr key={b.billId} style={{ borderBottom: '1px solid #dfe2e7' }}>
               <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600 }}>{b.billVno}</td>
               <td style={{ padding: '8px 12px', color: DIM }}>{b.date}</td>
-              <td style={{ padding: '8px 12px', textAlign: 'right' }}>{rupee(b.total)}</td>
-              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>{rupee(b.outstanding)}</td>
+              <td style={{ padding: '8px 12px', textAlign: 'right' }}>{fmt(b.total)}</td>
+              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>{fmt(b.outstanding)}</td>
               <td style={{ padding: '8px 12px', textAlign: 'center', color: overdue ? RED : GREEN, fontWeight: 700 }}>{b.ageDays}d</td>
               <td style={{ padding: '8px 12px', textAlign: 'center' }}><span style={{ padding: '2px 8px', background: b.status === 'partial' ? '#fbeedb' : '#e6e8f1', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{b.status}</span></td>
             </tr>
           );
         })}</tbody>
       </table>
-      {data.advances > 0 && <p style={{ margin: '10px 0 0', fontSize: 11.5, color: DIM }}>On-account / advances: <b style={{ color: DARK }}>{rupee(data.advances)}</b></p>}
+      {data.advances > 0 && <p style={{ margin: '10px 0 0', fontSize: 11.5, color: DIM }}>On-account / advances: <b style={{ color: DARK }}>{fmt(data.advances)}</b></p>}
       <div style={{ marginTop: 12, padding: 10, background: DARK, borderRadius: 5, display: 'flex', justifyContent: 'space-between' }}>
         <span style={{ color: GOLD, fontSize: 11.5, fontWeight: 700 }}>{side === 'supplier' ? 'TOTAL PAYABLE' : 'TOTAL RECEIVABLE'}</span>
-        <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}>{rupee(total)}</span>
+        <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}>{fmt(total)}</span>
       </div>
     </div>
   );
 }
 
 // History — KPIs + monthly bar chart derived from the party's vouchers.
-function HistoryTab({ q }) {
+function HistoryTab({ q, branch }) {
+  const fmt = (n) => rupee(n, branch);
   if (q.isLoading) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>Loading history…</p>);
   const rows = q.data || [];
   if (!rows.length) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>Once vouchers are posted for this party, monthly totals appear here.</p>);
@@ -318,8 +325,8 @@ function HistoryTab({ q }) {
   const chart = Object.keys(byMonth).sort().slice(-12).map((m) => ({ m, r: Math.round(byMonth[m]) }));
   const kpis = [
     { l: 'Vouchers', v: rows.length, c: DARK },
-    { l: 'Total Value', v: rupee(total), c: RED },
-    { l: 'Avg / Voucher', v: rupee(total / rows.length), c: GOLD },
+    { l: 'Total Value', v: fmt(total), c: RED },
+    { l: 'Avg / Voucher', v: fmt(total / rows.length), c: GOLD },
     { l: 'Active Months', v: Object.keys(byMonth).length, c: GREEN },
   ];
   return tabPanel(
@@ -337,7 +344,7 @@ function HistoryTab({ q }) {
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f7" />
           <XAxis dataKey="m" tick={{ fontSize: 10, fill: DIM }} />
           <YAxis tick={{ fontSize: 10, fill: DIM }} tickFormatter={(v) => (v >= 100000 ? (v / 100000).toFixed(0) + 'L' : v)} />
-          <Tooltip formatter={(v) => rupee(v)} />
+          <Tooltip formatter={(v) => fmt(v)} />
           <Bar dataKey="r" fill={GOLD} />
         </BarChart>
       </ResponsiveContainer>
@@ -523,8 +530,8 @@ export function CustomerMasterTabbed() {
           <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #cdd1d8' }}>
             <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase' }}>Current Exposure</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10, marginTop: 10 }}>
-              <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Outstanding</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: DARK }}>{f.out || rupee(0)}</p></div>
-              <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Available</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: GREEN }}>{rupee(available)}</p></div>
+              <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Outstanding</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: DARK }}>{f.out || rupee(0, f.branch)}</p></div>
+              <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Available</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: GREEN }}>{rupee(available, f.branch)}</p></div>
             </div>
             {(Number(f.creditLimit) || 0) > 0 && (
               <div style={{ marginTop: 12, height: 6, background: '#f0f2f7', borderRadius: 3, overflow: 'hidden' }}>
@@ -543,9 +550,9 @@ export function CustomerMasterTabbed() {
       {tab === 'custom' && tabPanel(
         <><EmptyHint>Custom key/value fields for this customer.</EmptyHint><ArrayEditor rows={f.customFields} cols={CUSTOM_COLS} onChange={(v) => set('customFields', v)} addLabel="Add Field" /></>
       )}
-      {tab === 'history' && <HistoryTab q={m.vouchersQ} />}
+      {tab === 'history' && <HistoryTab q={m.vouchersQ} branch={m.current?.branch} />}
       {tab === 'linked' && <LinkedVouchersTab q={m.vouchersQ} />}
-      {tab === 'outstanding' && <OutstandingTab q={m.openBillsQ} side="customer" />}
+      {tab === 'outstanding' && <OutstandingTab q={m.openBillsQ} side="customer" branch={m.current?.branch} />}
     </PartyShell>
   );
 }
@@ -675,9 +682,9 @@ export function SupplierMasterTabbed() {
       {tab === 'custom' && tabPanel(
         <><EmptyHint>Custom key/value fields for this supplier.</EmptyHint><ArrayEditor rows={f.customFields} cols={CUSTOM_COLS} onChange={(v) => set('customFields', v)} addLabel="Add Field" /></>
       )}
-      {tab === 'history' && <HistoryTab q={m.vouchersQ} />}
+      {tab === 'history' && <HistoryTab q={m.vouchersQ} branch={m.current?.branch} />}
       {tab === 'linked' && <LinkedVouchersTab q={m.vouchersQ} />}
-      {tab === 'outstanding' && <OutstandingTab q={m.openBillsQ} side="supplier" />}
+      {tab === 'outstanding' && <OutstandingTab q={m.openBillsQ} side="supplier" branch={m.current?.branch} />}
     </PartyShell>
   );
 }

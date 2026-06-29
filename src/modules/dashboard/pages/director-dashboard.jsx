@@ -74,6 +74,35 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
   const bq = useQueries({ queries: brList.map((b) => ({ queryKey: ['accounting', 'module-pl', b.code, dates.from, dates.to, 'summary'], queryFn: () => apiGet('/api/accounting/module-pl', { branch: b.code, from: dates.from, to: dates.to, summary: 1 }), enabled: isGroup })) });
   const branchRows = brList.map((b, i) => { const d = bq[i].data || {}; return { code: b.code, sales: d?.totals?.sales || 0, gp: d?.totals?.gp || 0, net: d?.bridge?.netProfit || 0 }; });
 
+  // ── Per-branch performance KPIs (Group/ALL scope only) ──
+  // Money KPIs in Group mode render PER BRANCH (each in its own currency) — never a
+  // merged cross-branch ₹ sum. Stitched from useModulePL.byBranch (Revenue/GP/NP) and
+  // useAgeing.byBranch (Receivables/Payables), keyed by branch code.
+  // Declared ABOVE the isError/isLoading early returns so the hook order is stable
+  // across loading→loaded renders (a useMemo after an early return throws React #300).
+  const perBranchKpis = React.useMemo(() => {
+    if (!isGroup) return [];
+    const codes = [...new Set([
+      ...(Array.isArray(mpl.byBranch) ? mpl.byBranch : []).map((b) => b.branch),
+      ...(Array.isArray(age.byBranch) ? age.byBranch : []).map((b) => b.branch),
+    ])].filter(Boolean).sort();
+    const byCode = (arr, code) => (Array.isArray(arr) ? arr.find((x) => x.branch === code) : null) || {};
+    return codes.map((code) => {
+      const p = byCode(mpl.byBranch, code);
+      const a = byCode(age.byBranch, code);
+      const sales = p?.totals?.sales || 0, gp = p?.totals?.gp || 0, gpPct = sales ? (gp / sales) * 100 : 0;
+      return {
+        code,
+        revenue: sales,
+        gp, gpPct,
+        net: p?.bridge?.netProfit || 0,
+        outstanding: a?.receivables?.totals?.total || 0,
+        arOverdue: a?.receivables?.totals?.d90 || 0,
+        payable: a?.payables?.totals?.total || 0,
+      };
+    });
+  }, [isGroup, mpl.byBranch, age.byBranch]);
+
   const Controls = (
     <div className="mb-3.5 mt-1 flex flex-wrap items-center gap-2.5">
       <PeriodBar branch={branchArg} defaultPreset="all" onChange={setPeriod} />
@@ -97,33 +126,6 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
   const rangeShort = period.label || 'Period';
   const arOverdue = age?.receivables?.totals?.d90 || 0;
   const mods = (mpl.modules || []).slice().sort((a, b) => (b.gp || 0) - (a.gp || 0));
-
-  // ── Per-branch performance KPIs (Group/ALL scope only) ──
-  // Money KPIs in Group mode render PER BRANCH (each in its own currency) — never a
-  // merged cross-branch ₹ sum. Stitched from useModulePL.byBranch (Revenue/GP/NP) and
-  // useAgeing.byBranch (Receivables/Payables), keyed by branch code.
-  const perBranchKpis = React.useMemo(() => {
-    if (!isGroup) return [];
-    const codes = [...new Set([
-      ...(Array.isArray(mpl.byBranch) ? mpl.byBranch : []).map((b) => b.branch),
-      ...(Array.isArray(age.byBranch) ? age.byBranch : []).map((b) => b.branch),
-    ])].filter(Boolean).sort();
-    const byCode = (arr, code) => (Array.isArray(arr) ? arr.find((x) => x.branch === code) : null) || {};
-    return codes.map((code) => {
-      const p = byCode(mpl.byBranch, code);
-      const a = byCode(age.byBranch, code);
-      const sales = p?.totals?.sales || 0, gp = p?.totals?.gp || 0, gpPct = sales ? (gp / sales) * 100 : 0;
-      return {
-        code,
-        revenue: sales,
-        gp, gpPct,
-        net: p?.bridge?.netProfit || 0,
-        outstanding: a?.receivables?.totals?.total || 0,
-        arOverdue: a?.receivables?.totals?.d90 || 0,
-        payable: a?.payables?.totals?.total || 0,
-      };
-    });
-  }, [isGroup, mpl.byBranch, age.byBranch]);
 
   // Scoreboard rows: best → worst by net profit, with each branch's contribution
   // to group sales (only meaningful in Group mode).

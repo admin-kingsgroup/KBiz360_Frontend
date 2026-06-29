@@ -1,0 +1,52 @@
+import React from 'react';
+import { useCustomerLtv } from '../../../../core/useAccounting';
+
+// ⑥ Top customers by value (LTV + ABC) — who drives the branch's revenue this period:
+// the top 5 by lifetime value with their ABC class and GP%. Self-contained; period-
+// driven. "View →" opens the full Customer Value board.
+//
+// The customer-ltv endpoint returns rows ranked by value but NOT an ABC class (that
+// lives in the separate abc-analysis report). We derive the Pareto class here from the
+// cumulative share of total LTV — the SAME rule the backend uses (A ≤80%, B ≤95%, C
+// tail) — so the badge is meaningful without a second round-trip.
+const CLASS_COLOR = { A: '#16a34a', B: '#d4a437', C: '#5b616e' };
+
+export function TopCustomersPanel({ branch, range, formatMoney = (n) => n, onView }) {
+  const q = useCustomerLtv(branch, range);
+  const totals = q.data?.totals || {};
+  const allRows = q.data?.rows || [];
+  const totalLtv = totals.ltv || allRows.reduce((s, r) => s + (r.ltv || 0), 0);
+  let cum = 0;
+  const rows = allRows.slice(0, 5).map((r) => {
+    cum += r.ltv || 0;
+    const cumPct = totalLtv ? (cum / totalLtv) * 100 : 0;
+    return { ...r, abc: cumPct <= 80 ? 'A' : cumPct <= 95 ? 'B' : 'C' };
+  });
+
+  return (
+    <div className="rounded-brand border border-surface-border bg-surface p-4 shadow-card">
+      <div className="mb-2.5 flex items-center justify-between gap-2">
+        <h3 className="text-xs font-bold text-ink">⭐ Top Customers <span className="font-semibold text-ink-muted">· {totals.customers || 0} total</span></h3>
+        {onView && <button onClick={onView} style={{ color: '#2563eb' }} className="cursor-pointer text-[11px] font-bold">View →</button>}
+      </div>
+      {rows.length === 0 ? (
+        <div className="py-3 text-center text-[11.5px] text-ink-muted">{q.isLoading ? 'Loading customers…' : 'No customer activity for this period.'}</div>
+      ) : (
+        <table className="w-full border-collapse">
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} className="border-b border-surface-border last:border-0">
+                <td className="py-1.5 pr-2">
+                  <span className="mr-1.5 inline-block w-[16px] text-center text-[11px] font-extrabold" style={{ color: CLASS_COLOR[r.abc] || '#5b616e' }} title={`Class ${r.abc}`}>{r.abc}</span>
+                  <span className="text-[12px] font-semibold text-ink">{r.name}</span>
+                </td>
+                <td className="py-1.5 text-right text-[12px] font-bold tabular-nums text-ink">{formatMoney(r.ltv)}</td>
+                <td className="py-1.5 pl-2 text-right text-[10.5px] tabular-nums text-ink-muted">{r.gpPct != null ? `${Number(r.gpPct).toFixed(0)}% GP` : ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}

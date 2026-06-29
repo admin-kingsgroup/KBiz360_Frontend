@@ -117,5 +117,11 @@ export const ReceiptRegisterPage = (props) => <VoucherRegisterPage {...props} ca
 export const PaymentRegisterPage = (props) => <VoucherRegisterPage {...props} category="payment" title="Payment Register" />;
 export const ContraRegisterPage  = (props) => <VoucherRegisterPage {...props} category="contra"  title="Contra Register" />;
 export const JournalRegisterPage = (props) => <VoucherRegisterPage {...props} category="journal" title="Journal Register" />;
+// Refund (RF, full + partial) and Reissue (RI) are raised against a sale; Debit Note
+// (DN) is a purchase return. All three post like any other voucher, so they reuse the
+// same category-driven engine — only the `category` filter differs.
+export const RefundRegisterPage    = (props) => <VoucherRegisterPage {...props} category="refund"      title="Refund Register" />;
+export const ReissueRegisterPage   = (props) => <VoucherRegisterPage {...props} category="reissue"     title="Reissue Register" />;
+export const DebitNoteRegisterPage = (props) => <VoucherRegisterPage {...props} category="debit-note"  title="Debit Note Register" />;
 
 export default VoucherRegisterPage;

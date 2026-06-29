@@ -312,6 +312,13 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     // Module Sales/Purchase Register, Invoice-wise GP and Sales & GP Analytics
     // moved to the Finance pill (Finance ▸ Registers & Outstanding).
   ]},
+  // Adjustment registers — refund/reissue are raised against a sale, debit note is a
+  // purchase return. Each reuses the category-driven voucher register (Finance ▸ pages).
+  {label:"Refunds & Returns", children:[
+    {label:"Refund Register",     href:"/finance/refund-register"},
+    {label:"Reissue Register",    href:"/finance/reissue-register"},
+    {label:"Debit Note Register", href:"/finance/debit-note-register"},
+  ]},
   {label:"BSP & Airline", children:[
     {label:"BSP Summary",             href:"/purchase/bsp-summary"},
     {label:"BSP Statement Import",    href:"/purchase/bsp-import"},
@@ -568,7 +575,7 @@ function applyHidden(menus, currentUser){
 
 export function getMenu(branch, currentUser){
   const isAll   = branch==="ALL";
-  const isIndia = !isAll && branch?.code && ["TKHO","BOM","AMD"].includes(branch.code);
+  const isIndia = !isAll && branch?.code && ["BOMMB","BOM","AMD"].includes(branch.code);
   const taxSection = isAll ? TAX_ALL : isIndia ? TAX_INDIA : TAX_AFRICA;
   // Tax/GST reconciliation screens live ONLY under the Taxation pill now, so the
   // Accounts pill is the same regardless of branch regime.

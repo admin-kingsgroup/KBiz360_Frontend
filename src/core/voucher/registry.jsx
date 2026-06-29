@@ -127,6 +127,11 @@ function makeRcptPmt(side) {
         .map(([vno, v]) => ({ billVno: vno, billId: (s._billIds || {})[vno] || '', amount: +v }));
       return {
         ...common, party: s.party, partyType: isReceipt ? 'customer' : 'supplier',
+        // Party model carries NO lines — the journal is inferred from party + bankRef +
+        // total. Emit lines:[] EXPLICITLY so editing a line-model voucher (e.g. a Tally
+        // import stored as Dr/Cr lines) into the party model wipes the stale legs instead
+        // of leaving them on the document (a partial $set update wouldn't clear them).
+        lines: [],
         subtotal: net, total: gross, tdsAmt: tds, tdsSection: s.tds ? (s.tdsSection || '') : '',
         allocations, onAccount: sum.onAcc, applyMode: s.applyMode,
         remarks: s.remarks || `Being ${isReceipt ? 'receipt from' : 'payment to'} ${s.party} via ${s.paymentMode}${s.utr ? ` ref ${s.utr}` : ''}`,
@@ -293,6 +298,12 @@ function makeAdmAcm(kind) {
         reasonCode: s.reasonCode || '',
         counterParty: s.counterParty, counterPartyGroup: 'Sundry Creditors', againstInvoice: s.againstInvoice || '',
         gstMode: taxAmt > 0 ? s.gstMode : '', gstPct,
+        // The current ADM/ACM is BSP-only single-amount (posts from subtotal/total).
+        // Emit lines:[] EXPLICITLY so editing a legacy memo that still carries the old
+        // passOn-shape income lines wipes them — otherwise admLines/acmLines would post
+        // the stale line amount instead of the edited subtotal (a partial $set update
+        // wouldn't clear an omitted key). Same stale-field class as the party-edit bug.
+        lines: [],
         subtotal: amount, taxAmt, supplierAmt: amount, total: r2(amount + taxAmt),
         remarks: s.remarks || `Being ${isAdm ? 'Agent Debit' : 'Agent Credit'} Memo${s.reasonCode ? ` (${s.reasonCode})` : ''}`,
         status: 'saved',

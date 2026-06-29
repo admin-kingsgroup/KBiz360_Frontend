@@ -1315,7 +1315,7 @@ export function CustomerMasterDetail(){
               <CMDLabel label="Customer Code"><input style={{...inp,fontFamily:"monospace"}} defaultValue="CUST-BOM-00142"/></CMDLabel>
               <CMDLabel label="Customer Name"><input style={inp} defaultValue=""/></CMDLabel>
               <CMDLabel label="Type"><select style={inp}><option>Corporate</option><option>Individual</option><option>Sub-Agent</option><option>Govt / PSU</option></select></CMDLabel>
-              <CMDLabel label="Branch"><select style={inp}><option>TKHO</option><option>BOM</option><option>AMD</option></select></CMDLabel>
+              <CMDLabel label="Branch"><select style={inp}><option>BOMMB</option><option>BOM</option><option>AMD</option></select></CMDLabel>
               <CMDLabel label="Industry"><select style={inp}><option>Engineering & Construction</option><option>IT/ITES</option><option>Manufacturing</option><option>BFSI</option></select></CMDLabel>
               <CMDLabel label="Credit Limit"><input type="number" style={inp} defaultValue="5000000"/></CMDLabel>
               <CMDLabel label="Credit Days"><input type="number" style={inp} defaultValue="45"/></CMDLabel>

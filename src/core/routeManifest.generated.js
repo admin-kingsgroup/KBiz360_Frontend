@@ -76,6 +76,7 @@ export const APP_ROUTES = [
   "/finance/cash-book",
   "/finance/comments-demo",
   "/finance/contra-register",
+  "/finance/debit-note-register",
   "/finance/interest-calc",
   "/finance/investments",
   "/finance/journal-register",
@@ -92,7 +93,9 @@ export const APP_ROUTES = [
   "/finance/reco-queue",
   "/finance/refund",
   "/finance/refund-partial",
+  "/finance/refund-register",
   "/finance/reissue",
+  "/finance/reissue-register",
   "/finance/targets",
   "/finance/tds-calculator",
   "/finance/trial-balance",
@@ -307,8 +310,11 @@ export const APP_ROUTES = [
 // else gets a label derived from its path in core/pageCatalog.js.
 export const APP_ROUTE_LABELS = {
   "/finance/contra-register": "Contra Register",
+  "/finance/debit-note-register": "Debit Note Register",
   "/finance/journal-register": "Journal Register",
   "/finance/payment-register": "Payment Register",
   "/finance/receipt-register": "Receipt Register",
+  "/finance/refund-register": "Refund Register",
+  "/finance/reissue-register": "Reissue Register",
   "/finance/trial-balance": "Trial Balance"
 };

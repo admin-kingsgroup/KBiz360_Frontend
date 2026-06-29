@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { useModulePL, useBalanceSheet } from '../../../core/useAccounting';
 import { bc } from '../../../core/styles';
+import { localeOf } from '../../../core/format';
 import { CUR_MONTH, MONTH_OPTIONS, monthLabel, prevMonthKey } from '../../../core/dates';
 import { CONSOLIDATED_LABEL } from '../../../core/data';
 import { Select, LoadingState, ErrorState, EmptyState, PageSection } from '../../../shell/primitives';
@@ -72,7 +73,7 @@ export function ReportCF({ branch }) {
   ];
   if (Math.abs(other) >= 1) sections.push({ title: 'D. OTHER MOVEMENTS', color: '#5b616e', rows: [{ l: 'Unclassified / other balance movements', v: other, bold: true, border: true }] });
 
-  const f = (n) => { const abs = Math.abs(Math.round(n)); const s = cur + abs.toLocaleString('en-IN'); return n < 0 ? `(${s})` : s; };
+  const f = (n) => { const abs = Math.abs(Math.round(n)); const s = cur + abs.toLocaleString(localeOf(cur)); return n < 0 ? `(${s})` : s; };
   const clr = (n) => (n >= 0 ? '#16a34a' : '#dc2626');
   const hasData = !!qC.data && (Math.abs(closingCash) > 0.01 || Math.abs(openingCash) > 0.01 || Math.abs(netProfit) > 0.01);
 

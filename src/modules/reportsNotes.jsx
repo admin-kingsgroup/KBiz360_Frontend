@@ -17,7 +17,7 @@
 import React, { useMemo, useState } from 'react';
 import { FileSpreadsheet, Printer } from 'lucide-react';
 import { bc, RPT_thStyle, RPT_tdStyle } from '../core/styles';
-import { fmtINR } from '../core/format';
+import { fmtINR, localeOf } from '../core/format';
 import { CUR_FY, CUR_QUARTER, CUR_MONTH, MONTH_OPTIONS, todayISO, monthLabel, fyOptions, fyRange, fmtDate } from '../core/dates';
 import { useBalanceSheet, useProfitAndLoss, useTrialBalance, useAgeing, useLedgerStatement } from '../core/useAccounting';
 import { VoucherEditor } from './accountingLive';
@@ -32,7 +32,9 @@ import { openPrintPreview } from '../core/PrintPreview';
 
 const INK = '#1a1c22', GOLD = '#c2a04a', MUTE = '#5b616e', LINE = '#e6e8ec';
 const OK = '#3fb7a3', WARN = '#dc2626';
-const cell = (v) => { const x = Math.round(Number(v) || 0); return x ? x.toLocaleString('en-IN') : '—'; };
+// Bare-number cell (no symbol; the column/`cur` prefix carries the currency). Grouping
+// follows the branch locale — pass it via `loc`; each component shadows `cell` with its `cur`.
+const fmtCell = (v, loc = 'en-IN') => { const x = Math.round(Number(v) || 0); return x ? x.toLocaleString(loc) : '—'; };
 
 function lastDayISO(ym) { const [y, m] = String(ym).split('-').map(Number); const last = new Date(y, m, 0).getDate(); return `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`; }
 function periodOf(mode, fy, month) {
@@ -66,6 +68,7 @@ function notesToRows(notes) {
 
 /* ── reconciliation panel ─────────────────────────────────────────────── */
 function ReconRow({ label, line, cur }) {
+  const cell = (v) => fmtCell(v, localeOf(cur));
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5 }}>
       <span style={{ width: 16, height: 16, borderRadius: '50%', background: line.ok ? OK : WARN, color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{line.ok ? '✓' : '!'}</span>
@@ -75,6 +78,7 @@ function ReconRow({ label, line, cur }) {
   );
 }
 function ReconPanel({ recon, cur }) {
+  const cell = (v) => fmtCell(v, localeOf(cur));
   const allOk = recon.assets.ok && recon.liabilities.ok && recon.income.ok && recon.expenses.ok && recon.balanced !== false;
   return (
     <div className="mb-3.5 rounded-brand border border-l-4 border-surface-border bg-surface p-4 shadow-card" style={{ borderLeftColor: allOk ? OK : WARN }}>
@@ -101,6 +105,7 @@ function ReconPanel({ recon, cur }) {
 /* ── ageing block embedded in Trade Receivables / Payables notes ──────── */
 const AGE_BUCKETS = [['d0', '0–30', OK], ['d30', '31–60', GOLD], ['d60', '61–90', '#e9730c'], ['d90', '90+', WARN]];
 function AgeingBlock({ ageing, cur, onDrill }) {
+  const cell = (v) => fmtCell(v, localeOf(cur));
   const t = ageing.totals || {};
   const rows = (ageing.rows || []).filter((r) => (r.total || 0) !== 0);
   return (
@@ -139,6 +144,7 @@ function AgeingBlock({ ageing, cur, onDrill }) {
 
 /* ── one note's group→subgroup→ledger table ───────────────────────────── */
 function NoteTable({ note, cur, openG, toggleG, detailed, onDrill }) {
+  const cell = (v) => fmtCell(v, localeOf(cur));
   const cols = note.kind === 'movement'
     ? ['Opening', 'Additions', note.no === 6 ? 'Deductions / Depn' : 'Withdrawals', 'Closing']
     : note.kind === 'flow' ? ['Amount'] : ['Closing'];
@@ -194,6 +200,7 @@ function NoteTable({ note, cur, openG, toggleG, detailed, onDrill }) {
 
 /* ── ledger → voucher drill modal ─────────────────────────────────────── */
 function DrillModal({ ledger, branch, to, cur, onClose }) {
+  const cell = (v) => fmtCell(v, localeOf(cur));
   const [vid, setVid] = useState(null);
   const q = useLedgerStatement(ledger, branch, { to });
   const lines = q.data?.lines || [];

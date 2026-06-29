@@ -20,6 +20,8 @@
 //  nature, so the schedule is never blank as long as the books carry any data.
 // ════════════════════════════════════════════════════════════════════════
 
+import { localeOf } from '../core/format';
+
 const N = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const norm = (s) => String(s || '').trim().toLowerCase();
 
@@ -151,7 +153,7 @@ const sum = (arr, f) => (arr || []).reduce((s, x) => s + f(x), 0);
  * @param {object} ageing   /api/accounting/ageing response
  * @returns {{ notes: object[], recon: object }}
  */
-export function buildNotes({ bs, pl, tb, ageing } = {}) {
+export function buildNotes({ bs, pl, tb, ageing, cur = '₹' } = {}) {
   const tbRows = (tb && tb.rows) || [];
   const tbByName = new Map();
   const tbByGroup = new Map();
@@ -183,7 +185,7 @@ export function buildNotes({ bs, pl, tb, ageing } = {}) {
   const list = [...notes.values()].sort((a, b) => a.no - b.no);
   for (const n of list) {
     n.groups.forEach((g) => { g.subGroups.sort((a, b) => Math.abs(b.total) - Math.abs(a.total)); });
-    n.narrative = narrate(n);
+    n.narrative = narrate(n, cur);
   }
 
   // ── Reconciliation against the face of the statements ─────────────────
@@ -216,15 +218,16 @@ export function buildNotes({ bs, pl, tb, ageing } = {}) {
 }
 
 // Short auto-narrative per note (so even a collapsed note reads meaningfully).
-function narrate(n) {
+function narrate(n, cur = '₹') {
   const groups = n.groups.map((g) => g.group).join(', ');
+  const amt = (v) => `${cur}${Math.round(v).toLocaleString(localeOf(cur))}`;
   if (n.no === 4 && n.ageing) {
     const t = n.ageing.totals || {};
-    return `Trade receivables under ${groups}; ₹${Math.round(N(t.d60) + N(t.d90)).toLocaleString('en-IN')} outstanding beyond 60 days. Reconciles to the Balance Sheet.`;
+    return `Trade receivables under ${groups}; ${amt(N(t.d60) + N(t.d90))} outstanding beyond 60 days. Reconciles to the Balance Sheet.`;
   }
   if (n.no === 5 && n.ageing) {
     const t = n.ageing.totals || {};
-    return `Trade payables under ${groups}; ₹${Math.round(N(t.d60) + N(t.d90)).toLocaleString('en-IN')} outstanding beyond 60 days. Reconciles to the Balance Sheet.`;
+    return `Trade payables under ${groups}; ${amt(N(t.d60) + N(t.d90))} outstanding beyond 60 days. Reconciles to the Balance Sheet.`;
   }
   if (n.no === 2) return `Reserves, surplus and the carried-forward Profit & Loss balance. Reconciles to the Balance Sheet.`;
   if (n.no === 6) return `Fixed assets at cost less depreciation/deletions, with opening → closing movement. Reconciles to the Balance Sheet.`;

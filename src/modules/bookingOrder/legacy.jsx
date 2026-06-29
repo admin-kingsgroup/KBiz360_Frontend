@@ -9,23 +9,22 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Save, ArrowRight, Check, Lock, RefreshCw, Clock, CheckCircle2,
-  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil,
+  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil, RotateCcw,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../../core/styles.jsx';
 import { localeOf } from '../../core/format';
 import { todayISO } from '../../core/dates';
 import { PeriodBar, periodRange } from '../../core/period';
-import { openPrintPreview } from '../../core/PrintPreview';
-import { buildBookingInvoice } from '../../core/invoiceHtml';
+import { printBookingInvoice } from '../../core/printInvoice';
 import { apiGet, apiPost, apiPut } from '../../core/api';
 import { useOpenInb, useBookInb, useCreateInb } from '../../core/useInterBranchVoucher';
 import { useVNo } from '../../core/useNextNo';
 
 // Inter-branch jurisdiction (mirror of backend): same country (India) = IGST;
 // different country = cross-border export (zero-rated on the seller side).
-const INB_COUNTRY = { BOM: 'IN', AMD: 'IN', TKHO: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'FB' };
-const INB_ALL = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'TKHO'];
+const INB_COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'FB' };
+const INB_ALL = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'BOMMB'];
 const inbCrossBorder = (from, to) => (INB_COUNTRY[from] || 'IN') !== (INB_COUNTRY[to] || 'IN');
 import { AuditTrail } from '../../core/AuditTrail';
 import { useLedgerRegistry } from '../../core/useReference';
@@ -171,7 +170,8 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange })
               </div>
               <input value={leg.costCenter} onChange={(e) => setLeg(i, { costCenter: e.target.value.toUpperCase() })} placeholder="Cost Centre" style={{ ...cell, width: 120 }} />
               <input value={leg.purTallyRef} onChange={(e) => setLeg(i, { purTallyRef: e.target.value })} placeholder="Supplier Inv. No (Tally ref)" style={{ ...cell, width: 170 }} />
-              <select value={leg.gstMode} onChange={(e) => setLeg(i, { gstMode: e.target.value })} style={{ ...cell, width: 'auto' }}><option value="intra">Intra (CGST+SGST)</option><option value="inter">Inter (IGST)</option></select>
+              {/* VAT has no intra/inter split — hidden on Africa branches. */}
+              {!isVatBranch(brCode) && <select value={leg.gstMode} onChange={(e) => setLeg(i, { gstMode: e.target.value })} style={{ ...cell, width: 'auto' }}><option value="intra">Intra (CGST+SGST)</option><option value="inter">Inter (IGST)</option></select>}
               <button type="button" onClick={() => del(i)} style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: '#c0392b', fontSize: 16 }} title="Remove leg">×</button>
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -181,13 +181,12 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange })
               ))}
               <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service Charge<br />
                 <input type="number" min="0" value={leg.line.psvc ?? ''} onChange={(e) => setLine(i, 'psvc', e.target.value)} style={cell} /></label>
-              {pkg && <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service Charge GST<br />
+              {pkg && <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service Charge {isVatBranch(brCode) ? 'VAT' : 'GST'}<br />
                 <input type="number" min="0" value={leg.line.psvcGst ?? ''} onChange={(e) => setLine(i, 'psvcGst', e.target.value)} style={cell} /></label>}
               <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supp Comm/Inc Rcvd<br />
                 <input type="number" min="0" value={leg.line.incentive ?? ''} onChange={(e) => setLine(i, 'incentive', e.target.value)} style={cell} /></label>
-              {pkg && <label style={{ fontSize: 10.5, color: '#6b5a1e', display: 'flex', alignItems: 'center', gap: 5, paddingBottom: 6 }}>
-                <input type="checkbox" checked={!!leg.availItc} onChange={(e) => setLeg(i, { availItc: e.target.checked })} /> Avail ITC (tour-operator GST)</label>}
-              <div style={{ marginLeft: 'auto', paddingBottom: 4, fontSize: 12, fontWeight: 700, color: '#1a1c22' }}>Net payable ₹{fmt(po.total)}{num(po.gst) > 0 ? ` · ITC ₹${fmt(po.gst)}` : ''}</div>
+              {pkg && <span style={{ fontSize: 10, color: '#6b5a1e', fontStyle: 'italic', alignSelf: 'flex-end', paddingBottom: 8 }}>Supplier {isVatBranch(brCode) ? 'VAT' : 'GST'} auto-claimed as ITC</span>}
+              <div style={{ marginLeft: 'auto', paddingBottom: 4, fontSize: 12, fontWeight: 700, color: '#1a1c22' }}>Net payable {bc({ code: brCode }).cur}{fmt(po.total)}{num(po.gst) > 0 ? ` · ITC ${bc({ code: brCode }).cur}${fmt(po.gst)}` : ''}</div>
             </div>
           </div>
         );
@@ -212,7 +211,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // RF/RI are reversal modules with no fare-grid spec — fall back to SF so the
   // (unused) fare-grid hooks below stay safe; the reversal entry is rendered via an
   // early return before any of the fare-grid UI shows.
-  const spec = VSPECS[moduleCode] || VSPECS.SF;
+  const specRaw = VSPECS[moduleCode] || VSPECS.SF;
+  // Africa/VAT branches don't levy India's K3 (airline) tax on international air — drop
+  // the K3 fare column so the whole SO/PO/GP grid (header/body/footer/sectors/GP) hides
+  // it consistently. K3 is always 0 there, so the totals & posted heads are unchanged.
+  const spec = isVatBranch(brCode) && (specRaw.fareCols || []).some((c) => c.key === 'k3')
+    ? { ...specRaw, fareCols: specRaw.fareCols.filter((c) => c.key !== 'k3') }
+    : specRaw;
 
   const [lines, setLines] = useState(() => {
     if (editing) return rowsForEdit(VSPECS[initModule] || VSPECS.SF, editBooking);
@@ -298,6 +303,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const isNoSupp = moduleCode === 'SM' && noSupplier;
   // "Without VAT" is offered only on Africa/VAT branches; India ignores it.
   const isVatBr = isVatBranch(brCode);
+  // Tax label drives every "GST" caption on the grid: Africa shows VAT, India GST.
+  const taxLabel = isVatBr ? 'VAT' : 'GST';
   const effNoVat = isVatBr && noVat;
   const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat }), [spec, lines, packageType, isNoSupp, brCode, effNoVat]);
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
@@ -748,12 +755,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {!customer.name.trim()}
             </FL>
           )}
-          <FL label="Sale GST mode"><select value={saleGstMode} onChange={(e) => setSaleGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
+          {/* VAT has no intra/inter (place-of-supply) split — these CGST/SGST vs IGST
+              selectors are India-only and are hidden on Africa/VAT branches. */}
+          {!isVatBr && <FL label="Sale GST mode"><select value={saleGstMode} onChange={(e) => setSaleGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>}
           {!isNoSupp && !interBranch && <FL label="Supplier ledger (Pay to) *">
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
               onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
           </FL>}
-          {!isNoSupp && <FL label="Purchase GST mode"><select value={purGstMode} onChange={(e) => setPurGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>}
+          {!isNoSupp && !isVatBr && <FL label="Purchase GST mode"><select value={purGstMode} onChange={(e) => setPurGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>}
           {hasPackage && <FL label="Package type *"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={{ ...inp, paddingRight: 26 }}><option value="">Select International / Domestic</option><option value="Domestic">Domestic</option><option value="International">International</option></select>
           </FL>}
         </div>
@@ -763,7 +772,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', padding: '8px 14px', marginBottom: 12, background: '#FDFAF4', border: '1px solid #eee3cf', borderRadius: 8, flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#fff', border: '1px solid #C49A3C' }} /> Manual — you enter</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#faf7ef', border: '1px dashed #9A9A9A' }} /> Auto — calculated</span>
-        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · {pkg ? 'Holiday package: 5% GST on (Base Fare + Supplier Service Charge + Supplier Service Charge GST + Service Charge - 2); Intl adds 2% TCS' : 'Service Charge - 2 is GST-inclusive (GST = Service Charge - 2 × 18 ÷ 118), posted to separate GST ledgers'}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · {pkg ? `Holiday package: ${activeRate}% ${taxLabel} on (Base Fare + Supplier Service Charge + Service Charge - 2); supplier ${taxLabel} claimed as Input (ITC), not billed to client${isVatBr ? '' : '; Intl adds 2% TCS'}` : `Service Charge - 2 is ${taxLabel}-inclusive (${taxLabel} = Service Charge - 2 × ${activeRate} ÷ ${100 + activeRate}), posted to separate ${taxLabel} ledgers`}</span>
       </div>
 
       {/* ① Sales Order */}
@@ -774,7 +783,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {spec.idCols.map((c) => <th key={c.key} style={{ ...soHdrL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
               {spec.fareCols.map((c) => <th key={c.key} style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
               {!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Charge - 2</th>}{!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Fee</th>}
-              {!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>GST/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>GST/Service Charge - 2 ({pkg ? 5 : activeRate}%)</th>}<th style={{ ...soHdr, width: 110, whiteSpace: 'normal' }}>Total</th><th style={{ ...soHdr, width: 45 }}></th>
+              {!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{taxLabel}/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{taxLabel}/Service Charge - 2 ({pkg ? 5 : activeRate}%)</th>}<th style={{ ...soHdr, width: 110, whiteSpace: 'normal' }}>Total</th><th style={{ ...soHdr, width: 45 }}></th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -841,10 +850,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {spec.fareCols.map((c) => <th key={c.key} style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
               <th style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>Supplier Service Charge</th>
               {pkg
-                ? <th style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>Supplier Service Charge GST (18%)</th>
-                : <th style={{ ...poHdr, width: 95, whiteSpace: 'normal', background: '#FBF3DE', color: GOLD_DEEP }}>GST ({activeRate}%)</th>}
+                ? <th style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>Supplier Service Charge {taxLabel} ({activeRate}%)</th>
+                : <th style={{ ...poHdr, width: 95, whiteSpace: 'normal', background: '#FBF3DE', color: GOLD_DEEP }}>{taxLabel} ({activeRate}%)</th>}
               <th style={{ ...poHdr, width: 100, whiteSpace: 'normal' }}>Supp Comm/Inc Rcvd</th>
-              <th style={{ ...poHdr, width: 85 }}>TDS (2%)</th>
+              <th style={{ ...poHdr, width: 85 }}>{isVatBr ? 'WHT' : 'TDS (2%)'}</th>
               <th style={{ ...poHdr, width: 110 }}>Total</th>
             </tr></thead>
             <tbody>
@@ -894,8 +903,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* ③ Gross Profit */}
       <Section n="3" badge="GP" name="Gross Profit" sub="GP = net sales − net purchase · % on final sales value" accent={GP_BAR}>
         <div className="mb-3 grid grid-cols-1 gap-3 tablet:grid-cols-3">
-          <GpCard k={'Total Sales (incl GST' + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(totals.so.total)} color={DARK} bg="#FFFDF7" />
-          <GpCard k="Total Purchase (incl GST)" v={cur + ' ' + fmt(totals.po.total)} color={CR} bg="#FFFAEC" />
+          <GpCard k={'Total Sales (incl ' + taxLabel + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(totals.so.total)} color={DARK} bg="#FFFDF7" />
+          <GpCard k={'Total Purchase (incl ' + taxLabel + ')'} v={cur + ' ' + fmt(totals.po.total)} color={CR} bg="#FFFAEC" />
           <GpCard k="Gross Profit" v={cur + ' ' + fmt(totals.gp.total)} color={DR} pct={totals.gp.pct + '% margin'} bg="#FCF3DE" />
         </div>
         {totals.so.tcs > 0 && (
@@ -907,8 +916,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
             <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #cdd1d8' }}>
               <th style={{ ...thA, ...thL, width: 140 }}>First Name</th><th style={{ ...thA, ...thL, width: 140 }}>Surname</th>
-              <th style={{ ...thA, width: 110 }}>Final Sales</th><th style={{ ...thA, width: 85 }}>SVF GST ({activeRate}%)</th><th style={{ ...thA, width: 85 }}>SVC2 GST ({activeRate}%)</th><th style={{ ...thA, width: 110 }}>Final Purchase</th><th style={{ ...thA, width: 95 }}>Purchase GST ({pkg ? 18 : activeRate}%)</th>
-              <th style={{ ...thA, width: 95 }}>Supp Comm/Inc Rcvd</th><th style={{ ...thA, width: 80 }}>TDS (2%)</th>
+              <th style={{ ...thA, width: 110 }}>Final Sales</th><th style={{ ...thA, width: 85 }}>SVF {taxLabel} ({activeRate}%)</th><th style={{ ...thA, width: 85 }}>SVC2 {taxLabel} ({activeRate}%)</th><th style={{ ...thA, width: 110 }}>Final Purchase</th><th style={{ ...thA, width: 95 }}>Purchase {taxLabel} ({activeRate}%)</th>
+              <th style={{ ...thA, width: 95 }}>Supp Comm/Inc Rcvd</th><th style={{ ...thA, width: 80 }}>{isVatBr ? 'WHT' : 'TDS (2%)'}</th>
               <th style={{ ...thA, width: 110 }}>Gross Profit</th><th style={{ ...thA, width: 80 }}>GP %</th>
             </tr></thead>
             <tbody>
@@ -1248,7 +1257,7 @@ const sumT = (rows, path) => rows.reduce((s, b) => s + ((b[path] && b[path].tota
 const gpPctOf = (gp, sale) => (sale ? (gp / sale) * 100 : 0);
 const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
-function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, onInvoice, busyId, sel, onToggleSel }) {
+function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, onRevoke, canRevoke, onInvoice, busyId, sel, onToggleSel }) {
   const cols = mode === 'approved'
     ? ['', 'Booking No', 'Booking Date', 'Link No', 'Tally Ref', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
     : mode === 'rejected'
@@ -1294,7 +1303,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
               <React.Fragment key={b.id}>
                 <tr onClick={() => setOpen(isOpen ? null : b.id)} style={{ borderBottom: '1px solid #dfe2e7', cursor: 'pointer', background: isOpen ? '#faf7ef' : '#fff' }}>
                   <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{mode === 'pending' && onToggleSel && <input type="checkbox" checked={!!(sel && sel.has(b.id))} onChange={() => onToggleSel(b.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} />}{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
-                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}{mode === 'pending' && b.validation?.hasErrors ? <span title={(b.validation.errors || []).join(' · ')} style={{ marginLeft: 6, color: '#dc2626', fontWeight: 800 }}>⚠</span> : null}</td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}{mode === 'pending' && b.validation?.hasErrors ? <span title={(b.validation.errors || []).join(' · ')} style={{ marginLeft: 6, color: '#dc2626', fontWeight: 800 }}>⚠</span> : null}{mode === 'pending' && b.revokedAt ? <span title={`Revoked${b.revokedBy ? ' by ' + b.revokedBy : ''}${b.revokeReason ? ' — ' + b.revokeReason : ''}`} style={{ marginLeft: 6, fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 20, background: GOLD_SOFT, color: '#8a6d12', border: '1px solid ' + GOLD_LINE, whiteSpace: 'nowrap' }}>⟲ Revoked</span> : null}</td>
                   {(mode === 'approved' || mode === 'pending') && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5b616e' }}>{b.date || '—'}</td>}
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: BLUE, fontSize: 11.5 }}>{b.linkNo}</td>
                   {(mode === 'pending' || mode === 'approved') && <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, color: '#5b616e', whiteSpace: 'nowrap' }} title="Sales / Purchase Tally Ref">{(b.saleTallyRef || '—')}{b.purTallyRef ? ' / ' + b.purTallyRef : ''}</td>}
@@ -1326,12 +1335,13 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                         {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} title="Delete — remove from Pending, view-only (number not reusable)" style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: '#dc2626' }}><Trash2 size={12} /> Delete</button>}
                       </div>
                     ) : mode === 'approved' ? (
-                      // Edit is open to everyone (it un-posts the booking → Pending → re-approve);
-                      // Delete is admin-only (Super Admin / Director).
+                      // An approved booking is READ-ONLY: Revoke un-posts all its legs and
+                      // returns it to Pending (edit there, then re-approve under the SAME
+                      // numbers). Revoke is approver-only; Delete is admin-only.
                       <div style={{ display: 'flex', gap: 6 }}>
-                        {onEdit && <button disabled={busyId === b.id} onClick={() => onEdit(b)} title="Edit — reverses the posted Sales/Purchase out of the books and returns this to Pending for re-approval" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit</button>}
+                        {canRevoke && onRevoke && <button disabled={busyId === b.id} onClick={() => onRevoke(b)} title="Revoke — un-post the Sales/Purchase and return this booking to Pending so it can be edited & re-approved (numbers kept)" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: GOLD, borderColor: '#e3cd97' }}><RotateCcw size={12} /> Revoke</button>}
                         {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#dc2626', borderColor: '#f3c9c9' }}><Trash2 size={12} /> Delete</button>}
-                        {!onEdit && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
+                        {!(canRevoke && onRevoke) && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
                       </div>
                     ) : mode === 'deleted' ? (
                       <span style={{ fontSize: 11, color: '#9197a3' }} title={b.deletedReason || ''}>{b.deletedBy || '—'}{b.deletedReason ? ` · ${b.deletedReason}` : ''}</span>
@@ -1461,6 +1471,33 @@ export function PendingBookings({ branch, setRoute }) {
 }
 
 const isAdminRole = (u) => ['Super Admin', 'Director'].includes(u?.role);
+// Revoking un-posts a posted booking — approver-level roles only (the server enforces
+// this too; this just gates the button). Stricter than approving, looser than delete.
+const isApproverRole = (u) => ['Super Admin', 'Director', 'Senior Finance Manager', 'Sr. Accounts Executive'].includes(u?.role);
+
+// Shared Revoke handler factory for the booking screens — runs the server preflight so
+// the dialog shows the blast radius (which legs un-post) and any warnings, blocks on a
+// hard block, requires a reason, then posts the revoke and refreshes both books roots.
+function makeOnRevoke({ qc, setBusyId, setOpen, toastFn }) {
+  return async (b) => {
+    let pre = null;
+    try { pre = await apiGet('/api/booking-orders/' + b.id + '/revoke-check'); }
+    catch (e) { toastFn(e.message || 'Could not check this booking', 'error'); return; }
+    if (pre && (pre.blocks || []).length) { toastFn(`Can't revoke — ${pre.blocks.map((x) => x.msg).join(' ')}`, 'error'); return; }
+    const warns = (pre?.warnings || []).map((w) => w.msg).filter(Boolean);
+    const legs = (pre?.legs || []).filter(Boolean);
+    const { confirmed, reason } = await confirmDialog({
+      title: `Revoke booking ${b.bookingNo}?`,
+      message: `This un-posts its ${legs.length || ''} spawned invoice(s)${legs.length ? ` (${legs.join(', ')})` : ''} and returns the booking to Pending for editing & re-approval (the numbers are kept).${warns.length ? ' Note: ' + warns.join(' ') : ''}`,
+      danger: true, reasonRequired: true, reasonLabel: 'Reason for revoke', confirmLabel: 'Revoke',
+    });
+    if (!confirmed) return;
+    setBusyId(b.id);
+    try { await apiPost('/api/booking-orders/' + b.id + '/revoke', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); setOpen(null); toastFn(`Revoked ${b.bookingNo} → Pending`); }
+    catch (e) { toastFn(e.message || 'Revoke failed', 'error'); }
+    finally { setBusyId(null); }
+  };
+}
 
 export function ApprovedBookings({ branch, setRoute, currentUser }) {
   const brCode = brCodeOf(branch) || 'ALL';
@@ -1471,6 +1508,8 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
   const [busyId, setBusyId] = useState(null);
   const [groupBy, setGroupBy] = useState('none');
   const canDelete = isAdminRole(currentUser);
+  const canRevoke = isApproverRole(currentUser);
+  const onRevoke = makeOnRevoke({ qc, setBusyId, setOpen, toastFn: toast });
 
   const rows = data.filter((b) => b.status === 'approved' || b.status === 'posted');
 
@@ -1497,7 +1536,7 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
         <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>
       <div><GroupByBar value={groupBy} onChange={setGroupBy} /></div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" groupBy={groupBy} onDelete={onDelete} canDelete={canDelete} busyId={busyId} />
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" groupBy={groupBy} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} busyId={busyId} />
     </div>
   );
 }
@@ -1543,16 +1582,30 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   const [groupBy, setGroupBy] = useState('none');
   const [sel, setSel] = useState(() => new Set());
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
+  const [search, setSearch] = useState('');
   const canDelete = isAdminRole(currentUser);
   const inRange = (dt) => (!range.from || dt >= range.from) && (!range.to || dt <= range.to);
+  // Search filters the visible list by Booking No, Link No, module, customer, supplier,
+  // posted Sale/Purchase Vch No, or amount. Counts (tab badges) stay unfiltered.
+  const needle = search.trim().toLowerCase();
+  const matchBooking = (b) => {
+    if (!needle) return true;
+    const hay = [b.bookingNo, b.linkNo, b.module, b.customer && b.customer.name, b.supplier && b.supplier.name, b.saleVno, b.purchaseVno, String(Math.round(b.saleTotal || 0))].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(needle);
+  };
+  // Newest first: date desc, then Booking No desc (numeric-aware) as a stable tiebreak.
+  const cmpLatest = (a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.bookingNo || '').localeCompare(String(a.bookingNo || ''), undefined, { numeric: true });
 
   // Bookings edited ≥ once (cross-cuts status) — its own source for the Edited tab.
   const editedQ = useQuery({ queryKey: ['booking-edited', brCode], queryFn: () => apiGet('/api/booking-orders/edited', { branch: brCode === 'ALL' ? '' : brCode }) });
   const editedRows = (editedQ.data || []).filter((r) => inRange(r.date || ''));
+  const editedVisible = editedRows
+    .filter((r) => !needle || [r.bookingNo, r.linkNo, r.module, r.customer, r.lastBy, r.lastReason, String(Math.round(r.saleTotal || 0))].filter(Boolean).join(' ').toLowerCase().includes(needle))
+    .slice().sort((a, b) => String(b.lastAt || '').localeCompare(String(a.lastAt || '')));
   const bucket = (b) => (b.status === 'posted' ? 'approved' : b.status);
   const counts = { pending: 0, approved: 0, rejected: 0, deleted: 0, edited: editedRows.length };
   data.forEach((b) => { if (counts[bucket(b)] !== undefined && inRange(b.date || '')) counts[bucket(b)]++; });
-  const rows = data.filter((b) => bucket(b) === status && inRange(b.date || ''));
+  const rows = data.filter((b) => bucket(b) === status && inRange(b.date || '') && matchBooking(b)).sort(cmpLatest);
   const allIds = rows.map((b) => b.id);
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
@@ -1595,6 +1648,8 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
     try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); setOpen(null); setMsg(`✓ Deleted ${b.bookingNo}.`); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Delete failed')); } finally { setBusyId(null); }
   };
+  const canRevoke = isApproverRole(currentUser);
+  const onRevoke = makeOnRevoke({ qc, setBusyId, setOpen, toastFn: (m, kind) => setMsg((kind === 'error' ? '⚠ ' : '✓ ') + m) });
   const onApproveSelected = async () => {
     if (!sel.size) return;
     const { confirmed } = await confirmDialog({ title: `Approve ${sel.size} selected voucher(s)?`, message: 'Each posts its linked Sales + Purchase.', confirmLabel: 'Approve' });
@@ -1623,6 +1678,18 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
       {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, padding: '8px 12px', color: msg.startsWith('⚠') ? '#dc2626' : '#16a34a', background: msg.startsWith('⚠') ? '#fbe9e9' : '#e8f6ed', border: '1px solid ' + (msg.startsWith('⚠') ? '#f3c9c9' : '#cde3b6') }}>{msg}</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
         <GroupByBar value={groupBy} onChange={setGroupBy} />
+        <div style={{ position: 'relative', flex: '0 1 360px', minWidth: 200 }}>
+          <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#9197a3', pointerEvents: 'none' }}>🔍</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search Booking No · Link · customer · supplier · amount…"
+            aria-label="Search bookings"
+            style={{ width: '100%', padding: '6px 26px 6px 28px', border: '1px solid #cdd1d8', borderRadius: 7, fontSize: 12, outline: 'none', background: '#fff' }}
+          />
+          {search && <button onClick={() => setSearch('')} aria-label="Clear search" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: '#9197a3', fontSize: 14, lineHeight: 1 }}>✕</button>}
+        </div>
+        {needle && <span style={{ fontSize: 11, color: '#5b616e', fontWeight: 700 }}>{(status === 'edited' ? editedVisible.length : rows.length)} match{(status === 'edited' ? editedVisible.length : rows.length) === 1 ? '' : 'es'}</span>}
         {status === 'pending' && rows.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
@@ -1631,8 +1698,8 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
         )}
       </div>
       {status === 'edited'
-        ? <EditedBookingsList rows={editedRows} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
-        : <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: buildBookingInvoice(b, side, branch, master) }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />}
+        ? <EditedBookingsList rows={editedVisible} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
+        : <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />}
     </div>
   );
 }
@@ -1670,7 +1737,7 @@ function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
                 {isOpen && (
                   <tr><td colSpan={10} style={{ padding: 12, background: '#f7f8fb', borderBottom: '1px solid #cdd1d8' }}>
                     <div style={{ fontWeight: 800, fontSize: 12, color: DARK, marginBottom: 8 }}>Audit trail — {r.bookingNo}</div>
-                    <AuditTrail entityType="booking" entityId={r.id} />
+                    <AuditTrail entityType="booking" entityId={r.id} cur={cur} />
                   </td></tr>
                 )}
               </React.Fragment>

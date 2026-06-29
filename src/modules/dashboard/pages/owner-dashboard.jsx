@@ -76,43 +76,12 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch }) {
   const bq = useQueries({ queries: brList.map((b) => ({ queryKey: ['accounting', 'module-pl', b.code, dates.from, dates.to, 'summary'], queryFn: () => apiGet('/api/accounting/module-pl', { branch: b.code, from: dates.from, to: dates.to, summary: 1 }) })) });
   const branchRows = brList.map((b, i) => { const d = bq[i].data || {}; return { code: b.code, sales: d?.totals?.sales || 0, gp: d?.totals?.gp || 0, net: d?.bridge?.netProfit || 0 }; });
 
-  const Controls = (
-    <div className="mb-3.5 mt-1 flex flex-wrap items-center gap-2.5">
-      <PeriodBar branch={branchArg} defaultPreset="all" onChange={setPeriod} />
-      <span className="py-1 text-[11px] font-bold text-ink-muted">
-        Scope: {effScope === 'ALL' ? 'All branches (Consolidated)' : effScope} — set via the branch selector (top-right)
-      </span>
-    </div>
-  );
-
-  if (isError && !data) {
-    return <DashboardError error={error} onRetry={refetch} title="Could not load the Owner Dashboard." />;
-  }
-  if (isLoading || !data) {
-    return <DashboardSkeleton numKpis={12} />;
-  }
-
-  const { revenueTrend, topCustomers, topSuppliers } = data;
-  const fig = data.figures || { revenue: 0, gp: 0, gpPct: 0, netProfit: 0, outstanding: 0, payable: 0, cash: 0 };
-  const pb = data.pendingBookings || { count: 0, sales: 0, gp: 0 };
-  const ab = data.approvedBookings || { count: 0, sales: 0, gp: 0 };
-  const rangeShort = period.label || 'Period';
-
-  const assets = bs.assets || [], liabs = bs.liabilities || [];
-  const aT = assets.reduce((s, a) => s + (a.amount || 0), 0);
-  const lT = liabs.reduce((s, a) => s + (a.amount || 0), 0);
-  const balanced = Math.abs(aT - lT) < 1;
-  const netWorth = liabs.filter((l) => /capital|reserve|profit|equity|surplus/i.test(l.group || l.name || '')).reduce((s, l) => s + (l.amount || 0), 0);
-  const bankRows = (trial.rows || []).filter(isLiquidRow);
-  const bal = (r) => (r.closingDebit || 0) - (r.closingCredit || 0);
-  const liquid = bankRows.reduce((s, r) => s + bal(r), 0) || fig.cash || totalCashInr;
-  const arOverdue = age?.receivables?.totals?.d90 || 0;
-  const mods = (mpl.modules || []).slice().sort((a, b) => (b.gp || 0) - (a.gp || 0));
-
   // ── Per-branch headline KPIs (Group/ALL scope only) ──
   // Stitch each money KPI from the matching hook's `byBranch` slice so every branch's
   // Cash & Bank / Revenue / GP / NP / Receivables / Payables / Tax prints in its OWN
   // currency — never a merged cross-currency ₹ sum. Keyed by branch code.
+  // Declared ABOVE the isError/isLoading early returns so the hook order is stable
+  // across loading→loaded renders (a useMemo after an early return throws React #300).
   const liquidOf = (rows) => (rows || []).filter(isLiquidRow).reduce((s, r) => s + ((r.closingDebit || 0) - (r.closingCredit || 0)), 0);
   const perBranchKpis = React.useMemo(() => {
     if (!isAll) return [];
@@ -148,6 +117,39 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch }) {
       };
     });
   }, [isAll, mpl.byBranch, trial.byBranch, bs.byBranch, age.byBranch, tax.byBranch]);
+
+  const Controls = (
+    <div className="mb-3.5 mt-1 flex flex-wrap items-center gap-2.5">
+      <PeriodBar branch={branchArg} defaultPreset="all" onChange={setPeriod} />
+      <span className="py-1 text-[11px] font-bold text-ink-muted">
+        Scope: {effScope === 'ALL' ? 'All branches (Consolidated)' : effScope} — set via the branch selector (top-right)
+      </span>
+    </div>
+  );
+
+  if (isError && !data) {
+    return <DashboardError error={error} onRetry={refetch} title="Could not load the Owner Dashboard." />;
+  }
+  if (isLoading || !data) {
+    return <DashboardSkeleton numKpis={12} />;
+  }
+
+  const { revenueTrend, topCustomers, topSuppliers } = data;
+  const fig = data.figures || { revenue: 0, gp: 0, gpPct: 0, netProfit: 0, outstanding: 0, payable: 0, cash: 0 };
+  const pb = data.pendingBookings || { count: 0, sales: 0, gp: 0 };
+  const ab = data.approvedBookings || { count: 0, sales: 0, gp: 0 };
+  const rangeShort = period.label || 'Period';
+
+  const assets = bs.assets || [], liabs = bs.liabilities || [];
+  const aT = assets.reduce((s, a) => s + (a.amount || 0), 0);
+  const lT = liabs.reduce((s, a) => s + (a.amount || 0), 0);
+  const balanced = Math.abs(aT - lT) < 1;
+  const netWorth = liabs.filter((l) => /capital|reserve|profit|equity|surplus/i.test(l.group || l.name || '')).reduce((s, l) => s + (l.amount || 0), 0);
+  const bankRows = (trial.rows || []).filter(isLiquidRow);
+  const bal = (r) => (r.closingDebit || 0) - (r.closingCredit || 0);
+  const liquid = bankRows.reduce((s, r) => s + bal(r), 0) || fig.cash || totalCashInr;
+  const arOverdue = age?.receivables?.totals?.d90 || 0;
+  const mods = (mpl.modules || []).slice().sort((a, b) => (b.gp || 0) - (a.gp || 0));
 
   const pageSubtitle = effScope === 'ALL' ? 'Group view — all branches consolidated' : `Branch view — ${effScope} only`;
 

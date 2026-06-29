@@ -105,6 +105,8 @@ export function DataTable({
   toolbar,
   className = '',
   minWidth = '44rem',
+  numberLocale = 'en-IN',         // digit grouping for raw-number columns in the print export;
+                                  // branch-scoped screens pass localeOf(cur) so USD prints 123,456 not 1,23,456
 }) {
   const [sort, setSort] = useState(initialSort);
   const [query, setQuery] = useState('');
@@ -188,7 +190,7 @@ export function DataTable({
   };
 
   const doPrint = () => {
-    const fmt = (v, col) => (isRightCol(col) && typeof v === 'number' ? v.toLocaleString('en-IN') : (v == null ? '' : String(v)));
+    const fmt = (v, col) => (isRightCol(col) && typeof v === 'number' ? v.toLocaleString(numberLocale) : (v == null ? '' : String(v)));
     const align = (col) => (isRightCol(col) ? 'right' : col.align === 'center' ? 'center' : 'left');
     const head = exportCols.map((c) => `<th style="text-align:${align(c)};padding:6px 10px;border-bottom:2px solid #0d1326;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#0d1326;white-space:nowrap">${escHtml(c.header ?? c.key)}</th>`).join('');
     const body = sorted.map((r, i) => `<tr style="background:${i % 2 ? '#f7f8fb' : '#fff'}">${exportCols.map((c) => `<td style="text-align:${align(c)};padding:5px 10px;border-bottom:1px solid #dfe2e7;font-size:11px;color:#1a1a1a">${escHtml(fmt(valueFor(r, c), c))}</td>`).join('')}</tr>`).join('');

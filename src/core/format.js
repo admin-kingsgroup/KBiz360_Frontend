@@ -42,6 +42,12 @@ export function compactAmt(n, { currency = '₹', dash = false } = {}) {
 // Back-compat ₹ wrapper — delegates to the canonical formatter so the rules stay in one place.
 export const fmtINR = n => compactAmt(n, { currency: '₹' });
 
+// Canonical FULL amount (no Cr/L abbreviation), branch-currency aware. The single
+// source for screens that print exact figures (registers, vouchers, statements):
+// ₹ + Indian lakh/crore grouping for India branches, $/other + Western thousands
+// grouping for USD branches (NBO/DAR/FBM). Pass the branch currency symbol as `cur`.
+export const money = (n, cur = '₹') => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
+
 /* ════════════════════════════════════════════════════════════════════
    A. DIRECTOR DASHBOARD
    ════════════════════════════════════════════════════════════════════ */

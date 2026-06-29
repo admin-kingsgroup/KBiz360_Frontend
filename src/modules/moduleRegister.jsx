@@ -14,8 +14,7 @@ import { companyProfile } from '../core/referenceCache';
 import { bc } from '../core/styles';
 import { localeOf } from '../core/format';
 import { PeriodBar, periodRange } from '../core/period';
-import { openPrintPreview } from '../core/PrintPreview';
-import { buildBookingInvoice } from '../core/invoiceHtml';
+import { printBookingInvoice } from '../core/printInvoice';
 import { useReportExport } from '../core/reportExportContext';
 import { Search, X, Receipt, FileText } from 'lucide-react';
 import { PageLayout } from '../shell/PageLayout';
@@ -118,7 +117,7 @@ export function ModuleRegister({ branch, mode = 'both' }) {
   const custMap = byName(custs), supMap = byName(sups);
   const print = (b, side) => {
     const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()];
-    openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: buildBookingInvoice(b, side, branch, master) });
+    printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` });
   };
   const showSale = mode !== 'purchase', showPur = mode !== 'sales';
   const heading = mode === 'sales' ? 'Module Sales Register' : mode === 'purchase' ? 'Module Purchase Register' : 'Module Sales & Purchase Register';

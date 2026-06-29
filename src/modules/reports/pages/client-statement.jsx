@@ -12,6 +12,7 @@
 import React, { useState } from 'react';
 import { Printer, MessageCircle } from 'lucide-react';
 import { bc } from '../../../core/styles';
+import { localeOf } from '../../../core/format';
 import { useGpBills, useLedgerStatement } from '../../../core/useAccounting';
 import { ReportSearch, ReportDateBar, resolveReportRange, matchNeedle } from '../../../core/reportDateBar';
 import { PageLayout } from '../../../shell/PageLayout';
@@ -55,7 +56,7 @@ export function ClientStatement({ branch }) {
     if (days <= 30) ageing.a0 += t.dr; else if (days <= 60) ageing.a30 += t.dr; else if (days <= 90) ageing.a60 += t.dr; else ageing.a90 += t.dr;
   });
 
-  const f = (n) => cur + Number(Math.round(n)).toLocaleString('en-IN');
+  const f = (n) => cur + Number(Math.round(n)).toLocaleString(localeOf(cur));
   const balText = (v) => `${f(Math.abs(v))}${v > 0 ? ' Dr' : v < 0 ? ' Cr' : ''}`;
 
   const KPIS = [

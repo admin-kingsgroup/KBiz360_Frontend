@@ -20,7 +20,7 @@ import { exportToExcel, vouchersToSheet } from '../../core/exportExcel';
 import { voucherHaystack, bookingTravelDetail } from '../../core/registerSearch';
 import { isVatBranch } from '../../core/voucherSpecs';
 import { openPrintPreview } from '../../core/PrintPreview';
-import { buildBookingInvoice } from '../../core/invoiceHtml';
+import { printBookingInvoice } from '../../core/printInvoice';
 import { useReportExport } from '../../core/reportExportContext';
 import { LedgerAccountView } from '../../core/ledgerUI';
 import { resolveLedgerSelection } from '../../core/ledgerPicker';
@@ -48,6 +48,7 @@ import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { JvBlock } from '../../core/voucher/JvBlock';
 import { editorVoucherTotal } from '../../core/voucher/ui';
 import { hasRegistry } from '../../core/voucher/registry';
+import { useVoucherRevoke } from '../../core/voucher/useRevokeAction';
 import { PageLayout } from '../../shell/PageLayout';
 import { SkeletonTable } from '../../shell/primitives';
 
@@ -325,7 +326,7 @@ function DetailedTable({ columns, rows }) {
 // Small Summary/Detailed view switch.
 function ViewToggle({ view, setView }) {
   const B = ({ id, label }) => (
-    <button onClick={() => setView(id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === id ? DARK : '#fff', color: view === id ? GOLD : DIM, borderColor: view === id ? DARK : '#e6e8ec' }}>{label}</button>
+    <button onClick={() => setView(id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === id ? DARK : '#fff', color: view === id ? GOLD : DIM, borderColor: view === id ? DARK : '#cdd1d8' }}>{label}</button>
   );
   return <><B id="summary" label="Summary" /><B id="detailed" label="Detailed" /></>;
 }
@@ -354,7 +355,7 @@ function LedgerSelectMenu({ value, options, onChange, placeholder = 'No cash led
       {open && options.length > 0 && (
         <div role="menu" style={{
           position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 50, minWidth: '100%', maxHeight: 260, overflowY: 'auto',
-          background: '#fff', borderRadius: 12, border: '1px solid #e6e8ec', boxShadow: '0 10px 28px rgba(13,19,38,0.16)', padding: 5,
+          background: '#fff', borderRadius: 12, border: '1px solid #cdd1d8', boxShadow: '0 10px 28px rgba(13,19,38,0.16)', padding: 5,
         }}>
           {options.map((o) => (
             <button key={o} type="button" onClick={() => { onChange(o); setOpen(false); }}
@@ -376,7 +377,7 @@ function LedgerSelectMenu({ value, options, onChange, placeholder = 'No cash led
 
 function ModeToggle({ view, setView, modes }) {
   return <>{modes.map((m) => (
-    <button key={m.id} onClick={() => setView(m.id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === m.id ? DARK : '#fff', color: view === m.id ? GOLD : DIM, borderColor: view === m.id ? DARK : '#e6e8ec' }}>{m.label}</button>
+    <button key={m.id} onClick={() => setView(m.id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === m.id ? DARK : '#fff', color: view === m.id ? GOLD : DIM, borderColor: view === m.id ? DARK : '#cdd1d8' }}>{m.label}</button>
   ))}</>;
 }
 
@@ -448,7 +449,7 @@ function NarrationCell({ text, clamp = 55 }) {
 }
 
 // Plain number for export/print (no currency symbol; blank when zero).
-const nfmt = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : ''; };
+const nfmt = (n, loc = 'en-IN') => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : ''; };
 
 // Open a print-ready window for the report (Print, or "Save as PDF" in the
 // dialog). Builds a clean B/W table from the same columns/rows used for export.
@@ -486,7 +487,7 @@ function PrintBtn({ onClick, disabled }) {
   return (
     <button onClick={onClick} disabled={disabled} className="max-tablet:min-h-[44px]"
       style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6,
-        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, background: '#fff', color: DARK, borderColor: '#e6e8ec' }}
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, background: '#fff', color: DARK, borderColor: '#cdd1d8' }}
       title="Open a print view — choose your printer or Save as PDF">🖨 Print / PDF</button>
   );
 }
@@ -587,10 +588,10 @@ export function TrialBalanceLive({ branch }) {
        { key: 'debit', label: `Debit`, num: true }, { key: 'credit', label: `Credit`, num: true },
        { key: 'closingDebit', label: `Closing Dr`, num: true }, { key: 'closingCredit', label: `Closing Cr`, num: true }];
   const expRows = filtered.map((r) => ({ ...r, code: r.code || '' }));
-  const printRows = filtered.map((r) => { const o = { group: r.group, code: r.code || '', ledger: r.ledger }; for (const c of expColumns) if (c.num) o[c.key] = nfmt(r[c.key]); return o; });
+  const printRows = filtered.map((r) => { const o = { group: r.group, code: r.code || '', ledger: r.ledger }; for (const c of expColumns) if (c.num) o[c.key] = nfmt(r[c.key], localeOf(cur)); return o; });
   const totalRow = view === 'summary'
-    ? { group: 'TOTAL', ledger: '', closingDebit: nfmt(T.clDr), closingCredit: nfmt(T.clCr) }
-    : { group: 'TOTAL', code: '', ledger: '', openingDebit: nfmt(T.openDr), openingCredit: nfmt(T.openCr), debit: nfmt(T.dr), credit: nfmt(T.cr), closingDebit: nfmt(T.clDr), closingCredit: nfmt(T.clCr) };
+    ? { group: 'TOTAL', ledger: '', closingDebit: nfmt(T.clDr, localeOf(cur)), closingCredit: nfmt(T.clCr, localeOf(cur)) }
+    : { group: 'TOTAL', code: '', ledger: '', openingDebit: nfmt(T.openDr, localeOf(cur)), openingCredit: nfmt(T.openCr, localeOf(cur)), debit: nfmt(T.dr, localeOf(cur)), credit: nfmt(T.cr, localeOf(cur)), closingDebit: nfmt(T.clDr, localeOf(cur)), closingCredit: nfmt(T.clCr, localeOf(cur)) };
   const sub = `${branchLabel(branch)} · ${filtered.length} ledgers · Closing Dr ${money(cur, T.clDr)} / Cr ${money(cur, T.clCr)}`;
   const exportNow = () => filtered.length && exportToExcel(`trial-balance-${branchLabel(branch)}`, expColumns, expRows);
   const printNow = () => filtered.length && openReportPrint('Trial Balance', sub, expColumns, printRows, totalRow);
@@ -727,8 +728,8 @@ export function DayBookLive({ branch }) {
   const expColumns = view === 'minimal'
     ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'tallyRef', label: 'Tally Ref' }, { key: 'ledger', label: 'Ledger' }, { key: 'debit', label: `Debit (${cur})`, num: true }, { key: 'credit', label: `Credit (${cur})`, num: true }]
     : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'tallyRef', label: 'Tally Ref' }, { key: 'type', label: 'Type' }, { key: 'category', label: 'Category' }, { key: 'branch', label: 'Branch' }, { key: 'ledger', label: 'Ledger' }, { key: 'group', label: 'Group' }, { key: 'debit', label: `Debit (${cur})`, num: true }, { key: 'credit', label: `Credit (${cur})`, num: true }, { key: 'narration', label: 'Narration' }];
-  const printRows = postingRows.map((r) => ({ ...r, debit: nfmt(r.debit), credit: nfmt(r.credit) }));
-  const totalRow = { date: 'TOTAL', vno: `${sorted.length} vouchers`, debit: nfmt(gDr), credit: nfmt(gCr) };
+  const printRows = postingRows.map((r) => ({ ...r, debit: nfmt(r.debit, localeOf(cur)), credit: nfmt(r.credit, localeOf(cur)) }));
+  const totalRow = { date: 'TOTAL', vno: `${sorted.length} vouchers`, debit: nfmt(gDr, localeOf(cur)), credit: nfmt(gCr, localeOf(cur)) };
   const sub = `${branchLabel(branch)} · ${sorted.length} vouchers · ${postingRows.length} lines · Dr ${money(cur, gDr)} = Cr ${money(cur, gCr)}`;
   const exportNow = () => postingRows.length && exportToExcel(`day-book-${branchLabel(branch)}`, expColumns, postingRows);
   const printNow = () => postingRows.length && openReportPrint('Day Book', sub, expColumns, printRows, totalRow);
@@ -839,7 +840,7 @@ export function LedgerAcLive({ branch }) {
         <LedgerPicker value={pick} onChange={setPick} branch={branch} placeholder="Search ledger…" style={{ width: 260, fontSize: 11 }} />
         {/* "View" arms green once a ledger is selected (and differs from what's shown). */}
         <button onClick={view} disabled={!dirty} title="View this ledger's account statement" className="max-tablet:min-h-[44px]"
-          style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, cursor: dirty ? 'pointer' : 'default', background: dirty ? GREEN : '#eef1f6', color: dirty ? '#fff' : DIM, borderColor: dirty ? GREEN : '#e6e8ec' }}>
+          style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, cursor: dirty ? 'pointer' : 'default', background: dirty ? GREEN : '#eef1f6', color: dirty ? '#fff' : DIM, borderColor: dirty ? GREEN : '#cdd1d8' }}>
           View
         </button>
       </>}
@@ -888,6 +889,7 @@ function Crumb({ items }) {
 export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   const vq = useVoucher(voucherId);
   const upd = useUpdateVoucher();
+  const { canRevoke, doRevoke, revoking } = useVoucherRevoke();
   const v = vq.data;
   // Cost centres are branch-wise — only offer THIS voucher's branch's centres
   // (e.g. BOM-FLT-INT), never another branch's, so the tag can't be mismatched.
@@ -1004,6 +1006,44 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
           </table>
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <button onClick={printEntry} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
+          <button onClick={dismiss} style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
+        </div>
+      </div>
+    );
+  }
+  // Approved / posted vouchers are READ-ONLY from every drill-down (Day Book, ledgers,
+  // Cash Book, P&L / Balance Sheet, registers, GP analytics…). Editing one would
+  // silently re-post the journal outside the approval workflow, so we show it for
+  // viewing only. To change it, Revoke it back to Pending in Voucher Approvals — the
+  // number is kept (a booking-driven Sales/Purchase leg is edited on its SO/PO/GP).
+  if (v.status === 'approved' || v.status === 'posted') {
+    const byBooking = v.locked && v.source === 'booking';
+    return (
+      <div style={{ padding: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ fontWeight: 800, color: DARK, fontSize: 14 }}>{v.vno} <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>{v.type} - {v.category}</span></div>
+          <button onClick={onBack} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 34, fontSize: 11.5, cursor: 'pointer' }}>Back</button>
+        </div>
+        <div style={{ padding: '10px 12px', borderRadius: 7, background: '#FBF3DE', border: '1px solid #e3cd97', color: '#8a6d12', fontSize: 12, fontWeight: 600, marginBottom: 12 }}>
+          🔒 Approved &amp; posted — read-only. {byBooking ? <>Edit it on its SO / PO / GP booking <b>{v.bookingId}</b>.</> : <>To edit, <b>Revoke</b> it back to Pending in <b>Voucher Approvals</b> — the number is kept.</>}
+        </div>
+        <div style={{ fontSize: 11.5, color: DIM, marginBottom: 10 }}>{v.type} · {v.category} · {form.date} · {form.branch}{form.party ? ` · ${form.party}` : ''}</div>
+        <div style={{ ...card, padding: 10, boxShadow: 'none', border: '1px solid #dfe2e7' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Full Journal Entry</div>
+            <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+            <thead><tr><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Ledger</th><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Group</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Debit</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Credit</th></tr></thead>
+            <tbody>
+              {(pv.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
+            </tbody>
+            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money(cur, pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money(cur, pv.totalCredit)}</td></tr></tfoot>
+          </table>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          {canRevoke && !byBooking && <button onClick={() => doRevoke(voucherId, dismiss)} disabled={revoking} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: revoking ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff', opacity: revoking ? 0.6 : 1 }}>⟲ {revoking ? 'Revoking…' : 'Revoke'}</button>}
           <button onClick={printEntry} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
           <button onClick={dismiss} style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
         </div>
@@ -1508,7 +1548,7 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
 // footer. Numeric columns (flagged `num`) right-align, Indian-group, and sum in the
 // footer; text columns (Link No, Pax, PNR …) stay left-aligned. A mirrored top
 // scrollbar keeps sideways scrolling reachable on long lists.
-function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
+function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice, cur = '₹' }) {
   const topRef = React.useRef(null);
   const bodyRef = React.useRef(null);
   const [scrollW, setScrollW] = useState(0);
@@ -1520,7 +1560,7 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
   }, [columns, rows]);
   const fromTop = () => { if (bodyRef.current && topRef.current) bodyRef.current.scrollLeft = topRef.current.scrollLeft; };
   const fromBody = () => { if (bodyRef.current && topRef.current) topRef.current.scrollLeft = bodyRef.current.scrollLeft; };
-  const cellNum = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : '—'; };
+  const cellNum = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const mono = (k) => k === 'linkNo' || k === 'saleVno' || k === 'purVno';
   // Render only one page of rows so the DOM stays bounded; the tfoot totals + count
   // below still reflect the FULL set (totals/rows.length are unchanged).
@@ -1681,10 +1721,11 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
     // printed invoice has its financial detail. Fall back to the slim row if it fails.
     let full = b;
     if (b.id) { try { full = await apiGet(`/api/booking-orders/${b.id}`); } catch { full = b; } }
-    openPrintPreview({
+    await printBookingInvoice({
+      booking: full,
+      side: tab === 'sales' ? 'sale' : 'purchase',
+      branch,
       title: `${tab === 'sales' ? 'Sales Invoice' : 'Purchase Invoice'} · ${full.bookingNo || full.linkNo || ''}`,
-      recommend: 'portrait',
-      html: buildBookingInvoice(full, tab === 'sales' ? 'sale' : 'purchase', branch),
     });
   };
 
@@ -1742,7 +1783,7 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
     >
       <State q={q} empty={rows.length === 0}>
         {view === 'capture' ? (
-          <CaptureTable columns={captureSheet.columns} rows={captureSheet.rows} totals={captureSheet.totals} onOpenJV={openJV} onPrintInvoice={printInvoice} />
+          <CaptureTable columns={captureSheet.columns} rows={captureSheet.rows} totals={captureSheet.totals} onOpenJV={openJV} onPrintInvoice={printInvoice} cur={cur} />
         ) : view === 'detailed' ? (
           <DetailedTable columns={sheet.columns} rows={sheet.rows} />
         ) : (
@@ -2128,7 +2169,7 @@ export function AccountsChartLive({ branch }) {
 
   const setAll = (v) => setOpen(Object.fromEntries(allKeys.map((k) => [k, v])));
   const stmtBadge = (s) => <span style={{ fontSize: 9.5, padding: '1px 6px', borderRadius: 999, fontWeight: 700, background: (s === 'PL' ? GREEN : BLUE) + '1e', color: s === 'PL' ? GREEN : BLUE }}>{s === 'PL' ? 'P&L' : s === 'BS' ? 'Balance Sheet' : '—'}</span>;
-  const seg = (active) => ({ padding: '5px 12px', fontSize: 11.5, fontWeight: 700, border: `1px solid ${active ? DARK : '#e6e8ec'}`, background: active ? DARK : '#fff', color: active ? GOLD : DIM, cursor: 'pointer' });
+  const seg = (active) => ({ padding: '5px 12px', fontSize: 11.5, fontWeight: 700, border: `1px solid ${active ? DARK : '#cdd1d8'}`, background: active ? DARK : '#fff', color: active ? GOLD : DIM, cursor: 'pointer' });
   const Col = ({ title, count, children }) => (
     <div style={{ ...card, padding: 0, overflow: 'hidden', flex: 1, minWidth: 220 }}>
       <div style={{ padding: '8px 12px', background: DARK, color: GOLD, fontWeight: 700, fontSize: 11.5 }}>{title} — {count}</div>
@@ -2281,8 +2322,8 @@ export function CashBookLive({ branch }) {
   const expColumns = view === 'minimal'
     ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'ledgerName', label: 'Ledger Name' }, { key: 'narration', label: 'Narration' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }]
     : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'category', label: 'Type' }, { key: 'ledgerName', label: 'Ledger Name' }, { key: 'narration', label: 'Narration' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }, { key: 'running', label: `Balance (${cur})`, num: true }];
-  const printRows = rowsFull.map((r) => ({ ...r, debit: nfmt(r.debit), credit: nfmt(r.credit), running: nfmt(r.running) }));
-  const totalRow = { date: 'CLOSING', vno: '', particulars: '', debit: nfmt(receipts), credit: nfmt(payments), running: nfmt(closing) };
+  const printRows = rowsFull.map((r) => ({ ...r, debit: nfmt(r.debit, localeOf(cur)), credit: nfmt(r.credit, localeOf(cur)), running: nfmt(r.running, localeOf(cur)) }));
+  const totalRow = { date: 'CLOSING', vno: '', particulars: '', debit: nfmt(receipts, localeOf(cur)), credit: nfmt(payments, localeOf(cur)), running: nfmt(closing, localeOf(cur)) };
   const sub = `${selected || 'Cash account'} · ${branchLabel(branch)} · ${rowsFull.length} entries · Closing ${money(cur, closing)}`;
   const exportNow = () => rowsFull.length && exportToExcel(`cash-book-${branchLabel(branch)}`, expColumns, rowsFull);
   const printNow = () => rowsFull.length && openReportPrint(`Cash Book — ${selected}`, sub, expColumns, printRows, totalRow);

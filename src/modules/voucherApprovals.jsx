@@ -16,16 +16,18 @@ import { clickable } from '../core/ux/clickable';
 import { toast } from '../core/ux/toast';
 import { FocusBanner } from '../core/ux/FocusBanner';
 import { useNavFocusStore } from '../core/ux/navFocus';
-import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useApproveMany, useApproveAll, branchCode } from '../core/useAccounting';
+import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useRevokeVoucher, fetchRevokeCheck, useApproveMany, useApproveAll, branchCode } from '../core/useAccounting';
 import { VoucherEditor } from './accountingLive';
 import { BookingApprovals } from './bookingOrder';
 import { bc } from '../core/styles';
+import { localeOf } from '../core/format';
 import { PeriodBar, periodRange } from '../core/period';
 import { CONSOLIDATED_LABEL } from '../core/data';
 import { SkeletonTable } from '../shell/primitives';
 
-// Full rupee amount with Indian grouping — NO Cr/L abbreviation.
-const money = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
+// Full branch-currency amount (₹ India · $ USD branches) — NO Cr/L abbreviation.
+// Grouping follows the currency: Indian lakh/crore for ₹, Western thousands for $.
+const fmtAmount = (n, cur = '₹') => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
 
 const C = { dark: '#1a1c22', gold: '#c2a04a', blue: '#2563eb', red: '#dc2626', green: '#16a34a', dim: '#5b616e', border: '#cdd1d8' };
 const VCH = { payment: 'Payment', receipt: 'Receipt', contra: 'Contra', journal: 'Journal', 'credit-note': 'Credit Note', 'debit-note': 'Debit Note', 'purchase-expense': 'Purchase Expense', refund: 'Refund', reissue: 'Reissue', adm: 'ADM', acm: 'ACM' };
@@ -58,6 +60,9 @@ export function VoucherApprovals({ branch, currentUser }) {
   // can EDIT (which returns it to Pending for re-approval) but never delete — so the
   // Delete button is hidden for non-admins (the backend also 403s the delete).
   const isAdmin = /super.?admin|director/i.test(currentUser?.role || '');
+  // Revoking un-posts a posted voucher — restricted to approver-level roles (stricter
+  // than approving). The server enforces this too; this just gates the button.
+  const isApprover = /super.?admin|director|senior\s+finance\s+manager|sr\.?\s*accounts\s+executive/i.test(currentUser?.role || '');
   const [status, setStatus] = useState('pending');
   const [open, setOpen] = useState({});
   const [sel, setSel] = useState(() => new Set()); // selected voucher ids (multi-approve)
@@ -68,6 +73,7 @@ export function VoucherApprovals({ branch, currentUser }) {
   useModalEsc(() => setViewId(null), !!viewId);     // Esc closes the view modal
   useModalEsc(() => setEditId(null), !!editId);     // Esc closes the edit modal
   const cur = (bc(branch) || {}).cur || '₹';
+  const money = (n) => fmtAmount(n, cur);
   // Default to the current FY (not All): the Approved/Deleted tabs can hold thousands
   // of settled entries, and loading them all-time was ~18-40s. PENDING defaults to ALL
   // (no date filter — every pending voucher must be visible for approval, regardless of
@@ -91,12 +97,39 @@ export function VoucherApprovals({ branch, currentUser }) {
     edited: { n: editedRows.length, amount: editedRows.reduce((s, r) => s + (r.total || 0), 0) },
   };
   const entries = d.entries || [];
+  // ── Search + latest-first ordering ──────────────────────────────────────────
+  // One box filters the visible list (every view) by Vch No, party, type, entered-by,
+  // narration, any posting ledger, or amount. Order is newest-date-first throughout.
+  const [search, setSearch] = useState('');
+  const needle = search.trim().toLowerCase();
+  const matchEntry = (e) => {
+    if (!needle) return true;
+    const legs = e.postings || [];
+    const hay = [
+      e.vno, e.party, VCH[e.category] || e.category, e.type, e.narration, e.submittedBy,
+      String(Math.round(e.total || 0)),
+      ...legs.map((p) => p.ledger),
+      ...legs.map((p) => (p.debit ? String(Math.round(p.debit)) : p.credit ? String(Math.round(p.credit)) : '')),
+    ].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(needle);
+  };
+  const visibleEntries = useMemo(() => (needle ? entries.filter(matchEntry) : entries), [entries, needle]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Newest first: date desc, then Vch No desc (numeric-aware) as a stable tiebreak.
+  const cmpLatest = (a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.vno || '').localeCompare(String(a.vno || ''), undefined, { numeric: true });
+  // Edited tab: same search, ordered most-recently-edited first.
+  const visibleEdited = useMemo(() => {
+    const list = needle
+      ? editedRows.filter((r) => [r.vno, VCH[r.category] || r.type, r.party, r.lastBy, r.lastReason, String(Math.round(r.total || 0))].filter(Boolean).join(' ').toLowerCase().includes(needle))
+      : editedRows;
+    return [...list].sort((a, b) => String(b.lastAt || '').localeCompare(String(a.lastAt || '')));
+  }, [editedRows, needle]);
   const approve = useApproveVoucher();
   const reject = useRejectVoucher();
   const del = useDeleteVoucher();
+  const revoke = useRevokeVoucher();
   const approveMany = useApproveMany();
   const approveAll = useApproveAll();
-  const busy = approve.isPending || reject.isPending || del.isPending || approveMany.isPending || approveAll.isPending;
+  const busy = approve.isPending || reject.isPending || del.isPending || revoke.isPending || approveMany.isPending || approveAll.isPending;
 
   // P3 deep-link: opened from an Alert targeting voucher(s) → jump to the flagged
   // status and auto-open the first unpostable voucher's editor (once per focus).
@@ -112,7 +145,7 @@ export function VoucherApprovals({ branch, currentUser }) {
     if (fp.open && openedRef.current !== fp.open) { openedRef.current = fp.open; setEditId(fp.open); }
   }, [fp]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const allIds = useMemo(() => [...new Set(entries.map((e) => e.id))], [entries]);
+  const allIds = useMemo(() => [...new Set(visibleEntries.map((e) => e.id))], [visibleEntries]);
   React.useEffect(() => { setSel(new Set()); }, [status, branch]); // clear selection on tab/branch change
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
@@ -128,6 +161,22 @@ export function VoucherApprovals({ branch, currentUser }) {
     const pending = status === 'pending';
     const { confirmed, reason } = await confirmDialog({ title: 'Delete voucher?', message: pending ? 'It will be removed from Pending and kept view-only under Deleted — its number can never be reused.' : 'It will be reversed out of the books and kept view-only — its number can never be reused.', danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
     if (confirmed) del.mutate({ id, by: 'admin', reason }, { onSuccess: () => toast(pending ? 'Voucher deleted' : 'Voucher deleted & reversed'), onError: (e) => toast(e?.message || 'Delete failed', 'error') });
+  };
+  // Revoke (un-approve) → Pending. Runs the server preflight first so the dialog shows
+  // the exact blast radius (journal rows un-posted + any warnings) before committing; a
+  // hard block (locked / bank-reconciled / live refund) is surfaced and stops the action.
+  const doRevoke = async (id) => {
+    let pre = null;
+    try { pre = await fetchRevokeCheck(id); } catch (e) { toast(e?.message || 'Could not check this voucher', 'error'); return; }
+    if (pre && (pre.blocks || []).length) { toast(`Can't revoke — ${pre.blocks.map((b) => b.msg).join(' ')}`, 'error'); return; }
+    const warns = (pre?.warnings || []).map((w) => w.msg).filter(Boolean);
+    const rows = pre?.journalRows ? `This un-posts ${pre.journalRows} journal row${pre.journalRows === 1 ? '' : 's'}. ` : '';
+    const { confirmed, reason } = await confirmDialog({
+      title: 'Revoke voucher?',
+      message: `${rows}It returns to Pending for editing & re-approval (the number is kept).${warns.length ? ' Note: ' + warns.join(' ') : ''}`,
+      danger: true, reasonRequired: true, reasonLabel: 'Reason for revoke', confirmLabel: 'Revoke',
+    });
+    if (confirmed) revoke.mutate({ id, reason }, { onSuccess: () => toast('Voucher revoked → Pending'), onError: (e) => toast(e?.message || 'Revoke failed', 'error') });
   };
   const doApproveSelected = async () => {
     if (!sel.size) return;
@@ -163,7 +212,7 @@ export function VoucherApprovals({ branch, currentUser }) {
   const { tree, allKeys } = useMemo(() => {
     const groups = {}; const allKeys = [];
     const bump = (o, p) => { o.debit += p.debit || 0; o.credit += p.credit || 0; };
-    entries.forEach((e) => {
+    visibleEntries.forEach((e) => {
       // Entries that can't build a posting (e.g. don't balance) still surface here,
       // under a "Needs attention" node, so they can be reviewed/rejected (not hidden).
       const pts = (e.postings && e.postings.length) ? e.postings
@@ -182,14 +231,14 @@ export function VoucherApprovals({ branch, currentUser }) {
         allKeys.push('s:' + g.name + '/' + s.name);
         const ledgers = Object.values(s.ledgers).sort((a, b) => (b.debit + b.credit) - (a.debit + a.credit)).map((l) => {
           allKeys.push('l:' + g.name + '/' + s.name + '/' + l.name);
-          return { ...l, entries: l.entries.sort((x, y) => String(x.date).localeCompare(String(y.date))) };
+          return { ...l, entries: l.entries.sort(cmpLatest) };
         });
         return { ...s, ledgers };
       });
       return { ...g, subs };
     });
     return { tree: out, allKeys };
-  }, [entries]);
+  }, [visibleEntries]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isOpen = (k, def) => (open[k] === undefined ? def : open[k]);
   const toggle = (k, def) => setOpen((s) => ({ ...s, [k]: !(s[k] === undefined ? def : s[k]) }));
@@ -205,7 +254,7 @@ export function VoucherApprovals({ branch, currentUser }) {
   const Caret = ({ o }) => <span style={{ color: C.gold, width: 12, display: 'inline-block' }}>{o ? '▾' : '▸'}</span>;
 
   // ── Shared bits for the flat (Entry wise / Voucher wise) tables ──────────────
-  const flatEntries = useMemo(() => [...entries].sort((a, b) => String(a.date).localeCompare(String(b.date))), [entries]);
+  const flatEntries = useMemo(() => [...visibleEntries].sort(cmpLatest), [visibleEntries]); // eslint-disable-line react-hooks/exhaustive-deps
   // Total Debit & Total Credit across the shown vouchers — both equal the header
   // total. (A purchase with TDS credits the supplier NET; the TDS posts to Duties &
   // Taxes — so the supplier leg alone reads less than the gross header by the TDS.)
@@ -238,14 +287,17 @@ export function VoucherApprovals({ branch, currentUser }) {
       </>
     ) : status === 'approved' ? (
       <>
-        <button onClick={() => setEditId(e.id)} disabled={busy} title="Edit — un-posts this voucher and returns it to Pending for re-approval" style={ABTN(C.blue)}>Edit</button>
+        {isApprover && <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={ABTN(C.gold)}>Revoke</button>}
         {isAdmin && <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={ABTN(C.red)}>Delete</button>}
       </>
     ) : status === 'deleted' ? (
       <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
     ) : <span style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected</span>
   );
-  const vnoCell = (e, show = true) => <td {...(show ? clickable(() => setViewId(e.id)) : {})} title={show ? 'View full voucher' : ''} style={{ ...flatTd, color: C.blue, fontWeight: 700, cursor: show ? 'pointer' : 'default', textDecoration: show ? 'underline' : 'none', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{show ? e.vno : ''}</td>;
+  // "Revoked — was posted" chip: an entry that was approved then revoked back to Pending
+  // (vs a freshly-entered one). Shows who/why on hover from the live revoke trail.
+  const RevokedChip = ({ e }) => (e.revokedAt ? <span title={`Revoked${e.revokedBy ? ' by ' + e.revokedBy : ''}${e.revokeReason ? ' — ' + e.revokeReason : ''}`} style={{ marginLeft: 6, fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 20, background: '#FBF3DE', color: '#8a6d12', border: '1px solid #e3cd97', whiteSpace: 'nowrap' }}>⟲ Revoked</span> : null);
+  const vnoCell = (e, show = true) => <td {...(show ? clickable(() => setViewId(e.id)) : {})} title={show ? 'View full voucher' : ''} style={{ ...flatTd, color: C.blue, fontWeight: 700, cursor: show ? 'pointer' : 'default', textDecoration: show ? 'underline' : 'none', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{show ? e.vno : ''}{show && status === 'pending' ? <RevokedChip e={e} /> : null}</td>;
 
   // A single voucher row + the shared header (used by the Voucher-Type-wise groups).
   // One voucher in the "Voucher" view: a header (select · date · vno · type · party ·
@@ -336,7 +388,7 @@ export function VoucherApprovals({ branch, currentUser }) {
   // use shows 0 (column never hidden). Party (debtor) + Supplier (creditor) get
   // their own columns. Branch tags ([BOM]…) are trimmed from headers (full name on
   // hover); [Pur] is kept so sale vs purchase heads stay distinct.
-  const shortHead = (h) => String(h).replace(/\s*\[(BOM|AMD|NBO|DAR|FBM|TKHO)\]/gi, '').trim();
+  const shortHead = (h) => String(h).replace(/\s*\[(BOMMB|BOM|AMD|NBO|DAR|FBM)\]/gi, '').trim();
   const columnarWise = () => {
     const byCat = {};
     flatEntries.forEach((e) => { (byCat[e.category] || (byCat[e.category] = [])).push(e); });
@@ -425,6 +477,20 @@ export function VoucherApprovals({ branch, currentUser }) {
         <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
           {tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}
         </div>
+        <div style={{ display: 'flex', gap: 10, padding: '8px 12px', borderBottom: `1px solid ${C.border}`, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '0 1 380px', minWidth: 220 }}>
+            <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: C.dim, pointerEvents: 'none' }}>🔍</span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search Vch No · party · ledger · narration · amount…"
+              aria-label="Search vouchers"
+              style={{ width: '100%', padding: '6px 26px 6px 28px', border: `1px solid ${C.border}`, borderRadius: 7, fontSize: 12, outline: 'none', background: '#fff' }}
+            />
+            {search && <button onClick={() => setSearch('')} aria-label="Clear search" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: C.dim, fontSize: 14, lineHeight: 1 }}>✕</button>}
+          </div>
+          {needle && <span style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>{(status === 'edited' ? visibleEdited.length : visibleEntries.length)} match{(status === 'edited' ? visibleEdited.length : visibleEntries.length) === 1 ? '' : 'es'}</span>}
+        </div>
         {status !== 'edited' && <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: '#fafbfe', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
             {[['entry', 'Entry wise'], ['columnar', 'Columnar (all heads)'], ['voucher', 'Voucher Type wise'], ['tree', 'Group-Subgroup-Ledger-Entry']].map(([v, l]) => (
@@ -446,12 +512,12 @@ export function VoucherApprovals({ branch, currentUser }) {
       </div>
 
       {status === 'edited' ? (
-        <EditedVouchersList rows={editedRows} isLoading={editedQ.isLoading} open={open} setOpen={setOpen} setViewId={setViewId} />
+        <EditedVouchersList rows={visibleEdited} isLoading={editedQ.isLoading} open={open} setOpen={setOpen} setViewId={setViewId} cur={cur} />
       ) : (
       <div style={{ ...card }}>
         {q.isLoading ? <div style={{ padding: 12 }}><SkeletonTable rows={8} cols={5} /></div> : (
           <div style={{ maxHeight: '72vh', overflow: 'auto', fontSize: 12.5 }}>
-            {flatEntries.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: C.dim }}>No {status} vouchers.</div>}
+            {flatEntries.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: C.dim }}>{needle ? `No ${status} vouchers match “${search.trim()}”.` : `No ${status} vouchers.`}</div>}
             {flatEntries.length > 0 && view === 'voucher' && voucherTypeWise()}
             {flatEntries.length > 0 && view === 'entry' && entryWise()}
             {flatEntries.length > 0 && view === 'columnar' && columnarWise()}
@@ -510,7 +576,7 @@ export function VoucherApprovals({ branch, currentUser }) {
                                             </>
                                           ) : status === 'approved' ? (
                                             <>
-                                              <button onClick={() => setEditId(e.id)} disabled={busy} title="Edit — un-posts this voucher and returns it to Pending for re-approval" style={{ padding: '3px 9px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Edit</button>
+                                              {isApprover && <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ padding: '3px 9px', background: '#fff', color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Revoke</button>}
                                               {isAdmin && <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Delete</button>}
                                             </>
                                           ) : status === 'deleted' ? (
@@ -551,7 +617,7 @@ export function VoucherApprovals({ branch, currentUser }) {
             <div ref={viewRef}><VoucherView id={viewId} cur={cur} /></div>
             <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}` }}>
               <div style={{ fontWeight: 800, fontSize: 12, color: C.dark, marginBottom: 8 }}>Audit Trail</div>
-              <AuditTrail entityType="voucher" entityId={viewId} />
+              <AuditTrail entityType="voucher" entityId={viewId} cur={cur} />
             </div>
           </div>
         </div>
@@ -578,7 +644,8 @@ export function VoucherApprovals({ branch, currentUser }) {
 // to its full audit timeline (who/when/why + field-level changes + full snapshot).
 // Cross-cuts status: an approved voucher later edited shows here. Click the Vch No to
 // open the full formatted voucher view (which also shows the trail).
-function EditedVouchersList({ rows, isLoading, open, setOpen, setViewId }) {
+function EditedVouchersList({ rows, isLoading, open, setOpen, setViewId, cur = '₹' }) {
+  const money = (n) => fmtAmount(n, cur);
   const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: `2px solid ${C.border}`, whiteSpace: 'nowrap' };
   const td = { padding: '7px 10px', borderBottom: '1px solid #dfe2e7', fontSize: 12, whiteSpace: 'nowrap' };
   if (isLoading) return <div style={{ ...card, padding: 24, textAlign: 'center', color: C.dim }}>Loading edited vouchers…</div>;
@@ -606,7 +673,7 @@ function EditedVouchersList({ rows, isLoading, open, setOpen, setViewId }) {
                 </tr>
                 {isOpen && (
                   <tr><td colSpan={9} style={{ padding: 12, background: '#f7f8fb', borderBottom: `1px solid ${C.border}` }}>
-                    <AuditTrail entityType="voucher" entityId={r.id} />
+                    <AuditTrail entityType="voucher" entityId={r.id} cur={cur} />
                   </td></tr>
                 )}
               </React.Fragment>

@@ -9,16 +9,19 @@
 
 import React, { useMemo, useState } from 'react';
 import { useGpBills } from '../../../core/useAccounting';
+import { bc } from '../../../core/styles';
+import { money } from '../../../core/format';
 import { ReportSearch, ReportDateBar, resolveReportRange, matchNeedle } from '../../../core/reportDateBar';
 import { DataTable } from '../../../shell/DataTable';
 import { ResponsiveGrid, StatusPill } from '../../../shell/primitives';
 import { RptShell } from '../components/scaffold';
 
-const f = (n) => '₹' + Number(Math.round(n)).toLocaleString('en-IN');
 const DEST_EMOJIS = { Dubai: '🇦🇪', Bali: '🇮🇩', Singapore: '🇸🇬', Maldives: '🇲🇻', Bangkok: '🇹🇭', Europe: '🌍', London: '🇬🇧', Paris: '🇫🇷', 'Masai Mara': '🇰🇪', Nairobi: '🇰🇪' };
 const gpPctTone = (p) => (p >= 15 ? 'success' : p >= 8 ? 'warning' : 'danger');
 
 export function DestinationIntelligence({ branch }) {
+  const cur = bc(branch).cur;
+  const f = (n) => money(n, cur);
   const [range, setRange] = useState(() => ({ mode: 'all', ...resolveReportRange('all') }));
   const [search, setSearch] = useState('');
   const q = useGpBills(branch, { from: range.from || undefined, to: range.to || undefined });

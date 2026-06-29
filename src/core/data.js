@@ -18,7 +18,7 @@ function vDate(){
    and re-exported here so the dozens of existing call-sites — including
    synchronous ones like FX_RATES[code] and Object.keys(CURRENCY_META) — keep
    working unchanged.
-     India  (TKHO/BOM/AMD): INR
+     India  (BOMMB/BOM/AMD): INR
      Kenya  (NBO):     USD (main) + KES
      Tanzania (DAR):   USD (main) + TZS
      DR Congo (FBM):   USD (main) + CDF
@@ -251,7 +251,7 @@ export const HR_EMPLOYEES_DATA=[];
 
 export const HR_DEPTS=["All","Operations","Sales","Accounts","IT","HR & Admin"];
 
-export const HR_BRANCHES_F=["All","TKHO","BOM","AMD","NBO","DAR","FBM"];
+export const HR_BRANCHES_F=["All","BOMMB","BOM","AMD","NBO","DAR","FBM"];
 
 /* ── Employee Master ──────────────────────────────────────────── */
 
