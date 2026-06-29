@@ -307,8 +307,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   {label:"Sales & Purchase", children:[
     {label:"Sales Register",            href:"/reports/sreg"},
     {label:"Purchase Register",         href:"/reports/preg"},
-    {label:"INB Sales Register",        href:"/reports/inb-sreg"},
-    {label:"INB Purchase Register",     href:"/reports/inb-preg"},
+    // INB Sales/Purchase Registers consolidated under ACCOUNTS ▸ Inter Branch.
     // Module Sales/Purchase Register, Invoice-wise GP and Sales & GP Analytics
     // moved to the Finance pill (Finance ▸ Registers & Outstanding).
   ]},
@@ -363,9 +362,6 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Reconciliation Queue",     href:"/finance/reco-queue"},
     {divider:true, label:"Supplier"},
     {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
-    {divider:true, label:"Inter-branch"},
-    {label:"Inter-Branch Register",      href:"/accounts/inb-register"},
-    {label:"Inter-branch Reconciliation", href:"/accounts/interbranch-reco"},
     {divider:true, label:"Tally"},
     {label:"Tally Reconciliation (ERP vs Tally)", href:"/accounts/tally-reco"},
   ]},
@@ -383,6 +379,17 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Profit & Loss",         href:"/reports/pnl"},
     {label:"Balance Sheet",         href:"/reports/bs"},
     {label:"Cash Position Summary", href:"/reports/cash-position"},
+  ]},
+
+  /* Inter-Branch (INB) — all the inter-branch reports in one place. The INB
+     Voucher itself stays under Daily Entry ▸ Sales & Inter-Branch (it's a daily
+     entry); these are the read-only analytics over the INB Link registry. */
+  {label:"Inter Branch", children:[
+    {label:"Trade Matrix & Margin",     href:"/accounts/inb-matrix"},
+    {label:"Register & P&L Breakdown",  href:"/accounts/inb-register"},
+    {label:"INB Sales Register",        href:"/reports/inb-sreg"},
+    {label:"INB Purchase Register",     href:"/reports/inb-preg"},
+    {label:"Reconciliation",            href:"/accounts/interbranch-reco"},
   ]},
 
   /* ── 5 · PERIOD CLOSE & MASTERS ──────────────────────────── */
