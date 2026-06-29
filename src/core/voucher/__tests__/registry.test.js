@@ -61,6 +61,7 @@ describe('refund / reissue / adm / acm — registered & gated payloads', () => {
     expect(b.category).toBe('refund');
     expect(b.total).toBe(48000 - 2500 - 450); // 45050
     expect(b.lines).toHaveLength(2);
+    expect(b.partialAmount).toBe(0); // full refund explicitly NOT partial — can't be hijacked by a stale partialAmount
   });
 
   test.concurrent('reissue toBody: customer bill = supplier + our charges + GST', async () => {
@@ -73,13 +74,16 @@ describe('refund / reissue / adm / acm — registered & gated payloads', () => {
     const b = VOUCHER_REGISTRY.adm.toBody({ date: '2026-06-13', counterParty: 'Air India', amount: 1000, gstPct: 18, gstMode: 'intra', reasonCode: 'FD' }, ctx);
     expect(b).toMatchObject({ type: 'ADM', category: 'adm', counterParty: 'Air India', supplierAmt: 1000, taxAmt: 180, total: 1180 });
     expect(b.party).toBeUndefined();   // no customer leg
-    expect(b.lines).toBeUndefined();   // no markup/service income lines
+    // lines explicitly cleared (not undefined) so editing a legacy passOn-shape memo
+    // wipes its stale income lines — else admLines would post the stale line amount.
+    expect(b.lines).toEqual([]);
   });
 
   test.concurrent('acm toBody: BSP-only, no customer/markup, total = amount + GST', async () => {
     const b = VOUCHER_REGISTRY.acm.toBody({ date: '2026-06-13', counterParty: 'Air India', amount: 1500, gstPct: 0 }, ctx);
     expect(b).toMatchObject({ type: 'ACM', category: 'acm', supplierAmt: 1500, taxAmt: 0, total: 1500 });
     expect(b.party).toBeUndefined();
+    expect(b.lines).toEqual([]); // stale-line clear (see adm test)
   });
 
   test.concurrent('refund validate requires invoice + both parties + amount', async () => {

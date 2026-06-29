@@ -298,6 +298,12 @@ function makeAdmAcm(kind) {
         reasonCode: s.reasonCode || '',
         counterParty: s.counterParty, counterPartyGroup: 'Sundry Creditors', againstInvoice: s.againstInvoice || '',
         gstMode: taxAmt > 0 ? s.gstMode : '', gstPct,
+        // The current ADM/ACM is BSP-only single-amount (posts from subtotal/total).
+        // Emit lines:[] EXPLICITLY so editing a legacy memo that still carries the old
+        // passOn-shape income lines wipes them — otherwise admLines/acmLines would post
+        // the stale line amount instead of the edited subtotal (a partial $set update
+        // wouldn't clear an omitted key). Same stale-field class as the party-edit bug.
+        lines: [],
         subtotal: amount, taxAmt, supplierAmt: amount, total: r2(amount + taxAmt),
         remarks: s.remarks || `Being ${isAdm ? 'Agent Debit' : 'Agent Credit'} Memo${s.reasonCode ? ` (${s.reasonCode})` : ''}`,
         status: 'saved',

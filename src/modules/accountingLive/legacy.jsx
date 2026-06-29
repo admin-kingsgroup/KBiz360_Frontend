@@ -325,7 +325,7 @@ function DetailedTable({ columns, rows }) {
 // Small Summary/Detailed view switch.
 function ViewToggle({ view, setView }) {
   const B = ({ id, label }) => (
-    <button onClick={() => setView(id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === id ? DARK : '#fff', color: view === id ? GOLD : DIM, borderColor: view === id ? DARK : '#e6e8ec' }}>{label}</button>
+    <button onClick={() => setView(id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === id ? DARK : '#fff', color: view === id ? GOLD : DIM, borderColor: view === id ? DARK : '#cdd1d8' }}>{label}</button>
   );
   return <><B id="summary" label="Summary" /><B id="detailed" label="Detailed" /></>;
 }
@@ -354,7 +354,7 @@ function LedgerSelectMenu({ value, options, onChange, placeholder = 'No cash led
       {open && options.length > 0 && (
         <div role="menu" style={{
           position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 50, minWidth: '100%', maxHeight: 260, overflowY: 'auto',
-          background: '#fff', borderRadius: 12, border: '1px solid #e6e8ec', boxShadow: '0 10px 28px rgba(13,19,38,0.16)', padding: 5,
+          background: '#fff', borderRadius: 12, border: '1px solid #cdd1d8', boxShadow: '0 10px 28px rgba(13,19,38,0.16)', padding: 5,
         }}>
           {options.map((o) => (
             <button key={o} type="button" onClick={() => { onChange(o); setOpen(false); }}
@@ -376,7 +376,7 @@ function LedgerSelectMenu({ value, options, onChange, placeholder = 'No cash led
 
 function ModeToggle({ view, setView, modes }) {
   return <>{modes.map((m) => (
-    <button key={m.id} onClick={() => setView(m.id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === m.id ? DARK : '#fff', color: view === m.id ? GOLD : DIM, borderColor: view === m.id ? DARK : '#e6e8ec' }}>{m.label}</button>
+    <button key={m.id} onClick={() => setView(m.id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === m.id ? DARK : '#fff', color: view === m.id ? GOLD : DIM, borderColor: view === m.id ? DARK : '#cdd1d8' }}>{m.label}</button>
   ))}</>;
 }
 
@@ -486,7 +486,7 @@ function PrintBtn({ onClick, disabled }) {
   return (
     <button onClick={onClick} disabled={disabled} className="max-tablet:min-h-[44px]"
       style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6,
-        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, background: '#fff', color: DARK, borderColor: '#e6e8ec' }}
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, background: '#fff', color: DARK, borderColor: '#cdd1d8' }}
       title="Open a print view — choose your printer or Save as PDF">🖨 Print / PDF</button>
   );
 }
@@ -839,7 +839,7 @@ export function LedgerAcLive({ branch }) {
         <LedgerPicker value={pick} onChange={setPick} branch={branch} placeholder="Search ledger…" style={{ width: 260, fontSize: 11 }} />
         {/* "View" arms green once a ledger is selected (and differs from what's shown). */}
         <button onClick={view} disabled={!dirty} title="View this ledger's account statement" className="max-tablet:min-h-[44px]"
-          style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, cursor: dirty ? 'pointer' : 'default', background: dirty ? GREEN : '#eef1f6', color: dirty ? '#fff' : DIM, borderColor: dirty ? GREEN : '#e6e8ec' }}>
+          style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, cursor: dirty ? 'pointer' : 'default', background: dirty ? GREEN : '#eef1f6', color: dirty ? '#fff' : DIM, borderColor: dirty ? GREEN : '#cdd1d8' }}>
           View
         </button>
       </>}
@@ -2128,7 +2128,7 @@ export function AccountsChartLive({ branch }) {
 
   const setAll = (v) => setOpen(Object.fromEntries(allKeys.map((k) => [k, v])));
   const stmtBadge = (s) => <span style={{ fontSize: 9.5, padding: '1px 6px', borderRadius: 999, fontWeight: 700, background: (s === 'PL' ? GREEN : BLUE) + '1e', color: s === 'PL' ? GREEN : BLUE }}>{s === 'PL' ? 'P&L' : s === 'BS' ? 'Balance Sheet' : '—'}</span>;
-  const seg = (active) => ({ padding: '5px 12px', fontSize: 11.5, fontWeight: 700, border: `1px solid ${active ? DARK : '#e6e8ec'}`, background: active ? DARK : '#fff', color: active ? GOLD : DIM, cursor: 'pointer' });
+  const seg = (active) => ({ padding: '5px 12px', fontSize: 11.5, fontWeight: 700, border: `1px solid ${active ? DARK : '#cdd1d8'}`, background: active ? DARK : '#fff', color: active ? GOLD : DIM, cursor: 'pointer' });
   const Col = ({ title, count, children }) => (
     <div style={{ ...card, padding: 0, overflow: 'hidden', flex: 1, minWidth: 220 }}>
       <div style={{ padding: '8px 12px', background: DARK, color: GOLD, fontWeight: 700, fontSize: 11.5 }}>{title} — {count}</div>
