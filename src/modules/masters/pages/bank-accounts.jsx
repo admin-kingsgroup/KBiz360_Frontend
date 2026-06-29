@@ -73,13 +73,13 @@ export function BankAccountMaster({ branch, setRoute }) {
         </>
       }
       filters={
-        <>
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search bank / account / IFSC…" className="w-auto min-w-[220px] flex-1" />
+        <div className="flex w-full items-center justify-between gap-2">
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search bank / account / IFSC…" className="w-auto min-w-[220px]" />
           <Select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)} className="w-auto">
             <option value="ALL">All branches</option>
             {BRANCH_CODES.map((b) => <option key={b} value={b}>{b}</option>)}
           </Select>
-        </>
+        </div>
       }
     >
       {Object.keys(totalByCurrency).length > 0 && (

@@ -17,6 +17,8 @@ import { clickable } from './ux/clickable';
 import { PeriodBar } from './period';
 import { useLedgerStatement, useOpenBills, useLedgerSplit, useLedgerComponents, branchCode } from './useAccounting';
 import { openPrintPreview } from './PrintPreview';
+import { exportToExcel } from './exportExcel';
+import { toastSuccess, toastError } from './ux/toast';
 import { CONSOLIDATED_LABEL } from './data';
 import {
   esc, fmt, fmtB, dmy, vtLabel, billwiseSide, isBillwiseLedger,
@@ -192,6 +194,49 @@ export function LedgerAccountView({
     cur, branchLabel: branchLabelOf(branch), from, to, showNarr, showDetail,
   });
 
+  // Excel export — mirrors whichever view is on screen (Ledger T-account or
+  // Bill-wise outstanding), so the sheet always matches what the user is looking at.
+  const exportNow = () => {
+    try {
+      if (view === 'bill') {
+        if (!side) return;
+        const cols = [
+          { key: 'ref', label: 'Bill Ref' }, { key: 'bdate', label: 'Bill Date' },
+          { key: 'amt', label: `Bill Amount (${cur})` }, { key: 'settled', label: `Settled (${cur})` },
+          { key: 'pend', label: `Pending (${cur})` }, { key: 'age', label: 'Age (days)' }, { key: 'status', label: 'Status' },
+        ];
+        const rows = bills.map((b) => ({
+          ref: b.ref, bdate: b.bdate, amt: b.amt, settled: b.settled, pend: b.pend,
+          age: b.pend > 0 && b.age > 0 ? b.age : '',
+          status: b.pend <= 0 ? 'Settled' : b.age > 0 ? `${b.age}d overdue` : b.settled > 0 ? 'Part-paid' : 'Current',
+        }));
+        exportToExcel(`ledger-${name}-bills`, cols, rows);
+      } else {
+        if (!d) return;
+        const cols = [
+          { key: 'date', label: 'Date' }, { key: 'toBy', label: 'To/By' }, { key: 'part', label: 'Particulars' },
+          { key: 'vt', label: 'Vch Type' }, { key: 'vno', label: 'Vch No' },
+          { key: 'dr', label: `Debit (${cur})` }, { key: 'cr', label: `Credit (${cur})` }, { key: 'balance', label: `Balance (${cur})` },
+        ];
+        const opSigned = d.opening.side === 'Dr' ? d.opening.amt : -d.opening.amt;
+        let bal = opSigned;
+        const rows = [{
+          date: '', toBy: '', part: 'Opening Balance', vt: '', vno: '',
+          dr: d.opening.side === 'Dr' ? d.opening.amt : '', cr: d.opening.side === 'Cr' ? d.opening.amt : '', balance: opSigned,
+        }];
+        d.rows.forEach((r) => {
+          bal += r.dr - r.cr;
+          rows.push({ date: r.date, toBy: r.toBy, part: r.part, vt: r.vt, vno: r.vno, dr: r.dr || '', cr: r.cr || '', balance: bal });
+        });
+        rows.push({ date: '', toBy: '', part: 'Closing Balance', vt: '', vno: '', dr: '', cr: '', balance: d.closing.amt });
+        exportToExcel(`ledger-${name}`, cols, rows);
+      }
+      toastSuccess('Excel file downloaded');
+    } catch (e) {
+      toastError('Excel export failed — ' + (e?.message || 'please try again'));
+    }
+  };
+
   return (
     <div className="kbled">
       <style>{LEDGER_CSS}</style>
@@ -217,6 +262,7 @@ export function LedgerAccountView({
           {showPeriodBranchHint(branch)}
           {showPeriod && <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setPeriod({ from: r.from, to: r.to })} />}
           <div className="printbtns">
+            <button onClick={exportNow} title="Export to Excel">📊 Excel</button>
             <button onClick={() => printNow()} title="Print / Save as PDF">🖨 Print</button>
           </div>
         </div>

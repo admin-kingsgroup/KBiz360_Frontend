@@ -76,7 +76,7 @@ export function FL({label,children}){
 }
 
 /* ── Report table cell styles ── */
-export const RPT_thStyle={padding:"10px 12px",textAlign:"left",fontWeight:600,color:"#5b616e",borderBottom:"1px solid #cdd1d8",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase",background:"#f4f5f7"};
+export const RPT_thStyle={padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#c2a04a",fontSize:10.5,letterSpacing:"0.4px",textTransform:"uppercase",background:"#1a1c22"};
 export const RPT_tdStyle={padding:"8px 12px",fontSize:12,color:"#14161a",borderBottom:"1px solid #dfe2e7"};
 
 /* ── KPI summary card ── */
