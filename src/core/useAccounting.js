@@ -582,6 +582,19 @@ export function useAlertsByBranch() {
   });
 }
 
+// Capital-vs-Investment analysis (capital employed, blocked vs in-flow working
+// capital, GP yield) — from the posted Balance Sheet + P&L. Same source as the
+// Capital vs Investment screen; exposed as a hook so dashboards can compose it.
+export function useCapitalAnalysis(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'capital-analysis', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/capital-analysis', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 // Single voucher (drill-down target) — view + edit.
 export function useVoucher(id) {
   return useQuery({

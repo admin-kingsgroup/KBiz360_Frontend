@@ -226,8 +226,12 @@ const VAT_RATE = { NBO: 16, DAR: 18, FBM: 16 };
 const isVatBranch = (b) => ['NBO', 'DAR', 'FBM'].includes(String(b || '').toUpperCase());
 const vatRateOf = (b) => num(VAT_RATE[String(b || '').toUpperCase()]) / 100;
 export const isTaxable = (ctx) => !(ctx && ctx.noVat);
+// Input (purchase) VAT is DECOUPLED from the client's Without-VAT SALE choice — it
+// follows the supplier's invoice, so a VAT (Africa) branch still records/reclaims it
+// under Without VAT. India never sets noVat → unchanged.
+const isInputTaxable = (ctx) => ((ctx && isVatBranch(ctx.branch)) ? true : !(ctx && ctx.noVat));
 const svcRateOf = (ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); return GST_RATE; };
-const purRateOf = (spec, ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); return moduleRate(spec); };
+const purRateOf = (spec, ctx) => { if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); if (ctx && ctx.noVat) return 0; return moduleRate(spec); };
 const pkgRateOf = (spec, ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); return spec.gstRate || PKG_GST; };
 export { isVatBranch };
 
@@ -255,15 +259,18 @@ export function lineCalcPackage(spec, l, ctx) {
   const markup = num(l.markup);            // net markup (agency margin = GP)
   const incentive = num(l.incentive);
   const tds = r2(incentive * 0.02);
-  const taxable = r2(land + psvc + psvcGst + markup); // full package consideration
-  const outGst = r2(taxable * rate);       // single 5% output GST
+  // Taxable package value EXCLUDES the supplier's GST — that GST is recovered as Input
+  // credit (ITC), not re-billed to the customer. Output GST 5% applies to
+  // (Land + Supplier Service + SVC2) only.
+  const taxable = r2(land + psvc + markup);
+  const outGst = r2(taxable * rate);       // 5% output GST on (land + supp svc + SVC2)
   const finalSales = r2(taxable + outGst); // TCS added at booking level
   const finalPurchase = r2(land + psvc + psvcGst); // GROSS payable to supplier (ITC split below)
   const salesGST = outGst;
-  // Tour-operator ITC option (Notif 11/2017-CTR): when availItc is set, the supplier's
-  // 5% GST (psvcGst) is claimable Input, not cost — payable to supplier is unchanged.
-  const availItc = !!(ctx && ctx.availItc) || !!l.availItc;
-  const gstPur = availItc ? psvcGst : 0;
+  // The supplier (a GST-registered tour operator, e.g. a Delhi DMC) charges 5% GST,
+  // which we ALWAYS claim as Input GST (ITC) — allowed even under the 5% scheme for a
+  // tour operator's input from another tour operator. It never loads onto the sale.
+  const gstPur = psvcGst;
   return {
     pass: land, gstSvc: 0, gstMk: r2(markup * rate), gstPur, psvcGst, markup, asp: taxable, outGst,
     incentive, tds,
@@ -281,7 +288,8 @@ export function lineCalc(spec, l, ctx) {
   const sr = svcRateOf(ctx), pr = purRateOf(spec, ctx);
   const gSvc = taxable ? gstSvc(l, sr) : 0;
   const gMk  = taxable ? gstMk(l, sr) : 0;
-  const gPur = taxable ? gstPur(spec, l, pr) : 0;
+  // Input VAT follows the supplier, not the Without-VAT sale choice (decoupled).
+  const gPur = isInputTaxable(ctx) ? gstPur(spec, l, pr) : 0;
   const incentive = num(l.incentive);
   const tds = r2(incentive * 0.02);
   const fSales = r2(fareSum(spec, l) + num(l.markup) + num(l.ssvc) + gSvc);
@@ -339,7 +347,8 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     spec.fareCols.forEach((col) => { addH(sH, col.key, col.label, num(l[col.key])); addH(pH, col.key, col.label, num(l[col.key])); });
     if (isPkg(spec)) {
       addH(sH, 'psvc', 'Supp SVCHG', num(l.psvc)); addH(pH, 'psvc', 'Supp SVCHG', num(l.psvc));
-      addH(sH, 'psvcGst', 'Supp SVCHG GST', num(l.psvcGst)); addH(pH, 'psvcGst', 'Supp SVCHG GST', num(l.psvcGst));
+      // Supplier Service GST is NEITHER a sale head NOR a purchase cost head — it is
+      // claimed as Input GST (ITC) and posts via po.gst → Input GST ledgers.
       addH(sH, 'markup', 'SVC2', num(l.markup));
     } else {
       addH(pH, 'psvc', 'Supp SVCHG', num(l.psvc));

@@ -1,10 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PageLayout } from '../../../shell/PageLayout';
 import { ResponsiveGrid } from '../../../shell/primitives';
+import { PeriodBar, periodRange } from '../../../core/period';
+import { useTrialBalance } from '../../../core/useAccounting';
+import { isLiquidRow } from '../../../core/ledgerKind';
 import { useBranchDashboard } from '../hooks/use-branch-dashboard';
 import { useDashboardActions } from '../hooks/use-dashboard-actions';
 import { formatCurrency } from '../utils/helpers';
 import { BranchHeader } from '../components/shared/BranchHeader';
+import { NeedsActionStrip } from '../components/shared/NeedsActionStrip';
+import { YoyStrip } from '../components/shared/YoyStrip';
+import { PnlWaterfallPanel } from '../components/shared/PnlWaterfallPanel';
+import { CashForecastPanel } from '../components/shared/CashForecastPanel';
+import { AgeingPanel } from '../components/shared/AgeingPanel';
+import { BalanceHealthPanel } from '../components/shared/BalanceHealthPanel';
+import { CapitalPanel } from '../components/shared/CapitalPanel';
+import { TargetsPanel } from '../components/shared/TargetsPanel';
+import { TopCustomersPanel } from '../components/shared/TopCustomersPanel';
 import { KpiTile } from '../components/cards/KpiTile';
 import { GpByModulePanel } from '../components/shared/GpByModulePanel';
 import { ConsultantLeaderboard } from '../components/shared/ConsultantLeaderboard';
@@ -18,6 +30,14 @@ import { DashboardError } from '../../../core/ux/DashboardError';
 export function BranchDashboardPage({ branch, setRoute }) {
   const { data, isLoading, isError, error, refetch, branchCode, currencySymbol, isIndia } = useBranchDashboard(branch);
   const { navigate } = useDashboardActions(setRoute);
+  // Period drives the financial bands (P&L / Balance Sheet / ageing / targets) added
+  // below the operational KPIs. The bundled ops payload above stays MTD/YTD as-is.
+  const [range, setRange] = useState(() => periodRange('cfy', { branch }));
+  // Live cash/bank position as of the period end — Σ closing of cash & bank ledgers
+  // (the branch bundle doesn't carry it, so derive it from the trial balance). Mirrors
+  // the Executive/Owner overviews so the figure ties out across dashboards.
+  const trial = useTrialBalance(branch, range).data || {};
+  const cash = (trial.rows || []).filter(isLiquidRow).reduce((s, r) => s + ((r.closingDebit || 0) - (r.closingCredit || 0)), 0);
 
   if (isError && !data) {
     return <DashboardError error={error} onRetry={refetch} title="Could not load the Branch Dashboard." />;
@@ -42,6 +62,15 @@ export function BranchDashboardPage({ branch, setRoute }) {
         bookingsCount={kpis.bookings}
         onNavigate={navigate}
       />
+
+      {/* Period selector — scopes the financial bands (P&L / cash / balance / targets) */}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <PeriodBar branch={branch} defaultPreset="cfy" compact onChange={setRange} />
+        <span className="text-[11px] font-semibold text-ink-muted">Financials: {range.label}</span>
+      </div>
+
+      {/* ② Needs-Action strip — alerts + approvals awaiting this branch */}
+      <NeedsActionStrip branch={branch} navigate={navigate} formatMoney={formatMoney} />
 
       {/* KPI Cards */}
       <ResponsiveGrid min="150px" gap="md" className="mb-4">
@@ -85,6 +114,14 @@ export function BranchDashboardPage({ branch, setRoute }) {
           icon="📤"
           color="#dc2626"
           onClick={() => navigate('/reports/pay')}
+        />
+        <KpiTile
+          label="Cash & Bank"
+          value={formatMoney(cash)}
+          sub={`as of ${range.to}`}
+          icon="🏦"
+          color={cash >= 0 ? '#0ea5e9' : '#dc2626'}
+          onClick={() => navigate('/dashboards/cash')}
         />
         <KpiTile
           label="Bookings"
@@ -231,9 +268,18 @@ export function BranchDashboardPage({ branch, setRoute }) {
         />
       </ResponsiveGrid>
 
+      {/* Year-on-year growth — Revenue · GP · Net Profit, CFY vs LFY */}
+      <YoyStrip branch={branch} range={range} />
+
       <div className="mb-3 grid grid-cols-1 gap-3 desktop:grid-cols-[2fr_1fr]">
         {/* Left column */}
         <div className="flex flex-col gap-3">
+          <PnlWaterfallPanel
+            branch={branch}
+            range={range}
+            formatMoney={formatMoney}
+            onViewFullReport={() => navigate('/reports/pnl')}
+          />
           <GpByModulePanel
             modGp={gpByModule}
             totalGp={kpis.gp}
@@ -269,6 +315,54 @@ export function BranchDashboardPage({ branch, setRoute }) {
             ]}
           />
         </div>
+      </div>
+
+      {/* ④ Cash & Working Capital — 13-week forecast + AR/AP ageing */}
+      <div className="mb-3 grid grid-cols-1 gap-3 desktop:grid-cols-[2fr_1fr]">
+        <CashForecastPanel
+          branch={branch}
+          range={range}
+          formatMoney={formatMoney}
+          onView={() => navigate('/dashboards/cash-forecast')}
+        />
+        <AgeingPanel
+          branch={branch}
+          formatMoney={formatMoney}
+          onView={() => navigate('/dashboards/arap')}
+        />
+      </div>
+
+      {/* ⑤ Financial Position — Balance Sheet health + Capital vs Investment + Tax */}
+      <div className="mb-3 grid grid-cols-1 gap-3 desktop:grid-cols-2">
+        <BalanceHealthPanel
+          branch={branch}
+          range={range}
+          formatMoney={formatMoney}
+          onView={() => navigate('/dashboards/balance-sheet')}
+          onViewTax={() => navigate('/dashboards/tax')}
+        />
+        <CapitalPanel
+          branch={branch}
+          range={range}
+          formatMoney={formatMoney}
+          onView={() => navigate('/dashboards/capital')}
+        />
+      </div>
+
+      {/* ⑥ Targets & Value — attainment vs target/budget + top customers (LTV/ABC) */}
+      <div className="mb-3 grid grid-cols-1 gap-3 desktop:grid-cols-2">
+        <TargetsPanel
+          branch={branch}
+          range={range}
+          formatMoney={formatMoney}
+          onView={() => navigate('/dashboards/sales-target')}
+        />
+        <TopCustomersPanel
+          branch={branch}
+          range={range}
+          formatMoney={formatMoney}
+          onView={() => navigate('/dashboards/customer-value')}
+        />
       </div>
 
       <QuickCreateBar onNavigate={navigate} />

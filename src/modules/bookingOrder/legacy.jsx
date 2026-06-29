@@ -185,8 +185,7 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange })
                 <input type="number" min="0" value={leg.line.psvcGst ?? ''} onChange={(e) => setLine(i, 'psvcGst', e.target.value)} style={cell} /></label>}
               <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supp Comm/Inc Rcvd<br />
                 <input type="number" min="0" value={leg.line.incentive ?? ''} onChange={(e) => setLine(i, 'incentive', e.target.value)} style={cell} /></label>
-              {pkg && <label style={{ fontSize: 10.5, color: '#6b5a1e', display: 'flex', alignItems: 'center', gap: 5, paddingBottom: 6 }}>
-                <input type="checkbox" checked={!!leg.availItc} onChange={(e) => setLeg(i, { availItc: e.target.checked })} /> Avail ITC (tour-operator GST)</label>}
+              {pkg && <span style={{ fontSize: 10, color: '#6b5a1e', fontStyle: 'italic', alignSelf: 'flex-end', paddingBottom: 8 }}>Supplier GST auto-claimed as ITC</span>}
               <div style={{ marginLeft: 'auto', paddingBottom: 4, fontSize: 12, fontWeight: 700, color: '#1a1c22' }}>Net payable ₹{fmt(po.total)}{num(po.gst) > 0 ? ` · ITC ₹${fmt(po.gst)}` : ''}</div>
             </div>
           </div>
@@ -740,7 +739,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', padding: '8px 14px', marginBottom: 12, background: '#FDFAF4', border: '1px solid #eee3cf', borderRadius: 8, flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#fff', border: '1px solid #C49A3C' }} /> Manual — you enter</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#faf7ef', border: '1px dashed #9A9A9A' }} /> Auto — calculated</span>
-        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · {pkg ? 'Holiday package: 5% GST on (Base Fare + Supplier Service Charge + Supplier Service Charge GST + Service Charge - 2); Intl adds 2% TCS' : 'Service Charge - 2 is GST-inclusive (GST = Service Charge - 2 × 18 ÷ 118), posted to separate GST ledgers'}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · {pkg ? 'Holiday package: 5% GST on (Base Fare + Supplier Service Charge + Service Charge - 2); supplier GST claimed as Input (ITC), not billed to client; Intl adds 2% TCS' : 'Service Charge - 2 is GST-inclusive (GST = Service Charge - 2 × 18 ÷ 118), posted to separate GST ledgers'}</span>
       </div>
 
       {/* ① Sales Order */}
@@ -818,7 +817,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {spec.fareCols.map((c) => <th key={c.key} style={{ ...poHdr, width: 95 }}>{c.label}</th>)}
               <th style={{ ...poHdr, width: 95 }}>Supplier Service Charge</th>
               {pkg
-                ? <th style={{ ...poHdr, width: 95 }}>Supplier Service Charge GST (18%)</th>
+                ? <th style={{ ...poHdr, width: 95 }}>Supplier Service Charge GST ({activeRate}%)</th>
                 : <th style={{ ...poHdr, width: 95 }}>GST ({activeRate}%)</th>}
               <th style={{ ...poHdr, width: 100 }}>Supp Comm/Inc Rcvd</th>
               <th style={{ ...poHdr, width: 85 }}>TDS (2%)</th>
@@ -884,7 +883,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
             <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #cdd1d8' }}>
               <th style={{ ...thA, ...thL, width: 140 }}>First Name</th><th style={{ ...thA, ...thL, width: 140 }}>Surname</th>
-              <th style={{ ...thA, width: 110 }}>Final Sales</th><th style={{ ...thA, width: 85 }}>SVF GST ({activeRate}%)</th><th style={{ ...thA, width: 85 }}>SVC2 GST ({activeRate}%)</th><th style={{ ...thA, width: 110 }}>Final Purchase</th><th style={{ ...thA, width: 95 }}>Purchase GST ({pkg ? 18 : activeRate}%)</th>
+              <th style={{ ...thA, width: 110 }}>Final Sales</th><th style={{ ...thA, width: 85 }}>SVF GST ({activeRate}%)</th><th style={{ ...thA, width: 85 }}>SVC2 GST ({activeRate}%)</th><th style={{ ...thA, width: 110 }}>Final Purchase</th><th style={{ ...thA, width: 95 }}>Purchase GST ({activeRate}%)</th>
               <th style={{ ...thA, width: 95 }}>Supp Comm/Inc Rcvd</th><th style={{ ...thA, width: 80 }}>TDS (2%)</th>
               <th style={{ ...thA, width: 110 }}>Gross Profit</th><th style={{ ...thA, width: 80 }}>GP %</th>
             </tr></thead>

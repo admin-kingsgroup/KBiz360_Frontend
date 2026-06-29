@@ -131,6 +131,9 @@ const partyBlock = (lab, p, cur) => `<div class="party"><div class="lab">${esc(l
 // (optional) — used to back-fill blank party fields on older bookings.
 export function buildBookingInvoice(booking = {}, side = 'sale', branch, master = {}) {
   const isSale = side === 'sale';
+  // Holiday (package) client invoice hides the SVC2 margin: it's folded into the Base
+  // Fare line and its GST is folded into the regular GST — the books keep them separate.
+  const isPkg = String(booking.module || '') === 'SH';
   const code = String(branch?.code || booking.branch || 'BOM').toUpperCase();
   // Prefer the live company-profile, but fall back to the seeded issuer/bank constants
   // field-by-field, so the Issued-By block, Place of Supply and Bank details always
@@ -206,6 +209,10 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     const desc = `<td class="l desc"><div class="nm">${esc(headerRef || 'Booking')}</div>${idHtml}${secHtml}</td>`;
     if (isSale) {
       const totalFare = base + k3 + tax + markup;
+      // Holiday: SVC2 (margin) is hidden — folded into the Base Fare, no separate column.
+      if (isPkg) {
+        return `<tr>${desc}<td class="l">${esc(sac)}</td><td>${n2(base + markup)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td class="tf">${cur}${n2(totalFare)}</td></tr>`;
+      }
       // Taxes (YQ/YR) = the pass-through fare taxes; Service Charge - 2 = the agency margin
       // (retained income), shown as its own column per the customer-facing layout.
       return `<tr>${desc}<td class="l">${esc(sac)}</td><td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td>${n2(markup)}</td><td class="tf">${cur}${n2(totalFare)}</td></tr>`;
@@ -213,19 +220,22 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     const totalCost = base + k3 + tax + psvc - incentive + tds;
     return `<tr>${desc}<td class="l">${esc(sac)}</td><td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td>${n2(psvc)}</td><td>${n2(incentive)}</td><td>${n2(tds)}</td><td class="tf">${cur}${n2(totalCost)}</td></tr>`;
   }).join('');
-  const emptyRow = `<tr><td class="l" colSpan="${isSale ? 7 : 9}" style="text-align:center;color:#9A9A9A;padding:16px">No line detail captured for this booking.</td></tr>`;
+  const emptyRow = `<tr><td class="l" colSpan="${isSale ? (isPkg ? 6 : 7) : 9}" style="text-align:center;color:#9A9A9A;padding:16px">No line detail captured for this booking.</td></tr>`;
 
   // summary from the booked snapshot (ties to the books)
   const otGst = r2(snap.otherTaxesGst || 0); // GST on the SVC2 margin — billed separately
   const subTotal = r2(snap.lineTotal || 0), service = r2(snap.serviceCharge || 0), gst = r2(snap.gst || 0), tcs = r2(snap.tcs || 0), incentive = r2(snap.incentiveAmt || 0), tds = r2(snap.incentiveTds || 0), net = r2(snap.total || (subTotal + service + gst + otGst + tcs));
   const inter = booking.gstMode === 'inter';
-  const half = r2(gst / 2), otHalf = r2(otGst / 2);
+  // Holiday client invoice folds the SVC2-margin GST into the regular GST (one line);
+  // every other module keeps SVF GST + SVC2 GST as separate rows.
+  const gstShown = isPkg ? r2(gst + otGst) : gst;
+  const half = r2(gstShown / 2), otHalf = r2(otGst / 2);
   // SVF GST (regular) + SVC2 GST (margin) shown as separate rows so the breakdown
   // reconciles to the NET total. Intra → CGST/SGST halves; inter → single IGST.
   const gstRows = (inter
-    ? `<div class="r"><span class="k">IGST</span><span class="v">${cur}${n2(gst)}</span></div>`
-    : `<div class="r"><span class="k">CGST</span><span class="v">${cur}${n2(half)}</span></div><div class="r"><span class="k">SGST</span><span class="v">${cur}${n2(r2(gst - half))}</span></div>`)
-    + (otGst ? (inter
+    ? `<div class="r"><span class="k">IGST</span><span class="v">${cur}${n2(gstShown)}</span></div>`
+    : `<div class="r"><span class="k">CGST</span><span class="v">${cur}${n2(half)}</span></div><div class="r"><span class="k">SGST</span><span class="v">${cur}${n2(r2(gstShown - half))}</span></div>`)
+    + ((!isPkg && otGst) ? (inter
       ? `<div class="r"><span class="k">SVC2 IGST</span><span class="v">${cur}${n2(otGst)}</span></div>`
       : `<div class="r"><span class="k">SVC2 CGST</span><span class="v">${cur}${n2(otHalf)}</span></div><div class="r"><span class="k">SVC2 SGST</span><span class="v">${cur}${n2(r2(otGst - otHalf))}</span></div>`) : '');
   const tcsRow = tcs ? `<div class="r"><span class="k">TCS</span><span class="v">${cur}${n2(tcs)}</span></div>` : '';
@@ -257,7 +267,9 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     : `<div class="lab2">Settlement</div><div class="pay">Payable to supplier per agreed credit terms.<br>Input GST credit claimed against supplier GSTIN.<br>Link No referenced for invoice-wise GP.</div>`;
 
   const headCols = isSale
-    ? `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Base Fare</th><th>K3 Tax</th><th>Taxes</th><th>Service Charge - 2</th><th>Total Fare</th>`
+    ? (isPkg
+      ? `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Base Fare</th><th>K3 Tax</th><th>Taxes</th><th>Total Fare</th>`
+      : `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Base Fare</th><th>K3 Tax</th><th>Taxes</th><th>Service Charge - 2</th><th>Total Fare</th>`)
     : `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Base Fare</th><th>K3 Tax</th><th>Taxes</th><th>Supplier Service Charge</th><th>Supp Comm/Inc Rcvd</th><th>TDS (2%)</th><th>Total Cost</th>`;
 
   const sheet = `<div class="iv"><div class="sheet">
