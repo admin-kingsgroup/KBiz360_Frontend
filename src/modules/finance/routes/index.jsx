@@ -27,4 +27,7 @@ export const financeRoutes = [
   { path: '/finance/payment-register', title: 'Payment Register', moduleName: 'Finance', Element: lazyEl(() => import('../pages/voucher-register'), 'PaymentRegisterPage') },
   { path: '/finance/contra-register', title: 'Contra Register', moduleName: 'Finance', Element: lazyEl(() => import('../pages/voucher-register'), 'ContraRegisterPage') },
   { path: '/finance/journal-register', title: 'Journal Register', moduleName: 'Finance', Element: lazyEl(() => import('../pages/voucher-register'), 'JournalRegisterPage') },
+  { path: '/finance/refund-register', title: 'Refund Register', moduleName: 'Finance', Element: lazyEl(() => import('../pages/voucher-register'), 'RefundRegisterPage') },
+  { path: '/finance/reissue-register', title: 'Reissue Register', moduleName: 'Finance', Element: lazyEl(() => import('../pages/voucher-register'), 'ReissueRegisterPage') },
+  { path: '/finance/debit-note-register', title: 'Debit Note Register', moduleName: 'Finance', Element: lazyEl(() => import('../pages/voucher-register'), 'DebitNoteRegisterPage') },
 ];

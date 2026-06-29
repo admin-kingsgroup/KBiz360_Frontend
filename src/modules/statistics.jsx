@@ -23,6 +23,9 @@ export function voucherRegister(category) {
     contra: '/finance/contra-register',
     journal: '/finance/journal-register',
     'purchase-expense': '/reports/preg',
+    refund: '/finance/refund-register',
+    reissue: '/finance/reissue-register',
+    'debit-note': '/finance/debit-note-register',
   })[category] || '';
 }
 
