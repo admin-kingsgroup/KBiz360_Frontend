@@ -58,7 +58,7 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
             <thead><tr style={{ background: DARK }}>
-              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 30 }}>#</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 30 }}>No</th>
               <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5 }}>Ledger</th>
               <th style={{ padding: '8px 10px', textAlign: 'center', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 70 }}>Dr / Cr</th>
               <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5 }}>Description</th>
@@ -68,24 +68,24 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
             <tbody>
               {lines.map((l, i) => (
                 <tr key={l._k ?? i} style={{ borderBottom: '1px solid #dfe2e7', background: l.drCr === 'Cr' ? '#fdf3f3' : ((+l.amt || 0) > 0 ? '#f0fbf5' : '#fff') }}>
-                  <td style={{ padding: '4px 8px', textAlign: 'center', fontSize: 10.5, color: DIM }}>{i + 1}</td>
-                  <td style={{ padding: '3px 6px', minWidth: 220 }}>
+                  <td style={{ padding: '10px', textAlign: 'center', fontSize: 10.5, color: DIM }}>{i + 1}</td>
+                  <td style={{ padding: '8px', minWidth: 220 }}>
                     <LedgerPicker branch={branch} value={l.ledger} onChange={(v) => updLine(i, 'ledger', v)} placeholder="Office Rent / Discount Received..." style={{ minHeight: 30, fontSize: 10.5 }} />
                   </td>
-                  <td style={{ padding: '3px 6px' }}>
+                  <td style={{ padding: '8px' }}>
                     <div style={{ display: 'flex', border: '1px solid #cdd1d8', borderRadius: 5, overflow: 'hidden', width: 60, margin: '0 auto' }}>
                       {['Dr', 'Cr'].map((d) => (
                         <button key={d} onClick={() => updLine(i, 'drCr', d)} style={{ flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 9.5, fontWeight: 800, padding: '6px 0', background: l.drCr === d ? (d === 'Dr' ? V_DR : V_CR) : '#fff', color: l.drCr === d ? '#fff' : '#9A9A9A' }}>{d.toUpperCase()}</button>
                       ))}
                     </div>
                   </td>
-                  <td style={{ padding: '3px 6px' }}>
+                  <td style={{ padding: '8px' }}>
                     <input value={l.desc || ''} onChange={(e) => updLine(i, 'desc', e.target.value)} style={{ ...inp, minHeight: 30, fontSize: 10.5 }} placeholder="e.g. June office rent" />
                   </td>
-                  <td style={{ padding: '3px 6px' }}>
+                  <td style={{ padding: '8px' }}>
                     <input type="number" value={l.amt} onChange={(e) => updLine(i, 'amt', e.target.value)} placeholder="0.00" style={{ ...inp, textAlign: 'right', minHeight: 30, fontSize: 11, fontWeight: 600 }} />
                   </td>
-                  <td style={{ padding: '3px 6px', textAlign: 'center' }}>
+                  <td style={{ padding: '8px', textAlign: 'center' }}>
                     <button onClick={() => delLine(i)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#9A9A9A', fontSize: 16, lineHeight: 1 }}>×</button>
                   </td>
                 </tr>
@@ -147,7 +147,9 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
         </div>
       )}
 
-      <FL label="Narration"><textarea value={state.remarks || ''} onChange={(e) => patch({ remarks: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder={state.party ? `Being expense/asset purchase from ${state.party}` : 'Accounting narration...'} /></FL>
+      <div style={{ marginTop: 14 }}>
+        <FL label="Narration"><textarea value={state.remarks || ''} onChange={(e) => patch({ remarks: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder={state.party ? `Being expense/asset purchase from ${state.party}` : 'Accounting narration...'} /></FL>
+      </div>
     </>
   );
 }

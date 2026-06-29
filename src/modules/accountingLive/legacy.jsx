@@ -13,7 +13,7 @@
    #c2a04a accents). No demo data — empty in, empty out.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { card, inp, bc } from '../../core/styles';
 import { localeOf } from '../../core/format';
 import { exportToExcel, vouchersToSheet } from '../../core/exportExcel';
@@ -331,6 +331,49 @@ function ViewToggle({ view, setView }) {
 }
 
 // Two-mode view switch with custom labels (Detailed / Minimal).
+// Themed ledger picker — a native <select>'s open option list can't be styled
+// (square corners, OS-default rows), so this renders the same options as a
+// small rounded popover instead, matching the rest of the app's menus.
+function LedgerSelectMenu({ value, options, onChange, placeholder = 'No cash ledger', width = 200 }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+  return (
+    <div ref={ref} className="max-tablet:w-full" style={{ position: 'relative', display: 'inline-block', gap: '10px'}}>
+      <button type="button" onClick={() => options.length > 0 && setOpen((o) => !o)}
+        className="max-tablet:min-h-[44px] max-tablet:w-full"
+        style={{ ...inp, width, minHeight: 32, fontSize: 11, cursor: options.length ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || placeholder}</span>
+        <span style={{ fontSize: 13, lineHeight: 1, color: DIM, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>▾</span>
+      </button>
+      {open && options.length > 0 && (
+        <div role="menu" style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 50, minWidth: '100%', maxHeight: 260, overflowY: 'auto',
+          background: '#fff', borderRadius: 12, border: '1px solid #e6e8ec', boxShadow: '0 10px 28px rgba(13,19,38,0.16)', padding: 5,
+        }}>
+          {options.map((o) => (
+            <button key={o} type="button" onClick={() => { onChange(o); setOpen(false); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                padding: '7px 9px', borderRadius: 8, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                background: o === value ? '#e8f0ff' : 'transparent',
+                fontSize: 11.5, fontWeight: o === value ? 700 : 500, color: DARK,
+              }}>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{o}</span>
+              {o === value && <span style={{ color: BLUE, fontWeight: 800 }}>✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ModeToggle({ view, setView, modes }) {
   return <>{modes.map((m) => (
     <button key={m.id} onClick={() => setView(m.id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === m.id ? DARK : '#fff', color: view === m.id ? GOLD : DIM, borderColor: view === m.id ? DARK : '#e6e8ec' }}>{m.label}</button>
@@ -2259,10 +2302,7 @@ export function CashBookLive({ branch }) {
       title="Cash Book"
       sub={sub}
       right={<>
-        <select value={selected} onChange={(e) => { setLedger(e.target.value); setPage(0); }} className="max-tablet:min-h-[44px] max-tablet:w-full" style={{ ...inp, width: 200, minHeight: 32, fontSize: 11, cursor: 'pointer' }}>
-          {cashLedgers.length === 0 && <option value="">No cash ledger</option>}
-          {cashLedgers.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
-        </select>
+        <LedgerSelectMenu value={selected} options={cashLedgers.map((l) => l.name)} onChange={(v) => { setLedger(v); setPage(0); }} />
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Ledger / narration / voucher…" />
         <button
           onClick={() => setExpandAll((x) => !x)}

@@ -221,7 +221,7 @@ export function DataTable({
   return (
     <div className={cn('flex flex-col rounded-brand border border-surface-border bg-surface shadow-sm overflow-hidden', className)}>
       {showHeaderBar && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-border px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-border bg-accent-soft px-4 py-3">
           <div className="min-w-0">
             {title && <h3 className="truncate text-sm font-bold text-navy">{title}</h3>}
             {subtitle && <p className="mt-0.5 truncate text-xs text-ink-muted">{subtitle}</p>}
@@ -439,9 +439,9 @@ export function DataTable({
                   <td
                     key={col.key}
                     className={cn(
-                      padX, 'py-2.5 font-bold text-white', alignClass(col), col.num && 'tabular-nums',
+                      padX, 'bg-navy py-2.5 font-bold text-white', alignClass(col), col.num && 'tabular-nums',
                       stickyHeader && 'sticky bottom-0 z-20',
-                      col.sticky && cn('sticky', col.sticky === 'right' ? 'right-0' : 'left-0', 'z-30 bg-navy'),
+                      col.sticky && cn('sticky', col.sticky === 'right' ? 'right-0' : 'left-0', 'z-30'),
                     )}
                   >
                     {typeof col.footer === 'function' ? col.footer(sorted) : (col.footerLabel ?? '')}

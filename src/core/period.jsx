@@ -88,7 +88,7 @@ export function PeriodBar({ branch, defaultPreset = 'all', onChange, compact = f
   });
   const dInp = { padding: '4px 7px', fontSize: 11.5, border: `1px solid ${C.border}`, borderRadius: 6 };
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
       <div style={{ display: 'inline-flex', gap: 3, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, padding: 3, flexWrap: 'wrap' }}>
         {PERIOD_PRESETS.map(([k, l]) => (
           <button key={k} title={k === 'all' ? 'Inception → today' : ''} onClick={() => { setCustom(null); setPreset(k); }} style={btn(preset === k && !custom)}>{l}</button>

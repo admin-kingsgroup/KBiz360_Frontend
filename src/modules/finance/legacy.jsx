@@ -291,7 +291,7 @@ export function BankReco({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{code||CONSOLIDATED_LABEL} · Book (ledger) vs Bank statement · auto &amp; manual matching</p>
           </div>
         </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+        <div style={{display:"flex",gap:20,flexWrap:"wrap",alignItems:"center"}}>
           <select value={ledger} onChange={e=>{setLedger(e.target.value);setSelBook(null);setSelStmt(null);}} style={{...inp,width:"auto",minWidth:180,minHeight:32,fontSize:11}}>
             {bankLedgers.length===0&&<option value="">{ledgersLoading?"Loading banks…":"No bank ledgers"}</option>}
             {bankLedgers.map(b=><option key={b.code||b.name} value={b.name}>{b.name}{b.currency&&b.currency!=="INR"?` (${b.currency})`:""}</option>)}

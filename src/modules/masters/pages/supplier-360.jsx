@@ -82,13 +82,15 @@ export function Supplier360({ branch }) {
       title="Supplier 360° View"
       subtitle="Complete supplier profile — purchases, outstanding, ADMs, ACMs, performance"
       filters={
-        <>
-          <ReportSearch value={search} onChange={setSearch} placeholder="Voucher / module / destination…" />
+        <div className="flex w-full flex-wrap items-center gap-3">
+          <div className="flex flex-1 items-center gap-2">
+            <div className="flex-1"><ReportSearch value={search} onChange={setSearch} placeholder="Voucher / module / destination…" width="100%" /></div>
+            <Select value={selSupplier} onChange={(e) => setSupplier(e.target.value)} disabled={!ALL_SUPPLIERS.length} className="flex-1">
+              {ALL_SUPPLIERS.length ? ALL_SUPPLIERS.map((s) => <option key={s}>{s}</option>) : <option value="">No supplier data yet</option>}
+            </Select>
+          </div>
           <ReportDateBar value={range} onChange={setRange} branch={branch} />
-          <Select value={selSupplier} onChange={(e) => setSupplier(e.target.value)} disabled={!ALL_SUPPLIERS.length} className="w-auto min-w-[200px]">
-            {ALL_SUPPLIERS.length ? ALL_SUPPLIERS.map((s) => <option key={s}>{s}</option>) : <option value="">No supplier data yet</option>}
-          </Select>
-        </>
+        </div>
       }
     >
       {gpQ.isError && (
@@ -129,7 +131,7 @@ export function Supplier360({ branch }) {
           <DataTable columns={histColumns} rows={displayHist} loading={gpQ.isLoading} isError={gpQ.isError} getRowKey={(r) => r.id} dense exportName={`supplier-${selSupplier || 'none'}`} emptyMessage="No purchases for this supplier." />
         </div>
         <div className="flex flex-col gap-3">
-          <PageSection title="Payable Ageing" className="border-t-[3px] border-t-[#185FA5]">
+          <PageSection title="Payable Ageing" className="border-t-[3px] mt-6 border-t-[#185FA5]">
             {!ageRow.party ? <p className="text-[11px] text-ink-muted">No open payable for this supplier.</p> : (
               <div className="text-[11px]">
                 {[['d0', '0–30'], ['d30', '31–60'], ['d60', '61–90'], ['d90', '90+']].map(([k, lbl]) => (

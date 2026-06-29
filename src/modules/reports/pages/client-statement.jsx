@@ -92,18 +92,20 @@ export function ClientStatement({ branch }) {
       }
       filters={
         <>
-          <ReportSearch value={search} onChange={setSearch} placeholder="Ref / type / description…" />
-          <Select value={client} onChange={(e) => setClient(e.target.value)} className="w-auto">
-            <option value="">— Select client —</option>
-            {clients.map((c) => <option key={c}>{c}</option>)}
-          </Select>
+          <div className="flex flex-1 items-center gap-2">
+            <div className="flex-1"><ReportSearch value={search} onChange={setSearch} placeholder="Ref / type / description…" width="100%" /></div>
+            <Select value={client} onChange={(e) => setClient(e.target.value)} className="flex-1">
+              <option value="">Select client</option>
+              {clients.map((c) => <option key={c}>{c}</option>)}
+            </Select>
+          </div>
           <ReportDateBar value={range} onChange={setRange} branch={branch} />
         </>
       }
     >
-      <ResponsiveGrid min="140px" gap="md" className="mb-4">
+      <ResponsiveGrid min="200px" gap="lg" className="mb-4">
         {KPIS.map((k, i) => (
-          <div key={i} className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3 py-2.5" style={{ borderTopColor: k.c }}>
+          <div key={i} className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3 py-4" style={{ borderTopColor: k.c }}>
             <p className="text-[8.5px] font-bold uppercase tracking-wide" style={{ color: k.c }}>{k.l}</p>
             <p className="mt-1 text-base font-extrabold tabular-nums text-navy tablet:text-lg">{k.v}</p>
           </div>
@@ -111,7 +113,7 @@ export function ClientStatement({ branch }) {
       </ResponsiveGrid>
 
       <DataTable
-        title={`Account Ledger — ${client || '…'}`}
+        title={`Account Ledger : ${client || ''}`}
         subtitle={`${filteredTxns.length} transactions`}
         columns={columns}
         rows={filteredTxns}
