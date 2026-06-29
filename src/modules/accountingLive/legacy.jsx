@@ -48,6 +48,7 @@ import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { JvBlock } from '../../core/voucher/JvBlock';
 import { editorVoucherTotal } from '../../core/voucher/ui';
 import { hasRegistry } from '../../core/voucher/registry';
+import { useVoucherRevoke } from '../../core/voucher/useRevokeAction';
 import { PageLayout } from '../../shell/PageLayout';
 import { SkeletonTable } from '../../shell/primitives';
 
@@ -888,6 +889,7 @@ function Crumb({ items }) {
 export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   const vq = useVoucher(voucherId);
   const upd = useUpdateVoucher();
+  const { canRevoke, doRevoke, revoking } = useVoucherRevoke();
   const v = vq.data;
   // Cost centres are branch-wise — only offer THIS voucher's branch's centres
   // (e.g. BOM-FLT-INT), never another branch's, so the tag can't be mismatched.
@@ -1041,6 +1043,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
           </table>
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          {canRevoke && !byBooking && <button onClick={() => doRevoke(voucherId, dismiss)} disabled={revoking} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: revoking ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff', opacity: revoking ? 0.6 : 1 }}>⟲ {revoking ? 'Revoking…' : 'Revoke'}</button>}
           <button onClick={printEntry} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
           <button onClick={dismiss} style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
         </div>

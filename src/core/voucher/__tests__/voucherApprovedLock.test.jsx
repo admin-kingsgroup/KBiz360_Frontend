@@ -16,7 +16,12 @@ jest.mock('../../useAccounting', () => ({
   useVoucherPreview: jest.fn(() => ({ data: { postings: [], balanced: true, totalDebit: 0, totalCredit: 0, diff: 0 } })),
   useCreateVoucher: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
   useUpdateVoucher: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
+  useRevokeVoucher: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
+  fetchRevokeCheck: jest.fn(() => Promise.resolve({ blocks: [], warnings: [], journalRows: 2 })),
 }));
+jest.mock('../../ux/confirm', () => ({ confirmDialog: jest.fn(() => Promise.resolve({ confirmed: false })) }));
+const mockIsApprover = jest.fn(() => true);
+jest.mock('../../api', () => ({ isViewOnly: () => false, isApprover: () => mockIsApprover() }));
 jest.mock('../../PrintPreview', () => ({ openPrintPreview: jest.fn() }));
 jest.mock('../../styles', () => ({
   B: {}, bc: () => ({ cur: '₹' }),
@@ -38,7 +43,6 @@ jest.mock('../JvBlock', () => ({ JvBlock: () => null }));
 jest.mock('../../ux/forms', () => ({ useFormKeys: () => ({ ref: { current: null }, onKeyDown: jest.fn() }) }));
 jest.mock('../../ux/toast', () => ({ toast: jest.fn() }));
 jest.mock('../../ux/widgets.jsx', () => ({ Kbd: () => null }));
-jest.mock('../../api', () => ({ isViewOnly: () => false }));
 jest.mock('../../hooks', () => ({ triggerSaveRefresh: jest.fn() }));
 jest.mock('../../useNextNo', () => ({ useVNo: () => 'PMT/BOM/26/0002' }));
 
@@ -49,13 +53,36 @@ import { VoucherShell } from '../VoucherShell';
 const vch = (status) => ({ vno: 'PMT/BOM/26/0001', status, branch: 'BOM', type: 'PMT', category: 'payment' });
 
 describe('VoucherShell (registry edit) — approved vouchers are read-only, not editable', () => {
-  test('an APPROVED voucher shows the Revoke notice and no Save button', () => {
+  beforeEach(() => mockIsApprover.mockReturnValue(true));
+
+  test('an APPROVED voucher shows the read-only notice and no Save button', () => {
     render(<VoucherShell category="payment" mode="edit" voucher={vch('approved')} cur="₹" onBack={jest.fn()} />);
     expect(screen.getByText(/read-only/i)).toBeInTheDocument();
-    expect(screen.getByText(/Revoke/)).toBeInTheDocument();
     expect(screen.getByText(/Voucher Approvals/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Save Voucher/i })).toBeNull();
     expect(screen.queryByText('FORM FIELDS')).toBeNull();
+  });
+
+  test('an approver sees a Revoke button beside Print/Close in the read-only view', () => {
+    mockIsApprover.mockReturnValue(true);
+    render(<VoucherShell category="payment" mode="edit" voucher={vch('approved')} cur="₹" onBack={jest.fn()} />);
+    expect(screen.getByRole('button', { name: /Revoke/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Print/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Close/i })).toBeInTheDocument();
+  });
+
+  test('a non-approver gets the read-only view but NO Revoke button', () => {
+    mockIsApprover.mockReturnValue(false);
+    render(<VoucherShell category="payment" mode="edit" voucher={vch('approved')} cur="₹" onBack={jest.fn()} />);
+    expect(screen.getByText(/read-only/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Revoke/i })).toBeNull();
+  });
+
+  test('a booking-driven (locked) voucher shows no Revoke even for an approver', () => {
+    mockIsApprover.mockReturnValue(true);
+    render(<VoucherShell category="payment" mode="edit" voucher={{ ...vch('approved'), locked: true, source: 'booking', bookingId: 'SF/BOM/26/0001' }} cur="₹" onBack={jest.fn()} />);
+    expect(screen.getByText(/SO \/ PO \/ GP booking/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Revoke/i })).toBeNull();
   });
 
   test('a POSTED voucher is also read-only', () => {
@@ -79,10 +106,11 @@ describe('VoucherShell (registry edit) — approved vouchers are read-only, not 
 });
 
 describe('guard — the generic VoucherEditor carries the same approved/posted gate', () => {
-  test('accountingLive editor blocks editing approved/posted vouchers', () => {
+  test('accountingLive editor blocks editing approved/posted vouchers and offers Revoke', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'modules', 'accountingLive', 'legacy.jsx'), 'utf8');
-    // The gate guards both statuses and routes the user to Revoke.
+    // The gate guards both statuses and offers the shared Revoke action in the read-only view.
     expect(src).toMatch(/v\.status === 'approved' \|\| v\.status === 'posted'/);
-    expect(src).toMatch(/Revoke/);
+    expect(src).toMatch(/useVoucherRevoke/);
+    expect(src).toMatch(/canRevoke && !byBooking && .*doRevoke\(voucherId, dismiss\)/);
   });
 });

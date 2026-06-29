@@ -5,6 +5,7 @@ import { B, bc, VWrap, VHead, FL, inp, card, btnG, btnGh } from '../styles';
 import { VOUCHER_REGISTRY } from './registry';
 import { DARK, DIM, BLUE, RED, GREEN, money, brCodeOf, escHtml } from './ui';
 import { JvBlock } from './JvBlock';
+import { useVoucherRevoke } from './useRevokeAction';
 import { useFormKeys } from '../ux/forms';
 import { toast } from '../ux/toast';
 import { Kbd } from '../ux/widgets.jsx';
@@ -49,6 +50,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   const createMut = useCreateVoucher();
   const updateMut = useUpdateVoucher();
   const saving = createMut.isPending || updateMut.isPending;
+  const { canRevoke, doRevoke, revoking } = useVoucherRevoke();
 
   // Live, backend-computed journal — identical engine for create and edit.
   const previewBody = { ...desc.toBody(state, ctx), sourceRef: state.sourceRef || '' };
@@ -232,6 +234,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
         </div>
         {journalTable}
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          {canRevoke && !byBooking && <button onClick={() => doRevoke(editId, dismiss)} disabled={revoking} className="max-tablet:min-h-[44px]" title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: revoking ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff', opacity: revoking ? 0.6 : 1 }}>⟲ {revoking ? 'Revoking…' : 'Revoke'}</button>}
           <button onClick={printEntry} className="max-tablet:min-h-[44px]" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
           <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
         </div>
