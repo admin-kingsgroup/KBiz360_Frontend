@@ -10,15 +10,17 @@
 import React, { useState } from 'react';
 import { Download } from 'lucide-react';
 import { exportToCSV } from '../../../core/business-logic';
+import { bc } from '../../../core/styles';
+import { money } from '../../../core/format';
 import { CUR_MONTH, PERIOD_OPTIONS } from '../../../core/dates';
 import { ReportSearch, matchNeedle } from '../../../core/reportDateBar';
 import { DataTable } from '../../../shell/DataTable';
 import { ResponsiveGrid, Select, Button, StatusPill } from '../../../shell/primitives';
 import { RptShell } from '../components/scaffold';
 
-const f = (n) => '₹' + Number(Math.round(n)).toLocaleString('en-IN');
-
 export function ForexReport({ branch }) {
+  const cur = bc(branch).cur;
+  const f = (n) => money(n, cur);
   const [period, setPeriod] = useState(CUR_MONTH);
   const [search, setSearch] = useState('');
   const needle = search.trim().toLowerCase();

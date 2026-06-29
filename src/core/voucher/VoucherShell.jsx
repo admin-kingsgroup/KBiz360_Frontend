@@ -111,7 +111,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   }, [err]);
 
   const printEntry = () => {
-    const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? cur + x.toLocaleString('en-IN') : ''; };
+    const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? money(cur, x) : ''; };
     const rows = (pv.postings || []).map((p) => `<tr><td>${escHtml(p.ledger)}</td><td>${escHtml(p.group || '')}</td><td class="r">${fmt(p.debit)}</td><td class="r">${fmt(p.credit)}</td></tr>`).join('');
     const html = `<style>
       .ve{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#141414}

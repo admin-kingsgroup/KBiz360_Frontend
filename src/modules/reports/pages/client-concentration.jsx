@@ -9,6 +9,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { bc } from '../../../core/styles';
+import { localeOf } from '../../../core/format';
 import { useGpBills } from '../../../core/useAccounting';
 import { ReportDateBar, resolveReportRange } from '../../../core/reportDateBar';
 import { DataTable } from '../../../shell/DataTable';
@@ -42,7 +43,7 @@ export function ClientConcentration({ branch }) {
   const top1Rev = clients[0]?.rev || 0;
   const top3Rev = clients.slice(0, 3).reduce((s, c) => s + c.rev, 0);
   const herfindahl = clients.reduce((s, c) => s + Math.pow(totalRev > 0 ? c.rev / totalRev : 0, 2), 0);
-  const f = (n) => cur + Number(Math.round(n)).toLocaleString('en-IN');
+  const f = (n) => cur + Number(Math.round(n)).toLocaleString(localeOf(cur));
   const pct = (n) => (totalRev > 0 ? (n / totalRev * 100).toFixed(1) : 0);
   const risk = top1Rev / totalRev > 0.4 ? 'HIGH' : top3Rev / totalRev > 0.6 ? 'MEDIUM' : 'LOW';
 

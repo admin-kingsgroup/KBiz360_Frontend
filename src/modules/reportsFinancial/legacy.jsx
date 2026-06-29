@@ -67,7 +67,7 @@ const compact = (cur, n) => {
   const v = Number(n) || 0, a = Math.abs(v);
   if (a >= 1e7) return `${cur}${(v / 1e7).toFixed(2)} Cr`;
   if (a >= 1e5) return `${cur}${(v / 1e5).toFixed(2)} L`;
-  return `${cur}${Math.round(v).toLocaleString('en-IN')}`;
+  return `${cur}${Math.round(v).toLocaleString(localeOf(cur))}`;
 };
 // Branch-locale variant of `compact` for the operational AR/AP screens. Keeps the
 // Cr/L Indian compaction (it's a magnitude grouping, not a tax/value change) but
@@ -160,7 +160,8 @@ const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', padding: '
 const STMT_GRID_CSS = '@media (max-width:1180px){.stmt-grid{grid-template-columns:1fr !important}.stmt-rail{order:-1}}';
 // Booking-file drill rows (shared by single-leaf modules and sub-centres).
 // Clickable when the file carries editable vouchers → opens the voucher drill.
-function FileRows({ files, indent = 48, onPick }) {
+function FileRows({ files, indent = 48, onPick, cur = '₹' }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   return (files || []).map((f, i) => {
     const drillable = !f.aggregate && (f.vouchers || []).length > 0;
     return (
@@ -198,6 +199,7 @@ function Modal({ title, onClose, mobile, children, wide }) {
 
 // P&L booking file → its sale/purchase vouchers → edit (saving re-posts the journal).
 function FileVoucherDrill({ file, cur, mobile, onClose }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const [vid, setVid] = useState(null);
   const vouchers = file?.vouchers || [];
   return (
@@ -223,6 +225,7 @@ function FileVoucherDrill({ file, cur, mobile, onClose }) {
 // step module → booking file → its sale/purchase vouchers → edit (re-posts the
 // journal). The Fiori view drills file-first; this enters from an aggregate row.
 function ModuleVoucherDrill({ module, cur, mobile, onClose }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const allFiles = module.hasSubs ? (module.subs || []).flatMap((s) => s.files || []) : (module.files || []);
   const files = allFiles.filter((f) => !f.aggregate && (f.vouchers || []).length > 0);
   const [file, setFile] = useState(null);
@@ -438,6 +441,7 @@ function PnlPeriodBar({ mode, setMode, fy, setFy, compare, setCompare, custom, s
    Fires one module-PL query per column (cache-shared with the detail view's
    key), rolls up a FY-Total column, and drills any column → its full P&L. */
 function PnLMatrix({ branch, cur, fy, grain, onFocus }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const code = branchCode(branch);
   const cols = useMemo(
     () => (grain === 'month'
@@ -635,6 +639,8 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
    state + voucher/ledger drills, so each per-branch section in the consolidated
    view drills independently. `d` is a byBranch slice or the merged top-level. */
 function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
+  const paren = (n) => { const v = Math.round(Number(n) || 0); return v ? `(${v.toLocaleString(localeOf(cur))})` : '—'; };
   const [openMod, setOpenMod] = useState({});
   const [openSub, setOpenSub] = useState({});
   const [openHead, setOpenHead] = useState({});   // Section A: ledger → component drill per module
@@ -733,7 +739,7 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
                             <td style={{ ...num, color: SAP.sec }}>{pctTxt(m.pctOfSales)}</td>
                           </tr>
                           {/* single-leaf modules: ledger composition at module level (captured fares — Base Fare, K3, Taxes …) */}
-                          {open && !m.hasSubs && <FioriLedgerRows m={m} openHead={openHead} setOpenHead={setOpenHead} />}
+                          {open && !m.hasSubs && <FioriLedgerRows m={m} cur={cur} openHead={openHead} setOpenHead={setOpenHead} />}
                           {/* multi-leaf modules (Flights/Holiday) → sub-centre rows → files */}
                           {open && m.hasSubs && (m.subs || []).map((s) => {
                             const sk = `${m.key}|${s.code}`;
@@ -750,13 +756,13 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
                                   <td style={{ ...num, color: SAP.sec }}>{pctTxt(s.pctOfSales)}</td>
                                 </tr>
                                 {/* per-sub-centre ledger composition — fares split by Int'l/Domestic, not merged */}
-                                {so && <FioriLedgerRows heads={s.heads} keyBase={sk} stripPrefix openHead={openHead} setOpenHead={setOpenHead} />}
-                                {so && <FileRows files={s.files} indent={62} onPick={setDrillFile} />}
+                                {so && <FioriLedgerRows heads={s.heads} keyBase={sk} stripPrefix cur={cur} openHead={openHead} setOpenHead={setOpenHead} />}
+                                {so && <FileRows files={s.files} indent={62} cur={cur} onPick={setDrillFile} />}
                               </React.Fragment>
                             );
                           })}
                           {/* single-leaf modules → files directly */}
-                          {open && !m.hasSubs && <FileRows files={m.files} indent={48} onPick={setDrillFile} />}
+                          {open && !m.hasSubs && <FileRows files={m.files} indent={48} cur={cur} onPick={setDrillFile} />}
                         </React.Fragment>
                       );
                     })}
@@ -916,7 +922,8 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
    the entry (Base Fare, K3, Taxes …). Sales ledgers show their amount in the
    Sales column, Purchase ledgers in the COGS column; click a ledger to reveal
    its components. Same six columns as the module table (colSpan-aware). */
-function FioriLedgerRows({ m, heads: headsProp, keyBase, stripPrefix, openHead, setOpenHead }) {
+function FioriLedgerRows({ m, heads: headsProp, keyBase, stripPrefix, openHead, setOpenHead, cur = '₹' }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   // Module-level (m.heads) for single-leaf modules, or a sub-centre's own heads
   // (Int'l/Domestic) when `heads` + `keyBase` are passed — so fares are split, not merged.
   // Under an Int'l/Domestic head the leaf prefix is redundant, so strip it for display.
@@ -1002,6 +1009,7 @@ const azByName = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'en', 
 // reach its booking files → vouchers → edit; tap any expense ledger to drill
 // its postings → voucher → edit. Same live data & editor as the Fiori view.
 function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const [drillModule, setDrillModule] = useState(null);
   // Collapsible indirect tree: Fixed/Variable buckets default expanded; sub-groups
   // default collapsed (click a sub-group to reveal its ledgers).
@@ -1213,6 +1221,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
    Gross Profit → add Other Income → less Indirect Expenses → Net Profit.
    Fully drillable (module / ledger / sub-group) exactly like Classic. */
 function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const [drillModule, setDrillModule] = useState(null);
   const [openSub, setOpenSub] = useState({});
   const isOpen = (key, defOpen) => (openSub[key] === undefined ? defOpen : openSub[key]);
@@ -1443,6 +1452,7 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
    Register (wired via openLedgerModal's `invoiceToRegister`). Reuses the same
    modulePL data + pnlDetail helpers as Classic/Vertical, so the drill is identical. */
 function DrillPnL({ d, cur, branch, periodTxt }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const [openSub, setOpenSub] = useState({});
   const isOpen = (key, defOpen) => (openSub[key] === undefined ? defOpen : openSub[key]);
   const mono = { fontFamily: "'Courier New', Courier, monospace" };
@@ -1662,7 +1672,8 @@ function BSToolbar({ mode, setMode, quick, setQuick, customDate, setCustomDate, 
 
 // Prev / Difference / %-Change cells, shared by every comparison row. Renders
 // nothing when not comparing; three dashes when there is no prior figure.
-function DiffCells({ cur, prev, showPY, dark }) {
+function DiffCells({ cur, prev, showPY, dark, loc = 'en-IN' }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : '—'; };
   if (!showPY) return null;
   const sec = dark ? '#9fb4cc' : SAP.sec;
   if (prev == null) return (<><td style={{ ...num, color: sec }}>—</td><td style={{ ...num, color: sec }}>—</td><td style={{ ...num, color: sec }}>—</td></>);
@@ -1821,6 +1832,7 @@ function FioriExpandBar({ onExpand, onCollapse }) {
 
 /* ── Fiori vertical view ─────────────────────────────────────────────── */
 function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, to, mobile, detail }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const netWorth = netWorthOf(d);
   const ca = sumGroups(d.assets, CURRENT_ASSETS), cl = sumGroups(d.liabilities, CURRENT_LIABS);
   const workingCap = ca - cl;
@@ -1865,18 +1877,20 @@ function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, t
   );
 }
 // A single leaf-ledger row (tap → drill into its postings → voucher → edit).
-function bsLedgerRow(l, i, indent, onPickLedger, showPY) {
+function bsLedgerRow(l, i, indent, onPickLedger, showPY, loc = 'en-IN') {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : '—'; };
   return (
     <tr key={`${indent}-${i}-${l.name}`} {...keyActivate(() => onPickLedger && onPickLedger(l.name))}
       style={{ background: i % 2 ? SAP.rowAlt : '#fff', borderBottom: `1px solid ${SAP.borderLt}`, cursor: onPickLedger ? 'pointer' : 'default' }}>
       <td style={{ padding: `5px 16px 5px ${indent}px`, color: SAP.text }}>{l.name}{onPickLedger ? <span style={{ color: SAP.blue, fontWeight: 700, marginLeft: 6 }}>›</span> : null}</td>
       <td style={num}>{inr(l.amount)}</td>
-      <DiffCells cur={l.amount} prev={null} showPY={showPY} />
+      <DiffCells cur={l.amount} prev={null} showPY={showPY} loc={loc} />
     </tr>
   );
 }
 
 function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, showPY, curLabel, prevLabel, onPickLedger, detail, open: openProp, setOpen: setOpenProp, openSub: openSubProp, setOpenSub: setOpenSubProp }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   // Controlled by FioriBS (shared across both side cards) when props are passed;
   // otherwise self-managed, so the card still works standalone.
   const [openLocal, setOpenLocal] = useState({});
@@ -1909,7 +1923,7 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
                     style={{ background: rowBg, color: rowColor, cursor: hasChildren ? 'pointer' : 'default', borderTop: '2px solid #b3ccf5', fontWeight: 700 }}>
                     <td style={{ padding: '9px 16px' }}>{hasChildren ? <Toggle open={isOpen} /> : <span style={{ marginRight: 7 }}>{g.isResult ? '●' : '•'}</span>}{g.group}</td>
                     <td style={num}>{inr(g.amount)}</td>
-                    <DiffCells cur={g.amount} prev={pv} showPY={showPY} />
+                    <DiffCells cur={g.amount} prev={pv} showPY={showPY} loc={localeOf(cur)} />
                   </tr>
                   {/* Sub-groups (if the ledgers carry one) → expand to their ledgers; A→Z within the group */}
                   {!summary && isOpen && [...subs].sort((a, b) => azByName(a.name, b.name)).map((sg) => {
@@ -1921,21 +1935,21 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
                           style={{ background: SAP.subBg, color: SAP.subText, cursor: 'pointer', borderBottom: `1px solid ${SAP.borderLt}`, fontWeight: 600 }}>
                           <td style={{ padding: '6px 16px 6px 38px' }}><Toggle open={so} />{sg.name}<span style={{ fontSize: 9, color: SAP.label, marginLeft: 6 }}>· {sg.ledgers.length} ledger{sg.ledgers.length > 1 ? 's' : ''}</span></td>
                           <td style={{ ...num, fontWeight: 600 }}>{inr(sg.amount)}</td>
-                          <DiffCells cur={sg.amount} prev={null} showPY={showPY} />
+                          <DiffCells cur={sg.amount} prev={null} showPY={showPY} loc={localeOf(cur)} />
                         </tr>
-                        {so && [...sg.ledgers].sort((a, b) => azByName(a.name, b.name)).map((l, i) => bsLedgerRow(l, i, 62, onPickLedger, showPY))}
+                        {so && [...sg.ledgers].sort((a, b) => azByName(a.name, b.name)).map((l, i) => bsLedgerRow(l, i, 62, onPickLedger, showPY, localeOf(cur)))}
                       </React.Fragment>
                     );
                   })}
                   {/* Ledgers with no sub-group hang directly under the 28-group head; A→Z within the group */}
-                  {!summary && isOpen && [...direct].sort((a, b) => azByName(a.name, b.name)).map((l, i) => bsLedgerRow(l, i, 48, onPickLedger, showPY))}
+                  {!summary && isOpen && [...direct].sort((a, b) => azByName(a.name, b.name)).map((l, i) => bsLedgerRow(l, i, 48, onPickLedger, showPY, localeOf(cur)))}
                 </React.Fragment>
               );
             })}
             <tr style={{ background: SAP.shell, color: '#fff', fontWeight: 700, borderTop: `2px solid ${SAP.blue}` }}>
               <td style={{ padding: '11px 16px' }}>{totalLabel}</td>
               <td style={num}>{inr(total)}</td>
-              <DiffCells cur={total} prev={showPY ? (prevTotal ?? null) : null} showPY={showPY} dark />
+              <DiffCells cur={total} prev={showPY ? (prevTotal ?? null) : null} showPY={showPY} dark loc={localeOf(cur)} />
             </tr>
           </tbody>
         </table>
@@ -1964,6 +1978,7 @@ const sideRows = (groups, summary, isOpen = () => true, side = '') => [...(group
   ];
 });
 function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const summary = detail === 'summary';
   const [openSub, setOpenSub] = useState({});
   const [drillLedger, setDrillLedger] = useState(null);
@@ -2060,6 +2075,7 @@ const branchLabelClassic = (d) => (d?.filter?.branch && d.filter.branch !== 'ALL
    same totals d.totalLiabilities/d.totalAssets) — just stacked top-to-bottom:
    Equity & Liabilities above Assets. Fully drillable like Classic. */
 function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
+  const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const summary = detail === 'summary';
   const [openSub, setOpenSub] = useState({});
   const [drillLedger, setDrillLedger] = useState(null);

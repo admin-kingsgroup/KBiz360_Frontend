@@ -118,7 +118,7 @@ export function InterBranchVoucher({ branch }) {
           <span>Service Fee: <b>{cur}{svc.toLocaleString(loc)}</b></span>
           {treatment.crossBorder
             ? <span style={{ color: C.blue }}>Tax: <b>Export · zero-rated</b></span>
-            : <span>{taxName} ({taxRate}% on fee): <b>{cur}{igst.toLocaleString('en-IN')}</b></span>}
+            : <span>{taxName} ({taxRate}% on fee): <b>{cur}{igst.toLocaleString(loc)}</b></span>}
           <span style={{ marginLeft: 'auto', fontWeight: 800 }}>Total: {cur}{total.toLocaleString(loc)}</span>
         </div>
       </div>
@@ -131,7 +131,7 @@ export function InterBranchVoucher({ branch }) {
           &nbsp;&nbsp;&nbsp;Cr&nbsp; Service Fee Income &nbsp; {cur}{svc.toLocaleString(loc)}<br />
           {treatment.crossBorder
             ? <span style={{ color: C.blue }}>&nbsp;&nbsp;&nbsp;(export — zero-rated, no output tax)</span>
-            : <>&nbsp;&nbsp;&nbsp;Cr&nbsp; Output {taxName} &nbsp; {cur}{igst.toLocaleString('en-IN')}</>}
+            : <>&nbsp;&nbsp;&nbsp;Cr&nbsp; Output {taxName} &nbsp; {cur}{igst.toLocaleString(loc)}</>}
         </div>
         <div style={{ fontSize: 11, color: form.toBranch ? (treatment.crossBorder ? C.blue : C.green) : C.dim, marginTop: 6 }}>
           {form.toBranch ? `Tax treatment: ${treatmentLabel}` : 'Select a destination branch to see the tax treatment'}

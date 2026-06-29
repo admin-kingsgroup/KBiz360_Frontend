@@ -12,16 +12,19 @@ import React, { useMemo, useState } from 'react';
 import { Download, BarChart3, LineChart } from 'lucide-react';
 import { useGpBills } from '../../../core/useAccounting';
 import { exportToCSV } from '../../../core/business-logic';
+import { bc } from '../../../core/styles';
+import { money } from '../../../core/format';
 import { ReportSearch, ReportDateBar, resolveReportRange, priorYearRange, matchNeedle } from '../../../core/reportDateBar';
 import { DataTable } from '../../../shell/DataTable';
 import { PageSection, ResponsiveGrid, StatusPill, Button } from '../../../shell/primitives';
 import { RptShell } from '../components/scaffold';
 
-const f = (n) => '₹' + Number(Math.round(n)).toLocaleString('en-IN');
 const MOD_CLR = { Flight: '#378ADD', Holiday: '#3fb7a3', Hotel: '#BA7517', Visa: '#D4537E', Car: '#7F77DD', Insurance: '#5F9EA0', Misc: '#888' };
 const gpPctTone = (p) => (p >= 15 ? 'success' : p >= 8 ? 'warning' : 'danger');
 
 export function ConsultantReport({ branch }) {
+  const cur = bc(branch).cur;
+  const f = (n) => money(n, cur);
   const [range, setRange] = useState(() => ({ mode: 'all', ...resolveReportRange('all') }));
   const [view, setView] = useState('table'); // table | trend
   const [search, setSearch] = useState('');

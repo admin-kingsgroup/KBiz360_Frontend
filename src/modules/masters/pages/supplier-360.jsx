@@ -9,6 +9,7 @@
 
 import React, { useState } from 'react';
 import { bc } from '../../../core/styles';
+import { localeOf } from '../../../core/format';
 import { useGpBills, useAgeing } from '../../../core/useAccounting';
 import { useAdmMemos } from '../../../core/useAdmMemos';
 import { ReportSearch, ReportDateBar, resolveReportRange, matchNeedle } from '../../../core/reportDateBar';
@@ -53,7 +54,7 @@ export function Supplier360({ branch }) {
   const memoMatch = (a) => selSupplier && (a.airline === selSupplier || (a.airline || '').includes(selSupplier.split(' ')[0]));
   const suppADMs = (admQ.data || []).filter(memoMatch);
   const suppACMs = (acmQ.data || []).filter(memoMatch);
-  const f = (n) => cur + Number(Math.round(n)).toLocaleString('en-IN');
+  const f = (n) => cur + Number(Math.round(n)).toLocaleString(localeOf(cur));
 
   const profileKpis = [
     { l: 'Total Purchases', v: f(totCost) }, { l: 'GP Generated', v: f(totGP) }, { l: 'Avg GP%', v: `${gpPct}%` },

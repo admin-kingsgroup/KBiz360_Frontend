@@ -9,6 +9,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { bc } from '../../../core/styles';
+import { localeOf } from '../../../core/format';
 import { useGpBills } from '../../../core/useAccounting';
 import { ReportSearch, ReportDateBar, resolveReportRange, matchNeedle } from '../../../core/reportDateBar';
 import { DataTable } from '../../../shell/DataTable';
@@ -23,7 +24,7 @@ export function ReportCommission({ branch }) {
   const [search, setSearch] = useState('');
   const q = useGpBills(branch, { from: range.from || undefined, to: range.to || undefined });
   const bills = q.data || [];
-  const f = (n) => cur + Number(Math.round(n)).toLocaleString('en-IN');
+  const f = (n) => cur + Number(Math.round(n)).toLocaleString(localeOf(cur));
 
   const rows = useMemo(() => {
     const suppMap = {};

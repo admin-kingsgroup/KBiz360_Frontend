@@ -1647,7 +1647,7 @@ function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
                 {isOpen && (
                   <tr><td colSpan={10} style={{ padding: 12, background: '#f7f8fb', borderBottom: '1px solid #cdd1d8' }}>
                     <div style={{ fontWeight: 800, fontSize: 12, color: DARK, marginBottom: 8 }}>Audit trail — {r.bookingNo}</div>
-                    <AuditTrail entityType="booking" entityId={r.id} />
+                    <AuditTrail entityType="booking" entityId={r.id} cur={cur} />
                   </td></tr>
                 )}
               </React.Fragment>

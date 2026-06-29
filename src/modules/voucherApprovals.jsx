@@ -20,12 +20,14 @@ import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVouc
 import { VoucherEditor } from './accountingLive';
 import { BookingApprovals } from './bookingOrder';
 import { bc } from '../core/styles';
+import { localeOf } from '../core/format';
 import { PeriodBar, periodRange } from '../core/period';
 import { CONSOLIDATED_LABEL } from '../core/data';
 import { SkeletonTable } from '../shell/primitives';
 
-// Full rupee amount with Indian grouping — NO Cr/L abbreviation.
-const money = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
+// Full branch-currency amount (₹ India · $ USD branches) — NO Cr/L abbreviation.
+// Grouping follows the currency: Indian lakh/crore for ₹, Western thousands for $.
+const fmtAmount = (n, cur = '₹') => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
 
 const C = { dark: '#1a1c22', gold: '#c2a04a', blue: '#2563eb', red: '#dc2626', green: '#16a34a', dim: '#5b616e', border: '#cdd1d8' };
 const VCH = { payment: 'Payment', receipt: 'Receipt', contra: 'Contra', journal: 'Journal', 'credit-note': 'Credit Note', 'debit-note': 'Debit Note', 'purchase-expense': 'Purchase Expense', refund: 'Refund', reissue: 'Reissue', adm: 'ADM', acm: 'ACM' };
@@ -68,6 +70,7 @@ export function VoucherApprovals({ branch, currentUser }) {
   useModalEsc(() => setViewId(null), !!viewId);     // Esc closes the view modal
   useModalEsc(() => setEditId(null), !!editId);     // Esc closes the edit modal
   const cur = (bc(branch) || {}).cur || '₹';
+  const money = (n) => fmtAmount(n, cur);
   // Default to the current FY (not All): the Approved/Deleted tabs can hold thousands
   // of settled entries, and loading them all-time was ~18-40s. PENDING defaults to ALL
   // (no date filter — every pending voucher must be visible for approval, regardless of
@@ -446,7 +449,7 @@ export function VoucherApprovals({ branch, currentUser }) {
       </div>
 
       {status === 'edited' ? (
-        <EditedVouchersList rows={editedRows} isLoading={editedQ.isLoading} open={open} setOpen={setOpen} setViewId={setViewId} />
+        <EditedVouchersList rows={editedRows} isLoading={editedQ.isLoading} open={open} setOpen={setOpen} setViewId={setViewId} cur={cur} />
       ) : (
       <div style={{ ...card }}>
         {q.isLoading ? <div style={{ padding: 12 }}><SkeletonTable rows={8} cols={5} /></div> : (
@@ -551,7 +554,7 @@ export function VoucherApprovals({ branch, currentUser }) {
             <div ref={viewRef}><VoucherView id={viewId} cur={cur} /></div>
             <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}` }}>
               <div style={{ fontWeight: 800, fontSize: 12, color: C.dark, marginBottom: 8 }}>Audit Trail</div>
-              <AuditTrail entityType="voucher" entityId={viewId} />
+              <AuditTrail entityType="voucher" entityId={viewId} cur={cur} />
             </div>
           </div>
         </div>
@@ -578,7 +581,8 @@ export function VoucherApprovals({ branch, currentUser }) {
 // to its full audit timeline (who/when/why + field-level changes + full snapshot).
 // Cross-cuts status: an approved voucher later edited shows here. Click the Vch No to
 // open the full formatted voucher view (which also shows the trail).
-function EditedVouchersList({ rows, isLoading, open, setOpen, setViewId }) {
+function EditedVouchersList({ rows, isLoading, open, setOpen, setViewId, cur = '₹' }) {
+  const money = (n) => fmtAmount(n, cur);
   const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: `2px solid ${C.border}`, whiteSpace: 'nowrap' };
   const td = { padding: '7px 10px', borderBottom: '1px solid #dfe2e7', fontSize: 12, whiteSpace: 'nowrap' };
   if (isLoading) return <div style={{ ...card, padding: 24, textAlign: 'center', color: C.dim }}>Loading edited vouchers…</div>;
@@ -606,7 +610,7 @@ function EditedVouchersList({ rows, isLoading, open, setOpen, setViewId }) {
                 </tr>
                 {isOpen && (
                   <tr><td colSpan={9} style={{ padding: 12, background: '#f7f8fb', borderBottom: `1px solid ${C.border}` }}>
-                    <AuditTrail entityType="voucher" entityId={r.id} />
+                    <AuditTrail entityType="voucher" entityId={r.id} cur={cur} />
                   </td></tr>
                 )}
               </React.Fragment>

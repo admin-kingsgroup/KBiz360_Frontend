@@ -17,7 +17,7 @@ import { useBudgetVsActual } from '../../../core/useAccounting';
 import { bc } from '../../../core/styles';
 import { BRANCHES, CONSOLIDATED_LABEL } from '../../../core/data';
 import { CUR_FY, CUR_MONTH } from '../../../core/dates';
-import { compactAmt } from '../../../core/format';
+import { compactAmt, localeOf } from '../../../core/format';
 import { GRP_COLORS } from '../../../core/helpers';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
@@ -78,7 +78,7 @@ export function ReportExpenseBgt({ branch, setRoute }) {
   // Canonical compact formatter (correct lakh/crore thresholds, branch-currency aware) —
   // replaces a local one that mislabelled 1–10 lakh as "K".
   const f = (n) => compactAmt(n, { currency: cur, dash: true });
-  const ff = (n) => (n > 0 ? cur + Number(n).toLocaleString('en-IN') : '—');
+  const ff = (n) => (n > 0 ? cur + Number(n).toLocaleString(localeOf(cur)) : '—');
 
   const allBranchSummary = isAll ? BRANCHES.map((b) => {
     const bBgt = bgtFor(b.code, fyObj.v);

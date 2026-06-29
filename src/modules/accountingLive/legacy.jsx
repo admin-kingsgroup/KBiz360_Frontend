@@ -448,7 +448,7 @@ function NarrationCell({ text, clamp = 55 }) {
 }
 
 // Plain number for export/print (no currency symbol; blank when zero).
-const nfmt = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : ''; };
+const nfmt = (n, loc = 'en-IN') => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : ''; };
 
 // Open a print-ready window for the report (Print, or "Save as PDF" in the
 // dialog). Builds a clean B/W table from the same columns/rows used for export.
@@ -587,10 +587,10 @@ export function TrialBalanceLive({ branch }) {
        { key: 'debit', label: `Debit`, num: true }, { key: 'credit', label: `Credit`, num: true },
        { key: 'closingDebit', label: `Closing Dr`, num: true }, { key: 'closingCredit', label: `Closing Cr`, num: true }];
   const expRows = filtered.map((r) => ({ ...r, code: r.code || '' }));
-  const printRows = filtered.map((r) => { const o = { group: r.group, code: r.code || '', ledger: r.ledger }; for (const c of expColumns) if (c.num) o[c.key] = nfmt(r[c.key]); return o; });
+  const printRows = filtered.map((r) => { const o = { group: r.group, code: r.code || '', ledger: r.ledger }; for (const c of expColumns) if (c.num) o[c.key] = nfmt(r[c.key], localeOf(cur)); return o; });
   const totalRow = view === 'summary'
-    ? { group: 'TOTAL', ledger: '', closingDebit: nfmt(T.clDr), closingCredit: nfmt(T.clCr) }
-    : { group: 'TOTAL', code: '', ledger: '', openingDebit: nfmt(T.openDr), openingCredit: nfmt(T.openCr), debit: nfmt(T.dr), credit: nfmt(T.cr), closingDebit: nfmt(T.clDr), closingCredit: nfmt(T.clCr) };
+    ? { group: 'TOTAL', ledger: '', closingDebit: nfmt(T.clDr, localeOf(cur)), closingCredit: nfmt(T.clCr, localeOf(cur)) }
+    : { group: 'TOTAL', code: '', ledger: '', openingDebit: nfmt(T.openDr, localeOf(cur)), openingCredit: nfmt(T.openCr, localeOf(cur)), debit: nfmt(T.dr, localeOf(cur)), credit: nfmt(T.cr, localeOf(cur)), closingDebit: nfmt(T.clDr, localeOf(cur)), closingCredit: nfmt(T.clCr, localeOf(cur)) };
   const sub = `${branchLabel(branch)} · ${filtered.length} ledgers · Closing Dr ${money(cur, T.clDr)} / Cr ${money(cur, T.clCr)}`;
   const exportNow = () => filtered.length && exportToExcel(`trial-balance-${branchLabel(branch)}`, expColumns, expRows);
   const printNow = () => filtered.length && openReportPrint('Trial Balance', sub, expColumns, printRows, totalRow);
@@ -727,8 +727,8 @@ export function DayBookLive({ branch }) {
   const expColumns = view === 'minimal'
     ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'tallyRef', label: 'Tally Ref' }, { key: 'ledger', label: 'Ledger' }, { key: 'debit', label: `Debit (${cur})`, num: true }, { key: 'credit', label: `Credit (${cur})`, num: true }]
     : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'tallyRef', label: 'Tally Ref' }, { key: 'type', label: 'Type' }, { key: 'category', label: 'Category' }, { key: 'branch', label: 'Branch' }, { key: 'ledger', label: 'Ledger' }, { key: 'group', label: 'Group' }, { key: 'debit', label: `Debit (${cur})`, num: true }, { key: 'credit', label: `Credit (${cur})`, num: true }, { key: 'narration', label: 'Narration' }];
-  const printRows = postingRows.map((r) => ({ ...r, debit: nfmt(r.debit), credit: nfmt(r.credit) }));
-  const totalRow = { date: 'TOTAL', vno: `${sorted.length} vouchers`, debit: nfmt(gDr), credit: nfmt(gCr) };
+  const printRows = postingRows.map((r) => ({ ...r, debit: nfmt(r.debit, localeOf(cur)), credit: nfmt(r.credit, localeOf(cur)) }));
+  const totalRow = { date: 'TOTAL', vno: `${sorted.length} vouchers`, debit: nfmt(gDr, localeOf(cur)), credit: nfmt(gCr, localeOf(cur)) };
   const sub = `${branchLabel(branch)} · ${sorted.length} vouchers · ${postingRows.length} lines · Dr ${money(cur, gDr)} = Cr ${money(cur, gCr)}`;
   const exportNow = () => postingRows.length && exportToExcel(`day-book-${branchLabel(branch)}`, expColumns, postingRows);
   const printNow = () => postingRows.length && openReportPrint('Day Book', sub, expColumns, printRows, totalRow);
@@ -1508,7 +1508,7 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
 // footer. Numeric columns (flagged `num`) right-align, Indian-group, and sum in the
 // footer; text columns (Link No, Pax, PNR …) stay left-aligned. A mirrored top
 // scrollbar keeps sideways scrolling reachable on long lists.
-function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
+function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice, cur = '₹' }) {
   const topRef = React.useRef(null);
   const bodyRef = React.useRef(null);
   const [scrollW, setScrollW] = useState(0);
@@ -1520,7 +1520,7 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
   }, [columns, rows]);
   const fromTop = () => { if (bodyRef.current && topRef.current) bodyRef.current.scrollLeft = topRef.current.scrollLeft; };
   const fromBody = () => { if (bodyRef.current && topRef.current) topRef.current.scrollLeft = bodyRef.current.scrollLeft; };
-  const cellNum = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : '—'; };
+  const cellNum = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const mono = (k) => k === 'linkNo' || k === 'saleVno' || k === 'purVno';
   // Render only one page of rows so the DOM stays bounded; the tfoot totals + count
   // below still reflect the FULL set (totals/rows.length are unchanged).
@@ -1742,7 +1742,7 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
     >
       <State q={q} empty={rows.length === 0}>
         {view === 'capture' ? (
-          <CaptureTable columns={captureSheet.columns} rows={captureSheet.rows} totals={captureSheet.totals} onOpenJV={openJV} onPrintInvoice={printInvoice} />
+          <CaptureTable columns={captureSheet.columns} rows={captureSheet.rows} totals={captureSheet.totals} onOpenJV={openJV} onPrintInvoice={printInvoice} cur={cur} />
         ) : view === 'detailed' ? (
           <DetailedTable columns={sheet.columns} rows={sheet.rows} />
         ) : (
@@ -2281,8 +2281,8 @@ export function CashBookLive({ branch }) {
   const expColumns = view === 'minimal'
     ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'ledgerName', label: 'Ledger Name' }, { key: 'narration', label: 'Narration' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }]
     : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'category', label: 'Type' }, { key: 'ledgerName', label: 'Ledger Name' }, { key: 'narration', label: 'Narration' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }, { key: 'running', label: `Balance (${cur})`, num: true }];
-  const printRows = rowsFull.map((r) => ({ ...r, debit: nfmt(r.debit), credit: nfmt(r.credit), running: nfmt(r.running) }));
-  const totalRow = { date: 'CLOSING', vno: '', particulars: '', debit: nfmt(receipts), credit: nfmt(payments), running: nfmt(closing) };
+  const printRows = rowsFull.map((r) => ({ ...r, debit: nfmt(r.debit, localeOf(cur)), credit: nfmt(r.credit, localeOf(cur)), running: nfmt(r.running, localeOf(cur)) }));
+  const totalRow = { date: 'CLOSING', vno: '', particulars: '', debit: nfmt(receipts, localeOf(cur)), credit: nfmt(payments, localeOf(cur)), running: nfmt(closing, localeOf(cur)) };
   const sub = `${selected || 'Cash account'} · ${branchLabel(branch)} · ${rowsFull.length} entries · Closing ${money(cur, closing)}`;
   const exportNow = () => rowsFull.length && exportToExcel(`cash-book-${branchLabel(branch)}`, expColumns, rowsFull);
   const printNow = () => rowsFull.length && openReportPrint(`Cash Book — ${selected}`, sub, expColumns, printRows, totalRow);

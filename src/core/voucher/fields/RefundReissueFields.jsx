@@ -6,7 +6,7 @@ import { VPlaceOfSupply } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
 import { apiGet } from '../../api';
 import { useVoucherPreview } from '../../useAccounting';
-import { money2, r2 } from '../ui';
+import { money, money2, r2 } from '../ui';
 import { refundPrefillFromBooking, refundPrefillFromLeg, poSnapForView, splitRefundJv } from './refundPrefill';
 import { buildRefundReissueBody } from './refundBody';
 import { JvBlock } from '../JvBlock';
@@ -219,7 +219,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
             <select value={legIdx} onChange={(e) => selectLeg(Number(e.target.value))} style={inp}>
               <option value={-1}>Primary — {booking.module} · {booking.supplier?.ledgerName || booking.supplier?.name || '—'} · {booking.purchaseVno}</option>
               {booking.purchases.map((leg, i) => (
-                <option key={i} value={i}>{leg.module} · {leg.supplier?.ledgerName || leg.supplier?.name || '—'} · {leg.purchaseVno || '(pending)'} (₹{Number(leg.po?.total || 0).toLocaleString('en-IN')})</option>
+                <option key={i} value={i}>{leg.module} · {leg.supplier?.ledgerName || leg.supplier?.name || '—'} · {leg.purchaseVno || '(pending)'} ({money(cur, leg.po?.total || 0)})</option>
               ))}
             </select>
           </FL>
