@@ -94,6 +94,32 @@ export function VoucherApprovals({ branch, currentUser }) {
     edited: { n: editedRows.length, amount: editedRows.reduce((s, r) => s + (r.total || 0), 0) },
   };
   const entries = d.entries || [];
+  // ── Search + latest-first ordering ──────────────────────────────────────────
+  // One box filters the visible list (every view) by Vch No, party, type, entered-by,
+  // narration, any posting ledger, or amount. Order is newest-date-first throughout.
+  const [search, setSearch] = useState('');
+  const needle = search.trim().toLowerCase();
+  const matchEntry = (e) => {
+    if (!needle) return true;
+    const legs = e.postings || [];
+    const hay = [
+      e.vno, e.party, VCH[e.category] || e.category, e.type, e.narration, e.submittedBy,
+      String(Math.round(e.total || 0)),
+      ...legs.map((p) => p.ledger),
+      ...legs.map((p) => (p.debit ? String(Math.round(p.debit)) : p.credit ? String(Math.round(p.credit)) : '')),
+    ].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(needle);
+  };
+  const visibleEntries = useMemo(() => (needle ? entries.filter(matchEntry) : entries), [entries, needle]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Newest first: date desc, then Vch No desc (numeric-aware) as a stable tiebreak.
+  const cmpLatest = (a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.vno || '').localeCompare(String(a.vno || ''), undefined, { numeric: true });
+  // Edited tab: same search, ordered most-recently-edited first.
+  const visibleEdited = useMemo(() => {
+    const list = needle
+      ? editedRows.filter((r) => [r.vno, VCH[r.category] || r.type, r.party, r.lastBy, r.lastReason, String(Math.round(r.total || 0))].filter(Boolean).join(' ').toLowerCase().includes(needle))
+      : editedRows;
+    return [...list].sort((a, b) => String(b.lastAt || '').localeCompare(String(a.lastAt || '')));
+  }, [editedRows, needle]);
   const approve = useApproveVoucher();
   const reject = useRejectVoucher();
   const del = useDeleteVoucher();
@@ -115,7 +141,7 @@ export function VoucherApprovals({ branch, currentUser }) {
     if (fp.open && openedRef.current !== fp.open) { openedRef.current = fp.open; setEditId(fp.open); }
   }, [fp]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const allIds = useMemo(() => [...new Set(entries.map((e) => e.id))], [entries]);
+  const allIds = useMemo(() => [...new Set(visibleEntries.map((e) => e.id))], [visibleEntries]);
   React.useEffect(() => { setSel(new Set()); }, [status, branch]); // clear selection on tab/branch change
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
@@ -166,7 +192,7 @@ export function VoucherApprovals({ branch, currentUser }) {
   const { tree, allKeys } = useMemo(() => {
     const groups = {}; const allKeys = [];
     const bump = (o, p) => { o.debit += p.debit || 0; o.credit += p.credit || 0; };
-    entries.forEach((e) => {
+    visibleEntries.forEach((e) => {
       // Entries that can't build a posting (e.g. don't balance) still surface here,
       // under a "Needs attention" node, so they can be reviewed/rejected (not hidden).
       const pts = (e.postings && e.postings.length) ? e.postings
@@ -185,14 +211,14 @@ export function VoucherApprovals({ branch, currentUser }) {
         allKeys.push('s:' + g.name + '/' + s.name);
         const ledgers = Object.values(s.ledgers).sort((a, b) => (b.debit + b.credit) - (a.debit + a.credit)).map((l) => {
           allKeys.push('l:' + g.name + '/' + s.name + '/' + l.name);
-          return { ...l, entries: l.entries.sort((x, y) => String(x.date).localeCompare(String(y.date))) };
+          return { ...l, entries: l.entries.sort(cmpLatest) };
         });
         return { ...s, ledgers };
       });
       return { ...g, subs };
     });
     return { tree: out, allKeys };
-  }, [entries]);
+  }, [visibleEntries]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isOpen = (k, def) => (open[k] === undefined ? def : open[k]);
   const toggle = (k, def) => setOpen((s) => ({ ...s, [k]: !(s[k] === undefined ? def : s[k]) }));
@@ -208,7 +234,7 @@ export function VoucherApprovals({ branch, currentUser }) {
   const Caret = ({ o }) => <span style={{ color: C.gold, width: 12, display: 'inline-block' }}>{o ? '▾' : '▸'}</span>;
 
   // ── Shared bits for the flat (Entry wise / Voucher wise) tables ──────────────
-  const flatEntries = useMemo(() => [...entries].sort((a, b) => String(a.date).localeCompare(String(b.date))), [entries]);
+  const flatEntries = useMemo(() => [...visibleEntries].sort(cmpLatest), [visibleEntries]); // eslint-disable-line react-hooks/exhaustive-deps
   // Total Debit & Total Credit across the shown vouchers — both equal the header
   // total. (A purchase with TDS credits the supplier NET; the TDS posts to Duties &
   // Taxes — so the supplier leg alone reads less than the gross header by the TDS.)
@@ -428,6 +454,20 @@ export function VoucherApprovals({ branch, currentUser }) {
         <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
           {tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}
         </div>
+        <div style={{ display: 'flex', gap: 10, padding: '8px 12px', borderBottom: `1px solid ${C.border}`, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '0 1 380px', minWidth: 220 }}>
+            <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: C.dim, pointerEvents: 'none' }}>🔍</span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search Vch No · party · ledger · narration · amount…"
+              aria-label="Search vouchers"
+              style={{ width: '100%', padding: '6px 26px 6px 28px', border: `1px solid ${C.border}`, borderRadius: 7, fontSize: 12, outline: 'none', background: '#fff' }}
+            />
+            {search && <button onClick={() => setSearch('')} aria-label="Clear search" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: C.dim, fontSize: 14, lineHeight: 1 }}>✕</button>}
+          </div>
+          {needle && <span style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>{(status === 'edited' ? visibleEdited.length : visibleEntries.length)} match{(status === 'edited' ? visibleEdited.length : visibleEntries.length) === 1 ? '' : 'es'}</span>}
+        </div>
         {status !== 'edited' && <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: '#fafbfe', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
             {[['entry', 'Entry wise'], ['columnar', 'Columnar (all heads)'], ['voucher', 'Voucher Type wise'], ['tree', 'Group-Subgroup-Ledger-Entry']].map(([v, l]) => (
@@ -449,12 +489,12 @@ export function VoucherApprovals({ branch, currentUser }) {
       </div>
 
       {status === 'edited' ? (
-        <EditedVouchersList rows={editedRows} isLoading={editedQ.isLoading} open={open} setOpen={setOpen} setViewId={setViewId} cur={cur} />
+        <EditedVouchersList rows={visibleEdited} isLoading={editedQ.isLoading} open={open} setOpen={setOpen} setViewId={setViewId} cur={cur} />
       ) : (
       <div style={{ ...card }}>
         {q.isLoading ? <div style={{ padding: 12 }}><SkeletonTable rows={8} cols={5} /></div> : (
           <div style={{ maxHeight: '72vh', overflow: 'auto', fontSize: 12.5 }}>
-            {flatEntries.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: C.dim }}>No {status} vouchers.</div>}
+            {flatEntries.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: C.dim }}>{needle ? `No ${status} vouchers match “${search.trim()}”.` : `No ${status} vouchers.`}</div>}
             {flatEntries.length > 0 && view === 'voucher' && voucherTypeWise()}
             {flatEntries.length > 0 && view === 'entry' && entryWise()}
             {flatEntries.length > 0 && view === 'columnar' && columnarWise()}

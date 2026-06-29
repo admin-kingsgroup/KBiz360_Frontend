@@ -1520,16 +1520,30 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   const [groupBy, setGroupBy] = useState('none');
   const [sel, setSel] = useState(() => new Set());
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
+  const [search, setSearch] = useState('');
   const canDelete = isAdminRole(currentUser);
   const inRange = (dt) => (!range.from || dt >= range.from) && (!range.to || dt <= range.to);
+  // Search filters the visible list by Booking No, Link No, module, customer, supplier,
+  // posted Sale/Purchase Vch No, or amount. Counts (tab badges) stay unfiltered.
+  const needle = search.trim().toLowerCase();
+  const matchBooking = (b) => {
+    if (!needle) return true;
+    const hay = [b.bookingNo, b.linkNo, b.module, b.customer && b.customer.name, b.supplier && b.supplier.name, b.saleVno, b.purchaseVno, String(Math.round(b.saleTotal || 0))].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(needle);
+  };
+  // Newest first: date desc, then Booking No desc (numeric-aware) as a stable tiebreak.
+  const cmpLatest = (a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.bookingNo || '').localeCompare(String(a.bookingNo || ''), undefined, { numeric: true });
 
   // Bookings edited ≥ once (cross-cuts status) — its own source for the Edited tab.
   const editedQ = useQuery({ queryKey: ['booking-edited', brCode], queryFn: () => apiGet('/api/booking-orders/edited', { branch: brCode === 'ALL' ? '' : brCode }) });
   const editedRows = (editedQ.data || []).filter((r) => inRange(r.date || ''));
+  const editedVisible = editedRows
+    .filter((r) => !needle || [r.bookingNo, r.linkNo, r.module, r.customer, r.lastBy, r.lastReason, String(Math.round(r.saleTotal || 0))].filter(Boolean).join(' ').toLowerCase().includes(needle))
+    .slice().sort((a, b) => String(b.lastAt || '').localeCompare(String(a.lastAt || '')));
   const bucket = (b) => (b.status === 'posted' ? 'approved' : b.status);
   const counts = { pending: 0, approved: 0, rejected: 0, deleted: 0, edited: editedRows.length };
   data.forEach((b) => { if (counts[bucket(b)] !== undefined && inRange(b.date || '')) counts[bucket(b)]++; });
-  const rows = data.filter((b) => bucket(b) === status && inRange(b.date || ''));
+  const rows = data.filter((b) => bucket(b) === status && inRange(b.date || '') && matchBooking(b)).sort(cmpLatest);
   const allIds = rows.map((b) => b.id);
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
@@ -1600,6 +1614,18 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
       {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, padding: '8px 12px', color: msg.startsWith('⚠') ? '#dc2626' : '#16a34a', background: msg.startsWith('⚠') ? '#fbe9e9' : '#e8f6ed', border: '1px solid ' + (msg.startsWith('⚠') ? '#f3c9c9' : '#cde3b6') }}>{msg}</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
         <GroupByBar value={groupBy} onChange={setGroupBy} />
+        <div style={{ position: 'relative', flex: '0 1 360px', minWidth: 200 }}>
+          <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#9197a3', pointerEvents: 'none' }}>🔍</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search Booking No · Link · customer · supplier · amount…"
+            aria-label="Search bookings"
+            style={{ width: '100%', padding: '6px 26px 6px 28px', border: '1px solid #cdd1d8', borderRadius: 7, fontSize: 12, outline: 'none', background: '#fff' }}
+          />
+          {search && <button onClick={() => setSearch('')} aria-label="Clear search" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: '#9197a3', fontSize: 14, lineHeight: 1 }}>✕</button>}
+        </div>
+        {needle && <span style={{ fontSize: 11, color: '#5b616e', fontWeight: 700 }}>{(status === 'edited' ? editedVisible.length : rows.length)} match{(status === 'edited' ? editedVisible.length : rows.length) === 1 ? '' : 'es'}</span>}
         {status === 'pending' && rows.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
@@ -1608,7 +1634,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
         )}
       </div>
       {status === 'edited'
-        ? <EditedBookingsList rows={editedRows} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
+        ? <EditedBookingsList rows={editedVisible} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
         : <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: buildBookingInvoice(b, side, branch, master) }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />}
     </div>
   );
