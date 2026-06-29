@@ -46,7 +46,7 @@ export function Statistics({ branch, setRoute }) {
   const m = data?.masters || {};
   const vouchers = data?.vouchers || [];
   const totals = data?.totals;
-  const th = { textAlign: 'left', padding: '9px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #cdd1d8' };
+  const th = { textAlign: 'left', padding: '9px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: '#c2a04a' };
   const tdN = { padding: '8px 13px', textAlign: 'right', color: '#334155' };
 
   return (
@@ -67,9 +67,9 @@ export function Statistics({ branch, setRoute }) {
       {!isLoading && !isError && data && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: 14, alignItems: 'start' }}>
           {/* ── Masters ── */}
-          <div className="kb-sticky" style={{ ...card, padding: 0 }}>
+          <div className="kb-sticky" style={{ ...card, padding: 0, '--stick-head': '#1a1c22' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-              <thead><tr style={{ background: '#f3f5f9' }}><th style={th}>Masters</th><th style={{ ...th, textAlign: 'right' }}>Count</th></tr></thead>
+              <thead><tr><th style={th}>Masters</th><th style={{ ...th, textAlign: 'right' }}>Count</th></tr></thead>
               <tbody>
                 <MasterRow label="Groups (total)" value={num(m.groups?.total)} onClick={() => go('/masters/groups')} />
                 <MasterRow indent label="Primary Groups" value={num(m.groups?.primary)} />
@@ -87,9 +87,9 @@ export function Statistics({ branch, setRoute }) {
           </div>
 
           {/* ── Vouchers ── */}
-          <div className="kb-sticky" style={{ ...card, padding: 0 }}>
+          <div className="kb-sticky" style={{ ...card, padding: 0, '--stick-head': '#1a1c22' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-              <thead><tr style={{ background: '#f3f5f9' }}>
+              <thead><tr>
                 <th style={th}>Voucher Type</th>
                 <th style={{ ...th, textAlign: 'right' }}>Posted</th>
                 <th style={{ ...th, textAlign: 'right' }}>Pending</th>

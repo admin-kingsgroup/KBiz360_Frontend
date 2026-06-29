@@ -65,18 +65,18 @@ const thL = { textAlign: 'left' };
 const tdC = { padding: '6px 8px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #cdd1d8', fontVariantNumeric: 'tabular-nums', verticalAlign: 'middle' };
 const tdAuto = { ...tdC, background: '#faf7ef', color: '#5b616e', fontWeight: 600 };
 const tdTot = { ...tdC, fontWeight: 800, color: DARK };
-const cellInp = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'right', border: '1px solid #cdd1d8', borderRadius: 6, background: '#fff', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s' };
-const cellTxt = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'left', border: '1px solid #cdd1d8', borderRadius: 6, background: '#fff', fontFamily: 'inherit', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' };
+const cellInp = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'right', border: '1px solid #cdd1d8', borderRadius: 8, background: '#fff', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s' };
+const cellTxt = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'left', border: '1px solid #cdd1d8', borderRadius: 8, background: '#fff', fontFamily: 'inherit', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' };
 const tfTd = { borderTop: '2px solid ' + DARK, padding: '10px 8px', fontWeight: 800, fontSize: 12, background: '#f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: DARK };
 // Per-section column-header + total-row styles — the section colour carries INTO
 // the table (SO blue, PO maroon), matching the SO/PO/GP voucher theme.
-const thBaseHdr = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: 'right' };
-const soHdr = { ...thBaseHdr, color: SO_BAR, background: '#EAF1F9', borderBottom: '2px solid ' + SO_BAR };
-const soHdrL = { ...soHdr, textAlign: 'left' };
-const poHdr = { ...thBaseHdr, color: PO_BAR, background: '#F9E8EE', borderBottom: '2px solid ' + PO_BAR };
-const poHdrL = { ...poHdr, textAlign: 'left' };
+const thBaseHdr = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' };
+const soHdr = { ...thBaseHdr, color: '#fff', background: 'linear-gradient(180deg, ' + SO_BAR + ' 0%, #163d6c 100%)', borderBottom: '2px solid ' + SO_BAR, whiteSpace: 'normal', lineHeight: 1.3 };
+const soHdrL = { ...soHdr, textAlign: 'center' };
+const poHdr = { ...thBaseHdr, color: '#fff', background: 'linear-gradient(180deg, ' + PO_BAR + ' 0%, #6f1830 100%)', borderBottom: '2px solid ' + PO_BAR, whiteSpace: 'normal', lineHeight: 1.3 };
+const poHdrL = { ...poHdr, textAlign: 'center' };
 const soTf = { ...tfTd, background: '#DCE8F4', color: SO_BAR, borderTop: '2px solid ' + SO_BAR };
-const poTf = { ...tfTd, background: '#F2D8E0', color: PO_BAR, borderTop: '2px solid ' + PO_BAR };
+const poTf = { ...tfTd, background: '#FBEEF2', color: PO_BAR, borderTop: '2px solid ' + PO_BAR };
 
 /* ════════════════════════════════════════════════════════════════════════════
    SO / PO / GP Voucher entry
@@ -548,14 +548,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   // Sectors sub-table for a passenger line — editable on the Purchase grid,
   // read-only ("fetched & locked") on the Sales grid.
-  const sectorBlock = (l, li, readOnly, colSpan) => (
-    <tr key={'sec-' + li}>
-      <td colSpan={colSpan} style={{ padding: '8px 6px 8px 26px', background: readOnly ? '#faf7ef' : '#fbfcff', borderBottom: '1px solid #dfe2e7' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.3px', color: '#5b616e', textTransform: 'uppercase', margin: '6px 0' }}>{readOnly ? 'Sectors — from Purchase (locked)' : 'Sectors — enter each segment'}</div>
+  const sectorBlock = (l, li, readOnly, colSpan) => {
+    const grid = (
+      <>
         <table style={{ borderCollapse: 'collapse' }}>
           <thead><tr>
-            {spec.sectorCols.map((sc) => <th key={sc.key} style={{ ...thA, ...thL, fontSize: 8.5, padding: '4px 16px' }}>{sc.label}</th>)}
-            {!readOnly && <th style={{ ...thA, width: 26 }} />}
+            {spec.sectorCols.map((sc) => <th key={sc.key} style={{ ...thA, ...thL, fontSize: 8.5, padding: '4px 16px', ...(readOnly ? {} : { color: GOLD_DEEP, background: 'transparent', borderBottom: '1px solid #ecdfb8' }) }}>{sc.label}</th>)}
+            {!readOnly && <th style={{ ...thA, width: 26, background: 'transparent', borderBottom: '1px solid #ecdfb8' }} />}
           </tr></thead>
           <tbody>
             {(l.sectors || []).map((s, si) => (
@@ -564,7 +563,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                   <td key={sc.key} style={{ padding: '6px 16px' }}>
                     {readOnly
                       ? <span style={{ fontSize: 11, fontWeight: 600, color: s[sc.key] ? (sc.kind === 'pnr' ? GOLD : '#3A3A3A') : '#b9b9b9', fontStyle: s[sc.key] ? 'normal' : 'italic' }}>{s[sc.key] || `No ${sc.label}`}</span>
-                      : <input type={sc.type === 'date' ? 'date' : 'text'} value={s[sc.key] ?? ''} onChange={(e) => setSec(li, si, sc.key, e.target.value)} style={{ ...cellTxt, width: sc.type === 'date' ? 140 : 110, color: sc.kind === 'pnr' ? GOLD : DARK }} />}
+                      : <input type={sc.type === 'date' ? 'date' : 'text'} value={s[sc.key] ?? ''} onChange={(e) => setSec(li, si, sc.key, e.target.value)} placeholder={sc.label} style={{ ...cellTxt, width: sc.type === 'date' ? 140 : 110, color: sc.kind === 'pnr' ? GOLD : DARK }} />}
                   </td>
                 ))}
                 {!readOnly && <td style={{ padding: '6px 16px', textAlign: 'center' }}><button onClick={() => delSec(li, si)} title="Remove sector" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={12} /></button></td>}
@@ -572,10 +571,34 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             ))}
           </tbody>
         </table>
-        {!readOnly && <button onClick={() => addSec(li)} style={{ ...btnGh, marginTop: 4, padding: '3px 9px', fontSize: 10 }}><Plus size={11} /> Add sector</button>}
-      </td>
-    </tr>
-  );
+        {!readOnly && (
+          <button onClick={() => addSec(li)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '5px 12px', fontSize: 10.5, fontWeight: 700, color: GOLD_DEEP, background: '#FBF3DE', border: '1px solid #ecdfb8', borderRadius: 999, cursor: 'pointer' }}>
+            <Plus size={11} /> Add sector
+          </button>
+        )}
+      </>
+    );
+    return (
+      <tr key={'sec-' + li}>
+        <td colSpan={colSpan} style={{ padding: readOnly ? '8px 6px 8px 26px' : '10px 14px 12px 26px', background: readOnly ? '#faf7ef' : '#fbfcff', borderBottom: '1px solid #dfe2e7' }}>
+          {readOnly ? (
+            <div style={{ border: '1px solid #ece4cf', borderRadius: 10, background: '#fffdf7', padding: '10px 14px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 800, letterSpacing: '.4px', color: GOLD_DEEP, textTransform: 'uppercase', marginBottom: 8 }}>
+                🔒 Sectors
+                <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '.4px', textTransform: 'uppercase', background: '#FBF3DE', color: GOLD_DEEP, padding: '2px 7px', borderRadius: 999 }}>from Purchase · locked</span>
+              </div>
+              {grid}
+            </div>
+          ) : (
+            <div style={{ border: '1px dashed #ecd5dc', borderRadius: 10, background: '#fffdfb', padding: '10px 14px 12px' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.4px', color: GOLD_DEEP, textTransform: 'uppercase', marginBottom: 8 }}>✈ Sectors — enter each segment</div>
+              {grid}
+            </div>
+          )}
+        </td>
+      </tr>
+    );
+  };
 
   return (
     <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV, color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
@@ -754,9 +777,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {/* ① Sales Order */}
       <Section n="1" badge="SO" name="Sales Order" sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · Service Charge - 2 is GST-inclusive'} accent={SO_BAR}>
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #d8e0ea' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
-            <thead><tr style={{ background: '#EAF1F9', borderBottom: '2px solid ' + SO_BAR }}>
+            <thead><tr style={{ borderBottom: '2px solid ' + SO_BAR }}>
               {spec.idCols.map((c) => <th key={c.key} style={{ ...soHdrL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
               {spec.fareCols.map((c) => <th key={c.key} style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
               {!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Charge - 2</th>}{!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Fee</th>}
@@ -818,18 +841,18 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             {inbLinkNo && <span style={{ fontSize: 11, fontWeight: 700, color: '#27500A' }}>✓ {inbLinkNo} — fares & Service Fee pre-filled (IGST)</span>}
           </div>
         )}
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
-            <thead><tr style={{ background: '#F9E8EE', borderBottom: '2px solid ' + PO_BAR }}>
+        <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #ecd5dc' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960, tableLayout: 'fixed' }}>
+            <thead><tr style={{ borderBottom: '2px solid ' + PO_BAR }}>
               <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[0].label}</th>
               <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[1].label}</th>
               {refKeys.map((c) => <th key={c.key} style={{ ...poHdrL, width: 120 }}>{c.label}</th>)}
-              {spec.fareCols.map((c) => <th key={c.key} style={{ ...poHdr, width: 95 }}>{c.label}</th>)}
-              <th style={{ ...poHdr, width: 95 }}>Supplier Service Charge</th>
+              {spec.fareCols.map((c) => <th key={c.key} style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
+              <th style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>Supplier Service Charge</th>
               {pkg
-                ? <th style={{ ...poHdr, width: 95 }}>Supplier Service Charge {taxLabel} ({activeRate}%)</th>
-                : <th style={{ ...poHdr, width: 95 }}>{taxLabel} ({activeRate}%)</th>}
-              <th style={{ ...poHdr, width: 100 }}>Supp Comm/Inc Rcvd</th>
+                ? <th style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>Supplier Service Charge {taxLabel} ({activeRate}%)</th>
+                : <th style={{ ...poHdr, width: 95, whiteSpace: 'normal', background: '#FBF3DE', color: GOLD_DEEP }}>{taxLabel} ({activeRate}%)</th>}
+              <th style={{ ...poHdr, width: 100, whiteSpace: 'normal' }}>Supp Comm/Inc Rcvd</th>
               <th style={{ ...poHdr, width: 85 }}>{isVatBr ? 'WHT' : 'TDS (2%)'}</th>
               <th style={{ ...poHdr, width: 110 }}>Total</th>
             </tr></thead>
@@ -838,15 +861,15 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
                 return (
                   <React.Fragment key={i}>
-                  <tr>
-                    <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} style={cellTxt} /></td>
-                    <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} style={cellTxt} /></td>
+                  <tr className="transition hover:bg-[#fdf7f9]">
+                    <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} placeholder={spec.idCols[0].label} style={cellTxt} /></td>
+                    <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} placeholder={spec.idCols[1].label} style={cellTxt} /></td>
                     {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A', width: 120, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{l[col.key] || '—'}</td>)}
-                    {spec.fareCols.map((col) => <td key={col.key} style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
+                    {spec.fareCols.map((col) => <td key={col.key} style={{ padding: '6px 3px', width: 60, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
                     <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} /></td>
                     {pkg
                       ? <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} /></td>
-                      : <td style={{ ...tdAuto, width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.gstPur)}</td>}
+                      : <td style={{ ...tdAuto, width: 95, background: '#FBF3DE', color: GOLD_DEEP, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.gstPur)}</td>}
                     <td style={{ padding: '6px 3px', width: 100, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} /></td>
                     <td style={{ ...tdAuto, width: 85, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.tds)}</td>
                     <td style={{ ...tdC, fontWeight: 800, color: CR, background: '#faf7ef', width: 110, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.finalPurchase)}</td>
@@ -1068,7 +1091,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
 
 function Section({ n, name, sub, accent, badge, children }) {
   return (
-    <div style={{ background: '#fff', border: '1.5px solid ' + accent, borderRadius: 6, overflow: 'hidden', marginBottom: 13, boxShadow: '0 1px 3px rgba(0,0,0,.05)' }}>
+    <div style={{ background: '#fff', border: '1px solid ' + accent, borderRadius: 12, overflow: 'hidden', marginBottom: 13, boxShadow: '0 4px 16px rgba(0,0,0,.06)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '8px 14px', background: accent, color: '#fff' }}>
         <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '1px', padding: '3px 9px', borderRadius: 4, background: 'rgba(255,255,255,.24)' }}>{badge || n}</span>
         <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '2.5px', textTransform: 'uppercase' }}>{name}</span>

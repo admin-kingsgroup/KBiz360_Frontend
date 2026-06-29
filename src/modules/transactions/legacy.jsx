@@ -3510,14 +3510,13 @@ export function TicketControlRegister({branch}){
         </div>
       </div>
 
-      <div style={{display:"flex",gap:8,marginBottom:14,overflowX:"auto",paddingBottom:4}}>
+      <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
         {STATUSES.slice(1).map(s=>(
           <div key={s} {...clickable(()=>setFilter(f=>f===s?"All":s))}
-            style={{flexShrink:0,padding:"7px 12px",borderRadius:8,cursor:"pointer",textAlign:"center",
-              border:`2px solid ${filter===s?"#1a1c22":"#e6e8ec"}`,
-              background:filter===s?"#1a1c22":STATUS_BG[s]||"#f4f5f7"}}>
-            <p style={{margin:0,fontSize:16,fontWeight:800,color:filter===s?"#c2a04a":STATUS_CLR[s]}}>{totByStatus[s]||0}</p>
-            <p style={{margin:"1px 0 0",fontSize:8.5,fontWeight:700,color:filter===s?"#fff":STATUS_CLR[s],whiteSpace:"nowrap"}}>{s}</p>
+            className={`rounded-brand border border-t-[3px] px-3 py-4 cursor-pointer transition ${filter===s?"border-navy bg-surface-alt":"border-surface-border bg-surface"}`}
+            style={{flex:"1 1 140px",minWidth:120,textAlign:"start",borderTopColor:STATUS_CLR[s]}}>
+            <p className="text-[8.5px] font-bold uppercase tracking-wide whitespace-nowrap" style={{color:STATUS_CLR[s]}}>{s}</p>
+            <p className="mt-1 text-base font-extrabold tabular-nums text-navy tablet:text-lg">{totByStatus[s]||0}</p>
           </div>
         ))}
       </div>
