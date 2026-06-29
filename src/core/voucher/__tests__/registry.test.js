@@ -307,15 +307,18 @@ describe('toBody — Option A party vs non-party branch', () => {
     expect(b.lines[0]).toMatchObject({ ledger: 'ICICI', drCr: 'Dr' });
     expect(b.lines[1]).toMatchObject({ ledger: 'AD Loan', drCr: 'Cr' });
   });
-  test.concurrent('supplier payment → party model (no lines)', async () => {
+  // Party model emits lines:[] EXPLICITLY (not undefined) so editing a line-model
+  // voucher into the party model wipes the stale Dr/Cr legs instead of leaving them on
+  // the document (a partial $set update wouldn't clear an omitted key).
+  test.concurrent('supplier payment → party model (lines explicitly cleared)', async () => {
     const b = PM.toBody({ party: 'TRIP JACK', otherType: 'Creditor', bankRef: 'ICICI', amount: 9300, alloc: {}, applyMode: 'onaccount', parkOnAcc: true }, ctx);
-    expect(b.lines).toBeUndefined();
+    expect(b.lines).toEqual([]);
     expect(b.party).toBe('TRIP JACK');
     expect(b.partyType).toBe('supplier');
   });
-  test.concurrent('customer receipt → party model (no lines)', async () => {
+  test.concurrent('customer receipt → party model (lines explicitly cleared)', async () => {
     const b = RC.toBody({ party: 'NeuIQ', otherType: 'Debtor', bankRef: 'ICICI', amount: 5000, alloc: {}, applyMode: 'onaccount', parkOnAcc: true }, ctx);
-    expect(b.lines).toBeUndefined();
+    expect(b.lines).toEqual([]);
     expect(b.partyType).toBe('customer');
   });
 });

@@ -127,6 +127,11 @@ function makeRcptPmt(side) {
         .map(([vno, v]) => ({ billVno: vno, billId: (s._billIds || {})[vno] || '', amount: +v }));
       return {
         ...common, party: s.party, partyType: isReceipt ? 'customer' : 'supplier',
+        // Party model carries NO lines — the journal is inferred from party + bankRef +
+        // total. Emit lines:[] EXPLICITLY so editing a line-model voucher (e.g. a Tally
+        // import stored as Dr/Cr lines) into the party model wipes the stale legs instead
+        // of leaving them on the document (a partial $set update wouldn't clear them).
+        lines: [],
         subtotal: net, total: gross, tdsAmt: tds, tdsSection: s.tds ? (s.tdsSection || '') : '',
         allocations, onAccount: sum.onAcc, applyMode: s.applyMode,
         remarks: s.remarks || `Being ${isReceipt ? 'receipt from' : 'payment to'} ${s.party} via ${s.paymentMode}${s.utr ? ` ref ${s.utr}` : ''}`,
