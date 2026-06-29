@@ -12,7 +12,7 @@ jest.mock('../../core/api', () => ({ apiGet: jest.fn(() => Promise.resolve({})),
 const PL = {
   BOM: { totals: { sales: 1000, cogs: 700, gp: 300 }, bridge: { netProfit: 200 } },
   AMD: { totals: { sales: 500, cogs: 400, gp: 100 }, bridge: { netProfit: 60 } },
-  TKHO: { totals: { sales: 0, cogs: 0, gp: 0 }, bridge: { netProfit: 0 } },
+  BOMMB: { totals: { sales: 0, cogs: 0, gp: 0 }, bridge: { netProfit: 0 } },
   NBO: { totals: { sales: 800, cogs: 500, gp: 300 }, bridge: { netProfit: 220 } },
   DAR: { totals: { sales: 200, cogs: 150, gp: 50 }, bridge: { netProfit: 30 } },
   FBM: { totals: { sales: 0, cogs: 0, gp: 0 }, bridge: { netProfit: 0 } },
@@ -20,7 +20,7 @@ const PL = {
 const CAP = {
   BOM: { totals: { capitalInvested: 5000, inflowCapital: 4000 } },
   AMD: { totals: { capitalInvested: 2000, inflowCapital: 1500 } },
-  TKHO: { totals: { capitalInvested: 0, inflowCapital: 0 } },
+  BOMMB: { totals: { capitalInvested: 0, inflowCapital: 0 } },
   NBO: { totals: { capitalInvested: 9000, inflowCapital: 7000 } },
   DAR: { totals: { capitalInvested: 1000, inflowCapital: 800 } },
   FBM: { totals: { capitalInvested: 0, inflowCapital: 0 } },

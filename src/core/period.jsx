@@ -6,7 +6,7 @@
 //  • MTD   → 1st of this month → today
 //  • QTD   → start of current (FY) quarter → today
 //  • CFY/LFY → current / last financial year. FY basis is PER BRANCH:
-//      India (BOM/AMD/TKHO/ALL) = Apr–Mar · Africa (NBO/DAR/FBM) = Jan–Dec.
+//      India (BOM/AMD/BOMMB/ALL) = Apr–Mar · Africa (NBO/DAR/FBM) = Jan–Dec.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from './api';

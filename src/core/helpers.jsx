@@ -1605,7 +1605,7 @@ export const RECON_STATUS_DATA = [];
 
 
 export const TODAY_VOUCHERS_BY_BR = {
-  TKHO: [],
+  BOMMB: [],
   BOM: [],
   AMD: [],
 };
@@ -1904,7 +1904,7 @@ export const STATUTORY_FILINGS = [];
 
 
 export const PERIOD_LOCK_STATE = {
-  "TKHO": {},
+  "BOMMB": {},
   "BOM": {},
   "AMD": {},
 };

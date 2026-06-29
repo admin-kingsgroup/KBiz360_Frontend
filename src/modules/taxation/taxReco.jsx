@@ -16,7 +16,7 @@ const GST_MODES = [
   { key: 'tds-26as', label: 'TDS vs Form 26AS' },
 ];
 const VAT_MODES = [{ key: 'vat-books', label: 'VAT Return vs Books' }];
-const isIndiaBranch = (b) => b?.code && ['TKHO', 'BOM', 'AMD'].includes(b.code);
+const isIndiaBranch = (b) => b?.code && ['BOMMB', 'BOM', 'AMD'].includes(b.code);
 
 export function TaxReco({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';

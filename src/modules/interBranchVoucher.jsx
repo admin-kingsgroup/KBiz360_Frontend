@@ -10,10 +10,10 @@ import { useCreateInb, useOpenInb } from '../core/useInterBranchVoucher';
 import { toast } from '../core/ux/toast';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
-const ALL_BRANCHES = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'TKHO'];
+const ALL_BRANCHES = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'BOMMB'];
 // Tax jurisdiction per branch (mirror of the backend). Same country (India) =
 // IGST taxable; different country = cross-border export (zero-rated).
-const COUNTRY = { BOM: 'IN', AMD: 'IN', TKHO: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'FB' };
+const COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'FB' };
 const inbTreatment = (from, to) => {
   const cf = COUNTRY[from] || 'IN'; const ct = COUNTRY[to] || 'IN';
   return cf !== ct

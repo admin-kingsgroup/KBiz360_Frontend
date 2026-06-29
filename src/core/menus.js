@@ -568,7 +568,7 @@ function applyHidden(menus, currentUser){
 
 export function getMenu(branch, currentUser){
   const isAll   = branch==="ALL";
-  const isIndia = !isAll && branch?.code && ["TKHO","BOM","AMD"].includes(branch.code);
+  const isIndia = !isAll && branch?.code && ["BOMMB","BOM","AMD"].includes(branch.code);
   const taxSection = isAll ? TAX_ALL : isIndia ? TAX_INDIA : TAX_AFRICA;
   // Tax/GST reconciliation screens live ONLY under the Taxation pill now, so the
   // Accounts pill is the same regardless of branch regime.

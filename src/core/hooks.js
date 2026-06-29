@@ -17,7 +17,7 @@ import { _NOTIF_LISTENERS } from './notifStore';
 
 /* ── Branch-aware navigation menu ──────────────────────────────────
    Taxation section (India / GST):
-   India  (TKHO/BOM/AMD) → GST modules (GSTR-1, GSTR-3B, TDS, RCM, E-Invoice)
+   India  (BOMMB/BOM/AMD) → GST modules (GSTR-1, GSTR-3B, TDS, RCM, E-Invoice)
    Travkings Group          → Full list (consolidated view)
    ─────────────────────────────────────────────────────────────── */
 

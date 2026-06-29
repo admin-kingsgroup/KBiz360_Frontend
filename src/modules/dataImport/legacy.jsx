@@ -260,7 +260,7 @@ const GROUPS = ['Masters', 'Parties', 'SO/PO/GP Voucher', 'Vouchers'];
    regime (VAT Output/Input for Africa, CGST/SGST for India), so a VAT file just
    works. Sub-groups and non-tax columns are identical across regimes. */
 const REGIMES = [
-  { key: 'GST', label: 'India · GST', hint: 'BOM · AMD · TKHO' },
+  { key: 'GST', label: 'India · GST', hint: 'BOM · AMD · BOMMB' },
   { key: 'VAT', label: 'Africa · VAT', hint: 'NBO · DAR · FBM' },
 ];
 const isGstCol = (c) => /cgst|sgst|igst/i.test(c);
@@ -754,7 +754,7 @@ export function DataImportPage({ currentUser }) {
         <span style={{ fontSize: 10.5, color: DIM }}>
           {regime === 'VAT'
             ? 'VAT branches (NBO/DAR/FBM): one VAT column, USD, no GST/TCS/TDS.'
-            : 'GST branches (BOM/AMD/TKHO): CGST/SGST/IGST + TCS/TDS as applicable.'}
+            : 'GST branches (BOM/AMD/BOMMB): CGST/SGST/IGST + TCS/TDS as applicable.'}
         </span>
       </div>
 

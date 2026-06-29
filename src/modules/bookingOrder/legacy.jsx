@@ -23,8 +23,8 @@ import { useVNo } from '../../core/useNextNo';
 
 // Inter-branch jurisdiction (mirror of backend): same country (India) = IGST;
 // different country = cross-border export (zero-rated on the seller side).
-const INB_COUNTRY = { BOM: 'IN', AMD: 'IN', TKHO: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'FB' };
-const INB_ALL = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'TKHO'];
+const INB_COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'FB' };
+const INB_ALL = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'BOMMB'];
 const inbCrossBorder = (from, to) => (INB_COUNTRY[from] || 'IN') !== (INB_COUNTRY[to] || 'IN');
 import { AuditTrail } from '../../core/AuditTrail';
 import { useLedgerRegistry } from '../../core/useReference';
