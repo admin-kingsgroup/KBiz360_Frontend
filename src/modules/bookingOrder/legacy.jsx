@@ -1189,7 +1189,7 @@ function WhereItPosts({ approved }) {
   const items = [
     ['Day Book / Ledgers', 'both vouchers appear in the Day Book and each ledger statement (Sundry Debtors, Supplier, every Sales/Purchase component head, GST).'],
     ['Trial Balance', 'every Dr/Cr leg above lands in the Trial Balance under its group.'],
-    ['Profit & Loss', 'each head nests in the Tally chart — Sales Accounts → module sub-group (Ticketing → Domestic/International) → DT-Base Fare / DT-K3 Tax / DT-SVC2 / DT-SVF; Purchase Accounts → … [Pur] incl. Supp SVCHG (an agency cost that reduces GP). Drill the P&L to see it head-wise.'],
+    ['Profit & Loss', 'each head nests in the Tally chart — Sales Accounts → module sub-group (Flights → Domestic/International Flights, Holiday Packages → Domestic/International Holidays) → DT-Base Fare / DT-K3 Tax / DT-SVC2 / DT-SVF; Purchase Accounts → … [Pur] incl. Supp SVCHG (an agency cost that reduces GP). Drill the P&L to see it head-wise.'],
     ['Balance Sheet', 'customer (Sundry Debtors, asset), supplier (Sundry Creditors, liability), CGST/SGST (Duties & Taxes) and any TCS Payable sit on the Balance Sheet.'],
     ['Sales & Purchase Registers', 'the sale shows in the Sales Register, the purchase in the Purchase Register.'],
     ['Invoice GP / Sales-GP Analytics', 'both are tied by the Link No, so GP is tracked invoice-wise.'],
