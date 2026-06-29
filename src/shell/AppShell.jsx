@@ -29,6 +29,7 @@ import { openPrintPreview } from '../core/PrintPreview';
 import { useFyStore, FY_OPTIONS } from '../store/fy';
 import { ModuleSearch } from './ModuleSearch';
 import { BranchSwitcher } from './BranchSwitcher';
+import { FxRateChip } from './FxRateChip';
 import { NotifPanel } from './NotifPanel';
 import { UserMenu } from './UserMenu';
 import { useFocusTrap, getFocusable } from '../core/ux/focus';
@@ -469,6 +470,7 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
             )}
           </div>
 
+          <FxRateChip branch={branch} />
           <div className="hidden wide:block"><FySelector /></div>
           <div className="hidden w-[150px] desktop:block 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
 

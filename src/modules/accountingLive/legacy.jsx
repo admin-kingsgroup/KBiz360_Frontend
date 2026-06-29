@@ -20,7 +20,7 @@ import { exportToExcel, vouchersToSheet } from '../../core/exportExcel';
 import { voucherHaystack, bookingTravelDetail } from '../../core/registerSearch';
 import { isVatBranch } from '../../core/voucherSpecs';
 import { openPrintPreview } from '../../core/PrintPreview';
-import { buildBookingInvoice } from '../../core/invoiceHtml';
+import { printBookingInvoice } from '../../core/printInvoice';
 import { useReportExport } from '../../core/reportExportContext';
 import { LedgerAccountView } from '../../core/ledgerUI';
 import { resolveLedgerSelection } from '../../core/ledgerPicker';
@@ -1010,6 +1010,43 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
       </div>
     );
   }
+  // Approved / posted vouchers are READ-ONLY from every drill-down (Day Book, ledgers,
+  // Cash Book, P&L / Balance Sheet, registers, GP analytics…). Editing one would
+  // silently re-post the journal outside the approval workflow, so we show it for
+  // viewing only. To change it, Revoke it back to Pending in Voucher Approvals — the
+  // number is kept (a booking-driven Sales/Purchase leg is edited on its SO/PO/GP).
+  if (v.status === 'approved' || v.status === 'posted') {
+    const byBooking = v.locked && v.source === 'booking';
+    return (
+      <div style={{ padding: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ fontWeight: 800, color: DARK, fontSize: 14 }}>{v.vno} <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>{v.type} - {v.category}</span></div>
+          <button onClick={onBack} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 34, fontSize: 11.5, cursor: 'pointer' }}>Back</button>
+        </div>
+        <div style={{ padding: '10px 12px', borderRadius: 7, background: '#FBF3DE', border: '1px solid #e3cd97', color: '#8a6d12', fontSize: 12, fontWeight: 600, marginBottom: 12 }}>
+          🔒 Approved &amp; posted — read-only. {byBooking ? <>Edit it on its SO / PO / GP booking <b>{v.bookingId}</b>.</> : <>To edit, <b>Revoke</b> it back to Pending in <b>Voucher Approvals</b> — the number is kept.</>}
+        </div>
+        <div style={{ fontSize: 11.5, color: DIM, marginBottom: 10 }}>{v.type} · {v.category} · {form.date} · {form.branch}{form.party ? ` · ${form.party}` : ''}</div>
+        <div style={{ ...card, padding: 10, boxShadow: 'none', border: '1px solid #dfe2e7' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Full Journal Entry</div>
+            <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+            <thead><tr><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Ledger</th><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Group</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Debit</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Credit</th></tr></thead>
+            <tbody>
+              {(pv.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
+            </tbody>
+            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money(cur, pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money(cur, pv.totalCredit)}</td></tr></tfoot>
+          </table>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <button onClick={printEntry} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
+          <button onClick={dismiss} style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
+        </div>
+      </div>
+    );
+  }
   // Passenger / traveller detail rides on each saved line (passenger, ticket, sector,
   // pnr, travelDate…) — shown read-only here so the edit screen isn't "passenger
   // details not available". Editing those fields stays in the booking/CRM source; the
@@ -1681,10 +1718,11 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
     // printed invoice has its financial detail. Fall back to the slim row if it fails.
     let full = b;
     if (b.id) { try { full = await apiGet(`/api/booking-orders/${b.id}`); } catch { full = b; } }
-    openPrintPreview({
+    await printBookingInvoice({
+      booking: full,
+      side: tab === 'sales' ? 'sale' : 'purchase',
+      branch,
       title: `${tab === 'sales' ? 'Sales Invoice' : 'Purchase Invoice'} · ${full.bookingNo || full.linkNo || ''}`,
-      recommend: 'portrait',
-      html: buildBookingInvoice(full, tab === 'sales' ? 'sale' : 'purchase', branch),
     });
   };
 

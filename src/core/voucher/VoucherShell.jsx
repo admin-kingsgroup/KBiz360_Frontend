@@ -218,6 +218,27 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
     </>
   );
 
+  // Approved / posted vouchers are READ-ONLY. Editing one would silently re-post the
+  // journal outside the approval workflow, so the drill-downs that reuse this shell
+  // (Day Book, ledgers, Cash Book, P&L / Balance Sheet, registers) open it for viewing
+  // only. To change it, Revoke it back to Pending in Voucher Approvals — the number is
+  // kept (a booking-driven Sales/Purchase leg is edited on its SO/PO/GP booking).
+  if (isEdit && (voucher?.status === 'approved' || voucher?.status === 'posted')) {
+    const byBooking = voucher?.locked && voucher?.source === 'booking';
+    return editFrame(
+      <div style={{ padding: 14 }}>
+        <div style={{ padding: '10px 12px', borderRadius: 7, background: '#FBF3DE', border: '1px solid #E8D9A8', color: '#6B4E0F', fontSize: 12, fontWeight: 600, marginBottom: 12 }}>
+          🔒 Approved &amp; posted — read-only. {byBooking ? <>Edit it on its SO / PO / GP booking <b>{voucher.bookingId}</b>.</> : <>To edit, <b>Revoke</b> it back to Pending in <b>Voucher Approvals</b> — the number is kept.</>}
+        </div>
+        {journalTable}
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <button onClick={printEntry} className="max-tablet:min-h-[44px]" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
+          <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
+        </div>
+      </div>
+    );
+  }
+
   if (isEdit) {
     return editFrame(
       <div style={{ padding: '14px 16px' }} ref={formKeys.ref} onKeyDown={formKeys.onKeyDown}>{formInner}</div>

@@ -125,11 +125,11 @@ const CSS = `
   .iv .terms{margin-top:20px;font-size:9px;color:var(--ink4);line-height:1.7;border-top:1px solid var(--rule);padding-top:11px}
   @media print{@page{size:A4 portrait;margin:9mm} .iv .sheet{padding:0;max-width:100%} .iv *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
 
-const partyBlock = (lab, p, cur) => `<div class="party"><div class="lab">${esc(lab)}</div><div class="nm">${esc(p.name || '—')}</div><div class="ln">${[p.address, p.gstin ? `GSTIN : ${esc(p.gstin)}` : '', p.email ? `Email : ${esc(p.email)}` : '', p.contact ? `Contact : ${esc(p.contact)}` : ''].filter(Boolean).map(esc).join('<br>')}</div></div>`;
+const partyBlock = (lab, p, cur, idLabel = 'GSTIN') => `<div class="party"><div class="lab">${esc(lab)}</div><div class="nm">${esc(p.name || '—')}</div><div class="ln">${[p.address, p.gstin ? `${idLabel} : ${esc(p.gstin)}` : '', p.email ? `Email : ${esc(p.email)}` : '', p.contact ? `Contact : ${esc(p.contact)}` : ''].filter(Boolean).map(esc).join('<br>')}</div></div>`;
 
 // side: 'sale' | 'purchase'. `master` = the resolved customer/supplier master record
 // (optional) — used to back-fill blank party fields on older bookings.
-export function buildBookingInvoice(booking = {}, side = 'sale', branch, master = {}) {
+export function buildBookingInvoice(booking = {}, side = 'sale', branch, master = {}, opts = {}) {
   const isSale = side === 'sale';
   // Holiday (package) client invoice hides the SVC2 margin: it's folded into the Base
   // Fare line and its GST is folded into the regular GST — the books keep them separate.
@@ -148,7 +148,28 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     authSignatory: pv('authSignatory'), authDesignation: pv('authDesignation'),
     banks: (Array.isArray(live.banks) && live.banks.length) ? live.banks : (fb.banks || []),
   };
-  const cur = prof.cur_sym || (bc(branch) || {}).cur || '₹';
+  // Branch regime → the VAT presentation + hidden-margin rules.
+  const isVat = ['NBO', 'DAR', 'FBM'].includes(code);
+  const taxLabel = isVat ? 'VAT' : 'GST';
+  const idLabel = isVat ? 'VAT Reg No' : 'GSTIN';
+  // Hidden-margin rule (EVERYWHERE): the SVC2 margin is never a visible invoice line.
+  // Its full (tax-inclusive) amount folds into a visible bucket so the row still foots —
+  // Africa, and Holiday packages (no Taxes column), fold it into Base Fare; India folds
+  // it into Taxes. The displayed tax line stays the SVF/regular tax only; SVC2's own tax
+  // is absorbed into the Sub Total. The books keep SVC2 separate, so GP is unchanged.
+  const foldSvc2IntoBase = isVat || isPkg;
+  // Optional local-currency print: convert every amount at the daily branch FX rate and
+  // switch the currency symbol. The books never move — this is display-only.
+  const fx = (opts && Number(opts.fxRate) > 0) ? Number(opts.fxRate) : 1;
+  const localCcy = (opts && opts.localCurrency) || '';
+  const converting = fx !== 1 && !!localCcy;
+  const LOCAL_SYM = { KES: 'KSh ', TZS: 'TSh ', CDF: 'FC ' };
+  const baseCur = prof.cur_sym || (bc(branch) || {}).cur || '₹';
+  const cur = converting ? (LOCAL_SYM[localCcy] || `${localCcy} `) : baseCur;
+  const curCode = converting ? localCcy : (isVat ? 'USD' : 'INR');
+  // fx-aware money formatter — shadows the module n2 so EVERY amount in this invoice
+  // converts at the branch FX rate when printing in local currency (1× otherwise).
+  const n2 = (n) => (Number(n || 0) * fx).toLocaleString(curCode === 'INR' ? 'en-IN' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const company = { name: prof.entity || 'Travkings Tours & Travels Pvt. Ltd.', address: prof.operAddr || '', gstin: prof.gstin || '', email: prof.email || '', contact: prof.phone || '' };
   // HSN/SAC for the booked travel service — fetched from the live HSN/SAC master by
   // module, falling back to the built-in map (then a generic SAC) if it hasn't loaded.
@@ -209,48 +230,47 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     const desc = `<td class="l desc"><div class="nm">${esc(headerRef || 'Booking')}</div>${idHtml}${secHtml}</td>`;
     if (isSale) {
       const totalFare = base + k3 + tax + markup;
-      // Holiday: SVC2 (margin) is hidden — folded into the Base Fare, no separate column.
-      if (isPkg) {
-        return `<tr>${desc}<td class="l">${esc(sac)}</td><td>${n2(base + markup)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td class="tf">${cur}${n2(totalFare)}</td></tr>`;
-      }
-      // Taxes (YQ/YR) = the pass-through fare taxes; Service Charge - 2 = the agency margin
-      // (retained income), shown as its own column per the customer-facing layout.
-      return `<tr>${desc}<td class="l">${esc(sac)}</td><td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td>${n2(markup)}</td><td class="tf">${cur}${n2(totalFare)}</td></tr>`;
+      // SVC2 (margin) is hidden everywhere — its full amount folds into Base Fare (Africa
+      // / Holiday) or Taxes (India), so there is never a Service Charge - 2 column.
+      const baseShown = foldSvc2IntoBase ? base + markup : base;
+      const taxShown  = foldSvc2IntoBase ? tax : tax + markup;
+      return `<tr>${desc}<td class="l">${esc(sac)}</td><td>${n2(baseShown)}</td><td>${n2(k3)}</td><td>${n2(taxShown)}</td><td class="tf">${cur}${n2(totalFare)}</td></tr>`;
     }
     const totalCost = base + k3 + tax + psvc - incentive + tds;
     return `<tr>${desc}<td class="l">${esc(sac)}</td><td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td>${n2(psvc)}</td><td>${n2(incentive)}</td><td>${n2(tds)}</td><td class="tf">${cur}${n2(totalCost)}</td></tr>`;
   }).join('');
-  const emptyRow = `<tr><td class="l" colSpan="${isSale ? (isPkg ? 6 : 7) : 9}" style="text-align:center;color:#9A9A9A;padding:16px">No line detail captured for this booking.</td></tr>`;
+  const emptyRow = `<tr><td class="l" colSpan="${isSale ? 6 : 9}" style="text-align:center;color:#9A9A9A;padding:16px">No line detail captured for this booking.</td></tr>`;
 
   // summary from the booked snapshot (ties to the books)
-  const otGst = r2(snap.otherTaxesGst || 0); // GST on the SVC2 margin — billed separately
-  const subTotal = r2(snap.lineTotal || 0), service = r2(snap.serviceCharge || 0), gst = r2(snap.gst || 0), tcs = r2(snap.tcs || 0), incentive = r2(snap.incentiveAmt || 0), tds = r2(snap.incentiveTds || 0), net = r2(snap.total || (subTotal + service + gst + otGst + tcs));
+  const otGst = r2(snap.otherTaxesGst || 0); // tax on the hidden SVC2 margin — never shown
+  const gst = r2(snap.gst || 0), tcs = r2(snap.tcs || 0), incentive = r2(snap.incentiveAmt || 0), tds = r2(snap.incentiveTds || 0);
+  // Hidden-margin rule: the SVC2 margin's own tax (otGst) is folded into the Sub Total so
+  // it never appears as its own line, and the displayed tax line shows the SVF/regular tax
+  // ONLY. Still foots to NET because NET already contains otGst.
+  const subTotal = r2(r2(snap.lineTotal || 0) + otGst), service = r2(snap.serviceCharge || 0);
+  const net = r2(snap.total || (r2(snap.lineTotal || 0) + service + gst + otGst + tcs));
+  // VAT (Africa) → a single tax line, no place-of-supply split. India → CGST/SGST (intra)
+  // or IGST (inter). The SVC2 margin tax is NOT shown (folded into Sub Total above).
   const inter = booking.gstMode === 'inter';
-  // Holiday client invoice folds the SVC2-margin GST into the regular GST (one line);
-  // every other module keeps SVF GST + SVC2 GST as separate rows.
-  const gstShown = isPkg ? r2(gst + otGst) : gst;
-  const half = r2(gstShown / 2), otHalf = r2(otGst / 2);
-  // SVF GST (regular) + SVC2 GST (margin) shown as separate rows so the breakdown
-  // reconciles to the NET total. Intra → CGST/SGST halves; inter → single IGST.
-  const gstRows = (inter
-    ? `<div class="r"><span class="k">IGST</span><span class="v">${cur}${n2(gstShown)}</span></div>`
-    : `<div class="r"><span class="k">CGST</span><span class="v">${cur}${n2(half)}</span></div><div class="r"><span class="k">SGST</span><span class="v">${cur}${n2(r2(gstShown - half))}</span></div>`)
-    + ((!isPkg && otGst) ? (inter
-      ? `<div class="r"><span class="k">SVC2 IGST</span><span class="v">${cur}${n2(otGst)}</span></div>`
-      : `<div class="r"><span class="k">SVC2 CGST</span><span class="v">${cur}${n2(otHalf)}</span></div><div class="r"><span class="k">SVC2 SGST</span><span class="v">${cur}${n2(r2(otGst - otHalf))}</span></div>`) : '');
+  const half = r2(gst / 2);
+  const gstRows = isVat
+    ? `<div class="r"><span class="k">${taxLabel}</span><span class="v">${cur}${n2(gst)}</span></div>`
+    : (inter
+      ? `<div class="r"><span class="k">IGST</span><span class="v">${cur}${n2(gst)}</span></div>`
+      : `<div class="r"><span class="k">CGST</span><span class="v">${cur}${n2(half)}</span></div><div class="r"><span class="k">SGST</span><span class="v">${cur}${n2(r2(gst - half))}</span></div>`);
   const tcsRow = tcs ? `<div class="r"><span class="k">TCS</span><span class="v">${cur}${n2(tcs)}</span></div>` : '';
   const sumtbl = isSale
     ? `
     <div class="r"><span class="k">Sub Total</span><span class="v">${cur}${n2(subTotal)}</span></div>
     ${service ? `<div class="r"><span class="k">Service Fee</span><span class="v">${cur}${n2(service)}</span></div>` : ''}
-    ${(gst || otGst) ? gstRows : ''}${tcsRow}
-    <div class="net"><span class="k">NET TOTAL (${esc(cur)})</span><span class="v">${cur}${n2(net)}</span></div>`
+    ${gst ? gstRows : ''}${tcsRow}
+    <div class="net"><span class="k">NET TOTAL (${esc(curCode)})</span><span class="v">${cur}${n2(net)}</span></div>`
     : `
     <div class="r"><span class="k">Sub Total (Fares + Svc)</span><span class="v">${cur}${n2(subTotal)}</span></div>
     ${incentive ? `<div class="r" style="color:#A32D2D"><span class="k">Supplier Incentive</span><span class="v">-${cur}${n2(incentive)}</span></div>` : ''}
-    ${(gst || otGst) ? gstRows : ''}
-    ${tds ? `<div class="r" style="color:#A07828"><span class="k">TDS (2%)</span><span class="v">${cur}${n2(tds)}</span></div>` : ''}
-    <div class="net"><span class="k">NET COST (${esc(cur)})</span><span class="v">${cur}${n2(r2(net - incentive + tds))}</span></div>`;
+    ${gst ? gstRows : ''}
+    ${tds ? `<div class="r" style="color:#A07828"><span class="k">${isVat ? 'WHT' : 'TDS (2%)'}</span><span class="v">${cur}${n2(tds)}</span></div>` : ''}
+    <div class="net"><span class="k">NET COST (${esc(curCode)})</span><span class="v">${cur}${n2(r2(net - incentive + tds))}</span></div>`;
 
   // bank (sales) from company-profile
   const bank = (prof.banks || []).find((b) => b.primary) || (prof.banks || [])[0] || {};
@@ -264,13 +284,13 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   ].filter(Boolean).join('<br>') || 'Bank details on file.';
   const payBlock = isSale
     ? `<div class="lab2">Bank Details</div><div class="pay">${bankLines}</div>`
-    : `<div class="lab2">Settlement</div><div class="pay">Payable to supplier per agreed credit terms.<br>Input GST credit claimed against supplier GSTIN.<br>Link No referenced for invoice-wise GP.</div>`;
+    : `<div class="lab2">Settlement</div><div class="pay">Payable to supplier per agreed credit terms.<br>Input ${taxLabel} credit claimed against supplier ${idLabel}.<br>Link No referenced for invoice-wise GP.</div>`;
 
+  // SVC2 (margin) is hidden on every sale invoice → one consistent layout, no Service
+  // Charge - 2 column. Purchase keeps its cost breakdown (internal record).
   const headCols = isSale
-    ? (isPkg
-      ? `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Base Fare</th><th>K3 Tax</th><th>Taxes</th><th>Total Fare</th>`
-      : `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Base Fare</th><th>K3 Tax</th><th>Taxes</th><th>Service Charge - 2</th><th>Total Fare</th>`)
-    : `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Base Fare</th><th>K3 Tax</th><th>Taxes</th><th>Supplier Service Charge</th><th>Supp Comm/Inc Rcvd</th><th>TDS (2%)</th><th>Total Cost</th>`;
+    ? `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Base Fare</th><th>K3 Tax</th><th>Taxes</th><th>Total Fare</th>`
+    : `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Base Fare</th><th>K3 Tax</th><th>Taxes</th><th>Supplier Service Charge</th><th>Supp Comm/Inc Rcvd</th><th>${isVat ? 'WHT' : 'TDS (2%)'}</th><th>Total Cost</th>`;
 
   const sheet = `<div class="iv"><div class="sheet">
     <div class="titlebar"><div class="title">${isSale ? 'INVOICE' : 'PURCHASE INVOICE'}</div><img class="iata-badge" src="${IATA_LOGO}" alt="IATA Accredited Agent" /></div><div class="title-rule"></div>
@@ -281,20 +301,20 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
       <div class="inv-meta">
         <div class="row firstline"><span class="k">${isSale ? 'Invoice No.' : 'Purchase Inv No.'}</span><span class="v big">${esc(vno || '(on approval)')}</span></div>
         <div class="row"><span class="k">Date</span><span class="v">${esc(booking.date || '')}</span></div>
-        ${placeOfSupply ? `<div class="row"><span class="k">Place of Supply</span><span class="v">${esc(placeOfSupply)}</span></div>` : ''}
+        ${(!isVat && placeOfSupply) ? `<div class="row"><span class="k">Place of Supply</span><span class="v">${esc(placeOfSupply)}</span></div>` : ''}
         <div class="row"><span class="k">Link No.</span><span class="v" style="color:var(--gold)">${esc(booking.linkNo || '—')}</span></div>
       </div>
     </div>
     <div class="blackrule"></div>
     <div class="parties">${isSale
-      ? partyBlock('Billed To', party, cur) + partyBlock('Issued By', company, cur)
-      : partyBlock('Supplier', party, cur) + partyBlock('Billed To (Buyer)', company, cur)}</div>
+      ? partyBlock('Billed To', party, cur, idLabel) + partyBlock('Issued By', company, cur, idLabel)
+      : partyBlock('Supplier', party, cur, idLabel) + partyBlock('Billed To (Buyer)', company, cur, idLabel)}</div>
     <div class="fb-label">${isSale ? 'Fare Breakdown' : 'Cost Breakdown'}</div>
     <table><thead><tr>${headCols}</tr></thead><tbody>${fareRows || emptyRow}</tbody></table>
     <div class="summary"><div class="sumtbl">${sumtbl}</div></div>
     <div class="botrule"></div>
     <div class="botgrid">
-      <div class="botleft"><div class="lab2">Amount in Words</div><div class="words">INR ${esc(inWords(net))} Only</div>${payBlock}</div>
+      <div class="botleft"><div class="lab2">Amount in Words</div><div class="words">${esc(curCode)} ${esc(inWords(Math.round(net * fx)))} Only</div>${converting ? `<div class="pay" style="margin-bottom:12px;font-style:italic">Converted at 1 USD = ${esc(Number(opts.fxRate).toFixed(2))} ${esc(localCcy)} (${esc(opts.fxDate || booking.date || '')})</div>` : ''}${payBlock}</div>
       <div class="botright"><div class="for">For ${esc(company.name)}</div><div class="sigline"><div class="a">${esc(prof.authSignatory || 'Authorised Signatory')}</div><div class="b">${esc(prof.authDesignation || company.name)}</div></div></div>
     </div>
     <div class="terms">${isSale

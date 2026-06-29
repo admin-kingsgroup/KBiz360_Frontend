@@ -31,7 +31,10 @@ const grab = (detail = {}) => {
 const headStyles = () => Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map((n) => n.outerHTML).join('\n');
 
 export function PrintPreviewHost() {
-  const [job, setJob] = useState(null);          // { html, title, recommend }
+  const [job, setJob] = useState(null);          // { html, title, recommend, variants }
+  // Optional currency variants (USD / local) for Africa booking invoices — the active
+  // one drives the rendered html. 0 = the default (USD), which is always enabled.
+  const [variantIdx, setVariantIdx] = useState(0);
   // App-wide print defaults: Portrait · A4 · Narrow margins · Shrink-to-fit ON.
   const [orient, setOrient] = useState('portrait');
   const [paper, setPaper] = useState('A4');
@@ -42,7 +45,8 @@ export function PrintPreviewHost() {
   useEffect(() => {
     const onPrint = (e) => {
       const d = e.detail || {};
-      setJob({ html: grab(d), title: d.title || 'Document', recommend: d.recommend === 'landscape' ? 'landscape' : 'portrait' });
+      setJob({ html: grab(d), title: d.title || 'Document', recommend: d.recommend === 'landscape' ? 'landscape' : 'portrait', variants: Array.isArray(d.currencyVariants) && d.currencyVariants.length ? d.currencyVariants : null });
+      setVariantIdx(0);
     };
     window.addEventListener('kb:print', onPrint);
     return () => window.removeEventListener('kb:print', onPrint);
@@ -62,6 +66,10 @@ export function PrintPreviewHost() {
   // (Re)render the iframe whenever the job or any option changes.
   const render = useCallback(() => {
     const frame = frameRef.current; if (!frame || !job) return;
+    // The active currency variant (if any) drives the rendered html; a locked variant
+    // (today's FX not set) falls back to the default USD html.
+    const v = job.variants && job.variants[variantIdx];
+    const activeHtml = (v && !v.disabled && v.html) ? v.html : job.html;
     const doc = frame.contentDocument;
     doc.open();
     doc.write(`<!doctype html><html><head><meta charset="utf-8">${headStyles()}
@@ -71,7 +79,7 @@ export function PrintPreviewHost() {
         #pp-wrap{ box-sizing:border-box; }
         @media screen { body{background:#9aa0ad;padding:14px} #pp-wrap{background:#fff;margin:0 auto;box-shadow:0 0 14px rgba(0,0,0,.3)} }
       </style></head>
-      <body><div id="pp-wrap"><div id="pp-content">${job.html}</div></div></body></html>`);
+      <body><div id="pp-wrap"><div id="pp-content">${activeHtml}</div></div></body></html>`);
     doc.close();
 
     // Lay out the on-screen A4 page, then shrink-to-fit the content to the printable width.
@@ -98,7 +106,7 @@ export function PrintPreviewHost() {
     };
     // give the browser a tick to lay out before measuring
     if (doc.readyState === 'complete') setTimeout(apply, 30); else frame.onload = () => setTimeout(apply, 30);
-  }, [job, paper, orient, margin, fit, page]);
+  }, [job, variantIdx, paper, orient, margin, fit, page]);
 
   useEffect(() => { render(); }, [render]);
 
@@ -113,6 +121,19 @@ export function PrintPreviewHost() {
     <div onClick={close} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.55)', zIndex: 9000, display: 'flex', flexDirection: 'column' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderBottom: '1px solid #cdd1d8', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <strong style={{ fontSize: 14, color: '#0d1326' }}>🖨 Print Preview — {job.title}</strong>
+        {job.variants && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#5a6691' }}>Currency
+            <span style={{ display: 'inline-flex', borderRadius: 6, overflow: 'hidden' }}>
+              {job.variants.map((v, i) => (
+                <button key={v.label + i} disabled={v.disabled} title={v.note || (v.disabled ? '' : `Print in ${v.label}`)}
+                  onClick={() => { if (!v.disabled) setVariantIdx(i); }}
+                  style={{ ...seg(variantIdx === i && !v.disabled), borderRight: i < job.variants.length - 1 ? 'none' : '1px solid #cdd1d8', opacity: v.disabled ? 0.5 : 1, cursor: v.disabled ? 'not-allowed' : 'pointer' }}>
+                  {v.disabled ? `🔒 ${v.label}` : v.label}
+                </button>
+              ))}
+            </span>
+          </span>
+        )}
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#5a6691' }}>Orientation
           <span style={{ display: 'inline-flex', borderRadius: 6, overflow: 'hidden' }}>
             <button onClick={() => setOrient('portrait')} style={{ ...seg(orient === 'portrait'), borderRight: 'none' }}>Portrait</button>
