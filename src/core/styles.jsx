@@ -564,9 +564,9 @@ export function RPT_CashPosition({branch}){
   return (
     <RPT_Page title="Cash Position Summary" subtitle="All bank balances + petty cash · real-time · each branch in its own currency">
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,marginBottom:14}}>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Bank Accounts</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{BANK_ACCOUNTS_DATA.filter(b=>b.type!=="Cash").length}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Currencies</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{Object.keys(groupByCurrency).length}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Branches</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{Object.keys(groupByBranch).length}</p></div>
+        <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#2563eb"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#2563eb"}}>Bank Accounts</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{BANK_ACCOUNTS_DATA.filter(b=>b.type!=="Cash").length}</p></div>
+        <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#16a34a"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#16a34a"}}>Currencies</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{Object.keys(groupByCurrency).length}</p></div>
+        <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#d97706"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#d97706"}}>Branches</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{Object.keys(groupByBranch).length}</p></div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
         <div style={cardStyle}>
@@ -640,16 +640,19 @@ export function RPT_AuditTrail(){
   const colorOf=act=>act==="DELETE"?"#A32D2D":act==="CREATE"?"#22c55e":act==="APPROVE"?"#d4a437":act==="EDIT"?"#f97316":"#5a6691";
   return (
     <RPT_Page title="Audit Trail Report" subtitle="Who changed what, when · filterable by user, action, module">
-      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-        <input placeholder="Search description..." value={search} onChange={e=>setSearch(e.target.value)} style={{flex:"1 1 250px",padding:"8px 11px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12}}/>
-        <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} style={{padding:"8px 11px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All users</option>{users.map(u=><option key={u} value={u}>{u}</option>)}</select>
-        <select value={filterAction} onChange={e=>setFilterAction(e.target.value)} style={{padding:"8px 11px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All actions</option>{actions.map(a=><option key={a} value={a}>{a}</option>)}</select>
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-brand border border-surface-border bg-surface px-3 py-2.5 shadow-xs">
+        <div className="relative flex-1 min-w-[220px]">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px]">🔍</span>
+          <input placeholder="Search description..." value={search} onChange={e=>setSearch(e.target.value)} className="w-full rounded-md border border-surface-border bg-surface py-2 pl-7 pr-3 text-[12px] outline-none transition focus:border-navy focus:ring-2 focus:ring-navy/15"/>
+        </div>
+        <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} className="rounded-md border border-surface-border bg-surface px-3 py-2 text-[12px] outline-none transition focus:border-navy"><option value="ALL">All users</option>{users.map(u=><option key={u} value={u}>{u}</option>)}</select>
+        <select value={filterAction} onChange={e=>setFilterAction(e.target.value)} className="rounded-md border border-surface-border bg-surface px-3 py-2 text-[12px] outline-none transition focus:border-navy"><option value="ALL">All actions</option>{actions.map(a=><option key={a} value={a}>{a}</option>)}</select>
       </div>
-      <div style={cardStyle}>
-        <p style={{margin:0,fontSize:11,color:"#5a6691",marginBottom:10}}>{filtered.length} entries</p>
-        <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
+      <div className="rounded-brand border border-surface-border bg-surface p-3.5 shadow-card">
+        <p className="mb-2.5 inline-block rounded-full bg-surface-alt px-2.5 py-1 text-[10.5px] font-bold text-ink-muted">{filtered.length} entries</p>
+        <div className="kb-sticky overflow-x-auto" style={{'--stick-head':'#1a1c22',maxHeight:'calc(100vh - 320px)'}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Timestamp</th><th style={RPT_thStyle}>User</th><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Action</th><th style={RPT_thStyle}>Module</th><th style={RPT_thStyle}>Description</th><th style={RPT_thStyle}>IP Address</th></tr></thead>
-          <tbody>{filtered.map((a,i)=>(<tr key={i}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{a.ts}</td><td style={{...RPT_tdStyle,fontWeight:600}}>{a.user}</td><td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{a.branch}</span></td><td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:colorOf(a.action)+"22",color:colorOf(a.action),borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px"}}>{a.action}</span></td><td style={{...RPT_tdStyle,fontSize:11}}>{a.module}</td><td style={{...RPT_tdStyle,fontSize:11}}>{a.desc}</td><td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{a.ip}</td></tr>))}</tbody>
+          <tbody>{filtered.map((a,i)=>(<tr key={i} className={`transition hover:bg-[#eef1f6] ${i%2===0?'bg-surface':'bg-surface-alt/40'}`}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{a.ts}</td><td style={{...RPT_tdStyle,fontWeight:600}}>{a.user}</td><td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{a.branch}</span></td><td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:colorOf(a.action)+"22",color:colorOf(a.action),borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px"}}>{a.action}</span></td><td style={{...RPT_tdStyle,fontSize:11}}>{a.module}</td><td style={{...RPT_tdStyle,fontSize:11}}>{a.desc}</td><td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{a.ip}</td></tr>))}</tbody>
         </table></div>
       </div>
     </RPT_Page>

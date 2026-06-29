@@ -576,7 +576,7 @@ export const GroupsMaster = ({ branch }) => {
         <Button variant="success" size="sm" icon={Plus} onClick={() => openNew('ledger')}>ERP Ledger</Button>
       </div>
       <div className="kbiz-card mb-3 px-3.5 py-2.5 text-[11px] text-ink-muted">
-        🔒 <b>Primary Group</b> (16) &amp; <b>Primary Sub Group</b> (12) are the fixed 28-group backbone — <b>locked &amp; non-editable</b>. The <b>ERP Group / Sub Group / Ledger</b> columns are your custom chart — click the <Pencil size={11} style={{ verticalAlign: 'middle', color: BLUE }} /> in a cell to edit that node. To add new ones, use Masters → Sub-Groups / Ledgers.
+        <b>Primary Group</b> (16) &amp; <b>Primary Sub Group</b> (12) are the fixed 28-group backbone — <b>locked &amp; non-editable</b>. The <b>ERP Group / Sub Group / Ledger</b> columns are your custom chart — click the <Pencil size={11} style={{ display: 'inline', verticalAlign: 'middle', color: BLUE }} /> in a cell to edit that node. To add new ones, use Masters → Sub-Groups / Ledgers.
       </div>
 
       {loading && <LoadingState label="Loading chart…" />}
@@ -586,7 +586,7 @@ export const GroupsMaster = ({ branch }) => {
         <div className="kb-sticky rounded-brand border border-surface-border bg-surface shadow-card" style={{ '--stick-head': '#f3f5f9', maxHeight: 'calc(100vh - 240px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead><tr style={{ background: '#f3f5f9' }}>
-              {COLS.map((c) => <th key={c.key} style={th}>{c.lock ? '🔒 ' : ''}{c.label}</th>)}
+              {COLS.map((c) => <th key={c.key} style={th}>{c.lock ? '' : ''}{c.label}</th>)}
             </tr></thead>
             <tbody>
               {rows.length === 0 && <tr><td colSpan={COLS.length} style={{ padding: 28, textAlign: 'center', color: DIM }}>No accounts yet.</td></tr>}
