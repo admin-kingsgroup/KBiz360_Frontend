@@ -16,7 +16,7 @@ import { clickable } from '../core/ux/clickable';
 import { toast } from '../core/ux/toast';
 import { FocusBanner } from '../core/ux/FocusBanner';
 import { useNavFocusStore } from '../core/ux/navFocus';
-import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useApproveMany, useApproveAll, branchCode } from '../core/useAccounting';
+import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useRevokeVoucher, fetchRevokeCheck, useApproveMany, useApproveAll, branchCode } from '../core/useAccounting';
 import { VoucherEditor } from './accountingLive';
 import { BookingApprovals } from './bookingOrder';
 import { bc } from '../core/styles';
@@ -60,6 +60,9 @@ export function VoucherApprovals({ branch, currentUser }) {
   // can EDIT (which returns it to Pending for re-approval) but never delete — so the
   // Delete button is hidden for non-admins (the backend also 403s the delete).
   const isAdmin = /super.?admin|director/i.test(currentUser?.role || '');
+  // Revoking un-posts a posted voucher — restricted to approver-level roles (stricter
+  // than approving). The server enforces this too; this just gates the button.
+  const isApprover = /super.?admin|director|senior\s+finance\s+manager|sr\.?\s*accounts\s+executive/i.test(currentUser?.role || '');
   const [status, setStatus] = useState('pending');
   const [open, setOpen] = useState({});
   const [sel, setSel] = useState(() => new Set()); // selected voucher ids (multi-approve)
@@ -123,9 +126,10 @@ export function VoucherApprovals({ branch, currentUser }) {
   const approve = useApproveVoucher();
   const reject = useRejectVoucher();
   const del = useDeleteVoucher();
+  const revoke = useRevokeVoucher();
   const approveMany = useApproveMany();
   const approveAll = useApproveAll();
-  const busy = approve.isPending || reject.isPending || del.isPending || approveMany.isPending || approveAll.isPending;
+  const busy = approve.isPending || reject.isPending || del.isPending || revoke.isPending || approveMany.isPending || approveAll.isPending;
 
   // P3 deep-link: opened from an Alert targeting voucher(s) → jump to the flagged
   // status and auto-open the first unpostable voucher's editor (once per focus).
@@ -157,6 +161,22 @@ export function VoucherApprovals({ branch, currentUser }) {
     const pending = status === 'pending';
     const { confirmed, reason } = await confirmDialog({ title: 'Delete voucher?', message: pending ? 'It will be removed from Pending and kept view-only under Deleted — its number can never be reused.' : 'It will be reversed out of the books and kept view-only — its number can never be reused.', danger: true, reasonRequired: true, reasonLabel: 'Reason for deletion', confirmLabel: 'Delete' });
     if (confirmed) del.mutate({ id, by: 'admin', reason }, { onSuccess: () => toast(pending ? 'Voucher deleted' : 'Voucher deleted & reversed'), onError: (e) => toast(e?.message || 'Delete failed', 'error') });
+  };
+  // Revoke (un-approve) → Pending. Runs the server preflight first so the dialog shows
+  // the exact blast radius (journal rows un-posted + any warnings) before committing; a
+  // hard block (locked / bank-reconciled / live refund) is surfaced and stops the action.
+  const doRevoke = async (id) => {
+    let pre = null;
+    try { pre = await fetchRevokeCheck(id); } catch (e) { toast(e?.message || 'Could not check this voucher', 'error'); return; }
+    if (pre && (pre.blocks || []).length) { toast(`Can't revoke — ${pre.blocks.map((b) => b.msg).join(' ')}`, 'error'); return; }
+    const warns = (pre?.warnings || []).map((w) => w.msg).filter(Boolean);
+    const rows = pre?.journalRows ? `This un-posts ${pre.journalRows} journal row${pre.journalRows === 1 ? '' : 's'}. ` : '';
+    const { confirmed, reason } = await confirmDialog({
+      title: 'Revoke voucher?',
+      message: `${rows}It returns to Pending for editing & re-approval (the number is kept).${warns.length ? ' Note: ' + warns.join(' ') : ''}`,
+      danger: true, reasonRequired: true, reasonLabel: 'Reason for revoke', confirmLabel: 'Revoke',
+    });
+    if (confirmed) revoke.mutate({ id, reason }, { onSuccess: () => toast('Voucher revoked → Pending'), onError: (e) => toast(e?.message || 'Revoke failed', 'error') });
   };
   const doApproveSelected = async () => {
     if (!sel.size) return;
@@ -267,14 +287,17 @@ export function VoucherApprovals({ branch, currentUser }) {
       </>
     ) : status === 'approved' ? (
       <>
-        <button onClick={() => setEditId(e.id)} disabled={busy} title="Edit — un-posts this voucher and returns it to Pending for re-approval" style={ABTN(C.blue)}>Edit</button>
+        {isApprover && <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={ABTN(C.gold)}>Revoke</button>}
         {isAdmin && <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={ABTN(C.red)}>Delete</button>}
       </>
     ) : status === 'deleted' ? (
       <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
     ) : <span style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected</span>
   );
-  const vnoCell = (e, show = true) => <td {...(show ? clickable(() => setViewId(e.id)) : {})} title={show ? 'View full voucher' : ''} style={{ ...flatTd, color: C.blue, fontWeight: 700, cursor: show ? 'pointer' : 'default', textDecoration: show ? 'underline' : 'none', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{show ? e.vno : ''}</td>;
+  // "Revoked — was posted" chip: an entry that was approved then revoked back to Pending
+  // (vs a freshly-entered one). Shows who/why on hover from the live revoke trail.
+  const RevokedChip = ({ e }) => (e.revokedAt ? <span title={`Revoked${e.revokedBy ? ' by ' + e.revokedBy : ''}${e.revokeReason ? ' — ' + e.revokeReason : ''}`} style={{ marginLeft: 6, fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 20, background: '#FBF3DE', color: '#8a6d12', border: '1px solid #e3cd97', whiteSpace: 'nowrap' }}>⟲ Revoked</span> : null);
+  const vnoCell = (e, show = true) => <td {...(show ? clickable(() => setViewId(e.id)) : {})} title={show ? 'View full voucher' : ''} style={{ ...flatTd, color: C.blue, fontWeight: 700, cursor: show ? 'pointer' : 'default', textDecoration: show ? 'underline' : 'none', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{show ? e.vno : ''}{show && status === 'pending' ? <RevokedChip e={e} /> : null}</td>;
 
   // A single voucher row + the shared header (used by the Voucher-Type-wise groups).
   // One voucher in the "Voucher" view: a header (select · date · vno · type · party ·
@@ -553,7 +576,7 @@ export function VoucherApprovals({ branch, currentUser }) {
                                             </>
                                           ) : status === 'approved' ? (
                                             <>
-                                              <button onClick={() => setEditId(e.id)} disabled={busy} title="Edit — un-posts this voucher and returns it to Pending for re-approval" style={{ padding: '3px 9px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Edit</button>
+                                              {isApprover && <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ padding: '3px 9px', background: '#fff', color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Revoke</button>}
                                               {isAdmin && <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Delete</button>}
                                             </>
                                           ) : status === 'deleted' ? (

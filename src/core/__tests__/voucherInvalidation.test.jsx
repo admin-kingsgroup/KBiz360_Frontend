@@ -24,8 +24,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import {
   useDeleteVoucher, useCreateVoucher, useUpdateVoucher,
-  useApproveVoucher, useRejectVoucher, useApproveMany, useApproveAll, useSettleAdvance,
+  useApproveVoucher, useRejectVoucher, useRevokeVoucher, useApproveMany, useApproveAll, useSettleAdvance,
 } from '../useAccounting';
+import { apiPost } from '../api';
 
 // Roots that reflect the books and MUST refresh after any voucher change.
 const BOOK_ROOTS = ['vouchers', 'accounting', 'groups', 'finance'];
@@ -48,6 +49,7 @@ describe('voucher mutations invalidate every books cache (incl. finance)', () =>
     ['useUpdateVoucher', useUpdateVoucher, { id: 'v1', body: { editReason: 'fix', branch: 'BOM' } }],
     ['useApproveVoucher', useApproveVoucher, { id: 'v1', approver: 'admin' }],
     ['useRejectVoucher', useRejectVoucher, { id: 'v1', by: 'admin', reason: 'x' }],
+    ['useRevokeVoucher', useRevokeVoucher, { id: 'v1', reason: 'wrong ledger' }],
     ['useApproveMany', useApproveMany, { ids: ['v1', 'v2'], approver: 'admin' }],
     ['useApproveAll', useApproveAll, { branch: 'BOM', approver: 'admin' }],
     ['useSettleAdvance', useSettleAdvance, { id: 'v1', allocations: [] }],
@@ -62,5 +64,14 @@ describe('voucher mutations invalidate every books cache (incl. finance)', () =>
     for (const root of BOOK_ROOTS) {
       expect(roots).toContain(root); // <-- 'finance' is the one the bug was missing
     }
+  });
+
+  test('useRevokeVoucher posts to /revoke with the reason (un-approve endpoint)', async () => {
+    const { wrapper } = makeHarness();
+    apiPost.mockClear();
+    const { result } = renderHook(() => useRevokeVoucher(), { wrapper });
+    result.current.mutate({ id: 'v9', reason: 'wrong ledger' });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(apiPost).toHaveBeenCalledWith('/api/vouchers/v9/revoke', { reason: 'wrong ledger' });
   });
 });

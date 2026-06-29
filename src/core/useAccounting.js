@@ -234,6 +234,18 @@ export function useDeleteVoucher() {
     onSuccess: () => invalidateBooks(qc),
   });
 }
+// Revoke (un-approve) a posted voucher → back to Pending (un-posts, keeps the vno).
+// Approver-only on the server; the FE also gates the button. Invalidates BOTH books
+// roots so the approval queue + every register/report refresh.
+export function useRevokeVoucher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }) => apiPost(`/api/vouchers/${id}/revoke`, { reason }),
+    onSuccess: (_d, { id }) => { invalidateBooks(qc); qc.invalidateQueries({ queryKey: ['voucher', id] }); },
+  });
+}
+// On-demand preflight (blocks + warnings + journal rows) for the revoke confirm dialog.
+export const fetchRevokeCheck = (id) => apiGet(`/api/vouchers/${id}/revoke-check`);
 export function useApproveMany() {
   const qc = useQueryClient();
   return useMutation({
