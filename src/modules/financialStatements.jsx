@@ -141,13 +141,19 @@ function tkfPnLStatement(sd, sCur) {
   // Profit also adds Direct Income (and other trading items). Show that bridge so
   // the statement foots: Operating GP + Direct Income = GROSS PROFIT.
   const operatingGP = sd.totals.operatingGP != null ? sd.totals.operatingGP : (sd.totals.sales - sd.totals.cogs);
+  // Direct Income (Commission, Discount Received …) and Direct Expenses are trading items
+  // beyond module Sales/COGS — shown as their OWN lines bridging operating GP → full Gross
+  // Profit, exactly where the Tally Trading account places them.
+  const directIncome = sd.totals.directIncome || 0;
+  const directExpense = sd.totals.directExpense || 0;
   const cogsRows = [
     ...(sd.modules || []).flatMap((m) => moduleStmtRows(m, 'cogs')),
     { label: 'Total Direct Cost (COGS)', amount: sd.totals.cogs, subtotal: true },
-    ...(sd.totals.tradingOther
+    ...((directIncome || directExpense)
       ? [
         { label: 'Operating Gross Profit (Sales − COGS)', amount: operatingGP, subtotal: true },
-        { label: 'Add: Direct Income', amount: sd.totals.tradingOther },
+        ...(directIncome ? [{ label: 'Add: Direct Income', amount: directIncome, ledger: 'Direct Income' }] : []),
+        ...(directExpense ? [{ label: 'Less: Direct Expenses', amount: -directExpense, ledger: 'Direct Expenses' }] : []),
       ]
       : []),
     { label: 'GROSS PROFIT', amount: sd.totals.gp, subtotal: true, bold: true },

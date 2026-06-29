@@ -853,7 +853,7 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
                     <td style={num}>{inr(d.bridge.grossProfit)}</td>
                     <td style={{ ...num, width: '20%' }}>{pctTxt(d.totals.gpPct)} of Sales</td>
                   </tr>
-                  {d.bridge.indirectIncome > 0 && (
+                  {!!d.bridge.indirectIncome && (
                     <tr style={{ borderBottom: `1px solid ${SAP.borderLt}` }}>
                       <td style={{ padding: '7px 16px' }}>Add: Indirect Income</td>
                       <td style={{ ...num, color: SAP.greenDk }}>{inr(d.bridge.indirectIncome)}</td>
@@ -1048,21 +1048,25 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
     return open ? [row, ...moduleDrillRows(m, side, isOpen)] : [row];
   };
 
-  // Trading account — Purchases/COGS (Dr) vs Sales (Cr); both sides total Nett Sales.
+  // Trading account — Purchases/COGS + Direct Expenses (Dr) vs Sales + Direct Income (Cr).
+  // Direct Income (Commission, Discount Received …) and Direct Expenses are the trading
+  // items beyond module Sales/COGS; per Tally they sit as their OWN lines ABOVE Gross
+  // Profit. Both sides foot to Sales + Direct Income: Dr (cogs + directExp + GP c/d) ==
+  // Cr (sales + directInc), since GP = (sales − cogs) + (directInc − directExp).
+  const directIncome = d.totals.directIncome || 0;
+  const directExpense = d.totals.directExpense || 0;
   const tradeLeft = [
     { label: 'Purchase Accounts (COGS)', amount: d.totals.cogs, group: true },
     ...modules.flatMap((m) => moduleBlock(m, 'cogs')),
+    ...(directExpense ? [{ label: 'Direct Expenses', amount: directExpense, ledger: 'Direct Expenses', leaf: true }] : []),
     { label: 'Gross Profit c/d', amount: grossProfit, result: true },
   ];
-  // Supplier incentive is direct income → credited in the Trading A/c so COGS +
-  // Gross Profit c/d (Dr) balances against Sales + Incentive (Cr): gp = sales + incentive − cogs.
-  const incentive = d.totals.incentive || 0;
   const tradeRight = [
     { label: 'Sales Accounts', amount: d.totals.sales, group: true },
     ...modules.flatMap((m) => moduleBlock(m, 'sales')),
-    ...(incentive > 0 ? [{ label: 'Supplier Incentive (Direct Income)', amount: incentive }] : []),
+    ...(directIncome ? [{ label: 'Direct Income', amount: directIncome, ledger: 'Direct Income', leaf: true }] : []),
   ];
-  const tradeTotal = d.totals.sales + incentive;
+  const tradeTotal = d.totals.sales + directIncome;
 
   // Profit & Loss account — Indirect Exp (Fixed/Variable → sub-group → ledger) +
   // Tax + Net Profit (Dr) vs GP b/d + Indirect Income (Cr).
@@ -1097,7 +1101,10 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
   // whole indirect income is one ledger, the single line opens it directly; with
   // several ledgers it becomes a drill header (expand → click any ledger). If the
   // backend hasn't sent the income tree yet, still make the line clickable.
-  const incomeBlock = indIncome <= 0 ? []
+  // Show the Indirect Income block whenever there is movement — INCLUDING a net-debit
+  // (negative) balance, e.g. a lone Interest-on-FD reversal. `plTotal` already carries
+  // `indIncome` with its sign, so the visible Cr rows then foot to the column total.
+  const incomeBlock = !indIncome ? []
     : allIncomeLedgers.length === 1
       ? [{ label: 'Indirect Income', amount: indIncome, ledger: allIncomeLedgers[0].name, leaf: true }]
       : incomeGroups.length
@@ -1235,8 +1242,9 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
   const indIncome = d.bridge?.indirectIncome || 0;
   const incomeGroups = d.indirect?.incomeGroups || []; // indirect-income groups → ledgers (drillable)
   const grossProfit = d.bridge?.grossProfit ?? d.totals.gp;
-  const incentive = d.totals.incentive || 0;
-  const revenueTrading = d.totals.sales + incentive;
+  const directIncome = d.totals.directIncome || 0;
+  const directExpense = d.totals.directExpense || 0;
+  const revenueTrading = d.totals.sales + directIncome;
   const nett = d.totals.sales;
 
   // Indirect-income tree (group → ledger) — every ledger row clickable → its account.
@@ -1384,14 +1392,15 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
               <Head txt="Income" />
               <Row r={{ label: 'Revenue from Operations (Sales)', amount: d.totals.sales, group: true }} />
               {modules.flatMap((m) => moduleBlock(m, 'sales')).map((r, i) => <Row key={'s' + i} r={r} />)}
-              {incentive > 0 && <Row r={{ label: 'Supplier Incentive (Direct Income)', amount: incentive }} />}
+              {!!directIncome && <Row r={{ label: 'Direct Income', amount: directIncome, ledger: 'Direct Income', leaf: true }} />}
               <Sub txt="Total Revenue (Trading)" val={revenueTrading} />
               <Head txt="Less: Cost of Sales (COGS)" />
               <Row r={{ label: 'Purchase Accounts (COGS)', amount: d.totals.cogs, group: true }} neg />
               {modules.flatMap((m) => moduleBlock(m, 'cogs')).map((r, i) => <Row key={'c' + i} r={r} neg />)}
               <Sub txt="Total Cost of Sales" val={d.totals.cogs} neg />
+              {!!directExpense && <Row r={{ label: 'Less: Direct Expenses', amount: directExpense, ledger: 'Direct Expenses', leaf: true }} neg />}
               <Result txt="Gross Profit" val={grossProfit} />
-              {indIncome > 0 && (oneIncomeLedger
+              {!!indIncome && (oneIncomeLedger
                 ? <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome, ledger: allIncomeLedgers[0].name, leaf: true }} />
                 : incomeGroups.length
                   ? <>
