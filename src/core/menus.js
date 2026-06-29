@@ -402,7 +402,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Forex Rates", href:"/masters/forex"},
     {divider:true, label:"Costing"},
     {label:"Cost Categories", href:"/masters/cost-categories"},
-    {label:"Cost Centres (🔒 Super-Admin)", href:"/masters/cost-centers"},
+    {label:"Cost Centres (Super-Admin)", href:"/masters/cost-centers"},
     {divider:true, label:"Planning"},
     {label:"Budgets", href:"/masters/budgets"},
     {label:"Scenarios", href:"/masters/scenarios"},
@@ -420,7 +420,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
 export const MENU_HO_CONTROL = {label:"HO Control", icon:Settings, children:[
   {label:"Group Monthly Dashboard", href:"/ho/group-dashboard"},
   {divider:true, label:"Authority & Approvals"},
-  {label:"⭐ Authority Configuration Center", href:"/settings/authority-config"},
+  {label:"Authority Configuration Center", href:"/settings/authority-config"},
   {label:"Master Change Request Queue", href:"/settings/master-change-queue"},
   {label:"Vacation Delegations", href:"/settings/delegations"},
   {divider:true, label:"Asset & Procurement"},

@@ -60,7 +60,7 @@ export function VendorAdvances({ branch }) {
         <button key={ff} onClick={() => setFilter(ff)} className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${filter === ff ? 'border-navy bg-navy text-gold' : 'border-surface-border bg-surface text-ink-muted hover:bg-surface-alt'}`}>{ff}</button>
       ))}
     >
-      <ResponsiveGrid min="200px" gap="md" className="mb-4">
+      <ResponsiveGrid min="260px" gap="lg" className="mb-4">
         {KPIS.map((k, i) => (
           <div key={i} className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-2.5" style={{ borderTopColor: k.c }}>
             <p className="text-[10px] font-bold uppercase tracking-wide text-ink-muted">{k.l}</p>
