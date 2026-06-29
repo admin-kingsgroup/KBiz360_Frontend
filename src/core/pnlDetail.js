@@ -110,7 +110,10 @@ export function moduleSubDetailRows(m, side, isOpen, keyPrefix = '') {
     const open = expandable && isOpen(ekey, false);
     const row = { label: s.name, amount: subAmount(s, side), costCentre: true, subCode: s.code, expandable, ekey, open };
     if (!open) return [row];
-    return [row, ...headRows(heads, isOpen, (ledger) => subLedgerDetailKey(m, side, s.code, ledger, keyPrefix), stripLeafPrefix)];
+    // Show the FULL component ledger name (e.g. "IT-Base Fare", "DT-K3 Tax") under the
+    // Int'l/Domestic head — the prefix is kept so the P&L drill matches the Chart of
+    // Accounts / Tally P&L tree exactly (no display-only stripping).
+    return [row, ...headRows(heads, isOpen, (ledger) => subLedgerDetailKey(m, side, s.code, ledger, keyPrefix))];
   });
 }
 

@@ -34,7 +34,7 @@ import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys
 import { VoucherEditor } from '../accountingLive';
 import { OutstandingOnAccount } from '../outstanding';
 import { useMobile } from '../../core/hooks';
-import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail, stripLeafPrefix, moduleSideRows } from '../../core/pnlDetail';
+import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail, moduleSideRows } from '../../core/pnlDetail';
 import { openPrintPreview } from '../../core/PrintPreview';
 import { LedgerActions } from '../../core/ledgerActions';
 import { toast } from '../../core/ux/toast';
@@ -756,7 +756,7 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
                                   <td style={{ ...num, color: SAP.sec }}>{pctTxt(s.pctOfSales)}</td>
                                 </tr>
                                 {/* per-sub-centre ledger composition — fares split by Int'l/Domestic, not merged */}
-                                {so && <FioriLedgerRows heads={s.heads} keyBase={sk} stripPrefix cur={cur} openHead={openHead} setOpenHead={setOpenHead} />}
+                                {so && <FioriLedgerRows heads={s.heads} keyBase={sk} cur={cur} openHead={openHead} setOpenHead={setOpenHead} />}
                                 {so && <FileRows files={s.files} indent={62} cur={cur} onPick={setDrillFile} />}
                               </React.Fragment>
                             );
@@ -947,14 +947,15 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
    the entry (Base Fare, K3, Taxes …). Sales ledgers show their amount in the
    Sales column, Purchase ledgers in the COGS column; click a ledger to reveal
    its components. Same six columns as the module table (colSpan-aware). */
-function FioriLedgerRows({ m, heads: headsProp, keyBase, stripPrefix, openHead, setOpenHead, cur = '₹' }) {
+function FioriLedgerRows({ m, heads: headsProp, keyBase, openHead, setOpenHead, cur = '₹' }) {
   const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   // Module-level (m.heads) for single-leaf modules, or a sub-centre's own heads
   // (Int'l/Domestic) when `heads` + `keyBase` are passed — so fares are split, not merged.
-  // Under an Int'l/Domestic head the leaf prefix is redundant, so strip it for display.
+  // Show the FULL component ledger name (e.g. "IT-Base Fare") so the drill matches the
+  // Chart of Accounts / Tally P&L tree — no display-only prefix stripping.
   const allHeads = headsProp || (m && m.heads) || {};
   const base = keyBase || (m && m.key) || '';
-  const ledgerLabel = (name) => (stripPrefix ? stripLeafPrefix(name) : name);
+  const ledgerLabel = (name) => name;
   const rows = [];
   for (const side of ['sales', 'cogs']) {
     const heads = allHeads[side] || [];
