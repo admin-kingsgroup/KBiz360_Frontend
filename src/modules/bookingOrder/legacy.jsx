@@ -71,10 +71,13 @@ const tfTd = { borderTop: '2px solid ' + DARK, padding: '10px 8px', fontWeight: 
 // Per-section column-header + total-row styles — the section colour carries INTO
 // the table (SO blue, PO maroon), matching the SO/PO/GP voucher theme.
 const thBaseHdr = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' };
-const soHdr = { ...thBaseHdr, color: '#fff', background: 'linear-gradient(180deg, ' + SO_BAR + ' 0%, #163d6c 100%)', borderBottom: '2px solid ' + SO_BAR, whiteSpace: 'normal', lineHeight: 1.3 };
-const soHdrL = { ...soHdr, textAlign: 'center' };
-const poHdr = { ...thBaseHdr, color: '#fff', background: 'linear-gradient(180deg, ' + PO_BAR + ' 0%, #6f1830 100%)', borderBottom: '2px solid ' + PO_BAR, whiteSpace: 'normal', lineHeight: 1.3 };
-const poHdrL = { ...poHdr, textAlign: 'center' };
+// Header text-align matches the column's data alignment (right for the numeric
+// fare/GST/total cells, left for the name/reference text cells) — otherwise the
+// centred header text visually drifts away from the right-aligned figures below it.
+const soHdr = { ...thBaseHdr, color: '#fff', background: 'linear-gradient(180deg, ' + SO_BAR + ' 0%, #163d6c 100%)', borderBottom: '2px solid ' + SO_BAR, whiteSpace: 'normal', lineHeight: 1.3, textAlign: 'right' };
+const soHdrL = { ...soHdr, textAlign: 'left' };
+const poHdr = { ...thBaseHdr, color: '#fff', background: 'linear-gradient(180deg, ' + PO_BAR + ' 0%, #6f1830 100%)', borderBottom: '2px solid ' + PO_BAR, whiteSpace: 'normal', lineHeight: 1.3, textAlign: 'right' };
+const poHdrL = { ...poHdr, textAlign: 'left' };
 const soTf = { ...tfTd, background: '#DCE8F4', color: SO_BAR, borderTop: '2px solid ' + SO_BAR };
 const poTf = { ...tfTd, background: '#FBEEF2', color: PO_BAR, borderTop: '2px solid ' + PO_BAR };
 
