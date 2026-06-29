@@ -55,6 +55,7 @@ const { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3B
 const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, DebitNoteVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, RefundPartialVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
 const { SoPoGpVoucherEntry } = lazyModule(() => import('./modules/bookingOrder'));
 const { InterBranchRegister } = lazyModule(() => import('./modules/interBranchRegister'));
+const { InterBranchMatrix } = lazyModule(() => import('./modules/interBranchMatrix'));
 const { UnifiedApprovals } = lazyModule(() => import('./modules/voucherApprovals'));
 const { ModuleRegister } = lazyModule(() => import('./modules/moduleRegister'));
 const { AccountsTreeView } = lazyModule(() => import('./modules/chartBuilder'));
@@ -435,6 +436,7 @@ export default function KB360App(){
     if(route==="/accounts/client-reco")   return <ClientReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/interbranch-reco") return <InterBranchReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/inb-register")   return <InterBranchRegister branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/inb-matrix")     return <InterBranchMatrix branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/tally-reco")    return <TallyReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/payment-run")   return <PaymentRun branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/suspense")      return <SuspenseClearing branch={branch} setRoute={navigate}/>;

@@ -43,6 +43,16 @@ export function useInbPnlBreakdown(branch, { from, to } = {}) {
   });
 }
 
+// Seller→buyer trade matrix + per-pair margin (SVF income vs discount given).
+export function useInbMatrix({ from, to } = {}) {
+  return useQuery({
+    queryKey: ['inb', 'matrix', from || '', to || ''],
+    queryFn: () => apiGet('/api/inter-branch/matrix', { from, to }),
+    enabled: enabled(),
+    staleTime: 15_000,
+  });
+}
+
 function useInbMutation(mutationFn) {
   const qc = useQueryClient();
   return useMutation({ mutationFn, onSuccess: () => qc.invalidateQueries({ queryKey: ['inb'] }) });

@@ -848,6 +848,31 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
             <FCard title="Section C — Profit Bridge (Gross Profit → Net Profit)" badge={<Badge>✓ {d.bridge.result}</Badge>}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <tbody>
+                  {/* Operating GP → Direct Income / Direct Expenses → full Gross Profit
+                      (only when there are trading items beyond module Sales/COGS). */}
+                  {(!!d.totals.directIncome || !!d.totals.directExpense) && (
+                    <>
+                      <tr style={{ borderBottom: `1px solid ${SAP.borderLt}`, color: SAP.sec }}>
+                        <td style={{ padding: '7px 16px' }}>Operating Gross Profit (Sales − COGS)</td>
+                        <td style={num}>{inr(d.totals.operatingGP)}</td>
+                        <td style={num} />
+                      </tr>
+                      {!!d.totals.directIncome && (
+                        <tr style={{ borderBottom: `1px solid ${SAP.borderLt}` }}>
+                          <td style={{ padding: '7px 16px' }}>Add: Direct Income</td>
+                          <td style={{ ...num, color: SAP.greenDk }}>{inr(d.totals.directIncome)}</td>
+                          <td style={num} />
+                        </tr>
+                      )}
+                      {!!d.totals.directExpense && (
+                        <tr style={{ borderBottom: `1px solid ${SAP.borderLt}` }}>
+                          <td style={{ padding: '7px 16px' }}>Less: Direct Expenses</td>
+                          <td style={{ ...num, color: SAP.red }}>{paren(d.totals.directExpense)}</td>
+                          <td style={num} />
+                        </tr>
+                      )}
+                    </>
+                  )}
                   <tr style={{ background: SAP.greenBg, color: SAP.greenDk, fontWeight: 700 }}>
                     <td style={{ padding: '10px 16px', width: '62%' }}>Gross Profit (All Modules)</td>
                     <td style={num}>{inr(d.bridge.grossProfit)}</td>
