@@ -176,8 +176,8 @@ const GRID_COLS = {
 const GRID_GAP = { none: 'gap-0', sm: 'gap-2', md: 'gap-3', lg: 'gap-4' };
 
 export function ResponsiveGrid({ cols = 3, min, gap = 'md', className = '', children, ...rest }) {
-  // `min` → fluid auto-fill track (no breakpoints); else breakpoint preset.
-  const style = min ? { gridTemplateColumns: `repeat(auto-fill, minmax(min(${min}, 100%), 1fr))` } : undefined;
+  // `min` → fluid auto-fit track (no breakpoints); else breakpoint preset.
+  const style = min ? { gridTemplateColumns: `repeat(auto-fit, minmax(min(${min}, 100%), 1fr))` } : undefined;
   return (
     <div
       className={cn('grid', !min && (GRID_COLS[cols] || GRID_COLS[3]), GRID_GAP[gap] || GRID_GAP.md, className)}
