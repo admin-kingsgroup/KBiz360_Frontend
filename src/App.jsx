@@ -443,7 +443,7 @@ export default function KB360App(){
     if(route==="/accounts/payment-run")   return <PaymentRun branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/suspense")      return <SuspenseClearing branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/month-end")     return <MonthEndChecklist branch={branch} setRoute={navigate}/>;
-    if(route==="/dashboard")          return <DashboardRouter branch={branch} setRoute={navigate} currentUser={currentUser}/>;
+    if(route==="/dashboard")          return <DashboardRouter branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>;
     // Owner Dashboard — consolidated whole-company view. Restricted to the group
     // owner: the Super Admin whose email is afshin.dhanani@kingsgroupco.com (BOTH
     // role + email required). Non-owners hitting the URL get a "not available" card.
