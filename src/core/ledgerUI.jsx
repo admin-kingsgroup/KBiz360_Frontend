@@ -91,6 +91,10 @@ export const LEDGER_CSS = `
 .kbled .part .by{color:var(--ink4);font-weight:400;font-style:italic;margin-right:4px}
 .kbled .part .vlink{color:var(--gold);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .kbled .narr{font-size:10.5px;color:var(--ink4);font-style:italic;font-weight:400;margin-top:3px}
+.kbled .alloc{margin-top:4px;font-weight:400;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.kbled .alloc .alabel{font-size:9px;font-weight:800;letter-spacing:.3px;color:var(--dr);text-transform:uppercase}
+.kbled .alloc .achip{font-size:9.5px;font-weight:600;color:var(--ink2);background:#eaf5ef;border:1px solid #c8e6d5;border-radius:4px;padding:1px 6px;font-variant-numeric:tabular-nums}
+.kbled .alloc .achip b{color:var(--dr);font-weight:800;margin-left:3px}
 .kbled .detail{margin-top:5px;padding-left:14px;border-left:2px solid var(--rule)}
 .kbled .detail .dl{display:flex;justify-content:space-between;gap:14px;font-size:10.5px;color:var(--ink3);padding:2px 0;max-width:430px}
 .kbled .detail .dl .dnm{font-weight:400}
@@ -185,7 +189,10 @@ export function LedgerAccountView({
 
   // Bill-wise needs a real party + a concrete branch (a bill belongs to a branch).
   // Only party ledgers (debtors/creditors) carry bills — skip the query otherwise.
-  const bw = useOpenBills(side ? name : null, branch, side || 'customer');
+  // Statement view: include fully-settled bills (excludeId none, includeSettled true)
+  // so the Bill-wise tab's Settled / Bills-Raised totals reflect knocked-off bills
+  // instead of dropping them (which read Settled = 0).
+  const bw = useOpenBills(side ? name : null, branch, side || 'customer', undefined, true);
   const bills = useMemo(() => mapBills(bw.data), [bw.data]);
   const hasBranch = !!branchCode(branch);
 
@@ -308,6 +315,12 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
       <td className="l dt">{r.date}</td>
       <td className="l part">
         <span className="by">{r.toBy}</span>{r.part}
+        {r.alloc && r.alloc.length > 0 && (
+          <div className="alloc" title="Bills settled by this entry">
+            <span className="alabel">Settled against:</span>{' '}
+            {r.alloc.map((a, j) => <span key={j} className="achip">{a.ref} <b>{fmt(a.amt)}</b></span>)}
+          </div>
+        )}
         {showNarr && r.narr && <div className="narr">{r.narr}</div>}
         {showDetail && r.detail.length > 0 && (
           <div className="detail">{r.detail.map((dd, j) => (
@@ -552,9 +565,11 @@ function ledgerPrintHTML({ m, showNarr, showDetail, cur = '₹' }) {
     const detail = (showDetail && r.detail.length)
       ? `<div class="detail">${r.detail.map((dd) => `<div class="dl"><span class="dnm">${esc(dd.side)} <b>${esc(dd.n)}</b></span><span class="damt">${fmt(dd.amt)}</span></div>`).join('')}</div>` : '';
     const narr = (showNarr && r.narr) ? `<div class="narr">${esc(r.narr)}</div>` : '';
+    const alloc = (r.alloc && r.alloc.length)
+      ? `<div class="alloc"><span class="alabel">Settled against:</span> ${r.alloc.map((a) => `<span class="achip">${esc(a.ref)} <b>${fmt(a.amt)}</b></span>`).join(' ')}</div>` : '';
     return `<tr>
       <td class="l dt">${esc(r.date)}</td>
-      <td class="l part"><span class="by">${esc(r.toBy)}</span>${esc(r.part)}${narr}${detail}</td>
+      <td class="l part"><span class="by">${esc(r.toBy)}</span>${esc(r.part)}${alloc}${narr}${detail}</td>
       <td class="l"><span class="vt">${esc(r.vt)}</span></td>
       <td class="l vno">${esc(r.vno)}</td>
       <td class="num drc">${fmt(r.dr)}</td>

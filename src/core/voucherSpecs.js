@@ -31,6 +31,11 @@ export function tcsApplies(spec, packageType) {
   return spec.tcs.intlOnly ? isIntl(packageType) : true;
 }
 
+// A B2B buyer (another agent / tour operator) is NOT charged TCS u/s 206C(1G) — they
+// resell and collect it from their own client. Identified by the customer's Sundry
+// Debtors sub-group (e.g. "B2B" / "B2B Clients"). B2C and B2E still attract TCS.
+export const isB2B = (clientType) => /\bb2b\b/i.test(String(clientType || ''));
+
 // ── Per-module column specs ──────────────────────────────────────────────────
 // idCols[0]/[1] are always the name pair (editable on both grids); idCols[2…] are
 // the module reference fields (editable on the Sales grid, shown read-only on the
@@ -320,8 +325,8 @@ export function lineCalc(spec, l, ctx) {
 // po/so carry { lineTotal (net, ex tax), serviceCharge, gst, tcs, total, lines }.
 // gp = sales net − purchase net (= net markup + service charge). The per-line
 // `lines` detail is preserved for the read-only voucher view + voucher meta.
-export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, availItc = false, foreignSupplier = false } = {}) {
-  const ctx = { branch, noVat: !!noVat, availItc: !!availItc, foreignSupplier: !!foreignSupplier };
+export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, availItc = false, foreignSupplier = false, clientType = '' } = {}) {
+  const ctx = { branch, noVat: !!noVat, availItc: !!availItc, foreignSupplier: !!foreignSupplier, clientType };
   const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, incentiveAmt: 0, incentiveGst: 0, incentiveTds: 0, total: 0, lines: [] };
   // `otherTaxesGst` = GST carved out of the SVC2 margin (GST-inclusive, so the
   // customer total is unchanged); kept OUT of `gst` so it posts to the dedicated
@@ -377,7 +382,7 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
   // on top of the invoice. It's a Balance-Sheet liability, NOT income, so it never
   // enters the net and the GP is unchanged. India-only — never on Africa/VAT
   // branches (and moot under Without-VAT).
-  if (!ctx.noVat && !isVatBranch(ctx.branch) && tcsApplies(spec, packageType)) {
+  if (!ctx.noVat && !isVatBranch(ctx.branch) && !isB2B(ctx.clientType) && tcsApplies(spec, packageType)) {
     so.tcs = r2(so.total * spec.tcs.rate / 100);
     so.total = r2(so.total + so.tcs);
   }

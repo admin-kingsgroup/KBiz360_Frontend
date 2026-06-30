@@ -40,6 +40,8 @@ export function mapLedger(d) {
       dr: e.debit || 0, cr: e.credit || 0,
       narr: e.narration || e.entryNarration || '',
       detail: (e.particulars || []).map((p) => ({ n: p.ledger, side: p.side, amt: p.amount })),
+      // Bill-wise settlement (which bills this receipt/payment/note knocked off).
+      alloc: (e.allocations || []).map((a) => ({ ref: a.billVno, amt: a.amount })),
       balance: e.balance, balanceSide: e.balanceSide,
     })),
     totalDebit: d.totalDebit || 0, totalCredit: d.totalCredit || 0,

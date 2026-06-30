@@ -49,6 +49,14 @@ describe('Holiday package — corrected SO/PO/GP (supplier GST → ITC, off the 
     expect(gp.saleNet).toBeCloseTo(37441.64, 2);
     expect(gp.costNet).toBeCloseTo(32520, 2);
   });
+
+  test('B2B buyer is exempt from TCS (resells & collects from its own client)', () => {
+    const b2b = bookingTotals(SH, [pkgLine()], { packageType: 'International', branch: 'BOM', clientType: 'B2B' }).so;
+    expect(b2b.tcs).toBeCloseTo(0, 2);
+    expect(b2b.total).toBeCloseTo(39313.72, 2);     // net + GST, no TCS
+    // B2C / B2E still attract the 2% TCS.
+    expect(bookingTotals(SH, [pkgLine()], { packageType: 'International', branch: 'BOM', clientType: 'B2C' }).so.tcs).toBeCloseTo(786.27, 2);
+  });
 });
 
 describe('Holiday client invoice — SVC2 hidden, SVC2 GST folded into GST', () => {

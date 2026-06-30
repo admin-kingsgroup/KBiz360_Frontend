@@ -326,7 +326,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Tax label drives every "GST" caption on the grid: Africa shows VAT, India GST.
   const taxLabel = isVatBr ? 'VAT' : 'GST';
   const effNoVat = isVatBr && noVat;
-  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, suppForeign]);
+  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign, clientType }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, suppForeign, clientType]);
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
   const getGstRate = () => {
     if (effNoVat) return 0;

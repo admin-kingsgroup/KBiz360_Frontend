@@ -501,11 +501,14 @@ export function useRegisterSummary(branch, { category, from, to } = {}) {
 // `excludeId` (optional) — when editing a receipt/payment, pass its id so the
 // open-bills query ignores this voucher's own settlement; the bills it already
 // cleared then show at full outstanding and its allocation can be re-edited.
-export function useOpenBills(party, branch, side = 'customer', excludeId) {
+// `includeSettled` (optional) — the Bill-wise STATEMENT view passes this to also
+// receive fully-paid bills (settled amount + pending 0), so its Settled/Bills-Raised
+// totals foot to the full picture. The settle screen leaves it off (open bills only).
+export function useOpenBills(party, branch, side = 'customer', excludeId, includeSettled = false) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || '', excludeId || ''],
-    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side, excludeId }),
+    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || '', excludeId || '', includeSettled ? 'all' : 'open'],
+    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side, excludeId, includeSettled: includeSettled ? '1' : undefined }),
     enabled: enabled() && !!party && !!code,
     staleTime: 15_000,
   });
