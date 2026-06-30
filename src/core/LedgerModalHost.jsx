@@ -49,6 +49,15 @@ export function LedgerModalHost({ branch: shellBranch }) {
     return () => window.removeEventListener('kb:ledger-modal', onOpen);
   }, []);
 
+  // Any navigation (kb:open-register) closes this overlay — e.g. a deep-link from a
+  // read-only locked voucher to its booking/INB-deal approvals screen would otherwise
+  // be hidden behind this full-screen ledger modal.
+  useEffect(() => {
+    const onNav = () => { setVoucher(null); setJob(null); };
+    window.addEventListener('kb:open-register', onNav);
+    return () => window.removeEventListener('kb:open-register', onNav);
+  }, []);
+
   useEffect(() => {
     if (!job) return undefined;
     const pop = pushModal(() => { if (voucher) setVoucher(null); else setJob(null); }); // Esc closes voucher first, then modal

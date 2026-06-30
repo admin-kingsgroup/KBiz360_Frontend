@@ -1668,7 +1668,7 @@ export function DeletedBookings({ branch, setRoute }) {
 
 // Unified SO/PO/GP approval — Pending · Approved · Rejected · Deleted in one screen
 // with internal tabs (mirrors Voucher Approvals). Reuses BookingTable + all actions.
-export function BookingApprovals({ branch, setRoute, currentUser }) {
+export function BookingApprovals({ branch, setRoute, currentUser, initialSearch = '', initialStatus = '' }) {
   const brCode = brCodeOf(branch) || 'ALL';
   const cur = bc(branch).cur;
   const qc = useQueryClient();
@@ -1677,7 +1677,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   const sups = useQuery({ queryKey: ['suppliers'], queryFn: () => apiGet('/api/suppliers') }).data || [];
   const partyBy = (arr) => { const m = {}; (arr || []).forEach((x) => { if (x && x.name) m[String(x.name).toLowerCase().trim()] = x; }); return m; };
   const custMap = partyBy(custs), supMap = partyBy(sups);
-  const [status, setStatus] = useState('pending');
+  const [status, setStatus] = useState(initialStatus || 'pending');
   const [open, setOpen] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [msg, setMsg] = useState('');
@@ -1685,7 +1685,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   const [groupBy, setGroupBy] = useState('none');
   const [sel, setSel] = useState(() => new Set());
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch || '');
   const canDelete = isAdminRole(currentUser);
   const inRange = (dt) => (!range.from || dt >= range.from) && (!range.to || dt <= range.to);
   // Search filters the visible list by Booking No, Link No, module, customer, supplier,
