@@ -258,7 +258,9 @@ export function lineCalcPackage(spec, l, ctx) {
   const psvcGst = num(l.psvcGst);          // Supplier Service GST — entered
   const markup = num(l.markup);            // net markup (agency margin = GP)
   const incentive = num(l.incentive);
-  const tds = r2(incentive * 0.02);
+  // A FOREIGN supplier (master country ≠ India, e.g. IATA-BSP / Singapore) cannot
+  // withhold Indian 194H TDS — drop the 2% so the grid matches what the books post.
+  const tds = (ctx && ctx.foreignSupplier) ? 0 : r2(incentive * 0.02);
   // Taxable package value EXCLUDES the supplier's GST — that GST is recovered as Input
   // credit (ITC), not re-billed to the customer. Output GST 5% applies to
   // (Land + Supplier Service + SVC2) only.
@@ -291,7 +293,9 @@ export function lineCalc(spec, l, ctx) {
   // Input VAT follows the supplier, not the Without-VAT sale choice (decoupled).
   const gPur = isInputTaxable(ctx) ? gstPur(spec, l, pr) : 0;
   const incentive = num(l.incentive);
-  const tds = r2(incentive * 0.02);
+  // A FOREIGN supplier (master country ≠ India, e.g. IATA-BSP / Singapore) cannot
+  // withhold Indian 194H TDS — drop the 2% so the grid matches what the books post.
+  const tds = (ctx && ctx.foreignSupplier) ? 0 : r2(incentive * 0.02);
   const fSales = r2(fareSum(spec, l) + num(l.markup) + num(l.ssvc) + gSvc);
   const fPur   = r2(fareSum(spec, l) + num(l.psvc) + gPur); // GROSS cost; incentive netted via incentivePostings on post
   const sGST = r2(gSvc + gMk);
@@ -311,8 +315,8 @@ export function lineCalc(spec, l, ctx) {
 // po/so carry { lineTotal (net, ex tax), serviceCharge, gst, tcs, total, lines }.
 // gp = sales net − purchase net (= net markup + service charge). The per-line
 // `lines` detail is preserved for the read-only voucher view + voucher meta.
-export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, availItc = false } = {}) {
-  const ctx = { branch, noVat: !!noVat, availItc: !!availItc };
+export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, availItc = false, foreignSupplier = false } = {}) {
+  const ctx = { branch, noVat: !!noVat, availItc: !!availItc, foreignSupplier: !!foreignSupplier };
   const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, incentiveAmt: 0, incentiveGst: 0, incentiveTds: 0, total: 0, lines: [] };
   // `otherTaxesGst` = GST carved out of the SVC2 margin (GST-inclusive, so the
   // customer total is unchanged); kept OUT of `gst` so it posts to the dedicated

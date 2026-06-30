@@ -53,6 +53,10 @@ const SO_BAR = '#1D4E89', PO_BAR = '#8A1F3D', GP_BAR = GOLD;
 const REVERSAL_CHIPS = [{ code: 'RF', name: 'Refund', icon: '↩️' }, { code: 'RI', name: 'Reissue', icon: '🔁' }];
 const isReversalModule = (m) => m === 'RF' || m === 'RI';
 const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || 'BOM'));
+// A supplier attracts Indian 194H TDS only when it is an Indian vendor (blank country =
+// India default). Mirrors the backend isIndia() in shared/util/gstSupplyType so the live
+// PO grid drops the 2% TDS for a foreign supplier exactly as the posted journal does.
+const isIndiaCountry = (c) => { const s = String(c || '').trim().toLowerCase(); return s === '' || s === 'india' || s === 'in' || s === 'bharat'; };
 const today = () => new Date().toISOString().slice(0, 10);
 const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
@@ -128,9 +132,9 @@ const legsFromEdit = (booking) => (booking.purchases || []).map((leg) => {
     line: (Array.isArray(leg.rows) && leg.rows[0]) ? { ...blankLine(sp), ...leg.rows[0] } : blankLine(sp),
   };
 });
-export function legToPayload(leg, brCode, noVat) {
+export function legToPayload(leg, brCode, noVat, foreign = false) {
   const spec = VSPECS[leg.module] || VSPECS.SM;
-  const { po } = bookingTotals(spec, [leg.line], { branch: brCode, noVat, availItc: leg.availItc, packageType: leg.packageType });
+  const { po } = bookingTotals(spec, [leg.line], { branch: brCode, noVat, availItc: leg.availItc, packageType: leg.packageType, foreignSupplier: foreign });
   return {
     module: leg.module,
     supplier: { name: leg.supplier.name, ledgerName: leg.supplier.name, ledgerGroup: leg.supplier.ledgerGroup },
@@ -139,7 +143,7 @@ export function legToPayload(leg, brCode, noVat) {
   };
 }
 
-function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange }) {
+function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, isForeign }) {
   const allowed = ALLOWED_LEG_MODULES[parentModule];
   if (!allowed) return null;
   const setLeg = (i, patch) => onChange(legs.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -159,7 +163,7 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange })
       {legs.map((leg, i) => {
         const spec = VSPECS[leg.module] || VSPECS.SM;
         const pkg = spec.model === 'package';
-        const po = legToPayload(leg, brCode, noVat).po;
+        const po = legToPayload(leg, brCode, noVat, isForeign ? isForeign(leg.supplier.name) : false).po;
         return (
           <div key={i} style={{ padding: 11, marginBottom: 10, background: '#fffdf7', border: '1px solid #eee3cf', borderRadius: 7 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -238,6 +242,19 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   const [clientType, setClientType] = useState(editing ? (editBooking.customer?.ledgerGroup || '') : '');
   const reg = useLedgerRegistry(branch).data || [];
+  // Foreign-supplier resolver (mirrors the backend's countryFromSupplierMaster): match the
+  // chosen creditor ledger to its master row by exact name and read its home country — a
+  // foreign vendor (e.g. IATA-BSP / Singapore) can't withhold Indian 194H TDS, so the 2%
+  // TDS on its incentive is dropped here too, keeping the grid in step with the books.
+  const supplierMaster = useQuery({ queryKey: ['suppliers'], queryFn: () => apiGet('/api/suppliers') }).data || [];
+  const supplierCountryBy = useMemo(() => {
+    const m = new Map();
+    (supplierMaster || []).forEach((s) => { if (s && s.name) m.set(s.name.trim().toLowerCase(), s.country || ''); });
+    return m;
+  }, [supplierMaster]);
+  const countryOfSupplier = (name) => supplierCountryBy.get(String(name || '').trim().toLowerCase()) || '';
+  const isForeignSupplier = (name) => !isIndiaCountry(countryOfSupplier(name));
+  const suppForeign = isForeignSupplier(supplier.name);
   const clientTypes = useMemo(() => {
     const set = new Set();
     reg.forEach((l) => {
@@ -309,7 +326,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Tax label drives every "GST" caption on the grid: Africa shows VAT, India GST.
   const taxLabel = isVatBr ? 'VAT' : 'GST';
   const effNoVat = isVatBr && noVat;
-  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat }), [spec, lines, packageType, isNoSupp, brCode, effNoVat]);
+  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, suppForeign]);
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
   const getGstRate = () => {
     if (effNoVat) return 0;
@@ -400,11 +417,18 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       const serviceFee = round2(lines.reduce((s, l) => s + num(l.ssvc), 0));
       const pax = lines.map((l) => [l.fn, l.sn].filter(Boolean).join(' ')).filter(Boolean).join(', ');
       if (!fareLines.length && !serviceFee) { setError('Enter the fares and/or a Service Fee'); return; }
+      // Supplier (airline) PURCHASE leg — booked through the INB voucher under the same
+      // INB Link No. Sent only when a supplier + cost exist; otherwise the deal stays
+      // sale-only (server skips the purchase). `totals.po` carries the PO grid's cost.
+      const hasPurchase = !isNoSupp && supplier.name.trim() && totals.po.total > 0;
       setError(''); setSaving(true);
       createInb.mutate({
         fromBranch: brCode, toBranch, date, module: moduleCode,
         packageType: hasPackage ? packageType : '', passenger: pax, reference: saleTallyRef || headerRef,
         fareLines, serviceFee,
+        noSupplier: isNoSupp,
+        supplier: hasPurchase ? { name: supplier.name, ledgerName: supplier.ledgerName || supplier.name, ledgerGroup: supplier.ledgerGroup, country: countryOfSupplier(supplier.name), foreign: suppForeign } : null,
+        purchase: hasPurchase ? { heads: totals.po.heads || [], gst: totals.po.gst || 0, incentiveAmt: totals.po.incentiveAmt || 0, incentiveTds: totals.po.incentiveTds || 0, gstMode: purGstMode } : null,
       }, {
         onSuccess: (res) => { setResult({ bookingNo: res?.inbLinkNo || '', _approved: false, _inb: true }); toast(`Inter-branch sale posted · ${res?.inbLinkNo || ''}`); qc.invalidateQueries({ queryKey: ['inb'] }); },
         onError: (e) => { setError(e.message || 'Failed to post'); toast(`Could not post — ${e.message || 'failed'}`, 'error'); },
@@ -430,14 +454,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         module: moduleCode, branch: brCode, date, travelDate, noSupplier: isNoSupp, noVat: effNoVat,
         customer: { name: customer.name, gstin: customer.gstin, address: customer.address, email: customer.email, contact: customer.contact, group: customer.group, ledgerName: customer.ledgerName || customer.name, ledgerGroup: customer.ledgerGroup || customer.group },
         supplier: isNoSupp ? { name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }
-          : { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup },
+          : { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup, country: countryOfSupplier(supplier.name) },
         gstMode: saleGstMode, packageType: hasPackage ? packageType : '',
         headerRef, rows: lines.map((l) => syncLineRefs(spec, l)),
         po: { ...totals.po, gstMode: purGstMode }, so: { ...totals.so, gstMode: saleGstMode },
         gp: { lines: gpLines, total: totals.gp.total, pct: totals.gp.pct },
         remarks, saleTallyRef, purTallyRef,
         // N-PO: additional purchase legs (empty unless Flight+Misc / Holiday components).
-        purchases: (isNoSupp ? [] : extraPOs).filter((leg) => num(leg.line.base) > 0 || num(leg.line.psvc) > 0).map((leg) => legToPayload(leg, brCode, effNoVat)),
+        purchases: (isNoSupp ? [] : extraPOs).filter((leg) => num(leg.line.base) > 0 || num(leg.line.psvc) > 0).map((leg) => legToPayload(leg, brCode, effNoVat, isForeignSupplier(leg.supplier.name))),
       };
       const booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, payload)
@@ -609,11 +633,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       <div style={{ ...card, border: '1px solid #dfe2e7', borderLeft: '4px solid ' + GOLD, borderRadius: 4, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
         <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : 'SO / PO / GP VOUCHER'}</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : (interBranch ? 'INTER-BRANCH (INB) VOUCHER' : 'SO / PO / GP VOUCHER')}</p>
             <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#8A8A84' }}>
               {editing
                 ? <>Fix any data-entry mistake — or switch the <b style={{ color: GOLD }}>module</b> if it was booked wrong — then <b style={{ color: GOLD }}>Save changes</b> · {brCode} · returns to Pending; approve it from the Pending queue</>
-                : <>Enter cost + Service Charge - 2 → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
+                : interBranch
+                  ? <>Sell to another branch (Inter-Branch Sale) + book the supplier purchase — both under one <b style={{ color: GOLD }}>INB Link No</b> · {brCode || 'select a branch'} · saves as <b style={{ color: GOLD }}>Pending</b></>
+                  : <>Enter cost + Service Charge - 2 → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -629,11 +655,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         </div>
         {/* Link band */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: '#1f1f1f' }}>
-          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: GOLD, textTransform: 'uppercase' }}>Link No</span>
-          <span style={{ padding: '5px 12px', borderRadius: 4, background: GOLD_SOFT, color: GOLD_DEEP, fontWeight: 800, letterSpacing: '.5px', fontFamily: 'monospace', fontSize: 13 }}>{editing ? (editBooking.linkNo || '—') : `${nextLinkNo} · on save`}</span>
-          <span style={{ fontSize: 10.5, color: '#9197a3', fontStyle: 'italic' }}>links the Sales Order, Purchase Order &amp; Gross Profit of this invoice</span>
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: GOLD, textTransform: 'uppercase' }}>{interBranch ? 'INB Link No' : 'Link No'}</span>
+          <span style={{ padding: '5px 12px', borderRadius: 4, background: GOLD_SOFT, color: GOLD_DEEP, fontWeight: 800, letterSpacing: '.5px', fontFamily: 'monospace', fontSize: 13 }}>{editing ? (editBooking.linkNo || '—') : (interBranch ? 'INB Link · on save' : `${nextLinkNo} · on save`)}</span>
+          <span style={{ fontSize: 10.5, color: '#9197a3', fontStyle: 'italic' }}>{interBranch ? 'links the Inter-Branch Sale & Supplier Purchase of this voucher' : 'links the Sales Order, Purchase Order & Gross Profit of this invoice'}</span>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            {['SO', 'PO', 'GP'].map((c) => <span key={c} style={{ fontSize: 9, fontWeight: 800, padding: '3px 9px', borderRadius: 20, background: GOLD_SOFT, color: GOLD_DEEP }}>{c}</span>)}
+            {(interBranch ? ['INB', 'SO', 'PO', 'GP'] : ['SO', 'PO', 'GP']).map((c) => <span key={c} style={{ fontSize: 9, fontWeight: 800, padding: '3px 9px', borderRadius: 20, background: c === 'INB' ? GOLD : GOLD_SOFT, color: c === 'INB' ? '#fff' : GOLD_DEEP }}>{c}</span>)}
           </span>
         </div>
       </div>
@@ -761,7 +787,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           {/* VAT has no intra/inter (place-of-supply) split — these CGST/SGST vs IGST
               selectors are India-only and are hidden on Africa/VAT branches. */}
           {!isVatBr && <FL label="Sale GST mode"><select value={saleGstMode} onChange={(e) => setSaleGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>}
-          {!isNoSupp && !interBranch && <FL label="Supplier ledger (Pay to) *">
+          {!isNoSupp && <FL label={interBranch ? 'Supplier ledger (airline / cost) *' : 'Supplier ledger (Pay to) *'}>
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
               onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
           </FL>}
@@ -790,7 +816,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign });
                 return (
                   <React.Fragment key={i}>
                   <tr>
@@ -832,7 +858,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {/* ② Purchase Order — hidden in no-supplier mode (there's no cost leg). */}
       {!isNoSupp && (
-      <Section n="2" badge="PO" name="Purchase Order" sub="what you pay the airline / supplier · supplier incentive is automatically subtracted, 2% TDS is added" accent={PO_BAR}>
+      <Section n="2" badge="PO" name="Purchase Order" sub={`what you pay the airline / supplier · supplier incentive is automatically subtracted${suppForeign ? ' · foreign supplier — no Indian TDS' : ', 2% TDS is added'}`} accent={PO_BAR}>
         {!editing && (openInbQ.data || []).length > 0 && (
           <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: CR }}>Fetch open INB:</span>
@@ -861,7 +887,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign });
                 return (
                   <React.Fragment key={i}>
                   <tr className="transition hover:bg-[#fdf7f9]">
@@ -900,7 +926,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {/* N-PO: additional purchase legs (Flight +Misc / Holiday components) */}
       {!isNoSupp && ALLOWED_LEG_MODULES[moduleCode] && (
-        <ExtraPurchases parentModule={moduleCode} branch={branch} brCode={brCode} noVat={effNoVat} legs={extraPOs} onChange={setExtraPOs} />
+        <ExtraPurchases parentModule={moduleCode} branch={branch} brCode={brCode} noVat={effNoVat} legs={extraPOs} onChange={setExtraPOs} isForeign={isForeignSupplier} />
       )}
 
       {/* ③ Gross Profit */}
@@ -925,7 +951,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign });
                 return (
                   <tr key={i}>
                     <td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.fn || '—'}</td><td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.sn || ''}</td>
