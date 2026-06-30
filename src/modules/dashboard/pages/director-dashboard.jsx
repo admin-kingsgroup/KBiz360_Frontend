@@ -214,7 +214,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
       {/* ── Group-only: branch performance scoreboard ── */}
       {isGroup && (
         <div className="mb-3.5">
-          <WidgetCard title="Branch Performance Scoreboard" subtitle="Best → worst by Net Profit · contribution to group sales" onDrill={() => navigate('/dashboards/branch')}>
+          <WidgetCard title="Branch Performance Scoreboard" subtitle="Best → worst by Net Profit · contribution to group sales" color="#185FA5" onDrill={() => navigate('/dashboards/branch')}>
             <Scroll>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead><tr><th scope="col" style={th}>#</th><th scope="col" style={th}>Branch</th><th scope="col" style={{ ...th, ...num }}>Sales</th><th scope="col" style={{ ...th, ...num }}>GP</th><th scope="col" style={{ ...th, ...num }}>GP %</th><th scope="col" style={{ ...th, ...num }}>Net</th><th scope="col" style={{ ...th, ...num }}>Contrib.</th></tr></thead>
@@ -240,10 +240,10 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
 
       {/* ── Trend + Targets ── */}
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 desktop:grid-cols-[2fr_1fr]">
-        <WidgetCard title="Revenue Trend — 12 Months" subtitle={compare ? 'Current Year vs Last Year' : 'Current Year only'} onPin={() => togglePin('rev')} pinned={pinned.rev} onDrill={() => navigate('/reports/pnl')}>
+        <WidgetCard title="Revenue Trend — 12 Months" subtitle={compare ? 'Current Year vs Last Year' : 'Current Year only'} color="#c2a04a" onPin={() => togglePin('rev')} pinned={pinned.rev} onDrill={() => navigate('/reports/pnl')}>
           <RevenueTrendChart data={revenueTrend} compareLastYear={compare} onToggleCompare={setCompare} formatMoney={m0} />
         </WidgetCard>
-        <WidgetCard title={`FY ${CUR_FY.label} Targets vs Actual`} onPin={() => togglePin('targets')} pinned={pinned.targets} onDrill={() => navigate('/dashboards/sales-target')}>
+        <WidgetCard title={`FY ${CUR_FY.label} Targets vs Actual`} color="#c2a04a" onPin={() => togglePin('targets')} pinned={pinned.targets} onDrill={() => navigate('/dashboards/sales-target')}>
           {liveTargets.length
             ? <FyTargetsPanel targets={liveTargets} />
             : <div className="px-0.5 py-1 text-xs text-ink-muted">No targets set. Add them in <b>Finance ▸ Sales Targets</b>.</div>}
@@ -252,7 +252,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
 
       {/* ── GP by Module + Consultant leaderboard (team performance) ── */}
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
-        <WidgetCard title="Gross Profit by Module" subtitle="Which products earn" onDrill={() => navigate('/dashboards/module-gp')}>
+        <WidgetCard title="Gross Profit by Module" subtitle="Which products earn" color="#16a34a" onDrill={() => navigate('/dashboards/module-gp')}>
           <Scroll>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th scope="col" style={th}>Module</th><th scope="col" style={{ ...th, ...num }}>Sales</th><th scope="col" style={{ ...th, ...num }}>GP</th><th scope="col" style={{ ...th, ...num }}>GP %</th></tr></thead>
@@ -263,14 +263,14 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
             </table>
           </Scroll>
         </WidgetCard>
-        <WidgetCard title="Consultant Leaderboard" subtitle={isGroup ? 'Top earners · all branches' : `Top earners · ${effScope}`} onDrill={() => navigate('/reports/gp')}>
+        <WidgetCard title="Consultant Leaderboard" subtitle={isGroup ? 'Top earners · all branches' : `Top earners · ${effScope}`} color="#185FA5" onDrill={() => navigate('/reports/gp')}>
           <ConsultantLeaderboard consultants={topConsultants} formatMoney={m0} onViewAll={() => navigate('/reports/gp')} />
         </WidgetCard>
       </div>
 
       {/* ── AR/AP Ageing (collections) + Top customers ── */}
       <div className="grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
-        <WidgetCard title="Receivables / Payables Ageing" subtitle="As of today" onDrill={() => navigate('/dashboards/arap')}>
+        <WidgetCard title="Receivables / Payables Ageing" subtitle="As of today" color="#dc2626" onDrill={() => navigate('/dashboards/arap')}>
           <Scroll>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th scope="col" style={th}></th><th scope="col" style={{ ...th, ...num }}>0–30</th><th scope="col" style={{ ...th, ...num }}>30–60</th><th scope="col" style={{ ...th, ...num }}>60–90</th><th scope="col" style={{ ...th, ...num }}>90+</th><th scope="col" style={{ ...th, ...num }}>Total</th></tr></thead>
@@ -282,7 +282,7 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch }) {
             </table>
           </Scroll>
         </WidgetCard>
-        <WidgetCard title="Top 10 Customers" onPin={() => togglePin('topcust')} pinned={pinned.topcust} onDrill={() => navigate('/masters/customers')}>
+        <WidgetCard title="Top 10 Customers" color="#185FA5" onPin={() => togglePin('topcust')} pinned={pinned.topcust} onDrill={() => navigate('/masters/customers')}>
           <TopEntitiesTable rows={topCustomers} kind="customer" formatMoney={m0} />
         </WidgetCard>
       </div>

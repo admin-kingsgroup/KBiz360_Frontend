@@ -234,10 +234,10 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch }) {
 
       {/* ── Trend + Targets ── */}
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 desktop:grid-cols-[2fr_1fr]">
-        <WidgetCard title="Revenue Trend — 12 Months" subtitle={compare ? 'Current Year vs Last Year' : 'Current Year only'} onPin={() => togglePin('rev')} pinned={pinned.rev} onDrill={() => navigate('/reports/pnl')}>
+        <WidgetCard title="Revenue Trend — 12 Months" subtitle={compare ? 'Current Year vs Last Year' : 'Current Year only'} color="#c2a04a" onPin={() => togglePin('rev')} pinned={pinned.rev} onDrill={() => navigate('/reports/pnl')}>
           <RevenueTrendChart data={revenueTrend} compareLastYear={compare} onToggleCompare={setCompare} formatMoney={m0} />
         </WidgetCard>
-        <WidgetCard title={`FY ${CUR_FY.label} Targets vs Actual`} onPin={() => togglePin('targets')} pinned={pinned.targets} onDrill={() => navigate('/dashboards/sales-target')}>
+        <WidgetCard title={`FY ${CUR_FY.label} Targets vs Actual`} color="#c2a04a" onPin={() => togglePin('targets')} pinned={pinned.targets} onDrill={() => navigate('/dashboards/sales-target')}>
           {liveTargets.length
             ? <FyTargetsPanel targets={liveTargets} />
             : <div className="px-0.5 py-1 text-xs text-ink-muted">No targets set. Add them in <b>Finance ▸ Sales Targets</b>.</div>}
@@ -246,7 +246,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch }) {
 
       {/* ── GP by Module + Balance Sheet ── */}
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
-        <WidgetCard title="Gross Profit by Module" subtitle="Which products earn" onDrill={() => navigate('/dashboards/module-gp')}>
+        <WidgetCard title="Gross Profit by Module" subtitle="Which products earn" color="#16a34a" onDrill={() => navigate('/dashboards/module-gp')}>
           <Scroll>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th scope="col" style={th}>Module</th><th scope="col" style={{ ...th, ...num }}>Sales</th><th scope="col" style={{ ...th, ...num }}>GP</th><th scope="col" style={{ ...th, ...num }}>GP %</th></tr></thead>
@@ -257,7 +257,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch }) {
             </table>
           </Scroll>
         </WidgetCard>
-        <WidgetCard title="Balance Sheet — Position" subtitle={`As on ${dates.to || 'today'}`} onDrill={() => navigate('/dashboards/balance-sheet')}>
+        <WidgetCard title="Balance Sheet — Position" subtitle={`As on ${dates.to || 'today'}`} color="#185FA5" onDrill={() => navigate('/dashboards/balance-sheet')}>
           <Scroll>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
@@ -273,7 +273,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch }) {
 
       {/* ── AR/AP Ageing + Cash & Bank ── */}
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
-        <WidgetCard title="Receivables / Payables Ageing" subtitle="As of today" onDrill={() => navigate('/dashboards/arap')}>
+        <WidgetCard title="Receivables / Payables Ageing" subtitle="As of today" color="#dc2626" onDrill={() => navigate('/dashboards/arap')}>
           <Scroll>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th scope="col" style={th}></th><th scope="col" style={{ ...th, ...num }}>0–30</th><th scope="col" style={{ ...th, ...num }}>30–60</th><th scope="col" style={{ ...th, ...num }}>60–90</th><th scope="col" style={{ ...th, ...num }}>90+</th><th scope="col" style={{ ...th, ...num }}>Total</th></tr></thead>
@@ -285,7 +285,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch }) {
             </table>
           </Scroll>
         </WidgetCard>
-        <WidgetCard title="Cash & Bank" subtitle="Live balances" onDrill={() => navigate('/dashboards/cash')}>
+        <WidgetCard title="Cash & Bank" subtitle="Live balances" color="#16a34a" onDrill={() => navigate('/dashboards/cash')}>
           <Scroll>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
@@ -299,7 +299,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch }) {
 
       {/* ── Branch performance ── */}
       <div className="mb-3.5">
-        <WidgetCard title="Branch Performance" subtitle={`Sales · GP · Net Profit · ${rangeShort}`} onPin={() => togglePin('heat')} pinned={pinned.heat} onDrill={() => navigate('/dashboards/branch')}>
+        <WidgetCard title="Branch Performance" subtitle={`Sales · GP · Net Profit · ${rangeShort}`} color="#185FA5" onPin={() => togglePin('heat')} pinned={pinned.heat} onDrill={() => navigate('/dashboards/branch')}>
           <Scroll>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th scope="col" style={th}>Branch</th><th scope="col" style={{ ...th, ...num }}>Sales</th><th scope="col" style={{ ...th, ...num }}>GP</th><th scope="col" style={{ ...th, ...num }}>GP %</th><th scope="col" style={{ ...th, ...num }}>Net</th></tr></thead>
@@ -313,10 +313,10 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch }) {
 
       {/* ── Top customers / suppliers ── */}
       <div className="grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
-        <WidgetCard title="Top 10 Customers" onPin={() => togglePin('topcust')} pinned={pinned.topcust} onDrill={() => navigate('/masters/customers')}>
+        <WidgetCard title="Top 10 Customers" color="#185FA5" onPin={() => togglePin('topcust')} pinned={pinned.topcust} onDrill={() => navigate('/masters/customers')}>
           <TopEntitiesTable rows={topCustomers} kind="customer" formatMoney={m0} />
         </WidgetCard>
-        <WidgetCard title="Top 10 Suppliers" onPin={() => togglePin('topsup')} pinned={pinned.topsup} onDrill={() => navigate('/masters/suppliers')}>
+        <WidgetCard title="Top 10 Suppliers" color="#d97706" onPin={() => togglePin('topsup')} pinned={pinned.topsup} onDrill={() => navigate('/masters/suppliers')}>
           <TopEntitiesTable rows={topSuppliers} kind="supplier" valueKey="spend" countKey="vouchers" formatMoney={m0} />
         </WidgetCard>
       </div>

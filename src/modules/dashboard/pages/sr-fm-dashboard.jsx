@@ -60,31 +60,31 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
       </ResponsiveGrid>
 
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 desktop:grid-cols-[2fr_1fr]">
-        <WidgetCard title="13-Week Cash Forecast" subtitle="Projected inflows / outflows / closing balance" onDrill={() => navigate('/reports/cashflow-forecast')}>
+        <WidgetCard title="13-Week Cash Forecast" subtitle="Projected inflows / outflows / closing balance" color="#16a34a" onDrill={() => navigate('/reports/cashflow-forecast')}>
           <CashForecastChart data={cashForecast} formatMoney={money} />
         </WidgetCard>
-        <WidgetCard title="Bank Balances — Real Time" onDrill={() => navigate('/masters/bank-accounts')}>
+        <WidgetCard title="Bank Balances — Real Time" color="#16a34a" onDrill={() => navigate('/masters/bank-accounts')}>
           <BankBalancesPanel accounts={bankAccounts} />
         </WidgetCard>
       </div>
 
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
-        <WidgetCard title="Period Close Progress" subtitle={`Branch-by-branch ${CUR_MONTH_LABEL} close status`}>
+        <WidgetCard title="Period Close Progress" subtitle={`Branch-by-branch ${CUR_MONTH_LABEL} close status`} color="#185FA5">
           <PeriodCloseTable rows={periodClose} />
         </WidgetCard>
-        <WidgetCard title="GSTR Filing Status" subtitle="Return for the just-closed month — net liability & due date" onDrill={() => navigate('/tax/gstr-1')}>
+        <WidgetCard title="GSTR Filing Status" subtitle="Return for the just-closed month — net liability & due date" color="#d97706" onDrill={() => navigate('/tax/gstr-1')}>
           <GstrFilingPanel rows={gstrFiling} formatMoney={money} />
         </WidgetCard>
       </div>
 
       <div className="grid grid-cols-1 gap-3.5 tablet:grid-cols-2 desktop:grid-cols-3">
-        <WidgetCard title="Receivables Ageing" onDrill={() => navigate('/reports/rec')}>
+        <WidgetCard title="Receivables Ageing" color="#dc2626" onDrill={() => navigate('/reports/rec')}>
           <AgeingBuckets buckets={arAgeing} kind="receivable" formatMoney={money} />
         </WidgetCard>
-        <WidgetCard title="Payables Ageing" onDrill={() => navigate('/reports/pay')}>
+        <WidgetCard title="Payables Ageing" color="#dc2626" onDrill={() => navigate('/reports/pay')}>
           <AgeingBuckets buckets={apAgeing} kind="payable" formatMoney={money} />
         </WidgetCard>
-        <WidgetCard title="Recent Variance Flags" subtitle={varianceFlags.length + ' items'} onDrill={() => navigate('/reports/variance')}>
+        <WidgetCard title="Recent Variance Flags" subtitle={varianceFlags.length + ' items'} color="#d97706" onDrill={() => navigate('/reports/variance')}>
           <VarianceFlagsPanel flags={varianceFlags} currency={bc(branch).cur} />
         </WidgetCard>
       </div>
