@@ -95,6 +95,13 @@ export const LEDGER_CSS = `
 .kbled .alloc .alabel{font-size:9px;font-weight:800;letter-spacing:.3px;color:var(--dr);text-transform:uppercase}
 .kbled .alloc .achip{font-size:9.5px;font-weight:600;color:var(--ink2);background:#eaf5ef;border:1px solid #c8e6d5;border-radius:4px;padding:1px 6px;font-variant-numeric:tabular-nums}
 .kbled .alloc .achip b{color:var(--dr);font-weight:800;margin-left:3px}
+.kbled .alloc .achip .cdt{color:var(--ink4);font-weight:500;font-size:8.5px}
+.kbled .alloc .achip.pend{background:#fff6e6;border-color:#ecd9a8}
+.kbled .alloc .achip.pend b{color:var(--amber)}
+.kbled .lpill{display:inline-block;font-size:8px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;padding:1px 6px;border-radius:9px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+.kbled .lpill.paid{background:#eaf5ef;color:var(--dr);border:1px solid #c8e6d5}
+.kbled .lpill.part{background:#fbf0db;color:var(--amber);border:1px solid #ecd9a8}
+.kbled .lpill.open{background:#f3f4f8;color:var(--ink4);border:1px solid #dfe2e7}
 /* Shift+Enter settlement drill — caret, cursor row, inline themed breakup */
 .kbled .caret{display:inline-block;width:15px;color:var(--gold);font-weight:800;cursor:pointer;user-select:none}
 .kbled .caret.ghost{cursor:default;color:transparent}
@@ -374,6 +381,17 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
     const explodable = (/sale|purchase/i.test(cat) && !!side) || (SETTLE_RX.test(cat) && r.alloc && r.alloc.length > 0);
     const k = keyOf(r, idx);
     const isOpen = explodable && open.has(k);
+    // Settlement status pill (in the Particulars cell): a party-ledger bill line carries
+    // settled/pending (r.pending != null); a receipt/payment carries the bills it cleared
+    // (r.alloc). The detailed "Settled against …" chips show only on Show Narration.
+    const billInfo = r.pending != null;
+    const settleInfo = r.alloc && r.alloc.length > 0;
+    let pillTxt = '', pillCls = '';
+    if (billInfo) {
+      if (r.pending <= 0.01 && (r.settled || 0) > 0) { pillTxt = 'Settled'; pillCls = 'paid'; }
+      else if ((r.settled || 0) > 0) { pillTxt = `Part · ${fmt(r.settled)}`; pillCls = 'part'; }
+      else { pillTxt = 'Open'; pillCls = 'open'; }
+    } else if (settleInfo) { pillTxt = 'Settled'; pillCls = 'paid'; }
     const nodes = [
       <tr key={key} data-lrow={idx} className={'lrow' + (idx === cursor ? ' sel' : '')}>
         <td className="l dt">{r.date}</td>
@@ -382,6 +400,20 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
             ? <span className="caret" role="button" aria-label="Settlement drill" onClick={(e) => { e.stopPropagation(); setCursor(idx); toggle(k); if (wrapRef.current) wrapRef.current.focus(); }} title="Settlement drill — Shift+Enter">{isOpen ? '▾' : '▸'}</span>
             : <span className="caret ghost" />}
           <span className="by">{r.toBy}</span>{r.part}
+          {showNarr && pillTxt && <span className={'lpill ' + pillCls} title="Settlement status">{pillTxt}</span>}
+          {showNarr && billInfo && r.settledBy.length > 0 && (
+            <div className="alloc" title="Payments that settled this bill">
+              <span className="alabel">Settled against:</span>{' '}
+              {r.settledBy.map((s, j) => <span key={j} className="achip">{s.ref} <b>{fmt(s.amt)}</b>{s.date ? <span className="cdt"> · {dmy(s.date)}</span> : null}</span>)}
+              {r.pending > 0.01 && <span className="achip pend">Pending <b>{fmt(r.pending)}</b></span>}
+            </div>
+          )}
+          {showNarr && !billInfo && settleInfo && (
+            <div className="alloc" title="Bills settled by this entry">
+              <span className="alabel">Settled against:</span>{' '}
+              {r.alloc.map((a, j) => <span key={j} className="achip">{a.ref} <b>{fmt(a.amt)}</b></span>)}
+            </div>
+          )}
           {showNarr && r.narr && <div className="narr">{r.narr}</div>}
           {showDetail && r.detail.length > 0 && (
             <div className="detail">{r.detail.map((dd, j) => (
@@ -706,11 +738,23 @@ function ledgerPrintHTML({ m, showNarr, showDetail, cur = '₹' }) {
     const detail = (showDetail && r.detail.length)
       ? `<div class="detail">${r.detail.map((dd) => `<div class="dl"><span class="dnm">${esc(dd.side)} <b>${esc(dd.n)}</b></span><span class="damt">${fmt(dd.amt)}</span></div>`).join('')}</div>` : '';
     const narr = (showNarr && r.narr) ? `<div class="narr">${esc(r.narr)}</div>` : '';
-    const alloc = (r.alloc && r.alloc.length)
-      ? `<div class="alloc"><span class="alabel">Settled against:</span> ${r.alloc.map((a) => `<span class="achip">${esc(a.ref)} <b>${fmt(a.amt)}</b></span>`).join(' ')}</div>` : '';
+    const billInfo = r.pending != null;
+    const settleInfo = r.alloc && r.alloc.length;
+    let pillTxt = '', pillCls = '';
+    if (billInfo) {
+      if (r.pending <= 0.01 && (r.settled || 0) > 0) { pillTxt = 'Settled'; pillCls = 'paid'; }
+      else if ((r.settled || 0) > 0) { pillTxt = `Part · ${fmt(r.settled)}`; pillCls = 'part'; }
+      else { pillTxt = 'Open'; pillCls = 'open'; }
+    } else if (settleInfo) { pillTxt = 'Settled'; pillCls = 'paid'; }
+    const pill = (showNarr && pillTxt) ? `<span class="lpill ${pillCls}">${esc(pillTxt)}</span>` : '';
+    const chips = (showNarr && billInfo && r.settledBy.length)
+      ? `<div class="alloc"><span class="alabel">Settled against:</span> ${r.settledBy.map((s) => `<span class="achip">${esc(s.ref)} <b>${fmt(s.amt)}</b>${s.date ? `<span class="cdt"> · ${esc(dmy(s.date))}</span>` : ''}</span>`).join(' ')}${r.pending > 0.01 ? `<span class="achip pend">Pending <b>${fmt(r.pending)}</b></span>` : ''}</div>`
+      : (showNarr && settleInfo)
+        ? `<div class="alloc"><span class="alabel">Settled against:</span> ${r.alloc.map((a) => `<span class="achip">${esc(a.ref)} <b>${fmt(a.amt)}</b></span>`).join(' ')}</div>`
+        : '';
     return `<tr>
       <td class="l dt">${esc(r.date)}</td>
-      <td class="l part"><span class="by">${esc(r.toBy)}</span>${esc(r.part)}${alloc}${narr}${detail}</td>
+      <td class="l part"><span class="by">${esc(r.toBy)}</span>${esc(r.part)}${pill}${chips}${narr}${detail}</td>
       <td class="l"><span class="vt">${esc(r.vt)}</span></td>
       <td class="l vno">${esc(r.vno)}</td>
       <td class="num drc">${fmt(r.dr)}</td>

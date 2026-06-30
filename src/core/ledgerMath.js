@@ -42,6 +42,11 @@ export function mapLedger(d) {
       detail: (e.particulars || []).map((p) => ({ n: p.ledger, side: p.side, amt: p.amount })),
       // Bill-wise settlement (which bills this receipt/payment/note knocked off).
       alloc: (e.allocations || []).map((a) => ({ ref: a.billVno, amt: a.amount })),
+      // Reverse view (party-ledger bill lines): which settlements knocked THIS bill off,
+      // plus its settled / pending split (drives the Settled/Part/Open pill).
+      settledBy: (e.settledBy || []).map((x) => ({ ref: x.vno, amt: x.amount, date: x.date, cat: x.category })),
+      settled: e.settled != null ? e.settled : null,
+      pending: e.pending != null ? e.pending : null,
       balance: e.balance, balanceSide: e.balanceSide,
     })),
     totalDebit: d.totalDebit || 0, totalCredit: d.totalCredit || 0,

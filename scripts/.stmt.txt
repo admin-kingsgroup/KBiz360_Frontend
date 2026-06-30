@@ -1,0 +1,148 @@
+<div class="st">
+<div class="sheet">
+<div class="title">SO / PO / GP WORKING</div>
+<div class="title-rule">
+</div>
+<div class="meta">
+<div class="m">Booking <b>BKG/BOM/26/0285</b>
+</div>
+<div class="m">Link No <b style="color:#A07828">LK/BOM/00596</b>
+</div>
+<div class="m">Module <b>SF</b>
+</div>
+<div class="m">Date <b>2026-02-14</b>
+</div>
+<div class="m">GST Mode <b>intra</b>
+</div>
+<div class="m">Customer <b>Inaysha Creations FZE</b>
+</div>
+<div class="m">Supplier <b>TRIP JACK Private Limited [Ticketing]</b>
+</div>
+<div class="m">SO Vno <b>BOM/0626/SF00709</b>
+</div>
+<div class="m">PO Vno <b>BOM/0626/PF00709</b>
+</div>
+</div>
+<div class="blackrule">
+</div>
+<div class="sec">Sales Order (SO) — what the client is billed</div>
+<table>
+<thead>
+<tr>
+<th class="l">Passenger</th>
+<th>Base Fare</th>
+<th>K3</th>
+<th>Taxes</th>
+<th>SVC2 (margin)</th>
+<th>SVF (svc fee)</th>
+<th>GST</th>
+<th>Line Total</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="l">Global Konnection</td>
+<td>15,554.00</td>
+<td>0.00</td>
+<td>3,255.00</td>
+<td>25.00</td>
+<td>267.80</td>
+<td>52.01</td>
+<td class="tf">19,150.00</td>
+</tr>
+</tbody>
+</table>
+<div class="tt">
+<div class="sumtbl">
+<div class="r ">
+<span class="k">Line Total</span>
+<span class="v">₹19,097.99</span>
+</div>
+<div class="r ">
+<span class="k">Service Fee (SVF)</span>
+<span class="v">₹267.80</span>
+</div>
+<div class="r ">
+<span class="k">GST (SVF)</span>
+<span class="v">₹48.20</span>
+</div>
+<div class="r dim">
+<span class="k">GST on SVC2 margin (folded)</span>
+<span class="v">₹3.81</span>
+</div>
+<div class="r" style="border-bottom:none;background:#111;color:#fff;padding:10px 12px;margin-top:4px">
+<span class="k" style="color:#fff;font-weight:700">SO TOTAL</span>
+<span class="v" style="color:#C49A3C;font-size:15px">₹19,150.00</span>
+</div>
+</div>
+</div>
+<div class="sec">Purchase Order (PO) — what we pay the supplier</div>
+<table>
+<thead>
+<tr>
+<th class="l">Passenger</th>
+<th>Base Fare</th>
+<th>K3</th>
+<th>Taxes</th>
+<th>Supp Svc Chg</th>
+<th>Incentive</th>
+<th>TDS</th>
+<th>GST</th>
+<th>Line Total</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="l">Global Konnection</td>
+<td>15,554.00</td>
+<td>0.00</td>
+<td>3,255.00</td>
+<td>21.19</td>
+<td>0.00</td>
+<td>0.00</td>
+<td>3.81</td>
+<td class="tf">18,834.00</td>
+</tr>
+</tbody>
+</table>
+<div class="tt">
+<div class="sumtbl">
+<div class="r ">
+<span class="k">Line Total</span>
+<span class="v">₹18,830.19</span>
+</div>
+<div class="r ">
+<span class="k">Supplier Service Charge</span>
+<span class="v">₹21.19</span>
+</div>
+<div class="r ">
+<span class="k">GST</span>
+<span class="v">₹3.81</span>
+</div>
+<div class="r" style="border-bottom:none;background:#111;color:#fff;padding:10px 12px;margin-top:4px">
+<span class="k" style="color:#fff;font-weight:700">PO TOTAL</span>
+<span class="v" style="color:#C49A3C;font-size:15px">₹18,834.00</span>
+</div>
+</div>
+</div>
+<div class="sec">Gross Profit (GP)</div>
+<div class="gpcard">
+<div class="box">
+<div class="lab">Sale (SO Total)</div>
+<div class="val">₹19,150.00</div>
+</div>
+<div class="box">
+<div class="lab">Cost (PO Total)</div>
+<div class="val">₹18,834.00</div>
+</div>
+<div class="box net">
+<div class="lab">Gross Profit</div>
+<div class="val">₹267.80</div>
+</div>
+<div class="box net">
+<div class="lab">GP %</div>
+<div class="val">1.40%</div>
+</div>
+</div>
+</div>
+</div>
