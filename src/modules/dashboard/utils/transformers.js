@@ -158,15 +158,21 @@ export const sumVoucherTotals = (vouchersByBranch, key) =>
 // Pure transforms for the LIVE voucher-activity feeds (get-voucher-activity.js).
 // Kept here (no I/O) so they are unit-testable without the Vite-only api client.
 
-// Tally today's receipt/payment/journal voucher counts per branch.
-// Shape: { [branch]: { receipt, payment, journal } } — only cash-book categories.
+// Tally today's receipt/payment/journal vouchers per branch — counts AND money.
+// Shape: { [branch]: { receipt, payment, journal, total, value } } where `total` is the
+// voucher COUNT (receipt+payment+journal) and `value` is the summed money throughput
+// (Σ voucher.total). The total/value were previously missing, so callers reading them
+// (sumVoucherTotals('total'|'value') → "Posted Today" KPI; the "Total Value" column)
+// got NaN / ₹0 even when vouchers existed.
 export const tallyVouchersByBranch = (vouchers = []) => {
   const out = {};
   for (const v of vouchers || []) {
     if (!v || !['receipt', 'payment', 'journal'].includes(v.category)) continue;
     const br = v.branch || '—';
-    const row = out[br] || (out[br] = { receipt: 0, payment: 0, journal: 0 });
+    const row = out[br] || (out[br] = { receipt: 0, payment: 0, journal: 0, total: 0, value: 0 });
     row[v.category] += 1;
+    row.total += 1;
+    row.value += Number(v.total) || 0;
   }
   return out;
 };
