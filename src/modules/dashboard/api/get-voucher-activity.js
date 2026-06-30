@@ -27,3 +27,17 @@ export const getRecentActivity = async (branchCode) => {
     return vouchersToActivity(vouchers);
   } catch { return []; }
 };
+
+// This-week throughput (last 7 days) for the Accounts-Executive KPIs: receipt voucher
+// COUNT + summed VALUE, branch-scoped. Live from /api/vouchers; { receipts: 0, value: 0 }
+// on error so the KPI never shows NaN/undefined.
+export const getWeekVoucherStats = async (branchCode) => {
+  try {
+    const vouchers = (await apiGet('/api/vouchers', { from: daysAgoISO(7), to: todayISO(), branch: branchCode })) || [];
+    let receipts = 0, value = 0;
+    for (const v of vouchers) {
+      if (v && v.category === 'receipt') { receipts += 1; value += Number(v.total) || 0; }
+    }
+    return { receipts, value };
+  } catch { return { receipts: 0, value: 0 }; }
+};

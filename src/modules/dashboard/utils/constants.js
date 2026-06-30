@@ -42,11 +42,14 @@ export const QUICK_CREATE_ACTIONS = [
   { label: '📒 Journal',      route: '/journal',       color: '#5b616e' },
 ];
 
+// Quick "post" shortcuts for the maker (Accts-Exec) dashboard. Sale/Purchase post via the
+// SO/PO/GP booking entry now (per-module /sales/* and /purchase/* are RETIRED → read-only
+// registers), so these point at /bookings/new — clicking actually opens a posting form.
 export const POST_SHORTCUTS = [
-  { label: 'Receipt',   icon: '⬇',  route: '/receipts',       color: '#16a34a' },
-  { label: 'Payment',   icon: '⬆',  route: '/payments',       color: '#dc2626' },
-  { label: 'Sale Inv.', icon: '📄', route: '/sales/flight',   color: '#1a1c22' },
-  { label: 'Purchase',  icon: '📥', route: '/purchase/flight',color: '#6B4C8B' },
+  { label: 'Receipt',     icon: '⬇',  route: '/receipts',     color: '#16a34a' },
+  { label: 'Payment',     icon: '⬆',  route: '/payments',     color: '#dc2626' },
+  { label: 'New Booking', icon: '📄', route: '/bookings/new', color: '#1a1c22' },
+  { label: 'Purchase',    icon: '📥', route: '/bookings/new', color: '#6B4C8B' },
 ];
 
 export const MONTH_CLOSE_CHECKLIST = [
