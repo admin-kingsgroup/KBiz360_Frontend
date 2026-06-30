@@ -10,6 +10,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Pencil, Trash2, Download, Printer } from 'lucide-react';
 import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../core/data';
+import {
+  SUPPLIER_CATS, GST_TREATMENTS, COUNTRIES, STATE_NAMES, MSME_STATUS, TDS_SECTIONS,
+  PAY_TERMS, SETTLE_CYCLES, PAY_METHODS, CUST_TYPES, CUST_SOURCES,
+} from '../core/partyEnums';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
 import { SourceBadge } from '../core/LedgerLabel';
 import { branchCode } from '../core/useAccounting';
@@ -46,8 +50,11 @@ function FieldInput({ field, value, onChange, form }) {
   }
   if (field.type === 'select') {
     // options may be a static array or a fn(form) → array (e.g. Sub-Group depends
-    // on the chosen Group). An empty list renders just the placeholder.
-    const options = typeof field.options === 'function' ? (field.options(form) || []) : (field.options || []);
+    // on the chosen Group). An empty list renders just the placeholder. We always
+    // render our own empty placeholder option, so drop any blank entry the source
+    // list carries (several partyEnums lists lead with '') to avoid a double-blank.
+    const raw = typeof field.options === 'function' ? (field.options(form) || []) : (field.options || []);
+    const options = raw.filter((o) => o !== '' && o != null);
     return (
       <Select value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">{field.emptyLabel || 'Select…'}</option>
@@ -339,15 +346,23 @@ export const CustomersMaster = () => (
   <MasterCrud title="Customers" subtitle="Clients (Sundry Debtors) — live from the backend" resource="customers"
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
+      // Dropdowns are fed from core/partyEnums (the same picklists the 12-tab master uses),
+      // so values stay consistent with the rest of the ERP instead of free-typed text.
+      { key: 'customerType', label: 'Customer Type', type: 'select', options: CUST_TYPES, table: false },
+      { key: 'source', label: 'Source', type: 'select', options: CUST_SOURCES, table: false },
       // Branch must be a real code (not a free-text/blank field) — a blank branch creates
       // an unscoped party. Default 'ALL' matches how auto-created party ledgers are scoped.
       { key: 'branch', label: 'Branch', type: 'select', options: ['ALL', ...BRANCH_CODES], default: 'ALL', required: true },
       { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
+      { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false },
+      { key: 'tdsSection', label: 'TDS Section', type: 'select', options: TDS_SECTIONS, table: false },
+      { key: 'msmeStatus', label: 'MSME Status', type: 'select', options: MSME_STATUS, table: false },
       { key: 'address', label: 'Address', type: 'text', table: false },
       { key: 'city', label: 'City', type: 'text', table: false },
       { key: 'phone', label: 'Phone', type: 'text' },
       { key: 'contact', label: 'Contact', type: 'text', table: false },
       { key: 'email', label: 'Email', type: 'text', table: false },
+      { key: 'paymentTerms', label: 'Payment Terms', type: 'select', options: PAY_TERMS, table: false },
       { key: 'creditLimit', label: 'Credit Limit', type: 'number' },
       { key: 'creditDays', label: 'Credit Days', type: 'number' },
     ]} />
@@ -357,17 +372,27 @@ export const SuppliersMaster = () => (
   <MasterCrud title="Suppliers" subtitle="Vendors (Sundry Creditors) — live from the backend" resource="suppliers"
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
-      { key: 'category', label: 'Category', type: 'text' },
-      { key: 'type', label: 'Type', type: 'text' },
+      // Category is the one picklist the backend validates (VALID_CATS) — a dropdown
+      // guarantees a valid value. The rest mirror the 12-tab master via core/partyEnums.
+      { key: 'category', label: 'Category', type: 'select', options: SUPPLIER_CATS },
       // Branch must be a real code, not free-text/blank (a blank branch = unscoped party).
       { key: 'branch', label: 'Branch', type: 'select', options: ['ALL', ...BRANCH_CODES], default: 'ALL', required: true },
       { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
       { key: 'pan', label: 'PAN', type: 'text', table: false },
+      // Country '' (the default) is treated as India downstream but does NOT force a state;
+      // picking India explicitly does (it decides CGST/SGST vs IGST) — the backend derives
+      // the state code from the chosen state name.
+      { key: 'country', label: 'Country', type: 'select', options: COUNTRIES, emptyLabel: 'India (default)', table: false },
+      { key: 'state', label: 'State (place of supply)', type: 'select', options: STATE_NAMES, table: false },
+      { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false },
+      { key: 'tdsSection', label: 'TDS Section', type: 'select', options: TDS_SECTIONS, table: false },
+      { key: 'msmeStatus', label: 'MSME Status', type: 'select', options: MSME_STATUS, table: false },
       { key: 'contact', label: 'Contact', type: 'text', table: false },
       { key: 'phone', label: 'Phone', type: 'text' },
       { key: 'email', label: 'Email', type: 'text', table: false },
       { key: 'city', label: 'City', type: 'text', table: false },
-      { key: 'country', label: 'Country', type: 'text', table: false },
+      { key: 'settlementCycle', label: 'Settlement Cycle', type: 'select', options: SETTLE_CYCLES, table: false },
+      { key: 'paymentMethod', label: 'Payment Method', type: 'select', options: PAY_METHODS, table: false },
       { key: 'creditDays', label: 'Credit Days', type: 'number' },
       { key: 'active', label: 'Active', type: 'bool', default: true },
     ]} />
