@@ -1018,12 +1018,14 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
       </div>
     );
   }
-  // Approved / posted vouchers are READ-ONLY from every drill-down (Day Book, ledgers,
-  // Cash Book, P&L / Balance Sheet, registers, GP analytics…). Editing one would
-  // silently re-post the journal outside the approval workflow, so we show it for
-  // viewing only. To change it, Revoke it back to Pending in Voucher Approvals — the
-  // number is kept (a booking-driven Sales/Purchase leg is edited on its SO/PO/GP).
-  if (v.status === 'approved' || v.status === 'posted') {
+  // Posted vouchers are READ-ONLY from every drill-down (Day Book, ledgers, Cash Book,
+  // P&L / Balance Sheet, registers, GP analytics…). "Posted" = a real journal exists in
+  // the General Ledger, which the backend writes for BOTH `approved` AND `saved` (an
+  // approved-booking leg or a seeded/migrated entry posts immediately as `saved`).
+  // Editing one would silently re-post outside the approval workflow, so show it for
+  // viewing only — to change it, Revoke it back to Pending (the number is kept; a
+  // booking-driven Sales/Purchase leg is edited on its SO / PO / GP booking).
+  if (v.status === 'approved' || v.status === 'saved' || v.status === 'posted') {
     const byBooking = v.locked && v.source === 'booking';
     return (
       <div style={{ padding: 14 }}>

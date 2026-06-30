@@ -91,11 +91,16 @@ describe('VoucherShell (registry edit) — approved vouchers are read-only, not 
     expect(screen.queryByRole('button', { name: /Save Voucher/i })).toBeNull();
   });
 
-  test('a SAVED (draft) voucher still opens the editable form with Save', () => {
+  test('a SAVED voucher is POSTED (real journal) → read-only with Revoke, not editable', () => {
+    // The backend writes a journal for BOTH `approved` AND `saved` (a seeded/migrated
+    // entry or an approved-booking leg posts immediately as `saved`), and treats `saved`
+    // as revocable. So a `saved` voucher is live in the books — editing it directly would
+    // re-post outside the approval workflow. It must open read-only, like `approved`.
     render(<VoucherShell category="payment" mode="edit" voucher={vch('saved')} cur="₹" onBack={jest.fn()} />);
-    expect(screen.getByText('FORM FIELDS')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Save Voucher/i })).toBeInTheDocument();
-    expect(screen.queryByText(/read-only/i)).toBeNull();
+    expect(screen.getByText(/read-only/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Save Voucher/i })).toBeNull();
+    expect(screen.queryByText('FORM FIELDS')).toBeNull();
+    expect(screen.getByRole('button', { name: /Revoke/i })).toBeInTheDocument();
   });
 
   test('a PENDING voucher (in the approval queue) is still editable', () => {
@@ -108,8 +113,8 @@ describe('VoucherShell (registry edit) — approved vouchers are read-only, not 
 describe('guard — the generic VoucherEditor carries the same approved/posted gate', () => {
   test('accountingLive editor blocks editing approved/posted vouchers and offers Revoke', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'modules', 'accountingLive', 'legacy.jsx'), 'utf8');
-    // The gate guards both statuses and offers the shared Revoke action in the read-only view.
-    expect(src).toMatch(/v\.status === 'approved' \|\| v\.status === 'posted'/);
+    // The gate guards every posted status (approved + saved) and offers the shared Revoke.
+    expect(src).toMatch(/v\.status === 'approved' \|\| v\.status === 'saved' \|\| v\.status === 'posted'/);
     expect(src).toMatch(/useVoucherRevoke/);
     expect(src).toMatch(/canRevoke && !byBooking && .*doRevoke\(voucherId, dismiss\)/);
   });
