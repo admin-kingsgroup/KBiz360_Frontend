@@ -344,9 +344,9 @@ export function ReportGP({ branch }) {
                 </button>
               )}
             />
-            <Input type="date" value={dateFrom} onChange={onDate(setDateFrom)} className="w-[125px] shrink-0" />
+            <Input type="date" value={dateFrom} onChange={onDate(setDateFrom)} className="!w-[150px] shrink-0" />
             <span className="shrink-0 text-xs text-ink-muted">to</span>
-            <Input type="date" value={dateTo} onChange={onDate(setDateTo)} className="w-[125px] shrink-0" />
+            <Input type="date" value={dateTo} onChange={onDate(setDateTo)} className="!w-[150px] shrink-0" />
           </div>
           <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto [scrollbar-width:thin]">
             {[{ k: 'all', l: 'All' }, { k: 'today', l: 'Today' }, { k: 'week', l: 'Week' }, { k: 'mtd', l: 'MTD' }, { k: 'qtd', l: 'QTD' }, { k: 'cfy', l: 'CFY' }, { k: 'lfy', l: 'LFY' }, { k: 'month', l: 'Monthly' }, { k: 'quarter', l: 'Quarterly' }, { k: 'custom', l: 'Custom' }].map((p) => (
