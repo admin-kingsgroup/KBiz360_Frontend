@@ -141,13 +141,31 @@ function tkfPnLStatement(sd, sCur) {
   // Profit also adds Direct Income (and other trading items). Show that bridge so
   // the statement foots: Operating GP + Direct Income = GROSS PROFIT.
   const operatingGP = sd.totals.operatingGP != null ? sd.totals.operatingGP : (sd.totals.sales - sd.totals.cogs);
+  // Direct Income (Commission, Discount Received …) and Direct Expenses are trading items
+  // beyond module Sales/COGS — shown as their OWN lines bridging operating GP → full Gross
+  // Profit, exactly where the Tally Trading account places them.
+  const directIncome = sd.totals.directIncome || 0;
+  const directExpense = sd.totals.directExpense || 0;
+  // Direct Income / Direct Expenses as a group ▸ sub-group ▸ ledger tree (matching how
+  // Indirect Expenses renders below), not a single flat line. sign: income +1, expense −1.
+  const directRows = (gs, total, label, sign) => {
+    const cats = gs || [];
+    const head = { label: (sign < 0 ? 'Less: ' : 'Add: ') + label, amount: sign * total, bold: true };
+    if (!cats.length) return [{ ...head, ledger: label }];
+    return [head, ...cats.flatMap((g) => {
+      const led = (g.ledgers || []).map((l) => ({ label: l.name, amount: sign * l.amount, ledger: l.name, indent: 2 }));
+      if (g.name === label) return led.map((r) => ({ ...r, indent: 1 })); // ledgers directly under the group
+      return [{ label: g.name, amount: sign * g.amount, indent: 1 }, ...led];
+    })];
+  };
   const cogsRows = [
     ...(sd.modules || []).flatMap((m) => moduleStmtRows(m, 'cogs')),
     { label: 'Total Direct Cost (COGS)', amount: sd.totals.cogs, subtotal: true },
-    ...(sd.totals.tradingOther
+    ...((directIncome || directExpense)
       ? [
         { label: 'Operating Gross Profit (Sales − COGS)', amount: operatingGP, subtotal: true },
-        { label: 'Add: Direct Income', amount: sd.totals.tradingOther },
+        ...(directIncome ? directRows(sd.totals.directIncomeGroups, directIncome, 'Direct Income', 1) : []),
+        ...(directExpense ? directRows(sd.totals.directExpenseGroups, directExpense, 'Direct Expenses', -1) : []),
       ]
       : []),
     { label: 'GROSS PROFIT', amount: sd.totals.gp, subtotal: true, bold: true },

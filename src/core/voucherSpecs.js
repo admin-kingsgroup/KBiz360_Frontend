@@ -31,6 +31,11 @@ export function tcsApplies(spec, packageType) {
   return spec.tcs.intlOnly ? isIntl(packageType) : true;
 }
 
+// A B2B buyer (another agent / tour operator) is NOT charged TCS u/s 206C(1G) — they
+// resell and collect it from their own client. Identified by the customer's Sundry
+// Debtors sub-group (e.g. "B2B" / "B2B Clients"). B2C and B2E still attract TCS.
+export const isB2B = (clientType) => /\bb2b\b/i.test(String(clientType || ''));
+
 // ── Per-module column specs ──────────────────────────────────────────────────
 // idCols[0]/[1] are always the name pair (editable on both grids); idCols[2…] are
 // the module reference fields (editable on the Sales grid, shown read-only on the
@@ -245,25 +250,29 @@ export const gpPctOf = (spec, l) => { const fs = finalSales(spec, l); return fs 
 
 // Holiday "package" model (tour-operator): no service charge; Supplier Service GST
 // is entered; SVC2 is the net agency margin. Tour-operator 5% scheme (no ITC):
-// a SINGLE 5% output GST on the full package consideration (taxable) =
-// Land + Supplier Service + Supplier Service GST + SVC2. The SVC2 margin is taxed ONCE
-// here as part of the taxable value — NOT booked as a separate SVC2 GST AND
-// re-taxed inside the base (the old double-count that made GST ~5.41%). TCS (Intl)
-// added at booking level on (taxable + GST). Cost = Land + Supplier Service +
-// Supplier Service GST (no ITC). GP = SVC2 (net) only.
+// a SINGLE 5% output GST on the SALES consideration (taxable) = Base Fare + SVC2.
+// The SVC2 margin is taxed ONCE here as part of the taxable value — NOT booked as a
+// separate SVC2 GST AND re-taxed inside the base (the old double-count that made GST
+// ~5.41%). The supplier service charge is a PURCHASE-side cost only — it is NOT
+// billed to the customer and is NOT in the GST base. TCS (Intl) added at booking
+// level on (taxable + GST). Cost = Land + Supplier Service + Supplier Service GST
+// (GST claimed as ITC). GP = SVC2 − Supplier Service Charge (margin net of the
+// supplier service we absorb).
 export function lineCalcPackage(spec, l, ctx) {
   const rate = pkgRateOf(spec, ctx);
   const land = num(l.base);
   const psvc = num(l.psvc);
   const psvcGst = num(l.psvcGst);          // Supplier Service GST — entered
-  const markup = num(l.markup);            // net markup (agency margin = GP)
+  const markup = num(l.markup);            // net markup (agency margin = SVC2)
   const incentive = num(l.incentive);
-  const tds = r2(incentive * 0.02);
-  // Taxable package value EXCLUDES the supplier's GST — that GST is recovered as Input
-  // credit (ITC), not re-billed to the customer. Output GST 5% applies to
-  // (Land + Supplier Service + SVC2) only.
-  const taxable = r2(land + psvc + markup);
-  const outGst = r2(taxable * rate);       // 5% output GST on (land + supp svc + SVC2)
+  // A FOREIGN supplier (master country ≠ India, e.g. IATA-BSP / Singapore) cannot
+  // withhold Indian 194H TDS — drop the 2% so the grid matches what the books post.
+  const tds = (ctx && ctx.foreignSupplier) ? 0 : r2(incentive * 0.02);
+  // Taxable SALES value = Base Fare + SVC2 only. The supplier service charge (psvc)
+  // is a purchase-side cost we absorb — never billed to the customer, never in the
+  // GST base. The supplier's GST is recovered as Input credit (ITC), not re-billed.
+  const taxable = r2(land + markup);
+  const outGst = r2(taxable * rate);       // 5% output GST on (Base Fare + SVC2)
   const finalSales = r2(taxable + outGst); // TCS added at booking level
   const finalPurchase = r2(land + psvc + psvcGst); // GROSS payable to supplier (ITC split below)
   const salesGST = outGst;
@@ -271,11 +280,14 @@ export function lineCalcPackage(spec, l, ctx) {
   // which we ALWAYS claim as Input GST (ITC) — allowed even under the 5% scheme for a
   // tour operator's input from another tour operator. It never loads onto the sale.
   const gstPur = psvcGst;
+  // GP = SVC2 − supplier service charge (we recover the markup but absorb the supplier
+  // service charge as a cost) + any supplier incentive (our income). Mirrors bookingTotals.
+  const gp = r2(markup - psvc + incentive);
   return {
     pass: land, gstSvc: 0, gstMk: r2(markup * rate), gstPur, psvcGst, markup, asp: taxable, outGst,
     incentive, tds,
-    finalSales, finalPurchase, salesGST, gp: r2(markup + incentive),
-    gpPct: finalSales > 0 ? r2(((markup + incentive) / finalSales) * 100) : 0,
+    finalSales, finalPurchase, salesGST, gp,
+    gpPct: finalSales > 0 ? r2((gp / finalSales) * 100) : 0,
   };
 }
 
@@ -291,7 +303,9 @@ export function lineCalc(spec, l, ctx) {
   // Input VAT follows the supplier, not the Without-VAT sale choice (decoupled).
   const gPur = isInputTaxable(ctx) ? gstPur(spec, l, pr) : 0;
   const incentive = num(l.incentive);
-  const tds = r2(incentive * 0.02);
+  // A FOREIGN supplier (master country ≠ India, e.g. IATA-BSP / Singapore) cannot
+  // withhold Indian 194H TDS — drop the 2% so the grid matches what the books post.
+  const tds = (ctx && ctx.foreignSupplier) ? 0 : r2(incentive * 0.02);
   const fSales = r2(fareSum(spec, l) + num(l.markup) + num(l.ssvc) + gSvc);
   const fPur   = r2(fareSum(spec, l) + num(l.psvc) + gPur); // GROSS cost; incentive netted via incentivePostings on post
   const sGST = r2(gSvc + gMk);
@@ -311,8 +325,8 @@ export function lineCalc(spec, l, ctx) {
 // po/so carry { lineTotal (net, ex tax), serviceCharge, gst, tcs, total, lines }.
 // gp = sales net − purchase net (= net markup + service charge). The per-line
 // `lines` detail is preserved for the read-only voucher view + voucher meta.
-export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, availItc = false } = {}) {
-  const ctx = { branch, noVat: !!noVat, availItc: !!availItc };
+export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, availItc = false, foreignSupplier = false, clientType = '' } = {}) {
+  const ctx = { branch, noVat: !!noVat, availItc: !!availItc, foreignSupplier: !!foreignSupplier, clientType };
   const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, incentiveAmt: 0, incentiveGst: 0, incentiveTds: 0, total: 0, lines: [] };
   // `otherTaxesGst` = GST carved out of the SVC2 margin (GST-inclusive, so the
   // customer total is unchanged); kept OUT of `gst` so it posts to the dedicated
@@ -346,7 +360,9 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     // SVC2 (net of embedded GST) + Service Charge are sale-only.
     spec.fareCols.forEach((col) => { addH(sH, col.key, col.label, num(l[col.key])); addH(pH, col.key, col.label, num(l[col.key])); });
     if (isPkg(spec)) {
-      addH(sH, 'psvc', 'Supp SVCHG', num(l.psvc)); addH(pH, 'psvc', 'Supp SVCHG', num(l.psvc));
+      // Supplier service charge is a PURCHASE-side cost only (Option A) — it is NOT
+      // billed to the customer, so it never becomes a SALE head.
+      addH(pH, 'psvc', 'Supp SVCHG', num(l.psvc));
       // Supplier Service GST is NEITHER a sale head NOR a purchase cost head — it is
       // claimed as Input GST (ITC) and posts via po.gst → Input GST ledgers.
       addH(sH, 'markup', 'SVC2', num(l.markup));
@@ -366,7 +382,7 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
   // on top of the invoice. It's a Balance-Sheet liability, NOT income, so it never
   // enters the net and the GP is unchanged. India-only — never on Africa/VAT
   // branches (and moot under Without-VAT).
-  if (!ctx.noVat && !isVatBranch(ctx.branch) && tcsApplies(spec, packageType)) {
+  if (!ctx.noVat && !isVatBranch(ctx.branch) && !isB2B(ctx.clientType) && tcsApplies(spec, packageType)) {
     so.tcs = r2(so.total * spec.tcs.rate / 100);
     so.total = r2(so.total + so.tcs);
   }

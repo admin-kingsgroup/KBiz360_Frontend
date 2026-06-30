@@ -18,6 +18,7 @@ describe('Accounts pill — reorganized layout', () => {
       'Dashboard Accountant',
       'Daily Entry',
       'Sales & Purchase',
+      'Refunds & Returns',
       'BSP & Airline',
       'Receivables & Clients',
       'Payables & Suppliers',
@@ -25,6 +26,7 @@ describe('Accounts pill — reorganized layout', () => {
       'Reconciliation',
       'Books & Scrutiny',
       'Branch MIS',
+      'Inter Branch',
       'Period Close',
       'Accounts Master',
     ]);

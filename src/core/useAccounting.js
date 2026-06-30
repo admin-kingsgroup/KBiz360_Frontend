@@ -501,12 +501,28 @@ export function useRegisterSummary(branch, { category, from, to } = {}) {
 // `excludeId` (optional) — when editing a receipt/payment, pass its id so the
 // open-bills query ignores this voucher's own settlement; the bills it already
 // cleared then show at full outstanding and its allocation can be re-edited.
-export function useOpenBills(party, branch, side = 'customer', excludeId) {
+// `includeSettled` (optional) — the Bill-wise STATEMENT view passes this to also
+// receive fully-paid bills (settled amount + pending 0), so its Settled/Bills-Raised
+// totals foot to the full picture. The settle screen leaves it off (open bills only).
+export function useOpenBills(party, branch, side = 'customer', excludeId, includeSettled = false) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || '', excludeId || ''],
-    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side, excludeId }),
+    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || '', excludeId || '', includeSettled ? 'all' : 'open'],
+    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side, excludeId, includeSettled: includeSettled ? '1' : undefined }),
     enabled: enabled() && !!party && !!code,
+    staleTime: 15_000,
+  });
+}
+
+// One bill's settlement history (Tally bill-wise breakup) — the Shift+Enter drill on
+// the ledger Bill-wise / T-account views. Lazy: only fetched when a row is exploded.
+// Returns { bill, settlements:[{date,category,ref,narration,amount,side,runningPending}], settled, pending }.
+export function useBillSettlements(party, branch, billVno, side = 'customer', enabledFlag = true) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['vouchers', 'bill-settlements', code || 'all', side, party || '', billVno || ''],
+    queryFn: () => apiGet('/api/vouchers/bill-settlements', { party, branch: code, side, billVno }),
+    enabled: enabled() && enabledFlag && !!party && !!billVno && !!code,
     staleTime: 15_000,
   });
 }

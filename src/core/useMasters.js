@@ -37,9 +37,17 @@ export function useMasterHealth(resource, branch) {
 //     voucher pickers (['ref','ledger-registry']), the group tree (['groups',…])
 //     and — through its opening balance — every books report (['accounting',…]).
 // Map each such resource to the extra roots that must refetch on any mutation.
+// Re-grouping the chart (moving a sub-group, or re-pointing a ledger's group) changes
+// where every report nests its balances, so it MUST bust the FULL books roots — both
+// 'accounting' (Trial Balance / P&L / Module-P&L / Balance Sheet / group tree) AND
+// 'finance' (migrated Trial Balance + registers). Previously `subgroups` invalidated
+// only the narrow ['accounting','groups'] key, which does NOT match the P&L keys
+// (['accounting','pnl'], ['accounting','module-pl'], ['accounting','pl-tally']) — so a
+// group re-parent refreshed the Chart tree but left the P&L showing the OLD nesting
+// until staleTime lapsed (the "re-grouped but P&L still shows old view" bug).
 export const MASTER_RELATED_ROOTS = {
-  subgroups: [['master', 'groups'], ['groups'], ['accounting', 'groups']],
-  ledgers:   [['ledgers'], ['ref', 'ledger-registry'], ['groups'], ['accounting']],
+  subgroups: [['master', 'groups'], ['groups'], ['accounting'], ['finance']],
+  ledgers:   [['ledgers'], ['ref', 'ledger-registry'], ['groups'], ['accounting'], ['finance']],
 };
 
 export function useMasterMutations(resource) {

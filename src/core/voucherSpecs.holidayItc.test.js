@@ -1,9 +1,10 @@
-// Holiday (SH) tour-operator package — corrected model (2026-06-29):
+// Holiday (SH) tour-operator package — Option A model (2026-06-30):
 //   • Supplier Service GST is NOT on the sales side and is NOT a cost — it is always
 //     claimed as Input GST (ITC) on the purchase.
-//   • Output GST 5% applies to (Base Fare + Supplier Service + SVC2) only.
+//   • Output GST 5% applies to the SALES value (Base Fare + SVC2) only; the supplier
+//     service charge is a purchase-side cost, not billed and not in the GST base.
 //   • TCS @2% (Intl) on the corrected base (excludes supplier GST).
-//   • GP = SVC2 margin, unchanged.
+//   • GP = SVC2 − supplier service charge (here psvc=0, so GP = SVC2 margin).
 // Figures mirror the real booking LK/BOM/00760. Pure, DB-free unit tests.
 import { VSPECS, blankLine, bookingTotals } from './voucherSpecs.js';
 import { buildBookingInvoice } from './invoiceHtml.js';
@@ -47,6 +48,14 @@ describe('Holiday package — corrected SO/PO/GP (supplier GST → ITC, off the 
     expect(gp.total).toBeCloseTo(4921.64, 2);
     expect(gp.saleNet).toBeCloseTo(37441.64, 2);
     expect(gp.costNet).toBeCloseTo(32520, 2);
+  });
+
+  test('B2B buyer is exempt from TCS (resells & collects from its own client)', () => {
+    const b2b = bookingTotals(SH, [pkgLine()], { packageType: 'International', branch: 'BOM', clientType: 'B2B' }).so;
+    expect(b2b.tcs).toBeCloseTo(0, 2);
+    expect(b2b.total).toBeCloseTo(39313.72, 2);     // net + GST, no TCS
+    // B2C / B2E still attract the 2% TCS.
+    expect(bookingTotals(SH, [pkgLine()], { packageType: 'International', branch: 'BOM', clientType: 'B2C' }).so.tcs).toBeCloseTo(786.27, 2);
   });
 });
 

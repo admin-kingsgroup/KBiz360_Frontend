@@ -22,7 +22,7 @@ export function voucherRegister(category) {
     payment: '/finance/payment-register',
     contra: '/finance/contra-register',
     journal: '/finance/journal-register',
-    'purchase-expense': '/reports/preg',
+    'purchase-expense': '/finance/purchase-expense-register',
     refund: '/finance/refund-register',
     reissue: '/finance/reissue-register',
     'debit-note': '/finance/debit-note-register',

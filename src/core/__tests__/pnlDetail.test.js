@@ -183,18 +183,18 @@ describe('stripLeafPrefix', () => {
   });
 });
 
-describe('moduleSubDetailRows label stripping', () => {
+describe('moduleSubDetailRows keeps the full prefixed ledger name', () => {
   const prefixed = {
     key: 'Flights', name: 'Flights', hasSubs: true, sales: 100, cogs: 0,
     subs: [{ code: 'FLT-INT', name: 'Flight — International', sales: 100, cogs: 0,
       heads: { sales: [{ ledger: 'IT-Base Fare', amount: 100, components: [{ label: 'Servicecharge', amount: 5 }] }], cogs: [] } }],
   };
-  test('open sub → ledger label stripped, real ledger name preserved for drill', () => {
+  test('open sub → FULL ledger name shown (no prefix stripping; matches Chart / Tally P&L tree)', () => {
     const sk = subDetailKey(prefixed, 'sales', 'FLT-INT');
     const rows = moduleSubDetailRows(prefixed, 'sales', opener(new Set([sk])));
     const head = rows.find((r) => r.ledgerHead);
-    expect(head.label).toBe('Base Fare');     // prefix stripped for display
-    expect(head.ledger).toBe('IT-Base Fare'); // drill-through keeps the real ledger
+    expect(head.label).toBe('IT-Base Fare');  // prefix kept for display
+    expect(head.ledger).toBe('IT-Base Fare'); // drill-through ledger unchanged
   });
 });
 

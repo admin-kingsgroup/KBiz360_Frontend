@@ -34,7 +34,7 @@ import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys
 import { VoucherEditor } from '../accountingLive';
 import { OutstandingOnAccount } from '../outstanding';
 import { useMobile } from '../../core/hooks';
-import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail, stripLeafPrefix, moduleSideRows } from '../../core/pnlDetail';
+import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail, moduleSideRows } from '../../core/pnlDetail';
 import { openPrintPreview } from '../../core/PrintPreview';
 import { LedgerActions } from '../../core/ledgerActions';
 import { toast } from '../../core/ux/toast';
@@ -756,7 +756,7 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
                                   <td style={{ ...num, color: SAP.sec }}>{pctTxt(s.pctOfSales)}</td>
                                 </tr>
                                 {/* per-sub-centre ledger composition — fares split by Int'l/Domestic, not merged */}
-                                {so && <FioriLedgerRows heads={s.heads} keyBase={sk} stripPrefix cur={cur} openHead={openHead} setOpenHead={setOpenHead} />}
+                                {so && <FioriLedgerRows heads={s.heads} keyBase={sk} cur={cur} openHead={openHead} setOpenHead={setOpenHead} />}
                                 {so && <FileRows files={s.files} indent={62} cur={cur} onPick={setDrillFile} />}
                               </React.Fragment>
                             );
@@ -848,12 +848,37 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
             <FCard title="Section C — Profit Bridge (Gross Profit → Net Profit)" badge={<Badge>✓ {d.bridge.result}</Badge>}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <tbody>
+                  {/* Operating GP → Direct Income / Direct Expenses → full Gross Profit
+                      (only when there are trading items beyond module Sales/COGS). */}
+                  {(!!d.totals.directIncome || !!d.totals.directExpense) && (
+                    <>
+                      <tr style={{ borderBottom: `1px solid ${SAP.borderLt}`, color: SAP.sec }}>
+                        <td style={{ padding: '7px 16px' }}>Operating Gross Profit (Sales − COGS)</td>
+                        <td style={num}>{inr(d.totals.operatingGP)}</td>
+                        <td style={num} />
+                      </tr>
+                      {!!d.totals.directIncome && (
+                        <tr style={{ borderBottom: `1px solid ${SAP.borderLt}` }}>
+                          <td style={{ padding: '7px 16px' }}>Add: Direct Income</td>
+                          <td style={{ ...num, color: SAP.greenDk }}>{inr(d.totals.directIncome)}</td>
+                          <td style={num} />
+                        </tr>
+                      )}
+                      {!!d.totals.directExpense && (
+                        <tr style={{ borderBottom: `1px solid ${SAP.borderLt}` }}>
+                          <td style={{ padding: '7px 16px' }}>Less: Direct Expenses</td>
+                          <td style={{ ...num, color: SAP.red }}>{paren(d.totals.directExpense)}</td>
+                          <td style={num} />
+                        </tr>
+                      )}
+                    </>
+                  )}
                   <tr style={{ background: SAP.greenBg, color: SAP.greenDk, fontWeight: 700 }}>
                     <td style={{ padding: '10px 16px', width: '62%' }}>Gross Profit (All Modules)</td>
                     <td style={num}>{inr(d.bridge.grossProfit)}</td>
                     <td style={{ ...num, width: '20%' }}>{pctTxt(d.totals.gpPct)} of Sales</td>
                   </tr>
-                  {d.bridge.indirectIncome > 0 && (
+                  {!!d.bridge.indirectIncome && (
                     <tr style={{ borderBottom: `1px solid ${SAP.borderLt}` }}>
                       <td style={{ padding: '7px 16px' }}>Add: Indirect Income</td>
                       <td style={{ ...num, color: SAP.greenDk }}>{inr(d.bridge.indirectIncome)}</td>
@@ -922,14 +947,15 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
    the entry (Base Fare, K3, Taxes …). Sales ledgers show their amount in the
    Sales column, Purchase ledgers in the COGS column; click a ledger to reveal
    its components. Same six columns as the module table (colSpan-aware). */
-function FioriLedgerRows({ m, heads: headsProp, keyBase, stripPrefix, openHead, setOpenHead, cur = '₹' }) {
+function FioriLedgerRows({ m, heads: headsProp, keyBase, openHead, setOpenHead, cur = '₹' }) {
   const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   // Module-level (m.heads) for single-leaf modules, or a sub-centre's own heads
   // (Int'l/Domestic) when `heads` + `keyBase` are passed — so fares are split, not merged.
-  // Under an Int'l/Domestic head the leaf prefix is redundant, so strip it for display.
+  // Show the FULL component ledger name (e.g. "IT-Base Fare") so the drill matches the
+  // Chart of Accounts / Tally P&L tree — no display-only prefix stripping.
   const allHeads = headsProp || (m && m.heads) || {};
   const base = keyBase || (m && m.key) || '';
-  const ledgerLabel = (name) => (stripPrefix ? stripLeafPrefix(name) : name);
+  const ledgerLabel = (name) => name;
   const rows = [];
   for (const side of ['sales', 'cogs']) {
     const heads = allHeads[side] || [];
@@ -1048,21 +1074,46 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
     return open ? [row, ...moduleDrillRows(m, side, isOpen)] : [row];
   };
 
-  // Trading account — Purchases/COGS (Dr) vs Sales (Cr); both sides total Nett Sales.
+  // Trading account — Purchases/COGS + Direct Expenses (Dr) vs Sales + Direct Income (Cr).
+  // Direct Income (Commission, Discount Received …) and Direct Expenses are the trading
+  // items beyond module Sales/COGS; per Tally they sit as their OWN lines ABOVE Gross
+  // Profit. Both sides foot to Sales + Direct Income: Dr (cogs + directExp + GP c/d) ==
+  // Cr (sales + directInc), since GP = (sales − cogs) + (directInc − directExp).
+  const directIncome = d.totals.directIncome || 0;
+  const directExpense = d.totals.directExpense || 0;
+  // Direct Income / Direct Expenses render as a drillable group ▸ sub-group ▸ ledger
+  // tree (like every other group), not a flat lump. A category whose name equals the
+  // group itself (ledgers sitting directly under it, no sub-group) skips the dup middle row.
+  const directBlock = (gs, total, label, prefix) => {
+    const cats = [...(gs || [])].sort((a, b) => azByName(a.name, b.name));
+    if (!cats.length) return [{ label, amount: total, ledger: label, leaf: true }]; // no detail → flat fallback (clickable)
+    const hOpen = isOpen(prefix, false);
+    const head = { label, amount: total, group: true, expandable: true, ekey: prefix, open: hOpen };
+    if (!hOpen) return [head];
+    return [head, ...cats.flatMap((g) => {
+      const led = [...(g.ledgers || [])].sort((x, y) => azByName(x.name, y.name)).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }));
+      if (g.name === label) return led; // ledgers directly under the group — no redundant sub-group row
+      const gk = prefix + '/' + g.name;
+      const gOpen = isOpen(gk, true);
+      const ghead = { label: g.name, amount: g.amount, sub: true, expandable: true, ekey: gk, open: gOpen };
+      return gOpen ? [ghead, ...led] : [ghead];
+    })];
+  };
+  // Register the direct-tree expand keys so Expand/Collapse-all covers them too.
+  if (directExpense) { allKeys.push('de'); (d.totals.directExpenseGroups || []).forEach((g) => { if (g.name !== 'Direct Expenses') allKeys.push('de/' + g.name); }); }
+  if (directIncome) { allKeys.push('di'); (d.totals.directIncomeGroups || []).forEach((g) => { if (g.name !== 'Direct Income') allKeys.push('di/' + g.name); }); }
   const tradeLeft = [
     { label: 'Purchase Accounts (COGS)', amount: d.totals.cogs, group: true },
     ...modules.flatMap((m) => moduleBlock(m, 'cogs')),
+    ...(directExpense ? directBlock(d.totals.directExpenseGroups, directExpense, 'Direct Expenses', 'de') : []),
     { label: 'Gross Profit c/d', amount: grossProfit, result: true },
   ];
-  // Supplier incentive is direct income → credited in the Trading A/c so COGS +
-  // Gross Profit c/d (Dr) balances against Sales + Incentive (Cr): gp = sales + incentive − cogs.
-  const incentive = d.totals.incentive || 0;
   const tradeRight = [
     { label: 'Sales Accounts', amount: d.totals.sales, group: true },
     ...modules.flatMap((m) => moduleBlock(m, 'sales')),
-    ...(incentive > 0 ? [{ label: 'Supplier Incentive (Direct Income)', amount: incentive }] : []),
+    ...(directIncome ? directBlock(d.totals.directIncomeGroups, directIncome, 'Direct Income', 'di') : []),
   ];
-  const tradeTotal = d.totals.sales + incentive;
+  const tradeTotal = d.totals.sales + directIncome;
 
   // Profit & Loss account — Indirect Exp (Fixed/Variable → sub-group → ledger) +
   // Tax + Net Profit (Dr) vs GP b/d + Indirect Income (Cr).
@@ -1097,7 +1148,10 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
   // whole indirect income is one ledger, the single line opens it directly; with
   // several ledgers it becomes a drill header (expand → click any ledger). If the
   // backend hasn't sent the income tree yet, still make the line clickable.
-  const incomeBlock = indIncome <= 0 ? []
+  // Show the Indirect Income block whenever there is movement — INCLUDING a net-debit
+  // (negative) balance, e.g. a lone Interest-on-FD reversal. `plTotal` already carries
+  // `indIncome` with its sign, so the visible Cr rows then foot to the column total.
+  const incomeBlock = !indIncome ? []
     : allIncomeLedgers.length === 1
       ? [{ label: 'Indirect Income', amount: indIncome, ledger: allIncomeLedgers[0].name, leaf: true }]
       : incomeGroups.length
@@ -1235,8 +1289,9 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
   const indIncome = d.bridge?.indirectIncome || 0;
   const incomeGroups = d.indirect?.incomeGroups || []; // indirect-income groups → ledgers (drillable)
   const grossProfit = d.bridge?.grossProfit ?? d.totals.gp;
-  const incentive = d.totals.incentive || 0;
-  const revenueTrading = d.totals.sales + incentive;
+  const directIncome = d.totals.directIncome || 0;
+  const directExpense = d.totals.directExpense || 0;
+  const revenueTrading = d.totals.sales + directIncome;
   const nett = d.totals.sales;
 
   // Indirect-income tree (group → ledger) — every ledger row clickable → its account.
@@ -1290,8 +1345,27 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
   buckets.forEach((b) => { allKeys.push('b:' + b.name); (b.groups || []).forEach((g) => allKeys.push('g:' + b.name + '/' + g.name)); });
   incomeGroups.forEach((g) => allKeys.push('ig:' + g.name));
   allKeys.push(...moduleExpandKeys(modules));
+  if (directExpense) { allKeys.push('de'); (d.totals.directExpenseGroups || []).forEach((g) => { if (g.name !== 'Direct Expenses') allKeys.push('de/' + g.name); }); }
+  if (directIncome) { allKeys.push('di'); (d.totals.directIncomeGroups || []).forEach((g) => { if (g.name !== 'Direct Income') allKeys.push('di/' + g.name); }); }
   const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
   const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
+
+  // Direct Income / Direct Expenses → drillable group ▸ sub-group ▸ ledger (like Classic).
+  const directBlock = (gs, total, label, prefix) => {
+    const cats = [...(gs || [])].sort((a, b) => azByName(a.name, b.name));
+    if (!cats.length) return [{ label, amount: total, ledger: label, leaf: true }];
+    const hOpen = isOpen(prefix, false);
+    const head = { label, amount: total, group: true, expandable: true, ekey: prefix, open: hOpen };
+    if (!hOpen) return [head];
+    return [head, ...cats.flatMap((g) => {
+      const led = [...(g.ledgers || [])].sort((x, y) => azByName(x.name, y.name)).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }));
+      if (g.name === label) return led;
+      const gk = prefix + '/' + g.name;
+      const gOpen = isOpen(gk, true);
+      const ghead = { label: g.name, amount: g.amount, sub: true, expandable: true, ekey: gk, open: gOpen };
+      return gOpen ? [ghead, ...led] : [ghead];
+    })];
+  };
 
   const pctCell = (v, bold) => <td style={{ padding: '3px 10px', textAlign: 'right', color: SAP.sec, fontSize: 11.5, fontWeight: bold ? 700 : 400, ...mono }}>{share(v, nett) >= 0.05 ? `${share(v, nett).toFixed(1)}%` : ''}</td>;
   const Row = ({ r, neg }) => {
@@ -1384,14 +1458,15 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
               <Head txt="Income" />
               <Row r={{ label: 'Revenue from Operations (Sales)', amount: d.totals.sales, group: true }} />
               {modules.flatMap((m) => moduleBlock(m, 'sales')).map((r, i) => <Row key={'s' + i} r={r} />)}
-              {incentive > 0 && <Row r={{ label: 'Supplier Incentive (Direct Income)', amount: incentive }} />}
+              {directIncome ? directBlock(d.totals.directIncomeGroups, directIncome, 'Direct Income', 'di').map((r, i) => <Row key={'di' + i} r={r} />) : null}
               <Sub txt="Total Revenue (Trading)" val={revenueTrading} />
               <Head txt="Less: Cost of Sales (COGS)" />
               <Row r={{ label: 'Purchase Accounts (COGS)', amount: d.totals.cogs, group: true }} neg />
               {modules.flatMap((m) => moduleBlock(m, 'cogs')).map((r, i) => <Row key={'c' + i} r={r} neg />)}
               <Sub txt="Total Cost of Sales" val={d.totals.cogs} neg />
+              {directExpense ? directBlock(d.totals.directExpenseGroups, directExpense, 'Direct Expenses', 'de').map((r, i) => <Row key={'de' + i} r={r} neg />) : null}
               <Result txt="Gross Profit" val={grossProfit} />
-              {indIncome > 0 && (oneIncomeLedger
+              {!!indIncome && (oneIncomeLedger
                 ? <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome, ledger: allIncomeLedgers[0].name, leaf: true }} />
                 : incomeGroups.length
                   ? <>

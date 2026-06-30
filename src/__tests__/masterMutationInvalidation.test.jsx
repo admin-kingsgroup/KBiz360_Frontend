@@ -40,10 +40,11 @@ describe('useMasterMutations — cross-root cache invalidation', () => {
       JSON.stringify(['ref', 'ledger-registry']),
       JSON.stringify(['groups']),
       JSON.stringify(['accounting']),
+      JSON.stringify(['finance']),
     ]));
   });
 
-  test('sub-group update invalidates the groups list, group tree and accounting groups', async () => {
+  test('sub-group re-group busts the FULL books roots so the P&L refetches (not just the group tree)', async () => {
     const { result, spy } = setup('subgroups');
     await act(async () => { result.current.update.mutate({ id: 's1', body: { name: 'Renamed' } }); });
     await waitFor(() => expect(result.current.update.isSuccess).toBe(true));
@@ -52,8 +53,11 @@ describe('useMasterMutations — cross-root cache invalidation', () => {
       JSON.stringify(['master', 'subgroups']),
       JSON.stringify(['master', 'groups']),
       JSON.stringify(['groups']),
-      JSON.stringify(['accounting', 'groups']),
+      JSON.stringify(['accounting']),   // BROAD root — matches ['accounting','pnl'|'module-pl'|'pl-tally'…]
+      JSON.stringify(['finance']),
     ]));
+    // Must NOT use the old narrow key that left the P&L stale after a re-group.
+    expect(keys).not.toContain(JSON.stringify(['accounting', 'groups']));
   });
 
   test('a master with no related roots (voucher-types) only invalidates its own key', async () => {

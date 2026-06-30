@@ -100,7 +100,9 @@ function usePartyVouchers(party) {
 function useOpenBills(party, side) {
   return useQuery({
     queryKey: ['party-openbills', party, side],
-    queryFn: () => apiGet('/api/vouchers/open-bills', { party, side }),
+    // includeSettled → full bill-wise picture (raised → settled → outstanding) for the
+    // party statement, not just open bills. Outstanding total still sums open amounts.
+    queryFn: () => apiGet('/api/vouchers/open-bills', { party, side, includeSettled: '1' }),
     enabled: !!getAuthToken() && !!party,
     staleTime: 30_000,
   });
@@ -282,32 +284,36 @@ function OutstandingTab({ q, side, branch }) {
   const data = q.data || { bills: [], advances: 0 };
   const bills = data.bills || [];
   const total = bills.reduce((s, b) => s + (Number(b.outstanding) || 0), 0);
-  if (!bills.length && !data.advances) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>{side === 'supplier' ? 'No unpaid bills to this supplier.' : 'No unpaid invoices from this customer.'}</p>);
+  const settledTotal = bills.reduce((s, b) => s + (Number(b.allocated) || 0), 0);
+  if (!bills.length && !data.advances) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>{side === 'supplier' ? 'No bills recorded for this supplier.' : 'No invoices recorded for this customer.'}</p>);
+  const STATUS_BG = { settled: '#e3f0e3', partial: '#fbeedb', pending: '#e6e8f1' };
   return tabPanel(
     <div className="kbiz-card">
-      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: DARK, marginBottom: 10 }}>{side === 'supplier' ? 'Open bills (we owe)' : 'Open invoices (owed to us)'}</p>
+      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: DARK, marginBottom: 10 }}>{side === 'supplier' ? 'Bill-wise — billed, settled & payable' : 'Bill-wise — invoiced, settled & receivable'}</p>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-        <thead style={{ background: '#f7f8fb' }}><tr>{['Bill', 'Date', 'Bill Amt', 'Outstanding', 'Age', 'Status'].map((h, i) => (
-          <th key={h} style={{ padding: '8px 12px', textAlign: i === 2 || i === 3 ? 'right' : i >= 4 ? 'center' : 'left', fontSize: 10, color: DIM, fontWeight: 700 }}>{h}</th>
+        <thead style={{ background: '#f7f8fb' }}><tr>{['Bill', 'Date', 'Bill Amt', 'Settled', 'Outstanding', 'Age', 'Status'].map((h, i) => (
+          <th key={h} style={{ padding: '8px 12px', textAlign: (i === 2 || i === 3 || i === 4) ? 'right' : i >= 5 ? 'center' : 'left', fontSize: 10, color: DIM, fontWeight: 700 }}>{h}</th>
         ))}</tr></thead>
         <tbody>{bills.map((b) => {
-          const overdue = b.creditDays != null && b.ageDays > b.creditDays;
+          const settled = (Number(b.outstanding) || 0) <= 0.01;
+          const overdue = !settled && b.creditDays != null && b.ageDays > b.creditDays;
           return (
             <tr key={b.billId} style={{ borderBottom: '1px solid #dfe2e7' }}>
               <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600 }}>{b.billVno}</td>
               <td style={{ padding: '8px 12px', color: DIM }}>{b.date}</td>
               <td style={{ padding: '8px 12px', textAlign: 'right' }}>{fmt(b.total)}</td>
-              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>{fmt(b.outstanding)}</td>
-              <td style={{ padding: '8px 12px', textAlign: 'center', color: overdue ? RED : GREEN, fontWeight: 700 }}>{b.ageDays}d</td>
-              <td style={{ padding: '8px 12px', textAlign: 'center' }}><span style={{ padding: '2px 8px', background: b.status === 'partial' ? '#fbeedb' : '#e6e8f1', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{b.status}</span></td>
+              <td style={{ padding: '8px 12px', textAlign: 'right', color: b.allocated ? GREEN : DIM, fontWeight: b.allocated ? 700 : 400 }}>{b.allocated ? fmt(b.allocated) : '—'}</td>
+              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: settled ? DIM : undefined }}>{settled ? '—' : fmt(b.outstanding)}</td>
+              <td style={{ padding: '8px 12px', textAlign: 'center', color: settled ? DIM : overdue ? RED : GREEN, fontWeight: 700 }}>{settled ? '—' : `${b.ageDays}d`}</td>
+              <td style={{ padding: '8px 12px', textAlign: 'center' }}><span style={{ padding: '2px 8px', background: STATUS_BG[b.status] || '#e6e8f1', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{b.status}</span></td>
             </tr>
           );
         })}</tbody>
       </table>
       {data.advances > 0 && <p style={{ margin: '10px 0 0', fontSize: 11.5, color: DIM }}>On-account / advances: <b style={{ color: DARK }}>{fmt(data.advances)}</b></p>}
-      <div style={{ marginTop: 12, padding: 10, background: DARK, borderRadius: 5, display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ color: GOLD, fontSize: 11.5, fontWeight: 700 }}>{side === 'supplier' ? 'TOTAL PAYABLE' : 'TOTAL RECEIVABLE'}</span>
-        <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}>{fmt(total)}</span>
+      <div style={{ marginTop: 12, padding: 10, background: DARK, borderRadius: 5, display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+        <span style={{ color: GREEN, fontSize: 11.5, fontWeight: 700 }}>SETTLED <b style={{ color: '#fff', fontFamily: 'monospace', marginLeft: 6 }}>{fmt(settledTotal)}</b></span>
+        <span style={{ color: GOLD, fontSize: 11.5, fontWeight: 700 }}>{side === 'supplier' ? 'TOTAL PAYABLE' : 'TOTAL RECEIVABLE'} <b style={{ color: '#fff', fontFamily: 'monospace', marginLeft: 6 }}>{fmt(total)}</b></span>
       </div>
     </div>
   );

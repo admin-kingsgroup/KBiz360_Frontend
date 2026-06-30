@@ -43,6 +43,27 @@ export function useInbPnlBreakdown(branch, { from, to } = {}) {
   });
 }
 
+// Seller→buyer trade matrix + per-pair margin (SVF income vs discount given).
+export function useInbMatrix({ from, to } = {}) {
+  return useQuery({
+    queryKey: ['inb', 'matrix', from || '', to || ''],
+    queryFn: () => apiGet('/api/inter-branch/matrix', { from, to }),
+    enabled: enabled(),
+    staleTime: 15_000,
+  });
+}
+
+// Per-counterparty date-ordered statement of inter-branch deals (the registry ledger).
+export function useInbCounterparty(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['inb', 'counterparty', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/inter-branch/counterparty', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 15_000,
+  });
+}
+
 function useInbMutation(mutationFn) {
   const qc = useQueryClient();
   return useMutation({ mutationFn, onSuccess: () => qc.invalidateQueries({ queryKey: ['inb'] }) });

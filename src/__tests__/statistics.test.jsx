@@ -36,6 +36,7 @@ describe('voucherRegister', () => {
     expect(voucherRegister('refund')).toBe('/finance/refund-register');
     expect(voucherRegister('reissue')).toBe('/finance/reissue-register');
     expect(voucherRegister('debit-note')).toBe('/finance/debit-note-register');
+    expect(voucherRegister('purchase-expense')).toBe('/finance/purchase-expense-register');
     expect(voucherRegister('adm')).toBe(''); // no register → no drill
   });
 });
