@@ -33,11 +33,28 @@ export function BranchDashboardPage({ branch, setRoute }) {
   // Period drives the financial bands (P&L / Balance Sheet / ageing / targets) added
   // below the operational KPIs. The bundled ops payload above stays MTD/YTD as-is.
   const [range, setRange] = useState(() => periodRange('cfy', { branch }));
-  // Live cash/bank position as of the period end — Σ closing of cash & bank ledgers
-  // (the branch bundle doesn't carry it, so derive it from the trial balance). Mirrors
-  // the Executive/Owner overviews so the figure ties out across dashboards.
-  const trial = useTrialBalance(branch, range).data || {};
+  // Live cash/bank position AS OF the period end — Σ closing of cash & bank ledgers.
+  // Pass ONLY `to` (no `from`): a point-in-time closing balance must carry the full
+  // opening + ALL movement up to `to`; a `from` cutoff would drop pre-period activity
+  // while still adding the full opening (wrong hybrid). This matches the Balance-Sheet /
+  // getCashPosition convention so the figure ties out with the Owner/Director cash views.
+  const trial = useTrialBalance(branch, { to: range.to }).data || {};
   const cash = (trial.rows || []).filter(isLiquidRow).reduce((s, r) => s + ((r.closingDebit || 0) - (r.closingCredit || 0)), 0);
+
+  // This is a SINGLE-BRANCH performance view (figures + currency are that branch's).
+  // In Group/ALL scope it would merge ₹ and USD branches under one symbol, so instead
+  // point the user at the branch selector (the consolidated view lives on the Owner /
+  // Director dashboards, which render per branch). Declared AFTER all hooks above.
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
+  if (isAll) {
+    return (
+      <PageLayout>
+        <div className="mx-auto mt-10 max-w-[560px] rounded-brand border border-surface-border bg-surface px-5 py-8 text-center text-sm text-ink-muted">
+          The <b className="text-ink">Branch Dashboard</b> is a single-branch view. Pick a branch from the selector (top-right) to see its performance — a consolidated all-branch view isn’t shown here because branches report in different currencies (₹ / $). For the group view, use the Owner or Director dashboard.
+        </div>
+      </PageLayout>
+    );
+  }
 
   if (isError && !data) {
     return <DashboardError error={error} onRetry={refetch} title="Could not load the Branch Dashboard." />;
@@ -126,9 +143,10 @@ export function BranchDashboardPage({ branch, setRoute }) {
         <KpiTile
           label="Bookings"
           value={String(kpis.bookings)}
-          sub={`${Math.round(kpis.revenue / Math.max(1, kpis.bookings)).toLocaleString()} avg`}
+          sub={`${formatMoney(kpis.revenue / Math.max(1, kpis.bookings))} avg`}
           icon="✈"
           color="#5b616e"
+          onClick={() => navigate('/bookings/list')}
         />
         <KpiTile
           label="YTD Revenue"
@@ -266,6 +284,14 @@ export function BranchDashboardPage({ branch, setRoute }) {
           color="#6b7280"
           onClick={() => navigate('/bookings/deleted')}
         />
+        <KpiTile
+          label="Deleted GP"
+          value={formatMoney(db.gp)}
+          sub={db.sales > 0 ? `${((db.gp / db.sales) * 100).toFixed(1)}% GP` : 'reversed bookings'}
+          icon="🗑"
+          color="#6b7280"
+          onClick={() => navigate('/bookings/deleted')}
+        />
       </ResponsiveGrid>
 
       {/* Year-on-year growth — Revenue · GP · Net Profit, CFY vs LFY */}
@@ -289,6 +315,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
           <ConsultantLeaderboard
             consultants={topConsultants}
             formatMoney={formatMoney}
+            title="🏆 Top earners · MTD"
             onViewAll={() => navigate('/reports/gp')}
           />
         </div>
@@ -296,7 +323,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
         {/* Right column */}
         <div className="flex flex-col gap-3">
           <ActionItemsPanel items={actionItems} onItemClick={navigate} />
-          <UpcomingTravelPanel bookings={upcomingTravel} />
+          <UpcomingTravelPanel bookings={upcomingTravel} onViewAll={() => navigate('/bookings/list')} />
           <QuickStatsCard
             rows={[
               { label: 'YTD Revenue', value: formatMoney(kpis.ytdRevenue), color: '#fff' },
