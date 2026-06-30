@@ -36,6 +36,7 @@ import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { JvBlock } from '../../core/voucher/JvBlock';
 import { clickable } from '../../core/ux/clickable';
+import { Menu as StatusMenu } from '../../core/ux/Menu';
 import { listKeyNav } from '../../core/ux/listKeys';
 import { SmartDateInput } from '../../core/ux/SmartDateInput';
 
@@ -3013,13 +3014,31 @@ export function AdmRegister({branch}){
           </div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-          <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}
-            style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-            {STATUSES.map(s=><option key={s}>{s}</option>)}
-          </select>
-          <input value={search} onChange={e=>setSearch(e.target.value)}
-            placeholder="ADM no / airline / ticket / passenger..."
-            style={{...inp,width:220,minHeight:32,fontSize:11}}/>
+          <div style={{display:"flex",alignItems:"center",gap:6,background:"#f4f5f7",border:"1px solid #e3e6eb",borderRadius:10,padding:4,boxShadow:"0 1px 2px rgba(16,18,22,0.04)"}}>
+            <div style={{position:"relative"}}>
+              <Search size={12} style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",color:"#9aa1ab"}}/>
+              <input value={search} onChange={e=>setSearch(e.target.value)}
+                placeholder="ADM no / airline / ticket / passenger..."
+                style={{...inp,width:220,minHeight:32,fontSize:11,paddingLeft:26,paddingRight:search?22:10,border:"none",background:"#fff",borderRadius:7}}/>
+              {search&&(
+                <button onClick={()=>setSearch("")} aria-label="Clear search"
+                  style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",border:"none",background:"none",cursor:"pointer",color:"#9aa1ab",fontSize:14,lineHeight:1,padding:2}}>×</button>
+              )}
+            </div>
+            <StatusMenu
+              ariaLabel="Filter by status"
+              menuRole="listbox"
+              width={150}
+              items={STATUSES.map(s=>({key:s,label:s,selected:s===statusFilter,onSelect:()=>setStatusFilter(s)}))}
+              renderTrigger={({ref,toggle,triggerProps})=>(
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  style={{...inp,display:"flex",alignItems:"center",gap:6,width:"auto",minHeight:32,fontSize:11,paddingRight:10,paddingLeft:10,border:"none",background:"#fff",borderRadius:7,fontWeight:600,color:"#2e323c",cursor:"pointer"}}>
+                  {statusFilter}
+                  <ChevronDown size={12} style={{color:"#5b616e"}}/>
+                </button>
+              )}
+            />
+          </div>
           <button onClick={()=>setModal(true)} style={{...btnG,background:"#dc2626",fontSize:11}}>
             <Plus size={13}/> New ADM
           </button>
@@ -3291,11 +3310,11 @@ export function BspSummary({branch}){
     {label:"Gross ticket sales (BSP)",               amt:grossSales,  type:"neutral",bold:false},
     {label:"Less: Ticket cost (airline net fare)",    amt:-ticketCost, type:"debit",  bold:false},
     {label:"Agency commission (2% avg)",             amt:commission,  type:"credit", bold:false},
-    {label:"─── BSP NET AMOUNT ───",                 amt:ticketCost,  type:"section",bold:true},
+    {label:"BSP NET AMOUNT",                 amt:ticketCost,  type:"section",bold:true},
     {label:"Less: ADMs raised this period",          amt:-admTotal,   type:admTotal>0?"debit":"neutral",bold:false},
     {label:"Plus: ACMs received this period",        amt:acmTotal,    type:acmTotal>0?"credit":"neutral",bold:false},
     {label:"Less: BSP service charge (0.25%)",       amt:-bspCharge,  type:"debit",  bold:false},
-    {label:"═══ NET BSP SETTLEMENT AMOUNT ═══",      amt:netBsp,      type:"total",  bold:true},
+    {label:"NET BSP SETTLEMENT AMOUNT",      amt:netBsp,      type:"total",  bold:true},
   ];
 
   const TYPE_CLR={credit:"#16a34a",debit:"#dc2626",neutral:"#1a1c22",section:"#2563eb",total:"#1a1c22"};
@@ -3502,11 +3521,29 @@ export function TicketControlRegister({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>Track every ticket: Issued · Used · Voided · Refunded · Exchanged · Reissued</p>
           </div>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <select value={filter} onChange={e=>setFilter(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-            {STATUSES.map(s=><option key={s}>{s}</option>)}
-          </select>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Ticket / PNR / passenger..." style={{...inp,width:200,minHeight:32,fontSize:11}}/>
+        <div style={{display:"flex",alignItems:"center",gap:6,background:"#f4f5f7",border:"1px solid #e3e6eb",borderRadius:10,padding:4,boxShadow:"0 1px 2px rgba(16,18,22,0.04)"}}>
+          <div style={{position:"relative"}}>
+            <Search size={12} style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",color:"#9aa1ab"}}/>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Ticket / PNR / passenger..."
+              style={{...inp,width:200,minHeight:32,fontSize:11,paddingLeft:26,paddingRight:search?22:10,border:"none",background:"#fff",borderRadius:7}}/>
+            {search&&(
+              <button onClick={()=>setSearch("")} aria-label="Clear search"
+                style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",border:"none",background:"none",cursor:"pointer",color:"#9aa1ab",fontSize:14,lineHeight:1,padding:2}}>×</button>
+            )}
+          </div>
+          <StatusMenu
+            ariaLabel="Filter by status"
+            menuRole="listbox"
+            width={150}
+            items={STATUSES.map(s=>({key:s,label:s,selected:s===filter,onSelect:()=>setFilter(s)}))}
+            renderTrigger={({ref,toggle,triggerProps})=>(
+              <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                style={{...inp,display:"flex",alignItems:"center",gap:6,width:"auto",minHeight:32,fontSize:11,paddingRight:10,paddingLeft:10,border:"none",background:"#fff",borderRadius:7,fontWeight:600,color:"#2e323c",cursor:"pointer"}}>
+                {filter}
+                <ChevronDown size={12} style={{color:"#5b616e"}}/>
+              </button>
+            )}
+          />
         </div>
       </div>
 

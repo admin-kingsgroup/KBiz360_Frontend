@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronDown } from 'lucide-react';
+import { Menu as DropdownMenu } from '../../ux/Menu';
 import { FL, inp, btnGh, card } from '../../styles';
 import { todayISO } from '../../dates';
 import { SmartDateInput } from '../../ux/SmartDateInput';
@@ -112,7 +113,20 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
         {state.gstApplicable && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'end' }}>
-              <FL label="GST rate"><select value={state.gstPct} onChange={(e) => { const pct = +e.target.value; patch({ gstPct: pct, gstAmt: r2(t.taxable * pct / 100) }); }} style={inp}>{GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}</select></FL>
+              <FL label="GST rate">
+                <DropdownMenu
+                  ariaLabel="GST rate"
+                  menuRole="listbox"
+                  items={GST_SLABS.map((r) => ({ key: r, label: `${r}%`, selected: state.gstPct === r, onSelect: () => patch({ gstPct: r, gstAmt: r2(t.taxable * r / 100) }) }))}
+                  renderTrigger={({ ref, toggle, triggerProps }) => (
+                    <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                      style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{state.gstPct}%</span>
+                      <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                    </button>
+                  )}
+                />
+              </FL>
               <FL label="GST amount"><input type="number" value={state.gstAmt || ''} onChange={(e) => patch({ gstAmt: +e.target.value || 0 })} style={inp} /></FL>
               <button onClick={autoGst} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
             </div>
@@ -124,7 +138,20 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
       {/* TDS */}
       <div style={{ padding: '10px 12px', borderRadius: 9, background: '#FAEEDA', border: '1px solid #FAC775', marginBottom: 12 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
-          <FL label="TDS Section"><select value={state.tdsSection} onChange={(e) => patch({ tdsSection: e.target.value })} style={inp}>{Object.entries(TDS_SECTIONS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}</select></FL>
+          <FL label="TDS Section">
+            <DropdownMenu
+              ariaLabel="TDS Section"
+              menuRole="listbox"
+              items={Object.entries(TDS_SECTIONS).map(([k, s]) => ({ key: k, label: s.label, selected: state.tdsSection === k, onSelect: () => patch({ tdsSection: k }) }))}
+              renderTrigger={({ ref, toggle, triggerProps }) => (
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{TDS_SECTIONS[state.tdsSection]?.label}</span>
+                  <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                </button>
+              )}
+            />
+          </FL>
           <FL label="Rate"><div style={{ ...inp, background: '#f9fafb', color: '#854F0B', fontWeight: 700, display: 'flex', alignItems: 'center' }}>{rate}%</div></FL>
           <FL label="TDS amount"><input type="number" value={state.tdsAmt || ''} onChange={(e) => patch({ tdsAmt: +e.target.value || 0 })} style={inp} /></FL>
           <button onClick={autoTds} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>

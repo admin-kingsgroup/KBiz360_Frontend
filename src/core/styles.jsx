@@ -4,7 +4,8 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useRef, useState, useEffect, Suspense } from 'react';
-import { Calendar, ChevronRight, Clock, Download, Plus, Save, Search, Trash2, TrendingDown, TrendingUp, User } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronRight, Clock, Download, Plus, Save, Search, Trash2, TrendingDown, TrendingUp, User } from 'lucide-react';
+import { Menu as DropdownMenu } from './ux/Menu';
 import { Bar, BarChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from './business-logic';
 import { FX_RATES, PURCHASE_REGISTRY } from './data';
@@ -87,7 +88,7 @@ export const ST={
 export function SalespersonField({branch,label="Salesperson (CRM)",name}){
   const SALESPEOPLE=useSalespeople().data||[];   // DB-backed (/api/salespeople)
   const branchCode=branch?.code;
-  const resolved=name||SALESPEOPLE.find(p=>p.branch===branchCode)?.name||SALESPEOPLE[0]?.name||"—";
+  const resolved=name||SALESPEOPLE.find(p=>p.branch===branchCode)?.name||SALESPEOPLE[0]?.name||"";
   return (
     <FL label={label}>
       <input value={resolved} readOnly title="Synced from CRM"
@@ -304,6 +305,9 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
 export function VHead({vNo,branch,salesperson=true}){
   const cfg=bc(branch);
   const isIndia=cfg.taxType==="GST";
+  const invoiceOptions=isIndia?["Tax Invoice","Bill of Supply","Proforma"]:["VAT Invoice","Receipt","Proforma"];
+  const [invoiceType,setInvoiceType]=useState(invoiceOptions[0]);
+  useEffect(()=>{ if(!invoiceOptions.includes(invoiceType)) setInvoiceType(invoiceOptions[0]); },[isIndia]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(155px,1fr))",gap:11}}>
@@ -314,12 +318,18 @@ export function VHead({vNo,branch,salesperson=true}){
             <input type="date" defaultValue={todayISO()} style={inp}/>
           </FL>
           <FL label={isIndia?"Invoice type":"Document type"}>
-            <select style={inp}>
-              {isIndia
-                ?<><option>Tax Invoice</option><option>Bill of Supply</option><option>Proforma</option></>
-                :<><option>VAT Invoice</option><option>Receipt</option><option>Proforma</option></>
-              }
-            </select>
+            <DropdownMenu
+              ariaLabel={isIndia?"Invoice type":"Document type"}
+              menuRole="listbox"
+              items={invoiceOptions.map(o=>({key:o,label:o,selected:invoiceType===o,onSelect:()=>setInvoiceType(o)}))}
+              renderTrigger={({ref,toggle,triggerProps})=>(
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  style={{...inp,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,cursor:"pointer",textAlign:"left"}}>
+                  <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0}}>{invoiceType}</span>
+                  <ChevronDown size={14} style={{color:"#5b616e",flexShrink:0}}/>
+                </button>
+              )}
+            />
           </FL>
           <FL label="Currency">
             <input value={cfg.curCode} readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontWeight:600}}/>
