@@ -123,5 +123,8 @@ export const JournalRegisterPage = (props) => <VoucherRegisterPage {...props} ca
 export const RefundRegisterPage    = (props) => <VoucherRegisterPage {...props} category="refund"      title="Refund Register" />;
 export const ReissueRegisterPage   = (props) => <VoucherRegisterPage {...props} category="reissue"     title="Reissue Register" />;
 export const DebitNoteRegisterPage = (props) => <VoucherRegisterPage {...props} category="debit-note"  title="Debit Note Register" />;
+// Purchase Expense (PXP) — the system's expense-side purchase voucher (e.g. bank-charge
+// ITC, supplier expenses). Distinct from a trade Purchase (PI); same category-driven engine.
+export const PurchaseExpenseRegisterPage = (props) => <VoucherRegisterPage {...props} category="purchase-expense" title="Purchase Expense Register (PXP)" />;
 
 export default VoucherRegisterPage;

@@ -13,6 +13,7 @@ describe('finance adjustment registers — route wiring', () => {
     ['/finance/refund-register', 'Refund Register'],
     ['/finance/reissue-register', 'Reissue Register'],
     ['/finance/debit-note-register', 'Debit Note Register'],
+    ['/finance/purchase-expense-register', 'Purchase Expense Register (PXP)'],
   ])('%s is mounted with the right title + a lazy Element', (path, title) => {
     const route = byPath(path);
     expect(route).toBeDefined();

@@ -307,6 +307,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   {label:"Sales & Purchase", children:[
     {label:"Sales Register",            href:"/reports/sreg"},
     {label:"Purchase Register",         href:"/reports/preg"},
+    {label:"Purchase Expense Register (PXP)", href:"/finance/purchase-expense-register"},
     // INB Sales/Purchase Registers consolidated under ACCOUNTS ▸ Inter Branch.
     // Module Sales/Purchase Register, Invoice-wise GP and Sales & GP Analytics
     // moved to the Finance pill (Finance ▸ Registers & Outstanding).

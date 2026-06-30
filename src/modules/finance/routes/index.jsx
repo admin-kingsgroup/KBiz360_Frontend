@@ -30,4 +30,5 @@ export const financeRoutes = [
   { path: '/finance/refund-register', title: 'Refund Register', moduleName: 'Finance', Element: lazyEl(() => import('../pages/voucher-register'), 'RefundRegisterPage') },
   { path: '/finance/reissue-register', title: 'Reissue Register', moduleName: 'Finance', Element: lazyEl(() => import('../pages/voucher-register'), 'ReissueRegisterPage') },
   { path: '/finance/debit-note-register', title: 'Debit Note Register', moduleName: 'Finance', Element: lazyEl(() => import('../pages/voucher-register'), 'DebitNoteRegisterPage') },
+  { path: '/finance/purchase-expense-register', title: 'Purchase Expense Register (PXP)', moduleName: 'Finance', Element: lazyEl(() => import('../pages/voucher-register'), 'PurchaseExpenseRegisterPage') },
 ];
