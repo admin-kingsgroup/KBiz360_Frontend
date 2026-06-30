@@ -62,8 +62,10 @@ describe('Accounts voucher chrome (VWrap / VoucherShell)', () => {
     // Both the editable form and the post-save panel reuse the frame.
     expect(shell).toContain('return editFrame(doneInner)');
     expect(shell).toMatch(/return editFrame\(\s*<div style=\{\{ padding: '14px 16px' \}\}/);
-    // The stripped-down bare edit header is gone.
-    expect(shell).not.toContain('<div style={{ padding: 14 }}>');
+    // The stripped-down bare edit header is gone: a `<div style={{ padding: 14 }}>` may
+    // only appear as INNER content passed to editFrame(...) (e.g. the approved/read-only
+    // panel), never returned directly as the edit container itself (the old un-themed look).
+    expect(shell).not.toMatch(/return\s*\(?\s*<div style=\{\{ padding: 14 \}\}>/);
   });
 });
 
@@ -107,11 +109,12 @@ describe('SO / PO / GP booking voucher (legacy.jsx)', () => {
   test('exact HTML match — muted Dr/Cr + section-tinted tables + 26px GP', () => {
     // Dr green / Cr red are the template's muted hexes, not the app's bright ones.
     expect(legacy).toContain("DR = '#1A7A42', CR = '#C0392B'");
-    // SO headers/totals carry blue; PO carry maroon (section colour into the table).
-    expect(legacy).toContain("color: SO_BAR, background: '#EAF1F9'");
-    expect(legacy).toContain("color: SO_BAR, borderTop: '2px solid ' + SO_BAR"); // soTf
-    expect(legacy).toContain("color: PO_BAR, background: '#F9E8EE'");
-    expect(legacy).toContain("color: PO_BAR, borderTop: '2px solid ' + PO_BAR"); // poTf
+    // SO headers carry blue / PO maroon via a section-colour gradient; the total rows
+    // tint that colour into the table (blue #DCE8F4 for SO, maroon #FBEEF2 for PO).
+    expect(legacy).toContain("'linear-gradient(180deg, ' + SO_BAR"); // soHdr
+    expect(legacy).toContain("background: '#DCE8F4', color: SO_BAR, borderTop: '2px solid ' + SO_BAR"); // soTf
+    expect(legacy).toContain("'linear-gradient(180deg, ' + PO_BAR"); // poHdr
+    expect(legacy).toContain("background: '#FBEEF2', color: PO_BAR, borderTop: '2px solid ' + PO_BAR"); // poTf
     // Net SALE column green, NET COST column red.
     expect(legacy).toContain('color: DR, background: \'#faf7ef\'');
     expect(legacy).toContain('color: CR, background: \'#faf7ef\'');

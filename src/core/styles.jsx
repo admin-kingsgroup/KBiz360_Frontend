@@ -515,8 +515,15 @@ export function KPICard({label,value,delta,color,onClick}){
      "₹2L overdue 90+" (a "+" inside the text). */
   const d=String(delta||"").trim();
   const deltaColor=d.startsWith("+")?"#16a34a":d.startsWith("-")?"#dc2626":"#5b616e";
+  // When clickable, the card is a real button to AT/keyboard: role+tabIndex+Enter/Space
+  // activation, an aria-label, and a min touch height (≥44px) for mobile tap targets.
+  const interactive=!!onClick;
+  const onKeyDown=interactive?(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); onClick(e); } }:undefined;
   return (
-    <div onClick={onClick} style={{...PREMIUM_CARD,cursor:onClick?"pointer":"default",borderTop:"3px solid "+(color||"#c2a04a")}}>
+    <div onClick={onClick}
+      role={interactive?"button":undefined} tabIndex={interactive?0:undefined} onKeyDown={onKeyDown}
+      aria-label={interactive?`${label}: ${value}`:undefined}
+      style={{...PREMIUM_CARD,cursor:interactive?"pointer":"default",borderTop:"3px solid "+(color||"#c2a04a"),...(interactive?{minHeight:64}:{})}}>
       <p style={{margin:0,fontSize:10.5,color:"#5b616e",letterSpacing:"0.4px",textTransform:"uppercase",fontWeight:700}}>{label}</p>
       <p style={{margin:"5px 0 2px",fontSize:22,fontWeight:800,color:"#14161a",fontVariantNumeric:"tabular-nums"}}>{value}</p>
       {delta&&<p style={{margin:0,fontSize:11,color:deltaColor,fontWeight:600}}>{delta}</p>}

@@ -8,12 +8,12 @@ export function RevenueTrendChart({ data, compareLastYear, onToggleCompare, form
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
-        <label style={{ fontSize: 11, color: '#5b616e', cursor: 'pointer' }}>
+        <label style={{ fontSize: 11, color: '#5b616e', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 4px' }}>
           <input
             type="checkbox"
             checked={compareLastYear}
             onChange={(e) => onToggleCompare(e.target.checked)}
-            style={{ marginRight: 5 }}
+            style={{ marginRight: 6, width: 16, height: 16 }}
           />
           Compare to last year
         </label>

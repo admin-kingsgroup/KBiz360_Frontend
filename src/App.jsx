@@ -448,7 +448,7 @@ export default function KB360App(){
     // owner: the Super Admin whose email is afshin.dhanani@kingsgroupco.com (BOTH
     // role + email required). Non-owners hitting the URL get a "not available" card.
     if(route==="/dashboard/owner")    return isOwnerDashboardUser(currentUser)
-      ? <OwnerDashboard branch={branch} setRoute={navigate} currentUser={currentUser}/>
+      ? <OwnerDashboard branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>
       : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
           <div style={{fontSize:42,marginBottom:14}}>🔒</div>
           <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Owner Dashboard</h2>
