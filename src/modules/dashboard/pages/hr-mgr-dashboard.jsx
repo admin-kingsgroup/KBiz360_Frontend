@@ -43,10 +43,10 @@ export function HrMgrDashboardPage({ currentUser, setRoute }) {
       </ResponsiveGrid>
 
       <div className="grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
-        <WidgetCard title="🎂 Upcoming Birthdays" subtitle="Next 7 days">
+        <WidgetCard title="🎂 Upcoming Birthdays" subtitle="Next 7 days" color="#db2777">
           <BirthdaysPanel birthdays={stats.birthdays} />
         </WidgetCard>
-        <WidgetCard title="🎉 Work Anniversaries" subtitle="Next 30 days">
+        <WidgetCard title="🎉 Work Anniversaries" subtitle="Next 30 days" color="#c2a04a">
           <AnniversariesPanel anniversaries={stats.anniversaries} />
         </WidgetCard>
       </div>

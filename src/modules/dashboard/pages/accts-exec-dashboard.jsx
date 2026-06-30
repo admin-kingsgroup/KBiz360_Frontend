@@ -54,10 +54,10 @@ export function AcctsExecDashboardPage({ currentUser, setRoute, branch }) {
       </ResponsiveGrid>
 
       <div className="grid grid-cols-1 gap-3.5 desktop:grid-cols-[2fr_1fr]">
-        <WidgetCard title="Recent Activity Feed" subtitle="Last 5 actions on this branch">
+        <WidgetCard title="Recent Activity Feed" subtitle="Last 5 actions on this branch" color="#185FA5">
           <RecentActivityFeed entries={recentActivity} formatMoney={money} />
         </WidgetCard>
-        <WidgetCard title={`Customer Ageing — ${ownBranch}`} onDrill={() => navigate('/reports/rec')}>
+        <WidgetCard title={`Customer Ageing — ${ownBranch}`} color="#dc2626" onDrill={() => navigate('/reports/rec')}>
           <AgeingBuckets buckets={arAgeing} kind="receivable" formatMoney={money} scale={1 / 6} condensed />
         </WidgetCard>
       </div>

@@ -484,10 +484,14 @@ export function AgeTable({data}){
 
 const PREMIUM_CARD={...cardStyle,border:"1px solid #cdd1d8",borderRadius:12,boxShadow:"0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)"};
 
-export function WidgetCard({title,subtitle,children,onPin,pinned,onDrill}){
+export function WidgetCard({title,subtitle,children,onPin,pinned,onDrill,color}){
+  const accent = color || "#8a93a6";
   return (
     <div style={PREMIUM_CARD}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,gap:8}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,
+        margin:"-14px -14px 10px -14px",padding:"10px 14px",
+        background:`${accent}1A`,borderBottom:`1px solid ${accent}40`,
+        borderRadius:"11px 11px 0 0"}}>
         <div style={{minWidth:0}}>
           <h3 style={{margin:0,fontSize:11,color:"#5b616e",letterSpacing:"0.4px",textTransform:"uppercase",fontWeight:700}}>{title}</h3>
           {subtitle&&<p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>{subtitle}</p>}
