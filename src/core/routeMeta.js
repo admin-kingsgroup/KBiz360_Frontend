@@ -41,6 +41,8 @@ const EXTRA = {
   '/accounts/supplier-reco': ['Accounts', 'Reconciliation', 'Supplier Reconciliation'],
   '/accounts/interbranch-reco': ['Accounts', 'Reconciliation', 'Inter-branch Reconciliation'],
   '/accounts/inb-register': ['Accounts', 'Reconciliation', 'Inter-Branch Register'],
+  '/accounts/inb-counterparty': ['Accounts', 'Inter Branch', 'Counterparty Ledger'],
+  '/transactions/inb-approvals': ['Finance', 'Approvals', 'INB SPG'],
   '/accounts/tally-reco': ['Accounts', 'Reconciliation', 'Tally Reconciliation'],
   '/finance/reco-queue': ['Accounts', 'Reconciliation', 'Reconciliation Queue'],
   '/import': ['Admin', 'Import / Export', 'Data Import'],

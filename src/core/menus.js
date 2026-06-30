@@ -388,9 +388,11 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   {label:"Inter Branch", children:[
     {label:"Trade Matrix & Margin",     href:"/accounts/inb-matrix"},
     {label:"Register & P&L Breakdown",  href:"/accounts/inb-register"},
+    {label:"Counterparty Ledger",       href:"/accounts/inb-counterparty"},
     {label:"INB Sales Register",        href:"/reports/inb-sreg"},
     {label:"INB Purchase Register",     href:"/reports/inb-preg"},
     {label:"Reconciliation",            href:"/accounts/interbranch-reco"},
+    {label:"INB SPG Approvals",         href:"/transactions/inb-approvals"},
   ]},
 
   /* ── 5 · PERIOD CLOSE & MASTERS ──────────────────────────── */

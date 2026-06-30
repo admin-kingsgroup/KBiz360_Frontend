@@ -53,6 +53,17 @@ export function useInbMatrix({ from, to } = {}) {
   });
 }
 
+// Per-counterparty date-ordered statement of inter-branch deals (the registry ledger).
+export function useInbCounterparty(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['inb', 'counterparty', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/inter-branch/counterparty', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 15_000,
+  });
+}
+
 function useInbMutation(mutationFn) {
   const qc = useQueryClient();
   return useMutation({ mutationFn, onSuccess: () => qc.invalidateQueries({ queryKey: ['inb'] }) });

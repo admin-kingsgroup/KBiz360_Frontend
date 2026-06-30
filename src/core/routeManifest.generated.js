@@ -16,6 +16,7 @@ export const APP_ROUTES = [
   "/accounts/client-reco",
   "/accounts/collections",
   "/accounts/dashboard",
+  "/accounts/inb-counterparty",
   "/accounts/inb-matrix",
   "/accounts/inb-register",
   "/accounts/interbranch-reco",
@@ -303,6 +304,7 @@ export const APP_ROUTES = [
   "/tax/tds-certs",
   "/tax/vat",
   "/transactions/approvals",
+  "/transactions/inb-approvals",
   "/transactions/voucher-approvals",
   "/transactions/voucher-tabs",
   "/trial-balance"
