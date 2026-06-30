@@ -61,10 +61,13 @@ describe('INB SPG Approvals', () => {
   test('groups the two legs into ONE pending deal row under the INB Link No', async () => {
     mockApiGet.mockResolvedValue(mkLegs('pending'));
     wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
-    expect(await screen.findByText(LINK)).toBeInTheDocument();
+    expect(await screen.findByText(LINK, { exact: false })).toBeInTheDocument();
     expect(mockApiGet).toHaveBeenCalledWith('/api/vouchers', { type: 'INB', branch: 'BOM' });
-    expect(screen.getByText('BOM → AMD')).toBeInTheDocument();
+    expect(screen.getByText('BOM → AMD', { exact: false })).toBeInTheDocument();
+    // one deal → one Approve button, and both leg vnos appear as Sale Inv / Purchase Inv
     expect(screen.getAllByRole('button', { name: 'Approve' })).toHaveLength(1);
+    expect(screen.getByText('INB/BOM/26/0003')).toBeInTheDocument();
+    expect(screen.getByText('INB/BOM/26/0004')).toBeInTheDocument();
   });
 
   test('Approve posts BOTH legs via approve-many (sale + purchase ids)', async () => {
@@ -84,19 +87,19 @@ describe('INB SPG Approvals', () => {
     mockApiGet.mockResolvedValue(legs);
     wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
     fireEvent.click(await screen.findByRole('button', { name: /Approved/ }));
-    // one deal row → identified by the sale vno (no INB-link sourceRef present)
-    expect(screen.getByText('INB/BOM/26/0003')).toBeInTheDocument();
-    expect(screen.getByText('BOM → AMD')).toBeInTheDocument();
-    // both legs present (Sale + Pur), not two separate rows
-    expect(screen.getByText('Sale + Pur')).toBeInTheDocument();
+    // ONE deal row → both legs paired (Sale Inv + Purchase Inv on the same row)
+    expect(screen.getByText('INB/BOM/26/0003')).toBeInTheDocument();   // Sale Inv cell (exact; link cell has "▸ " prefix)
+    expect(screen.getByText('INB/BOM/26/0004')).toBeInTheDocument();   // Purchase Inv cell
+    // exactly one From→To cell ⇒ not split into two rows
+    expect(screen.getAllByText('BOM → AMD', { exact: false })).toHaveLength(1);
   });
 
   test('a posted (saved) deal shows under Approved, not Pending', async () => {
     mockApiGet.mockResolvedValue(mkLegs('saved'));
     wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
-    expect(await screen.findByText('No pending INB deals.')).toBeInTheDocument();
+    expect(await screen.findByText('No pending INB deals.', { exact: false })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Approved/ }));
-    expect(screen.getByText(LINK)).toBeInTheDocument();
+    expect(screen.getByText(LINK, { exact: false })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
   });
 });
