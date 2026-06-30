@@ -17,7 +17,8 @@
 
 import React, { useMemo, useState } from 'react';
 import { openPrintPreview } from '../../../core/PrintPreview';
-import { Download, Printer } from 'lucide-react';
+import { Download, Printer, ChevronDown } from 'lucide-react';
+import { Menu as DropdownMenu } from '../../../core/ux/Menu';
 import { useGpBills } from '../../../core/useAccounting';
 import { bc } from '../../../core/styles';
 import { exportToExcel } from '../../../core/exportExcel';
@@ -27,7 +28,7 @@ import { periodRange } from '../../../core/period';
 import { compactAmt } from '../../../core/format';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
-import { ResponsiveGrid, PageSection, Button, Select, Input } from '../../../shell/primitives';
+import { ResponsiveGrid, PageSection, Button, Input } from '../../../shell/primitives';
 
 const gpClr = (p) => (p >= 20 ? '#16a34a' : p >= 12 ? '#3fb7a3' : p >= 8 ? '#d97706' : '#dc2626');
 const gpBg = (p) => (p >= 12 ? '#e8f6ed' : p >= 8 ? '#fbeedb' : '#fbe9e9');
@@ -329,21 +330,33 @@ export function ReportGP({ branch }) {
         </>
       }
       filters={
-        <>
-          <Select value={modFilter} onChange={(e) => setModFilter(e.target.value)} className="w-auto">{MODS.map((m) => <option key={m}>{m}</option>)}</Select>
-          <Input type="date" value={dateFrom} onChange={onDate(setDateFrom)} className="w-[140px]" />
-          <span className="text-xs text-ink-muted">to</span>
-          <Input type="date" value={dateTo} onChange={onDate(setDateTo)} className="w-[140px]" />
-        </>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-nowrap items-center gap-2">
+            <DropdownMenu
+              ariaLabel="Module"
+              menuRole="listbox"
+              items={MODS.map((m) => ({ key: m, label: m, selected: modFilter === m, onSelect: () => setModFilter(m) }))}
+              renderTrigger={({ ref, toggle, triggerProps }) => (
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-surface-border bg-surface px-3 text-[13px] font-medium text-ink hover:bg-surface-alt">
+                  {modFilter}
+                  <ChevronDown size={13} className="text-ink-subtle" />
+                </button>
+              )}
+            />
+            <Input type="date" value={dateFrom} onChange={onDate(setDateFrom)} className="w-[125px] shrink-0" />
+            <span className="shrink-0 text-xs text-ink-muted">to</span>
+            <Input type="date" value={dateTo} onChange={onDate(setDateTo)} className="w-[125px] shrink-0" />
+          </div>
+          <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto [scrollbar-width:thin]">
+            {[{ k: 'all', l: 'All' }, { k: 'today', l: 'Today' }, { k: 'week', l: 'Week' }, { k: 'mtd', l: 'MTD' }, { k: 'qtd', l: 'QTD' }, { k: 'cfy', l: 'CFY' }, { k: 'lfy', l: 'LFY' }, { k: 'month', l: 'Monthly' }, { k: 'quarter', l: 'Quarterly' }, { k: 'custom', l: 'Custom' }].map((p) => (
+              <button key={p.k} onClick={() => setPeriod(p.k)} className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] transition ${periodMode === p.k ? 'border-navy bg-navy font-bold text-gold' : 'border-surface-border bg-surface text-ink-muted hover:bg-surface-alt'}`}>{p.l}</button>
+            ))}
+            <span className="ml-1 shrink-0 whitespace-nowrap text-[10.5px] text-ink-subtle">{periodMode === 'custom' ? rangeNote('range', { from: dateFrom, to: dateTo }) : presetRange(periodMode).label}</span>
+          </div>
+        </div>
       }
     >
-      {/* Period presets */}
-      <div className="mb-3 flex flex-wrap items-center gap-1.5">
-        {[{ k: 'all', l: 'All' }, { k: 'today', l: 'Today' }, { k: 'week', l: 'Week' }, { k: 'mtd', l: 'MTD' }, { k: 'qtd', l: 'QTD' }, { k: 'cfy', l: 'CFY' }, { k: 'lfy', l: 'LFY' }, { k: 'month', l: 'Monthly' }, { k: 'quarter', l: 'Quarterly' }, { k: 'custom', l: 'Custom' }].map((p) => (
-          <button key={p.k} onClick={() => setPeriod(p.k)} className={`rounded-full border px-3 py-1.5 text-[11px] transition ${periodMode === p.k ? 'border-navy bg-navy font-bold text-gold' : 'border-surface-border bg-surface text-ink-muted hover:bg-surface-alt'}`}>{p.l}</button>
-        ))}
-        <span className="ml-1 text-[10.5px] text-ink-subtle">{periodMode === 'custom' ? rangeNote('range', { from: dateFrom, to: dateTo }) : presetRange(periodMode).label}</span>
-      </div>
 
       {gpQuery.isLoading && <PageSection><p className="py-10 text-center text-sm text-ink-muted">Loading GP data…</p></PageSection>}
       {gpQuery.error && !gpQuery.isLoading && (

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../../core/styles.jsx';
+import { Menu as DropdownMenu } from '../../core/ux/Menu';
 import { localeOf } from '../../core/format';
 import { todayISO } from '../../core/dates';
 import { PeriodBar, periodRange } from '../../core/period';
@@ -254,6 +255,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     if (ct && customer.ledgerGroup && customer.ledgerGroup !== ct) {
       setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' });
     }
+  };
+  const handleToBranchChange = (tb) => {
+    setToBranch(tb);
+    if (tb) { setCustomer((c) => ({ ...c, name: `Travkings Tours and Travels ${tb}`, ledgerName: `Travkings Tours and Travels ${tb}`, ledgerGroup: 'Sundry Debtors', group: 'Sundry Debtors' })); setSaleGstMode(inbCrossBorder(brCode, tb) ? 'inter' : 'inter'); }
   };
   // No-supplier mode (Misc only): a sale with no purchase leg — full sale value is
   // income. Hides the Purchase Order + supplier fields and posts only the sale.
@@ -717,26 +722,38 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <FL label="SPG Date"><SmartDateInput max={todayISO()} value={date} onChange={setDate} style={inp} /></FL>
           <FL label="Travel / Departure Date"><SmartDateInput value={travelDate} onChange={setTravelDate} min={editing ? undefined : todayISO()} style={inp} title="When the customer travels (no past dates) — type e.g. 20.03.2026 → 20/03/2026; drives the Upcoming Travel dashboard" /></FL>
           <FL label="Client Type">
-            <select value={clientType} onChange={(e) => handleClientTypeChange(e.target.value)} style={inp}>
-              <option value="">All Client Types</option>
-              {clientTypes.map((ct) => (
-                <option key={ct} value={ct}>{ct}</option>
-              ))}
-            </select>
+            <DropdownMenu
+              ariaLabel="Client Type"
+              menuRole="listbox"
+              items={[{ key: '', label: 'All Client Types', selected: clientType === '', onSelect: () => handleClientTypeChange('') },
+                ...clientTypes.map((ct) => ({ key: ct, label: ct, selected: clientType === ct, onSelect: () => handleClientTypeChange(ct) }))]}
+              renderTrigger={({ ref, toggle, triggerProps }) => (
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{clientType || 'All Client Types'}</span>
+                  <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                </button>
+              )}
+            />
           </FL>
           {spec.headerLabel && spec.headerLabel !== 'Sector / Airline' && (
             <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
           )}
           {interBranch ? (
             <FL label={<>To Branch (counterparty) <span style={{ color: '#dc2626' }}>*</span></>}>
-              <select value={toBranch} onChange={(e) => {
-                const tb = e.target.value;
-                setToBranch(tb);
-                if (tb) { setCustomer((c) => ({ ...c, name: `Travkings Tours and Travels ${tb}`, ledgerName: `Travkings Tours and Travels ${tb}`, ledgerGroup: 'Sundry Debtors', group: 'Sundry Debtors' })); setSaleGstMode(inbCrossBorder(brCode, tb) ? 'inter' : 'inter'); }
-              }} style={inp}>
-                <option value="">Select branch</option>
-                {inbBranches.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select>
+              <DropdownMenu
+                ariaLabel="To Branch"
+                menuRole="listbox"
+                items={[{ key: '', label: 'Select branch', selected: toBranch === '', onSelect: () => handleToBranchChange('') },
+                  ...inbBranches.map((b) => ({ key: b, label: b, selected: toBranch === b, onSelect: () => handleToBranchChange(b) }))]}
+                renderTrigger={({ ref, toggle, triggerProps }) => (
+                  <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                    style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{toBranch || 'Select branch'}</span>
+                    <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                  </button>
+                )}
+              />
             </FL>
           ) : (
           <FL label="Client Ledger *">
@@ -760,13 +777,62 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           )}
           {/* VAT has no intra/inter (place-of-supply) split — these CGST/SGST vs IGST
               selectors are India-only and are hidden on Africa/VAT branches. */}
-          {!isVatBr && <FL label="Sale GST mode"><select value={saleGstMode} onChange={(e) => setSaleGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>}
+          {!isVatBr && <FL label="Sale GST mode">
+            <DropdownMenu
+              ariaLabel="Sale GST mode"
+              menuRole="listbox"
+              items={[
+                { key: 'intra', label: 'Intra-state (CGST+SGST)', selected: saleGstMode === 'intra', onSelect: () => setSaleGstMode('intra') },
+                { key: 'inter', label: 'Inter-state (IGST)', selected: saleGstMode === 'inter', onSelect: () => setSaleGstMode('inter') },
+              ]}
+              renderTrigger={({ ref, toggle, triggerProps }) => (
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{saleGstMode === 'inter' ? 'Inter-state (IGST)' : 'Intra-state (CGST+SGST)'}</span>
+                  <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                </button>
+              )}
+            />
+          </FL>}
           {!isNoSupp && !interBranch && <FL label="Supplier ledger (Pay to) *">
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
               onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
           </FL>}
-          {!isNoSupp && !isVatBr && <FL label="Purchase GST mode"><select value={purGstMode} onChange={(e) => setPurGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>}
-          {hasPackage && <FL label="Package type *"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={{ ...inp, paddingRight: 26 }}><option value="">Select International / Domestic</option><option value="Domestic">Domestic</option><option value="International">International</option></select>
+          {!isNoSupp && !isVatBr && <FL label="Purchase GST mode">
+            <DropdownMenu
+              ariaLabel="Purchase GST mode"
+              menuRole="listbox"
+              items={[
+                { key: 'intra', label: 'Intra-state (CGST+SGST)', selected: purGstMode === 'intra', onSelect: () => setPurGstMode('intra') },
+                { key: 'inter', label: 'Inter-state (IGST)', selected: purGstMode === 'inter', onSelect: () => setPurGstMode('inter') },
+              ]}
+              renderTrigger={({ ref, toggle, triggerProps }) => (
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{purGstMode === 'inter' ? 'Inter-state (IGST)' : 'Intra-state (CGST+SGST)'}</span>
+                  <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                </button>
+              )}
+            />
+          </FL>}
+          {hasPackage && <FL label="Package type *">
+            <DropdownMenu
+              ariaLabel="Package type"
+              menuRole="listbox"
+              width={260}
+              items={[
+                { key: '', label: 'Select International / Domestic', selected: packageType === '', onSelect: () => setPackageType('') },
+                { key: 'Domestic', label: 'Domestic', selected: packageType === 'Domestic', onSelect: () => setPackageType('Domestic') },
+                { key: 'International', label: 'International', selected: packageType === 'International', onSelect: () => setPackageType('International') },
+              ]}
+              renderTrigger={({ ref, toggle, triggerProps }) => (
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{packageType || 'Select International / Domestic'}</span>
+                  <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                </button>
+              )}
+            />
           </FL>}
         </div>
       </div>
@@ -1249,6 +1315,9 @@ function useBookings(brCode) {
 
 // Group bookings for the "… wise" views. 'none' = bill-wise (flat).
 function groupBookings(rows, by) {
+  // Recently Approved wise: not a bucketed group — a flat list sorted by approval
+  // recency (most recent first). Unapproved rows (no approvedAt) sort last.
+  if (by === 'recent') return [{ key: '__all', label: null, rows: [...rows].sort((a, b) => new Date(b.approvedAt || 0) - new Date(a.approvedAt || 0)) }];
   if (by !== 'client' && by !== 'supplier' && by !== 'module') return [{ key: '__all', label: null, rows }];
   const keyOf = (b) => (by === 'client' ? (b.customer?.name || '—') : by === 'supplier' ? (b.supplier?.name || '—') : (b.module || '—'));
   const labelOf = (b) => (by === 'module' ? ((VSPECS[b.module] && VSPECS[b.module].name) || b.module || '—') : keyOf(b));
@@ -1377,13 +1446,13 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
 }
 
 // Bill-wise / Client-wise / Supplier-wise / Module-wise grouping toggle.
-function GroupByBar({ value, onChange }) {
-  const OPTS = [['none', 'Bill wise'], ['client', 'Client wise'], ['supplier', 'Supplier wise'], ['module', 'Module wise']];
+function GroupByBar({ value, onChange, extra = [] }) {
+  const OPTS = [['none', 'Bill wise'], ['client', 'Client wise'], ['supplier', 'Supplier wise'], ['module', 'Module wise'], ...extra];
   return (
-    <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden', marginBottom: 12 }}>
+    <div style={{ display: 'inline-flex', height: 32, boxSizing: 'border-box', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
       {OPTS.map(([v, l]) => (
         <button key={v} onClick={() => onChange(v)}
-          style={{ padding: '6px 12px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: value === v ? BLUE : '#fff', color: value === v ? '#fff' : '#5b616e' }}>{l}</button>
+          style={{ display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: value === v ? BLUE : '#fff', color: value === v ? '#fff' : '#5b616e' }}>{l}</button>
       ))}
     </div>
   );
@@ -1538,7 +1607,7 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
         </div>
         <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>
-      <div><GroupByBar value={groupBy} onChange={setGroupBy} /></div>
+      <div style={{ marginBottom: 12 }}><GroupByBar value={groupBy} onChange={setGroupBy} extra={[['recent', 'Recently Approved']]} /></div>
       <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" groupBy={groupBy} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} busyId={busyId} />
     </div>
   );
@@ -1676,11 +1745,11 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
         <button onClick={() => setRoute && setRoute('/bookings/new')} className="max-tablet:min-h-[44px]" style={btnG}><Plus size={14} /> New voucher</button>
       </div>
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 10 }}>
-        <div style={{ display: 'flex', borderBottom: '1px solid #cdd1d8', flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #cdd1d8', flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}</div>
       </div>
       {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, padding: '8px 12px', color: msg.startsWith('⚠') ? '#dc2626' : '#16a34a', background: msg.startsWith('⚠') ? '#fbe9e9' : '#e8f6ed', border: '1px solid ' + (msg.startsWith('⚠') ? '#f3c9c9' : '#cde3b6') }}>{msg}</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
-        <GroupByBar value={groupBy} onChange={setGroupBy} />
+        <GroupByBar value={groupBy} onChange={setGroupBy} extra={status === 'approved' ? [['recent', 'Recently Approved']] : []} />
         <div style={{ position: 'relative', flex: '0 1 360px', minWidth: 200 }}>
           <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#9197a3', pointerEvents: 'none' }}>🔍</span>
           <input
@@ -1770,7 +1839,7 @@ export function RejectedBookings({ branch, setRoute }) {
         </div>
         <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>
-      <div><GroupByBar value={groupBy} onChange={setGroupBy} /></div>
+      <div style={{ marginBottom: 12 }}><GroupByBar value={groupBy} onChange={setGroupBy} /></div>
       <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="rejected" groupBy={groupBy} busyId={null} />
     </div>
   );

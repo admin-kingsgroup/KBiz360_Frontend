@@ -17,14 +17,15 @@
 
 import React, { useState } from 'react';
 import { openPrintPreview } from '../../../core/PrintPreview';
-import { Download } from 'lucide-react';
+import { Download, ChevronDown } from 'lucide-react';
+import { Menu as DropdownMenu } from '../../../core/ux/Menu';
 import { useGpBills, useModulePL, useAgeing } from '../../../core/useAccounting';
 import { bc } from '../../../core/styles';
 import { CUR_MONTH, MONTH_OPTIONS, ALL_TIME_FROM, todayISO, prevMonthKey } from '../../../core/dates';
 import { CONSOLIDATED_LABEL } from '../../../core/data';
 import { compactAmt } from '../../../core/format';
 import { PageLayout } from '../../../shell/PageLayout';
-import { PageSection, ResponsiveGrid, Button, Select } from '../../../shell/primitives';
+import { PageSection, ResponsiveGrid, Button } from '../../../shell/primitives';
 
 const achvStyle = (a) => (a >= 90 ? { background: '#e8f6ed', color: '#16a34a' } : a >= 70 ? { background: '#fbeedb', color: '#d97706' } : { background: '#fbe9e9', color: '#dc2626' });
 const growthStyle = (g) => (g >= 0 ? { background: '#e8f6ed', color: '#16a34a' } : { background: '#fbe9e9', color: '#dc2626' });
@@ -243,8 +244,24 @@ export function MisReport({ branch }) {
     <PageLayout
       title="Management Information System"
       subtitle={`${periodLabel} · ${brCode || CONSOLIDATED_LABEL} · Monday Morning Report`}
-      actions={<Button size="sm" variant="primary" icon={Download} onClick={() => openPrintPreview({ selector: 'main', title: 'MIS Report', recommend: 'portrait' })}>Export</Button>}
-      filters={<Select value={period} onChange={(e) => setPeriod(e.target.value)} className="w-auto">{PERIODS.map((p) => <option key={p.v} value={p.v}>{p.l}</option>)}</Select>}
+      actions={
+        <>
+          <DropdownMenu
+            ariaLabel="Period"
+            menuRole="listbox"
+            width={160}
+            items={PERIODS.map((p) => ({ key: p.v, label: p.l, selected: period === p.v, onSelect: () => setPeriod(p.v) }))}
+            renderTrigger={({ ref, toggle, triggerProps }) => (
+              <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                className="flex h-9 items-center gap-1.5 rounded-md border border-surface-border bg-surface px-3 text-[13px] font-medium text-ink hover:bg-surface-alt">
+                {periodLabel}
+                <ChevronDown size={13} className="text-ink-subtle" />
+              </button>
+            )}
+          />
+          <Button size="sm" variant="primary" icon={Download} onClick={() => openPrintPreview({ selector: 'main', title: 'MIS Report', recommend: 'portrait' })}>Export</Button>
+        </>
+      }
     >
       {consolidated
         ? (gpByBranch.length === 0

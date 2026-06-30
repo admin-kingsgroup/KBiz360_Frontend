@@ -103,14 +103,16 @@ export function ConsultantReport({ branch }) {
   ];
 
   const filters = (
-    <>
-      <ReportSearch value={search} onChange={setSearch} placeholder="Consultant / module…" />
-      <ReportDateBar value={range} onChange={setRange} branch={branch} />
-      <div className="inline-flex overflow-hidden rounded-md border border-surface-border">
+    <div className="flex w-full flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <ReportSearch value={search} onChange={setSearch} placeholder="Consultant / module…" />
+        <ReportDateBar value={range} onChange={setRange} branch={branch} />
+      </div>
+      <div className="inline-flex shrink-0 overflow-hidden rounded-md border border-surface-border">
         <button onClick={() => setView('table')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === 'table' ? 'bg-navy text-white' : 'bg-surface text-ink-muted hover:bg-surface-alt'}`}><BarChart3 size={13} /> Table</button>
         <button onClick={() => setView('trend')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === 'trend' ? 'bg-navy text-white' : 'bg-surface text-ink-muted hover:bg-surface-alt'}`}><LineChart size={13} /> Trend</button>
       </div>
-    </>
+    </div>
   );
 
   return (

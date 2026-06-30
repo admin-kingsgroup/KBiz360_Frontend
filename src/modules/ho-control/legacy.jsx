@@ -4,7 +4,8 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
-import { Check, Download, Lock, Plus, Save, Settings } from 'lucide-react';
+import { Check, ChevronDown, Download, Lock, Plus, Save, Settings } from 'lucide-react';
+import { Menu as DropdownMenu } from '../../core/ux/Menu';
 import { Legend, Line } from 'recharts';
 import { BRANCHES, EXP_ACTUALS, FX_RATES, GP_BILLS } from '../../core/data';
 import { fmt, fmtINR } from '../../core/format';
@@ -86,9 +87,18 @@ export function GroupDashboard(){
             <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {rangeNote('month',{month:period})} · use the period selector to change</p>
           </div>
         </div>
-        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-          {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-        </select>
+        <DropdownMenu
+          ariaLabel="Period"
+          menuRole="listbox"
+          items={PERIODS.map(p=>({key:p.v,label:p.l,selected:period===p.v,onSelect:()=>setPeriod(p.v)}))}
+          renderTrigger={({ref,toggle,triggerProps})=>(
+            <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+              style={{...inp,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,width:"auto",minHeight:32,fontSize:11,cursor:"pointer",textAlign:"left"}}>
+              {monthLabel(period)}
+              <ChevronDown size={14} style={{color:"#5b616e",flexShrink:0}}/>
+            </button>
+          )}
+        />
       </div>
 
       {loading&&<div style={{margin:"0 0 12px",padding:"9px 14px",borderRadius:9,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:11,color:"#185FA5",fontWeight:600}}>⏳ Loading live group data…</div>}

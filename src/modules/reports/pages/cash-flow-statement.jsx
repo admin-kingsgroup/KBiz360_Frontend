@@ -8,12 +8,14 @@
    ──────────────────────────────────────────────────────────────────── */
 
 import React, { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { Menu as DropdownMenu } from '../../../core/ux/Menu';
 import { useModulePL, useBalanceSheet } from '../../../core/useAccounting';
 import { bc } from '../../../core/styles';
 import { localeOf } from '../../../core/format';
 import { CUR_MONTH, MONTH_OPTIONS, monthLabel, prevMonthKey } from '../../../core/dates';
 import { CONSOLIDATED_LABEL } from '../../../core/data';
-import { Select, LoadingState, ErrorState, EmptyState, PageSection } from '../../../shell/primitives';
+import { LoadingState, ErrorState, EmptyState, PageSection } from '../../../shell/primitives';
 import { RptShell } from '../components/scaffold';
 
 export function ReportCF({ branch }) {
@@ -78,13 +80,23 @@ export function ReportCF({ branch }) {
   const hasData = !!qC.data && (Math.abs(closingCash) > 0.01 || Math.abs(openingCash) > 0.01 || Math.abs(netProfit) > 0.01);
 
   const periodSelect = (
-    <Select value={period} onChange={(e) => setPeriod(e.target.value)} className="w-auto">
-      {MONTH_OPTIONS.map((p) => <option key={p.v} value={p.v}>{p.l}</option>)}
-    </Select>
+    <DropdownMenu
+      ariaLabel="Period"
+      menuRole="listbox"
+      width={180}
+      items={MONTH_OPTIONS.map((p) => ({ key: p.v, label: p.l, selected: period === p.v, onSelect: () => setPeriod(p.v) }))}
+      renderTrigger={({ ref, toggle, triggerProps }) => (
+        <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+          className="flex h-9 items-center gap-1.5 rounded-md border border-surface-border bg-surface px-3 text-[13px] font-medium text-ink hover:bg-surface-alt">
+          {monthLabel(period)}
+          <ChevronDown size={13} className="text-ink-subtle" />
+        </button>
+      )}
+    />
   );
 
   return (
-    <RptShell title="Cash Flow Statement" subtitle={`Indirect method · ${monthLabel(period)} · ${brCode || CONSOLIDATED_LABEL} · live double-entry`} filters={periodSelect}>
+    <RptShell title="Cash Flow Statement" subtitle={`Indirect method · ${monthLabel(period)} · ${brCode || CONSOLIDATED_LABEL} · live double-entry`} actions={periodSelect}>
       {loading && <LoadingState label="Loading live books…" />}
       {!loading && errored && <ErrorState message="Could not load accounting data." onRetry={() => { qPL.refetch(); qC.refetch(); qO.refetch(); }} />}
       {!loading && !errored && !hasData && (

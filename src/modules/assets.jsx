@@ -8,13 +8,14 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
-import { Plus, TrendingDown, Landmark } from 'lucide-react';
+import { Plus, TrendingDown, Landmark, Search, ChevronDown } from 'lucide-react';
 import { fmt, localeOf } from '../core/format';
 import { ACM_REASON_CODES } from '../core/helpers';
 import { useAssetCategories } from '../core/useReference';
 import { useMasterList } from '../core/useMasters';
 import { useAdmMemos, useCreateAdmMemo, useAcceptAdmMemo, useRejectAdmMemo, useDisputeAdmMemo } from '../core/useAdmMemos';
 import { toast } from '../core/ux/toast';
+import { Menu as StatusMenu } from '../core/ux/Menu';
 import { BRANCH_CODES, branchCurrencies, branchMainCurrency } from '../core/data';
 import { bc } from '../core/styles';
 import { PageLayout } from '../shell/PageLayout';
@@ -106,10 +107,28 @@ export function AcmRegister({ branch }) {
       subtitle="Agent Credit Memos · Airline credits to the agency via BSP · Refunds, incentives, ADM reversals"
       actions={
         <>
-          <div className="w-32"><Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            {STATUSES.map((s) => <option key={s}>{s}</option>)}
-          </Select></div>
-          <div className="w-[200px]"><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ACM no / airline…" /></div>
+          <div className="relative">
+            <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-subtle" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ACM no / airline…"
+              className={`w-[200px] pl-8 ${search ? 'pr-7' : ''}`} />
+            {search && (
+              <button type="button" onClick={() => setSearch('')} aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink">×</button>
+            )}
+          </div>
+          <StatusMenu
+            ariaLabel="Filter by status"
+            menuRole="listbox"
+            width={140}
+            items={STATUSES.map((s) => ({ key: s, label: s, selected: s === statusFilter, onSelect: () => setStatusFilter(s) }))}
+            renderTrigger={({ ref, toggle, triggerProps }) => (
+              <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                className="flex h-9 items-center gap-1.5 rounded-md border border-surface-border bg-surface px-3 text-[13px] font-medium text-ink hover:bg-surface-alt">
+                {statusFilter}
+                <ChevronDown size={13} className="text-ink-subtle" />
+              </button>
+            )}
+          />
           <Button variant="success" size="sm" icon={Plus} onClick={() => setModal(true)}>Record ACM</Button>
         </>
       }
