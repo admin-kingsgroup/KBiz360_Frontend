@@ -285,7 +285,7 @@ export function ProfitabilityDash({ branch, go }) {
 }
 
 // ── 3) Cash & Liquidity ───────────────────────────────────────────────────────
-export function CashLiquidityDash({ branch }) {
+export function CashLiquidityDash({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const trial = useTrialBalance(branch, range).data || {};
@@ -294,13 +294,14 @@ export function CashLiquidityDash({ branch }) {
   const cash = rows.filter((r) => liquidityKind(r) === 'cash').reduce((s, r) => s + bal(r), 0);
   const bankRows = rows.filter((r) => liquidityKind(r) === 'bank');
   const bank = bankRows.reduce((s, r) => s + bal(r), 0);
+  const toCash = go && (() => go('/reports/cash-position'));
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Cash & Liquidity" sub={`Cash + bank position · ${range.label}`} branch={branch} p={p} />
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Cash in Hand" value={money(cur, cash)} tone={cash < 0 ? 'bad' : undefined} />
-        <KPI label="Bank Balance" value={money(cur, bank)} tone={bank < 0 ? 'bad' : undefined} />
-        <KPI label="Total Liquid" value={money(cur, cash + bank)} tone={(cash + bank) < 0 ? 'bad' : 'good'} />
+        <KPI label="Cash in Hand" value={money(cur, cash)} tone={cash < 0 ? 'bad' : undefined} onClick={toCash} />
+        <KPI label="Bank Balance" value={money(cur, bank)} tone={bank < 0 ? 'bad' : undefined} onClick={toCash} />
+        <KPI label="Total Liquid" value={money(cur, cash + bank)} tone={(cash + bank) < 0 ? 'bad' : 'good'} onClick={toCash} />
       </div>
       <Card title="Bank & Cash Accounts">
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -316,14 +317,21 @@ export function CashLiquidityDash({ branch }) {
 }
 
 // ── 4) Receivables & Payables ─────────────────────────────────────────────────
-export function ReceivablesPayablesDash({ branch }) {
+export function ReceivablesPayablesDash({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
-  const age = useAgeing(branch).data || {};
+  // Ageing is an as-of snapshot — drive it off the period's `to` so the period bar
+  // actually changes the view (previously it always showed "as of today").
+  const age = useAgeing(branch, range.to).data || {};
   const ar = age.receivables || { rows: [], totals: {} }, ap = age.payables || { rows: [], totals: {} };
   const buckets = (t) => ['d0', 'd30', 'd60', 'd90'].map((k, i) => [['0–30', '30–60', '60–90', '90+'][i], t?.[k] || 0]);
-  const tbl = (title, data, tone) => (
-    <Card title={title} right={<strong style={{ color: tone, fontSize: 13 }}>{money(cur, data.totals?.total || 0)}</strong>}>
+  const tbl = (title, data, tone, to) => (
+    <Card title={title} right={
+      <strong onClick={to && go ? () => go(to) : undefined} role={to && go ? 'button' : undefined} tabIndex={to && go ? 0 : undefined}
+        onKeyDown={to && go ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(to); } } : undefined}
+        title={to && go ? 'Open report →' : undefined}
+        style={{ color: tone, fontSize: 13, cursor: to && go ? 'pointer' : 'default', textDecoration: to && go ? 'underline dotted' : 'none' }}>{money(cur, data.totals?.total || 0)}</strong>
+    }>
       <div style={{ display: 'flex', gap: 8, padding: '8px 14px', flexWrap: 'wrap' }}>
         {buckets(data.totals).map(([l, v]) => <span key={l} style={{ fontSize: 11.5, color: C.dim }}>{l}: <b style={{ color: l === '90+' && v ? C.red : C.dark }}>{money(cur, v)}</b></span>)}
       </div>
@@ -340,9 +348,9 @@ export function ReceivablesPayablesDash({ branch }) {
   );
   return (
     <div style={{ margin: 12 }}>
-      <Toolbar title="Receivables & Payables" sub={`Ageing as of today · top 12 each`} branch={branch} p={p} />
-      {tbl('Receivables (from customers)', ar, C.green)}
-      {tbl('Payables (to suppliers)', ap, C.red)}
+      <Toolbar title="Receivables & Payables" sub={`Ageing as of ${range.to} · top 12 each`} branch={branch} p={p} />
+      {tbl('Receivables (from customers)', ar, C.green, '/reports/rec')}
+      {tbl('Payables (to suppliers)', ap, C.red, '/reports/pay')}
     </div>
   );
 }
@@ -351,7 +359,7 @@ export function ReceivablesPayablesDash({ branch }) {
 // Per-branch P&L + capital in each branch's native currency, then a Group subtotal
 // per currency (the "combined" report) — respecting that branches in different
 // currencies can't be summed without forex.
-export function BranchPerformanceDash() {
+export function BranchPerformanceDash({ go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const BR = branchList(); // live branches (code + currency)
   // Two parallel fan-outs per branch: P&L (module-pl) and capital (capital-analysis).
@@ -477,20 +485,28 @@ const topBy = (rows, keyFn, valFn, n = 10) => {
 };
 
 // ── 6) Balance Sheet ──────────────────────────────────────────────────────────
-export function BalanceSheetDash({ branch }) {
+export function BalanceSheetDash({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
-  const bs = useBalanceSheet(branch, { to: range.to }).data || {};
+  const bsQ = useBalanceSheet(branch, { to: range.to }); const bs = bsQ.data || {};
   const assets = bs.assets || [], liabs = bs.liabilities || [];
   const aT = assets.reduce((s, a) => s + (a.amount || 0), 0), lT = liabs.reduce((s, a) => s + (a.amount || 0), 0);
-  const balanced = Math.abs(aT - lT) < 1;
+  // The backend ALWAYS plugs the sheet with a "Difference in Opening Balances" row so
+  // Assets == Liabilities on paper (and its own `balanced` flag is computed AFTER the
+  // plug, so it's always true). The genuine imbalance is therefore the size of that
+  // plug row — surface it instead of recomputing aT−lT (which is always ~0).
+  const diffRow = liabs.find((l) => /difference in opening/i.test(l.group || ''));
+  const realDiff = diffRow ? (diffRow.amount || 0) : 0;
+  const balanced = Math.abs(realDiff) < 1;
+  const loading = bsQ.isLoading;
+  const toBs = go && (() => go('/reports/bs'));
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Balance Sheet" sub={`Financial position as of ${range.to}`} branch={branch} p={p} />
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Total Assets" value={money(cur, aT)} />
-        <KPI label="Total Liabilities & Capital" value={money(cur, lT)} />
-        <KPI label="Balanced" value={balanced ? '✓ Yes' : '✗ No'} tone={balanced ? 'good' : 'bad'} sub={balanced ? '' : money(cur, aT - lT) + ' diff'} />
+        <KPI label="Total Assets" value={loading ? '…' : money(cur, aT)} onClick={toBs} />
+        <KPI label="Total Liabilities & Capital" value={loading ? '…' : money(cur, lT)} onClick={toBs} />
+        <KPI label="Balanced" value={loading ? '…' : (balanced ? '✓ Yes' : '✗ No')} tone={loading ? undefined : (balanced ? 'good' : 'bad')} sub={loading || balanced ? '' : money(cur, realDiff) + ' unbalanced'} />
       </div>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <div style={{ flex: '1 1 320px' }}><ListTable title="Liabilities & Capital" rows={[...liabs.map((l) => ({ name: l.group, amount: l.amount })), { name: 'Total', amount: lT, bold: true }]} cur={cur} /></div>
@@ -501,19 +517,20 @@ export function BalanceSheetDash({ branch }) {
 }
 
 // ── 7) Module / Product GP ────────────────────────────────────────────────────
-export function ModuleGpDash({ branch }) {
+export function ModuleGpDash({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
   const mods = mpl.modules || [], t = mpl.totals || {};
   const maxGp = Math.max(1, ...mods.map((m) => Math.abs(m.gp || 0)));
+  const toGp = go && (() => go('/reports/gp'));
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Module / Product GP" sub={`Gross profit by product · ${range.label}`} branch={branch} p={p} />
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Sales" value={money(cur, t.sales)} />
-        <KPI label="COGS" value={money(cur, t.cogs)} />
-        <KPI label="Gross Profit" value={money(cur, t.gp)} tone={(t.gp || 0) < 0 ? 'bad' : 'good'} sub={pct(t.gpPct || 0)} />
+        <KPI label="Sales" value={money(cur, t.sales)} onClick={toGp} />
+        <KPI label="COGS" value={money(cur, t.cogs)} onClick={toGp} />
+        <KPI label="Gross Profit" value={money(cur, t.gp)} tone={(t.gp || 0) < 0 ? 'bad' : 'good'} sub={pct(t.gpPct || 0)} onClick={toGp} />
       </div>
       <Card title="GP by Module"><div style={{ padding: '10px 16px' }}>{mods.map((m) => miniBar(m.name || m.key, m.gp, maxGp, (m.gp || 0) < 0 ? C.red : C.green, cur))}{!mods.length && <div style={{ color: C.dim, fontSize: 12 }}>No data.</div>}</div></Card>
       <Card title="Detail">
@@ -530,7 +547,7 @@ export function ModuleGpDash({ branch }) {
 }
 
 // ── 8) Sales & Bookings ───────────────────────────────────────────────────────
-export function SalesBookingsDash({ branch }) {
+export function SalesBookingsDash({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
@@ -542,10 +559,10 @@ export function SalesBookingsDash({ branch }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Sales & Bookings" sub={`Sales, deals & top customers · ${range.label}`} branch={branch} p={p} />
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Total Sales" value={money(cur, sales)} />
-        <KPI label="Deals / Bookings" value={String(deals)} />
-        <KPI label="Avg Deal" value={money(cur, deals ? sales / deals : 0)} />
-        <KPI label="Gross Profit" value={money(cur, mpl?.totals?.gp || 0)} tone="good" />
+        <KPI label="Total Sales" value={money(cur, sales)} onClick={go && (() => go('/reports/sreg'))} />
+        <KPI label="Deals / Bookings" value={String(deals)} onClick={go && (() => go('/reports/invoice-gp'))} />
+        <KPI label="Avg Deal" value={money(cur, deals ? sales / deals : 0)} onClick={go && (() => go('/reports/invoice-gp'))} />
+        <KPI label="Gross Profit" value={money(cur, mpl?.totals?.gp || 0)} tone="good" onClick={go && (() => go('/reports/gp'))} />
       </div>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <div style={{ flex: '1 1 320px' }}><ListTable title="Sales by Module" rows={(mpl.modules || []).map((m) => ({ name: m.name || m.key, amount: m.sales }))} cur={cur} /></div>
@@ -556,7 +573,7 @@ export function SalesBookingsDash({ branch }) {
 }
 
 // ── 9) Supplier / Purchase ────────────────────────────────────────────────────
-export function SupplierPurchaseDash({ branch }) {
+export function SupplierPurchaseDash({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
@@ -569,9 +586,9 @@ export function SupplierPurchaseDash({ branch }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Supplier / Purchase" sub={`Purchases & payables · ${range.label}`} branch={branch} p={p} />
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Total Purchases" value={money(cur, mpl?.totals?.cogs || 0)} />
-        <KPI label="Payables Outstanding" value={money(cur, age.payables?.totals?.total || 0)} tone={(age.payables?.totals?.d90 || 0) ? 'bad' : undefined} sub={(age.payables?.totals?.d90 || 0) ? money(cur, age.payables.totals.d90) + ' overdue 90+' : ''} />
-        <KPI label="Suppliers" value={String(topBy(rows, (r) => r.supplier, () => 1, 9999).filter((s) => s.name !== '—').length)} />
+        <KPI label="Total Purchases" value={money(cur, mpl?.totals?.cogs || 0)} onClick={go && (() => go('/reports/preg'))} />
+        <KPI label="Payables Outstanding" value={money(cur, age.payables?.totals?.total || 0)} tone={(age.payables?.totals?.d90 || 0) ? 'bad' : undefined} sub={(age.payables?.totals?.d90 || 0) ? money(cur, age.payables.totals.d90) + ' overdue 90+' : ''} onClick={go && (() => go('/reports/pay'))} />
+        <KPI label="Suppliers" value={String(topBy(rows, (r) => r.supplier, () => 1, 9999).filter((s) => s.name !== '—').length)} onClick={go && (() => go('/masters/supplier-tabs'))} />
       </div>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <div style={{ flex: '1 1 320px' }}><ListTable title="Top 10 Suppliers (by purchase)" rows={topSup} cur={cur} /></div>
@@ -952,21 +969,24 @@ export function CustomerValueDash({ branch, go }) {
 // KPI tiles drill into the matching register/report.
 export function DirectorDash({ which, branch, setRoute }) {
   const go = (r) => setRoute && setRoute(r);
+  // Every dashboard receives `go` so its money KPIs drill into the matching
+  // register/report. (Previously only a handful were passed `go`, leaving most
+  // dashboards' amounts non-clickable.)
   if (which === 'profitability') return <ProfitabilityDash branch={branch} go={go} />;
-  if (which === 'cash') return <CashLiquidityDash branch={branch} />;
-  if (which === 'arap') return <ReceivablesPayablesDash branch={branch} />;
-  if (which === 'branch') return <BranchPerformanceDash />;
-  if (which === 'balance-sheet') return <BalanceSheetDash branch={branch} />;
-  if (which === 'module-gp') return <ModuleGpDash branch={branch} />;
-  if (which === 'sales') return <SalesBookingsDash branch={branch} />;
-  if (which === 'supplier') return <SupplierPurchaseDash branch={branch} />;
+  if (which === 'cash') return <CashLiquidityDash branch={branch} go={go} />;
+  if (which === 'arap') return <ReceivablesPayablesDash branch={branch} go={go} />;
+  if (which === 'branch') return <BranchPerformanceDash go={go} />;
+  if (which === 'balance-sheet') return <BalanceSheetDash branch={branch} go={go} />;
+  if (which === 'module-gp') return <ModuleGpDash branch={branch} go={go} />;
+  if (which === 'sales') return <SalesBookingsDash branch={branch} go={go} />;
+  if (which === 'supplier') return <SupplierPurchaseDash branch={branch} go={go} />;
   if (which === 'tax') return <TaxComplianceDash branch={branch} go={go} />;
-  if (which === 'expenses') return <ExpensesDash branch={branch} />;
-  if (which === 'audit') return <ApprovalsAuditDash branch={branch} />;
-  if (which === 'sales-target') return <VsTargetDash branch={branch} metric="sales" />;
-  if (which === 'gp-target') return <VsTargetDash branch={branch} metric="gp" />;
-  if (which === 'collections-target') return <VsTargetDash branch={branch} metric="collections" />;
-  if (which === 'budget-expense') return <BudgetVsExpenseDash branch={branch} />;
+  if (which === 'expenses') return <ExpensesDash branch={branch} go={go} />;
+  if (which === 'audit') return <ApprovalsAuditDash branch={branch} go={go} />;
+  if (which === 'sales-target') return <VsTargetDash branch={branch} metric="sales" go={go} />;
+  if (which === 'gp-target') return <VsTargetDash branch={branch} metric="gp" go={go} />;
+  if (which === 'collections-target') return <VsTargetDash branch={branch} metric="collections" go={go} />;
+  if (which === 'budget-expense') return <BudgetVsExpenseDash branch={branch} go={go} />;
   if (which === 'cash-forecast') return <CashForecastDash branch={branch} go={go} />;
   if (which === 'yoy') return <YoYGrowthDash branch={branch} go={go} />;
   if (which === 'customer-value') return <CustomerValueDash branch={branch} go={go} />;

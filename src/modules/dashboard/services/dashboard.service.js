@@ -159,4 +159,4 @@ export const loadAcctsExecDashboard = async ({ branchCode } = {}) => {
   return { todayVouchers, recentActivity, arAgeing, apAgeing, weekStats };
 };
 
-export const loadHrMgrDashboard = async () => api.getHrStats();
+export const loadHrMgrDashboard = async ({ branchCode } = {}) => api.getHrStats(branchCode);

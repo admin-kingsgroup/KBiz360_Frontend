@@ -1660,7 +1660,7 @@ export function DashboardRouter({branch,setBranch,setRoute,currentUser}){
   if(role==="Senior Finance Manager")          return <SrFmDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;
   if(role==="Sr. Accounts Executive")          return <SrAeDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;
   if(role==="Accounts Executive")              return <AcctsExecDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;
-  if(role==="HR Manager")                      return <HrMgrDashboard currentUser={currentUser} setRoute={setRoute}/>;
+  if(role==="HR Manager")                      return <HrMgrDashboard currentUser={currentUser} setRoute={setRoute} branch={branch}/>;
   /* Fallback to existing branch dashboard */
   return <Dashboard branch={branch} setRoute={setRoute}/>;
 }

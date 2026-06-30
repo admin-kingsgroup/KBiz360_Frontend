@@ -32,24 +32,27 @@ export const FX_TO_INR = {
   CDF: 0.03,
 };
 
+// All product sale/purchase entry is now via the SO/PO/GP booking form (the per-module
+// /sales/* routes are RETIRED → read-only registers), so the four module-sale shortcuts
+// collapse to one "New Booking" → /bookings/new. Receipt/Payment/Journal open their real
+// voucher forms. Every shortcut opens a posting form (no dead "create" buttons).
 export const QUICK_CREATE_ACTIONS = [
-  { label: '✈ Flight Sale',   route: '/sales/flight',  color: '#2563eb' },
-  { label: '🌴 Holiday',      route: '/sales/holiday', color: '#16a34a' },
-  { label: '🏨 Hotel',        route: '/sales/hotel',   color: '#d97706' },
-  { label: '🛂 Visa',         route: '/sales/visa',    color: '#3fb7a3' },
-  { label: '💰 Receipt',      route: '/receipts',      color: '#6b4c8b' },
-  { label: '💸 Payment',      route: '/payments',      color: '#dc2626' },
-  { label: '📒 Journal',      route: '/journal',       color: '#5b616e' },
+  { label: '✈ New Booking', route: '/bookings/new', color: '#2563eb' },
+  { label: '💰 Receipt',    route: '/receipts',     color: '#6b4c8b' },
+  { label: '💸 Payment',    route: '/payments',     color: '#dc2626' },
+  { label: '📒 Journal',    route: '/journal',      color: '#5b616e' },
 ];
 
 // Quick "post" shortcuts for the maker (Accts-Exec) dashboard. Sale/Purchase post via the
 // SO/PO/GP booking entry now (per-module /sales/* and /purchase/* are RETIRED → read-only
 // registers), so these point at /bookings/new — clicking actually opens a posting form.
+// Tiles render as "Post {label}" → labels stay single words so they read naturally
+// ("Post Sale", "Post Purchase"). Sale + Purchase both open the SO/PO/GP booking entry.
 export const POST_SHORTCUTS = [
-  { label: 'Receipt',     icon: '⬇',  route: '/receipts',     color: '#16a34a' },
-  { label: 'Payment',     icon: '⬆',  route: '/payments',     color: '#dc2626' },
-  { label: 'New Booking', icon: '📄', route: '/bookings/new', color: '#1a1c22' },
-  { label: 'Purchase',    icon: '📥', route: '/bookings/new', color: '#6B4C8B' },
+  { label: 'Receipt',  icon: '⬇',  route: '/receipts',     color: '#16a34a' },
+  { label: 'Payment',  icon: '⬆',  route: '/payments',     color: '#dc2626' },
+  { label: 'Sale',     icon: '📄', route: '/bookings/new', color: '#1a1c22' },
+  { label: 'Purchase', icon: '📥', route: '/bookings/new', color: '#6B4C8B' },
 ];
 
 export const MONTH_CLOSE_CHECKLIST = [

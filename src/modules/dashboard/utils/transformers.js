@@ -1,56 +1,13 @@
-import { PRODUCT_MODULES, FX_TO_INR } from './constants';
+import { FX_TO_INR } from './constants';
 import { fmtINR } from '../../../core/format';
 import { fmtDate, todayISO } from '../../../core/dates';
 
-export const filterBillsByBranchPeriod = (bills, branchCode, monthPrefix) =>
-  bills.filter(
-    (b) => (!branchCode || b.branch === branchCode) && b.date.startsWith(monthPrefix),
-  );
-
-export const filterBillsFromDate = (bills, branchCode, fromDate) =>
-  bills.filter(
-    (b) => (!branchCode || b.branch === branchCode) && b.date >= fromDate,
-  );
-
-export const filterExpensesByBranchMonth = (expenses, branchCode, month) =>
-  expenses.filter((a) => (!branchCode || a.br === branchCode) && a.m === month);
-
-export const computeBranchKpis = (bills) => {
-  const revenue = bills.reduce((s, b) => s + b.sell, 0);
-  const cost = bills.reduce((s, b) => s + b.cost, 0);
-  const gp = revenue - cost;
-  return {
-    revenue,
-    cost,
-    gp,
-    gpPct: revenue > 0 ? +((gp / revenue) * 100).toFixed(1) : 0,
-    bookings: bills.length,
-  };
-};
-
-export const computeGpByModule = (bills, totalGp) =>
-  PRODUCT_MODULES.map((mod) => {
-    const modBills = bills.filter((b) => b.mod === mod);
-    return {
-      mod,
-      rev: modBills.reduce((s, b) => s + b.sell, 0),
-      gp: modBills.reduce((s, b) => s + b.sell - b.cost, 0),
-      cnt: modBills.length,
-    };
-  })
-    .filter((m) => m.rev > 0)
-    .sort((a, b) => b.gp - a.gp);
-
-export const computeConsultantLeaderboard = (bills, limit = 5) => {
-  const map = {};
-  bills.forEach((b) => {
-    if (!map[b.consultant]) map[b.consultant] = { name: b.consultant, rev: 0, gp: 0, cnt: 0 };
-    map[b.consultant].rev += b.sell;
-    map[b.consultant].gp += b.sell - b.cost;
-    map[b.consultant].cnt += 1;
-  });
-  return Object.values(map).sort((a, b) => b.gp - a.gp).slice(0, limit);
-};
+// NOTE: the seed-era transforms (computeBranchKpis / computeGpByModule /
+// computeConsultantLeaderboard / filterBills* / filterExpensesByBranchMonth) and the
+// get-bills.js / get-expenses.js accessors that fed them were removed — they read the
+// now-empty GP_BILLS / EXP_ACTUALS seed arrays and had no consumers. The live engine
+// equivalents below (gpByModuleFromMpl / consultantsFromSales / countFiles / filesOf)
+// replaced them.
 
 /* ── Live (double-entry engine) → dashboard shapes ─────────────────────────
    These map a module-wise P&L payload (GET /api/accounting/module-pl) and the
