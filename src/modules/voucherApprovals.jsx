@@ -712,29 +712,43 @@ export function InbApprovals({ branch, currentUser }) {
   const approveMany = useApproveMany();
   const reject = useRejectVoucher();
 
-  // Group the two INB legs into one deal, keyed by the INB Link No (sourceRef).
+  // Pair the two INB legs into one deal. The robust link is the SALE's `againstPurchase`
+  // (set on every deal — historical folded + new); fall back to a shared INB-Link
+  // `sourceRef` for any new 2-leg deal that hasn't stamped againstPurchase. (Historical
+  // folded legs carry their original Tally sourceRefs, which differ between legs, so
+  // sourceRef alone would wrongly split a deal — hence againstPurchase first.)
   const deals = useMemo(() => {
-    const by = new Map();
-    for (const v of rows) {
-      const key = v.sourceRef || v.vno;
-      if (!by.has(key)) by.set(key, []);
-      by.get(key).push(v);
-    }
     const toOf = (p) => String(p || '').replace(/^Travkings Tours and Travels\s+/i, '').trim();
-    const out = [];
-    for (const [linkNo, legs] of by) {
-      const sale = legs.find((l) => l.category === 'sale');
-      const purchase = legs.find((l) => l.category === 'purchase');
-      const lead = sale || legs[0];
+    const sales = [], purchases = [];
+    for (const v of rows) (v.category === 'purchase' ? purchases : sales).push(v);
+    const purByVno = new Map(purchases.map((p) => [p.vno, p]));
+    const purBySrc = new Map();
+    purchases.forEach((p) => { if (p.sourceRef && /^INB\//.test(p.sourceRef)) purBySrc.set(p.sourceRef, p); });
+    const used = new Set();
+    const mk = (sale, purchase) => {
+      const lead = sale || purchase;
       const st = lead.status === 'saved' ? 'approved' : (lead.status || 'pending');
       const saleNet = sale ? (Number(sale.total) || 0) - (Number(sale.taxAmt) || 0) : 0;
       const purNet = purchase ? (Number(purchase.total) || 0) - (Number(purchase.taxAmt) || 0) : 0;
-      out.push({
-        linkNo, sale, purchase, status: st, from: lead.branch, to: toOf(lead.party), date: lead.date,
+      // Show the real INB Link No when the voucher carries it (sourceRef = INB/…),
+      // otherwise the sale voucher number is the deal's identifier.
+      const inbLink = [sale, purchase].map((l) => l && l.sourceRef).find((s) => s && /^INB\//.test(s));
+      return {
+        key: (sale && sale.vno) || (purchase && purchase.vno), linkNo: inbLink || (sale && sale.vno) || (purchase && purchase.vno),
+        sale, purchase, status: st, from: lead.branch, to: toOf((sale || lead).party), date: lead.date,
         saleTotal: sale ? Number(sale.total) || 0 : 0, purTotal: purchase ? Number(purchase.total) || 0 : 0,
         margin: Math.round((saleNet - purNet) * 100) / 100,
-      });
+      };
+    };
+    const out = [];
+    for (const sale of sales) {
+      let pur = null;
+      if (sale.againstPurchase && purByVno.has(sale.againstPurchase)) pur = purByVno.get(sale.againstPurchase);
+      else if (sale.sourceRef && /^INB\//.test(sale.sourceRef) && purBySrc.has(sale.sourceRef)) pur = purBySrc.get(sale.sourceRef);
+      if (pur) used.add(pur.vno);
+      out.push(mk(sale, pur));
     }
+    for (const p of purchases) if (!used.has(p.vno)) out.push(mk(null, p)); // orphan purchase (no matching sale)
     return out.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(a.linkNo).localeCompare(String(b.linkNo)));
   }, [rows]);
 
@@ -784,7 +798,7 @@ export function InbApprovals({ branch, currentUser }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderBottom: `1px solid ${C.border}`, padding: '0 8px', flexWrap: 'wrap' }}>
           {tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}
           <div style={{ flex: 1 }} />
-          {pendingTab && sel.size > 0 && isApprover && <button disabled={busy} onClick={() => doApprove(shown.filter((d) => sel.has(d.linkNo)))} style={{ margin: 6, padding: '7px 14px', background: C.green, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 800, cursor: 'pointer' }}>Approve selected ({sel.size})</button>}
+          {pendingTab && sel.size > 0 && isApprover && <button disabled={busy} onClick={() => doApprove(shown.filter((d) => sel.has(d.key)))} style={{ margin: 6, padding: '7px 14px', background: C.green, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 800, cursor: 'pointer' }}>Approve selected ({sel.size})</button>}
         </div>
 
         {q.isLoading ? <div style={{ padding: 12 }}><SkeletonTable rows={6} cols={7} /></div>
@@ -801,10 +815,10 @@ export function InbApprovals({ branch, currentUser }) {
               </thead>
               <tbody>
                 {shown.map((d) => (
-                  <React.Fragment key={d.linkNo}>
+                  <React.Fragment key={d.key}>
                     <tr style={{ borderTop: `1px solid ${C.border}` }}>
-                      {pendingTab && <td style={{ padding: 8 }}><input type="checkbox" checked={sel.has(d.linkNo)} onChange={() => toggle(d.linkNo)} aria-label={`select ${d.linkNo}`} /></td>}
-                      <td {...clickable(() => setOpen((o) => ({ ...o, [d.linkNo]: !o[d.linkNo] })))} title="Show legs" style={{ padding: 8, fontFamily: 'monospace', color: C.blue, cursor: 'pointer', textDecoration: 'underline' }}>{d.linkNo}</td>
+                      {pendingTab && <td style={{ padding: 8 }}><input type="checkbox" checked={sel.has(d.key)} onChange={() => toggle(d.key)} aria-label={`select ${d.linkNo}`} /></td>}
+                      <td {...clickable(() => setOpen((o) => ({ ...o, [d.key]: !o[d.key] })))} title="Show legs" style={{ padding: 8, fontFamily: 'monospace', color: C.blue, cursor: 'pointer', textDecoration: 'underline' }}>{d.linkNo}</td>
                       <td style={{ padding: 8 }}>{fmtDate(d.date)}</td>
                       <td style={{ padding: 8 }}>{d.from} → {d.to}</td>
                       <td style={{ padding: 8, ...num }}>{money(d.saleTotal)}</td>
@@ -819,7 +833,7 @@ export function InbApprovals({ branch, currentUser }) {
                         {pendingTab && !isApprover && <span style={{ fontSize: 11, color: C.dim }}>Approver only</span>}
                       </td>
                     </tr>
-                    {open[d.linkNo] && (
+                    {open[d.key] && (
                       <tr><td colSpan={pendingTab ? 9 : 8} style={{ padding: 0, background: '#fbfcfd' }}>
                         <div style={{ padding: 12 }}>
                           {[d.sale, d.purchase].filter(Boolean).map((leg) => (

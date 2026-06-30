@@ -76,6 +76,21 @@ describe('INB SPG Approvals', () => {
     expect(arg.ids.sort()).toEqual(['pur1', 'sale1']);
   });
 
+  test('historical folded legs pair via againstPurchase even when sourceRef differs', async () => {
+    // Real post-migration shape: legs keep their ORIGINAL Tally sourceRefs (DS/01 vs
+    // DP/01) — only the sale's againstPurchase links them. Must still be ONE deal.
+    const legs = mkLegs('saved').map((l) => ({ ...l, sourceRef: l.category === 'sale' ? 'DS/01' : 'DP/01' }));
+    legs.find((l) => l.category === 'sale').againstPurchase = 'INB/BOM/26/0004';
+    mockApiGet.mockResolvedValue(legs);
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Approved/ }));
+    // one deal row → identified by the sale vno (no INB-link sourceRef present)
+    expect(screen.getByText('INB/BOM/26/0003')).toBeInTheDocument();
+    expect(screen.getByText('BOM → AMD')).toBeInTheDocument();
+    // both legs present (Sale + Pur), not two separate rows
+    expect(screen.getByText('Sale + Pur')).toBeInTheDocument();
+  });
+
   test('a posted (saved) deal shows under Approved, not Pending', async () => {
     mockApiGet.mockResolvedValue(mkLegs('saved'));
     wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
