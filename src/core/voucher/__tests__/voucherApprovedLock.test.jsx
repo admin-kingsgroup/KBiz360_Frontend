@@ -78,11 +78,22 @@ describe('VoucherShell (registry edit) — approved vouchers are read-only, not 
     expect(screen.queryByRole('button', { name: /Revoke/i })).toBeNull();
   });
 
-  test('a booking-driven (locked) voucher shows no Revoke even for an approver', () => {
+  test('a booking-driven (locked) voucher shows no Revoke — offers an Open-booking deep-link instead', () => {
     mockIsApprover.mockReturnValue(true);
     render(<VoucherShell category="payment" mode="edit" voucher={{ ...vch('approved'), locked: true, source: 'booking', bookingId: 'SF/BOM/26/0001' }} cur="₹" onBack={jest.fn()} />);
-    expect(screen.getByText(/SO \/ PO \/ GP booking/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/SO \/ PO \/ GP booking/i).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /Revoke/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /Open .*SO \/ PO \/ GP booking/i })).toBeInTheDocument();
+  });
+
+  test('an INB-deal leg (locked, source:inb) shows no Revoke — deep-links to the INB deal', () => {
+    mockIsApprover.mockReturnValue(true);
+    render(<VoucherShell category="payment" mode="edit" voucher={{ ...vch('approved'), locked: true, source: 'inb', bookingId: 'INB/BOM-AMD/26/0001' }} cur="₹" onBack={jest.fn()} />);
+    expect(screen.getAllByText(/INB deal/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/INB\/BOM-AMD\/26\/0001/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Revoke/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /Open .*INB deal/i })).toBeInTheDocument();
+    expect(screen.queryByText('FORM FIELDS')).toBeNull();
   });
 
   test('a POSTED voucher is also read-only', () => {
@@ -116,6 +127,6 @@ describe('guard — the generic VoucherEditor carries the same approved/posted g
     // The gate guards every posted status (approved + saved) and offers the shared Revoke.
     expect(src).toMatch(/v\.status === 'approved' \|\| v\.status === 'saved' \|\| v\.status === 'posted'/);
     expect(src).toMatch(/useVoucherRevoke/);
-    expect(src).toMatch(/canRevoke && !byBooking && .*doRevoke\(voucherId, dismiss\)/);
+    expect(src).toMatch(/canRevoke && !parent && .*doRevoke\(voucherId, dismiss\)/);
   });
 });

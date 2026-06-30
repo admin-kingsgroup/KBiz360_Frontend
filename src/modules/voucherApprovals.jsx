@@ -715,17 +715,17 @@ function InbDealJv({ sale, purchase }) {
   );
 }
 
-export function InbApprovals({ branch, setRoute, currentUser }) {
+export function InbApprovals({ branch, setRoute, currentUser, initialSearch = '', initialStatus = '' }) {
   const brCode = branchCode(branch);
   const cur = (bc(branch) || {}).cur || '₹';
   const money = (n) => fmtAmount(n, cur);
   const isApprover = /super.?admin|director|senior\s+finance\s+manager|sr\.?\s*accounts\s+executive/i.test(currentUser?.role || '');
 
-  const [status, setStatus] = useState('pending');
+  const [status, setStatus] = useState(initialStatus || 'pending');
   const [open, setOpen] = useState(null);     // single expanded deal key (mirrors SO/PO/GP)
   const [sel, setSel] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch || '');
 
   // One fetch of every INB voucher (both legs of every deal, all statuses) — INB
   // volume is small, so we group + count + filter client-side, mirroring how the
@@ -921,7 +921,9 @@ export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain 
   // Opened from an Alert deep-link targeting a voucher → start on the Vouchers tab.
   const navFocus = useNavFocusStore((s) => s.focus);
   const focusVoucher = navFocus && navFocus.params && navFocus.params.kind === 'voucher';
-  const [domain, setDomain] = useState(focusVoucher ? 'vouchers' : initialDomain);
+  // File deep-link (from a read-only booking/INB leg) → land on its domain, filtered.
+  const fileFocus = navFocus && navFocus.params && navFocus.params.kind === 'file' ? navFocus.params : null;
+  const [domain, setDomain] = useState(fileFocus ? fileFocus.domain : (focusVoucher ? 'vouchers' : initialDomain));
   const seg = (k, label) => (
     <button key={k} onClick={() => setDomain(k)} style={{ padding: '8px 18px', fontSize: 13, fontWeight: 800, border: `1px solid ${domain === k ? C.dark : '#d6dbe6'}`, background: domain === k ? C.dark : '#fff', color: domain === k ? C.gold : C.dim, cursor: 'pointer' }}>{label}</button>
   );
@@ -932,9 +934,9 @@ export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain 
         {seg('sopogp', 'SO / PO / GP')}{seg('vouchers', 'Vouchers')}{seg('inbspg', 'INB SPG')}
       </div>
       {domain === 'sopogp'
-        ? <BookingApprovals branch={branch} setRoute={setRoute} currentUser={currentUser} />
+        ? <BookingApprovals branch={branch} setRoute={setRoute} currentUser={currentUser} initialSearch={fileFocus?.search || ''} initialStatus={fileFocus?.status || ''} />
         : domain === 'inbspg'
-          ? <InbApprovals branch={branch} setRoute={setRoute} currentUser={currentUser} />
+          ? <InbApprovals branch={branch} setRoute={setRoute} currentUser={currentUser} initialSearch={fileFocus?.search || ''} initialStatus={fileFocus?.status || ''} />
           : <VoucherApprovals branch={branch} currentUser={currentUser} />}
     </div>
   );

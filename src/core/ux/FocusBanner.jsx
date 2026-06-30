@@ -9,6 +9,7 @@ function labelFor(p = {}) {
     case 'ledger': return p.name ? `Find & open ledger “${p.name}”` : 'Find the flagged ledger';
     case 'fy': return p.fy ? `Set the sales target for ${p.fy}` : 'Set the sales target';
     case 'fields': return p.fields && p.fields.length ? `Complete: ${p.fields.join(', ')}` : 'Complete the missing setup';
+    case 'file': return p.ref ? `Revoke its ${p.label || 'parent file'} ${p.ref} here — the whole file un-posts together` : 'Open the parent file';
     default: return p.label || 'Resolve the flagged issue';
   }
 }
@@ -24,9 +25,10 @@ export function FocusBanner({ render }) {
   const clear = useNavFocusStore((s) => s.clear);
   if (!focus || focus.route !== route) return null;
   const label = render ? render(focus.params) : labelFor(focus.params);
+  const prefix = focus.params && focus.params.kind === 'file' ? '' : 'From Alerts: ';
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 12px', margin: '0 0 10px', borderRadius: 8, background: '#E6F1FB', border: '1px solid #B9D6F2' }}>
-      <span style={{ fontSize: 12, fontWeight: 700, color: '#185FA5' }}>⮕ From Alerts: {label}</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color: '#185FA5' }}>⮕ {prefix}{label}</span>
       <button onClick={clear} title="Clear focus" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#5a6691', fontSize: 16, lineHeight: 1 }}>✕</button>
     </div>
   );

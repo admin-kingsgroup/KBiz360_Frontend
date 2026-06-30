@@ -48,7 +48,7 @@ import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { JvBlock } from '../../core/voucher/JvBlock';
 import { editorVoucherTotal } from '../../core/voucher/ui';
 import { hasRegistry } from '../../core/voucher/registry';
-import { useVoucherRevoke } from '../../core/voucher/useRevokeAction';
+import { useVoucherRevoke, voucherParent, openParentFile } from '../../core/voucher/useRevokeAction';
 import { PageLayout } from '../../shell/PageLayout';
 import { SkeletonTable } from '../../shell/primitives';
 
@@ -1026,7 +1026,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   // viewing only — to change it, Revoke it back to Pending (the number is kept; a
   // booking-driven Sales/Purchase leg is edited on its SO / PO / GP booking).
   if (v.status === 'approved' || v.status === 'saved' || v.status === 'posted') {
-    const byBooking = v.locked && v.source === 'booking';
+    const parent = voucherParent(v);
     return (
       <div style={{ padding: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -1034,7 +1034,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
           <button onClick={onBack} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 34, fontSize: 11.5, cursor: 'pointer' }}>Back</button>
         </div>
         <div style={{ padding: '10px 12px', borderRadius: 7, background: '#FBF3DE', border: '1px solid #e3cd97', color: '#8a6d12', fontSize: 12, fontWeight: 600, marginBottom: 12 }}>
-          🔒 Approved &amp; posted — read-only. {byBooking ? <>Edit it on its SO / PO / GP booking <b>{v.bookingId}</b>.</> : <>To edit, <b>Revoke</b> it back to Pending in <b>Voucher Approvals</b> — the number is kept.</>}
+          🔒 Approved &amp; posted — read-only. {parent ? <>It is a leg of its {parent.label} <b>{parent.ref}</b> — edit or revoke it there (the whole file is un-posted together), never the voucher alone.</> : <>To edit, <b>Revoke</b> it back to Pending in <b>Voucher Approvals</b> — the number is kept.</>}
         </div>
         <div style={{ fontSize: 11.5, color: DIM, marginBottom: 10 }}>{v.type} · {v.category} · {form.date} · {form.branch}{form.party ? ` · ${form.party}` : ''}</div>
         <div style={{ ...card, padding: 10, boxShadow: 'none', border: '1px solid #dfe2e7' }}>
@@ -1051,7 +1051,8 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
           </table>
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-          {canRevoke && !byBooking && <button onClick={() => doRevoke(voucherId, dismiss)} disabled={revoking} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: revoking ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff', opacity: revoking ? 0.6 : 1 }}>⟲ {revoking ? 'Revoking…' : 'Revoke'}</button>}
+          {parent && parent.navigable && <button onClick={() => { openParentFile(v); dismiss(); }} title={`Open its ${parent.label} ${parent.ref} — revoke the whole file there`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff' }}>⟲ Open {parent.label} →</button>}
+          {canRevoke && !parent && <button onClick={() => doRevoke(voucherId, dismiss)} disabled={revoking} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: revoking ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff', opacity: revoking ? 0.6 : 1 }}>⟲ {revoking ? 'Revoking…' : 'Revoke'}</button>}
           <button onClick={printEntry} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
           <button onClick={dismiss} style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
         </div>

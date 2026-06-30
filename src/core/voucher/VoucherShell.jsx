@@ -5,7 +5,7 @@ import { B, bc, VWrap, VHead, FL, inp, card, btnG, btnGh } from '../styles';
 import { VOUCHER_REGISTRY } from './registry';
 import { DARK, DIM, BLUE, RED, GREEN, money, brCodeOf, escHtml } from './ui';
 import { JvBlock } from './JvBlock';
-import { useVoucherRevoke } from './useRevokeAction';
+import { useVoucherRevoke, voucherParent, openParentFile } from './useRevokeAction';
 import { useFormKeys } from '../ux/forms';
 import { toast } from '../ux/toast';
 import { Kbd } from '../ux/widgets.jsx';
@@ -226,15 +226,16 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   // only. To change it, Revoke it back to Pending in Voucher Approvals — the number is
   // kept (a booking-driven Sales/Purchase leg is edited on its SO/PO/GP booking).
   if (isEdit && (voucher?.status === 'approved' || voucher?.status === 'saved' || voucher?.status === 'posted')) {
-    const byBooking = voucher?.locked && voucher?.source === 'booking';
+    const parent = voucherParent(voucher);
     return editFrame(
       <div style={{ padding: 14 }}>
         <div style={{ padding: '10px 12px', borderRadius: 7, background: '#FBF3DE', border: '1px solid #E8D9A8', color: '#6B4E0F', fontSize: 12, fontWeight: 600, marginBottom: 12 }}>
-          🔒 Approved &amp; posted — read-only. {byBooking ? <>Edit it on its SO / PO / GP booking <b>{voucher.bookingId}</b>.</> : <>To edit, <b>Revoke</b> it back to Pending in <b>Voucher Approvals</b> — the number is kept.</>}
+          🔒 Approved &amp; posted — read-only. {parent ? <>It is a leg of its {parent.label} <b>{parent.ref}</b> — edit or revoke it there (the whole file is un-posted together), never the voucher alone.</> : <>To edit, <b>Revoke</b> it back to Pending in <b>Voucher Approvals</b> — the number is kept.</>}
         </div>
         {journalTable}
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-          {canRevoke && !byBooking && <button onClick={() => doRevoke(editId, dismiss)} disabled={revoking} className="max-tablet:min-h-[44px]" title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: revoking ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff', opacity: revoking ? 0.6 : 1 }}>⟲ {revoking ? 'Revoking…' : 'Revoke'}</button>}
+          {parent && parent.navigable && <button onClick={() => { openParentFile(voucher); dismiss(); }} className="max-tablet:min-h-[44px]" title={`Open its ${parent.label} ${parent.ref} — revoke the whole file there`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff' }}>⟲ Open {parent.label} →</button>}
+          {canRevoke && !parent && <button onClick={() => doRevoke(editId, dismiss)} disabled={revoking} className="max-tablet:min-h-[44px]" title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: revoking ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff', opacity: revoking ? 0.6 : 1 }}>⟲ {revoking ? 'Revoking…' : 'Revoke'}</button>}
           <button onClick={printEntry} className="max-tablet:min-h-[44px]" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
           <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
         </div>

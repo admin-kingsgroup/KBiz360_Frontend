@@ -10,6 +10,41 @@ import { useRevokeVoucher, fetchRevokeCheck } from '../useAccounting';
 import { confirmDialog } from '../ux/confirm';
 import { toast } from '../ux/toast';
 import { isApprover } from '../api';
+import { setNavFocus } from '../ux/navFocus';
+
+// A voucher LOCKED to a parent master is a leg of a file (SO/PO/GP booking, INB deal,
+// purchase-expense order, ADM/ACM register) — it can never be edited or revoked alone;
+// you act on the parent, which un-posts every leg together. Mirrors the backend
+// LOCKED_MASTERS gate, so the read-only editor hides Save/Revoke and points at the parent.
+const PARENT_LABEL = {
+  booking: 'SO / PO / GP booking',
+  inb: 'INB deal',
+  'expense-order': 'purchase expense order',
+  'adm-register': 'ADM register',
+  'acm-register': 'ACM register',
+};
+// Parents we can one-click open (deep-link → the approvals screen, right tab, filtered
+// to the parent ref so the user can revoke the whole file there).
+const PARENT_NAV = {
+  booking: { route: '/transactions/approvals', domain: 'sopogp' },
+  inb: { route: '/transactions/inb-approvals', domain: 'inbspg' },
+};
+export function voucherParent(v) {
+  const label = v && v.locked ? PARENT_LABEL[v.source] : null;
+  return label ? { label, ref: v.bookingId || v.sourceRef || '', source: v.source, navigable: !!PARENT_NAV[v.source] } : null;
+}
+
+// Deep-link from a read-only leg to its parent file's approvals screen, focused on the
+// parent (right domain + the Approved tab + search seeded to the ref). Returns false for
+// a parent we can't navigate to (caller keeps the plain "act on <parent>" text).
+export function openParentFile(v) {
+  const nav = v && v.locked ? PARENT_NAV[v.source] : null;
+  if (!nav) return false;
+  const ref = v.bookingId || v.sourceRef || '';
+  setNavFocus(nav.route, { kind: 'file', domain: nav.domain, status: 'approved', search: ref, label: PARENT_LABEL[v.source], ref });
+  try { window.dispatchEvent(new CustomEvent('kb:open-register', { detail: { route: nav.route } })); } catch { /* ignore */ }
+  return true;
+}
 
 export function useVoucherRevoke() {
   const revoke = useRevokeVoucher();
