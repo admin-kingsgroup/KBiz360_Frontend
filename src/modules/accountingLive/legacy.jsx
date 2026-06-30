@@ -715,10 +715,12 @@ export function DayBookLive({ branch }) {
     return m;
   }, [sorted]);
 
-  const postingRows = useMemo(() => sorted.flatMap((j) => (j.postings || []).map((p) => ({
+  const postingRows = useMemo(() => sorted.flatMap((j) => (j.postings || []).map((p, pi) => ({
     dateKey: dayKey(j.date), date: j.date, vno: j.vno, tallyRef: j.sourceRef || '', voucherId: j.voucherId, type: j.type, category: j.category, branch: j.branch || '',
     ledger: p.ledger, group: p.group, debit: p.debit, credit: p.credit,
     narration: p.narration || j.narration || '', party: j.party || '',
+    // Bills this voucher settled — shown once (on its first leg) so the line isn't repeated per posting.
+    alloc: pi === 0 ? (j.allocations || []) : [],
   }))), [sorted]);
 
   const gDr = Math.round(sorted.reduce((s, j) => s + (j.totalDebit || 0), 0));
@@ -782,7 +784,11 @@ export function DayBookLive({ branch }) {
                       <td style={{ padding: '7px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: (TYPE_CLR[r.category] || '#2e323c') + '22', color: TYPE_CLR[r.category] || '#2e323c' }}>{r.category}</span></td>
                       <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.branch || '—'}</td>
                     </>}
-                    <td style={{ padding: '7px 12px', color: '#1a1c22', paddingLeft: r.debit > 0 ? 12 : 26 }}>{r.ledger}{view === 'detailed' && <span style={{ color: '#9197a3', fontSize: 9.5, marginLeft: 6 }}>{r.group}</span>}</td>
+                    <td style={{ padding: '7px 12px', color: '#1a1c22', paddingLeft: r.debit > 0 ? 12 : 26 }}>{r.ledger}{view === 'detailed' && <span style={{ color: '#9197a3', fontSize: 9.5, marginLeft: 6 }}>{r.group}</span>}
+                      {r.alloc && r.alloc.length > 0 && (
+                        <div style={{ marginTop: 3, fontSize: 9.5, color: GREEN, fontWeight: 600 }}>↳ Settled against: {r.alloc.map((a) => `${a.billVno} (${money(cur, a.amount)})`).join(', ')}</div>
+                      )}
+                    </td>
                     <td style={{ padding: '7px 12px', ...num, color: r.debit > 0 ? BLUE : '#dfe2ee' }}>{money(cur, r.debit)}</td>
                     <td style={{ padding: '7px 12px', ...num, color: r.credit > 0 ? RED : '#dfe2ee' }}>{money(cur, r.credit)}</td>
                     {view === 'detailed' && <td style={{ padding: '7px 12px', maxWidth: 320 }}><NarrationCell text={r.narration} /></td>}

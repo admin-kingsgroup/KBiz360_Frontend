@@ -408,12 +408,15 @@ function LedgerBillwise({ name, branch, side }) {
   const cur = bc(branch).cur;
   const { data, isLoading } = useQuery({
     queryKey: ['ledger-billwise', name, brCodeOf(branch), side],
-    queryFn: () => apiGet('/api/vouchers/open-bills', { party: name, branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), side }),
+    // includeSettled → full bill-wise picture (raised → settled → outstanding), not open-only.
+    queryFn: () => apiGet('/api/vouchers/open-bills', { party: name, branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), side, includeSettled: '1' }),
   });
   if (isLoading) return <div style={{ padding: 20, color: DIM, fontSize: 12 }}>Loading bills…</div>;
   const bills = (data && data.bills) || [];
   const advances = (data && data.advances) || 0;
-  if (!bills.length && advances <= 0.01) return <div style={{ padding: 24, textAlign: 'center', color: DIM, fontSize: 12 }}>No open bills for this ledger.</div>;
+  if (!bills.length && advances <= 0.01) return <div style={{ padding: 24, textAlign: 'center', color: DIM, fontSize: 12 }}>No bills for this ledger.</div>;
+  const totalBill = bills.reduce((s, b) => s + (b.total || 0), 0);
+  const totalSettled = bills.reduce((s, b) => s + (b.allocated || 0), 0);
   const totalOut = bills.reduce((s, b) => s + (b.outstanding || 0), 0);
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -429,17 +432,19 @@ function LedgerBillwise({ name, branch, side }) {
             <td style={{ ...tdName, fontWeight: 600, fontFamily: 'monospace', fontSize: 11 }}>{b.billVno}</td>
             <td style={{ ...tdName, color: DIM, whiteSpace: 'nowrap' }}>{b.creditDays ? dmy(addDaysStr(b.date, b.creditDays)) : '—'}</td>
             <td style={tdNum}>{money(b.total, cur)}</td>
-            <td style={{ ...tdNum, color: DIM }}>{b.allocated ? money(b.allocated, cur) : ''}</td>
-            <td style={{ ...tdNum, fontWeight: 700 }}>{money(b.outstanding, cur)}</td>
-            <td style={{ ...tdName, fontWeight: 600, color: ageColor(b.ageDays) }}>{b.ageDays}d</td>
+            <td style={{ ...tdNum, color: b.allocated ? '#27500A' : DIM, fontWeight: b.allocated ? 700 : 400 }}>{b.allocated ? money(b.allocated, cur) : ''}</td>
+            <td style={{ ...tdNum, fontWeight: 700, color: b.outstanding > 0.01 ? undefined : DIM }}>{b.outstanding > 0.01 ? money(b.outstanding, cur) : '—'}</td>
+            <td style={{ ...tdName, fontWeight: 600, color: b.outstanding > 0.01 ? ageColor(b.ageDays) : DIM }}>{b.outstanding > 0.01 ? `${b.ageDays}d` : 'settled'}</td>
           </tr>
         ))}
       </tbody>
       <tfoot>
         <tr style={{ borderTop: '2px solid ' + DARK, background: '#f4f5f7' }}>
-          <td style={{ ...tdName, fontWeight: 800 }} colSpan={5}>Total Outstanding</td>
+          <td style={{ ...tdName, fontWeight: 800 }} colSpan={3}>Total</td>
+          <td style={{ ...tdNum, fontWeight: 800 }}>{money(totalBill, cur)}</td>
+          <td style={{ ...tdNum, fontWeight: 800, color: '#27500A' }}>{money(totalSettled, cur)}</td>
           <td style={{ ...tdNum, fontWeight: 800 }}>{money(totalOut, cur)}</td>
-          <td />
+          <td style={{ ...tdName, fontSize: 10, color: DIM, fontWeight: 700 }}>outstanding</td>
         </tr>
         {advances > 0.01 && (
           <tr style={{ background: '#fff' }}>
