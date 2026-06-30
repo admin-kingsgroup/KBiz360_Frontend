@@ -514,6 +514,19 @@ export function useOpenBills(party, branch, side = 'customer', excludeId, includ
   });
 }
 
+// One bill's settlement history (Tally bill-wise breakup) — the Shift+Enter drill on
+// the ledger Bill-wise / T-account views. Lazy: only fetched when a row is exploded.
+// Returns { bill, settlements:[{date,category,ref,narration,amount,side,runningPending}], settled, pending }.
+export function useBillSettlements(party, branch, billVno, side = 'customer', enabledFlag = true) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['vouchers', 'bill-settlements', code || 'all', side, party || '', billVno || ''],
+    queryFn: () => apiGet('/api/vouchers/bill-settlements', { party, branch: code, side, billVno }),
+    enabled: enabled() && enabledFlag && !!party && !!billVno && !!code,
+    staleTime: 15_000,
+  });
+}
+
 // Whole-book unsettled bills + on-account advances (the Outstanding & On-Account
 // dashboard). Bills settle ONLY by explicit allocation — no FIFO. Returns
 // { salesBills, purchaseBills, onAccountReceipts, onAccountPayments, totals }.

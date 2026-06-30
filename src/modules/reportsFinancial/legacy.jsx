@@ -1081,16 +1081,37 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
   // Cr (sales + directInc), since GP = (sales − cogs) + (directInc − directExp).
   const directIncome = d.totals.directIncome || 0;
   const directExpense = d.totals.directExpense || 0;
+  // Direct Income / Direct Expenses render as a drillable group ▸ sub-group ▸ ledger
+  // tree (like every other group), not a flat lump. A category whose name equals the
+  // group itself (ledgers sitting directly under it, no sub-group) skips the dup middle row.
+  const directBlock = (gs, total, label, prefix) => {
+    const cats = [...(gs || [])].sort((a, b) => azByName(a.name, b.name));
+    if (!cats.length) return [{ label, amount: total, ledger: label, leaf: true }]; // no detail → flat fallback (clickable)
+    const hOpen = isOpen(prefix, false);
+    const head = { label, amount: total, group: true, expandable: true, ekey: prefix, open: hOpen };
+    if (!hOpen) return [head];
+    return [head, ...cats.flatMap((g) => {
+      const led = [...(g.ledgers || [])].sort((x, y) => azByName(x.name, y.name)).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }));
+      if (g.name === label) return led; // ledgers directly under the group — no redundant sub-group row
+      const gk = prefix + '/' + g.name;
+      const gOpen = isOpen(gk, true);
+      const ghead = { label: g.name, amount: g.amount, sub: true, expandable: true, ekey: gk, open: gOpen };
+      return gOpen ? [ghead, ...led] : [ghead];
+    })];
+  };
+  // Register the direct-tree expand keys so Expand/Collapse-all covers them too.
+  if (directExpense) { allKeys.push('de'); (d.totals.directExpenseGroups || []).forEach((g) => { if (g.name !== 'Direct Expenses') allKeys.push('de/' + g.name); }); }
+  if (directIncome) { allKeys.push('di'); (d.totals.directIncomeGroups || []).forEach((g) => { if (g.name !== 'Direct Income') allKeys.push('di/' + g.name); }); }
   const tradeLeft = [
     { label: 'Purchase Accounts (COGS)', amount: d.totals.cogs, group: true },
     ...modules.flatMap((m) => moduleBlock(m, 'cogs')),
-    ...(directExpense ? [{ label: 'Direct Expenses', amount: directExpense, ledger: 'Direct Expenses', leaf: true }] : []),
+    ...(directExpense ? directBlock(d.totals.directExpenseGroups, directExpense, 'Direct Expenses', 'de') : []),
     { label: 'Gross Profit c/d', amount: grossProfit, result: true },
   ];
   const tradeRight = [
     { label: 'Sales Accounts', amount: d.totals.sales, group: true },
     ...modules.flatMap((m) => moduleBlock(m, 'sales')),
-    ...(directIncome ? [{ label: 'Direct Income', amount: directIncome, ledger: 'Direct Income', leaf: true }] : []),
+    ...(directIncome ? directBlock(d.totals.directIncomeGroups, directIncome, 'Direct Income', 'di') : []),
   ];
   const tradeTotal = d.totals.sales + directIncome;
 
@@ -1324,8 +1345,27 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
   buckets.forEach((b) => { allKeys.push('b:' + b.name); (b.groups || []).forEach((g) => allKeys.push('g:' + b.name + '/' + g.name)); });
   incomeGroups.forEach((g) => allKeys.push('ig:' + g.name));
   allKeys.push(...moduleExpandKeys(modules));
+  if (directExpense) { allKeys.push('de'); (d.totals.directExpenseGroups || []).forEach((g) => { if (g.name !== 'Direct Expenses') allKeys.push('de/' + g.name); }); }
+  if (directIncome) { allKeys.push('di'); (d.totals.directIncomeGroups || []).forEach((g) => { if (g.name !== 'Direct Income') allKeys.push('di/' + g.name); }); }
   const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
   const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
+
+  // Direct Income / Direct Expenses → drillable group ▸ sub-group ▸ ledger (like Classic).
+  const directBlock = (gs, total, label, prefix) => {
+    const cats = [...(gs || [])].sort((a, b) => azByName(a.name, b.name));
+    if (!cats.length) return [{ label, amount: total, ledger: label, leaf: true }];
+    const hOpen = isOpen(prefix, false);
+    const head = { label, amount: total, group: true, expandable: true, ekey: prefix, open: hOpen };
+    if (!hOpen) return [head];
+    return [head, ...cats.flatMap((g) => {
+      const led = [...(g.ledgers || [])].sort((x, y) => azByName(x.name, y.name)).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }));
+      if (g.name === label) return led;
+      const gk = prefix + '/' + g.name;
+      const gOpen = isOpen(gk, true);
+      const ghead = { label: g.name, amount: g.amount, sub: true, expandable: true, ekey: gk, open: gOpen };
+      return gOpen ? [ghead, ...led] : [ghead];
+    })];
+  };
 
   const pctCell = (v, bold) => <td style={{ padding: '3px 10px', textAlign: 'right', color: SAP.sec, fontSize: 11.5, fontWeight: bold ? 700 : 400, ...mono }}>{share(v, nett) >= 0.05 ? `${share(v, nett).toFixed(1)}%` : ''}</td>;
   const Row = ({ r, neg }) => {
@@ -1418,13 +1458,13 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
               <Head txt="Income" />
               <Row r={{ label: 'Revenue from Operations (Sales)', amount: d.totals.sales, group: true }} />
               {modules.flatMap((m) => moduleBlock(m, 'sales')).map((r, i) => <Row key={'s' + i} r={r} />)}
-              {!!directIncome && <Row r={{ label: 'Direct Income', amount: directIncome, ledger: 'Direct Income', leaf: true }} />}
+              {directIncome ? directBlock(d.totals.directIncomeGroups, directIncome, 'Direct Income', 'di').map((r, i) => <Row key={'di' + i} r={r} />) : null}
               <Sub txt="Total Revenue (Trading)" val={revenueTrading} />
               <Head txt="Less: Cost of Sales (COGS)" />
               <Row r={{ label: 'Purchase Accounts (COGS)', amount: d.totals.cogs, group: true }} neg />
               {modules.flatMap((m) => moduleBlock(m, 'cogs')).map((r, i) => <Row key={'c' + i} r={r} neg />)}
               <Sub txt="Total Cost of Sales" val={d.totals.cogs} neg />
-              {!!directExpense && <Row r={{ label: 'Less: Direct Expenses', amount: directExpense, ledger: 'Direct Expenses', leaf: true }} neg />}
+              {directExpense ? directBlock(d.totals.directExpenseGroups, directExpense, 'Direct Expenses', 'de').map((r, i) => <Row key={'de' + i} r={r} neg />) : null}
               <Result txt="Gross Profit" val={grossProfit} />
               {!!indIncome && (oneIncomeLedger
                 ? <Row r={{ label: 'Add: Other Income (Indirect Income)', amount: indIncome, ledger: allIncomeLedgers[0].name, leaf: true }} />
