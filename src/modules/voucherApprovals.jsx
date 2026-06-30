@@ -685,9 +685,174 @@ function EditedVouchersList({ rows, isLoading, open, setOpen, setViewId, cur = '
   );
 }
 
+// ─── Inter-Branch (INB SPG) Approvals ─────────────────────────────────────────
+// INB SPG vouchers land here as PENDING (never auto-approved) and post to the books
+// only on approval — exactly like SO/PO/GP. Each deal groups the INB SALE leg with
+// its airline PURCHASE leg under one INB Link No (sourceRef); approving posts both.
+export function InbApprovals({ branch, currentUser }) {
+  const brCode = branchCode(branch);
+  const cur = (bc(branch) || {}).cur || '₹';
+  const money = (n) => fmtAmount(n, cur);
+  const isApprover = /super.?admin|director|senior\s+finance\s+manager|sr\.?\s*accounts\s+executive/i.test(currentUser?.role || '');
+
+  const [status, setStatus] = useState('pending');
+  const [open, setOpen] = useState({});
+  const [sel, setSel] = useState(() => new Set());
+  const [busy, setBusy] = useState(false);
+
+  // One fetch of every INB voucher (both legs of every deal, all statuses) — INB
+  // volume is small, so we group + count + filter client-side, mirroring how the
+  // SO/PO/GP tab loads all bookings. The books-invalidation on approve refreshes it.
+  const q = useQuery({
+    queryKey: ['vouchers', 'inb', brCode || 'all'],
+    queryFn: () => apiGet('/api/vouchers', { type: 'INB', branch: brCode === 'ALL' ? '' : brCode }),
+  });
+  const rows = Array.isArray(q.data) ? q.data : (q.data && q.data.data) || [];
+
+  const approveMany = useApproveMany();
+  const reject = useRejectVoucher();
+
+  // Group the two INB legs into one deal, keyed by the INB Link No (sourceRef).
+  const deals = useMemo(() => {
+    const by = new Map();
+    for (const v of rows) {
+      const key = v.sourceRef || v.vno;
+      if (!by.has(key)) by.set(key, []);
+      by.get(key).push(v);
+    }
+    const toOf = (p) => String(p || '').replace(/^Travkings Tours and Travels\s+/i, '').trim();
+    const out = [];
+    for (const [linkNo, legs] of by) {
+      const sale = legs.find((l) => l.category === 'sale');
+      const purchase = legs.find((l) => l.category === 'purchase');
+      const lead = sale || legs[0];
+      const st = lead.status === 'saved' ? 'approved' : (lead.status || 'pending');
+      const saleNet = sale ? (Number(sale.total) || 0) - (Number(sale.taxAmt) || 0) : 0;
+      const purNet = purchase ? (Number(purchase.total) || 0) - (Number(purchase.taxAmt) || 0) : 0;
+      out.push({
+        linkNo, sale, purchase, status: st, from: lead.branch, to: toOf(lead.party), date: lead.date,
+        saleTotal: sale ? Number(sale.total) || 0 : 0, purTotal: purchase ? Number(purchase.total) || 0 : 0,
+        margin: Math.round((saleNet - purNet) * 100) / 100,
+      });
+    }
+    return out.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(a.linkNo).localeCompare(String(b.linkNo)));
+  }, [rows]);
+
+  const counts = useMemo(() => {
+    const c = {};
+    for (const d of deals) { (c[d.status] = c[d.status] || { n: 0, amount: 0 }); c[d.status].n++; c[d.status].amount += d.saleTotal; }
+    return c;
+  }, [deals]);
+
+  const shown = deals.filter((d) => d.status === status);
+  const pendingTab = status === 'pending';
+  // Only PENDING legs can be approved/rejected; an already-approved leg is skipped.
+  const idsOf = (d) => [d.sale, d.purchase].filter(Boolean).filter((l) => l.status === 'pending').map((l) => l.id || l._id);
+  const toggle = (lk) => setSel((s) => { const n = new Set(s); if (n.has(lk)) n.delete(lk); else n.add(lk); return n; });
+
+  const doApprove = async (list) => {
+    const ids = list.flatMap(idsOf);
+    if (!ids.length) return;
+    const { confirmed } = await confirmDialog({ title: `Approve ${list.length} INB deal(s)?`, message: 'Each posts its INB Sale + airline Purchase to the books.', confirmLabel: 'Approve' });
+    if (!confirmed) return;
+    setBusy(true);
+    approveMany.mutate({ ids, approver: 'admin' }, {
+      onSuccess: (res) => { setSel(new Set()); const a = (res && res.approved) != null ? res.approved : ids.length, f = (res && res.failed) || 0; toast(f ? `Approved ${a}, ${f} failed` : `Approved ${list.length} INB deal(s)`, f ? 'error' : 'success'); },
+      onError: (e) => toast((e && e.message) || 'Approve failed', 'error'),
+      onSettled: () => setBusy(false),
+    });
+  };
+
+  const doReject = async (d) => {
+    const { confirmed, reason } = await confirmDialog({ title: `Reject INB ${d.linkNo}?`, message: 'Both legs are marked Rejected (no books impact).', danger: true, reasonRequired: true, reasonLabel: 'Reason for rejection', confirmLabel: 'Reject' });
+    if (!confirmed) return;
+    setBusy(true);
+    try { for (const id of idsOf(d)) await reject.mutateAsync({ id, by: 'admin', reason }); toast(`Rejected ${d.linkNo}`); }
+    catch (e) { toast((e && e.message) || 'Reject failed', 'error'); }
+    finally { setBusy(false); }
+  };
+
+  const tab = (k, label) => (
+    <button key={k} onClick={() => { setStatus(k); setSel(new Set()); }} style={{ padding: '8px 16px', border: 'none', borderBottom: `3px solid ${status === k ? C.gold : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? C.dark : C.dim }}>
+      {label} <span style={{ fontSize: 11, color: C.dim }}>({(counts[k] && counts[k].n) || 0}{counts[k] ? ` · ${money(counts[k].amount)}` : ''})</span>
+    </button>
+  );
+
+  return (
+    <div>
+      <div style={{ ...card, marginTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderBottom: `1px solid ${C.border}`, padding: '0 8px', flexWrap: 'wrap' }}>
+          {tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}
+          <div style={{ flex: 1 }} />
+          {pendingTab && sel.size > 0 && isApprover && <button disabled={busy} onClick={() => doApprove(shown.filter((d) => sel.has(d.linkNo)))} style={{ margin: 6, padding: '7px 14px', background: C.green, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 800, cursor: 'pointer' }}>Approve selected ({sel.size})</button>}
+        </div>
+
+        {q.isLoading ? <div style={{ padding: 12 }}><SkeletonTable rows={6} cols={7} /></div>
+          : shown.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: C.dim }}>No {status} INB deals.</div>
+          : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: '#f6f7f9', color: C.dim, textAlign: 'left' }}>
+                  {pendingTab && <th style={{ padding: 8, width: 28 }} />}
+                  <th style={{ padding: 8 }}>INB Link No</th><th style={{ padding: 8 }}>Date</th><th style={{ padding: 8 }}>From → To</th>
+                  <th style={{ padding: 8, ...num }}>Sale</th><th style={{ padding: 8, ...num }}>Purchase</th><th style={{ padding: 8, ...num }}>Margin (SVF)</th>
+                  <th style={{ padding: 8 }}>Legs</th><th style={{ padding: 8 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((d) => (
+                  <React.Fragment key={d.linkNo}>
+                    <tr style={{ borderTop: `1px solid ${C.border}` }}>
+                      {pendingTab && <td style={{ padding: 8 }}><input type="checkbox" checked={sel.has(d.linkNo)} onChange={() => toggle(d.linkNo)} aria-label={`select ${d.linkNo}`} /></td>}
+                      <td {...clickable(() => setOpen((o) => ({ ...o, [d.linkNo]: !o[d.linkNo] })))} title="Show legs" style={{ padding: 8, fontFamily: 'monospace', color: C.blue, cursor: 'pointer', textDecoration: 'underline' }}>{d.linkNo}</td>
+                      <td style={{ padding: 8 }}>{fmtDate(d.date)}</td>
+                      <td style={{ padding: 8 }}>{d.from} → {d.to}</td>
+                      <td style={{ padding: 8, ...num }}>{money(d.saleTotal)}</td>
+                      <td style={{ padding: 8, ...num }}>{d.purchase ? money(d.purTotal) : '—'}</td>
+                      <td style={{ padding: 8, ...num, color: C.green, fontWeight: 700 }}>{money(d.margin)}</td>
+                      <td style={{ padding: 8, fontSize: 11, color: C.dim }}>{d.sale ? 'Sale' : ''}{d.sale && d.purchase ? ' + Pur' : (d.sale ? ' only' : 'Pur')}</td>
+                      <td style={{ padding: 8 }}>
+                        {pendingTab && isApprover && <>
+                          <button disabled={busy} onClick={() => doApprove([d])} style={{ marginRight: 6, padding: '5px 10px', background: C.green, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Approve</button>
+                          <button disabled={busy} onClick={() => doReject(d)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
+                        </>}
+                        {pendingTab && !isApprover && <span style={{ fontSize: 11, color: C.dim }}>Approver only</span>}
+                      </td>
+                    </tr>
+                    {open[d.linkNo] && (
+                      <tr><td colSpan={pendingTab ? 9 : 8} style={{ padding: 0, background: '#fbfcfd' }}>
+                        <div style={{ padding: 12 }}>
+                          {[d.sale, d.purchase].filter(Boolean).map((leg) => (
+                            <div key={leg.vno} style={{ marginBottom: 8 }}>
+                              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 4 }}>{leg.category === 'sale' ? 'INB Sale' : 'Airline Purchase'} · <span style={{ fontFamily: 'monospace' }}>{leg.vno}</span> · {leg.status} · CC {leg.costCenter || '—'}</div>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                                <tbody>
+                                  {(leg.lines || []).map((ln, i) => (
+                                    <tr key={i}><td style={{ padding: '2px 8px' }}>{ln.ledger}</td><td style={{ padding: '2px 8px', ...num }}>{money(ln.amt)}</td></tr>
+                                  ))}
+                                  {(Number(leg.taxAmt) || 0) > 0 && <tr><td style={{ padding: '2px 8px', color: C.dim }}>{leg.category === 'sale' ? 'IGST (on SVF)' : 'GST'}</td><td style={{ padding: '2px 8px', ...num }}>{money(leg.taxAmt)}</td></tr>}
+                                  <tr style={{ fontWeight: 700, borderTop: `1px solid ${C.border}` }}><td style={{ padding: '2px 8px' }}>Total</td><td style={{ padding: '2px 8px', ...num }}>{money(leg.total)}</td></tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          ))}
+                        </div>
+                      </td></tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          )}
+      </div>
+      <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>INB SPG vouchers post as <b>Pending</b> and hit the books only on approval — the INB Sale and its airline Purchase post together under one INB Link No.</div>
+    </div>
+  );
+}
+
 // ─── Unified Approvals ────────────────────────────────────────────────────────
-// One screen for ALL approvals: a top toggle switches between SO/PO/GP bookings
-// and Vouchers; each shows Pending · Approved · Rejected · Deleted · Edited.
+// One screen for ALL approvals: a top toggle switches between SO/PO/GP bookings,
+// Vouchers, and INB SPG; each shows Pending · Approved · Rejected (· Deleted · Edited).
 export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain = 'sopogp' }) {
   // Opened from an Alert deep-link targeting a voucher → start on the Vouchers tab.
   const navFocus = useNavFocusStore((s) => s.focus);
@@ -700,11 +865,13 @@ export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain 
     <div style={{ margin: 12 }}>
       <FocusBanner />
       <div style={{ display: 'inline-flex', borderRadius: 8, overflow: 'hidden', marginBottom: 4 }}>
-        {seg('sopogp', 'SO / PO / GP')}{seg('vouchers', 'Vouchers')}
+        {seg('sopogp', 'SO / PO / GP')}{seg('vouchers', 'Vouchers')}{seg('inbspg', 'INB SPG')}
       </div>
       {domain === 'sopogp'
         ? <BookingApprovals branch={branch} setRoute={setRoute} currentUser={currentUser} />
-        : <VoucherApprovals branch={branch} currentUser={currentUser} />}
+        : domain === 'inbspg'
+          ? <InbApprovals branch={branch} currentUser={currentUser} />
+          : <VoucherApprovals branch={branch} currentUser={currentUser} />}
     </div>
   );
 }
