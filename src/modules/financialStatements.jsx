@@ -127,10 +127,15 @@ function tkfPnLStatement(sd, sCur) {
   // TKF is a full printed statement, so the ledger-wise detail renders inline.
   const moduleStmtRows = (m, side) => {
     const rows = [{ label: m.name, amount: side === 'sales' ? m.sales : m.cogs }];
-    for (const h of ((m.heads && m.heads[side]) || [])) {
+    const heads = (m.heads && m.heads[side]) || [];
+    for (const h of heads) {
       rows.push({ label: h.ledger, amount: h.amount, ledger: h.ledger, indent: 1 });
       for (const comp of (h.components || [])) rows.push({ label: comp.label, amount: comp.amount, indent: 2 });
     }
+    // "Less: Refunds / Reissues" — foots the gross heads to the module's net total
+    // (signed contribution; refunds reduce). Only when there's refund movement.
+    const rf = Number(m.refunds && m.refunds[side]);
+    if (heads.length && Math.abs(rf || 0) > 0.5) rows.push({ label: 'Less: Refunds / Reissues', amount: rf, indent: 1 });
     return rows;
   };
   const incomeRows = [

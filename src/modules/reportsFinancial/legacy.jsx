@@ -756,7 +756,7 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
                                   <td style={{ ...num, color: SAP.sec }}>{pctTxt(s.pctOfSales)}</td>
                                 </tr>
                                 {/* per-sub-centre ledger composition — fares split by Int'l/Domestic, not merged */}
-                                {so && <FioriLedgerRows heads={s.heads} keyBase={sk} cur={cur} openHead={openHead} setOpenHead={setOpenHead} />}
+                                {so && <FioriLedgerRows heads={s.heads} refunds={s.refunds} keyBase={sk} cur={cur} openHead={openHead} setOpenHead={setOpenHead} />}
                                 {so && <FileRows files={s.files} indent={62} cur={cur} onPick={setDrillFile} />}
                               </React.Fragment>
                             );
@@ -947,13 +947,14 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
    the entry (Base Fare, K3, Taxes …). Sales ledgers show their amount in the
    Sales column, Purchase ledgers in the COGS column; click a ledger to reveal
    its components. Same six columns as the module table (colSpan-aware). */
-function FioriLedgerRows({ m, heads: headsProp, keyBase, openHead, setOpenHead, cur = '₹' }) {
+function FioriLedgerRows({ m, heads: headsProp, refunds: refundsProp, keyBase, openHead, setOpenHead, cur = '₹' }) {
   const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   // Module-level (m.heads) for single-leaf modules, or a sub-centre's own heads
   // (Int'l/Domestic) when `heads` + `keyBase` are passed — so fares are split, not merged.
   // Show the FULL component ledger name (e.g. "IT-Base Fare") so the drill matches the
   // Chart of Accounts / Tally P&L tree — no display-only prefix stripping.
   const allHeads = headsProp || (m && m.heads) || {};
+  const nodeRefunds = refundsProp || (m && m.refunds) || {};
   const base = keyBase || (m && m.key) || '';
   const ledgerLabel = (name) => name;
   const rows = [];
@@ -989,6 +990,22 @@ function FioriLedgerRows({ m, heads: headsProp, keyBase, openHead, setOpenHead, 
           <td style={num} /><td style={num} /><td style={num} />
         </tr>
       ));
+    }
+    // "Less: Refunds / Reissues" — foots the gross heads to the net total (signed
+    // contribution; refunds reduce). Shown only when there's refund movement on this side.
+    const rf = Number(nodeRefunds[side]);
+    if (heads.length && Math.abs(rf || 0) > 0.5) {
+      const salesCol = side === 'sales';
+      rows.push(
+        <tr key={`${base}:${side}:__refund`} style={{ background: '#fff', borderBottom: `1px solid ${SAP.borderLt}` }}>
+          <td style={{ padding: '5px 16px 5px 62px', color: SAP.sec, fontStyle: 'italic', fontWeight: 600 }}>
+            <span style={{ display: 'inline-block', width: 21 }} />Less: Refunds / Reissues
+          </td>
+          <td style={num}>{salesCol ? inr(rf) : ''}</td>
+          <td style={num}>{salesCol ? '' : inr(rf)}</td>
+          <td style={num} /><td style={num} /><td style={num} />
+        </tr>
+      );
     }
   }
   if (!rows.length) return null;
@@ -1373,7 +1390,10 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
     const bold = !!(r.group || r.bucket || r.sub || r.costCentre || r.result);
     const color = r.component ? '#6a6a6a' : r.result ? TALLY.green : (r.group || r.bucket || r.sub || r.costCentre) ? TALLY.head : '#1a1a1a';
     const pad = r.component ? 64 : r.ledgerHead ? 46 : r.leaf ? 50 : r.costCentre ? 42 : r.sub ? 34 : r.bucket ? 24 : 14;
-    const amt = neg ? -Math.abs(r.amount) : r.amount;
+    // Refund rows carry a PRE-SIGNED contribution (net − Σheads); on the COGS side
+    // flip the sign (not the magnitude) so it reduces cost, while normal rows keep the
+    // magnitude-flip. Keeps the gross heads + refund footing to the net total.
+    const amt = r.refund ? (neg ? -r.amount : r.amount) : (neg ? -Math.abs(r.amount) : r.amount);
     const structural = !!(r.group || r.bucket || r.sub || r.module) && !r.component;
     return (
       <tr style={{ borderBottom: '1px solid #dfe2e7', background: r.group ? '#fbfcfe' : '#fff' }}>
@@ -1555,7 +1575,10 @@ function DrillPnL({ d, cur, branch, periodTxt }) {
     const clickable = isLedger || r.expandable;
     const bold = lvl === 0 || r.costCentre;
     const color = r.component ? '#6a6a6a' : (lvl === 0 || r.costCentre) ? TALLY.head : isLedger ? '#1f3a8a' : '#1a1a1a';
-    const amt = neg ? -Math.abs(r.amount) : r.amount;
+    // Refund rows carry a PRE-SIGNED contribution (net − Σheads); on the COGS side
+    // flip the sign (not the magnitude) so it reduces cost, while normal rows keep the
+    // magnitude-flip. Keeps the gross heads + refund footing to the net total.
+    const amt = r.refund ? (neg ? -r.amount : r.amount) : (neg ? -Math.abs(r.amount) : r.amount);
     return (
       <tr style={{ borderBottom: '1px solid #dfe2e7' }}>
         {Array.from({ length: LABEL_COLS }).map((_, c) => (

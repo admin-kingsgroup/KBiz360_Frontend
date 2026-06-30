@@ -1,0 +1,118 @@
+<div class="iv">
+<div class="sheet">
+<div class="titlebar">
+<div class="title">PURCHASE INVOICE</div>
+<img class="iata-badge" src="/travkings-logo.png" alt="IATA Accredited Agent" />
+</div>
+<div class="title-rule">
+</div>
+<div class="tophead">
+<div class="brandcol">
+<img class="tk-logo" src="/travkings-logo.png" alt="Travkings Tours &amp; Travels" />
+</div>
+<div class="inv-meta">
+<div class="row firstline">
+<span class="k">Purchase Inv No.</span>
+<span class="v big">BOM/0626/PF00709</span>
+</div>
+<div class="row">
+<span class="k">Date</span>
+<span class="v">2026-02-14</span>
+</div>
+<div class="row">
+<span class="k">Place of Supply</span>
+<span class="v">Maharashtra — 27</span>
+</div>
+<div class="row">
+<span class="k">Link No.</span>
+<span class="v" style="color:var(--gold)">LK/BOM/00596</span>
+</div>
+</div>
+</div>
+<div class="blackrule">
+</div>
+<div class="parties">
+<div class="party">
+<div class="lab">Supplier</div>
+<div class="nm">TRIP JACK Private Limited [Ticketing]</div>
+<div class="ln">
+</div>
+</div>
+<div class="party">
+<div class="lab">Billed To (Buyer)</div>
+<div class="nm">Travkings Tours &amp; Travels</div>
+<div class="ln">Venus Tower, B 603, Veera Desai Rd, Azad Nagar 2, Mhada Colony, Jeevan Nagar, Andheri West, Mumbai, Maharashtra 400053<br>GSTIN : 27AAMCT1096J1ZU<br>Email : accounts.bom@travkings.com<br>Contact : +91 88280 06599</div>
+</div>
+</div>
+<div class="fb-label">Cost Breakdown</div>
+<table>
+<thead>
+<tr>
+<th class="l">Description</th>
+<th class="l">HSN/SAC</th>
+<th>Base Fare</th>
+<th>K3 Tax</th>
+<th>Taxes</th>
+<th>Supplier Service Charge</th>
+<th>Supp Comm/Inc Rcvd</th>
+<th>TDS (2%)</th>
+<th>Total Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="l desc">
+<div class="nm">Booking</div>
+<div class="sub idl">PAX: Global Konnection</div>
+</td>
+<td class="l">996421</td>
+<td>15,554.00</td>
+<td>0.00</td>
+<td>3,255.00</td>
+<td>21.19</td>
+<td>0.00</td>
+<td>0.00</td>
+<td class="tf">₹18,830.19</td>
+</tr>
+</tbody>
+</table>
+<div class="summary">
+<div class="sumtbl">
+<div class="r">
+<span class="k">Sub Total (Fares + Svc)</span>
+<span class="v">₹18,830.19</span>
+</div>
+<div class="r">
+<span class="k">CGST</span>
+<span class="v">₹1.91</span>
+</div>
+<div class="r">
+<span class="k">SGST</span>
+<span class="v">₹1.90</span>
+</div>
+<div class="net">
+<span class="k">NET COST (INR)</span>
+<span class="v">₹18,834.00</span>
+</div>
+</div>
+</div>
+<div class="botrule">
+</div>
+<div class="botgrid">
+<div class="botleft">
+<div class="lab2">Amount in Words</div>
+<div class="words">INR Eighteen Thousand Eight Hundred Thirty Four Only</div>
+<div class="lab2">Settlement</div>
+<div class="pay">Payable to supplier per agreed credit terms.<br>Input GST credit claimed against supplier GSTIN.<br>Link No referenced for invoice-wise GP.</div>
+</div>
+<div class="botright">
+<div class="for">For Travkings Tours &amp; Travels</div>
+<div class="sigline">
+<div class="a">Afshin Dhanani</div>
+<div class="b">Founder &amp; Director</div>
+</div>
+</div>
+</div>
+<div class="terms">Internal purchase record for accounting &amp; ITC. Cost net of supplier incentive per the GP working. Subject to reconciliation with the supplier statement / BSP. E.&amp;O.E.</div>
+</div>
+</div>

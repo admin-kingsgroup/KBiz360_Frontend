@@ -225,7 +225,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   // (Day Book, ledgers, Cash Book, P&L / Balance Sheet, registers) open it for viewing
   // only. To change it, Revoke it back to Pending in Voucher Approvals — the number is
   // kept (a booking-driven Sales/Purchase leg is edited on its SO/PO/GP booking).
-  if (isEdit && (voucher?.status === 'approved' || voucher?.status === 'posted')) {
+  if (isEdit && (voucher?.status === 'approved' || voucher?.status === 'saved' || voucher?.status === 'posted')) {
     const byBooking = voucher?.locked && voucher?.source === 'booking';
     return editFrame(
       <div style={{ padding: 14 }}>
