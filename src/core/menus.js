@@ -488,7 +488,9 @@ export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_ASSETS, MENU
 // Director/Super-Admin only: the plain "Dashboard" pill becomes a "Dashboards"
 // dropdown with the whole-company suite. Other roles keep the single Dashboard link.
 export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, children:[
-  {label:"Overview", children:[
+  // "AD Dashboards" (formerly "Overview") is Super-Admin-only — dashboardsFor()
+  // strips this group for every other role (e.g. Director). superAdminOnly flags it.
+  {label:"AD Dashboards", superAdminOnly:true, children:[
     {label:"My Dashboard", href:"/dashboard"},
     {label:"Alerts Dashboard", href:"/dashboard/alerts"},
     {label:"Capital vs Investment", href:"/dashboards/capital"},
@@ -525,8 +527,9 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
 ]};
 
 // The Owner Dashboard (consolidated all-branch) is owner-only — injected into the
-// "Overview" group right under "My Dashboard", and ONLY for the owner email (the
-// route itself is email-gated in App.jsx, so this just surfaces the link).
+// "AD Dashboards" group right under "My Dashboard", and ONLY for the owner email (the
+// route itself is email-gated in App.jsx, so this just surfaces the link). The owner
+// is a Super Admin, so this group is never stripped for them (see dashboardsFor).
 function withOwnerDashboard(menu){
   const overview = menu.children[0];
   const newOverview = {...overview, children:[
@@ -535,6 +538,16 @@ function withOwnerDashboard(menu){
     ...overview.children.slice(1),
   ]};
   return {...menu, children:[newOverview, ...menu.children.slice(1)]};
+}
+
+// The Dashboards dropdown for a role: the "AD Dashboards" group is Super-Admin-only,
+// so strip any superAdminOnly-flagged group for every other full-menu role (Director).
+// The owner-only Owner Dashboard link is folded in first (owner ⇒ Super Admin ⇒ kept).
+function dashboardsFor(currentUser){
+  const isSuperAdmin = (currentUser?.role || 'Super Admin') === 'Super Admin';
+  const menu = isOwnerDashboardUser(currentUser) ? withOwnerDashboard(MENU_DASHBOARDS) : MENU_DASHBOARDS;
+  if (isSuperAdmin) return menu;
+  return {...menu, children: menu.children.filter(c => !c.superAdminOnly)};
 }
 
 /* ── Per-user page visibility ─────────────────────────────────────────
@@ -620,8 +633,8 @@ export function fullMenuRoots(branch, currentUser){
   const taxSection = taxSectionFor(branch);
   const role = currentUser?.role || 'Super Admin';
   const isDir = role === 'Director' || role === 'Super Admin';
-  // The group owner (Super Admin + owner email) gets the extra Owner Dashboard link.
-  const dashboardsMenu = isOwnerDashboardUser(currentUser) ? withOwnerDashboard(MENU_DASHBOARDS) : MENU_DASHBOARDS;
+  // "AD Dashboards" group is Super-Admin-only; the owner also gets the Owner Dashboard link.
+  const dashboardsMenu = dashboardsFor(currentUser);
   const top = isDir ? [dashboardsMenu, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
   // 10 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · HR · Admin · Support
   return [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN, MENU_SUPPORT];
