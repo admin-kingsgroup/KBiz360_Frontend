@@ -2179,9 +2179,9 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
 function ArApScreen({ branch, side, setRoute, initialTab }) {
   const isRec = side === 'receivables';
   const [tab, setTab] = useState(initialTab || 'ageing'); // 'ageing' | 'settle' | 'net'
- 
+  const [advFocus, setAdvFocus] = useState(''); // party whose advances to focus
   const adjustAdvance = (party) => { setAdvFocus(party); setTab('settle'); };
-  
+
   const TABS = [['ageing', 'Ageing'], ['settle', 'Open Bills & On-Account ▸ Settle'], ['net', 'Net (Debtors − Creditors)']];
   const tabBtn = (active) => ({
     padding: '8px 16px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
@@ -2215,6 +2215,7 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfP
   const inrL = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : '—'; };
   const compactL = (n) => compactCur(cur, n);
   const mobile = useMobile();
+  const [asOfState, setAsOf] = useState(''); // '' = today; otherwise YYYY-MM-DD cut-off
 
   const asOf = embedded ? (asOfProp || '') : asOfState;
   const q = useAgeing(branch, asOf);
