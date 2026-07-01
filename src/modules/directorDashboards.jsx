@@ -885,11 +885,11 @@ export function PerformanceDash({ branch, go }) {
       </div>
       <div className="mt-1.5 text-[11px] text-ink-muted">Green ≥100% · amber ≥90% · red &lt;90% (budget inverts: green = under budget).{noNpTarget && <> · <b>No Nett Profit target set</b> — add one in <b>Finance ▸ Sales Targets</b> (metric “Nett Profit”).</>}</div>
 
-      <Card title="Profit Bridge — how Sales flows down to Nett Profit">
-        <div style={{ padding: 14 }}>
-          <PnlWaterfallPanel branch={branch} range={range} formatMoney={(n) => money(cur, n)} onViewFullReport={go && (() => go('/reports/pnl'))} />
-        </div>
-      </Card>
+      {/* PnlWaterfallPanel is a self-titled card ("📉 Profit Bridge") — render it
+          directly (NO wrapping Card) to avoid a card-in-card + duplicate title. */}
+      <div className="mt-3.5">
+        <PnlWaterfallPanel branch={branch} range={range} formatMoney={(n) => money(cur, n)} onViewFullReport={go && (() => go('/reports/pnl'))} />
+      </div>
 
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 440 }}>

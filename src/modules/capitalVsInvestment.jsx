@@ -82,7 +82,7 @@ const CSS = `
 .cvi .formula .cell .k{font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase}
 .cvi .formula .cell .v{font-size:18px;font-weight:800;margin-top:4px}
 .cvi .formula .op{display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:var(--ink3);flex:0 0 30px;border-right:1px solid var(--rule)}
-.cvi .formula .cell.inv .v{color:var(--gold)}.cvi .formula .cell.blk .v{color:var(--block)}.cvi .formula .cell.res{background:var(--flow-l)}.cvi .formula .cell.res .v{color:var(--flow);font-size:20px}
+.cvi .formula .cell.inv .v{color:var(--gold)}.cvi .formula .cell.gp .v{color:var(--gold)}.cvi .formula .cell.blk .v{color:var(--block)}.cvi .formula .cell.res{background:var(--flow-l)}.cvi .formula .cell.res .v{color:var(--flow);font-size:20px}
 .cvi .reconcile{font-size:10.5px;color:var(--ink3);font-style:italic;margin:2px 2px 8px}.cvi .reconcile b{color:var(--flow);font-style:normal}
 .cvi .perf{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:6px 30px 4px}
 .cvi .pcard{border:1px solid var(--rule);border-radius:8px;padding:13px 15px}
