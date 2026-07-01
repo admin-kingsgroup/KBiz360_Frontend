@@ -14,6 +14,10 @@ import { PeriodBar, periodRange } from '../../../core/period';
 import { BRANCHES } from '../../../core/data';
 import { RevenueTrendChart } from '../components/shared/RevenueTrendChart';
 import { FyTargetsPanel } from '../components/shared/FyTargetsPanel';
+import { ConsultantLeaderboard } from '../components/shared/ConsultantLeaderboard';
+import { KeyAlertsPanel } from '../components/shared/KeyAlertsPanel';
+import { PnlWaterfallPanel } from '../components/shared/PnlWaterfallPanel';
+import { CashForecastPanel } from '../components/shared/CashForecastPanel';
 import { TopEntitiesTable } from '../components/tables/TopEntitiesTable';
 import { useModulePL, useBalanceSheet, useAgeing, useTaxSummary, useTrialBalance, useTargetsVsActual } from '../../../core/useAccounting';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
@@ -75,14 +79,20 @@ function FinancialTables({ mods = [], assets = [], liabs = [], rec, pay, bankRow
       </div>
 
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
-        <WidgetCard title="Receivables / Payables Ageing" subtitle="As of today" color="#dc2626" onDrill={() => nav('/dashboards/arap')}>
+        {/* Bill-wise settlement view — same no-FIFO truth the AR/AP report settles against:
+            Unsettled Bills (open bills) · On-Account (unapplied receipts/payments) · Actual
+            Balance (net = open − on-account). Ageing buckets stay for the open-bill drilldown. */}
+        <WidgetCard title="Receivables / Payables — Ageing & Settlement" subtitle="Open bills · on-account · actual balance" color="#dc2626" onDrill={() => nav('/dashboards/arap')}>
           <Scroll>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th scope="col" style={th}></th><th scope="col" style={{ ...th, ...num }}>0–30</th><th scope="col" style={{ ...th, ...num }}>31–60</th><th scope="col" style={{ ...th, ...num }}>61–90</th><th scope="col" style={{ ...th, ...num }}>90+</th><th scope="col" style={{ ...th, ...num }}>Total</th></tr></thead>
+              <thead><tr><th scope="col" style={th}></th><th scope="col" style={{ ...th, ...num }}>0–30</th><th scope="col" style={{ ...th, ...num }}>31–60</th><th scope="col" style={{ ...th, ...num }}>61–90</th><th scope="col" style={{ ...th, ...num }}>90+</th><th scope="col" style={{ ...th, ...num }} title="Unsettled bills (open)">Unsettled Bills</th><th scope="col" style={{ ...th, ...num }} title="Unapplied receipts / payments sitting on account">On-Account</th><th scope="col" style={{ ...th, ...num }} title="Actual balance = unsettled bills − on-account">Actual Bal.</th></tr></thead>
               <tbody>
-                {[['Receivable', rec], ['Payable', pay]].map(([lbl, t]) => (
-                  <tr key={lbl}><td style={{ ...td, fontWeight: 700 }}>{lbl}</td><td style={{ ...td, ...num }}>{fmt(t?.d0)}</td><td style={{ ...td, ...num }}>{fmt(t?.d30)}</td><td style={{ ...td, ...num }}>{fmt(t?.d60)}</td><td style={{ ...td, ...num, color: (t?.d90) ? C.red : undefined }}>{fmt(t?.d90)}</td><td style={{ ...td, ...num, fontWeight: 700 }}>{fmt(t?.total)}</td></tr>
-                ))}
+                {[['Receivable', rec], ['Payable', pay]].map(([lbl, t]) => {
+                  const netBal = (t?.net != null) ? t.net : ((t?.total || 0) - (t?.onAccount || 0));
+                  return (
+                    <tr key={lbl}><td style={{ ...td, fontWeight: 700 }}>{lbl}</td><td style={{ ...td, ...num }}>{fmt(t?.d0)}</td><td style={{ ...td, ...num }}>{fmt(t?.d30)}</td><td style={{ ...td, ...num }}>{fmt(t?.d60)}</td><td style={{ ...td, ...num, color: (t?.d90) ? C.red : undefined }}>{fmt(t?.d90)}</td><td style={{ ...td, ...num, fontWeight: 700 }}>{fmt(t?.total)}</td><td style={{ ...td, ...num, color: (t?.onAccount) ? C.gold : undefined }}>{fmt(t?.onAccount)}</td><td style={{ ...td, ...num, fontWeight: 700, color: netBal < 0 ? C.red : C.dark }}>{fmt(netBal)}</td></tr>
+                  );
+                })}
               </tbody>
             </table>
           </Scroll>
@@ -205,13 +215,13 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
   );
 
   if (isError && !data) {
-    return <DashboardError error={error} onRetry={refetch} title="Could not load the Owner Dashboard." />;
+    return <DashboardError error={error} onRetry={refetch} title="Could not load the AD Dashboard (All)." />;
   }
   if (isLoading || !data) {
     return <DashboardSkeleton numKpis={12} />;
   }
 
-  const { revenueTrend, topCustomers, topSuppliers } = data;
+  const { revenueTrend, topCustomers, topSuppliers, topConsultants = [], keyAlerts = [] } = data;
   const fig = data.figures || { revenue: 0, gp: 0, gpPct: 0, netProfit: 0, outstanding: 0, payable: 0, cash: 0 };
   const pb = data.pendingBookings || { count: 0, sales: 0, gp: 0 };
   const ab = data.approvedBookings || { count: 0, sales: 0, gp: 0 };
@@ -242,7 +252,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
 
   return (
     <PageLayout>
-      <DashboardHeader title="Owner Dashboard" subtitle={pageSubtitle} user={currentUser} onExport={() => openPrintPreview({ selector: 'main', title: 'Owner Dashboard', recommend: 'portrait' })} />
+      <DashboardHeader title="AD Dashboard (All)" subtitle={pageSubtitle} user={currentUser} onExport={() => openPrintPreview({ selector: 'main', title: 'AD Dashboard (All)', recommend: 'portrait' })} />
       {Controls}
 
       {/* ── Headline KPIs ──
@@ -332,6 +342,35 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
             : liveTargets.length
               ? <FyTargetsPanel targets={liveTargets} formatMoney={m0} />
               : <div className="px-0.5 py-1 text-xs text-ink-muted">No targets set. Add them in <b>Finance ▸ Sales Targets</b>.</div>}
+        </WidgetCard>
+      </div>
+
+      {/* ── Governance & Operations cockpit ── carried over from the (retired-for-owner) My
+          Dashboard so the owner loses nothing: Key Alerts (governance signal), Profit Bridge,
+          13-week Cash Forecast and the Consultant Leaderboard. The three money-shaped panels
+          are single-branch only (Group can't merge ₹ + $); Key Alerts always shows. */}
+      <div className="mb-3.5 grid grid-cols-1 gap-3.5 desktop:grid-cols-2">
+        <WidgetCard title="Key Alerts" subtitle="What needs attention" color="#dc2626" onPin={() => togglePin('alerts')} pinned={pinned.alerts} onDrill={() => navigate('/dashboard/alerts')}>
+          {keyAlerts.length
+            ? <KeyAlertsPanel alerts={keyAlerts} onAlertClick={(route) => route && navigate(route)} />
+            : <div className="px-0.5 py-3 text-xs text-ink-muted">No alerts — nothing needs attention right now.</div>}
+        </WidgetCard>
+        <WidgetCard title="Profit Bridge" subtitle={`Revenue → Net Profit · ${rangeShort}`} color="#16a34a" onPin={() => togglePin('bridge')} pinned={pinned.bridge} onDrill={() => navigate('/dashboards/profitability')}>
+          {isAll
+            ? <div className="px-0.5 py-3 text-xs text-ink-muted">Per-branch — pick a branch (top-right) to view its profit bridge. A consolidated bridge isn’t shown because branches report in different currencies (₹ / $).</div>
+            : <PnlWaterfallPanel branch={branchArg} range={dates} formatMoney={m0} onViewFullReport={() => navigate('/dashboards/profitability')} />}
+        </WidgetCard>
+      </div>
+      <div className="mb-3.5 grid grid-cols-1 gap-3.5 desktop:grid-cols-2">
+        <WidgetCard title="Cash Forecast — 13 Weeks" subtitle="Projected liquidity" color="#0ea5e9" onPin={() => togglePin('forecast')} pinned={pinned.forecast} onDrill={() => navigate('/dashboards/cash-forecast')}>
+          {isAll
+            ? <div className="px-0.5 py-3 text-xs text-ink-muted">Per-branch — pick a branch (top-right) to view its 13-week cash forecast. Not consolidated across currencies (₹ / $).</div>
+            : <CashForecastPanel branch={branchArg} range={dates} formatMoney={m0} onView={() => navigate('/dashboards/cash-forecast')} />}
+        </WidgetCard>
+        <WidgetCard title="Consultant Leaderboard" subtitle={isAll ? 'Pick a branch to view' : `Top earners · ${effScope}`} color="#185FA5" onPin={() => togglePin('leader')} pinned={pinned.leader} onDrill={() => navigate('/reports/gp')}>
+          {isAll
+            ? <div className="px-0.5 py-3 text-xs text-ink-muted">Per-branch — pick a branch (top-right) to view its consultant leaderboard. Not consolidated across branches (different currencies).</div>
+            : <ConsultantLeaderboard consultants={topConsultants} formatMoney={m0} onViewAll={() => navigate('/reports/gp')} />}
         </WidgetCard>
       </div>
 

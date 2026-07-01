@@ -19,10 +19,10 @@ function hrefs(nodes, acc = []) {
 }
 
 describe('Owner Dashboard menu link — owner email only', () => {
-  test('the owner sees the /dashboard/owner link', () => {
+  test('the owner sees the /dashboard/owner link, which REPLACES My Dashboard', () => {
     const all = hrefs(getMenu('ALL', OWNER));
     expect(all).toContain('/dashboard/owner');
-    expect(all).toContain('/dashboard'); // My Dashboard still present
+    expect(all).not.toContain('/dashboard'); // My Dashboard retired for the owner (its widgets moved to the Owner Dashboard)
   });
 
   test('another Super Admin (different email) does NOT see it', () => {

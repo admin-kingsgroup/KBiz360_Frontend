@@ -58,6 +58,7 @@ export const APP_ROUTES = [
   "/dashboards/expenses",
   "/dashboards/gp-target",
   "/dashboards/module-gp",
+  "/dashboards/performance",
   "/dashboards/profitability",
   "/dashboards/sales",
   "/dashboards/sales-target",

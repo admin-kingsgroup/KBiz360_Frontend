@@ -17,6 +17,7 @@ const fyLabel = (s) => { const d = new Date(s); const y = d.getMonth() >= 3 ? d.
 
 // Branch-aware money formatters. India branches keep ₹ + Indian grouping (Cr/L);
 // USD branches ($ — NBO/DAR/FBM) use en-US grouping and K/M/B short scale.
+const round0 = (n) => Math.round(Number(n) || 0);
 const localeOf = (cur) => (cur === '$' ? 'en-US' : 'en-IN');
 const fmtAmt = (cur, n) => (n < 0 ? '-' : '') + (cur || '₹') + Math.abs(Math.round(Number(n) || 0)).toLocaleString(localeOf(cur));
 const fmtShort = (cur, n) => {
@@ -81,7 +82,7 @@ const CSS = `
 .cvi .formula .cell .k{font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase}
 .cvi .formula .cell .v{font-size:18px;font-weight:800;margin-top:4px}
 .cvi .formula .op{display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:var(--ink3);flex:0 0 30px;border-right:1px solid var(--rule)}
-.cvi .formula .cell.inv .v{color:var(--gold)}.cvi .formula .cell.blk .v{color:var(--block)}.cvi .formula .cell.res{background:var(--flow-l)}.cvi .formula .cell.res .v{color:var(--flow);font-size:20px}
+.cvi .formula .cell.inv .v{color:var(--gold)}.cvi .formula .cell.gp .v{color:var(--gold)}.cvi .formula .cell.blk .v{color:var(--block)}.cvi .formula .cell.res{background:var(--flow-l)}.cvi .formula .cell.res .v{color:var(--flow);font-size:20px}
 .cvi .reconcile{font-size:10.5px;color:var(--ink3);font-style:italic;margin:2px 2px 8px}.cvi .reconcile b{color:var(--flow);font-style:normal}
 .cvi .perf{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:6px 30px 4px}
 .cvi .pcard{border:1px solid var(--rule);border-radius:8px;padding:13px 15px}
@@ -136,6 +137,19 @@ export function CapitalVsInvestmentLive({ branch }) {
   const good = (t.gpYield || 0) >= hurdle;
   const flowComp = t.flowComposition || 0;
   const reconciles = Math.abs(flowComp - (t.inflowCapital || 0)) < 1;
+  // Complete P&L statement (all accounts): Sales/Direct Income → Less COGS → Gross
+  // Profit, then Add other income → Less operating expenses → Net Profit.
+  const plFull = data?.profitAndLoss || {};
+  const signGrp = (arr, prefix, factor) => (arr || []).map((g) => ({
+    ...g, grp: prefix + g.grp, total: round0(factor * g.total),
+    ledgers: (g.ledgers || []).map((l) => ({ ...l, a: round0(factor * l.a) })),
+  }));
+  const plStatement = [
+    ...(plFull.sales || []),
+    ...signGrp(plFull.cogs, 'Less: ', -1),
+    ...signGrp(plFull.indirectIncome, 'Add: ', 1),
+    ...signGrp(plFull.indirectExpense, 'Less: ', -1),
+  ];
   // No capital/GP posted → show an empty state rather than a misleading verdict on zeros.
   const hasData = Math.abs(t.capitalInvested || 0) > 0.5 || Math.abs(t.grossProfit || 0) > 0.5 || Math.abs(t.inflowCapital || 0) > 0.5 || Math.abs(t.grossRevenue || 0) > 0.5;
 
@@ -201,18 +215,27 @@ export function CapitalVsInvestmentLive({ branch }) {
               <div className="op">=</div>
               <div className="cell res"><div className="k">In-Flow Capital</div><div className="v">{cr(t.inflowCapital)}</div></div>
             </div>
-            <div className="reconcile">Composition of current-asset ledgers totals <b>{inr(flowComp)}</b> — {reconciles ? 'reconciles with the in-flow residual ✓' : `difference ${inr((t.inflowCapital || 0) - flowComp)} (funded by current liabilities)`}</div>
+            <div className="reconcile">Composition of current-asset ledgers totals <b>{inr(flowComp)}</b> — {reconciles ? 'reconciles with the in-flow residual ✓' : <>the <b>{inr(flowComp - (t.inflowCapital || 0))}</b> gap is financed by external funding (creditors · loans · current liabilities), which totals <b>{inr(t.externalFunding)}</b> — see the complete Balance Sheet below.</>}</div>
             <SecTable groups={data.flow} totalLabel="COMPOSITION TOTAL (CURRENT ASSETS)" totalVal={flowComp} fmt={inr} />
           </div>
           <div className="sec-divider" />
 
           <div className="section secrev">
-            <div className="sec-band"><span className="sec-num">4</span><span className="sec-name">Turnover &amp; GP Performance</span><span className="sec-sub">is the in-flow capital generating enough gross profit? — from P&amp;L</span></div>
+            <div className="sec-band"><span className="sec-num">4</span><span className="sec-name">Turnover · Gross Profit · Net Profit</span><span className="sec-sub">is the in-flow capital generating enough profit? — from P&amp;L</span></div>
             <SecTable groups={data.revenue} totalLabel="GROSS PROFIT" totalVal={t.grossProfit} fmt={inr} />
+            <div className="formula">
+              <div className="cell gp"><div className="k">Gross Profit</div><div className="v">{cr(t.grossProfit)}</div></div>
+              <div className="op">+</div>
+              <div className="cell"><div className="k">Other Income</div><div className="v">{cr(t.indirectIncome)}</div></div>
+              <div className="op">−</div>
+              <div className="cell blk"><div className="k">Operating Exp.</div><div className="v">{cr(t.indirectExpense)}</div></div>
+              <div className="op">=</div>
+              <div className="cell res"><div className="k">Net Profit</div><div className="v">{cr(t.netProfit)}</div></div>
+            </div>
             <div className="perf">
-              <div className="pcard"><div className="k">Flow Turnover</div><div className="v">{(t.flowTurnover || 0).toFixed(2)}×</div><div className="d">Revenue ÷ In-Flow Capital — times the working capital is recycled</div></div>
-              <div className="pcard"><div className="k">GP Margin</div><div className="v">{(t.gpMargin || 0).toFixed(1)}%</div><div className="d">Gross Profit ÷ Revenue — margin earned on sales</div></div>
-              <div className="pcard"><div className="k">GP Yield on In-Flow Capital</div><div className="v">{(t.gpYield || 0).toFixed(1)}%</div><div className="d">Gross Profit ÷ In-Flow Capital — return the working capital throws off</div></div>
+              <div className="pcard"><div className="k">Flow Turnover</div><div className="v">{(t.flowTurnover || 0).toFixed(2)}×</div><div className="d">Turnover ÷ In-Flow Capital — times the working capital is recycled</div></div>
+              <div className="pcard"><div className="k">GP Yield on In-Flow Capital</div><div className="v">{(t.gpYield || 0).toFixed(1)}%</div><div className="d">Gross Profit ÷ In-Flow Capital — pre-operating return</div></div>
+              <div className="pcard"><div className="k">Net Yield on In-Flow Capital</div><div className="v">{(t.netYield || 0).toFixed(1)}%</div><div className="d">Net Profit ÷ In-Flow Capital — after operating costs</div></div>
             </div>
             <div className={`verdict ${good ? 'good' : 'bad'}`}>
               <div className="icon">{good ? '✓' : '!'}</div>
@@ -227,8 +250,24 @@ export function CapitalVsInvestmentLive({ branch }) {
           </div>
 
           <div className="summary-line">
-            <b>{cr(t.capitalInvested)}</b> invested − <b>{cr(t.capitalBlocked)}</b> blocked = <b>{cr(t.inflowCapital)}</b> in flow → recycled <b>{(t.flowTurnover || 0).toFixed(2)}×</b> into <b>{cr(t.grossRevenue)}</b> turnover at <b>{(t.gpMargin || 0).toFixed(1)}%</b> margin = <b>{cr(t.grossProfit)}</b> GP (a {(t.gpYield || 0).toFixed(0)}% yield on in-flow capital).
+            <b>{cr(t.capitalInvested)}</b> invested − <b>{cr(t.capitalBlocked)}</b> blocked = <b>{cr(t.inflowCapital)}</b> in flow → recycled <b>{(t.flowTurnover || 0).toFixed(2)}×</b> into <b>{cr(t.grossRevenue)}</b> turnover at <b>{(t.gpMargin || 0).toFixed(1)}%</b> margin = <b>{cr(t.grossProfit)}</b> GP → after operating costs <b>{cr(t.netProfit)}</b> net profit (a {(t.netYield || 0).toFixed(0)}% net yield on in-flow capital).
           </div>
+          <div className="sec-divider" />
+
+          <div className="section seccap">
+            <div className="sec-band"><span className="sec-num">5</span><span className="sec-name">Complete Balance Sheet</span><span className="sec-sub">every account, both sides — as-on {dmy(range.to)} · {data.balanceSheet?.balanced ? 'balanced ✓' : '⚠ unbalanced'}</span></div>
+            <SecTable groups={data.balanceSheet?.liabilities} totalLabel="TOTAL LIABILITIES & EQUITY" totalVal={t.totalLiabilities} fmt={inr} />
+            <div style={{ height: 12 }} />
+            <SecTable groups={data.balanceSheet?.assets} totalLabel="TOTAL ASSETS" totalVal={t.totalAssets} fmt={inr} />
+          </div>
+          <div className="sec-divider" />
+
+          <div className="section secrev">
+            <div className="sec-band"><span className="sec-num">6</span><span className="sec-name">Complete Profit &amp; Loss</span><span className="sec-sub">every account — trading → Gross Profit {cr(t.grossProfit)} → Net Profit</span></div>
+            <SecTable groups={plStatement} totalLabel="NET PROFIT" totalVal={t.netProfit} fmt={inr} />
+          </div>
+          <div className="sec-divider" />
+
           <div className="hint">Read-only · live from posted Balance Sheet (BS) and Profit &amp; Loss (P&amp;L). Sequence: <b>Capital Invested</b> → less <b>Capital Blocked</b> → the residual <b>In-Flow Capital</b> that actually circulates. Section 4 tests whether that in-flow capital generates enough gross profit, benchmarked against the editable {hurdle}% cost-of-capital hurdle.</div>
         </>)}
       </div>

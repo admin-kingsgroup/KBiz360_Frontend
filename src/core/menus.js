@@ -494,6 +494,7 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
     {label:"My Dashboard", href:"/dashboard"},
     {label:"Alerts Dashboard", href:"/dashboard/alerts"},
     {label:"Capital vs Investment", href:"/dashboards/capital"},
+    {label:"TGT VS Sales/GP/EX/NP", href:"/dashboards/performance"},
   ]},
   {label:"Financials", children:[
     {divider:true, label:"P&L & Growth"},
@@ -526,16 +527,16 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
   ]},
 ]};
 
-// The Owner Dashboard (consolidated all-branch) is owner-only — injected into the
-// "AD Dashboards" group right under "My Dashboard", and ONLY for the owner email (the
-// route itself is email-gated in App.jsx, so this just surfaces the link). The owner
-// is a Super Admin, so this group is never stripped for them (see dashboardsFor).
+// The Owner Dashboard (consolidated all-branch) is owner-only and REPLACES the role-scoped
+// "My Dashboard" for the owner: its governance widgets now carry everything My Dashboard
+// showed, so the owner sees a single home. Only the owner email gets this swap (the route is
+// email-gated in App.jsx too, which also redirects /dashboard → /dashboard/owner for them).
+// The owner is a Super Admin, so this group is never stripped for them (see dashboardsFor).
 function withOwnerDashboard(menu){
   const overview = menu.children[0];
   const newOverview = {...overview, children:[
-    overview.children[0],                                              // My Dashboard
-    {label:"Owner Dashboard (All Branches)", href:"/dashboard/owner"},
-    ...overview.children.slice(1),
+    {label:"AD Dashboard (All)", href:"/dashboard/owner"},   // replaces "My Dashboard" for the owner
+    ...overview.children.slice(1),                                        // Alerts, Capital, … (My Dashboard dropped)
   ]};
   return {...menu, children:[newOverview, ...menu.children.slice(1)]};
 }
