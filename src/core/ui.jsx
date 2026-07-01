@@ -11,7 +11,7 @@ import React from 'react';
 export function TRow({ l, v }){
   return (
     <div style={{display:"flex",justifyContent:"space-between",
-      fontSize:11.5,padding:"3px 0",borderBottom:"1px solid #f3f4f8"}}>
+      fontSize:11.5,padding:"3px 0",borderBottom:"1px solid #dfe2e7"}}>
       <span style={{color:"#5a6691"}}>{l}</span>
       <span style={{fontVariantNumeric:"tabular-nums"}}>{v}</span>
     </div>

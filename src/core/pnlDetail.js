@@ -89,9 +89,20 @@ function headRows(heads, isOpen, keyOf, labelOf = (s) => s) {
   });
 }
 
-/** Rows shown UNDER an open SINGLE-LEAF module, one side (ledger → components). */
+/** The "Less: Refunds / Reissues" row for a module/sub-centre side, so the head
+ *  breakdown foots to the NET total (heads are gross sale/purchase; the refund row
+ *  is the signed net−Σheads contribution). [] when there's no refund movement. */
+export function refundRows(node, side) {
+  const amt = node && node.refunds && Number(node.refunds[side]);
+  return Math.abs(amt || 0) > 0.5
+    ? [{ label: 'Less: Refunds / Reissues', amount: amt, refund: true, ledgerHead: true }]
+    : [];
+}
+
+/** Rows shown UNDER an open SINGLE-LEAF module, one side (ledger → components → refunds). */
 export function moduleDetailRows(m, side, isOpen, keyPrefix = '') {
-  return headRows(moduleHeads(m, side), isOpen, (ledger) => ledgerDetailKey(m, side, ledger, keyPrefix));
+  const rows = headRows(moduleHeads(m, side), isOpen, (ledger) => ledgerDetailKey(m, side, ledger, keyPrefix));
+  return rows.length ? [...rows, ...refundRows(m, side)] : rows;
 }
 
 /**
@@ -110,7 +121,11 @@ export function moduleSubDetailRows(m, side, isOpen, keyPrefix = '') {
     const open = expandable && isOpen(ekey, false);
     const row = { label: s.name, amount: subAmount(s, side), costCentre: true, subCode: s.code, expandable, ekey, open };
     if (!open) return [row];
-    return [row, ...headRows(heads, isOpen, (ledger) => subLedgerDetailKey(m, side, s.code, ledger, keyPrefix), stripLeafPrefix)];
+    // Show the FULL component ledger name (e.g. "IT-Base Fare", "DT-K3 Tax") under the
+    // Int'l/Domestic head — the prefix is kept so the P&L drill matches the Chart of
+    // Accounts / Tally P&L tree exactly (no display-only stripping). A "Less: Refunds /
+    // Reissues" row foots the gross heads to the sub-centre's net total.
+    return [row, ...headRows(heads, isOpen, (ledger) => subLedgerDetailKey(m, side, s.code, ledger, keyPrefix)), ...refundRows(s, side)];
   });
 }
 

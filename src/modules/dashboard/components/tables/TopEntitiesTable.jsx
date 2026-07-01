@@ -12,15 +12,23 @@ export function TopEntitiesTable({
   countKey = 'bookings',
   countLabel,
   shareColor,
+  formatMoney = fmtINR,
 }) {
   const isCustomer = kind === 'customer';
   const defaultCountLabel = isCustomer ? 'bookings' : 'vouchers';
   const defaultShareColor = isCustomer ? '#c2a04a' : '#dc2626';
+  if (!rows || rows.length === 0) {
+    return (
+      <p style={{ margin: 0, padding: '14px 4px', fontSize: 11, color: '#9197a3', textAlign: 'center' }}>
+        No {isCustomer ? 'customers' : 'suppliers'} for this period.
+      </p>
+    );
+  }
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
       <tbody>
         {rows.map((row, i) => (
-          <tr key={row.name} style={{ borderBottom: '1px solid #f0f2f7' }}>
+          <tr key={row.name} style={{ borderBottom: '1px solid #dfe2e7' }}>
             <td style={{ padding: '6px 4px', color: '#5b616e', width: 24 }}>{i + 1}.</td>
             <td style={{ padding: '6px 4px' }}>
               <p style={{ margin: 0, color: '#14161a', fontWeight: 600 }}>{row.name}</p>
@@ -29,7 +37,7 @@ export function TopEntitiesTable({
               </p>
             </td>
             <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 700, color: '#14161a' }}>
-              {fmtINR(row[valueKey])}
+              {formatMoney(row[valueKey])}
             </td>
             <td
               style={{

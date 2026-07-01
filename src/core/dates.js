@@ -62,14 +62,24 @@ export function prevMonthKey(key) {
   return monthKey(new Date(base.getFullYear(), base.getMonth() - 1, 1));
 }
 
-/* ── financial year (Apr 1 – Mar 31) ───────────────────────────────── */
-export function fyOf(d = new Date()) {
+/* ── financial year ────────────────────────────────────────────────────
+ * Defaults to the Indian FY (Apr 1 – Mar 31). `startMonth` (1-based) lets a
+ * branch with a different statutory FY override it later (e.g. Jan–Dec) WITHOUT
+ * touching this single source of truth — with the default it is byte-identical
+ * to the old hard-coded Apr–Mar logic. */
+export function fyOf(d = new Date(), startMonth = 4) {
+  const sm = ((startMonth - 1) % 12 + 12) % 12;                                  // 0-based start month (April → 3)
   const y = d.getFullYear(), m = d.getMonth();
-  const start = m >= 3 ? y : y - 1;                                              // FY starts in April (month index 3)
+  const start = m >= sm ? y : y - 1;
+  const crossesYear = sm > 0;                                                    // Apr–Mar spans two calendar years; Jan–Dec doesn't
+  const endYear = crossesYear ? start + 1 : start;
+  const endMon = (sm + 11) % 12;                                                 // last month of the FY (0-based): Apr-start → Mar (2)
+  const lastDay = new Date(endYear, endMon + 1, 0).getDate();
   return {
-    startYear: start, endYear: start + 1,
-    label: `${start}-${String(start + 1).slice(2)}`,                             // "2026-27"
-    startISO: `${start}-04-01`, endISO: `${start + 1}-03-31`,
+    startYear: start, endYear,
+    label: `${start}-${String(endYear).slice(2)}`,                              // "2026-27"
+    startISO: `${start}-${String(sm + 1).padStart(2, '0')}-01`,
+    endISO: `${endYear}-${String(endMon + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
   };
 }
 export const CUR_FY = fyOf();

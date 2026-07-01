@@ -9,8 +9,9 @@ import { useVoucherRegister } from '../hooks/use-voucher-register';
 import { useFinanceStore } from '../store/finance.store';
 import { useFyStore } from '../../../store/fy';
 import { fmtDate } from '../../../core/dates';
+import { localeOf } from '../../../core/format';
 
-const money = (cur, n) => (n ? `${cur}${Math.round(n).toLocaleString('en-IN')}` : '—');
+const money = (cur, n) => (n ? `${cur}${Math.round(n).toLocaleString(localeOf(cur))}` : '—');
 
 const STATUS_TONE = { approved: 'success', pending: 'warning', rejected: 'danger', deleted: 'neutral' };
 function StatusChip({ status }) {
@@ -116,5 +117,14 @@ export const ReceiptRegisterPage = (props) => <VoucherRegisterPage {...props} ca
 export const PaymentRegisterPage = (props) => <VoucherRegisterPage {...props} category="payment" title="Payment Register" />;
 export const ContraRegisterPage  = (props) => <VoucherRegisterPage {...props} category="contra"  title="Contra Register" />;
 export const JournalRegisterPage = (props) => <VoucherRegisterPage {...props} category="journal" title="Journal Register" />;
+// Refund (RF, full + partial) and Reissue (RI) are raised against a sale; Debit Note
+// (DN) is a purchase return. All three post like any other voucher, so they reuse the
+// same category-driven engine — only the `category` filter differs.
+export const RefundRegisterPage    = (props) => <VoucherRegisterPage {...props} category="refund"      title="Refund Register" />;
+export const ReissueRegisterPage   = (props) => <VoucherRegisterPage {...props} category="reissue"     title="Reissue Register" />;
+export const DebitNoteRegisterPage = (props) => <VoucherRegisterPage {...props} category="debit-note"  title="Debit Note Register" />;
+// Purchase Expense (PXP) — the system's expense-side purchase voucher (e.g. bank-charge
+// ITC, supplier expenses). Distinct from a trade Purchase (PI); same category-driven engine.
+export const PurchaseExpenseRegisterPage = (props) => <VoucherRegisterPage {...props} category="purchase-expense" title="Purchase Expense Register (PXP)" />;
 
 export default VoucherRegisterPage;

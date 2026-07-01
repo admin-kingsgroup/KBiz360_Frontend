@@ -9,6 +9,7 @@
 
 import React, { useState } from 'react';
 import { bc } from '../../../core/styles';
+import { localeOf } from '../../../core/format';
 import { useGpBills, useAgeing } from '../../../core/useAccounting';
 import { ReportSearch, ReportDateBar, resolveReportRange, matchNeedle } from '../../../core/reportDateBar';
 import { PageLayout } from '../../../shell/PageLayout';
@@ -47,7 +48,7 @@ export function Customer360({ branch }) {
   const histBills = clientBills.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
   const filteredHist = histBills.filter((b) => matchNeedle([b.id, b.date, b.mod, b.dest], needle));
   const displayHist = (needle ? filteredHist : filteredHist.slice(0, 10)).map((b) => ({ ...b, gp: b.sell - b.cost, gpPct: b.sell > 0 ? +((b.sell - b.cost) / b.sell * 100).toFixed(1) : 0 }));
-  const f = (n) => cur + Number(Math.round(n)).toLocaleString('en-IN');
+  const f = (n) => cur + Number(Math.round(n)).toLocaleString(localeOf(cur));
 
   const profileKpis = [
     { l: 'Total Sales', v: f(totRev) }, { l: 'GP Generated', v: f(totGP) }, { l: 'Avg GP%', v: `${gpPct}%` },
@@ -69,13 +70,15 @@ export function Customer360({ branch }) {
       title="Customer 360° View"
       subtitle="Complete customer profile — sales, GP, outstanding receivable and ageing"
       filters={
-        <>
-          <ReportSearch value={search} onChange={setSearch} placeholder="Voucher / module / destination…" />
+        <div className="flex w-full flex-wrap items-center gap-3">
+          <div className="flex flex-1 items-center gap-2">
+            <div className="flex-1"><ReportSearch value={search} onChange={setSearch} placeholder="Voucher / module / destination…" width="100%" /></div>
+            <Select value={selClient} onChange={(e) => setClient(e.target.value)} disabled={!ALL_CLIENTS.length} className="flex-1">
+              {ALL_CLIENTS.length ? ALL_CLIENTS.map((s) => <option key={s}>{s}</option>) : <option value="">No customer data yet</option>}
+            </Select>
+          </div>
           <ReportDateBar value={range} onChange={setRange} branch={branch} />
-          <Select value={selClient} onChange={(e) => setClient(e.target.value)} disabled={!ALL_CLIENTS.length} className="w-auto min-w-[200px]">
-            {ALL_CLIENTS.length ? ALL_CLIENTS.map((s) => <option key={s}>{s}</option>) : <option value="">No customer data yet</option>}
-          </Select>
-        </>
+        </div>
       }
     >
       {gpQ.isError && (
@@ -116,7 +119,7 @@ export function Customer360({ branch }) {
           <DataTable columns={histColumns} rows={displayHist} getRowKey={(r) => r.id} dense exportName={`customer-${selClient || 'none'}`} emptyMessage="No sales for this customer." />
         </div>
         <div className="flex flex-col gap-3">
-          <PageSection title="Receivable Ageing" className="border-t-[3px] border-t-[#185FA5]">
+          <PageSection title="Receivable Ageing" className="border-t-[3px] border-t-[#185FA5] mt-6">
             {!ageRow.party ? <p className="text-[11px] text-ink-muted">No open receivable for this customer.</p> : (
               <div className="text-[11px]">
                 {AGE_BUCKETS.map(([k, lbl]) => (

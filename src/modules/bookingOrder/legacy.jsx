@@ -9,16 +9,24 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Save, ArrowRight, Check, Lock, RefreshCw, Clock, CheckCircle2,
-  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil,
+  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil, RotateCcw,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../../core/styles.jsx';
+import { Menu as DropdownMenu } from '../../core/ux/Menu';
+import { localeOf } from '../../core/format';
 import { todayISO } from '../../core/dates';
 import { PeriodBar, periodRange } from '../../core/period';
-import { openPrintPreview } from '../../core/PrintPreview';
-import { buildBookingInvoice } from '../../core/invoiceHtml';
+import { printBookingInvoice } from '../../core/printInvoice';
 import { apiGet, apiPost, apiPut } from '../../core/api';
-import { useOpenInb, useBookInb } from '../../core/useInterBranchVoucher';
+import { useOpenInb, useBookInb, useCreateInb } from '../../core/useInterBranchVoucher';
+import { useVNo } from '../../core/useNextNo';
+
+// Inter-branch jurisdiction (mirror of backend): same country (India) = IGST;
+// different country = cross-border export (zero-rated on the seller side).
+const INB_COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'FB' };
+const INB_ALL = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'BOMMB'];
+const inbCrossBorder = (from, to) => (INB_COUNTRY[from] || 'IN') !== (INB_COUNTRY[to] || 'IN');
 import { AuditTrail } from '../../core/AuditTrail';
 import { useLedgerRegistry } from '../../core/useReference';
 import { useFormKeys } from '../../core/ux/forms';
@@ -28,33 +36,55 @@ import { clickable } from '../../core/ux/clickable';
 import { listKeyNav } from '../../core/ux/listKeys';
 import { usePager, Pager } from '../../core/ux/pager';
 import { SmartDateInput } from '../../core/ux/SmartDateInput';
+import { JvBlock } from '../../core/voucher/JvBlock';
 import {
   VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc, isVatBranch, rowsFromSnapshots,
 } from '../../core/voucherSpecs.js';
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
 import { invalidateBooks } from '../../core/useAccounting';
 
-const GOLD = '#c2a04a', DARK = '#1a1c22', DR = '#16a34a', CR = '#dc2626', BLUE = '#2563eb';
+const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', CR = '#C0392B', BLUE = '#2563eb';
+// Gold theme tokens + per-section bar accents (SO / PO / GP voucher theme).
+const GOLD_DEEP = '#6B4E0F', GOLD_SOFT = '#FBF3DE', GOLD_LINE = '#E8D9A8';
+const HELV = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+const SO_BAR = '#1D4E89', PO_BAR = '#8A1F3D', GP_BAR = GOLD;
 // Reversal modules (Refund / Reissue) act on an existing sale — picked from the same
 // module bar as Flight/Hotel, but they open the reversal entry (ReversalEntry) instead
 // of the fare grid and spawn one RF/RI voucher on approval.
 const REVERSAL_CHIPS = [{ code: 'RF', name: 'Refund', icon: '↩️' }, { code: 'RI', name: 'Reissue', icon: '🔁' }];
 const isReversalModule = (m) => m === 'RF' || m === 'RI';
 const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || 'BOM'));
+// A supplier attracts Indian 194H TDS only when it is an Indian vendor (blank country =
+// India default). Mirrors the backend isIndia() in shared/util/gstSupplyType so the live
+// PO grid drops the 2% TDS for a foreign supplier exactly as the posted journal does.
+const isIndiaCountry = (c) => { const s = String(c || '').trim().toLowerCase(); return s === '' || s === 'india' || s === 'in' || s === 'bharat'; };
 const today = () => new Date().toISOString().slice(0, 10);
 const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 /* shared cell styles */
-const thM = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: '#334155', textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #e2e8f0', background: '#f8fafc' };
+const thM = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: '#334155', textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #cdd1d8', background: '#f8fafc' };
 const thA = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: GOLD, textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #f2e6cc', background: '#fdfbfa' };
 const thL = { textAlign: 'left' };
-const tdC = { padding: '6px 8px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #e2e8f0', fontVariantNumeric: 'tabular-nums', verticalAlign: 'middle' };
+const tdC = { padding: '6px 8px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #cdd1d8', fontVariantNumeric: 'tabular-nums', verticalAlign: 'middle' };
 const tdAuto = { ...tdC, background: '#faf7ef', color: '#5b616e', fontWeight: 600 };
 const tdTot = { ...tdC, fontWeight: 800, color: DARK };
-const cellInp = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'right', border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s' };
-const cellTxt = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'left', border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', fontFamily: 'inherit', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' };
+const cellInp = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'right', border: '1px solid #cdd1d8', borderRadius: 8, background: '#fff', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s' };
+const cellTxt = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'left', border: '1px solid #cdd1d8', borderRadius: 8, background: '#fff', fontFamily: 'inherit', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' };
 const tfTd = { borderTop: '2px solid ' + DARK, padding: '10px 8px', fontWeight: 800, fontSize: 12, background: '#f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: DARK };
+// Per-section column-header + total-row styles — the section colour carries INTO
+// the table (SO blue, PO maroon), matching the SO/PO/GP voucher theme.
+const thBaseHdr = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' };
+// Header text-align matches the column's data alignment (right for the numeric
+// fare/GST/total cells, left for the name/reference text cells) — otherwise the
+// centred header text visually drifts away from the right-aligned figures below it.
+const soHdr = { ...thBaseHdr, color: '#fff', background: 'linear-gradient(180deg, ' + SO_BAR + ' 0%, #163d6c 100%)', borderBottom: '2px solid ' + SO_BAR, whiteSpace: 'normal', lineHeight: 1.3, textAlign: 'right' };
+const soHdrL = { ...soHdr, textAlign: 'left' };
+const poHdr = { ...thBaseHdr, color: '#fff', background: 'linear-gradient(180deg, ' + PO_BAR + ' 0%, #6f1830 100%)', borderBottom: '2px solid ' + PO_BAR, whiteSpace: 'normal', lineHeight: 1.3, textAlign: 'right' };
+const poHdrL = { ...poHdr, textAlign: 'left' };
+const soTf = { ...tfTd, background: '#DCE8F4', color: SO_BAR, borderTop: '2px solid ' + SO_BAR };
+const poTf = { ...tfTd, background: '#FBEEF2', color: PO_BAR, borderTop: '2px solid ' + PO_BAR };
 
 /* ════════════════════════════════════════════════════════════════════════════
    SO / PO / GP Voucher entry
@@ -87,12 +117,101 @@ export function rowsForEdit(spec, booking) {
   return [blankLine(spec)];
 }
 
-export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null, initialModule = null }) {
+// ── N-PO (Phase 2): additional purchase legs under one booking/Link No ────────
+// Flight (SF) may add ONE Misc PO; Holiday (SH) may add legs of ANY module type;
+// Visa (SV) may add another Visa (multi-country), Misc (courier/VFS) or Insurance.
+// Each leg carries its own module/supplier/cost-centre/ref/cost grid → its own
+// Purchase voucher on approval; the sale stays single. blank leg → dropped on save.
+export const ALLOWED_LEG_MODULES = { SF: ['SM'], SH: ['SF', 'SHT', 'SC', 'SV', 'SI', 'SM'], SV: ['SV', 'SM', 'SI'] };
+const newLeg = (module) => ({ module, supplier: { name: '', ledgerGroup: '' }, costCenter: '', purTallyRef: '', gstMode: 'intra', packageType: '', availItc: false, line: blankLine(VSPECS[module] || VSPECS.SM) });
+const legsFromEdit = (booking) => (booking.purchases || []).map((leg) => {
+  const sp = VSPECS[leg.module] || VSPECS.SM;
+  return {
+    module: leg.module, supplier: { name: leg.supplier?.ledgerName || leg.supplier?.name || '', ledgerGroup: leg.supplier?.ledgerGroup || '' },
+    costCenter: leg.costCenter || '', purTallyRef: leg.purTallyRef || '', gstMode: leg.gstMode || 'intra',
+    packageType: leg.packageType || '', availItc: !!leg.availItc,
+    line: (Array.isArray(leg.rows) && leg.rows[0]) ? { ...blankLine(sp), ...leg.rows[0] } : blankLine(sp),
+  };
+});
+export function legToPayload(leg, brCode, noVat, foreign = false) {
+  const spec = VSPECS[leg.module] || VSPECS.SM;
+  const { po } = bookingTotals(spec, [leg.line], { branch: brCode, noVat, availItc: leg.availItc, packageType: leg.packageType, foreignSupplier: foreign });
+  return {
+    module: leg.module,
+    supplier: { name: leg.supplier.name, ledgerName: leg.supplier.name, ledgerGroup: leg.supplier.ledgerGroup },
+    costCenter: leg.costCenter, purTallyRef: leg.purTallyRef, gstMode: leg.gstMode,
+    packageType: leg.packageType, availItc: leg.availItc, po: { ...po, gstMode: leg.gstMode }, rows: [leg.line],
+  };
+}
+
+function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, isForeign }) {
+  const allowed = ALLOWED_LEG_MODULES[parentModule];
+  if (!allowed) return null;
+  const setLeg = (i, patch) => onChange(legs.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  const setLine = (i, key, val) => setLeg(i, { line: { ...legs[i].line, [key]: val } });
+  const setModule = (i, m) => onChange(legs.map((l, idx) => (idx === i ? { ...newLeg(m), supplier: l.supplier, costCenter: l.costCenter, purTallyRef: l.purTallyRef } : l)));
+  const del = (i) => onChange(legs.filter((_, idx) => idx !== i));
+  const add = () => onChange([...legs, newLeg(allowed[0])]);
+  const cell = { width: 90, padding: '5px 7px', border: '1px solid #cdd1d8', borderRadius: 5, fontSize: 12 };
+  return (
+    <div style={{ ...card, marginTop: 14, marginBottom: 14, borderColor: '#cdb46a' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <strong style={{ fontSize: 13, color: '#6b5a1e' }}>➕ Additional Purchases (N-PO)</strong>
+        <span style={{ fontSize: 11, color: '#9A9A9A' }}>{parentModule === 'SF' ? 'Flight may add a Misc cost leg' : 'Holiday package — add any component (flight/hotel/car/visa/insurance/misc)'} · one Link No, separate supplier invoice each</span>
+        <button type="button" onClick={add} style={{ ...btnGh, marginLeft: 'auto', padding: '5px 11px', fontSize: 11 }}>+ Add PO</button>
+      </div>
+      {legs.length === 0 && <p style={{ margin: 0, fontSize: 11.5, color: '#9A9A9A' }}>No extra purchase legs. The sale stays a single invoice; add a PO to attach another supplier cost under this Link No.</p>}
+      {legs.map((leg, i) => {
+        const spec = VSPECS[leg.module] || VSPECS.SM;
+        const pkg = spec.model === 'package';
+        const po = legToPayload(leg, brCode, noVat, isForeign ? isForeign(leg.supplier.name) : false).po;
+        return (
+          <div key={i} style={{ padding: 11, marginBottom: 10, background: '#fffdf7', border: '1px solid #eee3cf', borderRadius: 7 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+              <strong style={{ fontSize: 12 }}>PO #{i + 1}</strong>
+              <select value={leg.module} onChange={(e) => setModule(i, e.target.value)} style={{ ...cell, width: 'auto' }}>
+                {allowed.map((m) => <option key={m} value={m}>{VSPECS[m].name}</option>)}
+              </select>
+              <div style={{ minWidth: 220 }}>
+                <PartyPicker branch={branch} kind="supplier" value={{ name: leg.supplier.name, group: leg.supplier.ledgerGroup }}
+                  onChange={(v) => setLeg(i, { supplier: { name: v.name, ledgerGroup: v.group } })} />
+              </div>
+              <input value={leg.costCenter} onChange={(e) => setLeg(i, { costCenter: e.target.value.toUpperCase() })} placeholder="Cost Centre" style={{ ...cell, width: 120 }} />
+              <input value={leg.purTallyRef} onChange={(e) => setLeg(i, { purTallyRef: e.target.value })} placeholder="Supplier Inv. No (Tally ref)" style={{ ...cell, width: 170 }} />
+              {/* VAT has no intra/inter split — hidden on Africa branches. */}
+              {!isVatBranch(brCode) && <select value={leg.gstMode} onChange={(e) => setLeg(i, { gstMode: e.target.value })} style={{ ...cell, width: 'auto' }}><option value="intra">Intra (CGST+SGST)</option><option value="inter">Inter (IGST)</option></select>}
+              <button type="button" onClick={() => del(i)} style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: '#c0392b', fontSize: 16 }} title="Remove leg">×</button>
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              {spec.fareCols.map((fc) => (
+                <label key={fc.key} style={{ fontSize: 10.5, color: '#5b616e' }}>{fc.label}<br />
+                  <input type="number" min="0" value={leg.line[fc.key] ?? ''} onChange={(e) => setLine(i, fc.key, e.target.value)} style={cell} /></label>
+              ))}
+              <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service Charge<br />
+                <input type="number" min="0" value={leg.line.psvc ?? ''} onChange={(e) => setLine(i, 'psvc', e.target.value)} style={cell} /></label>
+              {pkg && <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service Charge {isVatBranch(brCode) ? 'VAT' : 'GST'}<br />
+                <input type="number" min="0" value={leg.line.psvcGst ?? ''} onChange={(e) => setLine(i, 'psvcGst', e.target.value)} style={cell} /></label>}
+              <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supp Comm/Inc Rcvd<br />
+                <input type="number" min="0" value={leg.line.incentive ?? ''} onChange={(e) => setLine(i, 'incentive', e.target.value)} style={cell} /></label>
+              {pkg && <span style={{ fontSize: 10, color: '#6b5a1e', fontStyle: 'italic', alignSelf: 'flex-end', paddingBottom: 8 }}>Supplier {isVatBranch(brCode) ? 'VAT' : 'GST'} auto-claimed as ITC</span>}
+              <div style={{ marginLeft: 'auto', paddingBottom: 4, fontSize: 12, fontWeight: 700, color: '#1a1c22' }}>Net payable {bc({ code: brCode }).cur}{fmt(po.total)}{num(po.gst) > 0 ? ` · ITC ${bc({ code: brCode }).cur}${fmt(po.gst)}` : ''}</div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null, initialModule = null, interBranch = false }) {
   const qc = useQueryClient();
   const editing = !!editBooking;
   // Editing keeps the booking's own branch; a fresh voucher uses the top-bar branch.
   const brCode = editing ? (editBooking.branch || brCodeOf(branch)) : brCodeOf(branch);
   const cur = bc(editing ? { code: editBooking.branch } : branch).cur;
+  // Live preview of the next Link No (LK series) shown in the Link band instead of the
+  // old static "Auto" — advisory; the real Link No is assigned atomically on save.
+  const nextLinkNo = useVNo(editing ? { code: editBooking.branch } : branch, 'LK');
 
   const initModule = (editing && (VSPECS[editBooking.module] || isReversalModule(editBooking.module))) ? editBooking.module
     : (initialModule && (VSPECS[initialModule] || isReversalModule(initialModule))) ? initialModule : 'SF';
@@ -100,7 +219,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // RF/RI are reversal modules with no fare-grid spec — fall back to SF so the
   // (unused) fare-grid hooks below stay safe; the reversal entry is rendered via an
   // early return before any of the fare-grid UI shows.
-  const spec = VSPECS[moduleCode] || VSPECS.SF;
+  const specRaw = VSPECS[moduleCode] || VSPECS.SF;
+  // Africa/VAT branches don't levy India's K3 (airline) tax on international air — drop
+  // the K3 fare column so the whole SO/PO/GP grid (header/body/footer/sectors/GP) hides
+  // it consistently. K3 is always 0 there, so the totals & posted heads are unchanged.
+  const spec = isVatBranch(brCode) && (specRaw.fareCols || []).some((c) => c.key === 'k3')
+    ? { ...specRaw, fareCols: specRaw.fareCols.filter((c) => c.key !== 'k3') }
+    : specRaw;
 
   const [lines, setLines] = useState(() => {
     if (editing) return rowsForEdit(VSPECS[initModule] || VSPECS.SF, editBooking);
@@ -118,6 +243,19 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   const [clientType, setClientType] = useState(editing ? (editBooking.customer?.ledgerGroup || '') : '');
   const reg = useLedgerRegistry(branch).data || [];
+  // Foreign-supplier resolver (mirrors the backend's countryFromSupplierMaster): match the
+  // chosen creditor ledger to its master row by exact name and read its home country — a
+  // foreign vendor (e.g. IATA-BSP / Singapore) can't withhold Indian 194H TDS, so the 2%
+  // TDS on its incentive is dropped here too, keeping the grid in step with the books.
+  const supplierMaster = useQuery({ queryKey: ['suppliers'], queryFn: () => apiGet('/api/suppliers') }).data || [];
+  const supplierCountryBy = useMemo(() => {
+    const m = new Map();
+    (supplierMaster || []).forEach((s) => { if (s && s.name) m.set(s.name.trim().toLowerCase(), s.country || ''); });
+    return m;
+  }, [supplierMaster]);
+  const countryOfSupplier = (name) => supplierCountryBy.get(String(name || '').trim().toLowerCase()) || '';
+  const isForeignSupplier = (name) => !isIndiaCountry(countryOfSupplier(name));
+  const suppForeign = isForeignSupplier(supplier.name);
   const clientTypes = useMemo(() => {
     const set = new Set();
     reg.forEach((l) => {
@@ -134,6 +272,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     if (ct && customer.ledgerGroup && customer.ledgerGroup !== ct) {
       setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' });
     }
+  };
+  const handleToBranchChange = (tb) => {
+    setToBranch(tb);
+    if (tb) { setCustomer((c) => ({ ...c, name: `Travkings Tours and Travels ${tb}`, ledgerName: `Travkings Tours and Travels ${tb}`, ledgerGroup: 'Sundry Debtors', group: 'Sundry Debtors' })); setSaleGstMode(inbCrossBorder(brCode, tb) ? 'inter' : 'inter'); }
   };
   // No-supplier mode (Misc only): a sale with no purchase leg — full sale value is
   // income. Hides the Purchase Order + supplier fields and posts only the sale.
@@ -154,30 +296,42 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Free-text Tally references (optional) → flow to the spawned Sale / Purchase voucher sourceRef.
   const [saleTallyRef, setSaleTallyRef] = useState(editing ? (editBooking.saleTallyRef || '') : '');
   const [purTallyRef, setPurTallyRef] = useState(editing ? (editBooking.purTallyRef || '') : '');
+  // N-PO (Phase 2): additional purchase legs (Flight +Misc / Holiday components).
+  const [extraPOs, setExtraPOs] = useState(editing ? legsFromEdit(editBooking) : []);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   // Inter-branch (INB): the PO can fetch an open INB leg sent to this branch — it
   // pre-fills the supplier (the selling branch) + fares + Service Fee, and on save
   // the link is marked booked (consumed). inbLinkNo holds the fetched link.
-  const [inbLinkNo, setInbLinkNo] = useState('');
+  const [inbLinkNo, setInbLinkNo] = useState(''); // display (INB Link No)
+  const [inbId, setInbId] = useState('');         // the InbLink _id (API target)
   const openInbQ = useOpenInb(branch);
   const bookInb = useBookInb();
+  // Inter-branch SALE mode: the customer is a counterparty branch; the SO grid's
+  // fares pass through to Inter-Branch Sales and the Service Charge becomes the
+  // Service Fee (margin). Posts via the INB engine (not the booking pipeline).
+  const createInb = useCreateInb();
+  const [toBranch, setToBranch] = useState('');
+  const inbBranches = INB_ALL.filter((b) => b !== brCode);
+  const inbExport = interBranch && toBranch && inbCrossBorder(brCode, toBranch);
 
   // Switching module reloads the seed grid for that module — never while editing
   // (the module is locked to the existing voucher so its lines aren't wiped).
   // Reversal modules (RF/RI) have no fare-grid spec, so there's no seed grid to load —
   // skip the reset for them (the reversal UI is rendered via an early return and never
   // touches `lines`). Resetting here would call blankLine(undefined) → idCols crash.
-  useEffect(() => { if (editing || !VSPECS[moduleCode]) return; setLines([blankLine(VSPECS[moduleCode])]); setNoSupplier(false); setResult(null); setError(''); }, [moduleCode]);
+  useEffect(() => { if (editing || !VSPECS[moduleCode]) return; setLines([blankLine(VSPECS[moduleCode])]); setNoSupplier(false); setResult(null); setError(''); setExtraPOs([]); }, [moduleCode]);
 
   // No-supplier is only offered on Miscellaneous (sell-without-buy: seats / extra
   // services). Any other module always has a supplier (cost) leg.
   const isNoSupp = moduleCode === 'SM' && noSupplier;
   // "Without VAT" is offered only on Africa/VAT branches; India ignores it.
   const isVatBr = isVatBranch(brCode);
+  // Tax label drives every "GST" caption on the grid: Africa shows VAT, India GST.
+  const taxLabel = isVatBr ? 'VAT' : 'GST';
   const effNoVat = isVatBr && noVat;
-  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat }), [spec, lines, packageType, isNoSupp, brCode, effNoVat]);
+  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign, clientType }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, suppForeign, clientType]);
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
   const getGstRate = () => {
     if (effNoVat) return 0;
@@ -247,13 +401,46 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const hasCustLedger = !!(customer.ledgerName || '').trim();
   const hasSuppLedger = !!supplier.name.trim();
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
-  const canSave = !!brCode && !saving && totals.so.total > 0 && customer.name.trim() && hasCustLedger
-    && (isNoSupp || (totals.po.total > 0 && hasSuppLedger));
+  const canSave = interBranch
+    ? (!!brCode && !saving && !!toBranch && totals.so.total > 0)  // INB: just need a counterparty branch + a sale value
+    : (!!brCode && !saving && totals.so.total > 0 && customer.name.trim() && hasCustLedger
+      && (isNoSupp || (totals.po.total > 0 && hasSuppLedger)));
 
   // Saving ALWAYS lands the booking in Pending — there is no save-and-approve from
   // entry (for ANY user, Super Admin included). Approval happens only from the
   // Pending queue, so every voucher's books impact passes the same review gate.
   const save = async () => {
+    // ── Inter-branch SALE: post via the INB engine, not the booking pipeline ──
+    // Fares (the PO/SO fare columns) pass through to Inter-Branch Sales; the SO
+    // Service Charge becomes the Service Fee (margin). IGST for India inter-state;
+    // export zero-rated cross-border (decided server-side).
+    if (interBranch) {
+      if (!toBranch) { setError('Select the counterparty branch'); return; }
+      const fareLines = (spec.fareCols || [])
+        .map((c) => ({ ledger: 'Inter-Branch Sales', amt: round2(lines.reduce((s, l) => s + num(l[c.key]), 0)), desc: c.label }))
+        .filter((l) => l.amt > 0);
+      const serviceFee = round2(lines.reduce((s, l) => s + num(l.ssvc), 0));
+      const pax = lines.map((l) => [l.fn, l.sn].filter(Boolean).join(' ')).filter(Boolean).join(', ');
+      if (!fareLines.length && !serviceFee) { setError('Enter the fares and/or a Service Fee'); return; }
+      // Supplier (airline) PURCHASE leg — booked through the INB voucher under the same
+      // INB Link No. Sent only when a supplier + cost exist; otherwise the deal stays
+      // sale-only (server skips the purchase). `totals.po` carries the PO grid's cost.
+      const hasPurchase = !isNoSupp && supplier.name.trim() && totals.po.total > 0;
+      setError(''); setSaving(true);
+      createInb.mutate({
+        fromBranch: brCode, toBranch, date, module: moduleCode,
+        packageType: hasPackage ? packageType : '', passenger: pax, reference: saleTallyRef || headerRef,
+        fareLines, serviceFee,
+        noSupplier: isNoSupp,
+        supplier: hasPurchase ? { name: supplier.name, ledgerName: supplier.ledgerName || supplier.name, ledgerGroup: supplier.ledgerGroup, country: countryOfSupplier(supplier.name), foreign: suppForeign } : null,
+        purchase: hasPurchase ? { heads: totals.po.heads || [], gst: totals.po.gst || 0, incentiveAmt: totals.po.incentiveAmt || 0, incentiveTds: totals.po.incentiveTds || 0, gstMode: purGstMode } : null,
+      }, {
+        onSuccess: (res) => { setResult({ bookingNo: res?.inbLinkNo || '', _approved: false, _inb: true }); toast(`Inter-branch sale posted · ${res?.inbLinkNo || ''}`); qc.invalidateQueries({ queryKey: ['inb'] }); },
+        onError: (e) => { setError(e.message || 'Failed to post'); toast(`Could not post — ${e.message || 'failed'}`, 'error'); },
+        onSettled: () => setSaving(false),
+      });
+      return;
+    }
     // Editing an existing booking requires a reason (saved to the audit trail).
     let editReason = '';
     if (editing) {
@@ -272,12 +459,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         module: moduleCode, branch: brCode, date, travelDate, noSupplier: isNoSupp, noVat: effNoVat,
         customer: { name: customer.name, gstin: customer.gstin, address: customer.address, email: customer.email, contact: customer.contact, group: customer.group, ledgerName: customer.ledgerName || customer.name, ledgerGroup: customer.ledgerGroup || customer.group },
         supplier: isNoSupp ? { name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }
-          : { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup },
+          : { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup, country: countryOfSupplier(supplier.name) },
         gstMode: saleGstMode, packageType: hasPackage ? packageType : '',
         headerRef, rows: lines.map((l) => syncLineRefs(spec, l)),
         po: { ...totals.po, gstMode: purGstMode }, so: { ...totals.so, gstMode: saleGstMode },
         gp: { lines: gpLines, total: totals.gp.total, pct: totals.gp.pct },
         remarks, saleTallyRef, purTallyRef,
+        // N-PO: additional purchase legs (empty unless Flight+Misc / Holiday components).
+        purchases: (isNoSupp ? [] : extraPOs).filter((leg) => num(leg.line.base) > 0 || num(leg.line.psvc) > 0).map((leg) => legToPayload(leg, brCode, effNoVat, isForeignSupplier(leg.supplier.name))),
       };
       const booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, payload)
@@ -288,8 +477,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       toast(`Voucher ${booking.bookingNo || ''} saved — pending approval`);
       // If this PO was fetched from an open inter-branch leg, consume it (mark the
       // INB link booked). Non-fatal: a miss leaves the link open to retry.
-      if (inbLinkNo && booking?.bookingNo) {
-        try { await bookInb.mutateAsync({ inbLinkNo, purchaseVno: booking.bookingNo }); setInbLinkNo(''); }
+      if (inbId && booking?.bookingNo) {
+        try { await bookInb.mutateAsync({ id: inbId, purchaseVno: booking.bookingNo }); setInbLinkNo(''); setInbId(''); }
         catch (_) { /* link stays open; surfaced in the INB reconciliation */ }
       }
     } catch (e) { setError(e.message || 'Failed to save voucher'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
@@ -312,6 +501,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     ln.psvc = num(link.serviceFee);
     setLines([ln]);
     setInbLinkNo(link.inbLinkNo);
+    setInbId(link._id || link.id || '');
     toast(`Fetched ${link.inbLinkNo} from ${link.fromBranch} — review & save`);
   };
 
@@ -330,13 +520,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   // Reversal modules (Refund / Reissue) render a dedicated entry instead of the fare
   // grid — same module bar, but the original-invoice link + supplier-refund + retained
-  // Other Taxes inputs, spawning ONE RF/RI voucher on approval (reuses the proven
+  // Service Charge - 2 inputs, spawning ONE RF/RI voucher on approval (reuses the proven
   // reversal posting). All hooks above have run, so this early return is safe.
   if (isReversalModule(moduleCode)) {
-    return <ReversalEntry moduleCode={moduleCode} changeModule={changeModule} brCode={brCode} cur={cur} editing={editing} editBooking={editBooking} qc={qc} />;
+    return <ReversalEntry moduleCode={moduleCode} changeModule={changeModule} brCode={brCode} cur={cur} editing={editing} editBooking={editBooking} qc={qc} setRoute={setRoute} onDone={onDone} />;
   }
 
-  const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' }); setSupplier({ name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }); setNoSupplier(false); setResult(null); setError(''); setClientType(''); };
+  const reset = () => { setLines([blankLine(spec)]); setCustomer({ name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' }); setSupplier({ name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }); setNoSupplier(false); setResult(null); setError(''); setClientType(''); setExtraPOs([]); };
 
   if (result) {
     const approved = result._approved;
@@ -390,46 +580,71 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   // Sectors sub-table for a passenger line — editable on the Purchase grid,
   // read-only ("fetched & locked") on the Sales grid.
-  const sectorBlock = (l, li, readOnly, colSpan) => (
-    <tr key={'sec-' + li}>
-      <td colSpan={colSpan} style={{ padding: '2px 6px 8px 26px', background: readOnly ? '#faf7ef' : '#fbfcff', borderBottom: '1px solid #eef0f5' }}>
-        <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: '.3px', color: '#9A9A9A', textTransform: 'uppercase', margin: '2px 0' }}>{readOnly ? '▣ Sectors — from Purchase (locked)' : '✎ Sectors — enter each segment'}</div>
+  const sectorBlock = (l, li, readOnly, colSpan) => {
+    const grid = (
+      <>
         <table style={{ borderCollapse: 'collapse' }}>
           <thead><tr>
-            {spec.sectorCols.map((sc) => <th key={sc.key} style={{ ...thA, ...thL, fontSize: 8.5, padding: '3px 6px' }}>{sc.label}</th>)}
-            {!readOnly && <th style={{ ...thA, width: 26 }} />}
+            {spec.sectorCols.map((sc) => <th key={sc.key} style={{ ...thA, ...thL, fontSize: 8.5, padding: '4px 16px', ...(readOnly ? {} : { color: GOLD_DEEP, background: 'transparent', borderBottom: '1px solid #ecdfb8' }) }}>{sc.label}</th>)}
+            {!readOnly && <th style={{ ...thA, width: 26, background: 'transparent', borderBottom: '1px solid #ecdfb8' }} />}
           </tr></thead>
           <tbody>
             {(l.sectors || []).map((s, si) => (
               <tr key={si}>
                 {spec.sectorCols.map((sc) => (
-                  <td key={sc.key} style={{ padding: 2 }}>
+                  <td key={sc.key} style={{ padding: '6px 16px' }}>
                     {readOnly
-                      ? <span style={{ fontSize: 11, fontWeight: 600, color: sc.kind === 'pnr' ? GOLD : '#3A3A3A' }}>{s[sc.key] || '—'}</span>
-                      : <input type={sc.type === 'date' ? 'date' : 'text'} value={s[sc.key] ?? ''} onChange={(e) => setSec(li, si, sc.key, e.target.value)} style={{ ...cellTxt, width: sc.type === 'date' ? 124 : 92, color: sc.kind === 'pnr' ? GOLD : DARK }} />}
+                      ? <span style={{ fontSize: 11, fontWeight: 600, color: s[sc.key] ? (sc.kind === 'pnr' ? GOLD : '#3A3A3A') : '#b9b9b9', fontStyle: s[sc.key] ? 'normal' : 'italic' }}>{s[sc.key] || `No ${sc.label}`}</span>
+                      : <input type={sc.type === 'date' ? 'date' : 'text'} value={s[sc.key] ?? ''} onChange={(e) => setSec(li, si, sc.key, e.target.value)} placeholder={sc.label} style={{ ...cellTxt, width: sc.type === 'date' ? 140 : 110, color: sc.kind === 'pnr' ? GOLD : DARK }} />}
                   </td>
                 ))}
-                {!readOnly && <td style={{ padding: 2, textAlign: 'center' }}><button onClick={() => delSec(li, si)} title="Remove sector" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={12} /></button></td>}
+                {!readOnly && <td style={{ padding: '6px 16px', textAlign: 'center' }}><button onClick={() => delSec(li, si)} title="Remove sector" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={12} /></button></td>}
               </tr>
             ))}
           </tbody>
         </table>
-        {!readOnly && <button onClick={() => addSec(li)} style={{ ...btnGh, marginTop: 4, padding: '3px 9px', fontSize: 10 }}><Plus size={11} /> Add sector</button>}
-      </td>
-    </tr>
-  );
+        {!readOnly && (
+          <button onClick={() => addSec(li)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '5px 12px', fontSize: 10.5, fontWeight: 700, color: GOLD_DEEP, background: '#FBF3DE', border: '1px solid #ecdfb8', borderRadius: 999, cursor: 'pointer' }}>
+            <Plus size={11} /> Add sector
+          </button>
+        )}
+      </>
+    );
+    return (
+      <tr key={'sec-' + li}>
+        <td colSpan={colSpan} style={{ padding: readOnly ? '8px 6px 8px 26px' : '10px 14px 12px 26px', background: readOnly ? '#faf7ef' : '#fbfcff', borderBottom: '1px solid #dfe2e7' }}>
+          {readOnly ? (
+            <div style={{ border: '1px solid #ece4cf', borderRadius: 10, background: '#fffdf7', padding: '10px 14px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 800, letterSpacing: '.4px', color: GOLD_DEEP, textTransform: 'uppercase', marginBottom: 8 }}>
+                🔒 Sectors
+                <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '.4px', textTransform: 'uppercase', background: '#FBF3DE', color: GOLD_DEEP, padding: '2px 7px', borderRadius: 999 }}>from Purchase · locked</span>
+              </div>
+              {grid}
+            </div>
+          ) : (
+            <div style={{ border: '1px dashed #ecd5dc', borderRadius: 10, background: '#fffdfb', padding: '10px 14px 12px' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.4px', color: GOLD_DEEP, textTransform: 'uppercase', marginBottom: 8 }}>✈ Sectors — enter each segment</div>
+              {grid}
+            </div>
+          )}
+        </td>
+      </tr>
+    );
+  };
 
   return (
-    <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
+    <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV, color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
       {/* Header */}
-      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
-        <div style={{ padding: '14px 18px', background: DARK, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+      <div style={{ ...card, border: '1px solid #dfe2e7', borderLeft: '4px solid ' + GOLD, borderRadius: 4, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
+        <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : 'SO / PO / GP VOUCHER'}</p>
-            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#9197a3' }}>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : (interBranch ? 'INTER-BRANCH (INB) VOUCHER' : 'SO / PO / GP VOUCHER')}</p>
+            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#8A8A84' }}>
               {editing
                 ? <>Fix any data-entry mistake — or switch the <b style={{ color: GOLD }}>module</b> if it was booked wrong — then <b style={{ color: GOLD }}>Save changes</b> · {brCode} · returns to Pending; approve it from the Pending queue</>
-                : <>Enter cost + Other Taxes → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
+                : interBranch
+                  ? <>Sell to another branch (Inter-Branch Sale) + book the supplier purchase — both under one <b style={{ color: GOLD }}>INB Link No</b> · {brCode || 'select a branch'} · saves as <b style={{ color: GOLD }}>Pending</b></>
+                  : <>Enter cost + Service Charge - 2 → Sales auto-derives. Saving creates a <b style={{ color: GOLD }}>Pending</b> voucher · {brCode || 'select a branch'}</>}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -444,12 +659,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           </div>
         </div>
         {/* Link band */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: '#1b2138' }}>
-          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#C49A3C', textTransform: 'uppercase' }}>Link No</span>
-          <span style={{ padding: '5px 12px', borderRadius: 4, background: '#11162a', color: '#fff', fontWeight: 800, letterSpacing: '.5px', fontFamily: 'monospace', fontSize: 13 }}>Auto · assigned on save</span>
-          <span style={{ fontSize: 10.5, color: '#9197a3', fontStyle: 'italic' }}>links the Sales Order, Purchase Order &amp; Gross Profit of this invoice</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: '#1f1f1f' }}>
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: GOLD, textTransform: 'uppercase' }}>{interBranch ? 'INB Link No' : 'Link No'}</span>
+          <span style={{ padding: '5px 12px', borderRadius: 4, background: GOLD_SOFT, color: GOLD_DEEP, fontWeight: 800, letterSpacing: '.5px', fontFamily: 'monospace', fontSize: 13 }}>{editing ? (editBooking.linkNo || '—') : (interBranch ? 'INB Link · on save' : `${nextLinkNo} · on save`)}</span>
+          <span style={{ fontSize: 10.5, color: '#9197a3', fontStyle: 'italic' }}>{interBranch ? 'links the Inter-Branch Sale & Supplier Purchase of this voucher' : 'links the Sales Order, Purchase Order & Gross Profit of this invoice'}</span>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            {['SO', 'PO', 'GP'].map((c) => <span key={c} style={{ fontSize: 9, fontWeight: 800, padding: '3px 9px', borderRadius: 20, background: '#262c47', color: '#C49A3C' }}>{c}</span>)}
+            {(interBranch ? ['INB', 'SO', 'PO', 'GP'] : ['SO', 'PO', 'GP']).map((c) => <span key={c} style={{ fontSize: 9, fontWeight: 800, padding: '3px 9px', borderRadius: 20, background: c === 'INB' ? GOLD : GOLD_SOFT, color: c === 'INB' ? '#fff' : GOLD_DEEP }}>{c}</span>)}
           </span>
         </div>
       </div>
@@ -459,7 +674,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {moduleCode === 'SM' && (
         <div style={{ ...card, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: DARK, textTransform: 'uppercase', letterSpacing: '.3px' }}>Supplier</span>
-          <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden' }}>
+          <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
             {[['with', 'With supplier (cost + margin)'], ['without', 'Without supplier (pure income)']].map(([v, l]) => {
               const active = (v === 'without') === noSupplier;
               return (
@@ -483,7 +698,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {isVatBr && (
         <div style={{ ...card, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: DARK, textTransform: 'uppercase', letterSpacing: '.3px' }}>VAT</span>
-          <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden' }}>
+          <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
             {[['with', 'With VAT'], ['without', 'Without VAT']].map(([v, l]) => {
               const active = (v === 'without') === noVat;
               return (
@@ -496,7 +711,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <span style={{ fontSize: 10.5, color: '#9A9A9A', fontStyle: 'italic' }}>
             {noVat
               ? 'No VAT calculated on this booking (zero-rated).'
-              : `VAT charged at the branch rate on the service charge / margin.`}
+              : `VAT charged at the branch rate on the Service Fee / margin.`}
           </span>
         </div>
       )}
@@ -519,22 +734,54 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         )
       )}
 
+      {interBranch && (
+        <div style={{ ...card, background: '#EAF1FB', border: '1px solid #B9D6F2', color: '#185FA5', fontSize: 12, marginBottom: 14 }}>
+          🔁 <b>Inter-Branch sale.</b> Enter the fares in the Purchase Order grid (pass-through at cost) and your margin in the Sales <b>Service Fee</b> column. Fares post to <b>Inter-Branch Sales</b>, the Service Fee to <b>Service Fee Income</b>.
+          {toBranch && <> Tax: <b>{inbExport ? `Export · zero-rated (${INB_COUNTRY[brCode]}→${INB_COUNTRY[toBranch]})` : 'IGST · inter-state (18% on Service Fee)'}</b>.</>}
+          {' '}Creates an INB Link No the {toBranch || 'buying'} branch fetches on its SO/PO/GP.
+        </div>
+      )}
+
       {/* Header fields */}
       <div style={{ ...card, marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
           <FL label="SPG Date"><SmartDateInput max={todayISO()} value={date} onChange={setDate} style={inp} /></FL>
           <FL label="Travel / Departure Date"><SmartDateInput value={travelDate} onChange={setTravelDate} min={editing ? undefined : todayISO()} style={inp} title="When the customer travels (no past dates) — type e.g. 20.03.2026 → 20/03/2026; drives the Upcoming Travel dashboard" /></FL>
           <FL label="Client Type">
-            <select value={clientType} onChange={(e) => handleClientTypeChange(e.target.value)} style={inp}>
-              <option value="">— All Client Types —</option>
-              {clientTypes.map((ct) => (
-                <option key={ct} value={ct}>{ct}</option>
-              ))}
-            </select>
+            <DropdownMenu
+              ariaLabel="Client Type"
+              menuRole="listbox"
+              items={[{ key: '', label: 'All Client Types', selected: clientType === '', onSelect: () => handleClientTypeChange('') },
+                ...clientTypes.map((ct) => ({ key: ct, label: ct, selected: clientType === ct, onSelect: () => handleClientTypeChange(ct) }))]}
+              renderTrigger={({ ref, toggle, triggerProps }) => (
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{clientType || 'All Client Types'}</span>
+                  <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                </button>
+              )}
+            />
           </FL>
           {spec.headerLabel && spec.headerLabel !== 'Sector / Airline' && (
             <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
           )}
+          {interBranch ? (
+            <FL label={<>To Branch (counterparty) <span style={{ color: '#dc2626' }}>*</span></>}>
+              <DropdownMenu
+                ariaLabel="To Branch"
+                menuRole="listbox"
+                items={[{ key: '', label: 'Select branch', selected: toBranch === '', onSelect: () => handleToBranchChange('') },
+                  ...inbBranches.map((b) => ({ key: b, label: b, selected: toBranch === b, onSelect: () => handleToBranchChange(b) }))]}
+                renderTrigger={({ ref, toggle, triggerProps }) => (
+                  <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                    style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{toBranch || 'Select branch'}</span>
+                    <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                  </button>
+                )}
+              />
+            </FL>
+          ) : (
           <FL label="Client Ledger *">
             <PartyPicker branch={branch} kind="customer" value={{ name: customer.ledgerName, group: customer.ledgerGroup }} subGroupFilter={clientType}
               onChange={(v) => {
@@ -546,23 +793,72 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 });
                 if (v.group) setClientType(v.group);
               }} />
-            {!hasCustLedger && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — pick the Client Ledger to post & follow for payment</span>}
           </FL>
+          )}
           {isB2C && (
             <FL label="Customer (Bill to) — free text *">
               <input value={customer.name} onChange={(e) => setCustomer((c) => ({ ...c, name: e.target.value }))} placeholder="End-customer name (B2C)" style={inp} />
-              {!customer.name.trim() && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — type the end customer's name for the invoice</span>}
+              {!customer.name.trim()}
             </FL>
           )}
-          <FL label="Sale GST mode"><select value={saleGstMode} onChange={(e) => setSaleGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>
-          {!isNoSupp && <FL label="Supplier ledger (Pay to) *">
+          {/* VAT has no intra/inter (place-of-supply) split — these CGST/SGST vs IGST
+              selectors are India-only and are hidden on Africa/VAT branches. */}
+          {!isVatBr && <FL label="Sale GST mode">
+            <DropdownMenu
+              ariaLabel="Sale GST mode"
+              menuRole="listbox"
+              items={[
+                { key: 'intra', label: 'Intra-state (CGST+SGST)', selected: saleGstMode === 'intra', onSelect: () => setSaleGstMode('intra') },
+                { key: 'inter', label: 'Inter-state (IGST)', selected: saleGstMode === 'inter', onSelect: () => setSaleGstMode('inter') },
+              ]}
+              renderTrigger={({ ref, toggle, triggerProps }) => (
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{saleGstMode === 'inter' ? 'Inter-state (IGST)' : 'Intra-state (CGST+SGST)'}</span>
+                  <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                </button>
+              )}
+            />
+          </FL>}
+          {!isNoSupp && <FL label={interBranch ? 'Supplier ledger (airline / cost) *' : 'Supplier ledger (Pay to) *'}>
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
               onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
-            {!hasSuppLedger && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — pick the Creditor ledger to post & pay against</span>}
           </FL>}
-          {!isNoSupp && <FL label="Purchase GST mode"><select value={purGstMode} onChange={(e) => setPurGstMode(e.target.value)} style={inp}><option value="intra">Intra-state (CGST+SGST)</option><option value="inter">Inter-state (IGST)</option></select></FL>}
-          {hasPackage && <FL label="Package type *"><select value={packageType} onChange={(e) => setPackageType(e.target.value)} style={{ ...inp, ...(packageType ? {} : { borderColor: '#dc2626' }) }}><option value="">— Select International / Domestic —</option><option value="Domestic">Domestic</option><option value="International">International</option></select>
-            {!packageType && <span style={{ fontSize: 10, color: '#dc2626' }}>Required — sets the cost centre (Int'l/Domestic GP). Must be picked before approving.</span>}
+          {!isNoSupp && !isVatBr && <FL label="Purchase GST mode">
+            <DropdownMenu
+              ariaLabel="Purchase GST mode"
+              menuRole="listbox"
+              items={[
+                { key: 'intra', label: 'Intra-state (CGST+SGST)', selected: purGstMode === 'intra', onSelect: () => setPurGstMode('intra') },
+                { key: 'inter', label: 'Inter-state (IGST)', selected: purGstMode === 'inter', onSelect: () => setPurGstMode('inter') },
+              ]}
+              renderTrigger={({ ref, toggle, triggerProps }) => (
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{purGstMode === 'inter' ? 'Inter-state (IGST)' : 'Intra-state (CGST+SGST)'}</span>
+                  <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                </button>
+              )}
+            />
+          </FL>}
+          {hasPackage && <FL label="Package type *">
+            <DropdownMenu
+              ariaLabel="Package type"
+              menuRole="listbox"
+              width={260}
+              items={[
+                { key: '', label: 'Select International / Domestic', selected: packageType === '', onSelect: () => setPackageType('') },
+                { key: 'Domestic', label: 'Domestic', selected: packageType === 'Domestic', onSelect: () => setPackageType('Domestic') },
+                { key: 'International', label: 'International', selected: packageType === 'International', onSelect: () => setPackageType('International') },
+              ]}
+              renderTrigger={({ ref, toggle, triggerProps }) => (
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{packageType || 'Select International / Domestic'}</span>
+                  <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                </button>
+              )}
+            />
           </FL>}
         </div>
       </div>
@@ -571,40 +867,44 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', padding: '8px 14px', marginBottom: 12, background: '#FDFAF4', border: '1px solid #eee3cf', borderRadius: 8, flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#fff', border: '1px solid #C49A3C' }} /> Manual — you enter</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, color: '#3A3A3A' }}><span style={{ width: 24, height: 15, borderRadius: 3, background: '#faf7ef', border: '1px dashed #9A9A9A' }} /> Auto — calculated</span>
-        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · {pkg ? 'Holiday package: 5% GST on (Land + Supplier Service + Supplier Service GST + Other Taxes); Intl adds 2% TCS' : 'Other Taxes is GST-inclusive (GST = Other Taxes × 18 ÷ 118), posted to separate GST ledgers'}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9A9A9A', fontStyle: 'italic' }}>shaded fields are computed and can't be typed into · {pkg ? `Holiday package: ${activeRate}% ${taxLabel} on (Base Fare + Service Charge - 2); supplier service charge is a purchase-side cost (not billed to client), supplier ${taxLabel} claimed as Input (ITC)${isVatBr ? '' : '; Intl adds 2% TCS'}` : `Service Charge - 2 is ${taxLabel}-inclusive (${taxLabel} = Service Charge - 2 × ${activeRate} ÷ ${100 + activeRate}), posted to separate ${taxLabel} ledgers`}</span>
       </div>
 
       {/* ① Sales Order */}
-      <Section n="1" name="Sales Order" sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · Other Taxes is GST-inclusive'} accent={BLUE}>
-        <div style={{ overflowX: 'auto' }}>
+      <Section n="1" badge="SO" name="Sales Order" sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · Service Charge - 2 is GST-inclusive'} accent={SO_BAR}>
+        <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #d8e0ea' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
-            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-              {spec.idCols.map((c) => <th key={c.key} style={{ ...thM, ...thL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
-              {spec.fareCols.map((c) => <th key={c.key} style={{ ...thA, width: 95 }}>{c.label}</th>)}
-              <th style={{ ...thM, width: 95 }}>Other Taxes</th>{!pkg && <th style={{ ...thM, width: 95 }}>Service Chg</th>}
-              {!pkg && <th style={{ ...thA, width: 95 }}>GST/Service ({activeRate}%)</th>}<th style={{ ...thA, width: 95 }}>GST/Other Taxes ({pkg ? 5 : activeRate}%)</th><th style={{ ...thA, width: 110 }}>Total</th><th style={{ ...thA, width: 45 }}></th>
+            <thead><tr style={{ borderBottom: '2px solid ' + SO_BAR }}>
+              {spec.idCols.map((c) => <th key={c.key} style={{ ...soHdrL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
+              {spec.fareCols.map((c) => <th key={c.key} style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
+              {!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Charge - 2</th>}{!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Fee</th>}
+              {!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{taxLabel}/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{pkg ? `${taxLabel} (5%)` : `${taxLabel}/Service Charge - 2 (${activeRate}%)`}</th>}{spec.tcs && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>TCS ({spec.tcs.rate}%)</th>}<th style={{ ...soHdr, width: 110, whiteSpace: 'normal' }}>Total</th><th style={{ ...soHdr, width: 45 }}></th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign });
+                // TCS (Intl packages, u/s 206C(1G)) is a booking-level charge on the sale incl GST;
+                // show each line's share only when it actually applies (totals.so.tcs > 0).
+                const lineTcs = (spec.tcs && totals.so.tcs > 0) ? c.finalSales * spec.tcs.rate / 100 : 0;
                 return (
                   <React.Fragment key={i}>
                   <tr>
                     {spec.idCols.map((col) => (
-                      <td key={col.key} style={{ ...tdC, textAlign: 'left', padding: 3, width: col.key === 'fn' || col.key === 'sn' ? 140 : 120 }}>
+                      <td key={col.key} style={{ ...tdC, textAlign: 'left', padding: 3, width: col.key === 'fn' || col.key === 'sn' ? 140 : 120, ...(spec.sectors ? { background: '#faf7ef' } : {}) }}>
                         {spec.sectors
-                          ? <span style={{ fontSize: 11.5, fontWeight: 600, color: DARK }}>{l[col.key] || '—'}</span>
+                          ? <span style={{ fontSize: 11.5, fontWeight: 600, color: l[col.key] ? DARK : '#b9b9b9', fontStyle: l[col.key] ? 'normal' : 'italic' }}>{l[col.key] || `No ${col.label}`}</span>
                           : <input value={l[col.key] ?? ''} onChange={(e) => setLine(i, col.key, e.target.value)} style={{ ...cellTxt, color: col.kind === 'pnr' ? GOLD : DARK }} />}
                       </td>
                     ))}
                     {spec.fareCols.map((col) => (isNoSupp
                       ? <td key={col.key} style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>
                       : <td key={col.key} style={{ ...tdAuto, width: 95 }}>{fmt(l[col.key])}</td>))}
-                    <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.markup ?? ''} placeholder="0" onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>
-                    {!pkg && <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.ssvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
+                    {!interBranch && <td style={{ padding: 3, width: 95, background: '#faf7ef' }}><input type="number" min="0" value={l.markup ?? ''} placeholder="0" onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>}
+                    {!pkg && <td style={{ padding: 3, width: 95, background: '#faf7ef' }}><input type="number" min="0" value={l.ssvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
                     {!pkg && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstSvc)}</td>}
-                    <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstMk)}</td>
-                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef', width: 110 }}>{fmt(c.finalSales)}</td>
+                    {!interBranch && <td style={{ ...tdAuto, width: 95 }}>{fmt(pkg ? c.salesGST : c.gstMk)}</td>}
+                    {spec.tcs && <td style={{ ...tdAuto, width: 95 }}>{fmt(lineTcs)}</td>}
+                    <td style={{ ...tdC, fontWeight: 800, color: DR, background: '#faf7ef', width: 110 }}>{fmt(c.finalSales + lineTcs)}</td>
                     <td style={{ ...tdC, textAlign: 'center', background: '#faf7ef', padding: 3, width: 45 }}><button onClick={() => delLine(i)} title="Remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={13} /></button></td>
                   </tr>
                   {spec.sectors && sectorBlock(l, i, true, soCols)}
@@ -613,13 +913,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               })}
             </tbody>
             <tfoot><tr>
-              <td style={{ ...tfTd, textAlign: 'left' }}>TOTAL</td>
-              {spec.idCols.slice(1).map((c) => <td key={c.key} style={tfTd} />)}
-              {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
-              <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>
-              {!pkg && <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
-              <td style={tfTd} colSpan={pkg ? 1 : 2}>{fmt(totals.so.gst + totals.so.otherTaxesGst)} GST</td>
-              <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd} />
+              <td style={{ ...soTf, textAlign: 'left' }}>TOTAL</td>
+              {spec.idCols.slice(1).map((c) => <td key={c.key} style={soTf} />)}
+              {spec.fareCols.map((c) => <td key={c.key} style={soTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
+              {!interBranch && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>}
+              {!pkg && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
+              {!pkg && <td style={soTf}>{fmt(totals.so.gst)}</td>}{!interBranch && <td style={soTf}>{fmt(pkg ? totals.so.gst + totals.so.otherTaxesGst : totals.so.otherTaxesGst)}</td>}
+              {spec.tcs && <td style={soTf}>{fmt(totals.so.tcs)}</td>}
+              <td style={{ ...soTf, color: DR }}>{fmt(totals.so.total)}</td><td style={soTf} />
             </tr></tfoot>
           </table>
         </div>
@@ -628,50 +929,50 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {/* ② Purchase Order — hidden in no-supplier mode (there's no cost leg). */}
       {!isNoSupp && (
-      <Section n="2" name="Purchase Order" sub="what you pay the airline / supplier · supplier incentive is automatically subtracted, 2% TDS is added" accent={CR}>
+      <Section n="2" badge="PO" name="Purchase Order" sub={`what you pay the airline / supplier · supplier incentive is automatically subtracted${suppForeign ? ' · foreign supplier — no Indian TDS' : ', 2% TDS is added'}`} accent={PO_BAR}>
         {!editing && (openInbQ.data || []).length > 0 && (
           <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: CR }}>Fetch open INB:</span>
             <select value="" onChange={(e) => { const l = (openInbQ.data || []).find((x) => x.inbLinkNo === e.target.value); if (l) fetchInb(l); }}
-              style={{ padding: '5px 8px', border: '1px solid #e1e3ec', borderRadius: 6, fontSize: 12, minWidth: 340 }}>
+              style={{ padding: '5px 8px', border: '1px solid #cdd1d8', borderRadius: 6, fontSize: 12, minWidth: 340 }}>
               <option value="">Inter-branch legs sent to {brCode}…</option>
               {(openInbQ.data || []).map((l) => <option key={l.inbLinkNo} value={l.inbLinkNo}>{l.inbLinkNo} · from {l.fromBranch} · {l.passenger || '—'} · {fmt(l.total)}</option>)}
             </select>
             {inbLinkNo && <span style={{ fontSize: 11, fontWeight: 700, color: '#27500A' }}>✓ {inbLinkNo} — fares & Service Fee pre-filled (IGST)</span>}
           </div>
         )}
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
-            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-              <th style={{ ...thM, ...thL, width: 140 }}>{spec.idCols[0].label}</th>
-              <th style={{ ...thM, ...thL, width: 140 }}>{spec.idCols[1].label}</th>
-              {refKeys.map((c) => <th key={c.key} style={{ ...thA, ...thL, width: 120 }}>{c.label}</th>)}
-              {spec.fareCols.map((c) => <th key={c.key} style={{ ...thM, width: 95 }}>{c.label}</th>)}
-              <th style={{ ...thM, width: 95 }}>Supplier Service</th>
+        <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #ecd5dc' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960, tableLayout: 'fixed' }}>
+            <thead><tr style={{ borderBottom: '2px solid ' + PO_BAR }}>
+              <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[0].label}</th>
+              <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[1].label}</th>
+              {refKeys.map((c) => <th key={c.key} style={{ ...poHdrL, width: 120 }}>{c.label}</th>)}
+              {spec.fareCols.map((c) => <th key={c.key} style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
+              <th style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>Supplier Service Charge</th>
               {pkg
-                ? <th style={{ ...thM, width: 95 }}>Supplier Service GST (18%)</th>
-                : <th style={{ ...thA, width: 95 }}>GST ({activeRate}%)</th>}
-              <th style={{ ...thM, width: 100 }}>Supplier Incentive</th>
-              <th style={{ ...thA, width: 85 }}>TDS (2%)</th>
-              <th style={{ ...thA, width: 110 }}>Total</th>
+                ? <th style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>Supplier Service Charge {taxLabel} ({activeRate}%)</th>
+                : <th style={{ ...poHdr, width: 95, whiteSpace: 'normal', background: '#FBF3DE', color: GOLD_DEEP }}>{taxLabel} ({activeRate}%)</th>}
+              <th style={{ ...poHdr, width: 100, whiteSpace: 'normal' }}>Supp Comm/Inc Rcvd</th>
+              <th style={{ ...poHdr, width: 85 }}>{isVatBr ? 'WHT' : 'TDS (2%)'}</th>
+              <th style={{ ...poHdr, width: 110 }}>Total</th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign });
                 return (
                   <React.Fragment key={i}>
-                  <tr>
-                    <td style={{ ...tdC, textAlign: 'left', padding: 3, width: 140 }}><input value={l.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} style={cellTxt} /></td>
-                    <td style={{ ...tdC, textAlign: 'left', padding: 3, width: 140 }}><input value={l.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} style={cellTxt} /></td>
-                    {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A', width: 120 }}>{l[col.key] || '—'}</td>)}
-                    {spec.fareCols.map((col) => <td key={col.key} style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
-                    <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} /></td>
+                  <tr className="transition hover:bg-[#fdf7f9]">
+                    <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} placeholder={spec.idCols[0].label} style={cellTxt} /></td>
+                    <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} placeholder={spec.idCols[1].label} style={cellTxt} /></td>
+                    {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A', width: 120, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{l[col.key] || '—'}</td>)}
+                    {spec.fareCols.map((col) => <td key={col.key} style={{ padding: '6px 3px', width: 60, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
+                    <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} /></td>
                     {pkg
-                      ? <td style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} /></td>
-                      : <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstPur)}</td>}
-                    <td style={{ padding: 3, width: 100 }}><input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} /></td>
-                    <td style={{ ...tdAuto, width: 85 }}>{fmt(c.tds)}</td>
-                    <td style={{ ...tdC, fontWeight: 800, color: DARK, background: '#faf7ef', width: 110 }}>{fmt(c.finalPurchase)}</td>
+                      ? <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} /></td>
+                      : <td style={{ ...tdAuto, width: 95, background: '#FBF3DE', color: GOLD_DEEP, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.gstPur)}</td>}
+                    <td style={{ padding: '6px 3px', width: 100, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} /></td>
+                    <td style={{ ...tdAuto, width: 85, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.tds)}</td>
+                    <td style={{ ...tdC, fontWeight: 800, color: CR, background: '#faf7ef', width: 110, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.finalPurchase)}</td>
                   </tr>
                   {spec.sectors && sectorBlock(l, i, false, poCols)}
                   </React.Fragment>
@@ -679,27 +980,32 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               })}
             </tbody>
             <tfoot><tr>
-              <td style={{ ...tfTd, textAlign: 'left' }}>TOTAL</td>
-              <td style={tfTd} />
-              {refKeys.map((c) => <td key={c.key} style={tfTd} />)}
-              {spec.fareCols.map((c) => <td key={c.key} style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
-              <td style={tfTd}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
-              <td style={tfTd}>{pkg ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
-              <td style={tfTd}>{fmt(totals.po.incentiveAmt)}</td>
-              <td style={tfTd}>{fmt(totals.po.incentiveTds)}</td>
-              <td style={tfTd}>{fmt(totals.po.total)}</td>
+              <td style={{ ...poTf, textAlign: 'left' }}>TOTAL</td>
+              <td style={poTf} />
+              {refKeys.map((c) => <td key={c.key} style={poTf} />)}
+              {spec.fareCols.map((c) => <td key={c.key} style={poTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
+              <td style={poTf}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
+              <td style={poTf}>{pkg ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
+              <td style={poTf}>{fmt(totals.po.incentiveAmt)}</td>
+              <td style={poTf}>{fmt(totals.po.incentiveTds)}</td>
+              <td style={{ ...poTf, color: CR }}>{fmt(totals.po.total)}</td>
             </tr></tfoot>
           </table>
         </div>
       </Section>
       )}
 
+      {/* N-PO: additional purchase legs (Flight +Misc / Holiday components) */}
+      {!isNoSupp && ALLOWED_LEG_MODULES[moduleCode] && (
+        <ExtraPurchases parentModule={moduleCode} branch={branch} brCode={brCode} noVat={effNoVat} legs={extraPOs} onChange={setExtraPOs} isForeign={isForeignSupplier} />
+      )}
+
       {/* ③ Gross Profit */}
-      <Section n="3" name="Gross Profit" sub="GP = net sales − net purchase · % on final sales value" accent={DR}>
+      <Section n="3" badge="GP" name="Gross Profit" sub="GP = net sales − net purchase · % on final sales value" accent={GP_BAR}>
         <div className="mb-3 grid grid-cols-1 gap-3 tablet:grid-cols-3">
-          <GpCard k={'Total Sales (incl GST' + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(totals.so.total)} color={DARK} />
-          <GpCard k="Total Purchase (incl GST)" v={cur + ' ' + fmt(totals.po.total)} color={CR} />
-          <GpCard k="Gross Profit" v={cur + ' ' + fmt(totals.gp.total)} color={DR} pct={totals.gp.pct + '% margin'} />
+          <GpCard k={'Total Sales (incl ' + taxLabel + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(totals.so.total)} color={DARK} bg="#FFFDF7" />
+          <GpCard k={'Total Purchase (incl ' + taxLabel + ')'} v={cur + ' ' + fmt(totals.po.total)} color={CR} bg="#FFFAEC" />
+          <GpCard k="Gross Profit" v={cur + ' ' + fmt(totals.gp.total)} color={DR} pct={totals.gp.pct + '% margin'} bg="#FCF3DE" />
         </div>
         {totals.so.tcs > 0 && (
           <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 7, background: '#FFF7E6', border: '1px solid #F0C36D', color: '#7a5b12', fontSize: 11.5 }}>
@@ -708,19 +1014,19 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         )}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
-            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #cdd1d8' }}>
               <th style={{ ...thA, ...thL, width: 140 }}>First Name</th><th style={{ ...thA, ...thL, width: 140 }}>Surname</th>
-              <th style={{ ...thA, width: 110 }}>Final Sales</th><th style={{ ...thA, width: 95 }}>Sales GST ({activeRate}%)</th><th style={{ ...thA, width: 110 }}>Final Purchase</th><th style={{ ...thA, width: 95 }}>Purchase GST ({pkg ? 18 : activeRate}%)</th>
-              <th style={{ ...thA, width: 95 }}>Incentive</th><th style={{ ...thA, width: 80 }}>TDS (2%)</th>
+              <th style={{ ...thA, width: 110 }}>Final Sales</th><th style={{ ...thA, width: 85 }}>SVF {taxLabel} ({activeRate}%)</th><th style={{ ...thA, width: 85 }}>SVC2 {taxLabel} ({activeRate}%)</th><th style={{ ...thA, width: 110 }}>Final Purchase</th><th style={{ ...thA, width: 95 }}>Purchase {taxLabel} ({activeRate}%)</th>
+              <th style={{ ...thA, width: 95 }}>Supp Comm/Inc Rcvd</th><th style={{ ...thA, width: 80 }}>{isVatBr ? 'WHT' : 'TDS (2%)'}</th>
               <th style={{ ...thA, width: 110 }}>Gross Profit</th><th style={{ ...thA, width: 80 }}>GP %</th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign });
                 return (
                   <tr key={i}>
                     <td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.fn || '—'}</td><td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.sn || ''}</td>
-                    <td style={{ ...tdAuto, width: 110 }}>{fmt(c.finalSales)}</td><td style={{ ...tdAuto, width: 95 }}>{fmt(c.salesGST)}</td>
+                    <td style={{ ...tdAuto, width: 110 }}>{fmt(c.finalSales)}</td><td style={{ ...tdAuto, width: 85 }}>{fmt(c.gstSvc)}</td><td style={{ ...tdAuto, width: 85 }}>{fmt(c.gstMk)}</td>
                     <td style={{ ...tdAuto, width: 110 }}>{fmt(c.finalPurchase)}</td><td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstPur)}</td>
                     <td style={{ ...tdAuto, width: 95 }}>{fmt(c.incentive)}</td><td style={{ ...tdAuto, width: 80 }}>{fmt(c.tds)}</td>
                     <td style={{ ...tdAuto, fontWeight: 800, color: DR, width: 110 }}>{fmt(c.gp)}</td>
@@ -731,7 +1037,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tbody>
             <tfoot><tr>
               <td style={{ ...tfTd, textAlign: 'left' }} colSpan={2}>TOTAL</td>
-              <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd}>{fmt(totals.so.gst + totals.so.otherTaxesGst)}</td>
+              <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd}>{fmt(totals.so.gst)}</td><td style={tfTd}>{fmt(totals.so.otherTaxesGst)}</td>
               <td style={tfTd}>{fmt(totals.po.total)}</td><td style={tfTd}>{fmt(totals.po.gst)}</td>
               <td style={tfTd}>{fmt(totals.po.incentiveAmt)}</td><td style={tfTd}>{fmt(totals.po.incentiveTds)}</td>
               <td style={{ ...tfTd, color: DR }}>{fmt(totals.gp.total)}</td><td style={{ ...tfTd, color: GOLD }}>{totals.gp.pct.toFixed(2)}%</td>
@@ -743,7 +1049,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {error && <div style={{ ...card, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 12, marginBottom: 14 }}>{error}</div>}
 
       {/* Footer */}
-      <div style={{ position: 'sticky', bottom: 0, background: '#f3f4f8', borderTop: '1px solid #e6e8ec', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ position: 'sticky', bottom: 0, background: '#FAFAF8', borderTop: '1px solid #dfe2e7', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, color: '#5b616e', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
           {editing ? <><Pencil size={12} /> Editing returns this voucher to Pending — approve it from the Pending queue to post the books.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
         </span>
@@ -765,8 +1071,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 // ─── Refund / Reissue entry (reversal modules) ────────────────────────────────
 // Picked from the SO/PO/GP module bar; references the original sale invoice and, on
 // approval, spawns ONE RF/RI voucher posted via the proven reversal engine. Reuses
-// the RefundReissueFields body; maps its margin input → the booking's Other Taxes.
-function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBooking, qc }) {
+// the RefundReissueFields body; maps its margin input → the booking's Service Charge - 2.
+function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBooking, qc, setRoute, onDone }) {
   const kind = moduleCode === 'RF' ? 'refund' : 'reissue';
   const [state, setState] = useState(() => {
     const r = (editing && editBooking && editBooking.reversal) || {};
@@ -811,7 +1117,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       const booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, { ...payload, editReason: 'Edit ' + kind })
         : await apiPost('/api/booking-orders', payload);
-      setResult({ ...booking, _approved: false });
+      setResult({ ...booking, _approved: false, _edited: editing });
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
       if (editing) invalidateBooks(qc); // an edit reverses the prior posting → refresh every books cache
       toast(`Voucher ${booking.bookingNo || ''} saved — pending approval`);
@@ -827,28 +1133,34 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
         <div style={{ ...card, textAlign: 'center', padding: 28 }}>
           <div style={{ width: 54, height: 54, borderRadius: '50%', background: approved ? '#e8f6ed' : '#FEF6E6', color: approved ? '#16a34a' : GOLD, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>{approved ? <Check size={28} /> : <Clock size={28} />}</div>
-          <h2 style={{ margin: '0 0 4px', fontSize: 18, color: DARK }}>{approved ? `${kind === 'refund' ? 'Refund' : 'Reissue'} approved & posted` : `${kind === 'refund' ? 'Refund' : 'Reissue'} saved — Pending approval`}</h2>
+          <h2 style={{ margin: '0 0 4px', fontSize: 18, color: DARK }}>{approved ? `${kind === 'refund' ? 'Refund' : 'Reissue'} approved & posted` : result._edited ? `${kind === 'refund' ? 'Refund' : 'Reissue'} updated — still Pending` : `${kind === 'refund' ? 'Refund' : 'Reissue'} saved — Pending approval`}</h2>
           <p style={{ margin: '0 0 18px', fontSize: 12.5, color: '#5b616e' }}>{approved ? <>The original sale is <b>reversed in full</b> and the {kind} voucher posted to the books.</> : <>No books impact yet — approve it under <b>Pending</b> to post.</>}</p>
           <div className="grid grid-cols-1 gap-2.5 tablet:grid-cols-2" style={{ textAlign: 'left' }}>
             {fields.map(([k, v]) => (<div key={k} style={{ padding: '8px 12px', background: '#f6f7fb', borderRadius: 8 }}><div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.6px', color: '#9197a3', textTransform: 'uppercase' }}>{k}</div><div style={{ fontSize: 13, fontWeight: 700, color: DARK }}>{v}</div></div>))}
           </div>
-          <button onClick={() => { setResult(null); setState((s) => ({ ...s, againstInvoice: '', supplierAmt: '', serviceCharge: '', markup: '' })); }} style={{ ...btnG, marginTop: 18 }}>New {kind}</button>
+          {editing
+            ? <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} style={{ ...btnG, marginTop: 18 }}><ArrowRight size={14} /> Back to list</button>
+            : <button onClick={() => { setResult(null); setState((s) => ({ ...s, againstInvoice: '', supplierAmt: '', serviceCharge: '', markup: '' })); }} style={{ ...btnG, marginTop: 18 }}><Plus size={14} /> New {kind}</button>}
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px' }}>
-      <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14, borderLeft: '4px solid ' + GOLD }}>
-        <div style={{ padding: '14px 18px', background: DARK, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV, color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
+      <div style={{ ...card, border: '1px solid #dfe2e7', borderLeft: '4px solid ' + GOLD, borderRadius: 4, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
+        <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{kind === 'refund' ? 'REFUND VOUCHER' : 'REISSUE VOUCHER'}</p>
-            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#9197a3' }}>Reverses the linked original sale + retained charges → one <b style={{ color: GOLD }}>Pending</b> {kind} voucher · {brCode || 'select a branch'}</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : (kind === 'refund' ? 'REFUND VOUCHER' : 'REISSUE VOUCHER')}</p>
+            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#9197a3' }}>{editing
+              ? <>Fix this {kind} voucher, then <b style={{ color: GOLD }}>Save changes</b> · {brCode} · returns to Pending; approve it from the Pending queue</>
+              : <>Reverses the linked original sale + retained charges → one <b style={{ color: GOLD }}>Pending</b> {kind} voucher · {brCode || 'select a branch'}</>}</p>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {[...VMODULE_LIST, ...REVERSAL_CHIPS].map((m) => (
               <button key={m.code} onClick={() => changeModule(m.code)}
+                title={editing && m.code !== moduleCode ? `Switch this voucher to ${m.name} — the entered details are kept` : ''}
+                className="inline-flex items-center max-tablet:min-h-[44px]"
                 style={{ padding: '5px 11px', borderRadius: 999, border: '1px solid ' + (moduleCode === m.code ? GOLD : '#2e323c'), background: moduleCode === m.code ? GOLD : 'transparent', color: moduleCode === m.code ? '#fff' : '#9197a3', fontSize: 10.5, fontWeight: 700, cursor: m.code === moduleCode ? 'default' : 'pointer' }}>
                 {m.icon} {m.name}
               </button>
@@ -860,34 +1172,42 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       <div style={{ ...card, padding: 18 }}>
         <RefundReissueFields state={state} setState={setState} ctx={{ branch: brCode, cur }} kind={kind} />
         {error && <p style={{ margin: '8px 0 0', fontSize: 12, color: CR, fontWeight: 600 }}>⚠ {error}</p>}
-        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 16, alignItems: 'center' }}>
+          {editing && (
+            <span style={{ fontSize: 11, color: '#5b616e', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Pencil size={12} /> Editing returns this voucher to Pending — approve it from the Pending queue to post the books.
+            </span>
+          )}
+          {editing && (
+            <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
+          )}
           <button disabled={!ready} onClick={() => save()} className="max-tablet:min-h-[44px]" style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Save size={14} /> Save (Pending)</button>
         </div>
-        {!ready && <p style={{ margin: '8px 0 0', fontSize: 10.5, color: '#9197a3' }}>Need: original invoice, customer, supplier/airline &amp; a supplier amount &gt; 0.</p>}
+        {!ready && <p style={{ margin: '8px 0 0', padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#854F0B' }}>Need: original invoice, customer, supplier/airline &amp; a supplier amount &gt; 0.</p>}
       </div>
     </div>
   );
 }
 
-function Section({ n, name, sub, accent, children }) {
+function Section({ n, name, sub, accent, badge, children }) {
   return (
-    <div style={{ ...card, marginBottom: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <span style={{ width: 24, height: 24, borderRadius: '50%', background: DARK, color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{n}</span>
-        <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.5px', color: accent, textTransform: 'uppercase' }}>{name}</span>
-        <span style={{ fontSize: 10.5, color: '#9A9A9A', fontStyle: 'italic' }}>{sub}</span>
+    <div style={{ background: '#fff', border: '1px solid ' + accent, borderRadius: 12, overflow: 'hidden', marginBottom: 13, boxShadow: '0 4px 16px rgba(0,0,0,.06)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '8px 14px', background: accent, color: '#fff' }}>
+        <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '1px', padding: '3px 9px', borderRadius: 4, background: 'rgba(255,255,255,.24)' }}>{badge || n}</span>
+        <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '2.5px', textTransform: 'uppercase' }}>{name}</span>
+        <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,.92)', marginLeft: 'auto', fontStyle: 'italic' }}>{sub}</span>
       </div>
-      {children}
+      <div style={{ padding: '14px 16px' }}>{children}</div>
     </div>
   );
 }
 
-function GpCard({ k, v, color, pct }) {
+function GpCard({ k, v, color, pct, bg = '#FFFDF7' }) {
   return (
-    <div style={{ border: '1px solid #e8e2d2', borderRadius: 8, padding: '12px 14px', background: '#faf7ef' }}>
-      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.7px', color: '#9A9A9A', textTransform: 'uppercase' }}>{k}</div>
-      <div style={{ fontSize: 20, fontWeight: 800, marginTop: 4, color }}>{v}</div>
-      {pct && <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginTop: 2 }}>{pct}</div>}
+    <div style={{ border: '1px solid #F0E4C2', borderRadius: 8, padding: '12px 14px', background: bg }}>
+      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.7px', color: '#9A8138', textTransform: 'uppercase' }}>{k}</div>
+      <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-.5px', marginTop: 4, color }}>{v}</div>
+      {pct && <div style={{ fontSize: 12, fontWeight: 700, color: '#A88E48', marginTop: 2 }}>{pct}</div>}
     </div>
   );
 }
@@ -924,7 +1244,7 @@ function PartyPicker({ branch, kind, value, onChange, subGroupFilter }) {
         onChange={(e) => { setName(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)} style={inp} />
       {open && matches.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 60, marginTop: 2, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', maxHeight: 220, overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 60, marginTop: 2, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', maxHeight: 220, overflowY: 'auto' }}>
           {matches.map((l) => (
             <div key={l.id} {...clickable(() => pick(l), { role: 'option' })}
               style={{ padding: '7px 11px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5, outline: 'none' }}
@@ -945,37 +1265,11 @@ function PartyPicker({ branch, kind, value, onChange, subGroupFilter }) {
 /* ════════════════════════════════════════════════════════════════════════════
    JV / posting detail view (one voucher side)
    ════════════════════════════════════════════════════════════════════════════ */
+// SO/PO/GP booking JV side — now rendered by the shared JvBlock so it matches every
+// other JV view (voucher shell, refund, finance).
 function PostingTable({ side, accent, title }) {
   if (!side) return null;
-  const balanced = Math.abs((side.totalDr || 0) - (side.totalCr || 0)) < 0.01;
-  return (
-    <div style={{ border: '1px solid #e6e8ec', borderRadius: 8, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: accent + '12', borderBottom: '1px solid #e6e8ec' }}>
-        <span style={{ fontSize: 11.5, fontWeight: 800, color: accent }}>{title}</span>
-        <span style={{ fontSize: 10.5, fontFamily: 'monospace', color: '#5b616e' }}>{side.vno} · {side.type}</span>
-      </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead><tr style={{ background: '#f7f8fb' }}>
-          {['Ledger', 'Group', 'Debit', 'Credit'].map((h, i) => <th key={h} style={{ padding: '6px 10px', fontSize: 9.5, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', textAlign: i >= 2 ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>)}
-        </tr></thead>
-        <tbody>
-          {(side.postings || []).map((p, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #f0f2f7' }}>
-              <td style={{ padding: '5px 10px', fontSize: 11.5, fontWeight: 600, color: DARK, paddingLeft: p.credit > 0 ? 22 : 10 }}>{p.ledger}</td>
-              <td style={{ padding: '5px 10px', fontSize: 10.5, color: '#9197a3' }}>{p.group}</td>
-              <td style={{ padding: '5px 10px', fontSize: 11.5, textAlign: 'right', color: DR, fontVariantNumeric: 'tabular-nums' }}>{p.debit > 0 ? fmt(p.debit) : ''}</td>
-              <td style={{ padding: '5px 10px', fontSize: 11.5, textAlign: 'right', color: CR, fontVariantNumeric: 'tabular-nums' }}>{p.credit > 0 ? fmt(p.credit) : ''}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot><tr style={{ borderTop: '1.5px solid ' + DARK, background: '#f7f8fb' }}>
-          <td style={{ padding: '6px 10px', fontSize: 11, fontWeight: 800 }} colSpan={2}>{balanced ? '✓ Balanced' : '⚠ Unbalanced'}</td>
-          <td style={{ padding: '6px 10px', fontSize: 11.5, fontWeight: 800, textAlign: 'right', color: DR }}>{fmt(side.totalDr)}</td>
-          <td style={{ padding: '6px 10px', fontSize: 11.5, fontWeight: 800, textAlign: 'right', color: CR }}>{fmt(side.totalCr)}</td>
-        </tr></tfoot>
-      </table>
-    </div>
-  );
+  return <JvBlock title={title} sub={`${side.vno || ''}${side.type ? ' · ' + side.type : ''}`} postings={side.postings} color={accent} />;
 }
 
 function JournalView({ id, cur }) {
@@ -1018,7 +1312,7 @@ function WhereItPosts({ approved }) {
   const items = [
     ['Day Book / Ledgers', 'both vouchers appear in the Day Book and each ledger statement (Sundry Debtors, Supplier, every Sales/Purchase component head, GST).'],
     ['Trial Balance', 'every Dr/Cr leg above lands in the Trial Balance under its group.'],
-    ['Profit & Loss', 'each head nests in the Tally chart — Sales Accounts → module sub-group (Ticketing → Domestic/International) → DT-Base Fare / DT-K3-Taxes / DT-Other Taxes / DT-Service Charges; Purchase Accounts → … [Pur] incl. Supplier Service (an agency cost that reduces GP). Drill the P&L to see it head-wise.'],
+    ['Profit & Loss', 'each head nests in the Tally chart — Sales Accounts → module sub-group (Flights → Domestic/International Flights, Holiday Packages → Domestic/International Holidays) → DT-Base Fare / DT-K3 Tax / DT-SVC2 / DT-SVF; Purchase Accounts → … [Pur] incl. Supp SVCHG (an agency cost that reduces GP). Drill the P&L to see it head-wise.'],
     ['Balance Sheet', 'customer (Sundry Debtors, asset), supplier (Sundry Creditors, liability), CGST/SGST (Duties & Taxes) and any TCS Payable sit on the Balance Sheet.'],
     ['Sales & Purchase Registers', 'the sale shows in the Sales Register, the purchase in the Purchase Register.'],
     ['Invoice GP / Sales-GP Analytics', 'both are tied by the Link No, so GP is tracked invoice-wise.'],
@@ -1052,6 +1346,9 @@ function useBookings(brCode) {
 
 // Group bookings for the "… wise" views. 'none' = bill-wise (flat).
 function groupBookings(rows, by) {
+  // Recently Approved wise: not a bucketed group — a flat list sorted by approval
+  // recency (most recent first). Unapproved rows (no approvedAt) sort last.
+  if (by === 'recent') return [{ key: '__all', label: null, rows: [...rows].sort((a, b) => new Date(b.approvedAt || 0) - new Date(a.approvedAt || 0)) }];
   if (by !== 'client' && by !== 'supplier' && by !== 'module') return [{ key: '__all', label: null, rows }];
   const keyOf = (b) => (by === 'client' ? (b.customer?.name || '—') : by === 'supplier' ? (b.supplier?.name || '—') : (b.module || '—'));
   const labelOf = (b) => (by === 'module' ? ((VSPECS[b.module] && VSPECS[b.module].name) || b.module || '—') : keyOf(b));
@@ -1063,7 +1360,7 @@ const sumT = (rows, path) => rows.reduce((s, b) => s + ((b[path] && b[path].tota
 const gpPctOf = (gp, sale) => (sale ? (gp / sale) * 100 : 0);
 const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
-function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, onInvoice, busyId, sel, onToggleSel }) {
+function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, onRevoke, canRevoke, onInvoice, busyId, sel, onToggleSel }) {
   const cols = mode === 'approved'
     ? ['', 'Booking No', 'Booking Date', 'Link No', 'Tally Ref', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
     : mode === 'rejected'
@@ -1107,9 +1404,9 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
             const isOpen = open === b.id;
             return (
               <React.Fragment key={b.id}>
-                <tr onClick={() => setOpen(isOpen ? null : b.id)} style={{ borderBottom: '1px solid #f0f2f7', cursor: 'pointer', background: isOpen ? '#faf7ef' : '#fff' }}>
+                <tr onClick={() => setOpen(isOpen ? null : b.id)} style={{ borderBottom: '1px solid #dfe2e7', cursor: 'pointer', background: isOpen ? '#faf7ef' : '#fff' }}>
                   <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{mode === 'pending' && onToggleSel && <input type="checkbox" checked={!!(sel && sel.has(b.id))} onChange={() => onToggleSel(b.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: 6, verticalAlign: 'middle', cursor: 'pointer' }} />}{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
-                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}{mode === 'pending' && b.validation?.hasErrors ? <span title={(b.validation.errors || []).join(' · ')} style={{ marginLeft: 6, color: '#dc2626', fontWeight: 800 }}>⚠</span> : null}</td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 700, fontSize: 11.5 }}>{b.bookingNo}{mode === 'pending' && b.validation?.hasErrors ? <span title={(b.validation.errors || []).join(' · ')} style={{ marginLeft: 6, color: '#dc2626', fontWeight: 800 }}>⚠</span> : null}{mode === 'pending' && b.revokedAt ? <span title={`Revoked${b.revokedBy ? ' by ' + b.revokedBy : ''}${b.revokeReason ? ' — ' + b.revokeReason : ''}`} style={{ marginLeft: 6, fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 20, background: GOLD_SOFT, color: '#8a6d12', border: '1px solid ' + GOLD_LINE, whiteSpace: 'nowrap' }}>⟲ Revoked</span> : null}</td>
                   {(mode === 'approved' || mode === 'pending') && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5b616e' }}>{b.date || '—'}</td>}
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: BLUE, fontSize: 11.5 }}>{b.linkNo}</td>
                   {(mode === 'pending' || mode === 'approved') && <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, color: '#5b616e', whiteSpace: 'nowrap' }} title="Sales / Purchase Tally Ref">{(b.saleTallyRef || '—')}{b.purTallyRef ? ' / ' + b.purTallyRef : ''}</td>}
@@ -1141,12 +1438,13 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                         {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} title="Delete — remove from Pending, view-only (number not reusable)" style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: '#dc2626' }}><Trash2 size={12} /> Delete</button>}
                       </div>
                     ) : mode === 'approved' ? (
-                      // Edit is open to everyone (it un-posts the booking → Pending → re-approve);
-                      // Delete is admin-only (Super Admin / Director).
+                      // An approved booking is READ-ONLY: Revoke un-posts all its legs and
+                      // returns it to Pending (edit there, then re-approve under the SAME
+                      // numbers). Revoke is approver-only; Delete is admin-only.
                       <div style={{ display: 'flex', gap: 6 }}>
-                        {onEdit && <button disabled={busyId === b.id} onClick={() => onEdit(b)} title="Edit — reverses the posted Sales/Purchase out of the books and returns this to Pending for re-approval" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit</button>}
+                        {canRevoke && onRevoke && <button disabled={busyId === b.id} onClick={() => onRevoke(b)} title="Revoke — un-post the Sales/Purchase and return this booking to Pending so it can be edited & re-approved (numbers kept)" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: GOLD, borderColor: '#e3cd97' }}><RotateCcw size={12} /> Revoke</button>}
                         {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#dc2626', borderColor: '#f3c9c9' }}><Trash2 size={12} /> Delete</button>}
-                        {!onEdit && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
+                        {!(canRevoke && onRevoke) && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
                       </div>
                     ) : mode === 'deleted' ? (
                       <span style={{ fontSize: 11, color: '#9197a3' }} title={b.deletedReason || ''}>{b.deletedBy || '—'}{b.deletedReason ? ` · ${b.deletedReason}` : ''}</span>
@@ -1179,13 +1477,13 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
 }
 
 // Bill-wise / Client-wise / Supplier-wise / Module-wise grouping toggle.
-function GroupByBar({ value, onChange }) {
-  const OPTS = [['none', 'Bill wise'], ['client', 'Client wise'], ['supplier', 'Supplier wise'], ['module', 'Module wise']];
+function GroupByBar({ value, onChange, extra = [] }) {
+  const OPTS = [['none', 'Bill wise'], ['client', 'Client wise'], ['supplier', 'Supplier wise'], ['module', 'Module wise'], ...extra];
   return (
-    <div style={{ display: 'inline-flex', border: '1px solid #d8dcec', borderRadius: 7, overflow: 'hidden', marginBottom: 12 }}>
+    <div style={{ display: 'inline-flex', height: 32, boxSizing: 'border-box', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
       {OPTS.map(([v, l]) => (
         <button key={v} onClick={() => onChange(v)}
-          style={{ padding: '6px 12px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: value === v ? BLUE : '#fff', color: value === v ? '#fff' : '#5b616e' }}>{l}</button>
+          style={{ display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 11.5, fontWeight: 600, border: 'none', cursor: 'pointer', background: value === v ? BLUE : '#fff', color: value === v ? '#fff' : '#5b616e' }}>{l}</button>
       ))}
     </div>
   );
@@ -1276,6 +1574,33 @@ export function PendingBookings({ branch, setRoute }) {
 }
 
 const isAdminRole = (u) => ['Super Admin', 'Director'].includes(u?.role);
+// Revoking un-posts a posted booking — approver-level roles only (the server enforces
+// this too; this just gates the button). Stricter than approving, looser than delete.
+const isApproverRole = (u) => ['Super Admin', 'Director', 'Senior Finance Manager', 'Sr. Accounts Executive'].includes(u?.role);
+
+// Shared Revoke handler factory for the booking screens — runs the server preflight so
+// the dialog shows the blast radius (which legs un-post) and any warnings, blocks on a
+// hard block, requires a reason, then posts the revoke and refreshes both books roots.
+function makeOnRevoke({ qc, setBusyId, setOpen, toastFn }) {
+  return async (b) => {
+    let pre = null;
+    try { pre = await apiGet('/api/booking-orders/' + b.id + '/revoke-check'); }
+    catch (e) { toastFn(e.message || 'Could not check this booking', 'error'); return; }
+    if (pre && (pre.blocks || []).length) { toastFn(`Can't revoke — ${pre.blocks.map((x) => x.msg).join(' ')}`, 'error'); return; }
+    const warns = (pre?.warnings || []).map((w) => w.msg).filter(Boolean);
+    const legs = (pre?.legs || []).filter(Boolean);
+    const { confirmed, reason } = await confirmDialog({
+      title: `Revoke booking ${b.bookingNo}?`,
+      message: `This un-posts its ${legs.length || ''} spawned invoice(s)${legs.length ? ` (${legs.join(', ')})` : ''} and returns the booking to Pending for editing & re-approval (the numbers are kept).${warns.length ? ' Note: ' + warns.join(' ') : ''}`,
+      danger: true, reasonRequired: true, reasonLabel: 'Reason for revoke', confirmLabel: 'Revoke',
+    });
+    if (!confirmed) return;
+    setBusyId(b.id);
+    try { await apiPost('/api/booking-orders/' + b.id + '/revoke', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); setOpen(null); toastFn(`Revoked ${b.bookingNo} → Pending`); }
+    catch (e) { toastFn(e.message || 'Revoke failed', 'error'); }
+    finally { setBusyId(null); }
+  };
+}
 
 export function ApprovedBookings({ branch, setRoute, currentUser }) {
   const brCode = brCodeOf(branch) || 'ALL';
@@ -1286,6 +1611,8 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
   const [busyId, setBusyId] = useState(null);
   const [groupBy, setGroupBy] = useState('none');
   const canDelete = isAdminRole(currentUser);
+  const canRevoke = isApproverRole(currentUser);
+  const onRevoke = makeOnRevoke({ qc, setBusyId, setOpen, toastFn: toast });
 
   const rows = data.filter((b) => b.status === 'approved' || b.status === 'posted');
 
@@ -1311,8 +1638,8 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
         </div>
         <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>
-      <div><GroupByBar value={groupBy} onChange={setGroupBy} /></div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" groupBy={groupBy} onDelete={onDelete} canDelete={canDelete} busyId={busyId} />
+      <div style={{ marginBottom: 12 }}><GroupByBar value={groupBy} onChange={setGroupBy} extra={[['recent', 'Recently Approved']]} /></div>
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" groupBy={groupBy} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} busyId={busyId} />
     </div>
   );
 }
@@ -1341,7 +1668,7 @@ export function DeletedBookings({ branch, setRoute }) {
 
 // Unified SO/PO/GP approval — Pending · Approved · Rejected · Deleted in one screen
 // with internal tabs (mirrors Voucher Approvals). Reuses BookingTable + all actions.
-export function BookingApprovals({ branch, setRoute, currentUser }) {
+export function BookingApprovals({ branch, setRoute, currentUser, initialSearch = '', initialStatus = '' }) {
   const brCode = brCodeOf(branch) || 'ALL';
   const cur = bc(branch).cur;
   const qc = useQueryClient();
@@ -1350,7 +1677,7 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   const sups = useQuery({ queryKey: ['suppliers'], queryFn: () => apiGet('/api/suppliers') }).data || [];
   const partyBy = (arr) => { const m = {}; (arr || []).forEach((x) => { if (x && x.name) m[String(x.name).toLowerCase().trim()] = x; }); return m; };
   const custMap = partyBy(custs), supMap = partyBy(sups);
-  const [status, setStatus] = useState('pending');
+  const [status, setStatus] = useState(initialStatus || 'pending');
   const [open, setOpen] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [msg, setMsg] = useState('');
@@ -1358,16 +1685,30 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
   const [groupBy, setGroupBy] = useState('none');
   const [sel, setSel] = useState(() => new Set());
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
+  const [search, setSearch] = useState(initialSearch || '');
   const canDelete = isAdminRole(currentUser);
   const inRange = (dt) => (!range.from || dt >= range.from) && (!range.to || dt <= range.to);
+  // Search filters the visible list by Booking No, Link No, module, customer, supplier,
+  // posted Sale/Purchase Vch No, or amount. Counts (tab badges) stay unfiltered.
+  const needle = search.trim().toLowerCase();
+  const matchBooking = (b) => {
+    if (!needle) return true;
+    const hay = [b.bookingNo, b.linkNo, b.module, b.customer && b.customer.name, b.supplier && b.supplier.name, b.saleVno, b.purchaseVno, String(Math.round(b.saleTotal || 0))].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(needle);
+  };
+  // Newest first: date desc, then Booking No desc (numeric-aware) as a stable tiebreak.
+  const cmpLatest = (a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.bookingNo || '').localeCompare(String(a.bookingNo || ''), undefined, { numeric: true });
 
   // Bookings edited ≥ once (cross-cuts status) — its own source for the Edited tab.
   const editedQ = useQuery({ queryKey: ['booking-edited', brCode], queryFn: () => apiGet('/api/booking-orders/edited', { branch: brCode === 'ALL' ? '' : brCode }) });
   const editedRows = (editedQ.data || []).filter((r) => inRange(r.date || ''));
+  const editedVisible = editedRows
+    .filter((r) => !needle || [r.bookingNo, r.linkNo, r.module, r.customer, r.lastBy, r.lastReason, String(Math.round(r.saleTotal || 0))].filter(Boolean).join(' ').toLowerCase().includes(needle))
+    .slice().sort((a, b) => String(b.lastAt || '').localeCompare(String(a.lastAt || '')));
   const bucket = (b) => (b.status === 'posted' ? 'approved' : b.status);
   const counts = { pending: 0, approved: 0, rejected: 0, deleted: 0, edited: editedRows.length };
   data.forEach((b) => { if (counts[bucket(b)] !== undefined && inRange(b.date || '')) counts[bucket(b)]++; });
-  const rows = data.filter((b) => bucket(b) === status && inRange(b.date || ''));
+  const rows = data.filter((b) => bucket(b) === status && inRange(b.date || '') && matchBooking(b)).sort(cmpLatest);
   const allIds = rows.map((b) => b.id);
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
@@ -1410,6 +1751,8 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
     try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); setOpen(null); setMsg(`✓ Deleted ${b.bookingNo}.`); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Delete failed')); } finally { setBusyId(null); }
   };
+  const canRevoke = isApproverRole(currentUser);
+  const onRevoke = makeOnRevoke({ qc, setBusyId, setOpen, toastFn: (m, kind) => setMsg((kind === 'error' ? '⚠ ' : '✓ ') + m) });
   const onApproveSelected = async () => {
     if (!sel.size) return;
     const { confirmed } = await confirmDialog({ title: `Approve ${sel.size} selected voucher(s)?`, message: 'Each posts its linked Sales + Purchase.', confirmLabel: 'Approve' });
@@ -1433,11 +1776,23 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
         <button onClick={() => setRoute && setRoute('/bookings/new')} className="max-tablet:min-h-[44px]" style={btnG}><Plus size={14} /> New voucher</button>
       </div>
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 10 }}>
-        <div style={{ display: 'flex', borderBottom: '1px solid #e6e8ec', flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #cdd1d8', flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}{tab('deleted', 'Deleted')}{tab('edited', 'Edited')}</div>
       </div>
       {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, padding: '8px 12px', color: msg.startsWith('⚠') ? '#dc2626' : '#16a34a', background: msg.startsWith('⚠') ? '#fbe9e9' : '#e8f6ed', border: '1px solid ' + (msg.startsWith('⚠') ? '#f3c9c9' : '#cde3b6') }}>{msg}</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
-        <GroupByBar value={groupBy} onChange={setGroupBy} />
+        <GroupByBar value={groupBy} onChange={setGroupBy} extra={status === 'approved' ? [['recent', 'Recently Approved']] : []} />
+        <div style={{ position: 'relative', flex: '0 1 360px', minWidth: 200 }}>
+          <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#9197a3', pointerEvents: 'none' }}>🔍</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search Booking No · Link · customer · supplier · amount…"
+            aria-label="Search bookings"
+            style={{ width: '100%', padding: '6px 26px 6px 28px', border: '1px solid #cdd1d8', borderRadius: 7, fontSize: 12, outline: 'none', background: '#fff' }}
+          />
+          {search && <button onClick={() => setSearch('')} aria-label="Clear search" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: '#9197a3', fontSize: 14, lineHeight: 1 }}>✕</button>}
+        </div>
+        {needle && <span style={{ fontSize: 11, color: '#5b616e', fontWeight: 700 }}>{(status === 'edited' ? editedVisible.length : rows.length)} match{(status === 'edited' ? editedVisible.length : rows.length) === 1 ? '' : 'es'}</span>}
         {status === 'pending' && rows.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
@@ -1446,8 +1801,8 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
         )}
       </div>
       {status === 'edited'
-        ? <EditedBookingsList rows={editedRows} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
-        : <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; openPrintPreview({ title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}`, recommend: 'portrait', html: buildBookingInvoice(b, side, branch, master) }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />}
+        ? <EditedBookingsList rows={editedVisible} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
+        : <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />}
     </div>
   );
 }
@@ -1456,8 +1811,8 @@ export function BookingApprovals({ branch, setRoute, currentUser }) {
 // to its full audit timeline (who/when/why + field-level changes + full snapshot) and
 // the live JV. Cross-cuts status: an approved booking that was later edited shows here.
 function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
-  const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: '2px solid #e6e8ec', whiteSpace: 'nowrap' };
-  const td = { padding: '7px 10px', borderBottom: '1px solid #f4f6fa', fontSize: 12, whiteSpace: 'nowrap' };
+  const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: '2px solid #cdd1d8', whiteSpace: 'nowrap' };
+  const td = { padding: '7px 10px', borderBottom: '1px solid #dfe2e7', fontSize: 12, whiteSpace: 'nowrap' };
   if (isLoading) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#9197a3' }}>Loading edited bookings…</div>;
   if (!rows.length) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#9197a3' }}>No edited bookings in this period.</div>;
   const fmtAt = (s) => { const d = new Date(s); return isNaN(d) ? (s || '—') : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
@@ -1476,16 +1831,16 @@ function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
                   <td style={{ ...td, fontFamily: 'monospace', color: '#5b616e' }}>{r.linkNo || '—'}</td>
                   <td style={td}>{r.module}</td>
                   <td style={{ ...td, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.customer || '—'}</td>
-                  <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{cur} {Math.round(r.saleTotal || 0).toLocaleString('en-IN')}</td>
+                  <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{cur} {Math.round(r.saleTotal || 0).toLocaleString(localeOf(cur))}</td>
                   <td style={td}><span style={{ fontSize: 10.5, fontWeight: 700, color: '#5b616e', textTransform: 'capitalize' }}>{r.status}</span></td>
                   <td style={{ ...td, textAlign: 'center' }}><span style={{ fontSize: 10.5, fontWeight: 800, padding: '2px 8px', borderRadius: 20, background: '#FFF6D6', color: '#8a6d12' }}>{r.edits}{r.preAudit ? '*' : ''}</span></td>
                   <td style={td}>{r.lastBy || 'unknown'} · {fmtAt(r.lastAt)}</td>
                   <td style={{ ...td, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', color: '#5b616e' }} title={r.lastReason || ''}>{r.lastReason || (r.preAudit ? '— pre-audit —' : '—')}</td>
                 </tr>
                 {isOpen && (
-                  <tr><td colSpan={10} style={{ padding: 12, background: '#f7f8fb', borderBottom: '1px solid #e6e8ec' }}>
+                  <tr><td colSpan={10} style={{ padding: 12, background: '#f7f8fb', borderBottom: '1px solid #cdd1d8' }}>
                     <div style={{ fontWeight: 800, fontSize: 12, color: DARK, marginBottom: 8 }}>Audit trail — {r.bookingNo}</div>
-                    <AuditTrail entityType="booking" entityId={r.id} />
+                    <AuditTrail entityType="booking" entityId={r.id} cur={cur} />
                   </td></tr>
                 )}
               </React.Fragment>
@@ -1515,7 +1870,7 @@ export function RejectedBookings({ branch, setRoute }) {
         </div>
         <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>
-      <div><GroupByBar value={groupBy} onChange={setGroupBy} /></div>
+      <div style={{ marginBottom: 12 }}><GroupByBar value={groupBy} onChange={setGroupBy} /></div>
       <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="rejected" groupBy={groupBy} busyId={null} />
     </div>
   );

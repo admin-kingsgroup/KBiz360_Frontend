@@ -21,7 +21,14 @@ import { Plus, X } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
 import { apiGet, getAuthToken } from '../core/api';
+import { bc } from '../core/styles';
+import { localeOf } from '../core/format';
 import { BRANCH_CODES } from '../core/data';
+import {
+  SUPPLIER_CATS, GST_TREATMENTS, COUNTRIES, IN_STATES, STATE_NAMES, MSME_STATUS,
+  TDS_SECTIONS, PAY_TERMS, SETTLE_CYCLES, PAY_METHODS, CURRENCIES, ADDR_TYPES,
+  CUST_TYPES, CUST_SOURCES,
+} from '../core/partyEnums';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { useHotkey } from '../core/ux/hotkeys';
 import { Combobox } from '../core/ux/Combobox';
@@ -34,17 +41,40 @@ const GOLD = '#c2a04a', DARK = '#1a1c22', DIM = '#5b616e', RED = '#dc2626', GREE
 
 // Local panel wrapper (replaces helpers.tabPanel) — design-system spacing.
 const tabPanel = (children) => <div className="min-h-[360px] p-4 tablet:p-5">{children}</div>;
-const SUPPLIER_CATS = ['Airline', 'DMC', 'Hotel', 'Visa', 'Insurance', 'Car', 'Misc'];
-const GST_TREATMENTS = ['', 'Registered — Regular', 'Registered — Composition', 'Unregistered', 'SEZ', 'Overseas'];
-const MSME_STATUS = ['', 'Not Registered', 'Micro', 'Small', 'Medium'];
-const TDS_SECTIONS = ['', '194C @ 2%', '194J @ 10%', '194I @ 10%', '194H @ 2%', '194O @ 0.1%', 'None'];
-const PAY_TERMS = ['', 'Advance', 'Net 15', 'Net 30', 'Net 45', 'Net 60', 'Net 90'];
-const SETTLE_CYCLES = ['', 'Weekly', 'Bi-Monthly (BSP)', 'Monthly', 'On Invoice'];
-const PAY_METHODS = ['', 'Bank Transfer', 'BSP NEFT', 'NEFT/RTGS', 'Cheque', 'UPI', 'Cash'];
-const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD'];
-const ADDR_TYPES = ['Billing', 'Shipping', 'Registered Office', 'Head Office', 'Branch', 'Other'];
 
-const rupee = (n) => '₹' + (Number(n) || 0).toLocaleString('en-IN');
+// All party picklists (SUPPLIER_CATS, GST_TREATMENTS, COUNTRIES, IN_STATES, STATE_NAMES,
+// MSME_STATUS, TDS_SECTIONS, PAY_TERMS, SETTLE_CYCLES, PAY_METHODS, CURRENCIES, ADDR_TYPES,
+// CUST_TYPES, CUST_SOURCES) now live in core/partyEnums so the simple list masters in
+// mastersLive.jsx share the exact same vocabulary. Imported at the top of this file.
+
+// GST place-of-supply helpers (mirror backend src/shared/util/gstSupplyType.js). A supplier
+// attracts Indian GST/TDS only when it is Indian; CGST+SGST (intra) vs IGST (inter) is then
+// decided by the supplier's state vs the branch's home state.
+const HOME_STATE_BY_BRANCH = { BOM: '27', AMD: '24' }; // branch GST registration state
+const isIndiaFE = (c) => { const x = String(c || '').trim().toLowerCase(); return x === '' || x === 'india' || x === 'in' || x === 'bharat'; };
+const isExplicitIndiaFE = (c) => { const x = String(c || '').trim().toLowerCase(); return x === 'india' || x === 'in' || x === 'bharat'; };
+const stateCodeFE = (f) => {
+  const byName = IN_STATES.find(([, n]) => n.toLowerCase() === String(f.state || '').trim().toLowerCase());
+  if (f.stateCode && IN_STATES.some(([c]) => c === f.stateCode)) return f.stateCode;
+  if (byName) return byName[0];
+  const g = String(f.gstin || '').match(/^\d{2}/);
+  return g ? g[0] : '';
+};
+// → { type, label, tone } for the read-only Inter/Intra/Foreign indicator.
+function supplyTypeFE(f = {}) {
+  if (!isIndiaFE(f.country)) return { type: 'foreign', label: 'Overseas supplier — Indian GST / TDS NOT applicable', tone: 'muted' };
+  const sc = stateCodeFE(f);
+  if (!sc) return { type: '', label: 'Select a State to determine Inter / Intra', tone: 'warn' };
+  const home = HOME_STATE_BY_BRANCH[String(f.branch || '').toUpperCase()] || '27';
+  return sc === home
+    ? { type: 'intra', label: 'Intra-state — CGST + SGST', tone: 'ok' }
+    : { type: 'inter', label: 'Inter-state — IGST', tone: 'ok' };
+}
+
+// Branch-aware full amount: ₹ + Indian grouping for India branches, $ + Western
+// grouping for USD branches (NBO/DAR/FBM). `branchCode` defaults to the ₹ home branch.
+const curOfBranch = (branchCode) => (bc({ code: branchCode }) || {}).cur || '₹';
+const rupee = (n, branchCode) => { const c = curOfBranch(branchCode); return c + (Number(n) || 0).toLocaleString(localeOf(c)); };
 const numOf = (s) => Number(String(s == null ? '' : s).replace(/[^0-9.-]/g, '')) || 0;
 
 /* ── Live data hooks (party-scoped, only fire once a record is chosen) ─────── */
@@ -59,7 +89,9 @@ function usePartyVouchers(party) {
 function useOpenBills(party, side) {
   return useQuery({
     queryKey: ['party-openbills', party, side],
-    queryFn: () => apiGet('/api/vouchers/open-bills', { party, side }),
+    // includeSettled → full bill-wise picture (raised → settled → outstanding) for the
+    // party statement, not just open bills. Outstanding total still sums open amounts.
+    queryFn: () => apiGet('/api/vouchers/open-bills', { party, side, includeSettled: '1' }),
     enabled: !!getAuthToken() && !!party,
     staleTime: 30_000,
   });
@@ -219,12 +251,12 @@ function LinkedVouchersTab({ q }) {
       <tbody>{rows.map((r) => {
         const paid = /clear|paid|approv|post/i.test(r.status || '');
         return (
-          <tr key={r.id} style={{ borderBottom: '1px solid #f0f2f7' }}>
+          <tr key={r.id} style={{ borderBottom: '1px solid #dfe2e7' }}>
             <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontWeight: 600 }}>{r.vno || '—'}</td>
             <td style={{ padding: '9px 12px', color: DIM }}>{r.date || '—'}</td>
             <td style={{ padding: '9px 12px' }}>{r.type || r.category || '—'}</td>
             <td style={{ padding: '9px 12px' }}><span style={{ padding: '2px 6px', background: '#e6e8f1', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{r.branch || '—'}</span></td>
-            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700 }}>{rupee(r.total)}</td>
+            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700 }}>{rupee(r.total, r.branch)}</td>
             <td style={{ padding: '9px 12px', textAlign: 'center' }}><span style={{ padding: '2px 8px', background: paid ? '#e8f6ed' : '#fbeedb', color: paid ? '#16a34a' : '#d97706', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{r.status || '—'}</span></td>
           </tr>
         );
@@ -234,45 +266,51 @@ function LinkedVouchersTab({ q }) {
 }
 
 // Outstanding — live open bills (unsettled) for the party.
-function OutstandingTab({ q, side }) {
+function OutstandingTab({ q, side, branch }) {
+  const fmt = (n) => rupee(n, branch);
   if (q.isLoading) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>Loading open bills…</p>);
   if (q.isError) return tabPanel(<p style={{ color: RED, fontSize: 12 }}>⚠ {q.error?.message || 'Failed to load open bills'}</p>);
   const data = q.data || { bills: [], advances: 0 };
   const bills = data.bills || [];
   const total = bills.reduce((s, b) => s + (Number(b.outstanding) || 0), 0);
-  if (!bills.length && !data.advances) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>{side === 'supplier' ? 'No unpaid bills to this supplier.' : 'No unpaid invoices from this customer.'}</p>);
+  const settledTotal = bills.reduce((s, b) => s + (Number(b.allocated) || 0), 0);
+  if (!bills.length && !data.advances) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>{side === 'supplier' ? 'No bills recorded for this supplier.' : 'No invoices recorded for this customer.'}</p>);
+  const STATUS_BG = { settled: '#e3f0e3', partial: '#fbeedb', pending: '#e6e8f1' };
   return tabPanel(
     <div className="kbiz-card">
-      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: DARK, marginBottom: 10 }}>{side === 'supplier' ? 'Open bills (we owe)' : 'Open invoices (owed to us)'}</p>
+      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: DARK, marginBottom: 10 }}>{side === 'supplier' ? 'Bill-wise — billed, settled & payable' : 'Bill-wise — invoiced, settled & receivable'}</p>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-        <thead style={{ background: '#f7f8fb' }}><tr>{['Bill', 'Date', 'Bill Amt', 'Outstanding', 'Age', 'Status'].map((h, i) => (
-          <th key={h} style={{ padding: '8px 12px', textAlign: i === 2 || i === 3 ? 'right' : i >= 4 ? 'center' : 'left', fontSize: 10, color: DIM, fontWeight: 700 }}>{h}</th>
+        <thead style={{ background: '#f7f8fb' }}><tr>{['Bill', 'Date', 'Bill Amt', 'Settled', 'Outstanding', 'Age', 'Status'].map((h, i) => (
+          <th key={h} style={{ padding: '8px 12px', textAlign: (i === 2 || i === 3 || i === 4) ? 'right' : i >= 5 ? 'center' : 'left', fontSize: 10, color: DIM, fontWeight: 700 }}>{h}</th>
         ))}</tr></thead>
         <tbody>{bills.map((b) => {
-          const overdue = b.creditDays != null && b.ageDays > b.creditDays;
+          const settled = (Number(b.outstanding) || 0) <= 0.01;
+          const overdue = !settled && b.creditDays != null && b.ageDays > b.creditDays;
           return (
-            <tr key={b.billId} style={{ borderBottom: '1px solid #f0f2f7' }}>
+            <tr key={b.billId} style={{ borderBottom: '1px solid #dfe2e7' }}>
               <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600 }}>{b.billVno}</td>
               <td style={{ padding: '8px 12px', color: DIM }}>{b.date}</td>
-              <td style={{ padding: '8px 12px', textAlign: 'right' }}>{rupee(b.total)}</td>
-              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>{rupee(b.outstanding)}</td>
-              <td style={{ padding: '8px 12px', textAlign: 'center', color: overdue ? RED : GREEN, fontWeight: 700 }}>{b.ageDays}d</td>
-              <td style={{ padding: '8px 12px', textAlign: 'center' }}><span style={{ padding: '2px 8px', background: b.status === 'partial' ? '#fbeedb' : '#e6e8f1', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{b.status}</span></td>
+              <td style={{ padding: '8px 12px', textAlign: 'right' }}>{fmt(b.total)}</td>
+              <td style={{ padding: '8px 12px', textAlign: 'right', color: b.allocated ? GREEN : DIM, fontWeight: b.allocated ? 700 : 400 }}>{b.allocated ? fmt(b.allocated) : '—'}</td>
+              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: settled ? DIM : undefined }}>{settled ? '—' : fmt(b.outstanding)}</td>
+              <td style={{ padding: '8px 12px', textAlign: 'center', color: settled ? DIM : overdue ? RED : GREEN, fontWeight: 700 }}>{settled ? '—' : `${b.ageDays}d`}</td>
+              <td style={{ padding: '8px 12px', textAlign: 'center' }}><span style={{ padding: '2px 8px', background: STATUS_BG[b.status] || '#e6e8f1', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>{b.status}</span></td>
             </tr>
           );
         })}</tbody>
       </table>
-      {data.advances > 0 && <p style={{ margin: '10px 0 0', fontSize: 11.5, color: DIM }}>On-account / advances: <b style={{ color: DARK }}>{rupee(data.advances)}</b></p>}
-      <div style={{ marginTop: 12, padding: 10, background: DARK, borderRadius: 5, display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ color: GOLD, fontSize: 11.5, fontWeight: 700 }}>{side === 'supplier' ? 'TOTAL PAYABLE' : 'TOTAL RECEIVABLE'}</span>
-        <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}>{rupee(total)}</span>
+      {data.advances > 0 && <p style={{ margin: '10px 0 0', fontSize: 11.5, color: DIM }}>On-account / advances: <b style={{ color: DARK }}>{fmt(data.advances)}</b></p>}
+      <div style={{ marginTop: 12, padding: 10, background: DARK, borderRadius: 5, display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+        <span style={{ color: GREEN, fontSize: 11.5, fontWeight: 700 }}>SETTLED <b style={{ color: '#fff', fontFamily: 'monospace', marginLeft: 6 }}>{fmt(settledTotal)}</b></span>
+        <span style={{ color: GOLD, fontSize: 11.5, fontWeight: 700 }}>{side === 'supplier' ? 'TOTAL PAYABLE' : 'TOTAL RECEIVABLE'} <b style={{ color: '#fff', fontFamily: 'monospace', marginLeft: 6 }}>{fmt(total)}</b></span>
       </div>
     </div>
   );
 }
 
 // History — KPIs + monthly bar chart derived from the party's vouchers.
-function HistoryTab({ q }) {
+function HistoryTab({ q, branch }) {
+  const fmt = (n) => rupee(n, branch);
   if (q.isLoading) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>Loading history…</p>);
   const rows = q.data || [];
   if (!rows.length) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>Once vouchers are posted for this party, monthly totals appear here.</p>);
@@ -282,15 +320,15 @@ function HistoryTab({ q }) {
   const chart = Object.keys(byMonth).sort().slice(-12).map((m) => ({ m, r: Math.round(byMonth[m]) }));
   const kpis = [
     { l: 'Vouchers', v: rows.length, c: DARK },
-    { l: 'Total Value', v: rupee(total), c: RED },
-    { l: 'Avg / Voucher', v: rupee(total / rows.length), c: GOLD },
+    { l: 'Total Value', v: fmt(total), c: RED },
+    { l: 'Avg / Voucher', v: fmt(total / rows.length), c: GOLD },
     { l: 'Active Months', v: Object.keys(byMonth).length, c: GREEN },
   ];
   return tabPanel(
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,150px),1fr))', gap: 10, marginBottom: 14 }}>
         {kpis.map((k) => (
-          <div key={k.l} style={{ padding: 12, background: '#fafbfd', borderRadius: 6, border: '1px solid #e6e8ec', borderTop: '3px solid ' + k.c }}>
+          <div key={k.l} style={{ padding: 12, background: '#fafbfd', borderRadius: 6, border: '1px solid #cdd1d8', borderTop: '3px solid ' + k.c }}>
             <p style={{ margin: 0, fontSize: 10, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>{k.l}</p>
             <p style={{ margin: '3px 0 0', fontSize: 20, fontWeight: 700, color: DARK }}>{k.v}</p>
           </div>
@@ -301,7 +339,7 @@ function HistoryTab({ q }) {
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f7" />
           <XAxis dataKey="m" tick={{ fontSize: 10, fill: DIM }} />
           <YAxis tick={{ fontSize: 10, fill: DIM }} tickFormatter={(v) => (v >= 100000 ? (v / 100000).toFixed(0) + 'L' : v)} />
-          <Tooltip formatter={(v) => rupee(v)} />
+          <Tooltip formatter={(v) => fmt(v)} />
           <Bar dataKey="r" fill={GOLD} />
         </BarChart>
       </ResponsiveContainer>
@@ -414,8 +452,6 @@ const CUST_TABS = [
   { id: 'history', label: '9. History' }, { id: 'linked', label: '10. Linked Vouchers' },
   { id: 'outstanding', label: '11. Outstanding' }, { id: 'custom', label: '12. Custom Fields' },
 ];
-const CUST_TYPES = ['', 'Corporate · Premium', 'Corporate · Standard', 'Individual', 'Travel Agent', 'Government'];
-const CUST_SOURCES = ['', 'Direct Referral', 'Cold Outreach', 'Digital Marketing', 'Walk-in', 'Existing Client'];
 
 export function CustomerMasterTabbed() {
   const m = usePartyMaster('customers', 'customer');
@@ -475,7 +511,7 @@ export function CustomerMasterTabbed() {
       )}
       {tab === 'credit' && tabPanel(
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
-          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #e6e8ec' }}>
+          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #cdd1d8' }}>
             <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase' }}>Credit Configuration</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10, marginTop: 10 }}>
               <Field label="Credit Limit (₹)" type="number" value={f.creditLimit} onChange={(v) => set('creditLimit', v)} />
@@ -484,11 +520,11 @@ export function CustomerMasterTabbed() {
               <Field label="Late Payment Interest" value={f.interestRate} onChange={(v) => set('interestRate', v)} placeholder="e.g. 18% pa" />
             </div>
           </div>
-          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #e6e8ec' }}>
+          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #cdd1d8' }}>
             <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase' }}>Current Exposure</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10, marginTop: 10 }}>
-              <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Outstanding</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: DARK }}>{f.out || rupee(0)}</p></div>
-              <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Available</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: GREEN }}>{rupee(available)}</p></div>
+              <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Outstanding</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: DARK }}>{f.out || rupee(0, f.branch)}</p></div>
+              <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Available</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: GREEN }}>{rupee(available, f.branch)}</p></div>
             </div>
             {(Number(f.creditLimit) || 0) > 0 && (
               <div style={{ marginTop: 12, height: 6, background: '#f0f2f7', borderRadius: 3, overflow: 'hidden' }}>
@@ -507,9 +543,9 @@ export function CustomerMasterTabbed() {
       {tab === 'custom' && tabPanel(
         <><EmptyHint>Custom key/value fields for this customer.</EmptyHint><ArrayEditor rows={f.customFields} cols={CUSTOM_COLS} onChange={(v) => set('customFields', v)} addLabel="Add Field" /></>
       )}
-      {tab === 'history' && <HistoryTab q={m.vouchersQ} />}
+      {tab === 'history' && <HistoryTab q={m.vouchersQ} branch={m.current?.branch} />}
       {tab === 'linked' && <LinkedVouchersTab q={m.vouchersQ} />}
-      {tab === 'outstanding' && <OutstandingTab q={m.openBillsQ} side="customer" />}
+      {tab === 'outstanding' && <OutstandingTab q={m.openBillsQ} side="customer" branch={m.current?.branch} />}
     </PartyShell>
   );
 }
@@ -542,7 +578,7 @@ export function SupplierMasterTabbed() {
           <SelectField label="Category" value={f.category} onChange={(v) => set('category', v)} options={SUPPLIER_CATS} />
           <Field label="Type" value={f.type} onChange={(v) => set('type', v)} />
           <SelectField label="Branch" value={f.branch} onChange={(v) => set('branch', v)} options={branchOpts} />
-          <Field label="Country" value={f.country} onChange={(v) => set('country', v)} />
+          <SelectField label="Country" value={f.country || 'India'} onChange={(v) => set('country', v)} options={COUNTRIES} />
           <Field label="Vendor Manager" value={f.vendorManager} onChange={(v) => set('vendorManager', v)} />
           <Field label="Phone" value={f.phone} onChange={(v) => set('phone', v)} />
           <Field label="Email" value={f.email} onChange={(v) => set('email', v)} />
@@ -554,9 +590,9 @@ export function SupplierMasterTabbed() {
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14, marginBottom: 18 }}>
             <Field label="City" value={f.city} onChange={(v) => set('city', v)} />
-            <Field label="Country" value={f.country} onChange={(v) => set('country', v)} />
+            <SelectField label="Country" value={f.country || 'India'} onChange={(v) => set('country', v)} options={COUNTRIES} />
           </div>
-          <EmptyHint>Office / branch addresses</EmptyHint>
+          <EmptyHint>Office / branch addresses · GST place-of-supply is set on the Tax tab.</EmptyHint>
           <ArrayEditor rows={f.addresses} cols={ADDR_COLS} onChange={(v) => set('addresses', v)} addLabel="Add address" />
         </>
       )}
@@ -566,21 +602,60 @@ export function SupplierMasterTabbed() {
       {tab === 'bank' && tabPanel(
         <ArrayEditor rows={f.banks} cols={BANK_COLS} onChange={(v) => set('banks', v)} addLabel="Add Bank Account" />
       )}
-      {tab === 'tax' && tabPanel(
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
-          <Field label="GSTIN" value={f.gstin} onChange={(v) => set('gstin', v)} mono />
-          <Field label="PAN" value={f.pan} onChange={(v) => set('pan', v)} mono />
-          <Field label="TAN" value={f.tan} onChange={(v) => set('tan', v)} mono />
-          <Field label="IATA Code" value={f.iataCode} onChange={(v) => set('iataCode', v)} mono />
-          <Field label="BSP Code" value={f.bspCode} onChange={(v) => set('bspCode', v)} mono />
-          <SelectField label="GST Treatment" value={f.gstTreatment} onChange={(v) => set('gstTreatment', v)} options={GST_TREATMENTS} />
-          <SelectField label="TDS Section" value={f.tdsSection} onChange={(v) => set('tdsSection', v)} options={TDS_SECTIONS} />
-          <SelectField label="MSME Status" value={f.msmeStatus} onChange={(v) => set('msmeStatus', v)} options={MSME_STATUS} />
-        </div>
-      )}
+      {tab === 'tax' && tabPanel((() => {
+        const india = isIndiaFE(f.country);
+        const sup = supplyTypeFE(f);
+        const setState = (name) => {
+          const row = IN_STATES.find(([, n]) => n === name);
+          set('state', name);
+          set('stateCode', row ? row[0] : '');
+        };
+        const toneBg = { ok: '#e9f7ef', warn: '#fdf3e3', muted: '#eef0f4' }[sup.tone] || '#eef0f4';
+        const toneFg = { ok: '#16794c', warn: '#a9690a', muted: '#5b616e' }[sup.tone] || '#5b616e';
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Place of supply — drives whether Indian GST/TDS apply and inter vs intra. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
+              <SelectField label="Country" value={f.country || 'India'} onChange={(v) => set('country', v)} options={COUNTRIES} />
+              {india && (
+                <SelectField label="State (required for India)" value={f.state || ''} onChange={setState} options={STATE_NAMES} />
+              )}
+              <FormField label="GST Supply Type (auto)">
+                <div style={{ padding: '7px 10px', borderRadius: 6, background: toneBg, color: toneFg, fontSize: 12, fontWeight: 700, border: '1px solid #cdd1d8' }}>
+                  {sup.type === 'intra' ? '🟢 ' : sup.type === 'inter' ? '🔵 ' : sup.type === 'foreign' ? '🌐 ' : '⚠ '}{sup.label}
+                </div>
+              </FormField>
+            </div>
+            {isExplicitIndiaFE(f.country) && !stateCodeFE(f) && (
+              <div style={{ padding: '8px 11px', borderRadius: 6, background: '#fdf3e3', color: '#a9690a', fontSize: 11.5, fontWeight: 600 }}>
+                ⚠ State is mandatory for an Indian supplier — it decides CGST/SGST (intra-state) vs IGST (inter-state). Saving without it will be rejected.
+              </div>
+            )}
+            {/* GST / TDS identifiers — only meaningful for an Indian supplier. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
+              {india ? (
+                <>
+                  <Field label="GSTIN" value={f.gstin} onChange={(v) => set('gstin', v)} mono />
+                  <Field label="PAN" value={f.pan} onChange={(v) => set('pan', v)} mono />
+                  <Field label="TAN" value={f.tan} onChange={(v) => set('tan', v)} mono />
+                  <SelectField label="GST Treatment" value={f.gstTreatment} onChange={(v) => set('gstTreatment', v)} options={GST_TREATMENTS} />
+                  <SelectField label="TDS Section" value={f.tdsSection} onChange={(v) => set('tdsSection', v)} options={TDS_SECTIONS} />
+                  <SelectField label="MSME Status" value={f.msmeStatus} onChange={(v) => set('msmeStatus', v)} options={MSME_STATUS} />
+                </>
+              ) : (
+                <div style={{ gridColumn: '1/-1', padding: 12, borderRadius: 6, background: '#f6f8fb', border: '1px solid #cdd1d8', fontSize: 12, color: '#5b616e' }}>
+                  🌐 <b>Overseas supplier</b> — Indian GSTIN / GST Treatment / TDS Section are not applicable. Purchases from this vendor must be booked <b>without</b> CGST/SGST/IGST or TDS (import of service; reverse-charge handled separately if opted).
+                </div>
+              )}
+              <Field label="IATA Code" value={f.iataCode} onChange={(v) => set('iataCode', v)} mono />
+              <Field label="BSP Code" value={f.bspCode} onChange={(v) => set('bspCode', v)} mono />
+            </div>
+          </div>
+        );
+      })())}
       {tab === 'credit' && tabPanel(
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
-          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #e6e8ec' }}>
+          <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #cdd1d8' }}>
             <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase' }}>Payment Configuration</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10, marginTop: 10 }}>
               <SelectField label="Settlement Cycle" value={f.settlementCycle} onChange={(v) => set('settlementCycle', v)} options={SETTLE_CYCLES} />
@@ -600,9 +675,9 @@ export function SupplierMasterTabbed() {
       {tab === 'custom' && tabPanel(
         <><EmptyHint>Custom key/value fields for this supplier.</EmptyHint><ArrayEditor rows={f.customFields} cols={CUSTOM_COLS} onChange={(v) => set('customFields', v)} addLabel="Add Field" /></>
       )}
-      {tab === 'history' && <HistoryTab q={m.vouchersQ} />}
+      {tab === 'history' && <HistoryTab q={m.vouchersQ} branch={m.current?.branch} />}
       {tab === 'linked' && <LinkedVouchersTab q={m.vouchersQ} />}
-      {tab === 'outstanding' && <OutstandingTab q={m.openBillsQ} side="supplier" />}
+      {tab === 'outstanding' && <OutstandingTab q={m.openBillsQ} side="supplier" branch={m.current?.branch} />}
     </PartyShell>
   );
 }

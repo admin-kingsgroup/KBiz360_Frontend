@@ -369,7 +369,7 @@ function DetailGroup({ title, accent, side, rows, open, setOpen, from, to, onVou
         const key = `${side}:${r.ledger}`;
         const isOpen = open === key;
         return (
-          <div key={r.ledger} style={{ border: '1px solid #eef1f6', borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
+          <div key={r.ledger} style={{ border: '1px solid #dfe2e7', borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
             <div {...clickable(() => setOpen(isOpen ? '' : key))} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', cursor: 'pointer', background: isOpen ? '#f7f8fb' : '#fff' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                 <span style={{ color: '#b9bed4', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>▸</span>
@@ -380,7 +380,7 @@ function DetailGroup({ title, accent, side, rows, open, setOpen, from, to, onVou
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: accent, fontVariantNumeric: 'tabular-nums' }}>{fmtINR(r.outstanding)}</span>
-                <button onClick={(e) => { e.stopPropagation(); openLedgerModal(r.ledger); }} title="Open full ledger account" style={{ border: '1px solid #d6dbe6', background: '#fff', borderRadius: 6, fontSize: 11, padding: '3px 8px', cursor: 'pointer', color: '#0d1326', fontWeight: 700 }}>📒</button>
+                <button onClick={(e) => { e.stopPropagation(); openLedgerModal(r.ledger); }} title="Open full ledger account" style={{ border: '1px solid #cdd1d8', background: '#fff', borderRadius: 6, fontSize: 11, padding: '3px 8px', cursor: 'pointer', color: '#0d1326', fontWeight: 700 }}>📒</button>
                 <Badge status={r.status} />
               </div>
             </div>
@@ -400,7 +400,7 @@ function IBLedgerDrill({ ledger, status, from, to, onVoucher }) {
   if (q.isLoading) return <div style={{ padding: 16, fontSize: 11.5, color: '#5a6691' }}>Loading postings…</div>;
   if (q.isError) return <div style={{ padding: 16, fontSize: 11.5, color: '#A32D2D' }}>⚠ {q.error?.message || 'Could not load postings'}</div>;
   return (
-    <div style={{ overflowX: 'auto', borderTop: '1px solid #eef1f6' }}>
+    <div style={{ overflowX: 'auto', borderTop: '1px solid #dfe2e7' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
         <thead><tr style={{ background: '#f3f4f8' }}>
           {['Date', 'Voucher', 'Narration', 'Reference', 'Dr', 'Cr', 'Balance', 'Status'].map((h, i) => (
@@ -410,7 +410,7 @@ function IBLedgerDrill({ ledger, status, from, to, onVoucher }) {
         <tbody>
           {lines.length === 0 && <tr><td colSpan={8} style={{ padding: 18, textAlign: 'center', color: '#5a6691' }}>No postings in range.</td></tr>}
           {lines.map((e, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #f3f4f8' }}>
+            <tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}>
               <td style={{ padding: '7px 10px', color: '#5a6691', whiteSpace: 'nowrap' }}>{fmtDate(e.date)}</td>
               <td style={{ padding: '7px 10px' }}>
                 {e.voucherId
@@ -426,7 +426,7 @@ function IBLedgerDrill({ ledger, status, from, to, onVoucher }) {
             </tr>
           ))}
         </tbody>
-        {d && <tfoot><tr style={{ background: '#fafbfd', borderTop: '1px solid #e1e3ec' }}>
+        {d && <tfoot><tr style={{ background: '#fafbfd', borderTop: '1px solid #cdd1d8' }}>
           <td colSpan={4} style={{ padding: '7px 10px', fontWeight: 700, color: '#0d1326' }}>Closing</td>
           <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>{fmtINR(d.totalDebit)}</td>
           <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>{fmtINR(d.totalCredit)}</td>

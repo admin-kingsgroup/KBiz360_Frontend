@@ -8,13 +8,14 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';
-import { Plus, TrendingDown, Landmark } from 'lucide-react';
-import { fmt } from '../core/format';
+import { Plus, TrendingDown, Landmark, Search, ChevronDown } from 'lucide-react';
+import { fmt, localeOf } from '../core/format';
 import { ACM_REASON_CODES } from '../core/helpers';
 import { useAssetCategories } from '../core/useReference';
 import { useMasterList } from '../core/useMasters';
 import { useAdmMemos, useCreateAdmMemo, useAcceptAdmMemo, useRejectAdmMemo, useDisputeAdmMemo } from '../core/useAdmMemos';
 import { toast } from '../core/ux/toast';
+import { Menu as StatusMenu } from '../core/ux/Menu';
 import { BRANCH_CODES, branchCurrencies, branchMainCurrency } from '../core/data';
 import { bc } from '../core/styles';
 import { PageLayout } from '../shell/PageLayout';
@@ -63,7 +64,7 @@ export function AcmRegister({ branch }) {
 
   const totPending = filtered.filter((a) => !['Accepted', 'Rejected'].includes(a.status)).reduce((s, a) => s + (a.amount || 0), 0);
   const totAccepted = filtered.filter((a) => a.status === 'Accepted').reduce((s, a) => s + (a.amount || 0), 0);
-  const f = (n) => cur + Number(Math.round(n)).toLocaleString('en-IN');
+  const f = (n) => cur + Number(Math.round(n)).toLocaleString(localeOf(cur));
 
   const addAcm = () => {
     createM.mutate({ kind: 'acm', ...form, branch: form.branch }, {
@@ -106,10 +107,28 @@ export function AcmRegister({ branch }) {
       subtitle="Agent Credit Memos · Airline credits to the agency via BSP · Refunds, incentives, ADM reversals"
       actions={
         <>
-          <div className="w-32"><Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            {STATUSES.map((s) => <option key={s}>{s}</option>)}
-          </Select></div>
-          <div className="w-[200px]"><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ACM no / airline…" /></div>
+          <div className="relative">
+            <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-subtle" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ACM no / airline…"
+              className={`w-[200px] pl-8 ${search ? 'pr-7' : ''}`} />
+            {search && (
+              <button type="button" onClick={() => setSearch('')} aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink">×</button>
+            )}
+          </div>
+          <StatusMenu
+            ariaLabel="Filter by status"
+            menuRole="listbox"
+            width={140}
+            items={STATUSES.map((s) => ({ key: s, label: s, selected: s === statusFilter, onSelect: () => setStatusFilter(s) }))}
+            renderTrigger={({ ref, toggle, triggerProps }) => (
+              <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                className="flex h-9 items-center gap-1.5 rounded-md border border-surface-border bg-surface px-3 text-[13px] font-medium text-ink hover:bg-surface-alt">
+                {statusFilter}
+                <ChevronDown size={13} className="text-ink-subtle" />
+              </button>
+            )}
+          />
           <Button variant="success" size="sm" icon={Plus} onClick={() => setModal(true)}>Record ACM</Button>
         </>
       }
@@ -336,11 +355,11 @@ export function AssetDisposal({ branch }) {
   const cfg = bc(branch);
   const cur = cfg.cur;
 
-  const DISPOSALS = [
-    { id: 'DSP-001', assetId: 'FA-BOM-0099', name: 'Old HP Printer', disposalDate: '2026-03-15', reason: 'Sale', bookValue: 8500, saleValue: 12000, gain: 3500, buyer: 'Office Solutions Pvt Ltd', method: 'Sold' },
-    { id: 'DSP-002', assetId: 'FA-AMD-0045', name: 'Dell Workstation (4 yrs)', disposalDate: '2026-02-20', reason: 'Sale', bookValue: 15000, saleValue: 8000, gain: -7000, buyer: 'Cash buyer', method: 'Sold' },
-    { id: 'DSP-004', assetId: 'FA-BOM-0067', name: 'Conference Room Projector', disposalDate: '2025-12-05', reason: 'Transfer', bookValue: 18000, saleValue: 18000, gain: 0, buyer: 'Internal transfer', method: 'Transferred' },
-  ];
+  // No live asset-disposal register exists yet (the fixed-assets master tracks assets,
+  // not disposals). Previously this held 3 fabricated rows whose gains fed the
+  // Capital-Gain-YTD / Net-P&L KPIs as if real — emptied so the KPIs read an honest ₹0
+  // until a disposal source is wired. (Other screens in this file are already live.)
+  const DISPOSALS = [];
 
   const totGain = DISPOSALS.reduce((s, d) => s + (d.gain > 0 ? d.gain : 0), 0);
   const totLoss = DISPOSALS.reduce((s, d) => s + (d.gain < 0 ? Math.abs(d.gain) : 0), 0);

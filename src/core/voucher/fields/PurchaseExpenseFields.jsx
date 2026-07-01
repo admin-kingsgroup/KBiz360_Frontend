@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronDown } from 'lucide-react';
+import { Menu as DropdownMenu } from '../../ux/Menu';
 import { FL, inp, btnGh, card } from '../../styles';
 import { todayISO } from '../../dates';
 import { SmartDateInput } from '../../ux/SmartDateInput';
@@ -58,41 +59,41 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
             <thead><tr style={{ background: DARK }}>
-              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 30 }}>#</th>
-              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#d4a437', fontWeight: 700, fontSize: 9.5 }}>Ledger</th>
-              <th style={{ padding: '8px 10px', textAlign: 'center', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 70 }}>Dr / Cr</th>
-              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#d4a437', fontWeight: 700, fontSize: 9.5 }}>Description</th>
-              <th style={{ padding: '8px 10px', textAlign: 'right', color: '#d4a437', fontWeight: 700, fontSize: 9.5, width: 130 }}>Amount ({cur})</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 30 }}>No</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5 }}>Ledger</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 70 }}>Dr / Cr</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#A07828', fontWeight: 700, fontSize: 9.5 }}>Description</th>
+              <th style={{ padding: '8px 10px', textAlign: 'right', color: '#A07828', fontWeight: 700, fontSize: 9.5, width: 130 }}>Amount ({cur})</th>
               <th style={{ width: 32 }} />
             </tr></thead>
             <tbody>
               {lines.map((l, i) => (
-                <tr key={l._k ?? i} style={{ borderBottom: '1px solid #f3f4f8', background: l.drCr === 'Cr' ? '#fdf3f3' : ((+l.amt || 0) > 0 ? '#f0fbf5' : '#fff') }}>
-                  <td style={{ padding: '4px 8px', textAlign: 'center', fontSize: 10.5, color: DIM }}>{i + 1}</td>
-                  <td style={{ padding: '3px 6px', minWidth: 220 }}>
+                <tr key={l._k ?? i} style={{ borderBottom: '1px solid #dfe2e7', background: l.drCr === 'Cr' ? '#fdf3f3' : ((+l.amt || 0) > 0 ? '#f0fbf5' : '#fff') }}>
+                  <td style={{ padding: '10px', textAlign: 'center', fontSize: 10.5, color: DIM }}>{i + 1}</td>
+                  <td style={{ padding: '8px', minWidth: 220 }}>
                     <LedgerPicker branch={branch} value={l.ledger} onChange={(v) => updLine(i, 'ledger', v)} placeholder="Office Rent / Discount Received..." style={{ minHeight: 30, fontSize: 10.5 }} />
                   </td>
-                  <td style={{ padding: '3px 6px' }}>
-                    <div style={{ display: 'flex', border: '1px solid #e1e3ec', borderRadius: 5, overflow: 'hidden', width: 60, margin: '0 auto' }}>
+                  <td style={{ padding: '8px' }}>
+                    <div style={{ display: 'flex', border: '1px solid #cdd1d8', borderRadius: 5, overflow: 'hidden', width: 60, margin: '0 auto' }}>
                       {['Dr', 'Cr'].map((d) => (
                         <button key={d} onClick={() => updLine(i, 'drCr', d)} style={{ flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 9.5, fontWeight: 800, padding: '6px 0', background: l.drCr === d ? (d === 'Dr' ? V_DR : V_CR) : '#fff', color: l.drCr === d ? '#fff' : '#9A9A9A' }}>{d.toUpperCase()}</button>
                       ))}
                     </div>
                   </td>
-                  <td style={{ padding: '3px 6px' }}>
+                  <td style={{ padding: '8px' }}>
                     <input value={l.desc || ''} onChange={(e) => updLine(i, 'desc', e.target.value)} style={{ ...inp, minHeight: 30, fontSize: 10.5 }} placeholder="e.g. June office rent" />
                   </td>
-                  <td style={{ padding: '3px 6px' }}>
+                  <td style={{ padding: '8px' }}>
                     <input type="number" value={l.amt} onChange={(e) => updLine(i, 'amt', e.target.value)} placeholder="0.00" style={{ ...inp, textAlign: 'right', minHeight: 30, fontSize: 11, fontWeight: 600 }} />
                   </td>
-                  <td style={{ padding: '3px 6px', textAlign: 'center' }}>
+                  <td style={{ padding: '8px', textAlign: 'center' }}>
                     <button onClick={() => delLine(i)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#9A9A9A', fontSize: 16, lineHeight: 1 }}>×</button>
                   </td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr style={{ background: '#f3f4f8', borderTop: '2px solid #e1e3ec' }}>
+              <tr style={{ background: '#f3f4f8', borderTop: '2px solid #cdd1d8' }}>
                 <td colSpan={3} style={{ padding: '8px 10px' }}><button onClick={addLine} style={{ ...btnGh, fontSize: 10.5, padding: '4px 12px' }}><Plus size={12} /> Add line</button></td>
                 <td style={{ padding: '8px 6px', textAlign: 'right', fontSize: 9, fontWeight: 700, color: DIM }}>TAXABLE</td>
                 <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, fontSize: 13, color: DARK }}>{money2(cur, t.taxable)}</td>
@@ -112,7 +113,20 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
         {state.gstApplicable && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'end' }}>
-              <FL label="GST rate"><select value={state.gstPct} onChange={(e) => { const pct = +e.target.value; patch({ gstPct: pct, gstAmt: r2(t.taxable * pct / 100) }); }} style={inp}>{GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}</select></FL>
+              <FL label="GST rate">
+                <DropdownMenu
+                  ariaLabel="GST rate"
+                  menuRole="listbox"
+                  items={GST_SLABS.map((r) => ({ key: r, label: `${r}%`, selected: state.gstPct === r, onSelect: () => patch({ gstPct: r, gstAmt: r2(t.taxable * r / 100) }) }))}
+                  renderTrigger={({ ref, toggle, triggerProps }) => (
+                    <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                      style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{state.gstPct}%</span>
+                      <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                    </button>
+                  )}
+                />
+              </FL>
               <FL label="GST amount"><input type="number" value={state.gstAmt || ''} onChange={(e) => patch({ gstAmt: +e.target.value || 0 })} style={inp} /></FL>
               <button onClick={autoGst} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
             </div>
@@ -124,7 +138,20 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
       {/* TDS */}
       <div style={{ padding: '10px 12px', borderRadius: 9, background: '#FAEEDA', border: '1px solid #FAC775', marginBottom: 12 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
-          <FL label="TDS Section"><select value={state.tdsSection} onChange={(e) => patch({ tdsSection: e.target.value })} style={inp}>{Object.entries(TDS_SECTIONS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}</select></FL>
+          <FL label="TDS Section">
+            <DropdownMenu
+              ariaLabel="TDS Section"
+              menuRole="listbox"
+              items={Object.entries(TDS_SECTIONS).map(([k, s]) => ({ key: k, label: s.label, selected: state.tdsSection === k, onSelect: () => patch({ tdsSection: k }) }))}
+              renderTrigger={({ ref, toggle, triggerProps }) => (
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{TDS_SECTIONS[state.tdsSection]?.label}</span>
+                  <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                </button>
+              )}
+            />
+          </FL>
           <FL label="Rate"><div style={{ ...inp, background: '#f9fafb', color: '#854F0B', fontWeight: 700, display: 'flex', alignItems: 'center' }}>{rate}%</div></FL>
           <FL label="TDS amount"><input type="number" value={state.tdsAmt || ''} onChange={(e) => patch({ tdsAmt: +e.target.value || 0 })} style={inp} /></FL>
           <button onClick={autoTds} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
@@ -147,7 +174,9 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
         </div>
       )}
 
-      <FL label="Narration"><textarea value={state.remarks || ''} onChange={(e) => patch({ remarks: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder={state.party ? `Being expense/asset purchase from ${state.party}` : 'Accounting narration...'} /></FL>
+      <div style={{ marginTop: 14 }}>
+        <FL label="Narration"><textarea value={state.remarks || ''} onChange={(e) => patch({ remarks: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder={state.party ? `Being expense/asset purchase from ${state.party}` : 'Accounting narration...'} /></FL>
+      </div>
     </>
   );
 }

@@ -1,12 +1,15 @@
 import React from 'react';
 
 export function AnniversariesPanel({ anniversaries }) {
+  if (!anniversaries || anniversaries.length === 0) {
+    return <p style={{ margin: 0, color: '#5b616e', fontSize: 11.5 }}>No work anniversaries in the next 14 days</p>;
+  }
   return (
     <>
       {anniversaries.map((a) => (
         <div
           key={a.name}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #f0f2f7' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #dfe2e7' }}
         >
           <div
             style={{
@@ -30,20 +33,6 @@ export function AnniversariesPanel({ anniversaries }) {
               {a.branch} · {a.years} year{a.years !== 1 ? 's' : ''} on {a.date}
             </p>
           </div>
-          <button
-            style={{
-              padding: '4px 10px',
-              background: '#6B4C8B',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 4,
-              fontSize: 10.5,
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            Acknowledge
-          </button>
         </div>
       ))}
     </>

@@ -5,17 +5,28 @@
 // open INB Link No the buying branch fetches into its SO/PO/GP purchase side.
 import React, { useMemo, useState } from 'react';
 import { bc } from '../core/styles';
+import { localeOf } from '../core/format';
 import { useCreateInb, useOpenInb } from '../core/useInterBranchVoucher';
 import { toast } from '../core/ux/toast';
 
-const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec' };
-const ALL_BRANCHES = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'TKHO'];
+const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
+const ALL_BRANCHES = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'BOMMB'];
+// Tax jurisdiction per branch (mirror of the backend). Same country (India) =
+// IGST taxable; different country = cross-border export (zero-rated).
+const COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'FB' };
+const inbTreatment = (from, to) => {
+  const cf = COUNTRY[from] || 'IN'; const ct = COUNTRY[to] || 'IN';
+  return cf !== ct
+    ? { crossBorder: true, label: `Export · zero-rated (${cf}→${ct})` }
+    : { crossBorder: false, label: 'IGST · inter-state (18% on Service Fee)' };
+};
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const num = (x) => { const n = Number(x); return Number.isFinite(n) ? n : 0; };
 const todayISO = () => new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
 
 export function InterBranchVoucher({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';
+  const loc = localeOf(cur);
   const fromBranch = branch?.code || (typeof branch === 'string' ? branch : '') || '';
   const toOptions = ALL_BRANCHES.filter((b) => b !== fromBranch);
 
@@ -26,10 +37,19 @@ export function InterBranchVoucher({ branch }) {
   });
   const set = (k, v) => setForm((s) => ({ ...s, [k]: v }));
 
-  const taxRate = 18;
+  const treatment = inbTreatment(fromBranch, form.toBranch);
+  // Tax on the Service Fee follows the SELLING branch's regime — IGST 18% for an
+  // India (GST) branch, the branch VAT rate for a VAT branch — instead of a flat 18%.
+  const fromCfg = bc(branch) || {};
+  const isVat = fromCfg.taxType === 'VAT';
+  const taxRate = isVat ? (Number(fromCfg.vatRate) || 16) : 18;
+  const taxName = isVat ? 'VAT' : 'IGST';
+  const treatmentLabel = treatment.crossBorder
+    ? treatment.label
+    : `${taxName} · ${isVat ? 'domestic' : 'inter-state'} (${taxRate}% on Service Fee)`;
   const fares = r2(num(form.base) + num(form.k3) + num(form.taxes));
   const svc = r2(num(form.serviceFee));
-  const igst = r2(svc * taxRate / 100);
+  const igst = treatment.crossBorder ? 0 : r2(svc * taxRate / 100); // export → zero-rated
   const total = r2(fares + svc + igst);
 
   const create = useCreateInb();
@@ -94,20 +114,27 @@ export function InterBranchVoucher({ branch }) {
           ))}
         </div>
         <div style={{ display: 'flex', gap: 18, marginTop: 12, fontSize: 12.5, color: C.dark, flexWrap: 'wrap' }}>
-          <span>Fares: <b>{cur}{fares.toLocaleString('en-IN')}</b></span>
-          <span>Service Fee: <b>{cur}{svc.toLocaleString('en-IN')}</b></span>
-          <span>IGST (18% on fee): <b>{cur}{igst.toLocaleString('en-IN')}</b></span>
-          <span style={{ marginLeft: 'auto', fontWeight: 800 }}>Total: {cur}{total.toLocaleString('en-IN')}</span>
+          <span>Fares: <b>{cur}{fares.toLocaleString(loc)}</b></span>
+          <span>Service Fee: <b>{cur}{svc.toLocaleString(loc)}</b></span>
+          {treatment.crossBorder
+            ? <span style={{ color: C.blue }}>Tax: <b>Export · zero-rated</b></span>
+            : <span>{taxName} ({taxRate}% on fee): <b>{cur}{igst.toLocaleString(loc)}</b></span>}
+          <span style={{ marginLeft: 'auto', fontWeight: 800 }}>Total: {cur}{total.toLocaleString(loc)}</span>
         </div>
       </div>
 
       <div style={{ ...card, background: '#f7f9fc' }}>
         <div style={{ fontSize: 11, color: C.dim }}>Posts in {fromBranch || 'your branch'}:</div>
         <div style={{ fontSize: 12, fontFamily: 'monospace', color: C.dark, marginTop: 4, lineHeight: 1.7 }}>
-          Dr&nbsp; Travkings Tours &amp; Travels {form.toBranch || '<branch>'} &nbsp; {cur}{total.toLocaleString('en-IN')}<br />
-          &nbsp;&nbsp;&nbsp;Cr&nbsp; Inter-Branch Sales (fares) &nbsp; {cur}{fares.toLocaleString('en-IN')}<br />
-          &nbsp;&nbsp;&nbsp;Cr&nbsp; Service Fee Income &nbsp; {cur}{svc.toLocaleString('en-IN')}<br />
-          &nbsp;&nbsp;&nbsp;Cr&nbsp; Output IGST &nbsp; {cur}{igst.toLocaleString('en-IN')}
+          Dr&nbsp; Travkings Tours &amp; Travels {form.toBranch || '<branch>'} &nbsp; {cur}{total.toLocaleString(loc)}<br />
+          &nbsp;&nbsp;&nbsp;Cr&nbsp; Inter-Branch Sales (fares) &nbsp; {cur}{fares.toLocaleString(loc)}<br />
+          &nbsp;&nbsp;&nbsp;Cr&nbsp; Service Fee Income &nbsp; {cur}{svc.toLocaleString(loc)}<br />
+          {treatment.crossBorder
+            ? <span style={{ color: C.blue }}>&nbsp;&nbsp;&nbsp;(export — zero-rated, no output tax)</span>
+            : <>&nbsp;&nbsp;&nbsp;Cr&nbsp; Output {taxName} &nbsp; {cur}{igst.toLocaleString(loc)}</>}
+        </div>
+        <div style={{ fontSize: 11, color: form.toBranch ? (treatment.crossBorder ? C.blue : C.green) : C.dim, marginTop: 6 }}>
+          {form.toBranch ? `Tax treatment: ${treatmentLabel}` : 'Select a destination branch to see the tax treatment'}
         </div>
       </div>
 
@@ -130,7 +157,7 @@ export function InterBranchVoucher({ branch }) {
                   <td style={{ padding: '4px 8px' }}>{l.fromBranch}</td>
                   <td style={{ padding: '4px 8px' }}>{l.date}</td>
                   <td style={{ padding: '4px 8px' }}>{l.passenger || '—'}</td>
-                  <td style={{ padding: '4px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{cur}{r2(l.total).toLocaleString('en-IN')}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{cur}{r2(l.total).toLocaleString(loc)}</td>
                 </tr>
               ))}
             </tbody>

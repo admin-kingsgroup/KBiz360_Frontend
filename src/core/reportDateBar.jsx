@@ -84,7 +84,7 @@ export function toQueryParams({ from, to } = {}) {
  *  `matchRow(haystackParts, needle)` is the companion helper for the filtering side. */
 export function ReportSearch({ value, onChange, placeholder = 'Search…', width = 230 }) {
   return (
-    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', width }}>
       <Search size={13} style={{ position: 'absolute', left: 9, color: '#94a3b8', pointerEvents: 'none' }} />
       <input
         value={value}

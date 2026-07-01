@@ -19,7 +19,7 @@ export function AlertsPanel({ branch, onGo, compact }) {
   const c = d.counts || { error: 0, warn: 0, info: 0 };
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e5e9f0', borderRadius: 10, padding: 14, marginBottom: 14 }}>
+    <div style={{ background: '#fff', border: '1px solid #cdd1d8', borderRadius: 10, padding: 14, marginBottom: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: alerts.length ? 10 : 0, flexWrap: 'wrap' }}>
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: DARK }}>🔔 Alerts &amp; Action Items</h3>
         <span style={{ display: 'inline-flex', gap: 6 }}>

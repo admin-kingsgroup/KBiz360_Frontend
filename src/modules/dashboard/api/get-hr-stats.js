@@ -7,7 +7,9 @@ import { apiGet } from '../../../core/api';
 // Falls back to an empty payload on error so a failed call never blanks the page.
 const EMPTY = { totalHeadcount: 0, changeThisMonth: 0, attendancePct: null, pendingLeave: 0, payrollStatus: 'Not run', openPositions: 0, birthdays: [], anniversaries: [] };
 
-export const getHrStats = async () => {
-  try { return (await apiGet('/api/employees/stats')) || EMPTY; }
+// `branchCode` (null/undefined = the caller's full scope) honours the dashboard branch
+// selector; the backend confines it to the caller's allowed branches.
+export const getHrStats = async (branchCode) => {
+  try { return (await apiGet('/api/employees/stats', { branch: branchCode })) || EMPTY; }
   catch { return EMPTY; }
 };

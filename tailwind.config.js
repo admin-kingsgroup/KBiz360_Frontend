@@ -59,7 +59,9 @@ export default {
         surface: {
           DEFAULT: '#ffffff',   // card / panel
           alt:     '#f4f5f7',   // muted surface / page sections
-          border:  '#e6e8ec',   // subtle low-contrast divider
+          border:  '#cdd1d8',   // standard, clearly-visible structural border
+          divider: '#dfe2e7',   // lighter inner row divider (still visible)
+          strong:  '#bcc1cb',   // heavy section rule
         },
         bg:       '#f7f8fa',     // app background (soft neutral)
         elevated: '#ffffff',     // raised surface (use with shadow-pop)

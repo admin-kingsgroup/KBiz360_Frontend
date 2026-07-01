@@ -77,6 +77,18 @@ export function useTaxSummary(branch, { from, to } = {}) {
   });
 }
 
+// Reverse-charge (RCM) liability on foreign-supplier purchases for the period —
+// IGST self-assessed @ 18%, payable in cash AND claimable as ITC the same month.
+export function useRcmLiability(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'rcm', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/rcm', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 // Budget vs actual (indirect-expense heads) — Director "Budget vs Expense" dashboard.
 export function useBudgetVsActual(branch, { from, to, fy } = {}) {
   const code = branchCode(branch);
@@ -222,6 +234,18 @@ export function useDeleteVoucher() {
     onSuccess: () => invalidateBooks(qc),
   });
 }
+// Revoke (un-approve) a posted voucher → back to Pending (un-posts, keeps the vno).
+// Approver-only on the server; the FE also gates the button. Invalidates BOTH books
+// roots so the approval queue + every register/report refresh.
+export function useRevokeVoucher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }) => apiPost(`/api/vouchers/${id}/revoke`, { reason }),
+    onSuccess: (_d, { id }) => { invalidateBooks(qc); qc.invalidateQueries({ queryKey: ['voucher', id] }); },
+  });
+}
+// On-demand preflight (blocks + warnings + journal rows) for the revoke confirm dialog.
+export const fetchRevokeCheck = (id) => apiGet(`/api/vouchers/${id}/revoke-check`);
 export function useApproveMany() {
   const qc = useQueryClient();
   return useMutation({
@@ -341,6 +365,18 @@ export function useYearOverYear(branch, { from, to } = {}) {
   });
 }
 
+// Foreign-currency exposure per currency (non-INR branches → INR equivalent at the
+// latest forex rate). GET /api/accounting/fx-exposure.
+export function useFxExposure(branch) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'fx-exposure', code || 'all'],
+    queryFn: () => apiGet('/api/accounting/fx-exposure', { branch: code }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 // AR / AP ageing (receivables & payables, bill-wise / no FIFO). Each party row
 // carries age buckets + onAccount + net. Optional `asOf` (YYYY-MM-DD) ages the
 // books as of that cut-off date instead of today. GET /api/accounting/ageing.
@@ -371,7 +407,8 @@ export function useBackfillCostCenters() {
 // (the master screen), else only active centres are returned.
 export function useCostCenters(branch, { includeInactive = false } = {}) {
   const params = new URLSearchParams();
-  if (branch && branch !== 'ALL') params.set('branch', branch);
+  const code = branchCode(branch); // normalise: accept the branch object OR a bare code string (was emitting [object Object])
+  if (code && code !== 'ALL') params.set('branch', code);
   if (includeInactive) params.set('includeInactive', 'true');
   const qs = params.toString();
   return useQuery({
@@ -464,12 +501,28 @@ export function useRegisterSummary(branch, { category, from, to } = {}) {
 // `excludeId` (optional) — when editing a receipt/payment, pass its id so the
 // open-bills query ignores this voucher's own settlement; the bills it already
 // cleared then show at full outstanding and its allocation can be re-edited.
-export function useOpenBills(party, branch, side = 'customer', excludeId) {
+// `includeSettled` (optional) — the Bill-wise STATEMENT view passes this to also
+// receive fully-paid bills (settled amount + pending 0), so its Settled/Bills-Raised
+// totals foot to the full picture. The settle screen leaves it off (open bills only).
+export function useOpenBills(party, branch, side = 'customer', excludeId, includeSettled = false) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || '', excludeId || ''],
-    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side, excludeId }),
+    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || '', excludeId || '', includeSettled ? 'all' : 'open'],
+    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side, excludeId, includeSettled: includeSettled ? '1' : undefined }),
     enabled: enabled() && !!party && !!code,
+    staleTime: 15_000,
+  });
+}
+
+// One bill's settlement history (Tally bill-wise breakup) — the Shift+Enter drill on
+// the ledger Bill-wise / T-account views. Lazy: only fetched when a row is exploded.
+// Returns { bill, settlements:[{date,category,ref,narration,amount,side,runningPending}], settled, pending }.
+export function useBillSettlements(party, branch, billVno, side = 'customer', enabledFlag = true) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['vouchers', 'bill-settlements', code || 'all', side, party || '', billVno || ''],
+    queryFn: () => apiGet('/api/vouchers/bill-settlements', { party, branch: code, side, billVno }),
+    enabled: enabled() && enabledFlag && !!party && !!billVno && !!code,
     staleTime: 15_000,
   });
 }
@@ -477,11 +530,14 @@ export function useOpenBills(party, branch, side = 'customer', excludeId) {
 // Whole-book unsettled bills + on-account advances (the Outstanding & On-Account
 // dashboard). Bills settle ONLY by explicit allocation — no FIFO. Returns
 // { salesBills, purchaseBills, onAccountReceipts, onAccountPayments, totals }.
-export function useOutstanding(branch) {
+// Optional `asOf` (YYYY-MM-DD) snapshots the outstanding position as of that
+// cut-off date instead of today. Backward compatible: no asOf → same as before.
+export function useOutstanding(branch, { asOf } = {}) {
   const code = branchCode(branch);
+  const cut = asOf || '';
   return useQuery({
-    queryKey: ['vouchers', 'outstanding', code || 'all'],
-    queryFn: () => apiGet('/api/vouchers/outstanding', { branch: code }),
+    queryKey: ['vouchers', 'outstanding', code || 'all', cut || 'today'],
+    queryFn: () => apiGet('/api/vouchers/outstanding', { branch: code, ...(cut ? { asOf: cut } : {}) }),
     enabled: enabled(),
     staleTime: 20_000,
   });
@@ -521,14 +577,37 @@ export function useAlerts(branch) {
   });
 }
 
-// Set an alert's lifecycle status (Finish / Remind Later / re-open). Pass the
-// alert's current signature+magnitude so the backend can later detect change /
-// worsening. Invalidates the alerts feed so the dashboard reflects the move.
-export function useSetAlertStatus() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body) => apiPut('/api/alert-states', body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['alerts'] }),
+// Scrutiny trend for a branch — issues opened vs fixed per week + avg time-to-fix.
+export function useAlertTrend(branch) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['alert-trend', code || 'all'],
+    queryFn: () => apiGet('/api/alert-states/trend', { branch: code }),
+    enabled: enabled() && !!code,
+    staleTime: 60_000,
+  });
+}
+
+// Per-branch open-issue comparison (from each branch's latest scan).
+export function useAlertsByBranch() {
+  return useQuery({
+    queryKey: ['alerts-by-branch'],
+    queryFn: () => apiGet('/api/alert-states/by-branch'),
+    enabled: enabled(),
+    staleTime: 60_000,
+  });
+}
+
+// Capital-vs-Investment analysis (capital employed, blocked vs in-flow working
+// capital, GP yield) — from the posted Balance Sheet + P&L. Same source as the
+// Capital vs Investment screen; exposed as a hook so dashboards can compose it.
+export function useCapitalAnalysis(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'capital-analysis', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/capital-analysis', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
   });
 }
 

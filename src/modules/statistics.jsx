@@ -22,7 +22,10 @@ export function voucherRegister(category) {
     payment: '/finance/payment-register',
     contra: '/finance/contra-register',
     journal: '/finance/journal-register',
-    'purchase-expense': '/reports/preg',
+    'purchase-expense': '/finance/purchase-expense-register',
+    refund: '/finance/refund-register',
+    reissue: '/finance/reissue-register',
+    'debit-note': '/finance/debit-note-register',
   })[category] || '';
 }
 
@@ -30,7 +33,7 @@ const num = (n) => (n == null ? '—' : Number(n).toLocaleString('en-IN'));
 
 function MasterRow({ label, value, indent, onClick }) {
   return (
-    <tr style={{ borderBottom: '1px solid #f1f3f8', cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
+    <tr style={{ borderBottom: '1px solid #dfe2e7', cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
       <td style={{ padding: '7px 13px', color: indent ? DIM : '#334155', paddingLeft: indent ? 30 : 13, fontWeight: indent ? 400 : 600 }}>{label}</td>
       <td style={{ padding: '7px 13px', textAlign: 'right', fontWeight: 700, color: onClick ? BLUE : DARK }}>{value}</td>
     </tr>
@@ -43,11 +46,11 @@ export function Statistics({ branch, setRoute }) {
   const m = data?.masters || {};
   const vouchers = data?.vouchers || [];
   const totals = data?.totals;
-  const th = { textAlign: 'left', padding: '9px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #e5e9f0' };
+  const th = { textAlign: 'left', padding: '9px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: '#c2a04a' };
   const tdN = { padding: '8px 13px', textAlign: 'right', color: '#334155' };
 
   return (
-    <div style={{ padding: '12px 10px', maxWidth: 980, margin: '0 auto' }}>
+    <div style={{ padding: '12px 10px', maxWidth: 1600, margin: '0 auto' }}>
       <div style={{ marginBottom: 14 }}>
         <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>Statistics</h2>
         <p style={{ margin: '2px 0 0', fontSize: 10.5, color: DIM }}>Masters &amp; voucher counts {data?.branch && data.branch !== 'ALL' ? `· ${data.branch}` : '· All branches'} · live</p>
@@ -64,9 +67,9 @@ export function Statistics({ branch, setRoute }) {
       {!isLoading && !isError && data && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: 14, alignItems: 'start' }}>
           {/* ── Masters ── */}
-          <div className="kb-sticky" style={{ ...card, padding: 0 }}>
+          <div className="kb-sticky" style={{ ...card, padding: 0, '--stick-head': '#1a1c22' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-              <thead><tr style={{ background: '#f3f5f9' }}><th style={th}>Masters</th><th style={{ ...th, textAlign: 'right' }}>Count</th></tr></thead>
+              <thead><tr><th style={th}>Masters</th><th style={{ ...th, textAlign: 'right' }}>Count</th></tr></thead>
               <tbody>
                 <MasterRow label="Groups (total)" value={num(m.groups?.total)} onClick={() => go('/masters/groups')} />
                 <MasterRow indent label="Primary Groups" value={num(m.groups?.primary)} />
@@ -84,9 +87,9 @@ export function Statistics({ branch, setRoute }) {
           </div>
 
           {/* ── Vouchers ── */}
-          <div className="kb-sticky" style={{ ...card, padding: 0 }}>
+          <div className="kb-sticky" style={{ ...card, padding: 0, '--stick-head': '#1a1c22' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-              <thead><tr style={{ background: '#f3f5f9' }}>
+              <thead><tr>
                 <th style={th}>Voucher Type</th>
                 <th style={{ ...th, textAlign: 'right' }}>Posted</th>
                 <th style={{ ...th, textAlign: 'right' }}>Pending</th>
@@ -98,7 +101,7 @@ export function Statistics({ branch, setRoute }) {
                 {vouchers.map((v) => {
                   const href = voucherRegister(v.category);
                   return (
-                    <tr key={v.category} style={{ borderBottom: '1px solid #f1f3f8', cursor: href ? 'pointer' : 'default' }} onClick={() => go(href)} title={href ? 'Open register' : ''}>
+                    <tr key={v.category} style={{ borderBottom: '1px solid #dfe2e7', cursor: href ? 'pointer' : 'default' }} onClick={() => go(href)} title={href ? 'Open register' : ''}>
                       <td style={{ padding: '8px 13px', fontWeight: 600, color: href ? BLUE : '#334155' }}>{v.label}</td>
                       <td style={tdN}>{num(v.posted)}</td>
                       <td style={{ ...tdN, color: v.pending ? '#A06A00' : '#c2c8d6' }}>{v.pending ? num(v.pending) : '—'}</td>
@@ -108,7 +111,7 @@ export function Statistics({ branch, setRoute }) {
                   );
                 })}
                 {totals && (
-                  <tr style={{ background: '#f7f8fb', borderTop: '2px solid #e5e9f0' }}>
+                  <tr style={{ background: '#f7f8fb', borderTop: '2px solid #cdd1d8' }}>
                     <td style={{ padding: '9px 13px', fontWeight: 800, color: DARK }}>TOTAL</td>
                     <td style={{ ...tdN, fontWeight: 800 }}>{num(totals.posted)}</td>
                     <td style={{ ...tdN, fontWeight: 800 }}>{num(totals.pending)}</td>

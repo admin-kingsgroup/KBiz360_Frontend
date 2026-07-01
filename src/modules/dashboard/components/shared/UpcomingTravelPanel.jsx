@@ -5,7 +5,7 @@ export function UpcomingTravelPanel({ bookings, onViewAll }) {
   return (
     <div className="rounded-brand border border-surface-border bg-surface p-4 shadow-card">
       <div className="mb-2.5 flex items-center justify-between">
-        <p className="text-xs font-bold text-ink">✈ Upcoming Travel (14 days)</p>
+        <h3 className="m-0 text-xs font-bold text-ink">✈ Upcoming Travel (14 days)</h3>
         <Button variant="ghost" size="xs" onClick={onViewAll}>All →</Button>
       </div>
       {bookings.length === 0 && (
@@ -18,7 +18,7 @@ export function UpcomingTravelPanel({ bookings, onViewAll }) {
         <div
           key={b.id || i}
           className="py-2"
-          style={{ borderBottom: i < bookings.length - 1 ? '1px solid #f4f5f7' : 'none' }}
+          style={{ borderBottom: i < bookings.length - 1 ? '1px solid #dfe2e7' : 'none' }}
         >
           <div className="flex items-center justify-between">
             <div>

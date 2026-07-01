@@ -138,7 +138,7 @@ export function UserMenu({currentUser, setCurrentUser, setRoute, onOpenNotificat
             boxShadow:"0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 16px -6px rgba(0,0,0,0.05)",
             border:"1px solid rgba(225, 227, 236, 0.8)",overflow:"hidden"}}>
             {/* Profile header */}
-            <div style={{ padding: "16px 16px 12px 16px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
+            <div style={{ padding: "16px 16px 12px 16px", background: "#f8fafc", borderBottom: "1px solid #dfe2e7" }}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
                 <div style={{width:40,height:40,borderRadius:"50%",
                   background:"linear-gradient(135deg,#c2a04a,#9a6810)",
@@ -190,7 +190,7 @@ export function UserMenu({currentUser, setCurrentUser, setRoute, onOpenNotificat
               ))}
             </div>
             {/* Footer */}
-            <div style={{ padding: "10px 16px", background: "#f8fafc", borderTop: "1px solid #f1f5f9",
+            <div style={{ padding: "10px 16px", background: "#f8fafc", borderTop: "1px solid #dfe2e7",
               fontSize: 9, fontWeight: 600, color: "#94a3b8", textAlign: "center", letterSpacing: "0.5px" }}>
               KBIZ360 V1.0 • THE BUSINESS ENGINE
             </div>

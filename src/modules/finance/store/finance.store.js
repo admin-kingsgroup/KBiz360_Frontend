@@ -7,19 +7,22 @@
    ──────────────────────────────────────────────────────────────────── */
 
 import { create } from 'zustand';
-import { CUR_FY, todayISO } from '../../../core/dates';
+import { ALL_TIME_FROM, todayISO } from '../../../core/dates';
 
 export const useFinanceStore = create((set) => ({
   // ─── Trial Balance view state ───
   trialBalance: {
-    from: CUR_FY.startISO,   // FY start → opening balance is exact for the period
+    from: ALL_TIME_FROM,     // default "All" → every entry since inception (opening rolls in)
     to: todayISO(),          // "as on" date for closing balances
     view: 'detailed',        // 'detailed' (opening/movement/closing) | 'summary' (closing only)
+    includeZero: false,      // also list ledgers with a zero (nil) balance
   },
   setTrialBalancePeriod: (from, to) =>
     set((s) => ({ trialBalance: { ...s.trialBalance, from, to } })),
   setTrialBalanceView: (view) =>
     set((s) => ({ trialBalance: { ...s.trialBalance, view } })),
+  setTrialBalanceIncludeZero: (includeZero) =>
+    set((s) => ({ trialBalance: { ...s.trialBalance, includeZero } })),
 
   // ─── Voucher-register period override ───
   // null/null → follow the global Financial-Year selector; set → custom range.

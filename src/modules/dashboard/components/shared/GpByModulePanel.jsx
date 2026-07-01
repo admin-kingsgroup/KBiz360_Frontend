@@ -7,7 +7,7 @@ export function GpByModulePanel({ modGp, totalGp, formatMoney, onViewFullReport 
   return (
     <div className="rounded-brand border border-surface-border bg-surface p-4 shadow-card">
       <div className="mb-2.5 flex items-center justify-between">
-        <p className="text-xs font-bold text-ink">📊 GP by Product — This Month</p>
+        <h3 className="m-0 text-xs font-bold text-ink">📊 GP by Product — This Month</h3>
         <Button variant="ghost" size="xs" onClick={onViewFullReport}>Full Report →</Button>
       </div>
       {modGp.length === 0 && <p className="text-[11px] text-ink-muted">No bookings this month</p>}

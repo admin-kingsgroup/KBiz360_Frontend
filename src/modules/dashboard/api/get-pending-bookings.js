@@ -18,8 +18,17 @@ export async function getBookingSummary(branchCode) {
       approved: { ...BLANK, ...(d.approved || {}) },
       rejected: { ...BLANK, ...(d.rejected || {}) },
       deleted: { ...BLANK, ...(d.deleted || {}) },
+      // Consolidated (branch='ALL'): per-branch pipeline so the Group dashboard shows
+      // each branch's SO/PO/GP separately in its own currency (never a merged total).
+      byBranch: Array.isArray(d.byBranch) ? d.byBranch.map((b) => ({
+        branch: b.branch,
+        pending: { ...BLANK, ...(b.pending || {}) },
+        approved: { ...BLANK, ...(b.approved || {}) },
+        rejected: { ...BLANK, ...(b.rejected || {}) },
+        deleted: { ...BLANK, ...(b.deleted || {}) },
+      })) : null,
     };
   } catch {
-    return { pending: { ...BLANK }, approved: { ...BLANK }, rejected: { ...BLANK }, deleted: { ...BLANK } };
+    return { pending: { ...BLANK }, approved: { ...BLANK }, rejected: { ...BLANK }, deleted: { ...BLANK }, byBranch: null };
   }
 }

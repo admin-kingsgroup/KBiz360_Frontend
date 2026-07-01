@@ -105,6 +105,8 @@ export function DataTable({
   toolbar,
   className = '',
   minWidth = '44rem',
+  numberLocale = 'en-IN',         // digit grouping for raw-number columns in the print export;
+                                  // branch-scoped screens pass localeOf(cur) so USD prints 123,456 not 1,23,456
 }) {
   const [sort, setSort] = useState(initialSort);
   const [query, setQuery] = useState('');
@@ -188,10 +190,10 @@ export function DataTable({
   };
 
   const doPrint = () => {
-    const fmt = (v, col) => (isRightCol(col) && typeof v === 'number' ? v.toLocaleString('en-IN') : (v == null ? '' : String(v)));
+    const fmt = (v, col) => (isRightCol(col) && typeof v === 'number' ? v.toLocaleString(numberLocale) : (v == null ? '' : String(v)));
     const align = (col) => (isRightCol(col) ? 'right' : col.align === 'center' ? 'center' : 'left');
     const head = exportCols.map((c) => `<th style="text-align:${align(c)};padding:6px 10px;border-bottom:2px solid #0d1326;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#0d1326;white-space:nowrap">${escHtml(c.header ?? c.key)}</th>`).join('');
-    const body = sorted.map((r, i) => `<tr style="background:${i % 2 ? '#f7f8fb' : '#fff'}">${exportCols.map((c) => `<td style="text-align:${align(c)};padding:5px 10px;border-bottom:1px solid #eceef4;font-size:11px;color:#1a1a1a">${escHtml(fmt(valueFor(r, c), c))}</td>`).join('')}</tr>`).join('');
+    const body = sorted.map((r, i) => `<tr style="background:${i % 2 ? '#f7f8fb' : '#fff'}">${exportCols.map((c) => `<td style="text-align:${align(c)};padding:5px 10px;border-bottom:1px solid #dfe2e7;font-size:11px;color:#1a1a1a">${escHtml(fmt(valueFor(r, c), c))}</td>`).join('')}</tr>`).join('');
     const foot = hasFooter ? `<tr>${exportCols.map((c) => `<td style="text-align:${align(c)};padding:7px 10px;border-top:2px solid #d4a437;font-weight:700;font-size:11.5px;color:#0d1326">${escHtml(typeof c.footer === 'function' ? c.footer(sorted) : (c.footerLabel ?? ''))}</td>`).join('')}</tr>` : '';
     const html = `<div style="font-family:system-ui,-apple-system,sans-serif"><h2 style="margin:0 0 2px;font-size:16px;color:#0d1326">${escHtml(printTitle)}</h2>${printSubtitle ? `<div style="font-size:11px;color:#5a6691;margin-bottom:10px">${escHtml(printSubtitle)}</div>` : '<div style="margin-bottom:10px"></div>'}<table style="width:100%;border-collapse:collapse"><thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot ? `<tfoot>${foot}</tfoot>` : ''}</table><div style="margin-top:8px;font-size:9px;color:#8b94b3">${sorted.length} rows</div></div>`;
     try {
@@ -221,7 +223,7 @@ export function DataTable({
   return (
     <div className={cn('flex flex-col rounded-brand border border-surface-border bg-surface shadow-sm overflow-hidden', className)}>
       {showHeaderBar && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-border px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-border bg-accent-soft px-4 py-3">
           <div className="min-w-0">
             {title && <h3 className="truncate text-sm font-bold text-navy">{title}</h3>}
             {subtitle && <p className="mt-0.5 truncate text-xs text-ink-muted">{subtitle}</p>}
@@ -439,9 +441,9 @@ export function DataTable({
                   <td
                     key={col.key}
                     className={cn(
-                      padX, 'py-2.5 font-bold text-white', alignClass(col), col.num && 'tabular-nums',
+                      padX, 'bg-navy py-2.5 font-bold text-white', alignClass(col), col.num && 'tabular-nums',
                       stickyHeader && 'sticky bottom-0 z-20',
-                      col.sticky && cn('sticky', col.sticky === 'right' ? 'right-0' : 'left-0', 'z-30 bg-navy'),
+                      col.sticky && cn('sticky', col.sticky === 'right' ? 'right-0' : 'left-0', 'z-30'),
                     )}
                   >
                     {typeof col.footer === 'function' ? col.footer(sorted) : (col.footerLabel ?? '')}

@@ -27,7 +27,7 @@ export function UserSwitcher({currentUser, switchUser, light}){
   const panelBg = light ? "#ffffff" : "#0d1326";
   const panelBorder = light ? "#cbd5e1" : "#1a2340";
   const panelShadow = light ? "0 8px 32px rgba(29, 45, 62, 0.15)" : "0 8px 24px rgba(0,0,0,0.5)";
-  const itemBorder = light ? "1px solid #f1f5f9" : "1px solid #1a2340";
+  const itemBorder = light ? "1px solid #dfe2e7" : "1px solid #1a2340";
   const caretColor = light ? "#556b82" : "#5a6691";
 
   return (

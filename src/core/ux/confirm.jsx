@@ -89,7 +89,7 @@ export function ConfirmHost() {
             </label>
             <textarea id="kb-confirm-reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={3}
               placeholder={cur.reasonPlaceholder || ''}
-              style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #e1e3ec', borderRadius: 7, padding: '8px 10px', fontSize: 12, resize: 'vertical' }} />
+              style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #cdd1d8', borderRadius: 7, padding: '8px 10px', fontSize: 12, resize: 'vertical' }} />
           </div>
         )}
       </div>

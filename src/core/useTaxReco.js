@@ -17,6 +17,32 @@ export function useTaxReco(branch, period, mode) {
   });
 }
 
+// Tax Filing Status Board — entity × return-type matrix for a period (Filed/Pending
+// derived from entered figures). branch omitted/'ALL' → every branch the user may see.
+//   GET /api/tax-reconciliation/filing-board?branch=&period=YYYY-MM
+export function useTaxFilingBoard(branch, period) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['tax-filing-board', code || 'all', period || ''],
+    queryFn: () => apiGet('/api/tax-reconciliation/filing-board', { branch: code, period }),
+    enabled: !!getAuthToken(),
+    staleTime: 30_000,
+  });
+}
+
+// Statutory Dues Calendar — compliance dates enriched server-side with authority,
+// days-left and a derived Overdue/Pending/Upcoming/Filed status. Org-wide (the
+// calendar master has no branch), so no branch param.
+//   GET /api/tax-calendar/dues
+export function useStatutoryDues() {
+  return useQuery({
+    queryKey: ['tax-calendar', 'dues'],
+    queryFn: () => apiGet('/api/tax-calendar/dues'),
+    enabled: !!getAuthToken(),
+    staleTime: 60_000,
+  });
+}
+
 export function useUpsertTaxFigure() {
   const qc = useQueryClient();
   return useMutation({

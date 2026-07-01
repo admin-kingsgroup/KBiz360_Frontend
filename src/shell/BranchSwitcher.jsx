@@ -96,7 +96,7 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
   const panelBg = light ? "#ffffff" : "#1a1c22";
   const panelBorder = light ? "#cbd5e1" : "#1a2340";
   const panelShadow = light ? "0 8px 32px rgba(29, 45, 62, 0.15)" : "0 8px 24px rgba(0,0,0,0.4)";
-  const itemBorder = light ? "1px solid #f1f5f9" : "1px solid #1a2340";
+  const itemBorder = light ? "1px solid #dfe2e7" : "1px solid #1a2340";
 
   return (
     <div style={{position:"relative"}}>

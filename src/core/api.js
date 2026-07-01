@@ -38,6 +38,17 @@ export function isViewOnly() {
   } catch { return false; }
 }
 
+// Approver roles (FULL_SCOPE_ROLES) may Revoke a posted voucher/booking back to
+// Pending — stricter than Approve since it un-posts the books. Mirrors the role gate
+// in voucherApprovals.jsx so deep drill-down components (VoucherShell / VoucherEditor)
+// can offer Revoke without prop-drilling currentUser everywhere.
+export function isApprover() {
+  try {
+    const u = JSON.parse(localStorage.getItem(USER_KEY) || 'null');
+    return /super.?admin|director|senior\s+finance\s+manager|sr\.?\s*accounts\s+executive/i.test((u && u.role) || '');
+  } catch { return false; }
+}
+
 export function getAuthToken() {
   // Order: real SSO token (localStorage) → dev token → 'open' placeholder.
   // The 'open' placeholder is non-empty so the data hooks (enabled: !!token) still

@@ -25,7 +25,8 @@ import {
 import { useLedgerRegistry } from '../core/useReference';
 import { PeriodBar } from '../core/period';
 import { BRANCHES } from '../core/data';
-import { fmtINR } from '../core/format';
+import { fmtINR, compactAmt } from '../core/format';
+import { bc } from '../core/styleTokens';
 import { toast } from '../core/ux/toast';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { CUR_FY, CUR_QUARTER, CUR_MONTH, ALL_TIME_FROM, todayISO, fmtDate, monthLabel, fyQuarterOf } from '../core/dates';
@@ -111,6 +112,11 @@ const TABS = [
 ];
 
 export function SalesGpAnalytics({ branch }) {
+  // GP/sales figures are in the active branch's currency → format with it ($ for
+  // NBO/DAR/FBM). The module-level `money` stays ₹ for the Inter-Branch tab, whose
+  // elimination balances are INR control accounts. (Shadows it within this component.)
+  const cur = (bc(branch) || {}).cur || '₹';
+  const money = (n) => compactAmt(n || 0, { currency: cur });
   const [preset, setPreset] = useState('all');
   const [from, setFrom] = useState(ALL_TIME_FROM);     // default: inception → today (data may sit in a prior FY)
   const [to, setTo]     = useState(todayISO());
@@ -314,16 +320,16 @@ export function SalesGpAnalytics({ branch }) {
       )}
 
       {!loading && hasData && view === 'detailed' && (
-        <InvoiceTable title="All Transactions" invoices={drill ? invoices.filter((i) => matchDrill(i, drill)) : invoices} onVoucher={setVoucher} drill={drill} clearDrill={() => setDrill(null)} />
+        <InvoiceTable title="All Transactions" invoices={drill ? invoices.filter((i) => matchDrill(i, drill)) : invoices} onVoucher={setVoucher} drill={drill} clearDrill={() => setDrill(null)} money={money} />
       )}
 
       {!loading && hasData && view === 'summary' && (
         <>
           {tab === 'interbranch'
             ? <InterBranchTab branch={branch} from={from} to={to} invoices={invoices} onVoucher={setVoucher} />
-            : <AnalysisTab tab={tab} invoices={invoices} catSummary={catSummary} onDrill={(d) => setDrill(d)} />}
+            : <AnalysisTab tab={tab} invoices={invoices} catSummary={catSummary} onDrill={(d) => setDrill(d)} money={money} />}
           {drill && tab !== 'interbranch' && (
-            <InvoiceTable title={`${drill.label} — transactions`} invoices={invoices.filter((i) => matchDrill(i, drill))} onVoucher={setVoucher} drill={drill} clearDrill={() => setDrill(null)} />
+            <InvoiceTable title={`${drill.label} — transactions`} invoices={invoices.filter((i) => matchDrill(i, drill))} onVoucher={setVoucher} drill={drill} clearDrill={() => setDrill(null)} money={money} />
           )}
         </>
       )}
@@ -360,7 +366,7 @@ function aggregate(invoices, keyFn) {
   return [...m.values()].map((r) => ({ ...r, gp: r.sale - r.cost, gpPct: pct(r.sale - r.cost, r.sale), customers: r.custSet.size, avg: r.txns ? r.sale / r.txns : 0 }));
 }
 
-function AnalysisTab({ tab, invoices, catSummary, onDrill }) {
+function AnalysisTab({ tab, invoices, catSummary, onDrill, money }) {
   const cfg = {
     category:   { dim: 'category', label: 'Category', keyFn: (i) => i.category, sort: 'sale' },
     client:     { dim: 'client', label: 'Customer / Company', keyFn: (i) => i.customer, sort: 'sale', salesOnly: true },
@@ -424,7 +430,7 @@ function AnalysisTab({ tab, invoices, catSummary, onDrill }) {
 /* ══════════════════════════════════════════════════════════════════════
    INVOICE (detailed category) TABLE — expand to ledger entries → voucher
    ════════════════════════════════════════════════════════════════════ */
-function InvoiceTable({ title, invoices, onVoucher, drill, clearDrill }) {
+function InvoiceTable({ title, invoices, onVoucher, drill, clearDrill, money }) {
   const [open, setOpen] = useState('');
   const rows = [...invoices].sort((a, b) => b.sale - a.sale);
   const tot = rows.reduce((a, r) => ({ sale: a.sale + r.sale, cost: a.cost + r.cost, gp: a.gp + r.gp }), { sale: 0, cost: 0, gp: 0 });
@@ -463,7 +469,7 @@ function InvoiceTable({ title, invoices, onVoucher, drill, clearDrill }) {
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10.5 }}>
                         <tbody>
                           {[...inv.saleV.map((x) => ({ ...x, side: 'Sale' })), ...inv.purchV.map((x) => ({ ...x, side: 'Purchase' }))].map((vx, j) => (
-                            <tr key={j} style={{ borderBottom: '1px solid #eef1f6' }}>
+                            <tr key={j} style={{ borderBottom: '1px solid #dfe2e7' }}>
                               <td style={{ padding: '5px 8px', width: 70 }}><span style={{ fontSize: 9, fontWeight: 700, color: vx.side === 'Sale' ? '#2563eb' : '#d97706' }}>{vx.side}</span></td>
                               <td style={{ padding: '5px 8px' }}>
                                 {vx.id ? <button onClick={() => onVoucher({ id: vx.id })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontFamily: 'monospace', fontSize: 10, fontWeight: 700, padding: 0 }}>{vx.vno}</button>
@@ -555,7 +561,7 @@ function InterBranchTab({ branch, from, to, invoices, onVoucher }) {
         {[...ib.recv.map((r) => ({ ...r, side: 'Receivable' })), ...ib.pay.map((p) => ({ ...p, side: 'Payable' }))].map((l) => {
           const isOpen = openLedger === l.ledger;
           return (
-            <div key={`${l.side}:${l.ledger}`} style={{ border: '1px solid #eef1f6', borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
+            <div key={`${l.side}:${l.ledger}`} style={{ border: '1px solid #dfe2e7', borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
               <div {...clickable(() => setOpenLedger(isOpen ? '' : l.ledger))} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '9px 12px', cursor: 'pointer', background: isOpen ? '#f7f8fb' : '#fff' }}>
                 <div style={{ minWidth: 0 }}>
                   <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#1a1c22' }}><span style={{ color: '#9197a3', marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{l.ledger}</p>
@@ -563,7 +569,7 @@ function InterBranchTab({ branch, from, to, invoices, onVoucher }) {
                 </div>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 12.5, fontWeight: 700, color: l.side === 'Receivable' ? '#2563eb' : '#dc2626' }}>{money(l.outstanding)}</span>
-                  <button onClick={(e) => { e.stopPropagation(); openLedgerModal(l.ledger); }} title="Open full ledger account" style={{ border: '1px solid #d6dbe6', background: '#fff', borderRadius: 6, fontSize: 11, padding: '3px 8px', cursor: 'pointer', color: '#1a1c22', fontWeight: 700 }}>📒 Ledger</button>
+                  <button onClick={(e) => { e.stopPropagation(); openLedgerModal(l.ledger); }} title="Open full ledger account" style={{ border: '1px solid #cdd1d8', background: '#fff', borderRadius: 6, fontSize: 11, padding: '3px 8px', cursor: 'pointer', color: '#1a1c22', fontWeight: 700 }}>📒 Ledger</button>
                 </span>
               </div>
               {isOpen && <IBLedgerVouchers ledger={l.ledger} branch={branch} from={from} to={to} onVoucher={onVoucher} />}
@@ -580,7 +586,7 @@ function IBLedgerVouchers({ ledger, branch, from, to, onVoucher }) {
   const lines = q.data?.lines || [];
   if (q.isLoading) return <div style={{ padding: 14, fontSize: 11, color: '#5b616e' }}>Loading postings…</div>;
   return (
-    <div style={{ overflowX: 'auto', borderTop: '1px solid #eef1f6' }}>
+    <div style={{ overflowX: 'auto', borderTop: '1px solid #dfe2e7' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10.5 }}>
         <thead><tr style={{ background: '#f3f4f8' }}>
           {['Date', 'Voucher', 'Narration', 'Dr', 'Cr', 'Balance'].map((h, i) => <th key={i} style={{ padding: '6px 10px', textAlign: i >= 3 ? 'right' : 'left', color: '#5b616e', fontWeight: 700, fontSize: 9.5 }}>{h}</th>)}
@@ -588,7 +594,7 @@ function IBLedgerVouchers({ ledger, branch, from, to, onVoucher }) {
         <tbody>
           {lines.length === 0 && <tr><td colSpan={6} style={{ padding: 16, textAlign: 'center', color: '#5b616e' }}>No postings in range.</td></tr>}
           {lines.map((e, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #f3f4f8' }}>
+            <tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}>
               <td style={{ padding: '5px 10px', color: '#5b616e', whiteSpace: 'nowrap' }}>{fmtDate(e.date)}</td>
               <td style={{ padding: '5px 10px' }}>{e.voucherId ? <button onClick={() => onVoucher({ id: e.voucherId })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontFamily: 'monospace', fontSize: 10, fontWeight: 700, padding: 0 }}>{e.vno || '(view)'}</button> : <span style={{ fontFamily: 'monospace', fontSize: 10 }}>{e.vno}</span>}</td>
               <td style={{ padding: '5px 10px', color: '#2e323c' }}>{e.narration || e.party || '—'}</td>

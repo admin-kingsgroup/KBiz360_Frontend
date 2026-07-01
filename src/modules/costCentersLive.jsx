@@ -20,7 +20,7 @@ import { exportToExcel } from '../core/exportExcel';
 
 const DARK = '#1a1c22', GOLD = '#c2a04a', DIM = '#5b616e', GREEN = '#16a34a', RED = '#dc2626';
 const isSuperAdmin = (u) => /super\s*admin/i.test(u?.role || '');
-const inp = { padding: '7px 10px', border: '1px solid #d6dbe6', borderRadius: 6, fontSize: 12.5, outline: 'none' };
+const inp = { padding: '7px 10px', border: '1px solid #cdd1d8', borderRadius: 6, fontSize: 12.5, outline: 'none' };
 const btn = (bg, fg) => ({ padding: '6px 12px', background: bg, color: fg, border: 'none', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' });
 
 export function CostCenterMasterLive({ currentUser }) {
@@ -49,7 +49,7 @@ export function CostCenterMasterLive({ currentUser }) {
 
   if (!isSuperAdmin(currentUser)) {
     return (
-      <div style={{ maxWidth: 760, margin: '40px auto', padding: 28, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 10, textAlign: 'center' }}>
+      <div style={{ maxWidth: 760, margin: '40px auto', padding: 28, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 10, textAlign: 'center' }}>
         <div style={{ fontSize: 34, marginBottom: 6 }}>🔒</div>
         <h2 style={{ margin: 0, color: DARK, fontSize: 17 }}>Cost Centre Master — restricted</h2>
         <p style={{ color: DIM, fontSize: 12.5, marginTop: 8 }}>
@@ -97,7 +97,7 @@ export function CostCenterMasterLive({ currentUser }) {
     centers.map((c) => ({ code: c.code, name: c.name, module: c.module, branch: c.branch, kind: c.system ? 'Standard' : 'Custom', status: c.active ? 'Active' : 'Inactive' })));
 
   return (
-    <div style={{ maxWidth: 1040, margin: '0 auto', padding: '12px 10px' }}>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: DARK }}>Cost Centre Master</h2>
@@ -111,7 +111,7 @@ export function CostCenterMasterLive({ currentUser }) {
           </label>
           <span style={{ padding: '4px 10px', background: '#fff7e6', color: '#8a6300', border: '1px solid #f0dca6', borderRadius: 14, fontSize: 11, fontWeight: 700 }}>{centers.length} centres</span>
           <button onClick={() => setShowAdd((s) => !s)} className="max-tablet:min-h-[44px]" style={btn(GOLD, DARK)}>＋ Add cost centre</button>
-          <button onClick={exportSheet} disabled={!centers.length} className="max-tablet:min-h-[44px]" style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', cursor: centers.length ? 'pointer' : 'not-allowed', opacity: centers.length ? 1 : 0.5 }}>📤 Export</button>
+          <button onClick={exportSheet} disabled={!centers.length} className="max-tablet:min-h-[44px]" style={{ ...btn('#fff', DARK), border: '1px solid #cdd1d8', cursor: centers.length ? 'pointer' : 'not-allowed', opacity: centers.length ? 1 : 0.5 }}>📤 Export</button>
           <button onClick={runBackfill} disabled={backfill.isPending} className="max-tablet:min-h-[44px]" style={btn(DARK, GOLD)} title="Re-derive cost centres for already-imported vouchers from their saved Ticket Type / Service Type / Country">
             {backfill.isPending ? 'Re-tagging…' : '↻ Re-tag vouchers'}
           </button>
@@ -121,7 +121,7 @@ export function CostCenterMasterLive({ currentUser }) {
       {msg && <div style={{ marginBottom: 12, padding: '8px 14px', borderRadius: 8, background: msg.ok ? '#eef4ec' : '#fbe9e9', color: msg.ok ? GREEN : RED, fontSize: 12, fontWeight: 600 }}>{msg.ok ? '✓ ' : '⚠ '}{msg.text}</div>}
 
       {showAdd && (
-        <div style={{ marginBottom: 14, padding: 14, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div style={{ marginBottom: 14, padding: 14, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <label style={{ fontSize: 10, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Cost-centre name *</label>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Safari Packages" style={{ ...inp, width: 220 }} />
@@ -139,19 +139,19 @@ export function CostCenterMasterLive({ currentUser }) {
           </div>
           <span style={{ fontSize: 10.5, color: DIM, alignSelf: 'center' }}>Will be created for <b>{activeBranch}</b> as <code style={{ color: DARK }}>{activeBranch}-…</code></span>
           <button onClick={add} disabled={createCc.isPending} className="max-tablet:min-h-[44px]" style={btn(GREEN, '#fff')}>{createCc.isPending ? 'Saving…' : 'Save'}</button>
-          <button onClick={() => setShowAdd(false)} className="max-tablet:min-h-[44px]" style={{ ...btn('#fff', DIM), border: '1px solid #d6dbe6' }}>Cancel</button>
+          <button onClick={() => setShowAdd(false)} className="max-tablet:min-h-[44px]" style={{ ...btn('#fff', DIM), border: '1px solid #cdd1d8' }}>Cancel</button>
         </div>
       )}
 
       {q.isLoading && (
-        <div style={{ padding: 14, background: '#fff', border: '1px solid #e6e8ec', borderRadius: 10 }}>
+        <div style={{ padding: 14, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 10 }}>
           {Array.from({ length: 7 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.1) }} />)}
         </div>
       )}
       {q.isError && <div style={{ padding: 16, color: RED, background: '#fbe9e9', border: '1px solid #f3c9c9', borderRadius: 10, fontSize: 12, fontWeight: 600 }}>⚠ {q.error?.message || 'Failed to load cost centres'}</div>}
 
       {!q.isLoading && !q.isError && (
-        <div style={{ background: '#fff', border: '1px solid #e6e8ec', borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid #cdd1d8', borderRadius: 10, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
               <tr style={{ background: DARK }}>
@@ -163,14 +163,14 @@ export function CostCenterMasterLive({ currentUser }) {
             <tbody>
               {byModule.map((m) => (
                 <React.Fragment key={m.key}>
-                  <tr style={{ background: '#f3f6fb', borderTop: '1px solid #e6e8ec' }}>
+                  <tr style={{ background: '#f3f6fb', borderTop: '1px solid #cdd1d8' }}>
                     <td colSpan={6} style={{ padding: '7px 14px', fontWeight: 700, color: DARK }}>
                       <span style={{ marginRight: 7 }}>{m.meta?.icon || '•'}</span>{m.key}
                       {m.meta?.hasSubs && <span style={{ marginLeft: 8, fontSize: 9.5, fontWeight: 700, color: '#2563eb', background: '#e8f0ff', border: '1px solid #c3ddf5', borderRadius: 5, padding: '1px 6px' }}>INT'L / DOMESTIC</span>}
                     </td>
                   </tr>
                   {m.leaves.map((c) => (
-                    <tr key={c._id || c.code} style={{ borderTop: '1px solid #f0f2f7', opacity: c.active ? 1 : 0.55 }}>
+                    <tr key={c._id || c.code} style={{ borderTop: '1px solid #dfe2e7', opacity: c.active ? 1 : 0.55 }}>
                       <td style={{ padding: '8px 14px', fontFamily: 'monospace', fontWeight: 700, color: DARK }}>{c.code}</td>
                       <td style={{ padding: '8px 14px 8px 28px', color: DARK }}>{c.name}</td>
                       <td style={{ padding: '8px 14px', color: DIM }}>{c.module}</td>
@@ -183,8 +183,8 @@ export function CostCenterMasterLive({ currentUser }) {
                         <span style={{ padding: '2px 8px', background: c.active ? '#eef4ec' : '#f0f1f5', color: c.active ? GREEN : DIM, borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>● {c.active ? 'Active' : 'Inactive'}</span>
                       </td>
                       <td style={{ padding: '6px 14px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <button onClick={() => rename(c)} disabled={updateCc.isPending} title="Rename" style={{ ...btn('#fff', DARK), border: '1px solid #d6dbe6', padding: '3px 8px', marginRight: 5, opacity: updateCc.isPending ? 0.5 : 1 }}>✎</button>
-                        <button onClick={() => toggleActive(c)} disabled={updateCc.isPending} title={c.active ? 'Deactivate' : 'Reactivate'} style={{ ...btn('#fff', c.active ? RED : GREEN), border: '1px solid #d6dbe6', padding: '3px 8px', marginRight: 5, opacity: updateCc.isPending ? 0.5 : 1 }}>{c.active ? '⏻' : '✓'}</button>
+                        <button onClick={() => rename(c)} disabled={updateCc.isPending} title="Rename" style={{ ...btn('#fff', DARK), border: '1px solid #cdd1d8', padding: '3px 8px', marginRight: 5, opacity: updateCc.isPending ? 0.5 : 1 }}>✎</button>
+                        <button onClick={() => toggleActive(c)} disabled={updateCc.isPending} title={c.active ? 'Deactivate' : 'Reactivate'} style={{ ...btn('#fff', c.active ? RED : GREEN), border: '1px solid #cdd1d8', padding: '3px 8px', marginRight: 5, opacity: updateCc.isPending ? 0.5 : 1 }}>{c.active ? '⏻' : '✓'}</button>
                         {!c.system && <button onClick={() => del(c)} disabled={deleteCc.isPending} title="Delete custom cost centre" style={{ ...btn('#fff', RED), border: '1px solid #f3c9c9', padding: '3px 8px', opacity: deleteCc.isPending ? 0.5 : 1 }}>🗑</button>}
                       </td>
                     </tr>

@@ -5,13 +5,16 @@ import { todayISO } from '../../../core/dates';
 // lapsed while still open (status Received/Disputed, responseDeadline already passed),
 // read from /api/adm-memos. Returns an array (empty when nothing needs attention).
 // (Passenger passports are tracked in the CRM, not the ERP — no item here.)
-export const getActionItems = async () => {
+// Honours the branch selector: a branchCode → only that branch's items; null
+// (Group) → company-wide. ADMs that carry no branch stay visible in both.
+export const getActionItems = async (branchCode) => {
   const today = todayISO();
   let adms = [];
-  try { adms = (await apiGet('/api/adm-memos')) || []; } catch { adms = []; }
+  try { adms = (await apiGet('/api/adm-memos', branchCode ? { branch: branchCode } : undefined)) || []; } catch { adms = []; }
 
   const overdueAdm = (adms || []).filter(
-    (a) => a && (a.status === 'Disputed' || a.status === 'Received') && a.responseDeadline && a.responseDeadline < today,
+    (a) => a && (a.status === 'Disputed' || a.status === 'Received') && a.responseDeadline && a.responseDeadline < today
+      && (!branchCode || a.branch == null || a.branch === branchCode),
   );
   const items = [];
   if (overdueAdm.length) {

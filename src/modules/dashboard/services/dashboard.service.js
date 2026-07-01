@@ -7,6 +7,14 @@ import {
   buildKeyAlerts,
 } from '../utils/transformers';
 import { growthPct } from '../utils/helpers';
+import { bc } from '../../../core/styleTokens';
+import { compactAmt } from '../../../core/format';
+
+// Branch-aware compact money for alert text ($ for NBO/DAR/FBM, ₹ otherwise).
+const moneyFor = (branchCode) => {
+  const cur = (bc({ code: branchCode }) || {}).cur || '₹';
+  return (n) => compactAmt(n, { currency: cur });
+};
 
 /**
  * Dashboard service — the only place that orchestrates `api/*` accessors and
@@ -26,7 +34,7 @@ export const loadBranchDashboard = async ({ branchCode }) => {
     api.getModulePL({ branchCode, ...p.ytd }),
     api.getAgeingTotals(branchCode),
     api.getSaleVouchers({ branchCode, ...p.month }),
-    api.getActionItems(),
+    api.getActionItems(branchCode),
     api.getUpcomingTravel({ limit: 5, branchCode }),
     api.getBookingSummary(branchCode), // SO/PO/GP pipeline { pending, approved } (whole queue, not date-bound)
   ]);
@@ -39,6 +47,7 @@ export const loadBranchDashboard = async ({ branchCode }) => {
     approvedBookings: bookingSummary.approved,
     rejectedBookings: bookingSummary.rejected,
     deletedBookings: bookingSummary.deleted,
+    bookingsByBranch: bookingSummary.byBranch || null, // per-branch SO/PO/GP pipeline (consolidated only)
     kpis: {
       revenue: cur.totals.sales,
       cost: cur.totals.cogs,
@@ -66,7 +75,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
   // NOTE: FY targets and the branch heatmap are rendered LIVE by the page itself
   // (useTargetsVsActual + per-branch module-pl), so we no longer fetch the seed
   // getFyTargets() or getBranchHeatmap() here — they were unused round-trips.
-  const [revenueTrend, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, bookingSummary] =
+  const [revenueTrend, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, bookingSummary, saleVouchers] =
     await Promise.all([
       api.getRevenueTrend(branchCode),
       api.getTopCustomers(branchCode),
@@ -78,20 +87,24 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
       api.getArAgeingSummary(branchCode),  // branch-scoped: an all-scope Director who selects a
       api.getApAgeingSummary(branchCode),  // branch isn't auto-coerced server-side — must pass it
       api.getBookingSummary(branchCode), // SO/PO/GP pipeline { pending, approved } (not date-bound — whole queue)
+      api.getSaleVouchers({ branchCode, from: dates.from, to: dates.to }), // for the consultant leaderboard (Director ops view)
     ]);
 
   // Key Alerts are computed live from ageing + module P&L + concentration, not seeded.
   const keyAlerts = buildKeyAlerts({
     arAgeing, apAgeing, mpl, topCustomers,
     figures: { netProfit: mpl?.bridge?.netProfit, gpPct: mpl?.totals?.gpPct },
+    fmtMoney: moneyFor(branchCode),
   });
 
   return {
     revenueTrend, keyAlerts, topCustomers, topSuppliers, bankAccounts,
+    topConsultants: consultantsFromSales(saleVouchers, mpl?.totals?.gpPct), // team performance (Director)
     pendingBookings: bookingSummary.pending,
     approvedBookings: bookingSummary.approved,
     rejectedBookings: bookingSummary.rejected,
     deletedBookings: bookingSummary.deleted,
+    bookingsByBranch: bookingSummary.byBranch || null, // per-branch SO/PO/GP pipeline (consolidated only)
     rangeLabel: dates.label,
     figures: {
       revenue: mpl.totals.sales,
@@ -110,37 +123,40 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
 };
 
 export const loadSrFmDashboard = async ({ branchCode } = {}) => {
-  const [cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags] =
+  const [cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags, gstrFiling] =
     await Promise.all([
       api.getCashForecast(branchCode),
       api.getBankAccounts(branchCode),
-      api.getPeriodClose(),
+      api.getPeriodClose(branchCode),
       api.getArAgeingSummary(branchCode),
       api.getApAgeingSummary(branchCode),
       api.getVarianceFlags(branchCode),
+      api.getGstrFiling(branchCode),
     ]);
 
-  return { cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags };
+  return { cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags, gstrFiling };
 };
 
 export const loadSrAeDashboard = async ({ branchCode } = {}) => {
-  const [todayVouchers, reconStatus, topSuppliers] = await Promise.all([
-    api.getTodayVouchersByBranch(),
+  const [todayVouchers, reconStatus, topVendorsOverdue] = await Promise.all([
+    api.getTodayVouchersByBranch(branchCode),
     api.getReconStatus(branchCode),
-    api.getTopSuppliers(branchCode),
+    api.getTopVendorsOverdue(branchCode),
   ]);
 
-  return { todayVouchers, reconStatus, topSuppliers };
+  return { todayVouchers, reconStatus, topVendorsOverdue };
 };
 
 export const loadAcctsExecDashboard = async ({ branchCode } = {}) => {
-  const [todayVouchers, recentActivity, arAgeing] = await Promise.all([
-    api.getTodayVouchersByBranch(),
-    api.getRecentActivity(),
+  const [todayVouchers, recentActivity, arAgeing, apAgeing, weekStats] = await Promise.all([
+    api.getTodayVouchersByBranch(branchCode),
+    api.getRecentActivity(branchCode),
     api.getArAgeingSummary(branchCode),
+    api.getApAgeingSummary(branchCode),   // Open Payables KPI (gross payable outstanding)
+    api.getWeekVoucherStats(branchCode),  // Receipts This Week KPI (7-day receipt count)
   ]);
 
-  return { todayVouchers, recentActivity, arAgeing };
+  return { todayVouchers, recentActivity, arAgeing, apAgeing, weekStats };
 };
 
-export const loadHrMgrDashboard = async () => api.getHrStats();
+export const loadHrMgrDashboard = async ({ branchCode } = {}) => api.getHrStats(branchCode);

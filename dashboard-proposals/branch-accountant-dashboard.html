@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Branch Accountant Dashboard — Proposal Mockup</title>
+<style>
+  :root{
+    --dark:#1a1c22; --gold:#c2a04a; --blue:#2563eb; --amber:#d97706; --red:#dc2626;
+    --green:#16a34a; --dim:#5b616e; --border:#cdd1d8; --divider:#dfe2e7; --bg:#eef1f5;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;background:var(--bg);color:var(--dark);}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 18px 60px;}
+
+  /* ── Header ───────────────────────────────────────── */
+  header{background:var(--dark);color:#fff;position:sticky;top:0;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.18);}
+  .head-in{max-width:1280px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  .brand{font-size:16px;font-weight:800;letter-spacing:.3px;}
+  .brand b{color:var(--gold);}
+  .sub{font-size:11px;color:#aab0bd;margin-top:1px;}
+  .spacer{flex:1;}
+  select.branch{background:#262a33;color:#fff;border:1px solid #3a3f4b;border-radius:7px;padding:6px 10px;font-size:12.5px;font-weight:600;}
+  .qa{display:flex;gap:6px;flex-wrap:wrap;}
+  .qa button{border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:4px;}
+
+  /* ── Period bar ───────────────────────────────────── */
+  .period{background:#13151b;border-top:1px solid #2a2e38;}
+  .period-in{max-width:1280px;margin:0 auto;padding:9px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .preset{display:inline-flex;gap:3px;background:#262a33;border:1px solid #3a3f4b;border-radius:9px;padding:3px;}
+  .preset button{border:none;background:transparent;color:#aab0bd;font-size:12px;font-weight:700;padding:5px 14px;border-radius:6px;cursor:pointer;}
+  .preset button.on{background:var(--gold);color:#1a1c22;}
+  .dates{display:inline-flex;align-items:center;gap:6px;color:#aab0bd;font-size:12px;}
+  .dates input{background:#262a33;border:1px solid #3a3f4b;color:#fff;border-radius:6px;padding:4px 8px;font-size:12px;}
+  .rng-label{font-size:11px;color:var(--gold);font-weight:700;}
+
+  /* ── Tabs ─────────────────────────────────────────── */
+  nav.tabs{display:flex;gap:4px;border-bottom:2px solid var(--border);margin:16px 0 18px;flex-wrap:wrap;}
+  nav.tabs button{border:none;background:transparent;font-size:12.5px;font-weight:700;color:var(--dim);
+    padding:10px 16px;cursor:pointer;border-bottom:3px solid transparent;border-radius:6px 6px 0 0;}
+  nav.tabs button.on{color:var(--gold);background:var(--dark);border-bottom-color:var(--gold);}
+  nav.tabs button .num{display:inline-block;margin-right:7px;opacity:.65;}
+
+  /* ── Cards & bits ─────────────────────────────────── */
+  .sec{font-size:11px;font-weight:800;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin:18px 2px 9px;}
+  .row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+    box-shadow:0 1px 2px rgba(16,18,22,.04),0 6px 20px -10px rgba(16,18,22,.12);}
+  .tile{padding:14px;min-width:185px;flex:1 1 185px;border-left:4px solid var(--dark);}
+  .tile .lbl{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;}
+  .tile .val{font-size:21px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums;}
+  .tile .hint{font-size:11px;color:var(--dim);margin-top:3px;}
+  .b-blue{border-left-color:var(--blue);} .v-blue{color:var(--blue);}
+  .b-amber{border-left-color:var(--amber);} .v-amber{color:var(--amber);}
+  .b-green{border-left-color:var(--green);} .v-green{color:var(--green);}
+  .b-red{border-left-color:var(--red);} .v-red{color:var(--red);}
+  .b-dark{border-left-color:var(--dark);}
+  .pill{padding:2px 8px;border-radius:999px;font-size:10px;font-weight:800;color:#fff;}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead tr{background:var(--dark);}
+  th{padding:9px 12px;color:var(--gold);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;text-align:left;white-space:nowrap;}
+  td{padding:9px 12px;border-top:1px solid var(--divider);}
+  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  tr.zebra:nth-child(even){background:#fafbff;}
+  .drill{color:var(--blue);font-weight:800;cursor:pointer;}
+  .chev{font-weight:800;margin-left:4px;}
+
+  .bar{height:10px;border-radius:6px;background:#eceef3;overflow:hidden;}
+  .bar > span{display:block;height:100%;border-radius:6px;}
+
+  .panel{padding:0;overflow:hidden;flex:1 1 460px;min-width:320px;}
+  .panel .ph{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border);}
+  .panel .ph .t{font-size:13px;font-weight:800;}
+  .panel .ph .s{font-size:11px;color:var(--dim);margin-top:2px;}
+  .mini-btn{border:none;border-radius:6px;padding:4px 9px;font-size:10.5px;font-weight:700;color:#fff;cursor:pointer;}
+  .scroll{max-height:340px;overflow:auto;}
+  .hide{display:none;}
+  .note{font-size:11px;color:var(--dim);margin:4px 2px 0;}
+  .asof{font-size:11px;color:var(--amber);font-weight:700;}
+  .statwrap{display:flex;gap:12px;flex-wrap:wrap;}
+  .stat{flex:1 1 150px;min-width:140px;padding:13px 14px;border-radius:11px;border:1px solid var(--border);background:#fff;cursor:pointer;}
+  .stat .n{font-size:26px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;}
+  .stat .k{font-size:11px;font-weight:700;color:var(--dim);margin-top:5px;text-transform:uppercase;letter-spacing:.3px;}
+  .legend{font-size:11px;color:var(--dim);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-in">
+    <div>
+      <div class="brand">KBiz<b>360</b> · Branch Accountant Dashboard</div>
+      <div class="sub" id="subline">Mumbai (BOM) · single dashboard · separate views</div>
+    </div>
+    <div class="spacer"></div>
+    <select class="branch" onchange="document.getElementById('subline').firstChild.textContent='';">
+      <option>Mumbai (BOM)</option><option>Ahmedabad (AMD)</option><option>Nairobi (NBO)</option><option>Head Office (TK HO)</option>
+    </select>
+    <div class="qa">
+      <button style="background:#16a34a">+ Receipt</button>
+      <button style="background:#d97706">+ Payment</button>
+      <button style="background:#6b4c8b">+ Contra</button>
+      <button style="background:#1a1c22;border:1px solid #3a3f4b">+ Journal</button>
+    </div>
+  </div>
+  <div class="period">
+    <div class="period-in">
+      <span style="font-size:11px;color:#aab0bd;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Period</span>
+      <div class="preset" id="presets">
+        <button data-p="all">All</button>
+        <button data-p="lfy">LFY</button>
+        <button data-p="cfy" class="on">CFY</button>
+        <button data-p="cm">CM</button>
+      </div>
+      <div class="dates">
+        <input type="date" id="dFrom"><span>→</span><input type="date" id="dTo">
+      </div>
+      <span class="rng-label" id="rngLabel"></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="tabs" id="tabs">
+    <button data-t="overview" class="on"><span class="num">1</span>Overview</button>
+    <button data-t="perf"><span class="num">2</span>Performance</button>
+    <button data-t="cash"><span class="num">3</span>Cash &amp; Bank</button>
+    <button data-t="rp"><span class="num">4</span>Receivable &amp; Payable</button>
+    <button data-t="comp"><span class="num">5</span>Compliance</button>
+  </nav>
+
+  <!-- ════════ 1. OVERVIEW ════════ -->
+  <section data-pane="overview">
+    <!-- Branch Health traffic-light -->
+    <div class="card" style="margin-bottom:16px;border-left:4px solid var(--green);overflow:hidden">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)">
+        <span style="width:14px;height:14px;border-radius:999px;background:var(--green)"></span>
+        <div style="font-size:14px;font-weight:800">Branch Health — Healthy</div>
+        <div style="margin-left:auto;font-size:11.5px;font-weight:700;color:var(--dim)">3/4 checks pass</div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px;padding:9px 16px;flex:1 1 240px;border-top:1px solid #eef0f4"><span class="pill" style="background:var(--green)">✓</span><span style="font-size:12px;font-weight:700">Approvals clear</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:9px 16px;flex:1 1 240px;border-top:1px solid #eef0f4"><span class="pill" style="background:var(--green)">✓</span><span style="font-size:12px;font-weight:700">Trial Balance balanced</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:9px 16px;flex:1 1 240px;border-top:1px solid #eef0f4"><span class="pill" style="background:var(--green)">✓</span><span style="font-size:12px;font-weight:700">Gross profit healthy</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:9px 16px;flex:1 1 240px;border-top:1px solid #eef0f4"><span class="pill" style="background:var(--amber)">✕</span><span style="font-size:12px;font-weight:700">Compliance — GST due in 2d</span></div>
+      </div>
+    </div>
+
+    <div class="sec">Approval &amp; posting status <span class="asof" id="ov_flowlbl"></span></div>
+    <div class="statwrap" style="margin-bottom:14px">
+      <div class="stat" style="border-left:4px solid var(--green)"><div class="n v-green" id="ov_appr">—</div><div class="k">Approved &amp; posted</div></div>
+      <div class="stat" style="border-left:4px solid var(--amber)"><div class="n v-amber" id="ov_pend">—</div><div class="k">Pending / unapproved</div></div>
+      <div class="stat" style="border-left:4px solid var(--red)"><div class="n v-red" id="ov_block">—</div><div class="k">Blocked — needs fixing</div></div>
+      <div class="stat" style="border-left:4px solid var(--dark)"><div class="n" id="ov_susp">—</div><div class="k">In suspense</div></div>
+    </div>
+
+    <!-- Exception Radar -->
+    <div class="sec">Exception Radar</div>
+    <div class="card" style="margin-bottom:16px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 16px"><span style="width:26px;text-align:center;font-weight:800;color:var(--red)">3</span><span style="flex:1;font-size:12.5px;font-weight:700">Blocked vouchers — needs fixing</span><button class="mini-btn" style="background:var(--amber)">Open →</button></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid #eef0f4"><span style="width:26px;text-align:center;font-weight:800;color:var(--red)">2</span><span style="flex:1;font-size:12.5px;font-weight:700">Bookings in suspense</span><button class="mini-btn" style="background:var(--amber)">Open →</button></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid #eef0f4"><span style="width:26px;text-align:center;font-weight:800;color:var(--red)">1</span><span style="flex:1;font-size:12.5px;font-weight:700">Suppliers missing GSTIN / PAN</span><button class="mini-btn" style="background:var(--amber)">Open →</button></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid #eef0f4"><span style="width:26px;text-align:center;font-weight:800;color:var(--red)">1</span><span style="flex:1;font-size:12.5px;font-weight:700">Bank accounts with a reconciliation difference · ₹12,000</span><button class="mini-btn" style="background:var(--amber)">Open →</button></div>
+    </div>
+
+    <div class="sec">Performance headline <span class="asof" id="ov_perlbl"></span></div>
+    <div class="row">
+      <div class="card tile b-green"><div class="lbl">Sales</div><div class="val v-green" id="ov_sales">—</div><div class="hint">revenue in period</div></div>
+      <div class="card tile b-amber"><div class="lbl">Expenses</div><div class="val v-amber" id="ov_exp">—</div><div class="hint">indirect expenses</div></div>
+      <div class="card tile b-blue"><div class="lbl">Gross Profit</div><div class="val v-blue" id="ov_gp">—</div><div class="hint" id="ov_gppct">— margin</div></div>
+      <div class="card tile b-dark"><div class="lbl">Net Profit</div><div class="val" id="ov_np">—</div><div class="hint">after expenses</div></div>
+    </div>
+
+    <div class="sec">Money position &amp; working capital <span class="asof" id="ov_asof"></span></div>
+    <div class="row">
+      <div class="card tile b-green"><div class="lbl">Cash + Bank</div><div class="val v-green" id="ov_liq">—</div><div class="hint">available funds</div></div>
+      <div class="card tile b-blue"><div class="lbl">Receivable</div><div class="val v-blue" id="ov_rec">—</div><div class="hint" id="ov_recsub">debtors</div></div>
+      <div class="card tile b-amber"><div class="lbl">Payable</div><div class="val v-amber" id="ov_pay">—</div><div class="hint" id="ov_paysub">creditors</div></div>
+      <div class="card tile b-dark"><div class="lbl">Net Working Position</div><div class="val" id="ov_net">—</div><div class="hint" id="ov_netsub">receivable − payable</div></div>
+    </div>
+
+    <div class="sec">Needs action now (live)</div>
+    <div class="card" style="padding:12px 16px;border-left:4px solid var(--amber);display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:30px;font-weight:800;color:var(--amber)" id="ov_heroN">12</span>
+        <span style="font-size:12px;font-weight:700;color:var(--dim)">items need<br>your action</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;flex:1">
+        <span class="chipw">7 to approve &amp; post →</span>
+        <span class="chipw">2 in suspense →</span>
+        <span class="chipw">3 refunds pending →</span>
+        <span class="chipw">5 overdue debtors →</span>
+      </div>
+    </div>
+    <p class="note">Compliance due: <b>GST</b> by 20th · <b>TDS</b> by 7th · trial balance <b>balanced</b>. 1 audit alert open.</p>
+  </section>
+
+  <!-- ════════ 2. PERFORMANCE ════════ -->
+  <section data-pane="perf" class="hide">
+    <div class="sec">Sales · Expenses · GP · NP <span class="asof" id="pf_lbl"></span></div>
+    <div class="row">
+      <div class="card tile b-green"><div class="lbl">Sales (Revenue)</div><div class="val v-green" id="pf_sales">—</div><div class="hint">gross turnover</div></div>
+      <div class="card tile b-amber"><div class="lbl">Purchase (COGS)</div><div class="val v-amber" id="pf_cogs">—</div><div class="hint">cost of sales</div></div>
+      <div class="card tile b-blue"><div class="lbl">Gross Profit</div><div class="val v-blue" id="pf_gp">—</div><div class="hint" id="pf_gppct">— margin</div></div>
+      <div class="card tile b-dark"><div class="lbl">Expenses</div><div class="val" id="pf_exp">—</div><div class="hint">indirect</div></div>
+      <div class="card tile b-green"><div class="lbl">Net Profit</div><div class="val v-green" id="pf_np">—</div><div class="hint" id="pf_nppct">— of sales</div></div>
+    </div>
+
+    <div class="sec">Target &amp; Budget comparison <span class="asof" id="pf_lbl2"></span></div>
+    <div class="row">
+      <div class="card panel">
+        <div class="ph"><div><div class="t">Sales vs Target</div><div class="s">actual turnover against the branch sales target</div></div></div>
+        <div style="padding:14px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span>Actual <b id="tg_sales" class="v-green">—</b></span><span>Target <b id="tg_target">—</b></span></div>
+          <div class="bar"><span id="tg_bar" style="background:var(--green)"></span></div>
+          <div style="font-size:11.5px;margin-top:7px;color:var(--dim)"><b id="tg_pct">—</b> of target · <span id="tg_gap"></span></div>
+        </div>
+      </div>
+      <div class="card panel">
+        <div class="ph"><div><div class="t">Expenses vs Budget</div><div class="s">actual spend against the approved expense budget</div></div></div>
+        <div style="padding:14px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span>Actual <b id="bg_exp" class="v-amber">—</b></span><span>Budget <b id="bg_budget">—</b></span></div>
+          <div class="bar"><span id="bg_bar" style="background:var(--amber)"></span></div>
+          <div style="font-size:11.5px;margin-top:7px;color:var(--dim)"><b id="bg_pct">—</b> of budget · <span id="bg_gap"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">Module-wise P&amp;L (this period)</div>
+    <div class="card" style="overflow:hidden">
+      <table>
+        <thead><tr><th>Module</th><th class="num">Sales</th><th class="num">Cost</th><th class="num">GP</th><th class="num">GP %</th></tr></thead>
+        <tbody id="pf_mod"></tbody>
+      </table>
+    </div>
+    <p class="note">Flow metrics above respond to the period selector (All / LFY / CFY / CM or a custom range).</p>
+  </section>
+
+  <!-- ════════ 3. CASH & BANK ════════ -->
+  <section data-pane="cash" class="hide">
+    <div class="sec">Money position <span class="asof" id="cb_asof"></span></div>
+    <div class="row">
+      <div class="card tile b-green"><div class="lbl">Cash in Hand</div><div class="val v-green" id="cb_cash">—</div><div class="hint">cash book</div></div>
+      <div class="card tile b-blue"><div class="lbl">Bank Balance (3 a/c)</div><div class="val v-blue" id="cb_bank">—</div><div class="hint">all accounts</div></div>
+      <div class="card tile b-green"><div class="lbl">Collected (period)</div><div class="val v-green" id="cb_coll">—</div><div class="hint">receipts</div></div>
+      <div class="card tile b-amber"><div class="lbl">Paid (period)</div><div class="val v-amber" id="cb_paid">—</div><div class="hint">payments</div></div>
+    </div>
+
+    <div class="sec">Bank reconciliation — all accounts <span class="asof" id="cb_asof2"></span></div>
+    <div class="card" style="overflow:hidden;margin-bottom:14px">
+      <table>
+        <thead><tr><th>Bank Ledger</th><th class="num">Book Bal</th><th class="num">Statement</th><th class="num">Difference</th><th class="num">Open Lines</th></tr></thead>
+        <tbody>
+          <tr class="zebra"><td>HDFC Bank — 50200…1145</td><td class="num">₹24,80,000</td><td class="num">₹24,80,000</td><td class="num v-green">₹0</td><td class="num v-green">0</td></tr>
+          <tr class="zebra"><td>ICICI — 3338…3566</td><td class="num">₹12,30,000</td><td class="num">₹12,42,000</td><td class="num v-red">₹12,000</td><td class="num v-amber">4</td></tr>
+          <tr class="zebra"><td>Kotak — 0123…7788</td><td class="num">₹3,10,000</td><td class="num">₹3,10,000</td><td class="num v-green">₹0</td><td class="num v-green">0</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sec">Post-dated cheques (PDC)</div>
+    <div class="row">
+      <div class="card tile b-green"><div class="lbl">Received — Pending</div><div class="val v-green">₹6,40,000</div><div class="hint">9 cheque(s) · 2 due to bank</div></div>
+      <div class="card tile b-amber"><div class="lbl">Issued — Pending</div><div class="val v-amber">₹3,75,000</div><div class="hint">5 cheque(s)</div></div>
+      <div class="card tile b-blue"><div class="lbl">Deposited (clearing)</div><div class="val v-blue">₹1,20,000</div><div class="hint">2 awaiting clearance</div></div>
+      <div class="card tile b-red"><div class="lbl">Bounced</div><div class="val v-red">1</div><div class="hint">₹45,000 · re-present</div></div>
+    </div>
+
+    <div class="sec">Cash-flow outlook — next 4 weeks (forward)</div>
+    <div class="card" style="overflow:hidden">
+      <table>
+        <thead><tr><th>Week</th><th class="num">Expected In</th><th class="num">Expected Out</th><th class="num">Net</th><th class="num">Proj. Closing</th></tr></thead>
+        <tbody>
+          <tr class="zebra"><td>W1 · 30 Jun–06 Jul</td><td class="num v-green">₹18,40,000</td><td class="num v-amber">₹14,10,000</td><td class="num v-green">₹4,30,000</td><td class="num">₹44,50,000</td></tr>
+          <tr class="zebra"><td>W2 · 07–13 Jul</td><td class="num v-green">₹9,20,000</td><td class="num v-amber">₹16,80,000</td><td class="num v-red">−₹7,60,000</td><td class="num">₹36,90,000</td></tr>
+          <tr class="zebra"><td>W3 · 14–20 Jul</td><td class="num v-green">₹22,10,000</td><td class="num v-amber">₹11,40,000</td><td class="num v-green">₹10,70,000</td><td class="num">₹47,60,000</td></tr>
+          <tr class="zebra"><td>W4 · 21–27 Jul</td><td class="num v-green">₹7,80,000</td><td class="num v-amber">₹19,30,000</td><td class="num v-red">−₹11,50,000</td><td class="num">₹36,10,000</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Balances are an <b>as-of</b> snapshot at the period end-date; collected/paid &amp; the forecast are period flows.</p>
+  </section>
+
+  <!-- ════════ 4. RECEIVABLE & PAYABLE ════════ -->
+  <section data-pane="rp" class="hide">
+    <div class="sec">Net working position <span class="asof" id="rp_asof"></span></div>
+    <div class="row">
+      <div class="card tile b-blue"><div class="lbl">Accounts Receivable (Debtors)</div><div class="val v-blue" id="rp_rec">—</div><div class="hint" id="rp_recsub">overdue · open receivables</div></div>
+      <div class="card tile b-amber"><div class="lbl">Accounts Payable (Creditors)</div><div class="val v-amber" id="rp_pay">—</div><div class="hint" id="rp_paysub">suppliers · open payables</div></div>
+      <div class="card tile b-green"><div class="lbl">Net Working Position</div><div class="val v-green" id="rp_net">—</div><div class="hint" id="rp_netsub">net receivable</div></div>
+    </div>
+
+    <!-- Working-capital velocity -->
+    <div class="sec">Working-capital velocity</div>
+    <div class="row">
+      <div class="card tile b-blue"><div class="lbl">DSO — days sales outstanding</div><div class="val v-blue">47 d</div><div class="hint">avg days to collect a sale</div></div>
+      <div class="card tile b-amber"><div class="lbl">DPO — days payables outstanding</div><div class="val v-amber">38 d</div><div class="hint">avg days we take to pay</div></div>
+      <div class="card tile b-dark"><div class="lbl">CCC — cash conversion cycle</div><div class="val">9 d</div><div class="hint">DSO − DPO · lower is better</div></div>
+    </div>
+
+    <!-- Ageing distribution -->
+    <div class="sec">Ageing distribution — Debtors vs Creditors</div>
+    <div class="row">
+      <div class="card" style="padding:14px;flex:1 1 360px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12.5px;font-weight:800">Debtors ageing</span><span style="font-size:12.5px;font-weight:800;color:var(--blue)">₹86,40,000</span></div>
+        <div style="display:flex;height:16px;border-radius:6px;overflow:hidden;background:#eef0f4">
+          <div style="width:46%;background:var(--green)"></div><div style="width:24%;background:var(--blue)"></div><div style="width:18%;background:var(--amber)"></div><div style="width:12%;background:var(--red)"></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:10.5px;color:var(--dim)">
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--green)"></span> 0–30: <b>₹39,74,000</b></span>
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--blue)"></span> 31–60: <b>₹20,74,000</b></span>
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--amber)"></span> 61–90: <b>₹15,55,000</b></span>
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--red)"></span> 90+: <b>₹10,37,000</b></span>
+        </div>
+      </div>
+      <div class="card" style="padding:14px;flex:1 1 360px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12.5px;font-weight:800">Creditors ageing</span><span style="font-size:12.5px;font-weight:800;color:var(--amber)">₹64,30,000</span></div>
+        <div style="display:flex;height:16px;border-radius:6px;overflow:hidden;background:#eef0f4">
+          <div style="width:55%;background:var(--green)"></div><div style="width:25%;background:var(--blue)"></div><div style="width:14%;background:var(--amber)"></div><div style="width:6%;background:var(--red)"></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:10.5px;color:var(--dim)">
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--green)"></span> 0–30: <b>₹35,36,000</b></span>
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--blue)"></span> 31–60: <b>₹16,07,000</b></span>
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--amber)"></span> 61–90: <b>₹9,00,000</b></span>
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--red)"></span> 90+: <b>₹3,87,000</b></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">Receivable vs Payable — side-by-side comparison <span class="asof" id="rp_asof2"></span></div>
+    <div class="card" style="overflow:hidden;margin-bottom:18px">
+      <table>
+        <thead><tr><th>Metric</th><th class="num">Receivable (Customers)</th><th class="num">Payable (Suppliers)</th><th class="num">Net (R − P)</th></tr></thead>
+        <tbody id="rp_cmp"></tbody>
+      </table>
+    </div>
+
+    <div class="sec">Unsettled bills (bill-wise) — Client vs Supplier</div>
+    <div class="row">
+      <div class="card panel">
+        <div class="ph"><div><div class="t">Open sales bills — awaiting receipt</div><div class="s" id="rp_sbh">—</div></div><button class="mini-btn" style="background:var(--blue)">View all →</button></div>
+        <div class="scroll"><table>
+          <thead><tr><th>Party</th><th>Bill No</th><th class="num">Age</th><th class="num">Outstanding</th></tr></thead>
+          <tbody>
+            <tr class="zebra"><td>Inaysha Holidays <span class="chev v-blue">›</span></td><td>SF/00231</td><td class="num">62d</td><td class="num v-blue">₹18,40,000</td></tr>
+            <tr class="zebra"><td>Beyond Border Tours <span class="chev v-blue">›</span></td><td>SH/00118</td><td class="num">41d</td><td class="num v-blue">₹12,10,000</td></tr>
+            <tr class="zebra"><td>Rezlive B2B <span class="chev v-blue">›</span></td><td>SF/00244</td><td class="num">28d</td><td class="num v-blue">₹9,75,000</td></tr>
+            <tr class="zebra"><td>B2C Ref Farhan <span class="chev v-blue">›</span></td><td>SF/00250</td><td class="num">12d</td><td class="num v-blue">₹6,30,000</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="card panel">
+        <div class="ph"><div><div class="t">Open purchase bills — awaiting payment</div><div class="s" id="rp_pbh">—</div></div><button class="mini-btn" style="background:var(--amber)">View all →</button></div>
+        <div class="scroll"><table>
+          <thead><tr><th>Party</th><th>Bill No</th><th class="num">Age</th><th class="num">Outstanding</th></tr></thead>
+          <tbody>
+            <tr class="zebra"><td>Akbar Travels <span class="chev v-amber">›</span></td><td>PF/00712</td><td class="num">55d</td><td class="num v-amber">₹16,20,000</td></tr>
+            <tr class="zebra"><td>TripJack — Ticketing <span class="chev v-amber">›</span></td><td>PF/00733</td><td class="num">33d</td><td class="num v-amber">₹13,40,000</td></tr>
+            <tr class="zebra"><td>GRNconnect <span class="chev v-amber">›</span></td><td>PH/00091</td><td class="num">21d</td><td class="num v-amber">₹8,90,000</td></tr>
+            <tr class="zebra"><td>IATA-BSP (Singapore) <span class="chev v-amber">›</span></td><td>PF/00740</td><td class="num">9d</td><td class="num v-amber">₹5,60,000</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <div class="sec">On-account / Unallocated — Receipts vs Payments</div>
+    <div class="row">
+      <div class="card panel" style="flex:1 1 340px">
+        <div class="ph"><div class="t">Customer credits — unapplied receipts</div><b class="v-blue" id="rp_onr">—</b></div>
+        <div style="padding:8px 14px 12px">
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--divider)"><span>Inaysha Holidays · R/0331 <span class="chev v-blue">›</span></span><span class="num v-blue">₹3,20,000</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--divider)"><span>Beyond Border · R/0340 <span class="chev v-blue">›</span></span><span class="num v-blue">₹2,80,000</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--divider)"><span>Walk-in B2C · R/0355 <span class="chev v-blue">›</span></span><span class="num v-blue">₹2,20,000</span></div>
+        </div>
+      </div>
+      <div class="card panel" style="flex:1 1 340px">
+        <div class="ph"><div class="t">Supplier advances — unapplied payments</div><b class="v-amber" id="rp_onp">—</b></div>
+        <div style="padding:8px 14px 12px">
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--divider)"><span>Akbar Travels · P/0712 <span class="chev v-amber">›</span></span><span class="num v-amber">₹2,40,000</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--divider)"><span>TripJack · P/0733 <span class="chev v-amber">›</span></span><span class="num v-amber">₹1,80,000</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Snapshot is <b>as-of</b> the period end-date. Switch periods to see the position move (LFY closes 31-Mar-2026).</p>
+  </section>
+
+  <!-- ════════ 5. COMPLIANCE ════════ -->
+  <section data-pane="comp" class="hide">
+    <div class="sec">Statutory dues <span class="asof" id="cp_lbl"></span></div>
+    <div class="row">
+      <div class="card tile b-amber"><div class="lbl">GST / VAT (net payable)</div><div class="val v-amber" id="cp_gst">—</div><div class="hint">due 20th</div></div>
+      <div class="card tile b-amber"><div class="lbl">TDS Payable</div><div class="val v-amber" id="cp_tds">—</div><div class="hint">due 7th</div></div>
+      <div class="card tile b-blue"><div class="lbl">TCS Payable</div><div class="val v-blue">₹0</div><div class="hint">statutory calendar</div></div>
+      <div class="card tile b-green"><div class="lbl">Trial Balance</div><div class="val v-green">✓ Balanced</div><div class="hint">Dr = Cr</div></div>
+    </div>
+
+    <div class="sec">GST / Input-Tax-Credit position (this period)</div>
+    <div class="row">
+      <div class="card tile b-blue"><div class="lbl">Output Tax (on sales)</div><div class="val v-blue" id="cp_out">—</div><div class="hint">on invoices</div></div>
+      <div class="card tile b-green"><div class="lbl">Input Credit (ITC)</div><div class="val v-green" id="cp_itc">—</div><div class="hint">on purchases</div></div>
+      <div class="card tile b-amber"><div class="lbl">Net Payable</div><div class="val v-amber" id="cp_netgst">—</div><div class="hint">cash to pay</div></div>
+      <div class="card tile b-amber"><div class="lbl">RCM (Reverse Charge)</div><div class="val v-amber">₹54,000</div><div class="hint">2 foreign bills · pay + claim ITC</div></div>
+    </div>
+
+    <div class="sec">Upcoming statutory calendar</div>
+    <div class="card" style="overflow:hidden;margin-bottom:14px">
+      <table>
+        <thead><tr><th>Due Date</th><th>Tax</th><th>Filing event</th><th class="num">Est. Amount</th></tr></thead>
+        <tbody>
+          <tr class="zebra"><td>07 Jul 2026</td><td><span class="pill" style="background:#475569">TDS</span></td><td>TDS payment — June 2026</td><td class="num">₹62,000</td></tr>
+          <tr class="zebra"><td>11 Jul 2026</td><td><span class="pill" style="background:#2563eb">GST</span></td><td>GSTR-1 — June 2026</td><td class="num">—</td></tr>
+          <tr class="zebra"><td>20 Jul 2026</td><td><span class="pill" style="background:#2563eb">GST</span></td><td>GSTR-3B + payment — June 2026</td><td class="num">₹3,80,000</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sec">Month-end close checklist</div>
+    <div class="card" style="overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--divider);background:#fafbff;display:flex;justify-content:space-between">
+        <b style="font-size:12.5px">Auto + manual checks (Jun 2026)</b><b class="v-amber" style="font-size:12px">4/6 done</b>
+      </div>
+      <div style="padding:10px 14px;border-top:1px solid var(--divider);display:flex;gap:12px;align-items:center"><span class="pill" style="background:var(--green)">✓</span><div style="flex:1"><b style="font-size:12.5px">All vouchers approved &amp; posted</b><div style="font-size:11px;color:var(--green)">nothing pending</div></div></div>
+      <div style="padding:10px 14px;border-top:1px solid var(--divider);display:flex;gap:12px;align-items:center"><span class="pill" style="background:var(--green)">✓</span><div style="flex:1"><b style="font-size:12.5px">Trial Balance balanced (Dr = Cr)</b><div style="font-size:11px;color:var(--green)">balanced</div></div></div>
+      <div style="padding:10px 14px;border-top:1px solid var(--divider);display:flex;gap:12px;align-items:center"><span class="pill" style="background:var(--amber)">!</span><div style="flex:1"><b style="font-size:12.5px">Bank reconciliation done</b><div style="font-size:11px;color:var(--dim)">ICICI ₹12,000 difference open</div></div></div>
+      <div style="padding:10px 14px;border-top:1px solid var(--divider);display:flex;gap:12px;align-items:center"><span class="pill" style="background:#cbd0db">&nbsp;</span><div style="flex:1"><b style="font-size:12.5px">Cash counted vs Cash Book</b><div style="font-size:11px;color:var(--dim)">tick at day-close</div></div></div>
+    </div>
+  </section>
+</div>
+
+<script>
+// ── Mock dataset keyed by period preset. Flow metrics scale by range length;
+//    balances/R&P are an "as-of" snapshot at the period end-date.
+const fmt = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
+const NOW = '2026-06-27';
+const RANGES = {
+  all: { from:'2000-01-01', to:NOW, label:'All · inception → today', asof:NOW },
+  lfy: { from:'2025-04-01', to:'2026-03-31', label:'LFY 2025-26', asof:'2026-03-31' },
+  cfy: { from:'2026-04-01', to:NOW, label:'CFY 2026-27', asof:NOW },
+  cm:  { from:'2026-06-01', to:NOW, label:'CM · Jun 2026', asof:NOW },
+};
+const DATA = {
+  all: { sales:128000000, cogs:96500000, gp:31500000, exp:17800000, np:13700000,
+         target:0, budget:0,
+         appr:'4,820', pend:7, block:3, susp:2,
+         cash:125000, bank:40200000, coll:0, paid:0,
+         rec:8640000, pay:6430000, recOverdue:3210000, paySuppliers:34,
+         billedR:139000000, settledR:130360000, openR:7820000, onR:8200000,
+         billedP:104000000, settledP:97570000, openP:6010000, onP:4200000,
+         gstOut:0, gstItc:0, gstNet:0, tds:62000,
+         mod:[['Flight (Air)',71000000,55000000],['Holiday Packages',38000000,28000000],['Hotel',12000000,9000000],['Visa & Misc',7000000,4500000]] },
+  lfy: { sales:54200000, cogs:41000000, gp:13200000, exp:7400000, np:5800000,
+         target:50000000, budget:7200000,
+         appr:'3,940', pend:0, block:0, susp:0,
+         cash:90000, bank:38600000, coll:51800000, paid:46200000,
+         rec:7950000, pay:5900000, recOverdue:2680000, paySuppliers:29,
+         billedR:54200000, settledR:46250000, openR:7100000, onR:6900000,
+         billedP:41000000, settledP:35100000, openP:5400000, onP:3800000,
+         gstOut:3120000, gstItc:2280000, gstNet:840000, tds:58000,
+         mod:[['Flight (Air)',30100000,23200000],['Holiday Packages',16000000,11800000],['Hotel',5400000,4100000],['Visa & Misc',2700000,1900000]] },
+  cfy: { sales:13800000, cogs:10300000, gp:3500000, exp:1890000, np:1610000,
+         target:16500000, budget:1800000,
+         appr:'612', pend:7, block:3, susp:2,
+         cash:125000, bank:40200000, coll:12900000, paid:11200000,
+         rec:8640000, pay:6430000, recOverdue:3210000, paySuppliers:34,
+         billedR:13800000, settledR:5160000, openR:7820000, onR:8200000,
+         billedP:10300000, settledP:4290000, openP:6010000, onP:4200000,
+         gstOut:840000, gstItc:460000, gstNet:380000, tds:62000,
+         mod:[['Flight (Air)',7100000,5300000],['Holiday Packages',3800000,2800000],['Hotel',1900000,1500000],['Visa & Misc',1000000,700000]] },
+  cm:  { sales:4200000, cogs:3150000, gp:1050000, exp:620000, np:430000,
+         target:5000000, budget:600000,
+         appr:'196', pend:7, block:3, susp:2,
+         cash:125000, bank:40200000, coll:3850000, paid:3120000,
+         rec:8640000, pay:6430000, recOverdue:3210000, paySuppliers:34,
+         billedR:4200000, settledR:1560000, openR:7820000, onR:8200000,
+         billedP:3150000, settledP:1280000, openP:6010000, onP:4200000,
+         gstOut:312000, gstItc:175000, gstNet:137000, tds:24000,
+         mod:[['Flight (Air)',2200000,1700000],['Holiday Packages',1150000,850000],['Hotel',550000,420000],['Visa & Misc',300000,180000]] },
+};
+
+let period = 'cfy';
+const $ = (id) => document.getElementById(id);
+const setText = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+
+function render(){
+  const d = DATA[period], r = RANGES[period];
+  const gpPct = d.sales ? (d.gp/d.sales*100) : 0;
+  const npPct = d.sales ? (d.np/d.sales*100) : 0;
+  const net = d.rec - d.pay;
+
+  // period bar
+  $('dFrom').value = r.from; $('dTo').value = r.to;
+  setText('rngLabel', r.label);
+  document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', b.dataset.p === period));
+
+  // labels
+  ['ov_flowlbl','ov_perlbl','pf_lbl','pf_lbl2','cp_lbl'].forEach(id => setText(id, '· '+r.label));
+  ['ov_asof','cb_asof','cb_asof2','rp_asof','rp_asof2'].forEach(id => setText(id, '· as on '+r.asof));
+
+  // Overview
+  setText('ov_appr', d.appr); setText('ov_pend', d.pend); setText('ov_block', d.block); setText('ov_susp', d.susp);
+  setText('ov_sales', fmt(d.sales)); setText('ov_exp', fmt(d.exp)); setText('ov_gp', fmt(d.gp));
+  setText('ov_gppct', gpPct.toFixed(1)+'% margin'); setText('ov_np', fmt(d.np));
+  setText('ov_liq', fmt(d.cash+d.bank)); setText('ov_rec', fmt(d.rec)); setText('ov_pay', fmt(d.pay));
+  setText('ov_net', fmt(net));
+  setText('ov_recsub', fmt(d.recOverdue)+' overdue'); setText('ov_paysub', d.paySuppliers+' suppliers');
+  setText('ov_netsub', net>=0?'net receivable':'net payable');
+
+  // Performance
+  setText('pf_sales', fmt(d.sales)); setText('pf_cogs', fmt(d.cogs)); setText('pf_gp', fmt(d.gp));
+  setText('pf_gppct', gpPct.toFixed(1)+'% margin'); setText('pf_exp', fmt(d.exp)); setText('pf_np', fmt(d.np));
+  setText('pf_nppct', npPct.toFixed(1)+'% of sales');
+  // Target / Budget (All has no plan → show n/a)
+  if (d.target){
+    const tp = Math.min(100, d.sales/d.target*100);
+    setText('tg_sales', fmt(d.sales)); setText('tg_target', fmt(d.target));
+    $('tg_bar').style.width = tp+'%'; setText('tg_pct', tp.toFixed(0)+'%');
+    setText('tg_gap', d.sales>=d.target ? 'target met' : fmt(d.target-d.sales)+' to go');
+  } else { setText('tg_sales','n/a'); setText('tg_target','no target set'); $('tg_bar').style.width='0%'; setText('tg_pct','—'); setText('tg_gap',''); }
+  if (d.budget){
+    const bp = d.exp/d.budget*100;
+    setText('bg_exp', fmt(d.exp)); setText('bg_budget', fmt(d.budget));
+    $('bg_bar').style.width = Math.min(100,bp)+'%';
+    $('bg_bar').style.background = bp>100 ? 'var(--red)' : 'var(--amber)';
+    setText('bg_pct', bp.toFixed(0)+'%');
+    setText('bg_gap', d.exp<=d.budget ? fmt(d.budget-d.exp)+' under budget' : fmt(d.exp-d.budget)+' OVER budget');
+  } else { setText('bg_exp','n/a'); setText('bg_budget','no budget set'); $('bg_bar').style.width='0%'; setText('bg_pct','—'); setText('bg_gap',''); }
+  // module table
+  const mb = $('pf_mod'); mb.innerHTML = '';
+  d.mod.forEach(([m,s,c]) => {
+    const g = s-c, p = s? (g/s*100):0;
+    mb.insertAdjacentHTML('beforeend',
+      `<tr class="zebra"><td><b>${m}</b></td><td class="num">${fmt(s)}</td><td class="num">${fmt(c)}</td><td class="num v-blue"><b>${fmt(g)}</b></td><td class="num">${p.toFixed(1)}%</td></tr>`);
+  });
+
+  // Cash & Bank (balances are snapshot; collected/paid are flow)
+  setText('cb_cash', fmt(d.cash)); setText('cb_bank', fmt(d.bank));
+  setText('cb_coll', fmt(d.coll)); setText('cb_paid', fmt(d.paid));
+
+  // Receivable & Payable
+  setText('rp_rec', fmt(d.rec)); setText('rp_pay', fmt(d.pay)); setText('rp_net', fmt(net));
+  setText('rp_recsub', fmt(d.recOverdue)+' overdue'); setText('rp_paysub', d.paySuppliers+' suppliers');
+  setText('rp_netsub', net>=0?'net receivable':'net payable');
+  setText('rp_onr', fmt(d.onR)); setText('rp_onp', fmt(d.onP));
+  setText('rp_sbh', fmt(d.openR)+' across open sales bills'); setText('rp_pbh', fmt(d.openP)+' across open purchase bills');
+  const cmp = [
+    ['Total Billed','gross sales vs purchases', d.billedR, d.billedP],
+    ['Settled','received vs paid', d.settledR, d.settledP],
+    ['Unsettled Bills (open)','bill-wise outstanding', d.openR, d.openP],
+    ['Unallocated / On-Account','not yet applied', d.onR, d.onP],
+    ['Net Outstanding','debtors vs creditors', d.rec, d.pay],
+  ];
+  const cb = $('rp_cmp'); cb.innerHTML = '';
+  cmp.forEach(([lbl,sub,rv,pv],i) => {
+    const n = rv-pv, strong = i===4;
+    cb.insertAdjacentHTML('beforeend',
+      `<tr class="zebra"><td><b>${lbl}</b><div style="font-size:10.5px;color:var(--dim);font-weight:500">${sub}</div></td>
+       <td class="num drill" style="color:var(--blue);font-weight:${strong?800:700}">${fmt(rv)}</td>
+       <td class="num" style="color:var(--amber);font-weight:${strong?800:700};cursor:pointer">${fmt(pv)}</td>
+       <td class="num" style="font-weight:800;color:${n>=0?'var(--green)':'var(--red)'}">${fmt(n)}</td></tr>`);
+  });
+
+  // Compliance
+  setText('cp_gst', fmt(d.gstNet||0)); setText('cp_tds', fmt(d.tds));
+  setText('cp_out', fmt(d.gstOut||0)); setText('cp_itc', fmt(d.gstItc||0)); setText('cp_netgst', fmt(d.gstNet||0));
+}
+
+// period buttons
+document.querySelectorAll('#presets button').forEach(b => b.onclick = () => { period = b.dataset.p; render(); });
+// custom date edit just relabels (mock)
+['dFrom','dTo'].forEach(id => $(id).addEventListener('change', () => { setText('rngLabel','Custom range'); document.querySelectorAll('#presets button').forEach(b=>b.classList.remove('on')); }));
+
+// tabs
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x===b));
+  document.querySelectorAll('[data-pane]').forEach(p => p.classList.toggle('hide', p.dataset.pane !== b.dataset.t));
+});
+
+render();
+</script>
+</body>
+</html>

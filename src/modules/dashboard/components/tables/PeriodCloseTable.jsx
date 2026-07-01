@@ -1,6 +1,12 @@
 import React from 'react';
 
-const HEADERS = ['Branch', 'TB', 'Recon', 'Approve', 'Status'];
+// Honest columns only. The source knows ONE real signal: whether the branch still has
+// unposted (pending) vouchers this month (zero pending ⇒ all entries posted ⇒ period
+// effectively closed). The old TB / Recon / Approve trio were three columns ALL driven by
+// that single boolean — implying three independent checks that don't exist. Collapsed to a
+// single "Entries Posted" indicator + the derived Status. (Add real columns here only when a
+// genuine month-end-lock / reconciliation-sign-off subsystem provides distinct signals.)
+const HEADERS = ['Branch', 'Entries Posted', 'Status'];
 const HEADER_BASE = {
   padding: '7px 8px',
   fontSize: 10,
@@ -18,24 +24,26 @@ export function PeriodCloseTable({ rows }) {
       <thead>
         <tr style={{ background: '#f4f5f7' }}>
           {HEADERS.map((h, i) => (
-            <th key={h} style={{ ...HEADER_BASE, textAlign: i === 0 || i === 4 ? 'left' : 'center' }}>
+            <th key={h} scope="col" style={{ ...HEADER_BASE, textAlign: i === 1 ? 'center' : 'left' }}>
               {h}
             </th>
           ))}
         </tr>
       </thead>
       <tbody>
-        {rows.map((p) => (
-          <tr key={p.branch} style={{ borderBottom: '1px solid #f0f2f7' }}>
-            <td style={{ padding: '7px 8px', fontWeight: 700, color: '#14161a' }}>{p.branch}</td>
-            <td style={{ padding: '7px 8px', textAlign: 'center' }}>{p.tbClosed ? '✓' : '○'}</td>
-            <td style={{ padding: '7px 8px', textAlign: 'center' }}>{p.reconciled ? '✓' : '○'}</td>
-            <td style={{ padding: '7px 8px', textAlign: 'center' }}>{p.approved ? '✓' : '○'}</td>
-            <td style={{ padding: '7px 8px', fontSize: 10.5, color: statusColor(p.status), fontWeight: 600 }}>
-              {p.status}
-            </td>
-          </tr>
-        ))}
+        {(rows || []).map((p) => {
+          const posted = p.tbClosed ?? (p.status === 'Closed');
+          return (
+            <tr key={p.branch} style={{ borderBottom: '1px solid #dfe2e7' }}>
+              <td style={{ padding: '7px 8px', fontWeight: 700, color: '#14161a' }}>{p.branch}</td>
+              <td style={{ padding: '7px 8px', textAlign: 'center', color: posted ? '#16a34a' : '#d97706' }} title={posted ? 'All vouchers posted' : 'Pending vouchers remain'}>{posted ? '✓ All posted' : '○ Pending'}</td>
+              <td style={{ padding: '7px 8px', fontSize: 10.5, color: statusColor(p.status), fontWeight: 600 }}>
+                {p.status}
+              </td>
+            </tr>
+          );
+        })}
+        {(!rows || rows.length === 0) && <tr><td colSpan={3} style={{ padding: '10px 8px', fontSize: 10.5, color: '#5b616e' }}>No branch data.</td></tr>}
       </tbody>
     </table>
   );

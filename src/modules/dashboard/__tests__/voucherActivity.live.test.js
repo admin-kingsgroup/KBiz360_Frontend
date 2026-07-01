@@ -4,17 +4,18 @@
 import { tallyVouchersByBranch, vouchersToActivity } from '../utils/transformers';
 
 describe('tallyVouchersByBranch — today receipt/payment/journal counts per branch', () => {
-  test('groups the three cash categories by branch; ignores sale/purchase', () => {
+  test('groups the three cash categories by branch with count (total) + money (value); ignores sale/purchase', () => {
     const out = tallyVouchersByBranch([
-      { category: 'receipt', branch: 'BOM' },
-      { category: 'receipt', branch: 'BOM' },
-      { category: 'payment', branch: 'BOM' },
-      { category: 'journal', branch: 'NBO' },
-      { category: 'sale', branch: 'BOM' },      // not a cash voucher → ignored
-      { category: 'purchase', branch: 'NBO' },  // ignored
+      { category: 'receipt', branch: 'BOM', total: 1000 },
+      { category: 'receipt', branch: 'BOM', total: 500 },
+      { category: 'payment', branch: 'BOM', total: 300 },
+      { category: 'journal', branch: 'NBO', total: 200 },
+      { category: 'sale', branch: 'BOM', total: 9999 },      // not a cash voucher → ignored
+      { category: 'purchase', branch: 'NBO', total: 9999 },  // ignored
     ]);
-    expect(out.BOM).toEqual({ receipt: 2, payment: 1, journal: 0 });
-    expect(out.NBO).toEqual({ receipt: 0, payment: 0, journal: 1 });
+    // total = receipt+payment+journal count; value = Σ voucher.total of those rows
+    expect(out.BOM).toEqual({ receipt: 2, payment: 1, journal: 0, total: 3, value: 1800 });
+    expect(out.NBO).toEqual({ receipt: 0, payment: 0, journal: 1, total: 1, value: 200 });
   });
 
   test('empty / undefined input → empty object (no fabricated branches)', () => {

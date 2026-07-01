@@ -31,7 +31,7 @@ describe('bookingTotals — no-supplier Misc (sell without buying)', () => {
   test('still posts the sale heads (so the JV balances against the customer)', () => {
     const lines = [miscLine({ base: 5000 })];
     const { so } = bookingTotals(SM, lines, { noSupplier: true });
-    const basic = so.heads.find((h) => h.label === 'Basic');
+    const basic = so.heads.find((h) => h.label === 'Base Fare');
     expect(basic).toBeTruthy();
     expect(basic.amt).toBe(5000);
     // Sale heads must foot to the sale net.

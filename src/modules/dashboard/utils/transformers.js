@@ -1,56 +1,13 @@
-import { PRODUCT_MODULES, FX_TO_INR } from './constants';
+import { FX_TO_INR } from './constants';
 import { fmtINR } from '../../../core/format';
 import { fmtDate, todayISO } from '../../../core/dates';
 
-export const filterBillsByBranchPeriod = (bills, branchCode, monthPrefix) =>
-  bills.filter(
-    (b) => (!branchCode || b.branch === branchCode) && b.date.startsWith(monthPrefix),
-  );
-
-export const filterBillsFromDate = (bills, branchCode, fromDate) =>
-  bills.filter(
-    (b) => (!branchCode || b.branch === branchCode) && b.date >= fromDate,
-  );
-
-export const filterExpensesByBranchMonth = (expenses, branchCode, month) =>
-  expenses.filter((a) => (!branchCode || a.br === branchCode) && a.m === month);
-
-export const computeBranchKpis = (bills) => {
-  const revenue = bills.reduce((s, b) => s + b.sell, 0);
-  const cost = bills.reduce((s, b) => s + b.cost, 0);
-  const gp = revenue - cost;
-  return {
-    revenue,
-    cost,
-    gp,
-    gpPct: revenue > 0 ? +((gp / revenue) * 100).toFixed(1) : 0,
-    bookings: bills.length,
-  };
-};
-
-export const computeGpByModule = (bills, totalGp) =>
-  PRODUCT_MODULES.map((mod) => {
-    const modBills = bills.filter((b) => b.mod === mod);
-    return {
-      mod,
-      rev: modBills.reduce((s, b) => s + b.sell, 0),
-      gp: modBills.reduce((s, b) => s + b.sell - b.cost, 0),
-      cnt: modBills.length,
-    };
-  })
-    .filter((m) => m.rev > 0)
-    .sort((a, b) => b.gp - a.gp);
-
-export const computeConsultantLeaderboard = (bills, limit = 5) => {
-  const map = {};
-  bills.forEach((b) => {
-    if (!map[b.consultant]) map[b.consultant] = { name: b.consultant, rev: 0, gp: 0, cnt: 0 };
-    map[b.consultant].rev += b.sell;
-    map[b.consultant].gp += b.sell - b.cost;
-    map[b.consultant].cnt += 1;
-  });
-  return Object.values(map).sort((a, b) => b.gp - a.gp).slice(0, limit);
-};
+// NOTE: the seed-era transforms (computeBranchKpis / computeGpByModule /
+// computeConsultantLeaderboard / filterBills* / filterExpensesByBranchMonth) and the
+// get-bills.js / get-expenses.js accessors that fed them were removed — they read the
+// now-empty GP_BILLS / EXP_ACTUALS seed arrays and had no consumers. The live engine
+// equivalents below (gpByModuleFromMpl / consultantsFromSales / countFiles / filesOf)
+// replaced them.
 
 /* ── Live (double-entry engine) → dashboard shapes ─────────────────────────
    These map a module-wise P&L payload (GET /api/accounting/module-pl) and the
@@ -107,7 +64,9 @@ const SEV_RANK = { high: 0, med: 1, low: 2 };
 const pickBucket = (buckets, test) => (buckets || []).find((b) => test(b.bucket)) || { amount: 0, count: 0 };
 const parties = (n) => `${n} ${n === 1 ? 'party' : 'parties'}`;
 
-export const buildKeyAlerts = ({ arAgeing = [], apAgeing = [], mpl, topCustomers = [], figures = {} } = {}) => {
+// `fmtMoney` lets the caller format alert amounts in the active branch's currency
+// (USD branches → $). Defaults to ₹ (fmtINR) for back-compat / consolidated views.
+export const buildKeyAlerts = ({ arAgeing = [], apAgeing = [], mpl, topCustomers = [], figures = {}, fmtMoney = fmtINR } = {}) => {
   const alerts = [];
   const asOf = fmtDate(todayISO());
 
@@ -115,28 +74,28 @@ export const buildKeyAlerts = ({ arAgeing = [], apAgeing = [], mpl, topCustomers
   const ar90 = pickBucket(arAgeing, (l) => /90\s*\+/.test(l));
   if (ar90.amount > 0)
     alerts.push({ severity: 'high', type: 'Receivables', date: asOf, route: '/reports/rec',
-      title: `${fmtINR(ar90.amount)} receivables overdue 90+ days · ${parties(ar90.count)}` });
+      title: `${fmtMoney(ar90.amount)} receivables overdue 90+ days · ${parties(ar90.count)}` });
   const ar60 = pickBucket(arAgeing, (l) => /^\s*61/.test(l));
   if (ar60.amount > 0)
     alerts.push({ severity: 'med', type: 'Receivables', date: asOf, route: '/reports/rec',
-      title: `${fmtINR(ar60.amount)} receivables ageing 61–90 days · ${parties(ar60.count)}` });
+      title: `${fmtMoney(ar60.amount)} receivables ageing 61–90 days · ${parties(ar60.count)}` });
 
   // Payables we're sitting on past 90 days (supplier-relationship / cash risk).
   const ap90 = pickBucket(apAgeing, (l) => /90\s*\+/.test(l));
   if (ap90.amount > 0)
     alerts.push({ severity: 'med', type: 'Payables', date: asOf, route: '/reports/pay',
-      title: `${fmtINR(ap90.amount)} payables overdue 90+ days · ${parties(ap90.count)}` });
+      title: `${fmtMoney(ap90.amount)} payables overdue 90+ days · ${parties(ap90.count)}` });
 
   // Net loss for the selected period.
   if (typeof figures.netProfit === 'number' && figures.netProfit < 0)
     alerts.push({ severity: 'high', type: 'Profitability', date: asOf, route: '/reports/pnl',
-      title: `Net loss this period: ${fmtINR(figures.netProfit)}` });
+      title: `Net loss this period: ${fmtMoney(figures.netProfit)}` });
 
   // Modules earning revenue but bleeding GP.
   for (const m of gpByModuleFromMpl(mpl))
     if (m.gp < 0)
       alerts.push({ severity: 'high', type: 'Module P&L', date: asOf, route: '/reports/gp',
-        title: `${m.mod} running at a loss · ${fmtINR(m.gp)} GP` });
+        title: `${m.mod} running at a loss · ${fmtMoney(m.gp)} GP` });
 
   // Over-reliance on a single customer.
   const top = topCustomers[0];
@@ -156,15 +115,21 @@ export const sumVoucherTotals = (vouchersByBranch, key) =>
 // Pure transforms for the LIVE voucher-activity feeds (get-voucher-activity.js).
 // Kept here (no I/O) so they are unit-testable without the Vite-only api client.
 
-// Tally today's receipt/payment/journal voucher counts per branch.
-// Shape: { [branch]: { receipt, payment, journal } } — only cash-book categories.
+// Tally today's receipt/payment/journal vouchers per branch — counts AND money.
+// Shape: { [branch]: { receipt, payment, journal, total, value } } where `total` is the
+// voucher COUNT (receipt+payment+journal) and `value` is the summed money throughput
+// (Σ voucher.total). The total/value were previously missing, so callers reading them
+// (sumVoucherTotals('total'|'value') → "Posted Today" KPI; the "Total Value" column)
+// got NaN / ₹0 even when vouchers existed.
 export const tallyVouchersByBranch = (vouchers = []) => {
   const out = {};
   for (const v of vouchers || []) {
     if (!v || !['receipt', 'payment', 'journal'].includes(v.category)) continue;
     const br = v.branch || '—';
-    const row = out[br] || (out[br] = { receipt: 0, payment: 0, journal: 0 });
+    const row = out[br] || (out[br] = { receipt: 0, payment: 0, journal: 0, total: 0, value: 0 });
     row[v.category] += 1;
+    row.total += 1;
+    row.value += Number(v.total) || 0;
   }
   return out;
 };

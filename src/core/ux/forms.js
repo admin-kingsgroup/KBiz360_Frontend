@@ -20,7 +20,7 @@ export function useFormKeys({ onSubmit, onCancel } = {}) {
   const ref = useRef(null);
 
   const onKeyDown = useCallback((e) => {
-    if (e.key === 'Escape') { if (onCancel) { e.preventDefault(); onCancel(); } return; }
+    if (e.key === 'Escape') { if (onCancel) { e.preventDefault(); e.stopPropagation(); onCancel(); } return; }
     if (e.key !== 'Enter') return;
     if ((e.ctrlKey || e.metaKey) && onSubmit) { e.preventDefault(); onSubmit(); return; }
     const el = e.target;

@@ -31,6 +31,11 @@ export function tcsApplies(spec, packageType) {
   return spec.tcs.intlOnly ? isIntl(packageType) : true;
 }
 
+// A B2B buyer (another agent / tour operator) is NOT charged TCS u/s 206C(1G) — they
+// resell and collect it from their own client. Identified by the customer's Sundry
+// Debtors sub-group (e.g. "B2B" / "B2B Clients"). B2C and B2E still attract TCS.
+export const isB2B = (clientType) => /\bb2b\b/i.test(String(clientType || ''));
+
 // ── Per-module column specs ──────────────────────────────────────────────────
 // idCols[0]/[1] are always the name pair (editable on both grids); idCols[2…] are
 // the module reference fields (editable on the Sales grid, shown read-only on the
@@ -52,7 +57,7 @@ export const VSPECS = {
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
     ],
-    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'k3', label: 'K3' }, { key: 'tax', label: 'Taxes' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'k3', label: 'K3 Tax' }, { key: 'tax', label: 'Taxes' }],
     seed: [
       { fn: 'KUNAL', sn: 'CHAUHAN', base: 4000, k3: 800, tax: 287, psvc: 50, markup: 500, ssvc: 100,
         sectors: [{ sector: 'BOM-DXB', airline: 'Emirates', flightNo: 'EK 501', ticketNo: '0981234567801', pnr: 'TJ1021', travelDate: '' }] },
@@ -61,15 +66,15 @@ export const VSPECS = {
   SH: {
     code: 'SH', name: 'Holiday Package', icon: '🌴', headerLabel: 'Destination / Package',
     // Tour-operator package model: 5% GST on the gross package value (no service
-    // charge), + 5% TCS u/s 206C(1G) on International packages.
+    // charge), + 2% TCS u/s 206C(1G) on International packages.
     model: 'package', gstRate: PKG_GST,
-    tax: { kind: 'holiday', rate: 5, tcsRate: 5 },
-    tcs: { rate: 5, intlOnly: true },
+    tax: { kind: 'holiday', rate: 5, tcsRate: 2 },
+    tcs: { rate: 2, intlOnly: true },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'pkg', label: 'Package', kind: 'tkt' }, { key: 'ref', label: 'Ref', kind: 'pnr' },
     ],
-    fareCols: [{ key: 'base', label: 'Land Package' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }],
     seed: [
       { fn: 'RAHUL', sn: 'MEHTA', pkg: 'Bali 5N', ref: 'HL2201', base: 85000, psvc: 1000, psvcGst: 180, markup: 12000 },
     ],
@@ -78,10 +83,10 @@ export const VSPECS = {
     code: 'SHT', name: 'Hotel', icon: '🏨', headerLabel: 'Hotel / City',
     tax: { kind: 'service', rate: 18 },
     idCols: [
-      { key: 'fn', label: 'Guest First' }, { key: 'sn', label: 'Surname' },
+      { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'htl', label: 'Hotel', kind: 'tkt' }, { key: 'conf', label: 'Conf. No', kind: 'pnr' },
     ],
-    fareCols: [{ key: 'base', label: 'Room / Basic' }, { key: 'tax', label: 'Taxes' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'tax', label: 'Taxes' }],
     seed: [
       { fn: 'PRIYA', sn: 'NAIR', htl: 'Taj Lands End', conf: 'HT5567', base: 18000, tax: 900, psvc: 500, markup: 2000, ssvc: 300 },
     ],
@@ -93,43 +98,47 @@ export const VSPECS = {
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'country', label: 'Country', kind: 'tkt' }, { key: 'pp', label: 'Passport', kind: 'pnr' },
     ],
-    fareCols: [{ key: 'base', label: 'Visa Fee' }, { key: 'tax', label: 'Taxes' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'tax', label: 'Taxes' }],
     seed: [
       { fn: 'AMIT', sn: 'SHAH', country: 'UAE', pp: 'P1234567', base: 4500, tax: 0, psvc: 250, markup: 800, ssvc: 200 },
     ],
   },
   SI: {
     code: 'SI', name: 'Insurance', icon: '🛡', headerLabel: 'Plan / Insurer',
-    tax: { kind: 'all', rate: 18 },
+    // Agent/service-provider model: GST 18% on the agency's service only (Service Fee +
+    // SVC2 on sale, Supplier Service on purchase) — NOT on the pass-through premium.
+    tax: { kind: 'service', rate: 18 },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'plan', label: 'Plan', kind: 'tkt' }, { key: 'pol', label: 'Policy No', kind: 'pnr' },
     ],
-    fareCols: [{ key: 'base', label: 'Premium' }, { key: 'tax', label: 'Taxes' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'tax', label: 'Taxes' }],
     seed: [
       { fn: 'SARA', sn: 'KHAN', plan: 'Schengen 30D', pol: 'INS8890', base: 1800, tax: 0, psvc: 0, markup: 400, ssvc: 100 },
     ],
   },
   SC: {
     code: 'SC', name: 'Car Rental', icon: '🚗', headerLabel: 'Route / Vendor',
-    tax: { kind: 'all', rate: 5 },
+    // Agent/service-provider model: GST 18% on the agency's service only (not the fare).
+    tax: { kind: 'service', rate: 18 },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'veh', label: 'Vehicle', kind: 'tkt' }, { key: 'route', label: 'Route', kind: 'pnr' },
     ],
-    fareCols: [{ key: 'base', label: 'Basic' }, { key: 'tax', label: 'Taxes' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'tax', label: 'Taxes' }],
     seed: [
       { fn: 'VIKRAM', sn: 'RAO', veh: 'Innova', route: 'BOM-Pune', base: 2800, tax: 0, psvc: 0, markup: 500, ssvc: 100 },
     ],
   },
   SM: {
     code: 'SM', name: 'Miscellaneous', icon: '📦', headerLabel: 'Service / Vendor',
-    tax: { kind: 'perRow' },
+    // Agent/service-provider model: GST 18% on the agency's service only.
+    tax: { kind: 'service', rate: 18 },
     idCols: [
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'svc', label: 'Service', kind: 'tkt' }, { key: 'ref', label: 'Ref No', kind: 'pnr' },
     ],
-    fareCols: [{ key: 'base', label: 'Basic' }, { key: 'tax', label: 'Taxes' }],
+    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'tax', label: 'Taxes' }],
     seed: [
       { fn: 'NEHA', sn: 'JOSHI', svc: 'Documentation', ref: 'MS1102', base: 900, tax: 0, psvc: 0, markup: 200, ssvc: 100 },
     ],
@@ -222,8 +231,12 @@ const VAT_RATE = { NBO: 16, DAR: 18, FBM: 16 };
 const isVatBranch = (b) => ['NBO', 'DAR', 'FBM'].includes(String(b || '').toUpperCase());
 const vatRateOf = (b) => num(VAT_RATE[String(b || '').toUpperCase()]) / 100;
 export const isTaxable = (ctx) => !(ctx && ctx.noVat);
+// Input (purchase) VAT is DECOUPLED from the client's Without-VAT SALE choice — it
+// follows the supplier's invoice, so a VAT (Africa) branch still records/reclaims it
+// under Without VAT. India never sets noVat → unchanged.
+const isInputTaxable = (ctx) => ((ctx && isVatBranch(ctx.branch)) ? true : !(ctx && ctx.noVat));
 const svcRateOf = (ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); return GST_RATE; };
-const purRateOf = (spec, ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); return moduleRate(spec); };
+const purRateOf = (spec, ctx) => { if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); if (ctx && ctx.noVat) return 0; return moduleRate(spec); };
 const pkgRateOf = (spec, ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); return spec.gstRate || PKG_GST; };
 export { isVatBranch };
 
@@ -236,31 +249,45 @@ export const gpOf = (spec, l) => r2((finalSales(spec, l) - salesGST(l)) - (final
 export const gpPctOf = (spec, l) => { const fs = finalSales(spec, l); return fs > 0 ? r2((gpOf(spec, l) / fs) * 100) : 0; };
 
 // Holiday "package" model (tour-operator): no service charge; Supplier Service GST
-// is entered; Markup is the net agency margin. Tour-operator 5% scheme (no ITC):
-// a SINGLE 5% output GST on the full package consideration (taxable) =
-// Land + Supplier Service + Supplier Service GST + Markup. The markup is taxed ONCE
-// here as part of the taxable value — NOT booked as a separate markup GST AND
-// re-taxed inside the base (the old double-count that made GST ~5.41%). TCS (Intl)
-// added at booking level on (taxable + GST). Cost = Land + Supplier Service +
-// Supplier Service GST (no ITC). GP = Markup (net) only.
+// is entered; SVC2 is the net agency margin. Tour-operator 5% scheme (no ITC):
+// a SINGLE 5% output GST on the SALES consideration (taxable) = Base Fare + SVC2.
+// The SVC2 margin is taxed ONCE here as part of the taxable value — NOT booked as a
+// separate SVC2 GST AND re-taxed inside the base (the old double-count that made GST
+// ~5.41%). The supplier service charge is a PURCHASE-side cost only — it is NOT
+// billed to the customer and is NOT in the GST base. TCS (Intl) added at booking
+// level on (taxable + GST). Cost = Land + Supplier Service + Supplier Service GST
+// (GST claimed as ITC). GP = SVC2 − Supplier Service Charge (margin net of the
+// supplier service we absorb).
 export function lineCalcPackage(spec, l, ctx) {
   const rate = pkgRateOf(spec, ctx);
   const land = num(l.base);
   const psvc = num(l.psvc);
   const psvcGst = num(l.psvcGst);          // Supplier Service GST — entered
-  const markup = num(l.markup);            // net markup (agency margin = GP)
+  const markup = num(l.markup);            // net markup (agency margin = SVC2)
   const incentive = num(l.incentive);
-  const tds = r2(incentive * 0.02);
-  const taxable = r2(land + psvc + psvcGst + markup); // full package consideration
-  const outGst = r2(taxable * rate);       // single 5% output GST
+  // A FOREIGN supplier (master country ≠ India, e.g. IATA-BSP / Singapore) cannot
+  // withhold Indian 194H TDS — drop the 2% so the grid matches what the books post.
+  const tds = (ctx && ctx.foreignSupplier) ? 0 : r2(incentive * 0.02);
+  // Taxable SALES value = Base Fare + SVC2 only. The supplier service charge (psvc)
+  // is a purchase-side cost we absorb — never billed to the customer, never in the
+  // GST base. The supplier's GST is recovered as Input credit (ITC), not re-billed.
+  const taxable = r2(land + markup);
+  const outGst = r2(taxable * rate);       // 5% output GST on (Base Fare + SVC2)
   const finalSales = r2(taxable + outGst); // TCS added at booking level
-  const finalPurchase = r2(land + psvc + psvcGst); // GROSS cost; incentive netted via incentivePostings on post
+  const finalPurchase = r2(land + psvc + psvcGst); // GROSS payable to supplier (ITC split below)
   const salesGST = outGst;
+  // The supplier (a GST-registered tour operator, e.g. a Delhi DMC) charges 5% GST,
+  // which we ALWAYS claim as Input GST (ITC) — allowed even under the 5% scheme for a
+  // tour operator's input from another tour operator. It never loads onto the sale.
+  const gstPur = psvcGst;
+  // GP = SVC2 − supplier service charge (we recover the markup but absorb the supplier
+  // service charge as a cost) + any supplier incentive (our income). Mirrors bookingTotals.
+  const gp = r2(markup - psvc + incentive);
   return {
-    pass: land, gstSvc: 0, gstMk: r2(markup * rate), gstPur: 0, psvcGst, markup, asp: taxable, outGst,
+    pass: land, gstSvc: 0, gstMk: r2(markup * rate), gstPur, psvcGst, markup, asp: taxable, outGst,
     incentive, tds,
-    finalSales, finalPurchase, salesGST, gp: r2(markup + incentive),
-    gpPct: finalSales > 0 ? r2(((markup + incentive) / finalSales) * 100) : 0,
+    finalSales, finalPurchase, salesGST, gp,
+    gpPct: finalSales > 0 ? r2((gp / finalSales) * 100) : 0,
   };
 }
 
@@ -273,9 +300,12 @@ export function lineCalc(spec, l, ctx) {
   const sr = svcRateOf(ctx), pr = purRateOf(spec, ctx);
   const gSvc = taxable ? gstSvc(l, sr) : 0;
   const gMk  = taxable ? gstMk(l, sr) : 0;
-  const gPur = taxable ? gstPur(spec, l, pr) : 0;
+  // Input VAT follows the supplier, not the Without-VAT sale choice (decoupled).
+  const gPur = isInputTaxable(ctx) ? gstPur(spec, l, pr) : 0;
   const incentive = num(l.incentive);
-  const tds = r2(incentive * 0.02);
+  // A FOREIGN supplier (master country ≠ India, e.g. IATA-BSP / Singapore) cannot
+  // withhold Indian 194H TDS — drop the 2% so the grid matches what the books post.
+  const tds = (ctx && ctx.foreignSupplier) ? 0 : r2(incentive * 0.02);
   const fSales = r2(fareSum(spec, l) + num(l.markup) + num(l.ssvc) + gSvc);
   const fPur   = r2(fareSum(spec, l) + num(l.psvc) + gPur); // GROSS cost; incentive netted via incentivePostings on post
   const sGST = r2(gSvc + gMk);
@@ -295,16 +325,16 @@ export function lineCalc(spec, l, ctx) {
 // po/so carry { lineTotal (net, ex tax), serviceCharge, gst, tcs, total, lines }.
 // gp = sales net − purchase net (= net markup + service charge). The per-line
 // `lines` detail is preserved for the read-only voucher view + voucher meta.
-export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false } = {}) {
-  const ctx = { branch, noVat: !!noVat };
+export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, availItc = false, foreignSupplier = false, clientType = '' } = {}) {
+  const ctx = { branch, noVat: !!noVat, availItc: !!availItc, foreignSupplier: !!foreignSupplier, clientType };
   const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, incentiveAmt: 0, incentiveGst: 0, incentiveTds: 0, total: 0, lines: [] };
-  // `otherTaxesGst` = GST carved out of the Other Taxes margin (GST-inclusive, so the
+  // `otherTaxesGst` = GST carved out of the SVC2 margin (GST-inclusive, so the
   // customer total is unchanged); kept OUT of `gst` so it posts to the dedicated
-  // per-branch "Other Taxes [C/S/I]GST Output" ledgers, separate from the regular GST.
+  // per-branch "SVC2 [C/S/I]GST Output" ledgers, separate from the regular GST.
   const so = { lineTotal: 0, serviceCharge: 0, gst: 0, otherTaxesGst: 0, tcs: 0, total: 0, lines: [] };
   // Per-component ledger heads (ex-GST). Every SO/PO field posts to its OWN ledger
   // under the Sales / Purchase group — pass-through fares + supplier service mirror
-  // on both sides; Markup & Service Charge are sale-only (their GST → Output GST).
+  // on both sides; SVC2 & Service Charge are sale-only (their GST → Output GST).
   const sH = {}, pH = {};
   const addH = (bag, key, label, amt) => { (bag[key] || (bag[key] = { key, label, amt: 0 })).amt += num(amt); };
   (lines || []).forEach((l) => {
@@ -321,22 +351,25 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     so.lineTotal += r2(c.finalSales - c.salesGST);
     so.serviceCharge += num(l.ssvc);
     so.gst += r2(c.salesGST - c.gstMk);   // regular output GST (fares / service charge)
-    so.otherTaxesGst += c.gstMk;          // GST on the Other Taxes margin → separate ledgers
+    so.otherTaxesGst += c.gstMk;          // GST on the SVC2 margin → separate ledgers
     so.total += c.finalSales;
     so.lines.push({ ...id, ...fares, pass: c.pass, markup: num(l.markup), ssvc: num(l.ssvc), gstMk: c.gstMk, gstSvc: c.gstSvc, gst: c.salesGST, total: c.finalSales });
     // heads — pass-through fares (sale = purchase). Package model: Land + Supplier
-    // Service + Supplier Service GST are pass-through (both sides), Markup is sale-only
+    // Service + Supplier Service GST are pass-through (both sides), SVC2 is sale-only
     // income (= GP). Fare model: Supplier Service is purchase-only (agency cost),
-    // Markup (net of embedded GST) + Service Charge are sale-only.
+    // SVC2 (net of embedded GST) + Service Charge are sale-only.
     spec.fareCols.forEach((col) => { addH(sH, col.key, col.label, num(l[col.key])); addH(pH, col.key, col.label, num(l[col.key])); });
     if (isPkg(spec)) {
-      addH(sH, 'psvc', 'Supplier Service', num(l.psvc)); addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
-      addH(sH, 'psvcGst', 'Supplier Service GST', num(l.psvcGst)); addH(pH, 'psvcGst', 'Supplier Service GST', num(l.psvcGst));
-      addH(sH, 'markup', 'Other Taxes', num(l.markup));
+      // Supplier service charge is a PURCHASE-side cost only (Option A) — it is NOT
+      // billed to the customer, so it never becomes a SALE head.
+      addH(pH, 'psvc', 'Supp SVCHG', num(l.psvc));
+      // Supplier Service GST is NEITHER a sale head NOR a purchase cost head — it is
+      // claimed as Input GST (ITC) and posts via po.gst → Input GST ledgers.
+      addH(sH, 'markup', 'SVC2', num(l.markup));
     } else {
-      addH(pH, 'psvc', 'Supplier Service', num(l.psvc));
-      addH(sH, 'markup', 'Other Taxes', r2(num(l.markup) - c.gstMk));
-      addH(sH, 'ssvc', 'Service Charge', num(l.ssvc));
+      addH(pH, 'psvc', 'Supp SVCHG', num(l.psvc));
+      addH(sH, 'markup', 'SVC2', r2(num(l.markup) - c.gstMk));
+      addH(sH, 'ssvc', 'SVF', num(l.ssvc));
     }
     // NOTE: supplier incentive + 2% TDS are NOT posted as cost heads — they ride on
     // po.incentiveAmt / po.incentiveTds and post via the engine's incentivePostings
@@ -349,7 +382,7 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
   // on top of the invoice. It's a Balance-Sheet liability, NOT income, so it never
   // enters the net and the GP is unchanged. India-only — never on Africa/VAT
   // branches (and moot under Without-VAT).
-  if (!ctx.noVat && !isVatBranch(ctx.branch) && tcsApplies(spec, packageType)) {
+  if (!ctx.noVat && !isVatBranch(ctx.branch) && !isB2B(ctx.clientType) && tcsApplies(spec, packageType)) {
     so.tcs = r2(so.total * spec.tcs.rate / 100);
     so.total = r2(so.total + so.tcs);
   }

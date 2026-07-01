@@ -49,6 +49,15 @@ export function LedgerModalHost({ branch: shellBranch }) {
     return () => window.removeEventListener('kb:ledger-modal', onOpen);
   }, []);
 
+  // Any navigation (kb:open-register) closes this overlay — e.g. a deep-link from a
+  // read-only locked voucher to its booking/INB-deal approvals screen would otherwise
+  // be hidden behind this full-screen ledger modal.
+  useEffect(() => {
+    const onNav = () => { setVoucher(null); setJob(null); };
+    window.addEventListener('kb:open-register', onNav);
+    return () => window.removeEventListener('kb:open-register', onNav);
+  }, []);
+
   useEffect(() => {
     if (!job) return undefined;
     const pop = pushModal(() => { if (voucher) setVoucher(null); else setJob(null); }); // Esc closes voucher first, then modal
@@ -105,7 +114,7 @@ export function LedgerModalHost({ branch: shellBranch }) {
       {voucher && (
         <div onMouseDown={(e) => { e.stopPropagation(); setVoucher(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(17,17,17,0.5)', zIndex: 8900, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
           <div onMouseDown={(e) => e.stopPropagation()} style={{ width: 'min(880px, 96vw)', maxHeight: '92vh', overflowY: 'auto', background: '#fff', borderRadius: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: '1px solid #e5e9f0', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <strong style={{ fontSize: 13, color: '#0d1326' }}>{job.name} · {voucher.vno}</strong>
               <button onClick={() => setVoucher(null)} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18 }}>✕</button>
             </div>

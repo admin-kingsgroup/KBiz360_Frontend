@@ -135,7 +135,7 @@ function MegaMenu({ item, route, go, buttonCoords, parentWidth }) {
             <div style={{
               fontSize: 11, fontWeight: 700, letterSpacing: '0.5px',
               textTransform: 'uppercase', color: FIORI_BLUE,
-              padding: '4px 8px 8px', borderBottom: '1px solid #e2e8f0',
+              padding: '4px 8px 8px', borderBottom: '1px solid #cdd1d8',
               marginBottom: 8
             }}>
               {col.title}
@@ -195,7 +195,7 @@ export function TopNav({ branch, setBranch, route, setRoute, currentUser, switch
       alignItems: mob ? 'stretch' : 'center',
       gap: mob ? 6 : 8,
       padding: mob ? '6px 16px' : '0 16px',
-      background: '#ffffff', borderBottom: '1px solid #e2e8f0', flexShrink: 0,
+      background: '#ffffff', borderBottom: '1px solid #cdd1d8', flexShrink: 0,
       boxShadow: '0 1px 3px rgba(0,0,0,0.04)', overflow: 'visible',
     }}>
       {/* Dynamic injection of premium styles */}
@@ -297,7 +297,7 @@ export function TopNav({ branch, setBranch, route, setRoute, currentUser, switch
         paddingLeft: mob ? 0 : 10,
         paddingTop: mob ? 4 : 0,
         height: mob ? 36 : '100%',
-        borderTop: mob ? '1px solid #f1f5f9' : 'none'
+        borderTop: mob ? '1px solid #dfe2e7' : 'none'
       }}>
         <div style={{ width: mob ? '100%' : 172 }}>
           <BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light={true} />

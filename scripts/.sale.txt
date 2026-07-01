@@ -1,0 +1,116 @@
+<div class="iv">
+<div class="sheet">
+<div class="titlebar">
+<div class="title">INVOICE</div>
+<img class="iata-badge" src="/travkings-logo.png" alt="IATA Accredited Agent" />
+</div>
+<div class="title-rule">
+</div>
+<div class="tophead">
+<div class="brandcol">
+<img class="tk-logo" src="/travkings-logo.png" alt="Travkings Tours &amp; Travels" />
+</div>
+<div class="inv-meta">
+<div class="row firstline">
+<span class="k">Invoice No.</span>
+<span class="v big">BOM/0626/SF00709</span>
+</div>
+<div class="row">
+<span class="k">Date</span>
+<span class="v">2026-02-14</span>
+</div>
+<div class="row">
+<span class="k">Place of Supply</span>
+<span class="v">Maharashtra — 27</span>
+</div>
+<div class="row">
+<span class="k">Link No.</span>
+<span class="v" style="color:var(--gold)">LK/BOM/00596</span>
+</div>
+</div>
+</div>
+<div class="blackrule">
+</div>
+<div class="parties">
+<div class="party">
+<div class="lab">Billed To</div>
+<div class="nm">Inaysha Creations FZE</div>
+<div class="ln">
+</div>
+</div>
+<div class="party">
+<div class="lab">Issued By</div>
+<div class="nm">Travkings Tours &amp; Travels</div>
+<div class="ln">Venus Tower, B 603, Veera Desai Rd, Azad Nagar 2, Mhada Colony, Jeevan Nagar, Andheri West, Mumbai, Maharashtra 400053<br>GSTIN : 27AAMCT1096J1ZU<br>Email : accounts.bom@travkings.com<br>Contact : +91 88280 06599</div>
+</div>
+</div>
+<div class="fb-label">Fare Breakdown</div>
+<table>
+<thead>
+<tr>
+<th class="l">Description</th>
+<th class="l">HSN/SAC</th>
+<th>Base Fare</th>
+<th>K3 Tax</th>
+<th>Taxes</th>
+<th>Total Fare</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="l desc">
+<div class="nm">Booking</div>
+<div class="sub idl">PAX: Global Konnection</div>
+</td>
+<td class="l">996421</td>
+<td>15,554.00</td>
+<td>0.00</td>
+<td>3,280.00</td>
+<td class="tf">₹18,834.00</td>
+</tr>
+</tbody>
+</table>
+<div class="summary">
+<div class="sumtbl">
+<div class="r">
+<span class="k">Sub Total</span>
+<span class="v">₹19,101.80</span>
+</div>
+<div class="r">
+<span class="k">Service Fee</span>
+<span class="v">₹267.80</span>
+</div>
+<div class="r">
+<span class="k">CGST</span>
+<span class="v">₹24.10</span>
+</div>
+<div class="r">
+<span class="k">SGST</span>
+<span class="v">₹24.10</span>
+</div>
+<div class="net">
+<span class="k">NET TOTAL (INR)</span>
+<span class="v">₹19,150.00</span>
+</div>
+</div>
+</div>
+<div class="botrule">
+</div>
+<div class="botgrid">
+<div class="botleft">
+<div class="lab2">Amount in Words</div>
+<div class="words">INR Nineteen Thousand One Hundred Fifty Only</div>
+<div class="lab2">Bank Details</div>
+<div class="pay">Bank: ICICI Bank<br>A/c Name: Travkings Tours &amp; Travels Private Limited<br>A/c No: 333805003566<br>IFSC: ICIC0003338<br>SWIFT: ICICINBBCTS<br>Branch: Versova Link Road Branch, Andheri West</div>
+</div>
+<div class="botright">
+<div class="for">For Travkings Tours &amp; Travels</div>
+<div class="sigline">
+<div class="a">Afshin Dhanani</div>
+<div class="b">Founder &amp; Director</div>
+</div>
+</div>
+</div>
+<div class="terms">Terms &amp; Conditions: 1. Payment due as per agreed terms; delay attracts 18% p.a. 2. Service charges non-refundable; cancellations per supplier policy. 3. We act as intermediary; not liable for third-party delays/cancellations. E.&amp;O.E.</div>
+</div>
+</div>

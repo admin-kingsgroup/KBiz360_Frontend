@@ -5,20 +5,19 @@
 
 import React, { useEffect, useState } from 'react';
 import { Save, Settings, User } from 'lucide-react';
-import { _EXP_BGT_LISTENERS, _SAVE_LISTENERS, genVNo } from './data';
+import { _EXP_BGT_LISTENERS, _SAVE_LISTENERS } from './data';
 import { _NOTIF_LISTENERS } from './notifStore';
 
-// VNO is auto-assigned by the server on save (sequential per branch × type, no
-// duplicates). The form shows "Auto" so the displayed number always matches reality.
-export function useVNo(){
-  return 'Auto';
-}
+// useVNo (the live "next number" preview) lives in ./useNextNo — it pulls in the
+// axios/api data layer, which this pure-UI hooks module deliberately avoids so that
+// non-form modules importing useMobile / useSaveRefresh don't drag in the API client.
+// Import it directly from '../useNextNo' (NOT from here).
 
 
 
 /* ── Branch-aware navigation menu ──────────────────────────────────
    Taxation section (India / GST):
-   India  (TKHO/BOM/AMD) → GST modules (GSTR-1, GSTR-3B, TDS, RCM, E-Invoice)
+   India  (BOMMB/BOM/AMD) → GST modules (GSTR-1, GSTR-3B, TDS, RCM, E-Invoice)
    Travkings Group          → Full list (consolidated view)
    ─────────────────────────────────────────────────────────────── */
 

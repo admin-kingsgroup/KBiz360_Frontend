@@ -90,11 +90,11 @@ const SPECS = [
   // GST (CGST/SGST/IGST) is auto-summed; TOTAL is used as the invoice grand total.
   { group: 'Sales & Purchase', entity: 'ticket-sale', label: 'Tickets — Sale',
     desc: 'Air ticket sale to a client.',
-    columns: ['Vch No', 'Vch Date', 'Branch', 'LINK NO', 'CLIENT Name', 'Place Of Supply', 'Ticket Type', 'PAX Name', 'Ticket No', 'Sector', 'PNR Number', 'Airline', 'BASE FARE', 'K3', 'TAXES', 'OTHER TAXES', 'SERVICE CHARGE', 'CGST', 'SGST', 'IGST'],
+    columns: ['Vch No', 'Vch Date', 'Branch', 'LINK NO', 'CLIENT Name', 'Place Of Supply', 'Ticket Type', 'PAX Name', 'Ticket No', 'Sector', 'PNR Number', 'Airline', 'BASE FARE', 'K3 Tax', 'TAXES', 'OTHER TAXES', 'SERVICE FEE', 'CGST', 'SGST', 'IGST'],
     example: ['SF/26/0001', '2025-06-01', 'BOM', 'TKB-0001', 'Acme Travels', 'Maharashtra', 'Domestic', 'John Doe', '0987654321098', 'BOM-DXB', 'ABCDEF', 'EK', '10000', '200', '800', '0', '500', '315', '315', '0'] },
   { group: 'Sales & Purchase', entity: 'ticket-purchase', label: 'Tickets — Purchase',
     desc: 'Air ticket cost from a supplier/GSA.',
-    columns: ['Vch No', 'Vch Date', 'Branch', 'LINK NO', 'SUPPLIER Name', 'Place Of Supply', 'Ticket Type', 'PAX Name', 'Ticket No', 'Sector', 'PNR Number', 'Airline', 'BASE FARE', 'K3', 'TAXES', 'SERVICE CHARGE', 'CGST', 'SGST', 'IGST'],
+    columns: ['Vch No', 'Vch Date', 'Branch', 'LINK NO', 'SUPPLIER Name', 'Place Of Supply', 'Ticket Type', 'PAX Name', 'Ticket No', 'Sector', 'PNR Number', 'Airline', 'BASE FARE', 'K3 Tax', 'TAXES', 'SERVICE FEE', 'CGST', 'SGST', 'IGST'],
     example: ['PF/26/0001', '2025-06-01', 'BOM', 'TKB-0001', 'Emirates GSA', 'Maharashtra', 'Domestic', 'John Doe', '0987654321098', 'BOM-DXB', 'ABCDEF', 'EK', '8000', '150', '600', '300', '270', '270', '0'] },
   { group: 'Sales & Purchase', entity: 'holiday-sale', label: 'Holiday — Sale',
     desc: 'Holiday package sale.',
@@ -176,15 +176,15 @@ const SPECS = [
     example: ['DB/26/0001', '2025-06-05', 'BOM', 'Emirates GSA', 'Purchase — Air Tickets', '1000', '180', '1180', 'TKB-0001', 'Ticket void'] },
   // Refund / Reissue raised against a sale. The customer figure is DERIVED so the
   // entry always balances — Original Fare/Cancellation (refund) or Change Fee/Fare
-  // Difference (reissue) drive the supplier leg; Service Charge + Markup + GST are
-  // our retained income. Put the original sale's Link No to tie it for invoice GP.
+  // Difference (reissue) drive the supplier leg; Service Fee + Service Charge - 2 + GST
+  // are our retained income. Put the original sale's Link No to tie it for invoice GP.
   { group: 'Vouchers', entity: 'refund', label: 'Refund Voucher (against Sale)',
-    desc: 'Cancellation of a sale. Dr supplier (net of its charges) + supplier service charge (to Purchase — <Module>) + Input GST · Cr customer + service charge/markup + Output GST. The supplier’s service charge is your own cost (reduces GP) and is NOT deducted from the customer: Customer refund = (Original Fare − Cancellation) − Service Charge − Markup − GST. Against Invoice (sale) AND Against Purchase are both required — one voucher settles both sides.',
-    columns: ['Vch No', 'Vch Date', 'Branch', 'Against Invoice', 'Against Purchase', 'Link No', 'Module', 'Place Of Supply', 'Customer Name', 'Customer Group', 'Supplier Name', 'Supplier Group', 'PNR / Ref', 'Ticket No / Ref', 'Original Fare', 'Cancellation Charge', 'Supplier Service Charge', 'Supplier GST', 'Service Charge', 'Markup', 'CGST', 'SGST', 'IGST', 'Narration'],
+    desc: 'Cancellation of a sale. Dr supplier (net of its charges) + supplier service charge (to Purchase — <Module>) + Input GST · Cr customer + Service Fee/Service Charge - 2 + Output GST. The supplier’s service charge is your own cost (reduces GP) and is NOT deducted from the customer: Customer refund = (Original Fare − Cancellation) − Service Fee − Service Charge - 2 − GST. Against Invoice (sale) AND Against Purchase are both required — one voucher settles both sides.',
+    columns: ['Vch No', 'Vch Date', 'Branch', 'Against Invoice', 'Against Purchase', 'Link No', 'Module', 'Place Of Supply', 'Customer Name', 'Customer Group', 'Supplier Name', 'Supplier Group', 'PNR / Ref', 'Ticket No / Ref', 'Original Fare', 'Cancellation Charge', 'Supplier Service Charge', 'Supplier GST', 'Service Fee', 'Service Charge - 2', 'CGST', 'SGST', 'IGST', 'Narration'],
     example: ['RF/26/0001', '2025-06-10', 'BOM', 'SF/26/0001', 'PF/26/0001', 'TKB-0001', 'Flight', 'Maharashtra', 'Acme Travels', 'Sundry Debtors', 'Emirates GSA', 'Sundry Creditors', 'ABCDEF', '0987654321098', '11000', '1000', '200', '36', '500', '300', '72', '72', '0', 'Refund of ticket PNR ABCDEF against SF/26/0001'] },
   { group: 'Vouchers', entity: 'reissue', label: 'Reissue Voucher (against Sale)',
-    desc: 'Amendment of a sale. Dr customer + supplier service charge (to Purchase — <Module>) + Input GST · Cr supplier (incl. its charges) + service charge/markup + Output GST. The supplier’s service charge is your own cost (reduces GP) and is NOT added to the customer: Customer bill = (Change Fee + Fare Difference) + Service Charge + Markup + GST. Against Invoice (sale) AND Against Purchase are both required — one voucher settles both sides.',
-    columns: ['Vch No', 'Vch Date', 'Branch', 'Against Invoice', 'Against Purchase', 'Link No', 'Module', 'Place Of Supply', 'Customer Name', 'Customer Group', 'Supplier Name', 'Supplier Group', 'PNR / Ref', 'Ticket No / Ref', 'Change Fee', 'Fare Difference', 'Supplier Service Charge', 'Supplier GST', 'Service Charge', 'Markup', 'CGST', 'SGST', 'IGST', 'Narration'],
+    desc: 'Amendment of a sale. Dr customer + supplier service charge (to Purchase — <Module>) + Input GST · Cr supplier (incl. its charges) + Service Fee/Service Charge - 2 + Output GST. The supplier’s service charge is your own cost (reduces GP) and is NOT added to the customer: Customer bill = (Change Fee + Fare Difference) + Service Fee + Service Charge - 2 + GST. Against Invoice (sale) AND Against Purchase are both required — one voucher settles both sides.',
+    columns: ['Vch No', 'Vch Date', 'Branch', 'Against Invoice', 'Against Purchase', 'Link No', 'Module', 'Place Of Supply', 'Customer Name', 'Customer Group', 'Supplier Name', 'Supplier Group', 'PNR / Ref', 'Ticket No / Ref', 'Change Fee', 'Fare Difference', 'Supplier Service Charge', 'Supplier GST', 'Service Fee', 'Service Charge - 2', 'CGST', 'SGST', 'IGST', 'Narration'],
     example: ['RI/26/0001', '2025-06-12', 'BOM', 'SF/26/0001', 'PF/26/0001', 'TKB-0001', 'Flight', 'Maharashtra', 'Acme Travels', 'Sundry Debtors', 'Emirates GSA', 'Sundry Creditors', 'ABCDEF', '0987654321098', '2000', '1500', '200', '36', '500', '300', '72', '72', '0', 'Reissue of ticket PNR ABCDEF against SF/26/0001'] },
 ];
 
@@ -225,7 +225,7 @@ function makeBookingSpec(code) {
   const idLabels = sp.idCols.map((c) => c.label);
   const sectorLabels = (sp.sectorCols || []).map((c) => c.label);
   const fareLabels = sp.fareCols.map((c) => c.label);
-  const tail = ['Supplier Service', 'Supplier Service GST', 'Markup', 'Markup GST', 'Service Charge', 'Service Charge GST'];
+  const tail = ['Supp SVCHG', 'Supp SVCHG GST', 'Service Charge - 2', 'Service Charge - 2 GST', 'Service Fee', 'Service Fee GST'];
   const columns = [...header, ...idLabels, ...sectorLabels, ...fareLabels, ...tail];
 
   const seed = (sp.seed && sp.seed[0]) || {};
@@ -241,7 +241,7 @@ function makeBookingSpec(code) {
 
   return {
     group: 'SO/PO/GP Voucher', entity: BOOKING_ENTITY[code], label: `${sp.name} — SO/PO/GP (bulk)`,
-    desc: `One row = one ${code === 'SHT' ? 'guest' : 'passenger'}/line for a ${sp.name} booking (same fields as the SO/PO/GP Voucher screen). Put the SAME Link No on rows of one booking (multi-line); blank = a standalone single-line booking.${sp.sectors ? ' Flight travel detail (Sector / Airline / Flight No / Ticket No / PNR / Travel Date) imports as ONE sector per row; add any extra sectors for a passenger in the voucher screen after import.' : ''} Supplier Service is an agency cost (reduces GP). The three “… GST” columns are optional — blank = auto (markup GST-inclusive; service & supplier-service @18%), or fill to import the exact GST. Header fields are read from the first row of each Link No. "Without VAT" (Africa/VAT branches only — Yes/No) zero-rates the booking tax, e.g. international air; blank/No uses the branch VAT rate. Imported as PENDING — approve to post the linked Sales & Purchase invoices.`,
+    desc: `One row = one ${code === 'SHT' ? 'guest' : 'passenger'}/line for a ${sp.name} booking (same fields as the SO/PO/GP Voucher screen). Put the SAME Link No on rows of one booking (multi-line); blank = a standalone single-line booking.${sp.sectors ? ' Flight travel detail (Sector / Airline / Flight No / Ticket No / PNR / Travel Date) imports as ONE sector per row; add any extra sectors for a passenger in the voucher screen after import.' : ''} Supplier Service is an agency cost (reduces GP). The three “… GST” columns are optional — blank = auto (Service Charge - 2 GST-inclusive; Service Fee & supplier-service @18%), or fill to import the exact GST. Header fields are read from the first row of each Link No. "Without VAT" (Africa/VAT branches only — Yes/No) zero-rates the booking tax, e.g. international air; blank/No uses the branch VAT rate. Imported as PENDING — approve to post the linked Sales & Purchase invoices.`,
     columns, example,
   };
 }
@@ -260,7 +260,7 @@ const GROUPS = ['Masters', 'Parties', 'SO/PO/GP Voucher', 'Vouchers'];
    regime (VAT Output/Input for Africa, CGST/SGST for India), so a VAT file just
    works. Sub-groups and non-tax columns are identical across regimes. */
 const REGIMES = [
-  { key: 'GST', label: 'India · GST', hint: 'BOM · AMD · TKHO' },
+  { key: 'GST', label: 'India · GST', hint: 'BOM · AMD · BOMMB' },
   { key: 'VAT', label: 'Africa · VAT', hint: 'NBO · DAR · FBM' },
 ];
 const isGstCol = (c) => /cgst|sgst|igst/i.test(c);
@@ -467,7 +467,7 @@ function LedgerConfirmModal({ spec, newLedgers, busy, onYes, onNo }) {
   return (
     <div onClick={onNo} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(580px, 96vw)', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '16px 18px', borderBottom: '1px solid #eef1f6' }}>
+        <div style={{ padding: '16px 18px', borderBottom: '1px solid #dfe2e7' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlertTriangle size={17} style={{ color: '#854F0B' }} />
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: DARK }}>Create {n} new ledger{n > 1 ? 's' : ''}?</h3>
@@ -480,23 +480,23 @@ function LedgerConfirmModal({ spec, newLedgers, busy, onYes, onNo }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: DIM, position: 'sticky', top: 0, background: '#fff' }}>
-                <th style={{ padding: '8px', borderBottom: '1px solid #eef1f6' }}>New Ledger</th>
-                <th style={{ padding: '8px', borderBottom: '1px solid #eef1f6' }}>Group</th>
-                <th style={{ padding: '8px', borderBottom: '1px solid #eef1f6' }}>Sub-Group</th>
+                <th style={{ padding: '8px', borderBottom: '1px solid #dfe2e7' }}>New Ledger</th>
+                <th style={{ padding: '8px', borderBottom: '1px solid #dfe2e7' }}>Group</th>
+                <th style={{ padding: '8px', borderBottom: '1px solid #dfe2e7' }}>Sub-Group</th>
               </tr>
             </thead>
             <tbody>
               {newLedgers.map((l, i) => (
                 <tr key={i}>
-                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #f3f5f9', fontWeight: 600, color: DARK }}>{l.name}</td>
-                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #f3f5f9', color: BLUE, fontWeight: 600 }}>{l.group || '—'}</td>
-                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #f3f5f9', color: DIM }}>{l.subGroup || '—'}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #dfe2e7', fontWeight: 600, color: DARK }}>{l.name}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #dfe2e7', color: BLUE, fontWeight: 600 }}>{l.group || '—'}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #dfe2e7', color: DIM }}>{l.subGroup || '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <div style={{ padding: '12px 18px', borderTop: '1px solid #eef1f6', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div style={{ padding: '12px 18px', borderTop: '1px solid #dfe2e7', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onNo} disabled={busy} style={{ ...btn('#fff', DIM, true), opacity: busy ? 0.5 : 1 }}>Cancel</button>
           <button onClick={onYes} disabled={busy} style={{ ...btn(BLUE, '#fff'), opacity: busy ? 0.6 : 1 }}>
             <CheckCircle2 size={13} /> {busy ? 'Creating…' : `Yes, create & import`}
@@ -517,14 +517,14 @@ function PreviewModal({ spec, data, onClose }) {
   const fmt = (n) => '₹' + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
   const errCount = rows.filter((r) => r.error || r._error).length;
   const missingCount = rows.filter((r) => r.jv?.missing?.length).length;
-  const th = { padding: '7px 8px', borderBottom: '2px solid #e7eaf2', textAlign: 'left', color: DIM, fontWeight: 700, position: 'sticky', top: 0, background: '#fff', whiteSpace: 'nowrap' };
-  const td = { padding: '6px 8px', borderBottom: '1px solid #f3f5f9', whiteSpace: 'nowrap' };
+  const th = { padding: '7px 8px', borderBottom: '2px solid #cdd1d8', textAlign: 'left', color: DIM, fontWeight: 700, position: 'sticky', top: 0, background: '#fff', whiteSpace: 'nowrap' };
+  const td = { padding: '6px 8px', borderBottom: '1px solid #dfe2e7', whiteSpace: 'nowrap' };
   const masterCols = d.kind === 'master' && rows.length ? Object.keys(rows[0]).filter((k) => k !== 'row' && k !== '_error') : [];
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(960px, 97vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid #eef1f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #dfe2e7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: DARK }}>{data.existing ? 'Existing data' : 'Preview'} — {spec.label}</h3>
             <p style={{ margin: '3px 0 0', fontSize: 11, color: DIM }}>
@@ -625,7 +625,7 @@ function PreviewModal({ spec, data, onClose }) {
           )}
         </div>
 
-        <div style={{ padding: '10px 18px', borderTop: '1px solid #eef1f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '10px 18px', borderTop: '1px solid #dfe2e7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 10.5, color: DIM }}>{data.existing ? 'Live data currently in the system (read-only).' : 'This is a preview only — use “Upload CSV” on the card to actually import.'}</span>
           <button onClick={onClose} style={btn(BLUE, '#fff')}>Close</button>
         </div>
@@ -728,7 +728,7 @@ export function DataImportPage({ currentUser }) {
   };
 
   return (
-    <div style={{ padding: '12px 14px', maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: '12px 14px', maxWidth: 1600, margin: '0 auto' }}>
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK }}>Data Import — Tally Migration</h2>
         <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>
@@ -742,7 +742,7 @@ export function DataImportPage({ currentUser }) {
       {/* Tax-regime selector: swaps GST↔VAT tax columns + example branch/currency. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: DIM }}>Template region:</span>
-        <div style={{ display: 'inline-flex', border: '1px solid #d6dbe6', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 8, overflow: 'hidden' }}>
           {REGIMES.map((r) => (
             <button key={r.key} onClick={() => setRegime(r.key)} title={r.hint}
               style={{ padding: '7px 14px', border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 700,
@@ -754,7 +754,7 @@ export function DataImportPage({ currentUser }) {
         <span style={{ fontSize: 10.5, color: DIM }}>
           {regime === 'VAT'
             ? 'VAT branches (NBO/DAR/FBM): one VAT column, USD, no GST/TCS/TDS.'
-            : 'GST branches (BOM/AMD/TKHO): CGST/SGST/IGST + TCS/TDS as applicable.'}
+            : 'GST branches (BOM/AMD/BOMMB): CGST/SGST/IGST + TCS/TDS as applicable.'}
         </span>
       </div>
 

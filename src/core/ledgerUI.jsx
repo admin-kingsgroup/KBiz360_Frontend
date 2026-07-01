@@ -11,12 +11,14 @@
 //   • Bill-wise / ageing GET /api/vouchers/open-bills (useOpenBills)
 // No static data — empty in, empty out.
 // ───────────────────────────────────────────────────────────────────────────
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { bc } from './styleTokens';
 import { clickable } from './ux/clickable';
 import { PeriodBar } from './period';
-import { useLedgerStatement, useOpenBills, useLedgerSplit, useLedgerComponents, branchCode } from './useAccounting';
+import { useLedgerStatement, useOpenBills, useBillSettlements, useLedgerSplit, useLedgerComponents, branchCode } from './useAccounting';
 import { openPrintPreview } from './PrintPreview';
+import { exportToExcel } from './exportExcel';
+import { toastSuccess, toastError } from './ux/toast';
 import { CONSOLIDATED_LABEL } from './data';
 import {
   esc, fmt, fmtB, dmy, vtLabel, billwiseSide, isBillwiseLedger,
@@ -89,6 +91,37 @@ export const LEDGER_CSS = `
 .kbled .part .by{color:var(--ink4);font-weight:400;font-style:italic;margin-right:4px}
 .kbled .part .vlink{color:var(--gold);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .kbled .narr{font-size:10.5px;color:var(--ink4);font-style:italic;font-weight:400;margin-top:3px}
+.kbled .alloc{margin-top:4px;font-weight:400;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.kbled .alloc .alabel{font-size:9px;font-weight:800;letter-spacing:.3px;color:var(--dr);text-transform:uppercase}
+.kbled .alloc .achip{font-size:9.5px;font-weight:600;color:var(--ink2);background:#eaf5ef;border:1px solid #c8e6d5;border-radius:4px;padding:1px 6px;font-variant-numeric:tabular-nums}
+.kbled .alloc .achip b{color:var(--dr);font-weight:800;margin-left:3px}
+.kbled .alloc .achip .cdt{color:var(--ink4);font-weight:500;font-size:8.5px}
+.kbled .alloc .achip.pend{background:#fff6e6;border-color:#ecd9a8}
+.kbled .alloc .achip.pend b{color:var(--amber)}
+.kbled .lpill{display:inline-block;font-size:8px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;padding:1px 6px;border-radius:9px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+.kbled .lpill.paid{background:#eaf5ef;color:var(--dr);border:1px solid #c8e6d5}
+.kbled .lpill.part{background:#fbf0db;color:var(--amber);border:1px solid #ecd9a8}
+.kbled .lpill.open{background:#f3f4f8;color:var(--ink4);border:1px solid #dfe2e7}
+/* Shift+Enter settlement drill — caret, cursor row, inline themed breakup */
+.kbled .caret{display:inline-block;width:15px;color:var(--gold);font-weight:800;cursor:pointer;user-select:none}
+.kbled .caret.ghost{cursor:default;color:transparent}
+.kbled tr.bill{cursor:pointer}
+.kbled tr.bill:hover>td{background:#FBF7EC}
+.kbled tr.bill.sel>td,.kbled tr.lrow.sel>td{background:#FFF4DC;box-shadow:inset 0 0 0 9999px rgba(160,120,40,.05)}
+.kbled tr.bill.sel>td:first-child,.kbled tr.lrow.sel>td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
+.kbled tr.exp>td{padding:0 12px 9px 0;background:#FFFDF6;border-bottom:.5px solid var(--rule)}
+.kbled .breakup{margin-left:30px;border-left:2px solid var(--gold);padding:5px 0 3px}
+.kbled .bk-row{display:grid;grid-template-columns:96px 112px 1fr 168px;align-items:baseline;column-gap:12px;padding:4px 0 4px 16px;font-size:11.5px;font-style:italic;color:var(--ink3)}
+.kbled .bk-row .bk-dt{white-space:nowrap;font-variant-numeric:tabular-nums}
+.kbled .bk-row .bk-ty{text-transform:uppercase;font-size:8.5px;font-weight:800;letter-spacing:.3px;font-style:normal;color:var(--gold)}
+.kbled .bk-row .bk-ref{font-style:normal;color:var(--ink2);font-family:'Consolas','Courier New',monospace;font-size:11px;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kbled .bk-row .bk-amt{text-align:right;font-style:normal;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink)}
+.kbled .bk-row.self{color:var(--ink);font-style:normal;font-weight:700}
+.kbled .bk-row.self .bk-ty{color:var(--ink3)}
+.kbled .bk-row.self .bk-ref{color:var(--ink)}
+.kbled .bk-narr{grid-column:3 / -1;grid-row:2;font-size:9.5px;color:var(--ink4);font-style:italic;margin-top:-2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kbled .bk-cap{margin-left:16px;font-size:9.5px;color:var(--gold);font-weight:700;padding:5px 0 3px}
+.kbled .bk-cap b{color:var(--dr)}
 .kbled .detail{margin-top:5px;padding-left:14px;border-left:2px solid var(--rule)}
 .kbled .detail .dl{display:flex;justify-content:space-between;gap:14px;font-size:10.5px;color:var(--ink3);padding:2px 0;max-width:430px}
 .kbled .detail .dl .dnm{font-weight:400}
@@ -183,7 +216,10 @@ export function LedgerAccountView({
 
   // Bill-wise needs a real party + a concrete branch (a bill belongs to a branch).
   // Only party ledgers (debtors/creditors) carry bills — skip the query otherwise.
-  const bw = useOpenBills(side ? name : null, branch, side || 'customer');
+  // Statement view: include fully-settled bills (excludeId none, includeSettled true)
+  // so the Bill-wise tab's Settled / Bills-Raised totals reflect knocked-off bills
+  // instead of dropping them (which read Settled = 0).
+  const bw = useOpenBills(side ? name : null, branch, side || 'customer', undefined, true);
   const bills = useMemo(() => mapBills(bw.data), [bw.data]);
   const hasBranch = !!branchCode(branch);
 
@@ -191,6 +227,49 @@ export function LedgerAccountView({
     d: q.data, bills, view: mode === 'bill' ? 'bill' : view, group, side,
     cur, branchLabel: branchLabelOf(branch), from, to, showNarr, showDetail,
   });
+
+  // Excel export — mirrors whichever view is on screen (Ledger T-account or
+  // Bill-wise outstanding), so the sheet always matches what the user is looking at.
+  const exportNow = () => {
+    try {
+      if (view === 'bill') {
+        if (!side) return;
+        const cols = [
+          { key: 'ref', label: 'Bill Ref' }, { key: 'bdate', label: 'Bill Date' },
+          { key: 'amt', label: `Bill Amount (${cur})` }, { key: 'settled', label: `Settled (${cur})` },
+          { key: 'pend', label: `Pending (${cur})` }, { key: 'age', label: 'Age (days)' }, { key: 'status', label: 'Status' },
+        ];
+        const rows = bills.map((b) => ({
+          ref: b.ref, bdate: b.bdate, amt: b.amt, settled: b.settled, pend: b.pend,
+          age: b.pend > 0 && b.age > 0 ? b.age : '',
+          status: b.pend <= 0 ? 'Settled' : b.age > 0 ? `${b.age}d overdue` : b.settled > 0 ? 'Part-paid' : 'Current',
+        }));
+        exportToExcel(`ledger-${name}-bills`, cols, rows);
+      } else {
+        if (!d) return;
+        const cols = [
+          { key: 'date', label: 'Date' }, { key: 'toBy', label: 'To/By' }, { key: 'part', label: 'Particulars' },
+          { key: 'vt', label: 'Vch Type' }, { key: 'vno', label: 'Vch No' },
+          { key: 'dr', label: `Debit (${cur})` }, { key: 'cr', label: `Credit (${cur})` }, { key: 'balance', label: `Balance (${cur})` },
+        ];
+        const opSigned = d.opening.side === 'Dr' ? d.opening.amt : -d.opening.amt;
+        let bal = opSigned;
+        const rows = [{
+          date: '', toBy: '', part: 'Opening Balance', vt: '', vno: '',
+          dr: d.opening.side === 'Dr' ? d.opening.amt : '', cr: d.opening.side === 'Cr' ? d.opening.amt : '', balance: opSigned,
+        }];
+        d.rows.forEach((r) => {
+          bal += r.dr - r.cr;
+          rows.push({ date: r.date, toBy: r.toBy, part: r.part, vt: r.vt, vno: r.vno, dr: r.dr || '', cr: r.cr || '', balance: bal });
+        });
+        rows.push({ date: '', toBy: '', part: 'Closing Balance', vt: '', vno: '', dr: '', cr: '', balance: d.closing.amt });
+        exportToExcel(`ledger-${name}`, cols, rows);
+      }
+      toastSuccess('Excel file downloaded');
+    } catch (e) {
+      toastError('Excel export failed — ' + (e?.message || 'please try again'));
+    }
+  };
 
   return (
     <div className="kbled">
@@ -217,6 +296,7 @@ export function LedgerAccountView({
           {showPeriodBranchHint(branch)}
           {showPeriod && <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setPeriod({ from: r.from, to: r.to })} />}
           <div className="printbtns">
+            <button onClick={exportNow} title="Export to Excel">📊 Excel</button>
             <button onClick={() => printNow()} title="Print / Save as PDF">🖨 Print</button>
           </div>
         </div>
@@ -231,19 +311,21 @@ export function LedgerAccountView({
         </div>
 
         {q.isLoading && <div className="loading">Loading ledger…</div>}
-        {!q.isLoading && view === 'ledger' && d && <LedgerBody d={d} cur={cur} segmented={!hasBranch} showNarr={showNarr} showDetail={showDetail} onPickVoucher={onPickVoucher} onPickInvoice={onPickInvoice} maxHeight={maxHeight} />}
+        {!q.isLoading && view === 'ledger' && d && <LedgerBody d={d} cur={cur} segmented={!hasBranch} showNarr={showNarr} showDetail={showDetail} onPickVoucher={onPickVoucher} onPickInvoice={onPickInvoice} maxHeight={maxHeight} party={name} branch={branch} side={side} />}
         {!q.isLoading && view === 'bill' && (
-          <BillwiseBody side={side} bills={bills} loading={bw.isLoading} hasBranch={hasBranch} group={group} name={name} maxHeight={maxHeight} />
+          <BillwiseBody side={side} bills={bills} loading={bw.isLoading} hasBranch={hasBranch} group={group} name={name} branch={branch} cur={cur} maxHeight={maxHeight} />
         )}
-        {view === 'cc' && <BreakdownBody title="Cost-Centre Split (Domestic / International)" rows={splitRows} loading={splitQ.isLoading} maxHeight={maxHeight} hint="Module cost-centre split of this ledger (Tally sub-ledger level). Drill the full statement from the Ledger tab." />}
-        {view === 'comp' && <BreakdownBody title="Fare / Charge Components" rows={compRows} loading={compQ.isLoading} maxHeight={maxHeight} hint="Component breakup (Base Fare, K3, Taxes, Service Charge…) summed from each voucher's fare detail." />}
+        {view === 'cc' && <BreakdownBody title="Cost-Centre Split (Domestic / International)" rows={splitRows} loading={splitQ.isLoading} cur={cur} maxHeight={maxHeight} hint="Module cost-centre split of this ledger (Tally sub-ledger level). Drill the full statement from the Ledger tab." />}
+        {view === 'comp' && <BreakdownBody title="Fare / Charge Components" rows={compRows} loading={compQ.isLoading} cur={cur} maxHeight={maxHeight} hint="Component breakup (Base Fare, K3, Taxes, Service Charge…) summed from each voucher's fare detail." />}
       </div>
     </div>
   );
 }
 
 /* ── Ledger (T-account) body ─────────────────────────────────────────────── */
-function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, onPickInvoice, maxHeight }) {
+const SETTLE_RX = /receipt|payment|credit-note|debit-note|refund|acm/i;
+
+function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, onPickInvoice, maxHeight, party, branch, side }) {
   const opSigned = d.opening.side === 'Dr' ? d.opening.amt : -d.opening.amt;
   let bal = opSigned;
   const closing = d.closing;
@@ -256,33 +338,106 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
   const segments = segmented ? groupByBranch(d.rows) : null;
   const doSegment = !!(segments && segments.length > 1);
 
-  // One posting row, drawn at the current running-balance value.
-  const postingRow = (r, key) => (
-    <tr key={key}>
-      <td className="l dt">{r.date}</td>
-      <td className="l part">
-        <span className="by">{r.toBy}</span>{r.part}
-        {showNarr && r.narr && <div className="narr">{r.narr}</div>}
-        {showDetail && r.detail.length > 0 && (
-          <div className="detail">{r.detail.map((dd, j) => (
-            <div className="dl" key={j}><span className="dnm">{dd.side} <b>{dd.n}</b></span><span className="damt">{fmt(dd.amt)}</span></div>
-          ))}</div>
-        )}
-      </td>
-      <td className="l"><span className="vt">{r.vt}</span></td>
-      <td className="l vno">
-        {r.voucherId && onPickInvoice && /sale|purchase/i.test(r.category || '')
-          ? <span className="vlink" {...clickable(() => onPickInvoice({ id: r.voucherId, vno: r.vno, category: r.category }))} title={/purchase/i.test(r.category) ? 'Open in Purchase Register' : 'Open in Sales Register'}>{r.vno}</span>
-          : r.voucherId && onPickVoucher
-            ? <span className="vlink" {...clickable(() => onPickVoucher({ id: r.voucherId, vno: r.vno }))} title="Open voucher">{r.vno}</span>
-            : r.vno}
-        {r.tallyRef && <div className="narr" title="Tally Ref">Tally: {r.tallyRef}</div>}
-      </td>
-      <td className="num drc">{fmt(r.dr)}</td>
-      <td className="num crc">{fmt(r.cr)}</td>
-      <td className="bal">{fmtB(bal)}<span className="sd">{bal >= 0 ? 'Dr' : 'Cr'}</span></td>
-    </tr>
-  );
+  // Shift+Enter drill: a flat cursor over every posting row; explode a bill into its
+  // settlement history (BillBreakup) or a receipt/payment into the bills it knocked off.
+  const [cursor, setCursor] = useState(-1);
+  const [open, setOpen] = useState(() => new Set());
+  const wrapRef = useRef(null);
+  const flat = [];
+  const keyOf = (r, idx) => `${r.voucherId || r.vno || ''}:${idx}`;
+  const toggle = (k) => setOpen((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
+  React.useEffect(() => {
+    if (cursor < 0 || !wrapRef.current) return;
+    const row = wrapRef.current.querySelector(`tr[data-lrow="${cursor}"]`);
+    if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+  }, [cursor]);
+
+  // The exploded breakup row beneath a posting (themed like the bill-wise drill).
+  const explodeRow = (r, key) => {
+    if (/sale|purchase/i.test(r.category || '')) {
+      return <BillBreakup key={`${key}-x`} party={party} branch={r.branch || branch} billVno={r.vno} side={side || 'customer'} cur={cur} colSpan={7} />;
+    }
+    const alloc = r.alloc || [];
+    const sum = alloc.reduce((t, a) => t + (a.amt || 0), 0);
+    const amt = r.dr > 0 ? r.dr : r.cr;
+    return (
+      <tr className="exp" key={`${key}-x`}><td colSpan={7}>
+        <div className="breakup">
+          <div className="bk-row self"><span className="bk-dt">{r.date}</span><span className="bk-ty">{r.vt}</span><span className="bk-ref">{r.vno}</span><span className="bk-amt">{fmt(amt)} {r.dr > 0 ? 'Dr' : 'Cr'}</span></div>
+          {alloc.length === 0
+            ? <div className="bk-cap">No bill-wise allocation — settled on-account / undirected.</div>
+            : alloc.map((a, j) => (
+                <div className="bk-row" key={j}><span className="bk-dt" /><span className="bk-ty">Bill</span><span className="bk-ref">{a.ref}</span><span className={'bk-amt ' + (r.dr > 0 ? 'crc' : 'drc')}>{fmt(a.amt)}</span></div>
+              ))}
+          {alloc.length > 0 && <div className="bk-cap">Settled {alloc.length} bill{alloc.length === 1 ? '' : 's'} · total <b>{fmt(sum) || '0.00'}</b></div>}
+        </div>
+      </td></tr>
+    );
+  };
+
+  // One posting row (+ its breakup when exploded), drawn at the running-balance value.
+  const postingRow = (r, key, idx) => {
+    const cat = r.category || '';
+    const explodable = (/sale|purchase/i.test(cat) && !!side) || (SETTLE_RX.test(cat) && r.alloc && r.alloc.length > 0);
+    const k = keyOf(r, idx);
+    const isOpen = explodable && open.has(k);
+    // Settlement status pill (in the Particulars cell): a party-ledger bill line carries
+    // settled/pending (r.pending != null); a receipt/payment carries the bills it cleared
+    // (r.alloc). The detailed "Settled against …" chips show only on Show Narration.
+    const billInfo = r.pending != null;
+    const settleInfo = r.alloc && r.alloc.length > 0;
+    let pillTxt = '', pillCls = '';
+    if (billInfo) {
+      if (r.pending <= 0.01 && (r.settled || 0) > 0) { pillTxt = 'Settled'; pillCls = 'paid'; }
+      else if ((r.settled || 0) > 0) { pillTxt = `Part · ${fmt(r.settled)}`; pillCls = 'part'; }
+      else { pillTxt = 'Open'; pillCls = 'open'; }
+    } else if (settleInfo) { pillTxt = 'Settled'; pillCls = 'paid'; }
+    const nodes = [
+      <tr key={key} data-lrow={idx} className={'lrow' + (idx === cursor ? ' sel' : '')}>
+        <td className="l dt">{r.date}</td>
+        <td className="l part">
+          {explodable
+            ? <span className="caret" role="button" aria-label="Settlement drill" onClick={(e) => { e.stopPropagation(); setCursor(idx); toggle(k); if (wrapRef.current) wrapRef.current.focus(); }} title="Settlement drill — Shift+Enter">{isOpen ? '▾' : '▸'}</span>
+            : <span className="caret ghost" />}
+          <span className="by">{r.toBy}</span>{r.part}
+          {showNarr && pillTxt && <span className={'lpill ' + pillCls} title="Settlement status">{pillTxt}</span>}
+          {showNarr && billInfo && r.settledBy.length > 0 && (
+            <div className="alloc" title="Payments that settled this bill">
+              <span className="alabel">Settled against:</span>{' '}
+              {r.settledBy.map((s, j) => <span key={j} className="achip">{s.ref} <b>{fmt(s.amt)}</b>{s.date ? <span className="cdt"> · {dmy(s.date)}</span> : null}</span>)}
+              {r.pending > 0.01 && <span className="achip pend">Pending <b>{fmt(r.pending)}</b></span>}
+            </div>
+          )}
+          {showNarr && !billInfo && settleInfo && (
+            <div className="alloc" title="Bills settled by this entry">
+              <span className="alabel">Settled against:</span>{' '}
+              {r.alloc.map((a, j) => <span key={j} className="achip">{a.ref} <b>{fmt(a.amt)}</b></span>)}
+            </div>
+          )}
+          {showNarr && r.narr && <div className="narr">{r.narr}</div>}
+          {showDetail && r.detail.length > 0 && (
+            <div className="detail">{r.detail.map((dd, j) => (
+              <div className="dl" key={j}><span className="dnm">{dd.side} <b>{dd.n}</b></span><span className="damt">{fmt(dd.amt)}</span></div>
+            ))}</div>
+          )}
+        </td>
+        <td className="l"><span className="vt">{r.vt}</span></td>
+        <td className="l vno">
+          {r.voucherId && onPickInvoice && /sale|purchase/i.test(r.category || '')
+            ? <span className="vlink" {...clickable(() => onPickInvoice({ id: r.voucherId, vno: r.vno, category: r.category }))} title={/purchase/i.test(r.category) ? 'Open in Purchase Register' : 'Open in Sales Register'}>{r.vno}</span>
+            : r.voucherId && onPickVoucher
+              ? <span className="vlink" {...clickable(() => onPickVoucher({ id: r.voucherId, vno: r.vno }))} title="Open voucher">{r.vno}</span>
+              : r.vno}
+          {r.tallyRef && <div className="narr" title="Tally Ref">Tally: {r.tallyRef}</div>}
+        </td>
+        <td className="num drc">{fmt(r.dr)}</td>
+        <td className="num crc">{fmt(r.cr)}</td>
+        <td className="bal">{fmtB(bal)}<span className="sd">{bal >= 0 ? 'Dr' : 'Cr'}</span></td>
+      </tr>,
+    ];
+    if (isOpen) nodes.push(explodeRow(r, key));
+    return nodes;
+  };
 
   const bodyRows = [];
   if (doSegment) {
@@ -293,7 +448,7 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
           🏢 <span className="bc">{branchSeg(g.branch)}</span><span className="bn">{g.rows.length} entr{g.rows.length === 1 ? 'y' : 'ies'}</span>
         </td></tr>,
       );
-      g.rows.forEach((r, ri) => { bal += r.dr - r.cr; gDr += r.dr; gCr += r.cr; bodyRows.push(postingRow(r, `${gi}-${ri}`)); });
+      g.rows.forEach((r, ri) => { bal += r.dr - r.cr; gDr += r.dr; gCr += r.cr; const idx = flat.length; flat.push(r); bodyRows.push(...postingRow(r, `${gi}-${ri}`, idx)); });
       bodyRows.push(
         <tr className="brsub" key={`s${gi}`}>
           <td className="l" colSpan={4}>Subtotal — {branchSeg(g.branch)}</td>
@@ -303,21 +458,29 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
       );
     });
   } else {
-    d.rows.forEach((r, i) => { bal += r.dr - r.cr; bodyRows.push(postingRow(r, i)); });
+    d.rows.forEach((r, i) => { bal += r.dr - r.cr; const idx = flat.length; flat.push(r); bodyRows.push(...postingRow(r, i, idx)); });
   }
+
+  const onKeyDown = (e) => {
+    const max = flat.length - 1;
+    if (max < 0) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => Math.min((c < 0 ? -1 : c) + 1, max)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => Math.max((c < 0 ? max + 1 : c) - 1, 0)); }
+    else if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); const r = flat[cursor]; if (r) toggle(keyOf(r, cursor)); }
+  };
 
   return (
     <>
       <div className="summary">
-        <div className="scard"><div className="k">Opening Balance</div><div className="v">{fmtB(opSigned)} <span style={{ fontSize: 11, color: '#9A9A9A' }}>{d.opening.side}</span></div></div>
-        <div className="scard dr"><div className="k">Total Debit</div><div className="v">{fmt(d.totalDebit) || '0.00'}</div></div>
-        <div className="scard cr"><div className="k">Total Credit</div><div className="v">{fmt(d.totalCredit) || '0.00'}</div></div>
-        <div className="scard bal"><div className="k">Closing Balance</div><div className="v">{fmtB(closing.amt)} <span style={{ fontSize: 11, color: '#9A9A9A' }}>{closing.side}</span></div></div>
+        <div className="scard"><div className="k">Opening Balance</div><div className="v">{cur}{fmtB(opSigned)} <span style={{ fontSize: 11, color: '#9A9A9A' }}>{d.opening.side}</span></div></div>
+        <div className="scard dr"><div className="k">Total Debit</div><div className="v">{cur}{fmt(d.totalDebit) || '0.00'}</div></div>
+        <div className="scard cr"><div className="k">Total Credit</div><div className="v">{cur}{fmt(d.totalCredit) || '0.00'}</div></div>
+        <div className="scard bal"><div className="k">Closing Balance</div><div className="v">{cur}{fmtB(closing.amt)} <span style={{ fontSize: 11, color: '#9A9A9A' }}>{closing.side}</span></div></div>
       </div>
 
-      <div className="tblwrap" style={{ maxHeight, overflowY: 'auto' }}>
+      <div className="tblwrap" ref={wrapRef} tabIndex={0} onKeyDown={onKeyDown} style={{ maxHeight, overflowY: 'auto', outline: 'none' }}>
         <table>
-          <thead><tr><th className="l">Date</th><th className="l">Particulars</th><th className="l">Vch Type</th><th className="l">Vch No</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead>
+          <thead><tr><th className="l">Date</th><th className="l">Particulars</th><th className="l">Vch Type</th><th className="l">Vch No</th><th>Debit ({cur})</th><th>Credit ({cur})</th><th>Balance ({cur})</th></tr></thead>
           <tbody>
             <tr className="open-row">
               <td className="l" colSpan={4}>Opening Balance{doSegment ? ' (Group)' : ''}</td>
@@ -341,13 +504,53 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
       </div>
       <div className="hint">{doSegment
         ? <>Consolidated <b>TK HO Group</b> view — postings are <b>segmented by branch</b> with per-branch subtotals; branch books are never blended. Select a branch top-right for that branch only.</>
-        : <>Tally-style ledger. <b>To/By</b> shows the contra account. Toggle <b>Narration</b> for the voucher note, or <b>Detailed</b> to expand each voucher into its full double-entry. Switch to <b>Bill-wise</b> for outstanding bills.</>}</div>
+        : <>Tally-style ledger. <b>To/By</b> shows the contra account. On a bill or receipt, <b>▸ Shift+Enter</b> (or click the arrow) drills its settlement history. Toggle <b>Narration</b> / <b>Detailed</b> for more, or switch to <b>Bill-wise</b>.</>}</div>
     </>
   );
 }
 
+/* Tally bill-wise breakup — ONE bill's settlement history (the Shift+Enter drill).
+   Themed sub-rows: Date · Type · Ref/Instrument · Amount Dr/Cr (+ narration), with a
+   running pending. Lazy — fetched only when a row is exploded. Reused by both views. */
+function BillBreakup({ party, branch, billVno, side, cur, colSpan }) {
+  const q = useBillSettlements(party, branch, billVno, side);
+  const d = q.data;
+  const set = (d && d.settlements) || [];
+  return (
+    <tr className="exp"><td colSpan={colSpan}>
+      <div className="breakup">
+        {q.isLoading ? (
+          <div className="bk-cap">Loading settlement history…</div>
+        ) : (!d || (!set.length && !d.bill)) ? (
+          <div className="bk-cap">No directed settlement — this bill was cleared on-account or not bill-wise allocated.</div>
+        ) : (
+          <>
+            {d.bill && (
+              <div className="bk-row self">
+                <span className="bk-dt">{dmy(d.bill.date)}</span><span className="bk-ty">{vtLabel(d.bill.category)}</span>
+                <span className="bk-ref">{d.bill.vno}</span><span className="bk-amt">{cur}{fmt(d.bill.total)} {d.bill.side}</span>
+              </div>
+            )}
+            {set.map((s, j) => (
+              <div className="bk-row" key={j}>
+                <span className="bk-dt">{dmy(s.date)}</span><span className="bk-ty">{vtLabel(s.category)}</span>
+                <span className="bk-ref">{s.ref}</span>
+                <span className={'bk-amt ' + (s.side === 'Cr' ? 'crc' : 'drc')}>{cur}{fmt(s.amount)} {s.side}</span>
+                {s.narration && <span className="bk-narr">{s.narration}</span>}
+              </div>
+            ))}
+            {set.length === 0
+              ? <div className="bk-cap">No settlements yet — bill fully open.</div>
+              : <div className="bk-cap">{set.length} settlement{set.length === 1 ? '' : 's'} · settled <b>{cur}{fmt(d.settled) || '0.00'}</b> · closing pending <b>{cur}{fmt(d.pending) || '0.00'}</b></div>}
+          </>
+        )}
+      </div>
+    </td></tr>
+  );
+}
+
 /* ── Bill-wise + ageing body ─────────────────────────────────────────────── */
-function BillwiseBody({ side, bills, loading, hasBranch, group, name, maxHeight }) {
+function BillwiseBody({ side, bills, loading, hasBranch, group, name, branch, cur = '₹', maxHeight }) {
   if (!side) {
     return (
       <>
@@ -364,21 +567,44 @@ function BillwiseBody({ side, bills, loading, hasBranch, group, name, maxHeight 
     );
   }
   if (loading) return <div className="loading">Loading bills…</div>;
+  return <BillwiseTable side={side} bills={bills} name={name} branch={branch} cur={cur} maxHeight={maxHeight} />;
+}
+
+// Bill-wise table with keyboard cursor (↑/↓) + Shift+Enter / click drill into each
+// bill's settlement history. Hooks live here (after BillwiseBody's guards).
+function BillwiseTable({ side, bills, name, branch, cur, maxHeight }) {
+  const [cursor, setCursor] = useState(-1);
+  const [open, setOpen] = useState(() => new Set());
+  const wrapRef = useRef(null);
+  React.useEffect(() => {
+    if (cursor < 0 || !wrapRef.current) return;
+    const row = wrapRef.current.querySelector(`tr[data-billrow="${cursor}"]`);
+    if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+  }, [cursor]);
 
   let totAmt = 0, totSet = 0, totPend = 0, overdueCount = 0;
   bills.forEach((b) => { totAmt += b.amt; totSet += b.settled; totPend += b.pend; if (b.pend > 0 && b.age > 0) overdueCount++; });
   const { age, totPend: agePend } = ageingOf(bills);
   const ageTotal = agePend || 1;
 
+  const toggle = (ref) => setOpen((s) => { const n = new Set(s); n.has(ref) ? n.delete(ref) : n.add(ref); return n; });
+  const onKeyDown = (e) => {
+    const max = bills.length - 1;
+    if (max < 0) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => Math.min((c < 0 ? -1 : c) + 1, max)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => Math.max((c < 0 ? max + 1 : c) - 1, 0)); }
+    else if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); const b = bills[cursor]; if (b) toggle(b.ref); }
+  };
+
   return (
     <>
       <div className="summary">
-        <div className="scard"><div className="k">Bills Raised</div><div className="v">{fmt(totAmt) || '0.00'}</div></div>
-        <div className="scard dr"><div className="k">Settled</div><div className="v">{fmt(totSet) || '0.00'}</div></div>
-        <div className="scard bal"><div className="k">Pending (Outstanding)</div><div className="v">{fmt(totPend) || '0.00'}</div></div>
+        <div className="scard"><div className="k">Bills Raised</div><div className="v">{cur}{fmt(totAmt) || '0.00'}</div></div>
+        <div className="scard dr"><div className="k">Settled</div><div className="v">{cur}{fmt(totSet) || '0.00'}</div></div>
+        <div className="scard bal"><div className="k">Pending (Outstanding)</div><div className="v">{cur}{fmt(totPend) || '0.00'}</div></div>
         <div className="scard cr"><div className="k">Overdue Bills</div><div className="v">{overdueCount}</div></div>
       </div>
-      <div className="tblwrap" style={{ maxHeight, overflowY: 'auto' }}>
+      <div className="tblwrap" ref={wrapRef} tabIndex={0} onKeyDown={onKeyDown} style={{ maxHeight, overflowY: 'auto', outline: 'none' }}>
         <div className="ageing">
           <div className="age-title">Ageing of Outstanding <span>(by days outstanding)</span></div>
           <div className="agebar">
@@ -391,7 +617,7 @@ function BillwiseBody({ side, bills, loading, hasBranch, group, name, maxHeight 
           </div>
         </div>
         <table>
-          <thead><tr><th className="l">Bill Ref</th><th className="l">Bill Date</th><th>Bill Amount</th><th>Settled</th><th>Pending</th><th>Age</th><th className="l">Status</th></tr></thead>
+          <thead><tr><th className="l">Bill Ref</th><th className="l">Bill Date</th><th>Bill Amount ({cur})</th><th>Settled ({cur})</th><th>Pending ({cur})</th><th>Age</th><th className="l">Status</th></tr></thead>
           <tbody>
             {bills.length === 0 && <tr><td className="l" colSpan={7} style={{ textAlign: 'center', padding: 26, color: '#9A9A9A' }}>No outstanding bills.</td></tr>}
             {bills.map((b, i) => {
@@ -400,29 +626,35 @@ function BillwiseBody({ side, bills, loading, hasBranch, group, name, maxHeight 
               else if (b.age > 0) { status = b.age + 'd overdue'; scls = 'over'; }
               else if (b.settled > 0) { status = 'Part-paid'; scls = 'part'; }
               else { status = 'Current'; scls = 'curr'; }
+              const isOpen = open.has(b.ref);
               return (
-                <tr key={i}>
-                  <td className="l part">{b.ref}</td>
-                  <td className="l dt">{b.bdate}</td>
-                  <td className="num">{fmt(b.amt)}</td>
-                  <td className="num drc">{fmt(b.settled)}</td>
-                  <td className="num pend">{fmt(b.pend)}</td>
-                  <td className={b.age > 0 && b.pend > 0 ? 'over' : ''}>{b.pend > 0 && b.age > 0 ? b.age + ' d' : '—'}</td>
-                  <td className="l"><span className={'bw-status ' + scls}>{status}</span></td>
-                </tr>
+                <React.Fragment key={i}>
+                  <tr className={'bill' + (i === cursor ? ' sel' : '')} data-billrow={i}
+                    onClick={() => { setCursor(i); toggle(b.ref); if (wrapRef.current) wrapRef.current.focus(); }}
+                    title="Click or Shift+Enter — settlement history">
+                    <td className="l part"><span className="caret">{isOpen ? '▾' : '▸'}</span>{b.ref}</td>
+                    <td className="l dt">{b.bdate}</td>
+                    <td className="num">{fmt(b.amt)}</td>
+                    <td className="num drc">{fmt(b.settled)}</td>
+                    <td className="num pend">{fmt(b.pend)}</td>
+                    <td className={b.age > 0 && b.pend > 0 ? 'over' : ''}>{b.pend > 0 && b.age > 0 ? b.age + ' d' : '—'}</td>
+                    <td className="l"><span className={'bw-status ' + scls}>{status}</span></td>
+                  </tr>
+                  {isOpen && <BillBreakup party={name} branch={branch} billVno={b.ref} side={side} cur={cur} colSpan={7} />}
+                </React.Fragment>
               );
             })}
           </tbody>
           <tfoot><tr><td className="l">Total</td><td /><td>{fmt(totAmt)}</td><td>{fmt(totSet)}</td><td className="pend">{fmt(totPend)}</td><td /><td /></tr></tfoot>
         </table>
       </div>
-      <div className="hint">Bill-wise outstanding. Pending total ties to the ledger closing balance. Age = days the bill has been outstanding.</div>
+      <div className="hint"><b>Click a bill</b> (or ↑/↓ then <b>Shift+Enter</b>) to drill its settlement history — every receipt / note that knocked it off. Pending total ties to the ledger closing balance.</div>
     </>
   );
 }
 
 /* ── Cost-Centre / Components breakdown body (Dr/Cr table, cream-gold theme) ── */
-function BreakdownBody({ title, rows, loading, maxHeight, hint }) {
+function BreakdownBody({ title, rows, loading, cur = '₹', maxHeight, hint }) {
   if (loading) return <div className="loading">Loading…</div>;
   const list = rows || [];
   const grand = list.reduce((s, r) => s + (r.side === 'Cr' ? r.amount : -r.amount), 0);
@@ -430,7 +662,7 @@ function BreakdownBody({ title, rows, loading, maxHeight, hint }) {
     <>
       <div className="tblwrap" style={{ maxHeight, overflowY: 'auto' }}>
         <table>
-          <thead><tr><th className="l">{title}</th><th>Debit</th><th>Credit</th></tr></thead>
+          <thead><tr><th className="l">{title}</th><th>Debit ({cur})</th><th>Credit ({cur})</th></tr></thead>
           <tbody>
             {list.length === 0 && <tr><td className="l" colSpan={3} style={{ textAlign: 'center', padding: 26, color: '#9A9A9A' }}>No breakdown for this ledger / period.</td></tr>}
             {list.map((r, i) => (
@@ -471,8 +703,8 @@ export function printLedgerUI({ d, bills = [], view = 'ledger', group, side, cur
   const m = mapLedger(d);
   const period = `From <b>${from ? dmy(from) : '…'}</b> to <b>${to ? dmy(to) : '…'}</b>`;
   const inner = (view === 'bill')
-    ? billwisePrintHTML({ side, bills, group, name: m.name })
-    : ledgerPrintHTML({ m, showNarr, showDetail });
+    ? billwisePrintHTML({ side, bills, group, name: m.name, cur })
+    : ledgerPrintHTML({ m, showNarr, showDetail, cur });
 
   const html = `<style>${LEDGER_CSS}</style><div class="kbled"><div class="sheet">
     <div class="hdr">
@@ -489,7 +721,7 @@ export function printLedgerUI({ d, bills = [], view = 'ledger', group, side, cur
   openPrintPreview({ title: `Ledger — ${m.name || 'Statement'}`, recommend: view === 'bill' ? 'landscape' : 'portrait', html });
 }
 
-function ledgerPrintHTML({ m, showNarr, showDetail }) {
+function ledgerPrintHTML({ m, showNarr, showDetail, cur = '₹' }) {
   const opSigned = m.opening.side === 'Dr' ? m.opening.amt : -m.opening.amt;
   let bal = opSigned;
   const closing = m.closing;
@@ -506,9 +738,23 @@ function ledgerPrintHTML({ m, showNarr, showDetail }) {
     const detail = (showDetail && r.detail.length)
       ? `<div class="detail">${r.detail.map((dd) => `<div class="dl"><span class="dnm">${esc(dd.side)} <b>${esc(dd.n)}</b></span><span class="damt">${fmt(dd.amt)}</span></div>`).join('')}</div>` : '';
     const narr = (showNarr && r.narr) ? `<div class="narr">${esc(r.narr)}</div>` : '';
+    const billInfo = r.pending != null;
+    const settleInfo = r.alloc && r.alloc.length;
+    let pillTxt = '', pillCls = '';
+    if (billInfo) {
+      if (r.pending <= 0.01 && (r.settled || 0) > 0) { pillTxt = 'Settled'; pillCls = 'paid'; }
+      else if ((r.settled || 0) > 0) { pillTxt = `Part · ${fmt(r.settled)}`; pillCls = 'part'; }
+      else { pillTxt = 'Open'; pillCls = 'open'; }
+    } else if (settleInfo) { pillTxt = 'Settled'; pillCls = 'paid'; }
+    const pill = (showNarr && pillTxt) ? `<span class="lpill ${pillCls}">${esc(pillTxt)}</span>` : '';
+    const chips = (showNarr && billInfo && r.settledBy.length)
+      ? `<div class="alloc"><span class="alabel">Settled against:</span> ${r.settledBy.map((s) => `<span class="achip">${esc(s.ref)} <b>${fmt(s.amt)}</b>${s.date ? `<span class="cdt"> · ${esc(dmy(s.date))}</span>` : ''}</span>`).join(' ')}${r.pending > 0.01 ? `<span class="achip pend">Pending <b>${fmt(r.pending)}</b></span>` : ''}</div>`
+      : (showNarr && settleInfo)
+        ? `<div class="alloc"><span class="alabel">Settled against:</span> ${r.alloc.map((a) => `<span class="achip">${esc(a.ref)} <b>${fmt(a.amt)}</b></span>`).join(' ')}</div>`
+        : '';
     return `<tr>
       <td class="l dt">${esc(r.date)}</td>
-      <td class="l part"><span class="by">${esc(r.toBy)}</span>${esc(r.part)}${narr}${detail}</td>
+      <td class="l part"><span class="by">${esc(r.toBy)}</span>${esc(r.part)}${pill}${chips}${narr}${detail}</td>
       <td class="l"><span class="vt">${esc(r.vt)}</span></td>
       <td class="l vno">${esc(r.vno)}</td>
       <td class="num drc">${fmt(r.dr)}</td>
@@ -533,13 +779,13 @@ function ledgerPrintHTML({ m, showNarr, showDetail }) {
   const clLabel = doSegment ? 'Closing Balance (Group)' : 'Closing Balance';
 
   return `<div class="summary">
-      <div class="scard"><div class="k">Opening Balance</div><div class="v">${fmtB(opSigned)} <span style="font-size:11px;color:#9A9A9A">${esc(m.opening.side)}</span></div></div>
-      <div class="scard dr"><div class="k">Total Debit</div><div class="v">${fmt(m.totalDebit) || '0.00'}</div></div>
-      <div class="scard cr"><div class="k">Total Credit</div><div class="v">${fmt(m.totalCredit) || '0.00'}</div></div>
-      <div class="scard bal"><div class="k">Closing Balance</div><div class="v">${fmtB(closing.amt)} <span style="font-size:11px;color:#9A9A9A">${esc(closing.side)}</span></div></div>
+      <div class="scard"><div class="k">Opening Balance</div><div class="v">${cur}${fmtB(opSigned)} <span style="font-size:11px;color:#9A9A9A">${esc(m.opening.side)}</span></div></div>
+      <div class="scard dr"><div class="k">Total Debit</div><div class="v">${cur}${fmt(m.totalDebit) || '0.00'}</div></div>
+      <div class="scard cr"><div class="k">Total Credit</div><div class="v">${cur}${fmt(m.totalCredit) || '0.00'}</div></div>
+      <div class="scard bal"><div class="k">Closing Balance</div><div class="v">${cur}${fmtB(closing.amt)} <span style="font-size:11px;color:#9A9A9A">${esc(closing.side)}</span></div></div>
     </div>
     <div class="tblwrap"><table>
-      <thead><tr><th class="l">Date</th><th class="l">Particulars</th><th class="l">Vch Type</th><th class="l">Vch No</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead>
+      <thead><tr><th class="l">Date</th><th class="l">Particulars</th><th class="l">Vch Type</th><th class="l">Vch No</th><th>Debit (${cur})</th><th>Credit (${cur})</th><th>Balance (${cur})</th></tr></thead>
       <tbody>
         <tr class="open-row"><td class="l" colspan="4">${opLabel}</td>
           <td class="num">${m.opening.side === 'Dr' ? fmt(m.opening.amt) : ''}</td>
@@ -556,7 +802,7 @@ function ledgerPrintHTML({ m, showNarr, showDetail }) {
     </table></div>`;
 }
 
-function billwisePrintHTML({ side, bills, group, name }) {
+function billwisePrintHTML({ side, bills, group, name, cur = '₹' }) {
   if (!side) return `<div class="tblwrap"><div class="notmaintained">This ledger (<b>${esc(name)}</b>, under ${esc(group || '—')}) is not maintained <b>bill-by-bill</b>.</div></div>`;
   let totAmt = 0, totSet = 0, totPend = 0;
   const rows = bills.map((b) => {
@@ -579,7 +825,7 @@ function billwisePrintHTML({ side, bills, group, name }) {
   return `<div class="tblwrap">
     <div class="ageing"><div class="age-title">Ageing of Outstanding <span>(by days outstanding)</span></div><div class="agebar">${bar}</div><div class="agecards">${cards}</div></div>
     <table>
-      <thead><tr><th class="l">Bill Ref</th><th class="l">Bill Date</th><th>Bill Amount</th><th>Settled</th><th>Pending</th><th>Age</th><th class="l">Status</th></tr></thead>
+      <thead><tr><th class="l">Bill Ref</th><th class="l">Bill Date</th><th>Bill Amount (${cur})</th><th>Settled (${cur})</th><th>Pending (${cur})</th><th>Age</th><th class="l">Status</th></tr></thead>
       <tbody>${rows || '<tr><td class="l" colspan="7" style="text-align:center;padding:26px;color:#9A9A9A">No outstanding bills.</td></tr>'}</tbody>
       <tfoot><tr><td class="l">Total</td><td></td><td>${fmt(totAmt)}</td><td>${fmt(totSet)}</td><td class="pend">${fmt(totPend)}</td><td></td><td></td></tr></tfoot>
     </table></div>`;

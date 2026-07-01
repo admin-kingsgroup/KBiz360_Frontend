@@ -42,7 +42,7 @@ export function ReferenceProvider({ children }) {
   if (hasToken && !ready) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f3f4f8', flexDirection: 'column', gap: 14, fontFamily: 'system-ui,sans-serif' }}>
-        <div style={{ width: 34, height: 34, border: '3px solid #d7dae6', borderTopColor: '#0d1326', borderRadius: '50%', animation: 'kbspin 0.8s linear infinite' }} />
+        <div style={{ width: 34, height: 34, border: '3px solid #cdd1d8', borderTopColor: '#0d1326', borderRadius: '50%', animation: 'kbspin 0.8s linear infinite' }} />
         <div style={{ color: '#5a6691', fontSize: 13, fontWeight: 600 }}>Loading KBiz360…</div>
         <style>{'@keyframes kbspin{to{transform:rotate(360deg)}}'}</style>
       </div>

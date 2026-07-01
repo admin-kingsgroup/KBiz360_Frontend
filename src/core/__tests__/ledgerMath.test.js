@@ -86,6 +86,39 @@ describe('mapLedger', () => {
     expect(m.rows[0].part).toBe('ACME');
     expect(m.rows[1].part).toBe('Journal');
   });
+
+  test.concurrent('carries settlement allocations onto the row (which bills a receipt cleared)', async () => {
+    const m = mapLedger({ ledger: 'Global Konnection', group: 'Sundry Debtors', lines: [
+      { date: '15-Dec-25', vno: 'RV/BOM/26/0043', category: 'receipt', debit: 0, credit: 36900,
+        allocations: [
+          { billVno: 'BOM/0626/SF01034', amount: 12300 },
+          { billVno: 'BOM/0626/SF01035', amount: 12300 },
+          { billVno: 'BOM/0626/SF01036', amount: 12300 },
+        ] },
+      { date: '08-Dec-25', vno: 'SF01034', category: 'sale', debit: 12300, credit: 0 }, // no allocations → empty
+    ] });
+    expect(m.rows[0].alloc).toEqual([
+      { ref: 'BOM/0626/SF01034', amt: 12300 },
+      { ref: 'BOM/0626/SF01035', amt: 12300 },
+      { ref: 'BOM/0626/SF01036', amt: 12300 },
+    ]);
+    expect(m.rows[1].alloc).toEqual([]); // a plain bill carries no settlement chips
+  });
+
+  test.concurrent('carries reverse settlement (settledBy/settled/pending) onto a bill line', async () => {
+    const m = mapLedger({ ledger: 'Global Konnection', group: 'Sundry Debtors', lines: [
+      { date: '08-Dec-25', vno: 'SF01034', category: 'sale', debit: 12300, credit: 0,
+        settledBy: [{ vno: 'RV/BOM/26/0043', amount: 12300, date: '2025-12-15', category: 'receipt' }], settled: 12300, pending: 0 },
+      { date: '17-Apr-26', vno: 'SF01032', category: 'sale', debit: 14998, credit: 0 }, // open bill → no reverse data
+    ] });
+    expect(m.rows[0].settledBy).toEqual([{ ref: 'RV/BOM/26/0043', amt: 12300, date: '2025-12-15', cat: 'receipt' }]);
+    expect(m.rows[0].settled).toBe(12300);
+    expect(m.rows[0].pending).toBe(0);
+    // A line with no reverse info → empty settledBy, null settled/pending (renders no pill).
+    expect(m.rows[1].settledBy).toEqual([]);
+    expect(m.rows[1].settled).toBeNull();
+    expect(m.rows[1].pending).toBeNull();
+  });
 });
 
 describe('mapBills', () => {
@@ -101,6 +134,14 @@ describe('mapBills', () => {
   test.concurrent('empty / missing → []', async () => {
     expect(mapBills(null)).toEqual([]);
     expect(mapBills({})).toEqual([]);
+  });
+  test.concurrent('fully-settled bill (statement view) → settled amount, pending 0', async () => {
+    const bills = mapBills({ bills: [
+      { billVno: 'BOM/0626/SF01034', date: 'd', total: 12300, allocated: 12300, outstanding: 0, status: 'settled' },
+    ] });
+    expect(bills[0]).toMatchObject({ ref: 'BOM/0626/SF01034', amt: 12300, settled: 12300, pend: 0 });
+    // Settled total across the list is non-zero (the bug was this summing to 0).
+    expect(bills.reduce((s, b) => s + b.settled, 0)).toBe(12300);
   });
 });
 

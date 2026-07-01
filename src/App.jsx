@@ -15,6 +15,7 @@ import { useMobile } from './core/hooks';
 import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
 import { lazyModule } from './core/lazyModule';
+import { isOwnerDashboardUser } from './core/pageCatalog';
 
 /* ── Route-level code-splitting ───────────────────────────────────────────
    Every page component below is loaded via lazyModule() → one dynamic
@@ -29,7 +30,7 @@ const { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RP
 const { RPT_InterbranchElim } = lazyModule(() => import('./modules/interbranch'));
 const { SalesGpAnalytics } = lazyModule(() => import('./modules/salesGpAnalytics'));
 const { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } = lazyModule(() => import('./modules/assets'));
-const { Dashboard, AlertsDashboard } = lazyModule(() => import('./modules/dashboard'));
+const { Dashboard, AlertsDashboard, OwnerDashboard } = lazyModule(() => import('./modules/dashboard'));
 const { DirectorDash, TargetsMaster } = lazyModule(() => import('./modules/directorDashboards'));
 const { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose } = lazyModule(() => import('./modules/finance'));
 
@@ -53,7 +54,9 @@ const { PageAccessControl } = lazyModule(() => import('./modules/pageAccess'));
 const { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxReco, TaxTdsTcs, TaxVat } = lazyModule(() => import('./modules/taxation'));
 const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, DebitNoteVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, RefundPartialVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
 const { SoPoGpVoucherEntry } = lazyModule(() => import('./modules/bookingOrder'));
-const { InterBranchVoucher } = lazyModule(() => import('./modules/interBranchVoucher'));
+const { InterBranchRegister } = lazyModule(() => import('./modules/interBranchRegister'));
+const { InterBranchMatrix } = lazyModule(() => import('./modules/interBranchMatrix'));
+const { InterBranchCounterpartyLedger } = lazyModule(() => import('./modules/interBranchCounterpartyLedger'));
 const { UnifiedApprovals } = lazyModule(() => import('./modules/voucherApprovals'));
 const { ModuleRegister } = lazyModule(() => import('./modules/moduleRegister'));
 const { AccountsTreeView } = lazyModule(() => import('./modules/chartBuilder'));
@@ -266,7 +269,7 @@ export default function KB360App(){
     if(route!=="/dashboard" && route!=="/settings/page-access" && hiddenPages.includes(route)){
       return (
         <div style={{padding:30,maxWidth:560,margin:"40px auto",
-          background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",textAlign:"center"}}>
+          background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
           <div style={{fontSize:42,marginBottom:14}}>🚫</div>
           <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Page not available</h2>
           <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>
@@ -302,7 +305,7 @@ export default function KB360App(){
     if(routeModule && !canAccessModule(currentUser, routeModule)){
       return (
         <div style={{padding:30,maxWidth:600,margin:"40px auto",
-          background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",
+          background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",
           textAlign:"center"}}>
           <div style={{fontSize:42,marginBottom:14}}>🔒</div>
           <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Access restricted</h2>
@@ -361,8 +364,8 @@ export default function KB360App(){
     /* New Compliance Reports */
     if(route==="/reports/tax-summary")    return <RPT_TaxSummary branch={branch}/>;
     if(route==="/reports/statutory-dues") return <RPT_StatutoryDues/>;
-    if(route==="/reports/tax-board")      return <RPT_TaxFilingBoard/>;
-    if(route==="/reports/fx-exposure")    return <RPT_CurrencyExposure/>;
+    if(route==="/reports/tax-board")      return <RPT_TaxFilingBoard branch={branch}/>;
+    if(route==="/reports/fx-exposure")    return <RPT_CurrencyExposure branch={branch}/>;
                         /* HR Self-Service */
         /* HO Control Center */
         /* Authority Configuration */
@@ -427,27 +430,42 @@ export default function KB360App(){
     if(route==="/masters/approval-limits")return <ApprovalLimitsMaster/>;
     if(route==="/masters/numbering")      return <NumberingSeriesMaster branch={branch}/>;
     // ── Accounts — branch accountant workspace (new screens) ──
-    if(route==="/accounts/dashboard")     return <DashboardAccountant branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/dashboard")     return <DashboardAccountant branch={branch} setRoute={navigate} currentUser={currentUser}/>;
     if(route==="/accounts/net-ageing")    return <PayablesLive branch={branch} setRoute={navigate} initialTab="net"/>;
     if(route==="/accounts/collections")   return <CollectionsFollowup branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/supplier-reco") return <SupplierReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/client-reco")   return <ClientReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/interbranch-reco") return <InterBranchReco branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/inb-register")   return <InterBranchRegister branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/inb-matrix")     return <InterBranchMatrix branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/inb-counterparty") return <InterBranchCounterpartyLedger branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/tally-reco")    return <TallyReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/payment-run")   return <PaymentRun branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/suspense")      return <SuspenseClearing branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/month-end")     return <MonthEndChecklist branch={branch} setRoute={navigate}/>;
-    if(route==="/dashboard")          return <DashboardRouter branch={branch} setRoute={navigate} currentUser={currentUser}/>;
+    if(route==="/dashboard")          return <DashboardRouter branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>;
+    // Owner Dashboard — consolidated whole-company view. Restricted to the group
+    // owner: the Super Admin whose email is afshin.dhanani@kingsgroupco.com (BOTH
+    // role + email required). Non-owners hitting the URL get a "not available" card.
+    if(route==="/dashboard/owner")    return isOwnerDashboardUser(currentUser)
+      ? <OwnerDashboard branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>
+      : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
+          <div style={{fontSize:42,marginBottom:14}}>🔒</div>
+          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Owner Dashboard</h2>
+          <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>This consolidated all-branch dashboard is restricted to the group owner.</p>
+          <button onClick={()=>navigate("/dashboard")} style={{background:"#0d1326",color:"#fff",border:"none",padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>← Back to Dashboard</button>
+        </div>;
     if(route==="/dashboard/alerts")   return <AlertsDashboard branch={branch} setRoute={navigate}/>;
     if(route==="/dashboards/capital") return <CapitalVsInvestmentLive branch={branch}/>; // Capital vs Investment (live from BS + P&L)
     // Director/Super-Admin dashboard suite (menu is role-gated in getMenu).
     if(/^\/dashboards\/(exec|profitability|cash|cash-forecast|arap|branch|balance-sheet|module-gp|sales|supplier|tax|expenses|audit|sales-target|gp-target|collections-target|budget-expense|yoy|customer-value)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch} setRoute={navigate}/>;
     if(route==="/finance/targets") return <TargetsMaster branch={branch}/>;
     if(route==="/bookings/new")       return <SoPoGpVoucherEntry branch={branch} setRoute={navigate}/>;
-    if(route==="/bookings/inter-branch") return <InterBranchVoucher branch={branch} setRoute={navigate}/>;
+    if(route==="/bookings/inter-branch") return <SoPoGpVoucherEntry branch={branch} setRoute={navigate} interBranch/>;
     // Unified Approvals — SO/PO/GP + Vouchers, each with Pending/Approved/Rejected/Deleted.
     if(route==="/transactions/approvals")          return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="sopogp"/>;
     if(route==="/transactions/voucher-approvals")  return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;
+    if(route==="/transactions/inb-approvals")       return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="inbspg"/>;
     if(/^\/bookings\/(pending|approved|rejected|deleted|list)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="sopogp"/>;
     // Per-module Sale/Purchase ENTRY is retired — all product entry is via SO/PO/GP.
     // These routes now open the read-only Module Register (view + print invoices).
@@ -498,6 +516,8 @@ export default function KB360App(){
     if(route==="/reports/pay")        return <PayablesLive branch={branch} setRoute={navigate}/>;
     if(route==="/reports/sreg")       return <RegisterLive branch={branch} initial="sales"/>;
     if(route==="/reports/preg")       return <RegisterLive branch={branch} initial="purchase"/>;
+    if(route==="/reports/inb-sreg")   return <RegisterLive branch={branch} initial="sales" inbOnly/>;
+    if(route==="/reports/inb-preg")   return <RegisterLive branch={branch} initial="purchase" inbOnly/>;
     if(route==="/reports/invoice-gp") return <InvoiceGPLive branch={branch}/>;
     if(route==="/reports/sales-gp-analytics") return <SalesGpAnalytics branch={branch}/>;
     if(route==="/reports/branch")     return <ReportBranch/>;

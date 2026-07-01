@@ -15,17 +15,22 @@ import { PageLayout } from '../../../shell/PageLayout';
 import { PageSection, Button, EmptyState } from '../../../shell/primitives';
 import { openPrintPreview } from '../../../core/PrintPreview';
 
-/* Report page scaffold: breadcrumb + title + filters + an Export (print) action. */
-export function RptShell({ title, subtitle, children, filters }) {
+/* Report page scaffold: breadcrumb + title + filters + an Export (print) action.
+   `actions` is optional extra header content (e.g. a period picker) rendered
+   to the left of the Export button. */
+export function RptShell({ title, subtitle, children, filters, actions }) {
   return (
     <PageLayout
       title={title}
       subtitle={subtitle}
       filters={filters}
       actions={
-        <Button variant="primary" size="sm" icon={Download} onClick={() => openPrintPreview({ selector: 'main', title: 'Report', recommend: 'portrait' })}>
-          Export
-        </Button>
+        <>
+          {actions}
+          <Button variant="primary" size="sm" icon={Download} onClick={() => openPrintPreview({ selector: 'main', title: 'Report', recommend: 'portrait' })}>
+            Export
+          </Button>
+        </>
       }
     >
       {children}

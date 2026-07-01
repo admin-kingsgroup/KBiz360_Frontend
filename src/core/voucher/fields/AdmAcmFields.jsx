@@ -1,4 +1,6 @@
 import React from 'react';
+import { ChevronDown } from 'lucide-react';
+import { Menu as DropdownMenu } from '../../ux/Menu';
 import { FL, inp } from '../../styles';
 import { todayISO } from '../../dates';
 import { SmartDateInput } from '../../ux/SmartDateInput';
@@ -34,14 +36,25 @@ export function AdmAcmFields({ state, setState, ctx, kind }) {
         <FL label="Date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
         <FL label="Ticket / reference (optional)"><input value={state.againstInvoice || ''} onChange={(e) => patch({ againstInvoice: e.target.value })} style={inp} placeholder="Ticket / ADM no." /></FL>
         <FL label="Reason code">
-          <select value={state.reasonCode || ''} onChange={(e) => patch({ reasonCode: e.target.value })} style={inp}>
-            <option value="">— select —</option>
-            {reasonList.map((r) => <option key={r.code} value={r.code}>{r.code} — {r.label}</option>)}
-          </select>
+          <DropdownMenu
+            ariaLabel="Reason code"
+            menuRole="listbox"
+            items={[{ key: '', label: 'select', selected: !state.reasonCode, onSelect: () => patch({ reasonCode: '' }) },
+              ...reasonList.map((r) => ({ key: r.code, label: `${r.code} — ${r.label}`, selected: state.reasonCode === r.code, onSelect: () => patch({ reasonCode: r.code }) }))]}
+            renderTrigger={({ ref, toggle, triggerProps }) => (
+              <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                  {state.reasonCode ? `${state.reasonCode} — ${reasonCodes[state.reasonCode]?.label || ''}` : 'select'}
+                </span>
+                <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+              </button>
+            )}
+          />
         </FL>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 5 }}>
         <FL label="Airline / BSP (Creditor)">
           <LedgerPicker branch={branch} value={state.counterParty} onChange={(v) => patch({ counterParty: v })} filter={(l) => l.type === 'Creditor'} placeholder="Select airline / BSP..." />
         </FL>
@@ -49,7 +62,18 @@ export function AdmAcmFields({ state, setState, ctx, kind }) {
           <input type="number" value={state.amount} onChange={(e) => patch({ amount: e.target.value })} placeholder="0.00" style={{ ...inp, textAlign: 'right', fontWeight: 700 }} />
         </FL>
         <FL label={`GST on memo (${isAdm ? 'input' : 'output'} credit)`}>
-          <select value={state.gstPct} onChange={(e) => patch({ gstPct: +e.target.value })} style={inp}>{GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}</select>
+          <DropdownMenu
+            ariaLabel="GST on memo"
+            menuRole="listbox"
+            items={GST_SLABS.map((r) => ({ key: r, label: `${r}%`, selected: state.gstPct === r, onSelect: () => patch({ gstPct: r }) }))}
+            renderTrigger={({ ref, toggle, triggerProps }) => (
+              <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{state.gstPct}%</span>
+                <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+              </button>
+            )}
+          />
         </FL>
       </div>
 

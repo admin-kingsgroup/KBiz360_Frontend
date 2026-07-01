@@ -10,6 +10,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Pencil, Trash2, Download, Printer } from 'lucide-react';
 import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../core/data';
+import {
+  SUPPLIER_CATS, GST_TREATMENTS, COUNTRIES, STATE_NAMES, MSME_STATUS, TDS_SECTIONS,
+  PAY_TERMS, SETTLE_CYCLES, PAY_METHODS, CUST_TYPES, CUST_SOURCES,
+} from '../core/partyEnums';
 import { useMasterList, useMasterMutations } from '../core/useMasters';
 import { SourceBadge } from '../core/LedgerLabel';
 import { branchCode } from '../core/useAccounting';
@@ -46,8 +50,11 @@ function FieldInput({ field, value, onChange, form }) {
   }
   if (field.type === 'select') {
     // options may be a static array or a fn(form) → array (e.g. Sub-Group depends
-    // on the chosen Group). An empty list renders just the placeholder.
-    const options = typeof field.options === 'function' ? (field.options(form) || []) : (field.options || []);
+    // on the chosen Group). An empty list renders just the placeholder. We always
+    // render our own empty placeholder option, so drop any blank entry the source
+    // list carries (several partyEnums lists lead with '') to avoid a double-blank.
+    const raw = typeof field.options === 'function' ? (field.options(form) || []) : (field.options || []);
+    const options = raw.filter((o) => o !== '' && o != null);
     return (
       <Select value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">{field.emptyLabel || 'Select…'}</option>
@@ -200,7 +207,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
       return v ?? '';
     };
     const head = cols.map((f) => `<th style="text-align:${f.type === 'number' ? 'right' : 'left'};padding:6px 9px;border-bottom:2px solid #0d1326;font-size:9pt;text-transform:uppercase;letter-spacing:.4px;color:#0d1326;white-space:nowrap">${esc(f.label)}</th>`).join('');
-    const body = rows.map((r, i) => `<tr style="background:${i % 2 ? '#f7f8fb' : '#fff'}">${cols.map((f) => `<td style="text-align:${f.type === 'number' ? 'right' : 'left'};padding:5px 9px;border-bottom:1px solid #e5e9f0;font-size:9pt;color:#222">${esc(txt(r, f))}</td>`).join('')}</tr>`).join('');
+    const body = rows.map((r, i) => `<tr style="background:${i % 2 ? '#f7f8fb' : '#fff'}">${cols.map((f) => `<td style="text-align:${f.type === 'number' ? 'right' : 'left'};padding:5px 9px;border-bottom:1px solid #cdd1d8;font-size:9pt;color:#222">${esc(txt(r, f))}</td>`).join('')}</tr>`).join('');
     const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#222">
       <div style="margin-bottom:10px">
         <div style="font-size:16pt;font-weight:800;color:#0d1326">${esc(title)}</div>
@@ -245,8 +252,8 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
         <div className="kb-sticky rounded-brand border border-surface-border bg-surface shadow-card" style={{ '--stick-head': '#f3f5f9', maxHeight: 'calc(100vh - 220px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead><tr style={{ background: '#f3f5f9' }}>
-              {cols.map((f) => <th key={f.key} style={{ textAlign: f.type === 'number' ? 'right' : 'left', padding: '10px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #e6e8ec' }}>{f.label}</th>)}
-              <th style={{ width: 84, padding: '10px 13px', borderBottom: '1px solid #e6e8ec' }} />
+              {cols.map((f) => <th key={f.key} style={{ textAlign: f.type === 'number' ? 'right' : 'left', padding: '10px 13px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #cdd1d8' }}>{f.label}</th>)}
+              <th style={{ width: 84, padding: '10px 13px', borderBottom: '1px solid #cdd1d8' }} />
             </tr></thead>
             <tbody>
               {rows.length === 0 && <tr><td colSpan={cols.length + 1} style={{ padding: 28, textAlign: 'center', color: DIM }}>No records yet — click “New” to add one.</td></tr>}
@@ -254,7 +261,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
                 // rowStyle lets a view emphasize certain rows (e.g. a tinted,
                 // bold band on each primary Tally group). Cell weight inherits
                 // from the row so a bold rowStyle cascades to the text.
-                <tr key={r.id} style={{ borderBottom: '1px solid #f1f3f8', ...(rowStyle ? rowStyle(r) : null) }}>
+                <tr key={r.id} style={{ borderBottom: '1px solid #dfe2e7', ...(rowStyle ? rowStyle(r) : null) }}>
                   {cols.map((f) => <td key={f.key} style={{ padding: '9px 13px', textAlign: f.type === 'number' ? 'right' : 'left', color: '#334155', fontWeight: f.key === 'name' ? 700 : 'inherit' }}>{cell(r, f)}</td>)}
                   <td style={{ padding: '9px 13px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {readOnly || (lockedRow && lockedRow(r))
@@ -339,15 +346,23 @@ export const CustomersMaster = () => (
   <MasterCrud title="Customers" subtitle="Clients (Sundry Debtors) — live from the backend" resource="customers"
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
+      // Dropdowns are fed from core/partyEnums (the same picklists the 12-tab master uses),
+      // so values stay consistent with the rest of the ERP instead of free-typed text.
+      { key: 'customerType', label: 'Customer Type', type: 'select', options: CUST_TYPES, table: false },
+      { key: 'source', label: 'Source', type: 'select', options: CUST_SOURCES, table: false },
       // Branch must be a real code (not a free-text/blank field) — a blank branch creates
       // an unscoped party. Default 'ALL' matches how auto-created party ledgers are scoped.
       { key: 'branch', label: 'Branch', type: 'select', options: ['ALL', ...BRANCH_CODES], default: 'ALL', required: true },
       { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
+      { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false },
+      { key: 'tdsSection', label: 'TDS Section', type: 'select', options: TDS_SECTIONS, table: false },
+      { key: 'msmeStatus', label: 'MSME Status', type: 'select', options: MSME_STATUS, table: false },
       { key: 'address', label: 'Address', type: 'text', table: false },
       { key: 'city', label: 'City', type: 'text', table: false },
       { key: 'phone', label: 'Phone', type: 'text' },
       { key: 'contact', label: 'Contact', type: 'text', table: false },
       { key: 'email', label: 'Email', type: 'text', table: false },
+      { key: 'paymentTerms', label: 'Payment Terms', type: 'select', options: PAY_TERMS, table: false },
       { key: 'creditLimit', label: 'Credit Limit', type: 'number' },
       { key: 'creditDays', label: 'Credit Days', type: 'number' },
     ]} />
@@ -357,17 +372,27 @@ export const SuppliersMaster = () => (
   <MasterCrud title="Suppliers" subtitle="Vendors (Sundry Creditors) — live from the backend" resource="suppliers"
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
-      { key: 'category', label: 'Category', type: 'text' },
-      { key: 'type', label: 'Type', type: 'text' },
+      // Category is the one picklist the backend validates (VALID_CATS) — a dropdown
+      // guarantees a valid value. The rest mirror the 12-tab master via core/partyEnums.
+      { key: 'category', label: 'Category', type: 'select', options: SUPPLIER_CATS },
       // Branch must be a real code, not free-text/blank (a blank branch = unscoped party).
       { key: 'branch', label: 'Branch', type: 'select', options: ['ALL', ...BRANCH_CODES], default: 'ALL', required: true },
       { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
       { key: 'pan', label: 'PAN', type: 'text', table: false },
+      // Country '' (the default) is treated as India downstream but does NOT force a state;
+      // picking India explicitly does (it decides CGST/SGST vs IGST) — the backend derives
+      // the state code from the chosen state name.
+      { key: 'country', label: 'Country', type: 'select', options: COUNTRIES, emptyLabel: 'India (default)', table: false },
+      { key: 'state', label: 'State (place of supply)', type: 'select', options: STATE_NAMES, table: false },
+      { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false },
+      { key: 'tdsSection', label: 'TDS Section', type: 'select', options: TDS_SECTIONS, table: false },
+      { key: 'msmeStatus', label: 'MSME Status', type: 'select', options: MSME_STATUS, table: false },
       { key: 'contact', label: 'Contact', type: 'text', table: false },
       { key: 'phone', label: 'Phone', type: 'text' },
       { key: 'email', label: 'Email', type: 'text', table: false },
       { key: 'city', label: 'City', type: 'text', table: false },
-      { key: 'country', label: 'Country', type: 'text', table: false },
+      { key: 'settlementCycle', label: 'Settlement Cycle', type: 'select', options: SETTLE_CYCLES, table: false },
+      { key: 'paymentMethod', label: 'Payment Method', type: 'select', options: PAY_METHODS, table: false },
       { key: 'creditDays', label: 'Credit Days', type: 'number' },
       { key: 'active', label: 'Active', type: 'bool', default: true },
     ]} />
@@ -547,7 +572,7 @@ export const GroupsMaster = ({ branch }) => {
     rows.map((r) => ({ tallyParent: r.tallyParent, tallySub: r.tallySub, erpGroup: r.erpGroup, erpSub: r.erpSub, ledgerName: r.ledgerName })));
   const subGroupCount = groups.filter((g) => !g.system).length;
   const loading = groupsQ.isLoading || ledgersQ.isLoading;
-  const th = { textAlign: 'left', padding: '10px 12px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #e6e8ec', whiteSpace: 'nowrap' };
+  const th = { textAlign: 'left', padding: '10px 12px', fontSize: 10, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid #cdd1d8', whiteSpace: 'nowrap' };
   const pencilBtn = { background: 'none', border: 'none', cursor: 'pointer', color: BLUE, padding: 2, marginLeft: 6, verticalAlign: 'middle' };
 
   return (
@@ -576,7 +601,7 @@ export const GroupsMaster = ({ branch }) => {
         <Button variant="success" size="sm" icon={Plus} onClick={() => openNew('ledger')}>ERP Ledger</Button>
       </div>
       <div className="kbiz-card mb-3 px-3.5 py-2.5 text-[11px] text-ink-muted">
-        🔒 <b>Primary Group</b> (16) &amp; <b>Primary Sub Group</b> (12) are the fixed 28-group backbone — <b>locked &amp; non-editable</b>. The <b>ERP Group / Sub Group / Ledger</b> columns are your custom chart — click the <Pencil size={11} style={{ verticalAlign: 'middle', color: BLUE }} /> in a cell to edit that node. To add new ones, use Masters → Sub-Groups / Ledgers.
+        <b>Primary Group</b> (16) &amp; <b>Primary Sub Group</b> (12) are the fixed 28-group backbone — <b>locked &amp; non-editable</b>. The <b>ERP Group / Sub Group / Ledger</b> columns are your custom chart — click the <Pencil size={11} style={{ display: 'inline', verticalAlign: 'middle', color: BLUE }} /> in a cell to edit that node. To add new ones, use Masters → Sub-Groups / Ledgers.
       </div>
 
       {loading && <LoadingState label="Loading chart…" />}
@@ -586,12 +611,12 @@ export const GroupsMaster = ({ branch }) => {
         <div className="kb-sticky rounded-brand border border-surface-border bg-surface shadow-card" style={{ '--stick-head': '#f3f5f9', maxHeight: 'calc(100vh - 240px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead><tr style={{ background: '#f3f5f9' }}>
-              {COLS.map((c) => <th key={c.key} style={th}>{c.lock ? '🔒 ' : ''}{c.label}</th>)}
+              {COLS.map((c) => <th key={c.key} style={th}>{c.lock ? '' : ''}{c.label}</th>)}
             </tr></thead>
             <tbody>
               {rows.length === 0 && <tr><td colSpan={COLS.length} style={{ padding: 28, textAlign: 'center', color: DIM }}>No accounts yet.</td></tr>}
               {rows.map((r) => (
-                <tr key={r.key} style={{ borderBottom: '1px solid #f1f3f8' }}>
+                <tr key={r.key} style={{ borderBottom: '1px solid #dfe2e7' }}>
                   {COLS.map((c) => {
                     const v = r[c.key];
                     const node = c.node ? r[c.node] : null;

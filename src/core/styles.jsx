@@ -4,10 +4,11 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useRef, useState, useEffect, Suspense } from 'react';
-import { Calendar, ChevronRight, Clock, Download, Plus, Save, Search, Trash2, TrendingDown, TrendingUp, User } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronRight, Clock, Download, Plus, Save, Search, Trash2, TrendingDown, TrendingUp, User } from 'lucide-react';
+import { Menu as DropdownMenu } from './ux/Menu';
 import { Bar, BarChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from './business-logic';
-import { FX_RATES, INTERBRANCH_ELIMINATIONS, PURCHASE_REGISTRY, TAX_FILING_BOARD, YIELD_BY_CONSULTANT, YIELD_BY_DESTINATION, YIELD_BY_SUPPLIER, YOY_PL } from './data';
+import { FX_RATES, PURCHASE_REGISTRY } from './data';
 import { branchCfg } from './referenceCache';
 import { useSalespeople } from './useReference';
 import { useQuery } from '@tanstack/react-query';
@@ -19,8 +20,10 @@ import { buildLeaveUtilization, buildAttrition, lastMonths } from '../modules/hr
 import { fmt, fmtINR } from './format';
 import { todayISO, nowLabel, CUR_FY } from './dates';
 import { openPrintPreview } from './PrintPreview';
-import { AUDIT_TRAIL_DATA, BANK_ACCOUNTS_DATA, CUSTOMER_LTV_DATA, FS_NOTES, FX_EXPOSURE, STATUTORY_DUES, TOP_SUPPLIERS_DATA, abcOf, cardStyle } from './helpers';
-import { useGpBills, useProfitAndLoss, useYieldByDestination, useCustomerLtv, useAbcAnalysis, useYearOverYear } from './useAccounting';
+import { AUDIT_TRAIL_DATA, CUSTOMER_LTV_DATA, FS_NOTES, TOP_SUPPLIERS_DATA, abcOf, cardStyle } from './helpers';
+import { useGpBills, useProfitAndLoss, useYieldByDestination, useCustomerLtv, useAbcAnalysis, useYearOverYear, useFxExposure, useTrialBalance } from './useAccounting';
+import { isLiquidRow, liquidityKind } from './ledgerKind';
+import { useTaxFilingBoard, useStatutoryDues } from './useTaxReco';
 import { ReportDateBar, resolveReportRange } from './reportDateBar';
 import { triggerSaveRefresh, useMobile } from './hooks';
 import { openPrintWindow } from './voucher-print';
@@ -86,7 +89,7 @@ export const ST={
 export function SalespersonField({branch,label="Salesperson (CRM)",name}){
   const SALESPEOPLE=useSalespeople().data||[];   // DB-backed (/api/salespeople)
   const branchCode=branch?.code;
-  const resolved=name||SALESPEOPLE.find(p=>p.branch===branchCode)?.name||SALESPEOPLE[0]?.name||"—";
+  const resolved=name||SALESPEOPLE.find(p=>p.branch===branchCode)?.name||SALESPEOPLE[0]?.name||"";
   return (
     <FL label={label}>
       <input value={resolved} readOnly title="Synced from CRM"
@@ -143,7 +146,7 @@ export function VLinked({branch,type,vNo,setRoute}){
   if(!matchedPurchases.length && !thisEntry) return null;
 
   return (
-    <div style={{padding:"10px 16px",borderTop:"1px solid #e1e3ec",
+    <div style={{padding:"10px 16px",borderTop:"1px solid #cdd1d8",
       background:"#f9fafb"}}>
       <p style={{margin:"0 0 7px",fontSize:9.5,color:"#5a6691",fontWeight:700,
         textTransform:"uppercase",letterSpacing:"0.4px"}}>
@@ -211,7 +214,7 @@ export function LiveDateTime({compact=false}){
     return ()=>clearInterval(id);
   },[]);
   return (
-    <span title="Current date & time" style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:"#5a6691",fontWeight:600,background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,padding:compact?"3px 8px":"5px 10px"}}>
+    <span title="Current date & time" style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:"#5a6691",fontWeight:600,background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:compact?"3px 8px":"5px 10px"}}>
       <Clock size={13}/> {now}
     </span>
   );
@@ -225,31 +228,29 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
   const cfg=bc(branch);
   const isIndia=cfg.taxType==="GST";
   const taxBadge=isIndia?"GST":"VAT "+cfg.vatRate+"%";
-  const taxBg=isIndia?"#E6F1FB":"#EAF3DE";
-  const taxC=isIndia?"#185FA5":"#27500A";
   const brFlag=branch==="ALL"?"🌐":branch?.flag||"🇮🇳";
   const brCode=branch==="ALL"?"ALL":branch?.code||"BOM";
   return (
-    <div style={{padding:"12px 10px",maxWidth:1160,margin:"0 auto",paddingBottom:80}}>
-      <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:12,overflow:"hidden"}}>
+    <div style={{padding:"12px 10px",maxWidth:1160,margin:"0 auto",paddingBottom:80,fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif",color:"#1F2328",WebkitFontSmoothing:"antialiased"}}>
+      <div style={{background:"#fff",border:"1px solid #dfe2e7",borderLeft:"4px solid #A07828",borderRadius:4,overflow:"hidden",boxShadow:"0 3px 16px rgba(0,0,0,.10)"}}>
 
         {/* Voucher header bar */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",background:"#f3f4f8",borderBottom:"1px solid #e1e3ec",flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 16px",background:"#141414",borderBottom:"3px solid #A07828",flexWrap:"wrap",gap:8}}>
           <div style={{display:"flex",alignItems:"center",gap:11}}>
-            <div style={{width:38,height:38,borderRadius:9,background:"#E6F1FB",color:"#185FA5",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19}}>{icon}</div>
+            <div style={{width:38,height:38,borderRadius:9,background:"rgba(160,120,40,0.18)",color:"#A07828",border:"1px solid rgba(160,120,40,0.40)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19}}>{icon}</div>
             <div>
-              <p style={{margin:0,fontSize:15,fontWeight:700,color:"#0d1326"}}>{title}</p>
-              <p style={{margin:0,fontSize:10.5,color:"#5a6691"}}>{"Voucher · "+brCode+" · "+vNo}</p>
+              <p style={{margin:0,fontSize:15,fontWeight:800,letterSpacing:"0.3px",color:"#fff"}}>{title}</p>
+              <p style={{margin:0,fontSize:10.5,color:"#8A8A84",letterSpacing:"0.3px"}}>{"Voucher · "+brCode+" · "+vNo}</p>
             </div>
           </div>
           <div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
             <LiveDateTime/>
             {/* Branch tax badge */}
-            <span style={{fontSize:10,padding:"3px 9px",borderRadius:999,background:taxBg,color:taxC,fontWeight:700,border:"1px solid "+taxBg,letterSpacing:"0.04em"}}>
+            <span style={{fontSize:10,padding:"3px 9px",borderRadius:999,background:"#FBF3DE",color:"#6B4E0F",fontWeight:800,border:"1px solid #E8D9A8",letterSpacing:"0.04em"}}>
               {brFlag} {cfg.curCode} · {taxBadge}
             </span>
-            <button onClick={()=>openPrintWindow(branch,vNo,title,printRef.current)} style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",border:"1px solid #e1e3ec",borderRadius:8,fontSize:11.5,background:"#fff",cursor:"pointer",color:"#0d1326"}}><Download size={13}/> Download PDF</button>
-            <button style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",border:"1px solid #e1e3ec",borderRadius:8,fontSize:11.5,background:"#fff",cursor:"pointer"}}><Save size={13}/> Draft</button>
+            <button onClick={()=>openPrintWindow(branch,vNo,title,printRef.current)} style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",border:"1px solid #3a3a36",borderRadius:8,fontSize:11.5,background:"#1f1f1f",cursor:"pointer",color:"#e7d9ad"}}><Download size={13}/> Download PDF</button>
+            <button style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",border:"1px solid #3a3a36",borderRadius:8,fontSize:11.5,background:"#1f1f1f",cursor:"pointer",color:"#e7d9ad"}}><Save size={13}/> Draft</button>
           </div>
         </div>
 
@@ -272,12 +273,12 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
       </div>
 
       {/* Sticky footer */}
-      <div style={{position:"sticky",bottom:0,background:"#f3f4f8",borderTop:"1px solid #e1e3ec",padding:"12px 0",marginTop:14,display:"flex",gap:9,justifyContent:"flex-end"}}>
-        <button style={btnGh}>Cancel</button>
+      <div style={{position:"sticky",bottom:0,background:"#FAFAF8",borderTop:"1px solid #dfe2e7",padding:"12px 0",marginTop:14,display:"flex",gap:9,justifyContent:"flex-end"}}>
+        <button style={{...btnGh,background:"#FBF3DE",color:"#6B4E0F",borderColor:"#E8D9A8"}}>Cancel</button>
         <button
           disabled={!canSave}
           style={{...btnG,
-            background:canSave?"#0d1326":"#9ca3af",
+            background:canSave?"#A07828":"#9ca3af",
             cursor:canSave?"pointer":"not-allowed",
             opacity:canSave?1:0.6,
             userSelect:"none",
@@ -305,8 +306,11 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
 export function VHead({vNo,branch,salesperson=true}){
   const cfg=bc(branch);
   const isIndia=cfg.taxType==="GST";
+  const invoiceOptions=isIndia?["Tax Invoice","Bill of Supply","Proforma"]:["VAT Invoice","Receipt","Proforma"];
+  const [invoiceType,setInvoiceType]=useState(invoiceOptions[0]);
+  useEffect(()=>{ if(!invoiceOptions.includes(invoiceType)) setInvoiceType(invoiceOptions[0]); },[isIndia]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+    <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(155px,1fr))",gap:11}}>
           <FL label="Voucher no.">
             <input value={vNo} readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontFamily:"monospace",fontWeight:700}}/>
@@ -315,12 +319,18 @@ export function VHead({vNo,branch,salesperson=true}){
             <input type="date" defaultValue={todayISO()} style={inp}/>
           </FL>
           <FL label={isIndia?"Invoice type":"Document type"}>
-            <select style={inp}>
-              {isIndia
-                ?<><option>Tax Invoice</option><option>Bill of Supply</option><option>Proforma</option></>
-                :<><option>VAT Invoice</option><option>Receipt</option><option>Proforma</option></>
-              }
-            </select>
+            <DropdownMenu
+              ariaLabel={isIndia?"Invoice type":"Document type"}
+              menuRole="listbox"
+              items={invoiceOptions.map(o=>({key:o,label:o,selected:invoiceType===o,onSelect:()=>setInvoiceType(o)}))}
+              renderTrigger={({ref,toggle,triggerProps})=>(
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  style={{...inp,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,cursor:"pointer",textAlign:"left"}}>
+                  <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0}}>{invoiceType}</span>
+                  <ChevronDown size={14} style={{color:"#5b616e",flexShrink:0}}/>
+                </button>
+              )}
+            />
           </FL>
           <FL label="Currency">
             <input value={cfg.curCode} readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontWeight:600}}/>
@@ -343,7 +353,7 @@ export function VParty({label,name,gstin,branch:branchProp,onGstinChange}){
   const isIndia=cfg.taxType==="GST";
   const controlled=typeof onGstinChange==="function";
   return (
-    <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+    <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
       <p style={{margin:"0 0 9px",fontSize:10,color:"#5a6691",letterSpacing:"0.5px",textTransform:"uppercase"}}>{label||"Customer"} details</p>
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:11}}>
         <FL label="Party A/c">
@@ -372,7 +382,7 @@ export function VTot({lines,gstLbl,gst,tcs,tcsAmt,total,branch}){
   const isIndia=cfg.taxType==="GST";
   const tcsLabel=isIndia?"TCS 5%":"Withholding tax";
   return (
-    <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:10,padding:14}}>
+    <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:10,padding:14}}>
       {(lines||[]).map((r,i)=>(
         <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",fontSize:11}}>
           <span style={{color:"#5a6691"}}>{r.l}</span>
@@ -387,7 +397,7 @@ export function VTot({lines,gstLbl,gst,tcs,tcsAmt,total,branch}){
         <span style={{color:"#5a6691"}}>{tcsLabel}</span>
         <span>{cur+fmt(tcsAmt)}</span>
       </div>}
-      <div style={{borderTop:"1px solid #e1e3ec",margin:"8px 0"}}/>
+      <div style={{borderTop:"1px solid #cdd1d8",margin:"8px 0"}}/>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <span style={{fontSize:13,fontWeight:600}}>Invoice total</span>
         <span style={{fontSize:18,fontWeight:700,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{cur+fmt(total||0)}</span>
@@ -412,10 +422,10 @@ export function VNarr({def,children}){
 
 export function ARow({label,onAdd,children}){
   return (
-    <div style={{padding:"12px 16px",borderBottom:"1px solid #e1e3ec"}}>
+    <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
         <p style={{margin:0,fontSize:10,color:"#5a6691",letterSpacing:"0.5px",textTransform:"uppercase"}}>{label}</p>
-        <button onClick={onAdd} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",border:"1px solid #e1e3ec",borderRadius:7,fontSize:11,background:"#fff",cursor:"pointer"}}><Plus size={12}/> Add row</button>
+        <button onClick={onAdd} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",border:"1px solid #cdd1d8",borderRadius:7,fontSize:11,background:"#fff",cursor:"pointer"}}><Plus size={12}/> Add row</button>
       </div>
       <div style={{overflowX:"auto"}}>{children}</div>
     </div>
@@ -433,14 +443,14 @@ export function AgeTable({data}){
     <div style={{...card,padding:0,overflow:"hidden"}}>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",fontSize:11.5,borderCollapse:"collapse"}}>
-          <thead><tr style={{background:"#f3f4f8",borderBottom:"2px solid #e1e3ec"}}>
+          <thead><tr style={{background:"#f3f4f8",borderBottom:"2px solid #cdd1d8"}}>
             <th style={{textAlign:"left",padding:"9px 11px",fontWeight:600,color:"#384677",fontSize:11}}>Party</th>
             <th style={{textAlign:"right",padding:"9px 11px",fontWeight:600,color:"#384677",fontSize:11}}>{"Total ₹"}</th>
             {AGE_H.map((h,i)=><th key={i} style={{textAlign:"right",padding:"9px 11px",fontWeight:600,color:AGE_C[i],fontSize:11}}>{h}</th>)}
           </tr></thead>
           <tbody>
             {data.map((r,i)=>(
-              <tr key={i} style={{borderBottom:"1px solid #e1e3ec"}}
+              <tr key={i} style={{borderBottom:"1px solid #cdd1d8"}}
                 onMouseEnter={e=>e.currentTarget.style.background="#f9fafb"}
                 onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <td style={{padding:"9px 11px",fontWeight:500}}>{r.party}</td>
@@ -448,7 +458,7 @@ export function AgeTable({data}){
                 {AGE_COLS.map((c,ci)=><td key={ci} style={{padding:"9px 11px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:r[c]>0?AGE_C[ci]:"#bfc3d6"}}>{r[c]>0?fmt(r[c]):"—"}</td>)}
               </tr>
             ))}
-            <tr style={{background:"#f3f4f8",borderTop:"2px solid #e1e3ec"}}>
+            <tr style={{background:"#f3f4f8",borderTop:"2px solid #cdd1d8"}}>
               <td style={{padding:"9px 11px",fontWeight:700}}>Total</td>
               <td style={{padding:"9px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{fmt(data.reduce((s,r)=>s+r.total,0))}</td>
               {AGE_COLS.map((c,ci)=><td key={ci} style={{padding:"9px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:AGE_C[ci]}}>{fmt(tot(c))}</td>)}
@@ -473,19 +483,23 @@ export function AgeTable({data}){
 
 /* ── UserSwitcher (demo simulator — switch viewing identity) ── */
 
-const PREMIUM_CARD={...cardStyle,border:"1px solid #e6e8ec",borderRadius:12,boxShadow:"0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)"};
+const PREMIUM_CARD={...cardStyle,border:"1px solid #cdd1d8",borderRadius:12,boxShadow:"0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)"};
 
-export function WidgetCard({title,subtitle,children,onPin,pinned,onDrill}){
+export function WidgetCard({title,subtitle,children,onPin,pinned,onDrill,color}){
+  const accent = color || "#8a93a6";
   return (
     <div style={PREMIUM_CARD}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,gap:8}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,
+        margin:"-14px -14px 10px -14px",padding:"10px 14px",
+        background:`${accent}1A`,borderBottom:`1px solid ${accent}40`,
+        borderRadius:"11px 11px 0 0"}}>
         <div style={{minWidth:0}}>
-          <p style={{margin:0,fontSize:11,color:"#5b616e",letterSpacing:"0.4px",textTransform:"uppercase",fontWeight:700}}>{title}</p>
+          <h3 style={{margin:0,fontSize:11,color:"#5b616e",letterSpacing:"0.4px",textTransform:"uppercase",fontWeight:700}}>{title}</h3>
           {subtitle&&<p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>{subtitle}</p>}
         </div>
         <div style={{display:"flex",gap:6,flexShrink:0}}>
           {onPin&&<button onClick={onPin} title={pinned?"Unpin":"Pin"} className="inline-flex items-center justify-center max-tablet:min-h-[44px] max-tablet:min-w-[44px]" style={{padding:"3px 6px",background:"transparent",border:"none",cursor:"pointer",color:pinned?"#c2a04a":"#cdd1d8",fontSize:14}}>★</button>}
-          {onDrill&&<button onClick={onDrill} className="inline-flex items-center justify-center max-tablet:min-h-[44px]" style={{padding:"4px 9px",background:"transparent",border:"1px solid #e6e8ec",borderRadius:6,color:"#5b616e",cursor:"pointer",fontSize:10,fontWeight:600}}>Drill ↗</button>}
+          {onDrill&&<button onClick={onDrill} className="inline-flex items-center justify-center max-tablet:min-h-[44px]" style={{padding:"4px 9px",background:"transparent",border:"1px solid #cdd1d8",borderRadius:6,color:"#5b616e",cursor:"pointer",fontSize:10,fontWeight:600}}>Drill ↗</button>}
         </div>
       </div>
       {children}
@@ -495,29 +509,49 @@ export function WidgetCard({title,subtitle,children,onPin,pinned,onDrill}){
 
 
 export function KPICard({label,value,delta,color,onClick}){
+  /* Delta colour is SIGNED, not "anything-without-a-plus-is-red":
+       leading "+" → positive (green), leading "-" → negative (red),
+       everything else (e.g. "to pay", "5 awaiting", "not tracked yet") → neutral.
+     The old `delta.includes("+")` test also mis-greened strings like
+     "₹2L overdue 90+" (a "+" inside the text). */
+  const d=String(delta||"").trim();
+  const deltaColor=d.startsWith("+")?"#16a34a":d.startsWith("-")?"#dc2626":"#5b616e";
+  // When clickable, the card is a real button to AT/keyboard: role+tabIndex+Enter/Space
+  // activation, an aria-label, and a min touch height (≥44px) for mobile tap targets.
+  const interactive=!!onClick;
+  const onKeyDown=interactive?(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); onClick(e); } }:undefined;
   return (
-    <div onClick={onClick} style={{...PREMIUM_CARD,cursor:onClick?"pointer":"default",borderTop:"3px solid "+(color||"#c2a04a")}}>
+    <div onClick={onClick}
+      role={interactive?"button":undefined} tabIndex={interactive?0:undefined} onKeyDown={onKeyDown}
+      aria-label={interactive?`${label}: ${value}`:undefined}
+      style={{...PREMIUM_CARD,cursor:interactive?"pointer":"default",borderTop:"3px solid "+(color||"#c2a04a"),...(interactive?{minHeight:64}:{})}}>
       <p style={{margin:0,fontSize:10.5,color:"#5b616e",letterSpacing:"0.4px",textTransform:"uppercase",fontWeight:700}}>{label}</p>
       <p style={{margin:"5px 0 2px",fontSize:22,fontWeight:800,color:"#14161a",fontVariantNumeric:"tabular-nums"}}>{value}</p>
-      {delta&&<p style={{margin:0,fontSize:11,color:delta.includes("+")?"#16a34a":"#dc2626",fontWeight:600}}>{delta}</p>}
+      {delta&&<p style={{margin:0,fontSize:11,color:deltaColor,fontWeight:600}}>{delta}</p>}
     </div>
   );
 }
 
 
+// Standard widescreen page/report container width. Registers, reports and list
+// screens center their content at this cap so wide monitors aren't wasted on
+// empty gutters (matches the SO/PO/GP booking screens, already on 1600). The
+// P&L / Balance Sheet statements run slightly wider (1640) to fit their rail.
+export const PAGE_MAX = 1600;
+
 export function RPT_Page({title,subtitle,toolbar,children}){
   return (
-    <div style={{padding:18,maxWidth:1400,margin:"0 auto"}}>
-      <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:14,marginBottom:14,paddingBottom:12,borderBottom:"1px solid #e1e3ec"}}>
+    <div style={{padding:18,maxWidth:PAGE_MAX,margin:"0 auto"}}>
+      <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:14,marginBottom:14,paddingBottom:12,borderBottom:"1px solid #cdd1d8"}}>
         <div>
           <h2 style={{margin:0,fontSize:20,color:"#0d1326",fontWeight:700}}>{title}</h2>
           <p style={{margin:"3px 0 0",fontSize:12,color:"#5a6691"}}>{subtitle}</p>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           {toolbar}
-          <button onClick={()=>openPrintPreview({ selector: 'main', title: 'Report', recommend: 'portrait' })} style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📄 PDF</button>
-          <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📊 Excel</button>
-          <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📋 CSV</button>
+          <button onClick={()=>openPrintPreview({ selector: 'main', title: 'Report', recommend: 'portrait' })} style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📄 PDF</button>
+          <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📊 Excel</button>
+          <button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:6,fontSize:11.5,cursor:"pointer",fontWeight:600,color:"#5a6691"}}>📋 CSV</button>
         </div>
       </div>
       {children}
@@ -532,49 +566,80 @@ export function RPT_Page({title,subtitle,toolbar,children}){
 
 
 export function RPT_CashPosition({branch}){
-  const groupByBranch={};
-  BANK_ACCOUNTS_DATA.forEach(b=>{
-    if(!groupByBranch[b.branch]) groupByBranch[b.branch]=[];
-    groupByBranch[b.branch].push(b);
+  // LIVE cash & bank position — the same trial-balance liquid ledgers the dashboard's
+  // "Cash & Bank" KPI sums (no `from` bound → closing = opening + all movement). Each
+  // branch's balances stay in its OWN native currency; there is NO cross-currency total
+  // (summing ₹ + $ is meaningless), matching the interbranch-FX-manual policy.
+  // A position is an as-of balance → only the `to` (as-of date) matters; `from` is
+  // ignored. Default preset 'all' → to:'' → as of today; the date bar back-dates the snapshot.
+  const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
+  const q = useTrialBalance(branch, { to: range.to });
+  const data = q.data || {};
+  const bal = (r) => (r.closingDebit || 0) - (r.closingCredit || 0); // Dr +ve
+  const locOf = (cur) => (cur === "₹" || cur === "₨" || cur === "Rs") ? "en-IN" : "en-US";
+  const fmtCur = (cur, n) => `${cur} ${Math.round(Number(n) || 0).toLocaleString(locOf(cur))}`;
+  // Normalise to a flat list of liquid ledgers. Consolidated (ALL) scope uses the
+  // per-branch breakdown so each row carries its branch's currency; a single-branch call
+  // uses that branch's rows + currency.
+  const rows = [];
+  const pushRow = (brCode, cur, r) => rows.push({
+    branch: brCode || "—", ledger: r.ledger || r.name || "—", group: r.group || "",
+    type: liquidityKind(r) === "cash" ? "Cash" : "Bank", currency: cur, balance: bal(r),
   });
-  const groupByCurrency={};
-  BANK_ACCOUNTS_DATA.forEach(b=>{
-    if(!groupByCurrency[b.currency]) groupByCurrency[b.currency]={total:0,count:0,inINR:0};
-    const rate=FX_RATES[b.currency]||1;
-    groupByCurrency[b.currency].total+=b.openingBal;
-    groupByCurrency[b.currency].count+=1;
-    groupByCurrency[b.currency].inINR+=b.openingBal*rate;
-  });
-  const grandTotal=Object.values(groupByCurrency).reduce((s,c)=>s+c.inINR,0);
+  if (Array.isArray(data.byBranch) && data.byBranch.length) {
+    data.byBranch.forEach((b) => {
+      const cur = (bc({ code: b.branch }) || {}).cur || "₹";
+      (b.rows || []).filter(isLiquidRow).forEach((r) => pushRow(b.branch, cur, r));
+    });
+  } else {
+    const cur = (bc(branch) || {}).cur || "₹";
+    const brCode = (branch === "ALL" || !branch) ? "" : (branch.code || branch);
+    (data.rows || []).filter(isLiquidRow).forEach((r) => pushRow(brCode, cur, r));
+  }
+  rows.sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
+
+  const groupByCurrency = {};
+  rows.forEach((r) => { if (!groupByCurrency[r.currency]) groupByCurrency[r.currency] = { total: 0, count: 0 }; groupByCurrency[r.currency].total += r.balance; groupByCurrency[r.currency].count += 1; });
+  const groupByBranch = {};
+  rows.forEach((r) => { if (!groupByBranch[r.branch]) groupByBranch[r.branch] = []; groupByBranch[r.branch].push(r); });
+  const branchCurTotals = (accts) => { const m = {}; accts.forEach((a) => { m[a.currency] = (m[a.currency] || 0) + a.balance; }); return m; };
+  const bankCount = rows.filter((r) => r.type === "Bank").length;
+  const cashCount = rows.filter((r) => r.type === "Cash").length;
+
   return (
-    <RPT_Page title="Cash Position Summary" subtitle="All bank balances + petty cash · real-time · all branches">
+    <RPT_Page title="Cash Position Summary" subtitle={`Live cash + bank ledger balances · as of ${range.to || 'today'} · each branch in its own currency`} toolbar={<ReportDateBar value={range} onChange={setRange}/>}>
+      {q.isLoading && <div style={{padding:"14px 2px",fontSize:12.5,color:"#5a6691"}}>Loading balances…</div>}
+      {!q.isLoading && !rows.length && <div style={{padding:"14px 2px",fontSize:12.5,color:"#5a6691"}}>No cash or bank ledgers found for this scope.</div>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,marginBottom:14}}>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Grand Total (INR equiv)</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(grandTotal)}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Bank Accounts</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{BANK_ACCOUNTS_DATA.filter(b=>b.type!=="Cash").length}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Currencies</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{Object.keys(groupByCurrency).length}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px"}}>Branches</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{Object.keys(groupByBranch).length}</p></div>
+        <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#2563eb"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#2563eb"}}>Bank Ledgers</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{bankCount}</p></div>
+        <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#16a34a"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#16a34a"}}>Cash Ledgers</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{cashCount}</p></div>
+        <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#7c3aed"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#7c3aed"}}>Currencies</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{Object.keys(groupByCurrency).length}</p></div>
+        <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#d97706"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#d97706"}}>Branches</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{Object.keys(groupByBranch).length}</p></div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14,marginBottom:14}}>
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>By Currency</p>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Currency</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th><th style={{...RPT_thStyle,textAlign:"right"}}>INR Equiv</th></tr></thead>
-            <tbody>{Object.entries(groupByCurrency).map(([cur,d])=>(<tr key={cur}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:700}}>{cur} <span style={{color:"#5a6691",fontWeight:400,fontSize:10}}>({d.count})</span></td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{cur} {d.total.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(d.inINR)}</td></tr>))}</tbody>
-          </table>
+          <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Currency</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th></tr></thead>
+            <tbody>{Object.entries(groupByCurrency).map(([cur,d])=>(<tr key={cur}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:700}}>{cur} <span style={{color:"#5a6691",fontWeight:400,fontSize:10}}>({d.count})</span></td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:d.total<0?"#A32D2D":"#0d1326"}}>{fmtCur(cur,d.total)}</td></tr>))}
+              {!rows.length && <tr><td colSpan={2} style={{...RPT_tdStyle,textAlign:"center",color:"#5a6691"}}>—</td></tr>}</tbody>
+          </table></div>
         </div>
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>By Branch</p>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"center"}}>A/cs</th><th style={{...RPT_thStyle,textAlign:"right"}}>Total INR Equiv</th></tr></thead>
-            <tbody>{Object.entries(groupByBranch).map(([br,accts])=>{const total=accts.reduce((s,a)=>{const rate=1;return s+a.openingBal*rate;},0);return (<tr key={br}><td style={{...RPT_tdStyle,fontWeight:700}}>{br}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{accts.length}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(total)}</td></tr>);})}</tbody>
-          </table>
+          <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"center"}}>Ledgers</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance (native)</th></tr></thead>
+            <tbody>{Object.entries(groupByBranch).map(([br,accts])=>{const cm=branchCurTotals(accts);return (<tr key={br}><td style={{...RPT_tdStyle,fontWeight:700}}>{br}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{accts.length}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:700}}>{Object.entries(cm).map(([cur,v])=>fmtCur(cur,v)).join(" · ")}</td></tr>);})}
+              {!rows.length && <tr><td colSpan={3} style={{...RPT_tdStyle,textAlign:"center",color:"#5a6691"}}>—</td></tr>}</tbody>
+          </table></div>
         </div>
       </div>
       <div style={cardStyle}>
-        <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>Detail — All Accounts</p>
+        <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>Detail — Cash &amp; Bank Ledgers</p>
         <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Bank · Account</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>Currency</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th><th style={{...RPT_thStyle,textAlign:"right"}}>INR Equiv</th><th style={{...RPT_thStyle,textAlign:"right"}}>% of Limit</th></tr></thead>
-          <tbody>{BANK_ACCOUNTS_DATA.map(b=>{const rate=FX_RATES[b.currency]||1;const pct=Math.round(b.openingBal/b.limit*100);return (<tr key={b.id}><td style={RPT_tdStyle}>{b.branch}</td><td style={RPT_tdStyle}>{b.bank} · <span style={{fontFamily:"monospace",color:"#5a6691"}}>...{b.accountNo.slice(-6)}</span></td><td style={RPT_tdStyle}>{b.type}</td><td style={{...RPT_tdStyle,fontFamily:"monospace"}}>{b.currency}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{b.openingBal.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(b.openingBal*rate)}</td><td style={{...RPT_tdStyle,textAlign:"right",color:pct>80?"#A32D2D":"#0d1326",fontWeight:600}}>{pct}%</td></tr>);})}</tbody>
+          <thead><tr><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Ledger</th><th style={RPT_thStyle}>Group</th><th style={RPT_thStyle}>Type</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th></tr></thead>
+          <tbody>{rows.map((r,i)=>(<tr key={i}><td style={RPT_tdStyle}>{r.branch}</td><td style={{...RPT_tdStyle,fontWeight:600}}>{r.ledger}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{r.group}</td><td style={RPT_tdStyle}>{r.type}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:600,color:r.balance<0?"#A32D2D":"#0d1326"}}>{fmtCur(r.currency,r.balance)}</td></tr>))}
+            {!rows.length && <tr><td colSpan={5} style={{...RPT_tdStyle,textAlign:"center",color:"#5a6691",padding:16}}>{q.isLoading?"Loading…":"No cash/bank ledgers."}</td></tr>}</tbody>
         </table></div>
       </div>
     </RPT_Page>
@@ -626,16 +691,19 @@ export function RPT_AuditTrail(){
   const colorOf=act=>act==="DELETE"?"#A32D2D":act==="CREATE"?"#22c55e":act==="APPROVE"?"#d4a437":act==="EDIT"?"#f97316":"#5a6691";
   return (
     <RPT_Page title="Audit Trail Report" subtitle="Who changed what, when · filterable by user, action, module">
-      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-        <input placeholder="Search description..." value={search} onChange={e=>setSearch(e.target.value)} style={{flex:"1 1 250px",padding:"8px 11px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12}}/>
-        <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} style={{padding:"8px 11px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All users</option>{users.map(u=><option key={u} value={u}>{u}</option>)}</select>
-        <select value={filterAction} onChange={e=>setFilterAction(e.target.value)} style={{padding:"8px 11px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All actions</option>{actions.map(a=><option key={a} value={a}>{a}</option>)}</select>
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-brand border border-surface-border bg-surface px-3 py-2.5 shadow-xs">
+        <div className="relative flex-1 min-w-[220px]">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px]">🔍</span>
+          <input placeholder="Search description..." value={search} onChange={e=>setSearch(e.target.value)} className="w-full rounded-md border border-surface-border bg-surface py-2 pl-7 pr-3 text-[12px] outline-none transition focus:border-navy focus:ring-2 focus:ring-navy/15"/>
+        </div>
+        <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} className="rounded-md border border-surface-border bg-surface px-3 py-2 text-[12px] outline-none transition focus:border-navy"><option value="ALL">All users</option>{users.map(u=><option key={u} value={u}>{u}</option>)}</select>
+        <select value={filterAction} onChange={e=>setFilterAction(e.target.value)} className="rounded-md border border-surface-border bg-surface px-3 py-2 text-[12px] outline-none transition focus:border-navy"><option value="ALL">All actions</option>{actions.map(a=><option key={a} value={a}>{a}</option>)}</select>
       </div>
-      <div style={cardStyle}>
-        <p style={{margin:0,fontSize:11,color:"#5a6691",marginBottom:10}}>{filtered.length} entries</p>
-        <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
+      <div className="rounded-brand border border-surface-border bg-surface p-3.5 shadow-card">
+        <p className="mb-2.5 inline-block rounded-full bg-surface-alt px-2.5 py-1 text-[10.5px] font-bold text-ink-muted">{filtered.length} entries</p>
+        <div className="kb-sticky overflow-x-auto" style={{'--stick-head':'#1a1c22',maxHeight:'calc(100vh - 320px)'}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Timestamp</th><th style={RPT_thStyle}>User</th><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Action</th><th style={RPT_thStyle}>Module</th><th style={RPT_thStyle}>Description</th><th style={RPT_thStyle}>IP Address</th></tr></thead>
-          <tbody>{filtered.map((a,i)=>(<tr key={i}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{a.ts}</td><td style={{...RPT_tdStyle,fontWeight:600}}>{a.user}</td><td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{a.branch}</span></td><td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:colorOf(a.action)+"22",color:colorOf(a.action),borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px"}}>{a.action}</span></td><td style={{...RPT_tdStyle,fontSize:11}}>{a.module}</td><td style={{...RPT_tdStyle,fontSize:11}}>{a.desc}</td><td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{a.ip}</td></tr>))}</tbody>
+          <tbody>{filtered.map((a,i)=>(<tr key={i} className={`transition hover:bg-[#eef1f6] ${i%2===0?'bg-surface':'bg-surface-alt/40'}`}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{a.ts}</td><td style={{...RPT_tdStyle,fontWeight:600}}>{a.user}</td><td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{a.branch}</span></td><td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:colorOf(a.action)+"22",color:colorOf(a.action),borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px"}}>{a.action}</span></td><td style={{...RPT_tdStyle,fontSize:11}}>{a.module}</td><td style={{...RPT_tdStyle,fontSize:11}}>{a.desc}</td><td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{a.ip}</td></tr>))}</tbody>
         </table></div>
       </div>
     </RPT_Page>
@@ -857,7 +925,7 @@ export function RPT_ABCAnalysis({ branch }){
   return (
     <RPT_Page title="ABC Analysis (Pareto)"
       subtitle="80/15/5 split based on contribution to value — live from posted bills"
-      toolbar={<div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><ReportDateBar value={range} onChange={setRange}/><select value={dim} onChange={e=>setDim(e.target.value)} style={{padding:"7px 11px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:11.5,background:"#fff"}}><option value="customers">By Customer (LTV)</option><option value="suppliers">By Supplier (Spend)</option><option value="destinations">By Destination (Revenue)</option></select></div>}>
+      toolbar={<div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><ReportDateBar value={range} onChange={setRange}/><select value={dim} onChange={e=>setDim(e.target.value)} style={{padding:"7px 11px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:11.5,background:"#fff"}}><option value="customers">By Customer (LTV)</option><option value="suppliers">By Supplier (Spend)</option><option value="destinations">By Destination (Revenue)</option></select></div>}>
       <RptState q={q} empty={data.length===0} label="contribution data">
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
         {["A","B","C"].map(c=>{const cl=classes[c]||{count:0,value:0,share:0};return (<div key={c} style={{...cardStyle,borderTop:"4px solid "+(c==="A"?"#d4a437":c==="B"?"#3b82f6":"#5a6691")}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><span style={{padding:"4px 10px",borderRadius:4,fontSize:13,fontWeight:700,letterSpacing:"0.5px",...grpStyle(c)}}>CLASS {c}</span><span style={{fontSize:11,color:"#5a6691"}}>{cl.count} items · {cl.share}% of total</span></div><p style={{margin:0,fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(cl.value)}</p><p style={{margin:"3px 0 0",fontSize:10.5,color:"#5a6691"}}>{c==="A"?"Top contributors — focus & nurture":c==="B"?"Mid-tier — opportunity to grow":"Long tail — automate / rationalise"}</p></div>);})}
@@ -930,7 +998,7 @@ export function RPT_LeaveUtilization(){
       <div style={cardStyle}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Employee</th><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"right"}}>Entitled</th><th style={{...RPT_thStyle,textAlign:"right"}}>Used</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th><th style={{...RPT_thStyle,textAlign:"right"}}>CL</th><th style={{...RPT_thStyle,textAlign:"right"}}>SL</th><th style={{...RPT_thStyle,textAlign:"right"}}>EL</th><th style={{...RPT_thStyle,textAlign:"center"}}>Utilization</th></tr></thead>
-          <tbody>{LEAVE_UTILIZATION.length===0&&(<tr><td colSpan={9} style={{...RPT_tdStyle,textAlign:"center",color:"#8b94b3"}}>No employees yet.</td></tr>)}{LEAVE_UTILIZATION.map(l=>(<tr key={l.empId}><td style={{...RPT_tdStyle,fontWeight:600}}>{l.name}</td><td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{l.branch}</span></td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.entitled}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{l.used}</td><td style={{...RPT_tdStyle,textAlign:"right",color:l.balance<5?"#A32D2D":"#0d1326"}}>{l.balance}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.casual}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.sick}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.earned}</td><td style={{padding:"6px 12px",borderBottom:"1px solid #f0f2f7"}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{flex:1,height:6,background:"#f0f2f7",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:l.utilPct+"%",background:l.utilPct>75?"#A32D2D":l.utilPct>50?"#d4a437":"#22c55e",borderRadius:3}}/></div><span style={{fontSize:10.5,fontWeight:700,color:l.utilPct>75?"#A32D2D":"#0d1326",minWidth:36,textAlign:"right"}}>{l.utilPct.toFixed(0)}%</span></div></td></tr>))}</tbody>
+          <tbody>{LEAVE_UTILIZATION.length===0&&(<tr><td colSpan={9} style={{...RPT_tdStyle,textAlign:"center",color:"#8b94b3"}}>No employees yet.</td></tr>)}{LEAVE_UTILIZATION.map(l=>(<tr key={l.empId}><td style={{...RPT_tdStyle,fontWeight:600}}>{l.name}</td><td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{l.branch}</span></td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.entitled}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{l.used}</td><td style={{...RPT_tdStyle,textAlign:"right",color:l.balance<5?"#A32D2D":"#0d1326"}}>{l.balance}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.casual}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.sick}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.earned}</td><td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7"}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{flex:1,height:6,background:"#f0f2f7",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:l.utilPct+"%",background:l.utilPct>75?"#A32D2D":l.utilPct>50?"#d4a437":"#22c55e",borderRadius:3}}/></div><span style={{fontSize:10.5,fontWeight:700,color:l.utilPct>75?"#A32D2D":"#0d1326",minWidth:36,textAlign:"right"}}>{l.utilPct.toFixed(0)}%</span></div></td></tr>))}</tbody>
         </table>
       </div>
     </RPT_Page>
@@ -951,12 +1019,12 @@ export function RPT_BirthdayCalendar(){
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326",marginBottom:12}}>🎂 Upcoming Birthdays</p>
           {(stats.birthdays||[]).length===0&&<p style={{color:"#5a6691",fontSize:12}}>{statsQ.isLoading?"Loading…":"No upcoming birthdays"}</p>}
-          {(stats.birthdays||[]).map(b=>(<div key={b.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #f0f2f7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#d4a437",display:"flex",alignItems:"center",justifyContent:"center",color:"#0d1326",fontSize:14,fontWeight:700}}>{b.name.substring(0,2).toUpperCase()}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{b.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{b.branch} · {b.date}</p></div><button style={{padding:"5px 12px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Send wish</button></div>))}
+          {(stats.birthdays||[]).map(b=>(<div key={b.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #dfe2e7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#d4a437",display:"flex",alignItems:"center",justifyContent:"center",color:"#0d1326",fontSize:14,fontWeight:700}}>{b.name.substring(0,2).toUpperCase()}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{b.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{b.branch} · {b.date}</p></div></div>))}
         </div>
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326",marginBottom:12}}>🎉 Work Anniversaries</p>
           {(stats.anniversaries||[]).length===0&&<p style={{color:"#5a6691",fontSize:12}}>{statsQ.isLoading?"Loading…":"No upcoming anniversaries"}</p>}
-          {(stats.anniversaries||[]).map(a=>(<div key={a.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #f0f2f7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#6B4C8B",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:14,fontWeight:700}}>{a.years}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{a.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{a.branch} · {a.years} year{a.years!==1?"s":""} on {a.date}</p></div><button style={{padding:"5px 12px",background:"#6B4C8B",color:"#fff",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Acknowledge</button></div>))}
+          {(stats.anniversaries||[]).map(a=>(<div key={a.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #dfe2e7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#6B4C8B",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:14,fontWeight:700}}>{a.years}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{a.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{a.branch} · {a.years} year{a.years!==1?"s":""} on {a.date}</p></div></div>))}
         </div>
       </div>
     </RPT_Page>
@@ -970,60 +1038,88 @@ export function RPT_BirthdayCalendar(){
 /* 14. Statutory Dues Calendar */
 
 export function RPT_StatutoryDues(){
-  const overdue=STATUTORY_DUES.filter(d=>d.status==="Overdue");
-  const pending=STATUTORY_DUES.filter(d=>d.status==="Pending");
-  const upcoming=STATUTORY_DUES.filter(d=>d.status==="Upcoming");
+  // Live from the compliance calendar (GET /api/tax-calendar/dues); status +
+  // days-left are derived server-side so they match the dashboard alerts.
+  const q=useStatutoryDues();
+  const rows=q.data?.rows||[];
+  const t=q.data?.totals||{overdue:0,pending:0,upcoming:0,dueValue:0};
   return (
     <RPT_Page title="Statutory Dues Calendar" subtitle="All compliance dates · filing status &amp; reminders">
+      <RptState q={q} empty={rows.length===0} label="statutory dues">
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Overdue</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#A32D2D"}}>{overdue.length}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Pending</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#f97316"}}>{pending.length}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Upcoming</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#d4a437"}}>{upcoming.length}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Total Due Value</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(STATUTORY_DUES.reduce((s,d)=>s+d.amount,0))}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Overdue</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#A32D2D"}}>{t.overdue}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Pending</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#f97316"}}>{t.pending}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Upcoming</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#d4a437"}}>{t.upcoming}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Total Due Value</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(t.dueValue)}</p></div>
       </div>
       <div style={cardStyle}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Due Date</th><th style={RPT_thStyle}>Authority</th><th style={RPT_thStyle}>Filing</th><th style={RPT_thStyle}>Entity</th><th style={{...RPT_thStyle,textAlign:"right"}}>Amount</th><th style={{...RPT_thStyle,textAlign:"center"}}>Days Left</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
-          <tbody>{STATUTORY_DUES.map((d,i)=>(<tr key={i}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:600}}>{d.due}</td><td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700,color:"#0d1326"}}>{d.authority}</span></td><td style={{...RPT_tdStyle,fontWeight:600}}>{d.filing}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{d.entity}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{d.amount>0?fmtINR(d.amount):"—"}</td><td style={{...RPT_tdStyle,textAlign:"center",fontWeight:700,color:d.daysLeft<=0?"#A32D2D":d.daysLeft<=7?"#f97316":d.daysLeft<=30?"#d4a437":"#5a6691"}}>{d.daysLeft<=0?"DUE NOW":d.daysLeft+"d"}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"3px 10px",borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px",background:d.status==="Filed"?"#d4edda":d.status==="Pending"?"#f8d7da":d.status==="Upcoming"?"#fff3cd":"#f8d7da",color:d.status==="Filed"?"#155724":d.status==="Pending"?"#721c24":d.status==="Upcoming"?"#856404":"#721c24"}}>{d.status}</span></td></tr>))}</tbody>
+          <tbody>{rows.map((d,i)=>(<tr key={d.id||i}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:600}}>{d.due}</td><td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700,color:"#0d1326"}}>{d.authority}</span></td><td style={{...RPT_tdStyle,fontWeight:600}}>{d.filing}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{d.entity}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{d.amount>0?fmtINR(d.amount):"—"}</td><td style={{...RPT_tdStyle,textAlign:"center",fontWeight:700,color:d.daysLeft<=0?"#A32D2D":d.daysLeft<=7?"#f97316":d.daysLeft<=30?"#d4a437":"#5a6691"}}>{d.status==="Filed"?"—":d.daysLeft<=0?"DUE NOW":d.daysLeft+"d"}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"3px 10px",borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px",background:d.status==="Filed"?"#d4edda":d.status==="Pending"?"#f8d7da":d.status==="Upcoming"?"#fff3cd":"#f8d7da",color:d.status==="Filed"?"#155724":d.status==="Pending"?"#721c24":d.status==="Upcoming"?"#856404":"#721c24"}}>{d.status}</span></td></tr>))}</tbody>
         </table>
       </div>
+      </RptState>
     </RPT_Page>
   );
 }
 
 /* 15. Tax Filing Status Board */
 
-export function RPT_TaxFilingBoard(){
-  const allTaxes=[...new Set(TAX_FILING_BOARD.flatMap(e=>Object.keys(e.taxes)))];
+export function RPT_TaxFilingBoard({ branch }){
+  // Filed/Pending is derived live from entered return figures (no static data).
+  const [period,setPeriod]=useState(()=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);});
+  const q=useTaxFilingBoard(branch,period);
+  const entities=q.data?.entities||[];
+  const allTaxes=[...new Set(entities.flatMap(e=>Object.keys(e.taxes)))];
+  const t=q.data?.totals||{filed:0,pending:0,returns:0};
   return (
-    <RPT_Page title="Tax Filing Status Board" subtitle="GSTR / TDS / VAT / WHT / Income Tax — all entities at a glance">
+    <RPT_Page title="Tax Filing Status Board" subtitle="GSTR / TDS / VAT — filed vs pending per branch, derived live from entered return figures"
+      toolbar={<label style={{display:"flex",alignItems:"center",gap:6,fontSize:11.5,color:"#5a6691",fontWeight:600}}>Period
+        <input type="month" value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"4px 8px",border:"1px solid #cdd1d8",borderRadius:4,fontSize:12}}/></label>}>
+      <RptState q={q} empty={entities.length===0} label="branches">
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Returns Tracked</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{t.returns}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Filed</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#155724"}}>{t.filed}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Pending</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#A32D2D"}}>{t.pending}</p></div>
+      </div>
       <div style={cardStyle}>
         <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={{...RPT_thStyle,minWidth:180}}>Entity</th>{allTaxes.map(t=><th key={t} style={{...RPT_thStyle,textAlign:"center",minWidth:100}}>{t}</th>)}</tr></thead>
-          <tbody>{TAX_FILING_BOARD.map(e=>(<tr key={e.entity}><td style={{...RPT_tdStyle,fontWeight:700}}>{e.entity}</td>{allTaxes.map(t=>{const tax=e.taxes[t];if(!tax) return <td key={t} style={{...RPT_tdStyle,textAlign:"center",color:"#cbd0dc"}}>—</td>;return (<td key={t} style={{padding:"8px 6px",textAlign:"center",borderBottom:"1px solid #f0f2f7"}}><span style={{display:"inline-block",padding:"3px 10px",borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px",background:tax.status==="Filed"?"#d4edda":"#f8d7da",color:tax.status==="Filed"?"#155724":"#721c24"}}>{tax.status==="Filed"?"✓ Filed":"○ Pending"}</span>{tax.date!=="—"&&<p style={{margin:"3px 0 0",fontSize:9,color:"#5a6691",fontFamily:"monospace"}}>{tax.date}</p>}</td>);})}</tr>))}</tbody>
+          <tbody>{entities.map(e=>(<tr key={e.entity}><td style={{...RPT_tdStyle,fontWeight:700}}>{e.entity}</td>{allTaxes.map(t=>{const tax=e.taxes[t];if(!tax) return <td key={t} style={{...RPT_tdStyle,textAlign:"center",color:"#cbd0dc"}}>—</td>;return (<td key={t} style={{padding:"8px 6px",textAlign:"center",borderBottom:"1px solid #dfe2e7"}}><span style={{display:"inline-block",padding:"3px 10px",borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px",background:tax.status==="Filed"?"#d4edda":"#f8d7da",color:tax.status==="Filed"?"#155724":"#721c24"}}>{tax.status==="Filed"?"✓ Filed":"○ Pending"}</span>{tax.date!=="—"&&<p style={{margin:"3px 0 0",fontSize:9,color:"#5a6691",fontFamily:"monospace"}}>{tax.date}</p>}</td>);})}</tr>))}</tbody>
         </table></div>
       </div>
+      </RptState>
     </RPT_Page>
   );
 }
 
 /* 16. Currency Exposure */
 
-export function RPT_CurrencyExposure(){
-  const totalUnhedged=FX_EXPOSURE.reduce((s,c)=>s+c.unhedgedINR,0);
+export function RPT_CurrencyExposure({ branch }){
+  // Live foreign-currency exposure (GET /api/accounting/fx-exposure): each non-INR
+  // branch's receivables/payables/cash, grouped by currency, converted to INR at the
+  // latest forex rate. Hedge columns are intentionally absent — the system has no FX
+  // hedge/forward data, so showing them would be fabricated.
+  const q=useFxExposure(branch);
+  const rows=q.data?.rows||[];
+  const t=q.data?.totals||{currencies:0,inrEquivalent:0,missingRates:0};
+  const n=(v)=>Number(v||0).toLocaleString("en-IN");
   return (
-    <RPT_Page title="Currency Exposure Report" subtitle="Open positions per currency · hedged vs unhedged · INR equivalent at-risk">
+    <RPT_Page title="Currency Exposure Report" subtitle="Open foreign-currency positions per currency · net exposure & INR equivalent (live from posted books)">
+      <RptState q={q} empty={rows.length===0} label="foreign-currency exposure">
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Currencies in Use</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{FX_EXPOSURE.length}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Total Unhedged INR Eq.</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#A32D2D"}}>{fmtINR(totalUnhedged)}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Hedge Coverage</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#d4a437"}}>{((FX_EXPOSURE.reduce((s,c)=>s+c.hedged,0)/FX_EXPOSURE.reduce((s,c)=>s+c.netExposure,0))*100).toFixed(0)}%</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Currencies in Use</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{t.currencies}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Net INR Equivalent</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(t.inrEquivalent)}</p></div>
+        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Currencies w/o Rate</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:t.missingRates>0?"#A32D2D":"#155724"}}>{t.missingRates}</p></div>
       </div>
       <div style={cardStyle}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Currency</th><th style={{...RPT_thStyle,textAlign:"right"}}>Receivables</th><th style={{...RPT_thStyle,textAlign:"right"}}>Payables</th><th style={{...RPT_thStyle,textAlign:"right"}}>Cash Held</th><th style={{...RPT_thStyle,textAlign:"right"}}>Net Exposure</th><th style={{...RPT_thStyle,textAlign:"right"}}>Hedged</th><th style={{...RPT_thStyle,textAlign:"right"}}>Unhedged</th><th style={{...RPT_thStyle,textAlign:"right"}}>Unhedged INR Eq</th><th style={{...RPT_thStyle,textAlign:"center"}}>Risk</th></tr></thead>
-          <tbody>{FX_EXPOSURE.map(c=>{const hedgePct=c.netExposure>0?c.hedged/c.netExposure*100:100;const risk=hedgePct>=80?"Low":hedgePct>=40?"Medium":"High";return (<tr key={c.currency}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:700}}>{c.currency}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{c.receivables.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{c.payables.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{c.cashHeld.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:700}}>{c.netExposure.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:"#22c55e"}}>{c.hedged.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:"#A32D2D",fontWeight:700}}>{c.unhedged.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#A32D2D"}}>{fmtINR(c.unhedgedINR)}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"3px 10px",borderRadius:3,fontSize:10,fontWeight:700,background:risk==="Low"?"#d4edda":risk==="Medium"?"#fff3cd":"#f8d7da",color:risk==="Low"?"#155724":risk==="Medium"?"#856404":"#721c24"}}>{risk}</span></td></tr>);})}</tbody>
-        </table>
+        <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
+          <thead><tr><th style={RPT_thStyle}>Currency</th><th style={RPT_thStyle}>Branches</th><th style={{...RPT_thStyle,textAlign:"right"}}>Receivables</th><th style={{...RPT_thStyle,textAlign:"right"}}>Payables</th><th style={{...RPT_thStyle,textAlign:"right"}}>Cash Held</th><th style={{...RPT_thStyle,textAlign:"right"}}>Net Exposure</th><th style={{...RPT_thStyle,textAlign:"right"}}>Rate → INR</th><th style={{...RPT_thStyle,textAlign:"right"}}>INR Equivalent</th></tr></thead>
+          <tbody>{rows.map(c=>(<tr key={c.currency}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:700}}>{c.currency}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{(c.branches||[]).join(", ")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{n(c.receivables)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{n(c.payables)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{n(c.cashHeld)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:700}}>{n(c.netExposure)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:c.rateStale?"#A32D2D":"#5a6691"}}>{c.rateStale?"no rate":c.rate}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:c.inrEquivalent==null?"#A32D2D":"#0d1326"}}>{c.inrEquivalent==null?"rate missing":fmtINR(c.inrEquivalent)}</td></tr>))}</tbody>
+        </table></div>
       </div>
+      <p style={{margin:"10px 2px 0",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>Amounts shown in each foreign currency; INR equivalent uses the latest forex rate on file. Hedged/unhedged positions are not shown — the system does not yet track FX hedges or forward contracts, so this reflects open exposure only.</p>
+      </RptState>
     </RPT_Page>
   );
 }
@@ -1047,7 +1143,7 @@ export const tabBtnStyle = (active) => ({
 });
 
 
-export const inpStd = {padding:"8px 10px",width:"100%",border:"1px solid #e6e8ec",borderRadius:8,fontSize:12,boxSizing:"border-box",color:"#14161a"};
+export const inpStd = {padding:"8px 10px",width:"100%",border:"1px solid #cdd1d8",borderRadius:8,fontSize:12,boxSizing:"border-box",color:"#14161a"};
 
 /* ════════════════════════════════════════════════════════════════════
    1. CUSTOMER MASTER (12 tabs) — L&T Limited demo

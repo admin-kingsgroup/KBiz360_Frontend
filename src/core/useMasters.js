@@ -14,6 +14,19 @@ export function useMasterList(resource, params = {}) {
   });
 }
 
+// Tax-readiness defect COUNTS for a master (suppliers / customers), computed
+// server-side over the editable master rows so the dashboard never pulls the full
+// list just to count gaps. `resource` is 'suppliers' or 'customers'.
+export function useMasterHealth(resource, branch) {
+  const code = branch === 'ALL' || !branch ? '' : (branch.code || branch);
+  return useQuery({
+    queryKey: ['master-health', resource, code || 'all'],
+    queryFn: () => apiGet(`/api/${resource}/health`, { branch: code }),
+    enabled: !!getAuthToken(),
+    staleTime: 60_000,
+  });
+}
+
 // A few masters are ALSO read live under OTHER query roots, so invalidating only
 // ['master', resource] leaves those stale until their staleTime lapses (the
 // "new sub-group / ledger doesn't show up in the chart / picker / reports until
@@ -24,9 +37,17 @@ export function useMasterList(resource, params = {}) {
 //     voucher pickers (['ref','ledger-registry']), the group tree (['groups',…])
 //     and — through its opening balance — every books report (['accounting',…]).
 // Map each such resource to the extra roots that must refetch on any mutation.
+// Re-grouping the chart (moving a sub-group, or re-pointing a ledger's group) changes
+// where every report nests its balances, so it MUST bust the FULL books roots — both
+// 'accounting' (Trial Balance / P&L / Module-P&L / Balance Sheet / group tree) AND
+// 'finance' (migrated Trial Balance + registers). Previously `subgroups` invalidated
+// only the narrow ['accounting','groups'] key, which does NOT match the P&L keys
+// (['accounting','pnl'], ['accounting','module-pl'], ['accounting','pl-tally']) — so a
+// group re-parent refreshed the Chart tree but left the P&L showing the OLD nesting
+// until staleTime lapsed (the "re-grouped but P&L still shows old view" bug).
 export const MASTER_RELATED_ROOTS = {
-  subgroups: [['master', 'groups'], ['groups'], ['accounting', 'groups']],
-  ledgers:   [['ledgers'], ['ref', 'ledger-registry'], ['groups'], ['accounting']],
+  subgroups: [['master', 'groups'], ['groups'], ['accounting'], ['finance']],
+  ledgers:   [['ledgers'], ['ref', 'ledger-registry'], ['groups'], ['accounting'], ['finance']],
 };
 
 export function useMasterMutations(resource) {

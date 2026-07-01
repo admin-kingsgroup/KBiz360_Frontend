@@ -20,6 +20,13 @@ describe('compactAmt — Indian lakh/crore compaction', () => {
     expect(compactAmt(500000, { currency: 'KSh ' })).toBe('KSh 5.00L');
     expect(compactAmt(500000, { currency: '' })).toBe('5.00L');
   });
+  test('USD ($) branches abbreviate on the Western K/M/B scale, not Cr/L', () => {
+    expect(compactAmt(1500000, { currency: '$' })).toBe('$1.50M');   // not $1.50Cr / $15.00L
+    expect(compactAmt(320000, { currency: '$' })).toBe('$320.0K');   // not $3.20L
+    expect(compactAmt(2500000000, { currency: '$' })).toBe('$2.50B');
+    expect(compactAmt(-1500000, { currency: '$' })).toBe('$-1.50M');
+    expect(compactAmt(950, { currency: '$' })).toBe('$950');         // below 1K → grouped
+  });
   test('negatives keep the sign outside the abbreviation', () => {
     expect(compactAmt(-500000)).toBe('₹-5.00L');
   });

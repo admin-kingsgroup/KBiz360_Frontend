@@ -33,10 +33,20 @@ export function isPageAccessAdmin(user) {
   return String(user.email || '').toLowerCase() === PAGE_ACCESS_ADMIN_EMAIL;
 }
 
+// The Owner Dashboard (consolidated, all-branch) is for the group owner ONLY:
+// the Super Admin whose email is the owner email. BOTH must hold — a Super Admin
+// with a different email can't see it, and the owner email under any other role
+// can't either. Used to gate the /dashboard/owner route and its menu link.
+export function isOwnerDashboardUser(user) {
+  return isPageAccessAdmin(user) && String(user?.role || '') === 'Super Admin';
+}
+
 // Routes that must NEVER be hidden — hiding them would lock a user out of the
 // app's landing screen, or lock the admin out of this very control. They are
 // excluded from the catalogue (can't be toggled) and never pruned.
-export const ALWAYS_VISIBLE = new Set(['/dashboard', '/settings/page-access']);
+// '/dashboard/owner' is gated by EMAIL (owner only) at the route + menu level, not
+// by the page-visibility catalogue — so it's always-visible here (never toggled).
+export const ALWAYS_VISIBLE = new Set(['/dashboard', '/dashboard/owner', '/settings/page-access']);
 
 // Is this value a menu node?  { label, children[] } or a leaf { label, href }.
 function isMenuNode(v) {

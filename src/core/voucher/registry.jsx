@@ -6,11 +6,12 @@ import { ContraFields } from './fields/ContraFields';
 import { PurchaseExpenseFields } from './fields/PurchaseExpenseFields';
 import { DebitNoteFields } from './fields/DebitNoteFields';
 import { RefundReissueFields } from './fields/RefundReissueFields';
+import { buildRefundReissueBody } from './fields/refundBody';
 import { RefundPartialFields } from './fields/RefundPartialFields';
 import { AdmAcmFields } from './fields/AdmAcmFields';
 import { r2, allocSummary, pxpTotals, dnTotals } from './ui';
 
-// Recover a saved income line's amount (Service Charge / Markup) for the edit form.
+// Recover a saved income line's amount (Service Charge / SVC2) for the edit form.
 const lineAmt = (v, ledger) => {
   const l = (v.lines || []).find((x) => x.ledger === ledger);
   return l ? (l.amt ?? '') : '';
@@ -126,6 +127,11 @@ function makeRcptPmt(side) {
         .map(([vno, v]) => ({ billVno: vno, billId: (s._billIds || {})[vno] || '', amount: +v }));
       return {
         ...common, party: s.party, partyType: isReceipt ? 'customer' : 'supplier',
+        // Party model carries NO lines — the journal is inferred from party + bankRef +
+        // total. Emit lines:[] EXPLICITLY so editing a line-model voucher (e.g. a Tally
+        // import stored as Dr/Cr lines) into the party model wipes the stale legs instead
+        // of leaving them on the document (a partial $set update wouldn't clear them).
+        lines: [],
         subtotal: net, total: gross, tdsAmt: tds, tdsSection: s.tds ? (s.tdsSection || '') : '',
         allocations, onAccount: sum.onAcc, applyMode: s.applyMode,
         remarks: s.remarks || `Being ${isReceipt ? 'receipt from' : 'payment to'} ${s.party} via ${s.paymentMode}${s.utr ? ` ref ${s.utr}` : ''}`,
@@ -155,7 +161,7 @@ function makeRcptPmt(side) {
 
 /**
  * Refund (RF) / Reissue (RI) — two-party, raised against a sales invoice. The
- * supplier (airline) leg is supplierAmt; our retained service charge + markup
+ * supplier (airline) leg is supplierAmt; our retained service charge + Service Charge - 2
  * post as income; the customer figure (`total`) is derived so the voucher always
  * balances. Gated → enters PENDING and posts on approval. See posting.builder.
  */
@@ -166,53 +172,22 @@ function makeRefundReissue(kind) {
     label: isRefund ? 'Refund Voucher' : 'Reissue Voucher',
     icon: isRefund ? '↩️' : '🔁',
     explain: isRefund
-      ? (<><b style={{ color: '#A07828' }}>Refund:</b> cancellation of a sale — the <b>original sale and its purchase are reversed in full</b> (Base Fare / taxes on both Sales &amp; Purchase unwind). We then retain a cancellation service charge + markup (income) and absorb the airline's cancellation fee; the <b>customer is refunded the net balance</b>. Link the related Purchase invoice so the supplier side also reverses.</>)
-      : (<><b style={{ color: '#A07828' }}>Reissue:</b> amendment of a sale. The <b>customer (Debtor) is Debited</b> with the total billed; the <b>supplier/airline (Creditor) is Credited</b> with the fee + fare difference; our service charge + markup are retained as income.</>),
+      ? (<><b style={{ color: '#A07828' }}>Refund:</b> cancellation of a sale — the <b>original sale and its purchase are reversed in full</b> (Base Fare / taxes on both Sales &amp; Purchase unwind). We then retain a cancellation service charge + Service Charge - 2 (income) and absorb the airline's cancellation fee; the <b>customer is refunded the net balance</b>. Link the related Purchase invoice so the supplier side also reverses.</>)
+      : (<><b style={{ color: '#A07828' }}>Reissue:</b> amendment of a sale. The <b>customer (Debtor) is Debited</b> with the total billed; the <b>supplier/airline (Creditor) is Credited</b> with the fee + fare difference; our service charge + Service Charge - 2 are retained as income.</>),
 
     initial: () => ({ date: todayISO(), againstInvoice: '', againstPurchase: '', gstMode: 'intra', party: '', counterParty: '', supplierAmt: '', serviceCharge: '', markup: '', gstPct: 18, supplierSvc: '', supplierGst: '', supplierCancel: '', supplierCancelGst: '', cancelRecover: true, incentiveAmt: '', incentiveGst: '', incentiveTds: '', remarks: '' }),
 
     fromVoucher: (v) => ({
       date: v.date || '', againstInvoice: v.againstInvoice || v.linkNo || '', againstPurchase: v.againstPurchase || '', gstMode: v.gstMode || 'intra',
       party: v.party || '', counterParty: v.counterParty || '', supplierAmt: v.supplierAmt ?? '',
-      serviceCharge: lineAmt(v, 'Service Charge Income'), markup: lineAmt(v, 'Markup Income'),
+      serviceCharge: lineAmt(v, 'SVF Income') || lineAmt(v, 'Service Charge Income'), markup: lineAmt(v, 'SVC2 Income') || lineAmt(v, 'Markup Income'),
       gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18,
       supplierSvc: v.supplierSvc ?? '', supplierGst: v.supplierGst ?? '',
       supplierCancel: v.supplierCancel ?? '', supplierCancelGst: v.supplierCancelGst ?? '', cancelRecover: v.cancelRecover !== false,
       incentiveAmt: v.incentiveAmt ?? '', incentiveGst: v.incentiveGst ?? '', incentiveTds: v.incentiveTds ?? '', remarks: v.remarks || '',
     }),
 
-    toBody: (s, ctx) => {
-      const supplierAmt = r2(+s.supplierAmt || 0);
-      const svc = r2(+s.serviceCharge || 0), markup = r2(+s.markup || 0);
-      const ourIncome = r2(svc + markup);
-      const taxAmt = r2(ourIncome * (+s.gstPct || 0) / 100);
-      const supSvc = r2(+s.supplierSvc || 0), supGst = r2(+s.supplierGst || 0);
-      // Refund-only: the airline's cancellation fee the supplier keeps (passed through
-      // to the customer when cancelRecover) and the commission/TDS we clawed back.
-      const supCancel = isRefund ? r2(+s.supplierCancel || 0) : 0;
-      const supCancelGst = isRefund ? r2(+s.supplierCancelGst || 0) : 0;
-      const incentiveAmt = isRefund ? r2(+s.incentiveAmt || 0) : 0;
-      const incentiveGst = isRefund ? r2(+s.incentiveGst || 0) : 0;
-      const incentiveTds = isRefund ? r2(+s.incentiveTds || 0) : 0;
-      const total = isRefund
-        ? r2(supplierAmt + supSvc + supGst - ourIncome - taxAmt)
-        : r2(supplierAmt - supSvc - supGst + ourIncome + taxAmt);
-      const lines = [];
-      if (svc > 0) lines.push({ ledger: 'Service Charge Income', amt: svc, desc: 'Service charge' });
-      if (markup > 0) lines.push({ ledger: 'Markup Income', amt: markup, desc: 'Markup' });
-      return {
-        type: isRefund ? 'RF' : 'RI', category: kind, branch: ctx.branchCode, date: s.date,
-        party: s.party, partyType: 'customer',
-        counterParty: s.counterParty, counterPartyGroup: 'Sundry Creditors',
-        supplierAmt, supplierSvc: supSvc, supplierGst: supGst,
-        supplierCancel: supCancel, supplierCancelGst: supCancelGst, cancelRecover: s.cancelRecover !== false,
-        incentiveAmt, incentiveGst, incentiveTds,
-        lines, subtotal: ourIncome, taxAmt, gstMode: s.gstMode, gstPct: +s.gstPct || 0, total,
-        againstInvoice: s.againstInvoice, againstPurchase: s.againstPurchase || '', linkNo: s.againstInvoice,
-        remarks: s.remarks || `Being ${kind}${s.againstInvoice ? ` against ${s.againstInvoice}` : ''}`,
-        status: 'saved',
-      };
-    },
+    toBody: (s, ctx) => buildRefundReissueBody(s, ctx, kind),
 
     validate: (s) => {
       const supplierAmt = +s.supplierAmt || 0;
@@ -225,6 +200,10 @@ function makeRefundReissue(kind) {
     },
 
     fields: (props) => <RefundReissueFields {...props} kind={kind} />,
+    // The refund/reissue field component renders its OWN live JV right under the form,
+    // so the shell's generic editor journal would just duplicate it. (Post-save view
+    // still shows the shell journal.)
+    hideShellJournal: true,
   };
 }
 
@@ -319,6 +298,12 @@ function makeAdmAcm(kind) {
         reasonCode: s.reasonCode || '',
         counterParty: s.counterParty, counterPartyGroup: 'Sundry Creditors', againstInvoice: s.againstInvoice || '',
         gstMode: taxAmt > 0 ? s.gstMode : '', gstPct,
+        // The current ADM/ACM is BSP-only single-amount (posts from subtotal/total).
+        // Emit lines:[] EXPLICITLY so editing a legacy memo that still carries the old
+        // passOn-shape income lines wipes them — otherwise admLines/acmLines would post
+        // the stale line amount instead of the edited subtotal (a partial $set update
+        // wouldn't clear an omitted key). Same stale-field class as the party-edit bug.
+        lines: [],
         subtotal: amount, taxAmt, supplierAmt: amount, total: r2(amount + taxAmt),
         remarks: s.remarks || `Being ${isAdm ? 'Agent Debit' : 'Agent Credit'} Memo${s.reasonCode ? ` (${s.reasonCode})` : ''}`,
         status: 'saved',

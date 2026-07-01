@@ -8,7 +8,8 @@
 
 import React, { useState } from 'react';
 import { Plus, Download } from 'lucide-react';
-import { ACTIVE_CURRENCIES } from '../../../core/data';
+import { ACTIVE_CURRENCIES, currencySymbol } from '../../../core/data';
+import { money } from '../../../core/format';
 import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { exportToExcel } from '../../../core/exportExcel';
 import { PageLayout } from '../../../shell/PageLayout';
@@ -16,7 +17,9 @@ import { Modal, Button, Input, Select, FormField, ResponsiveGrid, StatusPill } f
 import { clickable } from '../../../core/ux/clickable';
 
 const TYPE_TONE = { Retail: 'info', Corporate: 'warning', Local: 'success', Online: 'success' };
-const f = (n) => '₹' + Number(Math.round(n)).toLocaleString('en-IN');
+// Per-agent figures format in the agent's own currency; cross-agent aggregates
+// (which may mix currencies) fall back to the ₹ house base.
+const f = (n, code) => money(n, currencySymbol(code) || '₹');
 const blankForm = { name: '', iata: '', email: '', phone: '', type: 'Retail', city: '', currency: 'INR', commType: 'Percentage of GP', commRate: 10, creditLimit: 200000, creditDays: 30, paymentCycle: 'Monthly' };
 
 export function MastersSubAgents() {
@@ -81,18 +84,18 @@ export function MastersSubAgents() {
                 <StatusPill tone={tone} size="sm">{s.type}</StatusPill>
               </div>
               <div className="mb-2.5 grid grid-cols-3 gap-2">
-                <Stat l="YTD Revenue" v={f(s.revYTD)} />
-                <Stat l="YTD GP" v={f(s.gpYTD)} c="#3fb7a3" />
+                <Stat l="YTD Revenue" v={f(s.revYTD, s.currency)} />
+                <Stat l="YTD GP" v={f(s.gpYTD, s.currency)} c="#3fb7a3" />
                 <Stat l="Bookings" v={String(s.books)} />
               </div>
               <div className="flex justify-between border-t border-surface-alt pt-2 text-[10.5px] text-ink-muted">
-                <span>Commission: <b className="text-navy">{s.commType.includes('%') ? `${s.commRate}%` : `₹${s.commRate}/booking`}</b></span>
+                <span>Commission: <b className="text-navy">{s.commType.includes('%') ? `${s.commRate}%` : `${f(s.commRate, s.currency)}/booking`}</b></span>
                 <span>Cycle: <b className="text-navy">{s.paymentCycle}</b></span>
                 <span>Credit: <b className="text-navy">{s.creditDays}d</b></span>
               </div>
               {open && (
                 <div className="mt-3 rounded-lg bg-surface-alt p-3" onClick={(e) => e.stopPropagation()}>
-                  {[{ l: 'IATA No.', v: s.iata || 'Non-IATA' }, { l: 'Email', v: s.email }, { l: 'Phone', v: s.phone }, { l: 'Territory', v: s.territory }, { l: 'Currency', v: s.currency }, { l: 'Credit Limit', v: f(s.creditLimit) }, { l: 'Joined', v: s.joined }].map((r, i) => (
+                  {[{ l: 'IATA No.', v: s.iata || 'Non-IATA' }, { l: 'Email', v: s.email }, { l: 'Phone', v: s.phone }, { l: 'Territory', v: s.territory }, { l: 'Currency', v: s.currency }, { l: 'Credit Limit', v: f(s.creditLimit, s.currency) }, { l: 'Joined', v: s.joined }].map((r, i) => (
                     <div key={i} className="flex gap-2 border-b border-surface-border py-1 text-[10.5px]"><span className="min-w-[100px] shrink-0 text-ink-muted">{r.l}</span><span className="font-medium text-navy">{r.v}</span></div>
                   ))}
                   <div className="mt-2 flex gap-1.5">

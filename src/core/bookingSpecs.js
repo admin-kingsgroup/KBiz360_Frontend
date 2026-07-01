@@ -11,22 +11,22 @@
 //   'perRow'  → each line carries its own gstPct
 
 const HOTEL_COLS = [
-  { key: 'passenger', label: 'Guest Name',   type: 'text' },
+  { key: 'passenger', label: 'PAX Name',     type: 'text' },
   { key: 'ci',        label: 'Check-in',     type: 'date' },
   { key: 'co',        label: 'Check-out',    type: 'date' },
   { key: 'rtype',     label: 'Room Type',    type: 'text' },
   { key: 'meal',      label: 'Meal',         type: 'select', options: ['EP', 'CP', 'MAP', 'AP'] },
-  { key: 'basic',     label: 'Room/Basic',   type: 'number', money: true },
+  { key: 'basic',     label: 'Base Fare',    type: 'number', money: true },
   { key: 'taxes',     label: 'Taxes',        type: 'number', money: true },
-  { key: 'otherTax',  label: 'Other Tax',    type: 'number', money: true },
+  { key: 'otherTax',  label: 'Other Taxes',  type: 'number', money: true },
 ];
 
 const VISA_COLS = [
-  { key: 'name',     label: 'Applicant',    type: 'text' },
+  { key: 'name',     label: 'PAX Name',     type: 'text' },
   { key: 'pp',       label: 'Passport',     type: 'text' },
   { key: 'country',  label: 'Visa Country', type: 'text' },
   { key: 'vtype',    label: 'Visa Type',    type: 'text' },
-  { key: 'vfsFee',   label: 'VFS Fee',      type: 'number', money: true },
+  { key: 'vfsFee',   label: 'Base Fare',    type: 'number', money: true },
   { key: 'taxes',    label: 'Taxes',        type: 'number', money: true },
   { key: 'otherTax', label: 'Other Taxes',  type: 'number', money: true },
 ];
@@ -36,16 +36,16 @@ const CAR_COLS = [
   { key: 'pickup',    label: 'Pickup',     type: 'text' },
   { key: 'drop',      label: 'Drop',       type: 'text' },
   { key: 'days',      label: 'Days',       type: 'number' },
-  { key: 'basic',     label: 'Basic',      type: 'number', money: true },
+  { key: 'basic',     label: 'Base Fare',  type: 'number', money: true },
   { key: 'otherFare', label: 'Other Fare', type: 'number', money: true },
 ];
 
 const INSURANCE_COLS = [
-  { key: 'name',     label: 'Insurer / Name', type: 'text' },
+  { key: 'name',     label: 'PAX Name',       type: 'text' },
   { key: 'pp',       label: 'Passport',       type: 'text' },
   { key: 'dest',     label: 'Destination',    type: 'text' },
-  { key: 'basic',    label: 'Premium',        type: 'number', money: true },
-  { key: 'otherTax', label: 'Other Tax',      type: 'number', money: true },
+  { key: 'basic',    label: 'Base Fare',      type: 'number', money: true },
+  { key: 'otherTax', label: 'Other Taxes',    type: 'number', money: true },
 ];
 
 const HOLIDAY_COLS = [
@@ -62,14 +62,14 @@ const MISC_COLS = [
 ];
 
 const FLIGHT_COLS = [
-  { key: 'passenger', label: 'Passenger', type: 'text' },
+  { key: 'passenger', label: 'PAX Name',  type: 'text' },
   { key: 'ticket',    label: 'Ticket no.', type: 'text' },
   { key: 'airline',   label: 'Airline',   type: 'text' },
   { key: 'sector',    label: 'Sector',    type: 'text' },
   { key: 'cls',       label: 'Class',     type: 'select', options: ['Economy', 'Premium Economy', 'Business', 'First'] },
-  { key: 'base',      label: 'Base fare', type: 'number', money: true },
-  { key: 'k3',        label: 'K3',        type: 'number', money: true },
-  { key: 'otherTax',  label: 'Other taxes', type: 'number', money: true },
+  { key: 'base',      label: 'Base Fare', type: 'number', money: true },
+  { key: 'k3',        label: 'K3 Tax',    type: 'number', money: true },
+  { key: 'otherTax',  label: 'Other Taxes', type: 'number', money: true },
 ];
 
 export const BOOKING_SPECS = {

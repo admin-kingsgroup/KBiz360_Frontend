@@ -31,6 +31,7 @@ ROOTS.forEach((r) => walk(r, []));
 // A few high-traffic routes that live outside the menu tree (or under aliases).
 const EXTRA = {
   '/dashboard': ['Dashboard'],
+  '/dashboard/owner': ['Dashboards', 'Owner Dashboard'],
   '/ledger': ['Finance', 'Books', 'Ledger Account'],
   '/day-book': ['Finance', 'Books', 'Day Book'],
   '/finance/cash-book': ['Finance', 'Books', 'Cash Book'],
@@ -39,6 +40,9 @@ const EXTRA = {
   '/accounts/client-reco': ['Accounts', 'Reconciliation', 'Client Reconciliation'],
   '/accounts/supplier-reco': ['Accounts', 'Reconciliation', 'Supplier Reconciliation'],
   '/accounts/interbranch-reco': ['Accounts', 'Reconciliation', 'Inter-branch Reconciliation'],
+  '/accounts/inb-register': ['Accounts', 'Reconciliation', 'Inter-Branch Register'],
+  '/accounts/inb-counterparty': ['Accounts', 'Inter Branch', 'Counterparty Ledger'],
+  '/transactions/inb-approvals': ['Finance', 'Approvals', 'INB SPG'],
   '/accounts/tally-reco': ['Accounts', 'Reconciliation', 'Tally Reconciliation'],
   '/finance/reco-queue': ['Accounts', 'Reconciliation', 'Reconciliation Queue'],
   '/import': ['Admin', 'Import / Export', 'Data Import'],

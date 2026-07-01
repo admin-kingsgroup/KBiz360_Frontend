@@ -5,15 +5,16 @@
 // through the normal approval queue — nothing posts to the books here.
 import React, { useMemo, useState } from 'react';
 import { bc, card } from '../core/styles';
+import { localeOf } from '../core/format';
 import { useOutstanding, usePaymentRun } from '../core/useAccounting';
 import { buildPaymentRunPayload, paymentRunSummary } from './paymentRunPayload';
 import { Wallet, CheckSquare, Square, ArrowRight } from 'lucide-react';
 
-const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#e1e3ec', amber: '#854F0B' };
-const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
+const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8', amber: '#854F0B' };
+const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
 const brLabel = (b) => (b === 'ALL' || !b ? 'All Branches' : (b.name || b.code || b));
 const th = { padding: '8px 12px', background: C.dark, color: C.gold, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'left', whiteSpace: 'nowrap' };
-const td = { padding: '8px 12px', borderBottom: '1px solid #f0f2f7', fontSize: 12.5 };
+const td = { padding: '8px 12px', borderBottom: '1px solid #dfe2e7', fontSize: 12.5 };
 const rnum = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 const fld = { padding: '6px 10px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12.5 };
 
@@ -85,21 +86,30 @@ export function PaymentRun({ branch, setRoute }) {
             {['NEFT', 'RTGS', 'UPI', 'Cheque', 'Cash'].map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
         </label>
-        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 18 }}>
           {outQ.isLoading ? (
             <>
-              <div className="kb-skeleton" style={{ height: 11, width: 120, borderRadius: 5, marginLeft: 'auto' }} />
-              <div className="kb-skeleton" style={{ height: 20, width: 110, borderRadius: 6, marginTop: 6, marginLeft: 'auto' }} />
+              <div className="kb-skeleton" style={{ height: 30, width: 130, borderRadius: 6 }} />
+              <div className="kb-skeleton" style={{ height: 40, width: 150, borderRadius: 8 }} />
             </>
           ) : (
             <>
-              <div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>{summary.bills} bills · {summary.suppliers} supplier{summary.suppliers === 1 ? '' : 's'}</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: C.dark }}>{money(cur, summary.total)}</div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>{summary.bills} bills · {summary.suppliers} supplier{summary.suppliers === 1 ? '' : 's'}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: C.dark }}>{money(cur, summary.total)}</div>
+              </div>
+              <button disabled={!summary.bills || run.isPending} onClick={submit}
+                style={{
+                  padding: '11px 22px', fontSize: 13.5, fontWeight: 800, border: 'none', borderRadius: 8,
+                  cursor: summary.bills ? 'pointer' : 'not-allowed', color: '#fff', background: C.amber,
+                  opacity: !summary.bills || run.isPending ? 0.6 : 1,
+                  boxShadow: summary.bills && !run.isPending ? '0 3px 10px rgba(133,79,11,0.35)' : 'none',
+                  display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap', transition: 'transform .1s, box-shadow .1s',
+                }}>
+                {run.isPending ? 'Posting…' : <>Post {summary.suppliers} payment{summary.suppliers === 1 ? '' : 's'} <ArrowRight size={14} /></>}
+              </button>
             </>
           )}
-          <button disabled={!summary.bills || run.isPending} onClick={submit}
-            style={{ marginTop: 6, padding: '8px 16px', fontSize: 13, fontWeight: 800, border: 'none', borderRadius: 6, cursor: summary.bills ? 'pointer' : 'not-allowed', color: '#fff', background: C.amber, opacity: !summary.bills || run.isPending ? 0.6 : 1 }}>
-            {run.isPending ? 'Posting…' : `Post ${summary.suppliers} payment${summary.suppliers === 1 ? '' : 's'}`}</button>
         </div>
       </div>
 

@@ -24,12 +24,12 @@ import { createPortal } from 'react-dom';
 import { Menu, X, ChevronDown, Bell, Printer, Eye } from 'lucide-react';
 import { KBIZ_LOGO } from '../core/brand';
 import { getMenu } from '../core/menus';
-import { useNotifRefresh } from '../core/hooks';
-import { getUnreadCount } from '../core/business-logic';
+import { useAlerts } from '../core/useAccounting';
 import { openPrintPreview } from '../core/PrintPreview';
 import { useFyStore, FY_OPTIONS } from '../store/fy';
 import { ModuleSearch } from './ModuleSearch';
 import { BranchSwitcher } from './BranchSwitcher';
+import { FxRateChip } from './FxRateChip';
 import { NotifPanel } from './NotifPanel';
 import { UserMenu } from './UserMenu';
 import { useFocusTrap, getFocusable } from '../core/ux/focus';
@@ -62,16 +62,56 @@ function buildColumns(children = []) {
   return cols;
 }
 
+/* Pack the (already-built) titled groups into `k` balanced columns WITHOUT
+   splitting a group and WITHOUT reordering — so the workflow clusters stay in
+   reading order while column heights stay as even as possible. Classic "split a
+   sequence into k contiguous segments minimising the tallest segment" DP (n and k
+   are tiny here, so the O(n²·k) cost is irrelevant). Returns an array of columns,
+   each an array of groups. Replaces the old CSS-masonry flow, which merged
+   unrelated groups in one column and produced ragged, unbalanced heights. */
+function packColumns(groups, k) {
+  const n = groups.length;
+  const parts = Math.max(1, Math.min(k, n));
+  if (parts >= n) return groups.map((g) => [g]);
+  // weight ≈ rendered height: one row per item (leaves + sub-dividers) + a header.
+  const w = groups.map((g) => (g.items?.length || 0) + 1);
+  const prefix = [0];
+  for (let i = 0; i < n; i++) prefix.push(prefix[i] + w[i]);
+  const segSum = (a, b) => prefix[b] - prefix[a]; // weight of groups [a, b)
+  const dp = Array.from({ length: parts + 1 }, () => Array(n + 1).fill(Infinity));
+  const cut = Array.from({ length: parts + 1 }, () => Array(n + 1).fill(0));
+  dp[0][0] = 0;
+  for (let p = 1; p <= parts; p++) {
+    for (let i = 1; i <= n; i++) {
+      for (let j = p - 1; j < i; j++) {
+        const val = Math.max(dp[p - 1][j], segSum(j, i));
+        if (val < dp[p][i]) { dp[p][i] = val; cut[p][i] = j; }
+      }
+    }
+  }
+  const bounds = [];
+  let i = n;
+  for (let p = parts; p >= 1; p--) { bounds.unshift([cut[p][i], i]); i = cut[p][i]; }
+  return bounds.map(([a, b]) => groups.slice(a, b));
+}
+
 /* A single leaf link inside a mega-menu / accordion. */
 function Leaf({ node, route, go }) {
   if (!node) return null;
   if (node.divider) {
-    return <div className="px-2.5 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-ink-subtle">{node.label}</div>;
+    // Second-tier label (a sub-section inside a boxed group). Smaller than the
+    // royal-blue group title, bold, in champagne gold — with a hairline rule
+    // separating consecutive sub-sections (reset for the first one).
+    return (
+      <div className="mt-2 border-t border-surface-border/70 px-2.5 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-wide text-gold-dark underline decoration-1 underline-offset-[3px] first:mt-0 first:border-t-0 first:pt-0">
+        {node.label}
+      </div>
+    );
   }
   if (node.children) {
     return (
       <div className="pt-1">
-        <div className="px-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-ink-subtle">{node.label}</div>
+        <div className="px-2.5 pb-1 text-[10.5px] font-bold uppercase tracking-wider text-gold-dark underline decoration-1 underline-offset-[3px]">{node.label}</div>
         <div className="space-y-0.5">{node.children.map((c, i) => <Leaf key={i} node={c} route={route} go={go} />)}</div>
       </div>
     );
@@ -85,7 +125,7 @@ function Leaf({ node, route, go }) {
       className={cn(
         'group/leaf flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] transition',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50',
-        active ? 'bg-navy/5 font-semibold text-navy' : 'font-medium text-ink-muted hover:bg-navy/5 hover:text-navy',
+        active ? 'bg-navy/5 font-semibold text-navy' : 'font-medium text-ink hover:bg-navy/5 hover:text-navy',
       )}
     >
       <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full transition', active ? 'bg-gold' : 'bg-transparent group-hover/leaf:bg-gold/60')} />
@@ -162,7 +202,7 @@ function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave, autoFocus
   // Balanced, contained sizing. Pick a column count from the group count, capped at
   // 5 and by what the viewport can actually fit, then derive a fixed panel width.
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
-  const COL_W = 220, COL_GAP = 24, PAD = 16;
+  const COL_W = 248, COL_GAP = 16, PAD = 16; // wider columns → long labels stop ellipsing
   const fitCols = Math.max(1, Math.floor((vw - 16 - 2 * PAD + COL_GAP) / (COL_W + COL_GAP)));
   const colCount = Math.max(1, Math.min(groups.length || 1, 5, fitCols));
   const panelW = Math.min(colCount * COL_W + (colCount - 1) * COL_GAP + 2 * PAD, vw - 16);
@@ -189,15 +229,25 @@ function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave, autoFocus
           </div>
         )}
         {groups.length > 0 && (
-          <div style={{ columnCount: colCount, columnGap: COL_GAP }}>
-            {groups.map((col, ci) => (
-              <div key={ci} className="mb-4" style={{ breakInside: 'avoid' }}>
-                <div className="mb-1.5 border-b border-surface-border px-2.5 pb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-ink-subtle">
-                  {col.title}
-                </div>
-                <div className="space-y-0.5">
-                  {col.items.map((c, i) => <Leaf key={i} node={c} route={route} go={go} />)}
-                </div>
+          // Balanced, order-preserving columns. Each group is a self-contained
+          // CARD so stacked groups read as distinct units (the old masonry let
+          // unrelated groups bleed into one another). The navy boxed title is the
+          // primary tier; sub-section dividers inside are the muted second tier.
+          <div className="flex items-start" style={{ gap: COL_GAP }}>
+            {packColumns(groups, colCount).map((colGroups, ci) => (
+              <div key={ci} className="flex flex-1 flex-col gap-2.5" style={{ minWidth: 0 }}>
+                {colGroups.map((col, gi) => (
+                  <section key={gi} className="rounded-xl border border-surface-border bg-surface-alt/50 p-2.5">
+                    {/* Primary tier — larger, bold, UNDERLINED group title in the
+                        on-theme deep-teal brand colour (pairs with the gold sub-sections). */}
+                    <div className="px-2.5 pb-1.5 text-sm font-bold uppercase tracking-wide text-[#2F7A8E] underline decoration-2 underline-offset-4">
+                      {col.title}
+                    </div>
+                    <div className="mt-1.5 space-y-0.5">
+                      {col.items.map((c, i) => <Leaf key={i} node={c} route={route} go={go} />)}
+                    </div>
+                  </section>
+                ))}
               </div>
             ))}
           </div>
@@ -348,8 +398,13 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
   const mobileDrawerRef = useRef(null);
-  useNotifRefresh();
-  const unread = getUnreadCount();
+  // Bell badge + critical banner read the live alert feed (same source as the
+  // Alerts Dashboard). Alerts are branch-specific and auto-resolve, so `open` is
+  // simply the live set; `critical` = open errors. (Consolidated view → empty.)
+  const alertsQ = useAlerts(branch);
+  const openAlerts = useMemo(() => alertsQ.data?.alerts || [], [alertsQ.data]);
+  const unread = openAlerts.length;
+  const critical = useMemo(() => openAlerts.filter((a) => a.severity === 'error'), [openAlerts]);
   const menu = useMemo(() => getMenu(branch, currentUser), [branch, currentUser]);
   const go = (href) => { if (href) setRoute(href); setMobileOpen(false); };
 
@@ -415,6 +470,7 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
             )}
           </div>
 
+          <FxRateChip branch={branch} />
           <div className="hidden wide:block"><FySelector /></div>
           <div className="hidden w-[150px] desktop:block 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
 
@@ -468,6 +524,24 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
           </div>
         )}
         {subBar && <div className="noprint shrink-0">{subBar}</div>}
+        {/* App-wide critical-alert banner — open 🔴 issues for the active branch
+            (Trial Balance out, negative bank, suspense, can't-post vouchers, bounced
+            cheques, ADM window closed). One click jumps to the Alerts Dashboard. */}
+        {critical.length > 0 && route !== '/dashboard/alerts' && (
+          <button
+            type="button"
+            onClick={() => setRoute && setRoute('/dashboard/alerts')}
+            className="noprint flex w-full shrink-0 items-center justify-between gap-3 border-b border-danger/30 bg-danger/[0.08] px-4 py-2 text-left text-[12px] font-semibold text-danger transition-colors hover:bg-danger/[0.12]"
+          >
+            <span className="flex items-center gap-2 min-w-0">
+              <span aria-hidden="true">🔴</span>
+              <span className="truncate">
+                {critical.length} critical issue{critical.length > 1 ? 's' : ''} need attention — {critical.slice(0, 2).map((a) => a.title).join(' · ')}{critical.length > 2 ? ` +${critical.length - 2} more` : ''}
+              </span>
+            </span>
+            <span className="shrink-0 whitespace-nowrap">Review →</span>
+          </button>
+        )}
         <main className="min-h-0 flex-1 overflow-y-auto bg-surface-alt">{children}</main>
       </div>
 
@@ -475,7 +549,7 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
       {showNotif && (
         <>
           <div className="noprint fixed inset-0 z-[599]" onClick={() => setShowNotif(false)} />
-          <NotifPanel onClose={() => setShowNotif(false)} setRoute={(r) => { setRoute && setRoute(r); setShowNotif(false); }} />
+          <NotifPanel branch={branch} onClose={() => setShowNotif(false)} setRoute={(r) => { setRoute && setRoute(r); setShowNotif(false); }} />
         </>
       )}
     </div>

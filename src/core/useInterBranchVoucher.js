@@ -32,11 +32,43 @@ export function useInbReconcile(branch) {
   });
 }
 
+// Inter-branch P&L breakdown: counterparty branch → module → component.
+export function useInbPnlBreakdown(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['inb', 'pnl', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/inter-branch/pnl-breakdown', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 15_000,
+  });
+}
+
+// Seller→buyer trade matrix + per-pair margin (SVF income vs discount given).
+export function useInbMatrix({ from, to } = {}) {
+  return useQuery({
+    queryKey: ['inb', 'matrix', from || '', to || ''],
+    queryFn: () => apiGet('/api/inter-branch/matrix', { from, to }),
+    enabled: enabled(),
+    staleTime: 15_000,
+  });
+}
+
+// Per-counterparty date-ordered statement of inter-branch deals (the registry ledger).
+export function useInbCounterparty(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['inb', 'counterparty', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/inter-branch/counterparty', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 15_000,
+  });
+}
+
 function useInbMutation(mutationFn) {
   const qc = useQueryClient();
   return useMutation({ mutationFn, onSuccess: () => qc.invalidateQueries({ queryKey: ['inb'] }) });
 }
 
 export const useCreateInb = () => useInbMutation((body) => apiPost('/api/inter-branch', body));
-export const useBookInb   = () => useInbMutation(({ inbLinkNo, ...body }) => apiPost(`/api/inter-branch/${encodeURIComponent(inbLinkNo)}/book`, body));
-export const useReopenInb = () => useInbMutation(({ inbLinkNo }) => apiPost(`/api/inter-branch/${encodeURIComponent(inbLinkNo)}/reopen`));
+export const useBookInb   = () => useInbMutation(({ id, ...body }) => apiPost(`/api/inter-branch/${id}/book`, body));
+export const useReopenInb = () => useInbMutation(({ id }) => apiPost(`/api/inter-branch/${id}/reopen`));

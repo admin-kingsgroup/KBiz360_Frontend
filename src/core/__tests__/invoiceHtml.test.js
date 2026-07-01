@@ -41,15 +41,15 @@ describe('buildBookingInvoice — sales invoice', () => {
   test('Hotel (SHT) sale breakdown renders its own fareCols + reference columns', () => {
     const hotel = { ...booking, module: 'SHT', rows: [{ fn: 'Priya', sn: 'Nair', htl: 'Taj', conf: 'HT55', base: 18000, tax: 900, markup: 2000, ssvc: 300 }] };
     const html = buildBookingInvoice(hotel, 'sale', { code: 'BOM' }, {});
-    expect(html).toContain('Room / Basic'); // SHT fareCols[0].label
-    expect(html).toContain('Hotel');        // idCols ref label
-    expect(html).toContain('Conf. No');     // idCols ref label
+    expect(html).toContain('Base Fare');    // SHT fareCols[0].label (unified across modules)
+    expect(html).toContain('Hotel');        // idCols ref label (module-specific)
+    expect(html).toContain('Conf. No');     // idCols ref label (module-specific)
   });
 
   test('Holiday package (SH) sale breakdown drops Service Charge and uses 5% GST', () => {
     const hol = { ...booking, module: 'SH', rows: [{ fn: 'Rahul', sn: 'Mehta', pkg: 'Bali 5N', ref: 'HL22', base: 85000, psvc: 1000, psvcGst: 180, markup: 12000 }] };
     const html = buildBookingInvoice(hol, 'sale', { code: 'BOM' }, {});
-    expect(html).toContain('Land Package');             // SH fareCols[0].label
+    expect(html).toContain('Package');                  // SH idCols ref label (module-specific)
     expect(html).toContain('GST/Other Taxes (5%)');     // package rate
     expect(html).not.toContain('Service Chg');          // no service charge on the package model
   });
@@ -111,5 +111,51 @@ describe('buildBookingInvoice — purchase invoice', () => {
     expect(html).toContain('Supplier Service');
     expect(html).toContain('Supplier Incentive');
     expect(html).toContain('TDS (2%)');
+  });
+});
+
+describe('buildBookingInvoice — hidden-margin fold (everywhere)', () => {
+  beforeEach(() => { companyProfile.mockReturnValue({}); hsnSacFor.mockReturnValue(''); });
+  test('India sale never shows a Service Charge - 2 / SVC2 column (folded into Taxes)', () => {
+    const html = buildBookingInvoice(booking, 'sale', { code: 'BOM' }, {});
+    expect(html).not.toContain('Service Charge - 2');
+    expect(html).not.toContain('SVC2');
+  });
+});
+
+describe('buildBookingInvoice — Africa VAT branch (NBO)', () => {
+  beforeEach(() => { companyProfile.mockReturnValue({}); hsnSacFor.mockReturnValue(''); });
+  const nbo = {
+    branch: 'NBO', module: 'SF', date: '2026-06-18', saleVno: 'NBO/0626/SF0001', linkNo: 'LK/NBO/0001',
+    customer: { name: 'Safari Ltd', gstin: 'P051234567X', ledgerGroup: 'B2B' },
+    so: { lineTotal: 1000, serviceCharge: 100, gst: 16, otherTaxesGst: 14, total: 1130 },
+    rows: [{ fn: 'Amani', sn: 'K', base: 1000, k3: 0, tax: 0, markup: 100 }],
+  };
+
+  test('shows a single VAT line — no GST/CGST/SGST and no Place of Supply', () => {
+    const html = buildBookingInvoice(nbo, 'sale', { code: 'NBO' }, {});
+    expect(html).toContain('>VAT<');           // one VAT line in the summary
+    expect(html).not.toContain('CGST');
+    expect(html).not.toContain('SGST');
+    expect(html).not.toContain('Place of Supply');
+  });
+
+  test('party tax id is labelled VAT Reg No, never GSTIN', () => {
+    const html = buildBookingInvoice(nbo, 'sale', { code: 'NBO' }, {});
+    expect(html).toContain('VAT Reg No');
+    expect(html).not.toContain('GSTIN');
+  });
+
+  test('SVC2 margin hidden + NET TOTAL in USD (books currency)', () => {
+    const html = buildBookingInvoice(nbo, 'sale', { code: 'NBO' }, {});
+    expect(html).not.toContain('Service Charge - 2');
+    expect(html).toContain('NET TOTAL (USD)');
+  });
+
+  test('local-currency print converts every amount at the FX rate + footnote', () => {
+    const html = buildBookingInvoice(nbo, 'sale', { code: 'NBO' }, {}, { fxRate: 130, localCurrency: 'KES', fxDate: '2026-06-29' });
+    expect(html).toContain('Converted at 1 USD = 130.00 KES');
+    expect(html).toContain('NET TOTAL (KES)');
+    expect(html).toContain('146,900.00'); // 1130 × 130, western grouping
   });
 });

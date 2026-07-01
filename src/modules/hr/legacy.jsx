@@ -8,20 +8,21 @@ import { AlertTriangle, BarChart2, Calendar, Check, Download, Lock, Plus, Save, 
 import { openPrintPreview } from '../../core/PrintPreview';
 import { Legend, Line } from 'recharts';
 import { BRANCHES, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../../core/data';
-import { fmt, fmtINR, compactAmt } from '../../core/format';
-import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, _LEAVE_BALANCES, cardStyle, tabPanel } from '../../core/helpers';
+import { fmt, fmtINR, compactAmt, localeOf } from '../../core/format';
+import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, cardStyle, tabPanel } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../../core/useReference';
 import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { fromEmpDTO, toEmpPayload, BLANK_EMP } from './employeeMap';
-import { fromLeaveDTO, toLeavePayload, leaveDays, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from './hrMaps';
+import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, takenFor, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from './hrMaps';
 import { buildRevisionDue } from './hrReports';
 import { todayISO } from '../../core/dates';
 import { toast } from '../../core/ux/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPut, getAuthToken } from '../../core/api';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../../core/styles';
+import { MiniBar } from '../../core/insightsUI';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 
 export function ExpenseBudget({branch,setRoute}){
@@ -64,10 +65,10 @@ export function ExpenseBudget({branch,setRoute}){
   const updM=(id,v)=>setDraft(d=>({...d,[id]:{...d[id],monthly:+v,yearly:Math.round(+v*12)}}));
   const updY=(id,v)=>setDraft(d=>({...d,[id]:{...d[id],yearly:+v,monthly:Math.round(+v/12)}}));
   const f=n=>compactAmt(n,{currency:'',dash:true}); // canonical compact (fixes 1–10 lakh shown as "K")
-  const ff=n=>n>0?cur+Number(n).toLocaleString("en-IN"):"—";
+  const ff=n=>n>0?cur+Number(n).toLocaleString(localeOf(cur)):"—";
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -98,7 +99,7 @@ export function ExpenseBudget({branch,setRoute}){
           <p style={{margin:"auto 6px auto 0",fontSize:10.5,color:"#5a6691",fontWeight:600}}>Configure branch:</p>
           {BRANCHES.map(b=>(
             <button key={b.code} onClick={()=>{setActiveBr(b);setEditing(false);setDraft(null);}}
-              style={{padding:"5px 12px",borderRadius:7,border:"1px solid #e1e3ec",fontSize:11,cursor:"pointer",
+              style={{padding:"5px 12px",borderRadius:7,border:"1px solid #cdd1d8",fontSize:11,cursor:"pointer",
                 fontWeight:brCode===b.code?700:400,
                 background:brCode===b.code?"#0d1326":"#fff",
                 color:brCode===b.code?"#d4a437":"#5a6691"}}>
@@ -137,7 +138,7 @@ export function ExpenseBudget({branch,setRoute}){
               const pct=totM>0?+(t.monthly/totM*100).toFixed(1):0;
               const gc=GRP_COLORS[l.group]||"#384677";
               return (
-                <tr key={l.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+                <tr key={l.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"10px 14px"}}>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
                       <span style={{fontSize:16}}>{l.icon}</span>
@@ -162,8 +163,8 @@ export function ExpenseBudget({branch,setRoute}){
             })}</tbody>
             <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
               <td colSpan={2} style={{padding:"11px 14px",fontWeight:700,color:"#d4a437",fontSize:12}}>TOTAL — {fyObj.l} · {brCode}</td>
-              <td style={{padding:"11px 14px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:14}}>{cur+Number(totM).toLocaleString("en-IN")}/mo</td>
-              <td style={{padding:"11px 14px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums",fontSize:14}}>{cur+Number(totY).toLocaleString("en-IN")}/yr</td>
+              <td style={{padding:"11px 14px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:14}}>{cur+Number(totM).toLocaleString(localeOf(cur))}/mo</td>
+              <td style={{padding:"11px 14px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums",fontSize:14}}>{cur+Number(totY).toLocaleString(localeOf(cur))}/yr</td>
               {tab==="monthly"&&<td style={{padding:"11px 14px",textAlign:"right",color:"#d4a437",fontWeight:700}}>100%</td>}
             </tr></tfoot>
           </table>
@@ -182,8 +183,8 @@ export function ExpenseBudget({branch,setRoute}){
             <tbody>{visLedgers.map((l,i)=>{
               const t=tgts[l.id]||{monthly:0,yearly:0};
               return (
-                <tr key={l.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
-                  <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326",position:"sticky",left:0,background:i%2===0?"#fff":"#fafafa",borderRight:"1px solid #e1e3ec"}}>{l.icon} {l.name}</td>
+                <tr key={l.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
+                  <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326",position:"sticky",left:0,background:i%2===0?"#fff":"#fafafa",borderRight:"1px solid #cdd1d8"}}>{l.icon} {l.name}</td>
                   {fyObj.months.map((_,mi)=><td key={mi} style={{padding:"8px 8px",textAlign:"right",color:t.monthly>0?"#384677":"#bfc3d6",fontVariantNumeric:"tabular-nums"}}>{t.monthly>0?f(t.monthly):"—"}</td>)}
                   <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{t.yearly>0?f(t.yearly):"—"}</td>
                 </tr>
@@ -259,7 +260,7 @@ export function HrEmployees({branch}){
   const net=e=>gross(e)-deductions(e);
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
         flexWrap:"wrap",gap:10,marginBottom:14}}>
@@ -314,7 +315,7 @@ export function HrEmployees({branch}){
             const bc2=brCfg(e);
             const c=DEPT_CLR[e.dept]||"#384677";
             return (
-              <tr key={e._id||e.id} style={{borderBottom:"1px solid #f3f4f8",
+              <tr key={e._id||e.id} style={{borderBottom:"1px solid #dfe2e7",
                 background:i%2===0?"#fff":"#fafafa",cursor:"pointer"}}
                 onMouseEnter={ev=>ev.currentTarget.style.background="#f0f4ff"}
                 onMouseLeave={ev=>ev.currentTarget.style.background=i%2===0?"#fff":"#fafafa"}
@@ -373,7 +374,7 @@ export function HrEmployees({branch}){
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:600,
             maxHeight:"92vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
             {/* Modal header */}
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",
               position:"sticky",top:0,background:"#0d1326",
               display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#d4a437"}}>
@@ -436,7 +437,7 @@ export function HrEmployees({branch}){
                 </div>
               </div>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",
               display:"flex",justifyContent:"space-between",gap:8,position:"sticky",bottom:0,background:"#fff"}}>
               <div>{selected&&(
                 <button onClick={deleteEmp} disabled={remove.isPending}
@@ -457,11 +458,13 @@ export function HrEmployees({branch}){
 /* ── Attendance ───────────────────────────────────────────────── */
 
 export function HrAttendance({branch}){
-  const [month,setMonth]=useState("2026-05");
+  // Last 6 months through the current one, derived from the live clock (was hard-coded to
+  // Mar–May 2026, so the current month — where marks & the dashboard KPI live — couldn't
+  // even be selected). Default to the current month.
+  const MONTHS=(()=>{const out=[];const d=new Date();for(let i=0;i<6;i++){const dt=new Date(d.getFullYear(),d.getMonth()-i,1);out.push({v:`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`,l:dt.toLocaleString("en",{month:"short"})+" "+dt.getFullYear()});}return out;})();
+  const [month,setMonth]=useState(MONTHS[0].v);
   const [brFilter,setBrFilter]=useState(branch==="ALL"?"All":branch?.code||"All");
   const qc=useQueryClient();
-
-  const MONTHS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
   const STATUS_CLR={P:{bg:"#EAF3DE",c:"#27500A",l:"Present"},A:{bg:"#FCEBEB",c:"#A32D2D",l:"Absent"},
     L:{bg:"#FAEEDA",c:"#854F0B",l:"Leave"},H:{bg:"#E6F1FB",c:"#185FA5",l:"Holiday"},
     WO:{bg:"#f3f4f8",c:"#5a6691",l:"Week Off"}};
@@ -496,6 +499,28 @@ export function HrAttendance({branch}){
 
   const days=getDaysInMonth(month);
 
+  /* Bulk "mark all present" — one round-trip for the whole visible roster. Needs a single
+     concrete branch (all-scope + no branch filter → disabled). Working days = Mon–Sat;
+     Sundays are left unmarked (excluded from the % either way). */
+  const bulkBranch=brScope||(brFilter!=="All"?brFilter:"");
+  const curMonth=MONTHS[0].v; const isCurMonth=month===curMonth;
+  const upTo=isCurMonth?new Date().getDate():days;
+  const bulkMut=useMutation({
+    mutationFn:(body)=>apiPut('/api/attendance/mark-days',body),
+    onSuccess:(d)=>{qc.invalidateQueries({queryKey:['attendance',brScope||'ALL',month]});toast(`Marked ${d?.employees||0} employee(s) present`);},
+    onError:(err)=>toast(err?.message||"Bulk mark failed","error"),
+  });
+  const empPayload=()=>emps.map(e=>({empId:e.id,empName:e.name}));
+  const canBulk=!!bulkBranch&&emps.length>0&&!bulkMut.isPending;
+  const markToday=()=>{ if(!canBulk||!isCurMonth)return; bulkMut.mutate({branch:bulkBranch,month,days:[new Date().getDate()],status:"P",employees:empPayload()}); };
+  const fillWorking=()=>{
+    if(!canBulk)return;
+    const list=[]; for(let d=1;d<=upTo;d++){ if(getDay(d)!==0) list.push(d); }
+    if(!list.length)return;
+    if(!window.confirm(`Mark ${list.length} working day(s) as Present for ${emps.length} employee(s) in ${bulkBranch}? (existing marks on those days are overwritten)`))return;
+    bulkMut.mutate({branch:bulkBranch,month,days:list,status:"P",employees:empPayload()});
+  };
+
   /* Live status for a cell: an explicit mark wins; otherwise weekends default to
      Week Off and weekdays show unmarked ("—") — we never invent Present. */
   const getAtt=(emp,day)=>{
@@ -517,7 +542,7 @@ export function HrAttendance({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
         flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -537,6 +562,10 @@ export function HrAttendance({branch}){
           <select value={brFilter} onChange={e=>setBrFilter(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
             {HR_BRANCHES_F.map(b=><option key={b}>{b}</option>)}
           </select>
+          {isCurMonth&&<button onClick={markToday} disabled={!canBulk} title={bulkBranch?"Mark every listed employee Present today":"Pick a single branch to bulk-mark"}
+            style={{...btnG,fontSize:11,minHeight:32,opacity:canBulk?1:0.5,cursor:canBulk?"pointer":"not-allowed"}}>✓ All present today</button>}
+          <button onClick={fillWorking} disabled={!canBulk} title={bulkBranch?"Mark all working days (Mon–Sat) up to date as Present":"Pick a single branch to bulk-mark"}
+            style={{...btnGh,fontSize:11,minHeight:32,opacity:canBulk?1:0.5,cursor:canBulk?"pointer":"not-allowed"}}>Fill working days →</button>
         </div>
       </div>
 
@@ -579,10 +608,10 @@ export function HrAttendance({branch}){
           )}{emps.map((emp,ei)=>{
             const s=summary(emp);
             return (
-              <tr key={emp.id} style={{borderBottom:"1px solid #f3f4f8",
+              <tr key={emp.id} style={{borderBottom:"1px solid #dfe2e7",
                 background:ei%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"7px 12px",position:"sticky",left:0,
-                  background:ei%2===0?"#fff":"#fafafa",borderRight:"1px solid #e1e3ec"}}>
+                  background:ei%2===0?"#fff":"#fafafa",borderRight:"1px solid #cdd1d8"}}>
                   <p style={{margin:0,fontWeight:600,color:"#0d1326",fontSize:11}}>{emp.name}</p>
                   <p style={{margin:0,fontSize:9,color:"#5a6691"}}>{emp.branch} · {emp.dept}</p>
                 </td>
@@ -619,9 +648,11 @@ export function HrPayroll({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?"BOM":branch?.code||"BOM";
   const [tab,setTab]=useState("register"); // register | pf-esi | bankfile | form16 | journal
-  const [period,setPeriod]=useState("2026-05");
+  // Last 6 months through the current one (was hard-coded to Mar–May 2026, so the current
+  // month's payroll run — which drives the dashboard KPI — couldn't be opened).
+  const PERIODS=(()=>{const out=[];const d=new Date();for(let i=0;i<6;i++){const dt=new Date(d.getFullYear(),d.getMonth()-i,1);out.push({v:`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`,l:dt.toLocaleString("en",{month:"short"})+" "+dt.getFullYear()});}return out;})();
+  const [period,setPeriod]=useState(PERIODS[0].v);
   const [journalPosted,setJournalPosted]=useState(false);
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
 
   /* Live active employees for this branch (from the now-live Employee Master). */
   const empQ=useMasterList('employees', {branch:brCode});
@@ -700,7 +731,7 @@ export function HrPayroll({branch}){
   const jDr=journalEntries.filter(e=>e.side==="Dr").reduce((s,e)=>s+e.amount,0);
   const jCr=journalEntries.filter(e=>e.side==="Cr").reduce((s,e)=>s+e.amount,0);
   const balDiff=jDr-jCr; const balanced=balDiff>=-0.01&&balDiff<=0.01;
-  const hrpContainerStyle={padding:"12px 10px",maxWidth:1300,margin:"0 auto"};
+  const hrpContainerStyle={padding:"12px 10px",maxWidth:1600,margin:"0 auto"};
 
   return (
     <div style={hrpContainerStyle}>
@@ -733,7 +764,7 @@ export function HrPayroll({branch}){
       </div>
 
       {/* Tabs */}
-      <div style={{display:"flex",gap:0,background:"#f3f4f8",borderRadius:"9px 9px 0 0",border:"1px solid #e1e3ec",overflowX:"auto"}}>
+      <div style={{display:"flex",gap:0,background:"#f3f4f8",borderRadius:"9px 9px 0 0",border:"1px solid #cdd1d8",overflowX:"auto"}}>
         <button onClick={()=>setTab("register")} style={{flexShrink:0,padding:"9px 14px",border:"none",cursor:"pointer",fontSize:11,fontWeight:tab==="register"?700:500,color:tab==="register"?"#0d1326":"#5a6691",background:tab==="register"?"#fff":"transparent",borderRadius:"9px 9px 0 0"}}>📋 Payroll Register</button><button onClick={()=>setTab("pf-esi")} style={{flexShrink:0,padding:"9px 14px",border:"none",cursor:"pointer",fontSize:11,fontWeight:tab==="pf-esi"?700:500,color:tab==="pf-esi"?"#0d1326":"#5a6691",background:tab==="pf-esi"?"#fff":"transparent",borderRadius:"9px 9px 0 0"}}>🏦 PF / ESI</button><button onClick={()=>setTab("bankfile")} style={{flexShrink:0,padding:"9px 14px",border:"none",cursor:"pointer",fontSize:11,fontWeight:tab==="bankfile"?700:500,color:tab==="bankfile"?"#0d1326":"#5a6691",background:tab==="bankfile"?"#fff":"transparent",borderRadius:"9px 9px 0 0"}}>🏧 Bank File</button><button onClick={()=>setTab("form16")} style={{flexShrink:0,padding:"9px 14px",border:"none",cursor:"pointer",fontSize:11,fontWeight:tab==="form16"?700:500,color:tab==="form16"?"#0d1326":"#5a6691",background:tab==="form16"?"#fff":"transparent",borderRadius:"9px 9px 0 0"}}>📄 Form 16</button><button onClick={()=>setTab("journal")} style={{flexShrink:0,padding:"9px 14px",border:"none",cursor:"pointer",fontSize:11,fontWeight:tab==="journal"?700:500,color:tab==="journal"?"#0d1326":"#5a6691",background:tab==="journal"?"#fff":"transparent",borderRadius:"9px 9px 0 0"}}>📒 Journal</button>
       </div>
 
@@ -743,13 +774,13 @@ export function HrPayroll({branch}){
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:1000}}>
               <thead><tr style={{background:"#0d1326"}}>
-                {["Employee","Basic","HRA","Special","LWP","Gross","PF (E)","ESI (E)","Prof Tax","TDS","Net Pay"].map((h,i)=>(
+                {["Employee","Basic","HRA","Special","LWP","Gross","PF (E)","ESI (E)","Prof Tax","TDS","Net Pay","Take-home %"].map((h,i)=>(
                   <th key={i} style={{padding:"8px 10px",textAlign:i>1?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
                 {payroll.map((e,i)=>(
-                  <tr key={e.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+                  <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                     <td style={{padding:"8px 10px",fontWeight:600,color:"#0d1326",whiteSpace:"nowrap"}}>{e.name}</td>
                     <td style={{padding:"8px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(e.basic)}</td>
                     <td style={{padding:"8px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(e.hra)}</td>
@@ -761,6 +792,14 @@ export function HrPayroll({branch}){
                     <td style={{padding:"8px 10px",textAlign:"right",color:"#854F0B",fontVariantNumeric:"tabular-nums"}}>{e.profTax>0?f(e.profTax):"—"}</td>
                     <td style={{padding:"8px 10px",textAlign:"right",color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{e.tds>0?f(e.tds):"—"}</td>
                     <td style={{padding:"8px 10px",textAlign:"right",fontWeight:700,color:"#27500A",fontVariantNumeric:"tabular-nums"}}>{f(e.net)}</td>
+                    <td style={{padding:"8px 10px",minWidth:120}}>
+                      {(()=>{const th=e.gross>0?(e.net/e.gross)*100:0;return(
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:10,color:"#5a6691",width:34,textAlign:"right",flexShrink:0,fontVariantNumeric:"tabular-nums"}}>{th.toFixed(0)}%</span>
+                          <div style={{flex:1,minWidth:36}}><MiniBar pct={th} color={th>=85?"linear-gradient(90deg,#22c55e,#15803d)":th>=70?"linear-gradient(90deg,#3b82f6,#1d4ed8)":"linear-gradient(90deg,#f0a35e,#d97706)"} /></div>
+                        </div>
+                      );})()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -769,6 +808,7 @@ export function HrPayroll({branch}){
                 {[totals.gross*0.5,totals.gross*0.2,totals.gross*0.3,0,totals.gross,totals.empPF,totals.empESI,totals.profTax,totals.tds,totals.net].map((v,i)=>(
                   <td key={i} style={{padding:"8px 10px",textAlign:"right",fontWeight:700,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:11}}>{v>0?f(v):"—"}</td>
                 ))}
+                <td style={{padding:"8px 10px",textAlign:"right",fontWeight:700,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:11}}>{totals.gross>0?`${Math.round(totals.net/totals.gross*100)}%`:"—"}</td>
                 </tr>
               </tfoot>
             </table>
@@ -782,19 +822,19 @@ export function HrPayroll({branch}){
           <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:16}}>
             <div style={{...card,background:"#f9fafb"}}>
                 <p style={{margin:"0 0 12px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Provident Fund (EPFO)</p>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #e1e3ec"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employee Contribution (12% Basic)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Deducted from salary</p></div><span style={{fontSize:11,fontWeight:600,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(totals.empPF)}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #e1e3ec"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employer Contribution (12% Basic)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Company expense</p></div><span style={{fontSize:11,fontWeight:600,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(totals.empPFr)}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #e1e3ec"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:700,color:"#0d1326"}}>Total PF Deposit</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Via ECR by 15th</p></div><span style={{fontSize:12,fontWeight:800,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(totals.empPF+totals.empPFr)}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #e1e3ec"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Admin Charges (0.5%)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>0.5% of wages</p></div><span style={{fontSize:11,fontWeight:600,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(Math.round((totals.empPF+totals.empPFr)*0.005))}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #e1e3ec"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Deposit Deadline</p><p style={{margin:0,fontSize:9.5,color:"#A32D2D"}}>Late = 12% p.a. interest</p></div><span style={{fontSize:11,fontWeight:700,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>15 Jun 2026</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employee Contribution (12% Basic)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Deducted from salary</p></div><span style={{fontSize:11,fontWeight:600,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(totals.empPF)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employer Contribution (12% Basic)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Company expense</p></div><span style={{fontSize:11,fontWeight:600,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(totals.empPFr)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:700,color:"#0d1326"}}>Total PF Deposit</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Via ECR by 15th</p></div><span style={{fontSize:12,fontWeight:800,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(totals.empPF+totals.empPFr)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Admin Charges (0.5%)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>0.5% of wages</p></div><span style={{fontSize:11,fontWeight:600,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(Math.round((totals.empPF+totals.empPFr)*0.005))}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Deposit Deadline</p><p style={{margin:0,fontSize:9.5,color:"#A32D2D"}}>Late = 12% p.a. interest</p></div><span style={{fontSize:11,fontWeight:700,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>15 Jun 2026</span></div>
               </div>
               <div style={{...card,background:"#f9fafb"}}>
                 <p style={{margin:"0 0 12px",fontSize:12,fontWeight:700,color:"#0d1326"}}>ESI Corporation</p>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #e1e3ec"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employee Contribution (0.75%)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Deducted from gross</p></div><span style={{fontSize:11,fontWeight:600,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{f(totals.empESI)}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #e1e3ec"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employer Contribution (3.25%)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Company expense</p></div><span style={{fontSize:11,fontWeight:600,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{f(totals.empESIr)}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #e1e3ec"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:700,color:"#0d1326"}}>Total ESI Deposit</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Via EC by 15th</p></div><span style={{fontSize:12,fontWeight:800,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{f(totals.empESI+totals.empESIr)}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #e1e3ec"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Eligible employees</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Gross up to ₹21,000</p></div><span style={{fontSize:11,fontWeight:600,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{String(payroll.filter(e=>e.empESI>0).length)+" of "+String(emps.length)}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #e1e3ec"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Deposit Deadline</p><p style={{margin:0,fontSize:9.5,color:"#A32D2D"}}>Late = 12% p.a. interest</p></div><span style={{fontSize:11,fontWeight:700,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>15 Jun 2026</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employee Contribution (0.75%)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Deducted from gross</p></div><span style={{fontSize:11,fontWeight:600,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{f(totals.empESI)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employer Contribution (3.25%)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Company expense</p></div><span style={{fontSize:11,fontWeight:600,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{f(totals.empESIr)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:700,color:"#0d1326"}}>Total ESI Deposit</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Via EC by 15th</p></div><span style={{fontSize:12,fontWeight:800,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{f(totals.empESI+totals.empESIr)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Eligible employees</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Gross up to ₹21,000</p></div><span style={{fontSize:11,fontWeight:600,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{String(payroll.filter(e=>e.empESI>0).length)+" of "+String(emps.length)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Deposit Deadline</p><p style={{margin:0,fontSize:9.5,color:"#A32D2D"}}>Late = 12% p.a. interest</p></div><span style={{fontSize:11,fontWeight:700,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>15 Jun 2026</span></div>
               </div>
           </div>
           <div style={{marginTop:12,padding:"10px 14px",borderRadius:9,background:"#E6F1FB",fontSize:10,color:"#185FA5"}}>
@@ -826,7 +866,7 @@ export function HrPayroll({branch}){
                 ))}
               </tr></thead>
               <tbody>{payroll.map((e,i)=>(
-                <tr key={e.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+                <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{e.id}</td>
                   <td style={{padding:"7px 12px",fontWeight:600,color:"#0d1326"}}>{e.name}</td>
                   <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:10.5}}>{e.bankAc||"●●●●"+String(i+1).padStart(4,"0")}</td>
@@ -863,7 +903,7 @@ export function HrPayroll({branch}){
                 const annualTds=e.tds*12;
                 const issued=annualTds>0;
                 return (
-                  <tr key={e.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+                  <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                     <td style={{padding:"7px 12px",fontWeight:600,color:"#0d1326"}}>{e.name}</td>
                     <td style={{padding:"7px 12px",fontSize:10.5,color:"#5a6691"}}>{e.designation||"Staff"}</td>
                     <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(e.gross*12)}</td>
@@ -905,7 +945,7 @@ export function HrPayroll({branch}){
                 ))}
               </tr></thead>
               <tbody>{journalEntries.map((e,i)=>(
-                <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:e.side==="Dr"?"#f0f8ff":"#f0fff4"}}>
+                <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:e.side==="Dr"?"#f0f8ff":"#f0fff4"}}>
                   <td style={{padding:"8px 12px",fontWeight:800,color:e.side==="Dr"?"#185FA5":"#27500A",fontFamily:"monospace"}}>{e.side}</td>
                   <td style={{padding:"8px 12px",fontWeight:500,color:"#0d1326"}}>{e.ledger}</td>
                   <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>₹{Number(Math.round(e.amount)).toLocaleString()}</td>
@@ -960,7 +1000,7 @@ export function HrPayslips({branch}){
   const net=gross-deductions;
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:900,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       {/* Controls */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
         flexWrap:"wrap",gap:10,marginBottom:16}}>
@@ -1000,7 +1040,7 @@ export function HrPayslips({branch}){
         </div>
 
         {/* Employee info */}
-        <div style={{padding:"16px 24px",borderBottom:"1px solid #e1e3ec",
+        <div style={{padding:"16px 24px",borderBottom:"1px solid #cdd1d8",
           display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,background:"#f9fafb"}}>
           {[
             ["Employee Name",emp.name],["Employee ID",emp.id],
@@ -1027,7 +1067,7 @@ export function HrPayslips({branch}){
               </tr></thead>
               <tbody>
                 {[["Basic Salary",emp.basic],["HRA",emp.hra],["Dearness Allowance",emp.da],["Travel Allowance",emp.travel],["Medical Allowance",emp.medical]].map(([l,v],i)=>(
-                  <tr key={i} style={{borderBottom:"1px solid #f3f4f8"}}>
+                  <tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}>
                     <td style={{padding:"6px 10px",color:"#384677"}}>{l}</td>
                     <td style={{padding:"6px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{c}{v.toLocaleString()}</td>
                   </tr>
@@ -1050,7 +1090,7 @@ export function HrPayslips({branch}){
               </tr></thead>
               <tbody>
                 {[["Provident Fund",emp.pf],["ESI",emp.esi],["Income Tax (TDS)",emp.tds]].map(([l,v],i)=>(
-                  <tr key={i} style={{borderBottom:"1px solid #f3f4f8"}}>
+                  <tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}>
                     <td style={{padding:"6px 10px",color:"#384677"}}>{l}</td>
                     <td style={{padding:"6px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{v>0?c+v.toLocaleString():"—"}</td>
                   </tr>
@@ -1078,7 +1118,7 @@ export function HrPayslips({branch}){
         </div>
 
         {/* Footer */}
-        <div style={{padding:"12px 24px",borderTop:"1px solid #e1e3ec",
+        <div style={{padding:"12px 24px",borderTop:"1px solid #cdd1d8",
           display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <p style={{margin:0,fontSize:9.5,color:"#bfc3d6"}}>
             This is a computer-generated payslip. No signature required.
@@ -1113,6 +1153,8 @@ export function HrLeave({branch}){
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [tab,setTab]=useState("requests"); // requests | balances
   const [form,setForm]=useState({empId:"",empName:"",type:"Casual Leave",from:"",to:"",reason:""});
+  const [balForm,setBalForm]=useState(null); // {empId,empName,branch,annual,sick,casual,id} when editing entitlement
+  useModalEsc(()=>setBalForm(null),!!balForm);
 
   /* Live, branch-scoped employees (for the apply dropdown + balances) and the
      live leave-request register. */
@@ -1120,6 +1162,19 @@ export function HrLeave({branch}){
   const leaveQ=useMasterList('leave-requests', brScope?{branch:brScope}:{});
   const filtered=((leaveQ.data)||[]).map(fromLeaveDTO);
   const {create,update}=useMasterMutations('leave-requests');
+
+  /* Live leave-balance ENTITLEMENT master for the current year; "taken" is derived from
+     the approved requests above so the two never drift. Editable per employee. */
+  const year=String(new Date().getFullYear());
+  const balQ=useMasterList('leave-balances', brScope?{branch:brScope,year}:{year});
+  const balByEmp=Object.fromEntries(((balQ.data)||[]).map(b=>{const x=fromLeaveBalanceDTO(b);return [x.empId,x];}));
+  const {create:createBal,update:updateBal}=useMasterMutations('leave-balances');
+  const saveBal=()=>{
+    if(!balForm)return;
+    const body=toLeaveBalancePayload({...balForm,year});
+    const onDone={onSuccess:()=>{toast("Entitlement saved");setBalForm(null);},onError:e=>toast(e?.message||"Save failed","error")};
+    if(balForm.id) updateBal.mutate({id:balForm.id,body},onDone); else createBal.mutate(body,onDone);
+  };
 
   const pending =filtered.filter(l=>l.status==="Pending");
   const approved=filtered.filter(l=>l.status==="Approved");
@@ -1140,7 +1195,7 @@ export function HrLeave({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🌴</div>
@@ -1174,7 +1229,7 @@ export function HrLeave({branch}){
                 {leaveQ.isLoading?"Loading…":"No leave requests for this branch yet. Use “Apply” to add one."}
               </td></tr>
             )}{filtered.map((l,i)=>(
-              <tr key={l.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+              <tr key={l.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{(l.id||"").slice(-6)}</td>
                 <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{l.empName}</td>
                 <td style={{padding:"8px 12px"}}><span style={{fontSize:10}}>{TYPE_ICON[l.type]||"📋"} {l.type}</span></td>
@@ -1200,31 +1255,67 @@ export function HrLeave({branch}){
         <div style={{...card,padding:0,overflow:"hidden"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#0d1326"}}>
-              {["Employee","Branch","Annual Leave","Sick Leave","Casual Leave","Total Available"].map((h,i)=>(
-                <th key={i} style={{padding:"9px 14px",textAlign:i>=2?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
+              {["Employee","Branch","Annual (rem/ent)","Sick (rem/ent)","Casual (rem/ent)","Total Remaining",""].map((h,i)=>(
+                <th key={i} style={{padding:"9px 14px",textAlign:i>=2&&i<6?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{emps.map((e,i)=>{
-              const bal=_LEAVE_BALANCES[e.id]||{AL:18,SL:12,CL:6};
+            <tbody>{emps.length===0&&(
+              <tr><td colSpan={7} style={{padding:"20px 12px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>
+                {balQ.isLoading?"Loading…":"No employees for this branch."}
+              </td></tr>
+            )}{emps.map((e,i)=>{
+              const ent=balByEmp[e.id]||{annual:18,sick:12,casual:6,id:null};
+              const taken=takenFor(filtered,e.id,year);
+              const rem={annual:ent.annual-taken.annual,sick:ent.sick-taken.sick,casual:ent.casual-taken.casual};
+              const cell=(val,ceil,warn,clr)=>(<td style={{padding:"9px 14px",textAlign:"right"}}>
+                <span style={{fontSize:13,fontWeight:800,color:val<=warn?"#A32D2D":clr}}>{val}</span>
+                <span style={{fontSize:10,color:"#5a6691"}}> / {ceil}</span></td>);
               return (
-                <tr key={e.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+                <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"9px 14px",fontWeight:600,color:"#0d1326"}}>{e.name}</td>
                   <td style={{padding:"9px 14px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{e.branch}</span></td>
-                  <td style={{padding:"9px 14px",textAlign:"right"}}><span style={{fontSize:13,fontWeight:800,color:bal.AL<5?"#A32D2D":"#27500A"}}>{bal.AL}</span><span style={{fontSize:10,color:"#5a6691"}}> / 18 days</span></td>
-                  <td style={{padding:"9px 14px",textAlign:"right"}}><span style={{fontSize:13,fontWeight:800,color:bal.SL<3?"#A32D2D":"#1D9E75"}}>{bal.SL}</span><span style={{fontSize:10,color:"#5a6691"}}> / 12 days</span></td>
-                  <td style={{padding:"9px 14px",textAlign:"right"}}><span style={{fontSize:13,fontWeight:800,color:"#185FA5"}}>{bal.CL}</span><span style={{fontSize:10,color:"#5a6691"}}> / 6 days</span></td>
-                  <td style={{padding:"9px 14px",textAlign:"right",fontWeight:800,fontSize:15,color:"#0d1326"}}>{bal.AL+bal.SL+bal.CL}</td>
+                  {cell(rem.annual,ent.annual,4,"#27500A")}
+                  {cell(rem.sick,ent.sick,2,"#1D9E75")}
+                  {cell(rem.casual,ent.casual,1,"#185FA5")}
+                  <td style={{padding:"9px 14px",textAlign:"right",fontWeight:800,fontSize:15,color:"#0d1326"}}>{rem.annual+rem.sick+rem.casual}</td>
+                  <td style={{padding:"9px 14px",textAlign:"right"}}>
+                    <button onClick={()=>setBalForm({empId:e.id,empName:e.name,branch:e.branch,annual:ent.annual,sick:ent.sick,casual:ent.casual,id:ent.id})}
+                      style={{...btnGh,padding:"3px 9px",fontSize:9.5}} title="Set entitlement">✎ Edit</button>
+                  </td>
                 </tr>
               );
             })}</tbody>
           </table>
+          <p style={{margin:0,padding:"8px 14px",fontSize:10,color:"#8b94b3",borderTop:"1px solid #dfe2e7"}}>
+            Entitlement = annual allotment ({year}); remaining = entitlement − approved leave taken this year. Edit sets the allotment.
+          </p>
+        </div>
+      )}
+
+      {balForm&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:400,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Leave entitlement · {balForm.empName} · {year}</p>
+              <button onClick={()=>setBalForm(null)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
+            </div>
+            <div style={{padding:"16px 18px",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+              <FL label="Annual"><input type="number" min={0} value={balForm.annual} onChange={e=>setBalForm(f=>({...f,annual:e.target.value}))} style={inp}/></FL>
+              <FL label="Sick"><input type="number" min={0} value={balForm.sick} onChange={e=>setBalForm(f=>({...f,sick:e.target.value}))} style={inp}/></FL>
+              <FL label="Casual"><input type="number" min={0} value={balForm.casual} onChange={e=>setBalForm(f=>({...f,casual:e.target.value}))} style={inp}/></FL>
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
+              <button onClick={()=>setBalForm(null)} style={btnGh}>Cancel</button>
+              <button onClick={saveBal} disabled={createBal.isPending||updateBal.isPending} style={btnG}>{createBal.isPending||updateBal.isPending?"Saving…":"Save"}</button>
+            </div>
+          </div>
         </div>
       )}
 
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:460,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Apply for Leave</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
             </div>
@@ -1242,7 +1333,7 @@ export function HrLeave({branch}){
               </div>
               <FL label="Reason"><textarea value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} rows={2} style={{...inp,resize:"vertical"}}/></FL>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
               <button onClick={submit} disabled={create.isPending} style={btnG}>{create.isPending?"Submitting…":"📨 Submit Request"}</button>
             </div>
@@ -1274,7 +1365,7 @@ export function HrExpenses({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>💳</div>
@@ -1305,7 +1396,7 @@ export function HrExpenses({branch}){
             ))}
           </tr></thead>
           <tbody>{filtered.map((c,i)=>(
-            <tr key={c.id} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+            <tr key={c.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
               <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{c.id}</td>
               <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{c.empName}</td>
               <td style={{padding:"8px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{c.date}</td>
@@ -1332,7 +1423,7 @@ export function HrExpenses({branch}){
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:440,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Submit Expense Claim</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
             </div>
@@ -1347,7 +1438,7 @@ export function HrExpenses({branch}){
               <FL label="Description"><input value={form.desc} onChange={e=>setForm(f=>({...f,desc:e.target.value}))} style={inp}/></FL>
               <FL label="Amount (₹)"><input type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:+e.target.value}))} style={inp}/></FL>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
               <button onClick={submit} style={btnG}>💳 Submit Claim</button>
             </div>
@@ -1395,7 +1486,7 @@ export function SalaryRevision({branch}){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📈</div>
@@ -1426,7 +1517,7 @@ export function SalaryRevision({branch}){
             <tbody>{dueFiltered.map((e,i)=>{
               const suggested=Math.round(e.currentBasic*0.10);
               return (
-                <tr key={e.empId} style={{borderBottom:"1px solid #f3f4f8",background:e.status==="OVERDUE"?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
+                <tr key={e.empId} style={{borderBottom:"1px solid #dfe2e7",background:e.status==="OVERDUE"?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{e.empName}</td>
                   <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{e.branch}</span></td>
                   <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>₹{e.currentBasic.toLocaleString()}</td>
@@ -1461,7 +1552,7 @@ export function SalaryRevision({branch}){
                   ))}
                 </tr></thead>
                 <tbody>{h.revisions.map((r,i)=>(
-                  <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+                  <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                     <td style={{padding:"7px 10px",color:"#5a6691",whiteSpace:"nowrap"}}>{r.date}</td>
                     <td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>₹{r.basic.toLocaleString()}</td>
                     <td style={{padding:"7px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:r.incr>0?"#27500A":"#5a6691"}}>{r.incr>0?`+₹${r.incr.toLocaleString()}`:"Nil"}</td>
@@ -1478,7 +1569,7 @@ export function SalaryRevision({branch}){
       {modal&&form&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:440,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Process Revision — {form.empName}</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
             </div>
@@ -1488,7 +1579,7 @@ export function SalaryRevision({branch}){
               <div style={{fontSize:11,color:"#27500A",fontWeight:700}}>Increment: +₹{Math.max(0,Math.round((+form.newBasic||0)-(form.currentBasic||0))).toLocaleString()} ({form.currentBasic>0?(((+form.newBasic||0)-form.currentBasic)/form.currentBasic*100).toFixed(1):0}%)</div>
               <FL label="Reason"><input value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} placeholder="Annual review / promotion" style={inp}/></FL>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
               <button onClick={saveRevision} disabled={create.isPending} style={btnG}>{create.isPending?"Saving…":"Record Revision"}</button>
             </div>
@@ -1559,7 +1650,7 @@ export function PfEsiChallan({branch}){
   const [challanESI,setChallanESI]=useState({bsr:"",date:"",trn:"",status:"Pending"});
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📋</div>
@@ -1596,7 +1687,7 @@ export function PfEsiChallan({branch}){
       </div>
 
       {/* Tabs */}
-      <div style={{display:"flex",gap:0,background:"#f3f4f8",borderRadius:"9px 9px 0 0",border:"1px solid #e1e3ec"}}>
+      <div style={{display:"flex",gap:0,background:"#f3f4f8",borderRadius:"9px 9px 0 0",border:"1px solid #cdd1d8"}}>
         <button onClick={()=>setTab("pf")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="pf"?700:500,background:tab==="pf"?"#fff":"transparent",borderRadius:6}}>🏦 PF Register</button><button onClick={()=>setTab("esi")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="esi"?700:500,background:tab==="esi"?"#fff":"transparent",borderRadius:6}}>🏥 ESI Register</button><button onClick={()=>setTab("pt")} style={{flex:1,padding:"8px",border:"none",cursor:"pointer",fontWeight:tab==="pt"?700:500,background:tab==="pt"?"#fff":"transparent",borderRadius:6}}>📋 Prof. Tax</button>
       </div>
 
@@ -1609,7 +1700,7 @@ export function PfEsiChallan({branch}){
               ))}
             </tr></thead>
             <tbody>{pfData.map((e,i)=>(
-              <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+              <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"7px 12px",fontWeight:600,color:"#0d1326"}}>{e.name}</td>
                 <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{e.uan}</td>
                 <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(e.basic)}</td>
@@ -1628,7 +1719,7 @@ export function PfEsiChallan({branch}){
             </tr></tfoot>
           </table>
           {/* Challan entry */}
-          <div style={{padding:"12px 14px",background:"#f9fafb",borderTop:"1px solid #e1e3ec"}}>
+          <div style={{padding:"12px 14px",background:"#f9fafb",borderTop:"1px solid #cdd1d8"}}>
             <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Record PF Challan Payment</p>
             <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end"}}>
               <FL label="BSR Code"><input value={challanPF.bsr} onChange={e=>setChallanPF(c=>({...c,bsr:e.target.value}))} style={{...inp,fontFamily:"monospace",width:120}} placeholder="0600115"/></FL>
@@ -1653,7 +1744,7 @@ export function PfEsiChallan({branch}){
               ))}
             </tr></thead>
             <tbody>{esiData.map((e,i)=>(
-              <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+              <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"7px 12px",fontWeight:600,color:"#0d1326"}}>{e.name}</td>
                 <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{e.esic}</td>
                 <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(e.gross)}</td>
@@ -1682,7 +1773,7 @@ export function PfEsiChallan({branch}){
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
             <thead><tr style={{background:"#0d1326"}}>{["Employee","Gross Salary","PT Applicable","PT Amount"].map((h,i)=><th key={i} style={{padding:"8px 12px",textAlign:i>=1?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>{h}</th>)}</tr></thead>
             <tbody>{ptData.map((e,i)=>(
-              <tr key={i} style={{borderBottom:"1px solid #f3f4f8",background:i%2===0?"#fff":"#fafafa"}}>
+              <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"7px 12px",fontWeight:600,color:"#0d1326"}}>{e.name}</td>
                 <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(e.gross)}</td>
                 <td style={{padding:"7px 12px",textAlign:"right"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700}}>Yes</span></td>
@@ -1726,10 +1817,10 @@ export function EmployeeAdvances({branch,setRoute}){
   const totOutstanding=visible.reduce((s,l)=>s+l.outstanding,0);
   const totEmi=visible.reduce((s,l)=>s+(l.outstanding>0?l.emi:0),0);
   const activeCount=visible.filter(l=>l.outstanding>0).length;
-  const card={background:"#fff",borderRadius:10,border:"1px solid #e1e3ec",padding:"12px 14px"};
+  const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>👤 Employee Loans &amp; Salary Advances</h2>
@@ -1768,7 +1859,7 @@ export function EmployeeAdvances({branch,setRoute}){
             <tbody>
               {visible.length===0&&(<tr><td colSpan={9} style={{padding:"18px 8px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>{loansQ.isLoading?"Loading…":"No loans for this filter. Use “Disburse Loan” to add one."}</td></tr>)}
               {visible.map((l,i)=>(
-                <tr key={l.id} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #e1e3ec"}}>
+                <tr key={l.id} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
                   <td style={{padding:"7px 8px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{(l.id||"").slice(-6)}</td>
                   <td style={{padding:"7px 8px",fontWeight:600}}>{l.name}<div style={{fontSize:9.5,color:"#5a6691",fontWeight:400}}>{l.empCode} · {l.designation} · {l.branch}</div></td>
                   <td style={{padding:"7px 8px",textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:10,fontSize:9.5,fontWeight:700,background:l.type==="Salary Advance"?"#FAEEDA":l.type==="Education Loan"?"#E6F1FB":"#FCEBEB",color:l.type==="Salary Advance"?"#854F0B":l.type==="Education Loan"?"#185FA5":"#A32D2D"}}>{l.type}</span></td>
@@ -1801,7 +1892,7 @@ export function EmployeeAdvances({branch,setRoute}){
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:520,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #e1e3ec",display:"flex",justifyContent:"space-between"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Disburse Employee Loan / Advance</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
             </div>
@@ -1817,7 +1908,7 @@ export function EmployeeAdvances({branch,setRoute}){
               <FL label="EMIs already paid"><input type="number" value={form.paid} onChange={e=>setForm(f=>({...f,paid:e.target.value}))} style={inp}/></FL>
               <FL label="Disbursed on"><input type="date" value={form.disbursedDate} onChange={e=>setForm(f=>({...f,disbursedDate:e.target.value}))} style={inp}/></FL>
             </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #e1e3ec",display:"flex",justifyContent:"flex-end",gap:8}}>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
               <button onClick={disburse} disabled={create.isPending} style={btnG}>{create.isPending?"Saving…":"Disburse"}</button>
             </div>
@@ -1839,8 +1930,8 @@ export function EmployeeMasterTabbed(){
   const tabs=[{id:"basic",label:"1. Basic Info"},{id:"address",label:"2. Address"},{id:"bank",label:"3. Bank Details"},{id:"tax",label:"4. Tax Info"},{id:"salary",label:"5. Salary Components"},{id:"leave",label:"6. Leave Balance"},{id:"attend",label:"7. Attendance"},{id:"perf",label:"8. Performance"},{id:"docs",label:"9. Documents"},{id:"notes",label:"10. Notes"}];
   return TAB_Page("Employee Master", "10-tab structure",
     {user:"AD",date:"2026-05-19 11:30",created:"2017-06-01 09:00"},
-    <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
-      <div style={{display:"flex",borderBottom:"1px solid #e1e3ec",overflowX:"auto",background:"#fafbfd"}}>{tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}</div>
+    <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
+      <div style={{display:"flex",borderBottom:"1px solid #cdd1d8",overflowX:"auto",background:"#fafbfd"}}>{tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabBtnStyle(tab===t.id)}>{t.label}</button>)}</div>
       {tab==="basic"&&tabPanel(
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}>
           <FL label="Full Name"><input defaultValue="" style={inpStd}/></FL>
@@ -1848,7 +1939,7 @@ export function EmployeeMasterTabbed(){
           <FL label="Date of Birth"><input type="date" defaultValue="1985-03-22" style={inpStd}/></FL>
           <FL label="Designation"><input defaultValue="Senior Finance Manager (CFO-equivalent)" style={inpStd}/></FL>
           <FL label="Department"><select style={inpStd}><option>Finance</option><option>Operations</option><option>HR</option><option>IT</option></select></FL>
-          <FL label="Branch"><select style={inpStd}><option>TKHO</option><option>BOM</option><option>AMD</option></select></FL>
+          <FL label="Branch"><select style={inpStd}><option>BOMMB</option><option>BOM</option><option>AMD</option></select></FL>
           <FL label="Date of Joining"><input type="date" defaultValue="2017-06-01" style={inpStd}/></FL>
           <FL label="Years of Service"><input defaultValue="9 years" readOnly style={{...inpStd,background:"#fafbfd"}}/></FL>
           <FL label="Reporting To"><select style={inpStd}><option value="">— Select —</option></select></FL>
@@ -1859,15 +1950,15 @@ export function EmployeeMasterTabbed(){
       )}
       {tab==="address"&&tabPanel(
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-          <div style={{padding:12,background:"#fafbfd",borderRadius:6,border:"1px solid #e1e3ec"}}>
+          <div style={{padding:12,background:"#fafbfd",borderRadius:6,border:"1px solid #cdd1d8"}}>
             <p style={{margin:0,fontSize:11,fontWeight:700,color:"#d4a437",textTransform:"uppercase"}}>🏠 Current Address</p>
             <textarea defaultValue="Flat 1402, Sapphire Heights, Andheri West, Mumbai 400053, Maharashtra, India" rows={3} style={{...inpStd,marginTop:6,fontFamily:"inherit",resize:"vertical"}}/>
           </div>
-          <div style={{padding:12,background:"#fafbfd",borderRadius:6,border:"1px solid #e1e3ec"}}>
+          <div style={{padding:12,background:"#fafbfd",borderRadius:6,border:"1px solid #cdd1d8"}}>
             <p style={{margin:0,fontSize:11,fontWeight:700,color:"#d4a437",textTransform:"uppercase"}}>🏡 Permanent Address</p>
             <textarea defaultValue="Patel Niwas, Khambhalia Gate, Jamnagar 361001, Gujarat, India" rows={3} style={{...inpStd,marginTop:6,fontFamily:"inherit",resize:"vertical"}}/>
           </div>
-          <div style={{padding:12,background:"#fafbfd",borderRadius:6,border:"1px solid #e1e3ec",gridColumn:"1 / -1"}}>
+          <div style={{padding:12,background:"#fafbfd",borderRadius:6,border:"1px solid #cdd1d8",gridColumn:"1 / -1"}}>
             <p style={{margin:0,fontSize:11,fontWeight:700,color:"#d4a437",textTransform:"uppercase"}}>📞 Emergency Contact</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginTop:6}}>
               <FL label="Name"><input defaultValue="Rukhsana Patel" style={inpStd}/></FL>
@@ -1901,7 +1992,7 @@ export function EmployeeMasterTabbed(){
             <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>Investment Declaration (FY 2025-26)</p>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
               <thead style={{background:"#f7f8fb"}}><tr><th style={{padding:"8px 12px",textAlign:"left",fontSize:10,color:"#5a6691",fontWeight:700}}>Section</th><th style={{padding:"8px 12px",textAlign:"left",fontSize:10,color:"#5a6691",fontWeight:700}}>Investment Type</th><th style={{padding:"8px 12px",textAlign:"right",fontSize:10,color:"#5a6691",fontWeight:700}}>Declared</th><th style={{padding:"8px 12px",textAlign:"right",fontSize:10,color:"#5a6691",fontWeight:700}}>Proof Received</th></tr></thead>
-              <tbody>{[{s:"80C",t:"PPF + ELSS",d:150000,p:150000},{s:"80D",t:"Health Insurance",d:25000,p:25000},{s:"80CCD(1B)",t:"NPS",d:50000,p:0},{s:"24(b)",t:"Home Loan Interest",d:200000,p:200000}].map(r=>(<tr key={r.s} style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"8px 12px",fontFamily:"monospace",fontWeight:600}}>{r.s}</td><td style={{padding:"8px 12px"}}>{r.t}</td><td style={{padding:"8px 12px",textAlign:"right"}}>₹{r.d.toLocaleString("en-IN")}</td><td style={{padding:"8px 12px",textAlign:"right",color:r.p===r.d?"#22c55e":r.p>0?"#d4a437":"#A32D2D",fontWeight:700}}>₹{r.p.toLocaleString("en-IN")}</td></tr>))}</tbody>
+              <tbody>{[{s:"80C",t:"PPF + ELSS",d:150000,p:150000},{s:"80D",t:"Health Insurance",d:25000,p:25000},{s:"80CCD(1B)",t:"NPS",d:50000,p:0},{s:"24(b)",t:"Home Loan Interest",d:200000,p:200000}].map(r=>(<tr key={r.s} style={{borderBottom:"1px solid #dfe2e7"}}><td style={{padding:"8px 12px",fontFamily:"monospace",fontWeight:600}}>{r.s}</td><td style={{padding:"8px 12px"}}>{r.t}</td><td style={{padding:"8px 12px",textAlign:"right"}}>₹{r.d.toLocaleString("en-IN")}</td><td style={{padding:"8px 12px",textAlign:"right",color:r.p===r.d?"#22c55e":r.p>0?"#d4a437":"#A32D2D",fontWeight:700}}>₹{r.p.toLocaleString("en-IN")}</td></tr>))}</tbody>
             </table>
           </div>
         </>
@@ -1909,13 +2000,13 @@ export function EmployeeMasterTabbed(){
       {tab==="salary"&&tabPanel(
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead style={{background:"#f7f8fb"}}><tr><th style={{padding:"9px 12px",textAlign:"left",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Component</th><th style={{padding:"9px 12px",textAlign:"right",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Monthly (₹)</th><th style={{padding:"9px 12px",textAlign:"right",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Annual (₹)</th><th style={{padding:"9px 12px",textAlign:"center",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Type</th></tr></thead>
-          <tbody>{[{c:"Basic Salary",m:80000,t:"Earning"},{c:"House Rent Allowance (HRA)",m:32000,t:"Earning"},{c:"Conveyance Allowance",m:6000,t:"Earning"},{c:"Special Allowance",m:24000,t:"Earning"},{c:"Medical Allowance",m:1250,t:"Earning"},{c:"Provident Fund (Employee)",m:-9600,t:"Deduction"},{c:"Professional Tax",m:-200,t:"Deduction"},{c:"Income Tax (TDS)",m:-12500,t:"Deduction"}].map(r=>(<tr key={r.c} style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"9px 12px",fontWeight:r.c==="Basic Salary"?700:400}}>{r.c}</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",color:r.m<0?"#A32D2D":"#0d1326",fontWeight:600}}>{r.m<0?"(":""}₹{Math.abs(r.m).toLocaleString("en-IN")}{r.m<0?")":""}</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",color:r.m<0?"#A32D2D":"#0d1326"}}>{r.m<0?"(":""}₹{Math.abs(r.m*12).toLocaleString("en-IN")}{r.m<0?")":""}</td><td style={{padding:"9px 12px",textAlign:"center"}}><span style={{padding:"2px 8px",background:r.t==="Earning"?"#d4edda":"#f8d7da",color:r.t==="Earning"?"#155724":"#721c24",borderRadius:3,fontSize:10,fontWeight:700}}>{r.t}</span></td></tr>))}
+          <tbody>{[{c:"Basic Salary",m:80000,t:"Earning"},{c:"House Rent Allowance (HRA)",m:32000,t:"Earning"},{c:"Conveyance Allowance",m:6000,t:"Earning"},{c:"Special Allowance",m:24000,t:"Earning"},{c:"Medical Allowance",m:1250,t:"Earning"},{c:"Provident Fund (Employee)",m:-9600,t:"Deduction"},{c:"Professional Tax",m:-200,t:"Deduction"},{c:"Income Tax (TDS)",m:-12500,t:"Deduction"}].map(r=>(<tr key={r.c} style={{borderBottom:"1px solid #dfe2e7"}}><td style={{padding:"9px 12px",fontWeight:r.c==="Basic Salary"?700:400}}>{r.c}</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",color:r.m<0?"#A32D2D":"#0d1326",fontWeight:600}}>{r.m<0?"(":""}₹{Math.abs(r.m).toLocaleString("en-IN")}{r.m<0?")":""}</td><td style={{padding:"9px 12px",textAlign:"right",fontFamily:"monospace",color:r.m<0?"#A32D2D":"#0d1326"}}>{r.m<0?"(":""}₹{Math.abs(r.m*12).toLocaleString("en-IN")}{r.m<0?")":""}</td><td style={{padding:"9px 12px",textAlign:"center"}}><span style={{padding:"2px 8px",background:r.t==="Earning"?"#d4edda":"#f8d7da",color:r.t==="Earning"?"#155724":"#721c24",borderRadius:3,fontSize:10,fontWeight:700}}>{r.t}</span></td></tr>))}
           <tr style={{background:"#0d1326",color:"#d4a437"}}><td style={{padding:"10px 12px",fontWeight:700,letterSpacing:"0.3px"}}>NET TAKE-HOME (per month)</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,fontFamily:"monospace",fontSize:14}}>₹1,20,950</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,fontFamily:"monospace",fontSize:14}}>₹14,51,400</td><td></td></tr></tbody>
         </table>
       )}
       {tab==="leave"&&tabPanel(
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
-          {[{type:"Casual Leave (CL)",entitled:12,used:4,color:"#d4a437"},{type:"Sick Leave (SL)",entitled:8,used:2,color:"#A32D2D"},{type:"Earned Leave (EL)",entitled:24,used:2,color:"#22c55e"}].map(l=>{const pct=l.used/l.entitled*100;return (<div key={l.type} style={{padding:14,background:"#fafbfd",borderRadius:6,border:"1px solid #e1e3ec",borderTop:"3px solid "+l.color}}><p style={{margin:0,fontSize:11.5,fontWeight:700,color:"#0d1326"}}>{l.type}</p><div style={{display:"flex",alignItems:"baseline",gap:6,marginTop:8}}><span style={{fontSize:26,fontWeight:700,color:"#0d1326"}}>{l.entitled-l.used}</span><span style={{fontSize:12,color:"#5a6691"}}>/ {l.entitled} days left</span></div><div style={{marginTop:8,height:6,background:"#f0f2f7",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:pct+"%",background:l.color,borderRadius:3}}/></div><p style={{margin:"6px 0 0",fontSize:10.5,color:"#5a6691"}}>{l.used} used · {l.entitled-l.used} remaining</p></div>);})}
+          {[{type:"Casual Leave (CL)",entitled:12,used:4,color:"#d4a437"},{type:"Sick Leave (SL)",entitled:8,used:2,color:"#A32D2D"},{type:"Earned Leave (EL)",entitled:24,used:2,color:"#22c55e"}].map(l=>{const pct=l.used/l.entitled*100;return (<div key={l.type} style={{padding:14,background:"#fafbfd",borderRadius:6,border:"1px solid #cdd1d8",borderTop:"3px solid "+l.color}}><p style={{margin:0,fontSize:11.5,fontWeight:700,color:"#0d1326"}}>{l.type}</p><div style={{display:"flex",alignItems:"baseline",gap:6,marginTop:8}}><span style={{fontSize:26,fontWeight:700,color:"#0d1326"}}>{l.entitled-l.used}</span><span style={{fontSize:12,color:"#5a6691"}}>/ {l.entitled} days left</span></div><div style={{marginTop:8,height:6,background:"#f0f2f7",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:pct+"%",background:l.color,borderRadius:3}}/></div><p style={{margin:"6px 0 0",fontSize:10.5,color:"#5a6691"}}>{l.used} used · {l.entitled-l.used} remaining</p></div>);})}
         </div>
       )}
       {tab==="attend"&&tabPanel(
@@ -1923,23 +2014,23 @@ export function EmployeeMasterTabbed(){
           <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:14}}>Monthly Attendance Summary</p>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead style={{background:"#f7f8fb"}}><tr><th style={{padding:"8px 12px",textAlign:"left",fontSize:10,color:"#5a6691",fontWeight:700}}>Month</th><th style={{padding:"8px 12px",textAlign:"right",fontSize:10,color:"#5a6691",fontWeight:700}}>Working Days</th><th style={{padding:"8px 12px",textAlign:"right",fontSize:10,color:"#5a6691",fontWeight:700}}>Present</th><th style={{padding:"8px 12px",textAlign:"right",fontSize:10,color:"#5a6691",fontWeight:700}}>Absent</th><th style={{padding:"8px 12px",textAlign:"right",fontSize:10,color:"#5a6691",fontWeight:700}}>Leave</th><th style={{padding:"8px 12px",textAlign:"right",fontSize:10,color:"#5a6691",fontWeight:700}}>%</th></tr></thead>
-            <tbody>{[{m:"May-26",w:22,p:21,a:0,l:1,pct:95.5},{m:"Apr-26",w:21,p:20,a:0,l:1,pct:95.2},{m:"Mar-26",w:23,p:23,a:0,l:0,pct:100},{m:"Feb-26",w:20,p:19,a:0,l:1,pct:95.0}].map(r=>(<tr key={r.m} style={{borderBottom:"1px solid #f0f2f7"}}><td style={{padding:"8px 12px",fontWeight:600}}>{r.m}</td><td style={{padding:"8px 12px",textAlign:"right"}}>{r.w}</td><td style={{padding:"8px 12px",textAlign:"right",color:"#22c55e",fontWeight:700}}>{r.p}</td><td style={{padding:"8px 12px",textAlign:"right",color:r.a>0?"#A32D2D":"#5a6691"}}>{r.a}</td><td style={{padding:"8px 12px",textAlign:"right",color:"#d4a437"}}>{r.l}</td><td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,color:r.pct>=95?"#22c55e":"#d4a437"}}>{r.pct.toFixed(1)}%</td></tr>))}</tbody>
+            <tbody>{[{m:"May-26",w:22,p:21,a:0,l:1,pct:95.5},{m:"Apr-26",w:21,p:20,a:0,l:1,pct:95.2},{m:"Mar-26",w:23,p:23,a:0,l:0,pct:100},{m:"Feb-26",w:20,p:19,a:0,l:1,pct:95.0}].map(r=>(<tr key={r.m} style={{borderBottom:"1px solid #dfe2e7"}}><td style={{padding:"8px 12px",fontWeight:600}}>{r.m}</td><td style={{padding:"8px 12px",textAlign:"right"}}>{r.w}</td><td style={{padding:"8px 12px",textAlign:"right",color:"#22c55e",fontWeight:700}}>{r.p}</td><td style={{padding:"8px 12px",textAlign:"right",color:r.a>0?"#A32D2D":"#5a6691"}}>{r.a}</td><td style={{padding:"8px 12px",textAlign:"right",color:"#d4a437"}}>{r.l}</td><td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,color:r.pct>=95?"#22c55e":"#d4a437"}}>{r.pct.toFixed(1)}%</td></tr>))}</tbody>
           </table>
         </div>
       )}
       {tab==="perf"&&tabPanel(
         <>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
-            {[{l:"Last Review",v:"Mar 2026",c:"#0d1326"},{l:"Rating",v:"4.5 / 5 ⭐",c:"#22c55e"},{l:"Next Review",v:"Mar 2027",c:"#d4a437"}].map(k=>(<div key={k.l} style={{padding:12,background:"#fafbfd",borderRadius:6,border:"1px solid #e1e3ec",borderTop:"3px solid "+k.c}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p><p style={{margin:"3px 0 0",fontSize:18,fontWeight:700,color:"#0d1326"}}>{k.v}</p></div>))}
+            {[{l:"Last Review",v:"Mar 2026",c:"#0d1326"},{l:"Rating",v:"4.5 / 5 ⭐",c:"#22c55e"},{l:"Next Review",v:"Mar 2027",c:"#d4a437"}].map(k=>(<div key={k.l} style={{padding:12,background:"#fafbfd",borderRadius:6,border:"1px solid #cdd1d8",borderTop:"3px solid "+k.c}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p><p style={{margin:"3px 0 0",fontSize:18,fontWeight:700,color:"#0d1326"}}>{k.v}</p></div>))}
           </div>
           <div style={cardStyle}>
             <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>Performance History</p>
-            {[{p:"FY 2025-26",r:4.5,k:"Exceeded all targets · Led GST automation project · Clean audit"},{p:"FY 2024-25",r:4.2,k:"Met all targets · Successfully managed branch expansion"},{p:"FY 2023-24",r:4.0,k:"Met all targets · Process improvements in receivables management"}].map(p=>(<div key={p.p} style={{padding:"10px 12px",background:"#fafbfd",borderRadius:6,marginBottom:6,border:"1px solid #e1e3ec"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{p.p}</p><span style={{padding:"2px 8px",background:p.r>=4.5?"#d4edda":p.r>=4?"#fff3cd":"#f8d7da",color:p.r>=4.5?"#155724":p.r>=4?"#856404":"#721c24",borderRadius:3,fontSize:11,fontWeight:700}}>⭐ {p.r}</span></div><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{p.k}</p></div>))}
+            {[{p:"FY 2025-26",r:4.5,k:"Exceeded all targets · Led GST automation project · Clean audit"},{p:"FY 2024-25",r:4.2,k:"Met all targets · Successfully managed branch expansion"},{p:"FY 2023-24",r:4.0,k:"Met all targets · Process improvements in receivables management"}].map(p=>(<div key={p.p} style={{padding:"10px 12px",background:"#fafbfd",borderRadius:6,marginBottom:6,border:"1px solid #cdd1d8"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{p.p}</p><span style={{padding:"2px 8px",background:p.r>=4.5?"#d4edda":p.r>=4?"#fff3cd":"#f8d7da",color:p.r>=4.5?"#155724":p.r>=4?"#856404":"#721c24",borderRadius:3,fontSize:11,fontWeight:700}}>⭐ {p.r}</span></div><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{p.k}</p></div>))}
           </div>
         </>
       )}
       {tab==="docs"&&tabPanel(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10}}>{["Offer Letter","Employment Contract","Background Verification","Educational Certificates","CA Membership Certificate","PAN Card Copy","Aadhaar Card Copy"].map(d=>(<div key={d} style={{padding:14,background:"#fafbfd",border:"1px solid #e1e3ec",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:32}}>📄</p><p style={{margin:"6px 0 2px",fontSize:11.5,color:"#0d1326",fontWeight:600}}>{d}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>2017-06-01</p><button style={{marginTop:6,padding:"3px 10px",background:"transparent",border:"1px solid #d4a437",color:"#d4a437",borderRadius:4,fontSize:10,cursor:"pointer",fontWeight:600}}>View</button></div>))}<button style={{padding:24,background:"transparent",border:"2px dashed #d4a437",color:"#d4a437",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:600}}>+ Upload</button></div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10}}>{["Offer Letter","Employment Contract","Background Verification","Educational Certificates","CA Membership Certificate","PAN Card Copy","Aadhaar Card Copy"].map(d=>(<div key={d} style={{padding:14,background:"#fafbfd",border:"1px solid #cdd1d8",borderRadius:6,textAlign:"center"}}><p style={{margin:0,fontSize:32}}>📄</p><p style={{margin:"6px 0 2px",fontSize:11.5,color:"#0d1326",fontWeight:600}}>{d}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>2017-06-01</p><button style={{marginTop:6,padding:"3px 10px",background:"transparent",border:"1px solid #d4a437",color:"#d4a437",borderRadius:4,fontSize:10,cursor:"pointer",fontWeight:600}}>View</button></div>))}<button style={{padding:24,background:"transparent",border:"2px dashed #d4a437",color:"#d4a437",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:600}}>+ Upload</button></div>
       )}
       {tab==="notes"&&tabPanel(
         <div>{[].map((n,i)=>(<div key={i} style={{padding:"10px 12px",background:"#fafbfd",borderRadius:6,marginBottom:8,borderLeft:"3px solid #d4a437"}}><p style={{margin:0,fontSize:12,color:"#0d1326",lineHeight:1.5}}>{n.txt}</p><p style={{margin:"4px 0 0",fontSize:10,color:"#5a6691"}}>{n.u} · {n.ts}</p></div>))}</div>
@@ -1975,7 +2066,7 @@ export function HRPortal({setRoute}){
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:12}}>
         {tiles.map(t=>(
           <button key={t.route} onClick={()=>setRoute(t.route)}
-            style={{padding:20,background:"#fff",border:"1px solid #e1e3ec",borderRadius:10,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:16,boxShadow:"0 2px 8px rgba(0,0,0,0.04)",borderLeft:"4px solid "+t.color}}>
+            style={{padding:20,background:"#fff",border:"1px solid #cdd1d8",borderRadius:10,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:16,boxShadow:"0 2px 8px rgba(0,0,0,0.04)",borderLeft:"4px solid "+t.color}}>
             <span style={{fontSize:30}}>{t.icon}</span>
             <div><p style={{margin:0,fontSize:13.5,fontWeight:700,color:"#0d1326"}}>{t.title}</p><p style={{margin:"2px 0 0",fontSize:11,color:"#5a6691"}}>{t.sub}</p></div>
           </button>
@@ -1995,7 +2086,7 @@ export function LeaveApply(){
   const [to,setTo]=useState("2026-06-03");
   const [reason,setReason]=useState("");
   const [submitted,setSubmitted]=useState(false);
-  const inp={padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12.5,width:"100%"};
+  const inp={padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12.5,width:"100%"};
   const days=Math.max(1,Math.round((new Date(to)-new Date(from))/86400000)+1);
   const balances=[{type:"Casual Leave",balance:4},{type:"Sick Leave",balance:8},{type:"Earned Leave",balance:7},{type:"LOP",balance:null}];
   const bal=balances.find(b=>b.type===type);
@@ -2036,7 +2127,7 @@ export function LeaveApply(){
             <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Leave History</p>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
               <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Dates</th><th style={RPT_thStyle}>Type</th><th style={{...RPT_thStyle,textAlign:"center"}}>Days</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
-              <tbody>{MY_LEAVE_HISTORY.map((h,i)=>(<tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}><td style={{...RPT_tdStyle,fontSize:10.5}}>{h.dates}</td><td style={RPT_tdStyle}>{h.type}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{h.days}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 7px",background:"#d4edda",color:"#155724",borderRadius:3,fontSize:10,fontWeight:700}}>{h.status}</span></td></tr>))}</tbody>
+              <tbody>{MY_LEAVE_HISTORY.map((h,i)=>(<tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}><td style={{...RPT_tdStyle,fontSize:10.5}}>{h.dates}</td><td style={RPT_tdStyle}>{h.type}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{h.days}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 7px",background:"#d4edda",color:"#155724",borderRadius:3,fontSize:10,fontWeight:700}}>{h.status}</span></td></tr>))}</tbody>
             </table>
           </div>
         </div>
@@ -2053,7 +2144,7 @@ export function LeaveApply(){
               </div>
             ))}
           </div>
-          <div style={{padding:14,background:"#fafbfd",border:"1px solid #e1e3ec",borderRadius:8,fontSize:11.5,color:"#5a6691"}}>
+          <div style={{padding:14,background:"#fafbfd",border:"1px solid #cdd1d8",borderRadius:8,fontSize:11.5,color:"#5a6691"}}>
             <p style={{margin:"0 0 6px",fontWeight:700,color:"#0d1326",fontSize:12}}>Approval chain</p>
             <p style={{margin:0}}>1. Reporting Manager — primary approver</p>
             <p style={{margin:"3px 0 0"}}>2. Department Head — for leaves &gt; 5 days</p>
@@ -2075,7 +2166,7 @@ export function ReimbursementClaim(){
   const addItem=()=>{setItems(it=>[...it,{id:nextId,date:"2026-05-20",cat:"Travel",desc:"",amount:0}]);setNextId(n=>n+1);};
   const removeItem=id=>setItems(it=>it.filter(x=>x.id!==id));
   const total=items.reduce((s,x)=>s+x.amount,0);
-  const inp={padding:"6px 8px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:11.5,width:"100%"};
+  const inp={padding:"6px 8px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:11.5,width:"100%"};
   const cats=["Travel","Meals","Stationery","Internet","Mobile","Equipment","Training","Other"];
   return(
     <PHASE2_Page title="Reimbursement Claim" subtitle="Submit expense claims for approval and payment">
@@ -2090,7 +2181,7 @@ export function ReimbursementClaim(){
               <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Date</th><th style={RPT_thStyle}>Category</th><th style={RPT_thStyle}>Description</th><th style={{...RPT_thStyle,textAlign:"right"}}>Amount</th><th style={RPT_thStyle}>Receipt</th><th style={RPT_thStyle}/></tr></thead>
               <tbody>
                 {items.map(it=>(
-                  <tr key={it.id} style={{borderBottom:"1px solid #f0f2f7"}}>
+                  <tr key={it.id} style={{borderBottom:"1px solid #dfe2e7"}}>
                     <td style={{padding:"6px 8px"}}><input type="date" defaultValue={it.date} style={{...inp,width:120}}/></td>
                     <td style={{padding:"6px 8px"}}><select style={inp}>{cats.map(c=><option key={c} selected={c===it.cat}>{c}</option>)}</select></td>
                     <td style={{padding:"6px 8px"}}><input placeholder="Brief description…" style={inp}/></td>
@@ -2112,14 +2203,14 @@ export function ReimbursementClaim(){
             <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>My Claims History</p>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
               <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Claim ID</th><th style={RPT_thStyle}>Date</th><th style={RPT_thStyle}>Category</th><th style={{...RPT_thStyle,textAlign:"right"}}>Amount</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th><th style={RPT_thStyle}>Paid On</th></tr></thead>
-              <tbody>{MY_CLAIMS_DATA.map(c=>(<tr key={c.id} style={{borderBottom:"1px solid #f0f2f7"}}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5}}>{c.id}</td><td style={RPT_tdStyle}>{c.date}</td><td style={RPT_tdStyle}>{c.category}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(c.amount)}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:3,fontSize:10,fontWeight:700,background:c.status==="Paid"||c.status==="Approved"?"#d4edda":"#fff3cd",color:c.status==="Paid"||c.status==="Approved"?"#155724":"#856404"}}>{c.status}</span></td><td style={{...RPT_tdStyle,fontSize:11,color:"#5a6691"}}>{c.paid}</td></tr>))}</tbody>
+              <tbody>{MY_CLAIMS_DATA.map(c=>(<tr key={c.id} style={{borderBottom:"1px solid #dfe2e7"}}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5}}>{c.id}</td><td style={RPT_tdStyle}>{c.date}</td><td style={RPT_tdStyle}>{c.category}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{fmtINR(c.amount)}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:3,fontSize:10,fontWeight:700,background:c.status==="Paid"||c.status==="Approved"?"#d4edda":"#fff3cd",color:c.status==="Paid"||c.status==="Approved"?"#155724":"#856404"}}>{c.status}</span></td><td style={{...RPT_tdStyle,fontSize:11,color:"#5a6691"}}>{c.paid}</td></tr>))}</tbody>
             </table>
           </div>
         </div>
-        <div style={{padding:14,background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,height:"fit-content"}}>
+        <div style={{padding:14,background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,height:"fit-content"}}>
           <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Policy Limits</p>
           {[{cat:"Travel",limit:"₹2,000/trip"},  {cat:"Meals",limit:"₹500/day"},{cat:"Stationery",limit:"₹1,500/month"},{cat:"Internet",limit:"₹500/month"},{cat:"Equipment",limit:"Mgr approval"},{cat:"Training",limit:"₹10,000/year"}].map(p=>(
-            <div key={p.cat} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f0f2f7",fontSize:11.5}}>
+            <div key={p.cat} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11.5}}>
               <span style={{color:"#5a6691"}}>{p.cat}</span><span style={{fontWeight:700,color:"#0d1326"}}>{p.limit}</span>
             </div>
           ))}
@@ -2143,9 +2234,9 @@ export function MyPayslip(){
   const netPay=totalEarnings-totalDeductions;
   return(
     <PHASE2_Page title="My Payslip" subtitle="View and download your monthly salary statement"
-      toolbar={<><select value={selMonth} onChange={e=>setSelMonth(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{months.map(m=><option key={m}>{m}</option>)}</select><button onClick={()=>openPrintPreview({ selector:'main', title:'Payslip', recommend:'portrait' })} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download PDF</button></>}>
+      toolbar={<><select value={selMonth} onChange={e=>setSelMonth(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{months.map(m=><option key={m}>{m}</option>)}</select><button onClick={()=>openPrintPreview({ selector:'main', title:'Payslip', recommend:'portrait' })} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download PDF</button></>}>
       <div style={{maxWidth:680,margin:"0 auto"}}>
-        <div style={{background:"#fff",border:"1px solid #e1e3ec",borderRadius:8,overflow:"hidden"}}>
+        <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
           {/* Header */}
           <div style={{padding:"18px 22px",background:"#0d1326",color:"#fff"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
@@ -2154,17 +2245,17 @@ export function MyPayslip(){
             </div>
           </div>
           {/* Employee info */}
-          <div style={{padding:"14px 22px",background:"#fafbfd",borderBottom:"1px solid #e1e3ec",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:11.5}}>
+          <div style={{padding:"14px 22px",background:"#fafbfd",borderBottom:"1px solid #cdd1d8",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:11.5}}>
             {[{l:"Employee",v:d.employee},{l:"Employee ID",v:d.empId},{l:"Branch",v:d.branch},{l:"Department",v:d.dept}].map(f=>(
               <div key={f.l} style={{display:"flex",gap:8}}><span style={{color:"#5a6691",minWidth:90}}>{f.l}:</span><b>{f.v}</b></div>
             ))}
           </div>
           {/* Earnings / Deductions */}
-          <div style={{padding:"0 22px",display:"grid",gridTemplateColumns:"1fr 1fr",borderBottom:"1px solid #e1e3ec"}}>
-            <div style={{paddingRight:16,borderRight:"1px solid #e1e3ec"}}>
+          <div style={{padding:"0 22px",display:"grid",gridTemplateColumns:"1fr 1fr",borderBottom:"1px solid #cdd1d8"}}>
+            <div style={{paddingRight:16,borderRight:"1px solid #cdd1d8"}}>
               <p style={{margin:"12px 0 8px",fontSize:11,fontWeight:700,color:"#155724",textTransform:"uppercase",letterSpacing:"0.4px"}}>Earnings</p>
               {d.earnings.map(e=>(
-                <div key={e.desc} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f0f2f7",fontSize:11.5}}>
+                <div key={e.desc} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11.5}}>
                   <span style={{color:"#0d1326"}}>{e.desc}</span><span style={{fontFamily:"monospace",fontWeight:600}}>₹{e.amount.toLocaleString("en-IN")}</span>
                 </div>
               ))}
@@ -2175,7 +2266,7 @@ export function MyPayslip(){
             <div style={{paddingLeft:16}}>
               <p style={{margin:"12px 0 8px",fontSize:11,fontWeight:700,color:"#A32D2D",textTransform:"uppercase",letterSpacing:"0.4px"}}>Deductions</p>
               {d.deductions.map(e=>(
-                <div key={e.desc} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f0f2f7",fontSize:11.5}}>
+                <div key={e.desc} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11.5}}>
                   <span style={{color:"#0d1326"}}>{e.desc}</span><span style={{fontFamily:"monospace",fontWeight:600}}>₹{e.amount.toLocaleString("en-IN")}</span>
                 </div>
               ))}
@@ -2205,7 +2296,7 @@ export function PerformanceReview(){
   const prev=PERFORMANCE_REVIEWS[0];
   return(
     <PHASE2_Page title="Performance Review Module" subtitle="Annual KPI-based reviews · self-assessment · manager rating">
-      <div style={{display:"flex",borderBottom:"1px solid #e1e3ec",marginBottom:14,background:"#fff",borderRadius:"8px 8px 0 0",overflow:"hidden",border:"1px solid #e1e3ec"}}>
+      <div style={{display:"flex",borderBottom:"1px solid #cdd1d8",marginBottom:14,background:"#fff",borderRadius:"8px 8px 0 0",overflow:"hidden",border:"1px solid #cdd1d8"}}>
         {[{k:"current",l:"FY 2025-26 (In Progress)"},{k:"history",l:"Previous Reviews"}].map(t=>(
           <button key={t.k} onClick={()=>setTab(t.k)} style={tabBtnStyle(tab===t.k)}>{t.l}</button>
         ))}
@@ -2215,19 +2306,19 @@ export function PerformanceReview(){
           <div style={cardStyle}>
             <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#0d1326"}}>KPI Self-Assessment — FY 2025-26</p>
             {kpis.map((k,i)=>(
-              <div key={i} style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid #f0f2f7"}}>
+              <div key={i} style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid #dfe2e7"}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                   <span style={{fontSize:12,fontWeight:700,color:"#0d1326"}}>{k.kpi}</span>
                   <span style={{fontSize:10.5,color:"#5a6691"}}>Weight: {k.weight}%</span>
                 </div>
                 <p style={{margin:"0 0 6px",fontSize:10.5,color:"#5a6691"}}>Target: {k.target}</p>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                  <div><label style={{fontSize:10,color:"#5a6691",fontWeight:700,display:"block",marginBottom:2}}>My Achievement</label><input style={{padding:"5px 8px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11.5,width:"100%"}} placeholder="e.g. 99.4%"/></div>
-                  <div><label style={{fontSize:10,color:"#5a6691",fontWeight:700,display:"block",marginBottom:2}}>Self-Rating (1-5)</label><select style={{padding:"5px 8px",border:"1px solid #e1e3ec",borderRadius:4,fontSize:11.5,width:"100%"}}><option>5 — Exceeded</option><option selected>4 — Met</option><option>3 — Partially Met</option><option>2 — Below Target</option><option>1 — Not Met</option></select></div>
+                  <div><label style={{fontSize:10,color:"#5a6691",fontWeight:700,display:"block",marginBottom:2}}>My Achievement</label><input style={{padding:"5px 8px",border:"1px solid #cdd1d8",borderRadius:4,fontSize:11.5,width:"100%"}} placeholder="e.g. 99.4%"/></div>
+                  <div><label style={{fontSize:10,color:"#5a6691",fontWeight:700,display:"block",marginBottom:2}}>Self-Rating (1-5)</label><select style={{padding:"5px 8px",border:"1px solid #cdd1d8",borderRadius:4,fontSize:11.5,width:"100%"}}><option>5 — Exceeded</option><option selected>4 — Met</option><option>3 — Partially Met</option><option>2 — Below Target</option><option>1 — Not Met</option></select></div>
                 </div>
               </div>
             ))}
-            <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.4px"}}>Overall Self-Comments</label><textarea rows={3} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%",fontFamily:"inherit",resize:"none"}} placeholder="Achievements, challenges, and development areas…"/></div>
+            <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.4px"}}>Overall Self-Comments</label><textarea rows={3} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%",fontFamily:"inherit",resize:"none"}} placeholder="Achievements, challenges, and development areas…"/></div>
             <button style={{marginTop:12,padding:"9px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",width:"100%"}}>Submit Self-Assessment</button>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -2244,7 +2335,7 @@ export function PerformanceReview(){
             <div style={cardStyle}>
               <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#0d1326"}}>My Development Goals</p>
               {["Complete GST Advanced certification by Aug 2026","Learn Power BI for financial dashboards","Shadow Sr. AE on period-end close process","Attend travel industry FHRAI conference"].map((g,i)=>(
-                <div key={i} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid #f0f2f7",fontSize:11.5}}>
+                <div key={i} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11.5}}>
                   <input type="checkbox" defaultChecked={i<1}/>
                   <span style={{textDecoration:i<1?"line-through":"none",color:i<1?"#5a6691":"#0d1326"}}>{g}</span>
                 </div>
@@ -2267,7 +2358,7 @@ export function PerformanceReview(){
           </div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>KPI</th><th style={{...RPT_thStyle,textAlign:"right"}}>Target</th><th style={{...RPT_thStyle,textAlign:"right"}}>Actual</th><th style={{...RPT_thStyle,textAlign:"right"}}>Score</th></tr></thead>
-            <tbody>{(prev.kpis||[]).map((k,i)=>(<tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}><td style={RPT_tdStyle}>{k.kpi}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{k.target}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#22c55e"}}>{k.actual}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{k.score}</td></tr>))}</tbody>
+            <tbody>{(prev.kpis||[]).map((k,i)=>(<tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>{k.kpi}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{k.target}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:"#22c55e"}}>{k.actual}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{k.score}</td></tr>))}</tbody>
           </table>
           <div style={{marginTop:12,padding:12,background:"#fafbfd",borderRadius:6}}>
             <p style={{margin:"0 0 4px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Manager Comments</p>
@@ -2289,7 +2380,7 @@ export function Feedback360(){
   const QUESTIONS=["Demonstrates technical competence in their role","Communicates clearly and effectively","Meets commitments and deadlines","Collaborates well with the team","Suggests improvements proactively","Shows ownership and accountability"];
   return(
     <PHASE2_Page title="360° Feedback Module" subtitle="Multi-source feedback · manager · peers · self · all anonymous except manager">
-      <div style={{display:"flex",borderBottom:"1px solid #e1e3ec",marginBottom:14,background:"#fff",border:"1px solid #e1e3ec",borderRadius:"8px 8px 0 0",overflow:"hidden"}}>
+      <div style={{display:"flex",borderBottom:"1px solid #cdd1d8",marginBottom:14,background:"#fff",border:"1px solid #cdd1d8",borderRadius:"8px 8px 0 0",overflow:"hidden"}}>
         {[{k:"received",l:"My Feedback"},{k:"give",l:"Give Feedback"},{k:"status",l:"Submission Status"}].map(t=>(
           <button key={t.k} onClick={()=>setTab(t.k)} style={tabBtnStyle(tab===t.k)}>{t.l}</button>
         ))}
@@ -2333,18 +2424,18 @@ export function Feedback360(){
       )}
       {tab==="give"&&(
         <div style={cardStyle}>
-          <p style={{margin:"0 0 4px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Give Feedback to: <select style={{border:"1px solid #e1e3ec",borderRadius:4,padding:"3px 8px",fontSize:12}}><option value="">— Select —</option></select></p>
+          <p style={{margin:"0 0 4px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Give Feedback to: <select style={{border:"1px solid #cdd1d8",borderRadius:4,padding:"3px 8px",fontSize:12}}><option value="">— Select —</option></select></p>
           <p style={{margin:"0 0 14px",fontSize:10.5,color:"#5a6691"}}>Your feedback is anonymous to the recipient (visible only to HR)</p>
           {QUESTIONS.map((q,i)=>(
-            <div key={i} style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid #f0f2f7"}}>
+            <div key={i} style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid #dfe2e7"}}>
               <p style={{margin:"0 0 8px",fontSize:12.5,fontWeight:600,color:"#0d1326"}}>{q}</p>
               <div style={{display:"flex",gap:8}}>
-                {[1,2,3,4,5].map(s=><button key={s} style={{width:40,height:40,borderRadius:5,border:"1px solid #e1e3ec",background:"#fff",cursor:"pointer",fontSize:13,fontWeight:700,color:"#5a6691"}}>{s}</button>)}
+                {[1,2,3,4,5].map(s=><button key={s} style={{width:40,height:40,borderRadius:5,border:"1px solid #cdd1d8",background:"#fff",cursor:"pointer",fontSize:13,fontWeight:700,color:"#5a6691"}}>{s}</button>)}
                 <span style={{fontSize:10.5,color:"#5a6691",alignSelf:"center",marginLeft:4}}>1=Needs improvement · 5=Outstanding</span>
               </div>
             </div>
           ))}
-          <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.4px"}}>Written Comments</label><textarea rows={3} style={{padding:"8px 10px",border:"1px solid #e1e3ec",borderRadius:5,fontSize:12,width:"100%",fontFamily:"inherit",resize:"none"}} placeholder="Specific examples, strengths, areas for growth…"/></div>
+          <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.4px"}}>Written Comments</label><textarea rows={3} style={{padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%",fontFamily:"inherit",resize:"none"}} placeholder="Specific examples, strengths, areas for growth…"/></div>
           <button style={{marginTop:12,padding:"9px 22px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>Submit Feedback</button>
         </div>
       )}
@@ -2353,7 +2444,7 @@ export function Feedback360(){
           <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>Submission Status — Cycle: FY 2025-26 Q4</p>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>From</th><th style={RPT_thStyle}>Relation</th><th style={{...RPT_thStyle,textAlign:"center"}}>Submitted</th></tr></thead>
-            <tbody>{FEEDBACK_360_DATA.map((f,i)=>(<tr key={i} style={{borderBottom:"1px solid #f0f2f7"}}><td style={{...RPT_tdStyle,fontWeight:600}}>{f.from}</td><td style={RPT_tdStyle}>{f.relation}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{f.submitted?<span style={{color:"#22c55e",fontWeight:700}}>✓ Submitted</span>:<span style={{color:"#f97316",fontWeight:600}}>Pending</span>}</td></tr>))}</tbody>
+            <tbody>{FEEDBACK_360_DATA.map((f,i)=>(<tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}><td style={{...RPT_tdStyle,fontWeight:600}}>{f.from}</td><td style={RPT_tdStyle}>{f.relation}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{f.submitted?<span style={{color:"#22c55e",fontWeight:700}}>✓ Submitted</span>:<span style={{color:"#f97316",fontWeight:600}}>Pending</span>}</td></tr>))}</tbody>
           </table>
         </div>
       )}
@@ -2372,7 +2463,7 @@ export function SkillMatrix(){
   const Stars=({n,max=5,color="#d4a437"})=><span style={{letterSpacing:1}}>{Array.from({length:max},(_,i)=><span key={i} style={{color:i<n?color:"#e1e3ec",fontSize:14}}>★</span>)}</span>;
   return(
     <PHASE2_Page title="Skill Matrix" subtitle="Employee competency mapping · current level vs target · development gaps"
-      toolbar={<select value={selEmp} onChange={e=>setSelEmp(e.target.value)} style={{padding:"7px 10px",border:"1px solid #e1e3ec",borderRadius:6,fontSize:12,background:"#fff"}}>{emps.map(e=><option key={e}>{e}</option>)}</select>}>
+      toolbar={<select value={selEmp} onChange={e=>setSelEmp(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{emps.map(e=><option key={e}>{e}</option>)}</select>}>
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14}}>
         <div style={cardStyle}>
           <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#0d1326"}}>{selEmp} — Skill Assessment</p>
@@ -2380,7 +2471,7 @@ export function SkillMatrix(){
             <div key={cat} style={{marginBottom:16}}>
               <p style={{margin:"0 0 8px",fontSize:10.5,fontWeight:700,color:"#5a6691",textTransform:"uppercase",letterSpacing:"0.4px"}}>{cat}</p>
               {SKILLS_DATA.filter(s=>s.category===cat).map(s=>(
-                <div key={s.skill} style={{display:"grid",gridTemplateColumns:"160px 1fr 1fr 80px",gap:10,alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f0f2f7"}}>
+                <div key={s.skill} style={{display:"grid",gridTemplateColumns:"160px 1fr 1fr 80px",gap:10,alignItems:"center",padding:"7px 0",borderBottom:"1px solid #dfe2e7"}}>
                   <span style={{fontSize:12,color:"#0d1326",fontWeight:600}}>{s.skill}</span>
                   <div>
                     <p style={{margin:"0 0 2px",fontSize:9.5,color:"#5a6691"}}>Current Level</p>
@@ -2406,15 +2497,15 @@ export function SkillMatrix(){
               <p style={{textAlign:"center",margin:"0 0 8px",fontSize:11.5,color:"#5a6691"}}>{met}/{total} skills at or above target</p>
             </>);})()} 
             {[{label:"Skills at target",count:SKILLS_DATA.filter(s=>s.level>=s.target).length,color:"#22c55e"},{label:"Skills below target",count:SKILLS_DATA.filter(s=>s.level<s.target).length,color:"#f97316"},{label:"Skills assessed",count:SKILLS_DATA.length,color:"#0d1326"}].map(s=>(
-              <div key={s.label} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f0f2f7",fontSize:11.5}}>
+              <div key={s.label} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11.5}}>
                 <span style={{color:"#5a6691"}}>{s.label}</span><b style={{color:s.color}}>{s.count}</b>
               </div>
             ))}
           </div>
-          <div style={{padding:12,background:"#fff",border:"1px solid #e1e3ec",borderRadius:8}}>
+          <div style={{padding:12,background:"#fff",border:"1px solid #cdd1d8",borderRadius:8}}>
             <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Development Focus Areas</p>
             {SKILLS_DATA.filter(s=>s.level<s.target).map(s=>(
-              <div key={s.skill} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f0f2f7",fontSize:11.5}}>
+              <div key={s.skill} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11.5}}>
                 <span style={{color:"#0d1326"}}>{s.skill}</span>
                 <span style={{color:"#f97316",fontWeight:700}}>L{s.level}→L{s.target}</span>
               </div>

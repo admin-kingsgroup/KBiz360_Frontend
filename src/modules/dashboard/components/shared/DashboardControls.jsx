@@ -31,12 +31,12 @@ export function DashboardControls({ range, setRange, scope, setScope }) {
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         flexWrap: 'wrap', gap: 12, marginBottom: 14,
-        padding: '10px 14px', background: '#f4f5f7', border: '1px solid #e6e8ec', borderRadius: 8,
+        padding: '10px 14px', background: '#f4f5f7', border: '1px solid #cdd1d8', borderRadius: 8,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         {/* Period segmented control */}
-        <div style={{ display: 'flex', gap: 4, padding: 3, background: '#fff', borderRadius: 7, border: '1px solid #e6e8ec' }}>
+        <div style={{ display: 'flex', gap: 4, padding: 3, background: '#fff', borderRadius: 7, border: '1px solid #cdd1d8' }}>
           {RANGE_TABS.map((t) => (
             <button
               key={t.id}
@@ -58,7 +58,7 @@ export function DashboardControls({ range, setRange, scope, setScope }) {
           <select
             value={scope}
             onChange={(e) => setScope(e.target.value)}
-            style={{ padding: '6px 10px', fontSize: 11.5, fontWeight: 600, color: '#14161a', background: '#fff', border: '1px solid #e6e8ec', borderRadius: 6, cursor: 'pointer', minHeight: 32 }}
+            style={{ padding: '6px 10px', fontSize: 11.5, fontWeight: 600, color: '#14161a', background: '#fff', border: '1px solid #cdd1d8', borderRadius: 6, cursor: 'pointer', minHeight: 32 }}
           >
             <option value="ALL">🌐 Group Company (All Branches)</option>
             {BRANCHES.map((b) => (

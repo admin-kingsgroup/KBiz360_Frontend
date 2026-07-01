@@ -35,9 +35,9 @@ export function ShortcutHelp() {
         </div>
         <div style={{ padding: '6px 0' }}>
           {SHORTCUTS.map(([k, d]) => (
-            <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '9px 16px', borderBottom: '1px solid #f2f4f9' }}>
+            <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '9px 16px', borderBottom: '1px solid #dfe2e7' }}>
               <span style={{ fontSize: 12.5, color: DIM }}>{d}</span>
-              <kbd style={{ fontFamily: 'inherit', fontSize: 11, fontWeight: 700, color: DARK, background: '#f1f3f8', border: '1px solid #d6dbe6', borderBottomWidth: 2, borderRadius: 5, padding: '2px 8px', whiteSpace: 'nowrap' }}>{k}</kbd>
+              <kbd style={{ fontFamily: 'inherit', fontSize: 11, fontWeight: 700, color: DARK, background: '#f1f3f8', border: '1px solid #cdd1d8', borderBottomWidth: 2, borderRadius: 5, padding: '2px 8px', whiteSpace: 'nowrap' }}>{k}</kbd>
             </div>
           ))}
         </div>

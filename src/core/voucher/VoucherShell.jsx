@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { useVoucherPreview, useCreateVoucher, useUpdateVoucher } from '../useAccounting';
 import { openPrintPreview } from '../PrintPreview';
-import { bc, VWrap, VHead, FL, inp, card, btnG, btnGh } from '../styles';
+import { B, bc, VWrap, VHead, FL, inp, card, btnG, btnGh } from '../styles';
 import { VOUCHER_REGISTRY } from './registry';
 import { DARK, DIM, BLUE, RED, GREEN, money, brCodeOf, escHtml } from './ui';
+import { JvBlock } from './JvBlock';
+import { useVoucherRevoke, voucherParent, openParentFile } from './useRevokeAction';
 import { useFormKeys } from '../ux/forms';
 import { toast } from '../ux/toast';
 import { Kbd } from '../ux/widgets.jsx';
 import { isViewOnly } from '../api';
+import { triggerSaveRefresh } from '../hooks';
+import { useVNo } from '../useNextNo';
 
 /**
  * Unified voucher form (Option C).
@@ -31,6 +35,9 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   const cur = curProp || bc(branch)?.cur || '₹';
   const editId = isEdit ? (voucherId || voucher?.id || voucher?._id) : undefined;
   const ctx = { branch: isEdit ? (voucher?.branch || branch) : branch, branchCode, cur, editId };
+  // Live "next number" preview shown in place of the old static "Auto" (create mode).
+  // Advisory — the server assigns the guaranteed-unique number atomically at save.
+  const vNo = useVNo(branchCode, desc?.type);
 
   const [state, setState] = useState(() => {
     const s = isEdit && voucher ? desc.fromVoucher(voucher, ctx) : desc.initial(ctx);
@@ -43,6 +50,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   const createMut = useCreateVoucher();
   const updateMut = useUpdateVoucher();
   const saving = createMut.isPending || updateMut.isPending;
+  const { canRevoke, doRevoke, revoking } = useVoucherRevoke();
 
   // Live, backend-computed journal — identical engine for create and edit.
   const previewBody = { ...desc.toBody(state, ctx), sourceRef: state.sourceRef || '' };
@@ -63,6 +71,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
     const base = { ...desc.toBody(state, ctx), sourceRef: state.sourceRef || '' };
     const ok = (vno) => {
       toast(`${desc.label} saved${vno ? ` — ${vno}` : ''}`);
+      triggerSaveRefresh(); // advance the "next number" preview to the following one
       // Rapid-entry vouchers (e.g. Debit Note) close the saved-confirmation panel and
       // drop straight back to a fresh blank voucher for the next entry (Tally-style);
       // every other type still shows the Print / ＋ New Voucher panel.
@@ -104,17 +113,17 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   }, [err]);
 
   const printEntry = () => {
-    const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? cur + x.toLocaleString('en-IN') : ''; };
+    const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? money(cur, x) : ''; };
     const rows = (pv.postings || []).map((p) => `<tr><td>${escHtml(p.ledger)}</td><td>${escHtml(p.group || '')}</td><td class="r">${fmt(p.debit)}</td><td class="r">${fmt(p.credit)}</td></tr>`).join('');
     const html = `<style>
-      .ve{font-family:'Segoe UI',Arial,sans-serif;color:#0d1326}
+      .ve{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#141414}
       .ve h1{font-size:16px;margin:0 0 2px}
       .ve .meta{font-size:10.5px;color:#5a6691;margin:0 0 4px}
       .ve table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:8px}
-      .ve th{background:#0d1326;color:#d4a437;text-align:left;padding:6px 8px;font-size:9.5px}
+      .ve th{background:#141414;color:#A07828;text-align:left;padding:6px 8px;font-size:9.5px}
       .ve th.r,.ve td.r{text-align:right}
-      .ve td{padding:5px 8px;border-bottom:1px solid #eceef4}
-      .ve tfoot td{background:#f3f5f9;font-weight:800;border-top:2px solid #0d1326}
+      .ve td{padding:5px 8px;border-bottom:1px solid #dfe2e7}
+      .ve tfoot td{background:#FBF3DE;font-weight:800;border-top:2px solid #A07828}
     </style>
     <div class="ve">
       <h1>${escHtml(desc.label)} — ${escHtml(isEdit ? (voucher.vno || '') : 'New')}</h1>
@@ -131,9 +140,9 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
 
   // ── shared live journal table ──────────────────────────────────────
   const journalTable = (
-    <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+    <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #E8D9A8', background: '#FFFDF7' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Accounting Effect — Full Journal (where this hits the books)</div>
+        <div style={{ fontWeight: 700, color: '#6B4E0F', fontSize: 12 }}>Accounting Effect — Full Journal (where this hits the books)</div>
         <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.error ? '⚠ ' + pv.error : pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
       </div>
       {pv.missing?.length > 0 && (
@@ -141,16 +150,35 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
           ⚠ Ledger not in Chart of Accounts: <b>{pv.missing.join(', ')}</b>. Create it in Masters first.
         </div>
       )}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-        <thead><tr><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Ledger</th><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Group</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Debit</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Credit</th></tr></thead>
-        <tbody>
-          {(pv.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
-          {!(pv.postings || []).length && <tr><td colSpan={4} style={{ padding: 12, textAlign: 'center', color: DIM }}>Pick ledgers / amounts to see the journal effect.</td></tr>}
-        </tbody>
-        <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money(cur, pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money(cur, pv.totalCredit)}</td></tr></tfoot>
-      </table>
+      <JvBlock postings={pv.postings} />
     </div>
   );
+
+  // ── edit-mode chrome ───────────────────────────────────────────────
+  // Editing opens the SAME voucher window as create: the dark/gold themed
+  // header (icon · label · branch/tax badge) + gold left border. One frame,
+  // reused by both the editable form and the post-save panel, so every place
+  // that opens an edit (ledger/day-book/cash-book drills, P&L, approvals)
+  // shows an identical-looking window to the create screen.
+  const editFrame = (children) => {
+    const cfg = (B && B[branchCode]) || {};
+    const taxBadge = cfg.taxType === 'GST' ? 'GST' : ('VAT ' + (cfg.vatRate || 0) + '%');
+    return (
+      <div style={{ background: '#fff', overflow: 'hidden', borderLeft: '4px solid #A07828', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', background: '#141414', borderBottom: '3px solid #A07828', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(160,120,40,0.18)', color: '#A07828', border: '1px solid rgba(160,120,40,0.40)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{desc.icon}</div>
+            <div>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 800, letterSpacing: '0.3px', color: '#fff' }}>{desc.label}</p>
+              <p style={{ margin: 0, fontSize: 10.5, color: '#8A8A84', letterSpacing: '0.3px' }}>{(voucher?.vno || '') + ' · ' + (branchCode || '') + ' · ' + (voucher?.type || '') + ' - ' + (voucher?.category || category)}</p>
+            </div>
+          </div>
+          <span style={{ fontSize: 10, padding: '3px 9px', borderRadius: 999, background: '#FBF3DE', color: '#6B4E0F', fontWeight: 800, border: '1px solid #E8D9A8', letterSpacing: '0.04em' }}>{(cfg.curCode || cur) + ' · ' + taxBadge}</span>
+        </div>
+        {children}
+      </div>
+    );
+  };
 
   // ── post-save preview (Print / Close|New) ──────────────────────────
   if (done) {
@@ -164,47 +192,65 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
           <button onClick={printEntry} className="max-tablet:min-h-[44px]" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
           {isEdit
-            ? <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #e6e8ec', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
+            ? <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
             : <button onClick={reset} className="max-tablet:min-h-[44px]" style={{ ...btnG }}>＋ New Voucher</button>}
         </div>
       </div>
     );
-    if (isEdit) return doneInner;
-    return <VWrap title={desc.label} icon={desc.icon} vNo="Auto" branch={branch}>{doneInner}</VWrap>;
+    if (isEdit) return editFrame(doneInner);
+    return <VWrap title={desc.label} icon={desc.icon} vNo={vNo} branch={branch}>{doneInner}</VWrap>;
   }
 
   // ── the editable form ──────────────────────────────────────────────
   const formInner = (
     <>
       {desc.fields({ state, setState, ctx })}
-      <FL label="Tally Ref"><input value={state.sourceRef || ''} onChange={(e) => setState((s) => ({ ...s, sourceRef: e.target.value }))} style={{ ...inp, maxWidth: 200 }} placeholder="original Tally voucher no (optional)" /></FL>
-      {journalTable}
+      <div style={{ marginTop: 12 }}><FL label="Tally Ref"><input value={state.sourceRef || ''} onChange={(e) => setState((s) => ({ ...s, sourceRef: e.target.value }))} style={{ ...inp, maxWidth: 200 }} placeholder="original Tally voucher no (optional)" /></FL></div>
+      {!desc.hideShellJournal && journalTable}
       {!branchCode && !isEdit && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#FAEEDA', fontSize: 10.5, color: '#854F0B', fontWeight: 600, textAlign: 'center', margin: '10px 0' }}>Select a specific branch (not “All”) to post this voucher.</div>}
       {err && <div ref={errRef} role="alert" style={{ padding: '8px 12px', borderRadius: 8, background: '#FCEBEB', fontSize: 11, color: RED, fontWeight: 600, margin: '10px 0' }}>! {err}</div>}
       {viewOnly && <div style={{ padding: '8px 12px', borderRadius: 8, background: '#FAEEDA', fontSize: 10.5, color: '#854F0B', fontWeight: 600, textAlign: 'center', margin: '10px 0' }}>View only — this account can review vouchers but cannot post them.</div>}
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
         {!isEdit && <button onClick={reset} className="max-tablet:min-h-[44px]" style={btnGh}>Reset</button>}
         {isEdit && <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={btnGh}>Back</button>}
-        <button onClick={save} disabled={!canSave} title={viewOnly ? 'View only — changes are not allowed' : 'Save (Ctrl/Cmd+Enter)'} className="max-tablet:min-h-[44px]" style={{ ...btnG, background: canSave ? '#2563eb' : '#cbd0db', opacity: canSave ? 1 : 0.6, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+        <button onClick={save} disabled={!canSave} title={viewOnly ? 'View only — changes are not allowed' : 'Save (Ctrl/Cmd+Enter)'} className="max-tablet:min-h-[44px]" style={{ ...btnG, background: canSave ? '#A07828' : '#cbd0db', opacity: canSave ? 1 : 0.6, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           {desc.icon} Save Voucher {saving ? '…' : val.hint} {!saving && <Kbd>⌃↵</Kbd>}
         </button>
       </div>
     </>
   );
 
-  if (isEdit) {
-    return (
+  // Approved / posted vouchers are READ-ONLY. Editing one would silently re-post the
+  // journal outside the approval workflow, so the drill-downs that reuse this shell
+  // (Day Book, ledgers, Cash Book, P&L / Balance Sheet, registers) open it for viewing
+  // only. To change it, Revoke it back to Pending in Voucher Approvals — the number is
+  // kept (a booking-driven Sales/Purchase leg is edited on its SO/PO/GP booking).
+  if (isEdit && (voucher?.status === 'approved' || voucher?.status === 'saved' || voucher?.status === 'posted')) {
+    const parent = voucherParent(voucher);
+    return editFrame(
       <div style={{ padding: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div style={{ fontWeight: 800, color: DARK, fontSize: 14 }}>{voucher.vno} <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>{voucher.type} - {voucher.category}</span></div>
+        <div style={{ padding: '10px 12px', borderRadius: 7, background: '#FBF3DE', border: '1px solid #E8D9A8', color: '#6B4E0F', fontSize: 12, fontWeight: 600, marginBottom: 12 }}>
+          🔒 Approved &amp; posted — read-only. {parent ? <>It is a leg of its {parent.label} <b>{parent.ref}</b> — edit or revoke it there (the whole file is un-posted together), never the voucher alone.</> : <>To edit, <b>Revoke</b> it back to Pending in <b>Voucher Approvals</b> — the number is kept.</>}
         </div>
-        <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown}>{formInner}</div>
+        {journalTable}
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          {parent && parent.navigable && <button onClick={() => { openParentFile(voucher); dismiss(); }} className="max-tablet:min-h-[44px]" title={`Open its ${parent.label} ${parent.ref} — revoke the whole file there`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff' }}>⟲ Open {parent.label} →</button>}
+          {canRevoke && !parent && <button onClick={() => doRevoke(editId, dismiss)} disabled={revoking} className="max-tablet:min-h-[44px]" title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: revoking ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff', opacity: revoking ? 0.6 : 1 }}>⟲ {revoking ? 'Revoking…' : 'Revoke'}</button>}
+          <button onClick={printEntry} className="max-tablet:min-h-[44px]" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
+          <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
+        </div>
       </div>
     );
   }
+
+  if (isEdit) {
+    return editFrame(
+      <div style={{ padding: '14px 16px' }} ref={formKeys.ref} onKeyDown={formKeys.onKeyDown}>{formInner}</div>
+    );
+  }
   return (
-    <VWrap title={desc.label} icon={desc.icon} vNo="Auto" branch={branch}>
-      <VHead vNo="Auto" />
+    <VWrap title={desc.label} icon={desc.icon} vNo={vNo} branch={branch}>
+      <VHead vNo={vNo} />
       <div style={{ padding: '14px 16px' }}>
         {desc.explain && <div style={{ marginBottom: 12 }}>{desc.explain}</div>}
         <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown}>{formInner}</div>

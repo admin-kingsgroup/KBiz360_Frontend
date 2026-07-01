@@ -23,7 +23,7 @@ export function TopBar({setRoute,currentUser,setCurrentUser,branch}){
       <div style={{
         height:52,display:"flex",alignItems:"center",
         justifyContent:"space-between",padding:"0 16px",
-        background:"#ffffff",borderBottom:"1px solid #e5e5e5",
+        background:"#ffffff",borderBottom:"1px solid #cdd1d8",
         boxShadow:"0 2px 8px rgba(0,0,0,0.04)",flexShrink:0,
       }}>
         <div style={{display:"flex",alignItems:"center",gap:12}}>

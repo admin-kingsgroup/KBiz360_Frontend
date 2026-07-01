@@ -5,8 +5,13 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from './api';
+import { money } from './format';
+import { bc } from './styles';
 
-const C = { dark: '#0d1326', blue: '#185FA5', red: '#A32D2D', green: '#27500A', gold: '#d4a437', dim: '#5a6691', border: '#e1e3ec' };
+// Currency symbol for a branch code on a snapshot/record (defaults to ₹).
+const curOf = (code) => (bc(code ? { code } : 'ALL') || {}).cur || '₹';
+
+const C = { dark: '#0d1326', blue: '#185FA5', red: '#A32D2D', green: '#27500A', gold: '#d4a437', dim: '#5a6691', border: '#cdd1d8' };
 
 const ACTION = {
   create:  { label: 'Created',  bg: '#EAF3DE', fg: '#27500A' },
@@ -23,16 +28,15 @@ const FIELD_LABEL = {
   vno: 'Voucher No', bookingNo: 'Booking No', linkNo: 'Link No', costCenter: 'Cost Centre', gstMode: 'GST mode',
   party: 'Party', billTo: 'Bill To', partyGroup: 'Party group', customer: 'Customer', supplier: 'Supplier',
   remarks: 'Remarks', date: 'Date', branch: 'Branch', module: 'Module', status: 'Status', total: 'Total',
-  subtotal: 'Subtotal', lines: 'Line items', rows: 'Line items', markupPct: 'Other Taxes %', consultant: 'Consultant',
+  subtotal: 'Subtotal', lines: 'Line items', rows: 'Line items', markupPct: 'Service Charge - 2 %', consultant: 'Consultant',
   noSupplier: 'No-supplier deal', packageType: 'Package type', saleVno: 'Sale invoice', purchaseVno: 'Purchase invoice',
   approvedBy: 'Approved by', deletedBy: 'Deleted by', rejectedReason: 'Rejected reason', supplierAmt: 'Supplier amount',
   amount: 'Amount', counterParty: 'Counter-party', consultantName: 'Consultant', headerRef: 'Reference',
 };
 const labelOf = (f) => FIELD_LABEL[f] || f.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 
-// Field names that hold money → render with ₹ and Indian grouping.
+// Field names that hold money → render with the branch currency + locale grouping.
 const MONEY = new Set(['total', 'subtotal', 'taxAmt', 'tcsAmt', 'tdsAmt', 'amount', 'supplierAmt', 'saleTotal', 'purchaseTotal', 'incentiveAmt', 'incentiveGst', 'incentiveTds', 'onAccount']);
-const money = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
 
 const fmtAt = (s) => {
   if (!s) return '';
@@ -41,22 +45,22 @@ const fmtAt = (s) => {
 };
 
 // Short one-line summary of a money side ({ total, gst, tcs }) for so/po.
-const sideSummary = (v) => {
+const sideSummary = (v, cur = '₹') => {
   if (!v || typeof v !== 'object') return '—';
-  const parts = [money(v.total)];
-  if (Number(v.gst)) parts.push(`incl GST ${money(v.gst)}`);
-  if (Number(v.tcs)) parts.push(`TCS ${money(v.tcs)}`);
+  const parts = [money(v.total, cur)];
+  if (Number(v.gst)) parts.push(`incl GST ${money(v.gst, cur)}`);
+  if (Number(v.tcs)) parts.push(`TCS ${money(v.tcs, cur)}`);
   return parts.join(' · ');
 };
 
 // Render one value (old or new) in plain language for the change table.
-function ValueView({ field, value }) {
+function ValueView({ field, value, cur = '₹' }) {
   const [raw, setRaw] = useState(false);
   if (value == null || value === '') return <span style={{ color: C.dim }}>—</span>;
 
   // Money + plain scalars.
   if (typeof value !== 'object') {
-    if (MONEY.has(field)) return <span style={{ fontWeight: 700 }}>{money(value)}</span>;
+    if (MONEY.has(field)) return <span style={{ fontWeight: 700 }}>{money(value, cur)}</span>;
     if (typeof value === 'boolean') return <span>{value ? 'Yes' : 'No'}</span>;
     return <span style={{ fontWeight: 600 }}>{String(value)}</span>;
   }
@@ -67,8 +71,8 @@ function ValueView({ field, value }) {
     const led = value.ledgerName && value.ledgerName !== value.name ? ` · ledger: ${value.ledgerName}` : '';
     return <span style={{ fontWeight: 600 }}>{name}{led}</span>;
   }
-  if (field === 'so' || field === 'po') return <span style={{ fontWeight: 600 }}>{sideSummary(value)}</span>;
-  if (field === 'gp') return <span style={{ fontWeight: 600 }}>{money(value.total)} {value.pct != null ? `(${value.pct}%)` : ''}</span>;
+  if (field === 'so' || field === 'po') return <span style={{ fontWeight: 600 }}>{sideSummary(value, cur)}</span>;
+  if (field === 'gp') return <span style={{ fontWeight: 600 }}>{money(value.total, cur)} {value.pct != null ? `(${value.pct}%)` : ''}</span>;
 
   // Arrays of line items → a readable mini list.
   if (Array.isArray(value)) {
@@ -81,7 +85,7 @@ function ValueView({ field, value }) {
             const name = l.ledger || l.desc || l.fn || l.name || `Item ${i + 1}`;
             const amt = l.amt != null ? l.amt : (l.total != null ? l.total : l.finalSales);
             const dc = l.drCr ? ` (${l.drCr})` : '';
-            return <li key={i} style={{ fontSize: 11 }}>{name}{dc}{amt != null ? ` — ${money(amt)}` : ''}</li>;
+            return <li key={i} style={{ fontSize: 11 }}>{name}{dc}{amt != null ? ` — ${money(amt, cur)}` : ''}</li>;
           })}
           {value.length > 12 && <li style={{ fontSize: 11, color: C.dim }}>…and {value.length - 12} more</li>}
         </ul>
@@ -103,21 +107,23 @@ function ValueView({ field, value }) {
 // A friendly read-only summary of a whole record snapshot (booking or voucher).
 function RecordSummary({ record }) {
   if (!record) return null;
+  // The snapshot carries its own branch → format its money in that branch's currency.
+  const cur = curOf(record.branch);
   const isBooking = !!(record.bookingNo || record.so || record.po);
   const rows = isBooking
     ? [
       ['Booking No', record.bookingNo], ['Link No', record.linkNo], ['Branch', record.branch],
       ['Module', record.module], ['Date', record.date], ['Status', record.status],
       ['Customer', record.customer?.name], ['Supplier', record.noSupplier ? '— (no supplier)' : record.supplier?.name],
-      ['Sales', record.so ? sideSummary(record.so) : null], ['Purchase', record.po ? sideSummary(record.po) : null],
-      ['Gross Profit', record.gp ? `${money(record.gp.total)} (${record.gp.pct ?? 0}%)` : null],
+      ['Sales', record.so ? sideSummary(record.so, cur) : null], ['Purchase', record.po ? sideSummary(record.po, cur) : null],
+      ['Gross Profit', record.gp ? `${money(record.gp.total, cur)} (${record.gp.pct ?? 0}%)` : null],
       ['Remarks', record.remarks],
     ]
     : [
       ['Voucher No', record.vno], ['Type', record.type], ['Category', record.category], ['Branch', record.branch],
       ['Date', record.date], ['Status', record.status], ['Party', record.party || record.billTo],
-      ['Total', money(record.total)], ['GST / Tax', Number(record.taxAmt) ? money(record.taxAmt) : null],
-      ['TCS', Number(record.tcsAmt) ? money(record.tcsAmt) : null], ['TDS', Number(record.tdsAmt) ? money(record.tdsAmt) : null],
+      ['Total', money(record.total, cur)], ['SVF GST', Number(record.taxAmt) ? money(record.taxAmt, cur) : null], ['SVC2 GST', Number(record.otherTaxesGst) ? money(record.otherTaxesGst, cur) : null],
+      ['TCS', Number(record.tcsAmt) ? money(record.tcsAmt, cur) : null], ['TDS', Number(record.tdsAmt) ? money(record.tdsAmt, cur) : null],
       ['Remarks', record.remarks],
     ];
   const shown = rows.filter(([, v]) => v != null && v !== '');
@@ -138,7 +144,7 @@ function RecordSummary({ record }) {
           <div style={{ color: C.dim, fontSize: 11 }}>Line items</div>
           <ul style={{ margin: '3px 0 0', paddingLeft: 16 }}>
             {record.lines.map((l, i) => (
-              <li key={i} style={{ fontSize: 11 }}>{l.ledger || l.desc || `Item ${i + 1}`}{l.drCr ? ` (${l.drCr})` : ''}{l.amt != null ? ` — ${money(l.amt)}` : ''}</li>
+              <li key={i} style={{ fontSize: 11 }}>{l.ledger || l.desc || `Item ${i + 1}`}{l.drCr ? ` (${l.drCr})` : ''}{l.amt != null ? ` — ${money(l.amt, cur)}` : ''}</li>
             ))}
           </ul>
         </div>
@@ -147,7 +153,7 @@ function RecordSummary({ record }) {
   );
 }
 
-function EventCard({ ev }) {
+function EventCard({ ev, cur = '₹' }) {
   const [showSnap, setShowSnap] = useState(false);
   const a = ACTION[ev.action] || { label: ev.action, bg: '#f0f1f5', fg: C.dim };
   const changes = ev.changes || [];
@@ -170,10 +176,10 @@ function EventCard({ ev }) {
               </tr></thead>
               <tbody>
                 {changes.map((c, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}>
+                  <tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}>
                     <td style={{ padding: '5px 8px', fontWeight: 600, color: C.dark, verticalAlign: 'top', whiteSpace: 'nowrap' }}>{labelOf(c.field)}</td>
-                    <td style={{ padding: '5px 8px', verticalAlign: 'top', color: C.red }}><ValueView field={c.field} value={c.from} /></td>
-                    <td style={{ padding: '5px 8px', verticalAlign: 'top', color: C.green }}><ValueView field={c.field} value={c.to} /></td>
+                    <td style={{ padding: '5px 8px', verticalAlign: 'top', color: C.red }}><ValueView field={c.field} value={c.from} cur={cur} /></td>
+                    <td style={{ padding: '5px 8px', verticalAlign: 'top', color: C.green }}><ValueView field={c.field} value={c.to} cur={cur} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -193,8 +199,10 @@ function EventCard({ ev }) {
   );
 }
 
-/** Live audit timeline. entityType: 'voucher' | 'booking'; entityId: the record _id. */
-export function AuditTrail({ entityType, entityId }) {
+/** Live audit timeline. entityType: 'voucher' | 'booking'; entityId: the record _id.
+ *  `cur` is the branch currency for the change-diff amounts (record snapshots self-derive
+ *  their own currency from the snapshot's branch). */
+export function AuditTrail({ entityType, entityId, cur = '₹' }) {
   const base = entityType === 'booking' ? '/api/booking-orders' : '/api/vouchers';
   const { data = [], isLoading, error } = useQuery({
     queryKey: ['audit', entityType, entityId],
@@ -208,7 +216,7 @@ export function AuditTrail({ entityType, entityId }) {
   return (
     <div>
       <div style={{ fontSize: 11.5, color: C.dim, marginBottom: 8 }}>{data.length} event{data.length === 1 ? '' : 's'} · newest first</div>
-      {data.map((ev) => <EventCard key={ev._id || ev.at} ev={ev} />)}
+      {data.map((ev) => <EventCard key={ev._id || ev.at} ev={ev} cur={cur} />)}
     </div>
   );
 }

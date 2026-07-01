@@ -13,15 +13,18 @@
    #c2a04a accents). No demo data — empty in, empty out.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { card, inp, bc } from '../../core/styles';
+import { localeOf } from '../../core/format';
 import { exportToExcel, vouchersToSheet } from '../../core/exportExcel';
 import { voucherHaystack, bookingTravelDetail } from '../../core/registerSearch';
 import { isVatBranch } from '../../core/voucherSpecs';
 import { openPrintPreview } from '../../core/PrintPreview';
-import { buildBookingInvoice } from '../../core/invoiceHtml';
+import { printBookingInvoice } from '../../core/printInvoice';
 import { useReportExport } from '../../core/reportExportContext';
 import { LedgerAccountView } from '../../core/ledgerUI';
+import { resolveLedgerSelection } from '../../core/ledgerPicker';
+import { LedgerPicker } from '../../core/voucher/LedgerPicker';
 import { openLedgerModal } from '../../core/LedgerModalHost';
 import { usePrefs } from '../../core/prefs';
 import { pushModal } from '../../core/ux/modalStore';
@@ -42,13 +45,16 @@ import {
 import { apiGet } from '../../core/api';
 import { LedgerVouchers } from '../pnlTally.jsx';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
+import { JvBlock } from '../../core/voucher/JvBlock';
+import { editorVoucherTotal } from '../../core/voucher/ui';
 import { hasRegistry } from '../../core/voucher/registry';
+import { useVoucherRevoke, voucherParent, openParentFile } from '../../core/voucher/useRevokeAction';
 import { PageLayout } from '../../shell/PageLayout';
 import { SkeletonTable } from '../../shell/primitives';
 
 const DARK = '#1a1c22', GOLD = '#c2a04a', DIM = '#5b616e', BLUE = '#2563eb', RED = '#dc2626', GREEN = '#16a34a';
 const curOf = (branch) => bc(branch).cur;
-const money = (cur, n) => { const v = Math.round(Number(n) || 0); return v ? cur + v.toLocaleString('en-IN') : '—'; };
+const money = (cur, n) => { const v = Math.round(Number(n) || 0); return v ? cur + v.toLocaleString(localeOf(cur)) : '—'; };
 const branchLabel = (branch) => (!branch || branch === 'ALL' ? CONSOLIDATED_LABEL : (branch.code || branch));
 
 /* ── shared chrome ──────────────────────────────────────────────────── */
@@ -147,7 +153,7 @@ function ExportBtn({ onClick, disabled, label = 'Export to Excel' }) {
 }
 
 // Reusable per-voucher detail: header chips + every line's full meta breakup
-// (base fare, K3, taxes, service charge, CGST/SGST/IGST, markup, TCS …).
+// (base fare, K3, taxes, service charge, CGST/SGST/IGST, SVC2, TCS …).
 export function VoucherLines({ voucher: v, cur }) {
   // Full-JV preview: the SAME engine the edit screen uses, so the popup shows the
   // COMPLETE balanced journal (party Dr, every component head, GST, TCS/TDS) for both
@@ -157,7 +163,7 @@ export function VoucherLines({ voucher: v, cur }) {
   if (!v) return null;
   // The shared `money` renders 0 as '—'; the JV must show a real ₹0 on the empty side
   // so EVERY ledger is visible with an explicit amount.
-  const money0 = (n) => cur + Math.round(Number(n) || 0).toLocaleString('en-IN');
+  const money0 = (n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
   const F = ({ label, val }) => (
     <div style={{ minWidth: 110 }}>
       <div style={{ fontSize: 9, color: DIM, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{label}</div>
@@ -178,32 +184,16 @@ export function VoucherLines({ voucher: v, cur }) {
         <F label="Voucher" val={v.vno} /><F label="Date" val={v.date} /><F label="Branch" val={v.branch} />
         <F label={v.category === 'purchase' ? 'Supplier' : 'Customer'} val={v.party} />
         <F label="Link No" val={v.linkNo} /><F label="Taxable" val={money(cur, v.subtotal)} />
-        <F label="GST" val={money(cur, v.taxAmt)} /><F label="Total" val={money(cur, v.total)} />
+        <F label="SVF GST" val={money(cur, v.taxAmt)} />{Number(v.otherTaxesGst) > 0 && <F label="SVC2 GST" val={money(cur, v.otherTaxesGst)} />}<F label="Total" val={money(cur, v.total)} />
       </div>
       {postings.length > 0 ? (
         // Full journal — every ledger, both sides; a zero side shows ₹0 (dimmed), never hidden.
-        <div style={{ ...card, padding: 10, marginBottom: 10, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+        <div style={{ ...card, padding: 10, marginBottom: 10, boxShadow: 'none', border: '1px solid #dfe2e7' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Full Journal Entry — every ledger this hits</div>
             {typeof pv.balanced === 'boolean' && <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.balanced ? '✓ Balanced' : `✗ Out by ${money0(pv.diff)}`}</span>}
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-            <thead><tr><th style={jvTh}>Ledger</th><th style={jvTh}>Group</th><th style={{ ...jvTh, textAlign: 'right' }}>Debit</th><th style={{ ...jvTh, textAlign: 'right' }}>Credit</th></tr></thead>
-            <tbody>
-              {postings.map((p, i) => {
-                const zeroD = !(Number(p.debit) > 0), zeroC = !(Number(p.credit) > 0);
-                return (
-                  <tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}>
-                    <td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td>
-                    <td style={{ padding: '5px 8px', color: DIM }}>{p.group || '—'}</td>
-                    <td style={{ padding: '5px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: zeroD ? '#9aa3bd' : BLUE }}>{money0(p.debit)}</td>
-                    <td style={{ padding: '5px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: zeroC ? '#9aa3bd' : RED }}>{money0(p.credit)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money0(pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money0(pv.totalCredit)}</td></tr></tfoot>
-          </table>
+          <JvBlock postings={postings} />
         </div>
       ) : (
         // Fallback when the preview is unavailable: the captured component-head lines.
@@ -212,7 +202,7 @@ export function VoucherLines({ voucher: v, cur }) {
           const meta = ln.meta && typeof ln.meta === 'object' ? ln.meta : {};
           const entries = Object.entries(meta).filter(([, val]) => val !== '' && val != null && typeof val !== 'object');
           return (
-            <div key={i} style={{ ...card, padding: 12, marginBottom: 10, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+            <div key={i} style={{ ...card, padding: 12, marginBottom: 10, boxShadow: 'none', border: '1px solid #dfe2e7' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: entries.length ? 8 : 0 }}>
                 <span style={{ fontWeight: 700, color: DARK, fontSize: 12.5 }}>{ln.ledger || `Line ${i + 1}`}</span>
                 <span style={{ fontWeight: 700, color: BLUE, fontVariantNumeric: 'tabular-nums' }}>{money0(ln.amt)}</span>
@@ -246,7 +236,7 @@ const Th = ({ children, right }) => (
   <th style={{ padding: '9px 14px', textAlign: right ? 'right' : 'left', color: GOLD, fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap' }}>{children}</th>
 );
 const headRow = { background: DARK };
-const rowBg = (i) => ({ borderBottom: '1px solid #f3f4f8', background: i % 2 === 0 ? '#fff' : '#fafafa' });
+const rowBg = (i) => ({ borderBottom: '1px solid #dfe2e7', background: i % 2 === 0 ? '#fff' : '#fafafa' });
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
 
 // Voucher type → product bucket (for the register's product filter).
@@ -304,7 +294,7 @@ function DetailedTable({ columns, rows }) {
   return (
     <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
       {/* mirrored top scrollbar */}
-      <div ref={topRef} onScroll={fromTop} style={{ overflowX: 'auto', overflowY: 'hidden', height: 14, borderBottom: '1px solid #eef1f6' }}>
+      <div ref={topRef} onScroll={fromTop} style={{ overflowX: 'auto', overflowY: 'hidden', height: 14, borderBottom: '1px solid #dfe2e7' }}>
         <div style={{ width: scrollW || '100%', height: 1 }} />
       </div>
       {/* the table itself — scrolls vertically inside a bounded height so the header pins */}
@@ -336,15 +326,58 @@ function DetailedTable({ columns, rows }) {
 // Small Summary/Detailed view switch.
 function ViewToggle({ view, setView }) {
   const B = ({ id, label }) => (
-    <button onClick={() => setView(id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === id ? DARK : '#fff', color: view === id ? GOLD : DIM, borderColor: view === id ? DARK : '#e6e8ec' }}>{label}</button>
+    <button onClick={() => setView(id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === id ? DARK : '#fff', color: view === id ? GOLD : DIM, borderColor: view === id ? DARK : '#cdd1d8' }}>{label}</button>
   );
   return <><B id="summary" label="Summary" /><B id="detailed" label="Detailed" /></>;
 }
 
 // Two-mode view switch with custom labels (Detailed / Minimal).
+// Themed ledger picker — a native <select>'s open option list can't be styled
+// (square corners, OS-default rows), so this renders the same options as a
+// small rounded popover instead, matching the rest of the app's menus.
+function LedgerSelectMenu({ value, options, onChange, placeholder = 'No cash ledger', width = 200 }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+  return (
+    <div ref={ref} className="max-tablet:w-full" style={{ position: 'relative', display: 'inline-block', gap: '10px'}}>
+      <button type="button" onClick={() => options.length > 0 && setOpen((o) => !o)}
+        className="max-tablet:min-h-[44px] max-tablet:w-full"
+        style={{ ...inp, width, minHeight: 32, fontSize: 11, cursor: options.length ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || placeholder}</span>
+        <span style={{ fontSize: 13, lineHeight: 1, color: DIM, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>▾</span>
+      </button>
+      {open && options.length > 0 && (
+        <div role="menu" style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 50, minWidth: '100%', maxHeight: 260, overflowY: 'auto',
+          background: '#fff', borderRadius: 12, border: '1px solid #cdd1d8', boxShadow: '0 10px 28px rgba(13,19,38,0.16)', padding: 5,
+        }}>
+          {options.map((o) => (
+            <button key={o} type="button" onClick={() => { onChange(o); setOpen(false); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                padding: '7px 9px', borderRadius: 8, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                background: o === value ? '#e8f0ff' : 'transparent',
+                fontSize: 11.5, fontWeight: o === value ? 700 : 500, color: DARK,
+              }}>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{o}</span>
+              {o === value && <span style={{ color: BLUE, fontWeight: 800 }}>✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ModeToggle({ view, setView, modes }) {
   return <>{modes.map((m) => (
-    <button key={m.id} onClick={() => setView(m.id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === m.id ? DARK : '#fff', color: view === m.id ? GOLD : DIM, borderColor: view === m.id ? DARK : '#e6e8ec' }}>{m.label}</button>
+    <button key={m.id} onClick={() => setView(m.id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === m.id ? DARK : '#fff', color: view === m.id ? GOLD : DIM, borderColor: view === m.id ? DARK : '#cdd1d8' }}>{m.label}</button>
   ))}</>;
 }
 
@@ -416,7 +449,7 @@ function NarrationCell({ text, clamp = 55 }) {
 }
 
 // Plain number for export/print (no currency symbol; blank when zero).
-const nfmt = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : ''; };
+const nfmt = (n, loc = 'en-IN') => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : ''; };
 
 // Open a print-ready window for the report (Print, or "Save as PDF" in the
 // dialog). Builds a clean B/W table from the same columns/rows used for export.
@@ -434,7 +467,7 @@ function openReportPrint(title, sub, columns, rows, totalRow) {
     h1{font-size:15pt;margin:0;color:#0d1326} .sub{font-size:9pt;color:#5a6691;margin:2px 0 12px}
     table{width:100%;border-collapse:collapse;font-size:8.5pt}
     th{background:#0d1326;color:#d4a437;padding:6px 8px;border:1px solid #0d1326;white-space:nowrap}
-    td{padding:4px 8px;border:1px solid #e1e3ec}
+    td{padding:4px 8px;border:1px solid #cdd1d8}
     tbody tr:nth-child(even) td{background:#fafafa}
     tfoot td{font-weight:700;background:#0d1326;color:#fff;border-color:#0d1326}
     @media print{.np{display:none}}
@@ -454,7 +487,7 @@ function PrintBtn({ onClick, disabled }) {
   return (
     <button onClick={onClick} disabled={disabled} className="max-tablet:min-h-[44px]"
       style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6,
-        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, background: '#fff', color: DARK, borderColor: '#e6e8ec' }}
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, background: '#fff', color: DARK, borderColor: '#cdd1d8' }}
       title="Open a print view — choose your printer or Save as PDF">🖨 Print / PDF</button>
   );
 }
@@ -473,7 +506,7 @@ function LedgerDrill({ branch, ledger, from, to, onClose }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(960px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e6e8ec', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
           <Crumb items={crumbs} />
           <button onClick={onClose} className="inline-flex items-center justify-center max-tablet:min-h-[44px] max-tablet:min-w-[44px]" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
         </div>
@@ -492,7 +525,7 @@ function VoucherModal({ branch, voucher, onClose }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(840px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e6e8ec', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
           <Crumb items={[{ label: voucher.vno }]} />
           <button onClick={onClose} className="inline-flex items-center justify-center max-tablet:min-h-[44px] max-tablet:min-w-[44px]" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
         </div>
@@ -555,10 +588,10 @@ export function TrialBalanceLive({ branch }) {
        { key: 'debit', label: `Debit`, num: true }, { key: 'credit', label: `Credit`, num: true },
        { key: 'closingDebit', label: `Closing Dr`, num: true }, { key: 'closingCredit', label: `Closing Cr`, num: true }];
   const expRows = filtered.map((r) => ({ ...r, code: r.code || '' }));
-  const printRows = filtered.map((r) => { const o = { group: r.group, code: r.code || '', ledger: r.ledger }; for (const c of expColumns) if (c.num) o[c.key] = nfmt(r[c.key]); return o; });
+  const printRows = filtered.map((r) => { const o = { group: r.group, code: r.code || '', ledger: r.ledger }; for (const c of expColumns) if (c.num) o[c.key] = nfmt(r[c.key], localeOf(cur)); return o; });
   const totalRow = view === 'summary'
-    ? { group: 'TOTAL', ledger: '', closingDebit: nfmt(T.clDr), closingCredit: nfmt(T.clCr) }
-    : { group: 'TOTAL', code: '', ledger: '', openingDebit: nfmt(T.openDr), openingCredit: nfmt(T.openCr), debit: nfmt(T.dr), credit: nfmt(T.cr), closingDebit: nfmt(T.clDr), closingCredit: nfmt(T.clCr) };
+    ? { group: 'TOTAL', ledger: '', closingDebit: nfmt(T.clDr, localeOf(cur)), closingCredit: nfmt(T.clCr, localeOf(cur)) }
+    : { group: 'TOTAL', code: '', ledger: '', openingDebit: nfmt(T.openDr, localeOf(cur)), openingCredit: nfmt(T.openCr, localeOf(cur)), debit: nfmt(T.dr, localeOf(cur)), credit: nfmt(T.cr, localeOf(cur)), closingDebit: nfmt(T.clDr, localeOf(cur)), closingCredit: nfmt(T.clCr, localeOf(cur)) };
   const sub = `${branchLabel(branch)} · ${filtered.length} ledgers · Closing Dr ${money(cur, T.clDr)} / Cr ${money(cur, T.clCr)}`;
   const exportNow = () => filtered.length && exportToExcel(`trial-balance-${branchLabel(branch)}`, expColumns, expRows);
   const printNow = () => filtered.length && openReportPrint('Trial Balance', sub, expColumns, printRows, totalRow);
@@ -682,10 +715,12 @@ export function DayBookLive({ branch }) {
     return m;
   }, [sorted]);
 
-  const postingRows = useMemo(() => sorted.flatMap((j) => (j.postings || []).map((p) => ({
+  const postingRows = useMemo(() => sorted.flatMap((j) => (j.postings || []).map((p, pi) => ({
     dateKey: dayKey(j.date), date: j.date, vno: j.vno, tallyRef: j.sourceRef || '', voucherId: j.voucherId, type: j.type, category: j.category, branch: j.branch || '',
     ledger: p.ledger, group: p.group, debit: p.debit, credit: p.credit,
     narration: p.narration || j.narration || '', party: j.party || '',
+    // Bills this voucher settled — shown once (on its first leg) so the line isn't repeated per posting.
+    alloc: pi === 0 ? (j.allocations || []) : [],
   }))), [sorted]);
 
   const gDr = Math.round(sorted.reduce((s, j) => s + (j.totalDebit || 0), 0));
@@ -695,8 +730,8 @@ export function DayBookLive({ branch }) {
   const expColumns = view === 'minimal'
     ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'tallyRef', label: 'Tally Ref' }, { key: 'ledger', label: 'Ledger' }, { key: 'debit', label: `Debit (${cur})`, num: true }, { key: 'credit', label: `Credit (${cur})`, num: true }]
     : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'tallyRef', label: 'Tally Ref' }, { key: 'type', label: 'Type' }, { key: 'category', label: 'Category' }, { key: 'branch', label: 'Branch' }, { key: 'ledger', label: 'Ledger' }, { key: 'group', label: 'Group' }, { key: 'debit', label: `Debit (${cur})`, num: true }, { key: 'credit', label: `Credit (${cur})`, num: true }, { key: 'narration', label: 'Narration' }];
-  const printRows = postingRows.map((r) => ({ ...r, debit: nfmt(r.debit), credit: nfmt(r.credit) }));
-  const totalRow = { date: 'TOTAL', vno: `${sorted.length} vouchers`, debit: nfmt(gDr), credit: nfmt(gCr) };
+  const printRows = postingRows.map((r) => ({ ...r, debit: nfmt(r.debit, localeOf(cur)), credit: nfmt(r.credit, localeOf(cur)) }));
+  const totalRow = { date: 'TOTAL', vno: `${sorted.length} vouchers`, debit: nfmt(gDr, localeOf(cur)), credit: nfmt(gCr, localeOf(cur)) };
   const sub = `${branchLabel(branch)} · ${sorted.length} vouchers · ${postingRows.length} lines · Dr ${money(cur, gDr)} = Cr ${money(cur, gCr)}`;
   const exportNow = () => postingRows.length && exportToExcel(`day-book-${branchLabel(branch)}`, expColumns, postingRows);
   const printNow = () => postingRows.length && openReportPrint('Day Book', sub, expColumns, printRows, totalRow);
@@ -749,7 +784,11 @@ export function DayBookLive({ branch }) {
                       <td style={{ padding: '7px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: (TYPE_CLR[r.category] || '#2e323c') + '22', color: TYPE_CLR[r.category] || '#2e323c' }}>{r.category}</span></td>
                       <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.branch || '—'}</td>
                     </>}
-                    <td style={{ padding: '7px 12px', color: '#1a1c22', paddingLeft: r.debit > 0 ? 12 : 26 }}>{r.ledger}{view === 'detailed' && <span style={{ color: '#9197a3', fontSize: 9.5, marginLeft: 6 }}>{r.group}</span>}</td>
+                    <td style={{ padding: '7px 12px', color: '#1a1c22', paddingLeft: r.debit > 0 ? 12 : 26 }}>{r.ledger}{view === 'detailed' && <span style={{ color: '#9197a3', fontSize: 9.5, marginLeft: 6 }}>{r.group}</span>}
+                      {r.alloc && r.alloc.length > 0 && (
+                        <div style={{ marginTop: 3, fontSize: 9.5, color: GREEN, fontWeight: 600 }}>↳ Settled against: {r.alloc.map((a) => `${a.billVno} (${money(cur, a.amount)})`).join(', ')}</div>
+                      )}
+                    </td>
                     <td style={{ padding: '7px 12px', ...num, color: r.debit > 0 ? BLUE : '#dfe2ee' }}>{money(cur, r.debit)}</td>
                     <td style={{ padding: '7px 12px', ...num, color: r.credit > 0 ? RED : '#dfe2ee' }}>{money(cur, r.credit)}</td>
                     {view === 'detailed' && <td style={{ padding: '7px 12px', maxWidth: 320 }}><NarrationCell text={r.narration} /></td>}
@@ -778,22 +817,19 @@ export function DayBookLive({ branch }) {
    every drill — one design, live data, identical print. */
 export function LedgerAcLive({ branch }) {
   const cur = curOf(branch);
-  const chart = useChartOfAccounts(branch);
-  const ledgers = chart.data || [];
-  const { prefs, setPref } = usePrefs();
-  const [name, setName] = useState('');
-  // Selection priority: explicit pick → last-opened (per-user pref) → first ledger.
-  const selected = name || prefs.lastLedger || ledgers[0]?.name || '';
-  const pickLedger = (n) => { setName(n); if (n) setPref('lastLedger', n); };
-  // Group + cascading Sub-Group filter to narrow the (long) ledger dropdown.
-  const [groupFilter, setGroupFilter] = useState('');
-  const [subGroupFilter, setSubGroupFilter] = useState('');
-  const allGroups = useMemo(() => [...new Set(ledgers.map((l) => l.group).filter(Boolean))].sort(), [ledgers]);
-  const subOptions = useMemo(() => (groupFilter ? [...new Set(ledgers.filter((l) => l.group === groupFilter).map((l) => l.subGroup).filter(Boolean))].sort() : []), [ledgers, groupFilter]);
-  const pickable = useMemo(() => ledgers.filter((l) => (!groupFilter || l.group === groupFilter) && (!subGroupFilter || l.subGroup === subGroupFilter)), [ledgers, groupFilter, subGroupFilter]);
-  // "Open ledger" from any screen (legacy in-page event) switches the ledger live.
+  const { setPref } = usePrefs();
+  // The ledger is chosen via a searchable combobox (type to filter, scroll the
+  // matches) and the statement renders ONLY after "View" is pressed — nothing is
+  // shown on open. Selection (`pick`) is decoupled from what's displayed (`shown`),
+  // so the picker can never desync from the panel below (the old ICICI Bank vs
+  // Credit-Card bug).
+  const [pick, setPick] = useState('');     // combobox choice (not yet viewed)
+  const [shown, setShown] = useState('');   // ledger actually fetched + rendered below
+  const { selected, display, dirty } = resolveLedgerSelection({ pick, shown });
+  const view = () => { if (selected) { setShown(selected); setPref('lastLedger', selected); } };
+  // "Open ledger" from any screen (legacy in-page event) opens it immediately.
   useEffect(() => {
-    const onOpen = (e) => { const n = e.detail?.name; if (n) { setName(n); setPref('lastLedger', n); } };
+    const onOpen = (e) => { const n = e.detail?.name; if (n) { setPick(n); setShown(n); setPref('lastLedger', n); } };
     window.addEventListener('kb:open-ledger', onOpen);
     return () => window.removeEventListener('kb:open-ledger', onOpen);
   }, [setPref]);
@@ -804,33 +840,29 @@ export function LedgerAcLive({ branch }) {
   return (
     <Page
       title="Ledger Account"
-      sub={selected}
+      sub={display || 'Select a ledger'}
       wide
       right={<>
-        <select value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setSubGroupFilter(''); }} title="Filter ledgers by group" className="max-tablet:min-h-[44px] max-tablet:flex-1" style={{ ...inp, width: 'auto', minWidth: 130, minHeight: 32, fontSize: 11 }}>
-          <option value="">All groups</option>
-          {allGroups.map((g) => <option key={g} value={g}>{g}</option>)}
-        </select>
-        {groupFilter && (
-          <select value={subGroupFilter} onChange={(e) => setSubGroupFilter(e.target.value)} title="Filter by sub-group" className="max-tablet:min-h-[44px] max-tablet:flex-1" style={{ ...inp, width: 'auto', minWidth: 130, minHeight: 32, fontSize: 11 }}>
-            <option value="">All sub-groups</option>
-            {subOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        )}
-        <select value={selected} onChange={(e) => pickLedger(e.target.value)} className="max-tablet:min-h-[44px] max-tablet:w-full" style={{ ...inp, width: 240, minHeight: 32, fontSize: 11 }}>
-          {pickable.length === 0 && <option value="">{ledgers.length ? 'No ledgers in this group' : 'Loading…'}</option>}
-          {pickable.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
-        </select>
+        <LedgerPicker value={pick} onChange={setPick} branch={branch} placeholder="Search ledger…" style={{ width: 260, fontSize: 11 }} />
+        {/* "View" arms green once a ledger is selected (and differs from what's shown). */}
+        <button onClick={view} disabled={!dirty} title="View this ledger's account statement" className="max-tablet:min-h-[44px]"
+          style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, fontWeight: 700, cursor: dirty ? 'pointer' : 'default', background: dirty ? GREEN : '#eef1f6', color: dirty ? '#fff' : DIM, borderColor: dirty ? GREEN : '#cdd1d8' }}>
+          View
+        </button>
       </>}
     >
       <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-        <LedgerAccountView name={selected} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} maxHeight="calc(100vh - 330px)" />
+        {display
+          ? <LedgerAccountView name={display} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} maxHeight="calc(100vh - 330px)" />
+          : <div style={{ padding: '64px 24px', textAlign: 'center', color: DIM, fontSize: 13, lineHeight: 1.7 }}>
+              Search and select a ledger above, then press <b style={{ color: GREEN }}>View</b><br />to open its account statement.
+            </div>}
       </div>
       {voucher && (
         <div onClick={closeVoucher} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
           <div onClick={(ev) => ev.stopPropagation()} style={{ ...card, width: 'min(820px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e6e8ec', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
-              <Crumb items={[{ label: selected || 'Ledger', onClick: closeVoucher }, { label: voucher.vno }]} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+              <Crumb items={[{ label: display || 'Ledger', onClick: closeVoucher }, { label: voucher.vno }]} />
               <button onClick={closeVoucher} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
             </div>
             <VoucherEditor voucherId={voucher.id} cur={cur} onBack={closeVoucher} onClose={closeVoucher} />
@@ -842,7 +874,7 @@ export function LedgerAcLive({ branch }) {
 }
 
 /* ════════════════════ DRILL-DOWN: group → ledger → voucher (editable) ═══ */
-const tapRow = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 14px', minHeight: 44, cursor: 'pointer', borderBottom: '1px solid #f1f3f8', WebkitTapHighlightColor: 'transparent' };
+const tapRow = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 14px', minHeight: 44, cursor: 'pointer', borderBottom: '1px solid #dfe2e7', WebkitTapHighlightColor: 'transparent' };
 
 function Crumb({ items }) {
   return (
@@ -863,6 +895,7 @@ function Crumb({ items }) {
 export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   const vq = useVoucher(voucherId);
   const upd = useUpdateVoucher();
+  const { canRevoke, doRevoke, revoking } = useVoucherRevoke();
   const v = vq.data;
   // Cost centres are branch-wise — only offer THIS voucher's branch's centres
   // (e.g. BOM-FLT-INT), never another branch's, so the tag can't be mismatched.
@@ -892,7 +925,9 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   // balances it against this total, so the figure must carry it or the journal is out
   // by exactly the TCS amount. TDS is NOT added: on a sale it posts only when the
   // customer withholds at receipt time, so it never affects the bill total here.
-  const total = r2(subtotal + (Number(form?.taxAmt) || 0) + (Number(form?.tcsAmt) || 0));
+  // otherTaxesGst (the SVC2 margin GST) ALSO posts to its own Output head, so it must
+  // ride inside total too — see editorVoucherTotal — else SVC2 sales read "out by" it.
+  const total = editorVoucherTotal({ subtotal, taxAmt: form?.taxAmt, otherTaxesGst: v?.otherTaxesGst, tcsAmt: form?.tcsAmt });
   const previewBody = (v && form) ? {
     ...v, branch: form.branch, party: form.party, taxAmt: Number(form.taxAmt) || 0,
     tdsAmt: Number(form.tdsAmt) || 0, tcsAmt: Number(form.tcsAmt) || 0, subtotal, total,
@@ -925,7 +960,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   };
   // Build a printable A4 view of the full journal entry and hand it to the print preview.
   const printEntry = () => {
-    const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? cur + x.toLocaleString('en-IN') : ''; };
+    const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? cur + x.toLocaleString(localeOf(cur)) : ''; };
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
     const rows = (pv.postings || []).map((p) => `<tr>
       <td>${esc(p.ledger)}</td><td>${esc(p.group || '')}</td>
@@ -937,7 +972,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
       .ve table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:8px}
       .ve th{background:#1a1c22;color:#c2a04a;text-align:left;padding:6px 8px;font-size:9.5px}
       .ve th.r,.ve td.r{text-align:right}
-      .ve td{padding:5px 8px;border-bottom:1px solid #eceef4}
+      .ve td{padding:5px 8px;border-bottom:1px solid #dfe2e7}
       .ve tfoot td{background:#f3f5f9;font-weight:800;border-top:2px solid #1a1c22}
     </style>
     <div class="ve">
@@ -963,7 +998,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         <div style={{ fontSize: 11.5, color: DIM, marginBottom: 10 }}>
           {v.type} · {v.category} · {form.date} · {form.branch}{form.party ? ` · ${form.party}` : ''}
         </div>
-        <div style={{ ...card, padding: 10, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+        <div style={{ ...card, padding: 10, boxShadow: 'none', border: '1px solid #dfe2e7' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Full Journal Entry</div>
             <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
@@ -971,14 +1006,55 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
             <thead><tr><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Ledger</th><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Group</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Debit</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Credit</th></tr></thead>
             <tbody>
-              {(pv.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
+              {(pv.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
             </tbody>
             <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money(cur, pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money(cur, pv.totalCredit)}</td></tr></tfoot>
           </table>
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
           <button onClick={printEntry} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
-          <button onClick={dismiss} style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #e6e8ec', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
+          <button onClick={dismiss} style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
+        </div>
+      </div>
+    );
+  }
+  // Posted vouchers are READ-ONLY from every drill-down (Day Book, ledgers, Cash Book,
+  // P&L / Balance Sheet, registers, GP analytics…). "Posted" = a real journal exists in
+  // the General Ledger, which the backend writes for BOTH `approved` AND `saved` (an
+  // approved-booking leg or a seeded/migrated entry posts immediately as `saved`).
+  // Editing one would silently re-post outside the approval workflow, so show it for
+  // viewing only — to change it, Revoke it back to Pending (the number is kept; a
+  // booking-driven Sales/Purchase leg is edited on its SO / PO / GP booking).
+  if (v.status === 'approved' || v.status === 'saved' || v.status === 'posted') {
+    const parent = voucherParent(v);
+    return (
+      <div style={{ padding: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ fontWeight: 800, color: DARK, fontSize: 14 }}>{v.vno} <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>{v.type} - {v.category}</span></div>
+          <button onClick={onBack} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 34, fontSize: 11.5, cursor: 'pointer' }}>Back</button>
+        </div>
+        <div style={{ padding: '10px 12px', borderRadius: 7, background: '#FBF3DE', border: '1px solid #e3cd97', color: '#8a6d12', fontSize: 12, fontWeight: 600, marginBottom: 12 }}>
+          🔒 Approved &amp; posted — read-only. {parent ? <>It is a leg of its {parent.label} <b>{parent.ref}</b> — edit or revoke it there (the whole file is un-posted together), never the voucher alone.</> : <>To edit, <b>Revoke</b> it back to Pending in <b>Voucher Approvals</b> — the number is kept.</>}
+        </div>
+        <div style={{ fontSize: 11.5, color: DIM, marginBottom: 10 }}>{v.type} · {v.category} · {form.date} · {form.branch}{form.party ? ` · ${form.party}` : ''}</div>
+        <div style={{ ...card, padding: 10, boxShadow: 'none', border: '1px solid #dfe2e7' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Full Journal Entry</div>
+            <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+            <thead><tr><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Ledger</th><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Group</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Debit</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Credit</th></tr></thead>
+            <tbody>
+              {(pv.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
+            </tbody>
+            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money(cur, pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money(cur, pv.totalCredit)}</td></tr></tfoot>
+          </table>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          {parent && parent.navigable && <button onClick={() => { openParentFile(v); dismiss(); }} title={`Open its ${parent.label} ${parent.ref} — revoke the whole file there`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff' }}>⟲ Open {parent.label} →</button>}
+          {canRevoke && !parent && <button onClick={() => doRevoke(voucherId, dismiss)} disabled={revoking} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: revoking ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff', opacity: revoking ? 0.6 : 1 }}>⟲ {revoking ? 'Revoking…' : 'Revoke'}</button>}
+          <button onClick={printEntry} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
+          <button onClick={dismiss} style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
         </div>
       </div>
     );
@@ -1025,7 +1101,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         <div><div style={lab}>Remarks</div><input value={form.remarks} onChange={(e) => set('remarks', e.target.value)} style={fld} /></div>
       </div>
       {paxRows.length > 0 && (
-        <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+        <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #dfe2e7' }}>
           <div style={{ fontWeight: 700, color: DARK, fontSize: 12, marginBottom: 8 }}>Passenger / Traveller Details</div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
             <thead><tr>
@@ -1035,7 +1111,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
             </tr></thead>
             <tbody>
               {paxRows.map((p, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}>
+                <tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}>
                   <td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.passenger || '—'}</td>
                   <td style={{ padding: '5px 8px', color: DIM }}>{p.ticket || '—'}</td>
                   <td style={{ padding: '5px 8px', color: DIM }}>{p.airline || '—'}</td>
@@ -1049,7 +1125,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
           </table>
         </div>
       )}
-      <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+      <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #dfe2e7' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Lines — pick ledger from Books (Dr / Cr)</div>
           <button onClick={addLine} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 28, fontSize: 11, cursor: 'pointer' }}>+ Add line</button>
@@ -1069,11 +1145,12 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 18, marginTop: 6, fontSize: 12 }}>
           <span style={{ color: DIM }}>Lines subtotal: <b style={{ color: DARK }}>{money(cur, subtotal)}</b></span>
           <span style={{ color: DIM }}>+ Tax: <b style={{ color: DARK }}>{money(cur, Number(form.taxAmt) || 0)}</b></span>
+          {(Number(v?.otherTaxesGst) || 0) > 0 && <span style={{ color: DIM }}>+ SVC2 GST: <b style={{ color: DARK }}>{money(cur, Number(v.otherTaxesGst) || 0)}</b></span>}
           {(Number(form.tcsAmt) || 0) > 0 && <span style={{ color: DIM }}>+ TCS: <b style={{ color: DARK }}>{money(cur, Number(form.tcsAmt) || 0)}</b></span>}
           <span style={{ color: DIM }}>= Total: <b style={{ color: DARK }}>{money(cur, total)}</b></span>
         </div>
       </div>
-      <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #eef1f6' }}>
+      <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #dfe2e7' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Accounting Effect — Full Journal (where this hits the books)</div>
           <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.error ? '⚠ ' + pv.error : pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
@@ -1086,7 +1163,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
           <thead><tr><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Ledger</th><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Group</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Debit</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Credit</th></tr></thead>
           <tbody>
-            {(pv.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #f2f4f8' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
+            {(pv.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
             {!(pv.postings || []).length && <tr><td colSpan={4} style={{ padding: 12, textAlign: 'center', color: DIM }}>Pick ledgers / amounts to see the journal effect.</td></tr>}
           </tbody>
           <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money(cur, pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money(cur, pv.totalCredit)}</td></tr></tfoot>
@@ -1135,7 +1212,7 @@ function DrillDown({ branch, group, onClose }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(780px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e6e8ec', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
           <Crumb items={crumbs} />
           <button onClick={onClose} className="inline-flex items-center justify-center max-tablet:min-h-[44px] max-tablet:min-w-[44px]" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
         </div>
@@ -1210,7 +1287,7 @@ function TAccount({ leftHead = 'Particulars', rightHead = 'Particulars', left, r
         </tr></thead>
         <tbody>
           {Array.from({ length: n }).map((_, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #f3f4f8', borderLeft: i === 0 ? 'none' : 'none' }}>
+            <tr key={i} style={{ borderBottom: '1px solid #dfe2e7', borderLeft: i === 0 ? 'none' : 'none' }}>
               <Cell row={left[i]} /><Cell row={right[i]} />
             </tr>
           ))}
@@ -1313,7 +1390,7 @@ function VoucherDetail({ voucher, cur, onClose }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', zIndex: 700, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '6vh' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 660, maxWidth: '94vw', maxHeight: '84vh', overflowY: 'auto', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid #e6e8ec', position: 'sticky', top: 0, background: '#fff' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff' }}>
           <div style={{ fontSize: 14.5, fontWeight: 800, color: DARK }}>{v.vno} <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>{v.type} · {v.category}</span></div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 16 }}>✕</button>
         </div>
@@ -1330,8 +1407,8 @@ function VoucherDetail({ voucher, cur, onClose }) {
 // captured on the booking at SO/PO/GP time, ONE LINE PER INVOICE:
 //   SPG/Link No · Sales Inv · Purchase Inv · Client Type · Client Ledger · Pax ·
 //   PNR · Ticket No · Final Invoice Value · each component head (IT-Base Fare /
-//   IT-K3-Taxes / IT-Taxes / IT-Other Taxes / IT-Service Charges …) · CGST/SGST/IGST
-//   Output · Other Taxes CGST/SGST Output · TCS.
+//   IT-K3-Taxes / IT-Taxes / IT-SVC2 / IT-SVF …) · CGST/SGST/IGST
+//   Output · SVC2 CGST/SGST Output · TCS.
 // The component-head columns are derived dynamically from the posted voucher lines —
 // their ledger names ARE "IT-Base Fare" etc. — so the SAME layout auto-adapts to
 // every module (Flight/Hotel/Visa/…), Domestic (DT-) or International (IT-), and the
@@ -1352,12 +1429,12 @@ function splitGst(amt, gstMode, brCode) {
 }
 
 // Rank a component-head ledger so the head columns sit in a natural reading order
-// (fares → K3 → taxes → other taxes → service charge → supplier service), regardless
-// of the DT-/IT- prefix or the [Pur] suffix. Tested in order so "Other Taxes" and
-// "K3-Taxes" don't collide with the generic "Taxes" match.
+// (fares → K3 → taxes → SVC2 → service fee → supplier service), regardless
+// of the DT-/IT- prefix or the [Pur] suffix. Tested in order so "SVC2"/"SVF" (and the
+// legacy "Other Taxes"/"Service Charge") and "K3-Taxes" don't collide with the generic "Taxes" match.
 const HEAD_RANK = [
   [/base\s*fare/i, 0], [/land/i, 1], [/room|basic|visa\s*fee|premium|fare/i, 2],
-  [/k3/i, 3], [/other\s*tax/i, 5], [/service\s*charge/i, 6], [/supplier\s*service/i, 7],
+  [/k3/i, 3], [/svc2|other\s*tax/i, 5], [/\bsvf\b|service\s*charge/i, 6], [/supp\s*svchg|supplier\s*service/i, 7],
   [/tax/i, 4], [/incentive/i, 8], [/tds/i, 9],
 ];
 const headRank = (ledger) => { for (const [re, rk] of HEAD_RANK) if (re.test(ledger)) return rk; return 50; };
@@ -1401,32 +1478,33 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
   // 2) Assemble columns: fixed lead → component heads → taxes → final value.
   const columns = [];
   const col = (key, label, isNum) => columns.push({ key, label, num: !!isNum });
-  col('bookingNo', 'Booking No');
-  col('linkNo', 'SPG / Link No');
+  // Lead columns, fixed business order: Date ▸ Sales Type ▸ Ledger ▸ Invoice Value
+  // ▸ Link No ▸ Sales Invoice No ▸ Purchase Invoice No. Everything else trails after.
   col('saleDate', isSale ? 'Sale Date' : 'Purchase Date');
+  col('salesType', isSale ? 'Sales Type' : 'Purchase Type'); // always shown (the register's type)
+  col('clientLedger', isSale ? 'Client Ledger' : 'Vendor Ledger'); // the accounting ledger
+  col('finalValue', isSale ? 'Final Invoice Value' : 'Final Bill Value', true);
+  col('linkNo', 'SPG / Link No');
   col('saleVno', 'Sales Invoice No');
-  col('saleTallyRef', 'Sales Tally Ref');
   col('purVno', 'Purchase Invoice No');
+  // ── the rest ──
+  col('bookingNo', 'Booking No');
+  col('saleTallyRef', 'Sales Tally Ref');   // kept with the purchase ref, beside each other
   col('purTallyRef', 'Purchase Tally Ref');
   if (!tag) col('branch', 'Branch');
-  // When viewing All modules together, surface which module each row belongs to —
-  // shown immediately before Client/Vendor Type so the mixed list stays readable.
-  if (showType) col('salesType', isSale ? 'Sales Type' : 'Purchase Type');
-  if (showType) col('intDom', 'INT / DOM'); // International vs Domestic, beside Sales Type
+  if (showType) col('intDom', 'INT / DOM'); // International vs Domestic (All-modules view only)
   col('clientType', isSale ? 'Client Type' : 'Vendor Type');
-  col('clientLedger', isSale ? 'Client Ledger' : 'Vendor Ledger');
   col('pax', 'Pax Details');
   col('pnr', 'PNR');
   col('ticket', 'Ticket No');
-  col('finalValue', isSale ? 'Final Invoice Value' : 'Final Bill Value', true);
   for (const lg of headLedgers) col(`head:${lg}`, lg, true);
   if (anyIndia) { col('cgst', `CGST ${taxWord}${sfx}`, true); col('sgst', `SGST ${taxWord}${sfx}`, true); }
   if (anyInter) col('igst', `IGST ${taxWord}${sfx}`, true);
   if (anyVat) col('vat', `VAT ${taxWord}${sfx}`, true);
   if (isSale && anyOther) {
-    if (anyIndia) { col('ocgst', `Other Taxes CGST Output${sfx}`, true); col('osgst', `Other Taxes SGST Output${sfx}`, true); }
-    if (anyInter) col('oigst', `Other Taxes IGST Output${sfx}`, true);
-    if (anyVat) col('ovat', `Other Taxes VAT Output${sfx}`, true);
+    if (anyIndia) { col('ocgst', `SVC2 CGST Output${sfx}`, true); col('osgst', `SVC2 SGST Output${sfx}`, true); }
+    if (anyInter) col('oigst', `SVC2 IGST Output${sfx}`, true);
+    if (anyVat) col('ovat', `SVC2 VAT Output${sfx}`, true);
   }
   if (isSale && anyTcs) col('tcs', 'TCS', true);
   if (!isSale && anyTds) col('tds', 'TDS', true);
@@ -1479,7 +1557,7 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
 // footer. Numeric columns (flagged `num`) right-align, Indian-group, and sum in the
 // footer; text columns (Link No, Pax, PNR …) stay left-aligned. A mirrored top
 // scrollbar keeps sideways scrolling reachable on long lists.
-function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
+function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice, cur = '₹' }) {
   const topRef = React.useRef(null);
   const bodyRef = React.useRef(null);
   const [scrollW, setScrollW] = useState(0);
@@ -1491,14 +1569,14 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
   }, [columns, rows]);
   const fromTop = () => { if (bodyRef.current && topRef.current) bodyRef.current.scrollLeft = topRef.current.scrollLeft; };
   const fromBody = () => { if (bodyRef.current && topRef.current) topRef.current.scrollLeft = bodyRef.current.scrollLeft; };
-  const cellNum = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : '—'; };
+  const cellNum = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const mono = (k) => k === 'linkNo' || k === 'saleVno' || k === 'purVno';
   // Render only one page of rows so the DOM stays bounded; the tfoot totals + count
   // below still reflect the FULL set (totals/rows.length are unchanged).
   const pg = usePager(rows);
   return (
     <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-      <div ref={topRef} onScroll={fromTop} style={{ overflowX: 'auto', overflowY: 'hidden', height: 14, borderBottom: '1px solid #eef1f6' }}>
+      <div ref={topRef} onScroll={fromTop} style={{ overflowX: 'auto', overflowY: 'hidden', height: 14, borderBottom: '1px solid #dfe2e7' }}>
         <div style={{ width: scrollW || '100%', height: 1 }} />
       </div>
       <div ref={bodyRef} onScroll={fromBody} className="kb-sticky" style={{ '--stick-head': DARK, '--stick-foot': DARK, maxHeight: 'calc(100vh - 230px)', overflow: 'auto' }}>
@@ -1557,7 +1635,12 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice }) {
   );
 }
 
-export function RegisterLive({ branch, initial = 'sales' }) {
+// An inter-branch row: a sale raised as an INB voucher, or a purchase whose party
+// is an inter-branch branch ledger ("Travkings Tours and Travels <BR>").
+const INB_PARTY_RE = /travkings tours and travels\s+(bom|amd|nbo|dar|fbm|tkho)\b/i;
+const isInbRow = (v, tab) => (tab === 'sales' ? v.type === 'INB' : INB_PARTY_RE.test(String(v.party || '')));
+
+export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
   const cur = curOf(branch);
   // Locked per menu: the Sales Register shows ONLY sales, the Purchase Register ONLY
   // purchase — no cross-tab toggle (so each register is its own dataset).
@@ -1594,11 +1677,22 @@ export function RegisterLive({ branch, initial = 'sales' }) {
   }, [allRows]);
   const needle = search.trim().toLowerCase();
   const rows = useMemo(() => allRows
+    .filter((v) => !inbOnly || isInbRow(v, tab)) // INB register → inter-branch rows only
     .filter((v) => product === 'all' || productOf(v) === product)
     // While a search term is active, ignore the date window so a match is found
     // regardless of period (otherwise the default month silently hides older vouchers).
     .filter((v) => !!needle || dateInRange(v.date, from, to))
-    .filter((v) => !needle || voucherHaystack(v).includes(needle)), [allRows, product, from, to, needle]);
+    .filter((v) => !needle || voucherHaystack(v).includes(needle))
+    // Default ordering = Date ascending (chronological, like a Tally register). Tally
+    // dates are mixed-format strings, so normalise via parseAnyDate; rows whose date
+    // can't be parsed sink to the bottom rather than being dropped.
+    .sort((a, b) => {
+      const da = parseAnyDate(a.date), db = parseAnyDate(b.date);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da - db;
+    }), [allRows, product, from, to, needle, inbOnly, tab]);
   const sum = (k) => rows.reduce((s, v) => s + (v[k] || 0), 0);
   const summaryPager = usePager(rows); // Summary view paging — sum() above still totals the full set
   const sheet = useMemo(() => vouchersToSheet(rows), [rows]);
@@ -1636,10 +1730,11 @@ export function RegisterLive({ branch, initial = 'sales' }) {
     // printed invoice has its financial detail. Fall back to the slim row if it fails.
     let full = b;
     if (b.id) { try { full = await apiGet(`/api/booking-orders/${b.id}`); } catch { full = b; } }
-    openPrintPreview({
+    await printBookingInvoice({
+      booking: full,
+      side: tab === 'sales' ? 'sale' : 'purchase',
+      branch,
       title: `${tab === 'sales' ? 'Sales Invoice' : 'Purchase Invoice'} · ${full.bookingNo || full.linkNo || ''}`,
-      recommend: 'portrait',
-      html: buildBookingInvoice(full, tab === 'sales' ? 'sale' : 'purchase', branch),
     });
   };
 
@@ -1673,14 +1768,15 @@ export function RegisterLive({ branch, initial = 'sales' }) {
           { ledger: party, amount: total, drCr: 'Cr' },
         ] };
   }), [rows, tab]);
-  useReportExport({ title: tab === 'sales' ? 'Sales Register' : 'Purchase Register', kind: 'vouchers', rows: tallyVouchers, recommend: 'landscape' }, [tallyVouchers, tab]);
+  const regTitle = inbOnly ? (tab === 'sales' ? 'INB Sales Register' : 'INB Purchase Register') : (tab === 'sales' ? 'Sales Register' : 'Purchase Register');
+  useReportExport({ title: regTitle, kind: 'vouchers', rows: tallyVouchers, recommend: 'landscape' }, [tallyVouchers, regTitle]);
   const subHint = view === 'capture' ? 'every SO/PO/GP figure, module-wise — scroll right'
     : view === 'detailed' ? 'every Tally column shown — scroll right'
       : 'click a row for full detail';
   return (
     <Page
       wide={view !== 'summary'}
-      title={tab === 'sales' ? 'Sales Register' : 'Purchase Register'}
+      title={regTitle}
       sub={`${branchLabel(branch)} · ${rows.length} vouchers · Total ${money(cur, sum('total'))} · ${needle ? 'searching all dates' : subHint}`}
       right={<>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Search passenger / party / ticket / link no / voucher…"
@@ -1696,14 +1792,14 @@ export function RegisterLive({ branch, initial = 'sales' }) {
     >
       <State q={q} empty={rows.length === 0}>
         {view === 'capture' ? (
-          <CaptureTable columns={captureSheet.columns} rows={captureSheet.rows} totals={captureSheet.totals} onOpenJV={openJV} onPrintInvoice={printInvoice} />
+          <CaptureTable columns={captureSheet.columns} rows={captureSheet.rows} totals={captureSheet.totals} onOpenJV={openJV} onPrintInvoice={printInvoice} cur={cur} />
         ) : view === 'detailed' ? (
           <DetailedTable columns={sheet.columns} rows={sheet.rows} />
         ) : (
           <Table pager={summaryPager}>
             <thead><tr style={headRow}>
               <Th>Date</Th><Th>Voucher</Th><Th>Type</Th><Th>{tab === 'sales' ? 'Customer' : 'Supplier'}</Th><Th>Link No</Th>
-              <Th right>Taxable</Th><Th right>GST</Th><Th right>Total</Th>
+              <Th right>Taxable</Th><Th right>{tab === 'sales' ? 'SVF GST' : 'GST'}</Th>{tab === 'sales' && <Th right>SVC2 GST</Th>}<Th right>Total</Th>
             </tr></thead>
             <tbody>
               {summaryPager.pageRows.map((v, i) => (
@@ -1720,6 +1816,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10, color: '#6b21a8' }}>{v.linkNo || '—'}</td>
                   <td style={{ padding: '8px 12px', ...num }}>{money(cur, v.subtotal)}</td>
                   <td style={{ padding: '8px 12px', ...num, color: '#d97706' }}>{money(cur, v.taxAmt)}</td>
+                  {tab === 'sales' && <td style={{ padding: '8px 12px', ...num, color: '#d97706' }}>{money(cur, v.otherTaxesGst)}</td>}
                   <td style={{ padding: '8px 12px', ...num, fontWeight: 700 }}>{money(cur, v.total)}</td>
                 </tr>
               ))}
@@ -1728,6 +1825,7 @@ export function RegisterLive({ branch, initial = 'sales' }) {
               <td colSpan={5} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD }}>TOTAL — {rows.length}</td>
               <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, sum('subtotal'))}</td>
               <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, sum('taxAmt'))}</td>
+              {tab === 'sales' && <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, sum('otherTaxesGst'))}</td>}
               <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, sum('total'))}</td>
             </tr></tfoot>
           </Table>
@@ -1904,7 +2002,7 @@ export function InvoiceGPLive({ branch }) {
                   </tr>
                   {isOpen && (
                     <tr>
-                      <td colSpan={9} style={{ padding: 0, background: '#f7f9fc', borderBottom: '2px solid #e6e8ec' }}>
+                      <td colSpan={9} style={{ padding: 0, background: '#f7f9fc', borderBottom: '2px solid #cdd1d8' }}>
                         <div style={{ padding: 16 }}>
                           <div style={{ fontSize: 11.5, fontWeight: 700, color: DARK, marginBottom: 12 }}>
                             File {f.ref} — Sale {money(cur, r.sale)} − Cost {money(cur, r.cost)} = GP <span style={{ color: r.gp >= 0 ? GREEN : RED }}>{money(cur, r.gp)}</span> ({r.gpPct}%)
@@ -1971,7 +2069,7 @@ export function LedgerGroupsLive() {
   return (
     <Page title="Ledger Groups — Tally's 28 Pre-Defined Groups" sub="Every ledger belongs to one of these groups; the group fixes whether it lands in the Balance Sheet or P&L."
       right={<button onClick={() => exportToExcel('ledger-groups', [{ key: 'id', label: '#' }, { key: 'name', label: 'Group' }, { key: 'nature', label: 'Nature' }, { key: 'cls', label: 'Golden-Rule Class' }, { key: 'naturalSide', label: 'Natural Side' }, { key: 'statement', label: 'Statement' }, { key: 'parent', label: 'Under' }], groups)} disabled={groups.length === 0} title="Export to Excel"
-        style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #e6e8ec', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: groups.length === 0 ? 'not-allowed' : 'pointer', opacity: groups.length === 0 ? 0.5 : 1 }}>📤 Export</button>}>
+        style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #cdd1d8', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: groups.length === 0 ? 'not-allowed' : 'pointer', opacity: groups.length === 0 ? 0.5 : 1 }}>📤 Export</button>}>
       <State q={q} empty={groups.length === 0}>
         <Section title="Balance Sheet" list={groups.filter((g) => g.statement === 'BS')} />
         <Section title="Profit & Loss Account" list={groups.filter((g) => g.statement === 'PL')} />
@@ -2013,7 +2111,7 @@ export function ChartOfAccountsLive({ branch }) {
           </label>
         )}
         <button onClick={() => exportToExcel(`chart-of-accounts-${branchLabel(branch)}`, [{ key: 'group', label: 'Group' }, { key: 'code', label: 'Code' }, { key: 'name', label: 'Ledger' }, { key: 'nature', label: 'Nature' }, { key: 'statement', label: 'Statement' }, { key: 'openingBalance', label: 'Opening Balance' }, { key: 'drCr', label: 'Dr/Cr' }], shown)} disabled={shown.length === 0} title="Export to Excel"
-          style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #e6e8ec', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: shown.length === 0 ? 'not-allowed' : 'pointer', opacity: shown.length === 0 ? 0.5 : 1 }}>📤 Export</button>
+          style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #cdd1d8', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: shown.length === 0 ? 'not-allowed' : 'pointer', opacity: shown.length === 0 ? 0.5 : 1 }}>📤 Export</button>
       </>}>
       <State q={q} empty={ledgers.length === 0}>
         <Table>
@@ -2024,7 +2122,7 @@ export function ChartOfAccountsLive({ branch }) {
                 .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }));
               return gl.map((l, i) => (
                 <tr key={l.id || l.code} style={rowBg(i)}>
-                  {i === 0 && <td rowSpan={gl.length} style={{ padding: '9px 14px', fontWeight: 700, color: DARK, borderRight: '2px solid #e6e8ec', verticalAlign: 'top', fontSize: 10.5, background: '#f9fafb' }}>{grp}</td>}
+                  {i === 0 && <td rowSpan={gl.length} style={{ padding: '9px 14px', fontWeight: 700, color: DARK, borderRight: '2px solid #cdd1d8', verticalAlign: 'top', fontSize: 10.5, background: '#f9fafb' }}>{grp}</td>}
                   <td style={{ padding: '9px 14px', fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{l.code}</td>
                   <td style={{ padding: '9px 14px', fontWeight: 600 }}>
                     <button onClick={() => openLedgerModal(l.name)} title="Open ledger account" style={{ background: 'none', border: 'none', padding: 0, color: BLUE, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2, fontSize: 'inherit' }}>{l.name}</button>
@@ -2080,7 +2178,7 @@ export function AccountsChartLive({ branch }) {
 
   const setAll = (v) => setOpen(Object.fromEntries(allKeys.map((k) => [k, v])));
   const stmtBadge = (s) => <span style={{ fontSize: 9.5, padding: '1px 6px', borderRadius: 999, fontWeight: 700, background: (s === 'PL' ? GREEN : BLUE) + '1e', color: s === 'PL' ? GREEN : BLUE }}>{s === 'PL' ? 'P&L' : s === 'BS' ? 'Balance Sheet' : '—'}</span>;
-  const seg = (active) => ({ padding: '5px 12px', fontSize: 11.5, fontWeight: 700, border: `1px solid ${active ? DARK : '#e6e8ec'}`, background: active ? DARK : '#fff', color: active ? GOLD : DIM, cursor: 'pointer' });
+  const seg = (active) => ({ padding: '5px 12px', fontSize: 11.5, fontWeight: 700, border: `1px solid ${active ? DARK : '#cdd1d8'}`, background: active ? DARK : '#fff', color: active ? GOLD : DIM, cursor: 'pointer' });
   const Col = ({ title, count, children }) => (
     <div style={{ ...card, padding: 0, overflow: 'hidden', flex: 1, minWidth: 220 }}>
       <div style={{ padding: '8px 12px', background: DARK, color: GOLD, fontWeight: 700, fontSize: 11.5 }}>{title} — {count}</div>
@@ -2110,7 +2208,7 @@ export function AccountsChartLive({ branch }) {
           <>
             {kids.map((c) => <Node key={c.id || c.name} node={c} depth={depth + 1} />)}
             {leds.map((l) => (
-              <div key={l.id || l.code || l.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: `5px 12px 5px ${12 + (depth + 1) * 18 + 14}px`, borderBottom: '1px solid #f4f6fa', fontSize: 12 }}>
+              <div key={l.id || l.code || l.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: `5px 12px 5px ${12 + (depth + 1) * 18 + 14}px`, borderBottom: '1px solid #dfe2e7', fontSize: 12 }}>
                 <span {...clickable(() => openLedgerModal(l.name))} title="Open ledger account" style={{ fontWeight: 600, color: BLUE, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>{l.name}</span>
                 {l.code ? <span style={{ fontFamily: 'monospace', fontSize: 10, color: BLUE }}>{l.code}</span> : null}
               </div>
@@ -2129,12 +2227,12 @@ export function AccountsChartLive({ branch }) {
           <button onClick={() => setView('split')} style={seg(view === 'split')}>Side-by-side</button>
         </span>
         <button onClick={() => exportToExcel(`chart-of-accounts-${branchLabel(branch)}`, [{ key: 'topGroup', label: 'Group' }, { key: 'subGroup', label: 'Sub-Group' }, { key: 'code', label: 'Code' }, { key: 'name', label: 'Ledger' }], ledgers)} disabled={ledgers.length === 0}
-          style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #e6e8ec', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: ledgers.length === 0 ? 'not-allowed' : 'pointer', opacity: ledgers.length === 0 ? 0.5 : 1 }}>📤 Export</button>
+          style={{ padding: '7px 13px', background: '#fff', color: DARK, border: '1px solid #cdd1d8', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: ledgers.length === 0 ? 'not-allowed' : 'pointer', opacity: ledgers.length === 0 ? 0.5 : 1 }}>📤 Export</button>
       </div>}>
       <State q={tq} empty={roots.length === 0}>
         {view === 'tree' ? (
           <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #eef1f6', background: '#fafbfe' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 12px', borderBottom: '1px solid #dfe2e7', background: '#fafbfe' }}>
               <button onClick={() => setAll(true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${DARK}`, borderRadius: 5, background: '#fff', color: DARK, cursor: 'pointer' }}>⊞ Expand all</button>
               <button onClick={() => setAll(false)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${DARK}`, borderRadius: 5, background: '#fff', color: DARK, cursor: 'pointer' }}>⊟ Collapse all</button>
             </div>
@@ -2233,8 +2331,8 @@ export function CashBookLive({ branch }) {
   const expColumns = view === 'minimal'
     ? [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'ledgerName', label: 'Ledger Name' }, { key: 'narration', label: 'Narration' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }]
     : [{ key: 'date', label: 'Date' }, { key: 'vno', label: 'Voucher No' }, { key: 'category', label: 'Type' }, { key: 'ledgerName', label: 'Ledger Name' }, { key: 'narration', label: 'Narration' }, { key: 'debit', label: `Receipt (${cur})`, num: true }, { key: 'credit', label: `Payment (${cur})`, num: true }, { key: 'running', label: `Balance (${cur})`, num: true }];
-  const printRows = rowsFull.map((r) => ({ ...r, debit: nfmt(r.debit), credit: nfmt(r.credit), running: nfmt(r.running) }));
-  const totalRow = { date: 'CLOSING', vno: '', particulars: '', debit: nfmt(receipts), credit: nfmt(payments), running: nfmt(closing) };
+  const printRows = rowsFull.map((r) => ({ ...r, debit: nfmt(r.debit, localeOf(cur)), credit: nfmt(r.credit, localeOf(cur)), running: nfmt(r.running, localeOf(cur)) }));
+  const totalRow = { date: 'CLOSING', vno: '', particulars: '', debit: nfmt(receipts, localeOf(cur)), credit: nfmt(payments, localeOf(cur)), running: nfmt(closing, localeOf(cur)) };
   const sub = `${selected || 'Cash account'} · ${branchLabel(branch)} · ${rowsFull.length} entries · Closing ${money(cur, closing)}`;
   const exportNow = () => rowsFull.length && exportToExcel(`cash-book-${branchLabel(branch)}`, expColumns, rowsFull);
   const printNow = () => rowsFull.length && openReportPrint(`Cash Book — ${selected}`, sub, expColumns, printRows, totalRow);
@@ -2254,10 +2352,7 @@ export function CashBookLive({ branch }) {
       title="Cash Book"
       sub={sub}
       right={<>
-        <select value={selected} onChange={(e) => { setLedger(e.target.value); setPage(0); }} className="max-tablet:min-h-[44px] max-tablet:w-full" style={{ ...inp, width: 200, minHeight: 32, fontSize: 11, cursor: 'pointer' }}>
-          {cashLedgers.length === 0 && <option value="">No cash ledger</option>}
-          {cashLedgers.map((l) => <option key={l.code || l.name} value={l.name}>{l.name}</option>)}
-        </select>
+        <LedgerSelectMenu value={selected} options={cashLedgers.map((l) => l.name)} onChange={(v) => { setLedger(v); setPage(0); }} />
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Ledger / narration / voucher…" />
         <button
           onClick={() => setExpandAll((x) => !x)}
@@ -2291,7 +2386,7 @@ export function CashBookLive({ branch }) {
           </tr></thead>
           <tbody>
             {page === 0 && !term && (
-              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #f3f4f8' }}>
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #dfe2e7' }}>
                 <td colSpan={colCount - 1} style={{ padding: '8px 12px', fontWeight: 700, color: BLUE }}>Opening Balance b/d</td>
                 <td style={{ padding: '8px 12px', ...num, fontWeight: 700 }}>{money(cur, Math.abs(periodOpen))} {periodOpen < 0 ? 'Cr' : 'Dr'}</td>
               </tr>
@@ -2326,7 +2421,7 @@ export function CashBookLive({ branch }) {
       {voucher && (
         <div onClick={() => setVoucher(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(840px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #e6e8ec', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <Crumb items={[{ label: selected || 'Cash Book', onClick: () => setVoucher(null) }, { label: voucher.vno }]} />
               <button onClick={() => setVoucher(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
             </div>
