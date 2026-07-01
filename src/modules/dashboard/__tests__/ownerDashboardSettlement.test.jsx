@@ -81,7 +81,7 @@ describe('Owner Dashboard — single branch (BOM)', () => {
       },
       payables: {
         totals: { d0: 0, d30: 0, d60: 0, d90: 600, a7: 0, a15: 0, a30: 0, a45: 0, a60: 0, a61: 600, billed: 900, settled: 300, total: 600, onAccount: 150, net: 450 },
-        rows: [{ party: 'TripJack', a7: 0, a15: 0, a30: 0, a45: 0, a60: 0, a61: 600, total: 600 }],
+        rows: [{ party: 'TripJack', a7: 0, a15: 0, a30: 0, a45: 0, a60: 0, a61: 600, total: 600, onAccount: 150, net: 450 }],
       },
     } });
   });
@@ -90,22 +90,22 @@ describe('Owner Dashboard — single branch (BOM)', () => {
     render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
     expect(screen.getByText('Receivables — Ageing & Settlement')).toBeInTheDocument();
     expect(screen.getByText('Payables — Ageing & Settlement')).toBeInTheDocument();
-    expect(screen.getByText('₹1500')).toBeInTheDocument();  // AR Total Bills (billed)
-    expect(screen.getByText('₹240')).toBeInTheDocument();   // AR Unsettled Receipt (on-account)
-    expect(screen.getByText('₹760')).toBeInTheDocument();   // AR Final Receivables (net)
-    expect(screen.getByText('₹450')).toBeInTheDocument();   // AP Final Payables (net)
+    expect(screen.getByText('₹1500')).toBeInTheDocument();              // AR Total Bills (billed) — unique
+    expect(screen.getAllByText('₹240').length).toBeGreaterThan(0);      // AR Unsettled Receipt (tile + grid + footer)
+    expect(screen.getAllByText('₹760').length).toBeGreaterThan(0);      // AR Final Receivables (net)
+    expect(screen.getAllByText('₹450').length).toBeGreaterThan(0);      // AP Final Payables (net)
   });
 
   test('Final Receivables is derived (total − onAccount) when net is absent', () => {
     mockUseAgeing.mockReturnValue({ data: {
       receivables: {
         totals: { a7: 900, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, billed: 900, settled: 100, total: 900, onAccount: 100 }, // no net field
-        rows: [{ party: 'Acme', a7: 900, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, total: 900 }],
+        rows: [{ party: 'Acme', a7: 900, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, total: 900, onAccount: 100 }], // row net absent too → derived
       },
       payables: { totals: { total: 0, onAccount: 0 }, rows: [] },
     } });
     render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
-    expect(screen.getByText('₹800')).toBeInTheDocument();   // Final = 900 − 100, computed client-side
+    expect(screen.getAllByText('₹800').length).toBeGreaterThan(0);   // Final = 900 − 100, computed client-side
   });
 
   test('financial cockpit renders (Key Alerts + Profit Bridge + Cash Forecast + Leaderboard)', () => {
@@ -122,16 +122,16 @@ describe('Owner Dashboard — Group / ALL', () => {
     mockUseAgeing.mockReturnValue({ data: {
       receivables: { totals: {} }, payables: { totals: {} },
       byBranch: [
-        { branch: 'BOM', receivables: { totals: { a7: 1000, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, billed: 1000, settled: 240, total: 1000, onAccount: 240, net: 760 }, rows: [{ party: 'Global', a7: 1000, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, total: 1000 }] }, payables: { totals: { total: 0, onAccount: 0, net: 0 }, rows: [] } },
-        { branch: 'NBO', receivables: { totals: { a7: 500, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, billed: 500, settled: 220, total: 500, onAccount: 220, net: 280 }, rows: [{ party: 'Aamir', a7: 500, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, total: 500 }] }, payables: { totals: { total: 0, onAccount: 0, net: 0 }, rows: [] } },
+        { branch: 'BOM', receivables: { totals: { a7: 1000, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, billed: 1000, settled: 240, total: 1000, onAccount: 240, net: 760 }, rows: [{ party: 'Global', a7: 1000, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, total: 1000, onAccount: 240, net: 760 }] }, payables: { totals: { total: 0, onAccount: 0, net: 0 }, rows: [] } },
+        { branch: 'NBO', receivables: { totals: { a7: 500, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, billed: 500, settled: 220, total: 500, onAccount: 220, net: 280 }, rows: [{ party: 'Aamir', a7: 500, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, total: 500, onAccount: 220, net: 280 }] }, payables: { totals: { total: 0, onAccount: 0, net: 0 }, rows: [] } },
       ],
     } });
   });
 
   test('settlement renders per branch, each in its own currency', () => {
     render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={'ALL'} />);
-    expect(screen.getByText('₹760')).toBeInTheDocument();   // BOM actual balance in ₹
-    expect(screen.getByText('$280')).toBeInTheDocument();   // NBO actual balance in $
+    expect(screen.getAllByText('₹760').length).toBeGreaterThan(0);   // BOM Final Receivables in ₹
+    expect(screen.getAllByText('$280').length).toBeGreaterThan(0);   // NBO Final Receivables in $
   });
 
   test('money cockpit panels collapse to per-branch notes in Group; Key Alerts still shows', () => {
