@@ -24,6 +24,7 @@ jest.mock('../api', () => ({
   getApAgeingSummary: jest.fn(async () => []),
   getBookingSummary: jest.fn(async () => ({ pending: {}, approved: {}, rejected: {}, deleted: {} })),
   getSalesReconciliation: jest.fn(async () => RECON),
+  getGpReconciliation: jest.fn(async () => ({ gp: 1548000, buckets: [{ key: 'sopogp', label: 'SO/PO/GP (sale − cost)', sign: '+', amount: 1236000, count: 768 }], bucketSum: 1548000, residual: 0, reconciles: true })),
   getSaleVouchers: jest.fn(async () => []),
 }));
 import * as api from '../api';
@@ -42,5 +43,12 @@ describe('loadDirectorDashboard — sales reconciliation bridge', () => {
     const d = await loadDirectorDashboard({ branchCode: 'BOM' });
     expect(d.salesRecon.reconciles).toBe(false);
     expect(d.salesRecon.residual).toBe(568);
+  });
+
+  test('also exposes data.gpRecon (GP-by-origin bridge), scoped to the branch/period', async () => {
+    const d = await loadDirectorDashboard({ branchCode: 'BOM', from: '2026-04-01', to: '2026-06-30' });
+    expect(d.gpRecon).toBeTruthy();
+    expect(d.gpRecon.gp).toBe(1548000);
+    expect(api.getGpReconciliation).toHaveBeenCalledWith(expect.objectContaining({ branchCode: 'BOM', from: '2026-04-01', to: '2026-06-30' }));
   });
 });

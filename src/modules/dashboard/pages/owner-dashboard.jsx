@@ -338,6 +338,48 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
         </div>
       ) : null}
 
+      {/* ── Gross-Profit Reconciliation (single-branch only) ──
+          Proves the GP KPI BY ORIGIN: GP = SO/PO/GP + INB + Refund/Reissue +
+          Commission/Adjustments (+ Other). Same 6 GP heads as the GP card, so it foots
+          to the rupee; the Commission/Discounts/JV line is a material, real bucket. */}
+      {!isAll && data.gpRecon && (data.gpRecon.buckets || []).length > 0 && (data.gpRecon.gp || data.gpRecon.bucketSum) ? (
+        <div className="mb-4">
+          <div className="mb-1.5 text-xs font-semibold text-ink-muted">
+            Gross Profit Reconciliation · {rangeShort} <span className="font-normal">— how the GP figure is composed</span>
+          </div>
+          <div className="rounded-brand border border-surface-border bg-surface px-4 py-3">
+            <div className="flex items-baseline justify-between border-b-2 pb-2" style={{ borderColor: '#185FA5' }}>
+              <span className="text-sm font-extrabold text-ink">Gross Profit · {rangeShort}</span>
+              <span className="text-lg font-extrabold tabular-nums" style={{ color: '#16a34a' }}>{m0(data.gpRecon.gp)}</span>
+            </div>
+            {data.gpRecon.buckets.map((b) => {
+              const neg = b.amount < 0;
+              const empty = b.amount === 0 && b.count === 0;
+              const inner = (
+                <>
+                  <span className="flex items-center gap-2 text-xs text-ink-muted">
+                    <span className="w-3 text-center font-bold" style={{ color: neg ? C.red : C.green }}>{neg ? '−' : '+'}</span>
+                    {b.label}
+                    {b.count ? <span className="text-[11px] text-ink-muted">· {b.count}</span> : null}
+                  </span>
+                  <span className={`text-sm font-bold tabular-nums ${empty ? 'text-ink-muted' : 'text-ink'}`}>{m0(Math.abs(b.amount))}</span>
+                </>
+              );
+              return empty ? (
+                <div key={b.key} className="flex w-full items-center justify-between py-1.5 opacity-60">{inner}</div>
+              ) : (
+                <button key={b.key} type="button" onClick={() => navigate(`/transactions/approvals?tab=${b.key}`)} className="flex w-full items-center justify-between py-1.5 text-left hover:opacity-80">{inner}</button>
+              );
+            })}
+            {!data.gpRecon.reconciles && (
+              <div className="mt-1 rounded border px-2 py-1 text-[11px] font-semibold" style={{ borderColor: C.red, color: C.red }}>
+                Unreconciled by {m0(Math.abs(data.gpRecon.residual))} — a GP-ledger posting isn't classified; see the Other/Manual bucket.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
       {/* ── Bookings pipeline (condensed) ── on Group/ALL: per branch, each in its own
           currency (Sales/GP money never summed across branches). */}
       <div className="mb-1.5 text-xs font-semibold text-ink-muted">SO/PO/GP Pipeline · {rangeShort}</div>

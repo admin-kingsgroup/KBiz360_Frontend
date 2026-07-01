@@ -163,6 +163,45 @@ describe('Owner Dashboard — Sales Reconciliation bridge (single branch)', () =
   });
 });
 
+describe('Owner Dashboard — Gross Profit Reconciliation bridge (single branch)', () => {
+  const GP_RECON = {
+    gp: 1548000,
+    buckets: [
+      { key: 'sopogp',      label: 'SO/PO/GP (sale − cost)',       sign: '+', amount: 1236000, count: 768 },
+      { key: 'inb',         label: 'INB inter-branch',            sign: '+', amount: 114000,  count: 548 },
+      { key: 'refund',      label: 'Refund / Reissue',            sign: '+', amount: 19000,   count: 42 },
+      { key: 'adjustments', label: 'Commission / Discounts / JV', sign: '+', amount: 179000,  count: 326 },
+      { key: 'other',       label: 'Other / Manual',              sign: '+', amount: 0, count: 0 },
+    ],
+    bucketSum: 1548000, residual: 0, reconciles: true,
+  };
+  beforeEach(() => {
+    mockUseAgeing.mockReturnValue({ data: { receivables: { totals: {} }, payables: { totals: {} } } });
+    useDirectorDashboard.mockReturnValue({ data: { ...LOADED, gpRecon: GP_RECON }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
+  });
+
+  test('renders the GP bridge incl the material Commission/Adjustments bucket', () => {
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    expect(screen.getByText(/Gross Profit Reconciliation/)).toBeInTheDocument();
+    expect(screen.getByText('SO/PO/GP (sale − cost)')).toBeInTheDocument();
+    expect(screen.getByText('Commission / Discounts / JV')).toBeInTheDocument();
+    expect(screen.getByText('₹1548000')).toBeInTheDocument();   // bridge top == GP KPI value
+    expect(screen.getByText('₹179000')).toBeInTheDocument();    // commission bucket
+  });
+
+  test('a GP bucket row drills into its Approvals register', () => {
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    fireEvent.click(screen.getByText('Commission / Discounts / JV').closest('button'));
+    expect(mockNavigate).toHaveBeenCalledWith('/transactions/approvals?tab=adjustments');
+  });
+
+  test('hides the GP bridge on Group/ALL scope', () => {
+    useDirectorDashboard.mockReturnValue({ data: { ...LOADED, gpRecon: GP_RECON, bookingsByBranch: [] }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={'ALL'} />);
+    expect(screen.queryByText(/Gross Profit Reconciliation/)).toBeNull();
+  });
+});
+
 describe('Owner Dashboard — Group / ALL', () => {
   beforeEach(() => {
     mockUseAgeing.mockReturnValue({ data: {
