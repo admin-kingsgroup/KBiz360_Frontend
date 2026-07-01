@@ -4,7 +4,8 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, Calendar, Download, Plus, Settings, Users } from 'lucide-react';
+import { AlertTriangle, Calendar, ChevronDown, Download, Plus, Settings, Users } from 'lucide-react';
+import { Menu as DropdownMenu } from '../../core/ux/Menu';
 import { useGpBills, useRcmLiability } from '../../core/useAccounting';
 import { useTaxCalendar } from '../../core/useReference';
 import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY, fyOptions, rangeNote } from '../../core/dates';
@@ -74,9 +75,18 @@ export function TaxGstr1({branch}){
           <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {rangeNote('month',{month:period})} · use the period selector to change</p>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-            {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-          </select>
+          <DropdownMenu
+            ariaLabel="Period"
+            menuRole="listbox"
+            items={PERIODS.map(p=>({key:p.v,label:p.l,selected:period===p.v,onSelect:()=>setPeriod(p.v)}))}
+            renderTrigger={({ref,toggle,triggerProps})=>(
+              <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                style={{...inp,width:"auto",minHeight:32,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                {PERIODS.find(p=>p.v===period)?.l||period}
+                <ChevronDown size={13} style={{color:"#5b616e",flexShrink:0}}/>
+              </button>
+            )}
+          />
           <button style={{...btnG,fontSize:11,background:"#27500A"}}>📤 File on GST Portal</button>
         </div>
       </div>
@@ -181,9 +191,18 @@ export function TaxGstr3b({branch}){
           <p style={{margin:"3px 0 0",fontSize:11,color:"#185FA5",fontWeight:600}}>📅 {rangeNote('month',{month:period})} · use the period selector to change</p>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-            {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-          </select>
+          <DropdownMenu
+            ariaLabel="Period"
+            menuRole="listbox"
+            items={PERIODS.map(p=>({key:p.v,label:p.l,selected:period===p.v,onSelect:()=>setPeriod(p.v)}))}
+            renderTrigger={({ref,toggle,triggerProps})=>(
+              <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                style={{...inp,width:"auto",minHeight:32,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                {PERIODS.find(p=>p.v===period)?.l||period}
+                <ChevronDown size={13} style={{color:"#5b616e",flexShrink:0}}/>
+              </button>
+            )}
+          />
           <button style={{...btnG,fontSize:11,background:"#A32D2D"}}>💳 Pay & File</button>
         </div>
       </div>

@@ -42,9 +42,6 @@ const { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlow
 import { financeRoutes } from './modules/finance/routes';
 /* Support (in-app issue tracker) route table — same plain-data shape as finance. */
 import { supportRoutes } from './modules/support/routes';
-/* Floating, app-wide "Report an issue" button (lazy so it never touches the
-   initial bundle) — mounted once as a global host below, like ToastHost. */
-const ReportIssueButton = React.lazy(() => import('./modules/support/components/ReportIssueButton'));
 
 /* Declarative route tables from migrated feature modules. The host renders
    these via react-router FIRST; any route not listed falls through to the
@@ -702,7 +699,7 @@ export default function KB360App(){
         branch={branch} setBranch={setBranch}
         route={route} setRoute={navigate}
         currentUser={currentUser} setCurrentUser={setUser}
-        subBar={<ContextBar branch={branch}/>}
+        subBar={<ContextBar branch={branch} route={route}/>}
       >
         {/* App-wide Tally Export / Print / PDF toolbar — shown on every report,
             finance, tax & register screen. Excluded from the printout itself. */}
@@ -729,9 +726,6 @@ export default function KB360App(){
       <GlobalFetchBar/>
       <PrintPreviewHost/>
       <ToastHost/>
-      {/* App-wide "Report an issue" button — raise a support ticket from any screen,
-          with the current route auto-captured. Lazy, so it's off the initial bundle. */}
-      <Suspense fallback={null}><ReportIssueButton route={route}/></Suspense>
       <ConfirmHost/>
       <LedgerSwitcher branch={branch}/>
       <LedgerModalHost branch={branch}/>

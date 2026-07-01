@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { lazyModule } from './lazyModule';
 import { useModalEsc } from './ux/useModalEsc';
+import { Menu as DropdownMenu } from './ux/Menu';
 import { AlertTriangle, ChevronDown, ChevronRight, Download, Lock, Plus, Printer, Save, Search, Settings, User } from 'lucide-react';
 import { Cell } from 'recharts';
 import { exportToCSV } from './business-logic';
@@ -800,9 +801,18 @@ export function PackagePnL({branch}){
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-            {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-          </select>
+          <DropdownMenu
+            ariaLabel="Period"
+            menuRole="listbox"
+            items={PERIODS.map(p=>({key:p.v,label:p.l,selected:period===p.v,onSelect:()=>setPeriod(p.v)}))}
+            renderTrigger={({ref,toggle,triggerProps})=>(
+              <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                style={{...inp,width:"auto",minHeight:32,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                {PERIODS.find(p=>p.v===period)?.l||period}
+                <ChevronDown size={13} style={{color:"#5b616e",flexShrink:0}}/>
+              </button>
+            )}
+          />
           <button onClick={()=>exportToCSV(rows,["code","dest","bks","pax","rev","cost","gp","gpPct"],"package-pnl.csv")} style={{...btnGh,fontSize:11}}><Download size={12}/> CSV</button>
         </div>
       </div>
