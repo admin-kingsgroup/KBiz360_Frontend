@@ -53,6 +53,19 @@ export function splitRefundJv(postings = [], opts = {}) {
   return { sale, purchase };
 }
 
+// The customer figure to DISPLAY on a refund/reissue must equal what actually POSTS —
+// the customer leg of the live (full-reversal) JV, net of the airline cancellation
+// recovered from the client. This replaces the old net-settlement `total` caption, which
+// pre-dated the full-reversal model and over-stated the refund payable. `party` is the
+// customer (Sundry Debtor). Refund → client is Cr (payable); reissue → Dr (billed). Falls
+// back to `fallback` (the local total) until the preview resolves / no party is picked.
+export function clientNetFromJv(postings = [], party = '', isRefund = true, fallback = 0) {
+  const ps = Array.isArray(postings) ? postings : [];
+  if (!ps.length || !party) return fallback;
+  const net = ps.filter((p) => p && p.ledger === party).reduce((s, p) => s + num(p && p.credit) - num(p && p.debit), 0);
+  return r2(isRefund ? net : -net);
+}
+
 // consolidateLegs now lives in ../ui (shared by the one JvBlock renderer used app-wide).
 // Re-exported here for back-compat with existing imports/tests.
 export { consolidateLegs } from '../ui';
