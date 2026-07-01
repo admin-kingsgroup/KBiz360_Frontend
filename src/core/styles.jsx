@@ -20,8 +20,9 @@ import { buildLeaveUtilization, buildAttrition, lastMonths } from '../modules/hr
 import { fmt, fmtINR } from './format';
 import { todayISO, nowLabel, CUR_FY } from './dates';
 import { openPrintPreview } from './PrintPreview';
-import { AUDIT_TRAIL_DATA, BANK_ACCOUNTS_DATA, CUSTOMER_LTV_DATA, FS_NOTES, TOP_SUPPLIERS_DATA, abcOf, cardStyle } from './helpers';
-import { useGpBills, useProfitAndLoss, useYieldByDestination, useCustomerLtv, useAbcAnalysis, useYearOverYear, useFxExposure } from './useAccounting';
+import { AUDIT_TRAIL_DATA, CUSTOMER_LTV_DATA, FS_NOTES, TOP_SUPPLIERS_DATA, abcOf, cardStyle } from './helpers';
+import { useGpBills, useProfitAndLoss, useYieldByDestination, useCustomerLtv, useAbcAnalysis, useYearOverYear, useFxExposure, useTrialBalance } from './useAccounting';
+import { isLiquidRow, liquidityKind } from './ledgerKind';
 import { useTaxFilingBoard, useStatutoryDues } from './useTaxReco';
 import { ReportDateBar, resolveReportRange } from './reportDateBar';
 import { triggerSaveRefresh, useMobile } from './hooks';
@@ -515,8 +516,15 @@ export function KPICard({label,value,delta,color,onClick}){
      "₹2L overdue 90+" (a "+" inside the text). */
   const d=String(delta||"").trim();
   const deltaColor=d.startsWith("+")?"#16a34a":d.startsWith("-")?"#dc2626":"#5b616e";
+  // When clickable, the card is a real button to AT/keyboard: role+tabIndex+Enter/Space
+  // activation, an aria-label, and a min touch height (≥44px) for mobile tap targets.
+  const interactive=!!onClick;
+  const onKeyDown=interactive?(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); onClick(e); } }:undefined;
   return (
-    <div onClick={onClick} style={{...PREMIUM_CARD,cursor:onClick?"pointer":"default",borderTop:"3px solid "+(color||"#c2a04a")}}>
+    <div onClick={onClick}
+      role={interactive?"button":undefined} tabIndex={interactive?0:undefined} onKeyDown={onKeyDown}
+      aria-label={interactive?`${label}: ${value}`:undefined}
+      style={{...PREMIUM_CARD,cursor:interactive?"pointer":"default",borderTop:"3px solid "+(color||"#c2a04a"),...(interactive?{minHeight:64}:{})}}>
       <p style={{margin:0,fontSize:10.5,color:"#5b616e",letterSpacing:"0.4px",textTransform:"uppercase",fontWeight:700}}>{label}</p>
       <p style={{margin:"5px 0 2px",fontSize:22,fontWeight:800,color:"#14161a",fontVariantNumeric:"tabular-nums"}}>{value}</p>
       {delta&&<p style={{margin:0,fontSize:11,color:deltaColor,fontWeight:600}}>{delta}</p>}
@@ -558,51 +566,80 @@ export function RPT_Page({title,subtitle,toolbar,children}){
 
 
 export function RPT_CashPosition({branch}){
-  const groupByBranch={};
-  BANK_ACCOUNTS_DATA.forEach(b=>{
-    if(!groupByBranch[b.branch]) groupByBranch[b.branch]=[];
-    groupByBranch[b.branch].push(b);
+  // LIVE cash & bank position — the same trial-balance liquid ledgers the dashboard's
+  // "Cash & Bank" KPI sums (no `from` bound → closing = opening + all movement). Each
+  // branch's balances stay in its OWN native currency; there is NO cross-currency total
+  // (summing ₹ + $ is meaningless), matching the interbranch-FX-manual policy.
+  // A position is an as-of balance → only the `to` (as-of date) matters; `from` is
+  // ignored. Default preset 'all' → to:'' → as of today; the date bar back-dates the snapshot.
+  const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
+  const q = useTrialBalance(branch, { to: range.to });
+  const data = q.data || {};
+  const bal = (r) => (r.closingDebit || 0) - (r.closingCredit || 0); // Dr +ve
+  const locOf = (cur) => (cur === "₹" || cur === "₨" || cur === "Rs") ? "en-IN" : "en-US";
+  const fmtCur = (cur, n) => `${cur} ${Math.round(Number(n) || 0).toLocaleString(locOf(cur))}`;
+  // Normalise to a flat list of liquid ledgers. Consolidated (ALL) scope uses the
+  // per-branch breakdown so each row carries its branch's currency; a single-branch call
+  // uses that branch's rows + currency.
+  const rows = [];
+  const pushRow = (brCode, cur, r) => rows.push({
+    branch: brCode || "—", ledger: r.ledger || r.name || "—", group: r.group || "",
+    type: liquidityKind(r) === "cash" ? "Cash" : "Bank", currency: cur, balance: bal(r),
   });
-  // Each currency/branch balance is shown in its OWN native currency only — no
-  // cross-currency conversion and no INR-equivalent grand total (a sum across
-  // currencies is meaningless and is intentionally not shown here).
-  const groupByCurrency={};
-  BANK_ACCOUNTS_DATA.forEach(b=>{
-    if(!groupByCurrency[b.currency]) groupByCurrency[b.currency]={total:0,count:0};
-    groupByCurrency[b.currency].total+=b.openingBal;
-    groupByCurrency[b.currency].count+=1;
-  });
-  // Per-branch native balances per currency it holds (branches are usually single-
-  // currency; mixed branches list each currency on its own line — never summed).
-  const branchCurTotals=(accts)=>{const m={};accts.forEach(a=>{m[a.currency]=(m[a.currency]||0)+a.openingBal;});return m;};
+  if (Array.isArray(data.byBranch) && data.byBranch.length) {
+    data.byBranch.forEach((b) => {
+      const cur = (bc({ code: b.branch }) || {}).cur || "₹";
+      (b.rows || []).filter(isLiquidRow).forEach((r) => pushRow(b.branch, cur, r));
+    });
+  } else {
+    const cur = (bc(branch) || {}).cur || "₹";
+    const brCode = (branch === "ALL" || !branch) ? "" : (branch.code || branch);
+    (data.rows || []).filter(isLiquidRow).forEach((r) => pushRow(brCode, cur, r));
+  }
+  rows.sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
+
+  const groupByCurrency = {};
+  rows.forEach((r) => { if (!groupByCurrency[r.currency]) groupByCurrency[r.currency] = { total: 0, count: 0 }; groupByCurrency[r.currency].total += r.balance; groupByCurrency[r.currency].count += 1; });
+  const groupByBranch = {};
+  rows.forEach((r) => { if (!groupByBranch[r.branch]) groupByBranch[r.branch] = []; groupByBranch[r.branch].push(r); });
+  const branchCurTotals = (accts) => { const m = {}; accts.forEach((a) => { m[a.currency] = (m[a.currency] || 0) + a.balance; }); return m; };
+  const bankCount = rows.filter((r) => r.type === "Bank").length;
+  const cashCount = rows.filter((r) => r.type === "Cash").length;
+
   return (
-    <RPT_Page title="Cash Position Summary" subtitle="All bank balances + petty cash · real-time · each branch in its own currency">
+    <RPT_Page title="Cash Position Summary" subtitle={`Live cash + bank ledger balances · as of ${range.to || 'today'} · each branch in its own currency`} toolbar={<ReportDateBar value={range} onChange={setRange}/>}>
+      {q.isLoading && <div style={{padding:"14px 2px",fontSize:12.5,color:"#5a6691"}}>Loading balances…</div>}
+      {!q.isLoading && !rows.length && <div style={{padding:"14px 2px",fontSize:12.5,color:"#5a6691"}}>No cash or bank ledgers found for this scope.</div>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,marginBottom:14}}>
-        <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#2563eb"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#2563eb"}}>Bank Accounts</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{BANK_ACCOUNTS_DATA.filter(b=>b.type!=="Cash").length}</p></div>
-        <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#16a34a"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#16a34a"}}>Currencies</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{Object.keys(groupByCurrency).length}</p></div>
+        <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#2563eb"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#2563eb"}}>Bank Ledgers</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{bankCount}</p></div>
+        <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#16a34a"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#16a34a"}}>Cash Ledgers</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{cashCount}</p></div>
+        <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#7c3aed"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#7c3aed"}}>Currencies</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{Object.keys(groupByCurrency).length}</p></div>
         <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#d97706"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#d97706"}}>Branches</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{Object.keys(groupByBranch).length}</p></div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14,marginBottom:14}}>
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>By Currency</p>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+          <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Currency</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th></tr></thead>
-            <tbody>{Object.entries(groupByCurrency).map(([cur,d])=>(<tr key={cur}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:700}}>{cur} <span style={{color:"#5a6691",fontWeight:400,fontSize:10}}>({d.count})</span></td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{cur} {d.total.toLocaleString("en-IN")}</td></tr>))}</tbody>
-          </table>
+            <tbody>{Object.entries(groupByCurrency).map(([cur,d])=>(<tr key={cur}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:700}}>{cur} <span style={{color:"#5a6691",fontWeight:400,fontSize:10}}>({d.count})</span></td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:d.total<0?"#A32D2D":"#0d1326"}}>{fmtCur(cur,d.total)}</td></tr>))}
+              {!rows.length && <tr><td colSpan={2} style={{...RPT_tdStyle,textAlign:"center",color:"#5a6691"}}>—</td></tr>}</tbody>
+          </table></div>
         </div>
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>By Branch</p>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"center"}}>A/cs</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance (native)</th></tr></thead>
-            <tbody>{Object.entries(groupByBranch).map(([br,accts])=>{const cm=branchCurTotals(accts);return (<tr key={br}><td style={{...RPT_tdStyle,fontWeight:700}}>{br}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{accts.length}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:700}}>{Object.entries(cm).map(([cur,v])=>`${cur} ${v.toLocaleString("en-IN")}`).join(" · ")}</td></tr>);})}</tbody>
-          </table>
+          <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"center"}}>Ledgers</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance (native)</th></tr></thead>
+            <tbody>{Object.entries(groupByBranch).map(([br,accts])=>{const cm=branchCurTotals(accts);return (<tr key={br}><td style={{...RPT_tdStyle,fontWeight:700}}>{br}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{accts.length}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:700}}>{Object.entries(cm).map(([cur,v])=>fmtCur(cur,v)).join(" · ")}</td></tr>);})}
+              {!rows.length && <tr><td colSpan={3} style={{...RPT_tdStyle,textAlign:"center",color:"#5a6691"}}>—</td></tr>}</tbody>
+          </table></div>
         </div>
       </div>
       <div style={cardStyle}>
-        <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>Detail — All Accounts</p>
+        <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326",marginBottom:10}}>Detail — Cash &amp; Bank Ledgers</p>
         <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Bank · Account</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>Currency</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th><th style={{...RPT_thStyle,textAlign:"right"}}>% of Limit</th></tr></thead>
-          <tbody>{BANK_ACCOUNTS_DATA.map(b=>{const pct=Math.round(b.openingBal/b.limit*100);return (<tr key={b.id}><td style={RPT_tdStyle}>{b.branch}</td><td style={RPT_tdStyle}>{b.bank} · <span style={{fontFamily:"monospace",color:"#5a6691"}}>...{b.accountNo.slice(-6)}</span></td><td style={RPT_tdStyle}>{b.type}</td><td style={{...RPT_tdStyle,fontFamily:"monospace"}}>{b.currency}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{b.currency} {b.openingBal.toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",color:pct>80?"#A32D2D":"#0d1326",fontWeight:600}}>{pct}%</td></tr>);})}</tbody>
+          <thead><tr><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Ledger</th><th style={RPT_thStyle}>Group</th><th style={RPT_thStyle}>Type</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th></tr></thead>
+          <tbody>{rows.map((r,i)=>(<tr key={i}><td style={RPT_tdStyle}>{r.branch}</td><td style={{...RPT_tdStyle,fontWeight:600}}>{r.ledger}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{r.group}</td><td style={RPT_tdStyle}>{r.type}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:600,color:r.balance<0?"#A32D2D":"#0d1326"}}>{fmtCur(r.currency,r.balance)}</td></tr>))}
+            {!rows.length && <tr><td colSpan={5} style={{...RPT_tdStyle,textAlign:"center",color:"#5a6691",padding:16}}>{q.isLoading?"Loading…":"No cash/bank ledgers."}</td></tr>}</tbody>
         </table></div>
       </div>
     </RPT_Page>
@@ -982,12 +1019,12 @@ export function RPT_BirthdayCalendar(){
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326",marginBottom:12}}>🎂 Upcoming Birthdays</p>
           {(stats.birthdays||[]).length===0&&<p style={{color:"#5a6691",fontSize:12}}>{statsQ.isLoading?"Loading…":"No upcoming birthdays"}</p>}
-          {(stats.birthdays||[]).map(b=>(<div key={b.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #dfe2e7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#d4a437",display:"flex",alignItems:"center",justifyContent:"center",color:"#0d1326",fontSize:14,fontWeight:700}}>{b.name.substring(0,2).toUpperCase()}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{b.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{b.branch} · {b.date}</p></div><button style={{padding:"5px 12px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Send wish</button></div>))}
+          {(stats.birthdays||[]).map(b=>(<div key={b.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #dfe2e7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#d4a437",display:"flex",alignItems:"center",justifyContent:"center",color:"#0d1326",fontSize:14,fontWeight:700}}>{b.name.substring(0,2).toUpperCase()}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{b.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{b.branch} · {b.date}</p></div></div>))}
         </div>
         <div style={cardStyle}>
           <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326",marginBottom:12}}>🎉 Work Anniversaries</p>
           {(stats.anniversaries||[]).length===0&&<p style={{color:"#5a6691",fontSize:12}}>{statsQ.isLoading?"Loading…":"No upcoming anniversaries"}</p>}
-          {(stats.anniversaries||[]).map(a=>(<div key={a.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #dfe2e7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#6B4C8B",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:14,fontWeight:700}}>{a.years}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{a.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{a.branch} · {a.years} year{a.years!==1?"s":""} on {a.date}</p></div><button style={{padding:"5px 12px",background:"#6B4C8B",color:"#fff",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer"}}>Acknowledge</button></div>))}
+          {(stats.anniversaries||[]).map(a=>(<div key={a.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #dfe2e7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#6B4C8B",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:14,fontWeight:700}}>{a.years}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{a.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{a.branch} · {a.years} year{a.years!==1?"s":""} on {a.date}</p></div></div>))}
         </div>
       </div>
     </RPT_Page>

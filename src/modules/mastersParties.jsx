@@ -24,6 +24,11 @@ import { apiGet, getAuthToken } from '../core/api';
 import { bc } from '../core/styles';
 import { localeOf } from '../core/format';
 import { BRANCH_CODES } from '../core/data';
+import {
+  SUPPLIER_CATS, GST_TREATMENTS, COUNTRIES, IN_STATES, STATE_NAMES, MSME_STATUS,
+  TDS_SECTIONS, PAY_TERMS, SETTLE_CYCLES, PAY_METHODS, CURRENCIES, ADDR_TYPES,
+  CUST_TYPES, CUST_SOURCES,
+} from '../core/partyEnums';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { useHotkey } from '../core/ux/hotkeys';
 import { Combobox } from '../core/ux/Combobox';
@@ -36,24 +41,15 @@ const GOLD = '#c2a04a', DARK = '#1a1c22', DIM = '#5b616e', RED = '#dc2626', GREE
 
 // Local panel wrapper (replaces helpers.tabPanel) — design-system spacing.
 const tabPanel = (children) => <div className="min-h-[360px] p-4 tablet:p-5">{children}</div>;
-const SUPPLIER_CATS = ['Airline', 'DMC', 'Hotel', 'Visa', 'Insurance', 'Car', 'Misc'];
-const GST_TREATMENTS = ['', 'Registered — Regular', 'Registered — Composition', 'Unregistered', 'SEZ', 'Overseas'];
 
-// GST place-of-supply (mirrors backend src/shared/util/gstSupplyType.js). A supplier
-// attracts Indian GST/TDS only when it is Indian; CGST+SGST (intra) vs IGST (inter) is
-// then decided by the supplier's state vs the branch's home state.
-const COUNTRIES = ['India', 'United Arab Emirates', 'Singapore', 'Thailand', 'United Kingdom', 'United States', 'Sri Lanka', 'Nepal', 'Maldives', 'Other'];
-const IN_STATES = [
-  ['01', 'Jammu & Kashmir'], ['02', 'Himachal Pradesh'], ['03', 'Punjab'], ['04', 'Chandigarh'],
-  ['05', 'Uttarakhand'], ['06', 'Haryana'], ['07', 'Delhi'], ['08', 'Rajasthan'], ['09', 'Uttar Pradesh'],
-  ['10', 'Bihar'], ['11', 'Sikkim'], ['12', 'Arunachal Pradesh'], ['13', 'Nagaland'], ['14', 'Manipur'],
-  ['15', 'Mizoram'], ['16', 'Tripura'], ['17', 'Meghalaya'], ['18', 'Assam'], ['19', 'West Bengal'],
-  ['20', 'Jharkhand'], ['21', 'Odisha'], ['22', 'Chhattisgarh'], ['23', 'Madhya Pradesh'], ['24', 'Gujarat'],
-  ['26', 'Dadra & Nagar Haveli and Daman & Diu'], ['27', 'Maharashtra'], ['29', 'Karnataka'], ['30', 'Goa'],
-  ['31', 'Lakshadweep'], ['32', 'Kerala'], ['33', 'Tamil Nadu'], ['34', 'Puducherry'],
-  ['35', 'Andaman & Nicobar Islands'], ['36', 'Telangana'], ['37', 'Andhra Pradesh'], ['38', 'Ladakh'],
-];
-const STATE_NAMES = ['', ...IN_STATES.map(([, n]) => n)];
+// All party picklists (SUPPLIER_CATS, GST_TREATMENTS, COUNTRIES, IN_STATES, STATE_NAMES,
+// MSME_STATUS, TDS_SECTIONS, PAY_TERMS, SETTLE_CYCLES, PAY_METHODS, CURRENCIES, ADDR_TYPES,
+// CUST_TYPES, CUST_SOURCES) now live in core/partyEnums so the simple list masters in
+// mastersLive.jsx share the exact same vocabulary. Imported at the top of this file.
+
+// GST place-of-supply helpers (mirror backend src/shared/util/gstSupplyType.js). A supplier
+// attracts Indian GST/TDS only when it is Indian; CGST+SGST (intra) vs IGST (inter) is then
+// decided by the supplier's state vs the branch's home state.
 const HOME_STATE_BY_BRANCH = { BOM: '27', AMD: '24' }; // branch GST registration state
 const isIndiaFE = (c) => { const x = String(c || '').trim().toLowerCase(); return x === '' || x === 'india' || x === 'in' || x === 'bharat'; };
 const isExplicitIndiaFE = (c) => { const x = String(c || '').trim().toLowerCase(); return x === 'india' || x === 'in' || x === 'bharat'; };
@@ -74,13 +70,6 @@ function supplyTypeFE(f = {}) {
     ? { type: 'intra', label: 'Intra-state — CGST + SGST', tone: 'ok' }
     : { type: 'inter', label: 'Inter-state — IGST', tone: 'ok' };
 }
-const MSME_STATUS = ['', 'Not Registered', 'Micro', 'Small', 'Medium'];
-const TDS_SECTIONS = ['', '194C @ 2%', '194J @ 10%', '194I @ 10%', '194H @ 2%', '194O @ 0.1%', 'None'];
-const PAY_TERMS = ['', 'Advance', 'Net 15', 'Net 30', 'Net 45', 'Net 60', 'Net 90'];
-const SETTLE_CYCLES = ['', 'Weekly', 'Bi-Monthly (BSP)', 'Monthly', 'On Invoice'];
-const PAY_METHODS = ['', 'Bank Transfer', 'BSP NEFT', 'NEFT/RTGS', 'Cheque', 'UPI', 'Cash'];
-const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD'];
-const ADDR_TYPES = ['Billing', 'Shipping', 'Registered Office', 'Head Office', 'Branch', 'Other'];
 
 // Branch-aware full amount: ₹ + Indian grouping for India branches, $ + Western
 // grouping for USD branches (NBO/DAR/FBM). `branchCode` defaults to the ₹ home branch.
@@ -463,8 +452,6 @@ const CUST_TABS = [
   { id: 'history', label: '9. History' }, { id: 'linked', label: '10. Linked Vouchers' },
   { id: 'outstanding', label: '11. Outstanding' }, { id: 'custom', label: '12. Custom Fields' },
 ];
-const CUST_TYPES = ['', 'Corporate · Premium', 'Corporate · Standard', 'Individual', 'Travel Agent', 'Government'];
-const CUST_SOURCES = ['', 'Direct Referral', 'Cold Outreach', 'Digital Marketing', 'Walk-in', 'Existing Client'];
 
 export function CustomerMasterTabbed() {
   const m = usePartyMaster('customers', 'customer');

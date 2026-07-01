@@ -1,56 +1,13 @@
-import { PRODUCT_MODULES, FX_TO_INR } from './constants';
+import { FX_TO_INR } from './constants';
 import { fmtINR } from '../../../core/format';
 import { fmtDate, todayISO } from '../../../core/dates';
 
-export const filterBillsByBranchPeriod = (bills, branchCode, monthPrefix) =>
-  bills.filter(
-    (b) => (!branchCode || b.branch === branchCode) && b.date.startsWith(monthPrefix),
-  );
-
-export const filterBillsFromDate = (bills, branchCode, fromDate) =>
-  bills.filter(
-    (b) => (!branchCode || b.branch === branchCode) && b.date >= fromDate,
-  );
-
-export const filterExpensesByBranchMonth = (expenses, branchCode, month) =>
-  expenses.filter((a) => (!branchCode || a.br === branchCode) && a.m === month);
-
-export const computeBranchKpis = (bills) => {
-  const revenue = bills.reduce((s, b) => s + b.sell, 0);
-  const cost = bills.reduce((s, b) => s + b.cost, 0);
-  const gp = revenue - cost;
-  return {
-    revenue,
-    cost,
-    gp,
-    gpPct: revenue > 0 ? +((gp / revenue) * 100).toFixed(1) : 0,
-    bookings: bills.length,
-  };
-};
-
-export const computeGpByModule = (bills, totalGp) =>
-  PRODUCT_MODULES.map((mod) => {
-    const modBills = bills.filter((b) => b.mod === mod);
-    return {
-      mod,
-      rev: modBills.reduce((s, b) => s + b.sell, 0),
-      gp: modBills.reduce((s, b) => s + b.sell - b.cost, 0),
-      cnt: modBills.length,
-    };
-  })
-    .filter((m) => m.rev > 0)
-    .sort((a, b) => b.gp - a.gp);
-
-export const computeConsultantLeaderboard = (bills, limit = 5) => {
-  const map = {};
-  bills.forEach((b) => {
-    if (!map[b.consultant]) map[b.consultant] = { name: b.consultant, rev: 0, gp: 0, cnt: 0 };
-    map[b.consultant].rev += b.sell;
-    map[b.consultant].gp += b.sell - b.cost;
-    map[b.consultant].cnt += 1;
-  });
-  return Object.values(map).sort((a, b) => b.gp - a.gp).slice(0, limit);
-};
+// NOTE: the seed-era transforms (computeBranchKpis / computeGpByModule /
+// computeConsultantLeaderboard / filterBills* / filterExpensesByBranchMonth) and the
+// get-bills.js / get-expenses.js accessors that fed them were removed — they read the
+// now-empty GP_BILLS / EXP_ACTUALS seed arrays and had no consumers. The live engine
+// equivalents below (gpByModuleFromMpl / consultantsFromSales / countFiles / filesOf)
+// replaced them.
 
 /* ── Live (double-entry engine) → dashboard shapes ─────────────────────────
    These map a module-wise P&L payload (GET /api/accounting/module-pl) and the
@@ -158,15 +115,21 @@ export const sumVoucherTotals = (vouchersByBranch, key) =>
 // Pure transforms for the LIVE voucher-activity feeds (get-voucher-activity.js).
 // Kept here (no I/O) so they are unit-testable without the Vite-only api client.
 
-// Tally today's receipt/payment/journal voucher counts per branch.
-// Shape: { [branch]: { receipt, payment, journal } } — only cash-book categories.
+// Tally today's receipt/payment/journal vouchers per branch — counts AND money.
+// Shape: { [branch]: { receipt, payment, journal, total, value } } where `total` is the
+// voucher COUNT (receipt+payment+journal) and `value` is the summed money throughput
+// (Σ voucher.total). The total/value were previously missing, so callers reading them
+// (sumVoucherTotals('total'|'value') → "Posted Today" KPI; the "Total Value" column)
+// got NaN / ₹0 even when vouchers existed.
 export const tallyVouchersByBranch = (vouchers = []) => {
   const out = {};
   for (const v of vouchers || []) {
     if (!v || !['receipt', 'payment', 'journal'].includes(v.category)) continue;
     const br = v.branch || '—';
-    const row = out[br] || (out[br] = { receipt: 0, payment: 0, journal: 0 });
+    const row = out[br] || (out[br] = { receipt: 0, payment: 0, journal: 0, total: 0, value: 0 });
     row[v.category] += 1;
+    row.total += 1;
+    row.value += Number(v.total) || 0;
   }
   return out;
 };

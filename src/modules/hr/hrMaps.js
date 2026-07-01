@@ -35,6 +35,59 @@ export function toLeavePayload(f = {}) {
   };
 }
 
+/* ── Leave balances (entitlement master + derived "taken") ──────────
+   The master (/api/leave-balances) stores only ANNUAL ENTITLEMENT per bucket; how much
+   is TAKEN is derived live from the approved leave requests so the two can never drift. */
+export function fromLeaveBalanceDTO(b = {}) {
+  return {
+    id: b.id,
+    empId: b.empId || '',
+    empName: b.empName || '',
+    branch: b.branch || '',
+    year: b.year || '',
+    annual: b.annual == null ? 18 : +b.annual,
+    sick: b.sick == null ? 12 : +b.sick,
+    casual: b.casual == null ? 6 : +b.casual,
+  };
+}
+export function toLeaveBalancePayload(f = {}) {
+  return {
+    empId: f.empId || '',
+    empName: f.empName || '',
+    branch: f.branch || '',
+    year: String(f.year || ''),
+    annual: +f.annual || 0,
+    sick: +f.sick || 0,
+    casual: +f.casual || 0,
+  };
+}
+
+// Which paid-leave bucket a request type deducts from. Handles both the storage enum
+// (Casual/Sick/Earned) and the UI labels (Casual Leave/Sick Leave/Annual Leave). Unpaid
+// / LWP deducts from no paid bucket → null. Pure.
+export function leaveBucketOf(type) {
+  const t = String(type || '').toLowerCase();
+  if (t.includes('sick')) return 'sick';
+  if (t.includes('casual')) return 'casual';
+  if (t.includes('earned') || t.includes('annual')) return 'annual';
+  return null; // unpaid / LWP / unknown → not a paid bucket
+}
+
+// Days TAKEN per bucket for one employee in a year, from APPROVED requests only
+// (pending/rejected don't reduce the paid balance). `requests` are fromLeaveDTO-shaped
+// ({ empId, type, from, days, status }). Pure — year comes from each request's `from`.
+export function takenFor(requests = [], empId, year) {
+  const out = { annual: 0, sick: 0, casual: 0 };
+  for (const r of requests) {
+    if (r.empId !== empId) continue;
+    if (String(r.status) !== 'Approved') continue;
+    if (String(r.from || '').slice(0, 4) !== String(year)) continue;
+    const bucket = leaveBucketOf(r.type);
+    if (bucket) out[bucket] += (+r.days || 0);
+  }
+  return out;
+}
+
 // Inclusive whole-day span between two YYYY-MM-DD dates (min 1). Pure — no Date.now.
 export function leaveDays(from, to) {
   if (!from || !to) return 1;

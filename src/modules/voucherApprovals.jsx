@@ -4,8 +4,8 @@
 // here as PENDING and hit the books only when approved.
 // Single nested sheet: Group › Sub-group › Ledger › Entry (collapsible).
 import React, { useMemo, useState, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { apiGet } from '../core/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiPost } from '../core/api';
 import { AuditTrail } from '../core/AuditTrail';
 import { JvBlock } from '../core/voucher/JvBlock';
 import { VoucherView } from './pnlTally';
@@ -738,6 +738,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
 
   const approveMany = useApproveMany();
   const reject = useRejectVoucher();
+  const qc = useQueryClient();
 
   // Pair the two INB legs into one deal. The robust link is the SALE's `againstPurchase`
   // (set on every deal — historical folded + new); fall back to a shared INB-Link
@@ -823,6 +824,27 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     finally { setBusy(false); }
   };
 
+  // Revoke an APPROVED deal as a unit — un-post BOTH legs to Pending (the legs are locked
+  // to the deal, never revoked alone). Preflight surfaces the settlement-release plan and
+  // hard-blocks a bank-reconciled settler.
+  const doRevoke = async (d) => {
+    let pre = null;
+    try { pre = await apiGet('/api/inter-branch/revoke-check', { linkNo: d.linkNo }); }
+    catch (e) { toast((e && e.message) || 'Could not check this deal', 'error'); return; }
+    if (pre && (pre.blocks || []).length) { toast(`Can't revoke — ${pre.blocks.map((b) => b.msg).join(' ')}`, 'error'); return; }
+    const warns = (pre && pre.warnings || []).map((w) => w.msg).filter(Boolean);
+    const { confirmed, reason } = await confirmDialog({
+      title: `Revoke INB ${d.linkNo}?`,
+      message: `Both legs (${(pre && pre.legs || []).join(', ') || `${d.saleVno}, ${d.purchaseVno}`}) un-post to Pending — the numbers are kept.${warns.length ? ' ' + warns.join(' ') : ''}`,
+      danger: true, reasonRequired: true, reasonLabel: 'Reason for revoke', confirmLabel: 'Revoke',
+    });
+    if (!confirmed) return;
+    setBusy(true);
+    try { await apiPost('/api/inter-branch/revoke', { linkNo: d.linkNo, reason }); toast(`Revoked ${d.linkNo} → Pending`); qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); }
+    catch (e) { toast((e && e.message) || 'Revoke failed', 'error'); }
+    finally { setBusy(false); }
+  };
+
   const tab = (k, label) => (
     <button key={k} onClick={() => { setStatus(k); setSel(new Set()); }} style={{ padding: '8px 16px', border: 'none', borderBottom: `3px solid ${status === k ? C.gold : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? C.dark : C.dim }}>
       {label} <span style={{ fontSize: 11, color: C.dim }}>({(counts[k] && counts[k].n) || 0}{counts[k] ? ` · ${money(counts[k].amount)}` : ''})</span>
@@ -896,7 +918,12 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                               <button disabled={busy} onClick={() => doReject(d)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
                             </> : <span style={{ fontSize: 11, color: C.dim }}>Approver only</span>}
                           </td>
-                        : <td style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: C.dim }}>{status === 'approved' ? (fmtDate(d.approvedAt) || 'Posted') : d.status}</td>}
+                        : <td style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: C.dim }}>{status === 'approved'
+                            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                                <span>{fmtDate(d.approvedAt) || 'Posted'}</span>
+                                {isApprover && <button disabled={busy} onClick={() => doRevoke(d)} title="Revoke this INB deal — un-post both legs to Pending (numbers kept)" style={{ padding: '4px 9px', background: '#fff', color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer', fontSize: 11 }}>⟲ Revoke</button>}
+                              </span>
+                            : d.status}</td>}
                     </tr>
                     {open === d.key && (
                       <tr><td colSpan={colSpan} style={{ padding: 0, background: '#fbfcfd' }}>

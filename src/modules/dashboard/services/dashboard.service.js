@@ -148,13 +148,15 @@ export const loadSrAeDashboard = async ({ branchCode } = {}) => {
 };
 
 export const loadAcctsExecDashboard = async ({ branchCode } = {}) => {
-  const [todayVouchers, recentActivity, arAgeing] = await Promise.all([
+  const [todayVouchers, recentActivity, arAgeing, apAgeing, weekStats] = await Promise.all([
     api.getTodayVouchersByBranch(branchCode),
     api.getRecentActivity(branchCode),
     api.getArAgeingSummary(branchCode),
+    api.getApAgeingSummary(branchCode),   // Open Payables KPI (gross payable outstanding)
+    api.getWeekVoucherStats(branchCode),  // Receipts This Week KPI (7-day receipt count)
   ]);
 
-  return { todayVouchers, recentActivity, arAgeing };
+  return { todayVouchers, recentActivity, arAgeing, apAgeing, weekStats };
 };
 
-export const loadHrMgrDashboard = async () => api.getHrStats();
+export const loadHrMgrDashboard = async ({ branchCode } = {}) => api.getHrStats(branchCode);

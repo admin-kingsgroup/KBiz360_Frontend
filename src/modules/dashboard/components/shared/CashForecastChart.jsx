@@ -10,7 +10,7 @@ export function CashForecastChart({ data, formatMoney = fmtINR }) {
       <AreaChart data={data} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f7" />
         <XAxis dataKey="week" tick={{ fontSize: 9.5, fill: '#5b616e' }} />
-        <YAxis tick={{ fontSize: 10, fill: '#5b616e' }} tickFormatter={(v) => (v / 100000).toFixed(0) + 'L'} />
+        <YAxis tick={{ fontSize: 10, fill: '#5b616e' }} width={48} tickFormatter={(v) => formatMoney(v)} />
         <Tooltip formatter={(v) => formatMoney(v)} />
         <Legend wrapperStyle={{ fontSize: 11 }} />
         <Area type="monotone" dataKey="inflow" stroke="#16a34a" fill="#16a34a" fillOpacity={0.25} name="Inflow" />

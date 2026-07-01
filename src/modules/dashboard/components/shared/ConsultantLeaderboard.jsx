@@ -3,11 +3,14 @@ import { MEDALS } from '../../utils/constants';
 import { safeRatio } from '../../utils/helpers';
 import { Button } from '../../../../shell/primitives';
 
-export function ConsultantLeaderboard({ consultants, formatMoney, onViewAll }) {
+// `title` lets the caller label the period correctly (the WidgetCard wrapper already
+// carries the scope/period subtitle); default avoids the old hardcoded "— This Month"
+// which was wrong for any other selected period.
+export function ConsultantLeaderboard({ consultants, formatMoney, onViewAll, title = '🏆 Top earners' }) {
   return (
     <div className="rounded-brand border border-surface-border bg-surface p-4 shadow-card">
       <div className="mb-2.5 flex items-center justify-between">
-        <h3 className="m-0 text-xs font-bold text-ink">🏆 Consultant Leaderboard — This Month</h3>
+        <h3 className="m-0 text-xs font-bold text-ink" title="GP is estimated — the period's blended GP% applied to each consultant's revenue (GP is tracked by cost-centre, not by consultant).">{title} <span className="font-normal text-ink-muted">· GP est.</span></h3>
         <Button variant="ghost" size="xs" onClick={onViewAll}>Full →</Button>
       </div>
       {consultants.length === 0 && <p className="text-[11px] text-ink-muted">No data</p>}

@@ -16,7 +16,7 @@ export function BranchHeader({ branch, branchCode, isIndia, bookingsCount, onNav
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="primary" icon={Plus} onClick={() => onNavigate('/sales/flight')}>New Sale</Button>
+        <Button size="sm" variant="primary" icon={Plus} onClick={() => onNavigate('/bookings/new')}>New Sale</Button>
         <Button size="sm" variant="success" icon={Plus} onClick={() => onNavigate('/receipts')}>Receipt</Button>
         <Button size="sm" variant="secondary" onClick={() => onNavigate('/reports/pnl')}>P&amp;L →</Button>
       </div>

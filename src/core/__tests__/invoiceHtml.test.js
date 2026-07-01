@@ -1,5 +1,5 @@
 // Sales/Purchase invoice PDF (buildBookingInvoice):
-//  1. HSN/SAC column + per-module SAC code.
+//  1. HSN/SAC code shown beside the summary + per-module breakdown columns.
 //  2. Issued-By details render even when the live company-profile cache is EMPTY
 //     (seeded fallback) — the BOM "issued by blank" bug.
 //  3. Place of Supply shown.
@@ -22,16 +22,44 @@ const booking = {
 describe('buildBookingInvoice — sales invoice', () => {
   beforeEach(() => { companyProfile.mockReturnValue({}); hsnSacFor.mockReturnValue(''); }); // caches empty → fallback path
 
-  test('HSN/SAC column header + the air-ticketing SAC for a Flight (SF) booking (fallback)', () => {
+  test('HSN / SAC code (air-ticketing SAC) shown beside the summary for a Flight (SF) booking (fallback)', () => {
     const html = buildBookingInvoice(booking, 'sale', { code: 'BOM' }, {});
-    expect(html).toContain('HSN/SAC');
-    expect(html).toContain('996421'); // SF → air ticketing SAC (built-in fallback)
+    expect(html).toContain('HSN / SAC');
+    expect(html).toContain('998551'); // SF → flight SAC from the Tax master (built-in fallback)
+  });
+
+  test('Flight (SF) sale breakdown uses the SO voucher columns/labels', () => {
+    const html = buildBookingInvoice(booking, 'sale', { code: 'BOM' }, {});
+    expect(html).toContain('Base Fare');            // spec.fareCols[0].label
+    expect(html).toContain('K3');                   // spec.fareCols[1].label
+    expect(html).toContain('Taxes');                // merged fare-tax + margin column
+    expect(html).toContain('Service Chg');          // ssvc column (non-package)
+    expect(html).toContain('GST/Service (18%)');    // gstSvc column at the module rate
+    expect(html).not.toContain('Other Taxes');      // margin folded into Taxes — no separate column
+    expect(html).not.toContain('GST/Other Taxes');  // per-line markup-GST column dropped
+  });
+
+  test('Hotel (SHT) sale breakdown renders its own fareCols + reference columns', () => {
+    const hotel = { ...booking, module: 'SHT', rows: [{ fn: 'Priya', sn: 'Nair', htl: 'Taj', conf: 'HT55', base: 18000, tax: 900, markup: 2000, ssvc: 300 }] };
+    const html = buildBookingInvoice(hotel, 'sale', { code: 'BOM' }, {});
+    expect(html).toContain('Base Fare');    // SHT fareCols[0].label (unified across modules)
+    expect(html).toContain('Hotel');        // idCols ref label (module-specific)
+    expect(html).toContain('Conf. No');     // idCols ref label (module-specific)
+  });
+
+  test('Holiday package (SH) sale breakdown drops Service Charge and uses 5% GST', () => {
+    const hol = { ...booking, module: 'SH', rows: [{ fn: 'Rahul', sn: 'Mehta', pkg: 'Bali 5N', ref: 'HL22', base: 85000, psvc: 1000, psvcGst: 180, markup: 12000 }] };
+    const html = buildBookingInvoice(hol, 'sale', { code: 'BOM' }, {});
+    expect(html).toContain('Package');                  // SH idCols ref label (module-specific)
+    expect(html).toContain('Taxes');                    // merged column present
+    expect(html).not.toContain('Service Chg');          // no service charge on the package model
+    expect(html).not.toContain('GST/Other Taxes');      // per-line markup-GST column dropped
   });
 
   test('the live HSN/SAC master wins when loaded', () => {
     hsnSacFor.mockImplementation((mod) => (String(mod).toLowerCase() === 'flight' ? '996422' : ''));
     const html = buildBookingInvoice(booking, 'sale', { code: 'BOM' }, {});
-    expect(html).toContain('996422'); // from the live master, not the 996421 fallback
+    expect(html).toContain('996422'); // from the live master, not the 998551 fallback
   });
 
   test('Issued By renders BOM issuer details from the seeded fallback when the profile cache is empty', () => {
@@ -49,6 +77,12 @@ describe('buildBookingInvoice — sales invoice', () => {
     expect(html).toContain('Maharashtra — 27');
   });
 
+  test('Billed To shows the customer PAN (derived from the GSTIN) on an India invoice', () => {
+    const b = { ...booking, customer: { name: 'NeuIQ Technologies Pvt Ltd', gstin: '27AABCN1234Q1Z5', ledgerGroup: 'B2B' } };
+    const html = buildBookingInvoice(b, 'sale', { code: 'BOM' }, {});
+    expect(html).toContain('PAN : AABCN1234Q'); // characters 3–12 of the 15-char GSTIN
+  });
+
   test('ICICI bank details (with account name) render at the bottom', () => {
     const html = buildBookingInvoice(booking, 'sale', { code: 'BOM' }, {});
     expect(html).toContain('Bank Details');
@@ -58,6 +92,13 @@ describe('buildBookingInvoice — sales invoice', () => {
     expect(html).toContain('333805003566');  // A/c no
     expect(html).toContain('ICIC0003338');   // IFSC
     expect(html).toContain('ICICINBBCTS');   // SWIFT
+  });
+
+  test('UPI Scan & Pay block (QR + VPA) renders on the sales invoice', () => {
+    const html = buildBookingInvoice(booking, 'sale', { code: 'BOM' }, {});
+    expect(html).toContain('UPI · Scan');
+    expect(html).toContain('upi-qr.png');
+    expect(html).toContain('MSTRAVKINGSTOURSTRAVELSPRIVATELIMITED.eazypay@icici');
   });
 
   test('a live company-profile overrides the fallback field-by-field', () => {
@@ -71,10 +112,13 @@ describe('buildBookingInvoice — sales invoice', () => {
 
 describe('buildBookingInvoice — purchase invoice', () => {
   beforeEach(() => { companyProfile.mockReturnValue({}); hsnSacFor.mockReturnValue(''); });
-  test('purchase invoice also carries the HSN/SAC column', () => {
+  test('purchase invoice shows the HSN / SAC code and the PO voucher columns', () => {
     const html = buildBookingInvoice({ ...booking, purchaseVno: 'BOM/0626/PF00920', po: booking.so }, 'purchase', { code: 'BOM' }, {});
-    expect(html).toContain('HSN/SAC');
-    expect(html).toContain('996421');
+    expect(html).toContain('HSN / SAC');
+    expect(html).toContain('998551');
+    expect(html).toContain('Supplier Service');
+    expect(html).toContain('Supplier Incentive');
+    expect(html).toContain('TDS (2%)');
   });
 });
 

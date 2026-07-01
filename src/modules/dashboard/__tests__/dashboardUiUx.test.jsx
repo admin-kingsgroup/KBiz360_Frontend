@@ -32,8 +32,8 @@ describe('DashboardError — shared failure state', () => {
 });
 
 describe('compactAmt — branch-aware currency (the mechanism the pages use)', () => {
-  test('uses the supplied currency symbol, not a hardcoded ₹', () => {
-    expect(compactAmt(2500000, { currency: '$' })).toBe('$25.00L');
+  test('uses the supplied currency symbol AND its native scale (₹→Cr/L, $→K/M/B)', () => {
+    expect(compactAmt(2500000, { currency: '$' })).toBe('$2.50M'); // USD branches: Western scale, not Cr/L
     expect(compactAmt(2500000, { currency: '₹' })).toBe('₹25.00L');
     expect(compactAmt(500, { currency: '$' })).toBe('$500');
   });
@@ -75,7 +75,10 @@ describe('FyTargetsPanel — progress has a text band, not only a coloured bar',
 describe('Tables — header semantics + empty/guard states', () => {
   test('PeriodCloseTable headers carry scope="col" and tolerate undefined rows', () => {
     const { container } = render(<PeriodCloseTable rows={undefined} />);
-    expect(container.querySelectorAll('th[scope="col"]').length).toBe(5);
+    // Collapsed from the old 5 (Branch/TB/Recon/Approve/Status) to 3 honest columns:
+    // the fake TB/Recon/Approve trio were all driven by one signal, now a single
+    // "Entries Posted" indicator + Status.
+    expect(container.querySelectorAll('th[scope="col"]').length).toBe(3);
   });
 
   test('TodayVouchersTable headers carry scope and shows an empty-state row', () => {

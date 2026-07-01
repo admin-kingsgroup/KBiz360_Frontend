@@ -57,7 +57,7 @@ const CSS = `
 .cvi .kpi .v{font-size:18px;font-weight:800;margin-top:5px}
 .cvi .kpi .s{font-size:11px;font-weight:700;margin-top:2px;color:var(--ink3)}
 .cvi .kpi.block .v,.cvi .kpi.block .s{color:var(--block)}.cvi .kpi.flow .v,.cvi .kpi.flow .s{color:var(--flow)}.cvi .kpi.gp .v{color:var(--gold)}
-.cvi .section{padding:16px 30px 4px}
+.cvi .section{padding:16px 30px 4px;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .cvi .sec-band{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .cvi .sec-num{width:22px;height:22px;border-radius:50%;background:var(--dark);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
 .cvi .sec-num.flow{background:var(--flow)}.cvi .sec-num.block{background:var(--block)}
@@ -97,6 +97,7 @@ const CSS = `
 .cvi .hint{padding:10px 30px 22px;font-size:10px;color:var(--ink4);font-style:italic;line-height:1.6}
 .cvi .state{padding:50px 30px;text-align:center;color:var(--ink3);font-size:13px}
 @media(max-width:760px){.cvi .meta,.cvi .kpis,.cvi .perf{grid-template-columns:1fr 1fr}.cvi .formula{flex-wrap:wrap}}
+@media(max-width:560px){.cvi .section{padding-left:14px;padding-right:14px}.cvi .perf{padding-left:14px;padding-right:14px;grid-template-columns:1fr}.cvi .led-row td.amt{width:auto;min-width:96px}.cvi .hdr{padding-left:16px;padding-right:16px}}
 `;
 
 const SecTable = ({ groups, totalLabel, totalVal, fmt }) => (
@@ -155,7 +156,7 @@ export function CapitalVsInvestmentLive({ branch }) {
               <input type="number" min="0" step="0.5" value={hurdle} onChange={(e) => setHurdle(Number(e.target.value) || 0)}
                 title="Cost-of-capital benchmark used for the GP-yield verdict" style={{ width: 58, padding: '4px 7px', borderRadius: 4, border: '1px solid #555', background: '#1e1e1e', color: '#fff', fontSize: 11, fontWeight: 700 }} />
             </label>
-            <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => setRange({ from: r.from, to: r.to })} />
+            <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => setRange({ from: r.from, to: r.to })} />
           </div>
         </div>
 
