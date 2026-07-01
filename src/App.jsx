@@ -15,7 +15,8 @@ import { useMobile } from './core/hooks';
 import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
 import { lazyModule } from './core/lazyModule';
-import { isOwnerDashboardUser } from './core/pageCatalog';
+import { isOwnerDashboardUser, topLevelPillHrefs } from './core/pageCatalog';
+import { canReachRoute } from './core/menus';
 
 /* ── Route-level code-splitting ───────────────────────────────────────────
    Every page component below is loaded via lazyModule() → one dynamic
@@ -39,11 +40,16 @@ const { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlow
    the finance barrel — to avoid dragging the whole finance feature (incl. the
    ~140 KB legacy.jsx) into the initial bundle. */
 import { financeRoutes } from './modules/finance/routes';
+/* Support (in-app issue tracker) route table — same plain-data shape as finance. */
+import { supportRoutes } from './modules/support/routes';
+/* Floating, app-wide "Report an issue" button (lazy so it never touches the
+   initial bundle) — mounted once as a global host below, like ToastHost. */
+const ReportIssueButton = React.lazy(() => import('./modules/support/components/ReportIssueButton'));
 
 /* Declarative route tables from migrated feature modules. The host renders
    these via react-router FIRST; any route not listed falls through to the
    legacy string-router in Page(). Append more tables here as modules migrate. */
-const MIGRATED_FEATURE_ROUTES = [...financeRoutes];
+const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes];
 const { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
 const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrExpenses, HrLeave, HrPayroll, HrPayslips, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
 const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
@@ -266,7 +272,9 @@ export default function KB360App(){
        and the visibility-control page itself are never blocked here (the latter
        gates non-admins inside its own component). ── */
     const hiddenPages = Array.isArray(currentUser?.hidden) ? currentUser.hidden : [];
-    if(route!=="/dashboard" && route!=="/settings/page-access" && hiddenPages.includes(route)){
+    // Top-level pills are structural — never blocked by the deny-list (they can't be
+    // hidden from the catalogue either), so a single-page pill like Approvals always works.
+    if(route!=="/dashboard" && route!=="/settings/page-access" && !topLevelPillHrefs().has(route) && hiddenPages.includes(route)){
       return (
         <div style={{padding:30,maxWidth:560,margin:"40px auto",
           background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
@@ -274,6 +282,31 @@ export default function KB360App(){
           <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Page not available</h2>
           <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>
             This page has been hidden for your account by the administrator.
+            Contact <b>afshin.dhanani@kingsgroupco.com</b> if you need access.
+          </p>
+          <button onClick={()=>navigate("/dashboard")}
+            style={{background:"#0d1326",color:"#fff",border:"none",
+              padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>
+            ← Back to Dashboard
+          </button>
+        </div>
+      );
+    }
+
+    /* ── Hard route-level lockout for restricted roles ───────────────────────
+       A Branch Accountant's nav is limited to their Accounts workspace, but the
+       nav filter alone doesn't stop a direct URL. canReachRoute() blocks the
+       out-of-scope admin areas (HR, Settings, HO Control, Group dashboard) by
+       direct link too. Full-menu roles (Super Admin/Director/…) reach everything;
+       finer per-page control stays with the `hidden` deny-list above. ── */
+    if(!canReachRoute(route, currentUser)){
+      return (
+        <div style={{padding:30,maxWidth:600,margin:"40px auto",
+          background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
+          <div style={{fontSize:42,marginBottom:14}}>🔒</div>
+          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Access restricted</h2>
+          <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>
+            Your role <b>{currentUser?.role}</b> doesn't have access to this section.
             Contact <b>afshin.dhanani@kingsgroupco.com</b> if you need access.
           </p>
           <button onClick={()=>navigate("/dashboard")}
@@ -672,6 +705,9 @@ export default function KB360App(){
       <GlobalFetchBar/>
       <PrintPreviewHost/>
       <ToastHost/>
+      {/* App-wide "Report an issue" button — raise a support ticket from any screen,
+          with the current route auto-captured. Lazy, so it's off the initial bundle. */}
+      <Suspense fallback={null}><ReportIssueButton route={route}/></Suspense>
       <ConfirmHost/>
       <LedgerSwitcher branch={branch}/>
       <LedgerModalHost branch={branch}/>

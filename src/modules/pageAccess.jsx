@@ -18,14 +18,23 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Eye, EyeOff, Search, Save, RotateCcw, Lock, ShieldCheck, ChevronDown, ChevronRight } from 'lucide-react';
+import { Eye, EyeOff, Search, Save, RotateCcw, Lock, ShieldCheck, ChevronDown, ChevronRight, Building2 } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiPut } from '../core/api';
 import { useUsersAdmin } from '../core/useReference';
 import { toast } from '../core/ux/toast';
-import { buildPageCatalog, isPageAccessAdmin } from '../core/pageCatalog';
+import { buildPageCatalog, isPageAccessAdmin, roleVisibleKeys } from '../core/pageCatalog';
+import { hasFullMenu } from '../core/menus';
+import { BRANCHES } from '../core/referenceCache';
 import { PageLayout } from '../shell/PageLayout';
 import { PageSection, Button, StatusPill, Input, ResponsiveGrid, EmptyState } from '../shell/primitives';
+
+// Roles that resolve to ALL branches at login (mirrors auth.service resolveBranches
+// ALL_SCOPE_ROLES on the backend). For these, a per-branch selection is ignored, so
+// the branch toggles are shown all-on and disabled with a "role-managed" note.
+const ALL_SCOPE_ROLES = new Set(['Super Admin', 'Director', 'Senior Finance Manager', 'Sr. Accounts Executive']);
+
+const setsEqual = (a, b) => { if (a.size !== b.size) return false; for (const k of a) if (!b.has(k)) return false; return true; };
 
 /* ── A small on/off switch. ON (green) = page is VISIBLE for the user. ── */
 function Switch({ on, onChange, disabled }) {
@@ -41,70 +50,103 @@ function Switch({ on, onChange, disabled }) {
 
 export function PageAccessControl({ currentUser, setRoute }) {
   const usersLive = useUsersAdmin().data;
-  const catalog = useMemo(() => buildPageCatalog(), []);
-  const totalPages = useMemo(() => catalog.reduce((n, s) => n + s.items.length, 0), [catalog]);
 
   const [selId, setSelId] = useState(null);
-  const [draft, setDraft] = useState(() => new Set());   // hidden keys (incl. any not in the catalogue, preserved)
-  const [base, setBase] = useState(() => new Set());     // saved baseline → dirty detection
+  const [hiddenDraft, setHiddenDraft] = useState(() => new Set()); // in-role pages turned OFF (deny-list)
+  const [hiddenBase, setHiddenBase] = useState(() => new Set());
+  const [grantDraft, setGrantDraft] = useState(() => new Set());   // out-of-role pages turned ON (allow-list)
+  const [grantBase, setGrantBase] = useState(() => new Set());
   const [userSearch, setUserSearch] = useState('');
   const [pageSearch, setPageSearch] = useState('');
   const [collapsed, setCollapsed] = useState(() => new Set());
+  const [branchDraft, setBranchDraft] = useState(() => new Set()); // branch codes the user can access
+  const [branchBase, setBranchBase] = useState(() => new Set());   // saved baseline → dirty detection
 
   const qc = useQueryClient();
   const saveMut = useMutation({
     // id is a Mongo _id for DB-backed users, or the email for bootstrap-map users
     // not yet persisted — encode it so the '@' rides safely in the URL path.
-    mutationFn: ({ id, hidden }) => apiPut(`/api/auth/users/${encodeURIComponent(id)}/access`, { hidden }),
+    mutationFn: (body) => apiPut(`/api/auth/users/${encodeURIComponent(body.id)}/access`, { hidden: body.hidden, granted: body.granted, branches: body.branches }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ref', 'users'] }),
   });
 
   const users = usersLive || [];
   const selectedUser = users.find((u) => u.id === selId) || null;
 
-  /* Load a user's saved deny-list into the editable draft. */
+  // The FULL catalogue is shown for every user. Each row's default ON/OFF comes from
+  // whether it is IN the selected user's role: in-role → ON (hiding it writes `hidden`),
+  // out-of-role → OFF (turning it ON writes `granted`). So one list both restricts and grants.
+  const catalog = useMemo(() => buildPageCatalog(), []);
+  const totalPages = useMemo(() => catalog.reduce((n, s) => n + s.items.length, 0), [catalog]);
+  const isFullUser = !!selectedUser && hasFullMenu(selectedUser);
+  const roleSet = useMemo(
+    () => (selectedUser ? roleVisibleKeys(selectedUser) : new Set()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedUser?.id, selectedUser?.role],
+  );
+  const inRole = (key) => isFullUser || roleSet.has(key);
+  const isVisible = (key) => (grantDraft.has(key) ? true : inRole(key) && !hiddenDraft.has(key));
+
+  /* Load a user's saved hidden + granted + branches into the editable drafts. */
   const selectUser = (u) => {
     const h = new Set(Array.isArray(u.hidden) ? u.hidden : []);
+    const g = new Set(Array.isArray(u.granted) ? u.granted : []);
+    const b = new Set(Array.isArray(u.branches) ? u.branches : []);
     setSelId(u.id);
-    setDraft(h);
-    setBase(new Set(h));
+    setHiddenDraft(h); setHiddenBase(new Set(h));
+    setGrantDraft(g); setGrantBase(new Set(g));
+    setBranchDraft(b); setBranchBase(new Set(b));
     setPageSearch('');
   };
 
-  // Keep the draft in sync if the underlying record changes while open and not dirty
+  // Keep drafts in sync if the underlying record changes while open and not dirty
   // (e.g. another admin saved). Never clobber unsaved edits.
   useEffect(() => {
-    if (!selectedUser) return;
-    const saved = new Set(Array.isArray(selectedUser.hidden) ? selectedUser.hidden : []);
-    const dirty = saved.size !== base.size || [...saved].some((k) => !base.has(k));
-    if (dirty && !isDirty) { setBase(saved); setDraft(new Set(saved)); }
+    if (!selectedUser || isDirty) return;
+    const sH = new Set(Array.isArray(selectedUser.hidden) ? selectedUser.hidden : []);
+    const sG = new Set(Array.isArray(selectedUser.granted) ? selectedUser.granted : []);
+    const sB = new Set(Array.isArray(selectedUser.branches) ? selectedUser.branches : []);
+    if (!setsEqual(sH, hiddenBase)) { setHiddenBase(sH); setHiddenDraft(new Set(sH)); }
+    if (!setsEqual(sG, grantBase)) { setGrantBase(sG); setGrantDraft(new Set(sG)); }
+    if (!setsEqual(sB, branchBase)) { setBranchBase(sB); setBranchDraft(new Set(sB)); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUser]);
 
-  const isDirty = useMemo(() => {
-    if (draft.size !== base.size) return true;
-    for (const k of draft) if (!base.has(k)) return true;
-    return false;
-  }, [draft, base]);
-
-  const isVisible = (key) => !draft.has(key);
-  const hiddenInCatalog = useMemo(
-    () => catalog.reduce((n, s) => n + s.items.filter((i) => draft.has(i.key)).length, 0),
-    [catalog, draft],
+  const isDirty = useMemo(
+    () => !setsEqual(hiddenDraft, hiddenBase) || !setsEqual(grantDraft, grantBase) || !setsEqual(branchDraft, branchBase),
+    [hiddenDraft, hiddenBase, grantDraft, grantBase, branchDraft, branchBase],
   );
 
+  const counts = useMemo(() => {
+    let visible = 0, hidden = 0, granted = 0;
+    for (const s of catalog) for (const i of s.items) {
+      if (isVisible(i.key)) visible++;
+      if (inRole(i.key) && hiddenDraft.has(i.key)) hidden++;
+      if (!inRole(i.key) && grantDraft.has(i.key)) granted++;
+    }
+    return { visible, hidden, granted };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalog, hiddenDraft, grantDraft, roleSet, isFullUser]);
+
+  // Set a batch of keys visible/hidden. An in-role key writes the deny-list (`hidden`);
+  // an out-of-role key writes the allow-list (`granted`).
   const setKeys = (keys, visible) => {
-    setDraft((prev) => {
-      const next = new Set(prev);
-      keys.forEach((k) => { if (visible) next.delete(k); else next.add(k); });
-      return next;
-    });
+    setHiddenDraft((prev) => { const h = new Set(prev); keys.forEach((k) => { if (inRole(k)) { visible ? h.delete(k) : h.add(k); } }); return h; });
+    setGrantDraft((prev) => { const g = new Set(prev); keys.forEach((k) => { if (!inRole(k)) { visible ? g.add(k) : g.delete(k); } }); return g; });
   };
   const toggleOne = (key) => setKeys([key], !isVisible(key));
   const setSection = (section, visible) => setKeys(section.items.map((i) => i.key), visible);
   const showAll = () => setKeys(catalog.flatMap((s) => s.items.map((i) => i.key)), true);
   const hideAll = () => setKeys(catalog.flatMap((s) => s.items.map((i) => i.key)), false);
-  const resetDraft = () => setDraft(new Set(base));
+  const resetDraft = () => { setHiddenDraft(new Set(hiddenBase)); setGrantDraft(new Set(grantBase)); setBranchDraft(new Set(branchBase)); };
+
+  // Branch access: all-scope roles resolve to every branch at login, so their
+  // per-branch selection is locked (shown all-on, disabled).
+  const isAllScopeRole = !!selectedUser && ALL_SCOPE_ROLES.has(selectedUser.role);
+  const toggleBranch = (code) => {
+    if (isAllScopeRole) return;
+    setBranchDraft((prev) => { const next = new Set(prev); next.has(code) ? next.delete(code) : next.add(code); return next; });
+  };
 
   const toggleCollapse = (name) => setCollapsed((prev) => {
     const next = new Set(prev); next.has(name) ? next.delete(name) : next.add(name); return next;
@@ -112,8 +154,14 @@ export function PageAccessControl({ currentUser, setRoute }) {
 
   const save = () => {
     if (!selId) return;
-    saveMut.mutate({ id: selId, hidden: [...draft] }, {
-      onSuccess: () => { setBase(new Set(draft)); toast(`Saved — ${selectedUser?.name || 'user'} now sees ${totalPages - hiddenInCatalog} of ${totalPages} pages.`, 'success'); },
+    saveMut.mutate({ id: selId, hidden: [...hiddenDraft], granted: [...grantDraft], branches: [...branchDraft] }, {
+      onSuccess: () => {
+        setHiddenBase(new Set(hiddenDraft));
+        setGrantBase(new Set(grantDraft));
+        setBranchBase(new Set(branchDraft));
+        const scope = isAllScopeRole ? 'all branches (role-managed)' : `${branchDraft.size} branch${branchDraft.size === 1 ? '' : 'es'}`;
+        toast(`Saved — ${selectedUser?.name || 'user'} sees ${counts.visible} of ${totalPages} pages · ${scope}.`, 'success');
+      },
       onError: (e) => toast(e?.message || 'Could not save. Try again.', 'error'),
     });
   };
@@ -152,14 +200,15 @@ export function PageAccessControl({ currentUser, setRoute }) {
   return (
     <PageLayout
       title="Page Visibility Control"
-      subtitle="Choose which pages & reports each user can see. Toggle on = visible, off = hidden from that user's menu and direct links."
+      subtitle="Choose which branches and which pages & reports each user can see. Toggle on = visible, off = hidden from that user's menu and direct links."
     >
       {/* ── Branded intro banner ── */}
       <div className="mb-4 flex items-start gap-2.5 rounded-brand bg-navy px-4 py-3.5 text-white tablet:px-5">
         <ShieldCheck size={22} className="mt-0.5 shrink-0 text-gold" />
         <p className="text-xs leading-relaxed text-[#aeb6d0]">
           Toggle <b className="text-[#27963c]">on</b> to make a page visible, or <b className="text-[#e58b8b]">off</b> to hide it from that user's
-          menu and direct links. Dashboard is always available. Changes apply on the user's next sign-in (or within ~10 minutes).
+          menu and direct links. Pages outside the user's role start <b className="text-[#e58b8b]">off</b> — switch one <b className="text-[#27963c]">on</b> to
+          <b className="text-white"> grant</b> it (it then shows in their menu and opens by direct link). Dashboard is always available. Changes apply on the user's next sign-in (or within ~10 minutes).
         </p>
       </div>
 
@@ -179,6 +228,7 @@ export function PageAccessControl({ currentUser, setRoute }) {
             {filteredUsers.map((u) => {
               const sel = u.id === selId;
               const nHidden = (Array.isArray(u.hidden) ? u.hidden : []).filter((k) => k !== '/dashboard' && k !== '/settings/page-access').length;
+              const nGranted = (Array.isArray(u.granted) ? u.granted : []).length;
               return (
                 <button key={u.id} onClick={() => selectUser(u)}
                   className={`flex w-full items-center gap-2.5 border-b border-surface-alt px-3 py-2.5 text-left transition ${sel ? 'border-l-[3px] border-l-[#0070f2] bg-[#eef4ff]' : 'border-l-[3px] border-l-transparent bg-surface hover:bg-surface-alt'}`}>
@@ -189,6 +239,7 @@ export function PageAccessControl({ currentUser, setRoute }) {
                     <div className="truncate text-[12.5px] font-bold text-navy">{u.name || u.email}</div>
                     <div className="truncate text-[10px] text-ink-subtle">{u.role}{u.active === false ? ' · inactive' : ''}</div>
                   </div>
+                  {nGranted > 0 && <StatusPill tone="info" size="sm">{nGranted} granted</StatusPill>}
                   {nHidden > 0 && <StatusPill tone="danger" size="sm">{nHidden} hidden</StatusPill>}
                 </button>
               );
@@ -210,8 +261,9 @@ export function PageAccessControl({ currentUser, setRoute }) {
                   <div className="min-w-[180px] flex-1">
                     <div className="text-sm font-extrabold text-navy">{selectedUser.name || selectedUser.email}</div>
                     <div className="text-[11px] text-ink-muted">
-                      {selectedUser.role} · sees <b className="text-[#27963c]">{totalPages - hiddenInCatalog}</b> of {totalPages} pages
-                      {hiddenInCatalog > 0 && <> · <b className="text-maroon">{hiddenInCatalog} hidden</b></>}
+                      {selectedUser.role} · sees <b className="text-[#27963c]">{counts.visible}</b> of {totalPages} pages
+                      {counts.hidden > 0 && <> · <b className="text-maroon">{counts.hidden} hidden</b></>}
+                      {counts.granted > 0 && <> · <b className="text-[#0070f2]">{counts.granted} granted</b></>}
                     </div>
                   </div>
                   <div className="relative flex-[1_1_100%] tablet:flex-[0_0_200px]">
@@ -227,6 +279,43 @@ export function PageAccessControl({ currentUser, setRoute }) {
                 </div>
               </div>
 
+              {/* Branch access — which branches this user is scoped to */}
+              <div className="mb-2.5 overflow-hidden rounded-brand border border-surface-border bg-surface shadow-sm">
+                <div className="flex items-center gap-2 border-b border-surface-border bg-surface-alt px-3.5 py-2.5">
+                  <Building2 size={15} className="text-ink-muted" />
+                  <span className="flex-1 text-[12.5px] font-extrabold text-navy">Branch access</span>
+                  <span className={`text-[10px] font-bold ${isAllScopeRole ? 'text-ink-muted' : (branchDraft.size ? 'text-[#27963c]' : 'text-maroon')}`}>
+                    {isAllScopeRole ? 'all branches · role-managed' : `${branchDraft.size} of ${BRANCHES.length} branches`}
+                  </span>
+                </div>
+                <ResponsiveGrid min="220px" gap="none">
+                  {BRANCHES.map((b) => {
+                    const on = isAllScopeRole || branchDraft.has(b.code);
+                    return (
+                      <label key={b.code}
+                        className={`flex items-center gap-2.5 border-b border-surface-alt px-3.5 py-2 ${isAllScopeRole ? 'cursor-default' : 'cursor-pointer'}`}>
+                        <Switch on={on} disabled={isAllScopeRole} onChange={() => toggleBranch(b.code)} />
+                        <div className="min-w-0 flex-1">
+                          <div className={`text-[12.5px] font-semibold ${on ? 'text-navy' : 'text-ink-subtle'}`}>
+                            <span className="mr-1">{b.flag}</span>{b.code}
+                          </div>
+                          <div className="truncate text-[10px] text-ink-subtle">{b.city}{b.country ? `, ${b.country}` : ''}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </ResponsiveGrid>
+                {isAllScopeRole ? (
+                  <div className="bg-surface-alt/60 px-3.5 py-2 text-[11px] text-ink-muted">
+                    <b>{selectedUser.role}</b> has all-branch access by role — per-branch selection is ignored for this user.
+                  </div>
+                ) : branchDraft.size === 0 ? (
+                  <div className="bg-surface-alt/60 px-3.5 py-2 text-[11px] text-maroon">
+                    No branches selected — this user can't load any branch-scoped data until at least one is enabled.
+                  </div>
+                ) : null}
+              </div>
+
               {/* Sections */}
               {visibleCatalog.length === 0 && (
                 <PageSection><EmptyState icon={Search} title={`No pages match “${pageSearch}”.`} /></PageSection>
@@ -234,7 +323,7 @@ export function PageAccessControl({ currentUser, setRoute }) {
               {visibleCatalog.map((s) => {
                 const isCollapsed = collapsed.has(s.section) && !q;
                 const total = s.items.length;
-                const hiddenN = s.items.filter((i) => draft.has(i.key)).length;
+                const visN = s.items.filter((i) => isVisible(i.key)).length;
                 return (
                   <div key={s.section} className="mb-2.5 overflow-hidden rounded-brand border border-surface-border bg-surface shadow-sm">
                     <div className={`flex items-center gap-2 bg-surface-alt px-3.5 py-2.5 ${isCollapsed ? '' : 'border-b border-surface-border'}`}>
@@ -242,8 +331,8 @@ export function PageAccessControl({ currentUser, setRoute }) {
                         className={`flex flex-1 items-center gap-1.5 p-0 text-left ${q ? 'cursor-default' : 'cursor-pointer'}`}>
                         {!q && (isCollapsed ? <ChevronRight size={15} className="text-ink-muted" /> : <ChevronDown size={15} className="text-ink-muted" />)}
                         <span className="text-[12.5px] font-extrabold text-navy">{s.section}</span>
-                        <span className={`text-[10px] font-bold ${hiddenN ? 'text-maroon' : 'text-[#27963c]'}`}>
-                          {hiddenN ? `${total - hiddenN}/${total} visible` : `all ${total} visible`}
+                        <span className={`text-[10px] font-bold ${visN < total ? 'text-maroon' : 'text-[#27963c]'}`}>
+                          {visN < total ? `${visN}/${total} visible` : `all ${total} visible`}
                         </span>
                       </button>
                       <Button size="xs" variant="secondary" onClick={() => setSection(s, true)}>Show all</Button>
@@ -253,11 +342,16 @@ export function PageAccessControl({ currentUser, setRoute }) {
                       <ResponsiveGrid min="300px" gap="none">
                         {s.items.map((it) => {
                           const on = isVisible(it.key);
+                          const extra = !inRole(it.key); // out-of-role → turning ON grants it
                           return (
                             <label key={it.key} className="flex cursor-pointer items-center gap-2.5 border-b border-surface-alt px-3.5 py-2">
                               <Switch on={on} onChange={() => toggleOne(it.key)} />
                               <div className="min-w-0 flex-1">
-                                <div className={`text-[12.5px] font-semibold ${on ? 'text-navy' : 'text-ink-subtle line-through'}`}>{it.label}</div>
+                                <div className={`flex items-center gap-1.5 text-[12.5px] font-semibold ${on ? 'text-navy' : 'text-ink-subtle line-through'}`}>
+                                  <span className="truncate">{it.label}</span>
+                                  {extra && on && <StatusPill tone="info" size="sm">granted</StatusPill>}
+                                  {extra && !on && <span className="text-[9px] font-bold uppercase tracking-wide text-ink-subtle">not in role</span>}
+                                </div>
                                 <div className="truncate font-mono text-[10px] text-ink-subtle">{it.key}</div>
                               </div>
                             </label>

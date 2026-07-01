@@ -3,7 +3,7 @@
    Auto-generated from KBiz360_v2.jsx · 361 lines · 11 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, LayoutDashboard, Lock, Settings, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
+import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, LayoutDashboard, LifeBuoy, Lock, Settings, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { PERM_MODULES } from './permissions';
 import { getRole } from './referenceCache';
@@ -455,6 +455,12 @@ export const MENU_HO_CONTROL = {label:"HO Control", icon:Settings, children:[
 // One unified approval screen (SO/PO/GP + Vouchers, each Pending/Approved/Rejected/Deleted).
 export const MENU_APPROVALS = {label:"Approvals", icon:CheckSquare, href:"/transactions/approvals"};
 
+// In-app issue tracker — every user can raise bugs / errors / change requests and
+// help triage the board while the software is under active development. A leaf pill
+// (like Approvals) surfaced to EVERY role, so it's added to both branches of
+// roleMenuRoots below (full menu AND the Branch-Accountant workspace).
+export const MENU_SUPPORT = {label:"Support", icon:LifeBuoy, href:"/support/tickets"};
+
 export const MENU_COMMON_TOP = [
   {label:"Dashboard",   icon:LayoutDashboard, href:"/dashboard"},
   MENU_FINANCE,        // finance-only items not duplicated in the Accounts pill (combined register, period-end, tools)
@@ -579,54 +585,122 @@ function applyHidden(menus, currentUser){
   // make sure the admin always keeps it (even if it slipped into their list).
   if(isPageAccessAdmin(currentUser)) hidden.delete('/settings/page-access');
   else hidden.add('/settings/page-access');
+  // Protect top-level pills: the deny-list may hide a pill's INNER sub-pages but can
+  // NEVER remove the pill itself. So (a) clear each top-level pill's OWN href from the
+  // hidden set — a single-page pill like Approvals always stays — and (b) below, keep
+  // every top-level node even if all its children are hidden (only children are pruned).
+  for(const m of menus){ if(m && m.href) hidden.delete(m.href); }
   if(!hidden.size) return menus;
-  return menus.map(m=>pruneNode(m,hidden)).filter(Boolean);
+  return menus.map(m=>{
+    if(!m) return m;
+    if(m.children){
+      const kids=cleanDividers(m.children.map(c=>pruneNode(c,hidden)).filter(Boolean));
+      return {...m, children:kids}; // pill kept even when its dropdown ends up empty
+    }
+    return m; // top-level leaf pill — always shown (its href was cleared above)
+  }).filter(Boolean);
+}
+
+// True when a role sees the FULL application, not the restricted Branch-Accountant
+// workspace. Page Visibility Control (core/pageCatalog.js) uses this to decide
+// whether to scope its catalogue + counts to the role's reachable pages.
+export function hasFullMenu(currentUser){
+  return !/accountant/i.test(currentUser?.role || '');
+}
+
+// Branch-regime tax section (GST / VAT / consolidated) for the given branch.
+function taxSectionFor(branch){
+  const isAll = branch==="ALL";
+  const isIndia = !isAll && branch?.code && ["BOMMB","BOM","AMD"].includes(branch.code);
+  return isAll ? TAX_ALL : isIndia ? TAX_INDIA : TAX_AFRICA;
+}
+
+// The COMPLETE pill set a full-menu role sees. Also the source tree used to place a
+// restricted user's GRANTED pages (each granted page shows under its natural pill).
+export function fullMenuRoots(branch, currentUser){
+  const taxSection = taxSectionFor(branch);
+  const role = currentUser?.role || 'Super Admin';
+  const isDir = role === 'Director' || role === 'Super Admin';
+  // The group owner (Super Admin + owner email) gets the extra Owner Dashboard link.
+  const dashboardsMenu = isOwnerDashboardUser(currentUser) ? withOwnerDashboard(MENU_DASHBOARDS) : MENU_DASHBOARDS;
+  const top = isDir ? [dashboardsMenu, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
+  // 10 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · HR · Admin · Support
+  return [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN, MENU_SUPPORT];
+}
+
+// The menu roots a user's ROLE exposes, BEFORE their personal hidden/granted lists.
+// Page Visibility Control walks these to know which pages are in-role (defaults).
+export function roleMenuRoots(branch, currentUser){
+  if (hasFullMenu(currentUser)) return fullMenuRoots(branch, currentUser);
+  // Branch Accountant → their self-contained Accounts workspace PLUS Approvals,
+  // Taxation and Support. Branch scope is still enforced by the top-right switcher.
+  return [MENU_ACCOUNTS, MENU_APPROVALS, taxSectionFor(branch), MENU_SUPPORT];
+}
+
+// Keep ONLY the leaves whose href is in `keep`; drop everything else (containers with
+// no surviving child are removed). Builds the sub-menu of a user's GRANTED pages.
+function keepPrune(node, keep){
+  if(!node || node.divider) return node || null;
+  if(node.children){
+    const kids=cleanDividers(node.children.map(c=>keepPrune(c,keep)).filter(Boolean));
+    const hasLeaf=kids.some(k=>k && (k.href || (k.children && k.children.length)));
+    if(!hasLeaf && !(node.href && keep.has(node.href))) return null;
+    return {...node, children:kids};
+  }
+  return (node.href && keep.has(node.href)) ? node : null;
+}
+
+// Merge grant pills `b` into role menu `a` at the top level, by label. Pills unique to
+// b are appended; a pill in both has b's children folded in. (Granted pages are
+// out-of-role, so overlap is rare.)
+function mergeMenus(a, b){
+  const byLabel=new Map(); const out=a.map(p=>{ byLabel.set(p.label,p); return p; });
+  for(const pill of b){
+    if(!pill) continue;
+    const ex=byLabel.get(pill.label);
+    if(ex && ex.children && pill.children){ ex.children=cleanDividers([...ex.children, ...pill.children]); }
+    else if(!ex){ out.push(pill); byLabel.set(pill.label, pill); }
+  }
+  return out;
 }
 
 export function getMenu(branch, currentUser){
-  const isAll   = branch==="ALL";
-  const isIndia = !isAll && branch?.code && ["BOMMB","BOM","AMD"].includes(branch.code);
-  const taxSection = isAll ? TAX_ALL : isIndia ? TAX_INDIA : TAX_AFRICA;
-  // Tax/GST reconciliation screens live ONLY under the Taxation pill now, so the
-  // Accounts pill is the same regardless of branch regime.
-  const accountsMenu = MENU_ACCOUNTS;
-  // Map each top-level menu label to its PERM_MODULES group name
-  const MENU_TO_GROUP = {
-    "Dashboard":        null,            // always visible
-    "Masters":          "Masters",
-    "Transactions":     "_TXN",          // special: passes if Sales OR Purchase accessible
-    "Finance":          "Finance",
-    "Assets":           "Finance",
-    "Taxation":         "Taxation",
-    "Taxation — GST":   "Taxation",
-    "Taxation — VAT":   "Taxation",
-    "Reports":          "Reports",
-    "HR":               "HR & Payroll",
-    "Settings":         "Settings",
-    "HO Control":       "Settings",
-  };
-  // OPEN ACCESS: every ERP user sees every menu (no role-based filtering).
-  // Director/Super Admin get the multi-dashboard dropdown in place of the plain
-  // Dashboard pill; everyone else keeps the single Dashboard link.
-  const role = currentUser?.role || 'Super Admin';
-  const isDir = role === 'Director' || role === 'Super Admin';
-  const isAccountant = /accountant/i.test(role || ''); // "Branch Accountant" et al.
-  // Branch Accountant → their self-contained Accounts workspace PLUS the Taxation
-  // pill. The Accounts pill bundles their Dashboard, Daily-Entry vouchers, Approve
-  // & Post, Sales/Purchase + Receivables/Payables + Cash/Bank registers, Books &
-  // Scrutiny, quick-create Masters, Period Close and Branch MIS. Tax & Statutory now
-  // lives under the Taxation header (regime-aware: GST / VAT / consolidated), so the
-  // accountant gets that pill too. Branch scope is still enforced by the top-right
-  // switcher (limited to their stored branches).
-  if (isAccountant) return applyHidden([accountsMenu, MENU_APPROVALS, taxSection], currentUser);
-  // The group owner (Super Admin + owner email) gets the extra Owner Dashboard
-  // link inside the Dashboards dropdown — nobody else.
-  const dashboardsMenu = isOwnerDashboardUser(currentUser) ? withOwnerDashboard(MENU_DASHBOARDS) : MENU_DASHBOARDS;
-  const top = isDir ? [dashboardsMenu, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
-  // 9 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · HR · Admin
-  const menus = [...top, accountsMenu, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN];
-  // Strip each user's hidden pages/reports (Settings → Page Visibility Control).
-  return applyHidden(menus, currentUser);
+  // Role picks the menu shape; then strip each user's hidden pages/reports.
+  const roleMenu = applyHidden(roleMenuRoots(branch, currentUser), currentUser);
+  if (hasFullMenu(currentUser)) return roleMenu; // full roles already see everything
+  // GRANTS: pages the admin turned ON beyond the role (Page Visibility Control). Show
+  // each under its natural pill (from the full tree), minus anything also hidden, and
+  // merge into the role menu so it appears in nav.
+  const hidden = new Set(Array.isArray(currentUser?.hidden) ? currentUser.hidden : []);
+  const granted = (Array.isArray(currentUser?.granted) ? currentUser.granted : []).filter((g) => !hidden.has(g));
+  if (!granted.length) return roleMenu;
+  const grantMenu = fullMenuRoots(branch, currentUser).map((r) => keepPrune(r, new Set(granted))).filter(Boolean);
+  return mergeMenus(roleMenu, grantMenu);
+}
+
+// Top-level route areas a RESTRICTED role (Branch Accountant) may NOT open — even by
+// direct URL — beyond the nav hiding. Deliberately a DENY-list of clearly out-of-scope
+// admin areas, NOT the inverse of their menu: menu leaves don't map 1:1 to routes, so
+// an allow-list wrongly blocks legit accounting sub-routes (trial-balance, approvals,
+// sales, assets…). Everything accounting/finance/reports/masters/tax stays reachable;
+// per-PAGE control is the hidden deny-list (Page Visibility Control).
+//   hr → employees/payroll/salaries · settings → users & roles / company config ·
+//   ho → HO Control · group-dashboard → group-level dashboard.
+const RESTRICTED_ROLE_DENY_SEGMENTS = new Set(['hr', 'settings', 'ho', 'group-dashboard']);
+
+// Hard route-level lockout used by App.jsx: can this user OPEN this route directly?
+// Full-menu roles (Super Admin / Director / everyone who isn't an accountant) reach
+// everything. Restricted roles are blocked from the out-of-scope areas above.
+export function canReachRoute(route, currentUser){
+  if (hasFullMenu(currentUser)) return true;
+  const r = String(route || '');
+  if (r === '/dashboard') return true; // landing page is never blocked (avoids lockout)
+  // An explicit per-user GRANT (Page Visibility Control) overrides the role lockout —
+  // e.g. granting /hr/employees lets this accountant open it directly.
+  const granted = Array.isArray(currentUser?.granted) ? currentUser.granted : [];
+  if (granted.includes(r)) return true;
+  const seg = r.replace(/^\//, '').split('/')[0];
+  return !RESTRICTED_ROLE_DENY_SEGMENTS.has(seg);
 }
 
 
