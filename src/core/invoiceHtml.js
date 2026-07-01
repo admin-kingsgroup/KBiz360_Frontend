@@ -3,10 +3,11 @@
 // LIVE approved booking. Used by Module Registers + SO/PO/GP Approvals.
 import { bc } from './styleTokens';
 import { companyProfile, hsnSacFor } from './referenceCache';
+import { VSPECS, lineCalc, isVatBranch } from './voucherSpecs';
 
 // Booking module code → HSN/SAC master module name (the master is keyed by name).
 const MODULE_NAME = {
-  SF: 'Flight', RF: 'Flight', RI: 'Flight', SH: 'Hotel', SHT: 'Holiday', HP: 'Holiday',
+  SF: 'Flight', RF: 'Flight', RI: 'Flight', SH: 'Holiday', HP: 'Holiday', SHT: 'Hotel',
   SC: 'Car', SV: 'Visa', SI: 'Insurance', SM: 'Misc', MS: 'Misc',
 };
 
@@ -20,12 +21,14 @@ const GST_STATES = {
 };
 // SAC (Service Accounting Code) per booking module — used ONLY as a fallback when the
 // live HSN/SAC master (Masters › Tax & Currency › Tax / HSN-SAC Codes) hasn't loaded.
+// Fallback SAC per booking module — MUST mirror the accountant's live Tax · HSN-SAC
+// master (Masters › Tax & Currency). Used only until that master hydrates the cache.
 const SAC_BY_MODULE = {
-  SF: '996421', RF: '996421', RI: '996421',       // air ticketing / refund / reissue
-  SH: '996311',                                    // hotel accommodation
-  SHT: '998555', HP: '998555',                     // holiday / tour package
-  SC: '996601', SV: '998212', SI: '997131',        // car rental / visa / travel insurance
-  SM: '998599', MS: '998599',                      // misc travel arrangement
+  SF: '998551', RF: '998551', RI: '998551',       // flight tickets
+  SH: '998555', HP: '998555',                      // holiday / tour package
+  SHT: '998552',                                   // hotel
+  SC: '998552', SV: '998559', SI: '997131',        // car rental / visa / travel insurance
+  SM: '998559', MS: '998559',                      // misc services
 };
 
 // Seeded issuer (Issued By) + bank fallback for the India GST branches. The invoice's
@@ -35,7 +38,7 @@ const SAC_BY_MODULE = {
 // win field-by-field (see the merge in buildBookingInvoice).
 const ISSUER_FALLBACK = {
   BOM: {
-    entity: 'Travkings Tours & Travels', gstin: '27AAMCT1096J1ZU', state: 'Maharashtra', stateCode: '27',
+    entity: 'Travkings Tours & Travels Pvt. Ltd.', gstin: '27AAMCT1096J1ZU', state: 'Maharashtra', stateCode: '27',
     operAddr: 'Venus Tower, B 603, Veera Desai Rd, Azad Nagar 2, Mhada Colony, Jeevan Nagar, Andheri West, Mumbai, Maharashtra 400053',
     phone: '+91 88280 06599', email: 'accounts.bom@travkings.com', cur_sym: '₹',
     authSignatory: 'Afshin Dhanani', authDesignation: 'Founder & Director',
@@ -44,7 +47,7 @@ const ISSUER_FALLBACK = {
     ],
   },
   AMD: {
-    entity: 'Travkings Tours & Travels', gstin: '24AABCT1234H1Z2', state: 'Gujarat', stateCode: '24',
+    entity: 'Travkings Tours & Travels Pvt. Ltd.', gstin: '24AABCT1234H1Z2', state: 'Gujarat', stateCode: '24',
     operAddr: '202, Shapath IV, SG Highway, Ahmedabad 380 054',
     phone: '+91 79 4000 5678', email: 'ahmedabad@travkings.com', cur_sym: '₹',
     authSignatory: 'Afshin Dhanani', authDesignation: 'Founder & Director',
@@ -55,6 +58,9 @@ const ISSUER_FALLBACK = {
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const n2 = (n) => (Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+// India PAN = characters 3–12 of a 15-char GSTIN. Derive it for the invoice when a
+// party has a GSTIN but no separately-captured PAN (not applicable to VAT/Africa nos.).
+const panFromGstin = (g) => { const s = String(g || '').trim(); return /^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z]/.test(s) ? s.slice(2, 12).toUpperCase() : ''; };
 
 function inWords(num) {
   num = Math.round(num); if (num === 0) return 'Zero';
@@ -70,33 +76,43 @@ function inWords(num) {
 const CSS = `
   .iv{--gold:#A07828;--gold-l:#C49A3C;--dark:#111;--ink:#1A1A1A;--ink2:#3A3A3A;--ink3:#6A6A6A;--ink4:#9A9A9A;--rule:#DEDBD4;--bg-lt:#F2EFE9;--paper:#FFF;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:var(--ink);background:var(--paper)}
   .iv *{box-sizing:border-box;margin:0;padding:0}
-  .iv .sheet{max-width:860px;margin:0 auto;background:var(--paper);padding:30px 40px}
-  .iv .title{text-align:center;font-size:30px;font-weight:800;letter-spacing:2px}
-  .iv .title-rule{height:1px;background:var(--gold);margin:9px 0 22px}
+  .iv .sheet{max-width:820px;margin:0 auto;background:var(--paper);padding:14px 26px}
+  .iv .title{text-align:center;font-size:23px;font-weight:800;letter-spacing:2px}
+  .iv .title-rule{height:1px;background:var(--gold);margin:6px 0 11px}
   .iv .tophead{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
   .iv .brandcol{display:flex;flex-direction:column;align-items:flex-start}
-  .iv .tk-logo{height:104px;width:auto;display:block;image-rendering:-webkit-optimize-contrast}
+  .iv .tk-logo{height:66px;width:auto;display:block;image-rendering:-webkit-optimize-contrast}
   .iv .titlebar{position:relative;display:flex;align-items:center;justify-content:center}
-  .iv .iata-badge{position:absolute;right:0;top:50%;transform:translateY(-50%);height:26px;width:auto;display:block}
-  .iv .inv-meta{text-align:right;min-width:260px}
-  .iv .inv-meta .row{display:flex;justify-content:flex-end;gap:18px;align-items:baseline;padding:3px 0}
-  .iv .inv-meta .k{font-size:9px;letter-spacing:1px;color:var(--ink4);text-transform:uppercase}
-  .iv .inv-meta .v{font-size:12.5px;font-weight:700;min-width:120px;text-align:right}
+  .iv .iata-box{position:absolute;right:0;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+  .iv .iata-badge{height:26px;width:auto;display:block}
+  .iv .iata-no{font-size:8.5px;font-weight:700;letter-spacing:.4px;color:var(--ink3);white-space:nowrap}
+  .iv .inv-meta{display:grid;grid-template-columns:auto auto;column-gap:16px;row-gap:6px;justify-content:end;align-items:baseline;min-width:260px}
+  .iv .inv-meta .k{font-size:9px;letter-spacing:1px;color:var(--ink4);text-transform:uppercase;text-align:right;white-space:nowrap}
+  .iv .inv-meta .v{font-size:12.5px;font-weight:700;text-align:right;white-space:nowrap}
   .iv .inv-meta .v.big{font-size:17px;font-weight:800}
-  .iv .inv-meta .firstline{border-bottom:1px solid var(--rule);padding-bottom:6px;margin-bottom:4px}
-  .iv .blackrule{height:2.5px;background:var(--dark);margin:16px 0 20px}
-  .iv .parties{display:flex;margin-bottom:22px}
+  .iv .inv-meta .divider{grid-column:1/-1;height:1px;background:var(--rule);margin:2px 0}
+  .iv .blackrule{height:2.5px;background:var(--dark);margin:9px 0 11px}
+  .iv .parties{display:flex;margin-bottom:11px}
   .iv .party{flex:1;padding-right:24px}
   .iv .party+.party{padding-left:24px;border-left:1px solid var(--rule)}
-  .iv .party .lab{font-size:9.5px;font-weight:700;letter-spacing:1.2px;color:var(--gold);text-transform:uppercase;margin-bottom:8px}
-  .iv .party .nm{font-size:16px;font-weight:800;margin-bottom:8px}
-  .iv .party .ln{font-size:11px;color:var(--ink3);line-height:1.8}
-  .iv .fb-label{font-size:9.5px;font-weight:700;letter-spacing:1.2px;color:var(--gold);text-transform:uppercase;margin-bottom:8px}
+  .iv .party .lab{font-size:9.5px;font-weight:700;letter-spacing:1.2px;color:var(--gold);text-transform:uppercase;margin-bottom:5px}
+  .iv .party .nm{font-size:15px;font-weight:800;margin-bottom:5px}
+  .iv .party .ln{font-size:10.5px;color:var(--ink3);line-height:1.5}
+  .iv .fb-label{font-size:9.5px;font-weight:700;letter-spacing:1.2px;color:var(--gold);text-transform:uppercase;margin-bottom:5px}
+  .iv .fb-ref{font-size:11px;font-weight:600;letter-spacing:0;color:var(--ink3);text-transform:none}
   .iv table{width:100%;border-collapse:collapse}
-  .iv thead th{font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;text-align:right;padding:8px;background:var(--bg-lt);border-top:2px solid var(--dark);border-bottom:2px solid var(--dark)}
+  .iv thead th{font-size:7.5px;font-weight:700;color:var(--ink3);text-transform:uppercase;text-align:right;padding:6px 4px;line-height:1.25;background:var(--bg-lt);border-top:2px solid var(--dark);border-bottom:2px solid var(--dark)}
   .iv thead th.l{text-align:left}
-  .iv tbody td{padding:12px 8px;border-bottom:1px solid var(--rule);font-size:11.5px;text-align:right;vertical-align:top}
-  .iv tbody td.l{text-align:left}
+  .iv tbody td{padding:6px 4px;border-bottom:1px solid var(--rule);font-size:8.5px;text-align:right;vertical-align:top;white-space:nowrap}
+  .iv tbody td.l{text-align:left;white-space:normal}
+  .iv td.gold{color:var(--gold);font-weight:700}
+  .iv tfoot td{padding:7px 4px;font-size:8.5px;font-weight:800;text-align:right;background:var(--bg-lt);border-top:2px solid var(--dark)}
+  .iv tfoot td.l{text-align:left}
+  .iv .secrow td{background:#FAF7EF;padding:5px 8px 7px}
+  .iv .secrow .seclab{font-size:8px;font-weight:700;letter-spacing:.6px;color:var(--ink4);text-transform:uppercase;margin-right:10px;vertical-align:top}
+  .iv .secrow .secs{margin-top:3px;display:flex;flex-direction:column;gap:3px}
+  .iv .secrow .sub.sec{color:var(--ink3);padding-left:12px;position:relative;white-space:nowrap;font-size:8.5px}
+  .iv .secrow .sub.sec::before{content:"›";position:absolute;left:0;color:var(--gold);font-weight:700}
   .iv .desc .nm{font-size:12.5px;font-weight:800;line-height:1.35;margin-bottom:5px}
   .iv .desc .sub{font-size:10px;line-height:1.6}
   .iv .desc .idl{color:var(--ink2)}
@@ -104,28 +120,35 @@ const CSS = `
   .iv .desc .sub.sec{color:var(--ink4);padding-left:12px;position:relative;white-space:nowrap;font-size:9px}
   .iv .desc .sub.sec::before{content:"›";position:absolute;left:0;color:var(--gold);font-weight:700}
   .iv td.tf{font-weight:800}
-  .iv .summary{display:flex;justify-content:flex-end;margin-top:14px}
-  .iv .sumtbl{width:360px}
-  .iv .sumtbl .r{display:flex;justify-content:space-between;padding:8px 4px;font-size:12px;border-bottom:1px solid var(--rule)}
+  .iv .summary{display:flex;justify-content:space-between;align-items:flex-end;gap:30px;margin-top:9px}
+  .iv .sumtbl{width:360px;flex:0 0 360px}
+  .iv .sumleft{padding-bottom:8px;min-width:140px}
+  .iv .hsnval{font-size:15px;font-weight:800;color:var(--ink);letter-spacing:.5px}
+  .iv .sumtbl .r{display:flex;justify-content:space-between;padding:5px 4px;font-size:11px;border-bottom:1px solid var(--rule)}
   .iv .sumtbl .r .k{color:var(--ink2)} .iv .sumtbl .r .v{font-weight:800}
-  .iv .sumtbl .net{display:flex;justify-content:space-between;align-items:center;background:var(--dark);color:#fff;padding:12px 16px;margin-top:4px}
-  .iv .sumtbl .net .k{font-size:11.5px;font-weight:700;letter-spacing:1px}
-  .iv .sumtbl .net .v{font-size:19px;font-weight:800;color:var(--gold-l)}
-  .iv .botrule{height:1px;background:var(--rule);margin:20px 0 14px}
+  .iv .sumtbl .net{display:flex;justify-content:space-between;align-items:center;background:var(--dark);color:#fff;padding:9px 14px;margin-top:3px}
+  .iv .sumtbl .net .k{font-size:11px;font-weight:700;letter-spacing:1px}
+  .iv .sumtbl .net .v{font-size:16px;font-weight:800;color:var(--gold-l)}
+  .iv .botrule{height:1px;background:var(--rule);margin:10px 0 8px}
   .iv .botgrid{display:flex;justify-content:space-between;gap:30px}
   .iv .botleft{flex:1}
-  .iv .lab2{font-size:9.5px;font-weight:700;letter-spacing:1.1px;color:var(--gold);text-transform:uppercase;margin-bottom:6px}
-  .iv .words{font-size:11.5px;font-style:italic;color:var(--ink2);margin-bottom:16px}
-  .iv .pay{font-size:11px;color:var(--ink2);line-height:1.8}
+  .iv .lab2{font-size:9.5px;font-weight:700;letter-spacing:1.1px;color:var(--gold);text-transform:uppercase;margin-bottom:4px}
+  .iv .words{font-size:10.5px;font-style:italic;color:var(--ink2);margin-bottom:8px}
+  .iv .pay{font-size:10px;color:var(--ink2);line-height:1.55}
+  .iv .paygrid{display:flex;gap:26px;align-items:flex-start;margin-top:2px}
+  .iv .bankcol{flex:1}
+  .iv .upicol{flex:0 0 auto;text-align:center}
+  .iv .upi-qr{width:78px;height:78px;display:block;margin:2px auto 3px;border:1px solid var(--rule);padding:3px;background:#fff}
+  .iv .upi-id{font-size:7.5px;font-weight:700;color:var(--ink2);max-width:140px;word-break:break-all;line-height:1.35}
   .iv .botright{width:280px;text-align:right}
   .iv .botright .for{font-size:11px;font-weight:700;color:var(--gold)}
-  .iv .botright .sigline{margin-top:48px;border-top:1px solid var(--ink3);padding-top:6px}
+  .iv .botright .sigline{margin-top:26px;border-top:1px solid var(--ink3);padding-top:6px}
   .iv .botright .sigline .a{font-size:11.5px;font-weight:700}
   .iv .botright .sigline .b{font-size:9.5px;color:var(--ink4)}
-  .iv .terms{margin-top:20px;font-size:9px;color:var(--ink4);line-height:1.7;border-top:1px solid var(--rule);padding-top:11px}
-  @media print{@page{size:A4 portrait;margin:9mm} .iv .sheet{padding:0;max-width:100%} .iv *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
+  .iv .terms{margin-top:10px;font-size:8.5px;color:var(--ink4);line-height:1.5}
+  @media print{.iv .sheet{padding:0;max-width:100%} .iv tr,.iv .parties,.iv .summary,.iv .botgrid{page-break-inside:avoid} .iv *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
 
-const partyBlock = (lab, p, cur, idLabel = 'GSTIN') => `<div class="party"><div class="lab">${esc(lab)}</div><div class="nm">${esc(p.name || '—')}</div><div class="ln">${[p.address, p.gstin ? `${idLabel} : ${esc(p.gstin)}` : '', p.email ? `Email : ${esc(p.email)}` : '', p.contact ? `Contact : ${esc(p.contact)}` : ''].filter(Boolean).map(esc).join('<br>')}</div></div>`;
+const partyBlock = (lab, p, cur, idLabel = 'GSTIN') => `<div class="party"><div class="lab">${esc(lab)}</div><div class="nm">${esc(p.name || '—')}</div><div class="ln">${[p.address, p.gstin ? `${idLabel} : ${esc(p.gstin)}` : '', p.pan ? `PAN : ${esc(p.pan)}` : '', p.email ? `Email : ${esc(p.email)}` : '', p.contact ? `Contact : ${esc(p.contact)}` : ''].filter(Boolean).map(esc).join('<br>')}</div></div>`;
 
 // side: 'sale' | 'purchase'. `master` = the resolved customer/supplier master record
 // (optional) — used to back-fill blank party fields on older bookings.
@@ -170,7 +193,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   // fx-aware money formatter — shadows the module n2 so EVERY amount in this invoice
   // converts at the branch FX rate when printing in local currency (1× otherwise).
   const n2 = (n) => (Number(n || 0) * fx).toLocaleString(curCode === 'INR' ? 'en-IN' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const company = { name: prof.entity || 'Travkings Tours & Travels Pvt. Ltd.', address: prof.operAddr || '', gstin: prof.gstin || '', email: prof.email || '', contact: prof.phone || '' };
+  const company = { name: prof.entity || 'Travkings Tours & Travels Pvt. Ltd.', address: prof.operAddr || '', gstin: prof.gstin || '', pan: prof.pan || (isVat ? '' : panFromGstin(prof.gstin || '')), email: prof.email || '', contact: prof.phone || '' };
   // HSN/SAC for the booked travel service — fetched from the live HSN/SAC master by
   // module, falling back to the built-in map (then a generic SAC) if it hasn't loaded.
   const sac = hsnSacFor(MODULE_NAME[booking.module] || '') || SAC_BY_MODULE[booking.module] || '998599';
@@ -179,6 +202,13 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const assetBase = (typeof window !== 'undefined' && window.location ? window.location.origin : '') + '/';
   const TK_LOGO = assetBase + 'travkings-logo.png';
   const IATA_LOGO = assetBase + 'iata-logo.png';
+  // IATA accreditation number — printed under the IATA badge. Reads the live profile
+  // (prof.iataNo) when present, else the registered Travkings BOM IATA number.
+  const iataNo = prof.iataNo || '14037951';
+  // UPI "Scan & Pay" — QR (public/upi-qr.png, absolute URL so it resolves inside the
+  // print-preview iframe) + VPA; both overridable from the live company-profile.
+  const UPI_QR = prof.upiQr || (assetBase + 'upi-qr.png');
+  const upiId = prof.upiId || 'MSTRAVKINGSTOURSTRAVELSPRIVATELIMITED.eazypay@icici';
   const raw = isSale ? (booking.customer || {}) : (booking.supplier || {});
   const m = master || {};
   const mAddr = m.address || [m.city, m.country].filter(Boolean).join(', ');
@@ -199,6 +229,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const party = {
     name: billToName || '',
     gstin: raw.gstin || m.gstin || '',
+    pan: raw.pan || m.pan || (isVat ? '' : panFromGstin(raw.gstin || m.gstin || '')),
     address: raw.address || mAddr || '',
     email: raw.email || m.email || '',
     contact: raw.contact || m.contact || m.phone || '',
@@ -208,38 +239,104 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const psCode = (party.gstin || prof.gstin || '').slice(0, 2);
   const placeOfSupply = GST_STATES[psCode] ? `${GST_STATES[psCode]} — ${psCode}` : (prof.state ? `${prof.state} — ${prof.stateCode || ''}` : '');
 
-  // per-line breakdown
-  const fareRows = rows.map((p) => {
-    const base = Number(p.base) || 0, k3 = Number(p.k3) || 0, tax = Number(p.tax) || 0, markup = Number(p.markup) || 0, psvc = Number(p.psvc) || 0;
-    const incentive = Number(p.incentive) || 0, tds = Number(p.tds) || 0;
-    const pax = [p.fn, p.sn].filter(Boolean).join(' ');
-    // Flight bookings carry per-sector travel detail; list each sector under the
-    // passenger. Other modules keep the single TKT/PNR line.
-    const secs = Array.isArray(p.sectors) ? p.sectors.filter((s) => s && (s.sector || s.airline || s.flightNo || s.ticketNo || s.pnr || s.travelDate)) : [];
-    const secLines = secs.map((s) => {
+  // ── Per-module breakdown — mirrors the SO (sale) / PO (purchase) voucher grids ──
+  // Columns, labels and the GST math are driven entirely by VSPECS[module] + lineCalc,
+  // exactly like the SO/PO/GP Voucher entry, so each module renders its own fields and
+  // the printed figures tie to the books line-for-line.
+  const moduleCode = String(booking.module || 'SF').toUpperCase();
+  const spec = VSPECS[moduleCode] || VSPECS.SF;   // reversal/unknown modules fall back to the Flight layout
+  const pkg = spec.model === 'package';            // Holiday tour-operator model (5% GST, supplier-service GST entered)
+  const refKeys = spec.idCols.slice(2);            // module reference fields (Ticket/PNR, Hotel/Conf, Country/Passport…)
+  const isVatBr = isVatBranch(code);
+  const effNoVat = isVatBr && !!booking.noVat;      // noVat only bites on Africa/VAT branches
+  const ctx = { branch: code, noVat: effNoVat };
+  // The GST rate shown in column headers — mirrors the voucher's getGstRate().
+  const activeRate = effNoVat ? 0
+    : isVatBr ? (code === 'NBO' ? 16 : code === 'DAR' ? 18 : code === 'FBM' ? 16 : 18)
+      : pkg ? (spec.gstRate ? spec.gstRate * 100 : 5)
+        : (spec.tax && spec.tax.rate != null ? spec.tax.rate : 18);
+  // Flight sectors → one sub-row spanning the whole table, one chip-line per segment.
+  const sectorRow = (l, cols) => {
+    if (!spec.sectors) return '';
+    const secs = (Array.isArray(l.sectors) ? l.sectors : []).filter((s) => s && (s.sector || s.airline || s.flightNo || s.ticketNo || s.pnr || s.travelDate));
+    if (!secs.length) return '';
+    const items = secs.map((s) => {
       const parts = [s.sector, s.airline, s.flightNo, s.ticketNo ? `TKT ${s.ticketNo}` : '', s.pnr ? `PNR ${s.pnr}` : '', s.travelDate].filter(Boolean).map(esc).join(' · ');
       return parts ? `<div class="sub sec">${parts}</div>` : '';
     }).join('');
-    const idline = secs.length
-      ? (pax ? `PAX: ${esc(pax)}` : '')
-      : [pax ? `PAX: ${esc(pax)}` : '', (p.tkt || p.pkg || p.htl) ? `TKT: ${esc(p.tkt || p.pkg || p.htl)}` : '', (p.pnr || p.ref || p.conf) ? `PNR: ${esc(p.pnr || p.ref || p.conf)}` : ''].filter(Boolean).join(' &nbsp;|&nbsp; ');
-    // Only render the id-line / sectors when present (an empty div used to leave a
-    // stray gap). Sectors get their own spaced container for clean separation.
-    const idHtml = idline ? `<div class="sub idl">${idline}</div>` : '';
-    const secHtml = secLines ? `<div class="secs">${secLines}</div>` : '';
-    const desc = `<td class="l desc"><div class="nm">${esc(headerRef || 'Booking')}</div>${idHtml}${secHtml}</td>`;
-    if (isSale) {
-      const totalFare = base + k3 + tax + markup;
-      // SVC2 (margin) is hidden everywhere — its full amount folds into Base Fare (Africa
-      // / Holiday) or Taxes (India), so there is never a Service Charge - 2 column.
-      const baseShown = foldSvc2IntoBase ? base + markup : base;
-      const taxShown  = foldSvc2IntoBase ? tax : tax + markup;
-      return `<tr>${desc}<td class="l">${esc(sac)}</td><td>${n2(baseShown)}</td><td>${n2(k3)}</td><td>${n2(taxShown)}</td><td class="tf">${cur}${n2(totalFare)}</td></tr>`;
-    }
-    const totalCost = base + k3 + tax + psvc - incentive + tds;
-    return `<tr>${desc}<td class="l">${esc(sac)}</td><td>${n2(base)}</td><td>${n2(k3)}</td><td>${n2(tax)}</td><td>${n2(psvc)}</td><td>${n2(incentive)}</td><td>${n2(tds)}</td><td class="tf">${cur}${n2(totalCost)}</td></tr>`;
-  }).join('');
-  const emptyRow = `<tr><td class="l" colSpan="${isSale ? 6 : 9}" style="text-align:center;color:#9A9A9A;padding:16px">No line detail captured for this booking.</td></tr>`;
+    return `<tr class="secrow"><td class="l" colspan="${cols}"><span class="seclab">Sectors</span><div class="secs">${items}</div></td></tr>`;
+  };
+  const idCell = (l, col) => `<td class="l${col.kind === 'pnr' ? ' gold' : ''}">${esc(l[col.key] || '—')}</td>`;
+  // Breakdown caption: flights show the ticket type (International / Domestic per the
+  // booking's package type); every other module shows a fixed service label.
+  const isFlight = spec.sectors || ['SF', 'RF', 'RI'].includes(moduleCode);
+  const CAPTION = {
+    SH: 'Holiday Package', HP: 'Holiday Package', SHT: 'Hotel Services',
+    SV: 'Visa', SC: 'Car Rental', SI: 'Travel Insurance', SM: 'Misc Services', MS: 'Misc Services',
+  };
+  const fbCaption = isFlight ? `Ticket - ${booking.packageType || 'Domestic'}` : (CAPTION[moduleCode] || headerRef);
+
+  let bkHead, bkBody, cols;
+  if (isSale) {
+    // Sale mirrors the SO grid, but the agency margin is not shown as its own line:
+    // the "Other Taxes" (markup) amount is FOLDED into a single "Taxes" column
+    // (Taxes = fare tax + markup) and the per-line markup-GST column is dropped.
+    // The Total is unchanged (markup is already inside finalSales).
+    const fareNoTax = spec.fareCols.filter((c) => c.key !== 'tax');
+    const head = [
+      ...spec.idCols.map((c) => `<th class="l">${esc(c.label)}</th>`),
+      ...fareNoTax.map((c) => `<th>${esc(c.label)}</th>`),
+      '<th>Taxes</th>',
+      pkg ? '' : '<th>Service Chg</th>',
+      pkg ? '' : `<th>GST/Service (${activeRate}%)</th>`,
+      '<th>Total</th>',
+    ];
+    cols = head.filter(Boolean).length;
+    bkHead = head.join('');
+    bkBody = rows.map((l) => {
+      const c = lineCalc(spec, l, ctx);
+      const taxes = (Number(l.tax) || 0) + (Number(l.markup) || 0); // fare tax + hidden margin, combined
+      const cells = [
+        ...spec.idCols.map((col) => idCell(l, col)),
+        ...fareNoTax.map((col) => `<td>${n2(l[col.key])}</td>`),
+        `<td>${n2(taxes)}</td>`,
+        pkg ? '' : `<td>${n2(l.ssvc)}</td>`,
+        pkg ? '' : `<td>${n2(c.gstSvc)}</td>`,
+        `<td class="tf">${cur}${n2(c.finalSales)}</td>`,
+      ].join('');
+      return `<tr>${cells}</tr>${sectorRow(l, cols)}`;
+    }).join('');
+  } else {
+    const head = [
+      `<th class="l">${esc(spec.idCols[0].label)}</th>`,
+      `<th class="l">${esc(spec.idCols[1].label)}</th>`,
+      ...refKeys.map((c) => `<th class="l">${esc(c.label)}</th>`),
+      ...spec.fareCols.map((c) => `<th>${esc(c.label)}</th>`),
+      '<th>Supplier Service</th>',
+      pkg ? '' : `<th>GST (${activeRate}%)</th>`, // package: supplier-service GST shows only in the Net Cost summary
+      '<th>Supplier Incentive</th>',
+      '<th>TDS (2%)</th>',
+      '<th>Total</th>',
+    ];
+    cols = head.filter(Boolean).length;
+    bkHead = head.join('');
+    bkBody = rows.map((l) => {
+      const c = lineCalc(spec, l, ctx);
+      const cells = [
+        `<td class="l">${esc(l.fn || '—')}</td>`,
+        `<td class="l">${esc(l.sn || '')}</td>`,
+        ...refKeys.map((col) => idCell(l, col)),
+        ...spec.fareCols.map((col) => `<td>${n2(l[col.key])}</td>`),
+        `<td>${n2(l.psvc)}</td>`,
+        pkg ? '' : `<td>${n2(c.gstPur)}</td>`,
+        `<td>${n2(l.incentive)}</td>`,
+        `<td>${n2(c.tds)}</td>`,
+        `<td class="tf">${cur}${n2(c.finalPurchase)}</td>`,
+      ].join('');
+      return `<tr>${cells}</tr>${sectorRow(l, cols)}`;
+    }).join('');
+  }
+  const emptyRow = `<tr><td class="l" colspan="${cols}" style="text-align:center;color:#9A9A9A;padding:16px">No line detail captured for this booking.</td></tr>`;
 
   // summary from the booked snapshot (ties to the books)
   const otGst = r2(snap.otherTaxesGst || 0); // tax on the hidden SVC2 margin — never shown
@@ -282,40 +379,39 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     bank.swift ? `SWIFT: ${esc(bank.swift)}` : '',
     bank.branch ? `Branch: ${esc(bank.branch)}` : '',
   ].filter(Boolean).join('<br>') || 'Bank details on file.';
+  const upiBlock = `<div class="upicol"><div class="lab2">UPI · Scan &amp; Pay</div><img class="upi-qr" src="${UPI_QR}" alt="UPI QR — ${esc(upiId)}" /><div class="upi-id">${esc(upiId)}</div></div>`;
   const payBlock = isSale
-    ? `<div class="lab2">Bank Details</div><div class="pay">${bankLines}</div>`
+    ? `<div class="paygrid"><div class="bankcol"><div class="lab2">Bank Details</div><div class="pay">${bankLines}</div></div>${upiBlock}</div>`
     : `<div class="lab2">Settlement</div><div class="pay">Payable to supplier per agreed credit terms.<br>Input ${taxLabel} credit claimed against supplier ${idLabel}.<br>Link No referenced for invoice-wise GP.</div>`;
 
-  // SVC2 (margin) is hidden on every sale invoice → one consistent layout, no Service
-  // Charge - 2 column. Purchase keeps its cost breakdown (internal record).
-  const headCols = isSale
-    ? `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Base Fare</th><th>K3 Tax</th><th>Taxes</th><th>Total Fare</th>`
-    : `<th class="l">Description</th><th class="l">HSN/SAC</th><th>Base Fare</th><th>K3 Tax</th><th>Taxes</th><th>Supplier Service Charge</th><th>Supp Comm/Inc Rcvd</th><th>${isVat ? 'WHT' : 'TDS (2%)'}</th><th>Total Cost</th>`;
-
   const sheet = `<div class="iv"><div class="sheet">
-    <div class="titlebar"><div class="title">${isSale ? 'INVOICE' : 'PURCHASE INVOICE'}</div><img class="iata-badge" src="${IATA_LOGO}" alt="IATA Accredited Agent" /></div><div class="title-rule"></div>
+    <div class="titlebar"><div class="title">${isSale ? 'INVOICE' : 'PURCHASE INVOICE'}</div><div class="iata-box"><img class="iata-badge" src="${IATA_LOGO}" alt="IATA Accredited Agent" /><div class="iata-no">IATA No: ${esc(iataNo)}</div></div></div><div class="title-rule"></div>
     <div class="tophead">
       <div class="brandcol">
         <img class="tk-logo" src="${TK_LOGO}" alt="${esc(company.name)}" />
       </div>
       <div class="inv-meta">
-        <div class="row firstline"><span class="k">${isSale ? 'Invoice No.' : 'Purchase Inv No.'}</span><span class="v big">${esc(vno || '(on approval)')}</span></div>
-        <div class="row"><span class="k">Date</span><span class="v">${esc(booking.date || '')}</span></div>
-        ${(!isVat && placeOfSupply) ? `<div class="row"><span class="k">Place of Supply</span><span class="v">${esc(placeOfSupply)}</span></div>` : ''}
-        <div class="row"><span class="k">Link No.</span><span class="v" style="color:var(--gold)">${esc(booking.linkNo || '—')}</span></div>
+        <div class="k">${isSale ? 'Invoice No.' : 'Purchase Inv No.'}</div><div class="v big">${esc(vno || '(on approval)')}</div>
+        <div class="divider"></div>
+        <div class="k">Invoice Date</div><div class="v">${esc(booking.date || '')}</div>
+        ${(!isVat && placeOfSupply) ? `<div class="k">Place of Supply</div><div class="v">${esc(placeOfSupply)}</div>` : ''}
+        <div class="k">Link No.</div><div class="v" style="color:var(--gold)">${esc(booking.linkNo || '—')}</div>
       </div>
     </div>
     <div class="blackrule"></div>
     <div class="parties">${isSale
       ? partyBlock('Billed To', party, cur, idLabel) + partyBlock('Issued By', company, cur, idLabel)
       : partyBlock('Supplier', party, cur, idLabel) + partyBlock('Billed To (Buyer)', company, cur, idLabel)}</div>
-    <div class="fb-label">${isSale ? 'Fare Breakdown' : 'Cost Breakdown'}</div>
-    <table><thead><tr>${headCols}</tr></thead><tbody>${fareRows || emptyRow}</tbody></table>
-    <div class="summary"><div class="sumtbl">${sumtbl}</div></div>
+    <div class="fb-label">${isSale ? 'Fare Breakdown' : 'Cost Breakdown'}${fbCaption ? ` <span class="fb-ref">· ${esc(fbCaption)}</span>` : ''}</div>
+    <table class="bk"><thead><tr>${bkHead}</tr></thead><tbody>${bkBody || emptyRow}</tbody></table>
+    <div class="summary">
+      <div class="sumleft"><div class="lab2">HSN / SAC</div><div class="hsnval">${esc(sac)}</div></div>
+      <div class="sumtbl">${sumtbl}</div>
+    </div>
     <div class="botrule"></div>
     <div class="botgrid">
       <div class="botleft"><div class="lab2">Amount in Words</div><div class="words">${esc(curCode)} ${esc(inWords(Math.round(net * fx)))} Only</div>${converting ? `<div class="pay" style="margin-bottom:12px;font-style:italic">Converted at 1 USD = ${esc(Number(opts.fxRate).toFixed(2))} ${esc(localCcy)} (${esc(opts.fxDate || booking.date || '')})</div>` : ''}${payBlock}</div>
-      <div class="botright"><div class="for">For ${esc(company.name)}</div><div class="sigline"><div class="a">${esc(prof.authSignatory || 'Authorised Signatory')}</div><div class="b">${esc(prof.authDesignation || company.name)}</div></div></div>
+      <div class="botright"><div class="for">For ${esc(company.name)}</div><div class="sigline"><div class="a">Authorised Signatory</div></div></div>
     </div>
     <div class="terms">${isSale
       ? 'Terms &amp; Conditions: 1. Payment due as per agreed terms; delay attracts 18% p.a. 2. Service charges non-refundable; cancellations per supplier policy. 3. We act as intermediary; not liable for third-party delays/cancellations. E.&amp;O.E.'
