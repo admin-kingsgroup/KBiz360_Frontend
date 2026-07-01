@@ -31,6 +31,18 @@ export function tcsApplies(spec, packageType) {
   return spec.tcs.intlOnly ? isIntl(packageType) : true;
 }
 
+// TCS u/s 206C(1G) rate for a booking DATE. The statutory rate on overseas tour
+// packages was 5% up to 31-03-2026; the Finance Act cut it to 2% from 01-04-2026.
+// A booking is taxed at the rate in force on its booking date, so the module's
+// spec.tcs.rate (the current 2%) is used from 01-04-2026 onward, and 5% before.
+// No/blank date → fall back to the module default (safe: never guesses upward).
+export const TCS_206C_CUTOVER = '2026-04-01'; // first day the 2% rate applies
+export function tcs206cRate(spec, date) {
+  const base = (spec && spec.tcs && spec.tcs.rate) || 0;
+  const d = String(date || '').slice(0, 10);
+  return (d && d < TCS_206C_CUTOVER) ? 5 : base;
+}
+
 // A B2B buyer (another agent / tour operator) is NOT charged TCS u/s 206C(1G) — they
 // resell and collect it from their own client. Identified by the customer's Sundry
 // Debtors sub-group (e.g. "B2B" / "B2B Clients"). B2C and B2E still attract TCS.
@@ -325,7 +337,7 @@ export function lineCalc(spec, l, ctx) {
 // po/so carry { lineTotal (net, ex tax), serviceCharge, gst, tcs, total, lines }.
 // gp = sales net − purchase net (= net markup + service charge). The per-line
 // `lines` detail is preserved for the read-only voucher view + voucher meta.
-export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, availItc = false, foreignSupplier = false, clientType = '' } = {}) {
+export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, availItc = false, foreignSupplier = false, clientType = '', date = '' } = {}) {
   const ctx = { branch, noVat: !!noVat, availItc: !!availItc, foreignSupplier: !!foreignSupplier, clientType };
   const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, incentiveAmt: 0, incentiveGst: 0, incentiveTds: 0, total: 0, lines: [] };
   // `otherTaxesGst` = GST carved out of the SVC2 margin (GST-inclusive, so the
@@ -383,7 +395,7 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
   // enters the net and the GP is unchanged. India-only — never on Africa/VAT
   // branches (and moot under Without-VAT).
   if (!ctx.noVat && !isVatBranch(ctx.branch) && !isB2B(ctx.clientType) && tcsApplies(spec, packageType)) {
-    so.tcs = r2(so.total * spec.tcs.rate / 100);
+    so.tcs = r2(so.total * tcs206cRate(spec, date) / 100);
     so.total = r2(so.total + so.tcs);
   }
   const saleNet = r2(so.total - so.gst - so.otherTaxesGst - so.tcs);

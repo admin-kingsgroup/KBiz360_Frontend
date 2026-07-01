@@ -610,7 +610,7 @@ export function PinnedRecentSection({setRoute}){
 // getLedgerName and the raw id leaks into the journal/preview. The menu renders in
 // a portal so a table's overflow:auto/hidden can't clip it (it used to open behind
 // the scroll container and look like it "wasn't opening").
-export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}){
+export function LedgerSelect({value,onChange,filter,placeholder,style={},branch,rawValue}){
   const [q,setQ]=useState("");
   const [open,setOpen]=useState(false);
   const [rect,setRect]=useState(null);
@@ -665,7 +665,12 @@ export function LedgerSelect({value,onChange,filter,placeholder,style={},branch}
       <div {...clickable(()=>open?setOpen(false):openMenu())} style={{...inp,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:32,...style}}>
         {selected
           ?<span style={{fontSize:11,color:"#0d1326",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected.name}</span>
-          :<span style={{fontSize:11,color:"#bfc3d6"}}>{placeholder||"Select ledger..."}</span>
+          :rawValue
+            // A stored ledger NAME with no match in the current chart (imported / merged /
+            // renamed): show it verbatim so the field never looks empty, flagged so the
+            // accountant re-picks before re-approving. The name stays in form state.
+            ?<span style={{fontSize:11,color:"#854F0B",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title="Not in the current chart of accounts — re-pick to confirm before approving">{rawValue} <span style={{fontSize:8.5,fontWeight:700,color:"#854F0B",background:"#FAEEDA",border:"1px solid #FAC775",borderRadius:5,padding:"1px 5px",marginLeft:4,whiteSpace:"nowrap"}}>not in chart</span></span>
+            :<span style={{fontSize:11,color:"#bfc3d6"}}>{placeholder||"Select ledger..."}</span>
         }
         <ChevronDown size={12} style={{color:"#5a6691",flexShrink:0}}/>
       </div>
