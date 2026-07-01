@@ -2057,10 +2057,12 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
 }
 
 /* ── Tally Classic (white) view ──────────────────────────────────────── */
-// Tally Classic lists Groups, Sub-Groups and Ledgers strictly alphabetically
-// (A→Z) via azByName. Applied per level inside this view only — the shared
-// splitSubGroups (amount-ranked) and the Fiori view are left untouched.
-const sideRows = (groups, summary, isOpen = () => true, side = '') => [...(groups || [])].sort((a, b) => azByName(a.group, b.group)).flatMap((g) => {
+// PRIMARY groups keep the backend's Tally-tree order (liabilities/assets arrive
+// pre-sorted via BS_LIAB_ORDER / BS_ASSET_ORDER) — same as the Fiori view — so
+// the Balance Sheet reads Capital → Loans → Current Liabilities / Fixed Assets →
+// Investments → Current Assets, NOT alphabetically. Sub-Groups and Ledgers below
+// each group still sort A→Z (azByName), which is normal Tally behaviour.
+const sideRows = (groups, summary, isOpen = () => true, side = '') => [...(groups || [])].flatMap((g) => {
   if (summary) return [{ label: g.group, amount: g.amount, group: true, result: g.isResult }];
   const { subs, direct } = splitSubGroups(g.ledgers);
   return [
