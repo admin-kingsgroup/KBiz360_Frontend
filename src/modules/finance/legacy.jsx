@@ -8,7 +8,8 @@ import { confirmDialog } from '../../core/ux/confirm';
 import { toast } from '../../core/ux/toast';
 import { clickable } from '../../core/ux/clickable';
 import { SampleBanner } from '../../core/ux/SampleBanner';
-import { AlertTriangle, Download, Lock, Plus, Printer, Save, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
+import { Menu as DropdownMenu } from '../../core/ux/Menu';
+import { AlertTriangle, ChevronDown, Download, Lock, Plus, Printer, Save, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
 import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useBankBRS, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement } from '../../core/useBankReco';
 import { usePDCs, usePDCSummary, useCreatePDC, useDepositPDC, useBouncePDC, useRepresentPDC, useDeletePDC } from '../../core/usePDC';
 import { branchCode } from '../../core/useAccounting';
@@ -30,12 +31,6 @@ import { RecurringVouchers } from '../transactions';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { openPrintPreview } from '../../core/PrintPreview';
 
-/* ════════════════════════════════════════════════════════════════════
-   BANK RECONCILIATION  —  live book (ledger) vs imported bank statement.
-   Book side  : GET /api/bank-reconciliation/book      (double-entry engine)
-   Bank side  : GET /api/bank-reconciliation/statement (imported CSV/paste)
-   Matching   : auto (amount+date+reference) and manual; 4 reconciliation states.
-   ════════════════════════════════════════════════════════════════════ */
 
 const RECON_CLR = {
   reconciled:   { c:"#27500A", bg:"#EAF3DE", label:"Reconciled" },
@@ -979,7 +974,21 @@ export function CashFlowForecast({branch}){
         <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Add expected cash line</p>
         <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6,alignItems:"center"}}>
           <input style={ip} type="date" value={f.date} onChange={set('date')}/>
-          <select style={ip} value={f.kind} onChange={set('kind')}><option value="inflow">Inflow</option><option value="outflow">Outflow</option></select>
+          <DropdownMenu
+            ariaLabel="Kind"
+            menuRole="listbox"
+            items={[
+              { key:'inflow', label:'▲ Inflow', selected:f.kind==='inflow', onSelect:()=>setF(s=>({...s,kind:'inflow'})) },
+              { key:'outflow', label:'▼ Outflow', selected:f.kind==='outflow', onSelect:()=>setF(s=>({...s,kind:'outflow'})) },
+            ]}
+            renderTrigger={({ ref, toggle, triggerProps }) => (
+              <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                style={{...ip,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,fontWeight:700,color:f.kind==="inflow"?"#27500A":"#A32D2D",cursor:"pointer",textAlign:"left"}}>
+                {f.kind==="inflow"?"▲ Inflow":"▼ Outflow"}
+                <ChevronDown size={13} style={{color:"#5b616e",flexShrink:0}}/>
+              </button>
+            )}
+          />
           <input style={ip} placeholder="Category" value={f.category} onChange={set('category')}/>
           <input style={ip} type="number" placeholder="Amount" value={f.amount} onChange={set('amount')}/>
           <button onClick={add} disabled={create.isPending} style={{...btnG,minHeight:32,fontSize:11}}>+ Add</button>

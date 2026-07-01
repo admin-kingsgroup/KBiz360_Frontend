@@ -1,8 +1,3 @@
-// ─── Accounts ▸ Payments ▸ Payment Run / Batch Pay ────────────────────────────
-// Select outstanding supplier bills across vendors, set the bank/mode/date, and
-// post them in ONE action. The backend groups the selection per supplier into one
-// PENDING payment voucher each (bills as directed allocations), which then flows
-// through the normal approval queue — nothing posts to the books here.
 import React, { useMemo, useState } from 'react';
 import { bc, card } from '../core/styles';
 import { localeOf } from '../core/format';

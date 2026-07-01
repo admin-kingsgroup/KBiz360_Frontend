@@ -1,8 +1,3 @@
-// ─── Finance ▸ Module Register (read-only) ────────────────────────────────────
-// All product entry now happens in SO/PO/GP. This screen is a VIEW: pick a module
-// (Flight/Holiday/Hotel/Visa/Insurance/Car/Misc) and see its approved deals — Sale,
-// Purchase, GP, by Link No — and print the Sales Invoice (give to the customer) or
-// the Purchase Invoice (internal filing), both stamped with the Link No.
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../core/api';
@@ -25,8 +20,6 @@ const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(locale
 const MODS = ['SF', 'SH', 'SHT', 'SV', 'SI', 'SC', 'SM'];
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-// Build a printable invoice (Sale → customer Tax Invoice · Purchase → filing voucher)
-// straight from the approved booking's so/po snapshot. Link No is stamped on it.
 function invoiceHtml(b, side, branch) {
   const cfg = bc(branch) || {}; const cur = cfg.cur || '₹';
   const prof = companyProfile(branch?.code || 'BOM') || {};
@@ -78,9 +71,6 @@ function invoiceHtml(b, side, branch) {
   return `<style>${css}</style>${body}`;
 }
 
-// Fetch the bookings for the register, bounded to the selected window server-side so
-// it doesn't pull every booking's SO/PO/GP grid up front. `filterBookingsForRegister`
-// still applies the same window client-side (a no-op refinement on the fetched set).
 function useBookingsReg(brCode, range) {
   const from = range?.from || '', to = range?.to || '';
   return useQuery({
@@ -90,17 +80,12 @@ function useBookingsReg(brCode, range) {
 }
 
 
-// mode: 'sales' (Sales Invoice only) · 'purchase' (Purchase Invoice only) · 'both'
 export function ModuleRegister({ branch, mode = 'both' }) {
   const [mod, setMod] = useState('ALL');
-  // Seed the search when opened from a drill (P&L Ledger Account → invoice), so the
-  // register lands on that one booking; normal navigation starts blank.
+  
   const [q, setQ] = useState(() => consumePendingRegisterSearch() || '');
   const brCode = branchCode(branch) || 'ALL';
-  // Default to the current MONTH so the register opens fast (~2.7s vs ~10s for the FY
-  // on the remote DB) — the fetch is period-scoped, and full bookings (SO/PO grids +
-  // passenger rows) are heavy to transfer. The period bar widens to QTD/CFY/All when
-  // you need older bookings.
+ 
   const [range, setRange] = useState(() => periodRange('mtd', { branch }));
   const { data = [], isLoading } = useBookingsReg(brCode, range);
   const spec = VSPECS[mod] || {};
@@ -122,8 +107,6 @@ export function ModuleRegister({ branch, mode = 'both' }) {
   const showSale = mode !== 'purchase', showPur = mode !== 'sales';
   const heading = mode === 'sales' ? 'Module Sales Register' : mode === 'purchase' ? 'Module Purchase Register' : 'Module Sales & Purchase Register';
 
-  // Feed the global Tally Export / Print / PDF bar real, balanced vouchers built
-  // from the visible bookings (party Dr, sales/purchase + GST on the other side).
   const tallyVouchers = useMemo(() => {
     const out = [];
     const n = (x) => Math.round(Number(x) || 0);
@@ -157,12 +140,6 @@ export function ModuleRegister({ branch, mode = 'both' }) {
   }, [rows, showSale, showPur]);
   useReportExport({ title: heading, kind: 'vouchers', rows: tallyVouchers, recommend: 'landscape' }, [tallyVouchers, heading]);
 
-  // Column order requested by the business: Date ▸ Sales Type ▸ Ledger Name ▸ Invoice
-  // Value ▸ Link No ▸ Sales Invoice No ▸ Purchase Invoice No, then the rest. Default
-  // sort is Date ascending (chronological, like a Tally register). The "Ledger Name"
-  // is the accounting party of the register it's viewed in — the customer (debtor) on
-  // the sales side, the vendor (creditor) on the purchase side; the opposite party is
-  // kept in the trailing columns so no detail is lost.
   const columns = useMemo(() => {
     const ledgerCol = mode === 'purchase'
       ? { key: 'supplier.name', header: 'Ledger Name', render: (r) => (r.noSupplier ? '—' : (r.supplier?.name || '—')) }
@@ -204,7 +181,7 @@ export function ModuleRegister({ branch, mode = 'both' }) {
         ),
       },
     ];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [mode, showSale, showPur, branch]);
 
   const emptyMsg = needle
