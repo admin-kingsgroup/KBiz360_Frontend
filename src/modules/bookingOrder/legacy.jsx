@@ -1086,6 +1086,13 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       supplierAmt: r.supplierAmt ?? '', serviceCharge: r.serviceCharge ?? '',
       markup: r.otherTaxes ?? '', gstPct: r.gstPct || 18,
       supplierSvc: r.supplierSvc ?? '', supplierGst: r.supplierGst ?? '',
+      // Refund-only economics — MUST round-trip or an edited/revoked refund re-opens
+      // blank and re-posts without the airline cancellation + commission clawback (the
+      // client leg would then change on re-approval). Mirrors RefundReissueFields state.
+      supplierCancel: r.supplierCancel ?? '', supplierCancelGst: r.supplierCancelGst ?? '',
+      cancelRecover: r.cancelRecover !== false,
+      commissionReversal: r.commissionReversal !== false,
+      incentiveAmt: r.incentiveAmt ?? '', incentiveGst: r.incentiveGst ?? '', incentiveTds: r.incentiveTds ?? '',
       remarks: (editing && editBooking.remarks) || '',
     };
   });
@@ -1100,11 +1107,22 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
   const save = async () => {
     setError(''); setSaving(true);
     try {
+      // Commission Reversal OFF → the clawback is not taken, so the three incentive
+      // fields post as 0 (matches RefundReissueFields, which locks them to 0 when off).
+      const reverseCommission = state.commissionReversal !== false;
       const reversal = {
         counterParty: state.counterParty, counterPartyGroup: 'Sundry Creditors',
         supplierAmt: +state.supplierAmt || 0, serviceCharge: +state.serviceCharge || 0,
         otherTaxes: +state.markup || 0, gstPct: +state.gstPct || 18, gstMode: state.gstMode,
         supplierSvc: +state.supplierSvc || 0, supplierGst: +state.supplierGst || 0,
+        // Airline cancellation penalty (+ its GST) and commission clawback — carried so
+        // the spawned RF voucher posts the SAME journal the live JV previewed, and so an
+        // edit/revoke re-opens with these populated instead of blank.
+        supplierCancel: +state.supplierCancel || 0, supplierCancelGst: +state.supplierCancelGst || 0,
+        cancelRecover: state.cancelRecover !== false, commissionReversal: reverseCommission,
+        incentiveAmt: reverseCommission ? (+state.incentiveAmt || 0) : 0,
+        incentiveGst: reverseCommission ? (+state.incentiveGst || 0) : 0,
+        incentiveTds: reverseCommission ? (+state.incentiveTds || 0) : 0,
         againstInvoice: state.againstInvoice, againstPurchase: state.againstPurchase || '',
       };
       const payload = {
@@ -1140,7 +1158,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
           </div>
           {editing
             ? <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} style={{ ...btnG, marginTop: 18 }}><ArrowRight size={14} /> Back to list</button>
-            : <button onClick={() => { setResult(null); setState((s) => ({ ...s, againstInvoice: '', supplierAmt: '', serviceCharge: '', markup: '' })); }} style={{ ...btnG, marginTop: 18 }}><Plus size={14} /> New {kind}</button>}
+            : <button onClick={() => { setResult(null); setState((s) => ({ ...s, againstInvoice: '', supplierAmt: '', serviceCharge: '', markup: '', supplierCancel: '', supplierCancelGst: '', incentiveAmt: '', incentiveGst: '', incentiveTds: '', cancelRecover: true, commissionReversal: true })); }} style={{ ...btnG, marginTop: 18 }}><Plus size={14} /> New {kind}</button>}
         </div>
       </div>
     );
