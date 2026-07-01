@@ -21,7 +21,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, X, ChevronDown, Bell, Printer, Eye } from 'lucide-react';
+import { Menu, X, ChevronDown, Eye } from 'lucide-react';
 import { KBIZ_LOGO } from '../core/brand';
 import { getMenu } from '../core/menus';
 import { useAlerts } from '../core/useAccounting';
@@ -441,35 +441,6 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
         <div className="flex shrink-0 items-center gap-1 2xl:gap-1.5">
           <div className="hidden w-40 desktop:block 2xl:w-64"><ModuleSearch branch={branch} currentUser={currentUser} setRoute={setRoute} /></div>
 
-          <button
-            type="button"
-            title="Print / Save as PDF"
-            onClick={() => openPrintPreview({ selector: 'main', title: 'Document', recommend: 'portrait' })}
-            // Secondary action — shown only from `wide` (1400px) up, where the header has
-            // room for it without clipping the nav (pages also have their own Export/Print).
-            className="hidden h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition-all duration-fast ease-premium hover:bg-ink/[0.06] hover:text-ink wide:flex"
-          >
-            <Printer size={18} />
-          </button>
-
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowNotif((s) => !s)}
-              aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
-              aria-haspopup="dialog"
-              aria-expanded={showNotif}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition-all duration-fast ease-premium hover:bg-ink/[0.06] hover:text-ink focus:outline-none focus-visible:shadow-focus-ring max-desktop:h-11 max-desktop:w-11"
-            >
-              <Bell size={18} />
-            </button>
-            {unread > 0 && (
-              <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full border-2 border-white bg-danger px-1 text-[9px] font-extrabold text-white">
-                {unread > 9 ? '9+' : unread}
-              </span>
-            )}
-          </div>
-
           <FxRateChip branch={branch} />
           <div className="hidden wide:block"><FySelector /></div>
           <div className="hidden w-[150px] desktop:block 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
@@ -523,7 +494,16 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
             View only — you can browse and open records, but changes are disabled for this account.
           </div>
         )}
-        {subBar && <div className="noprint shrink-0">{subBar}</div>}
+        {subBar && (
+          <div className="noprint shrink-0">
+            {React.cloneElement(subBar, {
+              unread,
+              showNotif,
+              onToggleNotif: () => setShowNotif((s) => !s),
+              onPrint: () => openPrintPreview({ selector: 'main', title: 'Document', recommend: 'portrait' }),
+            })}
+          </div>
+        )}
         {/* App-wide critical-alert banner — open 🔴 issues for the active branch
             (Trial Balance out, negative bank, suspense, can't-post vouchers, bounced
             cheques, ADM window closed). One click jumps to the Alerts Dashboard. */}

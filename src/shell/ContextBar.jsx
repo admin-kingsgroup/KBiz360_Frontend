@@ -5,6 +5,7 @@
 // Ctrl/Cmd+K, Ctrl/Cmd+1…9 to restore a minimized item).
 // ───────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useRef, useState } from 'react';
+import { Bell, Printer } from 'lucide-react';
 import { useNav } from '../core/ux/nav';
 import { useHotkey } from '../core/ux/hotkeys';
 import { usePrefs } from '../core/prefs';
@@ -15,10 +16,11 @@ import { openLedgerModal } from '../core/LedgerModalHost';
 import { Kbd } from '../core/ux/widgets.jsx';
 import { clickable } from '../core/ux/clickable';
 import { listKeyNav } from '../core/ux/listKeys';
+import { ReportIssueButton } from '../modules/support/components/ReportIssueButton';
 
 const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5', LINE = '#e1e3ec';
 
-export function ContextBar({ branch }) {
+export function ContextBar({ branch, route, unread, showNotif, onToggleNotif, onPrint }) {
   const nav = useNav();
   const { prefs, setPref } = usePrefs();
   const dock = useDock();
@@ -119,6 +121,30 @@ export function ContextBar({ branch }) {
             </span>
           );
         })}
+
+        {onPrint && (
+          <button type="button" title="Print / Save as PDF" onClick={onPrint} style={navBtn(true)}>
+            <Printer size={14} />
+          </button>
+        )}
+
+        {onToggleNotif && (
+          <span style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
+            <button type="button" onClick={onToggleNotif}
+              aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+              aria-haspopup="dialog" aria-expanded={!!showNotif}
+              style={navBtn(true)}>
+              <Bell size={14} />
+            </button>
+            {unread > 0 && (
+              <span style={{ position: 'absolute', top: -4, right: -4, display: 'flex', height: 15, minWidth: 15, alignItems: 'center', justifyContent: 'center', borderRadius: 999, border: '2px solid #fff', background: '#dc2626', padding: '0 3px', fontSize: 8.5, fontWeight: 800, color: '#fff' }}>
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
+          </span>
+        )}
+
+        <ReportIssueButton route={route}/>
 
         {recents.length > 0 && (
           <div ref={recRef} style={{ position: 'relative' }} onKeyDown={listKeyNav({ onEscape: () => setRecOpen(false) })}>
