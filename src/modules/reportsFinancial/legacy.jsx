@@ -1921,8 +1921,13 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
   );
 }
 
-
-const sideRows = (groups, summary, isOpen = () => true, side = '') => [...(groups || [])].sort((a, b) => azByName(a.group, b.group)).flatMap((g) => {
+/* ── Tally Classic (white) view ──────────────────────────────────────── */
+// PRIMARY groups keep the backend's Tally-tree order (liabilities/assets arrive
+// pre-sorted via BS_LIAB_ORDER / BS_ASSET_ORDER) — same as the Fiori view — so
+// the Balance Sheet reads Capital → Loans → Current Liabilities / Fixed Assets →
+// Investments → Current Assets, NOT alphabetically. Sub-Groups and Ledgers below
+// each group still sort A→Z (azByName), which is normal Tally behaviour.
+const sideRows = (groups, summary, isOpen = () => true, side = '') => [...(groups || [])].flatMap((g) => {
   if (summary) return [{ label: g.group, amount: g.amount, group: true, result: g.isResult }];
   const { subs, direct } = splitSubGroups(g.ledgers);
   return [
@@ -2217,6 +2222,7 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfP
   const mobile = useMobile();
   const [asOfState, setAsOf] = useState(''); // '' = today; otherwise YYYY-MM-DD cut-off
 
+  const [asOfState, setAsOf] = useState('');
   const asOf = embedded ? (asOfProp || '') : asOfState;
   const q = useAgeing(branch, asOf);
   const d = q.data;

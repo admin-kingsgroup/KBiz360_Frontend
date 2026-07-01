@@ -10,12 +10,16 @@ import { useLedgerRegistry } from '../useReference';
  * IDs. This adapter maps name↔id against the live chart so create and edit can
  * share the exact same field state.
  *
- * If `value` is a legacy name not present in the current chart, the trigger
- * shows the placeholder but the name is preserved in state (we never silently
- * drop it) — picking a new ledger overwrites it.
+ * If `value` is a legacy name not present in the current chart (imported / merged /
+ * renamed ledger), the trigger shows the NAME itself flagged "not in chart" — never a
+ * blank-looking field — so an edit/revoke reopen surfaces the stale ledger instead of
+ * hiding it. The name stays in state; picking a new ledger overwrites it. The flag is
+ * gated on the chart being loaded so valid ledgers don't flash it during load.
  */
 export function LedgerPicker({ value, onChange, filter, placeholder, style, branch }) {
-  const reg = useLedgerRegistry(branch).data || [];
+  const q = useLedgerRegistry(branch);
+  const reg = q.data || [];
+  const loaded = q.isSuccess && reg.length > 0;
   const idOf = (name) => reg.find((l) => l.name === name)?.id || '';
   const nameOf = (id) => reg.find((l) => l.id === id)?.name || '';
   return (
@@ -24,7 +28,8 @@ export function LedgerPicker({ value, onChange, filter, placeholder, style, bran
       value={idOf(value)}
       onChange={(id) => onChange(nameOf(id))}
       filter={filter}
-      placeholder={placeholder || (value && !idOf(value) ? value : 'Select ledger...')}
+      placeholder={placeholder || 'Select ledger...'}
+      rawValue={loaded && value && !idOf(value) ? value : ''}
       style={style}
     />
   );
