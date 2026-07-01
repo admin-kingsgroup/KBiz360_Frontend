@@ -2221,8 +2221,6 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfP
   const compactL = (n) => compactCur(cur, n);
   const mobile = useMobile();
   const [asOfState, setAsOf] = useState(''); // '' = today; otherwise YYYY-MM-DD cut-off
-
-  const [asOfState, setAsOf] = useState('');
   const asOf = embedded ? (asOfProp || '') : asOfState;
   const q = useAgeing(branch, asOf);
   const d = q.data;
