@@ -310,6 +310,17 @@ export function useGpBills(branch, { from, to } = {}) {
   });
 }
 
+// Audit Trail report — global, filterable audit-log list. GET /api/audit.
+export function useAuditTrail(branch, { action, by, from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['audit', 'list', code || 'all', action || '', by || '', from || '', to || ''],
+    queryFn: () => apiGet('/api/audit', { branch: code, action, by, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 // Revenue & GP ranked by destination. GET /api/accounting/yield-by-destination.
 export function useYieldByDestination(branch, { from, to } = {}) {
   const code = branchCode(branch);
@@ -504,11 +515,14 @@ export function useRegisterSummary(branch, { category, from, to } = {}) {
 // `includeSettled` (optional) — the Bill-wise STATEMENT view passes this to also
 // receive fully-paid bills (settled amount + pending 0), so its Settled/Bills-Raised
 // totals foot to the full picture. The settle screen leaves it off (open bills only).
-export function useOpenBills(party, branch, side = 'customer', excludeId, includeSettled = false) {
+// `mode` (optional) — 'advances' returns the party's open RECEIPTS (leftover per
+// receipt), shaped as bills, so a Payment voucher can refund a Sundry Debtor's
+// on-account money by settling against specific receipts. Default → open bills.
+export function useOpenBills(party, branch, side = 'customer', excludeId, includeSettled = false, mode) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || '', excludeId || '', includeSettled ? 'all' : 'open'],
-    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side, excludeId, includeSettled: includeSettled ? '1' : undefined }),
+    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || '', excludeId || '', includeSettled ? 'all' : 'open', mode || 'bills'],
+    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side, excludeId, mode, includeSettled: includeSettled ? '1' : undefined }),
     enabled: enabled() && !!party && !!code,
     staleTime: 15_000,
   });

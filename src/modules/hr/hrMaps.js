@@ -134,6 +134,76 @@ export function toJobPayload(f = {}) {
   };
 }
 
+/* ── Shifts (working-time master) ───────────────────────────────── */
+export function fromShiftDTO(s = {}) {
+  return {
+    id: s.id,
+    name: s.name || '',
+    code: s.code || '',
+    branch: s.branch || '',
+    startTime: s.startTime || '09:30',
+    endTime: s.endTime || '18:30',
+    breakMins: +s.breakMins || 0,
+    graceMins: +s.graceMins || 0,
+    weeklyOff: Array.isArray(s.weeklyOff) ? s.weeklyOff.map(Number) : [0],
+    nightShift: !!s.nightShift,
+    active: s.active !== false,
+  };
+}
+export function toShiftPayload(f = {}) {
+  return {
+    name: f.name || '',
+    code: f.code || '',
+    branch: f.branch || '',
+    startTime: f.startTime || '09:30',
+    endTime: f.endTime || '18:30',
+    breakMins: +f.breakMins || 0,
+    graceMins: +f.graceMins || 0,
+    weeklyOff: (Array.isArray(f.weeklyOff) ? f.weeklyOff : []).map(Number).filter((d) => d >= 0 && d <= 6),
+    nightShift: !!f.nightShift,
+    active: f.active !== false,
+  };
+}
+
+// The set of weekly-off day-of-week ints for an employee's assigned shift, given the
+// shifts list keyed by id. Falls back to Sunday-only when unassigned/unknown. Pure.
+export function weeklyOffForShift(shiftId, shiftsById = {}) {
+  const s = shiftId && shiftsById[shiftId];
+  const wo = s && Array.isArray(s.weeklyOff) ? s.weeklyOff.map(Number) : [0];
+  return wo;
+}
+
+// HH:mm → minutes since midnight, or null if malformed. Pure.
+function toMin(t) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(t == null ? '' : t).trim());
+  if (!m) return null;
+  const h = +m[1], mi = +m[2];
+  return (h > 23 || mi > 59) ? null : h * 60 + mi;
+}
+// Pure: is an in-time late for the shift? Late = strictly after start + grace. Missing/
+// malformed in-time or shift start → not late (can't judge). Mirrors the backend rule.
+export function isLate(inTime, startTime, graceMins = 0) {
+  const i = toMin(inTime), s = toMin(startTime);
+  if (i == null || s == null) return false;
+  return i > s + (Number(graceMins) || 0);
+}
+
+// Pure: one employee's month punctuality % = on-time ÷ present days that HAVE an in-time,
+// judged against their shift (start + grace). Mirrors the backend punctualityPctOf EXACTLY
+// (present-only, punch-required, grace-edge inclusive, same rounding, null when none) so the
+// grid column and the dashboard KPI can't drift. `shift` is the resolved shift or undefined.
+export function punctualityPct(days = {}, times = {}, shift) {
+  let onTime = 0, timed = 0;
+  for (const [d, code] of Object.entries(days || {})) {
+    if (String(code || '').toUpperCase() !== 'P') continue;
+    const inT = times && times[d] && times[d].in;
+    if (!inT) continue;
+    timed += 1;
+    if (!isLate(inT, shift ? shift.startTime : null, shift ? shift.graceMins : 0)) onTime += 1;
+  }
+  return timed ? Math.round((onTime / timed) * 1000) / 10 : null;
+}
+
 /* ── Employee loans / salary advances ───────────────────────────── */
 export function fromLoanDTO(l = {}) {
   const principal = +l.principal || 0, emi = +l.emi || 0, paid = +l.paid || 0;

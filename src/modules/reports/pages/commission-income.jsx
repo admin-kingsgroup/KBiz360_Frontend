@@ -18,7 +18,7 @@ import { RptShell } from '../components/scaffold';
 
 const RATE = (mod) => (mod === 'Insurance' ? 15 : mod === 'Flight' ? 2 : mod === 'Holiday' ? 3 : 1);
 
-export function ReportCommission({ branch }) {
+export function ReportCommission({ branch, setRoute }) {
   const cur = bc(branch).cur;
   const [range, setRange] = useState(() => ({ mode: 'all', ...resolveReportRange('all') }));
   const [search, setSearch] = useState('');
@@ -91,6 +91,7 @@ export function ReportCommission({ branch }) {
         columns={columns}
         rows={filtered}
         getRowKey={(r) => r.supplier}
+        onRowClick={setRoute ? (r) => (r.supplier && r.supplier !== '—') && setRoute(`/reports/supplier-360?party=${encodeURIComponent(r.supplier)}`) : undefined}
         dense
         initialSort={{ key: 'commission', dir: 'desc' }}
         exportName="commission-income"

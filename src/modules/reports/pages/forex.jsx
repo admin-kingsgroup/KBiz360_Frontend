@@ -1,12 +1,3 @@
-/* ════════════════════════════════════════════════════════════════════
-   Reports ▸ Forex Gain / Loss — realized + unrealized FX settlements.
-   ════════════════════════════════════════════════════════════════════
-   Migrated out of legacy.jsx. The book is India-only / INR base, so there
-   are no foreign-currency settlements (FOREX_DATA is empty) — the screen
-   honestly shows zero KPIs and an empty grid rather than fabricated figures.
-   Structure preserved on the shared scaffold for when FX wiring lands.
-   ──────────────────────────────────────────────────────────────────── */
-
 import React, { useState } from 'react';
 import { Download, ChevronDown } from 'lucide-react';
 import { Menu as DropdownMenu } from '../../../core/ux/Menu';
@@ -82,7 +73,7 @@ export function ForexReport({ branch }) {
     <RptShell title="Forex Gain / Loss Report" subtitle="Foreign currency settlements · Realized + Unrealized" filters={filters} actions={csvButton}>
       <ResponsiveGrid min="150px" gap="md" className="mb-4">
         {KPIS.map((k, i) => (
-          <div key={i} className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3 py-2.5" style={{ borderTopColor: k.c }}>
+          <div key={i} className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3 py-4" style={{ borderTopColor: k.c }}>
             <p className="text-[8.5px] font-bold uppercase tracking-wide" style={{ color: k.c }}>{k.l}</p>
             <p className="mt-1 text-base font-extrabold tabular-nums text-navy tablet:text-lg">{k.v}</p>
           </div>

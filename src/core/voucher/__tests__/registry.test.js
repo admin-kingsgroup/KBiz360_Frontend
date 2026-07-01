@@ -380,3 +380,53 @@ describe('refund toBody — cancellation + commission clawback fields', () => {
     expect(b.incentiveAmt).toBe(0);
   });
 });
+
+// Payment → Sundry Debtor = returning a client's leftover on-account money. It becomes
+// a settling party (not a loose direct entry): allocations name the client's open
+// RECEIPTS so each receipt's leftover is knocked down. Posting stays Dr Client / Cr Bank.
+describe('payment → Debtor = client refund (settles open receipts)', () => {
+  test.concurrent('isParty: a Debtor on a Payment now settles bill-wise (refund of advances)', async () => {
+    expect(PM.isParty({ otherType: 'Debtor' })).toBe(true);
+    expect(PM.isParty({ otherType: 'Creditor' })).toBe(true);   // supplier payment (unchanged)
+    expect(PM.isParty({ otherType: 'Expense' })).toBe(false);   // still a direct entry
+  });
+
+  test.concurrent('toBody: party model, partyType customer, allocations against receipt vnos, no TDS', async () => {
+    const b = PM.toBody({ party: 'Inaysha', otherType: 'Debtor', bankRef: 'Cash In Hand', amount: 3500,
+      applyMode: 'bills', alloc: { RV0201: 2000, RV0233: 1500 }, _billIds: { RV0201: 'r1', RV0233: 'r2' } }, ctx);
+    expect(b.category).toBe('payment');
+    expect(b.partyType).toBe('customer');
+    expect(b.lines).toEqual([]);            // party model — no explicit Dr/Cr legs
+    expect(b.total).toBe(3500);
+    expect(b.allocations).toEqual([
+      { billVno: 'RV0201', billId: 'r1', amount: 2000 },
+      { billVno: 'RV0233', billId: 'r2', amount: 1500 },
+    ]);
+    expect(b.tdsAmt).toBe(0);
+  });
+
+  test.concurrent('toBody: TDS is force-dropped even if stale state carries it (refund never withholds)', async () => {
+    const b = PM.toBody({ party: 'Inaysha', otherType: 'Debtor', bankRef: 'Cash', amount: 2000,
+      applyMode: 'bills', alloc: { RV0201: 2000 }, _billIds: {}, tds: true, tdsAmt: 200, tdsSection: '194H' }, ctx);
+    expect(b.tdsAmt).toBe(0);
+    expect(b.total).toBe(2000);            // gross not inflated by the dropped TDS
+  });
+
+  test.concurrent('validate: allocated refund saves; unallocated (against-bills) does not; on-account allowed', async () => {
+    const alloc = { party: 'Inaysha', otherType: 'Debtor', bankRef: 'Cash', amount: 2000, applyMode: 'bills', alloc: { RV0201: 2000 } };
+    expect(PM.validate(alloc).ok).toBe(true);
+    const none = { party: 'Inaysha', otherType: 'Debtor', bankRef: 'Cash', amount: 2000, applyMode: 'bills', alloc: {} };
+    expect(PM.validate(none).ok).toBe(false);
+    const onAcc = { party: 'Inaysha', otherType: 'Debtor', bankRef: 'Cash', amount: 2000, applyMode: 'onaccount', alloc: {} };
+    expect(PM.validate(onAcc).ok).toBe(true);   // overpay beyond advances = advance/receivable
+  });
+
+  test.concurrent('fromVoucher: a saved client-refund payment reloads as a settling Debtor with its allocations', async () => {
+    const b = PM.toBody({ party: 'Inaysha', otherType: 'Debtor', bankRef: 'Cash', amount: 2000,
+      applyMode: 'bills', alloc: { RV0201: 2000 }, _billIds: { RV0201: 'r1' } }, ctx);
+    const s = PM.fromVoucher(b);
+    expect(s.party).toBe('Inaysha');
+    expect(s.otherType).toBe('Debtor');
+    expect(s.alloc).toEqual({ RV0201: 2000 });
+  });
+});

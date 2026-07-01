@@ -51,7 +51,7 @@ const ReportIssueButton = React.lazy(() => import('./modules/support/components/
    legacy string-router in Page(). Append more tables here as modules migrate. */
 const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes];
 const { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
-const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrExpenses, HrLeave, HrPayroll, HrPayslips, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
+const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrExpenses, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
 const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
 const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/mastersParties'));
 const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } = lazyModule(() => import('./modules/reports'));
@@ -382,14 +382,14 @@ export default function KB360App(){
     if(route==="/reports/cash-position")  return <RPT_CashPosition branch={branch}/>;
     if(route==="/reports/interbranch")    return <RPT_InterbranchElim/>;
     if(route==="/reports/fs-notes")       return <NotesToFinancials branch={branch}/>;
-    if(route==="/reports/audit-trail")    return <RPT_AuditTrail/>;
+    if(route==="/reports/audit-trail")    return <RPT_AuditTrail branch={branch}/>;
     /* New Profitability Reports */
-    if(route==="/reports/yield-destination")return <RPT_YieldDestination branch={branch}/>;
-    if(route==="/reports/yield-consultant") return <RPT_YieldConsultant branch={branch}/>;
-    if(route==="/reports/yield-supplier")   return <RPT_YieldSupplier branch={branch}/>;
-    if(route==="/reports/yoy")              return <RPT_YoY branch={branch}/>;
-    if(route==="/reports/customer-ltv")     return <RPT_CustomerLTV branch={branch}/>;
-    if(route==="/reports/abc-analysis")     return <RPT_ABCAnalysis branch={branch}/>;
+    if(route==="/reports/yield-destination")return <RPT_YieldDestination branch={branch} setRoute={navigate}/>;
+    if(route==="/reports/yield-consultant") return <RPT_YieldConsultant branch={branch} setRoute={navigate}/>;
+    if(route==="/reports/yield-supplier")   return <RPT_YieldSupplier branch={branch} setRoute={navigate}/>;
+    if(route==="/reports/yoy")              return <RPT_YoY branch={branch} setRoute={navigate}/>;
+    if(route==="/reports/customer-ltv")     return <RPT_CustomerLTV branch={branch} setRoute={navigate}/>;
+    if(route==="/reports/abc-analysis")     return <RPT_ABCAnalysis branch={branch} setRoute={navigate}/>;
     /* New HR Reports */
     if(route==="/hr/attrition")           return <RPT_Attrition/>;
     if(route==="/hr/leave-utilization")   return <RPT_LeaveUtilization/>;
@@ -542,9 +542,11 @@ export default function KB360App(){
     // Unified statements: one P&L screen and one BS screen, view-switched
     // (Fiori · Classic · Vertical · Tally · TKF [· Schedule III · Consolidated]).
     // All legacy routes point here so existing links keep working.
-    if(route==="/reports/pnl" || route==="/reports/pnl-tally" || route==="/reports/pnl-modulewise") return <ProfitAndLossUnified branch={branch}/>;
-    if(route==="/reports/bs" || route==="/reports/bs-tally" || route==="/reports/bs-modulewise") return <BalanceSheetUnified branch={branch}/>;
-    if(route==="/reports/cf")         return <ReportCF/>;
+    if(route==="/reports/pnl-tally")  return <PnLTallyLive branch={branch}/>;              // purpose-built Tally-format P&L (was aliased to Unified)
+    if(route==="/reports/bs-tally")   return <BalanceSheetTallyLive branch={branch}/>;     // purpose-built Tally-format BS (was aliased to Unified)
+    if(route==="/reports/pnl" || route==="/reports/pnl-modulewise") return <ProfitAndLossUnified branch={branch}/>;
+    if(route==="/reports/bs" || route==="/reports/bs-modulewise") return <BalanceSheetUnified branch={branch}/>;
+    if(route==="/reports/cf")         return <ReportCF branch={branch} setRoute={navigate}/>;   // was <ReportCF/> — no branch → always ₹/consolidated
     if(route==="/reports/rec")        return <ReceivablesLive branch={branch} setRoute={navigate}/>;
     if(route==="/reports/pay")        return <PayablesLive branch={branch} setRoute={navigate}/>;
     if(route==="/reports/sreg")       return <RegisterLive branch={branch} initial="sales"/>;
@@ -571,7 +573,7 @@ export default function KB360App(){
     if(route==="/settings/preferences")  return <UxPreferences/>;
     if(route==="/reports/mis")            return <MisReport branch={branch}/>;
     if(route==="/reports/concentration")  return <ClientConcentration branch={branch}/>;
-    if(route==="/reports/consolidated-bs")return <ConsolidatedBS/>;
+    if(route==="/reports/consolidated-bs")return <ConsolidatedBS setRoute={navigate}/>;
     if(route==="/reports/cashflow-forecast")return <CashFlowForecast branch={branch}/>;
     if(route==="/reports/supplier-360")   return <Supplier360 branch={branch}/>;
     if(route==="/reports/customer-360")   return <Customer360 branch={branch}/>;
@@ -589,6 +591,7 @@ export default function KB360App(){
     if(route==="/expense/budget")       return <ExpenseBudget branch={branch} setRoute={navigate}/>;
     if(route==="/reports/exp-bgt")      return <ReportExpenseBgt branch={branch} setRoute={navigate}/>;
     if(route==="/hr/employees")         return <HrEmployees branch={branch}/>;
+    if(route==="/hr/shifts")            return <HrShifts branch={branch}/>;
     if(route==="/hr/attendance")        return <HrAttendance branch={branch}/>;
     if(route==="/hr/payroll")           return <HrPayroll branch={branch}/>;
     if(route==="/hr/payslips")          return <HrPayslips branch={branch}/>;

@@ -7,7 +7,7 @@ import { useLedgerRegistry } from '../../useReference';
 import { BillAllocPanel } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
 import { useVoucherRef } from '../useVoucherRef';
-import { allocSummary, money2, GREEN, RED } from '../ui';
+import { allocSummary, money2, GREEN, RED, settleSpec } from '../ui';
 
 /**
  * Receipt (money IN from a debtor) / Payment (money OUT to a creditor) body.
@@ -29,14 +29,19 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
   //   the registry's toBody/validate can branch without the chart.
   const chart = useLedgerRegistry(branch).data || [];
   const otherType = (chart.find((l) => l.name === state.party) || {}).type || '';
-  const isParty = otherType === (isReceipt ? 'Debtor' : 'Creditor');
+  // Does the counter-account settle bill-wise, and against what? A Debtor on a PAYMENT
+  // is a client refund — it settles the client's open RECEIPTS (advances mode).
+  const spec = settleSpec(side, otherType);
+  const isParty = spec.party;
+  const isRefund = spec.mode === 'advances'; // Payment → Debtor: returning on-account money
   useEffect(() => {
     if (state.party && otherType && state.otherType !== otherType) setState((s) => ({ ...s, otherType }));
   }, [otherType, state.party]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Live open bills for the chosen party. When editing, exclude this voucher's own
-  // settlement so the bills it already cleared reappear and stay re-allocatable.
-  const billsQ = useOpenBills(isParty ? state.party : '', branch, side, ctx.editId);
+  // Live open items for the chosen party. When editing, exclude this voucher's own
+  // settlement so what it cleared reappears and stays re-allocatable. In refund mode the
+  // rows are the client's open receipts (leftover each); otherwise their open bills.
+  const billsQ = useOpenBills(isParty ? state.party : '', branch, spec.obSide, ctx.editId, false, spec.mode);
 
   // Keep billVno→billId in sync as bills load, so toBody can carry billId.
   useEffect(() => {
@@ -105,8 +110,8 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
         </div>
       )}
 
-      {/* TDS (party receipts/payments only) */}
-      {isParty && (
+      {/* TDS (genuine supplier payment / customer receipt only — never a client refund) */}
+      {isParty && !isRefund && (
       <div style={{ padding: '10px 12px', borderRadius: 9, background: '#FAEEDA', border: '1px solid #FAC775', margin: '12px 0' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: state.tds ? 8 : 0 }}>
           <input type="checkbox" checked={!!state.tds} onChange={(e) => patch({ tds: e.target.checked })} style={{ cursor: 'pointer', accentColor: '#854F0B' }} />
@@ -124,13 +129,16 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
       </div>
       )}
 
-      {/* Bill-wise allocation (party ledgers only) */}
+      {/* Bill-wise allocation — open bills, or (client refund) the client's open receipts */}
       {isParty && (
       <BillAllocPanel
         side={side} party={state.party} q={billsQ} amount={gross}
         alloc={state.alloc} onSetAlloc={setAllocFor} onFull={fullAlloc}
         mode={state.applyMode} onMode={(m) => patch({ applyMode: m })}
         parkOnAcc={state.parkOnAcc} onParkOnAcc={(v) => patch({ parkOnAcc: v })} cur={cur}
+        heading={isRefund ? 'Refund Against Received Payments' : undefined}
+        itemLabel={isRefund ? 'Receipt No.' : undefined}
+        emptyHint={isRefund ? `No open receipts with a leftover balance for ${state.party || 'this client'}. Use “On Account” to pay it as an advance.` : undefined}
       />
       )}
 

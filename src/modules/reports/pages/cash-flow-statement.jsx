@@ -18,7 +18,10 @@ import { CONSOLIDATED_LABEL } from '../../../core/data';
 import { LoadingState, ErrorState, EmptyState, PageSection } from '../../../shell/primitives';
 import { RptShell } from '../components/scaffold';
 
-export function ReportCF({ branch }) {
+export function ReportCF({ branch, setRoute }) {
+  // Cash-flow lines are derived from Balance-Sheet movements (+ net profit) → drill to the
+  // detailed Balance Sheet, which itself drills group → ledger → voucher. Inert if no setRoute.
+  const cfNav = setRoute ? { onClick: () => setRoute('/reports/bs'), role: 'button', tabIndex: 0, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setRoute('/reports/bs'); } }, style: { cursor: 'pointer' }, title: 'Open source: Balance Sheet →' } : {};
   const cur = bc(branch).cur;
   const brCode = branch === 'ALL' ? null : branch?.code;
   const [period, setPeriod] = useState(CUR_MONTH);
@@ -111,7 +114,7 @@ export function ReportCF({ branch }) {
               <table className="w-full border-collapse text-[11.5px]">
                 <tbody>
                   {sec.rows.map((r, ri) => (
-                    <tr key={ri} className={`border-b border-surface-alt ${r.border ? 'border-t-2 border-t-surface-border bg-surface-alt' : ''}`}>
+                    <tr key={ri} {...cfNav} className={`border-b border-surface-alt ${r.border ? 'border-t-2 border-t-surface-border bg-surface-alt' : ''} ${setRoute ? 'hover:bg-surface-alt' : ''}`}>
                       <td className={`px-3.5 py-2.5 text-navy ${r.bold ? 'font-bold' : ''}`}>{r.l}</td>
                       <td className="px-3.5 py-2.5 text-right tabular-nums" style={{ color: r.bold ? clr(r.v) : r.v < 0 ? '#dc2626' : '#2e323c', fontWeight: r.bold ? 800 : 500, fontSize: r.bold ? 13 : 11.5 }}>{f(r.v)}</td>
                     </tr>

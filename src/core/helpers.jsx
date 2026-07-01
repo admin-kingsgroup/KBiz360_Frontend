@@ -766,21 +766,25 @@ export const GROUP_BOOKINGS=[];
 
 export function PackagePnL({branch}){
   const mob=useMobile();
-  const brCode=branch==="ALL"?null:branch?.code;
   const [period,setPeriod]=useState("YTD");
   const PERIODS=MONTH_PERIOD_OPTIONS;
   const FY_MONTHS=FY_YTD_MONTHS;
-  const bills=useMemo(()=>GP_BILLS.filter(b=>(!brCode||b.branch===brCode)&&(b.mod==="Holiday"||b.mod==="MICE")&&(period==="YTD"?FY_MONTHS.includes(b.date.slice(0,7)):b.date.startsWith(period))),[brCode,period]);
+  // LIVE: per-booking GP list (GET /api/accounting/gp-bills, branch-scoped server-side),
+  // filtered to Holiday/MICE packages. Previously read the empty GP_BILLS seed (always blank).
+  const gpQ=useGpBills(branch);
+  const bills=useMemo(()=>(gpQ.data||[]).filter(b=>(b.mod==="Holiday"||b.mod==="MICE")&&(period==="YTD"?FY_MONTHS.includes(String(b.date||"").slice(0,7)):String(b.date||"").startsWith(period))),[gpQ.data,period]);
 
-  // Group by tour code (simulate from dest)
+  // Group by tour code (falls back to a destination-derived code when the booking
+  // carries no explicit tour code).
   const pkgMap={};
   bills.forEach(b=>{
     const tourCode=b.tourCode||`TC-${b.dest?.slice(0,3).toUpperCase()||"OTH"}`;
     if(!pkgMap[tourCode])pkgMap[tourCode]={code:tourCode,dest:b.dest||"Various",rev:0,cost:0,bks:0,pax:0};
-    pkgMap[tourCode].rev+=b.sell;pkgMap[tourCode].cost+=b.cost;pkgMap[tourCode].bks++;pkgMap[tourCode].pax+=b.pax||2;
+    pkgMap[tourCode].rev+=(b.sell||0);pkgMap[tourCode].cost+=(b.cost||0);pkgMap[tourCode].bks++;pkgMap[tourCode].pax+=b.pax||2;
   });
   const rows=Object.values(pkgMap).map(p=>({...p,gp:p.rev-p.cost,gpPct:p.rev>0?+(( p.rev-p.cost)/p.rev*100).toFixed(1):0,gpPerPax:p.pax>0?Math.round((p.rev-p.cost)/p.pax):0})).sort((a,b)=>b.gp-a.gp);
-  const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
+  const cur=(bc(branch)||{}).cur||"₹";
+  const f=n=>cur+Number(Math.round(n||0)).toLocaleString((cur==="₹"||cur==="₨"||cur==="Rs")?"en-IN":"en-US");
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
@@ -821,7 +825,7 @@ export function PackagePnL({branch}){
               <td style={{padding:"8px 12px",textAlign:"right"}}>{r.gpPct>=15?"⭐⭐⭐":r.gpPct>=10?"⭐⭐":"⭐"}</td>
             </tr>
           ))}
-          {rows.length===0&&<tr><td colSpan={10} style={{padding:"24px",textAlign:"center",color:"#5a6691"}}>No holiday bookings for this period</td></tr>}
+          {rows.length===0&&<tr><td colSpan={10} style={{padding:"24px",textAlign:"center",color:"#5a6691"}}>{gpQ.isLoading?"Loading holiday bookings…":"No holiday bookings for this period"}</td></tr>}
           </tbody>
           {rows.length>0&&<tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
             <td colSpan={4} style={{padding:"9px 12px",fontWeight:700,color:"#d4a437",fontSize:12}}>TOTAL</td>
@@ -1365,7 +1369,8 @@ export function MsmeTracker({branch,setRoute}){
   return(
     <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
       <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>⚠️ MSME 45-Day Compliance Tracker</h2>
-      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Section 43B(h) of Income Tax Act · Pay MSME suppliers within 45 days or lose tax deduction</p>
+      <p style={{margin:"4px 0 10px",fontSize:11.5,color:"#5a6691"}}>Section 43B(h) of Income Tax Act · Pay MSME suppliers within 45 days or lose tax deduction</p>
+      <SampleBanner note="MSME supplier registration (UDYAM) is not yet captured on supplier masters — 43B(h) exposure cannot be computed from the live books. The figures below are NOT a clean bill of health; flag MSME suppliers first." />
 
       <div style={{display:"grid",gridTemplateColumns:mob?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:14}}>
         <div style={{...card,borderTop:"3px solid #A32D2D"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Critical (&gt; 45 days)</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#A32D2D"}}>{critical.length}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>{cur+fmt(totalAtRisk)} at risk</p></div>

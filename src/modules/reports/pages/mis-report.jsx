@@ -26,6 +26,15 @@ import { CONSOLIDATED_LABEL } from '../../../core/data';
 import { compactAmt } from '../../../core/format';
 import { PageLayout } from '../../../shell/PageLayout';
 import { PageSection, ResponsiveGrid, Button } from '../../../shell/primitives';
+import { openLedgerModal } from '../../../core/LedgerModalHost';
+
+// Client leaderboard rows drill into that party's ledger statement (→ voucher) via the
+// global ledger modal. Props inert for the "—" unmapped bucket.
+const clientDrill = (name) => (name && name !== '—' ? {
+  onClick: () => openLedgerModal(name), role: 'button', tabIndex: 0,
+  onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLedgerModal(name); } },
+  style: { cursor: 'pointer' }, title: 'Open ledger →',
+} : {});
 
 const achvStyle = (a) => (a >= 90 ? { background: '#e8f6ed', color: '#16a34a' } : a >= 70 ? { background: '#fbeedb', color: '#d97706' } : { background: '#fbe9e9', color: '#dc2626' });
 const growthStyle = (g) => (g >= 0 ? { background: '#e8f6ed', color: '#16a34a' } : { background: '#fbe9e9', color: '#dc2626' });
@@ -178,7 +187,7 @@ export function MisReport({ branch }) {
           {/* Top clients */}
           <PageSection title="👥 Top Clients">
             {topClients.map(([name, dd]) => (
-              <div key={name} className="border-b border-surface-alt py-1.5 last:border-0">
+              <div key={name} {...clientDrill(name)} className="border-b border-surface-alt py-1.5 last:border-0 hover:bg-surface-alt">
                 <div className="flex justify-between"><span className="text-[11px] font-semibold text-navy">{name}</span><span className="text-[11px] font-bold text-[#2563eb]">{f(dd.rev)}</span></div>
                 <div className="mt-px text-[9.5px] text-ink-muted">GP: {f(dd.gp)} ({pct(dd.gp, gp)}% of total GP)</div>
               </div>
@@ -190,7 +199,7 @@ export function MisReport({ branch }) {
               label makes that explicit so it doesn't look like it disagrees with the rest. */}
           <PageSection title="⚠ Overdue Receivables (as of today)" className="border-t-[3px] border-t-maroon">
             {overdueClients.slice(0, 4).map((c) => (
-              <div key={c.client} className="flex justify-between border-b border-surface-alt py-1.5"><span className="text-[10.5px] text-navy">{c.client}</span><span className="text-[11px] font-bold text-maroon">{f(c.outstanding)}</span></div>
+              <div key={c.client} {...clientDrill(c.client)} className="flex justify-between border-b border-surface-alt py-1.5 hover:bg-surface-alt"><span className="text-[10.5px] text-navy">{c.client}</span><span className="text-[11px] font-bold text-maroon">{f(c.outstanding)}</span></div>
             ))}
             {overdueClients.length === 0 && <p className="text-[11px] text-[#16a34a]">✔ No overdue receivables</p>}
             <div className="mt-2 rounded-lg bg-[#fbe9e9] px-2.5 py-1.5 text-[9.5px] font-semibold text-maroon">Total: {f(overdueClients.reduce((s, c) => s + c.outstanding, 0))}</div>

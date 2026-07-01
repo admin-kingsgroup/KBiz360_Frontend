@@ -22,7 +22,7 @@ import { useHrMgrDashboard } from '../hooks/use-hr-mgr-dashboard';
 import { HrMgrDashboardPage } from '../pages/hr-mgr-dashboard';
 
 const STATS = {
-  totalHeadcount: 10, changeThisMonth: 1, attendancePct: 95, pendingLeave: 2,
+  totalHeadcount: 10, changeThisMonth: 1, attendancePct: 95, punctualityPct: 88, pendingLeave: 2,
   payrollStatus: 'Paid', openPositions: 3,
   birthdays: [{ name: 'Asha', branch: 'BOM', date: '03 Jul' }],
   anniversaries: [{ name: 'Ravi', branch: 'BOM', years: 5, date: '05 Jul' }],
@@ -49,6 +49,11 @@ describe('HR-Mgr Dashboard', () => {
   test('Payroll Status shows the month as delta (no dead " — " split)', () => {
     render(<HrMgrDashboardPage currentUser={{ name: 'HR' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
     expect(screen.getByText('KPI|Payroll Status|Paid|Jul 2026')).toBeInTheDocument();
+  });
+
+  test('Punctuality % KPI renders the live value (— when absent)', () => {
+    render(<HrMgrDashboardPage currentUser={{ name: 'HR' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    expect(screen.getByText('KPI|Punctuality %|88%|on-time arrivals')).toBeInTheDocument();
   });
 
   test('the dead "Send wish" / "Acknowledge" buttons are removed', () => {
