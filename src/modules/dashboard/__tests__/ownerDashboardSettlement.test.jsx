@@ -53,7 +53,7 @@ jest.mock('../components/shared/PnlWaterfallPanel', () => ({ PnlWaterfallPanel: 
 jest.mock('../components/shared/CashForecastPanel', () => ({ CashForecastPanel: () => <div>FORECAST</div> }));
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { useDirectorDashboard } from '../hooks/use-director-dashboard';
 import { OwnerDashboardPage } from '../pages/owner-dashboard';
 
@@ -114,6 +114,52 @@ describe('Owner Dashboard — single branch (BOM)', () => {
     expect(screen.getByText('PNL')).toBeInTheDocument();
     expect(screen.getByText('FORECAST')).toBeInTheDocument();
     expect(screen.getByText('LEADER')).toBeInTheDocument();
+  });
+});
+
+describe('Owner Dashboard — Sales Reconciliation bridge (single branch)', () => {
+  const RECON = {
+    revenue: 31490745,
+    buckets: [
+      { key: 'sopogp', label: 'SO/PO/GP (forward sales)', sign: '+', amount: 22151862, count: 385 },
+      { key: 'inb',    label: 'INB inter-branch',         sign: '+', amount: 11519458, count: 274 },
+      { key: 'refund', label: 'Refund / Reissue',         sign: '-', amount: -2181143, count: 42 },
+      { key: 'other',  label: 'Other / Manual',           sign: '+', amount: 0, count: 0 },
+    ],
+    bucketSum: 31490177, residual: 0, reconciles: true,
+  };
+  beforeEach(() => {
+    mockUseAgeing.mockReturnValue({ data: { receivables: { totals: {} }, payables: { totals: {} } } });
+    useDirectorDashboard.mockReturnValue({ data: { ...LOADED, salesRecon: RECON }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
+  });
+
+  test('renders the origin buckets and shows the refund as an ABSOLUTE subtraction (no double negative)', () => {
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    expect(screen.getByText(/Sales Reconciliation/)).toBeInTheDocument();
+    expect(screen.getByText('SO/PO/GP (forward sales)')).toBeInTheDocument();
+    expect(screen.getByText('INB inter-branch')).toBeInTheDocument();
+    expect(screen.getByText('Refund / Reissue')).toBeInTheDocument();
+    expect(screen.getByText('₹2181143')).toBeInTheDocument();   // refund rendered as |amount|
+    expect(screen.queryByText('₹-2181143')).toBeNull();          // never a double-negative
+    expect(screen.getByText('₹31490745')).toBeInTheDocument();   // bridge top == Revenue KPI value
+  });
+
+  test('a bucket row drills into its Approvals register', () => {
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    fireEvent.click(screen.getByText('Refund / Reissue').closest('button'));
+    expect(mockNavigate).toHaveBeenCalledWith('/transactions/approvals?tab=refund');
+  });
+
+  test('flags drift (residual) when the endpoint does not reconcile', () => {
+    useDirectorDashboard.mockReturnValue({ data: { ...LOADED, salesRecon: { ...RECON, reconciles: false, residual: 5000 } }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    expect(screen.getByText(/Unreconciled by/)).toBeInTheDocument();
+  });
+
+  test('hides the bridge on Group/ALL scope (no cross-currency merge)', () => {
+    useDirectorDashboard.mockReturnValue({ data: { ...LOADED, salesRecon: RECON, bookingsByBranch: [] }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={'ALL'} />);
+    expect(screen.queryByText(/Sales Reconciliation/)).toBeNull();
   });
 });
 

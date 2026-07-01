@@ -75,7 +75,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
   // NOTE: FY targets and the branch heatmap are rendered LIVE by the page itself
   // (useTargetsVsActual + per-branch module-pl), so we no longer fetch the seed
   // getFyTargets() or getBranchHeatmap() here — they were unused round-trips.
-  const [revenueTrend, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, bookingSummary, saleVouchers] =
+  const [revenueTrend, topCustomers, topSuppliers, bankAccounts, mpl, unsettled, cash, arAgeing, apAgeing, bookingSummary, saleVouchers, salesRecon] =
     await Promise.all([
       api.getRevenueTrend(branchCode),
       api.getTopCustomers(branchCode),
@@ -88,6 +88,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
       api.getApAgeingSummary(branchCode),  // branch isn't auto-coerced server-side — must pass it
       api.getBookingSummary(branchCode), // SO/PO/GP pipeline { pending, approved } (not date-bound — whole queue)
       api.getSaleVouchers({ branchCode, from: dates.from, to: dates.to }), // for the consultant leaderboard (Director ops view)
+      api.getSalesReconciliation({ branchCode, from: dates.from, to: dates.to }), // Revenue = SO/PO/GP + INB − Refund (+Other); foots to the Revenue KPI
     ]);
 
   // Key Alerts are computed live from ageing + module P&L + concentration, not seeded.
@@ -105,6 +106,7 @@ export const loadDirectorDashboard = async ({ range = 'month', branchCode, from,
     rejectedBookings: bookingSummary.rejected,
     deletedBookings: bookingSummary.deleted,
     bookingsByBranch: bookingSummary.byBranch || null, // per-branch SO/PO/GP pipeline (consolidated only)
+    salesRecon, // Revenue-by-origin bridge (SO/PO/GP + INB − Refund + Other); foots to figures.revenue
     rangeLabel: dates.label,
     figures: {
       revenue: mpl.totals.sales,

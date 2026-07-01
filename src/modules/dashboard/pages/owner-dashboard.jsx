@@ -293,6 +293,51 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
         </ResponsiveGrid>
       )}
 
+      {/* ── Sales Reconciliation (single-branch only — no cross-currency merge on Group) ──
+          Proves the Revenue KPI BY ORIGIN: Revenue = SO/PO/GP + INB − Refund/Reissue
+          (+ Other/Manual). Same Sales-Accounts source as the Revenue card, so it foots
+          to the rupee; each line drills into its Approvals register. */}
+      {!isAll && data.salesRecon && (data.salesRecon.buckets || []).length > 0 && (data.salesRecon.revenue || data.salesRecon.bucketSum) ? (
+        <div className="mb-4">
+          <div className="mb-1.5 text-xs font-semibold text-ink-muted">
+            Sales Reconciliation · {rangeShort} <span className="font-normal">— how the Revenue figure is composed</span>
+          </div>
+          <div className="rounded-brand border border-surface-border bg-surface px-4 py-3">
+            <div className="flex items-baseline justify-between border-b-2 pb-2" style={{ borderColor: '#185FA5' }}>
+              <span className="text-sm font-extrabold text-ink">Revenue · {rangeShort}</span>
+              <span className="text-lg font-extrabold tabular-nums" style={{ color: '#c2a04a' }}>{m0(data.salesRecon.revenue)}</span>
+            </div>
+            {data.salesRecon.buckets.map((b) => {
+              // Operator + colour follow the SIGNED amount (refund is naturally negative),
+              // and we render the absolute value so a subtracted line reads "− ₹21.8L",
+              // not a confusing "− … -₹21.8L". Empty catch-all (Other = 0) is inert & dim.
+              const neg = b.amount < 0;
+              const empty = b.amount === 0 && b.count === 0;
+              const inner = (
+                <>
+                  <span className="flex items-center gap-2 text-xs text-ink-muted">
+                    <span className="w-3 text-center font-bold" style={{ color: neg ? C.red : C.green }}>{neg ? '−' : '+'}</span>
+                    {b.label}
+                    {b.count ? <span className="text-[11px] text-ink-muted">· {b.count}</span> : null}
+                  </span>
+                  <span className={`text-sm font-bold tabular-nums ${empty ? 'text-ink-muted' : 'text-ink'}`}>{m0(Math.abs(b.amount))}</span>
+                </>
+              );
+              return empty ? (
+                <div key={b.key} className="flex w-full items-center justify-between py-1.5 opacity-60">{inner}</div>
+              ) : (
+                <button key={b.key} type="button" onClick={() => navigate(`/transactions/approvals?tab=${b.key}`)} className="flex w-full items-center justify-between py-1.5 text-left hover:opacity-80">{inner}</button>
+              );
+            })}
+            {!data.salesRecon.reconciles && (
+              <div className="mt-1 rounded border px-2 py-1 text-[11px] font-semibold" style={{ borderColor: C.red, color: C.red }}>
+                Unreconciled by {m0(Math.abs(data.salesRecon.residual))} — a Sales-ledger posting isn't classified; see the Other/Manual bucket.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
       {/* ── Bookings pipeline (condensed) ── on Group/ALL: per branch, each in its own
           currency (Sales/GP money never summed across branches). */}
       <div className="mb-1.5 text-xs font-semibold text-ink-muted">SO/PO/GP Pipeline · {rangeShort}</div>
