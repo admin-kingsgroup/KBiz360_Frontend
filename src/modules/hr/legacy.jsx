@@ -1444,7 +1444,6 @@ export function HrLeave({branch}){
                 <td style={{padding:"8px 12px",textAlign:"center",fontWeight:700,color:"#185FA5"}}>{l.days}</td>
                 <td style={{padding:"8px 12px",color:"#384677",maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.reason}</td>
                 <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:STATUS_BG[l.status],color:STATUS_CLR[l.status]}}>{l.status}</span></td>
-                <td style={{padding:"8px 12px",color:"#5a6691",fontSize:10}}>{l.approvedBy||"—"}</td>
                 <td style={{padding:"8px 12px"}}>
                   {l.status==="Pending"&&<div style={{display:"flex",gap:4}}>
                     <button onClick={()=>approve(l)} disabled={update.isPending} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#27500A"}}>✓ Approve</button>
