@@ -257,6 +257,7 @@ export function PageAccessControl({ currentUser, setRoute }) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[12.5px] font-bold text-navy">{u.name || u.email}</div>
+                    <div className="truncate font-mono text-[10.5px] text-ink-muted">{u.email}</div>
                     <div className="truncate text-[10px] text-ink-subtle">{u.role}{u.active === false ? ' · inactive' : ''}</div>
                   </div>
                   {nGranted > 0 && <StatusPill tone="info" size="sm">{nGranted} granted</StatusPill>}
@@ -280,6 +281,7 @@ export function PageAccessControl({ currentUser, setRoute }) {
                 <div className="flex flex-wrap items-center gap-2.5">
                   <div className="min-w-[180px] flex-1">
                     <div className="text-sm font-extrabold text-navy">{selectedUser.name || selectedUser.email}</div>
+                    <div className="select-all truncate font-mono text-[11px] text-ink-muted">{selectedUser.email}</div>
                     <div className="text-[11px] text-ink-muted">
                       {selectedUser.role} · sees <b className="text-[#27963c]">{counts.visible}</b> of {totalPages} pages
                       {counts.hidden > 0 && <> · <b className="text-maroon">{counts.hidden} hidden</b></>}
