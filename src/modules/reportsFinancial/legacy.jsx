@@ -2184,7 +2184,8 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
 function ArApScreen({ branch, side, setRoute, initialTab }) {
   const isRec = side === 'receivables';
   const [tab, setTab] = useState(initialTab || 'ageing'); // 'ageing' | 'settle' | 'net'
- 
+  const [advFocus, setAdvFocus] = useState(null);
+
   const adjustAdvance = (party) => { setAdvFocus(party); setTab('settle'); };
   
   const TABS = [['ageing', 'Ageing'], ['settle', 'Open Bills & On-Account ▸ Settle'], ['net', 'Net (Debtors − Creditors)']];
