@@ -4,7 +4,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useRef, useState, useEffect, Suspense } from 'react';
-import { Calendar, ChevronDown, ChevronRight, Clock, Download, Plus, Save, Search, Trash2, TrendingDown, TrendingUp, User } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronRight, Clock, Download, PieChart as PieChartIcon, Percent, Plus, Save, Search, Trash2, TrendingDown, TrendingUp, Truck, User } from 'lucide-react';
 import { Menu as DropdownMenu } from './ux/Menu';
 import { Bar, BarChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getUnmatchedTickets, settlePurchaseEntry } from './business-logic';
@@ -27,16 +27,10 @@ import { useTaxFilingBoard, useStatutoryDues } from './useTaxReco';
 import { ReportDateBar, resolveReportRange } from './reportDateBar';
 import { triggerSaveRefresh, useMobile } from './hooks';
 import { openPrintWindow } from './voucher-print';
-/* PurchaseLinkField is lazy-loaded (used only inside the sales voucher form),
-   so styles.jsx no longer STATICALLY imports the transactions feature —
-   completing the break of the styles ↔ feature-modules cycle. The old
-   UserSwitcher import was dead (referenced only in a comment) and is removed. */
+
 const PurchaseLinkField = React.lazy(() =>
   import('../modules/transactions').then(m => ({ default: m.PurchaseLinkField })));
-/* Lightweight UI tokens were moved to ./styleTokens so eager shell/core files
-   can import them WITHOUT pulling this (recharts-heavy) file. Import for local
-   use here AND re-export under the original names so lazy './styles' consumers
-   keep working unchanged. */
+
 import { B, bc, bcfmt, inp, card, btnG, btnGh, Icon, FL, KpiCard, RPT_thStyle, RPT_tdStyle } from './styleTokens';
 export { B, bc, bcfmt, inp, card, btnG, btnGh, Icon, FL, KpiCard, RPT_thStyle, RPT_tdStyle };
 // Branch-aware compact money for the analytics RPT_ reports (each figure is in the
@@ -52,28 +46,6 @@ const rrow = (setRoute, route) => (setRoute && route ? {
 } : {});
 const partyLink = (base, name) => `${base}?party=${encodeURIComponent(name || '')}`;
 
-/* ── Per-branch config — now DB-backed ──────────────────────────────
-   The per-branch config (currency symbol, tax type, GST rates, place-of-supply
-   options, voucher prefix) used to be hardcoded here together with demo KPIs /
-   bookings / customers / alerts. The demo data is gone (screens read live data);
-   the config now comes from /api/company-profile via the synchronous reference
-   cache. `B` is a Proxy so legacy `B[code].cur` / `bc(branch)` keep working. */
-/* B, bc, bcfmt moved to ./styleTokens (imported + re-exported at top). */
-
-/* ── Voucher number generator ───────────────────────────────────────
-   Pattern: BRANCH/DDYY/MODULE + SEQ
-   e.g.  AMD/1726/SF00042   BOM/1726/SH00019   AMD/1726/PF00008
-   DDYY = day (DD) + year last 2 digits (YY) on date of entry
-   17 May 2026 → "1726"
-   ─────────────────────────────────────────────────────────────────*/
-/* ── Voucher numbering system ───────────────────────────────────────
-   Format: BRANCH / DDYY / MODULE + 5-digit running sequence
-   e.g.  AMD/1726/SF00001   BOM/1726/SH00019   AMD/1726/PF00042
-   Each branch maintains its OWN independent counter per module.
-   Branch prefix guarantees zero duplicacy across all branches.
-   ─────────────────────────────────────────────────────────────── */
-
-/* Date-stamp: DD (day) + YY (year last 2 digits)  → "1726" */
 
 export function vDate(){
   const d=new Date();
@@ -93,11 +65,7 @@ export const ST={
   Confirmed:{bg:"#E6F1FB",color:"#185FA5"},
 };
 
-/* FL moved to ./styleTokens (re-exported at top). */
 
-/* Salesperson — read-only, comes from CRM (SALESPEOPLE in data.js).
-   Shown on every sale/purchase voucher so the booking can be matched
-   back to a CRM owner. Not editable: CRM is the source of truth. */
 export function SalespersonField({branch,label="Salesperson (CRM)",name}){
   const SALESPEOPLE=useSalespeople().data||[];   // DB-backed (/api/salespeople)
   const branchCode=branch?.code;
@@ -110,19 +78,6 @@ export function SalespersonField({branch,label="Salesperson (CRM)",name}){
   );
 }
 
-
-/* Keep getUnmatchedTickets for backwards compat (flights only) */
-
-
-
-/* ══════════════════════════════════════════════════════════════════
-   LINK PURCHASE SELECTOR
-   Mandatory on every sales voucher. Opens a dropdown showing all
-   available (unsettled) purchase vouchers for that module.
-   Turns green when a purchase is selected.
-   Shows GP calculation immediately on selection.
-   ════════════════════════════════════════════════════════════════ */
-/* ══ PURCHASE REGISTRY — all branches × 7 modules ══════════════ */
 
 export function VLinked({branch,type,vNo,setRoute}){
   const mob=useMobile();
@@ -482,18 +437,6 @@ export function AgeTable({data}){
   );
 }
 
-/* ── RECEIVABLES AGEING ──────────────────────────────────── */
-
-/* Icon moved to ./styleTokens (re-exported at top). */
-
-
-/* ═══════════════════════════════════════════════════════════════
-   TOPBAR
-   ═══════════════════════════════════════════════════════════════ */
-
-/* KpiCard moved to ./styleTokens (re-exported at top). */
-
-/* ── UserSwitcher (demo simulator — switch viewing identity) ── */
 
 const PREMIUM_CARD={...cardStyle,border:"1px solid #cdd1d8",borderRadius:12,boxShadow:"0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)"};
 
@@ -521,11 +464,7 @@ export function WidgetCard({title,subtitle,children,onPin,pinned,onDrill,color})
 
 
 export function KPICard({label,value,delta,color,onClick}){
-  /* Delta colour is SIGNED, not "anything-without-a-plus-is-red":
-       leading "+" → positive (green), leading "-" → negative (red),
-       everything else (e.g. "to pay", "5 awaiting", "not tracked yet") → neutral.
-     The old `delta.includes("+")` test also mis-greened strings like
-     "₹2L overdue 90+" (a "+" inside the text). */
+
   const d=String(delta||"").trim();
   const deltaColor=d.startsWith("+")?"#16a34a":d.startsWith("-")?"#dc2626":"#5b616e";
   // When clickable, the card is a real button to AT/keyboard: role+tabIndex+Enter/Space
@@ -545,10 +484,6 @@ export function KPICard({label,value,delta,color,onClick}){
 }
 
 
-// Standard widescreen page/report container width. Registers, reports and list
-// screens center their content at this cap so wide monitors aren't wasted on
-// empty gutters (matches the SO/PO/GP booking screens, already on 1600). The
-// P&L / Balance Sheet statements run slightly wider (1640) to fit their rail.
 export const PAGE_MAX = 1600;
 
 // Generic client-side export for RPT_Page reports: scrapes the rendered detail table
@@ -600,9 +535,6 @@ export function RPT_Page({title,subtitle,toolbar,children}){
 }
 
 
-/* RPT_thStyle, RPT_tdStyle moved to ./styleTokens (re-exported at top). */
-
-/* ── Seed data ────────────────────────────────────────────────────── */
 
 
 export function RPT_CashPosition({branch}){
@@ -686,12 +618,6 @@ export function RPT_CashPosition({branch}){
   );
 }
 
-/* 2. Inter-branch Elimination — moved to ../modules/interbranch.jsx
-   (RPT_InterbranchElim), now a live group-consolidation report wired to the
-   double-entry engine instead of the static INTERBRANCH_ELIMINATIONS array. */
-
-/* 3. Note to Financial Statements */
-
 export function RPT_FSNotes(){
   return (
     <RPT_Page title="Notes to Financial Statements" subtitle="Auto-prepared from voucher data · for FY 2025-26 financial statements">
@@ -756,15 +682,6 @@ export function RPT_AuditTrail({ branch }){
   );
 }
 
-/* ════════════════════════════════════════════════════════════════════
-   PROFITABILITY REPORTS (6)
-   ════════════════════════════════════════════════════════════════════ */
-
-/* ─── Live profitability helpers ──────────────────────────────────────────
-   The reports below aggregate the LIVE per-file GP list (GET /api/accounting/
-   gp-bills) client-side — one row per booking file, branch-scoped server-side
-   and date-scoped by the shared <ReportDateBar/>. `cost` is net of supplier
-   incentive, so revenue − cost = file GP (ties to invoice-GP / module-PL).   */
 function aggBills(bills, keyOf, fallback = 'Unspecified') {
   const m = new Map();
   for (const b of bills || []) {
@@ -818,10 +735,10 @@ export function RPT_YieldDestination({ branch, setRoute }){
       toolbar={<ReportDateBar value={range} onChange={setRange}/>}>
       <RptState q={q} empty={sorted.length===0} label="destination bookings">
       {uncaptured&&<div role="note" style={{margin:"0 0 12px",padding:"8px 12px",background:"#FAEEDA",border:"1px solid #f0d28a",borderRadius:8,fontSize:11.5,color:"#854F0B",fontWeight:600}}>⚠ Destination / sector isn’t captured on bookings yet — all revenue groups under “Unspecified”. Figures are live; the destination split becomes meaningful once bookings carry a destination.</div>}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Total Revenue</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{cmoney(branch, totalRev)}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Total GP</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#22c55e"}}>{cmoney(branch, totalGP)}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Avg GP %</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{avgGpPct}%</p></div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
+        <KpiCard label="Total Revenue" value={cmoney(branch, totalRev)} Icon={TrendingUp} accent="info" />
+        <KpiCard label="Total GP" value={cmoney(branch, totalGP)} Icon={PieChartIcon} accent="success" />
+        <KpiCard label="Avg GP %" value={`${avgGpPct}%`} Icon={Percent} accent="neutral" />
       </div>
       <div style={cardStyle}>
         <ResponsiveContainer width="100%" height={220}>
@@ -899,10 +816,10 @@ export function RPT_YieldSupplier({ branch, setRoute }){
     <RPT_Page title="Yield by Supplier" subtitle="Spend, revenue & margin contribution per supplier — live from posted bills"
       toolbar={<ReportDateBar value={range} onChange={setRange}/>}>
       <RptState q={q} empty={rows.length===0} label="supplier purchases">
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Total Supplier Cost</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{cmoney(branch, totalCost)}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Revenue Booked</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{cmoney(branch, totalRev)}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>GP Generated</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#22c55e"}}>{cmoney(branch, totalGP)}</p></div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
+        <KpiCard label="Total Supplier Cost" value={cmoney(branch, totalCost)} Icon={Truck} accent="warning" />
+        <KpiCard label="Revenue Booked" value={cmoney(branch, totalRev)} Icon={TrendingUp} accent="info" />
+        <KpiCard label="GP Generated" value={cmoney(branch, totalGP)} Icon={PieChartIcon} accent="success" />
       </div>
       <div style={{...cardStyle,overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
@@ -991,15 +908,9 @@ export function RPT_ABCAnalysis({ branch, setRoute }){
   );
 }
 
-/* ════════════════════════════════════════════════════════════════════
-   HR REPORTS (3)
-   ════════════════════════════════════════════════════════════════════ */
-
-/* 11. Attrition Rate */
 
 export function RPT_Attrition(){
-  /* Live from the employee master: joiners by joinDate, leavers by exitDate, and a
-     running headcount over the last 12 months. */
+
   const emps=((useMasterList('employees').data)||[]).map(fromEmpDTO);
   const months=lastMonths(todayISO().slice(0,7),12);
   const {rows:ATTRITION_DATA,ttlJoiners,ttlLeavers,annualAttrition:annualAttritionN}=buildAttrition(emps,months);
@@ -1038,8 +949,7 @@ export function RPT_Attrition(){
 /* 12. Leave Utilization */
 
 export function RPT_LeaveUtilization(){
-  /* Live: approved leave days per employee from the leave register, against a
-     policy entitlement. Consolidated across branches. */
+
   const emps=((useMasterList('employees').data)||[]).map(fromEmpDTO);
   const leaves=((useMasterList('leave-requests').data)||[]).map(fromLeaveDTO);
   const LEAVE_UTILIZATION=buildLeaveUtilization(emps,leaves);
@@ -1058,9 +968,7 @@ export function RPT_LeaveUtilization(){
 /* 13. Birthday & Anniversary Calendar */
 
 export function RPT_BirthdayCalendar(){
-  /* Live from the employee master — the backend /stats endpoint derives upcoming
-     birthdays + work anniversaries from each employee's dob / joinDate, scoped to
-     the caller's branch(es). */
+
   const statsQ=useQuery({queryKey:['employees','stats'],queryFn:()=>apiGet('/api/employees/stats'),enabled:!!getAuthToken(),staleTime:60_000});
   const stats=statsQ.data||{birthdays:[],anniversaries:[]};
   return (
@@ -1081,15 +989,10 @@ export function RPT_BirthdayCalendar(){
   );
 }
 
-/* ════════════════════════════════════════════════════════════════════
-   COMPLIANCE & RISK REPORTS (3)
-   ════════════════════════════════════════════════════════════════════ */
 
-/* 14. Statutory Dues Calendar */
 
 export function RPT_StatutoryDues(){
-  // Live from the compliance calendar (GET /api/tax-calendar/dues); status +
-  // days-left are derived server-side so they match the dashboard alerts.
+  
   const q=useStatutoryDues();
   const rows=q.data?.rows||[];
   const t=q.data?.totals||{overdue:0,pending:0,upcoming:0,dueValue:0};
@@ -1146,10 +1049,7 @@ export function RPT_TaxFilingBoard({ branch }){
 /* 16. Currency Exposure */
 
 export function RPT_CurrencyExposure({ branch }){
-  // Live foreign-currency exposure (GET /api/accounting/fx-exposure): each non-INR
-  // branch's receivables/payables/cash, grouped by currency, converted to INR at the
-  // latest forex rate. Hedge columns are intentionally absent — the system has no FX
-  // hedge/forward data, so showing them would be fabricated.
+
   const q=useFxExposure(branch);
   const rows=q.data?.rows||[];
   const t=q.data?.totals||{currencies:0,inrEquivalent:0,missingRates:0};
@@ -1174,15 +1074,6 @@ export function RPT_CurrencyExposure({ branch }){
   );
 }
 
-/* ════════════════════════════════════════════════════════════════════
-   5 STANDARDIZED TABBED SCREENS
-   Customer Master (12 tabs) · Supplier Master (12 tabs) ·
-   Voucher Entry (8 tabs) · Report Viewer (9 tabs) · Employee Master (10 tabs)
-   ════════════════════════════════════════════════════════════════════ */
-
-/* ── Shared helpers ─────────────────────────────────────────────── */
-
-
 export const tabBtnStyle = (active) => ({
   padding:"10px 16px",border:"none",
   borderBottom: active?"2px solid #c2a04a":"2px solid transparent",
@@ -1195,7 +1086,4 @@ export const tabBtnStyle = (active) => ({
 
 export const inpStd = {padding:"8px 10px",width:"100%",border:"1px solid #cdd1d8",borderRadius:8,fontSize:12,boxSizing:"border-box",color:"#14161a"};
 
-/* ════════════════════════════════════════════════════════════════════
-   1. CUSTOMER MASTER (12 tabs) — L&T Limited demo
-   ════════════════════════════════════════════════════════════════════ */
 

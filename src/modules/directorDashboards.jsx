@@ -1,7 +1,3 @@
-// ─── Director Dashboards (Director + Super Admin only) ────────────────────────
-// Phase 1: a "Dashboards" suite giving the owner a whole-company view. Each reuses
-// the existing report endpoints (no new accounting logic). Shared toolbar gives
-// period presets; the Executive Overview adds an alert feed + KPI trend arrows.
 import React, { useMemo, useState } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { apiGet } from '../core/api';
@@ -18,17 +14,15 @@ import {
 import { CONSOLIDATED_LABEL, BRANCHES as LIVE_BRANCHES } from '../core/data';
 import { liquidityKind, isLiquidRow } from '../core/ledgerKind';
 import { openPrintPreview } from '../core/PrintPreview';
+import { TrendingUp, PieChart, Receipt, CircleDollarSign, ArrowRight } from 'lucide-react';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#1f7a3d', amber: '#b8860b', dim: '#5a6691', border: '#cdd1d8', bg: '#f3f4f8' };
-// Live branch list (code + currency symbol) from the company-config cache, so the
-// dashboards track whatever branches/currencies are configured in company profiles
-// rather than a hardcoded list. Read at render time — referenceCache mutates the
-// BRANCHES array in place once profiles load.
+
 const REGION = { '₹': 'India', '$': 'Africa' };
 const curSym = (b) => (b.cur ? b.cur : (b.currency === 'USD' || b.curCode === 'USD') ? '$' : '₹');
 const branchList = () => (LIVE_BRANCHES || []).filter((b) => b && b.code && b.code !== 'ALL').map((b) => ({ code: b.code, cur: curSym(b) }));
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+
 const r0 = (n) => Math.round(Number(n) || 0);
 const money = (cur, n) => { const c = cur || '₹'; const loc = (c === '₹' || c === '₨' || c === 'Rs') ? 'en-IN' : 'en-US'; return (n < 0 ? '-' : '') + c + Math.abs(r0(n)).toLocaleString(loc); };
 const pct = (n) => (Number(n) || 0).toFixed(1) + '%';
@@ -41,7 +35,7 @@ const MOD_OPTS = [['', 'All modules'], ['SF', 'Flight'], ['SH', 'Holiday'], ['SH
 // Header with title + the uniform PeriodBar (driven via the usePeriod object `p`).
 function Toolbar({ title, sub, branch, p, hidePeriod }) {
   return (
-    <div className="mb-3.5 flex flex-wrap items-center gap-3">
+    <div className="mb-3.5 flex flex-wrap items-center gap-3 border-b border-surface-border pb-3">
       <div>
         <div className="text-lg font-extrabold text-ink">{title}</div>
         {sub && <div className="text-xs text-ink-muted">{sub}</div>}
@@ -56,19 +50,22 @@ function Toolbar({ title, sub, branch, p, hidePeriod }) {
   );
 }
 
-function KPI({ label, value, sub, tone, delta, onClick }) {
+function KPI({ label, value, sub, tone, delta, onClick, icon: Icon }) {
   const col = tone === 'bad' ? C.red : tone === 'good' ? C.green : C.dark;
   const clickable = typeof onClick === 'function';
   return (
     <div onClick={onClick} role={clickable ? 'button' : undefined} tabIndex={clickable ? 0 : undefined}
       onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       title={clickable ? 'Open details →' : undefined}
-      className="min-w-[180px] flex-1 basis-[180px] rounded-brand border border-surface-border bg-surface p-4 shadow-sm"
-      style={{ cursor: clickable ? 'pointer' : 'default' }}>
-      <div className="text-[11px] font-bold uppercase tracking-wide text-ink-muted">{label}</div>
-      <div className="mt-1 text-[22px] font-black tabular-nums" style={{ color: col }}>{value}</div>
-      <div className="mt-0.5 flex justify-between">
-        {sub && <span className="text-[11px] text-ink-muted">{sub}</span>}
+      className="min-w-[180px] flex-1 basis-[180px] rounded-brand bg-surface p-4 shadow-sm transition-shadow hover:shadow-md"
+      style={{ cursor: clickable ? 'pointer' : 'default', border: `1px solid ${C.border}`, borderLeft: `4px solid ${col}` }}>
+      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-muted">
+        {Icon && <Icon size={13} style={{ color: col, flexShrink: 0 }} />}
+        {label}
+      </div>
+      <div className="mt-1.5 text-[22px] font-black tabular-nums" style={{ color: col }}>{value}</div>
+      <div className="mt-0.5 flex items-center justify-between">
+        {sub && <span className="text-[11px] text-ink-muted">{sub}{clickable && <ArrowRight size={11} className="ml-1 inline align-middle" />}</span>}
         {delta != null && <span className="text-[11px] font-bold" style={{ color: delta >= 0 ? C.green : C.red }}>{delta >= 0 ? '▲' : '▼'} {pct(Math.abs(delta))}</span>}
       </div>
     </div>
@@ -76,7 +73,7 @@ function KPI({ label, value, sub, tone, delta, onClick }) {
 }
 const Card = ({ title, children, right }) => (
   <div className="mt-3.5 overflow-hidden rounded-brand border border-surface-border bg-surface shadow-card">
-    <div className="flex items-center justify-between border-b border-surface-border px-3.5 py-2.5">
+    <div className="flex items-center justify-between border-b border-surface-border bg-surface-alt px-3.5 py-2.5">
       <strong className="text-[13.5px] text-ink">{title}</strong>{right}
     </div>
     <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">{children}</div>
@@ -273,10 +270,10 @@ export function ProfitabilityDash({ branch, go }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Profitability (P&L)" sub={`Revenue → Net Profit · ${range.label}`} branch={branch} p={p} />
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Revenue" value={money(cur, sales)} onClick={go && (() => go('/dashboards/sales'))} />
-        <KPI label="Gross Profit" value={money(cur, gp)} sub={pct(sales ? gp / sales * 100 : 0)} tone={gp < 0 ? 'bad' : 'good'} onClick={go && (() => go('/dashboards/module-gp'))} />
-        <KPI label="Indirect Expenses" value={money(cur, indExp)} onClick={go && (() => go('/dashboards/expenses'))} />
-        <KPI label="Net Profit" value={money(cur, net)} tone={net < 0 ? 'bad' : 'good'} sub={pct(sales ? net / sales * 100 : 0)} onClick={go && (() => go('/reports/pnl'))} />
+        <KPI label="Revenue" icon={TrendingUp} value={money(cur, sales)} onClick={go && (() => go('/dashboards/sales'))} />
+        <KPI label="Gross Profit" icon={PieChart} value={money(cur, gp)} sub={pct(sales ? gp / sales * 100 : 0)} tone={gp < 0 ? 'bad' : 'good'} onClick={go && (() => go('/dashboards/module-gp'))} />
+        <KPI label="Indirect Expenses" icon={Receipt} value={money(cur, indExp)} onClick={go && (() => go('/dashboards/expenses'))} />
+        <KPI label="Net Profit" icon={CircleDollarSign} value={money(cur, net)} tone={net < 0 ? 'bad' : 'good'} sub={pct(sales ? net / sales * 100 : 0)} onClick={go && (() => go('/reports/pnl'))} />
       </div>
       <Card title="Profit Bridge">
         <div style={{ padding: '10px 16px' }}>
@@ -504,7 +501,7 @@ function ListTable({ title, rows, cur, right, valColor, go, rowTo }) {
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={i} {...rowNav(go, routeOf(r))}><td style={{ ...td, fontWeight: r.bold ? 700 : 400, paddingLeft: r.indent ? 28 : 12 }}>{r.name}</td><td style={{ ...td, ...num, fontWeight: r.bold ? 700 : 400, color: valColor ? valColor(r.amount) : C.dark }}>{money(cur, r.amount)}</td></tr>
+            <tr key={i} {...rowNav(go, routeOf(r))} style={{ background: r.bold ? C.bg : undefined }}><td style={{ ...td, fontWeight: r.bold ? 700 : 400, paddingLeft: r.indent ? 28 : 12 }}>{r.name}</td><td style={{ ...td, ...num, fontWeight: r.bold ? 700 : 400, color: valColor ? valColor(r.amount) : C.dark }}>{money(cur, r.amount)}</td></tr>
           ))}
           {!rows.length && <tr><td colSpan={2} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No data.</td></tr>}
         </tbody>
@@ -668,14 +665,11 @@ export function TaxComplianceDash({ branch, go }) {
 export function ExpensesDash({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
-  // Source indirect expenses from module-PL: it carries the full Indirect-Expense
-  // group → ledger tree, so we can show ledger-level heads. (P&L's indirect.debit
-  // rows are group-level only and keyed `group`, not `name`.)
+ 
   const mpl = useModulePL(branch, range).data || {};
   const ind = mpl.indirect || {};
   const total = ind.expense || 0;
-  // Flatten to ledger-level expense heads; fall back to the group level if a build
-  // only carries the group rollup.
+  
   const heads = [];
   (ind.groups || []).forEach((g) => {
     if ((g.ledgers || []).length) (g.ledgers || []).forEach((l) => heads.push({ name: l.name, amount: l.amount }));
@@ -704,8 +698,7 @@ export function ApprovalsAuditDash({ branch, go }) {
   const va = useVoucherApprovals(branch, 'pending').data || {};
   const counts = va.counts || {};
   const brCode = branch === 'ALL' || !branch ? '' : (branch.code || branch);
-  // Only per-status counts are needed → use the cheap summary aggregation, not the full
-  // booking list (which pulled every SO/PO/GP grid — ~15s).
+ 
   const bq = useQuery({ queryKey: ['booking-orders', 'summary', brCode || 'all'], queryFn: () => apiGet('/api/booking-orders/summary', { branch: brCode }) });
   const bsum = bq.data || {};
   const bCount = (s) => (bsum[s]?.count || 0);
@@ -744,7 +737,7 @@ const gauge = (pct, tone) => (
   </div>
 );
 const stTone = (s) => (s === 'met' || s === 'ok' ? C.green : s === 'warn' ? C.amber : s === 'over' || s === 'short' ? C.red : C.dim);
-const stLabel = (s) => ({ met: '✓ Met', warn: '⚠ Near', short: '✗ Short', over: '🔴 Over', ok: '🟢 OK', 'no-target': '— No target' }[s] || s);
+const stLabel = (s) => ({ met: '✓ Met', warn: '⚠ Near', short: '✗ Short', over: '🔴 Over', ok: '🟢 OK', 'no-target': 'No target' }[s] || s);
 
 // ── 13/14/15) Sales / GP / Collections vs Target ──────────────────────────────
 export function VsTargetDash({ branch, metric = 'sales', go }) {
@@ -954,7 +947,7 @@ export function YoYGrowthDash({ branch, go }) {
               const g = dlt(r); const tone = growthTone(r);
               const col = tone === 'good' ? C.green : tone === 'bad' ? C.red : C.dim;
               return (
-                <tr key={i} {...rowNav(go, '/reports/pnl')}>
+                <tr key={i} style={{ background: r.bold ? C.bg : undefined }} {...rowNav(go, '/reports/pnl')}>
                   <td style={{ ...td, fontWeight: r.bold ? 800 : 400 }}>{r.line}</td>
                   <td style={{ ...td, ...num, fontWeight: r.bold ? 800 : 400 }}>{money(cur, r.cy)}</td>
                   <td style={{ ...td, ...num, color: C.dim }}>{money(cur, r.ly)}</td>
