@@ -1181,11 +1181,12 @@ export function HrPayroll({branch}){
 }
 
 export function HrPayslips({branch}){
-  const [month,setMonth]=useState("2026-05");
+  // Rolling last-6-months from the live clock (was frozen at Mar–May 2026, hiding the
+  // current month) — same fix already applied to HrAttendance / HrPayroll.
+  const MONTHS=(()=>{const out=[];const d=new Date();for(let i=0;i<6;i++){const dt=new Date(d.getFullYear(),d.getMonth()-i,1);out.push({v:`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`,l:dt.toLocaleString("en",{month:"short"})+" "+dt.getFullYear()});}return out;})();
+  const [month,setMonth]=useState(MONTHS[0].v);
   const [empId,setEmpId]=useState("");
   const [brFilter,setBrFilter]=useState(branch==="ALL"?"All":branch?.code||"All");
-
-  const MONTHS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
 
   /* Live, branch-scoped employees from the Employee Master; the payslip itself is
      computed from each employee's salary structure. */
@@ -1425,12 +1426,12 @@ export function HrLeave({branch}){
         <div style={{...card,padding:0,overflow:"hidden"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#0d1326"}}>
-              {["ID","Employee","Leave Type","From","To","Days","Reason","Status","Approved By","Actions"].map((h,i)=>(
+              {["ID","Employee","Leave Type","From","To","Days","Reason","Status","Actions"].map((h,i)=>(
                 <th key={i} style={{padding:"9px 12px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>{filtered.length===0&&(
-              <tr><td colSpan={10} style={{padding:"20px 12px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>
+              <tr><td colSpan={9} style={{padding:"20px 12px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>
                 {leaveQ.isLoading?"Loading…":"No leave requests for this branch yet. Use “Apply” to add one."}
               </td></tr>
             )}{filtered.map((l,i)=>(
@@ -1815,9 +1816,10 @@ export function SalaryRevision({branch}){
 export function PfEsiChallan({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?"BOM":branch?.code||"BOM";
-  const [month,setMonth]=useState("2026-05");
+  // Rolling last-6-months from the live clock (was frozen at Mar–May 2026).
+  const MONTHS=(()=>{const out=[];const d=new Date();for(let i=0;i<6;i++){const dt=new Date(d.getFullYear(),d.getMonth()-i,1);out.push({v:`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`,l:dt.toLocaleString("en",{month:"short"})+" "+dt.getFullYear()});}return out;})();
+  const [month,setMonth]=useState(MONTHS[0].v);
   const [tab,setTab]=useState("pf"); // pf | esi | pt
-  const MONTHS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
   /* Live, branch-scoped employees; PF/ESI/PT challans are computed from each
      employee's salary structure. */
   const emps=((useMasterList('employees', {branch:brCode}).data)||[]).map(fromEmpDTO);
