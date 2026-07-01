@@ -246,9 +246,27 @@ export default function KB360App(){
       }
       catch{ /* a dead session is handled by the auth-expired listener */ }
     };
-    renew();
-    const id=setInterval(renew, 10*60*1000);
-    return ()=>{ alive=false; clearInterval(id); };
+    /* ── Single-device sessions ────────────────────────────────────────────────
+       A login on another device invalidates THIS device's token server-side (the
+       backend rejects any token issued before the account's last login). renew()
+       doubles as the probe: on a dead token /api/auth/refresh 401s → the interceptor
+       fires 'kbiz:auth-expired' → this device signs out. To surface that within
+       SECONDS instead of on the next click, we validate on a short heartbeat AND
+       whenever the user returns to this tab/window (visibility + focus) — so an idle
+       device signs out as soon as the user looks at it. `tick` is throttled so
+       focus+visibility firing together (or a burst of tab switches) can't spam the
+       endpoint. Background tabs throttle timers to ~1/min anyway; the focus/visibility
+       hooks cover the "picked the old device back up" case instantly. */
+    let lastRun=0;
+    const HEARTBEAT_MS=60*1000; // idle-but-visible backstop
+    const MIN_GAP_MS=5*1000;    // collapse near-simultaneous triggers
+    const tick=()=>{ const now=Date.now(); if(now-lastRun<MIN_GAP_MS) return; lastRun=now; renew(); };
+    tick();
+    const id=setInterval(tick, HEARTBEAT_MS);
+    const onVisible=()=>{ if(document.visibilityState==="visible") tick(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", tick);
+    return ()=>{ alive=false; clearInterval(id); document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("focus", tick); };
   // Keyed on identity (not the whole object) so updating `hidden` above doesn't
   // tear down/recreate the renew interval.
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -48,6 +48,20 @@ function Switch({ on, onChange, disabled }) {
   );
 }
 
+/* Group a section's pages by their sub-group (the nav sub-header, e.g. Dashboards ▸
+   "Overview"), preserving menu order. Pages with no sub-group ('') collect under a
+   single leading unnamed bucket so they render directly beneath the section header. */
+function groupItems(items) {
+  const order = [];
+  const map = new Map();
+  for (const it of items) {
+    const name = it.group || '';
+    if (!map.has(name)) { map.set(name, []); order.push(name); }
+    map.get(name).push(it);
+  }
+  return order.map((name) => ({ name, items: map.get(name) }));
+}
+
 export function PageAccessControl({ currentUser, setRoute }) {
   const usersLive = useUsersAdmin().data;
 
@@ -58,7 +72,11 @@ export function PageAccessControl({ currentUser, setRoute }) {
   const [grantBase, setGrantBase] = useState(() => new Set());
   const [userSearch, setUserSearch] = useState('');
   const [pageSearch, setPageSearch] = useState('');
-  const [collapsed, setCollapsed] = useState(() => new Set());
+  // Start with EVERY section collapsed — the screen opens clean (just headers +
+  // their visible-count), and only the section a user expands mounts its rows. This
+  // keeps the DOM small (≈23 headers vs ≈270 toggle rows) so expand/collapse and
+  // each toggle stay instant instead of re-rendering the whole wall on every click.
+  const [collapsed, setCollapsed] = useState(() => new Set(buildPageCatalog().map((s) => s.section)));
   const [branchDraft, setBranchDraft] = useState(() => new Set()); // branch codes the user can access
   const [branchBase, setBranchBase] = useState(() => new Set());   // saved baseline → dirty detection
 
@@ -152,6 +170,8 @@ export function PageAccessControl({ currentUser, setRoute }) {
   const toggleCollapse = (name) => setCollapsed((prev) => {
     const next = new Set(prev); next.has(name) ? next.delete(name) : next.add(name); return next;
   });
+  const expandAll = () => setCollapsed(new Set());
+  const collapseAll = () => setCollapsed(new Set(catalog.map((s) => s.section)));
 
   // ── Admin password reset (afshin sets a new password for the selected user) ──
   const [resetOpen, setResetOpen] = useState(false);
@@ -377,6 +397,17 @@ export function PageAccessControl({ currentUser, setRoute }) {
               {visibleCatalog.length === 0 && (
                 <PageSection><EmptyState icon={Search} title={`No pages match “${pageSearch}”.`} /></PageSection>
               )}
+              {/* Expand / collapse all — sections start collapsed for a clean, fast page. */}
+              {visibleCatalog.length > 0 && !q && (
+                <div className="mb-2 flex items-center justify-between px-1">
+                  <span className="text-[11px] text-ink-subtle">{visibleCatalog.length} sections · click a header to expand</span>
+                  <span className="flex items-center gap-2">
+                    <button onClick={expandAll} className="text-[11px] font-semibold text-ink-muted hover:text-navy">Expand all</button>
+                    <span className="text-ink-subtle/40">·</span>
+                    <button onClick={collapseAll} className="text-[11px] font-semibold text-ink-muted hover:text-navy">Collapse all</button>
+                  </span>
+                </div>
+              )}
               {visibleCatalog.map((s) => {
                 const isCollapsed = collapsed.has(s.section) && !q;
                 const total = s.items.length;
@@ -396,25 +427,43 @@ export function PageAccessControl({ currentUser, setRoute }) {
                       <Button size="xs" variant="secondary" onClick={() => setSection(s, false)} className="text-maroon">Hide all</Button>
                     </div>
                     {!isCollapsed && (
-                      <ResponsiveGrid min="300px" gap="none">
-                        {s.items.map((it) => {
-                          const on = isVisible(it.key);
-                          const extra = !inRole(it.key); // out-of-role → turning ON grants it
-                          return (
-                            <label key={it.key} className="flex cursor-pointer items-center gap-2.5 border-b border-surface-alt px-3.5 py-2">
-                              <Switch on={on} onChange={() => toggleOne(it.key)} />
-                              <div className="min-w-0 flex-1">
-                                <div className={`flex items-center gap-1.5 text-[12.5px] font-semibold ${on ? 'text-navy' : 'text-ink-subtle line-through'}`}>
-                                  <span className="truncate">{it.label}</span>
-                                  {extra && on && <StatusPill tone="info" size="sm">granted</StatusPill>}
-                                  {extra && !on && <span className="text-[9px] font-bold uppercase tracking-wide text-ink-subtle">not in role</span>}
-                                </div>
-                                <div className="truncate font-mono text-[10px] text-ink-subtle">{it.key}</div>
+                      <div>
+                        {groupItems(s.items).map((grp) => (
+                          <div key={grp.name || '__nogroup'}>
+                            {/* Sub-header (nav sub-group) with its own All / None shortcut. */}
+                            {grp.name && (
+                              <div className="flex items-center justify-between gap-2 border-b border-surface-alt bg-surface-alt/50 px-3.5 py-1.5">
+                                <span className="text-[10.5px] font-bold uppercase tracking-wide text-ink-muted">{grp.name}</span>
+                                <span className="flex items-center gap-1.5">
+                                  <button onClick={() => setKeys(grp.items.map((i) => i.key), true)}
+                                    className="text-[10px] font-semibold text-ink-subtle hover:text-[#27963c]">All</button>
+                                  <span className="text-ink-subtle/40">·</span>
+                                  <button onClick={() => setKeys(grp.items.map((i) => i.key), false)}
+                                    className="text-[10px] font-semibold text-ink-subtle hover:text-maroon">None</button>
+                                </span>
                               </div>
-                            </label>
-                          );
-                        })}
-                      </ResponsiveGrid>
+                            )}
+                            {grp.items.map((it) => {
+                              const on = isVisible(it.key);
+                              const extra = !inRole(it.key); // out-of-role → turning ON grants it
+                              return (
+                                <label key={it.key}
+                                  className={`flex cursor-pointer items-center gap-2.5 border-b border-surface-alt py-2 ${grp.name ? 'pl-6 pr-3.5' : 'px-3.5'}`}>
+                                  <Switch on={on} onChange={() => toggleOne(it.key)} />
+                                  <div className="min-w-0 flex-1">
+                                    <div className={`flex items-center gap-1.5 text-[12.5px] font-semibold ${on ? 'text-navy' : 'text-ink-subtle line-through'}`}>
+                                      <span className="truncate">{it.label}</span>
+                                      {extra && on && <StatusPill tone="info" size="sm">granted</StatusPill>}
+                                      {extra && !on && <span className="text-[9px] font-bold uppercase tracking-wide text-ink-subtle">not in role</span>}
+                                    </div>
+                                    <div className="truncate font-mono text-[10px] text-ink-subtle">{it.key}</div>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 );

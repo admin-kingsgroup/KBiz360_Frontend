@@ -38,7 +38,7 @@ import { usePager, Pager } from '../../core/ux/pager';
 import { SmartDateInput } from '../../core/ux/SmartDateInput';
 import { JvBlock } from '../../core/voucher/JvBlock';
 import {
-  VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, lineCalc, isVatBranch, rowsFromSnapshots,
+  VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, tcs206cRate, lineCalc, isVatBranch, rowsFromSnapshots,
 } from '../../core/voucherSpecs.js';
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
 import { invalidateBooks } from '../../core/useAccounting';
@@ -331,7 +331,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Tax label drives every "GST" caption on the grid: Africa shows VAT, India GST.
   const taxLabel = isVatBr ? 'VAT' : 'GST';
   const effNoVat = isVatBr && noVat;
-  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign, clientType }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, suppForeign, clientType]);
+  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign, clientType, date }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, suppForeign, clientType, date]);
+  // Effective TCS 206C(1G) rate for this booking's date (5% up to 31-03-2026, else 2%).
+  const tcsRate = spec.tcs ? tcs206cRate(spec, date) : 0;
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
   const getGstRate = () => {
     if (effNoVat) return 0;
@@ -878,14 +880,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {spec.idCols.map((c) => <th key={c.key} style={{ ...soHdrL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
               {spec.fareCols.map((c) => <th key={c.key} style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
               {!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Charge - 2</th>}{!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Fee</th>}
-              {!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{taxLabel}/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{pkg ? `${taxLabel} (5%)` : `${taxLabel}/Service Charge - 2 (${activeRate}%)`}</th>}{spec.tcs && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>TCS ({spec.tcs.rate}%)</th>}<th style={{ ...soHdr, width: 110, whiteSpace: 'normal' }}>Total</th><th style={{ ...soHdr, width: 45 }}></th>
+              {!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{taxLabel}/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{pkg ? `${taxLabel} (5%)` : `${taxLabel}/Service Charge - 2 (${activeRate}%)`}</th>}{spec.tcs && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>TCS ({tcsRate}%)</th>}<th style={{ ...soHdr, width: 110, whiteSpace: 'normal' }}>Total</th><th style={{ ...soHdr, width: 45 }}></th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
                 const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign });
                 // TCS (Intl packages, u/s 206C(1G)) is a booking-level charge on the sale incl GST;
                 // show each line's share only when it actually applies (totals.so.tcs > 0).
-                const lineTcs = (spec.tcs && totals.so.tcs > 0) ? c.finalSales * spec.tcs.rate / 100 : 0;
+                const lineTcs = (spec.tcs && totals.so.tcs > 0) ? c.finalSales * tcsRate / 100 : 0;
                 return (
                   <React.Fragment key={i}>
                   <tr>
@@ -1009,7 +1011,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         </div>
         {totals.so.tcs > 0 && (
           <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 7, background: '#FFF7E6', border: '1px solid #F0C36D', color: '#7a5b12', fontSize: 11.5 }}>
-            Incl. <b>TCS @ {spec.tcs.rate}% = {cur} {fmt(totals.so.tcs)}</b> collected from the customer on this International package (u/s 206C(1G)) — posts to <b>TCS Payable</b> (Balance Sheet), not income, so GP is unaffected.
+            Incl. <b>TCS @ {tcsRate}% = {cur} {fmt(totals.so.tcs)}</b> collected from the customer on this International package (u/s 206C(1G)) — posts to <b>TCS Payable</b> (Balance Sheet), not income, so GP is unaffected.{tcsRate === 5 && ' Rate 5% applies to bookings up to 31-03-2026; 2% from 01-04-2026.'}
           </div>
         )}
         <div style={{ overflowX: 'auto' }}>
