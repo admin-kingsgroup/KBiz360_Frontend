@@ -1,7 +1,3 @@
-// ─── Director Dashboards (Director + Super Admin only) ────────────────────────
-// Phase 1: a "Dashboards" suite giving the owner a whole-company view. Each reuses
-// the existing report endpoints (no new accounting logic). Shared toolbar gives
-// period presets; the Executive Overview adds an alert feed + KPI trend arrows.
 import React, { useMemo, useState } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { apiGet } from '../core/api';
@@ -21,15 +17,12 @@ import { openPrintPreview } from '../core/PrintPreview';
 import { TrendingUp, PieChart, Receipt, CircleDollarSign, ArrowRight } from 'lucide-react';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#1f7a3d', amber: '#b8860b', dim: '#5a6691', border: '#cdd1d8', bg: '#f3f4f8' };
-// Live branch list (code + currency symbol) from the company-config cache, so the
-// dashboards track whatever branches/currencies are configured in company profiles
-// rather than a hardcoded list. Read at render time — referenceCache mutates the
-// BRANCHES array in place once profiles load.
+
 const REGION = { '₹': 'India', '$': 'Africa' };
 const curSym = (b) => (b.cur ? b.cur : (b.currency === 'USD' || b.curCode === 'USD') ? '$' : '₹');
 const branchList = () => (LIVE_BRANCHES || []).filter((b) => b && b.code && b.code !== 'ALL').map((b) => ({ code: b.code, cur: curSym(b) }));
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+
 const r0 = (n) => Math.round(Number(n) || 0);
 const money = (cur, n) => { const c = cur || '₹'; const loc = (c === '₹' || c === '₨' || c === 'Rs') ? 'en-IN' : 'en-US'; return (n < 0 ? '-' : '') + c + Math.abs(r0(n)).toLocaleString(loc); };
 const pct = (n) => (Number(n) || 0).toFixed(1) + '%';
@@ -672,14 +665,11 @@ export function TaxComplianceDash({ branch, go }) {
 export function ExpensesDash({ branch, go }) {
   const p = usePeriod('cfy'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
-  // Source indirect expenses from module-PL: it carries the full Indirect-Expense
-  // group → ledger tree, so we can show ledger-level heads. (P&L's indirect.debit
-  // rows are group-level only and keyed `group`, not `name`.)
+ 
   const mpl = useModulePL(branch, range).data || {};
   const ind = mpl.indirect || {};
   const total = ind.expense || 0;
-  // Flatten to ledger-level expense heads; fall back to the group level if a build
-  // only carries the group rollup.
+  
   const heads = [];
   (ind.groups || []).forEach((g) => {
     if ((g.ledgers || []).length) (g.ledgers || []).forEach((l) => heads.push({ name: l.name, amount: l.amount }));
@@ -708,8 +698,7 @@ export function ApprovalsAuditDash({ branch, go }) {
   const va = useVoucherApprovals(branch, 'pending').data || {};
   const counts = va.counts || {};
   const brCode = branch === 'ALL' || !branch ? '' : (branch.code || branch);
-  // Only per-status counts are needed → use the cheap summary aggregation, not the full
-  // booking list (which pulled every SO/PO/GP grid — ~15s).
+ 
   const bq = useQuery({ queryKey: ['booking-orders', 'summary', brCode || 'all'], queryFn: () => apiGet('/api/booking-orders/summary', { branch: brCode }) });
   const bsum = bq.data || {};
   const bCount = (s) => (bsum[s]?.count || 0);
@@ -958,7 +947,7 @@ export function YoYGrowthDash({ branch, go }) {
               const g = dlt(r); const tone = growthTone(r);
               const col = tone === 'good' ? C.green : tone === 'bad' ? C.red : C.dim;
               return (
-                <tr key={i} {...rowNav(go, '/reports/pnl')}>
+                <tr key={i} style={{ background: r.bold ? C.bg : undefined }} {...rowNav(go, '/reports/pnl')}>
                   <td style={{ ...td, fontWeight: r.bold ? 800 : 400 }}>{r.line}</td>
                   <td style={{ ...td, ...num, fontWeight: r.bold ? 800 : 400 }}>{money(cur, r.cy)}</td>
                   <td style={{ ...td, ...num, color: C.dim }}>{money(cur, r.ly)}</td>
