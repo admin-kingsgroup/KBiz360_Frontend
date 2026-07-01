@@ -24,6 +24,7 @@ import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 import { DashboardError } from '../../../core/ux/DashboardError';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { isLiquidRow } from '../../../core/ledgerKind';
+import { ArApSettlementView } from '../../../core/ArApSettlementView';
 
 /**
  * OWNER DASHBOARD — whole-company financial view (owner-only, gated by email +
@@ -44,7 +45,7 @@ const Scroll = ({ children }) => <div style={{ overflowX: 'auto' }}>{children}</
 // Group/ALL scope (each fed its own `byBranch` slice + its own-currency `fmt`) so a
 // consolidated view never sums ₹ and USD into one number — same rule the KPI cards follow.
 // `fmt` is the per-branch money formatter; we never FX-convert (inter-branch FX is manual).
-function FinancialTables({ mods = [], assets = [], liabs = [], rec, pay, bankRows = [], liquidFallback = 0, dateTo, fmt, nav }) {
+function FinancialTables({ mods = [], assets = [], liabs = [], rec, pay, recRows = [], payRows = [], bankRows = [], liquidFallback = 0, dateTo, fmt, nav }) {
   const aT = assets.reduce((s, a) => s + (a.amount || 0), 0);
   const lT = liabs.reduce((s, a) => s + (a.amount || 0), 0);
   const balanced = Math.abs(aT - lT) < 1;
@@ -78,25 +79,19 @@ function FinancialTables({ mods = [], assets = [], liabs = [], rec, pay, bankRow
         </WidgetCard>
       </div>
 
+      {/* Ageing & Settlement — two independent cards (Receivables / Payables). Each shows
+          the six settlement metrics as tabs and, below, the fine-bucket ageing of Unsettled
+          Bills per ledger (Final Total reconciles to the Unsettled Bills tile). Same no-FIFO
+          truth the AR/AP reports settle against — the reports carry the identical view. */}
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
-        {/* Bill-wise settlement view — same no-FIFO truth the AR/AP report settles against:
-            Unsettled Bills (open bills) · On-Account (unapplied receipts/payments) · Actual
-            Balance (net = open − on-account). Ageing buckets stay for the open-bill drilldown. */}
-        <WidgetCard title="Receivables / Payables — Ageing & Settlement" subtitle="Open bills · on-account · actual balance" color="#dc2626" onDrill={() => nav('/dashboards/arap')}>
-          <Scroll>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th scope="col" style={th}></th><th scope="col" style={{ ...th, ...num }}>0–30</th><th scope="col" style={{ ...th, ...num }}>31–60</th><th scope="col" style={{ ...th, ...num }}>61–90</th><th scope="col" style={{ ...th, ...num }}>90+</th><th scope="col" style={{ ...th, ...num }} title="Unsettled bills (open)">Unsettled Bills</th><th scope="col" style={{ ...th, ...num }} title="Unapplied receipts / payments sitting on account">On-Account</th><th scope="col" style={{ ...th, ...num }} title="Actual balance = unsettled bills − on-account">Actual Bal.</th></tr></thead>
-              <tbody>
-                {[['Receivable', rec], ['Payable', pay]].map(([lbl, t]) => {
-                  const netBal = (t?.net != null) ? t.net : ((t?.total || 0) - (t?.onAccount || 0));
-                  return (
-                    <tr key={lbl}><td style={{ ...td, fontWeight: 700 }}>{lbl}</td><td style={{ ...td, ...num }}>{fmt(t?.d0)}</td><td style={{ ...td, ...num }}>{fmt(t?.d30)}</td><td style={{ ...td, ...num }}>{fmt(t?.d60)}</td><td style={{ ...td, ...num, color: (t?.d90) ? C.red : undefined }}>{fmt(t?.d90)}</td><td style={{ ...td, ...num, fontWeight: 700 }}>{fmt(t?.total)}</td><td style={{ ...td, ...num, color: (t?.onAccount) ? C.gold : undefined }}>{fmt(t?.onAccount)}</td><td style={{ ...td, ...num, fontWeight: 700, color: netBal < 0 ? C.red : C.dark }}>{fmt(netBal)}</td></tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </Scroll>
+        <WidgetCard title="Receivables — Ageing & Settlement" subtitle="Bills · settled · unsettled · ageing of open bills" color="#dc2626" onDrill={() => nav('/dashboards/arap')}>
+          <ArApSettlementView side="receivable" totals={rec || {}} rows={recRows} formatMoney={fmt} maxRows={6} />
         </WidgetCard>
+        <WidgetCard title="Payables — Ageing & Settlement" subtitle="Bills · settled · unsettled · ageing of open bills" color="#16a34a" onDrill={() => nav('/dashboards/arap')}>
+          <ArApSettlementView side="payable" totals={pay || {}} rows={payRows} formatMoney={fmt} maxRows={6} />
+        </WidgetCard>
+      </div>
+      <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
         <WidgetCard title="Cash & Bank" subtitle="Live balances" color="#16a34a" onDrill={() => nav('/dashboards/cash')}>
           <Scroll>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -244,6 +239,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
       mods: (p.modules || []).slice().sort((x, y) => (y.gp || 0) - (x.gp || 0)),
       assets: b.assets || [], liabs: b.liabilities || [],
       rec: a.receivables?.totals, pay: a.payables?.totals,
+      recRows: a.receivables?.rows || [], payRows: a.payables?.rows || [],
       bankRows: (tr.rows || []).filter(isLiquidRow),
     };
   };
@@ -386,12 +382,12 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
                 <span className="text-sm font-extrabold text-ink">{r.code}</span>
                 <span className="text-[11px] font-bold text-ink-muted">· {bc({ code: r.code }).cur} · financial detail</span>
               </div>
-              <FinancialTables mods={f.mods} assets={f.assets} liabs={f.liabs} rec={f.rec} pay={f.pay} bankRows={f.bankRows} liquidFallback={r.liquid} dateTo={dates.to} fmt={(n) => mB(r.code, n)} nav={(route) => drillBranch(r.code, route)} />
+              <FinancialTables mods={f.mods} assets={f.assets} liabs={f.liabs} rec={f.rec} pay={f.pay} recRows={f.recRows} payRows={f.payRows} bankRows={f.bankRows} liquidFallback={r.liquid} dateTo={dates.to} fmt={(n) => mB(r.code, n)} nav={(route) => drillBranch(r.code, route)} />
             </div>
           );
         })
       ) : (
-        <FinancialTables mods={mods} assets={assets} liabs={liabs} rec={age.receivables?.totals} pay={age.payables?.totals} bankRows={bankRows} liquidFallback={liquid} dateTo={dates.to} fmt={m0} nav={navigate} />
+        <FinancialTables mods={mods} assets={assets} liabs={liabs} rec={age.receivables?.totals} pay={age.payables?.totals} recRows={age.receivables?.rows || []} payRows={age.payables?.rows || []} bankRows={bankRows} liquidFallback={liquid} dateTo={dates.to} fmt={m0} nav={navigate} />
       )}
 
       {/* ── Branch performance ── */}

@@ -5,6 +5,7 @@ import { localeOf } from '../../core/format';
 import { periodRange } from '../../core/period';
 import { useModulePL, useBalanceSheet, useLedgerStatement, useAgeing, branchCode } from '../../core/useAccounting';
 import { computeNetAgeing } from './netAgeing';
+import { ArApSettlementView } from '../../core/ArApSettlementView';
 import { splitSubGroups, bsFioriExpandKeys, pnlFioriExpandKeys } from './fioriExpand';
 import { share, topByGP, lowestGp } from './statementInsights';
 import { MiniBar, RailCard, Stat } from '../../core/insightsUI';
@@ -2187,7 +2188,7 @@ function ArApScreen({ branch, side, setRoute, initialTab }) {
   const [advFocus, setAdvFocus] = useState(''); // party whose advances to focus
   const adjustAdvance = (party) => { setAdvFocus(party); setTab('settle'); };
 
-  const TABS = [['ageing', 'Ageing'], ['settle', 'Open Bills & On-Account ▸ Settle'], ['net', 'Net (Debtors − Creditors)']];
+  const TABS = [['ageing', 'Ageing'], ['settlement', 'Ageing & Settlement'], ['settle', 'Open Bills & On-Account ▸ Settle'], ['net', 'Net (Debtors − Creditors)']];
   const tabBtn = (active) => ({
     padding: '8px 16px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
     border: `1px solid ${SAP.border}`, borderBottom: 'none', borderRadius: '8px 8px 0 0',
@@ -2200,11 +2201,37 @@ function ArApScreen({ branch, side, setRoute, initialTab }) {
       </div>
       {tab === 'ageing'
         ? <AgeingReport branch={branch} side={side} setRoute={setRoute} onAdjustAdvance={adjustAdvance} />
-        : tab === 'net'
-          ? <NetAgeingView branch={branch} setRoute={setRoute} />
-          : <OutstandingOnAccount branch={branch} side={isRec ? 'customer' : 'supplier'}
-              initialTab={advFocus ? (isRec ? 'recAdv' : 'payAdv') : undefined} initialParty={advFocus || undefined} />}
+        : tab === 'settlement'
+          ? <SettlementAgeingReport branch={branch} side={side} />
+          : tab === 'net'
+            ? <NetAgeingView branch={branch} setRoute={setRoute} />
+            : <OutstandingOnAccount branch={branch} side={isRec ? 'customer' : 'supplier'}
+                initialTab={advFocus ? (isRec ? 'recAdv' : 'payAdv') : undefined} initialParty={advFocus || undefined} />}
     </>
+  );
+}
+
+// Tabbed Bills-vs-Receipt settlement + fine-bucket ageing of Unsettled Bills, for one
+// side. Same view the AD Dashboard renders — here full-width in the report. Reuses the
+// shared ArApSettlementView so the dashboard card and this report can never diverge.
+function SettlementAgeingReport({ branch, side }) {
+  const cur = curOf(branch);
+  const q = useAgeing(branch, '');
+  const d = q.data;
+  const data = d ? d[side] : null;
+  const isRec = side === 'receivables';
+  const fm = (n) => compactCur(cur, n);
+  return (
+    <div style={{ maxWidth: 1640, margin: '0 auto', padding: '10px 6px 0' }}>
+      <StateBox q={q} empty={!data}>
+        <FCard title={isRec ? 'Receivables — Ageing & Settlement' : 'Payables — Ageing & Settlement'}
+          sub="Total / settled / unsettled bills & receipts · ageing of open bills by ledger">
+          <div style={{ padding: '4px 12px 12px' }}>
+            <ArApSettlementView side={side} totals={data?.totals || {}} rows={data?.rows || []} formatMoney={fm} />
+          </div>
+        </FCard>
+      </StateBox>
+    </div>
   );
 }
 export function ReceivablesLive({ branch, setRoute, initialTab }) { return <ArApScreen branch={branch} side="receivables" setRoute={setRoute} initialTab={initialTab} />; }
