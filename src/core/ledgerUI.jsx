@@ -201,7 +201,12 @@ export function LedgerAccountView({
   const q = useLedgerStatement(name, branch, { from, to });
   const d = useMemo(() => mapLedger(q.data), [q.data]);
   const group = d?.group || q.data?.group || '';
-  const side = billwiseSide(group);
+  // Bill-wise is decided by the PRIMARY (top) system group — a party kept under a
+  // custom sub-group ("Supplier B2B", "Supplier Interbranch", a renamed B2C group)
+  // still resolves to Sundry Debtors/Creditors. Falls back to the sub-group name
+  // for older payloads that don't carry primaryGroup.
+  const primaryGroup = d?.primaryGroup || q.data?.primaryGroup || group;
+  const side = billwiseSide(primaryGroup);
 
   // Analytical tabs (Cost-Centre DOM/INT split + fare Components) apply only to
   // trading ledgers (Sales/Purchase/Direct). Fetch lazily, show the tab only when

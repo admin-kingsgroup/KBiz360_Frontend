@@ -47,6 +47,9 @@ export function DestinationIntelligence({ branch }) {
   const filtered = useMemo(() => destRows.filter((d) => matchNeedle([d.dest, d.topMod], needle)).map((d, i) => ({ ...d, rank: i + 1 })), [destRows, needle]);
   const maxGP = Math.max(...filtered.map((d) => d.gp), 1);
   const totRev = filtered.reduce((s, d) => s + d.rev, 0);
+  // Destination/sector is not captured on bookings yet → every row collapses to "Other".
+  // Surface that honestly instead of presenting one meaningless bucket as real analysis.
+  const uncaptured = destRows.length > 0 && destRows.every((d) => d.dest === 'Other');
 
   const columns = [
     { key: 'rank', header: 'Rank', num: true, sortable: false, hideable: false, render: (r) => <span className={r.rank <= 3 ? 'font-extrabold text-gold-dark' : 'text-ink-muted'}>{r.rank}</span> },
@@ -69,6 +72,11 @@ export function DestinationIntelligence({ branch }) {
 
   return (
     <RptShell title="Destination Intelligence" subtitle={`${filtered.length} destinations · ${bills.length} bookings · Revenue & GP breakdown`} filters={filters}>
+      {uncaptured && (
+        <div role="note" style={{ margin: '0 0 12px', padding: '8px 12px', background: '#FAEEDA', border: '1px solid #f0d28a', borderRadius: 8, fontSize: 11.5, color: '#854F0B', fontWeight: 600 }}>
+          ⚠ Destination / sector isn’t captured on bookings yet — all revenue is grouped under “Other”. Figures are live, but the destination breakdown will be meaningful only once bookings carry a destination.
+        </div>
+      )}
       {/* Spotlight cards — top 6 by GP */}
       <ResponsiveGrid min="280px" gap="md" className="mb-4">
         {filtered.slice(0, 6).map((d, i) => (

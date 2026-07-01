@@ -151,7 +151,7 @@ export function allocSummary(alloc,amount,parkOnAcc,mode){
 // Bill-wise allocation panel (Receipt / Payment) — open bills with ageing, an
 // allocate box + "Full" per bill, an Against-Bills / On-Account mode toggle and a
 // summary foot. Controlled by the parent voucher form. Mirrors the HTML panel.
-export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode,onMode,parkOnAcc,onParkOnAcc,cur}){
+export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode,onMode,parkOnAcc,onParkOnAcc,cur,heading,itemLabel,emptyHint}){
   const bills=q?.data?.bills||[];
   const advances=q?.data?.advances||0;
   const {allocated,un,onAcc}=allocSummary(alloc,amount,parkOnAcc,mode);
@@ -164,7 +164,7 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
       {/* header + Apply As toggle */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",padding:"10px 14px",background:"#f4f5f7",borderBottom:"1px solid #cdd1d8"}}>
         <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-          <span style={{fontSize:10,fontWeight:800,letterSpacing:"0.6px",color:"#c2a04a",textTransform:"uppercase"}}>Bill-wise Allocation</span>
+          <span style={{fontSize:10,fontWeight:800,letterSpacing:"0.6px",color:"#c2a04a",textTransform:"uppercase"}}>{heading||"Bill-wise Allocation"}</span>
           {party&&<span style={{fontSize:11.5,fontWeight:700,color:"#1a1c22"}}>{party}</span>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -190,13 +190,13 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
             <div style={{padding:"18px 16px",textAlign:"center",fontSize:11.5,color:"#5b616e"}}>Loading open bills…</div>
           ):bills.length===0?(
             <div style={{padding:"18px 16px",textAlign:"center",fontSize:11.5,color:"#5b616e"}}>
-              {party?`No open bills for ${party}. Use “On Account” to park this ${settleWord} as an advance.`:`Select a party to load their open bills.`}
+              {party?(emptyHint||`No open bills for ${party}. Use “On Account” to park this ${settleWord} as an advance.`):`Select a party to load their open bills.`}
             </div>
           ):(
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
                 <thead><tr style={{background:"#fafafa",borderBottom:"1px solid #cdd1d8"}}>
-                  {["Bill No.","Date","Age","Outstanding","Status",`Allocate (${cur})`].map((h,i)=>(
+                  {[itemLabel||"Bill No.","Date","Age","Outstanding","Status",`Allocate (${cur})`].map((h,i)=>(
                     <th key={i} style={{padding:"8px 12px",textAlign:i>=3?(i===4?"center":"right"):"left",fontSize:9,fontWeight:700,letterSpacing:"0.4px",color:"#5b616e",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
                   ))}
                 </tr></thead>

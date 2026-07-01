@@ -64,6 +64,22 @@ export function allocSummary(alloc, amount, parkOnAcc, mode) {
   return { allocated, un, onAcc, valid, count };
 }
 
+// Whether the counter-account on a Receipt / Payment settles bill-wise, and against
+// what. Returns { party, partyType, obSide, mode }:
+//   Receipt + Debtor   → settle the client's open SALE bills          (mode 'bills')
+//   Payment + Creditor  → settle the supplier's open PURCHASE bills    (mode 'bills')
+//   Payment + Debtor    → refund the client's on-account money: settle against their
+//                         open RECEIPTS (leftover per receipt)         (mode 'advances')
+// Anything else (expense / loan / tax / income ledger) is a plain direct Dr/Cr entry
+// with no bill-wise allocation. `obSide` is the side to query open-bills with.
+export function settleSpec(side, otherType) {
+  const isReceipt = side === 'customer';
+  if (isReceipt && otherType === 'Debtor')   return { party: true, partyType: 'customer', obSide: 'customer', mode: 'bills' };
+  if (!isReceipt && otherType === 'Creditor') return { party: true, partyType: 'supplier', obSide: 'supplier', mode: 'bills' };
+  if (!isReceipt && otherType === 'Debtor')   return { party: true, partyType: 'customer', obSide: 'customer', mode: 'advances' };
+  return { party: false, partyType: '', obSide: isReceipt ? 'customer' : 'supplier', mode: 'bills' };
+}
+
 // Purchase-Expense totals from its line grid. Debit lines (expense/asset) add to
 // the taxable value; credit lines (e.g. Discount Received) subtract. GST and TDS
 // are amount-canonical (stored as amounts), so this round-trips exactly.

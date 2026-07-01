@@ -9,7 +9,7 @@ import { RefundReissueFields } from './fields/RefundReissueFields';
 import { buildRefundReissueBody } from './fields/refundBody';
 import { RefundPartialFields } from './fields/RefundPartialFields';
 import { AdmAcmFields } from './fields/AdmAcmFields';
-import { r2, allocSummary, pxpTotals, dnTotals } from './ui';
+import { r2, allocSummary, pxpTotals, dnTotals, settleSpec } from './ui';
 
 // Recover a saved income line's amount (Service Charge / SVC2) for the edit form.
 const lineAmt = (v, ledger) => {
@@ -81,25 +81,29 @@ function makeRcptPmt(side) {
       let amount = (+v.subtotal > 0) ? +v.subtotal : ((+v.total || 0) - (+v.tdsAmt || 0));
       if (!(amount > 0) && bankLine) amount = +bankLine.amt || 0;
       // Best-effort party flag so the model is right on first render; the field
-      // component re-derives otherType from the live chart once it loads.
-      const looksParty = !!v.party && (v.partyType === (isReceipt ? 'customer' : 'supplier') || (v.allocations || []).length > 0);
+      // component re-derives otherType from the live chart once it loads. A payment
+      // with partyType 'customer' is a client refund (Debtor settling open receipts).
+      const looksParty = !!v.party && (v.partyType === (isReceipt ? 'customer' : 'supplier') || (!isReceipt && v.partyType === 'customer') || (v.allocations || []).length > 0);
+      const guessType = isReceipt ? 'Debtor' : (v.partyType === 'customer' ? 'Debtor' : 'Creditor');
       return {
-        date: v.date || '', party, otherType: looksParty ? (isReceipt ? 'Debtor' : 'Creditor') : '', bankRef, paymentMode: v.paymentMode || 'NEFT', utr: v.utr || '',
+        date: v.date || '', party, otherType: looksParty ? guessType : '', bankRef, paymentMode: v.paymentMode || 'NEFT', utr: v.utr || '',
         amount, tds: (+v.tdsAmt || 0) > 0, tdsAmt: +v.tdsAmt || 0, tdsSection: v.tdsSection || '194H', remarks: v.remarks || '',
         alloc, applyMode: v.applyMode || 'bills', parkOnAcc: (+v.onAccount || 0) > 0, _billIds: billIds,
       };
     },
 
-    // A true party leg (Debtor for a receipt, Creditor for a payment) keeps the
-    // bill-wise model: party + total + allocations, no lines → the backend infers
-    // the journal and tracks the sub-ledger. ANY OTHER ledger (expense, loan, tax,
-    // income…) posts as an explicit Dr/Cr pair, exactly like Tally — the backend's
-    // receiptLines/paymentLines post lines with drCr verbatim (no inference).
-    isParty: (s) => s.otherType === (isReceipt ? 'Debtor' : 'Creditor'),
+    // A settling party keeps the bill-wise model: party + total + allocations, no
+    // lines → the backend infers the journal and tracks the sub-ledger. This covers a
+    // Debtor on a receipt, a Creditor on a payment, AND a Debtor on a PAYMENT (refunding
+    // the client's on-account money — allocations settle their open receipts). ANY OTHER
+    // ledger (expense, loan, tax, income…) posts as an explicit Dr/Cr pair, exactly like
+    // Tally — the backend's receiptLines/paymentLines post lines with drCr verbatim.
+    isParty: (s) => settleSpec(side, s.otherType).party,
 
     toBody: (s, ctx) => {
       const net = +s.amount || 0;
-      const party = s.otherType === (isReceipt ? 'Debtor' : 'Creditor');
+      const spec = settleSpec(side, s.otherType);
+      const party = spec.party;
       const common = {
         type: isReceipt ? 'RV' : 'PMT', category: isReceipt ? 'receipt' : 'payment',
         branch: ctx.branchCode, date: s.date,
@@ -119,14 +123,16 @@ function makeRcptPmt(side) {
           remarks: s.remarks || `Being ${isReceipt ? 'amount received — Cr' : 'amount paid — Dr'} ${s.party} via ${s.paymentMode}${s.utr ? ` ref ${s.utr}` : ''}`,
         };
       }
-      const tds = s.tds ? (+s.tdsAmt || 0) : 0;
+      // No TDS on a client refund (advances mode) — it only applies to a genuine
+      // supplier payment / customer receipt.
+      const tds = (s.tds && spec.mode !== 'advances') ? (+s.tdsAmt || 0) : 0;
       const gross = r2(net + tds);
       const sum = allocSummary(s.alloc, gross, s.parkOnAcc, s.applyMode);
       const allocations = Object.entries(s.alloc || {})
         .filter(([, v]) => (+v || 0) > 0)
         .map(([vno, v]) => ({ billVno: vno, billId: (s._billIds || {})[vno] || '', amount: +v }));
       return {
-        ...common, party: s.party, partyType: isReceipt ? 'customer' : 'supplier',
+        ...common, party: s.party, partyType: spec.partyType,
         // Party model carries NO lines — the journal is inferred from party + bankRef +
         // total. Emit lines:[] EXPLICITLY so editing a line-model voucher (e.g. a Tally
         // import stored as Dr/Cr lines) into the party model wipes the stale legs instead
@@ -140,7 +146,7 @@ function makeRcptPmt(side) {
 
     validate: (s) => {
       const net = +s.amount || 0;
-      const party = s.otherType === (isReceipt ? 'Debtor' : 'Creditor');
+      const party = settleSpec(side, s.otherType).party;
       let hint = '';
       if (!s.party) hint = `(Pick ${isReceipt ? 'account credited' : 'account debited'})`;
       else if (!s.bankRef) hint = '(Pick Bank / Cash)';

@@ -160,7 +160,7 @@ export function ConsultantReport({ branch }) {
                         <div className="w-[60%] rounded-t" style={{ height: Math.max(h, 2), background: ['#2563eb', '#16a34a', '#d97706'][ci % 3] || '#2e323c' }} />
                       </div>
                       <p className="text-[8.5px] text-ink-muted">{d.m.slice(5)}</p>
-                      <p className="text-[9.5px] font-bold text-navy">₹{Math.round(d.gp / 1000)}K</p>
+                      <p className="text-[9.5px] font-bold text-navy">{f(d.gp)}</p>
                     </div>
                   );
                 })}

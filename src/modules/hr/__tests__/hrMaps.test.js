@@ -1,4 +1,4 @@
-import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, leaveBucketOf, takenFor, fromJobDTO, toJobPayload, JOB_NEXT_STATUS, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from '../hrMaps';
+import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, leaveBucketOf, takenFor, fromShiftDTO, toShiftPayload, weeklyOffForShift, fromJobDTO, toJobPayload, JOB_NEXT_STATUS, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from '../hrMaps';
 
 describe('Employee loan ↔ /api/employee-loans wiring', () => {
   const DTO = { id: 'L1', name: 'Aa', empCode: 'E1', designation: 'Ops', branch: 'BOM',
@@ -95,6 +95,31 @@ describe('Leave balance ↔ /api/leave-balances wiring + derived "taken"', () =>
       { empId: 'e2', type: 'Casual Leave', from: '2026-05-04', days: 5, status: 'Approved' },   // other emp → ignored
     ];
     expect(takenFor(reqs, 'e1', '2026')).toEqual({ annual: 0, sick: 3, casual: 2 });
+  });
+});
+
+describe('Shift ↔ /api/shifts wiring', () => {
+  const DTO = { id: 's1', name: 'General', code: 'GEN', branch: 'BOM', startTime: '09:30', endTime: '18:30',
+    breakMins: 60, graceMins: 10, weeklyOff: [0], nightShift: false, active: true };
+
+  test('fromShiftDTO round-trips with numeric/array coercion + defaults', () => {
+    const s = fromShiftDTO(DTO);
+    expect(s).toMatchObject({ name: 'General', code: 'GEN', branch: 'BOM', weeklyOff: [0], active: true });
+    expect(fromShiftDTO({}).weeklyOff).toEqual([0]);       // default Sunday-off
+    expect(fromShiftDTO({ active: false }).active).toBe(false);
+  });
+
+  test('toShiftPayload keeps only valid day-of-week ints in weeklyOff', () => {
+    const p = toShiftPayload({ ...DTO, weeklyOff: [0, 6, 7, -1, '5'] });
+    expect(p.weeklyOff).toEqual([0, 6, 5]);                // 7 and -1 dropped, '5' coerced
+    expect(p).not.toHaveProperty('id');
+  });
+
+  test('weeklyOffForShift resolves the employee shift, else Sunday-only fallback', () => {
+    const byId = { s1: fromShiftDTO({ ...DTO, weeklyOff: [5] }) };   // Friday off (Gulf pattern)
+    expect(weeklyOffForShift('s1', byId)).toEqual([5]);
+    expect(weeklyOffForShift('', byId)).toEqual([0]);               // unassigned → Sunday
+    expect(weeklyOffForShift('nope', byId)).toEqual([0]);           // unknown id → Sunday
   });
 });
 

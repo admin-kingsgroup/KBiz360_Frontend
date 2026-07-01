@@ -133,6 +133,7 @@ export const APP_ROUTES = [
   "/hr/recruitment",
   "/hr/reimbursement",
   "/hr/salary-revision",
+  "/hr/shifts",
   "/hr/skills",
   "/hr/training",
   "/import",

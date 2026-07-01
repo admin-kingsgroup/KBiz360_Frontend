@@ -31,6 +31,9 @@ export function mapLedger(d) {
   if (!d) return null;
   return {
     name: d.ledger, group: d.group, code: d.code,
+    // Primary (top) system group from the backend — bill-wise is decided by this
+    // (Sundry Debtors/Creditors), not the immediate sub-group name.
+    primaryGroup: d.primaryGroup || d.group,
     opening: { amt: d.openingBalance || 0, side: d.openingSide || 'Dr' },
     rows: (d.lines || []).map((e) => ({
       date: e.date, vno: e.vno, tallyRef: e.sourceRef || '', voucherId: e.voucherId, branch: e.branch || '', category: e.category || e.type || '',
