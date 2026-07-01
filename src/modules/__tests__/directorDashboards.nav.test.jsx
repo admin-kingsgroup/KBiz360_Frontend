@@ -124,7 +124,7 @@ describe('Previously drill-dead dashboards now navigate', () => {
 describe('Performance vs Target — consolidated dashboard', () => {
   test('renders all four target tiles under one header', () => {
     render(<PerformanceDash branch={'BOM'} go={jest.fn()} />);
-    expect(screen.getByText('Performance vs Target')).toBeInTheDocument();
+    expect(screen.getByText('TGT VS Sales/GP/EX/NP')).toBeInTheDocument();
     expect(screen.getByText('Sales vs Target')).toBeInTheDocument();
     expect(screen.getByText('GP vs Target')).toBeInTheDocument();
     expect(screen.getByText('Budget vs Expense')).toBeInTheDocument();
