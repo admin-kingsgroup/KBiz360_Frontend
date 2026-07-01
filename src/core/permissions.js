@@ -115,7 +115,6 @@ export const PERM_MODULES=[
     {id:"hr_payroll",   label:"Salary Run / Payroll"},
     {id:"hr_payslip",   label:"Payslips"},
     {id:"hr_leave",     label:"Leave Management"},
-    {id:"hr_expense",   label:"Expense Claims"},
     {id:"hr_salrev",    label:"Salary Revision"},
   ]},
   {group:"Settings",     icon:"⚙",  mods:[

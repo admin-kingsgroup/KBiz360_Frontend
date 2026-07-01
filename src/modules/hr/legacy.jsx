@@ -9,7 +9,7 @@ import { openPrintPreview } from '../../core/PrintPreview';
 import { Legend, Line } from 'recharts';
 import { BRANCHES, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../../core/data';
 import { fmt, fmtINR, compactAmt, localeOf } from '../../core/format';
-import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, cardStyle, tabPanel } from '../../core/helpers';
+import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, cardStyle, tabPanel } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../../core/useReference';
@@ -1181,11 +1181,12 @@ export function HrPayroll({branch}){
 }
 
 export function HrPayslips({branch}){
-  const [month,setMonth]=useState("2026-05");
+  // Rolling last-6-months from the live clock (was frozen at Mar–May 2026, hiding the
+  // current month) — same fix already applied to HrAttendance / HrPayroll.
+  const MONTHS=(()=>{const out=[];const d=new Date();for(let i=0;i<6;i++){const dt=new Date(d.getFullYear(),d.getMonth()-i,1);out.push({v:`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`,l:dt.toLocaleString("en",{month:"short"})+" "+dt.getFullYear()});}return out;})();
+  const [month,setMonth]=useState(MONTHS[0].v);
   const [empId,setEmpId]=useState("");
   const [brFilter,setBrFilter]=useState(branch==="ALL"?"All":branch?.code||"All");
-
-  const MONTHS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
 
   /* Live, branch-scoped employees from the Employee Master; the payslip itself is
      computed from each employee's salary structure. */
@@ -1425,12 +1426,12 @@ export function HrLeave({branch}){
         <div style={{...card,padding:0,overflow:"hidden"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#0d1326"}}>
-              {["ID","Employee","Leave Type","From","To","Days","Reason","Status","Approved By","Actions"].map((h,i)=>(
+              {["ID","Employee","Leave Type","From","To","Days","Reason","Status","Actions"].map((h,i)=>(
                 <th key={i} style={{padding:"9px 12px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>{filtered.length===0&&(
-              <tr><td colSpan={10} style={{padding:"20px 12px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>
+              <tr><td colSpan={9} style={{padding:"20px 12px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>
                 {leaveQ.isLoading?"Loading…":"No leave requests for this branch yet. Use “Apply” to add one."}
               </td></tr>
             )}{filtered.map((l,i)=>(
@@ -1443,7 +1444,6 @@ export function HrLeave({branch}){
                 <td style={{padding:"8px 12px",textAlign:"center",fontWeight:700,color:"#185FA5"}}>{l.days}</td>
                 <td style={{padding:"8px 12px",color:"#384677",maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.reason}</td>
                 <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:STATUS_BG[l.status],color:STATUS_CLR[l.status]}}>{l.status}</span></td>
-                <td style={{padding:"8px 12px",color:"#5a6691",fontSize:10}}>{l.approvedBy||"—"}</td>
                 <td style={{padding:"8px 12px"}}>
                   {l.status==="Pending"&&<div style={{display:"flex",gap:4}}>
                     <button onClick={()=>approve(l)} disabled={update.isPending} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#27500A"}}>✓ Approve</button>
@@ -1549,110 +1549,6 @@ export function HrLeave({branch}){
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   PHASE 6b — EXPENSE CLAIMS  /hr/expenses
-   ════════════════════════════════════════════════════════════════ */
-
-export function HrExpenses({branch}){
-  const brCode=branch==="ALL"?null:branch?.code;
-  const [claims,setClaims]=useState(_EXPENSE_CLAIMS);
-  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
-  const [form,setForm]=useState({empId:"",empName:"",date:"",category:"Travel",desc:"",amount:0});
-
-  const filtered=claims.filter(c=>!brCode||HR_EMPLOYEES_DATA.find(e=>e.id===c.empId&&e.branch===brCode));
-  const totPending =filtered.filter(c=>!c.paid).reduce((s,c)=>s+c.amount,0);
-  const totApproved=filtered.filter(c=>c.status==="Approved"&&!c.paid).reduce((s,c)=>s+c.amount,0);
-  const CATS=["Travel","Entertainment","Stationery","Telephone","Miscellaneous"];
-
-  const submit=()=>{
-    setClaims(cs=>[{...form,id:`EXP${String(cs.length+1).padStart(3,"0")}`,receipt:false,status:"Pending",paid:false},...cs]);
-    setModal(false);
-  };
-
-  return (
-    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>💳</div>
-          <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Employee Expense Claims</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{filtered.filter(c=>c.status==="Pending").length} pending · ₹{totApproved.toLocaleString()} approved & pending payment</p>
-          </div>
-        </div>
-        <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> New Claim</button>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>
-        {[{l:"Claims",v:String(filtered.length),c:"#384677",bg:"#f3f4f8"},
-          {l:"Pending Approval",v:String(filtered.filter(c=>c.status==="Pending").length),c:"#854F0B",bg:"#FAEEDA"},
-          {l:"Approved — Unpaid",v:"₹"+totApproved.toLocaleString(),c:"#185FA5",bg:"#E6F1FB"},
-          {l:"Total Pending",v:"₹"+totPending.toLocaleString(),c:"#A32D2D",bg:"#FCEBEB"},
-        ].map((k,i)=>(
-          <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"11px 13px",background:k.bg}}>
-            <p style={{margin:0,fontSize:9,fontWeight:700,color:k.c,textTransform:"uppercase"}}>{k.l}</p>
-            <p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:"#0d1326"}}>{k.v}</p>
-          </div>
-        ))}
-      </div>
-      <div style={{...card,padding:0,overflow:"hidden"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr style={{background:"#0d1326"}}>
-            {["ID","Employee","Date","Category","Description","Amount","Receipt","Approval","Payment"].map((h,i)=>(
-              <th key={i} style={{padding:"9px 12px",textAlign:i===5?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
-            ))}
-          </tr></thead>
-          <tbody>{filtered.map((c,i)=>(
-            <tr key={c.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
-              <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{c.id}</td>
-              <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{c.empName}</td>
-              <td style={{padding:"8px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{c.date}</td>
-              <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{c.category}</span></td>
-              <td style={{padding:"8px 12px",color:"#384677"}}>{c.desc}</td>
-              <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>₹{c.amount.toLocaleString()}</td>
-              <td style={{padding:"8px 12px",textAlign:"center"}}>{c.receipt?"✅":"❌"}</td>
-              <td style={{padding:"8px 12px"}}>
-                <span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,
-                  background:c.status==="Approved"?"#EAF3DE":"#FAEEDA",
-                  color:c.status==="Approved"?"#27500A":"#854F0B"}}>{c.status}</span>
-                {c.status==="Pending"&&<button onClick={()=>setClaims(cs=>cs.map(x=>x.id===c.id?{...x,status:"Approved"}:x))} style={{...btnG,padding:"2px 6px",fontSize:8.5,marginLeft:4,background:"#27500A"}}>✓</button>}
-              </td>
-              <td style={{padding:"8px 12px"}}>
-                {c.status==="Approved"
-                  ?<span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:c.paid?"#EAF3DE":"#FAEEDA",color:c.paid?"#27500A":"#854F0B"}}>{c.paid?"Paid":"Pending"}</span>
-                  :<span style={{color:"#bfc3d6",fontSize:10}}>—</span>
-                }
-              </td>
-            </tr>
-          ))}</tbody>
-        </table>
-      </div>
-      {modal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:440,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
-              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Submit Expense Claim</p>
-              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
-            </div>
-            <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-              <FL label="Employee"><select value={form.empId} onChange={e=>{const emp=HR_EMPLOYEES_DATA.find(x=>x.id===e.target.value);setForm(f=>({...f,empId:e.target.value,empName:emp?.name||""}));}} style={inp}>
-                {HR_EMPLOYEES_DATA.filter(e=>!brCode||e.branch===brCode).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
-              </select></FL>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <FL label="Date"><input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} style={inp}/></FL>
-                <FL label="Category"><select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={inp}>{CATS.map(c=><option key={c}>{c}</option>)}</select></FL>
-              </div>
-              <FL label="Description"><input value={form.desc} onChange={e=>setForm(f=>({...f,desc:e.target.value}))} style={inp}/></FL>
-              <FL label="Amount (₹)"><input type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:+e.target.value}))} style={inp}/></FL>
-            </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
-              <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={submit} style={btnG}>💳 Submit Claim</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ════════════════════════════════════════════════════════════════
    PHASE 7 — POWER UX: Settings panel (dark mode, density)
@@ -1815,9 +1711,10 @@ export function SalaryRevision({branch}){
 export function PfEsiChallan({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?"BOM":branch?.code||"BOM";
-  const [month,setMonth]=useState("2026-05");
+  // Rolling last-6-months from the live clock (was frozen at Mar–May 2026).
+  const MONTHS=(()=>{const out=[];const d=new Date();for(let i=0;i<6;i++){const dt=new Date(d.getFullYear(),d.getMonth()-i,1);out.push({v:`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`,l:dt.toLocaleString("en",{month:"short"})+" "+dt.getFullYear()});}return out;})();
+  const [month,setMonth]=useState(MONTHS[0].v);
   const [tab,setTab]=useState("pf"); // pf | esi | pt
-  const MONTHS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
   /* Live, branch-scoped employees; PF/ESI/PT challans are computed from each
      employee's salary structure. */
   const emps=((useMasterList('employees', {branch:brCode}).data)||[]).map(fromEmpDTO);
