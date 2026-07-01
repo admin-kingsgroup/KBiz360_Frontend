@@ -1637,7 +1637,7 @@ function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice, cur = '
 
 // An inter-branch row: a sale raised as an INB voucher, or a purchase whose party
 // is an inter-branch branch ledger ("Travkings Tours and Travels <BR>").
-const INB_PARTY_RE = /travkings tours and travels\s+(bom|amd|nbo|dar|fbm|tkho)\b/i;
+const INB_PARTY_RE = /travkings tours and travels\s+(bommb|bom|amd|nbo|dar|fbm)\b/i; // BOMMB before BOM (shared prefix); TKHO renamed → BOMMB
 const isInbRow = (v, tab) => (tab === 'sales' ? v.type === 'INB' : INB_PARTY_RE.test(String(v.party || '')));
 
 export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {

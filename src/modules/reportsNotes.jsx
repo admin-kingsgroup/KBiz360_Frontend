@@ -17,7 +17,7 @@
 import React, { useMemo, useState } from 'react';
 import { FileSpreadsheet, Printer } from 'lucide-react';
 import { bc, RPT_thStyle, RPT_tdStyle } from '../core/styles';
-import { fmtINR, localeOf } from '../core/format';
+import { fmtINR, localeOf, compactAmt } from '../core/format';
 import { CUR_FY, CUR_QUARTER, CUR_MONTH, MONTH_OPTIONS, todayISO, monthLabel, fyOptions, fyRange, fmtDate } from '../core/dates';
 import { useBalanceSheet, useProfitAndLoss, useTrialBalance, useAgeing, useLedgerStatement } from '../core/useAccounting';
 import { VoucherEditor } from './accountingLive';
@@ -309,7 +309,7 @@ export function NotesToFinancials({ branch }) {
                     <p style={{ margin: '2px 0 0', fontSize: 11, color: MUTE }}>{n.narrative}</p>
                   </div>
                   <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: INK }}>{fmtINR(n.total)} <span style={{ fontSize: 10, color: MUTE }}>{n.side}</span></p>
+                    <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: INK }}>{compactAmt(n.total, { currency: cur })} <span style={{ fontSize: 10, color: MUTE }}>{n.side}</span></p>
                     <span style={{ fontSize: 9.5, color: MUTE, background: '#f2f4fa', border: `1px solid ${LINE}`, borderRadius: 3, padding: '1px 6px' }}>↺ {n.reconcilesTo}</span>
                   </div>
                 </div>

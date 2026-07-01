@@ -19,6 +19,7 @@
 
 import axios from 'axios';
 import { errMessage } from './apiError';
+import { unwrapEnvelope } from './apiEnvelope';
 
 const BASE = import.meta.env.VITE_KBIZ_API_BASE || 'http://localhost:9090';
 
@@ -100,8 +101,9 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (response) => {
     if (response.status === 204) return null;
-    const json = response.data;
-    return json && typeof json === 'object' && 'data' in json ? json.data : json;
+    // Unwrap { success, data } but PRESERVE top-level siblings (e.g. gp-bills byBranch)
+    // by hanging them on the returned value — see apiEnvelope.js.
+    return unwrapEnvelope(response.data);
   },
   (error) => {
     const res = error.response;

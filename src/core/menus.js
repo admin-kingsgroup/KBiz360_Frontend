@@ -189,6 +189,7 @@ export const MENU_HR = {label:"HR", icon:Users, children:[
     {label:"Employee (10-Tab View)", href:"/hr/employee-tabs"},
   ]},
   {label:"Operations", children:[
+    {label:"Shift Master", href:"/hr/shifts"},
     {label:"Attendance", href:"/hr/attendance"},
     {label:"Leave Management", href:"/hr/leave"},
     {label:"Recruitment", href:"/hr/recruitment"},

@@ -134,6 +134,45 @@ export function toJobPayload(f = {}) {
   };
 }
 
+/* ── Shifts (working-time master) ───────────────────────────────── */
+export function fromShiftDTO(s = {}) {
+  return {
+    id: s.id,
+    name: s.name || '',
+    code: s.code || '',
+    branch: s.branch || '',
+    startTime: s.startTime || '09:30',
+    endTime: s.endTime || '18:30',
+    breakMins: +s.breakMins || 0,
+    graceMins: +s.graceMins || 0,
+    weeklyOff: Array.isArray(s.weeklyOff) ? s.weeklyOff.map(Number) : [0],
+    nightShift: !!s.nightShift,
+    active: s.active !== false,
+  };
+}
+export function toShiftPayload(f = {}) {
+  return {
+    name: f.name || '',
+    code: f.code || '',
+    branch: f.branch || '',
+    startTime: f.startTime || '09:30',
+    endTime: f.endTime || '18:30',
+    breakMins: +f.breakMins || 0,
+    graceMins: +f.graceMins || 0,
+    weeklyOff: (Array.isArray(f.weeklyOff) ? f.weeklyOff : []).map(Number).filter((d) => d >= 0 && d <= 6),
+    nightShift: !!f.nightShift,
+    active: f.active !== false,
+  };
+}
+
+// The set of weekly-off day-of-week ints for an employee's assigned shift, given the
+// shifts list keyed by id. Falls back to Sunday-only when unassigned/unknown. Pure.
+export function weeklyOffForShift(shiftId, shiftsById = {}) {
+  const s = shiftId && shiftsById[shiftId];
+  const wo = s && Array.isArray(s.weeklyOff) ? s.weeklyOff.map(Number) : [0];
+  return wo;
+}
+
 /* ── Employee loans / salary advances ───────────────────────────── */
 export function fromLoanDTO(l = {}) {
   const principal = +l.principal || 0, emi = +l.emi || 0, paid = +l.paid || 0;

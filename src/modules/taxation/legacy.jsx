@@ -654,6 +654,7 @@ export function TallyExport({branch}){
 
   return (
     <div style={{padding:"12px 10px",maxWidth:800,margin:"0 auto"}}>
+      <SampleBanner note="The generated Tally XML is a SUMMARY of sales/cost ledgers (derived from live GP bills) for the period — it does NOT yet emit full ledger masters, individual vouchers, or party balances. The export-type selector affects the label only; use the accounting reports for full detail until the complete Tally export is built." />
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
         <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📤</div>
         <div>

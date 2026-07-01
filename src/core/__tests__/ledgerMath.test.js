@@ -57,6 +57,23 @@ describe('mapLedger', () => {
     expect(m.totalDebit).toBe(0);
   });
 
+  test.concurrent('carries primaryGroup so a custom party sub-group stays bill-wise', async () => {
+    // Party under a custom sub-group ("Supplier B2B") whose PRIMARY head is
+    // Sundry Creditors — the ledger view must resolve bill-wise from primaryGroup.
+    const m = mapLedger({ ledger: 'Akbar Online Booking Co. Pvt Ltd', group: 'Supplier B2B', primaryGroup: 'Sundry Creditors' });
+    expect(m.group).toBe('Supplier B2B');
+    expect(m.primaryGroup).toBe('Sundry Creditors');
+    // billwiseSide keyed off primaryGroup ⇒ a real supplier (bill-wise), not null.
+    expect(billwiseSide(m.primaryGroup)).toBe('supplier');
+    // And the immediate sub-group name alone would (correctly) miss it.
+    expect(billwiseSide(m.group)).toBeNull();
+  });
+
+  test.concurrent('primaryGroup falls back to group for older payloads', async () => {
+    const m = mapLedger({ ledger: 'Sundry Cr', group: 'Sundry Creditors' });
+    expect(m.primaryGroup).toBe('Sundry Creditors');
+  });
+
   test.concurrent('maps lines: To/By, contra particulars, detail, branch', async () => {
     const m = mapLedger({
       ledger: 'Global Konnection', group: 'Sundry Debtors', code: '1050',

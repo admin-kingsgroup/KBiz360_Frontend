@@ -11,7 +11,8 @@
 import React, { useMemo } from 'react';
 import { Inbox } from 'lucide-react';
 import { useGpBills } from '../../../core/useAccounting';
-import { fmt } from '../../../core/format';
+import { fmt, compactAmt } from '../../../core/format';
+import { bc } from '../../../core/styleTokens';
 import { DataTable } from '../../../shell/DataTable';
 import { PageSection, ResponsiveGrid, LoadingState, EmptyState } from '../../../shell/primitives';
 import { RptShell } from '../components/scaffold';
@@ -39,6 +40,13 @@ export function ReportBranch() {
   const hasData = BR_D.length > 0;
   const maxR = Math.max(...BR_D.map((b) => b.rev), 1);
   const totR = BR_D.reduce((s, b) => s + b.rev, 0) || 1;
+  // Each branch's figures are in its OWN currency — show them so, and only footer a
+  // grand total when every branch shares one currency (₹+$ can't be summed).
+  const curOf = (code) => (bc({ code }) || {}).cur || '₹';
+  const cm = (v, code) => compactAmt(v, { currency: curOf(code) });
+  const curs = [...new Set(BR_D.map((b) => curOf(b.branch)))];
+  const oneCur = curs.length === 1;
+  const totalCell = (rs, key) => (oneCur ? compactAmt(rs.reduce((s, r) => s + r[key], 0), { currency: curs[0] || '₹' }) : '—');
 
   if (q.isLoading) {
     return <RptShell title="Branch Comparison" subtitle="All branches · live double-entry"><LoadingState label="Loading live data…" /></RptShell>;
@@ -63,8 +71,8 @@ export function ReportBranch() {
         </span>
       ),
     },
-    { key: 'rev', header: 'Revenue ₹', num: true, render: (r, v) => fmt(v), footer: (rs) => fmt(rs.reduce((s, r) => s + r.rev, 0)) },
-    { key: 'gp', header: 'Gross Profit ₹', num: true, className: 'text-[#16a34a]', render: (r, v) => fmt(v), footer: (rs) => fmt(rs.reduce((s, r) => s + r.gp, 0)) },
+    { key: 'rev', header: 'Revenue', num: true, render: (r, v) => cm(v, r.branch), footer: (rs) => totalCell(rs, 'rev') },
+    { key: 'gp', header: 'Gross Profit', num: true, className: 'text-[#16a34a]', render: (r, v) => cm(v, r.branch), footer: (rs) => totalCell(rs, 'gp') },
     { key: 'gpPct', header: 'GP %', num: true, className: 'font-semibold text-[#16a34a]', render: (r, v) => `${v}%` },
     { key: 'share', header: 'Revenue share', num: true, sortValue: (r) => r.rev / totR, render: (r) => `${((r.rev / totR) * 100).toFixed(1)}%` },
   ];
@@ -75,7 +83,7 @@ export function ReportBranch() {
         {BR_D.map((b, i) => (
           <div key={i} className="rounded-brand border border-t-[3px] border-surface-border bg-surface-alt px-3.5 py-3" style={{ borderTopColor: b.color }}>
             <p className="text-[10.5px] font-semibold text-role-hr">{b.branch}</p>
-            <p className="mb-px mt-1 text-base font-bold tabular-nums text-navy">{'₹ ' + fmt(b.rev / 100000) + 'L'}</p>
+            <p className="mb-px mt-1 text-base font-bold tabular-nums text-navy">{cm(b.rev, b.branch)}</p>
             <p className="text-[11px] font-semibold text-[#16a34a]">{'GP: ' + b.gpPct + '%'}</p>
           </div>
         ))}
@@ -86,7 +94,7 @@ export function ReportBranch() {
           <div key={i} className="mb-3.5 last:mb-0">
             <div className="mb-1.5 flex justify-between text-[11.5px]">
               <span className="font-medium text-role-hr">{b.branch}</span>
-              <span className="font-semibold tabular-nums text-navy">{'₹ ' + fmt(b.rev)}</span>
+              <span className="font-semibold tabular-nums text-navy">{cm(b.rev, b.branch)}</span>
             </div>
             <div className="mb-1 h-2.5 overflow-hidden rounded-full bg-surface-alt">
               <div className="h-full rounded-full" style={{ width: (b.rev / maxR * 100) + '%', background: b.color }} />

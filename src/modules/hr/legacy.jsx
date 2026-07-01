@@ -15,7 +15,7 @@ import { useModalEsc } from '../../core/ux/useModalEsc';
 import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../../core/useReference';
 import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { fromEmpDTO, toEmpPayload, BLANK_EMP } from './employeeMap';
-import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, takenFor, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from './hrMaps';
+import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, takenFor, fromShiftDTO, toShiftPayload, weeklyOffForShift, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from './hrMaps';
 import { buildRevisionDue } from './hrReports';
 import { todayISO } from '../../core/dates';
 import { toast } from '../../core/ux/toast';
@@ -222,6 +222,9 @@ export function HrEmployees({branch}){
   const empQ=useMasterList('employees', brScope?{branch:brScope}:{});
   const emps=(empQ.data||[]).map(fromEmpDTO);
   const {create,update,remove}=useMasterMutations('employees');
+  /* Active shifts for the assignment picker: those for the form's branch + the all-branch ('') ones. */
+  const shifts=((useMasterList('shifts', {active:true}).data)||[]).map(fromShiftDTO).filter(s=>s.active);
+  const shiftOpts=shifts.filter(s=>!s.branch||s.branch===(form.branch||brScope));
   const saving=create.isPending||update.isPending;
   React.useEffect(()=>{ setBrFilter(branch==="ALL"?"All":branch?.code||"All"); },[branch]);
 
@@ -398,6 +401,9 @@ export function HrEmployees({branch}){
                   <option value="">—</option>
                   {HR_DEPTS.filter(d=>d!=="All").map(d=><option key={d} value={d}>{d}</option>)}</select></FL>
                 <FL label="Designation"><input value={form.desig} onChange={e=>setF("desig",e.target.value)} style={inp}/></FL>
+                <FL label="Shift"><select value={form.shiftId||""} onChange={e=>{const s=shiftOpts.find(x=>x.id===e.target.value);setForm(f=>({...f,shiftId:e.target.value,shiftCode:s?.code||""}));}} style={inp}>
+                  <option value="">— branch default —</option>
+                  {shiftOpts.map(s=><option key={s.id} value={s.id}>{s.name}{s.code?` (${s.code})`:""} · {s.startTime}–{s.endTime}</option>)}</select></FL>
                 <FL label="Date of joining"><input type="date" value={form.joined} onChange={e=>setF("joined",e.target.value)} style={inp}/></FL>
                 <FL label="Date of birth"><input type="date" value={form.dob} onChange={e=>setF("dob",e.target.value)} style={inp}/></FL>
                 <FL label="Mobile"><input value={form.mobile} onChange={e=>setF("mobile",e.target.value)} style={inp}/></FL>
@@ -481,6 +487,9 @@ export function HrAttendance({branch}){
   const brScope=branch==="ALL"?"":(branch?.code||"");
   const emps=((useMasterList('employees', brScope?{branch:brScope}:{}).data)||[]).map(fromEmpDTO)
     .filter(e=>(brFilter==="All"||e.branch===brFilter));
+  /* Shift master → each employee's weekly-off drives the WO default (was hard-coded Sat+Sun). */
+  const shiftsById=Object.fromEntries(((useMasterList('shifts',{active:true}).data)||[]).map(s=>{const x=fromShiftDTO(s);return [x.id,x];}));
+  const woFor=(emp)=>weeklyOffForShift(emp.shiftId,shiftsById);
   const attQ=useQuery({
     queryKey:['attendance',brScope||'ALL',month],
     queryFn:()=>apiGet('/api/attendance',{branch:brScope||'ALL',month}),
@@ -499,9 +508,10 @@ export function HrAttendance({branch}){
 
   const days=getDaysInMonth(month);
 
-  /* Bulk "mark all present" — one round-trip for the whole visible roster. Needs a single
-     concrete branch (all-scope + no branch filter → disabled). Working days = Mon–Sat;
-     Sundays are left unmarked (excluded from the % either way). */
+  /* Bulk "mark all present" — one round-trip per weekly-off GROUP. Needs a single concrete
+     branch (all-scope + no branch filter → disabled). "Working days" respects EACH employee's
+     assigned-shift weekly-off (grouped so a Friday-off Gulf shift and a Sunday-off General
+     shift each get their own correct day list), never a hard-coded Sun/Sat rule. */
   const bulkBranch=brScope||(brFilter!=="All"?brFilter:"");
   const curMonth=MONTHS[0].v; const isCurMonth=month===curMonth;
   const upTo=isCurMonth?new Date().getDate():days;
@@ -510,24 +520,45 @@ export function HrAttendance({branch}){
     onSuccess:(d)=>{qc.invalidateQueries({queryKey:['attendance',brScope||'ALL',month]});toast(`Marked ${d?.employees||0} employee(s) present`);},
     onError:(err)=>toast(err?.message||"Bulk mark failed","error"),
   });
-  const empPayload=()=>emps.map(e=>({empId:e.id,empName:e.name}));
   const canBulk=!!bulkBranch&&emps.length>0&&!bulkMut.isPending;
-  const markToday=()=>{ if(!canBulk||!isCurMonth)return; bulkMut.mutate({branch:bulkBranch,month,days:[new Date().getDate()],status:"P",employees:empPayload()}); };
+  // Group employees by their weekly-off signature so each group gets its own working-day list.
+  const bulkGroups=(dayFilter)=>{
+    const groups=new Map();
+    for(const e of emps){
+      const wo=woFor(e); const key=wo.join(",");
+      if(!groups.has(key)) groups.set(key,{wo,list:[]});
+      groups.get(key).list.push({empId:e.id,empName:e.name});
+    }
+    const plan=[];
+    for(const {wo,list} of groups.values()){
+      const daysArr=dayFilter.filter(d=>!wo.includes(getDay(d)));
+      if(daysArr.length&&list.length) plan.push({days:daysArr,employees:list});
+    }
+    return plan;
+  };
+  const markToday=()=>{
+    if(!canBulk||!isCurMonth)return;
+    const plan=bulkGroups([new Date().getDate()]);
+    if(!plan.length){toast("Everyone listed is on weekly-off today","info");return;}
+    for(const p of plan) bulkMut.mutate({branch:bulkBranch,month,days:p.days,status:"P",employees:p.employees});
+  };
   const fillWorking=()=>{
     if(!canBulk)return;
-    const list=[]; for(let d=1;d<=upTo;d++){ if(getDay(d)!==0) list.push(d); }
-    if(!list.length)return;
-    if(!window.confirm(`Mark ${list.length} working day(s) as Present for ${emps.length} employee(s) in ${bulkBranch}? (existing marks on those days are overwritten)`))return;
-    bulkMut.mutate({branch:bulkBranch,month,days:list,status:"P",employees:empPayload()});
+    const allDays=Array.from({length:upTo},(_,i)=>i+1);
+    const plan=bulkGroups(allDays);
+    const cells=plan.reduce((s,p)=>s+p.days.length*p.employees.length,0);
+    if(!cells)return;
+    if(!window.confirm(`Mark ${cells} present cell(s) for ${emps.length} employee(s) in ${bulkBranch}, respecting each one's shift weekly-off? (existing marks on those days are overwritten)`))return;
+    for(const p of plan) bulkMut.mutate({branch:bulkBranch,month,days:p.days,status:"P",employees:p.employees});
   };
 
-  /* Live status for a cell: an explicit mark wins; otherwise weekends default to
-     Week Off and weekdays show unmarked ("—") — we never invent Present. */
+  /* Live status for a cell: an explicit mark wins; otherwise the employee's assigned-shift
+     weekly-off days default to Week Off and other unmarked days show "—" — we never invent
+     Present. Unassigned employees fall back to Sunday-only off (weeklyOffForShift default). */
   const getAtt=(emp,day)=>{
     const marked=attByEmp[emp.id]?.[String(day)];
     if(marked) return marked;
-    const dow=getDay(day);
-    return (dow===0||dow===6)?"WO":"";
+    return woFor(emp).includes(getDay(day))?"WO":"";
   };
   const cycleCell=(emp,day)=>{
     const cur=attByEmp[emp.id]?.[String(day)]||"";
@@ -613,7 +644,7 @@ export function HrAttendance({branch}){
                 <td style={{padding:"7px 12px",position:"sticky",left:0,
                   background:ei%2===0?"#fff":"#fafafa",borderRight:"1px solid #cdd1d8"}}>
                   <p style={{margin:0,fontWeight:600,color:"#0d1326",fontSize:11}}>{emp.name}</p>
-                  <p style={{margin:0,fontSize:9,color:"#5a6691"}}>{emp.branch} · {emp.dept}</p>
+                  <p style={{margin:0,fontSize:9,color:"#5a6691"}}>{emp.branch} · {emp.dept}{emp.shiftCode?` · ${emp.shiftCode}`:""}</p>
                 </td>
                 {Array.from({length:days},(_,i)=>{
                   const att=getAtt(emp,i+1);
@@ -638,6 +669,110 @@ export function HrAttendance({branch}){
           })}</tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+/* ── Shift Master  /hr/shifts ─────────────────────────────────── */
+
+export function HrShifts({branch}){
+  const brScope=branch==="ALL"?"":(branch?.code||"");
+  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
+  const blank={name:"",code:"",branch:brScope||"BOM",startTime:"09:30",endTime:"18:30",breakMins:60,graceMins:10,weeklyOff:[0],nightShift:false,active:true,id:null};
+  const [form,setForm]=useState(blank);
+  const DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+  const shiftsQ=useMasterList('shifts', brScope?{branch:brScope}:{});
+  const shifts=((shiftsQ.data)||[]).map(fromShiftDTO);
+  const {create,update,remove}=useMasterMutations('shifts');
+
+  const openNew=()=>{setForm({...blank,branch:brScope||"BOM"});setModal(true);};
+  const openEdit=(s)=>{setForm({...s});setModal(true);};
+  const toggleWO=(d)=>setForm(f=>({...f,weeklyOff:f.weeklyOff.includes(d)?f.weeklyOff.filter(x=>x!==d):[...f.weeklyOff,d].sort((a,b)=>a-b)}));
+  const save=()=>{
+    if(!form.name){toast("Shift name is required","error");return;}
+    const body=toShiftPayload(form);
+    const onDone={onSuccess:()=>{toast("Shift saved");setModal(false);},onError:e=>toast(e?.message||"Save failed","error")};
+    if(form.id) update.mutate({id:form.id,body},onDone); else create.mutate(body,onDone);
+  };
+  const del=(s)=>{ if(!window.confirm(`Delete shift "${s.name}"? Employees on it fall back to the branch default.`))return;
+    remove.mutate(s.id,{onSuccess:()=>toast("Shift deleted"),onError:e=>toast(e?.message||"Delete failed","error")}); };
+
+  return (
+    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🕘</div>
+          <div>
+            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Shift Master</h2>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{shiftsQ.isLoading?"Loading…":`${shifts.length} shift${shifts.length===1?"":"s"}`} · {branch==="ALL"?"All branches":(branch?.code||brScope||"—")} · weekly-off drives the attendance Week-Off default</p>
+          </div>
+        </div>
+        <button onClick={openNew} style={{...btnG,fontSize:11}}><Plus size={13}/> New Shift</button>
+      </div>
+
+      <div style={{...card,padding:0,overflow:"hidden"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
+          <thead><tr style={{background:"#0d1326"}}>
+            {["Name","Code","Branch","Timing","Break","Grace","Weekly Off","Active",""].map((h,i)=>(
+              <th key={i} style={{padding:"9px 12px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>{shifts.length===0&&(
+            <tr><td colSpan={9} style={{padding:"20px 12px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>
+              {shiftsQ.isLoading?"Loading…":"No shifts yet. Use “New Shift” to add one (e.g. General 09:30–18:30, weekly-off Sun)."}
+            </td></tr>
+          )}{shifts.map((s,i)=>(
+            <tr key={s.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa",cursor:"pointer"}} onClick={()=>openEdit(s)}>
+              <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{s.name}{s.nightShift?" 🌙":""}</td>
+              <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{s.code||"—"}</td>
+              <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{s.branch||"All"}</span></td>
+              <td style={{padding:"8px 12px",color:"#384677",whiteSpace:"nowrap"}}>{s.startTime}–{s.endTime}</td>
+              <td style={{padding:"8px 12px",color:"#5a6691"}}>{s.breakMins}m</td>
+              <td style={{padding:"8px 12px",color:"#5a6691"}}>{s.graceMins}m</td>
+              <td style={{padding:"8px 12px",color:"#5a6691",fontSize:10}}>{s.weeklyOff.length?s.weeklyOff.map(d=>DOW[d]).join(", "):"—"}</td>
+              <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:s.active?"#EAF3DE":"#f3f4f8",color:s.active?"#27500A":"#5a6691"}}>{s.active?"Active":"Inactive"}</span></td>
+              <td style={{padding:"8px 12px"}}><button onClick={ev=>{ev.stopPropagation();del(s);}} style={{...btnGh,padding:"2px 8px",fontSize:9,color:"#A32D2D"}}>Delete</button></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+
+      {modal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:520,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>{form.id?"Edit shift":"New shift"}</p>
+              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
+            </div>
+            <div style={{padding:"16px 18px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <FL label="Shift name"><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="General" style={inp}/></FL>
+              <FL label="Code"><input value={form.code} onChange={e=>setForm(f=>({...f,code:e.target.value}))} placeholder="GEN" style={inp}/></FL>
+              <FL label="Branch"><select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))} style={inp}>
+                <option value="">All branches</option>
+                {BRANCHES.map(b=><option key={b.code} value={b.code}>{b.code}</option>)}</select></FL>
+              <FL label="Status"><select value={form.active?"Active":"Inactive"} onChange={e=>setForm(f=>({...f,active:e.target.value==="Active"}))} style={inp}><option>Active</option><option>Inactive</option></select></FL>
+              <FL label="Start time"><input type="time" value={form.startTime} onChange={e=>setForm(f=>({...f,startTime:e.target.value}))} style={inp}/></FL>
+              <FL label="End time"><input type="time" value={form.endTime} onChange={e=>setForm(f=>({...f,endTime:e.target.value}))} style={inp}/></FL>
+              <FL label="Break (min)"><input type="number" min={0} value={form.breakMins} onChange={e=>setForm(f=>({...f,breakMins:e.target.value}))} style={inp}/></FL>
+              <FL label="Grace (min)"><input type="number" min={0} value={form.graceMins} onChange={e=>setForm(f=>({...f,graceMins:e.target.value}))} style={inp}/></FL>
+              <div style={{gridColumn:"1/-1"}}><FL label="Weekly off">
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{DOW.map((d,idx)=>(
+                  <button key={d} type="button" onClick={()=>toggleWO(idx)}
+                    style={{fontSize:10,padding:"4px 10px",borderRadius:999,fontWeight:700,cursor:"pointer",border:"1px solid #cdd1d8",
+                    background:form.weeklyOff.includes(idx)?"#185FA5":"#fff",color:form.weeklyOff.includes(idx)?"#fff":"#5a6691"}}>{d}</button>
+                ))}</div></FL></div>
+              <label style={{gridColumn:"1/-1",display:"flex",alignItems:"center",gap:8,fontSize:11,color:"#384677"}}>
+                <input type="checkbox" checked={form.nightShift} onChange={e=>setForm(f=>({...f,nightShift:e.target.checked}))}/> Night shift (spans midnight)
+              </label>
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
+              <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
+              <button onClick={save} disabled={create.isPending||update.isPending} style={btnG}>{create.isPending||update.isPending?"Saving…":"Save shift"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
