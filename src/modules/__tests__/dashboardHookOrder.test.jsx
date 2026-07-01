@@ -89,7 +89,8 @@ afterEach(() => jest.clearAllMocks());
 
 describe.each([
   ['Director', DirectorDashboardPage, 'Director Dashboard'],
-  ['Owner', OwnerDashboardPage, 'Owner Dashboard'],
+  // Owner dashboard header was renamed to "AD Dashboard (All)" (owner-dashboard.jsx).
+  ['Owner', OwnerDashboardPage, 'AD Dashboard (All)'],
 ])('%s dashboard — stable hook order across loading → loaded', (_name, Page, title) => {
   test('renders loading then loaded without a React hooks-order violation (#300)', () => {
     // 1) Loading render — hits the `if (isLoading) return <Skeleton/>` early return.

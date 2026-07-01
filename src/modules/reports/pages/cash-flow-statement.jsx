@@ -1,12 +1,3 @@
-/* ════════════════════════════════════════════════════════════════════
-   Reports ▸ Cash Flow Statement (indirect) — LIVE from two BS snapshots.
-   ════════════════════════════════════════════════════════════════════
-   Migrated out of legacy.jsx. All cash-flow math is unchanged: opening vs
-   closing Balance Sheet (Bank + Cash) + the period's Module P&L, indirect
-   method, with an unclassified balancing line. A structured statement (not
-   a sortable grid), so it keeps custom section rendering on the scaffold.
-   ──────────────────────────────────────────────────────────────────── */
-
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Menu as DropdownMenu } from '../../../core/ux/Menu';
