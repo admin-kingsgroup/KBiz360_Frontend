@@ -32,7 +32,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
   const { navigate } = useDashboardActions(setRoute);
   // Period drives the financial bands (P&L / Balance Sheet / ageing / targets) added
   // below the operational KPIs. The bundled ops payload above stays MTD/YTD as-is.
-  const [range, setRange] = useState(() => periodRange('cfy', { branch }));
+  const [range, setRange] = useState(() => periodRange('all', { branch }));
   // Live cash/bank position AS OF the period end — Σ closing of cash & bank ledgers.
   // Pass ONLY `to` (no `from`): a point-in-time closing balance must carry the full
   // opening + ALL movement up to `to`; a `from` cutoff would drop pre-period activity
@@ -82,7 +82,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
 
       {/* Period selector — scopes the financial bands (P&L / cash / balance / targets) */}
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <PeriodBar branch={branch} defaultPreset="cfy" compact onChange={setRange} />
+        <PeriodBar branch={branch} defaultPreset="all" compact onChange={setRange} />
         <span className="text-[11px] font-semibold text-ink-muted">Financials: {range.label}</span>
       </div>
 

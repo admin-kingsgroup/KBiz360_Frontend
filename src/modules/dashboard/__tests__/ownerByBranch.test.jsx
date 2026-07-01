@@ -61,7 +61,7 @@ jest.mock('../../../core/styleTokens', () => ({
   bc: (arg) => { const code = typeof arg === 'string' ? arg : arg && arg.code; return { cur: ['NBO', 'DAR', 'FBM'].includes(code) ? '$' : '₹' }; },
 }));
 // Deterministic money so we can assert exact strings: "<symbol><rounded>".
-jest.mock('../../../core/format', () => ({ compactAmt: (n, opts) => `${(opts && opts.currency) || ''}${Math.round(Number(n) || 0)}` }));
+jest.mock('../../../core/format', () => ({ compactAmt: (n, opts) => `${(opts && opts.currency) || ''}${Math.round(Number(n) || 0)}`, localeOf: () => 'en-IN' }));
 jest.mock('../../../core/ledgerKind', () => ({ isLiquidRow: () => true }));
 jest.mock('../../../core/styles', () => ({
   KPICard: ({ label, value, delta, onClick }) => <button onClick={onClick}>{`KPI|${label}|${value}|${delta || ''}`}</button>,

@@ -139,6 +139,8 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
   const mFull = (n) => `${cur}${Math.round(Number(n) || 0).toLocaleString(localeOf(cur))}`;
   // Per-branch money formatter — value in the given branch CODE's own currency.
   const mB = (code, n) => compactAmt(Math.round(Number(n) || 0), { currency: bc({ code }).cur });
+  // Full grouped, per branch currency — the exact figure shown under the compact KPI.
+  const mBFull = (code, n) => { const c = bc({ code }).cur; return `${c}${Math.round(Number(n) || 0).toLocaleString(localeOf(c))}`; };
   const mpl = useModulePL(branchArg, { ...dates, summary: true }).data || {};
   const bs = useBalanceSheet(branchArg, { to: dates.to }).data || {};
   const age = useAgeing(branchArg).data || {};
@@ -274,8 +276,8 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
               </div>
               <ResponsiveGrid min="180px" gap="md">
                 <KPICard label="Cash & Bank" value={mB(r.code, r.liquid)} delta={r.liquid < 0 ? 'overdrawn' : 'liquid'} color={r.liquid < 0 ? C.red : '#16a34a'} onClick={() => drillBranch(r.code, '/dashboards/cash')} />
-                <KPICard label={`Revenue · ${rangeShort}`} value={mB(r.code, r.revenue)} delta="" color="#c2a04a" onClick={() => drillBranch(r.code, '/reports/pnl')} />
-                <KPICard label="Gross Profit" value={mB(r.code, r.gp)} delta={r.gpPct ? `${r.gpPct.toFixed(1)}% GP` : ''} color="#16a34a" onClick={() => drillBranch(r.code, '/reports/gp')} />
+                <KPICard label={`Revenue · ${rangeShort}`} value={mB(r.code, r.revenue)} delta={mBFull(r.code, r.revenue)} color="#c2a04a" onClick={() => drillBranch(r.code, '/reports/pnl')} />
+                <KPICard label="Gross Profit" value={mB(r.code, r.gp)} delta={`${r.gpPct ? r.gpPct.toFixed(1) + '% GP · ' : ''}${mBFull(r.code, r.gp)}`} color="#16a34a" onClick={() => drillBranch(r.code, '/reports/gp')} />
                 <KPICard label="Net Profit" value={mB(r.code, r.net)} delta={r.revenue ? `${((r.net / r.revenue) * 100).toFixed(1)}% margin` : ''} color={r.net >= 0 ? C.green : C.red} onClick={() => drillBranch(r.code, '/reports/pnl')} />
                 <KPICard label="Receivables" value={mB(r.code, r.outstanding)} delta={r.arOverdue ? `${mB(r.code, r.arOverdue)} overdue 90+` : 'to collect'} color={r.arOverdue ? C.red : C.gold} onClick={() => drillBranch(r.code, '/dashboards/arap')} />
                 <KPICard label="Payables" value={mB(r.code, r.payable)} delta="to pay" color={C.red} onClick={() => drillBranch(r.code, '/dashboards/arap')} />
@@ -287,8 +289,8 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
       ) : (
         <ResponsiveGrid min="180px" gap="md" className="mb-4">
           <KPICard label="Cash & Bank" value={m0(liquid)} delta={liquid < 0 ? 'overdrawn' : 'liquid'} color={liquid < 0 ? C.red : '#16a34a'} onClick={() => navigate('/dashboards/cash')} />
-          <KPICard label={`Revenue · ${rangeShort}`} value={m0(fig.revenue)} delta="" color="#c2a04a" onClick={() => navigate('/reports/pnl')} />
-          <KPICard label="Gross Profit" value={m0(fig.gp)} delta={fig.gpPct ? `${Number(fig.gpPct).toFixed(1)}% GP` : ''} color="#16a34a" onClick={() => navigate('/reports/gp')} />
+          <KPICard label={`Revenue · ${rangeShort}`} value={m0(fig.revenue)} delta={mFull(fig.revenue)} color="#c2a04a" onClick={() => navigate('/reports/pnl')} />
+          <KPICard label="Gross Profit" value={m0(fig.gp)} delta={`${fig.gpPct ? Number(fig.gpPct).toFixed(1) + '% GP · ' : ''}${mFull(fig.gp)}`} color="#16a34a" onClick={() => navigate('/reports/gp')} />
           <KPICard label="Net Profit" value={m0(fig.netProfit)} delta={fig.revenue ? `${((fig.netProfit / fig.revenue) * 100).toFixed(1)}% margin` : ''} color={fig.netProfit >= 0 ? C.green : C.red} onClick={() => navigate('/reports/pnl')} />
           <KPICard label="Receivables" value={m0(fig.outstanding)} delta={arOverdue ? `${m0(arOverdue)} overdue 90+` : 'to collect'} color={arOverdue ? C.red : C.gold} onClick={() => navigate('/dashboards/arap')} />
           <KPICard label="Payables" value={m0(fig.payable)} delta="to pay" color={C.red} onClick={() => navigate('/dashboards/arap')} />
