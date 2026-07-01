@@ -14,6 +14,7 @@ import {
 import { CONSOLIDATED_LABEL, BRANCHES as LIVE_BRANCHES } from '../core/data';
 import { liquidityKind, isLiquidRow } from '../core/ledgerKind';
 import { openPrintPreview } from '../core/PrintPreview';
+import { PnlWaterfallPanel } from './dashboard/components/shared/PnlWaterfallPanel';
 import { TrendingUp, PieChart, Receipt, CircleDollarSign, ArrowRight } from 'lucide-react';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#1f7a3d', amber: '#b8860b', dim: '#5a6691', border: '#cdd1d8', bg: '#f3f4f8' };
@@ -807,6 +808,117 @@ export function BudgetVsExpenseDash({ branch, go }) {
   );
 }
 
+// ── 16b) Performance vs Target — ONE page folding Sales / GP / Budget / Nett ───
+// Profit vs their targets. Four gauge tiles → the Profit Bridge that ties them
+// together → a module breakdown (Sales⇄GP toggle) beside the expense-head budget
+// table. All four cards share ONE Branch/Period header (each old dashboard set its
+// own period independently). Tiles drill into the standalone dashboards, which
+// stay live as the deep-dive views. NP actual = P&L netProfit; NP target = the
+// company-total 'np' SalesTarget (metric added to the targets master).
+export function PerformanceDash({ branch, go }) {
+  const p = usePeriod('cfy'); const range = p.range;
+  const cur = (bc(branch) || {}).cur || '₹';
+  const fy = fyStr();
+  const salesQ = useTargetsVsActual(branch, 'sales', { ...range, fy });
+  const gpQ    = useTargetsVsActual(branch, 'gp',    { ...range, fy });
+  const npQ    = useTargetsVsActual(branch, 'np',    { ...range, fy });
+  const budQ   = useBudgetVsActual(branch, { ...range, fy });
+  const ld = salesQ.isLoading || gpQ.isLoading || npQ.isLoading || budQ.isLoading; // don't paint ₹0 as real while loading
+  const sT = salesQ.data?.totals || {}, gT = gpQ.data?.totals || {}, nT = npQ.data?.totals || {}, bT = budQ.data?.totals || {};
+
+  const [tab, setTab] = useState('sales');            // module table toggle
+  const modRows = (tab === 'sales' ? salesQ.data : gpQ.data)?.rows || [];
+  const budRows = budQ.data?.rows || [];
+  const overHeads = budRows.filter((r) => r.status === 'over').length;
+
+  const achOf  = (t) => (t.target ? Math.round((t.actual / t.target) * 100) : 0);
+  const usedOf = (t) => (t.budget ? Math.round((t.actual / t.budget) * 100) : 0);
+  // Achievement gauge tone. Budget is inverted — high "used %" is BAD (overspend),
+  // so ≤100 = green (under budget), ≤110 = amber, else red. The rest are the
+  // standard ≥100 green / ≥90 amber / red thresholds.
+  const toneOf = (t) => (t.invert
+    ? (t.ach <= 100 ? C.green : t.ach <= 110 ? C.amber : C.red)
+    : (t.ach >= 100 ? C.green : t.ach >= 90 ? C.amber : C.red));
+
+  const tiles = [
+    { key: 'sales', title: 'Sales vs Target',       ach: achOf(sT), actual: sT.actual, target: sT.target, variance: sT.variance, invert: false, route: '/dashboards/sales-target', aLabel: 'Actual', tLabel: 'Target', fav: 'ahead', unfav: 'short' },
+    { key: 'gp',    title: 'GP vs Target',          ach: achOf(gT), actual: gT.actual, target: gT.target, variance: gT.variance, invert: false, route: '/dashboards/gp-target',    aLabel: 'Actual', tLabel: 'Target', fav: 'ahead', unfav: 'short' },
+    { key: 'bud',   title: 'Budget vs Expense',     ach: usedOf(bT), actual: bT.actual, target: bT.budget, variance: bT.variance, invert: true,  route: '/dashboards/budget-expense', aLabel: 'Spent', tLabel: 'Budget', fav: 'under', unfav: 'over' },
+    { key: 'np',    title: 'Nett Profit vs Target', ach: achOf(nT), actual: nT.actual, target: nT.target, variance: nT.variance, invert: false, route: '/dashboards/profitability', aLabel: 'Actual', tLabel: 'Target', fav: 'ahead', unfav: 'short' },
+  ];
+  const noNpTarget = !ld && !nT.target;
+
+  const Tile = ({ t }) => {
+    const tone = toneOf(t);
+    const favUp = (t.variance || 0) >= 0;               // positive variance is favourable for ALL four (budget's is budget−actual)
+    const open = go && t.route ? () => go(t.route) : undefined;
+    return (
+      <div onClick={open} role={open ? 'button' : undefined} tabIndex={open ? 0 : undefined}
+        onKeyDown={open ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } } : undefined}
+        title={open ? 'Open full dashboard →' : undefined}
+        className="min-w-[210px] flex-1 basis-[210px] rounded-brand bg-surface p-4 shadow-sm transition-shadow hover:shadow-md"
+        style={{ cursor: open ? 'pointer' : 'default', border: `1px solid ${C.border}`, borderTop: `4px solid ${tone}` }}>
+        <div className="text-[11px] font-bold uppercase tracking-wide text-ink-muted">{t.title}</div>
+        <div style={{ marginTop: 10, marginBottom: 10 }}>{gauge(ld ? 0 : t.ach, tone)}{t.invert && <div className="mt-0.5 text-right text-[10px] text-ink-muted">of budget used</div>}</div>
+        <div className="flex items-baseline justify-between">
+          <span className="text-[16px] font-black tabular-nums" style={{ color: C.dark }}>{ld ? '…' : money(cur, t.actual)}</span>
+          <span className="text-[12px] text-ink-muted tabular-nums">/ {ld ? '…' : money(cur, t.target)}</span>
+        </div>
+        <div className="mt-0.5 flex items-center justify-between">
+          <span className="text-[10.5px] text-ink-muted">{t.aLabel} / {t.tLabel}</span>
+          {!ld && <span className="text-[11px] font-bold" style={{ color: favUp ? C.green : C.red }}>{favUp ? '▲' : '▼'} {money(cur, Math.abs(t.variance || 0))} {favUp ? t.fav : t.unfav}</span>}
+        </div>
+      </div>
+    );
+  };
+
+  const TabBtn = ({ id, label }) => (
+    <button onClick={() => setTab(id)} style={{ padding: '3px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+      color: tab === id ? '#fff' : C.dim, background: tab === id ? C.dark : '#fff', border: `1px solid ${tab === id ? C.dark : C.border}`, borderRadius: 6 }}>{label}</button>
+  );
+
+  return (
+    <div style={{ margin: 12 }}>
+      <Toolbar title="Performance vs Target" sub={`Sales · GP · Budget · Nett Profit — all vs target · ${range.label}`} branch={branch} p={p} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        {tiles.map((t) => <Tile key={t.key} t={t} />)}
+      </div>
+      <div className="mt-1.5 text-[11px] text-ink-muted">Green ≥100% · amber ≥90% · red &lt;90% (budget inverts: green = under budget).{noNpTarget && <> · <b>No Nett Profit target set</b> — add one in <b>Finance ▸ Sales Targets</b> (metric “Nett Profit”).</>}</div>
+
+      <Card title="Profit Bridge — how Sales flows down to Nett Profit">
+        <div style={{ padding: 14 }}>
+          <PnlWaterfallPanel branch={branch} range={range} formatMoney={(n) => money(cur, n)} onViewFullReport={go && (() => go('/reports/pnl'))} />
+        </div>
+      </Card>
+
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, minWidth: 440 }}>
+          <Card title={`${tab === 'sales' ? 'Sales' : 'GP'} vs Target — by Module`} right={<div style={{ display: 'flex', gap: 6 }}><TabBtn id="sales" label="Sales" /><TabBtn id="gp" label="GP" /></div>}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr><th style={th}>Module</th><th style={{ ...th, ...num }}>Target</th><th style={{ ...th, ...num }}>Actual</th><th style={{ ...th, ...num }}>Variance</th><th style={{ ...th, ...num }}>Ach %</th><th style={th}>Status</th></tr></thead>
+              <tbody>
+                {modRows.map((r, i) => (<tr key={i} {...rowNav(go, tab === 'sales' ? '/reports/sreg' : '/reports/gp')}><td style={td}>{r.name}</td><td style={{ ...td, ...num }}>{money(cur, r.target)}</td><td style={{ ...td, ...num }}>{money(cur, r.actual)}</td><td style={{ ...td, ...num, color: r.variance < 0 ? C.red : C.green }}>{money(cur, r.variance)}</td><td style={{ ...td, ...num }}>{pct(r.pct)}</td><td style={{ ...td, color: stTone(r.status), fontWeight: 700 }}>{stLabel(r.status)}</td></tr>))}
+                {!modRows.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>{ld ? 'Loading…' : 'No module-level targets/actuals.'}</td></tr>}
+              </tbody>
+            </table>
+          </Card>
+        </div>
+        <div style={{ flex: 1, minWidth: 440 }}>
+          <Card title="Budget vs Expense — by Head" right={<span style={{ fontSize: 11, fontWeight: 700, color: overHeads ? C.red : C.green }}>{overHeads} over budget</span>}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr><th style={th}>Head</th><th style={{ ...th, ...num }}>Budget</th><th style={{ ...th, ...num }}>Actual</th><th style={{ ...th, ...num }}>Variance</th><th style={{ ...th, ...num }}>Used %</th><th style={th}>Status</th></tr></thead>
+              <tbody>
+                {budRows.map((r, i) => (<tr key={i} {...rowNav(go, '/reports/pnl')}><td style={td}>{r.name}{r.unbudgeted && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: C.amber }}>· no budget</span>}</td><td style={{ ...td, ...num }}>{money(cur, r.budget)}</td><td style={{ ...td, ...num }}>{money(cur, r.actual)}</td><td style={{ ...td, ...num, color: r.variance < 0 ? C.red : C.green }}>{money(cur, r.variance)}</td><td style={{ ...td, ...num }}>{pct(r.pct)}</td><td style={{ ...td, color: stTone(r.status), fontWeight: 700 }}>{stLabel(r.status)}</td></tr>))}
+                {!budRows.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>{ld ? 'Loading…' : 'No budgets set. Add them in Finance ▸ Expense Budget.'}</td></tr>}
+              </tbody>
+            </table>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Targets master (set targets that the vs-Target dashboards compare to) ──────
 export function TargetsMaster({ branch }) {
   const [brCode, setBrCode] = useState((branch && branch.code) || 'BOM');
@@ -821,9 +933,10 @@ export function TargetsMaster({ branch }) {
   const existing = {}; (q.data || []).forEach((t) => { if ((t.month || 0) === 0) existing[t.module || ''] = t.amount; });
   const valOf = (mod) => (draft[mod] !== undefined ? draft[mod] : (existing[mod] ?? ''));
   const onSave = () => {
-    // Collections targets are company-wide only — the engine ignores per-module rows, so
-    // don't persist them (avoids orphan 0-amount module rows in the DB).
-    const opts = MOD_OPTS.filter(([mod]) => metric !== 'collections' || mod === '');
+    // Collections AND Nett Profit are company-wide only — the engine ignores per-module
+    // rows for them, so don't persist module rows (avoids orphan 0-amount DB rows).
+    const companyOnly = metric === 'collections' || metric === 'np';
+    const opts = MOD_OPTS.filter(([mod]) => !companyOnly || mod === '');
     const rows = opts.map(([mod]) => ({ month: 0, metric, module: mod, amount: Number(valOf(mod)) || 0 }));
     save.mutate({ branch: brCode, fy, rows }, { onSuccess: () => setDraft({}) });
   };
@@ -835,13 +948,13 @@ export function TargetsMaster({ branch }) {
       <div className="mb-3 flex flex-wrap gap-2.5">
         <div className="w-28"><Select value={brCode} onChange={(e) => setBrCode(e.target.value)} className="font-semibold">{branchList().map((b) => <option key={b.code} value={b.code}>{b.code}</option>)}</Select></div>
         <div className="w-32"><Input value={fy} onChange={(e) => setFy(e.target.value)} placeholder="FY e.g. 2026-27" /></div>
-        <div className="w-40"><Select value={metric} onChange={(e) => setMetric(e.target.value)} className="font-semibold"><option value="sales">Sales</option><option value="gp">Gross Profit</option><option value="collections">Collections</option></Select></div>
+        <div className="w-40"><Select value={metric} onChange={(e) => setMetric(e.target.value)} className="font-semibold"><option value="sales">Sales</option><option value="gp">Gross Profit</option><option value="collections">Collections</option><option value="np">Nett Profit</option></Select></div>
       </div>
-      <Card title={`${metric === 'sales' ? 'Sales' : metric === 'gp' ? 'GP' : 'Collections'} target · ${brCode} · FY ${fy}`} right={<Button variant="accent" size="sm" loading={save.isPending} onClick={onSave}>Save</Button>}>
+      <Card title={`${{ sales: 'Sales', gp: 'GP', collections: 'Collections', np: 'Nett Profit' }[metric]} target · ${brCode} · FY ${fy}`} right={<Button variant="accent" size="sm" loading={save.isPending} onClick={onSave}>Save</Button>}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr><th style={th}>Module</th><th style={{ ...th, ...num }}>Annual Target ({cur})</th></tr></thead>
           <tbody>
-            {MOD_OPTS.filter(([mod]) => metric !== 'collections' || mod === '').map(([mod, label]) => (
+            {MOD_OPTS.filter(([mod]) => (metric !== 'collections' && metric !== 'np') || mod === '').map(([mod, label]) => (
               <tr key={mod || 'all'}><td style={{ ...td, fontWeight: mod === '' ? 700 : 400 }}>{label}{mod === '' ? ' (company)' : ''}</td>
                 <td style={{ ...td, ...num }}><div className="ml-auto w-40"><Input type="number" value={valOf(mod)} onChange={(e) => setDraft((d) => ({ ...d, [mod]: e.target.value }))} className="text-right" /></div></td></tr>
             ))}
@@ -849,7 +962,7 @@ export function TargetsMaster({ branch }) {
         </table>
       </Card>
       {save.isSuccess && <div className="mt-2 text-xs text-success">✓ Saved.</div>}
-      {metric === 'collections' && <div className="mt-2 text-[11px] text-ink-muted">Collections targets are company-wide — only the "All modules" row is used.</div>}
+      {(metric === 'collections' || metric === 'np') && <div className="mt-2 text-[11px] text-ink-muted">{metric === 'np' ? 'Nett Profit' : 'Collections'} targets are company-wide — only the "All modules" row is used.</div>}
     </div>
   );
 }
@@ -1045,6 +1158,7 @@ export function DirectorDash({ which, branch, setRoute }) {
   if (which === 'gp-target') return <VsTargetDash branch={branch} metric="gp" go={go} />;
   if (which === 'collections-target') return <VsTargetDash branch={branch} metric="collections" go={go} />;
   if (which === 'budget-expense') return <BudgetVsExpenseDash branch={branch} go={go} />;
+  if (which === 'performance') return <PerformanceDash branch={branch} go={go} />;
   if (which === 'cash-forecast') return <CashForecastDash branch={branch} go={go} />;
   if (which === 'yoy') return <YoYGrowthDash branch={branch} go={go} />;
   if (which === 'customer-value') return <CustomerValueDash branch={branch} go={go} />;

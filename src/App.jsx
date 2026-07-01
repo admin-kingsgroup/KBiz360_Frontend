@@ -476,7 +476,12 @@ export default function KB360App(){
     if(route==="/accounts/payment-run")   return <PaymentRun branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/suspense")      return <SuspenseClearing branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/month-end")     return <MonthEndChecklist branch={branch} setRoute={navigate}/>;
-    if(route==="/dashboard")          return <DashboardRouter branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>;
+    // The owner's home IS the Owner Dashboard — the role-scoped My Dashboard is retired for
+    // them (its widgets now live on the Owner Dashboard), so /dashboard renders the Owner
+    // Dashboard directly. Every other role keeps the role-routed DashboardRouter.
+    if(route==="/dashboard")          return isOwnerDashboardUser(currentUser)
+      ? <OwnerDashboard branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>
+      : <DashboardRouter branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>;
     // Owner Dashboard — consolidated whole-company view. Restricted to the group
     // owner: the Super Admin whose email is afshin.dhanani@kingsgroupco.com (BOTH
     // role + email required). Non-owners hitting the URL get a "not available" card.
@@ -491,7 +496,7 @@ export default function KB360App(){
     if(route==="/dashboard/alerts")   return <AlertsDashboard branch={branch} setRoute={navigate}/>;
     if(route==="/dashboards/capital") return <CapitalVsInvestmentLive branch={branch}/>; // Capital vs Investment (live from BS + P&L)
     // Director/Super-Admin dashboard suite (menu is role-gated in getMenu).
-    if(/^\/dashboards\/(exec|profitability|cash|cash-forecast|arap|branch|balance-sheet|module-gp|sales|supplier|tax|expenses|audit|sales-target|gp-target|collections-target|budget-expense|yoy|customer-value)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch} setRoute={navigate}/>;
+    if(/^\/dashboards\/(exec|profitability|cash|cash-forecast|arap|branch|balance-sheet|module-gp|sales|supplier|tax|expenses|audit|performance|sales-target|gp-target|collections-target|budget-expense|yoy|customer-value)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch} setRoute={navigate}/>;
     if(route==="/finance/targets") return <TargetsMaster branch={branch}/>;
     if(route==="/bookings/new")       return <SoPoGpVoucherEntry branch={branch} setRoute={navigate}/>;
     if(route==="/bookings/inter-branch") return <SoPoGpVoucherEntry branch={branch} setRoute={navigate} interBranch/>;
