@@ -227,8 +227,9 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch, setBranch
       )}
 
       {/* ── Bookings pipeline ── on Group/ALL: per branch, each in its own currency
-          (Sales/GP money never summed across branches). */}
-      <div className="mb-1.5 text-xs font-semibold text-ink-muted">SO/PO/GP Pipeline · {rangeShort}</div>
+          (Sales/GP money never summed across branches). The booking queue is NOT
+          date-bound, so the header says "whole queue" rather than the selected period. */}
+      <div className="mb-1.5 text-xs font-semibold text-ink-muted">SO/PO/GP Pipeline <span className="font-normal">· whole queue (not date-bound)</span></div>
       {isGroup && Array.isArray(data.bookingsByBranch) ? (
         <div className="mb-4">
           {data.bookingsByBranch.length === 0 && (

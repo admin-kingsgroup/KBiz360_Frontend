@@ -381,8 +381,10 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
       ) : null}
 
       {/* ── Bookings pipeline (condensed) ── on Group/ALL: per branch, each in its own
-          currency (Sales/GP money never summed across branches). */}
-      <div className="mb-1.5 text-xs font-semibold text-ink-muted">SO/PO/GP Pipeline · {rangeShort}</div>
+          currency (Sales/GP money never summed across branches). The booking queue is
+          NOT date-bound, so the header says "whole queue" (not the selected period) to
+          avoid implying it's period-scoped like the Revenue/GP figures above. */}
+      <div className="mb-1.5 text-xs font-semibold text-ink-muted">SO/PO/GP Pipeline <span className="font-normal">· whole queue (not date-bound)</span></div>
       {isAll && Array.isArray(data.bookingsByBranch) ? (
         <div className="mb-4">
           {data.bookingsByBranch.length === 0 && (

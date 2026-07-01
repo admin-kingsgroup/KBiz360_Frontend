@@ -199,7 +199,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
         <KpiTile
           label="Approved Sales"
           value={formatMoney(ab.sales)}
-          sub={`${ab.count} approved booking${ab.count === 1 ? '' : 's'}`}
+          sub={`${ab.count} approved · pipeline (all dates)`}
           icon="🧾"
           color="#2563eb"
           onClick={() => navigate('/bookings/approved')}
@@ -215,7 +215,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
         <KpiTile
           label="Approved GP"
           value={formatMoney(ab.gp)}
-          sub={ab.sales > 0 ? `${((ab.gp / ab.sales) * 100).toFixed(1)}% GP` : 'approved bookings'}
+          sub={ab.sales > 0 ? `${((ab.gp / ab.sales) * 100).toFixed(1)}% GP · pipeline` : 'pipeline (all dates)'}
           icon="📈"
           color="#16a34a"
           onClick={() => navigate('/bookings/approved')}
@@ -223,7 +223,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
         <KpiTile
           label="Pending Sales"
           value={formatMoney(pb.sales)}
-          sub={`${pb.count} pending booking${pb.count === 1 ? '' : 's'}`}
+          sub={`${pb.count} pending · pipeline (all dates)`}
           icon="🧾"
           color="#2563eb"
           onClick={() => navigate('/bookings/pending')}
@@ -239,7 +239,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
         <KpiTile
           label="Pending GP"
           value={formatMoney(pb.gp)}
-          sub={pb.sales > 0 ? `${((pb.gp / pb.sales) * 100).toFixed(1)}% GP` : 'SO/PO/GP queue'}
+          sub={pb.sales > 0 ? `${((pb.gp / pb.sales) * 100).toFixed(1)}% GP · pipeline` : 'pipeline (all dates)'}
           icon="⌛"
           color="#16a34a"
           onClick={() => navigate('/bookings/pending')}
