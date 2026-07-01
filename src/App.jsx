@@ -49,7 +49,7 @@ import { supportRoutes } from './modules/support/routes';
 const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes];
 const { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
 const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
-const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
+const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
 const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/mastersParties'));
 const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } = lazyModule(() => import('./modules/reports'));
 const { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } = lazyModule(() => import('./modules/settings'));
@@ -66,7 +66,7 @@ const { AccountsTreeView } = lazyModule(() => import('./modules/chartBuilder'));
 const { PnLTallyLive } = lazyModule(() => import('./modules/pnlTally'));
 const { BalanceSheetTallyLive } = lazyModule(() => import('./modules/balanceSheetTally'));
 const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/capitalVsInvestment'));
-const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, LedgerGroupsLive, ChartOfAccountsLive, AccountsChartLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
+const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { PaymentRun } = lazyModule(() => import('./modules/paymentRun'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
@@ -74,7 +74,7 @@ const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('.
 const { NotesToFinancials } = lazyModule(() => import('./modules/reportsNotes'));
 const { Statistics } = lazyModule(() => import('./modules/statistics'));
 const { CostCenterMasterLive } = lazyModule(() => import('./modules/costCentersLive'));
-const { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, GroupsMaster, SubGroupsMaster, LedgersMaster } = lazyModule(() => import('./modules/mastersLive'));
+const { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, GroupsMaster, LedgersMaster } = lazyModule(() => import('./modules/mastersLive'));
 const { DataImportPage } = lazyModule(() => import('./modules/dataImport'));
 import { GlobalSearch } from './shell/GlobalSearch';
 import { Placeholder } from './shell/Placeholder';
@@ -618,13 +618,14 @@ export default function KB360App(){
     if(route==="/settings/branches")     return <SettingsBranches/>;
     if(route==="/settings/users")        return <SettingsUsers/>;
     if(route==="/settings/audit")        return <SettingsAudit/>;
-    if(route==="/masters/groups")        return <GroupsMaster branch={branch}/>;  // Chart of Accounts matrix (Tally skeleton + editable ERP columns)
-    if(route==="/masters/subgroups")     return <SubGroupsMaster/>;              // CRUD: custom sub-groups (any depth)
-    if(route==="/masters/accounts-tree" || route==="/masters/chart-builder") return <AccountsTreeView branch={branch}/>;  // read-only viewer: Parent Group ▸ Group ▸ Sub-Group ▸ Ledger (old chart-builder route kept as alias)
-    if(route==="/masters/ledgers")    return <LedgersMaster branch={branch}/>;     // editable ledger master (live CRUD)
-    if(route==="/masters/groups-view")   return <LedgerGroupsLive/>;              // read-only 28-group reference
-    if(route==="/masters/ledgers-view")  return <ChartOfAccountsLive branch={branch}/>; // read-only chart of accounts
-    if(route==="/masters/accounts-info") return <AccountsChartLive branch={branch}/>;  // Groups/Sub-Groups/Ledgers — tree + side-by-side
+    // Chart-of-Accounts masters — 3 Tally-style doors (consolidated 2026-07-01):
+    //   Groups (Create/Alter/Display) · Ledgers (Create/Alter/Display) · Chart of
+    //   Accounts (tree, Display). The retired routes — /masters/subgroups (folded
+    //   into Groups), /masters/groups-view, /masters/ledgers-view, /masters/accounts-info
+    //   (overlapping read-only viewers) — were removed here.
+    if(route==="/masters/groups")        return <GroupsMaster/>;                 // Groups door — Create/Alter/Display groups & sub-groups (3-tier)
+    if(route==="/masters/ledgers")       return <LedgersMaster branch={branch}/>;// Ledgers door — live CRUD (cascading Group ▸ Sub-Group)
+    if(route==="/masters/accounts-tree" || route==="/masters/chart-builder") return <AccountsTreeView branch={branch}/>;  // Chart of Accounts (Display): Primary Group ▸ Group ▸ Sub-Group ▸ Ledger tree
     if(route==="/masters/voucher-types")   return <VoucherTypesMaster/>;
     if(route==="/masters/cost-categories") return <CostCategoriesMaster/>;
     if(route==="/masters/budgets")         return <BudgetsMaster/>;

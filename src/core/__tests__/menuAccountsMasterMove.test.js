@@ -2,8 +2,11 @@ import { MENU_ACCOUNTS, MENU_MASTERS } from '../menus';
 
 // "Accounts Master" (Chart of Accounts, Cost Centres, Budgets, Scenarios) was
 // moved from the standalone Masters pill into the Accounts header.
+// Consolidated to 3 Tally-style doors: Groups, Ledgers, Chart of Accounts (tree).
+// The old separate "/masters/subgroups" menu item was folded into the Groups door
+// (groups & sub-groups are one collection), so it no longer appears in the menu.
 const ACCOUNTS_MASTER_HREFS = [
-  '/masters/accounts-tree', '/masters/groups', '/masters/subgroups', '/masters/ledgers',
+  '/masters/groups', '/masters/ledgers', '/masters/accounts-tree',
   '/masters/bank-accounts', '/masters/cost-categories', '/masters/cost-centers',
   '/masters/budgets', '/masters/scenarios',
 ];

@@ -407,11 +407,13 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   // still open the screen to view. Tax & Statutory moved to the Taxation header (see
   // TAX_INDIA / TAX_AFRICA / TAX_ALL in core/data.js) — no longer under Accounts.
   {label:"Accounts Master", children:[
+    // Three Tally-style doors: Groups → Ledgers → Chart of Accounts (Display).
+    // Groups & Sub-Groups are the SAME collection (a 3-tier tree) so they share
+    // one "Groups" door; the read-only tree is the "Display" view.
     {divider:true, label:"Chart of Accounts"},
-    {label:"Accounts Tree View (read-only)", href:"/masters/accounts-tree"},
-    {label:"Chart of Accounts (Groups ▸ Ledgers)", href:"/masters/groups"},
-    {label:"Groups & Sub-Groups (Create / Edit)", href:"/masters/subgroups"},
-    {label:"Ledgers (Create / Edit)", href:"/masters/ledgers"},
+    {label:"Groups (Create / Alter / Display)", href:"/masters/groups"},
+    {label:"Ledgers (Create / Alter / Display)", href:"/masters/ledgers"},
+    {label:"Chart of Accounts (Tree view)", href:"/masters/accounts-tree"},
     {label:"Bank Accounts", href:"/masters/bank-accounts"},
     {divider:true, label:"Currency"},
     {label:"Currencies", href:"/masters/currency"},
