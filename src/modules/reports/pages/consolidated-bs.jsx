@@ -61,8 +61,9 @@ const gpRowsFromSlice = (rows) => {
   return Object.values(m).map((x) => ({ ...x, gpPct: x.rev > 0 ? +(x.gp / x.rev * 100).toFixed(1) : 0 })).sort((a, b) => b.rev - a.rev);
 };
 
-const Row = ({ label, val, sub, bold, cur }) => (
-  <div className={`flex justify-between border-b border-surface-alt px-3.5 ${bold ? 'bg-surface-alt py-2.5' : 'py-1.5'}`}>
+const cbsNav = (onDrill) => (onDrill ? { onClick: onDrill, role: 'button', tabIndex: 0, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDrill(); } }, style: { cursor: 'pointer' }, title: 'Open detailed Balance Sheet →' } : {});
+const Row = ({ label, val, sub, bold, cur, onDrill }) => (
+  <div {...cbsNav(onDrill)} className={`flex justify-between border-b border-surface-alt px-3.5 ${bold ? 'bg-surface-alt py-2.5' : 'py-1.5'} ${onDrill ? 'hover:bg-surface-alt' : ''}`}>
     <span className={`text-[11px] text-navy ${bold ? 'font-bold' : ''}`}>{label}</span>
     <div className="text-right">
       <p className="tabular-nums" style={{ fontWeight: bold ? 800 : 500, color: bold ? '#1a1c22' : '#2e323c', fontSize: bold ? 13 : 11 }}>{val ? money(val, cur) : '—'}</p>
@@ -78,9 +79,11 @@ const Panel = ({ title, color, children }) => (
   </div>
 );
 
-export function ConsolidatedBS() {
+export function ConsolidatedBS({ setRoute }) {
   const qBS = useBalanceSheet('ALL', { to: '' });
   const qGP = useGpBills('ALL', {});
+  // Consolidated lines aggregate the branch Balance Sheets → drill to the detailed BS.
+  const onDrill = setRoute ? () => setRoute('/reports/bs') : undefined;
   const bsData = qBS.data;
   const gpData = qGP.data;
   const loading = qBS.isLoading;
@@ -111,21 +114,21 @@ export function ConsolidatedBS() {
 
         <ResponsiveGrid cols={2} gap="md">
           <Panel title="ASSETS" color="#2563eb">
-            <Row label="Fixed Assets (net)" val={m.fixedAssets} sub="Tangible + intangible" cur={cur} />
-            <Row label="Non-current Investments" val={m.investments} cur={cur} />
-            <Row label="Bank & Cash" val={m.bank} cur={cur} />
-            <Row label="Trade Receivables" val={m.debtors} sub="Sundry Debtors" cur={cur} />
-            <Row label="Other Assets" val={m.otherAssets} sub="Deposits, advances, current assets" cur={cur} />
-            <Row label="TOTAL ASSETS" val={m.totalAssets} bold cur={cur} />
+            <Row label="Fixed Assets (net)" val={m.fixedAssets} sub="Tangible + intangible" cur={cur} onDrill={onDrill} />
+            <Row label="Non-current Investments" val={m.investments} cur={cur} onDrill={onDrill} />
+            <Row label="Bank & Cash" val={m.bank} cur={cur} onDrill={onDrill} />
+            <Row label="Trade Receivables" val={m.debtors} sub="Sundry Debtors" cur={cur} onDrill={onDrill} />
+            <Row label="Other Assets" val={m.otherAssets} sub="Deposits, advances, current assets" cur={cur} onDrill={onDrill} />
+            <Row label="TOTAL ASSETS" val={m.totalAssets} bold cur={cur} onDrill={onDrill} />
           </Panel>
           <Panel title="LIABILITIES & CAPITAL" color="#1a1c22">
-            <Row label="Capital Account" val={m.capital} cur={cur} />
-            <Row label="Reserves & Surplus (incl. P&L)" val={m.reserves} sub="Cumulative net profit" cur={cur} />
-            <Row label="Borrowings" val={m.borrowings} sub="Loans + bank OD" cur={cur} />
-            <Row label="Trade Payables" val={m.creditors} sub="Sundry Creditors" cur={cur} />
-            <Row label="Duties & Taxes (GST/VAT/TDS)" val={m.gst} cur={cur} />
-            <Row label="Other Liabilities" val={m.otherLiab} sub="Provisions, current liabilities" cur={cur} />
-            <Row label="TOTAL LIABILITIES" val={m.totalLiab} bold cur={cur} />
+            <Row label="Capital Account" val={m.capital} cur={cur} onDrill={onDrill} />
+            <Row label="Reserves & Surplus (incl. P&L)" val={m.reserves} sub="Cumulative net profit" cur={cur} onDrill={onDrill} />
+            <Row label="Borrowings" val={m.borrowings} sub="Loans + bank OD" cur={cur} onDrill={onDrill} />
+            <Row label="Trade Payables" val={m.creditors} sub="Sundry Creditors" cur={cur} onDrill={onDrill} />
+            <Row label="Duties & Taxes (GST/VAT/TDS)" val={m.gst} cur={cur} onDrill={onDrill} />
+            <Row label="Other Liabilities" val={m.otherLiab} sub="Provisions, current liabilities" cur={cur} onDrill={onDrill} />
+            <Row label="TOTAL LIABILITIES" val={m.totalLiab} bold cur={cur} onDrill={onDrill} />
           </Panel>
         </ResponsiveGrid>
 
@@ -137,6 +140,7 @@ export function ConsolidatedBS() {
           columns={branchCols}
           rows={rows}
           getRowKey={(r) => r.code}
+          onRowClick={onDrill ? () => onDrill() : undefined}
           dense
           showDensityToggle={false}
           initialSort={{ key: 'rev', dir: 'desc' }}
