@@ -104,6 +104,19 @@ describe('buildSettlement — edge cases', () => {
     expect(buildSettlement('receivable', { total: 999, onAccount: 0, net: 999 }, rows).reconciled).toBe(false);
   });
 
+  test('tolerance scales — sub-rupee drift at crore scale still reconciles', () => {
+    const rows = [row('Big', [100000000, 0, 0, 0, 0, 0], 0, 100000000, 'B2B')]; // ₹10 Cr
+    // totals drift by 0.40 (accumulated paise) — must NOT flag at this scale
+    const m = buildSettlement('receivable', { total: 100000000.4, onAccount: 0, net: 100000000.4 }, rows);
+    expect(m.reconciled).toBe(true);
+  });
+
+  test('a genuine missing bill still flags regardless of scale', () => {
+    const rows = [row('Big', [100000000, 0, 0, 0, 0, 0], 0, 100000000, 'B2B')]; // ₹10 Cr shown
+    const m = buildSettlement('receivable', { total: 105000000, onAccount: 0, net: 105000000 }, rows); // ₹50 L missing
+    expect(m.reconciled).toBe(false);
+  });
+
   test('no rows → no groups, footer zeroed', () => {
     const m = buildSettlement('receivable', { total: 0, onAccount: 0, net: 0 }, []);
     expect(m.groups).toHaveLength(0);

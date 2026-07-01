@@ -77,9 +77,11 @@ export function buildSettlement(side, totals = {}, rows = []) {
   groups.sort((a, b) => (a.group === OTHERS ? 1 : 0) - (b.group === OTHERS ? 1 : 0) || b.subtotal.unsettled - a.subtotal.unsettled);
 
   const footer = groups.reduce((f, g) => addInto(f, g.subtotal), blankSub());
-  const reconciled = Math.abs(footer.unsettled - open) <= 0.5
-    && Math.abs(footer.receipt - onAccount) <= 0.5
-    && Math.abs(footer.final - net) <= 0.5;
+  // Scale-aware tolerance: at least ₹1, growing with the total so accumulated per-ledger
+  // rounding (paise on hundreds of ledgers) never trips a false "gap" at crore scale,
+  // while still catching a genuine missing bill (orders of magnitude larger).
+  const within = (a, b) => Math.abs(a - b) <= Math.max(1, Math.abs(b) * 0.00001);
+  const reconciled = within(footer.unsettled, open) && within(footer.receipt, onAccount) && within(footer.final, net);
   return { isRec, metrics, groups, footer, open, onAccount, net, reconciled };
 }
 
@@ -144,8 +146,11 @@ export function ArApSettlementView({ side, totals = {}, rows = [], formatMoney =
               const st = g.subtotal;
               return (
                 <React.Fragment key={g.group}>
-                  {/* navy subtotal / group-anchor row (click to expand ledgers) */}
-                  <tr onClick={() => toggle(g.group)} style={{ background: C.subBg, color: C.subFg, cursor: 'pointer', fontWeight: 700 }}>
+                  {/* navy subtotal / group-anchor row (click or Enter/Space to expand ledgers) */}
+                  <tr role="button" tabIndex={0} aria-expanded={open}
+                    onClick={() => toggle(g.group)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(g.group); } }}
+                    style={{ background: C.subBg, color: C.subFg, cursor: 'pointer', fontWeight: 700 }}>
                     <td style={{ ...tdc, textAlign: 'left' }}>
                       <span style={{ display: 'inline-block', width: 12, color: '#9fb2d6', transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .12s' }}>▾</span>
                       {g.group} Subtotal <span style={{ color: '#9fb2d6', fontWeight: 600, fontSize: 11, marginLeft: 6 }}>{g.count} ledger{g.count > 1 ? 's' : ''}</span>
@@ -157,7 +162,7 @@ export function ArApSettlementView({ side, totals = {}, rows = [], formatMoney =
                   </tr>
                   {/* ledger detail rows */}
                   {open && g.ledgers.map((r, i) => (
-                    <tr key={r.party + i} style={{ borderBottom: `1px solid ${C.divider}` }}>
+                    <tr key={`${g.group}|${r.party}|${i}`} style={{ borderBottom: `1px solid ${C.divider}` }}>
                       <td style={{ ...tdc, textAlign: 'left', fontWeight: 600, paddingLeft: 26 }}>{r.party}</td>
                       <td style={{ ...tdc, fontWeight: 700 }}>{fm(r.unsettled)}</td>
                       {FINE_BUCKETS.map(([k]) => <td key={k} style={{ ...tdc, background: C.ageTint, color: k === 'a61' && r[k] ? C.red : C.ink, fontWeight: k === 'a61' && r[k] ? 600 : 400 }}>{fm(r[k])}</td>)}
