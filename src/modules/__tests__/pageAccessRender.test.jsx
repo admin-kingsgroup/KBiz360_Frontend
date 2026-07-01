@@ -36,8 +36,31 @@ describe('PageAccessControl renders without runtime errors', () => {
 
     // Branch-access card (uses ResponsiveGrid) rendered → import resolves.
     expect(screen.getByText('Branch access')).toBeInTheDocument();
-    // The grouped catalogue rendered a nav sub-group header (Masters ▸ "Client
-    // Master") — proves groupItems() ran and the header→sub-header layout renders.
-    expect(screen.getAllByText('Client Master').length).toBeGreaterThan(0);
+
+    // Sections start COLLAPSED (clean + fast), so the Masters section header shows
+    // but its sub-group "Client Master" is NOT mounted yet.
+    const mastersHeader = screen.getByRole('button', { name: /^Masters/ });
+    expect(screen.queryByText('Client Master')).toBeNull();
+
+    // One click expands it → the nav sub-group header renders (groupItems ran).
+    fireEvent.click(mastersHeader);
+    expect(screen.getByText('Client Master')).toBeInTheDocument();
+
+    // One click collapses it again (single-click, no double-toggle).
+    fireEvent.click(mastersHeader);
+    expect(screen.queryByText('Client Master')).toBeNull();
+  });
+
+  test('Expand all / Collapse all flips every section at once', () => {
+    wrap(<PageAccessControl currentUser={AFSHIN} setRoute={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /Clerk One/i }));
+
+    // Default collapsed → expand all → a deep sub-group is now visible.
+    fireEvent.click(screen.getByRole('button', { name: /^Expand all$/ }));
+    expect(screen.getByText('Client Master')).toBeInTheDocument();
+
+    // Collapse all → gone again.
+    fireEvent.click(screen.getByRole('button', { name: /^Collapse all$/ }));
+    expect(screen.queryByText('Client Master')).toBeNull();
   });
 });

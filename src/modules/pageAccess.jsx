@@ -72,7 +72,11 @@ export function PageAccessControl({ currentUser, setRoute }) {
   const [grantBase, setGrantBase] = useState(() => new Set());
   const [userSearch, setUserSearch] = useState('');
   const [pageSearch, setPageSearch] = useState('');
-  const [collapsed, setCollapsed] = useState(() => new Set());
+  // Start with EVERY section collapsed — the screen opens clean (just headers +
+  // their visible-count), and only the section a user expands mounts its rows. This
+  // keeps the DOM small (≈23 headers vs ≈270 toggle rows) so expand/collapse and
+  // each toggle stay instant instead of re-rendering the whole wall on every click.
+  const [collapsed, setCollapsed] = useState(() => new Set(buildPageCatalog().map((s) => s.section)));
   const [branchDraft, setBranchDraft] = useState(() => new Set()); // branch codes the user can access
   const [branchBase, setBranchBase] = useState(() => new Set());   // saved baseline → dirty detection
 
@@ -166,6 +170,8 @@ export function PageAccessControl({ currentUser, setRoute }) {
   const toggleCollapse = (name) => setCollapsed((prev) => {
     const next = new Set(prev); next.has(name) ? next.delete(name) : next.add(name); return next;
   });
+  const expandAll = () => setCollapsed(new Set());
+  const collapseAll = () => setCollapsed(new Set(catalog.map((s) => s.section)));
 
   // ── Admin password reset (afshin sets a new password for the selected user) ──
   const [resetOpen, setResetOpen] = useState(false);
@@ -390,6 +396,17 @@ export function PageAccessControl({ currentUser, setRoute }) {
               {/* Sections */}
               {visibleCatalog.length === 0 && (
                 <PageSection><EmptyState icon={Search} title={`No pages match “${pageSearch}”.`} /></PageSection>
+              )}
+              {/* Expand / collapse all — sections start collapsed for a clean, fast page. */}
+              {visibleCatalog.length > 0 && !q && (
+                <div className="mb-2 flex items-center justify-between px-1">
+                  <span className="text-[11px] text-ink-subtle">{visibleCatalog.length} sections · click a header to expand</span>
+                  <span className="flex items-center gap-2">
+                    <button onClick={expandAll} className="text-[11px] font-semibold text-ink-muted hover:text-navy">Expand all</button>
+                    <span className="text-ink-subtle/40">·</span>
+                    <button onClick={collapseAll} className="text-[11px] font-semibold text-ink-muted hover:text-navy">Collapse all</button>
+                  </span>
+                </div>
               )}
               {visibleCatalog.map((s) => {
                 const isCollapsed = collapsed.has(s.section) && !q;
