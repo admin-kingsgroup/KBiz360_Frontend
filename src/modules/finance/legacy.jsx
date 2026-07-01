@@ -922,7 +922,7 @@ export function AdvanceDepositLedger({branch}){
   return(
     <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <h2 style={{margin:0,fontSize:19,fontWeight:800,color:"#0d1326"}}>Advance / Deposit Ledger</h2>
-      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Open on-account advances from receipts (customers) & payments (suppliers). Live - 0 until on-account vouchers exist.</p>
+      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Open on-account advances — unallocated receipts &amp; payments (customer or supplier), classified by the party. Live - 0 until on-account vouchers exist.</p>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
         {kc("Customer Advances",t.customer,"#27500A")}{kc("Supplier Advances",t.supplier,"#854F0B")}{kc("Total On-Account",t.total,"#185FA5")}
       </div>

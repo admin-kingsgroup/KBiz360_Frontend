@@ -1,4 +1,4 @@
-import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, leaveBucketOf, takenFor, fromShiftDTO, toShiftPayload, weeklyOffForShift, fromJobDTO, toJobPayload, JOB_NEXT_STATUS, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from '../hrMaps';
+import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, leaveBucketOf, takenFor, fromShiftDTO, toShiftPayload, weeklyOffForShift, isLate, fromJobDTO, toJobPayload, JOB_NEXT_STATUS, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from '../hrMaps';
 
 describe('Employee loan ↔ /api/employee-loans wiring', () => {
   const DTO = { id: 'L1', name: 'Aa', empCode: 'E1', designation: 'Ops', branch: 'BOM',
@@ -120,6 +120,14 @@ describe('Shift ↔ /api/shifts wiring', () => {
     expect(weeklyOffForShift('s1', byId)).toEqual([5]);
     expect(weeklyOffForShift('', byId)).toEqual([0]);               // unassigned → Sunday
     expect(weeklyOffForShift('nope', byId)).toEqual([0]);           // unknown id → Sunday
+  });
+
+  test('isLate: after start+grace is late; on the edge / missing data is not (mirrors BE)', () => {
+    expect(isLate('09:41', '09:30', 10)).toBe(true);
+    expect(isLate('09:40', '09:30', 10)).toBe(false);   // grace edge
+    expect(isLate('09:00', '09:30', 10)).toBe(false);
+    expect(isLate('', '09:30', 10)).toBe(false);        // no punch
+    expect(isLate('09:41', '', 10)).toBe(false);        // no shift start
   });
 });
 

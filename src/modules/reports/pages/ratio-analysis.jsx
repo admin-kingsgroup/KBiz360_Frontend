@@ -69,7 +69,7 @@ function computeRatios(bs, pl) {
   return list;
 }
 
-export function RatioAnalysis({ branch }) {
+export function RatioAnalysis({ branch, setRoute }) {
   // LIVE — ratios from the double-entry Balance Sheet + Module P&L.
   const qBS = useBalanceSheet(branch, { to: '' });
   const qPL = useModulePL(branch, {});
@@ -120,6 +120,7 @@ export function RatioAnalysis({ branch }) {
             columns={columnsFor(CAT_COLOR[cat])}
             rows={RATIOS.filter((r) => r.category === cat)}
             getRowKey={(r) => r.name}
+            onRowClick={setRoute ? (r) => setRoute(r.category === 'Profitability' ? '/reports/pnl' : '/reports/bs') : undefined}
             dense
             showDensityToggle={false}
             className="mb-3.5"

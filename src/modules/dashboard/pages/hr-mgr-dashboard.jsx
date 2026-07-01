@@ -22,7 +22,7 @@ export function HrMgrDashboardPage({ currentUser, setRoute, branch }) {
     return <DashboardError error={error} onRetry={refetch} title="Could not load the HR Manager Dashboard." />;
   }
   if (isLoading || !stats) {
-    return <DashboardSkeleton numKpis={5} columns={2} hasCharts={false} />;
+    return <DashboardSkeleton numKpis={6} columns={2} hasCharts={false} />;
   }
 
   return (
@@ -37,6 +37,7 @@ export function HrMgrDashboardPage({ currentUser, setRoute, branch }) {
       <ResponsiveGrid min="170px" gap="md" className="mb-3.5">
         <KPICard label="Total Headcount" value={stats.totalHeadcount} delta={`+${stats.changeThisMonth} this month`} color="#16a34a" onClick={() => navigate('/hr/employees')} />
         <KPICard label="Attendance %" value={stats.attendancePct == null ? '—' : stats.attendancePct + '%'} delta={`${CUR_MONTH_LABEL} current`} color="#c2a04a" onClick={() => navigate('/hr/attendance')} />
+        <KPICard label="Punctuality %" value={stats.punctualityPct == null ? '—' : stats.punctualityPct + '%'} delta="on-time arrivals" color="#0891b2" onClick={() => navigate('/hr/attendance')} />
         <KPICard label="Pending Leave" value={stats.pendingLeave} delta="awaiting approval" color="#d97706" onClick={() => navigate('/hr/leave')} />
         <KPICard label="Payroll Status" value={stats.payrollStatus || 'Not run'} delta={CUR_MONTH_LABEL} color="#16a34a" onClick={() => navigate('/hr/payroll')} />
         <KPICard label="Open Positions" value={stats.openPositions} delta="recruitment active" color="#5b616e" onClick={() => navigate('/hr/recruitment')} />

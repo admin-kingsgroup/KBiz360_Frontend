@@ -513,7 +513,7 @@ export default function KB360App(){
     if(route==="/reports/bs-tally")   return <BalanceSheetTallyLive branch={branch}/>;     // purpose-built Tally-format BS (was aliased to Unified)
     if(route==="/reports/pnl" || route==="/reports/pnl-modulewise") return <ProfitAndLossUnified branch={branch}/>;
     if(route==="/reports/bs" || route==="/reports/bs-modulewise") return <BalanceSheetUnified branch={branch}/>;
-    if(route==="/reports/cf")         return <ReportCF branch={branch}/>;                  // was <ReportCF/> — no branch → always ₹/consolidated
+    if(route==="/reports/cf")         return <ReportCF branch={branch} setRoute={navigate}/>;   // was <ReportCF/> — no branch → always ₹/consolidated
     if(route==="/reports/rec")        return <ReceivablesLive branch={branch} setRoute={navigate}/>;
     if(route==="/reports/pay")        return <PayablesLive branch={branch} setRoute={navigate}/>;
     if(route==="/reports/sreg")       return <RegisterLive branch={branch} initial="sales"/>;
@@ -540,7 +540,7 @@ export default function KB360App(){
     if(route==="/settings/preferences")  return <UxPreferences/>;
     if(route==="/reports/mis")            return <MisReport branch={branch}/>;
     if(route==="/reports/concentration")  return <ClientConcentration branch={branch}/>;
-    if(route==="/reports/consolidated-bs")return <ConsolidatedBS/>;
+    if(route==="/reports/consolidated-bs")return <ConsolidatedBS setRoute={navigate}/>;
     if(route==="/reports/cashflow-forecast")return <CashFlowForecast branch={branch}/>;
     if(route==="/reports/supplier-360")   return <Supplier360 branch={branch}/>;
     if(route==="/reports/customer-360")   return <Customer360 branch={branch}/>;

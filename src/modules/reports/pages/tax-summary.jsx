@@ -17,6 +17,7 @@ import { ReportDateBar, resolveReportRange } from '../../../core/reportDateBar';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { ResponsiveGrid, Button, LoadingState, ErrorState } from '../../../shell/primitives';
+import { openLedgerModal } from '../../../core/LedgerModalHost';
 
 export function RPT_TaxSummary({ branch }) {
   const [range, setRange] = useState(() => ({ mode: 'all', ...resolveReportRange('all') }));
@@ -55,8 +56,11 @@ export function RPT_TaxSummary({ branch }) {
     { key: 'ledger', header: 'Ledger', className: 'text-navy', hideable: false },
     { key: 'amount', header: 'Amount', num: true, render: (r, v) => f(v), footer: (rs) => f(rs.reduce((s, r) => s + (r.amount || 0), 0)) },
   ];
+  // Each tax line is a real ledger → drill into its statement (→ voucher) via the
+  // global ledger modal.
+  const drillLedger = (r) => r && r.ledger && openLedgerModal(r.ledger, { from: range.from || undefined, to: range.to || undefined });
   const Section = ({ title, lines }) => (
-    <DataTable title={title} columns={sectionCols} rows={lines || []} loading={q.isLoading} isError={q.isError} getRowKey={(r, i) => i} dense showDensityToggle={false} className="mb-3.5" emptyMessage="No movement in this period." />
+    <DataTable title={title} columns={sectionCols} rows={lines || []} loading={q.isLoading} isError={q.isError} getRowKey={(r, i) => i} onRowClick={drillLedger} dense showDensityToggle={false} className="mb-3.5" emptyMessage="No movement in this period." />
   );
 
   return (

@@ -111,7 +111,7 @@ describe('splitRefundJv — sale-side / purchase-side T-blocks', () => {
   test('commission reversal legs land on the purchase side', () => {
     const withCommission = [
       ...LEGS,
-      { ledger: 'Commission/Incentive Received', group: 'Indirect Income', debit: 1275, credit: 0 },
+      { ledger: 'Commission / Incentive A/c.', group: 'Direct Income', debit: 1275, credit: 0 },
       { ledger: 'TDS Receivable [BOM]', group: 'Current Assets', debit: 0, credit: 25.5 },
     ];
     const { sale, purchase } = splitRefundJv(withCommission, { party: P, counterParty: S });
