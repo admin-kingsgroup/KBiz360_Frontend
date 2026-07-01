@@ -33,9 +33,21 @@ export function compactAmt(n, { currency = '₹', dash = false } = {}) {
   if (n == null || n === '' || isNaN(v) || v === 0) return dash ? '—' : `${currency}0`;
   const a = Math.abs(v);
   const sign = v < 0 ? '-' : '';
-  if (a >= 1e7) return `${currency}${sign}${(a / 1e7).toFixed(2)}Cr`;
-  if (a >= 1e5) return `${currency}${sign}${(a / 1e5).toFixed(2)}L`;
-  // Sub-lakh amounts print grouped: Indian grouping for ₹, Western for other currencies.
+  // USD (the currency the Africa branches — NBO/DAR/FBM — keep their books & dashboards
+  // in) abbreviates on the Western K/M/B scale; ₹ and every other symbol keep the Indian
+  // lakh/crore scale. Previously Cr/L was applied to ALL currencies, so a $ branch KPI
+  // printed "$1.50Cr" instead of "$1.50M".
+  const sym = String(currency).trim();
+  const usd = sym === '$' || sym === 'US$' || sym.toUpperCase() === 'USD';
+  if (usd) {
+    if (a >= 1e9) return `${currency}${sign}${(a / 1e9).toFixed(2)}B`;
+    if (a >= 1e6) return `${currency}${sign}${(a / 1e6).toFixed(2)}M`;
+    if (a >= 1e3) return `${currency}${sign}${(a / 1e3).toFixed(1)}K`;
+  } else {
+    if (a >= 1e7) return `${currency}${sign}${(a / 1e7).toFixed(2)}Cr`;
+    if (a >= 1e5) return `${currency}${sign}${(a / 1e5).toFixed(2)}L`;
+  }
+  // Sub-threshold amounts print grouped: Indian grouping for ₹, Western for other currencies.
   return `${currency}${sign}${Math.round(a).toLocaleString(localeOf(currency))}`;
 }
 

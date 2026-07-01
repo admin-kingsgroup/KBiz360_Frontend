@@ -32,8 +32,8 @@ describe('DashboardError — shared failure state', () => {
 });
 
 describe('compactAmt — branch-aware currency (the mechanism the pages use)', () => {
-  test('uses the supplied currency symbol, not a hardcoded ₹', () => {
-    expect(compactAmt(2500000, { currency: '$' })).toBe('$25.00L');
+  test('uses the supplied currency symbol AND its native scale (₹→Cr/L, $→K/M/B)', () => {
+    expect(compactAmt(2500000, { currency: '$' })).toBe('$2.50M'); // USD branches: Western scale, not Cr/L
     expect(compactAmt(2500000, { currency: '₹' })).toBe('₹25.00L');
     expect(compactAmt(500, { currency: '$' })).toBe('$500');
   });

@@ -7,7 +7,7 @@ import { toastInfo } from '../../../core/ux/toast';
 import { clickable } from '../../../core/ux/clickable';
 import { bc } from '../../../core/styleTokens';
 
-const DARK = '#14161a', DIM = '#5b616e', LINE = '#e6e8ec', GREEN = '#16a34a', AMBER = '#B7791F', RED = '#dc2626';
+const DARK = '#14161a', DIM = '#5b616e', LINE = '#cdd1d8', GREEN = '#16a34a', AMBER = '#B7791F', RED = '#dc2626';
 const SEV = {
   error: { dot: '#dc2626', bg: '#fbe9e9', label: 'Critical' },
   warn: { dot: '#B7791F', bg: '#fbeedb', label: 'Warning' },

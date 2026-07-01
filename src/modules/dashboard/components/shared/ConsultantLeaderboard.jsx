@@ -10,7 +10,7 @@ export function ConsultantLeaderboard({ consultants, formatMoney, onViewAll, tit
   return (
     <div className="rounded-brand border border-surface-border bg-surface p-4 shadow-card">
       <div className="mb-2.5 flex items-center justify-between">
-        <h3 className="m-0 text-xs font-bold text-ink">{title}</h3>
+        <h3 className="m-0 text-xs font-bold text-ink" title="GP is estimated — the period's blended GP% applied to each consultant's revenue (GP is tracked by cost-centre, not by consultant).">{title} <span className="font-normal text-ink-muted">· GP est.</span></h3>
         <Button variant="ghost" size="xs" onClick={onViewAll}>Full →</Button>
       </div>
       {consultants.length === 0 && <p className="text-[11px] text-ink-muted">No data</p>}
