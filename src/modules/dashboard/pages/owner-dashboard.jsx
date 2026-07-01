@@ -1,7 +1,7 @@
 import React from 'react';
 import { DashboardHeader } from '../../../core/helpers';
 import { KPICard, WidgetCard } from '../../../core/styles';
-import { compactAmt } from '../../../core/format';
+import { compactAmt, localeOf } from '../../../core/format';
 import { bc } from '../../../core/styleTokens';
 import { CUR_FY } from '../../../core/dates';
 import { PageLayout } from '../../../shell/PageLayout';
@@ -133,6 +133,10 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
   const { data, totalCashInr, isLoading, isError, error, refetch } = useDirectorDashboard({ scope: effScope, from: period.from, to: period.to });
   const cur = bc(branch).cur;
   const m0 = (n) => compactAmt(Math.round(Number(n) || 0), { currency: cur });
+  // FULL grouped amount (no Cr/L abbreviation) — used by the reconciliation bridges so
+  // every bucket foots to the total ON SCREEN. Compact units (mixing Cr & L across rows,
+  // each independently rounded) made the bridge look like it didn't add up.
+  const mFull = (n) => `${cur}${Math.round(Number(n) || 0).toLocaleString(localeOf(cur))}`;
   // Per-branch money formatter — value in the given branch CODE's own currency.
   const mB = (code, n) => compactAmt(Math.round(Number(n) || 0), { currency: bc({ code }).cur });
   const mpl = useModulePL(branchArg, { ...dates, summary: true }).data || {};
@@ -305,7 +309,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
           <div className="rounded-brand border border-surface-border bg-surface px-4 py-3">
             <div className="flex items-baseline justify-between border-b-2 pb-2" style={{ borderColor: '#185FA5' }}>
               <span className="text-sm font-extrabold text-ink">Revenue · {rangeShort}</span>
-              <span className="text-lg font-extrabold tabular-nums" style={{ color: '#c2a04a' }}>{m0(data.salesRecon.revenue)}</span>
+              <span className="text-lg font-extrabold tabular-nums" style={{ color: '#c2a04a' }}>{mFull(data.salesRecon.revenue)}</span>
             </div>
             {data.salesRecon.buckets.map((b) => {
               // Operator + colour follow the SIGNED amount (refund is naturally negative),
@@ -320,7 +324,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
                     {b.label}
                     {b.count ? <span className="text-[11px] text-ink-muted">· {b.count}</span> : null}
                   </span>
-                  <span className={`text-sm font-bold tabular-nums ${empty ? 'text-ink-muted' : 'text-ink'}`}>{m0(Math.abs(b.amount))}</span>
+                  <span className={`text-sm font-bold tabular-nums ${empty ? 'text-ink-muted' : 'text-ink'}`}>{mFull(Math.abs(b.amount))}</span>
                 </>
               );
               return empty ? (
@@ -331,7 +335,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
             })}
             {!data.salesRecon.reconciles && (
               <div className="mt-1 rounded border px-2 py-1 text-[11px] font-semibold" style={{ borderColor: C.red, color: C.red }}>
-                Unreconciled by {m0(Math.abs(data.salesRecon.residual))} — a Sales-ledger posting isn't classified; see the Other/Manual bucket.
+                Unreconciled by {mFull(Math.abs(data.salesRecon.residual))} — a Sales-ledger posting isn't classified; see the Other/Manual bucket.
               </div>
             )}
           </div>
@@ -350,7 +354,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
           <div className="rounded-brand border border-surface-border bg-surface px-4 py-3">
             <div className="flex items-baseline justify-between border-b-2 pb-2" style={{ borderColor: '#185FA5' }}>
               <span className="text-sm font-extrabold text-ink">Gross Profit · {rangeShort}</span>
-              <span className="text-lg font-extrabold tabular-nums" style={{ color: '#16a34a' }}>{m0(data.gpRecon.gp)}</span>
+              <span className="text-lg font-extrabold tabular-nums" style={{ color: '#16a34a' }}>{mFull(data.gpRecon.gp)}</span>
             </div>
             {data.gpRecon.buckets.map((b) => {
               const neg = b.amount < 0;
@@ -362,7 +366,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
                     {b.label}
                     {b.count ? <span className="text-[11px] text-ink-muted">· {b.count}</span> : null}
                   </span>
-                  <span className={`text-sm font-bold tabular-nums ${empty ? 'text-ink-muted' : 'text-ink'}`}>{m0(Math.abs(b.amount))}</span>
+                  <span className={`text-sm font-bold tabular-nums ${empty ? 'text-ink-muted' : 'text-ink'}`}>{mFull(Math.abs(b.amount))}</span>
                 </>
               );
               return empty ? (
@@ -373,7 +377,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
             })}
             {!data.gpRecon.reconciles && (
               <div className="mt-1 rounded border px-2 py-1 text-[11px] font-semibold" style={{ borderColor: C.red, color: C.red }}>
-                Unreconciled by {m0(Math.abs(data.gpRecon.residual))} — a GP-ledger posting isn't classified; see the Other/Manual bucket.
+                Unreconciled by {mFull(Math.abs(data.gpRecon.residual))} — a GP-ledger posting isn't classified; see the Other/Manual bucket.
               </div>
             )}
           </div>

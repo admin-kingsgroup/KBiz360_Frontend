@@ -32,7 +32,10 @@ jest.mock('../../../core/period', () => ({ PeriodBar: () => null, periodRange: (
 jest.mock('../../../core/styleTokens', () => ({
   bc: (arg) => { const code = typeof arg === 'string' ? arg : arg && arg.code; return { cur: ['NBO', 'DAR', 'FBM'].includes(code) ? '$' : '₹' }; },
 }));
-jest.mock('../../../core/format', () => ({ compactAmt: (n, opts) => `${(opts && opts.currency) || ''}${Math.round(Number(n) || 0)}` }));
+jest.mock('../../../core/format', () => ({
+  compactAmt: (n, opts) => `${(opts && opts.currency) || ''}${Math.round(Number(n) || 0)}`,
+  localeOf: () => 'en-IN', // reconciliation bridges format full grouped amounts (mFull)
+}));
 jest.mock('../../../core/styles', () => ({
   KPICard: ({ label, value, onClick }) => <button onClick={onClick}>{`KPI|${label}|${value}`}</button>,
   WidgetCard: ({ title, children, onDrill }) => <div><span>{title}</span>{onDrill && <button onClick={onDrill}>{`drill:${title}`}</button>}{children}</div>,
@@ -139,9 +142,9 @@ describe('Owner Dashboard — Sales Reconciliation bridge (single branch)', () =
     expect(screen.getByText('SO/PO/GP (forward sales)')).toBeInTheDocument();
     expect(screen.getByText('INB inter-branch')).toBeInTheDocument();
     expect(screen.getByText('Refund / Reissue')).toBeInTheDocument();
-    expect(screen.getByText('₹2181143')).toBeInTheDocument();   // refund rendered as |amount|
-    expect(screen.queryByText('₹-2181143')).toBeNull();          // never a double-negative
-    expect(screen.getByText('₹31490745')).toBeInTheDocument();   // bridge top == Revenue KPI value
+    expect(screen.getByText('₹21,81,143')).toBeInTheDocument();  // refund rendered as |amount|, full grouped so it foots
+    expect(screen.queryByText('₹-21,81,143')).toBeNull();         // never a double-negative
+    expect(screen.getByText('₹3,14,90,745')).toBeInTheDocument(); // bridge top == Revenue KPI value, full precision
   });
 
   test('a bucket row drills into its Approvals register', () => {
@@ -185,8 +188,8 @@ describe('Owner Dashboard — Gross Profit Reconciliation bridge (single branch)
     expect(screen.getByText(/Gross Profit Reconciliation/)).toBeInTheDocument();
     expect(screen.getByText('SO/PO/GP (sale − cost)')).toBeInTheDocument();
     expect(screen.getByText('Commission / Discounts / JV')).toBeInTheDocument();
-    expect(screen.getByText('₹1548000')).toBeInTheDocument();   // bridge top == GP KPI value
-    expect(screen.getByText('₹179000')).toBeInTheDocument();    // commission bucket
+    expect(screen.getByText('₹15,48,000')).toBeInTheDocument(); // bridge top == GP KPI value, full precision
+    expect(screen.getByText('₹1,79,000')).toBeInTheDocument();  // commission bucket
   });
 
   test('a GP bucket row drills into its Approvals register', () => {
