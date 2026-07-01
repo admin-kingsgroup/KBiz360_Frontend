@@ -489,7 +489,7 @@ export default function KB360App(){
       ? <OwnerDashboard branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>
       : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
           <div style={{fontSize:42,marginBottom:14}}>🔒</div>
-          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Owner Dashboard</h2>
+          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>AD Dashboard (All)</h2>
           <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>This consolidated all-branch dashboard is restricted to the group owner.</p>
           <button onClick={()=>navigate("/dashboard")} style={{background:"#0d1326",color:"#fff",border:"none",padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>← Back to Dashboard</button>
         </div>;

@@ -879,7 +879,7 @@ export function PerformanceDash({ branch, go }) {
 
   return (
     <div style={{ margin: 12 }}>
-      <Toolbar title="Performance vs Target" sub={`Sales · GP · Budget · Nett Profit — all vs target · ${range.label}`} branch={branch} p={p} />
+      <Toolbar title="TGT VS Sales/GP/EX/NP" sub={`Sales · GP · Budget · Nett Profit — all vs target · ${range.label}`} branch={branch} p={p} />
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         {tiles.map((t) => <Tile key={t.key} t={t} />)}
       </div>

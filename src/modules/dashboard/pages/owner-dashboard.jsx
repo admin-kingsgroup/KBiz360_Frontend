@@ -215,7 +215,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
   );
 
   if (isError && !data) {
-    return <DashboardError error={error} onRetry={refetch} title="Could not load the Owner Dashboard." />;
+    return <DashboardError error={error} onRetry={refetch} title="Could not load the AD Dashboard (All)." />;
   }
   if (isLoading || !data) {
     return <DashboardSkeleton numKpis={12} />;
@@ -252,7 +252,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
 
   return (
     <PageLayout>
-      <DashboardHeader title="Owner Dashboard" subtitle={pageSubtitle} user={currentUser} onExport={() => openPrintPreview({ selector: 'main', title: 'Owner Dashboard', recommend: 'portrait' })} />
+      <DashboardHeader title="AD Dashboard (All)" subtitle={pageSubtitle} user={currentUser} onExport={() => openPrintPreview({ selector: 'main', title: 'AD Dashboard (All)', recommend: 'portrait' })} />
       {Controls}
 
       {/* ── Headline KPIs ──

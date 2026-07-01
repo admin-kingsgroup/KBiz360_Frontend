@@ -494,6 +494,7 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
     {label:"My Dashboard", href:"/dashboard"},
     {label:"Alerts Dashboard", href:"/dashboard/alerts"},
     {label:"Capital vs Investment", href:"/dashboards/capital"},
+    {label:"TGT VS Sales/GP/EX/NP", href:"/dashboards/performance"},
   ]},
   {label:"Financials", children:[
     {divider:true, label:"P&L & Growth"},
@@ -516,7 +517,6 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
     {label:"Supplier / Purchase", href:"/dashboards/supplier"},
   ]},
   {label:"Targets", children:[
-    {label:"Performance vs Target (all-in-one)", href:"/dashboards/performance"},
     {label:"Sales vs Target", href:"/dashboards/sales-target"},
     {label:"GP vs Target", href:"/dashboards/gp-target"},
     {label:"Collections vs Target", href:"/dashboards/collections-target"},
@@ -535,7 +535,7 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
 function withOwnerDashboard(menu){
   const overview = menu.children[0];
   const newOverview = {...overview, children:[
-    {label:"Owner Dashboard (All Branches)", href:"/dashboard/owner"},   // replaces "My Dashboard" for the owner
+    {label:"AD Dashboard (All)", href:"/dashboard/owner"},   // replaces "My Dashboard" for the owner
     ...overview.children.slice(1),                                        // Alerts, Capital, … (My Dashboard dropped)
   ]};
   return {...menu, children:[newOverview, ...menu.children.slice(1)]};
