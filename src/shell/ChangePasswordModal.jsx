@@ -31,8 +31,10 @@ export function ChangePasswordModal({ open, onClose }) {
     setBusy(true);
     try {
       const { apiPost } = await import('../core/api');
-      await apiPost('/api/auth/change-password', { currentPassword: cur, newPassword: nw });
-      toast('Password changed — use it next time you sign in.', 'success');
+      const res = await apiPost('/api/auth/change-password', { currentPassword: cur, newPassword: nw });
+      // Keep THIS device signed in with the fresh token; other devices are now logged out.
+      if (res && res.token) { try { localStorage.setItem('kb360-token', res.token); } catch { /* ignore */ } }
+      toast('Password changed. Other devices have been signed out.', 'success');
       done();
     } catch (e) {
       toast(e?.message || 'Could not change password', 'error');
