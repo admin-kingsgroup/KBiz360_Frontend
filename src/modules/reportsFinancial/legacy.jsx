@@ -1,23 +1,3 @@
-/* ════════════════════════════════════════════════════════════════════
-   MODULES/REPORTS-FINANCIAL.JSX
-
-   The Reports → Profit & Loss and Balance Sheet screens, restyled to the
-   SAP-Fiori / Tally-Classic look & feel, rendered from LIVE data:
-
-     Profit & Loss  →  GET /api/accounting/module-pl   (module-wise GP →
-                       indirect overheads → Net Profit bridge)
-     Balance Sheet  →  GET /api/accounting/balance-sheet (group → ledger,
-                       Tally-Classic ⇄ Fiori vertical toggle)
-
-   Honest-data notes (mockup asked for things the books don't carry yet):
-     · P&L sub-rows are real booking files (by Link No), not the mock's
-       International/Domestic split (no int'l/domestic flag on a voucher).
-     · The P&L bottom line is Net Profit (Gross − overheads). There is no
-       fabricated "Provision for Tax @ 25.17%" line — tax shows only if a
-       real tax ledger is posted under indirect expenses.
-     · Prior-year columns/trends fetch the previous FY live and compare.
-   ════════════════════════════════════════════════════════════════════ */
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { card, inp, bc } from '../../core/styles';
@@ -55,10 +35,6 @@ const SAP = {
 const SHADOW = '0 1px 4px rgba(0,0,0,0.12), 0 0 1px rgba(0,0,0,0.08)';
 const TALLY = { head: '#14396b', titlebar: '#dbe7f5', gold: '#b8860b', green: '#1a7a1a' };
 
-/* ── number/format helpers ───────────────────────────────────────────── */
-// `bc()` resolves currency off `branch.code` (with an 'ALL' special-case), so a bare
-// branch-code string ('NBO') would fall back to BOM/₹. Normalise a string code into
-// `{ code }` first so per-branch sections in the consolidated view get their OWN currency.
 const curOf = (branch) => bc(typeof branch === 'string' && branch !== 'ALL' ? { code: branch } : branch).cur;
 const branchLabel = (branch) => (!branch || branch === 'ALL' ? CONSOLIDATED_LABEL : (branch.code || branch));
 const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : '—'; };
@@ -69,9 +45,7 @@ const compact = (cur, n) => {
   if (a >= 1e5) return `${cur}${(v / 1e5).toFixed(2)} L`;
   return `${cur}${Math.round(v).toLocaleString(localeOf(cur))}`;
 };
-// Branch-locale variant of `compact` for the operational AR/AP screens. Keeps the
-// Cr/L Indian compaction (it's a magnitude grouping, not a tax/value change) but
-// groups the plain-number tail in the branch's currency locale.
+
 const compactCur = (cur, n) => {
   const v = Number(n) || 0, a = Math.abs(v);
   if (a >= 1e7) return `${cur}${(v / 1e7).toFixed(2)} Cr`;
@@ -94,8 +68,6 @@ const asOn = (iso) => { if (!iso) return 'latest'; const d = new Date(iso); retu
 
 /* ── tiny shared chrome ──────────────────────────────────────────────── */
 function Wrap({ children, wide }) {
-  // `wide` (P&L / Balance Sheet statements) uses far more of the screen so the
-  // single-column views don't sit as a skinny ribbon in a sea of whitespace.
   return <div style={{ maxWidth: wide ? 1640 : 1180, margin: '0 auto', padding: '4px 6px 28px' }}>{children}</div>;
 }
 function FioriHead({ system, title, sub, right }) {
@@ -221,9 +193,6 @@ function FileVoucherDrill({ file, cur, mobile, onClose }) {
   );
 }
 
-// Classic-view module drill: a module row aggregates many booking files, so we
-// step module → booking file → its sale/purchase vouchers → edit (re-posts the
-// journal). The Fiori view drills file-first; this enters from an aggregate row.
 function ModuleVoucherDrill({ module, cur, mobile, onClose }) {
   const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const allFiles = module.hasSubs ? (module.subs || []).flatMap((s) => s.files || []) : (module.files || []);
@@ -267,10 +236,6 @@ function ModuleVoucherDrill({ module, cur, mobile, onClose }) {
   );
 }
 
-// Ledger drill — now a thin shim onto the ONE unified ledger UI. Every P&L /
-// Balance Sheet / GP ledger click flows through here, so they all open the exact
-// same `LedgerAccountView` modal (Statement · Bill-wise · Cost-Centre · Components),
-// scoped to the top-right global branch. (No bespoke ledger view any more.)
 function LedgerVoucherDrill({ ledger, onClose }) {
   useEffect(() => {
     if (ledger) openLedgerModal(ledger);   // branch comes from the global selector
@@ -281,11 +246,6 @@ function LedgerVoucherDrill({ ledger, onClose }) {
 }
 const Th = ({ children, right, w }) => <th style={{ background: '#f7f8f9', color: SAP.sec, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: right ? '9px 20px 9px 16px' : '9px 16px', borderBottom: `2px solid ${SAP.border}`, textAlign: right ? 'right' : 'left', width: w }}>{children}</th>;
 
-/* ═══════════════════ PROFIT & LOSS (Fiori ⇄ Tally Classic) ══════════════ */
-/* ── period model — drives every section live off { from, to } ─────────
-   Modes: all | ytd | month (matrix) | quarter (matrix) | custom.
-   All ranges flow into useModulePL, so Revenue/COGS/GP/overheads/Net Profit
-   and every % recompute for the selection. Source of truth: core/dates.js. */
 const PNL_PERIOD_KEY = 'kb360-pnl-period';
 function loadSavedPeriod() {
   try { return JSON.parse(localStorage.getItem(PNL_PERIOD_KEY) || '{}') || {}; } catch { return {}; }
@@ -315,15 +275,14 @@ const fyQuartersFor = (label) => {
   }
   return out;
 };
-// mode → resolved single-period { from, to, label, note }. month/quarter use the
-// matrix; if one of their columns is drilled the focus range is used directly.
+
 function resolvePeriod(mode, fy, custom, branch) {
   if (mode === 'all') return { from: '', to: '', label: 'All Time', note: rangeNote('all', { to: todayISO() }) };
   if (mode === 'custom') {
     const from = custom.from || CUR_FY.startISO, to = custom.to || todayISO();
     return { from, to, label: 'Custom Range', note: rangeNote('range', { from, to }) };
   }
-  // Uniform presets (per-branch FY) via the shared period util.
+
   if (['today', 'week', 'mtd', 'qtd', 'cfy', 'lfy'].includes(mode)) {
     const r = periodRange(mode, { branch });
     return { from: r.from, to: r.to, label: r.label, note: rangeNote('range', { from: r.from, to: r.to }) };
@@ -332,8 +291,7 @@ function resolvePeriod(mode, fy, custom, branch) {
   const to = fy === CUR_FY.label ? todayISO() : r.to;       // current FY → year-to-date
   return { from: r.from, to, label: `FY ${fy} YTD`, note: rangeNote('range', { from: r.from, to }) };
 }
-// comparison window: previous FY (ytd) or the equal-length window immediately
-// before a custom range.
+
 function priorPeriod(mode, fy, custom, period) {
   // Custom + short presets compare against the equal-length window immediately before.
   if (mode === 'custom' || ['today', 'week', 'mtd', 'qtd'].includes(mode)) {
@@ -345,19 +303,13 @@ function priorPeriod(mode, fy, custom, period) {
     const ps = new Date(pe); ps.setDate(ps.getDate() - days + 1);
     return { from: isoDate(ps), to: isoDate(pe), label: 'Previous period' };
   }
-  // LFY's comparison window is the FY *before* last — not last FY itself. The `fy`
-  // state isn't shown/updated in LFY mode (it stays at the current FY), so basing
-  // the prior on it made the comparison resolve back to the LFY period and every
-  // Trend/Δ showed 0% (a period compared against itself). Anchor on the LFY label.
+ 
   if (mode === 'lfy') {
     const lfyLabel = `${CUR_FY.startYear - 1}-${String(CUR_FY.startYear).slice(2)}`;
     const p = fyPrior(lfyLabel);
     return { from: p.from, to: p.to, label: 'FY prior' };
   }
-  // CFY is year-to-date (FY start → today), so compare against the SAME window one
-  // year earlier — not the full prior FY — otherwise a part-year is measured against a
-  // 12-month total and every Trend/Δ is overstated. (month/quarter keep the prior-FY
-  // comparison since they're full, fixed-length periods.)
+  
   if (mode === 'cfy' && period?.from && period?.to) {
     const shiftYr = (iso) => { const d = new Date(iso); if (isNaN(d.getTime())) return iso; d.setFullYear(d.getFullYear() - 1); return isoDate(d); };
     return { from: shiftYr(period.from), to: shiftYr(period.to), label: 'Prior YTD' };
@@ -365,8 +317,7 @@ function priorPeriod(mode, fy, custom, period) {
   const p = fyPrior(fy); // month / quarter → prior FY
   return { from: p.from, to: p.to, label: 'FY prior' };
 }
-// Flatten a single-period payload into an Excel sheet (Section A modules + the
-// indirect-expense groups + the net-profit line).
+
 function exportDetail(d, period, cur) {
   if (!d) return;
   const rows = [];
@@ -437,9 +388,7 @@ function PnlPeriodBar({ mode, setMode, fy, setFy, compare, setCompare, custom, s
   );
 }
 
-/* ── Monthly / Quarterly side-by-side matrix (one column per period) ─────
-   Fires one module-PL query per column (cache-shared with the detail view's
-   key), rolls up a FY-Total column, and drills any column → its full P&L. */
+
 function PnLMatrix({ branch, cur, fy, grain, onFocus }) {
   const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const code = branchCode(branch);
@@ -574,9 +523,7 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
   const d = q.data;
   const prev = showPY ? qP.data : null;
 
-  // Consolidated = all-branches scope: render each branch as its own P&L section in
-  // its OWN currency — never a merged cross-branch / cross-currency total. Driven by
-  // the BE `byBranch` slice (same shape as the merged top-level module-PL payload).
+
   const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
 
   const periodTxt = period.note || period.label || 'all periods';
@@ -634,10 +581,7 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
   );
 }
 
-/* ── One scope's P&L body (KPIs + Sections A/B/C + ranking/ratios, or the
-   Classic/Vertical/Drill view) in ONE branch's currency. Owns its own expand
-   state + voucher/ledger drills, so each per-branch section in the consolidated
-   view drills independently. `d` is a byBranch slice or the merged top-level. */
+
 function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) {
   const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const paren = (n) => { const v = Math.round(Number(n) || 0); return v ? `(${v.toLocaleString(localeOf(cur))})` : '—'; };
@@ -651,18 +595,14 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
   const [expDetail, setExpDetail] = useState('detailed'); // Indirect Expenses: detailed (full tree) | summary (Fixed/Variable totals)
 
   const ranking = useMemo(() => (d?.modules || []).slice().sort((a, b) => b.gp - a.gp), [d]);
-  // Indirect-expense Fixed/Variable buckets. New module-PL payloads carry
-  // `indirect.buckets`; fall back to wrapping the flat group list in one bucket
-  // so an older cached payload still renders.
+  
   const expBuckets = useMemo(() => {
     if (!d) return [];
     if (Array.isArray(d.indirect.buckets) && d.indirect.buckets.length) return d.indirect.buckets;
     const groups = d.indirect.groups || [];
     return groups.length ? [{ name: 'Indirect Expenses', amount: d.indirect.expense, pctOfSales: d.totals.sales ? (d.indirect.expense / d.totals.sales) * 100 : 0, groups }] : [];
   }, [d]);
-  // Fiori "Expand all / Collapse all" — covers Section A (modules → sub-centres →
-  // ledger-composition heads) and Section B (Fixed/Variable buckets → sub-groups).
-  // Section B defaults expanded, so Collapse must pin those keys false explicitly.
+ 
   const fioriKeys = useMemo(() => pnlFioriExpandKeys(d, expBuckets), [d, expBuckets]);
   const hasFioriExpand = fioriKeys.modKeys.length > 0 || fioriKeys.bucketKeys.length > 0;
   const expandAllFiori = () => {
@@ -678,10 +618,7 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
     setOpenBucket(Object.fromEntries(fioriKeys.bucketKeys.map((k) => [k, false])));
     setOpenExp(Object.fromEntries(fioriKeys.expKeys.map((k) => [k, false])));
   };
-  // Bottom line is Net Profit (Gross − overheads). Per the honest-data policy in this
-  // file's header, there is NO fabricated "Provision for Tax @ 25.17%" / PAT line —
-  // any real tax flows through indirect expenses, and the Balance Sheet posts this same
-  // pre-tax Net Profit to Capital, so the two now agree.
+  
   const ratios = useMemo(() => {
     if (!d) return [];
     const mods = (d.modules || []).filter((m) => m.sales > 0);
@@ -848,8 +785,7 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
             <FCard title="Section C — Profit Bridge (Gross Profit → Net Profit)" badge={<Badge>✓ {d.bridge.result}</Badge>}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <tbody>
-                  {/* Operating GP → Direct Income / Direct Expenses → full Gross Profit
-                      (only when there are trading items beyond module Sales/COGS). */}
+                
                   {(!!d.totals.directIncome || !!d.totals.directExpense) && (
                     <>
                       <tr style={{ borderBottom: `1px solid ${SAP.borderLt}`, color: SAP.sec }}>
@@ -942,17 +878,9 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
   );
 }
 
-/* ── Section A ledger composition — under an open module, the GL Sales/Purchase
-   ledgers each booking line posts to, and the fare/charge components captured on
-   the entry (Base Fare, K3, Taxes …). Sales ledgers show their amount in the
-   Sales column, Purchase ledgers in the COGS column; click a ledger to reveal
-   its components. Same six columns as the module table (colSpan-aware). */
 function FioriLedgerRows({ m, heads: headsProp, refunds: refundsProp, keyBase, openHead, setOpenHead, cur = '₹' }) {
   const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
-  // Module-level (m.heads) for single-leaf modules, or a sub-centre's own heads
-  // (Int'l/Domestic) when `heads` + `keyBase` are passed — so fares are split, not merged.
-  // Show the FULL component ledger name (e.g. "IT-Base Fare") so the drill matches the
-  // Chart of Accounts / Tally P&L tree — no display-only prefix stripping.
+
   const allHeads = headsProp || (m && m.heads) || {};
   const nodeRefunds = refundsProp || (m && m.refunds) || {};
   const base = keyBase || (m && m.key) || '';
@@ -1041,21 +969,12 @@ function PnlViewSwitcher({ view, setView }) {
   );
 }
 
-// Tally Classic alphabetical (A→Z) comparator — case-insensitive, numeric-aware
-// (so "Branch 2" sorts before "Branch 10"). Shared by the Classic P&L and
-// Balance Sheet views to arrange Groups / Sub-Groups / Ledgers / modules.
 const azByName = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'en', { sensitivity: 'base', numeric: true });
 
-/* ── Tally Classic (white) P&L view — Dr/Cr two-column, touch-drillable ── */
-// Trading A/c (COGS vs Sales, balancing with Gross Profit c/d) stacked over the
-// P&L A/c (indirect expenses + tax + net profit vs GP b/d). Tap any module to
-// reach its booking files → vouchers → edit; tap any expense ledger to drill
-// its postings → voucher → edit. Same live data & editor as the Fiori view.
 function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
   const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const [drillModule, setDrillModule] = useState(null);
-  // Collapsible indirect tree: Fixed/Variable buckets default expanded; sub-groups
-  // default collapsed (click a sub-group to reveal its ledgers).
+ 
   const [openSub, setOpenSub] = useState({});
   const isOpen = (key, defOpen) => (openSub[key] === undefined ? defOpen : openSub[key]);
   const mono = { fontFamily: "'Courier New', Courier, monospace" };
@@ -1069,9 +988,6 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
   const incomeGroups = d.indirect?.incomeGroups || []; // indirect-income groups → ledgers (drillable)
   const grossProfit = d.bridge?.grossProfit ?? d.totals.gp;
 
-  // Expand / Collapse all — every bucket + sub-group key in the indirect tree,
-  // PLUS every indirect-income group, PLUS every module + its GL ledgers on both
-  // trading sides (so "Expand all" also drills modules → ledger → fare components).
   const allKeys = [];
   buckets.forEach((b) => { allKeys.push('b:' + b.name); (b.groups || []).forEach((g) => allKeys.push('g:' + b.name + '/' + g.name)); });
   incomeGroups.forEach((g) => allKeys.push('ig:' + g.name));
@@ -1079,9 +995,6 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
   const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
   const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
 
-  // A module row + (when expanded) its GL ledger rows → fare/charge components.
-  // The caret toggles the inline drill; the row's "›" still opens the voucher
-  // drill popup. Modules with no captured ledger detail stay non-expandable.
   const moduleBlock = (m, side) => {
     const amount = side === 'cogs' ? m.cogs : m.sales;
     const hasDetail = moduleHasDetail(m, side);
@@ -1091,16 +1004,9 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
     return open ? [row, ...moduleDrillRows(m, side, isOpen)] : [row];
   };
 
-  // Trading account — Purchases/COGS + Direct Expenses (Dr) vs Sales + Direct Income (Cr).
-  // Direct Income (Commission, Discount Received …) and Direct Expenses are the trading
-  // items beyond module Sales/COGS; per Tally they sit as their OWN lines ABOVE Gross
-  // Profit. Both sides foot to Sales + Direct Income: Dr (cogs + directExp + GP c/d) ==
-  // Cr (sales + directInc), since GP = (sales − cogs) + (directInc − directExp).
   const directIncome = d.totals.directIncome || 0;
   const directExpense = d.totals.directExpense || 0;
-  // Direct Income / Direct Expenses render as a drillable group ▸ sub-group ▸ ledger
-  // tree (like every other group), not a flat lump. A category whose name equals the
-  // group itself (ledgers sitting directly under it, no sub-group) skips the dup middle row.
+  
   const directBlock = (gs, total, label, prefix) => {
     const cats = [...(gs || [])].sort((a, b) => azByName(a.name, b.name));
     if (!cats.length) return [{ label, amount: total, ledger: label, leaf: true }]; // no detail → flat fallback (clickable)
@@ -1161,13 +1067,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
     return [ghead, ...[...(g.ledgers || [])].sort((x, y) => azByName(x.name, y.name)).map((l) => ({ label: l.name, amount: l.amount, ledger: l.name, leaf: true }))];
   });
   const allIncomeLedgers = incomeGroups.flatMap((g) => g.ledgers || []);
-  // The "Indirect Income" line must itself open the income ledger account. When the
-  // whole indirect income is one ledger, the single line opens it directly; with
-  // several ledgers it becomes a drill header (expand → click any ledger). If the
-  // backend hasn't sent the income tree yet, still make the line clickable.
-  // Show the Indirect Income block whenever there is movement — INCLUDING a net-debit
-  // (negative) balance, e.g. a lone Interest-on-FD reversal. `plTotal` already carries
-  // `indIncome` with its sign, so the visible Cr rows then foot to the column total.
+ 
   const incomeBlock = !indIncome ? []
     : allIncomeLedgers.length === 1
       ? [{ label: 'Indirect Income', amount: indIncome, ledger: allIncomeLedgers[0].name, leaf: true }]
@@ -1183,12 +1083,8 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
 
   const nett = d.totals.sales;
   const toggle = (r) => setOpenSub((s) => ({ ...s, [r.ekey]: !r.open }));
-  // Row click → drill (module → files popup, ledger → its postings). The caret
-  // (rendered separately) toggles the inline expand without drilling.
+  
   const onRowClick = (r) => {
-    // A GL ledger leaf → its full Ledger Account (a sale/purchase invoice inside
-    // then opens the Sales/Purchase Register). Modules & sub-centres expand inline
-    // on click — same as the Drill view; the module's "›" still opens its files.
     if (r.ledger) openLedgerModal(r.ledger, { invoiceToRegister: true });
     else if (r.expandable) toggle(r);
     else if (r.module) setDrillModule(r.module);
@@ -1286,11 +1182,7 @@ function ClassicPnL({ d, cur, mobile, branch, to, periodTxt }) {
   );
 }
 
-/* ── Vertical (single-column, statement-style) P&L view ───────────────────────
-   Renders the SAME `d`, modules, indirect-expense tree, grossProfit and net profit
-   that ClassicPnL uses — just flowing top-to-bottom: Income → less COGS →
-   Gross Profit → add Other Income → less Indirect Expenses → Net Profit.
-   Fully drillable (module / ledger / sub-group) exactly like Classic. */
+
 function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
   const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const [drillModule, setDrillModule] = useState(null);
@@ -1339,9 +1231,6 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
 
   const toggle = (r) => setOpenSub((s) => ({ ...s, [r.ekey]: !r.open }));
   const onRowClick = (r) => {
-    // A GL ledger leaf → its full Ledger Account (a sale/purchase invoice inside
-    // then opens the Sales/Purchase Register). Modules & sub-centres expand inline
-    // on click — same as the Drill view; the module's "›" still opens its files.
     if (r.ledger) openLedgerModal(r.ledger, { invoiceToRegister: true });
     else if (r.expandable) toggle(r);
     else if (r.module) setDrillModule(r.module);
@@ -1390,9 +1279,7 @@ function VerticalPnL({ d, cur, mobile, branch, to, periodTxt }) {
     const bold = !!(r.group || r.bucket || r.sub || r.costCentre || r.result);
     const color = r.component ? '#6a6a6a' : r.result ? TALLY.green : (r.group || r.bucket || r.sub || r.costCentre) ? TALLY.head : '#1a1a1a';
     const pad = r.component ? 64 : r.ledgerHead ? 46 : r.leaf ? 50 : r.costCentre ? 42 : r.sub ? 34 : r.bucket ? 24 : 14;
-    // Refund rows carry a PRE-SIGNED contribution (net − Σheads); on the COGS side
-    // flip the sign (not the magnitude) so it reduces cost, while normal rows keep the
-    // magnitude-flip. Keeps the gross heads + refund footing to the net total.
+  
     const amt = r.refund ? (neg ? -r.amount : r.amount) : (neg ? -Math.abs(r.amount) : r.amount);
     const structural = !!(r.group || r.bucket || r.sub || r.module) && !r.component;
     return (
@@ -1559,15 +1446,13 @@ function DrillPnL({ d, cur, branch, periodTxt }) {
   const expandAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, true])));
   const collapseAll = () => setOpenSub(Object.fromEntries(allKeys.map((k) => [k, false])));
   const toggle = (r) => setOpenSub((s) => ({ ...s, [r.ekey]: !isOpen(r.ekey, false) }));
-  // Row click: a GL ledger leaf → its Ledger Account (invoices inside route to the
-  // Sales/Purchase Register); anything else expandable → toggle inline.
+ 
   const onRowClick = (r) => {
     if (r.ledgerHead && r.ledger) openLedgerModal(r.ledger, { invoiceToRegister: true });
     else if (r.expandable) toggle(r);
   };
 
-  // One stepped row — its label sits in the column for its depth (0..3), amount
-  // always in the last column. A caret (when expandable) toggles without drilling.
+ 
   const LABEL_COLS = 4;
   const Row = ({ r, neg }) => {
     const lvl = r.level || 0;
@@ -1575,9 +1460,7 @@ function DrillPnL({ d, cur, branch, periodTxt }) {
     const clickable = isLedger || r.expandable;
     const bold = lvl === 0 || r.costCentre;
     const color = r.component ? '#6a6a6a' : (lvl === 0 || r.costCentre) ? TALLY.head : isLedger ? '#1f3a8a' : '#1a1a1a';
-    // Refund rows carry a PRE-SIGNED contribution (net − Σheads); on the COGS side
-    // flip the sign (not the magnitude) so it reduces cost, while normal rows keep the
-    // magnitude-flip. Keeps the gross heads + refund footing to the net total.
+  
     const amt = r.refund ? (neg ? -r.amount : r.amount) : (neg ? -Math.abs(r.amount) : r.amount);
     return (
       <tr style={{ borderBottom: '1px solid #dfe2e7' }}>
@@ -1658,22 +1541,11 @@ function DrillPnL({ d, cur, branch, periodTxt }) {
 /* ════════════════════════ BALANCE SHEET (Classic ⇄ Fiori) ══════════════ */
 const CURRENT_ASSETS = new Set(['Current Assets', 'Bank Accounts', 'Cash-in-Hand', 'Deposits (Asset)', 'Loans & Advances (Asset)', 'Stock-in-Hand', 'Sundry Debtors']);
 const CURRENT_LIABS = new Set(['Current Liabilities', 'Duties & Taxes', 'Provisions', 'Sundry Creditors', 'Bank OD Accounts']);
-// Capital & reserves only — the P&L A/c is added via the signed `netProfit` so
-// Net Worth stays correct regardless of which side a profit/loss is shown on
-// (a net loss parks the P&L A/c on the Assets side, Tally-style).
+
 const CAPITAL_RESERVES = new Set(['Capital Account', 'Reserves & Surplus']);
 const sumGroups = (rows, set) => (rows || []).filter((g) => set.has(g.group)).reduce((s, g) => s + (g.amount || 0), 0);
 const netWorthOf = (d) => sumGroups(d?.liabilities, CAPITAL_RESERVES) + (d?.netProfit || 0);
 
-/* ════════════════════════════════════════════════════════════════════
-   Balance-Sheet "As On Date" controls — reporting modes, quick filters,
-   comparison, Summary/Detailed and PDF/Excel/Print export.
-
-   A Balance Sheet is an "as on a date" statement: the backend accumulates
-   every posting from inception up to `to`. So every mode below reduces to a
-   primary as-on date `to` and an optional comparison as-on date `toPrev`,
-   both fed to the same live useBalanceSheet hook + renderer.
-   ════════════════════════════════════════════════════════════════════ */
 const prevFyLabel = () => { const s = CUR_FY.startYear - 1; return `${s}-${String(s + 1).slice(2)}`; };
 const monthEndISO = (key) => { const [y, m] = String(key).split('-').map(Number); return isoDate(new Date(y, m, 0)); };
 
@@ -1844,9 +1716,6 @@ export function ReportBSLive({ branch, forceView, hideSwitcher }) {
   const curLabel = `as at ${asOn(to)}`;
   const prevLabel = `as at ${asOn(toPrev)}`;
 
-  // Consolidated = all-branches scope: render each branch as its own Balance Sheet
-  // section in its OWN currency — never a merged cross-currency total. Driven by the
-  // BE `byBranch` slice that carries the same shape as the merged top-level payload.
   const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
 
   const doExcel = () => {
@@ -1858,8 +1727,6 @@ export function ReportBSLive({ branch, forceView, hideSwitcher }) {
   const doPrint = () => { if (d) { toast('Opening print view…', 'info'); openPrintPreview({ selector: 'main', title: 'Balance Sheet', recommend: 'landscape' }); } };
   const expBtn = (dis) => ({ padding: '6px 11px', fontSize: 11, fontWeight: 600, border: '1px solid rgba(255,255,255,0.3)', borderRadius: 5, cursor: dis ? 'default' : 'pointer', background: 'rgba(255,255,255,0.1)', color: '#fff', opacity: dis ? 0.45 : 1 });
 
-  // One branch's Balance Sheet body (the chosen view), in that branch's currency.
-  // `sd` is a byBranch slice (or the merged top-level `d` in single-branch mode).
   const renderBody = (sd, sPrev, sBranch, sCur) => {
     const sPrevMap = {}; [...(sPrev?.liabilities || []), ...(sPrev?.assets || [])].forEach((g) => { sPrevMap[g.group] = g.amount; });
     return view === 'fiori'
@@ -1915,9 +1782,7 @@ export function ReportBSLive({ branch, forceView, hideSwitcher }) {
   );
 }
 
-/* ── Fiori "Expand all / Collapse all" control — shared by the Fiori P&L and
-   Balance Sheet so all three views (Fiori · Classic · Vertical) offer the same
-   bulk expand/collapse. Classic & Vertical carry their own equivalent buttons. */
+
 function FioriExpandBar({ onExpand, onCollapse }) {
   const btn = { padding: '5px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', border: `1px solid ${SAP.blue}`, borderRadius: 6, background: '#fff', color: SAP.blue };
   return (
@@ -2056,10 +1921,7 @@ function BSSideCard({ title, rows, total, totalLabel, prevMap, prevTotal, cur, s
   );
 }
 
-/* ── Tally Classic (white) view ──────────────────────────────────────── */
-// Tally Classic lists Groups, Sub-Groups and Ledgers strictly alphabetically
-// (A→Z) via azByName. Applied per level inside this view only — the shared
-// splitSubGroups (amount-ranked) and the Fiori view are left untouched.
+
 const sideRows = (groups, summary, isOpen = () => true, side = '') => [...(groups || [])].sort((a, b) => azByName(a.group, b.group)).flatMap((g) => {
   if (summary) return [{ label: g.group, amount: g.amount, group: true, result: g.isResult }];
   const { subs, direct } = splitSubGroups(g.ledgers);
@@ -2168,10 +2030,7 @@ function ClassicBS({ d, cur, curLabel, detail, branch, to, mobile }) {
 }
 const branchLabelClassic = (d) => (d?.filter?.branch && d.filter.branch !== 'ALL' ? d.filter.branch : 'All Branches — Consolidated');
 
-/* ── Vertical (single-column, statutory-style) Balance Sheet view ─────────────
-   Renders the SAME `d` as Fiori/Classic (same groups via sideRows/splitSubGroups,
-   same totals d.totalLiabilities/d.totalAssets) — just stacked top-to-bottom:
-   Equity & Liabilities above Assets. Fully drillable like Classic. */
+
 function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
   const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(cur)) : '—'; };
   const summary = detail === 'summary';
@@ -2316,22 +2175,13 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
   );
 }
 
-/* ════════════════════════ AR / AP AGEING (Phase 2, live) ═══════════════════ */
-/* Receivables / Payables are now 2-tab workbenches sharing ONE bill-wise truth:
- *   • Ageing                  → monitor: open bills bucketed by age + on-account
- *   • Open Bills & On-Account  → act:     settle bills bill-wise (the Settle modal)
- * Both read the same no-FIFO source, so the numbers always agree. The old combined
- * /finance/outstanding screen is retired in favour of these side-scoped tabs.     */
+
 function ArApScreen({ branch, side, setRoute, initialTab }) {
   const isRec = side === 'receivables';
   const [tab, setTab] = useState(initialTab || 'ageing'); // 'ageing' | 'settle' | 'net'
-  // "Adjust advance" deep-link from an ageing row: jump to the Settle tab focused on
-  // that party's on-account advances (supplier payments / customer receipts) so they
-  // can be allocated to an open bill. Works symmetrically on both AR and AP.
-  const [advFocus, setAdvFocus] = useState(''); // party whose advances to focus
+ 
   const adjustAdvance = (party) => { setAdvFocus(party); setTab('settle'); };
-  // The "Net" tab is the same-party Debtors − Creditors view (replaces the old
-  // standalone Net Ageing screen). It's offered on both AR and AP workbenches.
+  
   const TABS = [['ageing', 'Ageing'], ['settle', 'Open Bills & On-Account ▸ Settle'], ['net', 'Net (Debtors − Creditors)']];
   const tabBtn = (active) => ({
     padding: '8px 16px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
@@ -2340,7 +2190,7 @@ function ArApScreen({ branch, side, setRoute, initialTab }) {
   });
   return (
     <>
-      <div className="noprint" style={{ maxWidth: 1600, margin: '0 auto', padding: '8px 6px 0', display: 'flex', gap: 6 }}>
+      <div className="noprint" style={{ maxWidth: 1640, margin: '0 auto', padding: '8px 6px 0', display: 'flex', gap: 6 }}>
         {TABS.map(([id, label]) => <button key={id} onClick={() => setTab(id)} style={tabBtn(tab === id)}>{label}</button>)}
       </div>
       {tab === 'ageing'
@@ -2360,16 +2210,12 @@ const bucketColor = (k) => ({ d0: SAP.greenDk, d30: SAP.gold, d60: SAP.orange, d
 
 function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfProp }) {
   const cur = curOf(branch);
-  // Branch-aware number grouping for this operational AR/AP screen — the file-level
-  // `inr`/`compact` are en-IN (shared with P&L/BS); here amounts follow the branch's
-  // currency locale so a USD branch reads $1,234.56-style grouping. Value unchanged.
+  
   const loc = localeOf(cur);
   const inrL = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : '—'; };
   const compactL = (n) => compactCur(cur, n);
   const mobile = useMobile();
-  // `embedded` = a per-branch section inside the consolidated view: it hides the big
-  // header + date control and takes the as-of cut-off from the parent (asOfProp).
-  const [asOfState, setAsOf] = useState(''); // '' = today; otherwise YYYY-MM-DD cut-off
+
   const asOf = embedded ? (asOfProp || '') : asOfState;
   const q = useAgeing(branch, asOf);
   const d = q.data;
@@ -2379,14 +2225,12 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfP
   const [drillLedger, setDrillLedger] = useState(null);
 
   const isRec = side === 'receivables';
-  // Consolidated = the all-branches scope. Render branch-wise (never merge currencies),
-  // but only at the top level — an embedded per-branch section is always single-branch.
+
   const isAll = !embedded && (!branch || branch === 'ALL' || branch?.code === 'ALL');
   const partyLabel = isRec ? 'Customer' : 'Supplier';
   const overdue = totals.d30 + totals.d60 + totals.d90;
   const share = (x) => (totals.total > 0 ? (x / totals.total) * 100 : 0);
-  // On-account advances are unapplied credits (no FIFO) — surfaced separately,
-  // never netted into the age buckets. Net = gross open bills − on-account.
+  
   const netTotal = totals.net != null ? totals.net : (totals.total - (totals.onAccount || 0));
   const rowNet = (r) => (r.net != null ? r.net : (r.total - (r.onAccount || 0)));
 
@@ -2458,7 +2302,7 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfP
   }
 
   const dateControl = (
-    <div className="noprint" style={{ maxWidth: 1600, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+    <div className="noprint" style={{ maxWidth: 1640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, background: SAP.pageBg, border: `1px solid ${SAP.border}`, borderTop: 'none', borderBottom: 'none', padding: '10px 20px' }}>
       <span style={{ color: SAP.sec, fontWeight: 600 }}>Age as on</span>
       <input type="date" value={asOfState} onChange={(e) => setAsOf(e.target.value)}
         style={{ padding: '4px 8px', border: `1px solid ${SAP.border}`, borderRadius: 6, fontSize: 12 }} />
@@ -2569,7 +2413,7 @@ function NetAgeingView({ branch }) {
   };
 
   const dateControl = (
-    <div className="noprint" style={{ maxWidth: 1600, margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+    <div className="noprint" style={{ maxWidth: 1640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, background: SAP.pageBg, border: `1px solid ${SAP.border}`, borderTop: 'none', borderBottom: 'none', padding: '10px 20px' }}>
       <span style={{ color: SAP.sec, fontWeight: 600 }}>Age as on</span>
       <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)}
         style={{ padding: '4px 8px', border: `1px solid ${SAP.border}`, borderRadius: 6, fontSize: 12 }} />

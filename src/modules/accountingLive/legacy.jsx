@@ -1,19 +1,6 @@
-/* ════════════════════════════════════════════════════════════════════
-   MODULES/ACCOUNTING-LIVE.JSX
-
-   Tally-style books & financial reports rendered from the LIVE double-entry
-   engine in the backend (kbiz360-erp-backend → /api/accounting, /api/vouchers,
-   /api/ledgers). Every voucher saved in the ERP posts a balanced journal
-   (Debit = Credit); these screens aggregate those postings in real time:
-
-     Day Book · Ledger A/c · Trial Balance · Profit & Loss · Balance Sheet
-     Sales / Purchase Register · 28 Tally Groups · Chart of Accounts
-
-   The look matches the existing Books reports (dark #1a1c22 header, gold
-   #c2a04a accents). No demo data — empty in, empty out.
-   ════════════════════════════════════════════════════════════════════ */
-
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { Menu as DropdownMenu } from '../../core/ux/Menu';
 import { card, inp, bc } from '../../core/styles';
 import { localeOf } from '../../core/format';
 import { exportToExcel, vouchersToSheet } from '../../core/exportExcel';
@@ -246,14 +233,10 @@ const PRODUCT = {
   SCN: 'Credit Note', SDN: 'Debit Note', RF: 'Refund', RI: 'Reissue',
 };
 const productOf = (v) => PRODUCT[v.type] || v.type;
-// The module filter ALWAYS offers this full set (even when the current period/branch
-// has no rows for a module), so every module is selectable — the list is not limited
-// to what happens to be loaded. Extra values found in the data are appended.
+
 const MODULE_ORDER = ['Flight', 'Hotel', 'Holiday', 'Visa', 'Insurance', 'Car', 'Misc', 'Refund', 'Reissue'];
 
-// International vs Domestic for a register row. Prefer the joined booking's
-// packageType; else infer from the posted component-head ledger prefixes (IT- =
-// International, DT- = Domestic). Blank when the module carries no INT/DOM split.
+
 const intDomOf = (v, booking) => {
   const pt = booking?.packageType || '';
   if (/int/i.test(pt)) return 'INT';
@@ -264,8 +247,7 @@ const intDomOf = (v, booking) => {
   return '';
 };
 
-// Format a cell: numeric strings/numbers get Indian grouping + right align;
-// everything else (PNR, ticket no, dates, names) stays left-aligned text.
+
 function cellFmt(v) {
   if (v == null || v === '') return { text: '', num: false };
   const s = String(v).trim();
@@ -273,10 +255,7 @@ function cellFmt(v) {
   return { text: String(v), num: false };
 }
 
-// Wide, horizontally-scrollable table that shows EVERY column inline — the same
-// columns/rows produced for the Excel export, so the UI mirrors the export 1:1.
-// A second scrollbar is mirrored at the TOP so you can scroll sideways without
-// hunting for the bottom of a long list; the two stay in sync.
+
 function DetailedTable({ columns, rows }) {
   const topRef = React.useRef(null);
   const bodyRef = React.useRef(null);
@@ -331,10 +310,7 @@ function ViewToggle({ view, setView }) {
   return <><B id="summary" label="Summary" /><B id="detailed" label="Detailed" /></>;
 }
 
-// Two-mode view switch with custom labels (Detailed / Minimal).
-// Themed ledger picker — a native <select>'s open option list can't be styled
-// (square corners, OS-default rows), so this renders the same options as a
-// small rounded popover instead, matching the rest of the app's menus.
+
 function LedgerSelectMenu({ value, options, onChange, placeholder = 'No cash ledger', width = 200 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -387,17 +363,12 @@ const fyStartISO = () => { const t = new Date(); const y = t.getMonth() >= 3 ? t
 const yesterdayISO = () => { const t = new Date(); t.setDate(t.getDate() - 1); return isoDate(t); };
 const weekStartISO = () => { const t = new Date(); const back = (t.getDay() + 6) % 7; t.setDate(t.getDate() - back); return isoDate(t); };
 
-// From/To range with quick presets. Defaults are seeded by each report (today),
-// but the presets make it one tap to widen to month / financial year / all.
-// Pass `full` for the complete accounting-book preset row (Today · Yesterday ·
-// This Week · This Month · This Quarter · YTD · Current FY · All) — used by the
-// Cash Book and other primary Finance books.
+
 function RangeBar({ from, to, setFrom, setTo, onChange, full, branch }) {
   return <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r) => { setFrom(r.from); setTo(r.to); onChange && onChange(); }} />;
 }
 
-// Search box — filters the current report by any free text (narration, ledger,
-// voucher no, party). Controlled; clears the page back to 1 via onChange.
+
 function SearchInput({ value, onChange, placeholder = 'Search…' }) {
   return (
     <span className="max-tablet:w-full" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
@@ -410,8 +381,7 @@ function SearchInput({ value, onChange, placeholder = 'Search…' }) {
 }
 
 const PAGE_SIZES = [50, 100, 250, 1000];
-// Client-side pager. `total` is the full filtered count; the table renders only
-// the current page's slice while the sticky footer keeps the full-set totals.
+
 function Pagination({ total, page, setPage, pageSize, setPageSize, unit = 'rows' }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
   if (total <= PAGE_SIZES[0]) return null;
@@ -492,9 +462,7 @@ function PrintBtn({ onClick, disabled }) {
   );
 }
 
-/* ════════════════════ LEDGER DRILL (TB → ledger statement → voucher) ═══ */
-// Opened from the Trial Balance: shows the selected ledger's statement for the
-// SAME date range, every line tappable down to the editable voucher.
+
 function LedgerDrill({ branch, ledger, from, to, onClose }) {
   const cur = curOf(branch);
   const [voucher, setVoucher] = useState(null);
@@ -694,10 +662,7 @@ export function DayBookLive({ branch }) {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(1000); // show the whole ledger by default; pager still kicks in past 1000
   const [voucher, setVoucher] = useState(null); // clicked Day Book line → voucher modal
-  // Fetch only the selected window server-side (journal dates are all ISO, so the
-  // {date:$gte..$lte} range is exact) — defaults to today, so the Day Book opens fast
-  // instead of pulling the whole journal. The client-side dateInRange below still
-  // refines/handles any odd date string within the window.
+ 
   const q = useDayBook(branch, { from, to });
   const allJournals = q.data || [];
 
@@ -811,18 +776,11 @@ export function DayBookLive({ branch }) {
   );
 }
 
-/* ════════════════════ LEDGER ACCOUNT ═══════════════════════════════
-   Full-page host for the UNIFIED ledger UI (src/core/ledgerUI). The SAME
-   <LedgerAccountView/> renders here, in the Ctrl+L full-screen modal, and in
-   every drill — one design, live data, identical print. */
+
 export function LedgerAcLive({ branch }) {
   const cur = curOf(branch);
   const { setPref } = usePrefs();
-  // The ledger is chosen via a searchable combobox (type to filter, scroll the
-  // matches) and the statement renders ONLY after "View" is pressed — nothing is
-  // shown on open. Selection (`pick`) is decoupled from what's displayed (`shown`),
-  // so the picker can never desync from the panel below (the old ICICI Bank vs
-  // Credit-Card bug).
+ 
   const [pick, setPick] = useState('');     // combobox choice (not yet viewed)
   const [shown, setShown] = useState('');   // ledger actually fetched + rendered below
   const { selected, display, dirty } = resolveLedgerSelection({ pick, shown });
@@ -916,17 +874,9 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
       setMsg('');
     }
   }, [v]);
-  // computed with optional chaining so the JV-preview hook runs before the early return (rules of hooks)
-  // Credit lines (e.g. Discount Received) subtract from the payable; debit lines add.
+ 
   const subtotal = r2((form?.lines || []).reduce((s, l) => s + (l.drCr === 'Cr' ? -1 : 1) * (Number(l.amt) || 0), 0));
-  // TCS is collected from the customer on a sale (raises the receivable) and paid to
-  // the supplier on a purchase (raises the recoverable asset) — either way it RIDES
-  // INSIDE total. The posting builder credits TCS Payable / debits TCS Receivable and
-  // balances it against this total, so the figure must carry it or the journal is out
-  // by exactly the TCS amount. TDS is NOT added: on a sale it posts only when the
-  // customer withholds at receipt time, so it never affects the bill total here.
-  // otherTaxesGst (the SVC2 margin GST) ALSO posts to its own Output head, so it must
-  // ride inside total too — see editorVoucherTotal — else SVC2 sales read "out by" it.
+ 
   const total = editorVoucherTotal({ subtotal, taxAmt: form?.taxAmt, otherTaxesGst: v?.otherTaxesGst, tcsAmt: form?.tcsAmt });
   const previewBody = (v && form) ? {
     ...v, branch: form.branch, party: form.party, taxAmt: Number(form.taxAmt) || 0,
@@ -1018,13 +968,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
       </div>
     );
   }
-  // Posted vouchers are READ-ONLY from every drill-down (Day Book, ledgers, Cash Book,
-  // P&L / Balance Sheet, registers, GP analytics…). "Posted" = a real journal exists in
-  // the General Ledger, which the backend writes for BOTH `approved` AND `saved` (an
-  // approved-booking leg or a seeded/migrated entry posts immediately as `saved`).
-  // Editing one would silently re-post outside the approval workflow, so show it for
-  // viewing only — to change it, Revoke it back to Pending (the number is kept; a
-  // booking-driven Sales/Purchase leg is edited on its SO / PO / GP booking).
+ 
   if (v.status === 'approved' || v.status === 'saved' || v.status === 'posted') {
     const parent = voucherParent(v);
     return (
@@ -1059,10 +1003,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
       </div>
     );
   }
-  // Passenger / traveller detail rides on each saved line (passenger, ticket, sector,
-  // pnr, travelDate…) — shown read-only here so the edit screen isn't "passenger
-  // details not available". Editing those fields stays in the booking/CRM source; the
-  // spread on save preserves them, this panel just surfaces what was recorded.
+
   const paxRows = (v.lines || [])
     .map((l) => ({
       passenger: l.passenger || l.meta?.guest || '',
@@ -1130,10 +1071,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
           <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Lines — pick ledger from Books (Dr / Cr)</div>
           <button onClick={addLine} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 28, fontSize: 11, cursor: 'pointer' }}>+ Add line</button>
         </div>
-        {/* Line row: ledger | Dr/Cr | amount | delete.
-            Desktop keeps the compact 4-col layout; on ≤tablet the ledger takes a
-            full row and Dr/Cr · amount · delete wrap onto a second row so nothing
-            overflows at 375px. */}
+      
         {form.lines.map((ln, i) => (
           <div key={i} className="mb-1.5 grid items-center gap-2 max-tablet:grid-cols-[80px_1fr_44px] tablet:grid-cols-[1fr_80px_120px_28px]">
             <input list={dlId} value={ln.ledger} placeholder="Ledger (from Books)" onChange={(e) => setLine(i, 'ledger', e.target.value)} className="max-tablet:col-span-3 max-tablet:min-h-[44px]" style={{ ...inp, fontSize: 12 }} />
@@ -1402,23 +1340,9 @@ function VoucherDetail({ voucher, cur, onClose }) {
   );
 }
 
-/* ════════════════════ SALES / PURCHASE REGISTER ════════════════════ */
-// "SO/PO/GP Capture" view — a wide, horizontal register that lays out every figure
-// captured on the booking at SO/PO/GP time, ONE LINE PER INVOICE:
-//   SPG/Link No · Sales Inv · Purchase Inv · Client Type · Client Ledger · Pax ·
-//   PNR · Ticket No · Final Invoice Value · each component head (IT-Base Fare /
-//   IT-K3-Taxes / IT-Taxes / IT-SVC2 / IT-SVF …) · CGST/SGST/IGST
-//   Output · SVC2 CGST/SGST Output · TCS.
-// The component-head columns are derived dynamically from the posted voucher lines —
-// their ledger names ARE "IT-Base Fare" etc. — so the SAME layout auto-adapts to
-// every module (Flight/Hotel/Visa/…), Domestic (DT-) or International (IT-), and the
-// Purchase Register mirrors it (heads carry the [Pur] suffix; GST shows as Input).
-// (`r2` — round to 2dp — is defined once above and reused here.)
+
 const numOf = (n) => { const v = Number(n); return Number.isFinite(v) ? v : 0; };
 
-// Split a GST amount into the heads that actually post: VAT branches → one VAT leg;
-// inter-state → IGST; otherwise CGST + SGST halves (paise kept balanced — mirrors the
-// backend posting builder's gstPostings()).
 function splitGst(amt, gstMode, brCode) {
   const a = r2(amt);
   if (!a) return { cgst: 0, sgst: 0, igst: 0, vat: 0 };
@@ -1428,10 +1352,6 @@ function splitGst(amt, gstMode, brCode) {
   return { cgst: half, sgst: r2(a - half), igst: 0, vat: 0 };
 }
 
-// Rank a component-head ledger so the head columns sit in a natural reading order
-// (fares → K3 → taxes → SVC2 → service fee → supplier service), regardless
-// of the DT-/IT- prefix or the [Pur] suffix. Tested in order so "SVC2"/"SVF" (and the
-// legacy "Other Taxes"/"Service Charge") and "K3-Taxes" don't collide with the generic "Taxes" match.
 const HEAD_RANK = [
   [/base\s*fare/i, 0], [/land/i, 1], [/room|basic|visa\s*fee|premium|fare/i, 2],
   [/k3/i, 3], [/svc2|other\s*tax/i, 5], [/\bsvf\b|service\s*charge/i, 6], [/supp\s*svchg|supplier\s*service/i, 7],
@@ -1439,9 +1359,7 @@ const HEAD_RANK = [
 ];
 const headRank = (ledger) => { for (const [re, rk] of HEAD_RANK) if (re.test(ledger)) return rk; return 50; };
 
-// Flatten one voucher's passenger / ticket / PNR detail. Prefer the joined booking
-// (booking-spawned voucher lines are aggregate heads with NO pax); else fall back to
-// the voucher's own per-line pax (CRM / imported invoices carry it on the lines).
+
 function captureTravel(v, booking) {
   if (booking) return bookingTravelDetail(booking);
   const names = [], tkts = [], pnrs = [];
@@ -1451,11 +1369,7 @@ function captureTravel(v, booking) {
   return { passengers: names.join(', '), tickets: tkts.join(', '), pnrs: pnrs.join(', ') };
 }
 
-// Build the wide "capture" sheet ({columns, rows, totals}) for the Sales/Purchase
-// Register. `tab` = 'sales' | 'purchase'. `tag` (branch code, or '' for All-Branch)
-// suffixes the tax-head labels to match the posted ledger names (e.g. "CGST Output
-// [BOM]"). `linkIndex` cross-references the sale ↔ purchase invoice numbers, and
-// `bookingByLink` joins each invoice to its booking for the travel detail.
+
 export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink, showType }) {
   const isSale = tab !== 'purchase';
   const taxWord = isSale ? 'Output' : 'Input';
@@ -1553,10 +1467,7 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
   return { columns, rows, totals };
 }
 
-// Wide, horizontally-scrollable register table — sticky header AND sticky totals
-// footer. Numeric columns (flagged `num`) right-align, Indian-group, and sum in the
-// footer; text columns (Link No, Pax, PNR …) stay left-aligned. A mirrored top
-// scrollbar keeps sideways scrolling reachable on long lists.
+
 function CaptureTable({ columns, rows, totals, onOpenJV, onPrintInvoice, cur = '₹' }) {
   const topRef = React.useRef(null);
   const bodyRef = React.useRef(null);
@@ -1651,24 +1562,15 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
   const [from, setFrom] = useState(monthStartISO);
   const [to, setTo] = useState(todayISO);
   const [detail, setDetail] = useState(null);
-  // Fetch all (date filtering is done client-side because Tally dates are mixed-format strings).
-  // The PRIMARY side (this register's own category) is fetched in full — its lines drive the
-  // SO/PO/GP capture pivot. The OTHER side is only cross-referenced (linkNo → vno/sourceRef for
-  // the counterpart Invoice No / Tally Ref columns), so fetch it SLIM (no heavy lines/meta) —
-  // e.g. the Sales Register no longer pulls every full purchase doc just to show its invoice no.
+ 
   const XREF_FIELDS = 'vno,linkNo,sourceRef';
   const sales = useSalesRegister(branch, tab === 'sales' ? undefined : { fields: XREF_FIELDS });
   const purch = usePurchaseRegister(branch, tab === 'purchase' ? undefined : { fields: XREF_FIELDS });
   const refReissue = useRefundReissue(branch); // RF/RI folded into BOTH registers' All-modules view
-  // Join each invoice → its booking, but ONLY for the travel detail (Pax/PNR/Ticket via
-  // booking.rows) + bookingNo/packageType — so fetch a SLIM projection and skip every
-  // booking's heavy so/po/gp grid. The full booking is lazily fetched only when a row's
-  // "print invoice" is clicked (printInvoice below).
+ 
   const bookingsQ = useBookingOrders(branch, { fields: 'linkNo,status,bookingNo,packageType,rows' });
   const q = tab === 'sales' ? sales : purch;
-  // Sales register = sale + reissue + refund; Purchase register = purchase + the same
-  // RF/RI vouchers (their cost reversal lives in the one combined voucher). They show
-  // labelled 'Refund'/'Reissue' in the Sales/Purchase Type column — never as a sale.
+  
   const allRows = useMemo(() => [...(q.data || []), ...(refReissue.data || [])], [q.data, refReissue.data]);
   const products = useMemo(() => {
     const present = new Set(allRows.map(productOf).filter(Boolean));
@@ -1679,13 +1581,10 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
   const rows = useMemo(() => allRows
     .filter((v) => !inbOnly || isInbRow(v, tab)) // INB register → inter-branch rows only
     .filter((v) => product === 'all' || productOf(v) === product)
-    // While a search term is active, ignore the date window so a match is found
-    // regardless of period (otherwise the default month silently hides older vouchers).
+   
     .filter((v) => !!needle || dateInRange(v.date, from, to))
     .filter((v) => !needle || voucherHaystack(v).includes(needle))
-    // Default ordering = Date ascending (chronological, like a Tally register). Tally
-    // dates are mixed-format strings, so normalise via parseAnyDate; rows whose date
-    // can't be parsed sink to the bottom rather than being dropped.
+   
     .sort((a, b) => {
       const da = parseAnyDate(a.date), db = parseAnyDate(b.date);
       if (!da && !db) return 0;
@@ -1697,9 +1596,7 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
   const summaryPager = usePager(rows); // Summary view paging — sum() above still totals the full set
   const sheet = useMemo(() => vouchersToSheet(rows), [rows]);
 
-  // Sale ↔ purchase invoice numbers share a booking's Link No — index both sides so
-  // the capture row can show its counterpart invoice. Booking index (by Link No,
-  // approved/posted preferred) supplies the per-passenger travel detail.
+ 
   const linkIndex = useMemo(() => {
     const saleByLink = {}, purByLink = {}, saleRefByLink = {}, purRefByLink = {};
     for (const v of (sales.data || [])) if (v.linkNo) { saleByLink[v.linkNo] = v.vno; saleRefByLink[v.linkNo] = v.sourceRef || ''; }
@@ -1749,9 +1646,7 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
       exportToExcel(name, sheet.columns, sheet.rows);
     }
   };
-  // Feed the global Tally Export bar balanced Sales/Purchase vouchers. Only true
-  // sale/purchase rows go to Tally — refund/reissue are shown in the register view
-  // but excluded here so they can't export as a mis-typed Sales/Purchase voucher.
+
   const tallyVouchers = useMemo(() => rows.filter((v) => v.category === (tab === 'sales' ? 'sale' : 'purchase')).map((v) => {
     const total = Math.round(v.total || 0), gst = Math.round(v.taxAmt || 0), net = Math.round(v.subtotal || (total - gst));
     const party = v.party || (tab === 'sales' ? 'Sundry Debtors' : 'Sundry Creditors');
@@ -1781,10 +1676,22 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
       right={<>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Search passenger / party / ticket / link no / voucher…"
           className="max-tablet:w-full max-tablet:min-h-[44px]" style={{ ...inp, width: 280, minHeight: 32, fontSize: 11 }} />
-        <select value={product} onChange={(e) => setProduct(e.target.value)} title="Filter the register by module" className="max-tablet:min-h-[44px] max-tablet:flex-1" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer' }}>
-          <option value="all">All modules</option>
-          {products.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
+        <DropdownMenu
+          ariaLabel="Filter the register by module"
+          menuRole="listbox"
+          items={[
+            { key: 'all', label: 'All modules', selected: product === 'all', onSelect: () => setProduct('all') },
+            ...products.map((p) => ({ key: p, label: p, selected: product === p, onSelect: () => setProduct(p) })),
+          ]}
+          renderTrigger={({ ref, toggle, triggerProps }) => (
+            <button ref={ref} {...triggerProps} onClick={toggle} type="button" title="Filter the register by module"
+              className="max-tablet:min-h-[44px] max-tablet:flex-1"
+              style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {product === 'all' ? 'All modules' : product}
+              <ChevronDown size={13} style={{ color: '#5b616e', flexShrink: 0 }} />
+            </button>
+          )}
+        />
         <ModeToggle view={view} setView={setView} modes={[{ id: 'capture', label: 'SO/PO/GP Capture' }, { id: 'summary', label: 'Summary' }, { id: 'detailed', label: 'All Columns' }]} />
         <DateRange from={from} to={to} setFrom={setFrom} setTo={setTo} branch={branch} />
         <ExportBtn onClick={exportNow} disabled={!rows.length} />

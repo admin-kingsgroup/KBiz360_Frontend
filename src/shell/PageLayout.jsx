@@ -77,7 +77,7 @@ export function PageFilters({ className = '', scroll = false, children }) {
 /* Standard premium page header: breadcrumb · title/subtitle · actions. */
 export function PageHeader({ title, subtitle, breadcrumbs, actions, className = '' }) {
   return (
-    <header className={cn('mb-4', className)}>
+    <header className={cn('mb-4 border-b border-surface-border pb-3', className)}>
       <Breadcrumb items={breadcrumbs} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
