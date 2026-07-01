@@ -27,7 +27,7 @@ import { buildPageCatalog, isPageAccessAdmin, roleVisibleKeys } from '../core/pa
 import { hasFullMenu } from '../core/menus';
 import { BRANCHES } from '../core/referenceCache';
 import { PageLayout } from '../shell/PageLayout';
-import { PageSection, Button, StatusPill, Input, EmptyState } from '../shell/primitives';
+import { PageSection, Button, StatusPill, Input, ResponsiveGrid, EmptyState } from '../shell/primitives';
 
 // Roles that resolve to ALL branches at login (mirrors auth.service resolveBranches
 // ALL_SCOPE_ROLES on the backend). For these, a per-branch selection is ignored, so
