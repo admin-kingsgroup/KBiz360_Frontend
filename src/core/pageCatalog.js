@@ -146,7 +146,12 @@ function build() {
     for (const lf of leaves) {
       if (skip(lf.key) || seen.has(lf.key)) continue;
       seen.add(lf.key);
-      items.push({ key: lf.key, label: lf.label });
+      // `trail` is [pillLabel, subGroupLabel, …]; expose the immediate sub-group
+      // under the pill so the Page-Visibility screen can render the same
+      // header → sub-header → pages hierarchy the nav uses ('' = directly under
+      // the pill, no sub-group).
+      const group = Array.isArray(lf.trail) && lf.trail.length > 1 ? lf.trail[1] : '';
+      items.push({ key: lf.key, label: lf.label, group });
     }
     if (items.length) sections.push({ section: root.label, icon: root.icon || null, items });
   }
@@ -157,7 +162,7 @@ function build() {
     seen.add(route);
     const sec = routeSection(route);
     if (!extra.has(sec)) extra.set(sec, []);
-    extra.get(sec).push({ key: route, label: routeLabel(route) });
+    extra.get(sec).push({ key: route, label: routeLabel(route), group: '' });
   }
   for (const sec of [...extra.keys()].sort()) {
     sections.push({ section: sec, icon: null, items: extra.get(sec).sort((a, b) => a.label.localeCompare(b.label)) });

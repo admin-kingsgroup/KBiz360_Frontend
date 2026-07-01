@@ -27,7 +27,7 @@ import { buildPageCatalog, isPageAccessAdmin, roleVisibleKeys } from '../core/pa
 import { hasFullMenu } from '../core/menus';
 import { BRANCHES } from '../core/referenceCache';
 import { PageLayout } from '../shell/PageLayout';
-import { PageSection, Button, StatusPill, Input, ResponsiveGrid, EmptyState } from '../shell/primitives';
+import { PageSection, Button, StatusPill, Input, EmptyState } from '../shell/primitives';
 
 // Roles that resolve to ALL branches at login (mirrors auth.service resolveBranches
 // ALL_SCOPE_ROLES on the backend). For these, a per-branch selection is ignored, so
@@ -46,6 +46,20 @@ function Switch({ on, onChange, disabled }) {
       <span className={`absolute top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow transition-[left] ${on ? 'left-5' : 'left-0.5'}`} />
     </button>
   );
+}
+
+/* Group a section's pages by their sub-group (the nav sub-header, e.g. Dashboards ▸
+   "Overview"), preserving menu order. Pages with no sub-group ('') collect under a
+   single leading unnamed bucket so they render directly beneath the section header. */
+function groupItems(items) {
+  const order = [];
+  const map = new Map();
+  for (const it of items) {
+    const name = it.group || '';
+    if (!map.has(name)) { map.set(name, []); order.push(name); }
+    map.get(name).push(it);
+  }
+  return order.map((name) => ({ name, items: map.get(name) }));
 }
 
 export function PageAccessControl({ currentUser, setRoute }) {
@@ -396,25 +410,43 @@ export function PageAccessControl({ currentUser, setRoute }) {
                       <Button size="xs" variant="secondary" onClick={() => setSection(s, false)} className="text-maroon">Hide all</Button>
                     </div>
                     {!isCollapsed && (
-                      <ResponsiveGrid min="300px" gap="none">
-                        {s.items.map((it) => {
-                          const on = isVisible(it.key);
-                          const extra = !inRole(it.key); // out-of-role → turning ON grants it
-                          return (
-                            <label key={it.key} className="flex cursor-pointer items-center gap-2.5 border-b border-surface-alt px-3.5 py-2">
-                              <Switch on={on} onChange={() => toggleOne(it.key)} />
-                              <div className="min-w-0 flex-1">
-                                <div className={`flex items-center gap-1.5 text-[12.5px] font-semibold ${on ? 'text-navy' : 'text-ink-subtle line-through'}`}>
-                                  <span className="truncate">{it.label}</span>
-                                  {extra && on && <StatusPill tone="info" size="sm">granted</StatusPill>}
-                                  {extra && !on && <span className="text-[9px] font-bold uppercase tracking-wide text-ink-subtle">not in role</span>}
-                                </div>
-                                <div className="truncate font-mono text-[10px] text-ink-subtle">{it.key}</div>
+                      <div>
+                        {groupItems(s.items).map((grp) => (
+                          <div key={grp.name || '__nogroup'}>
+                            {/* Sub-header (nav sub-group) with its own All / None shortcut. */}
+                            {grp.name && (
+                              <div className="flex items-center justify-between gap-2 border-b border-surface-alt bg-surface-alt/50 px-3.5 py-1.5">
+                                <span className="text-[10.5px] font-bold uppercase tracking-wide text-ink-muted">{grp.name}</span>
+                                <span className="flex items-center gap-1.5">
+                                  <button onClick={() => setKeys(grp.items.map((i) => i.key), true)}
+                                    className="text-[10px] font-semibold text-ink-subtle hover:text-[#27963c]">All</button>
+                                  <span className="text-ink-subtle/40">·</span>
+                                  <button onClick={() => setKeys(grp.items.map((i) => i.key), false)}
+                                    className="text-[10px] font-semibold text-ink-subtle hover:text-maroon">None</button>
+                                </span>
                               </div>
-                            </label>
-                          );
-                        })}
-                      </ResponsiveGrid>
+                            )}
+                            {grp.items.map((it) => {
+                              const on = isVisible(it.key);
+                              const extra = !inRole(it.key); // out-of-role → turning ON grants it
+                              return (
+                                <label key={it.key}
+                                  className={`flex cursor-pointer items-center gap-2.5 border-b border-surface-alt py-2 ${grp.name ? 'pl-6 pr-3.5' : 'px-3.5'}`}>
+                                  <Switch on={on} onChange={() => toggleOne(it.key)} />
+                                  <div className="min-w-0 flex-1">
+                                    <div className={`flex items-center gap-1.5 text-[12.5px] font-semibold ${on ? 'text-navy' : 'text-ink-subtle line-through'}`}>
+                                      <span className="truncate">{it.label}</span>
+                                      {extra && on && <StatusPill tone="info" size="sm">granted</StatusPill>}
+                                      {extra && !on && <span className="text-[9px] font-bold uppercase tracking-wide text-ink-subtle">not in role</span>}
+                                    </div>
+                                    <div className="truncate font-mono text-[10px] text-ink-subtle">{it.key}</div>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 );
