@@ -7,7 +7,7 @@ import { VSPECS, lineCalc, isVatBranch } from './voucherSpecs';
 
 // Booking module code → HSN/SAC master module name (the master is keyed by name).
 const MODULE_NAME = {
-  SF: 'Flight', RF: 'Flight', RI: 'Flight', SH: 'Hotel', SHT: 'Holiday', HP: 'Holiday',
+  SF: 'Flight', RF: 'Flight', RI: 'Flight', SH: 'Holiday', HP: 'Holiday', SHT: 'Hotel',
   SC: 'Car', SV: 'Visa', SI: 'Insurance', SM: 'Misc', MS: 'Misc',
 };
 
@@ -21,12 +21,14 @@ const GST_STATES = {
 };
 // SAC (Service Accounting Code) per booking module — used ONLY as a fallback when the
 // live HSN/SAC master (Masters › Tax & Currency › Tax / HSN-SAC Codes) hasn't loaded.
+// Fallback SAC per booking module — MUST mirror the accountant's live Tax · HSN-SAC
+// master (Masters › Tax & Currency). Used only until that master hydrates the cache.
 const SAC_BY_MODULE = {
-  SF: '996421', RF: '996421', RI: '996421',       // air ticketing / refund / reissue
-  SH: '996311',                                    // hotel accommodation
-  SHT: '998555', HP: '998555',                     // holiday / tour package
-  SC: '996601', SV: '998212', SI: '997131',        // car rental / visa / travel insurance
-  SM: '998599', MS: '998599',                      // misc travel arrangement
+  SF: '998551', RF: '998551', RI: '998551',       // flight tickets
+  SH: '998555', HP: '998555',                      // holiday / tour package
+  SHT: '998552',                                   // hotel
+  SC: '998552', SV: '998559', SI: '997131',        // car rental / visa / travel insurance
+  SM: '998559', MS: '998559',                      // misc services
 };
 
 // Seeded issuer (Issued By) + bank fallback for the India GST branches. The invoice's
@@ -36,7 +38,7 @@ const SAC_BY_MODULE = {
 // win field-by-field (see the merge in buildBookingInvoice).
 const ISSUER_FALLBACK = {
   BOM: {
-    entity: 'Travkings Tours & Travels', gstin: '27AAMCT1096J1ZU', state: 'Maharashtra', stateCode: '27',
+    entity: 'Travkings Tours & Travels Pvt. Ltd.', gstin: '27AAMCT1096J1ZU', state: 'Maharashtra', stateCode: '27',
     operAddr: 'Venus Tower, B 603, Veera Desai Rd, Azad Nagar 2, Mhada Colony, Jeevan Nagar, Andheri West, Mumbai, Maharashtra 400053',
     phone: '+91 88280 06599', email: 'accounts.bom@travkings.com', cur_sym: '₹',
     authSignatory: 'Afshin Dhanani', authDesignation: 'Founder & Director',
@@ -45,7 +47,7 @@ const ISSUER_FALLBACK = {
     ],
   },
   AMD: {
-    entity: 'Travkings Tours & Travels', gstin: '24AABCT1234H1Z2', state: 'Gujarat', stateCode: '24',
+    entity: 'Travkings Tours & Travels Pvt. Ltd.', gstin: '24AABCT1234H1Z2', state: 'Gujarat', stateCode: '24',
     operAddr: '202, Shapath IV, SG Highway, Ahmedabad 380 054',
     phone: '+91 79 4000 5678', email: 'ahmedabad@travkings.com', cur_sym: '₹',
     authSignatory: 'Afshin Dhanani', authDesignation: 'Founder & Director',
@@ -56,6 +58,9 @@ const ISSUER_FALLBACK = {
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const n2 = (n) => (Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+// India PAN = characters 3–12 of a 15-char GSTIN. Derive it for the invoice when a
+// party has a GSTIN but no separately-captured PAN (not applicable to VAT/Africa nos.).
+const panFromGstin = (g) => { const s = String(g || '').trim(); return /^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z]/.test(s) ? s.slice(2, 12).toUpperCase() : ''; };
 
 function inWords(num) {
   num = Math.round(num); if (num === 0) return 'Zero';
@@ -143,7 +148,7 @@ const CSS = `
   .iv .terms{margin-top:10px;font-size:8.5px;color:var(--ink4);line-height:1.5}
   @media print{.iv .sheet{padding:0;max-width:100%} .iv tr,.iv .parties,.iv .summary,.iv .botgrid{page-break-inside:avoid} .iv *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
 
-const partyBlock = (lab, p, cur, idLabel = 'GSTIN') => `<div class="party"><div class="lab">${esc(lab)}</div><div class="nm">${esc(p.name || '—')}</div><div class="ln">${[p.address, p.gstin ? `${idLabel} : ${esc(p.gstin)}` : '', p.email ? `Email : ${esc(p.email)}` : '', p.contact ? `Contact : ${esc(p.contact)}` : ''].filter(Boolean).map(esc).join('<br>')}</div></div>`;
+const partyBlock = (lab, p, cur, idLabel = 'GSTIN') => `<div class="party"><div class="lab">${esc(lab)}</div><div class="nm">${esc(p.name || '—')}</div><div class="ln">${[p.address, p.gstin ? `${idLabel} : ${esc(p.gstin)}` : '', p.pan ? `PAN : ${esc(p.pan)}` : '', p.email ? `Email : ${esc(p.email)}` : '', p.contact ? `Contact : ${esc(p.contact)}` : ''].filter(Boolean).map(esc).join('<br>')}</div></div>`;
 
 // side: 'sale' | 'purchase'. `master` = the resolved customer/supplier master record
 // (optional) — used to back-fill blank party fields on older bookings.
@@ -188,7 +193,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   // fx-aware money formatter — shadows the module n2 so EVERY amount in this invoice
   // converts at the branch FX rate when printing in local currency (1× otherwise).
   const n2 = (n) => (Number(n || 0) * fx).toLocaleString(curCode === 'INR' ? 'en-IN' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const company = { name: prof.entity || 'Travkings Tours & Travels Pvt. Ltd.', address: prof.operAddr || '', gstin: prof.gstin || '', email: prof.email || '', contact: prof.phone || '' };
+  const company = { name: prof.entity || 'Travkings Tours & Travels Pvt. Ltd.', address: prof.operAddr || '', gstin: prof.gstin || '', pan: prof.pan || (isVat ? '' : panFromGstin(prof.gstin || '')), email: prof.email || '', contact: prof.phone || '' };
   // HSN/SAC for the booked travel service — fetched from the live HSN/SAC master by
   // module, falling back to the built-in map (then a generic SAC) if it hasn't loaded.
   const sac = hsnSacFor(MODULE_NAME[booking.module] || '') || SAC_BY_MODULE[booking.module] || '998599';
@@ -224,6 +229,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const party = {
     name: billToName || '',
     gstin: raw.gstin || m.gstin || '',
+    pan: raw.pan || m.pan || (isVat ? '' : panFromGstin(raw.gstin || m.gstin || '')),
     address: raw.address || mAddr || '',
     email: raw.email || m.email || '',
     contact: raw.contact || m.contact || m.phone || '',
@@ -261,47 +267,59 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     return `<tr class="secrow"><td class="l" colspan="${cols}"><span class="seclab">Sectors</span><div class="secs">${items}</div></td></tr>`;
   };
   const idCell = (l, col) => `<td class="l${col.kind === 'pnr' ? ' gold' : ''}">${esc(l[col.key] || '—')}</td>`;
+  // Breakdown caption: flights show the ticket type (International / Domestic per the
+  // booking's package type); every other module shows a fixed service label.
+  const isFlight = spec.sectors || ['SF', 'RF', 'RI'].includes(moduleCode);
+  const CAPTION = {
+    SH: 'Holiday Package', HP: 'Holiday Package', SHT: 'Hotel Services',
+    SV: 'Visa', SC: 'Car Rental', SI: 'Travel Insurance', SM: 'Misc Services', MS: 'Misc Services',
+  };
+  const fbCaption = isFlight ? `Ticket - ${booking.packageType || 'Domestic'}` : (CAPTION[moduleCode] || headerRef);
 
-  const saleCols = spec.idCols.length + spec.fareCols.length + 1 + (pkg ? 0 : 2) + 1 + 1; // ids + fares + OtherTax + (Svc+GST/Svc) + GST/OthTax + Total
-  const purCols = 2 + refKeys.length + spec.fareCols.length + 5;                          // fn+sn + refs + fares + (SupSvc,GST,Incentive,TDS,Total)
-  const cols = isSale ? saleCols : purCols;
-
-  let bkHead, bkBody;
+  let bkHead, bkBody, cols;
   if (isSale) {
-    bkHead = [
+    // Sale mirrors the SO grid, but the agency margin is not shown as its own line:
+    // the "Other Taxes" (markup) amount is FOLDED into a single "Taxes" column
+    // (Taxes = fare tax + markup) and the per-line markup-GST column is dropped.
+    // The Total is unchanged (markup is already inside finalSales).
+    const fareNoTax = spec.fareCols.filter((c) => c.key !== 'tax');
+    const head = [
       ...spec.idCols.map((c) => `<th class="l">${esc(c.label)}</th>`),
-      ...spec.fareCols.map((c) => `<th>${esc(c.label)}</th>`),
-      '<th>Other Taxes</th>',
+      ...fareNoTax.map((c) => `<th>${esc(c.label)}</th>`),
+      '<th>Taxes</th>',
       pkg ? '' : '<th>Service Chg</th>',
       pkg ? '' : `<th>GST/Service (${activeRate}%)</th>`,
-      `<th>GST/Other Taxes (${pkg ? 5 : activeRate}%)</th>`,
       '<th>Total</th>',
-    ].join('');
+    ];
+    cols = head.filter(Boolean).length;
+    bkHead = head.join('');
     bkBody = rows.map((l) => {
       const c = lineCalc(spec, l, ctx);
+      const taxes = (Number(l.tax) || 0) + (Number(l.markup) || 0); // fare tax + hidden margin, combined
       const cells = [
         ...spec.idCols.map((col) => idCell(l, col)),
-        ...spec.fareCols.map((col) => `<td>${n2(l[col.key])}</td>`),
-        `<td>${n2(l.markup)}</td>`,
+        ...fareNoTax.map((col) => `<td>${n2(l[col.key])}</td>`),
+        `<td>${n2(taxes)}</td>`,
         pkg ? '' : `<td>${n2(l.ssvc)}</td>`,
         pkg ? '' : `<td>${n2(c.gstSvc)}</td>`,
-        `<td>${n2(c.gstMk)}</td>`,
         `<td class="tf">${cur}${n2(c.finalSales)}</td>`,
       ].join('');
       return `<tr>${cells}</tr>${sectorRow(l, cols)}`;
     }).join('');
   } else {
-    bkHead = [
+    const head = [
       `<th class="l">${esc(spec.idCols[0].label)}</th>`,
       `<th class="l">${esc(spec.idCols[1].label)}</th>`,
       ...refKeys.map((c) => `<th class="l">${esc(c.label)}</th>`),
       ...spec.fareCols.map((c) => `<th>${esc(c.label)}</th>`),
       '<th>Supplier Service</th>',
-      pkg ? '<th>Supplier Service GST (18%)</th>' : `<th>GST (${activeRate}%)</th>`,
+      pkg ? '' : `<th>GST (${activeRate}%)</th>`, // package: supplier-service GST shows only in the Net Cost summary
       '<th>Supplier Incentive</th>',
       '<th>TDS (2%)</th>',
       '<th>Total</th>',
-    ].join('');
+    ];
+    cols = head.filter(Boolean).length;
+    bkHead = head.join('');
     bkBody = rows.map((l) => {
       const c = lineCalc(spec, l, ctx);
       const cells = [
@@ -310,7 +328,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
         ...refKeys.map((col) => idCell(l, col)),
         ...spec.fareCols.map((col) => `<td>${n2(l[col.key])}</td>`),
         `<td>${n2(l.psvc)}</td>`,
-        `<td>${n2(pkg ? l.psvcGst : c.gstPur)}</td>`,
+        pkg ? '' : `<td>${n2(c.gstPur)}</td>`,
         `<td>${n2(l.incentive)}</td>`,
         `<td>${n2(c.tds)}</td>`,
         `<td class="tf">${cur}${n2(c.finalPurchase)}</td>`,
@@ -384,7 +402,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     <div class="parties">${isSale
       ? partyBlock('Billed To', party, cur, idLabel) + partyBlock('Issued By', company, cur, idLabel)
       : partyBlock('Supplier', party, cur, idLabel) + partyBlock('Billed To (Buyer)', company, cur, idLabel)}</div>
-    <div class="fb-label">${isSale ? 'Fare Breakdown' : 'Cost Breakdown'}${headerRef ? ` <span class="fb-ref">· ${esc(headerRef)}</span>` : ''}</div>
+    <div class="fb-label">${isSale ? 'Fare Breakdown' : 'Cost Breakdown'}${fbCaption ? ` <span class="fb-ref">· ${esc(fbCaption)}</span>` : ''}</div>
     <table class="bk"><thead><tr>${bkHead}</tr></thead><tbody>${bkBody || emptyRow}</tbody></table>
     <div class="summary">
       <div class="sumleft"><div class="lab2">HSN / SAC</div><div class="hsnval">${esc(sac)}</div></div>

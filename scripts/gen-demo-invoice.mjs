@@ -4,13 +4,25 @@
 // Node. Output: public/invoice-demo.html → open http://localhost:5173/invoice-demo.html
 import fs from 'node:fs';
 import { buildBookingInvoice } from '../src/core/invoiceHtml.js';
-import { setBranchCfg } from '../src/core/referenceCache.js';
+import { setBranchCfg, setHsnCodes } from '../src/core/referenceCache.js';
 import { VSPECS, bookingTotals } from '../src/core/voucherSpecs.js';
+
+// Seed the live Tax · HSN-SAC master codes (as set by the accountant) so the demo's
+// HSN/SAC reads exactly what the app would show.
+setHsnCodes([
+  { module: 'Flight', code: '998551', active: true },
+  { module: 'Holiday', code: '998555', active: true },
+  { module: 'Hotel', code: '998552', active: true },
+  { module: 'Visa', code: '998559', active: true },
+  { module: 'Car', code: '998552', active: true },
+  { module: 'Insurance', code: '997131', active: true },
+  { module: 'Misc', code: '998559', active: true },
+]);
 
 // Seed the BOM company profile so the demo header matches the live app.
 setBranchCfg([{
   code: 'BOM',
-  entity: 'Travkings Tours & Travels',
+  entity: 'Travkings Tours & Travels Pvt. Ltd.',
   pan: 'AAMCT1096J', gstin: '27AAMCT1096J1ZU', tan: 'MUMT12345A',
   operAddr: 'Venus Tower, B 603, Veera Desai Rd, Azad Nagar 2, Mhada Colony, Jeevan Nagar, Andheri West, Mumbai, Maharashtra 400053',
   regAddr: 'Venus Tower, B 603, Veera Desai Rd, Azad Nagar 2, Mhada Colony, Jeevan Nagar, Andheri West, Mumbai, Maharashtra 400053', pin: '400053',
@@ -36,7 +48,7 @@ const secs = (tkt) => ([
 // summary + the breakdown TOTAL row tie exactly to the per-line math.
 const MODULES = [
   {
-    module: 'SF', packageType: '', headerRef: 'Dubai Corporate Travel — 2 Pax',
+    module: 'SF', packageType: 'International', headerRef: 'Dubai Corporate Travel — 2 Pax',
     rows: [
       { fn: 'Farhan', sn: 'Shaikh', base: 18000, k3: 1200, tax: 3500, psvc: 0, markup: 1500, ssvc: 200, incentive: 800, sectors: secs(['176-1234567890', '176-1234567891']) },
       { fn: 'Sara', sn: 'Khan', base: 18000, k3: 1200, tax: 3500, psvc: 0, markup: 1500, ssvc: 200, incentive: 800, sectors: secs(['176-1234567892', '176-1234567893']) },

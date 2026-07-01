@@ -25,17 +25,18 @@ describe('buildBookingInvoice — sales invoice', () => {
   test('HSN / SAC code (air-ticketing SAC) shown beside the summary for a Flight (SF) booking (fallback)', () => {
     const html = buildBookingInvoice(booking, 'sale', { code: 'BOM' }, {});
     expect(html).toContain('HSN / SAC');
-    expect(html).toContain('996421'); // SF → air ticketing SAC (built-in fallback)
+    expect(html).toContain('998551'); // SF → flight SAC from the Tax master (built-in fallback)
   });
 
   test('Flight (SF) sale breakdown uses the SO voucher columns/labels', () => {
     const html = buildBookingInvoice(booking, 'sale', { code: 'BOM' }, {});
     expect(html).toContain('Base Fare');            // spec.fareCols[0].label
     expect(html).toContain('K3');                   // spec.fareCols[1].label
-    expect(html).toContain('Other Taxes');          // markup column
+    expect(html).toContain('Taxes');                // merged fare-tax + margin column
     expect(html).toContain('Service Chg');          // ssvc column (non-package)
     expect(html).toContain('GST/Service (18%)');    // gstSvc column at the module rate
-    expect(html).toContain('GST/Other Taxes (18%)');
+    expect(html).not.toContain('Other Taxes');      // margin folded into Taxes — no separate column
+    expect(html).not.toContain('GST/Other Taxes');  // per-line markup-GST column dropped
   });
 
   test('Hotel (SHT) sale breakdown renders its own fareCols + reference columns', () => {
@@ -50,14 +51,15 @@ describe('buildBookingInvoice — sales invoice', () => {
     const hol = { ...booking, module: 'SH', rows: [{ fn: 'Rahul', sn: 'Mehta', pkg: 'Bali 5N', ref: 'HL22', base: 85000, psvc: 1000, psvcGst: 180, markup: 12000 }] };
     const html = buildBookingInvoice(hol, 'sale', { code: 'BOM' }, {});
     expect(html).toContain('Package');                  // SH idCols ref label (module-specific)
-    expect(html).toContain('GST/Other Taxes (5%)');     // package rate
+    expect(html).toContain('Taxes');                    // merged column present
     expect(html).not.toContain('Service Chg');          // no service charge on the package model
+    expect(html).not.toContain('GST/Other Taxes');      // per-line markup-GST column dropped
   });
 
   test('the live HSN/SAC master wins when loaded', () => {
     hsnSacFor.mockImplementation((mod) => (String(mod).toLowerCase() === 'flight' ? '996422' : ''));
     const html = buildBookingInvoice(booking, 'sale', { code: 'BOM' }, {});
-    expect(html).toContain('996422'); // from the live master, not the 996421 fallback
+    expect(html).toContain('996422'); // from the live master, not the 998551 fallback
   });
 
   test('Issued By renders BOM issuer details from the seeded fallback when the profile cache is empty', () => {
@@ -73,6 +75,12 @@ describe('buildBookingInvoice — sales invoice', () => {
     const html = buildBookingInvoice(booking, 'sale', { code: 'BOM' }, {});
     expect(html).toContain('Place of Supply');
     expect(html).toContain('Maharashtra — 27');
+  });
+
+  test('Billed To shows the customer PAN (derived from the GSTIN) on an India invoice', () => {
+    const b = { ...booking, customer: { name: 'NeuIQ Technologies Pvt Ltd', gstin: '27AABCN1234Q1Z5', ledgerGroup: 'B2B' } };
+    const html = buildBookingInvoice(b, 'sale', { code: 'BOM' }, {});
+    expect(html).toContain('PAN : AABCN1234Q'); // characters 3–12 of the 15-char GSTIN
   });
 
   test('ICICI bank details (with account name) render at the bottom', () => {
@@ -107,7 +115,7 @@ describe('buildBookingInvoice — purchase invoice', () => {
   test('purchase invoice shows the HSN / SAC code and the PO voucher columns', () => {
     const html = buildBookingInvoice({ ...booking, purchaseVno: 'BOM/0626/PF00920', po: booking.so }, 'purchase', { code: 'BOM' }, {});
     expect(html).toContain('HSN / SAC');
-    expect(html).toContain('996421');
+    expect(html).toContain('998551');
     expect(html).toContain('Supplier Service');
     expect(html).toContain('Supplier Incentive');
     expect(html).toContain('TDS (2%)');
