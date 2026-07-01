@@ -28,20 +28,23 @@ const round2 = (n) => Math.round((n || 0) * 100) / 100;
 const curOf = (br) => bc({ code: br }).cur;
 const branchLabel = (br) => (!br || br === 'ALL' ? CONSOLIDATED_LABEL : br);
 
-const Row = ({ head, value, total, bold, cur }) => (
-  <tr className={`border-b border-surface-border ${bold ? 'bg-[#fbeedb]' : ''}`}>
+// A Schedule III line is a REGROUPING of Balance-Sheet groups → clicking it opens the
+// detailed Balance Sheet (which drills group → ledger → voucher). `onDrill` inert if absent.
+const nav = (onDrill) => (onDrill ? { onClick: onDrill, role: 'button', tabIndex: 0, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDrill(); } }, style: { cursor: 'pointer' }, title: 'Open detailed Balance Sheet →' } : {});
+const Row = ({ head, value, total, bold, cur, onDrill }) => (
+  <tr {...nav(onDrill)} className={`border-b border-surface-border ${bold ? 'bg-[#fbeedb]' : ''}`}>
     <td className={`whitespace-pre px-2.5 py-1.5 text-navy ${bold ? 'text-[11.5px] font-bold' : 'text-[11px]'}`}>{head}</td>
     <td className="px-2.5 py-1.5 text-right tabular-nums" style={{ fontWeight: bold ? 700 : 400, color: bold ? '#1a1c22' : '#5b616e' }}>{value !== undefined ? (value ? cur + fmt(value) : '—') : ''}</td>
     <td className="px-2.5 py-1.5 text-right font-bold tabular-nums text-[#2563eb]">{total !== undefined ? cur + fmt(total) : ''}</td>
   </tr>
 );
 
-const Panel = ({ title, rows, total, cur }) => (
+const Panel = ({ title, rows, total, cur, onDrill }) => (
   <div className="overflow-hidden rounded-brand border border-surface-border bg-surface shadow-sm">
     <h3 className="bg-navy px-3 py-2.5 text-[13px] font-bold text-gold">{title}</h3>
     <table className="w-full border-collapse text-[11px]">
       <tbody>
-        {rows.map((r, i) => <Row key={i} {...r} cur={cur} />)}
+        {rows.map((r, i) => <Row key={i} {...r} cur={cur} onDrill={onDrill} />)}
         <tr className="bg-navy text-gold">
           <td className="px-2.5 py-2.5 text-xs font-bold">TOTAL</td>
           <td />
@@ -55,7 +58,7 @@ const Panel = ({ title, rows, total, cur }) => (
 // One scope's full Schedule III statement (the two prescribed panels), in `cur`,
 // computed from ONLY that scope's Balance-Sheet payload `d` — never merged across
 // branches / currencies.
-function renderBody(d, cur) {
+function renderBody(d, cur, onDrill) {
   const sideMap = (rows) => { const m = {}; (rows || []).forEach((g) => { m[g.group] = (m[g.group] || 0) + (g.amount || 0); }); return m; };
   const liab = sideMap(d && d.liabilities);
   const asset = sideMap(d && d.assets);
@@ -118,8 +121,8 @@ function renderBody(d, cur) {
 
   return (
     <ResponsiveGrid cols={2} gap="md">
-      <Panel title="I. EQUITY AND LIABILITIES" rows={EQUITY_LIABILITIES} total={totLiab} cur={cur} />
-      <Panel title="II. ASSETS" rows={ASSETS} total={totAssets} cur={cur} />
+      <Panel title="I. EQUITY AND LIABILITIES" rows={EQUITY_LIABILITIES} total={totLiab} cur={cur} onDrill={onDrill} />
+      <Panel title="II. ASSETS" rows={ASSETS} total={totAssets} cur={cur} onDrill={onDrill} />
     </ResponsiveGrid>
   );
 }
@@ -127,10 +130,12 @@ function renderBody(d, cur) {
 // Whether a Balance-Sheet payload carries any balances worth showing.
 const scopeHasData = (d) => !!d && (Math.abs(round2(d?.totalLiabilities || 0)) > 0.01 || Math.abs(round2(d?.totalAssets || 0)) > 0.01);
 
-export function ScheduleIIIBS({ branch }) {
+export function ScheduleIIIBS({ branch, setRoute }) {
   const cur = bc(branch).cur;
   const q = useBalanceSheet(branch, { to: '' });
   const d = q.data;
+  // Schedule III lines are regrouped BS groups → drill to the detailed Balance Sheet.
+  const onDrill = setRoute ? () => setRoute('/reports/bs') : undefined;
   // Consolidated = all-branches scope: render each branch's Schedule III statement
   // in its OWN currency, never a merged cross-currency total.
   const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
@@ -173,7 +178,7 @@ export function ScheduleIIIBS({ branch }) {
                       : <StatusPill tone="danger" size="sm">⚠ Out by {bCur + fmt(Math.abs(bAssets - bLiab))}</StatusPill>}
                   </span>
                 </div>
-                {renderBody(b, bCur)}
+                {renderBody(b, bCur, onDrill)}
               </div>
             );
           })
@@ -183,7 +188,7 @@ export function ScheduleIIIBS({ branch }) {
         <PageSection><EmptyState title="No transactions found" hint="The Schedule III Balance Sheet is generated from posted vouchers and opening balances. Record transactions to populate this statement." /></PageSection>
       )}
 
-      {!q.isLoading && !q.isError && !byBranch && hasData && renderBody(d, cur)}
+      {!q.isLoading && !q.isError && !byBranch && hasData && renderBody(d, cur, onDrill)}
 
       <p className="mt-3.5 text-[10.5px] italic text-ink-muted">
         💡 As per Division I of Schedule III of Companies Act, 2013 · Figures derived live from the Tally 28-group double-entry books · Reproduce with Notes 1–30 for full statutory compliance

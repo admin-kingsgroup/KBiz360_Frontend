@@ -6,7 +6,7 @@
 
 import * as MENUS from '../menus';
 import { TAX_ALL, TAX_INDIA, TAX_AFRICA } from '../data';
-import { buildPageCatalog, allPageKeys, ALWAYS_VISIBLE } from '../pageCatalog';
+import { buildPageCatalog, allPageKeys, ALWAYS_VISIBLE, topLevelPillHrefs } from '../pageCatalog';
 import { APP_ROUTES } from '../routeManifest.generated';
 // CommonJS generator (reads App.jsx at test time) — used to guard the manifest.
 const { manifest } = require('../../../scripts/gen-route-manifest.cjs');
@@ -28,7 +28,8 @@ describe('pageCatalog — Page Visibility Control', () => {
       collectHrefs(tree, everyHref);
     }
     const controllable = new Set(allPageKeys());
-    const missing = [...everyHref].filter((h) => !ALWAYS_VISIBLE.has(h) && !controllable.has(h));
+    const pills = topLevelPillHrefs();
+    const missing = [...everyHref].filter((h) => !ALWAYS_VISIBLE.has(h) && !pills.has(h) && !controllable.has(h));
     expect(missing).toEqual([]); // nothing navigable is left out of the control
   });
 
@@ -47,8 +48,17 @@ describe('pageCatalog — Page Visibility Control', () => {
 
   test('every route App.jsx can render is controllable (standalone pages too)', () => {
     const controllable = new Set(allPageKeys());
-    const missing = APP_ROUTES.filter((r) => !ALWAYS_VISIBLE.has(r) && !controllable.has(r));
+    const pills = topLevelPillHrefs();
+    const missing = APP_ROUTES.filter((r) => !ALWAYS_VISIBLE.has(r) && !pills.has(r) && !controllable.has(r));
     expect(missing).toEqual([]);
+  });
+
+  test('top-level pills are structural — excluded from the togglable catalogue', () => {
+    const controllable = new Set(allPageKeys());
+    const pills = topLevelPillHrefs();
+    expect(pills.size).toBeGreaterThan(0);            // there is at least one (e.g. Approvals)
+    expect(pills.has('/transactions/approvals')).toBe(true);
+    for (const p of pills) expect(controllable.has(p)).toBe(false); // never togglable
   });
 
   test('the generated route manifest is in sync with App.jsx (run `npm run gen:routes`)', () => {

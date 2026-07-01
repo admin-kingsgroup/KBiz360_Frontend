@@ -357,7 +357,6 @@ export const ROUTE_TITLES={
   "/group-dashboard":       "Group Executive Dashboard — Travkings Group",
   "/tax/calendar":          "Tax Compliance Calendar",
   "/hr/leave":              "Leave Management",
-  "/hr/expenses":           "Employee Expense Claims",
   "/settings/preferences":  "Display Preferences",
   "/reports/mis":            "MIS Report — Management Information System",
   "/reports/concentration":  "Client Concentration Risk",

@@ -111,7 +111,7 @@ describe('splitRefundJv — sale-side / purchase-side T-blocks', () => {
   test('commission reversal legs land on the purchase side', () => {
     const withCommission = [
       ...LEGS,
-      { ledger: 'Commission/Incentive Received', group: 'Indirect Income', debit: 1275, credit: 0 },
+      { ledger: 'Commission / Incentive A/c.', group: 'Direct Income', debit: 1275, credit: 0 },
       { ledger: 'TDS Receivable [BOM]', group: 'Current Assets', debit: 0, credit: 25.5 },
     ];
     const { sale, purchase } = splitRefundJv(withCommission, { party: P, counterParty: S });
@@ -235,5 +235,33 @@ describe('refundPrefillFromLeg (Phase 4)', () => {
     const p = refundPrefillFromLeg(leg, FOLDER, { counterParty: 'X', gstMode: 'inter' });
     expect(p.counterParty).toBeUndefined();
     expect(p.gstMode).toBeUndefined();
+  });
+});
+
+// The "Refund payable to customer" caption must equal what actually posts to the client
+// (customer leg of the full-reversal JV, net of the cancellation recovered) — not the old
+// net-settlement formula. Regression guard for the RF00063 "client amount differs" report.
+describe('clientNetFromJv — displayed client figure matches the posted JV', () => {
+  const { clientNetFromJv } = require('../fields/refundPrefill');
+  // RF00063 shape: client credited the gross reversal, debited the handling charge (59)
+  // and the airline cancellation recovered (36135) → net payable 139714 (NOT 168140).
+  const postings = [
+    { ledger: 'NeuIQ', credit: 175908, debit: 0 },
+    { ledger: 'NeuIQ', credit: 0, debit: 59 },
+    { ledger: 'NeuIQ', credit: 0, debit: 36135 },
+    { ledger: 'Cancellation Charge Income', credit: 36135, debit: 0 },
+  ];
+  test('refund → client net credit (payable), cancellation deducted', () => {
+    expect(clientNetFromJv(postings, 'NeuIQ', true, 168140)).toBe(139714);
+  });
+  test('reissue → client net debit (billed) returns the positive billed amount', () => {
+    const ri = [{ ledger: 'NeuIQ', debit: 5000, credit: 0 }, { ledger: 'NeuIQ', credit: 900, debit: 0 }];
+    expect(clientNetFromJv(ri, 'NeuIQ', false, 0)).toBe(4100);
+  });
+  test('falls back to the formula total until the preview resolves', () => {
+    expect(clientNetFromJv([], 'NeuIQ', true, 168140)).toBe(168140);
+  });
+  test('falls back when no party is picked yet', () => {
+    expect(clientNetFromJv(postings, '', true, 168140)).toBe(168140);
   });
 });

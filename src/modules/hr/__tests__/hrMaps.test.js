@@ -1,4 +1,4 @@
-import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, leaveBucketOf, takenFor, fromShiftDTO, toShiftPayload, weeklyOffForShift, fromJobDTO, toJobPayload, JOB_NEXT_STATUS, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from '../hrMaps';
+import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, leaveBucketOf, takenFor, fromShiftDTO, toShiftPayload, weeklyOffForShift, isLate, punctualityPct, fromJobDTO, toJobPayload, JOB_NEXT_STATUS, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from '../hrMaps';
 
 describe('Employee loan ↔ /api/employee-loans wiring', () => {
   const DTO = { id: 'L1', name: 'Aa', empCode: 'E1', designation: 'Ops', branch: 'BOM',
@@ -120,6 +120,24 @@ describe('Shift ↔ /api/shifts wiring', () => {
     expect(weeklyOffForShift('s1', byId)).toEqual([5]);
     expect(weeklyOffForShift('', byId)).toEqual([0]);               // unassigned → Sunday
     expect(weeklyOffForShift('nope', byId)).toEqual([0]);           // unknown id → Sunday
+  });
+
+  test('isLate: after start+grace is late; on the edge / missing data is not (mirrors BE)', () => {
+    expect(isLate('09:41', '09:30', 10)).toBe(true);
+    expect(isLate('09:40', '09:30', 10)).toBe(false);   // grace edge
+    expect(isLate('09:00', '09:30', 10)).toBe(false);
+    expect(isLate('', '09:30', 10)).toBe(false);        // no punch
+    expect(isLate('09:41', '', 10)).toBe(false);        // no shift start
+  });
+
+  // Must match the backend punctualityPctOf exactly (same fixture as employeesHrStats.test.js).
+  test('punctualityPct: on-time ÷ present-with-punch, mirrors the backend KPI', () => {
+    const S = { startTime: '09:30', graceMins: 10 }; // on-time cutoff 09:40
+    const days = { 1: 'P', 2: 'P', 3: 'P', 4: 'A', 5: 'P' };
+    const times = { 1: { in: '09:32' }, 2: { in: '10:05' }, 3: { in: '09:40' } }; // 1&3 on-time, 2 late; 5 unpunched
+    expect(punctualityPct(days, times, S)).toBe(66.7);           // 2 on-time ÷ 3 punched-present
+    expect(punctualityPct({ 1: 'P' }, {}, S)).toBeNull();         // no punches → null
+    expect(punctualityPct({ 1: 'P' }, { 1: { in: '11:00' } }, undefined)).toBe(100); // no shift → can't prove late
   });
 });
 

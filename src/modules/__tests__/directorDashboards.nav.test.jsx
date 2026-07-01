@@ -29,7 +29,7 @@ jest.mock('../../core/api', () => ({ apiGet: jest.fn(() => Promise.resolve({})),
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ExecutiveOverview, TaxComplianceDash, CashForecastDash, YoYGrowthDash, CustomerValueDash,
-  CashLiquidityDash, ModuleGpDash, SalesBookingsDash, SupplierPurchaseDash, ExpensesDash, BalanceSheetDash, VsTargetDash } from '../directorDashboards';
+  CashLiquidityDash, ModuleGpDash, SalesBookingsDash, SupplierPurchaseDash, ExpensesDash, BalanceSheetDash, VsTargetDash, PerformanceDash } from '../directorDashboards';
 
 afterEach(() => jest.clearAllMocks());
 
@@ -117,6 +117,43 @@ describe('Previously drill-dead dashboards now navigate', () => {
     render(<VsTargetDash branch={'BOM'} metric="gp" go={go} />);
     fireEvent.click(screen.getAllByRole('button', { name: /Actual/i })[0]);
     expect(go).toHaveBeenCalledWith('/reports/gp');
+  });
+});
+
+// Consolidated "Performance vs Target" — Sales/GP/Budget/Nett Profit on ONE page.
+describe('Performance vs Target — consolidated dashboard', () => {
+  test('renders all four target tiles under one header', () => {
+    render(<PerformanceDash branch={'BOM'} go={jest.fn()} />);
+    expect(screen.getByText('TGT VS Sales/GP/EX/NP')).toBeInTheDocument();
+    expect(screen.getByText('Sales vs Target')).toBeInTheDocument();
+    expect(screen.getByText('GP vs Target')).toBeInTheDocument();
+    expect(screen.getByText('Budget vs Expense')).toBeInTheDocument();
+    expect(screen.getByText('Nett Profit vs Target')).toBeInTheDocument();
+  });
+
+  test('each tile drills into its standalone dashboard', () => {
+    const go = jest.fn();
+    render(<PerformanceDash branch={'BOM'} go={go} />);
+    fireEvent.click(screen.getByRole('button', { name: /Sales vs Target/i }));
+    expect(go).toHaveBeenCalledWith('/dashboards/sales-target');
+    fireEvent.click(screen.getByRole('button', { name: /GP vs Target/i }));
+    expect(go).toHaveBeenCalledWith('/dashboards/gp-target');
+    fireEvent.click(screen.getByRole('button', { name: /Budget vs Expense/i }));
+    expect(go).toHaveBeenCalledWith('/dashboards/budget-expense');
+    fireEvent.click(screen.getByRole('button', { name: /Nett Profit vs Target/i }));
+    expect(go).toHaveBeenCalledWith('/dashboards/profitability');
+  });
+
+  test('warns when no Nett Profit target is set (empty totals)', () => {
+    render(<PerformanceDash branch={'BOM'} go={jest.fn()} />);
+    expect(screen.getByText(/No Nett Profit target set/i)).toBeInTheDocument();
+  });
+
+  test('module table toggles Sales ⇄ GP', () => {
+    render(<PerformanceDash branch={'BOM'} go={jest.fn()} />);
+    expect(screen.getByText(/Sales vs Target — by Module/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^GP$/ }));
+    expect(screen.getByText(/GP vs Target — by Module/i)).toBeInTheDocument();
   });
 });
 

@@ -49,7 +49,7 @@ function makeRcptPmt(side) {
     icon: isReceipt ? '💰' : '💸',
     explain: isReceipt
       ? (<><b style={{ color: '#A07828' }}>Receipt:</b> money coming <b>in</b>. Cash/Bank is <b>Debited</b> and the chosen account <b>Credited</b> — a <b>customer</b> (with bill-wise allocation), or any other account (loan, interest, capital…) as a direct entry.</>)
-      : (<><b style={{ color: '#A07828' }}>Payment:</b> money going <b>out</b>. Cash/Bank is <b>Credited</b> and the chosen account <b>Debited</b> — a <b>supplier</b> (with bill-wise allocation), or any other account (rent, salary, loan, tax…) as a direct expense entry.</>),
+      : (<><b style={{ color: '#A07828' }}>Payment:</b> money going <b>out</b>. Cash/Bank is <b>Credited</b> and the chosen account <b>Debited</b> — a <b>supplier</b> (bill-wise), a <b>client refund</b> (settled against their open receipts), or any other account (rent, salary, loan, tax…) as a direct entry.</>),
 
     initial: () => ({
       date: todayISO(), party: '', otherType: '', bankRef: '', paymentMode: 'NEFT', utr: '',

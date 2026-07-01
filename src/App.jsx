@@ -15,7 +15,8 @@ import { useMobile } from './core/hooks';
 import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
 import { lazyModule } from './core/lazyModule';
-import { isOwnerDashboardUser } from './core/pageCatalog';
+import { isOwnerDashboardUser, topLevelPillHrefs } from './core/pageCatalog';
+import { canReachRoute } from './core/menus';
 
 /* ── Route-level code-splitting ───────────────────────────────────────────
    Every page component below is loaded via lazyModule() → one dynamic
@@ -25,7 +26,7 @@ import { isOwnerDashboardUser } from './core/pageCatalog';
    Infrastructure that renders on every screen (shell, providers, hosts) stays
    eagerly imported above/below. Components render inside <Suspense> (see render).
    ── */
-const { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, GratuityRegister, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, TdsCertRegister, TrainingRecords, UxPreferences } = lazyModule(() => import('./core/helpers'));
+const { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, GratuityRegister, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, TdsCertRegister, UxPreferences } = lazyModule(() => import('./core/helpers'));
 const { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RPT_CashPosition, RPT_CurrencyExposure, RPT_CustomerLTV, RPT_LeaveUtilization, RPT_StatutoryDues, RPT_TaxFilingBoard, RPT_YieldConsultant, RPT_YieldDestination, RPT_YieldSupplier, RPT_YoY } = lazyModule(() => import('./core/styles'));
 const { RPT_InterbranchElim } = lazyModule(() => import('./modules/interbranch'));
 const { SalesGpAnalytics } = lazyModule(() => import('./modules/salesGpAnalytics'));
@@ -39,13 +40,18 @@ const { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlow
    the finance barrel — to avoid dragging the whole finance feature (incl. the
    ~140 KB legacy.jsx) into the initial bundle. */
 import { financeRoutes } from './modules/finance/routes';
+/* Support (in-app issue tracker) route table — same plain-data shape as finance. */
+import { supportRoutes } from './modules/support/routes';
+/* Floating, app-wide "Report an issue" button (lazy so it never touches the
+   initial bundle) — mounted once as a global host below, like ToastHost. */
+const ReportIssueButton = React.lazy(() => import('./modules/support/components/ReportIssueButton'));
 
 /* Declarative route tables from migrated feature modules. The host renders
    these via react-router FIRST; any route not listed falls through to the
    legacy string-router in Page(). Append more tables here as modules migrate. */
-const MIGRATED_FEATURE_ROUTES = [...financeRoutes];
+const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes];
 const { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
-const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrExpenses, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
+const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
 const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
 const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/mastersParties'));
 const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } = lazyModule(() => import('./modules/reports'));
@@ -266,7 +272,9 @@ export default function KB360App(){
        and the visibility-control page itself are never blocked here (the latter
        gates non-admins inside its own component). ── */
     const hiddenPages = Array.isArray(currentUser?.hidden) ? currentUser.hidden : [];
-    if(route!=="/dashboard" && route!=="/settings/page-access" && hiddenPages.includes(route)){
+    // Top-level pills are structural — never blocked by the deny-list (they can't be
+    // hidden from the catalogue either), so a single-page pill like Approvals always works.
+    if(route!=="/dashboard" && route!=="/settings/page-access" && !topLevelPillHrefs().has(route) && hiddenPages.includes(route)){
       return (
         <div style={{padding:30,maxWidth:560,margin:"40px auto",
           background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
@@ -274,6 +282,31 @@ export default function KB360App(){
           <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Page not available</h2>
           <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>
             This page has been hidden for your account by the administrator.
+            Contact <b>afshin.dhanani@kingsgroupco.com</b> if you need access.
+          </p>
+          <button onClick={()=>navigate("/dashboard")}
+            style={{background:"#0d1326",color:"#fff",border:"none",
+              padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>
+            ← Back to Dashboard
+          </button>
+        </div>
+      );
+    }
+
+    /* ── Hard route-level lockout for restricted roles ───────────────────────
+       A Branch Accountant's nav is limited to their Accounts workspace, but the
+       nav filter alone doesn't stop a direct URL. canReachRoute() blocks the
+       out-of-scope admin areas (HR, Settings, HO Control, Group dashboard) by
+       direct link too. Full-menu roles (Super Admin/Director/…) reach everything;
+       finer per-page control stays with the `hidden` deny-list above. ── */
+    if(!canReachRoute(route, currentUser)){
+      return (
+        <div style={{padding:30,maxWidth:600,margin:"40px auto",
+          background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
+          <div style={{fontSize:42,marginBottom:14}}>🔒</div>
+          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Access restricted</h2>
+          <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>
+            Your role <b>{currentUser?.role}</b> doesn't have access to this section.
             Contact <b>afshin.dhanani@kingsgroupco.com</b> if you need access.
           </p>
           <button onClick={()=>navigate("/dashboard")}
@@ -443,7 +476,12 @@ export default function KB360App(){
     if(route==="/accounts/payment-run")   return <PaymentRun branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/suspense")      return <SuspenseClearing branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/month-end")     return <MonthEndChecklist branch={branch} setRoute={navigate}/>;
-    if(route==="/dashboard")          return <DashboardRouter branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>;
+    // The owner's home IS the Owner Dashboard — the role-scoped My Dashboard is retired for
+    // them (its widgets now live on the Owner Dashboard), so /dashboard renders the Owner
+    // Dashboard directly. Every other role keeps the role-routed DashboardRouter.
+    if(route==="/dashboard")          return isOwnerDashboardUser(currentUser)
+      ? <OwnerDashboard branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>
+      : <DashboardRouter branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>;
     // Owner Dashboard — consolidated whole-company view. Restricted to the group
     // owner: the Super Admin whose email is afshin.dhanani@kingsgroupco.com (BOTH
     // role + email required). Non-owners hitting the URL get a "not available" card.
@@ -451,14 +489,14 @@ export default function KB360App(){
       ? <OwnerDashboard branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>
       : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
           <div style={{fontSize:42,marginBottom:14}}>🔒</div>
-          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Owner Dashboard</h2>
+          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>AD Dashboard (All)</h2>
           <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>This consolidated all-branch dashboard is restricted to the group owner.</p>
           <button onClick={()=>navigate("/dashboard")} style={{background:"#0d1326",color:"#fff",border:"none",padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>← Back to Dashboard</button>
         </div>;
     if(route==="/dashboard/alerts")   return <AlertsDashboard branch={branch} setRoute={navigate}/>;
     if(route==="/dashboards/capital") return <CapitalVsInvestmentLive branch={branch}/>; // Capital vs Investment (live from BS + P&L)
     // Director/Super-Admin dashboard suite (menu is role-gated in getMenu).
-    if(/^\/dashboards\/(exec|profitability|cash|cash-forecast|arap|branch|balance-sheet|module-gp|sales|supplier|tax|expenses|audit|sales-target|gp-target|collections-target|budget-expense|yoy|customer-value)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch} setRoute={navigate}/>;
+    if(/^\/dashboards\/(exec|profitability|cash|cash-forecast|arap|branch|balance-sheet|module-gp|sales|supplier|tax|expenses|audit|performance|sales-target|gp-target|collections-target|budget-expense|yoy|customer-value)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch} setRoute={navigate}/>;
     if(route==="/finance/targets") return <TargetsMaster branch={branch}/>;
     if(route==="/bookings/new")       return <SoPoGpVoucherEntry branch={branch} setRoute={navigate}/>;
     if(route==="/bookings/inter-branch") return <SoPoGpVoucherEntry branch={branch} setRoute={navigate} interBranch/>;
@@ -513,7 +551,7 @@ export default function KB360App(){
     if(route==="/reports/bs-tally")   return <BalanceSheetTallyLive branch={branch}/>;     // purpose-built Tally-format BS (was aliased to Unified)
     if(route==="/reports/pnl" || route==="/reports/pnl-modulewise") return <ProfitAndLossUnified branch={branch}/>;
     if(route==="/reports/bs" || route==="/reports/bs-modulewise") return <BalanceSheetUnified branch={branch}/>;
-    if(route==="/reports/cf")         return <ReportCF branch={branch}/>;                  // was <ReportCF/> — no branch → always ₹/consolidated
+    if(route==="/reports/cf")         return <ReportCF branch={branch} setRoute={navigate}/>;   // was <ReportCF/> — no branch → always ₹/consolidated
     if(route==="/reports/rec")        return <ReceivablesLive branch={branch} setRoute={navigate}/>;
     if(route==="/reports/pay")        return <PayablesLive branch={branch} setRoute={navigate}/>;
     if(route==="/reports/sreg")       return <RegisterLive branch={branch} initial="sales"/>;
@@ -536,11 +574,10 @@ export default function KB360App(){
     if(route==="/group-dashboard")       return <GroupDashboard/>;
     if(route==="/tax/calendar")          return <TaxCalendar/>;
     if(route==="/hr/leave")              return <HrLeave branch={branch}/>;
-    if(route==="/hr/expenses")           return <HrExpenses branch={branch}/>;
     if(route==="/settings/preferences")  return <UxPreferences/>;
     if(route==="/reports/mis")            return <MisReport branch={branch}/>;
     if(route==="/reports/concentration")  return <ClientConcentration branch={branch}/>;
-    if(route==="/reports/consolidated-bs")return <ConsolidatedBS/>;
+    if(route==="/reports/consolidated-bs")return <ConsolidatedBS setRoute={navigate}/>;
     if(route==="/reports/cashflow-forecast")return <CashFlowForecast branch={branch}/>;
     if(route==="/reports/supplier-360")   return <Supplier360 branch={branch}/>;
     if(route==="/reports/customer-360")   return <Customer360 branch={branch}/>;
@@ -595,7 +632,6 @@ export default function KB360App(){
     if(route==="/reports/destination")      return <DestinationIntelligence branch={branch}/>;
     if(route==="/reports/package-pl")       return <PackagePnL branch={branch}/>;
     if(route==="/hr/recruitment")           return <Recruitment branch={branch}/>;
-    if(route==="/hr/training")              return <TrainingRecords branch={branch}/>;
     if(route==="/reports/budget")           return <BudgetPlanning branch={branch}/>;
     if(route==="/accounting/intercompany")  return <IntercompanyBilling branch={branch}/>;
     if(route==="/masters/seats")            return <SeatInventory branch={branch}/>;
@@ -675,6 +711,9 @@ export default function KB360App(){
       <GlobalFetchBar/>
       <PrintPreviewHost/>
       <ToastHost/>
+      {/* App-wide "Report an issue" button — raise a support ticket from any screen,
+          with the current route auto-captured. Lazy, so it's off the initial bundle. */}
+      <Suspense fallback={null}><ReportIssueButton route={route}/></Suspense>
       <ConfirmHost/>
       <LedgerSwitcher branch={branch}/>
       <LedgerModalHost branch={branch}/>

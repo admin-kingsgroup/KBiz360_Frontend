@@ -123,15 +123,28 @@ const routeLabel = (route) =>
 // by href). ALWAYS_VISIBLE keys are dropped. After the menu sections we fold in
 // EVERY remaining App route (from the generated manifest) under "Other · …"
 // groups, so the admin can hide ANY page — not just nav links.
+// Top-level PILL hrefs — the direct-link pills that sit at the very top of the nav
+// (e.g. Approvals → /transactions/approvals). These are structural: the visibility
+// deny-list may hide a pill's INNER sub-pages but never the pill itself, so they are
+// excluded from the togglable catalogue (treated like ALWAYS_VISIBLE) and never pruned
+// from the nav (see menus.js applyHidden). Resolved lazily (TDZ-safe) + memoised.
+let _pillCache = null;
+export function topLevelPillHrefs() {
+  if (!_pillCache) _pillCache = new Set(sectionRoots().map((r) => r && r.href).filter(Boolean));
+  return _pillCache;
+}
+
 function build() {
   const sections = [];
+  const pills = topLevelPillHrefs();
+  const skip = (k) => ALWAYS_VISIBLE.has(k) || pills.has(k);
   const seen = new Set();
   for (const root of sectionRoots()) {
     const leaves = [];
     collectLeaves(root, [], leaves);
     const items = [];
     for (const lf of leaves) {
-      if (ALWAYS_VISIBLE.has(lf.key) || seen.has(lf.key)) continue;
+      if (skip(lf.key) || seen.has(lf.key)) continue;
       seen.add(lf.key);
       items.push({ key: lf.key, label: lf.label });
     }
@@ -140,7 +153,7 @@ function build() {
   // Standalone routes not surfaced by any menu, grouped under "Other · …".
   const extra = new Map();
   for (const route of APP_ROUTES) {
-    if (ALWAYS_VISIBLE.has(route) || seen.has(route)) continue;
+    if (skip(route) || seen.has(route)) continue;
     seen.add(route);
     const sec = routeSection(route);
     if (!extra.has(sec)) extra.set(sec, []);
@@ -153,12 +166,31 @@ function build() {
 }
 
 let _cache = null;
-export function buildPageCatalog() {
+function fullCatalog() {
   if (!_cache) _cache = build();
   return _cache;
 }
 
-// Every togglable page key (handy for "hide all" / counts).
+// The set of page hrefs a user's ROLE exposes (before their personal hidden/granted
+// lists), by walking the same role menu roots getMenu() renders. Page Visibility
+// Control uses this to know which catalogue rows are IN-ROLE (default ON) vs
+// OUT-OF-ROLE (default OFF, and turning them ON writes to the `granted` allow-list).
+export function roleVisibleKeys(user) {
+  const out = [];
+  for (const root of MENUS.roleMenuRoots('ALL', user)) collectLeaves(root, [], out);
+  return new Set(out.map((l) => l.key));
+}
+
+// The full togglable catalogue — every controllable page in the app. Page Visibility
+// Control shows this same list for EVERY user; the per-row ON/OFF default comes from
+// whether the row is in that user's role (see roleVisibleKeys), so an admin can both
+// hide in-role pages and GRANT out-of-role pages from one list.
+export function buildPageCatalog() {
+  return fullCatalog();
+}
+
+// Every togglable page key (handy for "hide all" / counts). Always the full set —
+// role scoping is a per-user view concern, not a change to the master catalogue.
 export function allPageKeys() {
-  return buildPageCatalog().flatMap((s) => s.items.map((i) => i.key));
+  return fullCatalog().flatMap((s) => s.items.map((i) => i.key));
 }

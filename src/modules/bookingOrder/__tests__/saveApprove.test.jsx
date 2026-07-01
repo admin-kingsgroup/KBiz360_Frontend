@@ -55,4 +55,19 @@ describe('booking entry — no one-shot Save & Approve', () => {
     wrap(<SoPoGpVoucherEntry branch={{ code: 'BOM' }} setRoute={() => {}} initialModule="RF" />);
     expect(screen.queryByRole('button', { name: /Cancel/i })).toBeNull();
   });
+
+  // Regression: revoke re-opened the refund BLANK because the editor never hydrated the
+  // airline cancellation + commission clawback back from editBooking.reversal. On edit
+  // those values MUST re-show (else re-approving silently drops them → the client amount
+  // changes). Uses distinct values so getByDisplayValue is unambiguous.
+  test('RF reversal edit re-hydrates the cancellation + commission fields', () => {
+    wrap(<SoPoGpVoucherEntry branch={{ code: 'BOM' }} setRoute={() => {}} editBooking={{
+      ...baseBooking, bookingNo: 'RF/BOM/26/0874', module: 'RF', againstInvoice: 'SF/BOM/26/0001',
+      reversal: { supplierAmt: 12345, supplierCancel: 3610, incentiveAmt: 1760, incentiveTds: 35, cancelRecover: true },
+    }} />);
+    expect(screen.getByDisplayValue('12345')).toBeInTheDocument(); // supplier refund
+    expect(screen.getByDisplayValue('3610')).toBeInTheDocument();  // airline cancellation fee
+    expect(screen.getByDisplayValue('1760')).toBeInTheDocument();  // commission clawback
+    expect(screen.getByDisplayValue('35')).toBeInTheDocument();    // TDS reversed
+  });
 });

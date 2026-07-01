@@ -7,7 +7,7 @@ import { LedgerPicker } from '../LedgerPicker';
 import { apiGet } from '../../api';
 import { useVoucherPreview } from '../../useAccounting';
 import { money, money2, r2 } from '../ui';
-import { refundPrefillFromBooking, refundPrefillFromLeg, poSnapForView, splitRefundJv } from './refundPrefill';
+import { refundPrefillFromBooking, refundPrefillFromLeg, poSnapForView, splitRefundJv, clientNetFromJv } from './refundPrefill';
 import { buildRefundReissueBody } from './refundBody';
 import { JvBlock } from '../JvBlock';
 
@@ -169,6 +169,14 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   // branch prop's code → the raw branch string).
   const branchResolved = branchCode || (branch && (branch.code || branch)) || '';
   const refundPv = useVoucherPreview({ ...buildRefundReissueBody(state, ctx, kind), branch: branchResolved, sourceRef: state.sourceRef || '' }).data || {};
+
+  // The customer figure to SHOW must match what actually POSTS. The backend preview does
+  // a FULL reversal of the linked sale (via originalsFor) and nets the airline cancellation
+  // recovered from the client — so the true refund payable is the customer leg of the live
+  // JV, NOT the local `total` (a net-settlement formula that predates the full-reversal
+  // model and over-states the payable by the cancellation recovery). Fall back to `total`
+  // only until the preview resolves (no postings yet / no party picked).
+  const clientNet = clientNetFromJv(refundPv.postings, state.party, isRefund, total);
 
   // GST on the supplier's service fee + the airline cancellation fee auto-calculates
   // at the voucher's GST rate (the "GST on our charges" slab, 18% by default), so the
@@ -344,8 +352,8 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       <p style={{ margin: '2px 0 12px', fontSize: 10.5, color: '#5a6691' }}>
         Our income <b>{money2(cur, ourIncome)}</b> · GST <b>{money2(cur, r2(taxAmt + svc2Gst))}</b> <span style={{ color: '#9197a3' }}>(SVF GST {money2(cur, taxAmt)} + SVC2 GST {money2(cur, svc2Gst)})</span> ·
         {isRefund ? ' Refund payable to customer ' : ' Billed to customer '}
-        <b style={{ color: total < 0 ? '#A32D2D' : '#185FA5' }}>{money2(cur, total)}</b>
-        {total < 0 && ' — our charges exceed the supplier amount'}
+        <b style={{ color: clientNet < 0 ? '#A32D2D' : '#185FA5' }}>{money2(cur, clientNet)}</b>
+        {clientNet < 0 && ' — our charges exceed the supplier amount'}
       </p>
       {isRefund && (
         <p style={{ margin: '-6px 0 12px', fontSize: 10.5, color: '#A07828' }}>
