@@ -1,4 +1,4 @@
-import { fromLeaveDTO, toLeavePayload, leaveDays, fromJobDTO, toJobPayload, JOB_NEXT_STATUS, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from '../hrMaps';
+import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, leaveBucketOf, takenFor, fromJobDTO, toJobPayload, JOB_NEXT_STATUS, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from '../hrMaps';
 
 describe('Employee loan ↔ /api/employee-loans wiring', () => {
   const DTO = { id: 'L1', name: 'Aa', empCode: 'E1', designation: 'Ops', branch: 'BOM',
@@ -61,6 +61,40 @@ describe('Leave request ↔ /api/leave-requests wiring', () => {
     expect(leaveDays('2026-05-04', '2026-05-04')).toBe(1);
     expect(leaveDays('2026-05-06', '2026-05-04')).toBe(1); // reversed → still ≥1
     expect(leaveDays('', '')).toBe(1);
+  });
+});
+
+describe('Leave balance ↔ /api/leave-balances wiring + derived "taken"', () => {
+  test('fromLeaveBalanceDTO applies the 18/12/6 defaults only when a field is absent', () => {
+    expect(fromLeaveBalanceDTO({ id: 'b1', empId: 'e1', year: '2026' })).toMatchObject({ annual: 18, sick: 12, casual: 6 });
+    expect(fromLeaveBalanceDTO({ id: 'b1', empId: 'e1', year: '2026', annual: 0, sick: 5 })).toMatchObject({ annual: 0, sick: 5, casual: 6 });
+  });
+
+  test('toLeaveBalancePayload coerces to numbers + drops id', () => {
+    const p = toLeaveBalancePayload({ id: 'b1', empId: 'e1', empName: 'Asha', branch: 'BOM', year: 2026, annual: '20', sick: '10', casual: '8' });
+    expect(p).toMatchObject({ empId: 'e1', branch: 'BOM', year: '2026', annual: 20, sick: 10, casual: 8 });
+    expect(p).not.toHaveProperty('id');
+  });
+
+  test('leaveBucketOf maps enum + UI labels; unpaid/LWP → null', () => {
+    expect(leaveBucketOf('Casual')).toBe('casual');
+    expect(leaveBucketOf('Casual Leave')).toBe('casual');
+    expect(leaveBucketOf('Sick Leave')).toBe('sick');
+    expect(leaveBucketOf('Earned')).toBe('annual');
+    expect(leaveBucketOf('Annual Leave')).toBe('annual');
+    expect(leaveBucketOf('LWP')).toBeNull();
+    expect(leaveBucketOf('Unpaid')).toBeNull();
+  });
+
+  test('takenFor sums APPROVED days per bucket for the employee/year only', () => {
+    const reqs = [
+      { empId: 'e1', type: 'Casual Leave', from: '2026-05-04', days: 2, status: 'Approved' },
+      { empId: 'e1', type: 'Sick Leave', from: '2026-06-01', days: 3, status: 'Approved' },
+      { empId: 'e1', type: 'Casual Leave', from: '2026-07-01', days: 1, status: 'Pending' },   // pending → ignored
+      { empId: 'e1', type: 'Annual Leave', from: '2025-12-30', days: 4, status: 'Approved' },   // prior year → ignored
+      { empId: 'e2', type: 'Casual Leave', from: '2026-05-04', days: 5, status: 'Approved' },   // other emp → ignored
+    ];
+    expect(takenFor(reqs, 'e1', '2026')).toEqual({ annual: 0, sick: 3, casual: 2 });
   });
 });
 

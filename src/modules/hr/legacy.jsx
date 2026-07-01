@@ -9,13 +9,13 @@ import { openPrintPreview } from '../../core/PrintPreview';
 import { Legend, Line } from 'recharts';
 import { BRANCHES, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../../core/data';
 import { fmt, fmtINR, compactAmt, localeOf } from '../../core/format';
-import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, _LEAVE_BALANCES, cardStyle, tabPanel } from '../../core/helpers';
+import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, _EXPENSE_CLAIMS, cardStyle, tabPanel } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../../core/useReference';
 import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { fromEmpDTO, toEmpPayload, BLANK_EMP } from './employeeMap';
-import { fromLeaveDTO, toLeavePayload, leaveDays, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from './hrMaps';
+import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, takenFor, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from './hrMaps';
 import { buildRevisionDue } from './hrReports';
 import { todayISO } from '../../core/dates';
 import { toast } from '../../core/ux/toast';
@@ -458,11 +458,13 @@ export function HrEmployees({branch}){
 /* ── Attendance ───────────────────────────────────────────────── */
 
 export function HrAttendance({branch}){
-  const [month,setMonth]=useState("2026-05");
+  // Last 6 months through the current one, derived from the live clock (was hard-coded to
+  // Mar–May 2026, so the current month — where marks & the dashboard KPI live — couldn't
+  // even be selected). Default to the current month.
+  const MONTHS=(()=>{const out=[];const d=new Date();for(let i=0;i<6;i++){const dt=new Date(d.getFullYear(),d.getMonth()-i,1);out.push({v:`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`,l:dt.toLocaleString("en",{month:"short"})+" "+dt.getFullYear()});}return out;})();
+  const [month,setMonth]=useState(MONTHS[0].v);
   const [brFilter,setBrFilter]=useState(branch==="ALL"?"All":branch?.code||"All");
   const qc=useQueryClient();
-
-  const MONTHS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
   const STATUS_CLR={P:{bg:"#EAF3DE",c:"#27500A",l:"Present"},A:{bg:"#FCEBEB",c:"#A32D2D",l:"Absent"},
     L:{bg:"#FAEEDA",c:"#854F0B",l:"Leave"},H:{bg:"#E6F1FB",c:"#185FA5",l:"Holiday"},
     WO:{bg:"#f3f4f8",c:"#5a6691",l:"Week Off"}};
@@ -496,6 +498,28 @@ export function HrAttendance({branch}){
   });
 
   const days=getDaysInMonth(month);
+
+  /* Bulk "mark all present" — one round-trip for the whole visible roster. Needs a single
+     concrete branch (all-scope + no branch filter → disabled). Working days = Mon–Sat;
+     Sundays are left unmarked (excluded from the % either way). */
+  const bulkBranch=brScope||(brFilter!=="All"?brFilter:"");
+  const curMonth=MONTHS[0].v; const isCurMonth=month===curMonth;
+  const upTo=isCurMonth?new Date().getDate():days;
+  const bulkMut=useMutation({
+    mutationFn:(body)=>apiPut('/api/attendance/mark-days',body),
+    onSuccess:(d)=>{qc.invalidateQueries({queryKey:['attendance',brScope||'ALL',month]});toast(`Marked ${d?.employees||0} employee(s) present`);},
+    onError:(err)=>toast(err?.message||"Bulk mark failed","error"),
+  });
+  const empPayload=()=>emps.map(e=>({empId:e.id,empName:e.name}));
+  const canBulk=!!bulkBranch&&emps.length>0&&!bulkMut.isPending;
+  const markToday=()=>{ if(!canBulk||!isCurMonth)return; bulkMut.mutate({branch:bulkBranch,month,days:[new Date().getDate()],status:"P",employees:empPayload()}); };
+  const fillWorking=()=>{
+    if(!canBulk)return;
+    const list=[]; for(let d=1;d<=upTo;d++){ if(getDay(d)!==0) list.push(d); }
+    if(!list.length)return;
+    if(!window.confirm(`Mark ${list.length} working day(s) as Present for ${emps.length} employee(s) in ${bulkBranch}? (existing marks on those days are overwritten)`))return;
+    bulkMut.mutate({branch:bulkBranch,month,days:list,status:"P",employees:empPayload()});
+  };
 
   /* Live status for a cell: an explicit mark wins; otherwise weekends default to
      Week Off and weekdays show unmarked ("—") — we never invent Present. */
@@ -538,6 +562,10 @@ export function HrAttendance({branch}){
           <select value={brFilter} onChange={e=>setBrFilter(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
             {HR_BRANCHES_F.map(b=><option key={b}>{b}</option>)}
           </select>
+          {isCurMonth&&<button onClick={markToday} disabled={!canBulk} title={bulkBranch?"Mark every listed employee Present today":"Pick a single branch to bulk-mark"}
+            style={{...btnG,fontSize:11,minHeight:32,opacity:canBulk?1:0.5,cursor:canBulk?"pointer":"not-allowed"}}>✓ All present today</button>}
+          <button onClick={fillWorking} disabled={!canBulk} title={bulkBranch?"Mark all working days (Mon–Sat) up to date as Present":"Pick a single branch to bulk-mark"}
+            style={{...btnGh,fontSize:11,minHeight:32,opacity:canBulk?1:0.5,cursor:canBulk?"pointer":"not-allowed"}}>Fill working days →</button>
         </div>
       </div>
 
@@ -620,9 +648,11 @@ export function HrPayroll({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?"BOM":branch?.code||"BOM";
   const [tab,setTab]=useState("register"); // register | pf-esi | bankfile | form16 | journal
-  const [period,setPeriod]=useState("2026-05");
+  // Last 6 months through the current one (was hard-coded to Mar–May 2026, so the current
+  // month's payroll run — which drives the dashboard KPI — couldn't be opened).
+  const PERIODS=(()=>{const out=[];const d=new Date();for(let i=0;i<6;i++){const dt=new Date(d.getFullYear(),d.getMonth()-i,1);out.push({v:`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`,l:dt.toLocaleString("en",{month:"short"})+" "+dt.getFullYear()});}return out;})();
+  const [period,setPeriod]=useState(PERIODS[0].v);
   const [journalPosted,setJournalPosted]=useState(false);
-  const PERIODS=[{v:"2026-03",l:"Mar 2026"},{v:"2026-04",l:"Apr 2026"},{v:"2026-05",l:"May 2026"}];
 
   /* Live active employees for this branch (from the now-live Employee Master). */
   const empQ=useMasterList('employees', {branch:brCode});
@@ -1123,6 +1153,8 @@ export function HrLeave({branch}){
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [tab,setTab]=useState("requests"); // requests | balances
   const [form,setForm]=useState({empId:"",empName:"",type:"Casual Leave",from:"",to:"",reason:""});
+  const [balForm,setBalForm]=useState(null); // {empId,empName,branch,annual,sick,casual,id} when editing entitlement
+  useModalEsc(()=>setBalForm(null),!!balForm);
 
   /* Live, branch-scoped employees (for the apply dropdown + balances) and the
      live leave-request register. */
@@ -1130,6 +1162,19 @@ export function HrLeave({branch}){
   const leaveQ=useMasterList('leave-requests', brScope?{branch:brScope}:{});
   const filtered=((leaveQ.data)||[]).map(fromLeaveDTO);
   const {create,update}=useMasterMutations('leave-requests');
+
+  /* Live leave-balance ENTITLEMENT master for the current year; "taken" is derived from
+     the approved requests above so the two never drift. Editable per employee. */
+  const year=String(new Date().getFullYear());
+  const balQ=useMasterList('leave-balances', brScope?{branch:brScope,year}:{year});
+  const balByEmp=Object.fromEntries(((balQ.data)||[]).map(b=>{const x=fromLeaveBalanceDTO(b);return [x.empId,x];}));
+  const {create:createBal,update:updateBal}=useMasterMutations('leave-balances');
+  const saveBal=()=>{
+    if(!balForm)return;
+    const body=toLeaveBalancePayload({...balForm,year});
+    const onDone={onSuccess:()=>{toast("Entitlement saved");setBalForm(null);},onError:e=>toast(e?.message||"Save failed","error")};
+    if(balForm.id) updateBal.mutate({id:balForm.id,body},onDone); else createBal.mutate(body,onDone);
+  };
 
   const pending =filtered.filter(l=>l.status==="Pending");
   const approved=filtered.filter(l=>l.status==="Approved");
@@ -1210,24 +1255,60 @@ export function HrLeave({branch}){
         <div style={{...card,padding:0,overflow:"hidden"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#0d1326"}}>
-              {["Employee","Branch","Annual Leave","Sick Leave","Casual Leave","Total Available"].map((h,i)=>(
-                <th key={i} style={{padding:"9px 14px",textAlign:i>=2?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
+              {["Employee","Branch","Annual (rem/ent)","Sick (rem/ent)","Casual (rem/ent)","Total Remaining",""].map((h,i)=>(
+                <th key={i} style={{padding:"9px 14px",textAlign:i>=2&&i<6?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{emps.map((e,i)=>{
-              const bal=_LEAVE_BALANCES[e.id]||{AL:18,SL:12,CL:6};
+            <tbody>{emps.length===0&&(
+              <tr><td colSpan={7} style={{padding:"20px 12px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>
+                {balQ.isLoading?"Loading…":"No employees for this branch."}
+              </td></tr>
+            )}{emps.map((e,i)=>{
+              const ent=balByEmp[e.id]||{annual:18,sick:12,casual:6,id:null};
+              const taken=takenFor(filtered,e.id,year);
+              const rem={annual:ent.annual-taken.annual,sick:ent.sick-taken.sick,casual:ent.casual-taken.casual};
+              const cell=(val,ceil,warn,clr)=>(<td style={{padding:"9px 14px",textAlign:"right"}}>
+                <span style={{fontSize:13,fontWeight:800,color:val<=warn?"#A32D2D":clr}}>{val}</span>
+                <span style={{fontSize:10,color:"#5a6691"}}> / {ceil}</span></td>);
               return (
                 <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"9px 14px",fontWeight:600,color:"#0d1326"}}>{e.name}</td>
                   <td style={{padding:"9px 14px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{e.branch}</span></td>
-                  <td style={{padding:"9px 14px",textAlign:"right"}}><span style={{fontSize:13,fontWeight:800,color:bal.AL<5?"#A32D2D":"#27500A"}}>{bal.AL}</span><span style={{fontSize:10,color:"#5a6691"}}> / 18 days</span></td>
-                  <td style={{padding:"9px 14px",textAlign:"right"}}><span style={{fontSize:13,fontWeight:800,color:bal.SL<3?"#A32D2D":"#1D9E75"}}>{bal.SL}</span><span style={{fontSize:10,color:"#5a6691"}}> / 12 days</span></td>
-                  <td style={{padding:"9px 14px",textAlign:"right"}}><span style={{fontSize:13,fontWeight:800,color:"#185FA5"}}>{bal.CL}</span><span style={{fontSize:10,color:"#5a6691"}}> / 6 days</span></td>
-                  <td style={{padding:"9px 14px",textAlign:"right",fontWeight:800,fontSize:15,color:"#0d1326"}}>{bal.AL+bal.SL+bal.CL}</td>
+                  {cell(rem.annual,ent.annual,4,"#27500A")}
+                  {cell(rem.sick,ent.sick,2,"#1D9E75")}
+                  {cell(rem.casual,ent.casual,1,"#185FA5")}
+                  <td style={{padding:"9px 14px",textAlign:"right",fontWeight:800,fontSize:15,color:"#0d1326"}}>{rem.annual+rem.sick+rem.casual}</td>
+                  <td style={{padding:"9px 14px",textAlign:"right"}}>
+                    <button onClick={()=>setBalForm({empId:e.id,empName:e.name,branch:e.branch,annual:ent.annual,sick:ent.sick,casual:ent.casual,id:ent.id})}
+                      style={{...btnGh,padding:"3px 9px",fontSize:9.5}} title="Set entitlement">✎ Edit</button>
+                  </td>
                 </tr>
               );
             })}</tbody>
           </table>
+          <p style={{margin:0,padding:"8px 14px",fontSize:10,color:"#8b94b3",borderTop:"1px solid #dfe2e7"}}>
+            Entitlement = annual allotment ({year}); remaining = entitlement − approved leave taken this year. Edit sets the allotment.
+          </p>
+        </div>
+      )}
+
+      {balForm&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:400,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Leave entitlement · {balForm.empName} · {year}</p>
+              <button onClick={()=>setBalForm(null)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
+            </div>
+            <div style={{padding:"16px 18px",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+              <FL label="Annual"><input type="number" min={0} value={balForm.annual} onChange={e=>setBalForm(f=>({...f,annual:e.target.value}))} style={inp}/></FL>
+              <FL label="Sick"><input type="number" min={0} value={balForm.sick} onChange={e=>setBalForm(f=>({...f,sick:e.target.value}))} style={inp}/></FL>
+              <FL label="Casual"><input type="number" min={0} value={balForm.casual} onChange={e=>setBalForm(f=>({...f,casual:e.target.value}))} style={inp}/></FL>
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
+              <button onClick={()=>setBalForm(null)} style={btnGh}>Cancel</button>
+              <button onClick={saveBal} disabled={createBal.isPending||updateBal.isPending} style={btnG}>{createBal.isPending||updateBal.isPending?"Saving…":"Save"}</button>
+            </div>
+          </div>
         </div>
       )}
 
