@@ -354,6 +354,7 @@ export const CustomersMaster = () => (
       // an unscoped party. Default 'ALL' matches how auto-created party ledgers are scoped.
       { key: 'branch', label: 'Branch', type: 'select', options: ['ALL', ...BRANCH_CODES], default: 'ALL', required: true },
       { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
+      { key: 'pan', label: 'PAN', type: 'text', table: false },
       { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false },
       { key: 'tdsSection', label: 'TDS Section', type: 'select', options: TDS_SECTIONS, table: false },
       { key: 'msmeStatus', label: 'MSME Status', type: 'select', options: MSME_STATUS, table: false },
