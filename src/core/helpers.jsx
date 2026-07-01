@@ -168,9 +168,7 @@ export const _LEAVES=[];
 
 export const _LEAVE_BALANCES={};
 
-/* ── EXPENSE CLAIMS DATA ── */
 
-export const _EXPENSE_CLAIMS=[];
 
 export const _DM_LISTENERS=new Set();
 
@@ -941,68 +939,7 @@ export function Recruitment({branch}){
   );
 }
 
-/* ── TRAINING RECORDS ─────────────────────────────────────────── */
 
-export function TrainingRecords({branch}){
-  const mob=useMobile();
-  const emps=HR_EMPLOYEES_DATA.filter(e=>branch==="ALL"||e.branch===branch?.code||true).slice(0,8);
-  const TRAININGS=[
-    {title:"Amadeus GDS Certification",provider:"Amadeus",type:"Technical",validity:24,mandatory:true},
-    {title:"IATA Travel & Tourism",provider:"IATA",type:"Professional",validity:36,mandatory:true},
-    {title:"GST for Travel Agents",provider:"CA Firm",type:"Compliance",validity:12,mandatory:true},
-    {title:"Anti-Money Laundering",provider:"Internal",type:"Compliance",validity:12,mandatory:true},
-    {title:"Sales & Communication",provider:"Internal",type:"Soft Skills",validity:0,mandatory:false},
-  ];
-  const TYPE_CLR={Technical:"#185FA5",Professional:"#854F0B",Compliance:"#A32D2D","Soft Skills":"#1D9E75"};
-  const TYPE_BG ={Technical:"#E6F1FB",Professional:"#FAEEDA",Compliance:"#FCEBEB","Soft Skills":"#EAF3DE"};
-
-  return(
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-        <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🎓</div>
-        <div>
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Training Records</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{TRAININGS.filter(t=>t.mandatory).length} mandatory certifications · Track compliance for all staff</p>
-        </div>
-      </div>
-
-      {/* Training matrix */}
-      <div style={{...card,padding:0,overflow:"hidden"}}>
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:800}}>
-            <thead><tr style={{background:"#0d1326"}}>
-              <th style={{padding:"9px 12px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5,minWidth:160}}>Employee</th>
-              {TRAININGS.map((t,i)=>(
-                <th key={i} style={{padding:"8px 10px",textAlign:"center",color:"#d4a437",fontWeight:700,fontSize:9,minWidth:100}}>
-                  <div style={{marginBottom:2}}>{t.title.split(" ").slice(0,2).join(" ")}</div>
-                  {t.mandatory&&<span style={{fontSize:8,padding:"1px 5px",borderRadius:999,background:"#A32D2D33",color:"#d4a437"}}>Required</span>}
-                </th>
-              ))}
-            </tr>
-            </thead>
-            <tbody>{emps.map((e,i)=>{
-              const scores=[true,i<6,true,i<7,i<4]; // simulate completion
-              return(
-                <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
-                  <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{e.name}<br/><span style={{fontSize:9,color:"#5a6691"}}>{e.branch}</span></td>
-                  {TRAININGS.map((t,j)=>(
-                    <td key={j} style={{padding:"8px 10px",textAlign:"center"}}>
-                      <span style={{fontSize:14}}>{scores[j]?"✅":"❌"}</span>
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}</tbody>
-          </table>
-        </div>
-      </div>
-      <div style={{marginTop:10,display:"flex",gap:8,justifyContent:"flex-end"}}>
-        <button style={{...btnG,fontSize:11}}>📅 Schedule Training</button>
-        <button style={{...btnGh,fontSize:11}}><Download size={12}/> Compliance Report</button>
-      </div>
-    </div>
-  );
-}
 
 /* ── DOCUMENT MANAGER ─────────────────────────────────────────── */
 

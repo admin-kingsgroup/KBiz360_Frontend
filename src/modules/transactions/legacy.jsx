@@ -21,7 +21,7 @@ import { SampleBanner } from '../../core/ux/SampleBanner';
 import { useLivePurchaseRegistry, useLiveSalesTickets } from '../../core/useVouchers';
 import { fmt, fmtINR } from '../../core/format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS } from '../../core/dates';
-import { ACM_DATA, ACM_REASON_CODES, LedgerSelect, RECURRING_DATA, REFUNDS_DATA, Recruitment, STATUS_FLOW, TAB_Page, TRow, TrainingRecords, VTD, VTH, _ACM_LIST, _ADM_LIST, _TICKET_CTRL, cardStyle, tabPanel } from '../../core/helpers';
+import { ACM_DATA, ACM_REASON_CODES, LedgerSelect, RECURRING_DATA, REFUNDS_DATA, Recruitment, STATUS_FLOW, TAB_Page, TRow, VTD, VTH, _ACM_LIST, _ADM_LIST, _TICKET_CTRL, cardStyle, tabPanel } from '../../core/helpers';
 import { triggerSaveRefresh, useMobile } from '../../core/hooks';
 import { useVNo } from '../../core/useNextNo';
 import { ARow, B, DBtn, FL, RPT_tdStyle, RPT_thStyle, SalespersonField, VHead, VNarr, VParty, VTot, VWrap, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../../core/styles';
@@ -4238,7 +4238,7 @@ export function RefundTracker({branch,setRoute}){
 /* ══════════════════════════════════════════════════════════════════
    BATCH D — PRIORITY 4: SYSTEM + STRATEGIC (8 screens)
    QuickPOS · NotificationCentre · CorporateAccounts
-   Form26AS · ApiKeySettings · Recruitment · TrainingRecords · DocumentManager
+   Form26AS · ApiKeySettings · Recruitment · DocumentManager
    ════════════════════════════════════════════════════════════════ */
 
 /* ── POS / QUICK BOOKING ─────────────────────────────────────── */

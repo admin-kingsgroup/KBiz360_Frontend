@@ -26,7 +26,7 @@ import { canReachRoute } from './core/menus';
    Infrastructure that renders on every screen (shell, providers, hosts) stays
    eagerly imported above/below. Components render inside <Suspense> (see render).
    ── */
-const { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, GratuityRegister, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, TdsCertRegister, TrainingRecords, UxPreferences } = lazyModule(() => import('./core/helpers'));
+const { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, GratuityRegister, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, TdsCertRegister, UxPreferences } = lazyModule(() => import('./core/helpers'));
 const { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RPT_CashPosition, RPT_CurrencyExposure, RPT_CustomerLTV, RPT_LeaveUtilization, RPT_StatutoryDues, RPT_TaxFilingBoard, RPT_YieldConsultant, RPT_YieldDestination, RPT_YieldSupplier, RPT_YoY } = lazyModule(() => import('./core/styles'));
 const { RPT_InterbranchElim } = lazyModule(() => import('./modules/interbranch'));
 const { SalesGpAnalytics } = lazyModule(() => import('./modules/salesGpAnalytics'));
@@ -51,7 +51,7 @@ const ReportIssueButton = React.lazy(() => import('./modules/support/components/
    legacy string-router in Page(). Append more tables here as modules migrate. */
 const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes];
 const { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
-const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrExpenses, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
+const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
 const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, ChartOfAccounts, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersLedgers, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
 const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/mastersParties'));
 const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } = lazyModule(() => import('./modules/reports'));
@@ -569,7 +569,6 @@ export default function KB360App(){
     if(route==="/group-dashboard")       return <GroupDashboard/>;
     if(route==="/tax/calendar")          return <TaxCalendar/>;
     if(route==="/hr/leave")              return <HrLeave branch={branch}/>;
-    if(route==="/hr/expenses")           return <HrExpenses branch={branch}/>;
     if(route==="/settings/preferences")  return <UxPreferences/>;
     if(route==="/reports/mis")            return <MisReport branch={branch}/>;
     if(route==="/reports/concentration")  return <ClientConcentration branch={branch}/>;
@@ -628,7 +627,6 @@ export default function KB360App(){
     if(route==="/reports/destination")      return <DestinationIntelligence branch={branch}/>;
     if(route==="/reports/package-pl")       return <PackagePnL branch={branch}/>;
     if(route==="/hr/recruitment")           return <Recruitment branch={branch}/>;
-    if(route==="/hr/training")              return <TrainingRecords branch={branch}/>;
     if(route==="/reports/budget")           return <BudgetPlanning branch={branch}/>;
     if(route==="/accounting/intercompany")  return <IntercompanyBilling branch={branch}/>;
     if(route==="/masters/seats")            return <SeatInventory branch={branch}/>;

@@ -193,7 +193,6 @@ export const MENU_HR = {label:"HR", icon:Users, children:[
     {label:"Attendance", href:"/hr/attendance"},
     {label:"Leave Management", href:"/hr/leave"},
     {label:"Recruitment", href:"/hr/recruitment"},
-    {label:"Training Records", href:"/hr/training"},
   ]},
   {label:"Payroll", children:[
     {label:"Salary Run", href:"/hr/payroll"},
@@ -203,7 +202,6 @@ export const MENU_HR = {label:"HR", icon:Users, children:[
     {label:"Gratuity Register", href:"/hr/gratuity"},
   ]},
   {label:"Expense & Loans", children:[
-    {label:"Expense Claims", href:"/hr/expenses"},
     {label:"Employee Loans & Advances", href:"/hr/loans-advances"},
   ]},
   {label:"HR Reports", children:[
