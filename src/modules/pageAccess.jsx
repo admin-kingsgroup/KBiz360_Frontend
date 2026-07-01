@@ -18,9 +18,9 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Eye, EyeOff, Search, Save, RotateCcw, Lock, ShieldCheck, ChevronDown, ChevronRight, Building2 } from 'lucide-react';
+import { Eye, EyeOff, Search, Save, RotateCcw, Lock, ShieldCheck, ChevronDown, ChevronRight, Building2, KeyRound } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiPut } from '../core/api';
+import { apiPut, apiPost } from '../core/api';
 import { useUsersAdmin } from '../core/useReference';
 import { toast } from '../core/ux/toast';
 import { buildPageCatalog, isPageAccessAdmin, roleVisibleKeys } from '../core/pageCatalog';
@@ -97,6 +97,7 @@ export function PageAccessControl({ currentUser, setRoute }) {
     setGrantDraft(g); setGrantBase(new Set(g));
     setBranchDraft(b); setBranchBase(new Set(b));
     setPageSearch('');
+    setResetOpen(false); setNewPwd(''); setConfirmPwd(''); setShowPwd(false);
   };
 
   // Keep drafts in sync if the underlying record changes while open and not dirty
@@ -151,6 +152,25 @@ export function PageAccessControl({ currentUser, setRoute }) {
   const toggleCollapse = (name) => setCollapsed((prev) => {
     const next = new Set(prev); next.has(name) ? next.delete(name) : next.add(name); return next;
   });
+
+  // ── Admin password reset (afshin sets a new password for the selected user) ──
+  const [resetOpen, setResetOpen] = useState(false);
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [showPwd, setShowPwd] = useState(false);
+  const resetMut = useMutation({
+    mutationFn: ({ email, newPassword }) => apiPost('/api/auth/admin/reset-password', { email, newPassword }),
+  });
+  const closeReset = () => { setResetOpen(false); setNewPwd(''); setConfirmPwd(''); setShowPwd(false); };
+  const doReset = () => {
+    if (!selectedUser?.email) return;
+    if (newPwd.length < 8) { toast('New password must be at least 8 characters', 'error'); return; }
+    if (newPwd !== confirmPwd) { toast('Passwords do not match', 'error'); return; }
+    resetMut.mutate({ email: selectedUser.email, newPassword: newPwd }, {
+      onSuccess: () => { toast(`Password reset for ${selectedUser.name || selectedUser.email}. Share it securely — it can't be shown again.`, 'success'); closeReset(); },
+      onError: (e) => toast(e?.message || 'Could not reset password (does this user have a login account?)', 'error'),
+    });
+  };
 
   const save = () => {
     if (!selId) return;
@@ -276,8 +296,43 @@ export function PageAccessControl({ currentUser, setRoute }) {
                   <Button size="sm" variant="primary" icon={Save} onClick={save} loading={saveMut.isPending} disabled={!isDirty || saveMut.isPending}>
                     {saveMut.isPending ? 'Saving…' : 'Save changes'}
                   </Button>
+                  <Button size="sm" variant="secondary" icon={KeyRound} onClick={() => (resetOpen ? closeReset() : setResetOpen(true))}>
+                    Reset password
+                  </Button>
                 </div>
               </div>
+
+              {/* Admin password reset — set a NEW password for this user (shared CRM login). */}
+              {resetOpen && (
+                <div className="mb-2.5 overflow-hidden rounded-brand border border-[#c7d6f2] bg-[#f5f8ff] shadow-sm">
+                  <div className="flex items-center gap-2 border-b border-[#c7d6f2] bg-[#eaf1ff] px-3.5 py-2.5">
+                    <KeyRound size={15} className="text-[#0070f2]" />
+                    <span className="flex-1 text-[12.5px] font-extrabold text-navy">Reset password — {selectedUser.name || selectedUser.email}</span>
+                  </div>
+                  <div className="p-3.5">
+                    <p className="mb-3 text-[11px] leading-relaxed text-ink-muted">
+                      Sets a brand-new password for <b>{selectedUser.email}</b>. Passwords are stored encrypted and can never be viewed — so note this one and share it securely; the user should change it after signing in. <b>This is their shared login — it also changes their CRM password.</b>
+                    </p>
+                    <div className="flex flex-wrap items-end gap-2.5">
+                      <label className="flex-1 min-w-[160px]">
+                        <span className="mb-1 block text-[11px] font-bold text-ink-muted">New password</span>
+                        <Input type={showPwd ? 'text' : 'password'} value={newPwd} onChange={(e) => setNewPwd(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" />
+                      </label>
+                      <label className="flex-1 min-w-[160px]">
+                        <span className="mb-1 block text-[11px] font-bold text-ink-muted">Confirm password</span>
+                        <Input type={showPwd ? 'text' : 'password'} value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} placeholder="Re-enter new password" autoComplete="new-password" />
+                      </label>
+                      <Button size="sm" variant="secondary" onClick={closeReset} disabled={resetMut.isPending}>Cancel</Button>
+                      <Button size="sm" variant="primary" icon={KeyRound} onClick={doReset} loading={resetMut.isPending} disabled={resetMut.isPending}>
+                        {resetMut.isPending ? 'Resetting…' : 'Set password'}
+                      </Button>
+                    </div>
+                    <label className="mt-2.5 flex cursor-pointer items-center gap-1.5 text-[11px] text-ink-muted">
+                      <input type="checkbox" checked={showPwd} onChange={(e) => setShowPwd(e.target.checked)} /> Show passwords
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {/* Branch access — which branches this user is scoped to */}
               <div className="mb-2.5 overflow-hidden rounded-brand border border-surface-border bg-surface shadow-sm">
