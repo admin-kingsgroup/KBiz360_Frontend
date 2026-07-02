@@ -809,9 +809,11 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
       const st = lead.status === 'saved' ? 'approved' : (lead.status || 'pending');
       const saleNet = sale ? (Number(sale.total) || 0) - (Number(sale.taxAmt) || 0) : 0;
       const purNet = purchase ? (Number(purchase.total) || 0) - (Number(purchase.taxAmt) || 0) : 0;
-      // Show the real INB Link No when the voucher carries it (sourceRef = INB/…),
-      // otherwise the sale voucher number is the deal's identifier.
-      const inbLink = [sale, purchase].map((l) => l && l.sourceRef).find((s) => s && /^INB\//.test(s));
+      // The real INB Link No lives in bookingId (the shared deal id — e.g. INB/BOM-NBO/26/0007);
+      // engine-created legs also carry it in sourceRef, but migrated legs keep per-leg Tally
+      // refs there. Prefer bookingId, fall back to an INB-shaped sourceRef, else the sale vno.
+      const inbLink = [sale, purchase].map((l) => l && l.bookingId).find((s) => s && /^INB\//.test(s))
+        || [sale, purchase].map((l) => l && l.sourceRef).find((s) => s && /^INB\//.test(s));
       const saleTotal = sale ? Number(sale.total) || 0 : 0;
       const margin = Math.round((saleNet - purNet) * 100) / 100;
       return {
@@ -1057,6 +1059,9 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                     {pendingTab
                       ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
                           {isApprover ? <>
+                            {/* Single voucher (RF/RI) — edit it in place via the shared voucher
+                                editor (saving reverts it to Pending), then Approve/Reject. */}
+                            <button disabled={busy} onClick={() => setEditId(e.id)} title="Edit this INB refund/reissue voucher, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Edit</button>
                             <button disabled={busy || !e.postable} title={e.postable ? '' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving')} onClick={() => doApproveRefund(e)} style={{ marginRight: 6, padding: '5px 10px', background: e.postable ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
                             <button disabled={busy} onClick={() => doRejectRefund(e)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
                             {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: C.red }}>blocked</span>}
