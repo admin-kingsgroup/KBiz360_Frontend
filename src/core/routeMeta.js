@@ -49,7 +49,6 @@ const EXTRA = {
   '/transactions/approvals/journal': ['Finance', 'Approvals', 'Journal'],
   '/transactions/approvals/purchase-expense': ['Finance', 'Approvals', 'Purchase Expense'],
   '/transactions/approvals/debit-note': ['Finance', 'Approvals', 'Debit Note'],
-  '/transactions/approvals/credit-note': ['Finance', 'Approvals', 'Credit Note'],
   '/transactions/approvals/adm': ['Finance', 'Approvals', 'ADM'],
   '/transactions/approvals/acm': ['Finance', 'Approvals', 'ACM'],
   '/accounts/tally-reco': ['Accounts', 'Reconciliation', 'Tally Reconciliation'],

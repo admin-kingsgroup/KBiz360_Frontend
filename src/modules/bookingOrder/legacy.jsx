@@ -345,6 +345,19 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   };
   const activeRate = getGstRate();
 
+  // N-PO: fold the ADDITIONAL purchase legs into the headline Gross Profit so the entry
+  // screen shows the same folder GP the booking saves with (backend gpForMulti), not the
+  // primary-PO-only figure. Mirrors backend purchaseNetOf (total − GST − TCS − incentive)
+  // and the save-time leg filter. The per-passenger table below stays the PRIMARY view.
+  const extraLegsFilled = (isNoSupp ? [] : extraPOs).filter((leg) => num(leg.line.base) > 0 || num(leg.line.psvc) > 0);
+  const extraLegNet = extraLegsFilled.reduce((s, leg) => {
+    const po = legToPayload(leg, brCode, effNoVat, isForeignSupplier(leg.supplier.name)).po;
+    return s + (num(po.total) - num(po.gst) - num(po.tcs) - num(po.incentiveAmt));
+  }, 0);
+  const hasExtraLegs = Math.abs(extraLegNet) > 0.005;
+  const folderGpTotal = Math.round((num(totals.gp.total) - extraLegNet) * 100) / 100;
+  const folderGpPct = num(totals.so.total) > 0 ? Math.round((folderGpTotal / num(totals.so.total)) * 10000) / 100 : 0;
+
   const setLine = (i, key, val, numeric) =>
     setLines(lines.map((l, idx) => (idx === i ? { ...l, [key]: numeric ? (val === '' ? '' : Number(val)) : val } : l)));
   const addLine = () => setLines([...lines, blankLine(spec)]);
@@ -402,10 +415,19 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // and the supplier's Creditor ledger (payable).
   const hasCustLedger = !!(customer.ledgerName || '').trim();
   const hasSuppLedger = !!supplier.name.trim();
+  // Inter-branch parties (a "Travkings Tours and Travels <branch>" ledger, or an
+  // inter-branch ledger group) belong on the INB Voucher screen — not SO/PO/GP. Detect
+  // one on either side and block the normal booking save (mirrors the backend guard;
+  // when interBranch=true this component IS the INB Voucher, so the check is skipped).
+  const IB_NAME = /travkings\s+tours\s+and\s+travels/i;
+  const IB_GROUP = /inter.?branch/i;
+  const interBranchParty = !interBranch && (
+    IB_NAME.test(supplier.name || '') || IB_NAME.test(customer.name || '') || IB_NAME.test(customer.ledgerName || '')
+    || IB_GROUP.test(supplier.ledgerGroup || '') || IB_GROUP.test(customer.ledgerGroup || '') || IB_GROUP.test(customer.group || ''));
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
   const canSave = interBranch
     ? (!!brCode && !saving && !!toBranch && totals.so.total > 0)  // INB: just need a counterparty branch + a sale value
-    : (!!brCode && !saving && totals.so.total > 0 && customer.name.trim() && hasCustLedger
+    : (!!brCode && !saving && !interBranchParty && totals.so.total > 0 && customer.name.trim() && hasCustLedger
       && (isNoSupp || (totals.po.total > 0 && hasSuppLedger)));
 
   // Saving ALWAYS lands the booking in Pending — there is no save-and-approve from
@@ -1007,8 +1029,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <div className="mb-3 grid grid-cols-1 gap-3 tablet:grid-cols-3">
           <GpCard k={'Total Sales (incl ' + taxLabel + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(totals.so.total)} color={DARK} bg="#FFFDF7" />
           <GpCard k={'Total Purchase (incl ' + taxLabel + ')'} v={cur + ' ' + fmt(totals.po.total)} color={CR} bg="#FFFAEC" />
-          <GpCard k="Gross Profit" v={cur + ' ' + fmt(totals.gp.total)} color={DR} pct={totals.gp.pct + '% margin'} bg="#FCF3DE" />
+          <GpCard k={hasExtraLegs ? 'Gross Profit · all POs' : 'Gross Profit'} v={cur + ' ' + fmt(hasExtraLegs ? folderGpTotal : totals.gp.total)} color={DR} pct={(hasExtraLegs ? folderGpPct : totals.gp.pct) + '% margin'} bg="#FCF3DE" />
         </div>
+        {hasExtraLegs && (
+          <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 7, background: '#FCF3DE', border: '1px solid #cdb46a', color: '#6b5a1e', fontSize: 11.5 }}>
+            Gross Profit above is the <b>whole folder</b> — it nets the {extraLegsFilled.length} additional purchase leg{extraLegsFilled.length > 1 ? 's' : ''} (−{cur} {fmt(extraLegNet)} net cost) booked under this Link No. The per-passenger table below is the <b>primary</b> sale/purchase only.
+          </div>
+        )}
         {totals.so.tcs > 0 && (
           <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 7, background: '#FFF7E6', border: '1px solid #F0C36D', color: '#7a5b12', fontSize: 11.5 }}>
             Incl. <b>TCS @ {tcsRate}% = {cur} {fmt(totals.so.tcs)}</b> collected from the customer on this International package (u/s 206C(1G)) — posts to <b>TCS Payable</b> (Balance Sheet), not income, so GP is unaffected.{tcsRate === 5 && ' Rate 5% applies to bookings up to 31-03-2026; 2% from 01-04-2026.'}
@@ -1049,6 +1076,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       </Section>
 
       {error && <div style={{ ...card, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 12, marginBottom: 14 }}>{error}</div>}
+
+      {/* Inter-branch parties belong on the INB Voucher screen — Save is blocked here. */}
+      {interBranchParty && (
+        <div style={{ ...card, background: '#fef3e2', border: '1px solid #f0cc8a', color: '#8a5a12', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span><b>Inter-branch party detected</b> (Travkings inter-branch). This is an inter-branch deal — it must be entered on the <b>INB Voucher</b> screen, not SO/PO/GP. Saving here is blocked.</span>
+          <button onClick={() => setRoute && setRoute('/bookings/inter-branch')} style={{ ...btnG, background: GOLD, padding: '6px 12px', fontSize: 11.5, marginLeft: 'auto' }}><ArrowRight size={13} /> Go to INB Voucher</button>
+        </div>
+      )}
 
       {/* Footer */}
       <div style={{ position: 'sticky', bottom: 0, background: '#FAFAF8', borderTop: '1px solid #dfe2e7', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>

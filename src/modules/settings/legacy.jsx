@@ -316,7 +316,6 @@ export function SettingsBranches(){
                     {pre:"SI",  label:"Sales — Insurance",     cat:"Sales"},
                     {pre:"SM",  label:"Sales — Misc",          cat:"Sales"},
                     {pre:"SPI", label:"Proforma Invoice",       cat:"Sales"},
-                    {pre:"SCN", label:"Credit Note",            cat:"Sales"},
                     {pre:"SDN", label:"Debit Note",             cat:"Sales"},
                     {pre:"PF",  label:"Purchase — Flight",     cat:"Purchase"},
                     {pre:"PH",  label:"Purchase — Holiday",    cat:"Purchase"},
@@ -983,7 +982,7 @@ export function DocTemplateEditor(){
   const [showLogo,setShowLogo]=useState(true);
   const [showGST,setShowGST]=useState(true);
   const [color,setColor]=useState("#0d1326");
-  const docs=["Tax Invoice","Payment Voucher","Receipt Voucher","Credit Note","Quotation","Hotel Voucher","Transfer Voucher","Visa Cover Letter"];
+  const docs=["Tax Invoice","Payment Voucher","Receipt Voucher","Quotation","Hotel Voucher","Transfer Voucher","Visa Cover Letter"];
   return(
     <PHASE2_Page title="Document Template Editor" subtitle="Customise invoice and voucher layouts · header · footer · logo · colours · font"
       toolbar={<><select value={selDoc} onChange={e=>setSelDoc(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{docs.map(d=><option key={d}>{d}</option>)}</select><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Template</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>Reset to Default</button></>}>
@@ -1160,7 +1159,7 @@ export function ApprovalMatrixBuilder(){
         <div style={cardStyle}>
           <p style={{margin:"0 0 12px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Add Rule</p>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Voucher Type</label><select value={form.voucherType} onChange={e=>setForm(f=>({...f,voucherType:e.target.value}))} style={inp}><option>Payment Voucher</option><option>Journal Voucher</option><option>Credit Note</option><option>Cash Refund</option><option>Forex Trade</option><option>Period Lock</option></select></div>
+            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Voucher Type</label><select value={form.voucherType} onChange={e=>setForm(f=>({...f,voucherType:e.target.value}))} style={inp}><option>Payment Voucher</option><option>Journal Voucher</option><option>Cash Refund</option><option>Forex Trade</option><option>Period Lock</option></select></div>
             <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Approver Role</label><select value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} style={inp}><option>Accounts Executive</option><option>Sr. Accounts Executive</option><option>Senior Finance Manager</option><option>Director</option></select></div>
             <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Min Amount (₹)</label><input type="number" value={form.minAmount} onChange={e=>setForm(f=>({...f,minAmount:+e.target.value}))} style={{...inp,fontFamily:"monospace"}}/></div>
             <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Max Amount (₹, 0 = unlimited)</label><input type="number" value={form.maxAmount} onChange={e=>setForm(f=>({...f,maxAmount:+e.target.value}))} style={{...inp,fontFamily:"monospace"}}/></div>

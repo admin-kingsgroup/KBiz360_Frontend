@@ -328,7 +328,7 @@ export function LedgerAccountView({
 }
 
 /* ── Ledger (T-account) body ─────────────────────────────────────────────── */
-const SETTLE_RX = /receipt|payment|credit-note|debit-note|refund|acm/i;
+const SETTLE_RX = /receipt|payment|debit-note|refund|acm/i;
 
 function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, onPickInvoice, maxHeight, party, branch, side }) {
   const opSigned = d.opening.side === 'Dr' ? d.opening.amt : -d.opening.amt;

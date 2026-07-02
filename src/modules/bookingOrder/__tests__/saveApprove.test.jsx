@@ -56,6 +56,20 @@ describe('booking entry — no one-shot Save & Approve', () => {
     expect(screen.queryByRole('button', { name: /Cancel/i })).toBeNull();
   });
 
+  // Go-forward guard: inter-branch deals must be entered on the INB Voucher screen, not
+  // SO/PO/GP. Picking a "Travkings Tours and Travels <branch>" party warns + blocks Save.
+  test('SO/PO/GP form BLOCKS an inter-branch party — warns and disables Save', () => {
+    wrap(<SoPoGpVoucherEntry branch={{ code: 'BOM' }} setRoute={() => {}} editBooking={{ ...baseBooking, module: 'SF', supplier: { name: 'Travkings Tours and Travels AMD', ledgerName: 'Travkings Tours and Travels AMD' } }} />);
+    expect(screen.getByText(/Inter-branch party detected/i)).toBeInTheDocument();
+    expect(screen.getByText(/Go to INB Voucher/i)).toBeInTheDocument();
+    expect(screen.getByText(/Save changes \(Pending\)/i).closest('button')).toBeDisabled();
+  });
+
+  test('a normal (non inter-branch) SO/PO/GP booking shows NO inter-branch warning', () => {
+    wrap(<SoPoGpVoucherEntry branch={{ code: 'BOM' }} setRoute={() => {}} editBooking={{ ...baseBooking, module: 'SF' }} />);
+    expect(screen.queryByText(/Inter-branch party detected/i)).toBeNull();
+  });
+
   // Regression: revoke re-opened the refund BLANK because the editor never hydrated the
   // airline cancellation + commission clawback back from editBooking.reversal. On edit
   // those values MUST re-show (else re-approving silently drops them → the client amount

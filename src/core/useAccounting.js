@@ -633,8 +633,8 @@ export function useVoucherPreview(body) {
   });
 }
 
-// Create a new voucher (Receipt / Payment / Contra / Journal / Credit Note /
-// Debit Note / Purchase Expense). The backend posts a balanced double-entry,
+// Create a new voucher (Receipt / Payment / Contra / Journal / Debit Note /
+// Purchase Expense). The backend posts a balanced double-entry,
 // so we invalidate every accounting report + register so the new voucher shows
 // in the Trial Balance, P&L, Balance Sheet, Day Book and ageing immediately.
 export function useCreateVoucher() {

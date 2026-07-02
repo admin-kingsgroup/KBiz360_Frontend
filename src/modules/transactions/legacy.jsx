@@ -69,7 +69,7 @@ export function VSaveMsg({m,okText}){
 
 /* ════════════════════════════════════════════════════════════════════
    SHARED VOUCHER BUILDING BLOCKS  (rebuilt Finance vouchers)
-   The Receipt / Payment / Contra / Journal / Credit Note / Debit Note /
+   The Receipt / Payment / Contra / Journal / Debit Note /
    Purchase-Expense forms below follow the provided HTML mockups — same layout
    and logic — rendered in the KBiz360 theme, wired to the live chart of accounts
    (LedgerSelect / useLedgerRegistry) and the /api/vouchers posting engine.
