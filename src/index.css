@@ -184,6 +184,14 @@ input:focus, select:focus, textarea:focus {
   box-shadow: var(--kb-shadow-sm), 0 0 0 3px var(--kb-ring) !important;
   outline: none;
 }
+/* Opt-out for inputs whose PARENT box already renders its own focus ring
+   (e.g. the header search) — without this, the global rule above stacks a
+   second border+ring directly on the <input>, nested inside the container's
+   ring, i.e. a "box inside a box". */
+.kb-focus-ring-none:focus {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
