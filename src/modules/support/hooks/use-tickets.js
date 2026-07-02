@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAuthToken } from '../../../core/api';
 import {
   getTickets, getTicketSummary, createTicket, updateTicket, addTicketComment, deleteTicket,
+  uploadTicketAttachment,
 } from '../api/support.api';
 
 // One namespace so every mutation can invalidate the whole feature at once.
@@ -37,6 +38,10 @@ export function useCreateTicket() {
     mutationFn: (body) => createTicket(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
+}
+
+export function useUploadTicketAttachment() {
+  return useMutation({ mutationFn: (file) => uploadTicketAttachment(file) });
 }
 
 export function useUpdateTicket() {

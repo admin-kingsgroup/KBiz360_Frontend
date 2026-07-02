@@ -11,6 +11,7 @@ jest.mock('../hooks/use-tickets', () => ({
   useTickets: () => ({ data: mockRows, isLoading: false, isError: false, error: null, refetch: jest.fn() }),
   useTicketSummary: () => ({ data: { total: 2, mine: 1, byStatus: { open: 1 }, byType: {} } }),
   useCreateTicket: () => ({ mutate: mockCreate, isPending: false }),
+  useUploadTicketAttachment: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useUpdateTicket: () => ({ mutate: jest.fn(), isPending: false }),
   useAddComment: () => ({ mutate: jest.fn(), isPending: false }),
   useDeleteTicket: () => ({ mutate: jest.fn(), isPending: false }),
