@@ -29,10 +29,21 @@ import { BRANCHES } from '../core/referenceCache';
 import { PageLayout } from '../shell/PageLayout';
 import { PageSection, Button, StatusPill, Input, ResponsiveGrid, EmptyState } from '../shell/primitives';
 
-// Roles that resolve to ALL branches at login (mirrors auth.service resolveBranches
-// ALL_SCOPE_ROLES on the backend). For these, a per-branch selection is ignored, so
-// the branch toggles are shown all-on and disabled with a "role-managed" note.
+// Roles that DEFAULT to all branches at login (mirrors auth.service resolveBranches
+// ALL_SCOPE_ROLES on the backend). For these, an empty selection means "all branches";
+// the admin can still narrow them to a specific subset with the toggles below.
 const ALL_SCOPE_ROLES = new Set(['Super Admin', 'Director', 'Senior Finance Manager', 'Sr. Accounts Executive']);
+
+// Every branch code shown in the toggles.
+const branchCodesAll = () => BRANCHES.map((b) => b.code);
+// Which branch toggles start ON for a user: the 'ALL' sentinel — or an empty list on an
+// all-scope role — means every branch; a concrete stored list means exactly those.
+function initialBranchSet(u) {
+  const raw = u && u.branches;
+  const arr = Array.isArray(raw) ? raw : (raw === 'ALL' ? ['ALL'] : []);
+  const isAll = arr.includes('ALL') || (arr.length === 0 && ALL_SCOPE_ROLES.has(u && u.role));
+  return new Set(isAll ? branchCodesAll() : arr);
+}
 
 const setsEqual = (a, b) => { if (a.size !== b.size) return false; for (const k of a) if (!b.has(k)) return false; return true; };
 
@@ -109,7 +120,7 @@ export function PageAccessControl({ currentUser, setRoute }) {
   const selectUser = (u) => {
     const h = new Set(Array.isArray(u.hidden) ? u.hidden : []);
     const g = new Set(Array.isArray(u.granted) ? u.granted : []);
-    const b = new Set(Array.isArray(u.branches) ? u.branches : []);
+    const b = initialBranchSet(u);
     setSelId(u.id);
     setHiddenDraft(h); setHiddenBase(new Set(h));
     setGrantDraft(g); setGrantBase(new Set(g));
@@ -124,7 +135,7 @@ export function PageAccessControl({ currentUser, setRoute }) {
     if (!selectedUser || isDirty) return;
     const sH = new Set(Array.isArray(selectedUser.hidden) ? selectedUser.hidden : []);
     const sG = new Set(Array.isArray(selectedUser.granted) ? selectedUser.granted : []);
-    const sB = new Set(Array.isArray(selectedUser.branches) ? selectedUser.branches : []);
+    const sB = initialBranchSet(selectedUser);
     if (!setsEqual(sH, hiddenBase)) { setHiddenBase(sH); setHiddenDraft(new Set(sH)); }
     if (!setsEqual(sG, grantBase)) { setGrantBase(sG); setGrantDraft(new Set(sG)); }
     if (!setsEqual(sB, branchBase)) { setBranchBase(sB); setBranchDraft(new Set(sB)); }
@@ -159,13 +170,16 @@ export function PageAccessControl({ currentUser, setRoute }) {
   const hideAll = () => setKeys(catalog.flatMap((s) => s.items.map((i) => i.key)), false);
   const resetDraft = () => { setHiddenDraft(new Set(hiddenBase)); setGrantDraft(new Set(grantBase)); setBranchDraft(new Set(branchBase)); };
 
-  // Branch access: all-scope roles resolve to every branch at login, so their
-  // per-branch selection is locked (shown all-on, disabled).
-  const isAllScopeRole = !!selectedUser && ALL_SCOPE_ROLES.has(selectedUser.role);
+  // Branch access is editable for EVERY user. All-scope roles merely DEFAULT to all
+  // branches (see initialBranchSet); the admin can narrow them to a subset here, and an
+  // empty selection on such a role falls back to all branches server-side.
+  const allBranchCodes = branchCodesAll();
+  const allSelected = allBranchCodes.length > 0 && allBranchCodes.every((c) => branchDraft.has(c));
+  const isAllScopeDefault = !!selectedUser && ALL_SCOPE_ROLES.has(selectedUser.role);
   const toggleBranch = (code) => {
-    if (isAllScopeRole) return;
     setBranchDraft((prev) => { const next = new Set(prev); next.has(code) ? next.delete(code) : next.add(code); return next; });
   };
+  const setAllBranches = (on) => setBranchDraft(() => new Set(on ? allBranchCodes : []));
 
   const toggleCollapse = (name) => setCollapsed((prev) => {
     const next = new Set(prev); next.has(name) ? next.delete(name) : next.add(name); return next;
@@ -194,12 +208,17 @@ export function PageAccessControl({ currentUser, setRoute }) {
 
   const save = () => {
     if (!selId) return;
-    saveMut.mutate({ id: selId, hidden: [...hiddenDraft], granted: [...grantDraft], branches: [...branchDraft] }, {
+    // Send the 'ALL' sentinel when every branch is on, so the user keeps expanding to the
+    // live branch list; otherwise persist the exact subset the admin picked.
+    const branchesPayload = allSelected ? ['ALL'] : [...branchDraft];
+    saveMut.mutate({ id: selId, hidden: [...hiddenDraft], granted: [...grantDraft], branches: branchesPayload }, {
       onSuccess: () => {
         setHiddenBase(new Set(hiddenDraft));
         setGrantBase(new Set(grantDraft));
         setBranchBase(new Set(branchDraft));
-        const scope = isAllScopeRole ? 'all branches (role-managed)' : `${branchDraft.size} branch${branchDraft.size === 1 ? '' : 'es'}`;
+        const scope = allSelected ? 'all branches'
+          : branchDraft.size === 0 ? (isAllScopeDefault ? 'all branches (role default)' : 'no branches')
+          : `${branchDraft.size} branch${branchDraft.size === 1 ? '' : 'es'}`;
         toast(`Saved — ${selectedUser?.name || 'user'} sees ${counts.visible} of ${totalPages} pages · ${scope}.`, 'success');
       },
       onError: (e) => toast(e?.message || 'Could not save. Try again.', 'error'),
@@ -361,17 +380,20 @@ export function PageAccessControl({ currentUser, setRoute }) {
                 <div className="flex items-center gap-2 border-b border-surface-border bg-surface-alt px-3.5 py-2.5">
                   <Building2 size={15} className="text-ink-muted" />
                   <span className="flex-1 text-[12.5px] font-extrabold text-navy">Branch access</span>
-                  <span className={`text-[10px] font-bold ${isAllScopeRole ? 'text-ink-muted' : (branchDraft.size ? 'text-[#27963c]' : 'text-maroon')}`}>
-                    {isAllScopeRole ? 'all branches · role-managed' : `${branchDraft.size} of ${BRANCHES.length} branches`}
+                  <button type="button" onClick={() => setAllBranches(!allSelected)}
+                    className="rounded border border-surface-border px-2 py-0.5 text-[10px] font-bold text-ink-muted transition hover:border-[#0070f2] hover:text-[#0070f2]">
+                    {allSelected ? 'Clear all' : 'Select all'}
+                  </button>
+                  <span className={`text-[10px] font-bold ${branchDraft.size ? 'text-[#27963c]' : 'text-maroon'}`}>
+                    {allSelected ? `all ${BRANCHES.length} branches` : `${branchDraft.size} of ${BRANCHES.length} branches`}
                   </span>
                 </div>
                 <ResponsiveGrid min="220px" gap="none">
                   {BRANCHES.map((b) => {
-                    const on = isAllScopeRole || branchDraft.has(b.code);
+                    const on = branchDraft.has(b.code);
                     return (
-                      <label key={b.code}
-                        className={`flex items-center gap-2.5 border-b border-surface-alt px-3.5 py-2 ${isAllScopeRole ? 'cursor-default' : 'cursor-pointer'}`}>
-                        <Switch on={on} disabled={isAllScopeRole} onChange={() => toggleBranch(b.code)} />
+                      <label key={b.code} className="flex cursor-pointer items-center gap-2.5 border-b border-surface-alt px-3.5 py-2">
+                        <Switch on={on} onChange={() => toggleBranch(b.code)} />
                         <div className="min-w-0 flex-1">
                           <div className={`text-[12.5px] font-semibold ${on ? 'text-navy' : 'text-ink-subtle'}`}>
                             <span className="mr-1">{b.flag}</span>{b.code}
@@ -382,15 +404,21 @@ export function PageAccessControl({ currentUser, setRoute }) {
                     );
                   })}
                 </ResponsiveGrid>
-                {isAllScopeRole ? (
-                  <div className="bg-surface-alt/60 px-3.5 py-2 text-[11px] text-ink-muted">
-                    <b>{selectedUser.role}</b> has all-branch access by role — per-branch selection is ignored for this user.
-                  </div>
-                ) : branchDraft.size === 0 ? (
+                {branchDraft.size === 0 ? (
                   <div className="bg-surface-alt/60 px-3.5 py-2 text-[11px] text-maroon">
-                    No branches selected — this user can't load any branch-scoped data until at least one is enabled.
+                    {isAllScopeDefault
+                      ? <><b>{selectedUser.role}</b> falls back to <b>all branches</b> when none are ticked. Tick a subset to restrict this user to specific branches.</>
+                      : <>No branches selected — this user can't load any branch-scoped data until at least one is enabled.</>}
                   </div>
-                ) : null}
+                ) : allSelected ? (
+                  <div className="bg-surface-alt/60 px-3.5 py-2 text-[11px] text-ink-muted">
+                    All branches enabled{isAllScopeDefault ? ' (role default)' : ''}. Turn some off to restrict this user to a subset.
+                  </div>
+                ) : (
+                  <div className="bg-surface-alt/60 px-3.5 py-2 text-[11px] text-ink-muted">
+                    Restricted to <b>{branchDraft.size}</b> branch{branchDraft.size === 1 ? '' : 'es'} — this user will see only these branches' data.
+                  </div>
+                )}
               </div>
 
               {/* Sections */}
