@@ -767,6 +767,8 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   const [search, setSearch] = useState(initialSearch || '');
   const [editId, setEditId] = useState(null);      // legacy: single INB leg edited in a modal (fallback)
   const [editLink, setEditLink] = useState(null);  // INB Link No edited as a UNIT on the unified SPG screen
+  useModalEsc(() => setEditId(null), !!editId);     // Esc / header Back closes the edit modal
+  useModalEsc(() => setEditLink(null), !!editLink); // Esc / header Back closes the SPG edit screen
 
   // One fetch of every INB voucher (both legs of every deal, all statuses) — INB
   // volume is small, so we group + count + filter client-side, mirroring how the

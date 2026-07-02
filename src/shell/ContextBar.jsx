@@ -11,7 +11,7 @@ import { useHotkey } from '../core/ux/hotkeys';
 import { usePrefs } from '../core/prefs';
 import { useDock } from '../core/ux/dock';
 import { crumbsFor, labelFor } from '../core/routeMeta';
-import { closeTopModal } from '../core/ux/modalStore';
+import { closeTopModal, modalCount } from '../core/ux/modalStore';
 import { openLedgerModal } from '../core/LedgerModalHost';
 import { Kbd } from '../core/ux/widgets.jsx';
 import { clickable } from '../core/ux/clickable';
@@ -78,7 +78,7 @@ export function ContextBar({ branch, route, unread, showNotif, onToggleNotif, on
     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) { el.blur(); return; }
     nav.goBack();
   }, [nav.route, nav.canBack]);
-  useHotkey('alt+left', () => nav.goBack(), [nav.canBack]);
+  useHotkey('alt+left', () => { if (closeTopModal()) return; nav.goBack(); }, [nav.canBack]);
   useHotkey('alt+right', () => nav.goForward(), [nav.canForward]);
   useHotkey('mod+k', () => nav.navigate('/search'), []);
 
@@ -116,7 +116,7 @@ export function ContextBar({ branch, route, unread, showNotif, onToggleNotif, on
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: '#fff', borderBottom: `1px solid ${LINE}`, minHeight: 38, flexWrap: 'nowrap', overflow: 'hidden' }}>
-      <button type="button" title="Back (Esc / Alt+←)" onClick={nav.goBack} disabled={!nav.canBack} style={navBtn(nav.canBack)}>‹</button>
+      <button type="button" title="Back (Esc / Alt+←)" onClick={() => { if (closeTopModal()) return; nav.goBack(); }} disabled={!nav.canBack && modalCount() === 0} style={navBtn(nav.canBack)}>‹</button>
       <button type="button" title="Forward (Alt+→)" onClick={nav.goForward} disabled={!nav.canForward} style={navBtn(nav.canForward)}>›</button>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0, overflow: 'hidden', flex: 1 }}>
