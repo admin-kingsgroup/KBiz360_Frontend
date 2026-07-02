@@ -16,7 +16,9 @@ const DATA = {
     indirectIncome: 100000, indirectExpense: 300000, netProfit: 600000, netMargin: 10, netYield: 15,
   },
   capital: [{ grp: 'Capital Account', src: 'bs', total: 5000000, ledgers: [{ n: 'Owner Capital', a: 5000000 }] }],
-  quasi: [], blocked: [], flow: [], revenue: [], otherFunding: [],
+  quasi: [],
+  capitalAdjust: [{ grp: 'Less: Accumulated Loss (P&L A/c)', src: 'bs', total: -500000, ledgers: [{ n: 'Profit & Loss A/c', a: -500000 }] }],
+  blocked: [], flow: [], revenue: [], otherFunding: [],
   balanceSheet: {
     liabilities: [{ grp: 'Capital Account', src: 'bs', total: 5000000, ledgers: [{ n: 'Owner Capital', a: 5000000 }] }],
     assets: [{ grp: 'Current Assets', src: 'bs', total: 5500000, ledgers: [{ n: 'Bank HDFC', a: 5500000 }] }],
@@ -55,6 +57,13 @@ test('Complete Balance Sheet + P&L sections render every account in branch curre
   expect(screen.getByText('Airline Cost')).toBeInTheDocument();
   // Net Profit label is surfaced (the new P&L bridge / Section 6 total).
   expect(screen.getAllByText(/Net Profit/i).length).toBeGreaterThan(0);
+});
+
+test('accumulated-loss deduction renders as a Less: line in Section 1', () => {
+  render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
+  // Section 1 (Capital Invested) is open by default → the deduction line is visible,
+  // so the ledger rows reconcile to CAPITAL EMPLOYED.
+  expect(screen.getAllByText(/Less: Accumulated Loss/).length).toBeGreaterThan(0);
 });
 
 test('a section header toggles its own body on click', () => {

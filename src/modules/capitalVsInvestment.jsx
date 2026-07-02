@@ -237,7 +237,7 @@ export function CapitalVsInvestmentLive({ branch }) {
 
           <Section variant="seccap" num="1" name="Capital Invested" isOpen={open.cap} onToggle={() => toggle('cap')}
             sub={<>Capital Account + Reserves &amp; Surplus + accumulated P&amp;L{(t.quasiCapital || 0) > 0.5 ? ' + owner & partner loans (quasi-capital)' : ''} — from Balance Sheet</>}>
-            <SecTable groups={[...(data.capital || []), ...(data.quasi || [])]} totalLabel="CAPITAL EMPLOYED" totalVal={t.capitalInvested} fmt={inr} />
+            <SecTable groups={[...(data.capital || []), ...(data.quasi || []), ...(data.capitalAdjust || [])]} totalLabel="CAPITAL EMPLOYED" totalVal={t.capitalInvested} fmt={inr} />
           </Section>
           <div className="sec-divider" />
 
