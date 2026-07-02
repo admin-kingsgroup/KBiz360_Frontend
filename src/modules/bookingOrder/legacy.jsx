@@ -14,6 +14,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../../core/styles.jsx';
 import { Menu as DropdownMenu } from '../../core/ux/Menu';
+import { useModalEsc } from '../../core/ux/useModalEsc';
 import { localeOf } from '../../core/format';
 import { todayISO } from '../../core/dates';
 import { PeriodBar, periodRange } from '../../core/period';
@@ -1588,7 +1589,7 @@ export function PendingBookings({ branch, setRoute }) {
   const [open, setOpen] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [msg, setMsg] = useState('');
-  const [editing, setEditing] = useState(null);
+  const [editing, setEditing] = useState(null); useModalEsc(() => setEditing(null), !!editing);
   const [groupBy, setGroupBy] = useState('none');
   const [sel, setSel] = useState(() => new Set());
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
@@ -1772,7 +1773,7 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   const [open, setOpen] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [msg, setMsg] = useState('');
-  const [editing, setEditing] = useState(null);
+  const [editing, setEditing] = useState(null); useModalEsc(() => setEditing(null), !!editing);
   const [groupBy, setGroupBy] = useState('none');
   // Refund/Reissue (SO/PO/GP reversal modules RF/RI) live in this same queue and show
   // inline in the normal Pending window alongside forward bookings — no separate filter.
