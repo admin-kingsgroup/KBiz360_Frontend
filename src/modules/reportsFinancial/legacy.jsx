@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQueries } from '@tanstack/react-query';
 import { card, inp, bc } from '../../core/styles';
 import { localeOf } from '../../core/format';
@@ -2184,7 +2185,15 @@ function VerticalBS({ d, cur, curLabel, detail, branch, to, mobile }) {
 
 function ArApScreen({ branch, side, setRoute, initialTab }) {
   const isRec = side === 'receivables';
-  const [tab, setTab] = useState(initialTab || 'ageing'); // 'ageing' | 'settle' | 'net'
+  // Tab lives in the URL (`?tab=`), not plain state, so the header/browser Back
+  // button steps back through tab switches one at a time instead of skipping
+  // straight past this whole page — a bare setState here leaves no history entry,
+  // so Back (which drives real browser history) jumps to whatever page was open
+  // BEFORE this one, ignoring the tab you were just on (e.g. clicking "Adjust ▸"
+  // into Settle, then Back, used to skip Ageing entirely).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') || initialTab || 'ageing'; // 'ageing' | 'settlement' | 'settle' | 'net'
+  const setTab = (next) => setSearchParams((prev) => { const p = new URLSearchParams(prev); p.set('tab', next); return p; });
   const [advFocus, setAdvFocus] = useState(''); // party whose advances to focus
   const adjustAdvance = (party) => { setAdvFocus(party); setTab('settle'); };
 

@@ -56,11 +56,12 @@ jest.mock('../../../core/useAccounting', () => {
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { ReceivablesLive } from '../legacy';
 
 describe('Consolidated Receivables ageing — renders branch-wise (smoke)', () => {
   test('All-Branches shows a SEPARATE section per branch, each in its own currency, no merged total', () => {
-    render(<ReceivablesLive branch="ALL" setRoute={() => {}} />);
+    render(<ReceivablesLive branch="ALL" setRoute={() => {}} />, { wrapper: MemoryRouter });
 
     // Consolidated header makes the rule explicit.
     expect(screen.getByText(/All Branches/i)).toBeInTheDocument();

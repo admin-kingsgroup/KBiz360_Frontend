@@ -80,6 +80,16 @@ export const LEDGER_CSS = `
 .kbled .scard.dr .v{color:var(--dr)}
 .kbled .scard.cr .v{color:var(--cr)}
 .kbled .scard.bal .v{color:var(--gold)}
+.kbled .scard .sub{font-size:9.5px;font-weight:700;color:var(--gold);margin-top:3px;letter-spacing:.2px}
+.kbled .scard.clik{cursor:pointer;transition:box-shadow .12s,border-color .12s,background .12s}
+.kbled .scard.clik:hover{border-color:var(--gold);background:var(--hi)}
+.kbled .scard.clik.on{border-color:var(--gold);background:var(--hi);box-shadow:inset 0 0 0 1px var(--gold),0 2px 8px rgba(160,120,40,.16)}
+.kbled .scard.clik.on::before{content:"● filtered";position:absolute;top:7px;right:11px;font-size:7.5px;font-weight:800;letter-spacing:.4px;color:var(--gold);text-transform:uppercase}
+.kbled .scard{position:relative}
+.kbled .filterbar{display:flex;align-items:center;gap:10px;padding:2px 30px 8px;font-size:11px;color:var(--ink3)}
+.kbled .filterbar b{color:var(--ink)}
+.kbled .filterbar button{border:1px solid var(--rule);background:var(--paper);color:var(--ink2);font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:5px;cursor:pointer;font-family:inherit}
+.kbled .filterbar button:hover{background:var(--bg-lt);border-color:var(--gold)}
 .kbled .tblwrap{padding:4px 24px 8px;overflow-x:auto}
 .kbled table{width:100%;border-collapse:collapse;min-width:760px}
 .kbled thead th{font-size:9px;font-weight:700;letter-spacing:.4px;color:var(--ink3);text-transform:uppercase;text-align:right;padding:9px 10px;background:var(--bg-lt);border-top:2px solid var(--dark);border-bottom:1.5px solid var(--dark);white-space:nowrap}
@@ -587,28 +597,62 @@ function BillwiseTable({ side, bills, name, branch, cur, maxHeight }) {
     if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
   }, [cursor]);
 
-  let totAmt = 0, totSet = 0, totPend = 0, overdueCount = 0;
-  bills.forEach((b) => { totAmt += b.amt; totSet += b.settled; totPend += b.pend; if (b.pend > 0 && b.age > 0) overdueCount++; });
+  // Summary tiles double as filters — click "Unsettled" to work only the bills that
+  // still need settling (pend > 0), "Settled" for the knocked-off ones, "Overdue" for
+  // the aged ones. Tile figures stay computed from the FULL bill set; only the table
+  // (and its total row) below reflects the active filter.
+  const [filter, setFilter] = useState('all');   // all | settled | unsettled | overdue
+  const pickFilter = (f) => { setFilter((cur2) => (cur2 === f ? 'all' : f)); setCursor(-1); };
+  const FILTER_LABEL = { all: '', settled: 'settled', unsettled: 'unsettled', overdue: 'overdue' };
+
+  let totAmt = 0, totSet = 0, totPend = 0, overdueCount = 0, unsettledCount = 0;
+  bills.forEach((b) => {
+    totAmt += b.amt; totSet += b.settled; totPend += b.pend;
+    if (b.pend > 0) { unsettledCount++; if (b.age > 0) overdueCount++; }
+  });
+
+  // The rows the table actually renders, per the tile-filter.
+  const visible = useMemo(() => {
+    if (filter === 'settled') return bills.filter((b) => b.pend <= 0);
+    if (filter === 'unsettled') return bills.filter((b) => b.pend > 0);
+    if (filter === 'overdue') return bills.filter((b) => b.pend > 0 && b.age > 0);
+    return bills;
+  }, [bills, filter]);
+  let vAmt = 0, vSet = 0, vPend = 0;
+  visible.forEach((b) => { vAmt += b.amt; vSet += b.settled; vPend += b.pend; });
+
   const { age, totPend: agePend } = ageingOf(bills);
   const ageTotal = agePend || 1;
 
   const toggle = (ref) => setOpen((s) => { const n = new Set(s); n.has(ref) ? n.delete(ref) : n.add(ref); return n; });
   const onKeyDown = (e) => {
-    const max = bills.length - 1;
+    const max = visible.length - 1;
     if (max < 0) return;
     if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => Math.min((c < 0 ? -1 : c) + 1, max)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => Math.max((c < 0 ? max + 1 : c) - 1, 0)); }
-    else if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); const b = bills[cursor]; if (b) toggle(b.ref); }
+    else if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); const b = visible[cursor]; if (b) toggle(b.ref); }
   };
 
   return (
     <>
       <div className="summary">
-        <div className="scard"><div className="k">Bills Raised</div><div className="v">{cur}{fmt(totAmt) || '0.00'}</div></div>
-        <div className="scard dr"><div className="k">Settled</div><div className="v">{cur}{fmt(totSet) || '0.00'}</div></div>
-        <div className="scard bal"><div className="k">Pending (Outstanding)</div><div className="v">{cur}{fmt(totPend) || '0.00'}</div></div>
-        <div className="scard cr"><div className="k">Overdue Bills</div><div className="v">{overdueCount}</div></div>
+        <div className={'scard clik' + (filter === 'all' ? ' on' : '')} onClick={() => pickFilter('all')} title="Show every bill">
+          <div className="k">Bills Raised</div><div className="v">{cur}{fmt(totAmt) || '0.00'}</div></div>
+        <div className={'scard dr clik' + (filter === 'settled' ? ' on' : '')} onClick={() => pickFilter('settled')} title="Show only fully-settled bills">
+          <div className="k">Settled</div><div className="v">{cur}{fmt(totSet) || '0.00'}</div></div>
+        <div className={'scard bal clik' + (filter === 'unsettled' ? ' on' : '')} onClick={() => pickFilter('unsettled')} title="Show only unsettled bills — the ones still to settle">
+          <div className="k">Unsettled (Outstanding)</div><div className="v">{cur}{fmt(totPend) || '0.00'}</div>
+          <div className="sub">{unsettledCount} bill{unsettledCount === 1 ? '' : 's'} to settle →</div></div>
+        <div className={'scard cr clik' + (filter === 'overdue' ? ' on' : '')} onClick={() => pickFilter('overdue')} title="Show only overdue bills">
+          <div className="k">Overdue Bills</div><div className="v">{overdueCount}</div></div>
       </div>
+      {filter !== 'all' && (
+        <div className="filterbar">
+          Showing <b>{visible.length}</b> {FILTER_LABEL[filter]} bill{visible.length === 1 ? '' : 's'}
+          {filter === 'unsettled' && visible.length > 0 && <span>· click any row to open its settlement history</span>}
+          <button onClick={() => pickFilter('all')}>Show all bills</button>
+        </div>
+      )}
       <div className="tblwrap" ref={wrapRef} tabIndex={0} onKeyDown={onKeyDown} style={{ maxHeight, overflowY: 'auto', outline: 'none' }}>
         <div className="ageing">
           <div className="age-title">Ageing of Outstanding <span>(by days outstanding)</span></div>
@@ -624,8 +668,13 @@ function BillwiseTable({ side, bills, name, branch, cur, maxHeight }) {
         <table>
           <thead><tr><th className="l">Bill Ref</th><th className="l">Bill Date</th><th>Bill Amount ({cur})</th><th>Settled ({cur})</th><th>Pending ({cur})</th><th>Age</th><th className="l">Status</th></tr></thead>
           <tbody>
-            {bills.length === 0 && <tr><td className="l" colSpan={7} style={{ textAlign: 'center', padding: 26, color: '#9A9A9A' }}>No outstanding bills.</td></tr>}
-            {bills.map((b, i) => {
+            {visible.length === 0 && <tr><td className="l" colSpan={7} style={{ textAlign: 'center', padding: 26, color: '#9A9A9A' }}>{
+              filter === 'settled' ? 'No settled bills yet.'
+                : filter === 'unsettled' ? 'Nothing unsettled — every bill is fully settled. 🎉'
+                  : filter === 'overdue' ? 'No overdue bills.'
+                    : 'No outstanding bills.'
+            }</td></tr>}
+            {visible.map((b, i) => {
               let status, scls;
               if (b.pend <= 0) { status = 'Settled'; scls = 'paid'; }
               else if (b.age > 0) { status = b.age + 'd overdue'; scls = 'over'; }
@@ -650,10 +699,10 @@ function BillwiseTable({ side, bills, name, branch, cur, maxHeight }) {
               );
             })}
           </tbody>
-          <tfoot><tr><td className="l">Total</td><td /><td>{fmt(totAmt)}</td><td>{fmt(totSet)}</td><td className="pend">{fmt(totPend)}</td><td /><td /></tr></tfoot>
+          <tfoot><tr><td className="l">Total{filter !== 'all' ? ` (${FILTER_LABEL[filter]})` : ''}</td><td /><td>{fmt(vAmt)}</td><td>{fmt(vSet)}</td><td className="pend">{fmt(vPend)}</td><td /><td /></tr></tfoot>
         </table>
       </div>
-      <div className="hint"><b>Click a bill</b> (or ↑/↓ then <b>Shift+Enter</b>) to drill its settlement history — every receipt / note that knocked it off. Pending total ties to the ledger closing balance.</div>
+      <div className="hint">Click the <b>Settled</b>, <b>Unsettled</b> or <b>Overdue</b> tile above to filter this list. <b>Click a bill</b> (or ↑/↓ then <b>Shift+Enter</b>) to drill its settlement history — every receipt / note that knocked it off. Pending total ties to the ledger closing balance.</div>
     </>
   );
 }
