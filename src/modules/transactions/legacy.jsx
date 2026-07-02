@@ -1507,7 +1507,7 @@ function InvoicePaxPanel({inv,cur,label="Invoice",selectable=false,selected,onTo
 
 // Refund / Reissue / ADM / ACM CREATE now render through the unified VoucherShell
 // (Option C) — they are gated voucher categories that enter PENDING and post on
-// approval, exactly like Receipt/Payment/Credit-Note. The legacy auto-posting
+// approval, exactly like Receipt/Payment/Debit-Note. The legacy auto-posting
 // RefundReissueVoucher below is retained for reference only (no longer routed).
 export function RefundVoucher({branch}){ return <VoucherShell category="refund" mode="create" branch={branch} />; }
 export function ReissueVoucher({branch}){ return <VoucherShell category="reissue" mode="create" branch={branch} />; }

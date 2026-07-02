@@ -462,7 +462,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
         <div>
           <div className="kbiz-page-title">{single ? `${VCH[category] || category} Approvals` : 'Voucher Approvals'}</div>
-          <div style={{ fontSize: 12, color: C.dim }}>{branchLabel(branch)} · {single ? `${VCH[category] || category} vouchers` : 'Payment · Receipt · Contra · Journal · Credit/Debit Note · Purchase Expense'} — manual & bulk post only when approved</div>
+          <div style={{ fontSize: 12, color: C.dim }}>{branchLabel(branch)} · {single ? `${VCH[category] || category} vouchers` : 'Payment · Receipt · Contra · Journal · Debit Note · Purchase Expense'} — manual & bulk post only when approved</div>
         </div>
         {status !== 'pending' && (
           <PeriodBar key={status} branch={branch} compact defaultPreset={presetFor(status)} onChange={setRange} />

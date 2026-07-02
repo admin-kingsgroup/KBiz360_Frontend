@@ -181,7 +181,7 @@ export function useLedgerComponents(name, branch, { from, to, costCenter } = {},
   });
 }
 
-// Voucher approval queue (gated types: payment/receipt/contra/journal/CN/DN/PXP).
+// Voucher approval queue (gated types: payment/receipt/contra/journal/DN/PXP).
 // Returns { counts, status, entries, byGroup, bySubGroup, byLedger }.
 // `category` scopes it to one gated type (the per-type split screens); omit for the
 // combined queue. It is part of the query key so each type's cache stays separate.
