@@ -439,15 +439,17 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // and the supplier's Creditor ledger (payable).
   const hasCustLedger = !!(customer.ledgerName || '').trim();
   const hasSuppLedger = !!supplier.name.trim();
-  // Inter-branch parties (a "Travkings Tours and Travels <branch>" ledger, or an
-  // inter-branch ledger group) belong on the INB Voucher screen — not SO/PO/GP. Detect
-  // one on either side and block the normal booking save (mirrors the backend guard;
-  // when interBranch=true this component IS the INB Voucher, so the check is skipped).
+  // Inter-branch guard is DIRECTION-specific (mirrors the backend). Only the SELLER side —
+  // a "Travkings Tours and Travels <branch>" CUSTOMER (selling to another branch) — belongs
+  // on the INB Voucher, so block the save there. The BUYER side (a Travkings inter-branch
+  // SUPPLIER — buying from another branch, e.g. completing the auto-seeded buyer booking of a
+  // pushed INB deal) is a normal-creditor SO/PO/GP purchase → allowed. (interBranch=true means
+  // this component IS the INB Voucher, so the check is skipped entirely.)
   const IB_NAME = /travkings\s+tours\s+and\s+travels/i;
   const IB_GROUP = /inter.?branch/i;
   const interBranchParty = !interBranch && (
-    IB_NAME.test(supplier.name || '') || IB_NAME.test(customer.name || '') || IB_NAME.test(customer.ledgerName || '')
-    || IB_GROUP.test(supplier.ledgerGroup || '') || IB_GROUP.test(customer.ledgerGroup || '') || IB_GROUP.test(customer.group || ''));
+    IB_NAME.test(customer.name || '') || IB_NAME.test(customer.ledgerName || '')
+    || IB_GROUP.test(customer.ledgerGroup || '') || IB_GROUP.test(customer.group || ''));
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
   const canSave = interBranch
     ? (!!brCode && !saving && !!toBranch && totals.so.total > 0)  // INB: just need a counterparty branch + a sale value
@@ -1118,7 +1120,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* Inter-branch parties belong on the INB Voucher screen — Save is blocked here. */}
       {interBranchParty && (
         <div style={{ ...card, background: '#fef3e2', border: '1px solid #f0cc8a', color: '#8a5a12', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span><b>Inter-branch party detected</b> (Travkings inter-branch). This is an inter-branch deal — it must be entered on the <b>INB Voucher</b> screen, not SO/PO/GP. Saving here is blocked.</span>
+          <span><b>Inter-branch customer detected</b> (a Travkings branch — you're selling to another branch). This is an inter-branch <b>sale</b> — it must be entered on the <b>INB Voucher</b> screen, not SO/PO/GP. Saving here is blocked. (Buying <i>from</i> another branch is fine here.)</span>
           <button onClick={() => setRoute && setRoute('/bookings/inter-branch')} style={{ ...btnG, background: GOLD, padding: '6px 12px', fontSize: 11.5, marginLeft: 'auto' }}><ArrowRight size={13} /> Go to INB Voucher</button>
         </div>
       )}

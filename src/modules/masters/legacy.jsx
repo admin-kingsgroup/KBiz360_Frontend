@@ -230,7 +230,7 @@ export function ChartOfAccounts(){
     {id:1, name:"Capital Account",         type:"Liability", parent:"Primary",
      sub:["Proprietor's Capital","Partner Capital A","Partner Capital B","Retained Earnings","Reserve & Surplus","Share Application Money"]},
     {id:2, name:"Loans (Liability)",        type:"Liability", parent:"Primary",
-     sub:["Bank Overdraft / CC Limit","Secured Loans","Unsecured Loans — Directors","Vehicle Loan","Equipment Finance Lease"]},
+     sub:["Bank Overdraft / CC Limit","Secured Loans","Unsecured Loans — Directors & Partners","Vehicle Loan","Equipment Finance Lease"]},
     {id:3, name:"Fixed Assets",             type:"Asset",     parent:"Primary",
      sub:["Computers & Laptops","Servers & Networking","Furniture & Fixtures","Office Equipment","Vehicles","Software Licenses (Perpetual)","Leasehold Improvements"]},
     {id:4, name:"Accumulated Depreciation", type:"Asset",     parent:"Primary",

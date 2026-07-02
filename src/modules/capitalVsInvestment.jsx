@@ -195,7 +195,7 @@ export function CapitalVsInvestmentLive({ branch }) {
           </div>
 
           <div className="section seccap">
-            <div className="sec-band"><span className="sec-num">1</span><span className="sec-name">Capital Invested</span><span className="sec-sub">Capital Account + Reserves &amp; Surplus + accumulated P&amp;L{(t.quasiCapital || 0) > 0.5 ? " + director's loans (quasi-capital)" : ''} — from Balance Sheet</span></div>
+            <div className="sec-band"><span className="sec-num">1</span><span className="sec-name">Capital Invested</span><span className="sec-sub">Capital Account + Reserves &amp; Surplus + accumulated P&amp;L{(t.quasiCapital || 0) > 0.5 ? " + owner &amp; partner loans (quasi-capital)" : ''} — from Balance Sheet</span></div>
             <SecTable groups={[...(data.capital || []), ...(data.quasi || [])]} totalLabel="CAPITAL EMPLOYED" totalVal={t.capitalInvested} fmt={inr} />
           </div>
           <div className="sec-divider" />

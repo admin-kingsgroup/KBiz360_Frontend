@@ -56,18 +56,24 @@ describe('booking entry — no one-shot Save & Approve', () => {
     expect(screen.queryByRole('button', { name: /Cancel/i })).toBeNull();
   });
 
-  // Go-forward guard: inter-branch deals must be entered on the INB Voucher screen, not
-  // SO/PO/GP. Picking a "Travkings Tours and Travels <branch>" party warns + blocks Save.
-  test('SO/PO/GP form BLOCKS an inter-branch party — warns and disables Save', () => {
-    wrap(<SoPoGpVoucherEntry branch={{ code: 'BOM' }} setRoute={() => {}} editBooking={{ ...baseBooking, module: 'SF', supplier: { name: 'Travkings Tours and Travels AMD', ledgerName: 'Travkings Tours and Travels AMD' } }} />);
-    expect(screen.getByText(/Inter-branch party detected/i)).toBeInTheDocument();
+  // Go-forward guard is DIRECTION-specific. An inter-branch CUSTOMER (selling to another
+  // branch) must use the INB Voucher → blocked. An inter-branch SUPPLIER (buying from
+  // another branch — the buyer-side of a pushed INB deal) is a normal purchase → allowed.
+  test('SO/PO/GP form BLOCKS an inter-branch CUSTOMER (seller direction) — warns and disables Save', () => {
+    wrap(<SoPoGpVoucherEntry branch={{ code: 'BOM' }} setRoute={() => {}} editBooking={{ ...baseBooking, module: 'SF', customer: { name: 'Travkings Tours and Travels AMD', ledgerName: 'Travkings Tours and Travels AMD' } }} />);
+    expect(screen.getByText(/Inter-branch customer detected/i)).toBeInTheDocument();
     expect(screen.getByText(/Go to INB Voucher/i)).toBeInTheDocument();
     expect(screen.getByText(/Save changes \(Pending\)/i).closest('button')).toBeDisabled();
   });
 
+  test('SO/PO/GP form ALLOWS an inter-branch SUPPLIER (buyer direction) — no block', () => {
+    wrap(<SoPoGpVoucherEntry branch={{ code: 'BOM' }} setRoute={() => {}} editBooking={{ ...baseBooking, module: 'SF', supplier: { name: 'Travkings Tours and Travels AMD', ledgerName: 'Travkings Tours and Travels AMD' } }} />);
+    expect(screen.queryByText(/Inter-branch customer detected/i)).toBeNull();
+  });
+
   test('a normal (non inter-branch) SO/PO/GP booking shows NO inter-branch warning', () => {
     wrap(<SoPoGpVoucherEntry branch={{ code: 'BOM' }} setRoute={() => {}} editBooking={{ ...baseBooking, module: 'SF' }} />);
-    expect(screen.queryByText(/Inter-branch party detected/i)).toBeNull();
+    expect(screen.queryByText(/Inter-branch customer detected/i)).toBeNull();
   });
 
   // Regression: revoke re-opened the refund BLANK because the editor never hydrated the
