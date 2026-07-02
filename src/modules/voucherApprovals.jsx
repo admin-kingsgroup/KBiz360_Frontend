@@ -974,7 +974,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     });
     if (!confirmed) return;
     setBusy(true);
-    try { await apiPost('/api/inter-branch/revoke', { linkNo: d.linkNo, reason }); toast(`Revoked ${d.linkNo} → Pending`); qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); }
+    try { await apiPost('/api/inter-branch/revoke', { linkNo: d.linkNo, reason }); toast(`Revoked ${d.linkNo} → Pending`); qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['inb'] }); }
     catch (e) { toast((e && e.message) || 'Revoke failed', 'error'); }
     finally { setBusy(false); }
   };
