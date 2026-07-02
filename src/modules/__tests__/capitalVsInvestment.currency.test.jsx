@@ -48,39 +48,29 @@ test('USD branch (NBO) renders $ figures, not ₹', () => {
   expect(screen.getAllByText('Owner Capital')[0].closest('tr')).toHaveTextContent('$');
 });
 
-test('Complete Balance Sheet + P&L sections render every account in branch currency', () => {
+test('every section renders in branch currency (all sections always visible)', () => {
   render(<CapitalVsInvestmentLive branch={{ code: 'NBO' }} />);
-  // Sections 5 (complete BS) & 6 (complete P&L) start collapsed — expand all first.
-  fireEvent.click(screen.getByTitle('Expand every section'));
-  expect(screen.getByText('Bank HDFC').closest('tr')).toHaveTextContent('$');
+  // Section 5 (Balance Sheet) lists groups; Section 6 (P&L) lists ledgers — both in $.
+  expect(screen.getByText('Current Assets').closest('tr')).toHaveTextContent('$');
   expect(screen.getByText('Ticket Sales').closest('tr')).toHaveTextContent('$');
   expect(screen.getByText('Airline Cost')).toBeInTheDocument();
-  // Net Profit label is surfaced (the new P&L bridge / Section 6 total).
+  // Net Profit surfaces on both the KPI strip and the Section-6 total.
   expect(screen.getAllByText(/Net Profit/i).length).toBeGreaterThan(0);
 });
 
 test('accumulated-loss deduction renders as a Less: line in Section 1', () => {
   render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
-  // Section 1 (Capital Invested) is open by default → the deduction line is visible,
-  // so the ledger rows reconcile to CAPITAL EMPLOYED.
+  // The deduction line is visible so the ledger rows reconcile to CAPITAL EMPLOYED.
   expect(screen.getAllByText(/Less: Accumulated Loss/).length).toBeGreaterThan(0);
 });
 
-test('a section header toggles its own body on click', () => {
+test('section nav renders and selecting a chip marks it active', () => {
   render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
-  // Section 5 (Complete Balance Sheet) starts collapsed → its ledger is hidden.
-  expect(screen.queryByText('Bank HDFC')).toBeNull();
-  fireEvent.click(screen.getByText('Complete Balance Sheet')); // expand
-  expect(screen.getByText('Bank HDFC')).toBeInTheDocument();
-  fireEvent.click(screen.getByText('Complete Balance Sheet')); // collapse again
-  expect(screen.queryByText('Bank HDFC')).toBeNull();
-});
-
-test('collapse-all / expand-all flip every section together', () => {
-  render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
-  expect(screen.getAllByText('Owner Capital').length).toBeGreaterThan(0); // Section 1 open by default
-  fireEvent.click(screen.getByTitle('Collapse every section'));
-  expect(screen.queryByText('Owner Capital')).toBeNull();
-  fireEvent.click(screen.getByTitle('Expand every section'));
-  expect(screen.getByText('Bank HDFC')).toBeInTheDocument(); // Section 5 now open too
+  const bsTab = screen.getByRole('tab', { name: 'Balance Sheet' });
+  expect(bsTab).toBeInTheDocument();
+  // No collapse: Section 1 ledger + Section 5 group are both on screen without any click.
+  expect(screen.getAllByText('Owner Capital').length).toBeGreaterThan(0);
+  expect(screen.getByText('Current Assets')).toBeInTheDocument();
+  fireEvent.click(bsTab);
+  expect(bsTab).toHaveAttribute('aria-selected', 'true');
 });
