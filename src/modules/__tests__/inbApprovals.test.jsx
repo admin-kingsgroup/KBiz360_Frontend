@@ -50,12 +50,12 @@ import { InbApprovals } from '../voucherApprovals';
 
 // One INB deal = a SALE leg + a PURCHASE leg sharing the same sourceRef (INB Link No).
 const LINK = 'INB/BOM-AMD/26/0001';
-const mkLegs = (status) => [
+const mkLegs = (status, pushed = false) => [
   { id: 'sale1', vno: 'INB/BOM/26/0003', category: 'sale', type: 'INB', branch: 'BOM', party: 'Travkings Tours and Travels AMD',
-    date: '2026-06-23', sourceRef: LINK, status, total: 30551, taxAmt: 21.81, costCenter: 'BOM-INB-FLT-INT',
+    date: '2026-06-23', sourceRef: LINK, status, pushed, total: 30551, taxAmt: 21.81, costCenter: 'BOM-INB-FLT-INT',
     lines: [{ ledger: 'IT-Base Fare [IB]', amt: 25845 }, { ledger: 'IT-SVF [IB]', amt: 121.19 }] },
   { id: 'pur1', vno: 'INB/BOM/26/0004', category: 'purchase', type: 'INB', branch: 'BOM', party: 'TRIP JACK',
-    date: '2026-06-23', sourceRef: LINK, status, total: 29113, taxAmt: 0, costCenter: 'BOM-INB-FLT-INT',
+    date: '2026-06-23', sourceRef: LINK, status, pushed, total: 29113, taxAmt: 0, costCenter: 'BOM-INB-FLT-INT',
     lines: [{ ledger: 'IT-Base Fare [Pur]', amt: 25845 }] },
 ];
 
@@ -102,27 +102,28 @@ describe('INB SPG Approvals', () => {
     expect(screen.getAllByText('BOM → AMD', { exact: false })).toHaveLength(1);
   });
 
-  test('a posted (saved) deal shows under Approved & Pushed, not Pending', async () => {
-    mockApiGet.mockResolvedValue(mkLegs('saved'));
+  // Approve POSTS to our books → the deal is in the APPROVED tab (not Pending), still
+  // revocable, exposing a Push action. Approve is gone from that tab (already approved).
+  test('an approved (not-yet-pushed) deal shows under Approved with Push, not Pending', async () => {
+    mockApiGet.mockResolvedValue(mkLegs('approved', false));
     wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
     expect(await screen.findByText('No pending INB deals.', { exact: false })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Approved & Pushed/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Approved/ }));   // the "Approved" tab (not "Pushed")
     expect(screen.getByText(LINK, { exact: false })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
-  });
-
-  // Two-step INB workflow: an approved-but-un-pushed deal folds into the Pending tab
-  // (no separate Un-Pushed tab) and exposes a Push action that posts both legs via the
-  // deal-level /inter-branch/push.
-  test('an un-pushed deal shows in Pending with a Push action that posts it by INB Link No', async () => {
-    mockApiGet.mockResolvedValue(mkLegs('unpushed'));
-    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
-    // Un-pushed folds into the default Pending tab → shows Push (⇪), not Approve.
-    const pushBtn = await screen.findByRole('button', { name: /Push$/ });  // row "⇪ Push"
-    expect(pushBtn).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();   // already approved
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull(); // already approved
+    const pushBtn = screen.getByRole('button', { name: /Push$/ });        // row "⇪ Push"
     fireEvent.click(pushBtn);
     await waitFor(() => expect(mockApiPost).toHaveBeenCalledWith('/api/inter-branch/push', { linkNo: LINK }));
+  });
+
+  // A PUSHED deal is locked: it lives in the Pushed tab, read-only — no Push, no Revoke.
+  test('a pushed deal shows in the Pushed tab, locked (no Push/Revoke)', async () => {
+    mockApiGet.mockResolvedValue(mkLegs('approved', true));
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Pushed/ })); // the "Pushed" tab
+    expect(screen.getByText(LINK, { exact: false })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Push$/ })).toBeNull();      // locked
+    expect(screen.queryByRole('button', { name: /Revoke/ })).toBeNull();     // locked
   });
 
   // The Edited tab is a cross-cut fed by /api/vouchers/edited, filtered to type INB.
