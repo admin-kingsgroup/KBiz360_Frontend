@@ -149,13 +149,6 @@ const CSS = `
 .cvd .sec-hd .tt{font-size:14.5px;font-weight:800}
 .cvd .sec-hd .ds{font-size:11.5px;color:var(--dim);margin-top:1px}
 .cvd .sec-hd .right{margin-left:auto;font-size:13px;font-weight:800;text-align:right;white-space:nowrap}
-.cvd .sec-hd.clk{cursor:pointer;user-select:none}
-.cvd .sec-hd.clk:hover{background:#fafbfd}
-.cvd .sec-hd.clk:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
-.cvd .sec-hd .chev{flex:0 0 auto;font-size:20px;font-weight:800;color:var(--dim);line-height:1;transition:transform .2s}
-.cvd .sec-hd.open .chev{transform:rotate(90deg)}
-.cvd .sec-hd.clk .right{margin-left:auto}
-.cvd .sec-hd.clk .chev{margin-left:2px}
 .cvd table{width:100%;border-collapse:collapse}
 .cvd .reg{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .cvd .reg th{text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);font-weight:700;
@@ -301,9 +294,6 @@ export function CapitalVsInvestmentLive({ branch }) {
   const [preset, setPreset] = useState('cfy');
   const [hurdle, setHurdle] = useState(DEFAULT_HURDLE); // cost-of-capital % — editable
   const [active, setActive] = useState('ov');
-  // The three detail-heavy sections start collapsed; click the header to expand.
-  const [openSec, setOpenSec] = useState({ s4: false, s5: false, s6: false });
-  const toggleSec = (k) => setOpenSec((o) => ({ ...o, [k]: !o[k] }));
   const range = useMemo(() => periodRange(preset, { branch }), [preset, branch]);
   const cur = (bc(branch) || {}).cur || '₹';
   const inr = (n) => fmtAmt(cur, n);   // full amount in branch currency
@@ -536,12 +526,7 @@ export function CapitalVsInvestmentLive({ branch }) {
 
             {/* Section 4 · Performance */}
             <div className="card section" id="cvd-s4">
-              <div className={`sec-hd clk ${openSec.s4 ? 'open' : ''}`} role="button" tabIndex={0} aria-expanded={openSec.s4}
-                onClick={() => toggleSec('s4')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSec('s4'); } }}
-                title={openSec.s4 ? 'Click to collapse' : 'Click to expand'}>
-                <span className="no">4</span><div><div className="tt">Turnover · Gross Profit · Net Profit</div><div className="ds">Is the in-flow capital generating enough profit? — from P&amp;L</div></div><span className="right num" style={{ color: 'var(--violet)' }}>{inr(t.grossProfit)} GP</span><span className="chev" aria-hidden="true">›</span>
-              </div>
-              {openSec.s4 && (<>
+              <div className="sec-hd"><span className="no">4</span><div><div className="tt">Turnover · Gross Profit · Net Profit</div><div className="ds">Is the in-flow capital generating enough profit? — from P&amp;L</div></div><span className="right num" style={{ color: 'var(--violet)' }}>{inr(t.grossProfit)} GP</span></div>
               <div className="pad">
                 <div className="formula">
                   <div className="cell"><div className="l">Gross Profit</div><div className="v num">{cr(t.grossProfit)}</div></div>
@@ -559,32 +544,21 @@ export function CapitalVsInvestmentLive({ branch }) {
                 </div>
               </div>
               <Reg groups={data.revenue} totalLabel="GROSS PROFIT" totalVal={t.grossProfit} fmt={inr} />
-              </>)}
             </div>
 
             {/* Section 5 · Complete Balance Sheet */}
             <div className="card section" id="cvd-s5">
-              <div className={`sec-hd clk ${openSec.s5 ? 'open' : ''}`} role="button" tabIndex={0} aria-expanded={openSec.s5}
-                onClick={() => toggleSec('s5')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSec('s5'); } }}
-                title={openSec.s5 ? 'Click to collapse' : 'Click to expand'}>
-                <span className="no">5</span><div><div className="tt">Complete Balance Sheet</div><div className="ds">Every account, both sides — as on {dmy(range.to)} · {data.balanceSheet?.balanced ? 'balanced ✓' : '⚠ unbalanced'}</div></div><span className="right num">{inr(t.totalAssets)}</span><span className="chev" aria-hidden="true">›</span>
-              </div>
-              {openSec.s5 && (
+              <div className="sec-hd"><span className="no">5</span><div><div className="tt">Complete Balance Sheet</div><div className="ds">Every account, both sides — as on {dmy(range.to)} · {data.balanceSheet?.balanced ? 'balanced ✓' : '⚠ unbalanced'}</div></div><span className="right num">{inr(t.totalAssets)}</span></div>
               <div className="bsgrid">
                 <GroupList head="Liabilities & Equity" groups={data.balanceSheet?.liabilities} totalLabel="TOTAL LIABILITIES & EQUITY" totalVal={t.totalLiabilities} fmt={inr} />
                 <GroupList head="Assets" groups={data.balanceSheet?.assets} totalLabel="TOTAL ASSETS" totalVal={t.totalAssets} fmt={inr} />
               </div>
-              )}
             </div>
 
             {/* Section 6 · Complete P&L */}
             <div className="card section" id="cvd-s6">
-              <div className={`sec-hd clk ${openSec.s6 ? 'open' : ''}`} role="button" tabIndex={0} aria-expanded={openSec.s6}
-                onClick={() => toggleSec('s6')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSec('s6'); } }}
-                title={openSec.s6 ? 'Click to collapse' : 'Click to expand'}>
-                <span className="no">6</span><div><div className="tt">Complete Profit &amp; Loss</div><div className="ds">Every account — trading → Gross Profit {cr(t.grossProfit)} → Net Profit</div></div><span className="right num" style={{ color: 'var(--green)' }}>{inr(t.netProfit)} NP</span><span className="chev" aria-hidden="true">›</span>
-              </div>
-              {openSec.s6 && <Reg groups={plStatement} totalLabel="NET PROFIT" totalVal={t.netProfit} tone="green" fmt={inr} />}
+              <div className="sec-hd"><span className="no">6</span><div><div className="tt">Complete Profit &amp; Loss</div><div className="ds">Every account — trading → Gross Profit {cr(t.grossProfit)} → Net Profit</div></div><span className="right num" style={{ color: 'var(--green)' }}>{inr(t.netProfit)} NP</span></div>
+              <Reg groups={plStatement} totalLabel="NET PROFIT" totalVal={t.netProfit} tone="green" fmt={inr} />
             </div>
 
             <div className="foot">Read-only · live from the posted <b>Balance Sheet</b> and <b>Profit &amp; Loss</b>. Sequence: Capital Invested → less Capital Blocked → the residual In-Flow Capital that circulates. Section 4 tests whether that in-flow capital generates enough gross profit, benchmarked against the editable {hurdle}% cost-of-capital hurdle.</div>

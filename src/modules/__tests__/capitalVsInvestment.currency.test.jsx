@@ -51,26 +51,14 @@ test('USD branch (NBO) renders $ figures, not ₹', () => {
   expect(screen.getAllByText('Owner Capital')[0].closest('tr')).toHaveTextContent('$');
 });
 
-test('Balance Sheet & P&L expand on click and render in branch currency', () => {
+test('every section is always visible and renders in branch currency (no collapse)', () => {
   render(<CapitalVsInvestmentLive branch={{ code: 'NBO' }} />);
-  // Sections 5 & 6 start collapsed → content hidden.
-  expect(screen.queryByText('Current Assets')).toBeNull();
-  expect(screen.queryByText('Ticket Sales')).toBeNull();
-  fireEvent.click(screen.getByText('Complete Balance Sheet')); // expand Section 5
-  fireEvent.click(screen.getByText('Complete Profit & Loss')); // expand Section 6
+  // Section 5 (Balance Sheet) lists groups; Section 6 (P&L) lists ledgers — both in $,
+  // with no click needed since nothing collapses.
   expect(screen.getByText('Current Assets').closest('tr')).toHaveTextContent('$');
   expect(screen.getByText('Ticket Sales').closest('tr')).toHaveTextContent('$');
   expect(screen.getByText('Airline Cost')).toBeInTheDocument();
-});
-
-test('Performance / Balance Sheet / P&L collapse by default and expand on click', () => {
-  render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
-  expect(screen.queryByText(/GROSS PROFIT/)).toBeNull();  // Section 4 body hidden
-  expect(screen.queryByText('Current Assets')).toBeNull(); // Section 5 body hidden
-  fireEvent.click(screen.getByText('Turnover · Gross Profit · Net Profit'));
-  expect(screen.getByText(/GROSS PROFIT/)).toBeInTheDocument();
-  fireEvent.click(screen.getByText('Complete Balance Sheet'));
-  expect(screen.getByText('Current Assets')).toBeInTheDocument();
+  expect(screen.getByText(/GROSS PROFIT/)).toBeInTheDocument(); // Section 4 body visible
 });
 
 test('Section 1 shows Capital Invested and Capital Employed as distinct totals', () => {
