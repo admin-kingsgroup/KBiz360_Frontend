@@ -68,6 +68,21 @@ describe('pageCatalog — Page Visibility Control', () => {
     expect(committed).toEqual([...fresh].sort());
   });
 
+  test('Admin sub-menus (Assets / HO Control / Settings / Import-Export) nest under one "Admin" section', () => {
+    const catalog = buildPageCatalog();
+    const admin = catalog.find((s) => s.section === 'Admin');
+    expect(admin).toBeTruthy();                                   // there is a single "Admin" section
+    // …and NOT as separate top-level sections (they moved under Admin, like the top nav).
+    for (const s of ['Assets', 'HO Control', 'Settings', 'Import / Export Data']) {
+      expect(catalog.some((sec) => sec.section === s)).toBe(false);
+    }
+    // The Admin section carries those as its sub-groups.
+    const groups = new Set(admin.items.map((i) => i.group));
+    for (const g of ['Assets', 'HO Control', 'Settings', 'Import / Export Data']) {
+      expect(groups.has(g)).toBe(true);
+    }
+  });
+
   test('a NEW module added as a menu export is auto-discovered (no edit to pageCatalog)', () => {
     jest.isolateModules(() => {
       jest.doMock('../menus', () => ({

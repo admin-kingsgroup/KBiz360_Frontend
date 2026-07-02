@@ -65,12 +65,15 @@ function isMenuNode(v) {
 const PREFERRED_SECTIONS = [
   'MENU_DASHBOARDS', 'MENU_FINANCE', 'MENU_APPROVALS', 'MENU_ACCOUNTS', 'MENU_REPORTS',
   'TAX_ALL', 'TAX_INDIA', 'TAX_AFRICA', 'MENU_MASTERS', 'MENU_TRANSACTIONS',
-  'MENU_HR', 'MENU_ASSETS', 'MENU_HO_CONTROL', 'MENU_SETTINGS', 'MENU_IMPORT_EXPORT',
+  'MENU_HR', 'MENU_ADMIN',
 ];
-// Umbrella / alias exports skipped when auto-appending: they only RE-GROUP sections
-// already listed above (MENU_ADMIN nests HR/Assets/Settings/…; MENU_COMMON_TOP is an
-// array of pills already covered), so including them would duplicate, not add.
-const SECTION_SKIP = new Set(['MENU_ADMIN', 'MENU_COMMON_TOP']);
+// Exports skipped when auto-appending. MENU_COMMON_TOP is an array of pills already
+// covered elsewhere. MENU_ADMIN is the section root that NESTS Assets / HO Control /
+// Settings / Import-Export (mirroring the top-nav "Admin" dropdown), so those four are
+// skipped as standalone sections — they render as sub-groups under one "Admin" section.
+const SECTION_SKIP = new Set([
+  'MENU_COMMON_TOP', 'MENU_ASSETS', 'MENU_HO_CONTROL', 'MENU_SETTINGS', 'MENU_IMPORT_EXPORT',
+]);
 
 // The top-level sections to expose. We take the curated order first, then
 // AUTO-APPEND every OTHER menu tree the app exports that isn't already represented.
