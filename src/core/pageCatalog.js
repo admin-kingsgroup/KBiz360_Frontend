@@ -23,14 +23,18 @@ import * as DATA from './data';
 // catalogue expose EVERY page, including standalone routes not in any nav menu.
 import { APP_ROUTES, APP_ROUTE_LABELS } from './routeManifest.generated';
 
-// Who may open Page Visibility Control: ONLY afshin, by email — no role (not even
-// Super Admin / Senior Finance Manager) grants it. Mirrors the backend gate in
-// features/auth/auth.route.js (requirePageAccessAdmin) — keep both in sync.
+// Who may open Page Visibility Control: the group admin (afshin) plus the internal
+// developer account — gated by email, no role grants it. Mirrors the backend gate in
+// features/auth/auth.route.js (requirePageAccessAdmin) — keep both lists in sync.
 export const PAGE_ACCESS_ADMIN_EMAIL = 'afshin.dhanani@kingsgroupco.com';
+export const PAGE_ACCESS_ADMIN_EMAILS = new Set([
+  PAGE_ACCESS_ADMIN_EMAIL,
+  'developer@kingsgroupco.com',   // full-access developer account (for proper development)
+]);
 
 export function isPageAccessAdmin(user) {
   if (!user) return false;
-  return String(user.email || '').toLowerCase() === PAGE_ACCESS_ADMIN_EMAIL;
+  return PAGE_ACCESS_ADMIN_EMAILS.has(String(user.email || '').toLowerCase());
 }
 
 // The Owner Dashboard (consolidated, all-branch) is for the group owner ONLY:
