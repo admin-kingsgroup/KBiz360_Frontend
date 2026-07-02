@@ -27,7 +27,7 @@ import { useVNo } from '../../core/useNextNo';
 import { ARow, B, DBtn, FL, RPT_tdStyle, RPT_thStyle, SalespersonField, VHead, VNarr, VParty, VTot, VWrap, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../../core/styles';
 import { Dashboard } from '../dashboard';
 import { TDS_SECTIONS } from '../finance';
-import { ChartOfAccounts, MastersLedgers, MastersSubAgents } from '../masters';
+import { MastersSubAgents } from '../masters';
 import { ApiKeySettings } from '../settings';
 import { Form26AS } from '../taxation';
 import { NotificationCentre } from '../../shell/NotifPanel';

@@ -147,4 +147,5 @@ async function apiWrite(method, path, body) {
 
 export const apiPost   = (path, body) => apiWrite('post', path, body);
 export const apiPut    = (path, body) => apiWrite('put', path, body);
+export const apiPatch  = (path, body) => apiWrite('patch', path, body);
 export const apiDelete = (path)       => apiWrite('delete', path);

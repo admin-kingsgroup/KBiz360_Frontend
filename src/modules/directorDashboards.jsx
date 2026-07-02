@@ -92,7 +92,7 @@ function usePeriod(def = 'all') {
 
 // ── 1) Executive Overview ─────────────────────────────────────────────────────
 export function ExecutiveOverview({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   // Consolidated = Group/ALL scope: render the money KPIs PER BRANCH (each in its own
   // currency), never one merged cross-branch ₹ total. Driven by each hook's `byBranch`.
@@ -254,7 +254,7 @@ function deltaPct(cur, prev) { cur = Number(cur) || 0; prev = Number(prev) || 0;
 
 // ── 2) Profitability (P&L) ────────────────────────────────────────────────────
 export function ProfitabilityDash({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const pl = useProfitAndLoss(branch, range).data || {};
   const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
@@ -292,7 +292,7 @@ export function ProfitabilityDash({ branch, go }) {
 
 // ── 3) Cash & Liquidity ───────────────────────────────────────────────────────
 export function CashLiquidityDash({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   // Liquidity is a POSITION (as-of), not a period flow: read the trial balance with the
   // `from` bound dropped so each ledger's closing = opening + ALL movement up to the
@@ -332,7 +332,7 @@ export function CashLiquidityDash({ branch, go }) {
 
 // ── 4) Receivables & Payables ─────────────────────────────────────────────────
 export function ReceivablesPayablesDash({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   // Ageing is an as-of snapshot — drive it off the period's `to` so the period bar
   // actually changes the view (previously it always showed "as of today").
@@ -374,7 +374,7 @@ export function ReceivablesPayablesDash({ branch, go }) {
 // per currency (the "combined" report) — respecting that branches in different
 // currencies can't be summed without forex.
 export function BranchPerformanceDash({ go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const BR = branchList(); // live branches (code + currency)
   // Two parallel fan-outs per branch: P&L (module-pl) and capital (capital-analysis).
   const plQ = useQueries({
@@ -526,7 +526,7 @@ const topBy = (rows, keyFn, valFn, n = 10) => {
 
 // ── 6) Balance Sheet ──────────────────────────────────────────────────────────
 export function BalanceSheetDash({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const bsQ = useBalanceSheet(branch, { to: range.to }); const bs = bsQ.data || {};
   const assets = bs.assets || [], liabs = bs.liabilities || [];
@@ -558,7 +558,7 @@ export function BalanceSheetDash({ branch, go }) {
 
 // ── 7) Module / Product GP ────────────────────────────────────────────────────
 export function ModuleGpDash({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
   const mods = mpl.modules || [], t = mpl.totals || {};
@@ -588,7 +588,7 @@ export function ModuleGpDash({ branch, go }) {
 
 // ── 8) Sales & Bookings ───────────────────────────────────────────────────────
 export function SalesBookingsDash({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
   const igp = useInvoiceGP(branch, range).data || {};
@@ -614,7 +614,7 @@ export function SalesBookingsDash({ branch, go }) {
 
 // ── 9) Supplier / Purchase ────────────────────────────────────────────────────
 export function SupplierPurchaseDash({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
   const igp = useInvoiceGP(branch, range).data || {};
@@ -642,7 +642,7 @@ export function SupplierPurchaseDash({ branch, go }) {
 
 // ── 10) Tax & Compliance ──────────────────────────────────────────────────────
 export function TaxComplianceDash({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const tax = useTaxSummary(branch, range).data || {};
   return (
@@ -664,7 +664,7 @@ export function TaxComplianceDash({ branch, go }) {
 
 // ── 11) Expenses ──────────────────────────────────────────────────────────────
 export function ExpensesDash({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
  
   const mpl = useModulePL(branch, range).data || {};
@@ -742,7 +742,7 @@ const stLabel = (s) => ({ met: '✓ Met', warn: '⚠ Near', short: '✗ Short', 
 
 // ── 13/14/15) Sales / GP / Collections vs Target ──────────────────────────────
 export function VsTargetDash({ branch, metric = 'sales', go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const d = useTargetsVsActual(branch, metric, { ...range, fy: fyStr() }).data || {};
   const t = d.totals || {}, rows = d.rows || [];
@@ -780,7 +780,7 @@ export function VsTargetDash({ branch, metric = 'sales', go }) {
 
 // ── 16) Budget vs Expense ─────────────────────────────────────────────────────
 export function BudgetVsExpenseDash({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const d = useBudgetVsActual(branch, { ...range, fy: fyStr() }).data || {};
   const t = d.totals || {}, rows = d.rows || [];
@@ -816,7 +816,7 @@ export function BudgetVsExpenseDash({ branch, go }) {
 // stay live as the deep-dive views. NP actual = P&L netProfit; NP target = the
 // company-total 'np' SalesTarget (metric added to the targets master).
 export function PerformanceDash({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const fy = fyStr();
   const salesQ = useTargetsVsActual(branch, 'sales', { ...range, fy });
@@ -1030,7 +1030,7 @@ export function CashForecastDash({ branch, go }) {
 // window one year earlier (defaults to FY-to-date). Growth is good on Income lines,
 // bad on Cost lines — colour follows the line's `group`.
 export function YoYGrowthDash({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const yq = useYearOverYear(branch, range); const d = yq.data || {};
   const rows = d.rows || [];
@@ -1083,7 +1083,7 @@ export function YoYGrowthDash({ branch, go }) {
 // merged with the ABC/Pareto class (/abc-analysis?by=customer). A-class customers
 // are the ~top 80% of revenue — the relationships to protect.
 export function CustomerValueDash({ branch, go }) {
-  const p = usePeriod('cfy'); const range = p.range;
+  const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
   const lq = useCustomerLtv(branch, range); const ltv = lq.data || {};
   const abc = useAbcAnalysis(branch, { ...range, by: 'customer' }).data || {};

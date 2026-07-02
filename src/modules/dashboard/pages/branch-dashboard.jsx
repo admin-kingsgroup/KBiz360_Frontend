@@ -32,7 +32,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
   const { navigate } = useDashboardActions(setRoute);
   // Period drives the financial bands (P&L / Balance Sheet / ageing / targets) added
   // below the operational KPIs. The bundled ops payload above stays MTD/YTD as-is.
-  const [range, setRange] = useState(() => periodRange('cfy', { branch }));
+  const [range, setRange] = useState(() => periodRange('all', { branch }));
   // Live cash/bank position AS OF the period end — Σ closing of cash & bank ledgers.
   // Pass ONLY `to` (no `from`): a point-in-time closing balance must carry the full
   // opening + ALL movement up to `to`; a `from` cutoff would drop pre-period activity
@@ -82,7 +82,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
 
       {/* Period selector — scopes the financial bands (P&L / cash / balance / targets) */}
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <PeriodBar branch={branch} defaultPreset="cfy" compact onChange={setRange} />
+        <PeriodBar branch={branch} defaultPreset="all" compact onChange={setRange} />
         <span className="text-[11px] font-semibold text-ink-muted">Financials: {range.label}</span>
       </div>
 
@@ -199,7 +199,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
         <KpiTile
           label="Approved Sales"
           value={formatMoney(ab.sales)}
-          sub={`${ab.count} approved booking${ab.count === 1 ? '' : 's'}`}
+          sub={`${ab.count} approved · pipeline (all dates)`}
           icon="🧾"
           color="#2563eb"
           onClick={() => navigate('/bookings/approved')}
@@ -215,7 +215,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
         <KpiTile
           label="Approved GP"
           value={formatMoney(ab.gp)}
-          sub={ab.sales > 0 ? `${((ab.gp / ab.sales) * 100).toFixed(1)}% GP` : 'approved bookings'}
+          sub={ab.sales > 0 ? `${((ab.gp / ab.sales) * 100).toFixed(1)}% GP · pipeline` : 'pipeline (all dates)'}
           icon="📈"
           color="#16a34a"
           onClick={() => navigate('/bookings/approved')}
@@ -223,7 +223,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
         <KpiTile
           label="Pending Sales"
           value={formatMoney(pb.sales)}
-          sub={`${pb.count} pending booking${pb.count === 1 ? '' : 's'}`}
+          sub={`${pb.count} pending · pipeline (all dates)`}
           icon="🧾"
           color="#2563eb"
           onClick={() => navigate('/bookings/pending')}
@@ -239,7 +239,7 @@ export function BranchDashboardPage({ branch, setRoute }) {
         <KpiTile
           label="Pending GP"
           value={formatMoney(pb.gp)}
-          sub={pb.sales > 0 ? `${((pb.gp / pb.sales) * 100).toFixed(1)}% GP` : 'SO/PO/GP queue'}
+          sub={pb.sales > 0 ? `${((pb.gp / pb.sales) * 100).toFixed(1)}% GP · pipeline` : 'pipeline (all dates)'}
           icon="⌛"
           color="#16a34a"
           onClick={() => navigate('/bookings/pending')}

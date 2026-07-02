@@ -14,6 +14,8 @@ jest.mock('../api', () => ({
   getArAgeingSummary: jest.fn(async () => []),
   getApAgeingSummary: jest.fn(async () => []),
   getBookingSummary: jest.fn(async () => ({ pending: {}, approved: {}, rejected: {}, deleted: {} })),
+  getSalesReconciliation: jest.fn(async () => ({ revenue: 0, buckets: [], bucketSum: 0, residual: 0, reconciles: true })),
+  getGpReconciliation: jest.fn(async () => ({ gp: 0, buckets: [], bucketSum: 0, residual: 0, reconciles: true })),
   getSaleVouchers: jest.fn(async () => [
     { consultant: 'Alice', subtotal: 1000 },
     { consultant: 'Alice', subtotal: 500 },

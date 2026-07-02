@@ -181,27 +181,6 @@ export function useLedgerComponents(name, branch, { from, to, costCenter } = {},
   });
 }
 
-export function useLedgerGroups() {
-  return useQuery({
-    queryKey: ['accounting', 'groups'],
-    queryFn: () => apiGet('/api/accounting/groups'),
-    enabled: enabled(),
-    staleTime: 5 * 60_000, // the 28 groups are effectively static
-  });
-}
-
-// Full Chart-of-Accounts hierarchy: primary groups → (system) groups → custom
-// sub-groups → ledgers. Authoritative nesting (same buildTree the BS/P&L use).
-export function useGroupTree(branch) {
-  const code = branchCode(branch);
-  return useQuery({
-    queryKey: ['groups', 'tree', code || 'all'],
-    queryFn: () => apiGet('/api/groups/tree', { branch: code }),
-    enabled: enabled(),
-    staleTime: 60_000,
-  });
-}
-
 // Voucher approval queue (gated types: payment/receipt/contra/journal/CN/DN/PXP).
 // Returns { counts, status, entries, byGroup, bySubGroup, byLedger }.
 export function useVoucherApprovals(branch, status = 'pending', { from, to } = {}) {

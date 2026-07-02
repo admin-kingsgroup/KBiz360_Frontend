@@ -1,7 +1,7 @@
 import React from 'react';
 import { DashboardHeader } from '../../../core/helpers';
 import { KPICard, WidgetCard } from '../../../core/styles';
-import { compactAmt } from '../../../core/format';
+import { compactAmt, localeOf } from '../../../core/format';
 import { bc } from '../../../core/styleTokens';
 import { CUR_FY } from '../../../core/dates';
 import { PageLayout } from '../../../shell/PageLayout';
@@ -94,8 +94,11 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch, setBranch
   const { data, isLoading, isError, error, refetch } = useDirectorDashboard({ scope: effScope, from: period.from, to: period.to });
   const cur = bc(branch).cur;
   const m0 = (n) => compactAmt(Math.round(Number(n) || 0), { currency: cur });
+  // Full grouped amount (exact figure shown under the compact Revenue/GP KPI).
+  const mFull = (n) => `${cur}${Math.round(Number(n) || 0).toLocaleString(localeOf(cur))}`;
   // Per-branch money formatter — value in the given branch CODE's own currency.
   const mB = (code, n) => compactAmt(Math.round(Number(n) || 0), { currency: bc({ code }).cur });
+  const mBFull = (code, n) => { const c = bc({ code }).cur; return `${c}${Math.round(Number(n) || 0).toLocaleString(localeOf(c))}`; };
   const mpl = useModulePL(branchArg, { ...dates, summary: true }).data || {};
   const age = useAgeing(branchArg).data || {};
 
@@ -206,8 +209,8 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch, setBranch
                 <span className="text-[11px] font-bold text-ink-muted">· {bc({ code: r.code }).cur}</span>
               </div>
               <ResponsiveGrid min="180px" gap="md">
-                <KPICard label={`Revenue · ${rangeShort}`} value={mB(r.code, r.revenue)} delta="" color="#c2a04a" onClick={() => drillBranch(r.code, '/reports/pnl')} />
-                <KPICard label="Gross Profit" value={mB(r.code, r.gp)} delta={r.gpPct ? `${r.gpPct.toFixed(1)}% GP` : ''} color="#16a34a" onClick={() => drillBranch(r.code, '/reports/gp')} />
+                <KPICard label={`Revenue · ${rangeShort}`} value={mB(r.code, r.revenue)} delta={mBFull(r.code, r.revenue)} color="#c2a04a" onClick={() => drillBranch(r.code, '/reports/pnl')} />
+                <KPICard label="Gross Profit" value={mB(r.code, r.gp)} delta={`${r.gpPct ? r.gpPct.toFixed(1) + '% GP · ' : ''}${mBFull(r.code, r.gp)}`} color="#16a34a" onClick={() => drillBranch(r.code, '/reports/gp')} />
                 <KPICard label="Net Profit" value={mB(r.code, r.net)} delta={r.revenue ? `${((r.net / r.revenue) * 100).toFixed(1)}% margin` : ''} color={r.net >= 0 ? C.green : C.red} onClick={() => drillBranch(r.code, '/reports/pnl')} />
                 <KPICard label="Receivables" value={mB(r.code, r.outstanding)} delta={r.arOverdue ? `${mB(r.code, r.arOverdue)} overdue 90+` : 'to collect'} color={r.arOverdue ? C.red : C.gold} onClick={() => drillBranch(r.code, '/dashboards/arap')} />
                 <KPICard label="Payables" value={mB(r.code, r.payable)} delta="to pay" color={C.red} onClick={() => drillBranch(r.code, '/dashboards/arap')} />
@@ -217,8 +220,8 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch, setBranch
         </div>
       ) : (
         <ResponsiveGrid min="180px" gap="md" className="mb-4">
-          <KPICard label={`Revenue · ${rangeShort}`} value={m0(fig.revenue)} delta="" color="#c2a04a" onClick={() => navigate('/reports/pnl')} />
-          <KPICard label="Gross Profit" value={m0(fig.gp)} delta={fig.gpPct ? `${Number(fig.gpPct).toFixed(1)}% GP` : ''} color="#16a34a" onClick={() => navigate('/reports/gp')} />
+          <KPICard label={`Revenue · ${rangeShort}`} value={m0(fig.revenue)} delta={mFull(fig.revenue)} color="#c2a04a" onClick={() => navigate('/reports/pnl')} />
+          <KPICard label="Gross Profit" value={m0(fig.gp)} delta={`${fig.gpPct ? Number(fig.gpPct).toFixed(1) + '% GP · ' : ''}${mFull(fig.gp)}`} color="#16a34a" onClick={() => navigate('/reports/gp')} />
           <KPICard label="Net Profit" value={m0(fig.netProfit)} delta={fig.revenue ? `${((fig.netProfit / fig.revenue) * 100).toFixed(1)}% margin` : ''} color={fig.netProfit >= 0 ? C.green : C.red} onClick={() => navigate('/reports/pnl')} />
           <KPICard label="Receivables" value={m0(fig.outstanding)} delta={arOverdue ? `${m0(arOverdue)} overdue 90+` : 'to collect'} color={arOverdue ? C.red : C.gold} onClick={() => navigate('/dashboards/arap')} />
           <KPICard label="Payables" value={m0(fig.payable)} delta="to pay" color={C.red} onClick={() => navigate('/dashboards/arap')} />
@@ -227,8 +230,9 @@ export function DirectorDashboardPage({ currentUser, setRoute, branch, setBranch
       )}
 
       {/* ── Bookings pipeline ── on Group/ALL: per branch, each in its own currency
-          (Sales/GP money never summed across branches). */}
-      <div className="mb-1.5 text-xs font-semibold text-ink-muted">SO/PO/GP Pipeline · {rangeShort}</div>
+          (Sales/GP money never summed across branches). The booking queue is NOT
+          date-bound, so the header says "whole queue" rather than the selected period. */}
+      <div className="mb-1.5 text-xs font-semibold text-ink-muted">SO/PO/GP Pipeline <span className="font-normal">· whole queue (not date-bound)</span></div>
       {isGroup && Array.isArray(data.bookingsByBranch) ? (
         <div className="mb-4">
           {data.bookingsByBranch.length === 0 && (

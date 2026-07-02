@@ -726,6 +726,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   const [sel, setSel] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState(initialSearch || '');
+  const [editId, setEditId] = useState(null);  // INB leg being edited in the modal (reuses the Vouchers editor)
 
   // One fetch of every INB voucher (both legs of every deal, all statuses) — INB
   // volume is small, so we group + count + filter client-side, mirroring how the
@@ -914,6 +915,8 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                       {pendingTab
                         ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
                             {isApprover ? <>
+                              {d.sale && <button disabled={busy} onClick={() => setEditId(d.sale.id || d.sale._id)} title="Edit the INB sale leg, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Sale</button>}
+                              {d.purchase && <button disabled={busy} onClick={() => setEditId(d.purchase.id || d.purchase._id)} title="Edit the airline purchase leg, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Pur</button>}
                               <button disabled={busy} onClick={() => doApprove([d])} style={{ marginRight: 6, padding: '5px 10px', background: C.green, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Approve</button>
                               <button disabled={busy} onClick={() => doReject(d)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
                             </> : <span style={{ fontSize: 11, color: C.dim }}>Approver only</span>}
@@ -937,6 +940,24 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
           )}
       </div>
       <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>INB SPG vouchers post as <b>Pending</b> and hit the books only on approval — the INB Sale and its airline Purchase post together under one INB Link No. Click a row for the JV (Dr/Cr) of both legs.</div>
+
+      {/* Edit an INB leg in place (reuses the Vouchers editor). Saving reverts the leg to
+          Pending; then Approve/Reject the deal on its row. Legs are editable only while
+          Pending — the backend allows a locked INB leg to be edited only in that state. */}
+      {editId && (
+        <div onClick={async () => { const { confirmed } = await confirmDialog({ title: 'Discard changes to this voucher?', message: 'Any edits you have not saved will be lost.', confirmLabel: 'Discard', danger: true }); if (confirmed) setEditId(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 900, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '5vh 12px' }}>
+          <div role="dialog" aria-modal="true" aria-label="Edit INB voucher" onClick={(ev) => ev.stopPropagation()} style={{ background: '#fff', width: 'min(720px, 96vw)', maxHeight: '90vh', overflowY: 'auto', borderRadius: 10, boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, background: '#fff' }}>
+              <strong style={{ color: C.dark }}>Edit INB Leg — fix &amp; approve</strong>
+              <button onClick={() => setEditId(null)} aria-label="Close editor" style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: C.dim }}>✕</button>
+            </div>
+            <div style={{ padding: 4 }}>
+              <VoucherEditor voucherId={editId} cur={cur} onBack={() => setEditId(null)} />
+            </div>
+            <div style={{ padding: '8px 16px', fontSize: 11, color: C.dim, borderTop: `1px solid ${C.border}` }}>Tip: edit the leg's amounts/ledgers so it balances, Save (reverts it to Pending), then click Approve on the row.</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

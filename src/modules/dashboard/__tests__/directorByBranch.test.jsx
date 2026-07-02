@@ -36,7 +36,7 @@ jest.mock('../../../core/period', () => ({ PeriodBar: () => null, periodRange: (
 jest.mock('../../../core/styleTokens', () => ({
   bc: (arg) => { const code = typeof arg === 'string' ? arg : arg && arg.code; return { cur: ['NBO', 'DAR', 'FBM'].includes(code) ? '$' : '₹' }; },
 }));
-jest.mock('../../../core/format', () => ({ compactAmt: (n, opts) => `${(opts && opts.currency) || ''}${Math.round(Number(n) || 0)}` }));
+jest.mock('../../../core/format', () => ({ compactAmt: (n, opts) => `${(opts && opts.currency) || ''}${Math.round(Number(n) || 0)}`, localeOf: () => 'en-IN' }));
 jest.mock('../../../core/styles', () => ({
   KPICard: ({ label, value, delta, onClick }) => <button onClick={onClick}>{`KPI|${label}|${value}|${delta || ''}`}</button>,
   WidgetCard: ({ title, children, onDrill }) => <div>{title}{onDrill && <button onClick={onDrill}>{`drill:${title}`}</button>}{children}</div>,
@@ -74,14 +74,14 @@ describe('Director Dashboard — Group/ALL per-branch wiring', () => {
 
   test('per-branch KPI cards render each branch in its own currency (NBO GP $200, BOM ₹300)', () => {
     render(<DirectorDashboardPage currentUser={{ name: 'Dir' }} setRoute={jest.fn()} branch={'ALL'} />);
-    expect(screen.getByText('KPI|Gross Profit|$200|40.0% GP')).toBeInTheDocument();   // NBO in USD
-    expect(screen.getByText('KPI|Gross Profit|₹300|30.0% GP')).toBeInTheDocument();   // BOM in ₹
+    expect(screen.getByText('KPI|Gross Profit|$200|40.0% GP · $200')).toBeInTheDocument();   // NBO in USD
+    expect(screen.getByText('KPI|Gross Profit|₹300|30.0% GP · ₹300')).toBeInTheDocument();   // BOM in ₹
   });
 
   test('per-branch drill switches the global branch selector to the clicked branch, then navigates', () => {
     const setBranch = jest.fn();
     render(<DirectorDashboardPage currentUser={{ name: 'Dir' }} setRoute={jest.fn()} setBranch={setBranch} branch={'ALL'} />);
-    fireEvent.click(screen.getByText('KPI|Gross Profit|$200|40.0% GP'));   // NBO GP card
+    fireEvent.click(screen.getByText('KPI|Gross Profit|$200|40.0% GP · $200'));   // NBO GP card
     expect(setBranch).toHaveBeenCalledWith(expect.objectContaining({ code: 'NBO' }));
     expect(mockNavigate).toHaveBeenCalledWith('/reports/gp');
   });

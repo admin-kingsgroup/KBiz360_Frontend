@@ -385,7 +385,7 @@ export const ROUTE_TITLES={
   "/settings/users":       "Users & Roles",
   "/settings/audit":       "Audit Log",
   "/accounts/statistics":  "Statistics",
-  "/masters/groups":       "Chart of Accounts",
+  "/masters/groups":       "Masters — Groups",
   "/masters/ledgers":      "Masters — Ledgers",
   "/masters/customers":    "Masters — Customers",
   "/masters/suppliers":    "Masters — Suppliers",

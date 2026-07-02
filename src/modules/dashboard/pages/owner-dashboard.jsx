@@ -1,7 +1,7 @@
 import React from 'react';
 import { DashboardHeader } from '../../../core/helpers';
 import { KPICard, WidgetCard } from '../../../core/styles';
-import { compactAmt } from '../../../core/format';
+import { compactAmt, localeOf } from '../../../core/format';
 import { bc } from '../../../core/styleTokens';
 import { CUR_FY } from '../../../core/dates';
 import { PageLayout } from '../../../shell/PageLayout';
@@ -84,11 +84,11 @@ function FinancialTables({ mods = [], assets = [], liabs = [], rec, pay, recRows
           Bills per ledger (Final Total reconciles to the Unsettled Bills tile). Same no-FIFO
           truth the AR/AP reports settle against — the reports carry the identical view. */}
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
-        <WidgetCard title="Receivables — Ageing & Settlement" subtitle="Bills · settled · unsettled · ageing of open bills" color="#dc2626" onDrill={() => nav('/dashboards/arap')}>
-          <ArApSettlementView side="receivable" totals={rec || {}} rows={recRows} formatMoney={fmt} maxRows={6} />
+        <WidgetCard title="Receivables — Ageing & Settlement" subtitle="Bills · settled · unsettled · ageing by sub-group" color="#dc2626" onDrill={() => nav('/reports/rec')}>
+          <ArApSettlementView side="receivable" totals={rec || {}} rows={recRows} formatMoney={fmt} collapsed />
         </WidgetCard>
-        <WidgetCard title="Payables — Ageing & Settlement" subtitle="Bills · settled · unsettled · ageing of open bills" color="#16a34a" onDrill={() => nav('/dashboards/arap')}>
-          <ArApSettlementView side="payable" totals={pay || {}} rows={payRows} formatMoney={fmt} maxRows={6} />
+        <WidgetCard title="Payables — Ageing & Settlement" subtitle="Bills · settled · unsettled · ageing by sub-group" color="#16a34a" onDrill={() => nav('/reports/pay')}>
+          <ArApSettlementView side="payable" totals={pay || {}} rows={payRows} formatMoney={fmt} collapsed />
         </WidgetCard>
       </div>
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
@@ -133,8 +133,14 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
   const { data, totalCashInr, isLoading, isError, error, refetch } = useDirectorDashboard({ scope: effScope, from: period.from, to: period.to });
   const cur = bc(branch).cur;
   const m0 = (n) => compactAmt(Math.round(Number(n) || 0), { currency: cur });
+  // FULL grouped amount (no Cr/L abbreviation) — used by the reconciliation bridges so
+  // every bucket foots to the total ON SCREEN. Compact units (mixing Cr & L across rows,
+  // each independently rounded) made the bridge look like it didn't add up.
+  const mFull = (n) => `${cur}${Math.round(Number(n) || 0).toLocaleString(localeOf(cur))}`;
   // Per-branch money formatter — value in the given branch CODE's own currency.
   const mB = (code, n) => compactAmt(Math.round(Number(n) || 0), { currency: bc({ code }).cur });
+  // Full grouped, per branch currency — the exact figure shown under the compact KPI.
+  const mBFull = (code, n) => { const c = bc({ code }).cur; return `${c}${Math.round(Number(n) || 0).toLocaleString(localeOf(c))}`; };
   const mpl = useModulePL(branchArg, { ...dates, summary: true }).data || {};
   const bs = useBalanceSheet(branchArg, { to: dates.to }).data || {};
   const age = useAgeing(branchArg).data || {};
@@ -270,8 +276,8 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
               </div>
               <ResponsiveGrid min="180px" gap="md">
                 <KPICard label="Cash & Bank" value={mB(r.code, r.liquid)} delta={r.liquid < 0 ? 'overdrawn' : 'liquid'} color={r.liquid < 0 ? C.red : '#16a34a'} onClick={() => drillBranch(r.code, '/dashboards/cash')} />
-                <KPICard label={`Revenue · ${rangeShort}`} value={mB(r.code, r.revenue)} delta="" color="#c2a04a" onClick={() => drillBranch(r.code, '/reports/pnl')} />
-                <KPICard label="Gross Profit" value={mB(r.code, r.gp)} delta={r.gpPct ? `${r.gpPct.toFixed(1)}% GP` : ''} color="#16a34a" onClick={() => drillBranch(r.code, '/reports/gp')} />
+                <KPICard label={`Revenue · ${rangeShort}`} value={mB(r.code, r.revenue)} delta={mBFull(r.code, r.revenue)} color="#c2a04a" onClick={() => drillBranch(r.code, '/reports/pnl')} />
+                <KPICard label="Gross Profit" value={mB(r.code, r.gp)} delta={`${r.gpPct ? r.gpPct.toFixed(1) + '% GP · ' : ''}${mBFull(r.code, r.gp)}`} color="#16a34a" onClick={() => drillBranch(r.code, '/reports/gp')} />
                 <KPICard label="Net Profit" value={mB(r.code, r.net)} delta={r.revenue ? `${((r.net / r.revenue) * 100).toFixed(1)}% margin` : ''} color={r.net >= 0 ? C.green : C.red} onClick={() => drillBranch(r.code, '/reports/pnl')} />
                 <KPICard label="Receivables" value={mB(r.code, r.outstanding)} delta={r.arOverdue ? `${mB(r.code, r.arOverdue)} overdue 90+` : 'to collect'} color={r.arOverdue ? C.red : C.gold} onClick={() => drillBranch(r.code, '/dashboards/arap')} />
                 <KPICard label="Payables" value={mB(r.code, r.payable)} delta="to pay" color={C.red} onClick={() => drillBranch(r.code, '/dashboards/arap')} />
@@ -283,8 +289,8 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
       ) : (
         <ResponsiveGrid min="180px" gap="md" className="mb-4">
           <KPICard label="Cash & Bank" value={m0(liquid)} delta={liquid < 0 ? 'overdrawn' : 'liquid'} color={liquid < 0 ? C.red : '#16a34a'} onClick={() => navigate('/dashboards/cash')} />
-          <KPICard label={`Revenue · ${rangeShort}`} value={m0(fig.revenue)} delta="" color="#c2a04a" onClick={() => navigate('/reports/pnl')} />
-          <KPICard label="Gross Profit" value={m0(fig.gp)} delta={fig.gpPct ? `${Number(fig.gpPct).toFixed(1)}% GP` : ''} color="#16a34a" onClick={() => navigate('/reports/gp')} />
+          <KPICard label={`Revenue · ${rangeShort}`} value={m0(fig.revenue)} delta={mFull(fig.revenue)} color="#c2a04a" onClick={() => navigate('/reports/pnl')} />
+          <KPICard label="Gross Profit" value={m0(fig.gp)} delta={`${fig.gpPct ? Number(fig.gpPct).toFixed(1) + '% GP · ' : ''}${mFull(fig.gp)}`} color="#16a34a" onClick={() => navigate('/reports/gp')} />
           <KPICard label="Net Profit" value={m0(fig.netProfit)} delta={fig.revenue ? `${((fig.netProfit / fig.revenue) * 100).toFixed(1)}% margin` : ''} color={fig.netProfit >= 0 ? C.green : C.red} onClick={() => navigate('/reports/pnl')} />
           <KPICard label="Receivables" value={m0(fig.outstanding)} delta={arOverdue ? `${m0(arOverdue)} overdue 90+` : 'to collect'} color={arOverdue ? C.red : C.gold} onClick={() => navigate('/dashboards/arap')} />
           <KPICard label="Payables" value={m0(fig.payable)} delta="to pay" color={C.red} onClick={() => navigate('/dashboards/arap')} />
@@ -293,9 +299,98 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
         </ResponsiveGrid>
       )}
 
+      {/* ── Sales Reconciliation (single-branch only — no cross-currency merge on Group) ──
+          Proves the Revenue KPI BY ORIGIN: Revenue = SO/PO/GP + INB − Refund/Reissue
+          (+ Other/Manual). Same Sales-Accounts source as the Revenue card, so it foots
+          to the rupee; each line drills into its Approvals register. */}
+      {!isAll && data.salesRecon && (data.salesRecon.buckets || []).length > 0 && (data.salesRecon.revenue || data.salesRecon.bucketSum) ? (
+        <div className="mb-4">
+          <div className="mb-1.5 text-xs font-semibold text-ink-muted">
+            Sales Reconciliation · {rangeShort} <span className="font-normal">— how the Revenue figure is composed</span>
+          </div>
+          <div className="rounded-brand border border-surface-border bg-surface px-4 py-3">
+            <div className="flex items-baseline justify-between border-b-2 pb-2" style={{ borderColor: '#185FA5' }}>
+              <span className="text-sm font-extrabold text-ink">Revenue · {rangeShort}</span>
+              <span className="text-lg font-extrabold tabular-nums" style={{ color: '#c2a04a' }}>{mFull(data.salesRecon.revenue)}</span>
+            </div>
+            {data.salesRecon.buckets.map((b) => {
+              // Operator + colour follow the SIGNED amount (refund is naturally negative),
+              // and we render the absolute value so a subtracted line reads "− ₹21.8L",
+              // not a confusing "− … -₹21.8L". Empty catch-all (Other = 0) is inert & dim.
+              const neg = b.amount < 0;
+              const empty = b.amount === 0 && b.count === 0;
+              const inner = (
+                <>
+                  <span className="flex items-center gap-2 text-xs text-ink-muted">
+                    <span className="w-3 text-center font-bold" style={{ color: neg ? C.red : C.green }}>{neg ? '−' : '+'}</span>
+                    {b.label}
+                    {b.count ? <span className="text-[11px] text-ink-muted">· {b.count}</span> : null}
+                  </span>
+                  <span className={`text-sm font-bold tabular-nums ${empty ? 'text-ink-muted' : 'text-ink'}`}>{mFull(Math.abs(b.amount))}</span>
+                </>
+              );
+              return empty ? (
+                <div key={b.key} className="flex w-full items-center justify-between py-1.5 opacity-60">{inner}</div>
+              ) : (
+                <button key={b.key} type="button" onClick={() => navigate(`/transactions/approvals?tab=${b.key}`)} className="flex w-full items-center justify-between py-1.5 text-left hover:opacity-80">{inner}</button>
+              );
+            })}
+            {!data.salesRecon.reconciles && (
+              <div className="mt-1 rounded border px-2 py-1 text-[11px] font-semibold" style={{ borderColor: C.red, color: C.red }}>
+                Unreconciled by {mFull(Math.abs(data.salesRecon.residual))} — a Sales-ledger posting isn't classified; see the Other/Manual bucket.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Gross-Profit Reconciliation (single-branch only) ──
+          Proves the GP KPI BY ORIGIN: GP = SO/PO/GP + INB + Refund/Reissue +
+          Commission/Adjustments (+ Other). Same 6 GP heads as the GP card, so it foots
+          to the rupee; the Commission/Discounts/JV line is a material, real bucket. */}
+      {!isAll && data.gpRecon && (data.gpRecon.buckets || []).length > 0 && (data.gpRecon.gp || data.gpRecon.bucketSum) ? (
+        <div className="mb-4">
+          <div className="mb-1.5 text-xs font-semibold text-ink-muted">
+            Gross Profit Reconciliation · {rangeShort} <span className="font-normal">— how the GP figure is composed</span>
+          </div>
+          <div className="rounded-brand border border-surface-border bg-surface px-4 py-3">
+            <div className="flex items-baseline justify-between border-b-2 pb-2" style={{ borderColor: '#185FA5' }}>
+              <span className="text-sm font-extrabold text-ink">Gross Profit · {rangeShort}</span>
+              <span className="text-lg font-extrabold tabular-nums" style={{ color: '#16a34a' }}>{mFull(data.gpRecon.gp)}</span>
+            </div>
+            {data.gpRecon.buckets.map((b) => {
+              const neg = b.amount < 0;
+              const empty = b.amount === 0 && b.count === 0;
+              const inner = (
+                <>
+                  <span className="flex items-center gap-2 text-xs text-ink-muted">
+                    <span className="w-3 text-center font-bold" style={{ color: neg ? C.red : C.green }}>{neg ? '−' : '+'}</span>
+                    {b.label}
+                    {b.count ? <span className="text-[11px] text-ink-muted">· {b.count}</span> : null}
+                  </span>
+                  <span className={`text-sm font-bold tabular-nums ${empty ? 'text-ink-muted' : 'text-ink'}`}>{mFull(Math.abs(b.amount))}</span>
+                </>
+              );
+              return empty ? (
+                <div key={b.key} className="flex w-full items-center justify-between py-1.5 opacity-60">{inner}</div>
+              ) : (
+                <button key={b.key} type="button" onClick={() => navigate(`/transactions/approvals?tab=${b.key}`)} className="flex w-full items-center justify-between py-1.5 text-left hover:opacity-80">{inner}</button>
+              );
+            })}
+            {!data.gpRecon.reconciles && (
+              <div className="mt-1 rounded border px-2 py-1 text-[11px] font-semibold" style={{ borderColor: C.red, color: C.red }}>
+                Unreconciled by {mFull(Math.abs(data.gpRecon.residual))} — a GP-ledger posting isn't classified; see the Other/Manual bucket.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
       {/* ── Bookings pipeline (condensed) ── on Group/ALL: per branch, each in its own
-          currency (Sales/GP money never summed across branches). */}
-      <div className="mb-1.5 text-xs font-semibold text-ink-muted">SO/PO/GP Pipeline · {rangeShort}</div>
+          currency (Sales/GP money never summed across branches). The booking queue is
+          NOT date-bound, so the header says "whole queue" (not the selected period) to
+          avoid implying it's period-scoped like the Revenue/GP figures above. */}
+      <div className="mb-1.5 text-xs font-semibold text-ink-muted">SO/PO/GP Pipeline <span className="font-normal">· whole queue (not date-bound)</span></div>
       {isAll && Array.isArray(data.bookingsByBranch) ? (
         <div className="mb-4">
           {data.bookingsByBranch.length === 0 && (

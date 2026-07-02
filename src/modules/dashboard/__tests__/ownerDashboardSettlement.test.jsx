@@ -32,7 +32,10 @@ jest.mock('../../../core/period', () => ({ PeriodBar: () => null, periodRange: (
 jest.mock('../../../core/styleTokens', () => ({
   bc: (arg) => { const code = typeof arg === 'string' ? arg : arg && arg.code; return { cur: ['NBO', 'DAR', 'FBM'].includes(code) ? '$' : '₹' }; },
 }));
-jest.mock('../../../core/format', () => ({ compactAmt: (n, opts) => `${(opts && opts.currency) || ''}${Math.round(Number(n) || 0)}` }));
+jest.mock('../../../core/format', () => ({
+  compactAmt: (n, opts) => `${(opts && opts.currency) || ''}${Math.round(Number(n) || 0)}`,
+  localeOf: () => 'en-IN', // reconciliation bridges format full grouped amounts (mFull)
+}));
 jest.mock('../../../core/styles', () => ({
   KPICard: ({ label, value, onClick }) => <button onClick={onClick}>{`KPI|${label}|${value}`}</button>,
   WidgetCard: ({ title, children, onDrill }) => <div><span>{title}</span>{onDrill && <button onClick={onDrill}>{`drill:${title}`}</button>}{children}</div>,
@@ -53,7 +56,7 @@ jest.mock('../components/shared/PnlWaterfallPanel', () => ({ PnlWaterfallPanel: 
 jest.mock('../components/shared/CashForecastPanel', () => ({ CashForecastPanel: () => <div>FORECAST</div> }));
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { useDirectorDashboard } from '../hooks/use-director-dashboard';
 import { OwnerDashboardPage } from '../pages/owner-dashboard';
 
@@ -114,6 +117,91 @@ describe('Owner Dashboard — single branch (BOM)', () => {
     expect(screen.getByText('PNL')).toBeInTheDocument();
     expect(screen.getByText('FORECAST')).toBeInTheDocument();
     expect(screen.getByText('LEADER')).toBeInTheDocument();
+  });
+});
+
+describe('Owner Dashboard — Sales Reconciliation bridge (single branch)', () => {
+  const RECON = {
+    revenue: 31490745,
+    buckets: [
+      { key: 'sopogp', label: 'SO/PO/GP (forward sales)', sign: '+', amount: 22151862, count: 385 },
+      { key: 'inb',    label: 'INB inter-branch',         sign: '+', amount: 11519458, count: 274 },
+      { key: 'refund', label: 'Refund / Reissue',         sign: '-', amount: -2181143, count: 42 },
+      { key: 'other',  label: 'Other / Manual',           sign: '+', amount: 0, count: 0 },
+    ],
+    bucketSum: 31490177, residual: 0, reconciles: true,
+  };
+  beforeEach(() => {
+    mockUseAgeing.mockReturnValue({ data: { receivables: { totals: {} }, payables: { totals: {} } } });
+    useDirectorDashboard.mockReturnValue({ data: { ...LOADED, salesRecon: RECON }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
+  });
+
+  test('renders the origin buckets and shows the refund as an ABSOLUTE subtraction (no double negative)', () => {
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    expect(screen.getByText(/Sales Reconciliation/)).toBeInTheDocument();
+    expect(screen.getByText('SO/PO/GP (forward sales)')).toBeInTheDocument();
+    expect(screen.getByText('INB inter-branch')).toBeInTheDocument();
+    expect(screen.getByText('Refund / Reissue')).toBeInTheDocument();
+    expect(screen.getByText('₹21,81,143')).toBeInTheDocument();  // refund rendered as |amount|, full grouped so it foots
+    expect(screen.queryByText('₹-21,81,143')).toBeNull();         // never a double-negative
+    expect(screen.getByText('₹3,14,90,745')).toBeInTheDocument(); // bridge top == Revenue KPI value, full precision
+  });
+
+  test('a bucket row drills into its Approvals register', () => {
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    fireEvent.click(screen.getByText('Refund / Reissue').closest('button'));
+    expect(mockNavigate).toHaveBeenCalledWith('/transactions/approvals?tab=refund');
+  });
+
+  test('flags drift (residual) when the endpoint does not reconcile', () => {
+    useDirectorDashboard.mockReturnValue({ data: { ...LOADED, salesRecon: { ...RECON, reconciles: false, residual: 5000 } }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    expect(screen.getByText(/Unreconciled by/)).toBeInTheDocument();
+  });
+
+  test('hides the bridge on Group/ALL scope (no cross-currency merge)', () => {
+    useDirectorDashboard.mockReturnValue({ data: { ...LOADED, salesRecon: RECON, bookingsByBranch: [] }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={'ALL'} />);
+    expect(screen.queryByText(/Sales Reconciliation/)).toBeNull();
+  });
+});
+
+describe('Owner Dashboard — Gross Profit Reconciliation bridge (single branch)', () => {
+  const GP_RECON = {
+    gp: 1548000,
+    buckets: [
+      { key: 'sopogp',      label: 'SO/PO/GP (sale − cost)',       sign: '+', amount: 1236000, count: 768 },
+      { key: 'inb',         label: 'INB inter-branch',            sign: '+', amount: 114000,  count: 548 },
+      { key: 'refund',      label: 'Refund / Reissue',            sign: '+', amount: 19000,   count: 42 },
+      { key: 'adjustments', label: 'Commission / Discounts / JV', sign: '+', amount: 179000,  count: 326 },
+      { key: 'other',       label: 'Other / Manual',              sign: '+', amount: 0, count: 0 },
+    ],
+    bucketSum: 1548000, residual: 0, reconciles: true,
+  };
+  beforeEach(() => {
+    mockUseAgeing.mockReturnValue({ data: { receivables: { totals: {} }, payables: { totals: {} } } });
+    useDirectorDashboard.mockReturnValue({ data: { ...LOADED, gpRecon: GP_RECON }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
+  });
+
+  test('renders the GP bridge incl the material Commission/Adjustments bucket', () => {
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    expect(screen.getByText(/Gross Profit Reconciliation/)).toBeInTheDocument();
+    expect(screen.getByText('SO/PO/GP (sale − cost)')).toBeInTheDocument();
+    expect(screen.getByText('Commission / Discounts / JV')).toBeInTheDocument();
+    expect(screen.getByText('₹15,48,000')).toBeInTheDocument(); // bridge top == GP KPI value, full precision
+    expect(screen.getByText('₹1,79,000')).toBeInTheDocument();  // commission bucket
+  });
+
+  test('a GP bucket row drills into its Approvals register', () => {
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    fireEvent.click(screen.getByText('Commission / Discounts / JV').closest('button'));
+    expect(mockNavigate).toHaveBeenCalledWith('/transactions/approvals?tab=adjustments');
+  });
+
+  test('hides the GP bridge on Group/ALL scope', () => {
+    useDirectorDashboard.mockReturnValue({ data: { ...LOADED, gpRecon: GP_RECON, bookingsByBranch: [] }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={'ALL'} />);
+    expect(screen.queryByText(/Gross Profit Reconciliation/)).toBeNull();
   });
 });
 

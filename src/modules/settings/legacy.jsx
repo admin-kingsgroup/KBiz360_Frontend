@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { todayISO } from '../../core/dates';
-import { AlertTriangle, Download, Lock, Plus, Save, Search, Settings, User, Users } from 'lucide-react';
+import { AlertTriangle, Download, Lock, Plus, Save, Search, Settings, Smartphone, User, Users } from 'lucide-react';
 import { Line } from 'recharts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { exportToCSV } from '../../core/business-logic';
@@ -13,8 +13,9 @@ import { toast } from '../../core/ux/toast';
 import { clickable } from '../../core/ux/clickable';
 import { listKeyNav } from '../../core/ux/listKeys';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../core/data';
-import { apiPost, apiPut, apiDelete } from '../../core/api';
-import { useUsersAdmin, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../core/useReference';
+import { apiPost, apiPut, apiPatch, apiDelete } from '../../core/api';
+import { useUsersAdmin, useUserAccess, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../core/useReference';
+import { Switch } from '../../shell/primitives';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { fmt } from '../../core/format';
 import { PERM_ACTIONS, cardStyle } from '../../core/helpers';
@@ -362,16 +363,82 @@ export function SettingsBranches(){
 
 /* ── PERMISSION SCHEMA ────────────────────────────────────────── */
 
+// The three apps that share the CRM `users` collection and honour the per-app login gate.
+const APP_ACCESS_COLS=[
+  {key:"crm", label:"CRM",           hint:"Kings CRM"},
+  {key:"erp", label:"ERP (Books)",   hint:"KBiz360 Books"},
+  {key:"app", label:"Smart Connect", hint:"KBiz360 Smart Connect mobile app"},
+];
+
+/* App Access tab — every CRM + ERP user with a login toggle per app. Toggle OFF blocks
+   that app's login (and evicts an active session within ~1 min). Data comes from
+   /api/user-access (the shared `users` collection), NOT the ERP BooksAccess grants.
+   Top-level (not nested in SettingsUsers) so the search input keeps focus while typing. */
+function AppAccessTab({ rows, search, setSearch, onToggle, loaded }){
+  return (
+    <div>
+      <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search users..."
+          style={{...inp,width:220,minHeight:32,fontSize:11}}/>
+        <span style={{fontSize:10.5,color:"#5a6691",display:"flex",alignItems:"center",gap:5}}>
+          <Smartphone size={13}/> Toggle which apps each user can log into. <b>Off</b> = login blocked; open sessions end within ~1 min.
+        </span>
+        <button onClick={()=>exportToCSV(rows.map(u=>({id:u.id,name:u.name,email:u.email,role:u.role,status:u.status,crm:!!u.access?.crm,erp:!!u.access?.erp,app:!!u.access?.app})),["id","name","email","role","status","crm","erp","app"],"app-access.csv")}
+          style={{...btnGh,fontSize:11,marginLeft:"auto"}}><Download size={13}/> Export</button>
+      </div>
+      <div style={{...card,padding:0,overflow:"hidden",marginBottom:14}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
+          <thead><tr style={{background:"#0d1326"}}>
+            {["User","Email","Role",...APP_ACCESS_COLS.map(a=>a.label)].map((h,i)=>(
+              <th key={i} title={i>=3?APP_ACCESS_COLS[i-3].hint:undefined} style={{padding:"9px 12px",textAlign:i<3?"left":"center",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {rows.length===0&&(
+              <tr><td colSpan={6} style={{padding:"18px 12px",textAlign:"center",color:"#5a6691"}}>{loaded?"No users match your search.":"Loading users…"}</td></tr>
+            )}
+            {rows.map((u,i)=>(
+              <tr key={u.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
+                <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326",whiteSpace:"nowrap"}}>
+                  {u.name||"—"}
+                  {u.status&&u.status!=="active"&&<span style={{marginLeft:6,fontSize:9,padding:"1px 6px",borderRadius:999,background:"#FCEBEB",color:"#A32D2D",fontWeight:700}}>{u.status}</span>}
+                </td>
+                <td style={{padding:"8px 12px",color:"#5a6691",fontSize:10.5}}>{u.email||"—"}</td>
+                <td style={{padding:"8px 12px",color:"#5a6691",fontSize:10.5}}>{u.role||"—"}</td>
+                {APP_ACCESS_COLS.map(a=>(
+                  <td key={a.key} style={{padding:"8px 12px",textAlign:"center"}}>
+                    <span style={{display:"inline-flex"}}>
+                      <Switch checked={!!u.access?.[a.key]} onChange={(v)=>onToggle(u,a.key,v)} label=""/>
+                    </span>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsUsers(){
   const usersLive=useUsersAdmin().data;                          // DB-backed (/api/auth/users)
   const [users,setUsers]=useState([]);
   useEffect(()=>{ if(usersLive) setUsers(usersLive); },[usersLive]);
-  const [tab,setTab]=useState("users"); // users | roles | matrix
+  const [tab,setTab]=useState("users"); // users | roles | access
+  // App Access tab: EVERY CRM + ERP user with their per-app login toggles (/api/user-access).
+  const accessLive=useUserAccess().data;
+  const [accessRows,setAccessRows]=useState([]);
+  useEffect(()=>{ if(accessLive) setAccessRows(accessLive); },[accessLive]);
+  const [accessSearch,setAccessSearch]=useState("");
+  // The signed-in admin's own email — used to stop them locking THEMSELVES out of the
+  // app they're currently using (ERP). Read straight from the stored session user.
+  const myEmail=(()=>{ try{ return String(JSON.parse(localStorage.getItem("kb360-user")||"null")?.email||"").toLowerCase(); }catch{ return ""; } })();
   const [selUser,setSelUser]=useState(null);
   const [selRole,setSelRole]=useState(null);
   const [editPerms,setEditPerms]=useState(null); // {userId, perms, special}
   const [newUserModal,setNewUserModal]=useState(false); useModalEsc(()=>setNewUserModal(false),newUserModal);
-  const [newUserForm,setNewUserForm]=useState({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"]});
+  const [newUserForm,setNewUserForm]=useState({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"],password:"",confirm:""});
   const [search,setSearch]=useState("");
   const mob=useMobile();
   const qc=useQueryClient();
@@ -380,6 +447,7 @@ export function SettingsUsers(){
   const createUserMut=useMutation({mutationFn:(b)=>apiPost('/api/auth/users',b),onSuccess:()=>qc.invalidateQueries({queryKey:['ref','users']})});
   const updateUserMut=useMutation({mutationFn:({id,body})=>apiPut(`/api/auth/users/${id}`,body),onSuccess:()=>qc.invalidateQueries({queryKey:['ref','users']})});
   const deleteUserMut=useMutation({mutationFn:(id)=>apiDelete(`/api/auth/users/${id}`),onSuccess:()=>qc.invalidateQueries({queryKey:['ref','users']})});
+  const setAccessMut=useMutation({mutationFn:({id,body})=>apiPatch(`/api/user-access/${id}`,body),onSuccess:()=>qc.invalidateQueries({queryKey:['ref','user-access']})});
 
   const ALL_BRANCHES=BRANCH_CODES;
   const ROLE_NAMES=Object.keys(ROLE_TEMPLATES);
@@ -452,6 +520,31 @@ export function SettingsUsers(){
   const isModAllChecked=(modId)=>ACTIONS.every(a=>editPerms?.perms[modId]?.[a]);
 
   const filteredUsers=users.filter(u=>!search||u.name.toLowerCase().includes(search.toLowerCase())||u.email.toLowerCase().includes(search.toLowerCase()));
+
+  /* ── APP ACCESS ───────────────────────────────────────────────────
+     The per-user login toggles. The presentational table is a STABLE top-level
+     component (AppAccessTab, defined above this function) so its search box keeps
+     focus while typing; this closure only owns the toggle mutation + self-lock guard. */
+  const toggleAccess=(u,key,val)=>{
+    // Guard against locking YOURSELF out of the app you're using right now.
+    if(!val && key==="erp" && u.email && u.email.toLowerCase()===myEmail){
+      toast("You can't disable your own ERP access while signed in here.","error");
+      return;
+    }
+    // Optimistic flip; reverts on error, and the invalidate refetch confirms on success.
+    setAccessRows(rows=>rows.map(r=>r.id===u.id?{...r,access:{...r.access,[key]:val}}:r));
+    setAccessMut.mutate(
+      {id:u.id, body:{[key]:val}},
+      {
+        onSuccess:()=>toast(`${val?"Enabled":"Disabled"} ${APP_ACCESS_COLS.find(a=>a.key===key).label} login for ${u.name||u.email}`),
+        onError:(e)=>{
+          setAccessRows(rows=>rows.map(r=>r.id===u.id?{...r,access:{...r.access,[key]:!val}}:r));
+          toast(e?.message||"Failed to update access","error");
+        },
+      }
+    );
+  };
+  const filteredAccess=accessRows.filter(u=>!accessSearch||(u.name||"").toLowerCase().includes(accessSearch.toLowerCase())||(u.email||"").toLowerCase().includes(accessSearch.toLowerCase()));
 
   /* ── USERS LIST VIEW ── */
   const UsersTab=()=>(
@@ -765,7 +858,7 @@ export function SettingsUsers(){
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <button onClick={()=>setTab("users")} style={{flex:1,padding:"8px 12px",border:"none",cursor:"pointer",fontWeight:tab==="users"?700:500,background:tab==="users"?"#fff":"transparent",borderRadius:6}}>👥 Users</button><button onClick={()=>setTab("roles")} style={{flex:1,padding:"8px 12px",border:"none",cursor:"pointer",fontWeight:tab==="roles"?700:500,background:tab==="roles"?"#fff":"transparent",borderRadius:6}}>🎭 Role Templates</button>
+          <button onClick={()=>setTab("users")} style={{flex:1,padding:"8px 12px",border:"none",cursor:"pointer",fontWeight:tab==="users"?700:500,background:tab==="users"?"#fff":"transparent",borderRadius:6}}>👥 Users</button><button onClick={()=>setTab("roles")} style={{flex:1,padding:"8px 12px",border:"none",cursor:"pointer",fontWeight:tab==="roles"?700:500,background:tab==="roles"?"#fff":"transparent",borderRadius:6}}>🎭 Role Templates</button><button onClick={()=>setTab("access")} style={{flex:1,padding:"8px 12px",border:"none",cursor:"pointer",fontWeight:tab==="access"?700:500,background:tab==="access"?"#fff":"transparent",borderRadius:6}}>🔐 App Access</button>
         </div>
       </div>
 
@@ -787,6 +880,7 @@ export function SettingsUsers(){
 
       {tab==="users"&&<UsersTab/>}
       {tab==="roles"&&<RolesTab/>}
+      {tab==="access"&&<AppAccessTab rows={filteredAccess} search={accessSearch} setSearch={setAccessSearch} onToggle={toggleAccess} loaded={accessRows.length>0}/>}
 
       {/* Permission editor overlay */}
       {editPerms&&<PermissionEditor/>}
@@ -810,6 +904,10 @@ export function SettingsUsers(){
                   {ROLE_NAMES.map(r=><option key={r}>{r}</option>)}
                 </select></FL>
               </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FL label="Password"><input type="password" autoComplete="new-password" value={newUserForm.password} onChange={e=>setNewUserForm(f=>({...f,password:e.target.value}))} placeholder="Min 8 characters" style={inp}/></FL>
+                <FL label="Confirm Password"><input type="password" autoComplete="new-password" value={newUserForm.confirm} onChange={e=>setNewUserForm(f=>({...f,confirm:e.target.value}))} placeholder="Re-enter password" style={inp}/></FL>
+              </div>
               <FL label="Branch Access">
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
                   {ALL_BRANCHES.map(b=>(
@@ -829,15 +927,18 @@ export function SettingsUsers(){
                 </div>
               </FL>
               <div style={{padding:"9px 12px",borderRadius:8,background:"#f3f4f8",fontSize:9.5,color:"#5a6691"}}>
-                Role template <b>{newUserForm.role}</b> will be applied. You can customise individual permissions after creation.
+                Creates a login for <b>ERP + CRM</b> with the password above — Books role <b>{newUserForm.role}</b> and a basic CRM role are assigned. Mobile app access stays off until enabled on the App Access tab. If this email already has a login, its password is kept.
               </div>
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setNewUserModal(false)} style={btnGh}>Cancel</button>
               <button disabled={createUserMut.isPending} onClick={()=>{
                 if(!newUserForm.name.trim()||!newUserForm.email.trim()){ toast("Name and email are required","error"); return; }
-                createUserMut.mutate({...newUserForm,active:true},{  // persists to /api/auth/users
-                  onSuccess:()=>{ setNewUserModal(false); setNewUserForm({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"]}); toast(`User ${newUserForm.name} created`); },
+                if((newUserForm.password||"").length<8){ toast("Password must be at least 8 characters","error"); return; }
+                if(newUserForm.password!==newUserForm.confirm){ toast("Passwords do not match","error"); return; }
+                const { confirm, ...payload }=newUserForm;
+                createUserMut.mutate({...payload,active:true},{  // persists to /api/auth/users
+                  onSuccess:()=>{ setNewUserModal(false); setNewUserForm({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"],password:"",confirm:""}); toast(`User ${newUserForm.name} created`); },
                   onError:(e)=>toast(e?.message||"Could not create user","error"),
                 });
               }} style={{...btnG,opacity:createUserMut.isPending?0.6:1,cursor:createUserMut.isPending?"not-allowed":"pointer"}}>{createUserMut.isPending?"Adding…":"Add User"}</button>

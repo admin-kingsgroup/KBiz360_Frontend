@@ -38,6 +38,9 @@ export const useSalespeople     = () => refQuery('salespeople', '/api/salespeopl
 export const useRoles           = () => refQuery('roles', '/api/roles', LONG);
 export const useRolesMeta       = () => refQuery('roles-meta', '/api/roles/meta', LONG);
 export const useUsersAdmin      = () => refQuery('users', '/api/auth/users', REF);
+// EVERY user across CRM + ERP with per-app login toggles (Settings → Users & Roles →
+// App Access). Distinct from useUsersAdmin (which lists only ERP/Books access grants).
+export const useUserAccess      = () => refQuery('user-access', '/api/user-access', REF);
 
 // app-config convenience: { INR:{symbol,toINR}, ... }
 export const useCurrencies      = () => refQuery('currencies', '/api/app-config/currencies', LONG);
