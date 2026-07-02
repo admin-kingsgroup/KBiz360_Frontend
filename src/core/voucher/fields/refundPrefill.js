@@ -17,6 +17,29 @@
 import { r2 } from '../ui';
 
 const num = (v) => (Number(v) || 0);
+// Recognised Indian GST slabs (mirrors the backend GST_SLABS in approvalChecks).
+const GST_SLABS = [0, 5, 12, 18, 28];
+
+// Recover the GST RATE the original sale was booked at, from its SO snapshot — so a
+// refund defaults to the SAME rate the sale used (a holiday sale at 5% refunds at 5%,
+// not a blanket 18%). The snapshot stores GST as amounts, not a rate, so we back it out
+// from the per-line components: the Service-Fee GST (gstSvc) over the service-fee base
+// (ssvc), falling back to the SVC2 margin GST (otherTaxesGst) over the net SVC2. The
+// result is snapped to the nearest recognised slab to absorb float-division noise
+// (17.998 → 18). Returns null when the sale carries no taxable retained income to
+// derive from — the caller then keeps the current/default rate.
+export function gstPctFromSo(so) {
+  const lines = Array.isArray(so && so.lines) ? so.lines : [];
+  const svcBase = num(so && so.serviceCharge) || lines.reduce((s, l) => s + num(l && l.ssvc), 0);
+  const svcGst  = lines.reduce((s, l) => s + num(l && l.gstSvc), 0);
+  const svc2Base = lines.reduce((s, l) => s + (num(l && l.markup) - num(l && l.gstMk)), 0);
+  const svc2Gst  = num(so && so.otherTaxesGst);
+  let rate = null;
+  if (svcBase > 0 && svcGst > 0) rate = (svcGst / svcBase) * 100;
+  else if (svc2Base > 0 && svc2Gst > 0) rate = (svc2Gst / svc2Base) * 100;
+  if (rate == null) return null;
+  return GST_SLABS.reduce((best, s) => (Math.abs(s - rate) < Math.abs(best - rate) ? s : best), GST_SLABS[0]);
+}
 
 // PO snapshot for the read-only fetch view, with the Supplier Incentive surfaced as
 // a per-line column (+ its 2% TDS). The stored `po.lines` snapshot doesn't keep
@@ -107,6 +130,8 @@ export function refundPrefillFromLeg(leg, b, state = {}) {
     ...(state.party ? {} : { party: b?.customer?.ledgerName || b?.customer?.name || '' }),
     ...(state.counterParty ? {} : { counterParty: sup.ledgerName || sup.name || '' }),
     ...(state.gstMode ? {} : { gstMode: leg?.gstMode || b?.gstMode || '' }),
+    // Adopt the folder sale's GST rate (leg is pass-through, no separate rate of its own).
+    ...((() => { const p = gstPctFromSo(b?.so); return p != null ? { gstPct: p } : {}; })()),
   };
 }
 
@@ -133,5 +158,8 @@ export function refundPrefillFromBooking(b, state = {}, isRefund = true) {
     ...(state.party ? {} : { party: b?.customer?.ledgerName || b?.customer?.name || '' }),
     ...(state.counterParty ? {} : { counterParty: b?.supplier?.ledgerName || b?.supplier?.name || '' }),
     ...(state.gstMode ? {} : { gstMode: so.gstMode || b?.gstMode || '' }),
+    // Default the refund's GST rate to the rate the original sale used (falls through to
+    // the form's existing/initial rate when the sale has no taxable income to derive from).
+    ...((() => { const p = gstPctFromSo(so); return p != null ? { gstPct: p } : {}; })()),
   };
 }

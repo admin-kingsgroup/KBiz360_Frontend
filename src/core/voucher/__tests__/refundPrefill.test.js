@@ -1,4 +1,4 @@
-import { refundPrefillFromBooking, poSnapForView, splitRefundJv, consolidateLegs } from '../fields/refundPrefill';
+import { refundPrefillFromBooking, poSnapForView, splitRefundJv, consolidateLegs, gstPctFromSo } from '../fields/refundPrefill';
 
 // The original SO/PO/GP booking BKG/BOM/26/0357 (BOM intl flight) as the by-link
 // endpoint returns it. PO has no supplier service fee; SO has a 250 service charge
@@ -54,12 +54,16 @@ describe('refundPrefillFromBooking', () => {
     expect(refundPrefillFromBooking(BOOKING, { commissionReversal: true }).incentiveAmt).toBe(1275);
   });
 
-  test('NEVER fills our service charge / its GST nor the supplier service charge / its GST', () => {
+  test('NEVER fills our service charge / the supplier service charge / its GST (amounts are retained, not refunded)', () => {
     const p = refundPrefillFromBooking(BOOKING, {});
     expect(p).not.toHaveProperty('serviceCharge');
-    expect(p).not.toHaveProperty('gstPct');
     expect(p).not.toHaveProperty('supplierSvc');
     expect(p).not.toHaveProperty('supplierGst');
+  });
+
+  test('defaults the GST RATE to the rate the original sale used (45 GST on 250 fee → 18%)', () => {
+    const p = refundPrefillFromBooking(BOOKING, {});
+    expect(p.gstPct).toBe(18);
   });
 
   test('does not clobber a customer / supplier / GST-mode the preparer already chose', () => {
@@ -74,6 +78,31 @@ describe('refundPrefillFromBooking', () => {
     expect(p.party).toBe('Travkings AMD');
     expect(p.counterParty).toBe('IATA-BSP [Stock]');
     expect(p.gstMode).toBe('inter');
+  });
+});
+
+describe('gstPctFromSo — recover the original sale GST rate for the refund default', () => {
+  test('service-fee route: 45 GST on a 250 fee → 18%', () => {
+    expect(gstPctFromSo({ serviceCharge: 250, gst: 45, lines: [{ ssvc: 250, gstSvc: 45 }] })).toBe(18);
+  });
+
+  test('holiday sale at 5% → refund defaults to 5% (NOT a blanket 18)', () => {
+    // SVC2 margin 4921.60 carries 246.08 GST (5%); no separate service fee.
+    expect(gstPctFromSo({ serviceCharge: 0, otherTaxesGst: 246.08, lines: [{ markup: 5167.68, gstMk: 246.08 }] })).toBe(5);
+  });
+
+  test('12% slab is recovered', () => {
+    expect(gstPctFromSo({ serviceCharge: 1000, lines: [{ ssvc: 1000, gstSvc: 120 }] })).toBe(12);
+  });
+
+  test('float-division noise snaps to the nearest slab (17.998 → 18)', () => {
+    expect(gstPctFromSo({ serviceCharge: 1000, lines: [{ ssvc: 1000, gstSvc: 179.98 }] })).toBe(18);
+  });
+
+  test('no taxable retained income → null (caller keeps its current/default rate)', () => {
+    expect(gstPctFromSo({ serviceCharge: 0, otherTaxesGst: 0, lines: [{ base: 5000 }] })).toBeNull();
+    expect(gstPctFromSo({})).toBeNull();
+    expect(gstPctFromSo(null)).toBeNull();
   });
 });
 

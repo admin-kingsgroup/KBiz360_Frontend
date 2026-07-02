@@ -12,6 +12,10 @@ import { buildRefundReissueBody } from './refundBody';
 import { JvBlock } from '../JvBlock';
 
 const num = (v) => (Number(v) || 0);
+// Recognised Indian GST slabs — mirrors the backend's GST_SLABS (approvalChecks) so a
+// refund can post at the correct rate (holiday 5%, most services 18%, exempt 0%) rather
+// than a hardcoded 18%.
+const GST_SLABS = [0, 5, 12, 18, 28];
 const fmtN = (v) => num(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const lockedInp = { ...inp, background: '#f3f4f7', color: '#444b5e', cursor: 'not-allowed' };
 
@@ -237,11 +241,19 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 0.7fr', gap: 12, marginBottom: 14 }}>
         <FL label="Date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
         <FL label="Against sales invoice 🔒"><input value={state.againstInvoice || ''} readOnly tabIndex={-1} style={lockedInp} placeholder="fetch by Link No" title="Locked — set by Link No lookup" /></FL>
         <FL label="Related purchase invoice 🔒"><input value={state.againstPurchase || ''} readOnly tabIndex={-1} style={lockedInp} placeholder="fetch by Link No" title="Locked — set by Link No lookup" /></FL>
         <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} />
+        {/* GST rate on OUR retained charges (Service Fee + SVC2) and the supplier fee /
+            cancellation. Auto-seeded from the linked sale on fetch (a holiday sale at 5%
+            refunds at 5%, not a blanket 18%); still editable to any valid GST slab. */}
+        <FL label="GST rate">
+          <select value={String(num(state.gstPct))} onChange={(e) => patch({ gstPct: +e.target.value })} style={inp} title="GST % applied to our Service Fee / SVC2 and the supplier fee & cancellation. Defaults from the linked sale.">
+            {GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}
+          </select>
+        </FL>
       </div>
 
       {/* Read-only SO/PO/GP voucher view — every column, incl. 0 amounts */}
