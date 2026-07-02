@@ -13,6 +13,7 @@ jest.mock('../../core/api', () => ({
 }));
 jest.mock('../../core/ux/confirm', () => ({ confirmDialog: jest.fn(() => Promise.resolve({ confirmed: false })) }));
 jest.mock('../../core/ux/toast', () => ({ toast: jest.fn() }));
+jest.mock('../accountingLive', () => ({ VoucherEditor: () => null }));
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';

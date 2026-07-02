@@ -17,6 +17,7 @@ jest.mock('../../core/api', () => ({
 }));
 jest.mock('../../core/ux/confirm', () => ({ confirmDialog: (...a) => mockConfirm(...a) }));
 jest.mock('../../core/ux/toast', () => ({ toast: jest.fn() }));
+jest.mock('../accountingLive', () => ({ VoucherEditor: ({ voucherId }) => <div data-testid="voucher-editor">editing {voucherId}</div> }));
 // Keep the real module (invalidateBooks, branchCode, …) but stub the 3 approval hooks.
 jest.mock('../../core/useAccounting', () => {
   const actual = jest.requireActual('../../core/useAccounting');
@@ -75,6 +76,13 @@ describe('SO/PO/GP Approvals — merged Refunds & Reissues section', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Reject' })[0]);
     await waitFor(() => expect(mockRejectAsync).toHaveBeenCalled());
     expect(mockRejectAsync.mock.calls[0][0]).toMatchObject({ id: 'rf1', reason: 'wrong fare' });
+  });
+
+  test('Edit opens the shared voucher editor so a blocked refund can be fixed inline', async () => {
+    wrap(<BookingApprovals branch={{ code: 'BOM' }} currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('RF/BOM/26/0021');
+    fireEvent.click(screen.getAllByRole('button', { name: /✎ Edit/ })[0]); // refund row Edit (not the "Edited" tab)
+    expect(await screen.findByTestId('voucher-editor')).toHaveTextContent('editing rf1');
   });
 
   test('a non-approver sees the refunds read-only (Approver only, no Approve button)', async () => {

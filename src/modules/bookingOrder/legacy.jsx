@@ -43,6 +43,7 @@ import {
 } from '../../core/voucherSpecs.js';
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
 import { invalidateBooks, useVoucherApprovals, useApproveMany, useRejectVoucher } from '../../core/useAccounting';
+import { VoucherEditor } from '../accountingLive';
 
 const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', CR = '#C0392B', BLUE = '#2563eb';
 // Gold theme tokens + per-section bar accents (SO / PO / GP voucher theme).
@@ -1765,14 +1766,15 @@ export function DeletedBookings({ branch, setRoute }) {
 // mutations. INB refunds are routed to the INB window instead — refundScope 'sopogp'
 // excludes anything reversing an INB deal (againstInvoice/linkNo starting 'INB/'). Hidden
 // on the Edited tab (a cross-cut list, not a status queue).
-const REFUND_APPROVER_RE = /super.?admin|director|senior\s+finance\s+manager|sr\.?\s*accounts\s+executive/i;
 function SopogpRefunds({ branch, status, needle, currentUser }) {
   const cur = bc(branch).cur;
-  const isApprover = REFUND_APPROVER_RE.test(currentUser?.role || '');
+  const isApprover = isApproverRole(currentUser);
   const q = useVoucherApprovals(branch, status, { refundScope: 'sopogp' });
   const approveMany = useApproveMany();
   const reject = useRejectVoucher();
   const [busy, setBusy] = useState(false);
+  const [editId, setEditId] = useState(null); // fix a blocked refund voucher in place, then approve
+  useModalEsc(() => setEditId(null), !!editId);
   const pendingTab = status === 'pending';
   const list = useMemo(() => {
     const all = Array.isArray(q.data && q.data.entries) ? q.data.entries : [];
@@ -1831,6 +1833,9 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
                   {pendingTab
                     ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
                         {isApprover ? <>
+                          {/* Edit in place (reuses the shared voucher editor); saving reverts it to
+                              Pending, then Approve. Lets an approver fix a blocked refund inline. */}
+                          <button disabled={busy} onClick={() => setEditId(e.id)} title="Edit this refund / reissue voucher, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: BLUE, border: `1px solid ${BLUE}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Edit</button>
                           <button disabled={busy || !e.postable} title={e.postable ? '' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving')} onClick={() => doApprove(e)} style={{ marginRight: 6, padding: '5px 10px', background: e.postable ? DR : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
                           <button disabled={busy} onClick={() => doReject(e)} style={{ padding: '5px 10px', background: '#fff', color: '#dc2626', border: '1px solid #f3c9c9', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
                           {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#dc2626' }}>blocked</span>}
@@ -1842,6 +1847,22 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
             </tbody>
           </table>
         )}
+      {/* Edit a refund/reissue voucher in place (reuses the Vouchers editor). Saving
+          reverts it to Pending; then Approve on the row. Mirrors the INB Refunds edit. */}
+      {editId && (
+        <div onClick={async () => { const { confirmed } = await confirmDialog({ title: 'Discard changes to this voucher?', message: 'Any edits you have not saved will be lost.', confirmLabel: 'Discard', danger: true }); if (confirmed) setEditId(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.5)', zIndex: 900, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '5vh 12px' }}>
+          <div role="dialog" aria-modal="true" aria-label="Edit refund voucher" onClick={(ev) => ev.stopPropagation()} style={{ background: '#fff', width: 'min(720px, 96vw)', maxHeight: '90vh', overflowY: 'auto', borderRadius: 10, boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff' }}>
+              <strong style={{ color: DARK }}>Edit Refund / Reissue — fix &amp; approve</strong>
+              <button onClick={() => setEditId(null)} aria-label="Close editor" style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9197a3' }}>✕</button>
+            </div>
+            <div style={{ padding: 4 }}>
+              <VoucherEditor voucherId={editId} cur={cur} onBack={() => setEditId(null)} />
+            </div>
+            <div style={{ padding: '8px 16px', fontSize: 11, color: '#5b616e', borderTop: '1px solid #cdd1d8' }}>Tip: fix the amounts / ledgers so it balances, Save (reverts it to Pending), then click Approve on the row.</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
