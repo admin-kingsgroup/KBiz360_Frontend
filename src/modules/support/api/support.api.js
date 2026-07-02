@@ -26,3 +26,13 @@ export const updateTicket = (id, patch) => apiPut(`/api/support-tickets/${id}`, 
 export const addTicketComment = (id, body) => apiPost(`/api/support-tickets/${id}/comments`, body);
 
 export const deleteTicket = (id) => apiDelete(`/api/support-tickets/${id}`);
+
+// Upload a voice note (Blob) or a screenshot (File) to the (private) S3 bucket,
+// returning { key } — not a URL, since the bucket has no public access. The key
+// is stored on the ticket's attachment; the backend signs a temporary URL from
+// it on every read.
+export const uploadTicketAttachment = (file) => {
+  const form = new FormData();
+  form.append('file', file, file.name || `voice-note-${Date.now()}.webm`);
+  return apiPost('/api/support-tickets/attachments', form);
+};
