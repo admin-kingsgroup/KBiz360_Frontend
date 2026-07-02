@@ -442,7 +442,6 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
           <div className="hidden w-40 desktop:block 2xl:w-64"><ModuleSearch branch={branch} currentUser={currentUser} setRoute={setRoute} /></div>
 
           <FxRateChip branch={branch} />
-          <div className="hidden wide:block"><FySelector /></div>
           <div className="hidden w-[150px] desktop:block 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
 
           <UserMenu currentUser={currentUser} setCurrentUser={setCurrentUser} setRoute={setRoute} onOpenNotifications={() => setShowNotif(true)} />

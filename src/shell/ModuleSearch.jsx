@@ -219,6 +219,7 @@ export function ModuleSearch({ branch, currentUser, setRoute, bar = false }) {
           <Search size={16} style={{ flexShrink: 0, color: DIM }} />
           <input ref={inputRef} autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown}
             placeholder="Search modules & pages…" aria-label="Search modules and pages"
+            className="kb-focus-ring-none"
             style={{ flex: 1, height: 44, border: 'none', outline: 'none', fontSize: 15, color: DARK, background: 'transparent' }} />
           <button type="button" onClick={() => setOpen(false)} aria-label="Close search" title="Close (Esc)"
             style={{ flexShrink: 0, background: 'transparent', border: 'none', cursor: 'pointer', color: DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 8 }}>
@@ -270,12 +271,13 @@ export function ModuleSearch({ branch, currentUser, setRoute, bar = false }) {
     <div ref={wrapRef} style={{ position: 'relative', flex: 1, maxWidth: 420, margin: '0 16px' }}>
       {scrollStyles}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, height: 34, padding: '0 12px',
+        display: 'flex', alignItems: 'center', gap: 8, height: 48, padding: '0 12px',
         background: open ? '#fff' : '#f4f5f7', border: `1px solid ${open ? BLUE : '#e6e8ec'}`,
         borderRadius: 8, transition: 'all 0.15s ease', boxShadow: open ? '0 0 0 3px rgba(37,99,235,0.12)' : 'none',
       }}>
         <Search size={15} style={{ flexShrink: 0, color: open ? BLUE : DIM }} />
         <input ref={inputRef} value={q}
+          className="kb-focus-ring-none"
           onChange={(e) => { setQ(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
