@@ -230,7 +230,7 @@ const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
 const PRODUCT = {
   SF: 'Flight', PF: 'Flight', SHT: 'Hotel', PHT: 'Hotel', SH: 'Holiday', PH: 'Holiday',
   SV: 'Visa', PV: 'Visa', SI: 'Insurance', PI: 'Insurance', SC: 'Car', PC: 'Car', SM: 'Misc', PM: 'Misc',
-  SCN: 'Credit Note', SDN: 'Debit Note', RF: 'Refund', RI: 'Reissue',
+  SDN: 'Debit Note', RF: 'Refund', RI: 'Reissue',
 };
 const productOf = (v) => PRODUCT[v.type] || v.type;
 
@@ -649,7 +649,7 @@ export function TrialBalanceLive({ branch }) {
 }
 
 /* ════════════════════ DAY BOOK ═════════════════════════════════════ */
-const TYPE_CLR = { sale: BLUE, purchase: '#d97706', receipt: GREEN, payment: RED, journal: '#2e323c', contra: '#6b21a8', 'credit-note': RED, 'debit-note': '#d97706' };
+const TYPE_CLR = { sale: BLUE, purchase: '#d97706', receipt: GREEN, payment: RED, journal: '#2e323c', contra: '#6b21a8', 'debit-note': '#d97706' };
 // Normalise any date string to ISO for stable day-grouping (Tally dates vary).
 const dayKey = (d) => { const p = parseAnyDate(d); return p ? isoDate(p) : String(d || ''); };
 

@@ -11,7 +11,7 @@ export const dmy = (s) => (s ? String(s).slice(0, 10).split('-').reverse().join(
 
 export const VT_LABEL = {
   sale: 'Sales', purchase: 'Purchase', receipt: 'Receipt', payment: 'Payment', contra: 'Contra',
-  journal: 'Journal', 'credit-note': 'Credit Note', 'debit-note': 'Debit Note',
+  journal: 'Journal', 'debit-note': 'Debit Note',
   'purchase-expense': 'Purch. Exp', refund: 'Refund', reissue: 'Reissue',
 };
 export const vtLabel = (c) => VT_LABEL[c] || String(c || '').replace(/\b\w/g, (m) => m.toUpperCase());

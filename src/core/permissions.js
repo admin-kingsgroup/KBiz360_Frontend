@@ -67,7 +67,6 @@ export const PERM_MODULES=[
     {id:"contra",       label:"Contra Entry"},
     {id:"bankreco",     label:"Bank Reconciliation"},
     {id:"journal",      label:"Journal Entry"},
-    {id:"s_creditnote", label:"Credit Notes"},
     {id:"s_debitnote",  label:"Debit Notes"},
     {id:"daybook",      label:"Day Book"},
     {id:"ledger",       label:"Ledger Account"},

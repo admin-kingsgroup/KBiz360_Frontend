@@ -32,7 +32,7 @@ describe('billwiseSide / isBillwiseLedger', () => {
 describe('vtLabel', () => {
   test.concurrent('known categories map to friendly labels', async () => {
     expect(vtLabel('sale')).toBe('Sales');
-    expect(vtLabel('credit-note')).toBe('Credit Note');
+    expect(vtLabel('debit-note')).toBe('Debit Note');
     expect(vtLabel('purchase-expense')).toBe('Purch. Exp');
   });
   test.concurrent('unknown category is title-cased, empty is empty', async () => {

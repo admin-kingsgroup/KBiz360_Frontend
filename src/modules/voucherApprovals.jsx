@@ -1,6 +1,6 @@
 // ─── Voucher Approvals ────────────────────────────────────────────────────────
 // Approval queue for the gated voucher types (Payment, Receipt, Contra, Journal,
-// Credit Note, Debit Note, Purchase Expense). Manual entries AND bulk uploads land
+// Debit Note, Purchase Expense). Manual entries AND bulk uploads land
 // here as PENDING and hit the books only when approved.
 // Single nested sheet: Group › Sub-group › Ledger › Entry (collapsible).
 import React, { useMemo, useState, useRef } from 'react';
@@ -30,7 +30,7 @@ import { SkeletonTable } from '../shell/primitives';
 const fmtAmount = (n, cur = '₹') => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
 
 const C = { dark: '#1a1c22', gold: '#c2a04a', blue: '#2563eb', red: '#dc2626', green: '#16a34a', dim: '#5b616e', border: '#cdd1d8' };
-const VCH = { payment: 'Payment', receipt: 'Receipt', contra: 'Contra', journal: 'Journal', 'credit-note': 'Credit Note', 'debit-note': 'Debit Note', 'purchase-expense': 'Purchase Expense', refund: 'Refund', reissue: 'Reissue', adm: 'ADM', acm: 'ACM' };
+const VCH = { payment: 'Payment', receipt: 'Receipt', contra: 'Contra', journal: 'Journal', 'debit-note': 'Debit Note', 'purchase-expense': 'Purchase Expense', refund: 'Refund', reissue: 'Reissue', adm: 'ADM', acm: 'ACM' };
 const card = { background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' };
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 const branchLabel = (b) => (!b || b === 'ALL' ? CONSOLIDATED_LABEL : (b.code || b));
@@ -334,7 +334,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   };
 
   // Voucher Type wise — vouchers grouped by type (Receipt / Payment / …), collapsible.
-  const TYPE_ORDER = ['receipt', 'payment', 'contra', 'journal', 'credit-note', 'debit-note', 'purchase-expense'];
+  const TYPE_ORDER = ['receipt', 'payment', 'contra', 'journal', 'debit-note', 'purchase-expense'];
   const byType = useMemo(() => {
     const m = {};
     flatEntries.forEach((e) => { (m[e.category] = m[e.category] || []).push(e); });
@@ -462,7 +462,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
         <div>
           <div className="kbiz-page-title">{single ? `${VCH[category] || category} Approvals` : 'Voucher Approvals'}</div>
-          <div style={{ fontSize: 12, color: C.dim }}>{branchLabel(branch)} · {single ? `${VCH[category] || category} vouchers` : 'Payment · Receipt · Contra · Journal · Credit/Debit Note · Purchase Expense'} — manual & bulk post only when approved</div>
+          <div style={{ fontSize: 12, color: C.dim }}>{branchLabel(branch)} · {single ? `${VCH[category] || category} vouchers` : 'Payment · Receipt · Contra · Journal · Debit Note · Purchase Expense'} — manual & bulk post only when approved</div>
         </div>
         {status !== 'pending' && (
           <PeriodBar key={status} branch={branch} compact defaultPreset={presetFor(status)} onChange={setRange} />
@@ -979,7 +979,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
 // (BookingOrder module RF/RI), so they live under SO/PO/GP with a module filter.
 const VOUCHER_TABS = [
   ['receipt', 'Receipt'], ['payment', 'Payment'], ['contra', 'Contra'], ['journal', 'Journal'],
-  ['purchase-expense', 'Purchase Expense'], ['debit-note', 'Debit Note'], ['credit-note', 'Credit Note'],
+  ['purchase-expense', 'Purchase Expense'], ['debit-note', 'Debit Note'],
   ['adm', 'ADM'], ['acm', 'ACM'],
 ];
 const VOUCHER_KEYS = new Set(VOUCHER_TABS.map(([k]) => k));

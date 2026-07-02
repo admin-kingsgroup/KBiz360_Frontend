@@ -316,7 +316,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
 }
 
 /* ── The four masters as field configs ──────────────────────────────────── */
-const PARENT_TYPES = ['Payment', 'Receipt', 'Sales', 'Purchase', 'Journal', 'Contra', 'Debit Note', 'Credit Note'];
+const PARENT_TYPES = ['Payment', 'Receipt', 'Sales', 'Purchase', 'Journal', 'Contra', 'Debit Note'];
 
 export const VoucherTypesMaster = () => (
   <MasterCrud title="Voucher Types" subtitle="Tally voucher-type master" resource="voucher-types"

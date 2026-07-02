@@ -521,7 +521,7 @@ export default function KB360App(){
     if(route==="/transactions/inb-approvals")       return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="inbspg"/>;
     // Per-type approval screens: /transactions/approvals/<category> opens the split
     // screen for one gated voucher type (Receipt / Payment / … / ACM), bookmarkable.
-    if(/^\/transactions\/approvals\/(receipt|payment|contra|journal|purchase-expense|debit-note|credit-note|adm|acm)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain={route.split('/').pop()}/>;
+    if(/^\/transactions\/approvals\/(receipt|payment|contra|journal|purchase-expense|debit-note|adm|acm)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain={route.split('/').pop()}/>;
     if(/^\/bookings\/(pending|approved|rejected|deleted|list)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="sopogp"/>;
     // Per-module Sale/Purchase ENTRY is retired — all product entry is via SO/PO/GP.
     // These routes now open the read-only Module Register (view + print invoices).

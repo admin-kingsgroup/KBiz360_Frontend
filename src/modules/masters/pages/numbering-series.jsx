@@ -15,7 +15,7 @@ import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { Input, Select, StatusPill } from '../../../shell/primitives';
 
-const STD = [['BKG', 'Booking'], ['LK', 'Link No'], ['SF', 'Sales (SO)'], ['PF', 'Purchase (PO)'], ['RV', 'Receipt'], ['PMT', 'Payment'], ['JV', 'Journal'], ['CV', 'Contra'], ['SCN', 'Credit Note'], ['SDN', 'Debit Note'], ['PXP', 'Purchase Expense'], ['RF', 'Refund'], ['RI', 'Reissue']];
+const STD = [['BKG', 'Booking'], ['LK', 'Link No'], ['SF', 'Sales (SO)'], ['PF', 'Purchase (PO)'], ['RV', 'Receipt'], ['PMT', 'Payment'], ['JV', 'Journal'], ['CV', 'Contra'], ['SDN', 'Debit Note'], ['PXP', 'Purchase Expense'], ['RF', 'Refund'], ['RI', 'Reissue']];
 
 export function NumberingSeriesMaster({ branch }) {
   const [filterBranch, setFilterBranch] = useState(branch === 'ALL' ? 'BOM' : branch?.code || 'BOM');

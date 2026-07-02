@@ -181,7 +181,7 @@ export function useLedgerComponents(name, branch, { from, to, costCenter } = {},
   });
 }
 
-// Voucher approval queue (gated types: payment/receipt/contra/journal/CN/DN/PXP).
+// Voucher approval queue (gated types: payment/receipt/contra/journal/DN/PXP).
 // Returns { counts, status, entries, byGroup, bySubGroup, byLedger }.
 // `category` scopes it to one gated type (the per-type split screens); omit for the
 // combined queue. It is part of the query key so each type's cache stays separate.
@@ -633,8 +633,8 @@ export function useVoucherPreview(body) {
   });
 }
 
-// Create a new voucher (Receipt / Payment / Contra / Journal / Credit Note /
-// Debit Note / Purchase Expense). The backend posts a balanced double-entry,
+// Create a new voucher (Receipt / Payment / Contra / Journal / Debit Note /
+// Purchase Expense). The backend posts a balanced double-entry,
 // so we invalidate every accounting report + register so the new voucher shows
 // in the Trial Balance, P&L, Balance Sheet, Day Book and ageing immediately.
 export function useCreateVoucher() {
