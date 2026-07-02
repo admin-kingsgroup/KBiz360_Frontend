@@ -43,7 +43,7 @@ function ArApAgeingSettlementPage({ side, branch, currentUser, setRoute }) {
         onExport={() => openPrintPreview({ selector: 'main', title, recommend: 'landscape' })}
       />
       <WidgetCard title={title} subtitle={subtitle} color={isRec ? '#dc2626' : '#16a34a'}
-        onDrill={() => setRoute?.(isRec ? '/reports/rec' : '/reports/pay')}>
+        onDrill={() => setRoute?.(isRec ? '/reports/rec?tab=settlement' : '/reports/pay?tab=settlement')}>
         <ArApSettlementView side={side} totals={slice.totals || {}} rows={slice.rows || []} formatMoney={fmt} collapsed />
       </WidgetCard>
     </PageLayout>

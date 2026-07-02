@@ -85,10 +85,10 @@ function FinancialTables({ mods = [], assets = [], liabs = [], rec, pay, recRows
           Bills per ledger (Final Total reconciles to the Unsettled Bills tile). Same no-FIFO
           truth the AR/AP reports settle against — the reports carry the identical view. */}
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 tablet:grid-cols-2">
-        <WidgetCard title="Receivables — Ageing & Settlement" subtitle="Bills · settled · unsettled · ageing by sub-group" color="#dc2626" onDrill={() => nav('/reports/rec')}>
+        <WidgetCard title="Receivables — Ageing & Settlement" subtitle="Bills · settled · unsettled · ageing by sub-group" color="#dc2626" onDrill={() => nav('/reports/rec?tab=settlement')}>
           <ArApSettlementView side="receivable" totals={rec || {}} rows={recRows} formatMoney={fmt} collapsed />
         </WidgetCard>
-        <WidgetCard title="Payables — Ageing & Settlement" subtitle="Bills · settled · unsettled · ageing by sub-group" color="#16a34a" onDrill={() => nav('/reports/pay')}>
+        <WidgetCard title="Payables — Ageing & Settlement" subtitle="Bills · settled · unsettled · ageing by sub-group" color="#16a34a" onDrill={() => nav('/reports/pay?tab=settlement')}>
           <ArApSettlementView side="payable" totals={pay || {}} rows={payRows} formatMoney={fmt} collapsed />
         </WidgetCard>
       </div>
