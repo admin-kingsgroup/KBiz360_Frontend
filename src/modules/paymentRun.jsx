@@ -3,7 +3,8 @@ import { bc, card } from '../core/styles';
 import { localeOf } from '../core/format';
 import { useOutstanding, usePaymentRun } from '../core/useAccounting';
 import { buildPaymentRunPayload, paymentRunSummary } from './paymentRunPayload';
-import { Wallet, CheckSquare, Square, ArrowRight } from 'lucide-react';
+import { Wallet, CheckSquare, Square, ArrowRight, ChevronDown } from 'lucide-react';
+import { Menu as DropdownMenu } from '../core/ux/Menu';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8', amber: '#854F0B' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
@@ -77,9 +78,19 @@ export function PaymentRun({ branch, setRoute }) {
         <label style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>Date<br /><input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={fld} /></label>
         <label style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>Pay from (bank/cash ledger)<br /><input value={bankRef} onChange={(e) => setBankRef(e.target.value)} placeholder="HDFC Bank" style={{ ...fld, minWidth: 180 }} /></label>
         <label style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>Mode<br />
-          <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} style={fld}>
-            {['NEFT', 'RTGS', 'UPI', 'Cheque', 'Cash'].map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
+          <DropdownMenu
+            ariaLabel="Payment mode"
+            menuRole="listbox"
+            width={130}
+            items={['NEFT', 'RTGS', 'UPI', 'Cheque', 'Cash'].map((m) => ({ key: m, label: m, selected: paymentMode === m, onSelect: () => setPaymentMode(m) }))}
+            renderTrigger={({ ref, toggle, triggerProps }) => (
+              <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                style={{ ...fld, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', fontWeight: 600, color: C.dark, background: '#fff' }}>
+                {paymentMode}
+                <ChevronDown size={13} style={{ color: C.dim, flexShrink: 0 }} />
+              </button>
+            )}
+          />
         </label>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 18 }}>
           {outQ.isLoading ? (

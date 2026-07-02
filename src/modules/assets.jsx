@@ -320,9 +320,25 @@ export function AssetDepreciation({ branch }) {
       subtitle="Monthly & annual depreciation · Companies Act rates · Auto-posts JV at month-end"
       actions={
         <>
-          <div className="w-40"><Select value={period} onChange={(e) => setPeriod(e.target.value)}>
-            <option value="2026-05">May 2026</option><option value="2026-04">Apr 2026</option><option value="2026-03">Mar 2026</option>
-          </Select></div>
+          <div className="w-30">
+            <StatusMenu
+              ariaLabel="Period"
+              menuRole="listbox"
+              width={140}
+              items={[
+                { key: '2026-05', label: 'May 2026', selected: period === '2026-05', onSelect: () => setPeriod('2026-05') },
+                { key: '2026-04', label: 'Apr 2026', selected: period === '2026-04', onSelect: () => setPeriod('2026-04') },
+                { key: '2026-03', label: 'Mar 2026', selected: period === '2026-03', onSelect: () => setPeriod('2026-03') },
+              ]}
+              renderTrigger={({ ref, toggle, triggerProps }) => (
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  className="flex h-9 w-full items-center justify-between gap-1.5 rounded-md border border-surface-border bg-surface px-3 text-[13px] font-medium text-ink hover:bg-surface-alt">
+                  {{ '2026-05': 'May 2026', '2026-04': 'Apr 2026', '2026-03': 'Mar 2026' }[period]}
+                  <ChevronDown size={13} className="text-ink-subtle" />
+                </button>
+              )}
+            />
+          </div>
           <Button variant="accent" size="sm">Post Depreciation JV</Button>
         </>
       }

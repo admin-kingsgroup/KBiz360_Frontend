@@ -18,6 +18,7 @@ import { clickable } from '../core/ux/clickable';
 import { listKeyNav } from '../core/ux/listKeys';
 import { ReportIssueButton } from '../modules/support/components/ReportIssueButton';
 import { useFyStore, FY_OPTIONS } from '../store/fy';
+import { Menu as DropdownMenu } from '../core/ux/Menu';
 
 const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5', LINE = '#e1e3ec';
 
@@ -26,21 +27,24 @@ const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5', LINE = '#e1e3ec';
 function FyMiniSelector() {
   const fy = useFyStore((s) => s.fy);
   const setFy = useFyStore((s) => s.setFy);
+  const current = FY_OPTIONS.find((o) => o.startYear === fy.startYear);
   return (
-    <label
-      title="Financial year"
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 26, padding: '0 7px', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 6, cursor: 'pointer' }}
-    >
-      <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.04em', color: DIM }}>FY</span>
-      <select
-        value={fy.startYear}
-        onChange={(e) => setFy(Number(e.target.value))}
-        aria-label="Financial year"
-        style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 11, fontWeight: 700, color: DARK, cursor: 'pointer' }}
-      >
-        {FY_OPTIONS.map((o) => <option key={o.startYear} value={o.startYear}>{o.label}</option>)}
-      </select>
-    </label>
+    <DropdownMenu
+      ariaLabel="Financial year"
+      menuRole="listbox"
+      width={130}
+      items={FY_OPTIONS.map((o) => ({ key: o.startYear, label: o.label, selected: fy.startYear === o.startYear, onSelect: () => setFy(o.startYear) }))}
+      renderTrigger={({ ref, toggle, triggerProps }) => (
+        <button
+          ref={ref} {...triggerProps} onClick={toggle} type="button" title="Financial year"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 26, padding: '0 7px', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 6, cursor: 'pointer' }}
+        >
+          <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.04em', color: DIM }}>FY</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: DARK }}>{current?.label || fy.startYear}</span>
+          <span style={{ fontSize: 9, color: DIM }}>▾</span>
+        </button>
+      )}
+    />
   );
 }
 

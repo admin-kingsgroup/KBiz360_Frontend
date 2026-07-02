@@ -11,10 +11,11 @@ import { localeOf } from '../core/format';
 import { PeriodBar, periodRange } from '../core/period';
 import { printBookingInvoice } from '../core/printInvoice';
 import { useReportExport } from '../core/reportExportContext';
-import { Search, X, Receipt, FileText } from 'lucide-react';
+import { Search, X, Receipt, FileText, ChevronDown } from 'lucide-react';
 import { PageLayout } from '../shell/PageLayout';
 import { DataTable } from '../shell/DataTable';
-import { Button, Select, Input } from '../shell/primitives';
+import { Button, Input } from '../shell/primitives';
+import { Menu as DropdownMenu } from '../core/ux/Menu';
 
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
 const MODS = ['SF', 'SH', 'SHT', 'SV', 'SI', 'SC', 'SM'];
@@ -194,11 +195,6 @@ export function ModuleRegister({ branch, mode = 'both' }) {
       subtitle={`Approved SO/PO/GP deals — one line per booking with full sale / purchase / GST / GP detail. All entry is via Finance ▸ Vouchers ▸ SO/PO/GP Voucher. ${mode === 'sales' ? 'Print the Sales Invoice (give to customer)' : mode === 'purchase' ? 'Print the Purchase Invoice (internal filing)' : 'Print the Sales Invoice (customer) or Purchase Invoice (filing)'} — Link No stamped.`}
       filters={
         <>
-          <PeriodBar branch={branch} compact defaultPreset="mtd" onChange={setRange} />
-          <div className="w-52"><Select value={mod} onChange={(e) => setMod(e.target.value)} className="font-semibold">
-            <option value="ALL">📋 All modules</option>
-            {MODS.map((m) => <option key={m} value={m}>{(VSPECS[m]?.icon || '') + ' ' + (VSPECS[m]?.name || m)}</option>)}
-          </Select></div>
           {/* Search across everything captured on the SO/PO — passenger, ticket, PNR, sector, customer, supplier… */}
           <div className="relative w-full max-w-[460px]">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
@@ -214,6 +210,25 @@ export function ModuleRegister({ branch, mode = 'both' }) {
               </button>
             )}
           </div>
+        
+          <div className="w-52">
+            <DropdownMenu
+              ariaLabel="Module"
+              menuRole="listbox"
+              items={[
+                { key: 'ALL', label: '📋 All modules', selected: mod === 'ALL', onSelect: () => setMod('ALL') },
+                ...MODS.map((m) => ({ key: m, label: `${VSPECS[m]?.icon || ''} ${VSPECS[m]?.name || m}`, selected: mod === m, onSelect: () => setMod(m) })),
+              ]}
+              renderTrigger={({ ref, toggle, triggerProps }) => (
+                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                  className="flex h-9 w-full items-center justify-between gap-1.5 rounded-md border border-surface-border bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-alt">
+                  {mod === 'ALL' ? '📋 All modules' : `${VSPECS[mod]?.icon || ''} ${VSPECS[mod]?.name || mod}`}
+                  <ChevronDown size={13} className="text-ink-subtle" />
+                </button>
+              )}
+            />
+          </div>
+            <PeriodBar branch={branch} compact defaultPreset="mtd" onChange={setRange} />
         </>
       }
     >
