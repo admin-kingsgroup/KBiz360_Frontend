@@ -42,7 +42,7 @@ import {
   VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, tcs206cRate, lineCalc, isVatBranch, rowsFromSnapshots,
 } from '../../core/voucherSpecs.js';
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
-import { invalidateBooks } from '../../core/useAccounting';
+import { invalidateBooks, useVoucherApprovals, useApproveMany, useRejectVoucher } from '../../core/useAccounting';
 
 const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', CR = '#C0392B', BLUE = '#2563eb';
 // Gold theme tokens + per-section bar accents (SO / PO / GP voucher theme).
@@ -1758,6 +1758,94 @@ export function DeletedBookings({ branch, setRoute }) {
   );
 }
 
+// SO/PO/GP Refunds & Reissues — RF/RI vouchers that reverse a SO/PO/GP sale. Unlike a
+// forward booking (a sale+purchase pair spawned from a booking master), a refund/reissue
+// is a SINGLE voucher (category 'refund'/'reissue'), so it lives in its own section under
+// this same window and is approved/rejected on its own row via the shared voucher
+// mutations. INB refunds are routed to the INB window instead — refundScope 'sopogp'
+// excludes anything reversing an INB deal (againstInvoice/linkNo starting 'INB/'). Hidden
+// on the Edited tab (a cross-cut list, not a status queue).
+const REFUND_APPROVER_RE = /super.?admin|director|senior\s+finance\s+manager|sr\.?\s*accounts\s+executive/i;
+function SopogpRefunds({ branch, status, needle, currentUser }) {
+  const cur = bc(branch).cur;
+  const isApprover = REFUND_APPROVER_RE.test(currentUser?.role || '');
+  const q = useVoucherApprovals(branch, status, { refundScope: 'sopogp' });
+  const approveMany = useApproveMany();
+  const reject = useRejectVoucher();
+  const [busy, setBusy] = useState(false);
+  const pendingTab = status === 'pending';
+  const list = useMemo(() => {
+    const all = Array.isArray(q.data && q.data.entries) ? q.data.entries : [];
+    return all
+      .filter((e) => e.category === 'refund' || e.category === 'reissue')
+      .filter((e) => !needle || [e.vno, e.party, e.againstInvoice, e.linkNo, String(Math.round(e.total || 0))].filter(Boolean).join(' ').toLowerCase().includes(needle));
+  }, [q.data, needle]);
+
+  // A refund/reissue is one voucher — approve/reject it on its own (shared voucher
+  // mutations, exactly like the INB Refunds section).
+  const doApprove = async (e) => {
+    const { confirmed } = await confirmDialog({ title: `Approve refund ${e.vno}?`, message: 'Posts this refund / reissue to the books (reverses the linked sale).', confirmLabel: 'Approve' });
+    if (!confirmed) return;
+    setBusy(true);
+    approveMany.mutate({ ids: [e.id], approver: 'admin' }, {
+      onSuccess: (res) => { const f = (res && res.failed) || 0; toast(f ? `${e.vno} failed to post` : `Approved ${e.vno}`, f ? 'error' : 'success'); },
+      onError: (err) => toast((err && err.message) || 'Approve failed', 'error'),
+      onSettled: () => setBusy(false),
+    });
+  };
+  const doReject = async (e) => {
+    const { confirmed, reason } = await confirmDialog({ title: `Reject refund ${e.vno}?`, message: 'Marks it Rejected (no books impact).', danger: true, reasonRequired: true, reasonLabel: 'Reason for rejection', confirmLabel: 'Reject' });
+    if (!confirmed) return;
+    setBusy(true);
+    try { await reject.mutateAsync({ id: e.id, by: 'admin', reason }); toast(`Rejected ${e.vno}`); }
+    catch (err) { toast((err && err.message) || 'Reject failed', 'error'); }
+    finally { setBusy(false); }
+  };
+
+  const th = { padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', whiteSpace: 'nowrap' };
+  return (
+    <div style={{ ...card, padding: 0, overflowX: 'auto', marginTop: 14 }}>
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid #cdd1d8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+        <span style={{ fontWeight: 800, color: DARK, fontSize: 13 }}>Refunds &amp; Reissues <span style={{ fontWeight: 700, color: '#9197a3', fontSize: 11 }}>— reverse a SO/PO/GP sale</span></span>
+        <span style={{ fontSize: 11.5, color: '#5b616e', fontWeight: 700 }}>{list.length} {status}</span>
+      </div>
+      {q.isLoading ? <div style={{ padding: 18, textAlign: 'center', color: '#9197a3', fontSize: 12 }}>Loading refunds…</div>
+        : list.length === 0 ? <div style={{ padding: 18, textAlign: 'center', color: '#9197a3', fontSize: 12 }}>No {status} refunds / reissues.</div>
+        : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <thead><tr style={{ background: '#f3f4f8' }}>
+              {['Vch No', 'Reverses (Sale)', 'Party', 'Amount', pendingTab ? 'Actions' : 'Status'].map((h, i) => (
+                <th key={i} style={{ ...th, textAlign: h === 'Amount' ? 'right' : 'left' }}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {list.map((e) => (
+                <tr key={e.id} style={{ borderTop: '1px solid #dfe2e7' }}>
+                  <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    {e.vno}
+                    <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#eef2ff', color: '#3d4ea8', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>{e.category === 'reissue' ? 'RI' : 'RF'}</span>
+                  </td>
+                  <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 11, color: '#5b616e' }}>{e.againstInvoice || e.linkNo || '—'}</td>
+                  <td style={{ padding: '7px 12px' }}>{e.party || '—'}</td>
+                  <td style={{ padding: '7px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{cur} {fmt(e.total || 0)}</td>
+                  {pendingTab
+                    ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
+                        {isApprover ? <>
+                          <button disabled={busy || !e.postable} title={e.postable ? '' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving')} onClick={() => doApprove(e)} style={{ marginRight: 6, padding: '5px 10px', background: e.postable ? DR : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
+                          <button disabled={busy} onClick={() => doReject(e)} style={{ padding: '5px 10px', background: '#fff', color: '#dc2626', border: '1px solid #f3c9c9', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
+                          {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#dc2626' }}>blocked</span>}
+                        </> : <span style={{ fontSize: 11, color: '#9197a3' }}>Approver only</span>}
+                      </td>
+                    : <td style={{ padding: '7px 12px', color: '#5b616e', textTransform: 'capitalize' }}>{e.status}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+    </div>
+  );
+}
+
 // Unified SO/PO/GP approval — Pending · Approved · Rejected · Deleted in one screen
 // with internal tabs (mirrors Voucher Approvals). Reuses BookingTable + all actions.
 export function BookingApprovals({ branch, setRoute, currentUser, initialSearch = '', initialStatus = '' }) {
@@ -1898,7 +1986,10 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
       </div>
       {status === 'edited'
         ? <EditedBookingsList rows={editedVisible} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
-        : <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />}
+        : <>
+            <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
+            <SopogpRefunds branch={branch} status={status} needle={needle} currentUser={currentUser} />
+          </>}
     </div>
   );
 }
