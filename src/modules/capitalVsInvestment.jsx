@@ -3,15 +3,14 @@
 // Sequence: Capital Invested → less Capital Blocked → residual In-Flow Capital,
 // then Section 4 tests whether that in-flow capital earns enough gross profit
 // (benchmarked against an editable cost-of-capital hurdle). No static data.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../core/api';
-import { PeriodBar } from '../core/period';
+import { periodRange } from '../core/period';
 import { bc } from '../core/styleTokens';
 
 const DEFAULT_HURDLE = 18; // initial cost-of-capital benchmark % — user-editable on screen
 const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
-const fyDefault = () => { const d = new Date(); const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; return { from: `${y}-04-01`, to: d.toISOString().slice(0, 10) }; };
 const dmy = (s) => { const d = new Date(s); return Number.isNaN(d.getTime()) ? s : `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })} ${d.getFullYear()}`; };
 const fyLabel = (s) => { const d = new Date(s); const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; return `${y}–${String(y + 1).slice(-2)}`; };
 
@@ -35,38 +34,60 @@ const fmtShort = (cur, n) => {
 
 const CSS = `
 .cvd,.cvd *{box-sizing:border-box}
-.cvd{--bg:#eef1f6;--card:#fff;--line:#e3e7ef;--line2:#eef1f6;--ink:#151b28;--ink2:#3a4356;--dim:#6b7488;
+.cvd{--nav:#0f1729;--nav2:#16203a;--nav-ink:#c3cde0;--nav-dim:#6b7690;--nav-active:#14b8a6;
+  --bg:#eef1f6;--card:#ffffff;--line:#e3e7ef;--line2:#eef1f6;--ink:#151b28;--ink2:#3a4356;--dim:#6b7488;
   --primary:#0d9488;--primary-d:#0b7d73;--amber:#d97706;--amber-s:#fdf3e6;--green:#16a34a;--red:#dc2626;
   --violet:#6366f1;--teal-s:#e9f6f4;--blue:#2563eb;
-  font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:14px;line-height:1.45}
+  font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);
+  display:grid;grid-template-columns:236px 1fr;min-height:100vh;font-size:14px;line-height:1.45}
 .cvd .num{font-variant-numeric:tabular-nums}
-.cvd .wrap{max-width:1320px;margin:0 auto;padding:0 4px}
 
-/* sticky toolbar + section nav */
-.cvd .bar{position:sticky;top:0;z-index:15;background:rgba(238,241,246,.94);backdrop-filter:blur(8px);
-  padding:12px 4px 0}
-.cvd .barrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-bottom:11px}
-.cvd .title{font-size:18px;font-weight:800;letter-spacing:-.01em}
-.cvd .title span{color:var(--dim);font-weight:600;font-size:13px;margin-left:8px}
-.cvd .crumb{font-size:11.5px;color:var(--dim);margin-bottom:1px}
-.cvd .crumb b{color:var(--ink2);font-weight:700}
-.cvd .ctrls{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.cvd .hurdle{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--dim);font-weight:700}
-.cvd .hurdle input{width:56px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:13px;
-  font-weight:700;color:var(--ink);text-align:right;background:#fff}
-.cvd .hurdle input:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
-.cvd .live{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dim);font-weight:600}
-.cvd .live .dot{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 0 0 rgba(52,211,153,.6);animation:cvdpl 2s infinite}
+/* ── sidebar ─────────────────────────────────────────── */
+.cvd .rail{background:var(--nav);color:var(--nav-ink);position:sticky;top:0;height:100vh;overflow-y:auto;
+  display:flex;flex-direction:column;padding:18px 0}
+.cvd .brand{padding:2px 20px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #22304f}
+.cvd .brand .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#14b8a6,#0d9488);
+  display:flex;align-items:center;justify-content:center;font-weight:800;color:#04211d;font-size:14px}
+.cvd .brand .nm{font-weight:800;font-size:14px;color:#fff;letter-spacing:.3px}
+.cvd .brand .nm span{display:block;font-size:9.5px;color:var(--nav-dim);font-weight:600;letter-spacing:1.5px;margin-top:1px}
+.cvd .navlabel{font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--nav-dim);padding:16px 20px 7px;font-weight:700}
+.cvd .navlink{display:flex;align-items:center;gap:11px;padding:9px 20px;color:var(--nav-ink);text-decoration:none;
+  font-size:13px;font-weight:500;border-left:3px solid transparent;cursor:pointer;transition:background .14s;background:none;border-top:0;border-right:0;border-bottom:0;width:100%;text-align:left;font-family:inherit}
+.cvd .navlink:hover{background:#18223c}
+.cvd .navlink.on{background:#18223c;border-left-color:var(--nav-active);color:#fff;font-weight:700}
+.cvd .navlink:focus-visible{outline:2px solid var(--nav-active);outline-offset:-2px}
+.cvd .navlink .ico{width:16px;text-align:center;color:var(--nav-active);font-size:13px}
+.cvd .railcard{margin:18px 16px 6px;background:var(--nav2);border-radius:10px;padding:13px 14px}
+.cvd .railcard .l{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--nav-dim);font-weight:700}
+.cvd .railcard .big{font-size:22px;font-weight:800;color:#fff;margin-top:5px}
+.cvd .railcard .sub{font-size:11px;color:#8ad9cf;margin-top:2px}
+.cvd .rail .live{margin-top:auto;padding:14px 20px 4px;font-size:11px;color:var(--nav-dim);display:flex;align-items:center;gap:8px}
+.cvd .rail .live .dot{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 0 0 rgba(52,211,153,.6);animation:cvdpl 2s infinite}
 @keyframes cvdpl{70%{box-shadow:0 0 0 6px rgba(52,211,153,0)}}
 @media(prefers-reduced-motion:reduce){.cvd *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
-.cvd .secnav{display:flex;gap:6px;overflow-x:auto;padding-bottom:11px;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
-.cvd .chip{appearance:none;border:1px solid var(--line);background:#fff;color:var(--ink2);font:inherit;font-size:12px;
-  font-weight:700;white-space:nowrap;padding:6px 13px;border-radius:999px;cursor:pointer;transition:all .14s}
-.cvd .chip:hover{border-color:var(--primary);color:var(--primary-d)}
-.cvd .chip.on{background:var(--primary);border-color:var(--primary);color:#fff}
-.cvd .chip:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 
-.cvd .content{display:flex;flex-direction:column;gap:20px;padding:20px 4px 60px}
+/* ── main ────────────────────────────────────────────── */
+.cvd .main{min-width:0;display:flex;flex-direction:column}
+.cvd .topbar{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);padding:13px 26px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.cvd .crumb{font-size:12px;color:var(--dim)}
+.cvd .crumb b{color:var(--ink);font-weight:700}
+.cvd .h1{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.cvd .controls{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cvd .presets{display:flex;background:#f1f3f8;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.cvd .presets button{appearance:none;border:0;background:transparent;font:inherit;font-size:12px;font-weight:600;color:var(--dim);
+  padding:6px 11px;cursor:pointer;border-right:1px solid var(--line)}
+.cvd .presets button:last-child{border-right:0}
+.cvd .presets button.on{background:var(--primary);color:#fff}
+.cvd .hurdle{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--dim);font-weight:600}
+.cvd .hurdle input{width:56px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:13px;
+  font-weight:700;color:var(--ink);text-align:right}
+.cvd .hurdle input:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+.cvd .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid var(--line);border-radius:8px;
+  background:#fff;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer}
+.cvd .btn.pri{background:var(--primary);border-color:var(--primary);color:#fff}
+
+.cvd .content{padding:22px 26px 60px;display:flex;flex-direction:column;gap:22px}
 .cvd .state{padding:48px 20px;text-align:center;color:var(--dim);font-size:14px;background:#fff;border:1px solid var(--line);border-radius:14px}
 
 /* verdict banner */
@@ -87,9 +108,9 @@ const CSS = `
 .cvd .kpi.green::before{background:var(--green)}.cvd .kpi.slate::before{background:#64748b}
 .cvd .kpi .l{font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);font-weight:700;
   display:flex;align-items:center;justify-content:space-between;gap:8px}
-.cvd .kpi .v{font-size:22px;font-weight:800;margin-top:8px;letter-spacing:-.01em}
+.cvd .kpi .v{font-size:23px;font-weight:800;margin-top:8px;letter-spacing:-.01em}
 .cvd .kpi .s{font-size:11.5px;color:var(--dim);margin-top:3px}
-.cvd .kpi .pill{font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;white-space:nowrap}
+.cvd .kpi .pill{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:20px;white-space:nowrap}
 .cvd .pill.up{background:#e7f6ec;color:var(--green)}.cvd .pill.warn{background:var(--amber-s);color:var(--amber)}
 .cvd .pill.dn{background:#fdecec;color:var(--red)}
 
@@ -106,21 +127,21 @@ const CSS = `
 .cvd .legend .sw{width:11px;height:11px;border-radius:3px;flex:none}
 .cvd .legend .amt{margin-left:auto;font-weight:800}
 .cvd .legend .pc{color:var(--dim);font-size:11px;width:46px;text-align:right}
-.cvd .bridge{display:flex;flex-direction:column;gap:10px}
-.cvd .brow{display:grid;grid-template-columns:140px 1fr 104px;align-items:center;gap:12px;font-size:12.5px}
+.cvd .bridge{display:flex;flex-direction:column;gap:11px}
+.cvd .brow{display:grid;grid-template-columns:132px 1fr 108px;align-items:center;gap:12px;font-size:12.5px}
 .cvd .brow .nm{color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cvd .brow .nm.b{font-weight:800;color:var(--ink)}
 .cvd .track{height:16px;background:#f1f3f8;border-radius:5px;position:relative;overflow:hidden}
 .cvd .fill{position:absolute;top:0;bottom:0;left:0;border-radius:5px}
 .cvd .brow .amt{text-align:right;font-weight:800}
 .cvd .amt.neg{color:var(--red)}
-.cvd .gaugewrap{display:flex;flex-direction:column;align-items:center;gap:2px}
-.cvd .gaugewrap .big{font-size:29px;font-weight:800;margin-top:-44px}
-.cvd .gaugewrap .cap{font-size:11.5px;color:var(--dim);margin-top:4px;text-align:center;line-height:1.5}
+.cvd .gaugewrap{display:flex;flex-direction:column;align-items:center;gap:6px}
+.cvd .gaugewrap .big{font-size:30px;font-weight:800;color:var(--primary);margin-top:-46px}
+.cvd .gaugewrap .cap{font-size:11.5px;color:var(--dim);margin-top:2px;text-align:center;line-height:1.5}
 .cvd .gaugewrap .cap b{color:var(--ink)}
 
-/* section card + register table */
-.cvd .section{scroll-margin-top:118px}
+/* section card */
+.cvd .section{scroll-margin-top:80px}
 .cvd .sec-hd{display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line)}
 .cvd .sec-hd .no{width:26px;height:26px;border-radius:8px;background:var(--ink);color:#fff;font-size:12px;font-weight:800;
   display:flex;align-items:center;justify-content:center;flex:none}
@@ -138,7 +159,7 @@ const CSS = `
   background:#fafbfd;padding-top:11px}
 .cvd .reg td.nm{color:var(--ink2)}
 .cvd .reg td.led{padding-left:34px;color:var(--ink2)}
-.cvd .reg td.amt{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;width:180px}
+.cvd .reg td.amt{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
 .cvd .reg td.amt.neg{color:var(--red)}
 .cvd .reg .tag{font-size:8.5px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:8px;letter-spacing:.4px;vertical-align:middle}
 .cvd .tag.bs{background:#eef2fb;color:var(--blue)}.cvd .tag.pl{background:#f3eefb;color:var(--violet)}
@@ -148,7 +169,7 @@ const CSS = `
 .cvd .reg tr.tot.amberT td.amt{color:var(--amber)}
 .cvd .reg tr.tot.greenT td.amt{color:var(--green)}
 
-/* formula + perf */
+/* formula + perf inside sections */
 .cvd .pad{padding:16px 18px;display:flex;flex-direction:column;gap:14px}
 .cvd .formula{display:flex;flex-wrap:wrap;align-items:stretch;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .cvd .formula .cell{flex:1;min-width:120px;padding:13px 16px;border-right:1px solid var(--line)}
@@ -167,17 +188,30 @@ const CSS = `
 .cvd .recon{font-size:12px;color:var(--ink2);background:#f7f9fc;border:1px dashed var(--line);border-radius:9px;padding:11px 14px}
 .cvd .recon b{color:var(--primary-d)}
 
-.cvd .bsgrid{display:grid;grid-template-columns:1fr 1fr}
+.cvd .bsgrid{display:grid;grid-template-columns:1fr 1fr;gap:0}
 .cvd .bsgrid>div:first-child{border-right:1px solid var(--line)}
-.cvd .foot{font-size:11px;color:var(--dim);padding:0 6px;line-height:1.6}
+.cvd .foot{font-size:11px;color:var(--dim);padding:0 2px;line-height:1.6}
 .cvd .foot b{color:var(--ink2)}
 
 @media(max-width:1080px){.cvd .analytics{grid-template-columns:1fr 1fr}.cvd .analytics .card:last-child{grid-column:1/-1}}
-@media(max-width:820px){.cvd .kpis{grid-template-columns:1fr 1fr}.cvd .bsgrid{grid-template-columns:1fr}
-  .cvd .bsgrid>div:first-child{border-right:0;border-bottom:1px solid var(--line)}}
-@media(max-width:560px){.cvd .analytics{grid-template-columns:1fr}.cvd .perfrow{grid-template-columns:1fr}
-  .cvd .brow{grid-template-columns:104px 1fr 88px}.cvd .reg td.amt{width:auto;min-width:96px}
-  .cvd .section{scroll-margin-top:150px}}
+@media(max-width:900px){
+  .cvd{grid-template-columns:1fr}
+  .cvd .rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px;padding:12px}
+  .cvd .rail .navlabel,.cvd .railcard,.cvd .rail .live{display:none}
+  .cvd .rail .brand{border:0;padding:2px 8px 2px 4px}
+  .cvd .navlink{border-left:0;border-radius:8px;padding:7px 11px;width:auto}
+  .cvd .navlink.on{border-left:0}
+  .cvd .kpis{grid-template-columns:1fr 1fr}
+  .cvd .bsgrid{grid-template-columns:1fr}
+  .cvd .bsgrid>div:first-child{border-right:0;border-bottom:1px solid var(--line)}
+}
+@media(max-width:560px){
+  .cvd .content{padding:16px 12px 48px}
+  .cvd .analytics{grid-template-columns:1fr}
+  .cvd .perfrow{grid-template-columns:1fr}
+  .cvd .brow{grid-template-columns:104px 1fr 92px}
+  .cvd .topbar{padding:11px 14px}
+}
 `;
 
 // ── register table (group ▸ ledgers ▸ subtotal, then a bold total row) ─────────
@@ -226,18 +260,20 @@ function GroupList({ head, groups, totalLabel, totalVal, fmt }) {
 }
 
 const NAV = [
-  ['ov', 'Overview'], ['s1', 'Capital Employed'], ['s2', 'Capital Blocked'],
-  ['s3', 'In-Flow'], ['s4', 'Performance'], ['s5', 'Balance Sheet'], ['s6', 'Profit & Loss'],
+  ['ov', 'Overview', '◆'], ['s1', 'Capital Employed', '①'], ['s2', 'Capital Blocked', '②'],
+  ['s3', 'In-Flow Capital', '③'], ['s4', 'Performance', '④'], ['s5', 'Balance Sheet', '⑤'], ['s6', 'Profit & Loss', '⑥'],
 ];
+const PRESETS = [['all', 'All'], ['mtd', 'MTD'], ['qtd', 'QTD'], ['cfy', 'CFY'], ['lfy', 'LFY']];
 
 export function CapitalVsInvestmentLive({ branch }) {
-  const [range, setRange] = useState(fyDefault);
+  const [preset, setPreset] = useState('cfy');
   const [hurdle, setHurdle] = useState(DEFAULT_HURDLE); // cost-of-capital % — editable
   const [active, setActive] = useState('ov');
+  const range = useMemo(() => periodRange(preset, { branch }), [preset, branch]);
   const cur = (bc(branch) || {}).cur || '₹';
   const inr = (n) => fmtAmt(cur, n);   // full amount in branch currency
   const cr = (n) => fmtShort(cur, n);  // short scale (Cr/L · K/M/B)
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['capital-analysis', brCodeOf(branch), range.from, range.to],
     queryFn: () => apiGet('/api/accounting/capital-analysis', { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from: range.from, to: range.to }),
   });
@@ -274,7 +310,7 @@ export function CapitalVsInvestmentLive({ branch }) {
   ];
   const maxAbs = Math.max(1, ...bridge.map((r) => Math.abs(r.v)));
 
-  // Donut (blocked vs in-flow, of capital employed) + gauge (GP yield vs hurdle).
+  // Donut (blocked vs in-flow) + gauge (GP yield vs hurdle).
   const DC = 289.03; // 2π·46
   const blkLen = (DC * Math.max(0, Math.min(100, t.blockedPct || 0)) / 100).toFixed(1);
   const flwLen = (DC * Math.max(0, Math.min(100, t.inflowPct || 0)) / 100).toFixed(1);
@@ -283,7 +319,7 @@ export function CapitalVsInvestmentLive({ branch }) {
   const needleAng = (Math.max(0, Math.min(40, hurdle)) / 40 * 180 - 90).toFixed(1);
   const yieldDiff = ((t.gpYield || 0) - hurdle).toFixed(1);
 
-  // Scroll-spy: highlight the section nav chip for whatever is in view.
+  // Scroll-spy: highlight the rail link for whatever section is in view.
   useEffect(() => {
     if (!hasData) return undefined;
     const ids = NAV.map(([id]) => document.getElementById('cvd-' + id)).filter(Boolean);
@@ -300,31 +336,48 @@ export function CapitalVsInvestmentLive({ branch }) {
   return (
     <div className="cvd">
       <style>{CSS}</style>
-      <div className="wrap">
-        <div className="bar">
-          <div className="barrow">
-            <div>
-              <div className="crumb">Dashboards › AD Dashboards › <b>Capital vs Investment</b></div>
-              <div className="title">Capital vs Investment<span>{brCodeOf(branch)} · {fyLabel(range.to)} · as on {dmy(range.to)}</span></div>
-            </div>
-            <div className="ctrls">
-              <div className="live"><span className="dot" />Live · BS + P&amp;L</div>
-              <div className="hurdle"><label htmlFor="cvd-hurdle">Hurdle</label>
-                <input id="cvd-hurdle" type="number" min="0" step="0.5" value={hurdle}
-                  onChange={(e) => setHurdle(Number(e.target.value) || 0)}
-                  title="Cost-of-capital benchmark used for the GP-yield verdict" />%
-              </div>
-              <PeriodBar branch={branch} compact defaultPreset="cfy" onChange={(r) => setRange({ from: r.from, to: r.to })} />
-            </div>
+
+      {/* ═══ SIDEBAR ═══ */}
+      <aside className="rail">
+        <div className="brand">
+          <div className="logo">K</div>
+          <div className="nm">KBiz360<span>AD DASHBOARDS</span></div>
+        </div>
+        <div className="navlabel">Capital vs Investment</div>
+        {NAV.map(([id, label, ico]) => (
+          <button key={id} type="button" className={`navlink ${active === id ? 'on' : ''}`} onClick={() => jump(id)} aria-current={active === id ? 'true' : undefined}>
+            <span className="ico">{ico}</span> {label}
+          </button>
+        ))}
+        <div className="railcard">
+          <div className="l">Capital Employed</div>
+          <div className="big num">{cr(t.capitalInvested)}</div>
+          <div className="sub">In-Flow {(t.inflowPct || 0).toFixed(1)}% · Blocked {(t.blockedPct || 0).toFixed(1)}%</div>
+        </div>
+        <div className="live"><span className="dot" /> Live · Balance Sheet + P&amp;L</div>
+      </aside>
+
+      {/* ═══ MAIN ═══ */}
+      <div className="main">
+        <div className="topbar">
+          <div>
+            <div className="crumb">Dashboards › AD Dashboards › <b>Capital vs Investment</b></div>
+            <div className="h1">Capital vs Investment · {brCodeOf(branch)}</div>
           </div>
-          {!isLoading && !error && data && hasData && (
-            <div className="secnav" role="tablist" aria-label="Report sections">
-              {NAV.map(([id, label]) => (
-                <button key={id} type="button" className={`chip ${active === id ? 'on' : ''}`}
-                  role="tab" aria-selected={active === id} onClick={() => jump(id)}>{label}</button>
+          <div className="controls">
+            <div className="presets" role="group" aria-label="Period">
+              {PRESETS.map(([k, label]) => (
+                <button key={k} type="button" className={preset === k ? 'on' : ''} onClick={() => setPreset(k)}>{label}</button>
               ))}
             </div>
-          )}
+            <div className="hurdle"><label htmlFor="cvd-hurdle">Hurdle</label>
+              <input id="cvd-hurdle" type="number" min="0" step="0.5" value={hurdle}
+                onChange={(e) => setHurdle(Number(e.target.value) || 0)}
+                title="Cost-of-capital benchmark used for the GP-yield verdict" />%
+            </div>
+            <button className="btn" type="button" onClick={() => { if (typeof window !== 'undefined' && window.print) window.print(); }}>⤓ Export</button>
+            <button className="btn pri" type="button" onClick={() => refetch && refetch()}>↻ Refresh</button>
+          </div>
         </div>
 
         <div className="content">

@@ -1,7 +1,10 @@
 // Capital vs Investment must render in the branch's own currency — ₹ for India
 // branches, $ for the USD branches (NBO / DAR / FBM). Regression for the old
 // hardcoded-₹ bug that mislabelled African-branch figures.
-jest.mock('../../core/period', () => ({ PeriodBar: () => null }));
+jest.mock('../../core/period', () => ({
+  PeriodBar: () => null,
+  periodRange: (p) => ({ from: '2026-04-01', to: '2026-07-02', label: 'CFY', preset: p }),
+}));
 jest.mock('../../core/api', () => ({ apiGet: jest.fn(() => Promise.resolve({})) }));
 jest.mock('../../core/styleTokens', () => ({
   bc: (b) => ({ cur: (b && (b.code === 'NBO' || b.code === 'DAR' || b.code === 'FBM')) ? '$' : '₹' }),
@@ -64,13 +67,21 @@ test('accumulated-loss deduction renders as a Less: line in Section 1', () => {
   expect(screen.getAllByText(/Less: Accumulated Loss/).length).toBeGreaterThan(0);
 });
 
-test('section nav renders and selecting a chip marks it active', () => {
+test('sidebar nav renders and selecting a link marks it active', () => {
   render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
-  const bsTab = screen.getByRole('tab', { name: 'Balance Sheet' });
-  expect(bsTab).toBeInTheDocument();
+  // Rail link "Balance Sheet" (the section title is "Complete Balance Sheet").
+  const bsLink = screen.getByRole('button', { name: /Balance Sheet/ });
+  expect(bsLink).toBeInTheDocument();
   // No collapse: Section 1 ledger + Section 5 group are both on screen without any click.
   expect(screen.getAllByText('Owner Capital').length).toBeGreaterThan(0);
   expect(screen.getByText('Current Assets')).toBeInTheDocument();
-  fireEvent.click(bsTab);
-  expect(bsTab).toHaveAttribute('aria-selected', 'true');
+  fireEvent.click(bsLink);
+  expect(bsLink).toHaveClass('on');
+});
+
+test('period presets switch the active pill', () => {
+  render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
+  const mtd = screen.getByRole('button', { name: 'MTD' });
+  fireEvent.click(mtd);
+  expect(mtd).toHaveClass('on');
 });
