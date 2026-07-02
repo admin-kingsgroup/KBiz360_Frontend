@@ -18,6 +18,7 @@ export { SrAeDashboardPage as SrAeDashboard, SrAeDashboardPage } from './pages/s
 export { AcctsExecDashboardPage as AcctsExecDashboard, AcctsExecDashboardPage } from './pages/accts-exec-dashboard';
 export { HrMgrDashboardPage as HrMgrDashboard, HrMgrDashboardPage } from './pages/hr-mgr-dashboard';
 export { AlertsDashboard } from './pages/alerts-dashboard';
+export { ReceivablesAgeingSettlementPage, PayablesAgeingSettlementPage } from './pages/ar-ap-ageing-settlement';
 
 export { dashboardRoutes } from './routes';
 export { useDashboardStore } from './store/dashboard.store';
