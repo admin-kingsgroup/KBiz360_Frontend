@@ -19,7 +19,10 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 export function PaymentRun({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const outQ = useOutstanding(branch);
-  const bills = useMemo(() => (outQ.data?.purchaseBills || []), [outQ.data]);
+  // JV/Contra legs age as payables on the Outstanding dashboard, but they are NOT swept
+  // into the bulk bank payment — a journal-booked liability is settled deliberately via a
+  // Payment Voucher, not a batch pay. Exclude them here (they carry kind 'journal'/'contra').
+  const bills = useMemo(() => (outQ.data?.purchaseBills || []).filter((b) => b.kind !== 'journal' && b.kind !== 'contra'), [outQ.data]);
   const run = usePaymentRun();
 
   // Per-bill UI state keyed by billVno (or billId): { selected, amount }.

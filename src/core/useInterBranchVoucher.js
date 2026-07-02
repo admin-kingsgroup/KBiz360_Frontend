@@ -4,7 +4,7 @@
 //   GET  /api/inter-branch/reconcile?branch= matched / unbooked by INB Link No
 //   POST /api/inter-branch/:inbLinkNo/book   { purchaseVno }
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPost, getAuthToken } from './api';
+import { apiGet, apiPost, apiPut, getAuthToken } from './api';
 
 const enabled = () => (typeof getAuthToken === 'function' ? !!getAuthToken() : false);
 // Resolve a branch code without importing from useAccounting (keeps this hook
@@ -64,11 +64,24 @@ export function useInbCounterparty(branch, { from, to } = {}) {
   });
 }
 
+// One INB deal reconstructed as the unified booking-input shape, for the SPG-style
+// edit screen (both legs). Only fetches when a linkNo is supplied (edit opened).
+export function useInbDeal(linkNo) {
+  return useQuery({
+    queryKey: ['inb', 'deal', linkNo || ''],
+    queryFn: () => apiGet('/api/inter-branch/deal', { linkNo }),
+    enabled: enabled() && !!linkNo,
+    staleTime: 0,
+  });
+}
+
 function useInbMutation(mutationFn) {
   const qc = useQueryClient();
   return useMutation({ mutationFn, onSuccess: () => qc.invalidateQueries({ queryKey: ['inb'] }) });
 }
 
 export const useCreateInb = () => useInbMutation((body) => apiPost('/api/inter-branch', body));
+// Edit BOTH pending legs of an INB deal as a unit (SO/PO/GP-style unified edit).
+export const useUpdateInb = () => useInbMutation((body) => apiPut('/api/inter-branch/deal', body));
 export const useBookInb   = () => useInbMutation(({ id, ...body }) => apiPost(`/api/inter-branch/${id}/book`, body));
 export const useReopenInb = () => useInbMutation(({ id }) => apiPost(`/api/inter-branch/${id}/reopen`));

@@ -19,7 +19,7 @@ import { todayISO } from '../../core/dates';
 import { PeriodBar, periodRange } from '../../core/period';
 import { printBookingInvoice } from '../../core/printInvoice';
 import { apiGet, apiPost, apiPut } from '../../core/api';
-import { useOpenInb, useBookInb, useCreateInb } from '../../core/useInterBranchVoucher';
+import { useOpenInb, useBookInb, useCreateInb, useUpdateInb } from '../../core/useInterBranchVoucher';
 import { useVNo } from '../../core/useNextNo';
 
 // Inter-branch jurisdiction (mirror of backend): same country (India) = IGST;
@@ -115,6 +115,23 @@ export function rowsForEdit(spec, booking) {
   const rebuilt = rowsFromSnapshots(booking);
   if (rebuilt.length) return rebuilt.map((r) => loadLineForEdit(spec, r));
   return [blankLine(spec)];
+}
+
+// Rebuild the INB entry grid from a reconstructed deal (getDeal → { fareLines:[{amt,
+// desc}], serviceFee, passenger }). Each fare component maps to its fare column by label;
+// the service fee is the seller's margin (the ssvc column). ONE row reproduces both legs
+// — the fares pass through to the sale AND are the airline cost. GST recomputes on save.
+export function inbRowsFromDeal(spec, deal) {
+  const line = blankLine(spec);
+  const cols = spec.fareCols || [];
+  for (const f of (deal.fareLines || [])) {
+    const col = cols.find((c) => String(c.label).trim().toLowerCase() === String(f.desc).trim().toLowerCase());
+    if (col) line[col.key] = num(f.amt);
+  }
+  line.ssvc = num(deal.serviceFee);
+  const parts = String(deal.passenger || '').trim().split(/\s+/);
+  if (parts[0]) { line.fn = parts[0]; line.sn = parts.slice(1).join(' '); }
+  return [line];
 }
 
 // ── N-PO (Phase 2): additional purchase legs under one booking/Link No ────────
@@ -228,6 +245,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     : specRaw;
 
   const [lines, setLines] = useState(() => {
+    // Editing an INB deal → rebuild the single fare row from the reconstructed deal
+    // (fares + service fee), so both legs load into the SAME unified grid as SO/PO/GP.
+    if (editing && interBranch && editBooking.isInterBranch) return inbRowsFromDeal(spec, editBooking);
     if (editing) return rowsForEdit(VSPECS[initModule] || VSPECS.SF, editBooking);
     return [blankLine(VSPECS.SF)];   // start blank — no demo rows
   });
@@ -238,8 +258,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     ? { name: editBooking.customer?.name || '', gstin: editBooking.customer?.gstin || '', address: editBooking.customer?.address || '', email: editBooking.customer?.email || '', contact: editBooking.customer?.contact || '', group: editBooking.customer?.group || '', ledgerName: editBooking.customer?.ledgerName || '', ledgerGroup: editBooking.customer?.ledgerGroup || '' }
     : { name: '', gstin: '', address: '', email: '', contact: '', group: '', ledgerName: '', ledgerGroup: '' });
   const [supplier, setSupplier] = useState(editing
-    ? { name: editBooking.supplier?.name || '', gstin: editBooking.supplier?.gstin || '', address: editBooking.supplier?.address || '', email: editBooking.supplier?.email || '', contact: editBooking.supplier?.contact || '', ledgerGroup: editBooking.supplier?.ledgerGroup || '' }
-    : { name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' });
+    ? { name: editBooking.supplier?.name || '', gstin: editBooking.supplier?.gstin || '', address: editBooking.supplier?.address || '', email: editBooking.supplier?.email || '', contact: editBooking.supplier?.contact || '', ledgerName: editBooking.supplier?.ledgerName || '', ledgerGroup: editBooking.supplier?.ledgerGroup || '' }
+    : { name: '', gstin: '', address: '', email: '', contact: '', ledgerName: '', ledgerGroup: '' });
 
   const [clientType, setClientType] = useState(editing ? (editBooking.customer?.ledgerGroup || '') : '');
   const reg = useLedgerRegistry(branch).data || [];
@@ -312,7 +332,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // fares pass through to Inter-Branch Sales and the Service Charge becomes the
   // Service Fee (margin). Posts via the INB engine (not the booking pipeline).
   const createInb = useCreateInb();
-  const [toBranch, setToBranch] = useState('');
+  const updateInb = useUpdateInb(); // edit BOTH pending legs of an existing INB deal as a unit
+  // Editing an INB deal preloads its counterparty branch; a fresh INB voucher starts empty.
+  const [toBranch, setToBranch] = useState(editing && interBranch && editBooking.isInterBranch ? (editBooking.toBranch || '') : '');
   const inbBranches = INB_ALL.filter((b) => b !== brCode);
   const inbExport = interBranch && toBranch && inbCrossBorder(brCode, toBranch);
 
@@ -450,15 +472,29 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       // INB Link No. Sent only when a supplier + cost exist; otherwise the deal stays
       // sale-only (server skips the purchase). `totals.po` carries the PO grid's cost.
       const hasPurchase = !isNoSupp && supplier.name.trim() && totals.po.total > 0;
-      setError(''); setSaving(true);
-      createInb.mutate({
+      const inbBody = {
         fromBranch: brCode, toBranch, date, module: moduleCode,
         packageType: hasPackage ? packageType : '', passenger: pax, reference: saleTallyRef || headerRef,
         fareLines, serviceFee,
         noSupplier: isNoSupp,
         supplier: hasPurchase ? { name: supplier.name, ledgerName: supplier.ledgerName || supplier.name, ledgerGroup: supplier.ledgerGroup, country: countryOfSupplier(supplier.name), foreign: suppForeign } : null,
         purchase: hasPurchase ? { heads: totals.po.heads || [], gst: totals.po.gst || 0, incentiveAmt: totals.po.incentiveAmt || 0, incentiveTds: totals.po.incentiveTds || 0, gstMode: purGstMode } : null,
-      }, {
+      };
+      // Editing an existing INB deal → rebuild BOTH pending legs as a unit (reason to the
+      // audit trail); a fresh voucher raises a new deal. Same body either way.
+      if (editing) {
+        const { confirmed, reason } = await confirmDialog({ title: 'Save changes to this INB deal?', message: 'Both legs are rebuilt from the entry and stay Pending for re-approval.', reasonRequired: true, reasonLabel: 'Reason for editing (saved to the audit trail)', confirmLabel: 'Save changes' });
+        if (!confirmed) return;
+        setError(''); setSaving(true);
+        updateInb.mutate({ linkNo: editBooking.linkNo, ...inbBody, editReason: reason }, {
+          onSuccess: () => { setResult({ bookingNo: editBooking.linkNo, _approved: false, _inb: true, _edited: true }); toast(`Inter-branch deal ${editBooking.linkNo} saved — pending approval`); qc.invalidateQueries({ queryKey: ['inb'] }); invalidateBooks(qc); },
+          onError: (e) => { setError(e.message || 'Failed to save'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); },
+          onSettled: () => setSaving(false),
+        });
+        return;
+      }
+      setError(''); setSaving(true);
+      createInb.mutate(inbBody, {
         onSuccess: (res) => { setResult({ bookingNo: res?.inbLinkNo || '', _approved: false, _inb: true }); toast(`Inter-branch sale posted · ${res?.inbLinkNo || ''}`); qc.invalidateQueries({ queryKey: ['inb'] }); },
         onError: (e) => { setError(e.message || 'Failed to post'); toast(`Could not post — ${e.message || 'failed'}`, 'error'); },
         onSettled: () => setSaving(false),

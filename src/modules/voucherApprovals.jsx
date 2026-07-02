@@ -18,7 +18,8 @@ import { FocusBanner } from '../core/ux/FocusBanner';
 import { useNavFocusStore } from '../core/ux/navFocus';
 import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useRevokeVoucher, fetchRevokeCheck, useApproveMany, useApproveAll, branchCode } from '../core/useAccounting';
 import { VoucherEditor } from './accountingLive';
-import { BookingApprovals } from './bookingOrder';
+import { BookingApprovals, SoPoGpVoucherEntry } from './bookingOrder';
+import { useInbDeal } from '../core/useInterBranchVoucher';
 import { bc } from '../core/styles';
 import { localeOf } from '../core/format';
 import { PeriodBar, periodRange } from '../core/period';
@@ -91,7 +92,9 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   // PENDING shows every pending voucher with NO date filter and NO period bar — always
   // "all" regardless of any range left over from another tab. The settled tabs use `range`.
   const effRange = status === 'pending' ? periodRange('all', { branch }) : range;
-  const q = useVoucherApprovals(branch, status, { from: effRange.from, to: effRange.to, category });
+  // INB refunds/reissues are routed to the INB pipeline (InbApprovals) — exclude them
+  // from this SO/PO/GP-side queue so they aren't shown (and approved) in both places.
+  const q = useVoucherApprovals(branch, status, { from: effRange.from, to: effRange.to, category, refundScope: 'sopogp' });
   const d = q.data || {};
   // Vouchers edited ≥ once (cross-cuts status) — its own source for the Edited tab.
   // Uses the SAME branch resolution as every other voucher query (branchCode →
@@ -723,6 +726,34 @@ function InbDealJv({ sale, purchase }) {
   );
 }
 
+// Edit a whole INB deal on the SAME unified screen as SO/PO/GP: fetch the deal (both
+// legs reconstructed into one booking-input shape), then hand it to SoPoGpVoucherEntry in
+// interBranch EDIT mode. Only PENDING deals are editable — an approved deal is Revoked
+// first (the backend also guards this). `onDone` returns to the INB approvals list.
+function InbEditGate({ linkNo, branch, onDone }) {
+  const dq = useInbDeal(linkNo);
+  const wrap = (msg, tone) => (
+    <div style={{ margin: 12, padding: 16, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10 }}>
+      <div style={{ color: tone || C.dim, fontSize: 13, marginBottom: 10 }}>{msg}</div>
+      <button onClick={onDone} style={{ padding: '7px 14px', background: C.dark, color: C.gold, border: 'none', borderRadius: 7, fontWeight: 800, cursor: 'pointer' }}>← Back to INB list</button>
+    </div>
+  );
+  if (dq.isLoading) return wrap('Loading INB deal…');
+  if (dq.error || !dq.data) return wrap(`Could not load ${linkNo}${dq.error ? ` — ${dq.error.message}` : ''}.`, C.red);
+  const deal = dq.data;
+  if (!deal.editable) return wrap(`INB deal ${linkNo} is not fully pending (${deal.saleStatus}${deal.purchaseStatus ? ` / ${deal.purchaseStatus}` : ''}) — Revoke it first, then edit.`, C.gold);
+  const editBooking = {
+    isInterBranch: true, linkNo: deal.linkNo, bookingNo: deal.linkNo,
+    branch: deal.fromBranch, toBranch: deal.toBranch, module: deal.module,
+    packageType: deal.packageType, date: deal.date, headerRef: deal.reference, passenger: deal.passenger,
+    noSupplier: deal.noSupplier, fareLines: deal.fareLines, serviceFee: deal.serviceFee,
+    supplier: deal.supplier
+      ? { name: deal.supplier.name, ledgerName: deal.supplier.ledgerName, ledgerGroup: deal.supplier.ledgerGroup }
+      : { name: '', ledgerName: '', ledgerGroup: '' },
+  };
+  return <SoPoGpVoucherEntry branch={branch} interBranch editBooking={editBooking} onDone={onDone} />;
+}
+
 export function InbApprovals({ branch, setRoute, currentUser, initialSearch = '', initialStatus = '' }) {
   const brCode = branchCode(branch);
   const cur = (bc(branch) || {}).cur || '₹';
@@ -734,7 +765,8 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   const [sel, setSel] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState(initialSearch || '');
-  const [editId, setEditId] = useState(null);  // INB leg being edited in the modal (reuses the Vouchers editor)
+  const [editId, setEditId] = useState(null);      // legacy: single INB leg edited in a modal (fallback)
+  const [editLink, setEditLink] = useState(null);  // INB Link No edited as a UNIT on the unified SPG screen
 
   // One fetch of every INB voucher (both legs of every deal, all statuses) — INB
   // volume is small, so we group + count + filter client-side, mirroring how the
@@ -744,6 +776,16 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     queryFn: () => apiGet('/api/vouchers', { type: 'INB', branch: brCode === 'ALL' ? '' : brCode }),
   });
   const rows = Array.isArray(q.data) ? q.data : (q.data && q.data.data) || [];
+
+  // INB refunds/reissues (RF/RI that reverse an INB deal) are routed to THIS pipeline,
+  // not the SO/PO/GP queue. They're single vouchers (not a sale+purchase pair), so they
+  // get their own section below the deals, fetched via the approvals report scoped to INB.
+  const rfQ = useVoucherApprovals(branch, status, { refundScope: 'inb' });
+  const inbRefunds = useMemo(() => {
+    const list = (rfQ.data && rfQ.data.entries) || [];
+    const nd = search.trim().toLowerCase();
+    return list.filter((e) => !nd || [e.vno, e.party, e.againstInvoice, String(Math.round(e.total || 0))].filter(Boolean).join(' ').toLowerCase().includes(nd));
+  }, [rfQ.data, search]);
 
   const approveMany = useApproveMany();
   const reject = useRejectVoucher();
@@ -767,9 +809,11 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
       const st = lead.status === 'saved' ? 'approved' : (lead.status || 'pending');
       const saleNet = sale ? (Number(sale.total) || 0) - (Number(sale.taxAmt) || 0) : 0;
       const purNet = purchase ? (Number(purchase.total) || 0) - (Number(purchase.taxAmt) || 0) : 0;
-      // Show the real INB Link No when the voucher carries it (sourceRef = INB/…),
-      // otherwise the sale voucher number is the deal's identifier.
-      const inbLink = [sale, purchase].map((l) => l && l.sourceRef).find((s) => s && /^INB\//.test(s));
+      // The real INB Link No lives in bookingId (the shared deal id — e.g. INB/BOM-NBO/26/0007);
+      // engine-created legs also carry it in sourceRef, but migrated legs keep per-leg Tally
+      // refs there. Prefer bookingId, fall back to an INB-shaped sourceRef, else the sale vno.
+      const inbLink = [sale, purchase].map((l) => l && l.bookingId).find((s) => s && /^INB\//.test(s))
+        || [sale, purchase].map((l) => l && l.sourceRef).find((s) => s && /^INB\//.test(s));
       const saleTotal = sale ? Number(sale.total) || 0 : 0;
       const margin = Math.round((saleNet - purNet) * 100) / 100;
       return {
@@ -854,6 +898,27 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     finally { setBusy(false); }
   };
 
+  // INB refund/reissue is a single voucher — approve/reject it on its own (reuses the
+  // shared voucher mutations, same as the SO/PO/GP queue would).
+  const doApproveRefund = async (e) => {
+    const { confirmed } = await confirmDialog({ title: `Approve refund ${e.vno}?`, message: 'Posts this INB refund to the books.', confirmLabel: 'Approve' });
+    if (!confirmed) return;
+    setBusy(true);
+    approveMany.mutate({ ids: [e.id], approver: 'admin' }, {
+      onSuccess: (res) => { const f = (res && res.failed) || 0; toast(f ? `${e.vno} failed to post` : `Approved ${e.vno}`, f ? 'error' : 'success'); },
+      onError: (err) => toast((err && err.message) || 'Approve failed', 'error'),
+      onSettled: () => setBusy(false),
+    });
+  };
+  const doRejectRefund = async (e) => {
+    const { confirmed, reason } = await confirmDialog({ title: `Reject refund ${e.vno}?`, message: 'Marks it Rejected (no books impact).', danger: true, reasonRequired: true, reasonLabel: 'Reason for rejection', confirmLabel: 'Reject' });
+    if (!confirmed) return;
+    setBusy(true);
+    try { await reject.mutateAsync({ id: e.id, by: 'admin', reason }); toast(`Rejected ${e.vno}`); }
+    catch (err) { toast((err && err.message) || 'Reject failed', 'error'); }
+    finally { setBusy(false); }
+  };
+
   const tab = (k, label) => (
     <button key={k} onClick={() => { setStatus(k); setSel(new Set()); }} style={{ padding: '8px 16px', border: 'none', borderBottom: `3px solid ${status === k ? C.gold : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? C.dark : C.dim }}>
       {label} <span style={{ fontSize: 11, color: C.dim }}>({(counts[k] && counts[k].n) || 0}{counts[k] ? ` · ${money(counts[k].amount)}` : ''})</span>
@@ -864,6 +929,13 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     ? ['', 'INB Link No', 'Date', 'From → To', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'Margin (SVF)', 'GP %', 'Actions']
     : ['INB Link No', 'Date', 'From → To', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'Margin (SVF)', 'GP %', status === 'approved' ? 'Approved' : 'Status'];
   const colSpan = COLS.length;
+
+  // Editing a whole INB deal takes over the screen with the unified SPG editor (both
+  // legs), exactly like SO/PO/GP. Placed after every hook so hook order never changes.
+  if (editLink) {
+    return <InbEditGate linkNo={editLink} branch={branch}
+      onDone={() => { setEditLink(null); setOpen(null); qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['inb'] }); }} />;
+  }
 
   return (
     <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 2px' }}>
@@ -923,8 +995,15 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                       {pendingTab
                         ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
                             {isApprover ? <>
-                              {d.sale && <button disabled={busy} onClick={() => setEditId(d.sale.id || d.sale._id)} title="Edit the INB sale leg, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Sale</button>}
-                              {d.purchase && <button disabled={busy} onClick={() => setEditId(d.purchase.id || d.purchase._id)} title="Edit the airline purchase leg, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Pur</button>}
+                              {/* One unified edit — opens the SAME SO/PO/GP booking screen with BOTH legs
+                                  loaded (interBranch mode). Falls back to per-leg edit only for a rare
+                                  legacy deal with no proper INB Link No (getDeal keys on the INB link). */}
+                              {/^INB\//.test(d.linkNo)
+                                ? <button disabled={busy} onClick={() => setEditLink(d.linkNo)} title="Edit this INB deal (both legs) on the SO/PO/GP screen, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Edit</button>
+                                : <>
+                                  {d.sale && <button disabled={busy} onClick={() => setEditId(d.sale.id || d.sale._id)} title="Edit the INB sale leg, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Sale</button>}
+                                  {d.purchase && <button disabled={busy} onClick={() => setEditId(d.purchase.id || d.purchase._id)} title="Edit the airline purchase leg, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Pur</button>}
+                                </>}
                               <button disabled={busy} onClick={() => doApprove([d])} style={{ marginRight: 6, padding: '5px 10px', background: C.green, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Approve</button>
                               <button disabled={busy} onClick={() => doReject(d)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
                             </> : <span style={{ fontSize: 11, color: C.dim }}>Approver only</span>}
@@ -948,6 +1027,53 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
           )}
       </div>
       <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>INB SPG vouchers post as <b>Pending</b> and hit the books only on approval — the INB Sale and its airline Purchase post together under one INB Link No. Click a row for the JV (Dr/Cr) of both legs.</div>
+
+      {/* INB Refunds — RF/RI vouchers that reverse an INB deal. Routed here (not the
+          SO/PO/GP queue); each is a single voucher, approved/rejected on its own row. */}
+      <div style={{ ...card, overflowX: 'auto', marginTop: 16 }}>
+        <div style={{ padding: '10px 12px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+          <span style={{ fontWeight: 800, color: C.dark, fontSize: 13 }}>INB Refunds &amp; Reissues <span style={{ fontWeight: 700, color: C.dim, fontSize: 11 }}>— reverse an INB deal</span></span>
+          <span style={{ fontSize: 11.5, color: C.dim, fontWeight: 700 }}>{inbRefunds.length} {status}</span>
+        </div>
+        {rfQ.isLoading ? <div style={{ padding: 12 }}><SkeletonTable rows={3} cols={6} /></div>
+          : inbRefunds.length === 0 ? <div style={{ padding: 18, textAlign: 'center', color: C.dim, fontSize: 12 }}>No {status} INB refunds.</div>
+          : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ background: '#f3f4f8' }}>
+                  {['Vch No', 'Reverses (INB)', 'Party', 'Amount', pendingTab ? 'Actions' : 'Status'].map((h, i) => (
+                    <th key={i} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: h === 'Amount' ? 'right' : 'left' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {inbRefunds.map((e) => (
+                  <tr key={e.id} style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      {e.vno}
+                      <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#eef2ff', color: '#3d4ea8', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>INB {e.category === 'reissue' ? 'RI' : 'RF'}</span>
+                    </td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 11, color: C.dim }}>{e.againstInvoice || e.linkNo || '—'}</td>
+                    <td style={{ padding: '7px 12px' }}>{e.party || '—'}</td>
+                    <td style={{ padding: '7px 12px', ...num }}>{money(e.total || 0)}</td>
+                    {pendingTab
+                      ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
+                          {isApprover ? <>
+                            {/* Single voucher (RF/RI) — edit it in place via the shared voucher
+                                editor (saving reverts it to Pending), then Approve/Reject. */}
+                            <button disabled={busy} onClick={() => setEditId(e.id)} title="Edit this INB refund/reissue voucher, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Edit</button>
+                            <button disabled={busy || !e.postable} title={e.postable ? '' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving')} onClick={() => doApproveRefund(e)} style={{ marginRight: 6, padding: '5px 10px', background: e.postable ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
+                            <button disabled={busy} onClick={() => doRejectRefund(e)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
+                            {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: C.red }}>blocked</span>}
+                          </> : <span style={{ fontSize: 11, color: C.dim }}>Approver only</span>}
+                        </td>
+                      : <td style={{ padding: '7px 12px', color: C.dim }}>{e.status}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+      </div>
 
       {/* Edit an INB leg in place (reuses the Vouchers editor). Saving reverts the leg to
           Pending; then Approve/Reject the deal on its row. Legs are editable only while
