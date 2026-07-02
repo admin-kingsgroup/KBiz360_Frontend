@@ -12,7 +12,7 @@ jest.mock('../../core/styleTokens', () => ({
 
 const DATA = {
   totals: {
-    capitalInvested: 5000000, capitalBlocked: 1000000, inflowCapital: 4000000,
+    capitalInvested: 5000000, capitalEmployed: 4500000, capitalBlocked: 1000000, inflowCapital: 4000000,
     grossProfit: 800000, grossRevenue: 6000000, gpYield: 20, gpMargin: 13.3, flowTurnover: 1.5,
     blockedPct: 20, inflowPct: 80, flowComposition: 4000000,
     quasiCapital: 0, externalFunding: 500000, totalLiabilities: 5500000, totalAssets: 5500000, bsBalanced: true,
@@ -71,6 +71,13 @@ test('Performance / Balance Sheet / P&L collapse by default and expand on click'
   expect(screen.getByText(/GROSS PROFIT/)).toBeInTheDocument();
   fireEvent.click(screen.getByText('Complete Balance Sheet'));
   expect(screen.getByText('Current Assets')).toBeInTheDocument();
+});
+
+test('Section 1 shows Capital Invested and Capital Employed as distinct totals', () => {
+  render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
+  // Two separate total rows (gross vs net) — the fix for "both showing the same".
+  expect(screen.getByText('CAPITAL INVESTED')).toBeInTheDocument();
+  expect(screen.getByText('CAPITAL EMPLOYED')).toBeInTheDocument();
 });
 
 test('accumulated-loss deduction renders as a Less: line in Section 1', () => {

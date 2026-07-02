@@ -221,7 +221,23 @@ const CSS = `
 }
 `;
 
-// ── register table (group ▸ ledgers ▸ subtotal, then a bold total row) ─────────
+// group ▸ ledgers ▸ subtotal rows — shared by Reg and the Capital-Employed table.
+function GroupRows({ groups, fmt }) {
+  return (groups || []).map((g, gi) => (
+    <React.Fragment key={gi}>
+      <tr className="grp"><td>{g.grp}</td><td className="r" /></tr>
+      {(g.ledgers || []).map((l, li) => (
+        <tr key={li}>
+          <td className="led">{l.n}<span className={`tag ${g.src === 'pl' ? 'pl' : 'bs'}`}>{g.src === 'pl' ? 'P&L' : 'BS'}</span></td>
+          <td className={`amt ${l.a < 0 ? 'neg' : ''}`}>{fmt(l.a)}</td>
+        </tr>
+      ))}
+      <tr className="sub"><td className="nm">{g.grp} — subtotal</td><td className="amt">{fmt(g.total)}</td></tr>
+    </React.Fragment>
+  ));
+}
+
+// ── register table (groups, then a bold total row) ─────────────────────────────
 function Reg({ groups, totalLabel, totalVal, tone, fmt }) {
   const totClass = tone === 'amber' ? 'tot amberT' : tone === 'green' ? 'tot greenT' : 'tot';
   return (
@@ -229,20 +245,29 @@ function Reg({ groups, totalLabel, totalVal, tone, fmt }) {
       <table>
         <thead><tr><th>Ledger</th><th className="r">Amount</th></tr></thead>
         <tbody>
-          {(groups || []).map((g, gi) => (
-            <React.Fragment key={gi}>
-              <tr className="grp"><td>{g.grp}</td><td className="r" /></tr>
-              {(g.ledgers || []).map((l, li) => (
-                <tr key={li}>
-                  <td className="led">{l.n}<span className={`tag ${g.src === 'pl' ? 'pl' : 'bs'}`}>{g.src === 'pl' ? 'P&L' : 'BS'}</span></td>
-                  <td className={`amt ${l.a < 0 ? 'neg' : ''}`}>{fmt(l.a)}</td>
-                </tr>
-              ))}
-              <tr className="sub"><td className="nm">{g.grp} — subtotal</td><td className="amt">{fmt(g.total)}</td></tr>
-            </React.Fragment>
-          ))}
+          <GroupRows groups={groups} fmt={fmt} />
           {!(groups || []).length && <tr><td colSpan={2} style={{ padding: 16, color: '#6b7488', fontSize: 12.5 }}>No ledgers in this bucket.</td></tr>}
           {totalLabel && <tr className={totClass}><td>{totalLabel}</td><td className="amt">{fmt(totalVal)}</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Section 1 — Capital Account + owner/partner loans = CAPITAL INVESTED, then the
+// retained-earnings adjust line bridges to CAPITAL EMPLOYED (net capital deployed).
+function CapitalTable({ capital, quasi, adjust, invested, employed, fmt }) {
+  return (
+    <div className="reg">
+      <table>
+        <thead><tr><th>Ledger</th><th className="r">Amount</th></tr></thead>
+        <tbody>
+          <GroupRows groups={[...(capital || []), ...(quasi || [])]} fmt={fmt} />
+          <tr className="tot"><td>CAPITAL INVESTED</td><td className="amt">{fmt(invested)}</td></tr>
+          {(adjust || []).map((a, i) => (
+            <tr key={i}><td className="led">{a.grp}</td><td className={`amt ${a.total < 0 ? 'neg' : ''}`}>{fmt(a.total)}</td></tr>
+          ))}
+          <tr className="tot"><td>CAPITAL EMPLOYED</td><td className="amt">{fmt(employed)}</td></tr>
         </tbody>
       </table>
     </div>
@@ -289,10 +314,13 @@ export function CapitalVsInvestmentLive({ branch }) {
   });
 
   const t = data?.totals || {};
+  // Capital Employed (net of retained earnings) is the deployed base for allocation,
+  // In-Flow and yields. Older payloads without the split fall back to capitalInvested.
+  const employed = (t.capitalEmployed != null ? t.capitalEmployed : t.capitalInvested) || 0;
   const good = (t.gpYield || 0) >= hurdle;
   const flowComp = t.flowComposition || 0;
   const reconciles = Math.abs(flowComp - (t.inflowCapital || 0)) < 1;
-  const hasData = Math.abs(t.capitalInvested || 0) > 0.5 || Math.abs(t.grossProfit || 0) > 0.5 || Math.abs(t.inflowCapital || 0) > 0.5 || Math.abs(t.grossRevenue || 0) > 0.5;
+  const hasData = Math.abs(t.capitalInvested || 0) > 0.5 || Math.abs(employed) > 0.5 || Math.abs(t.grossProfit || 0) > 0.5 || Math.abs(t.inflowCapital || 0) > 0.5 || Math.abs(t.grossRevenue || 0) > 0.5;
 
   // Complete P&L statement (all accounts) for Section 6.
   const plFull = data?.profitAndLoss || {};
@@ -307,14 +335,15 @@ export function CapitalVsInvestmentLive({ branch }) {
     ...signGrp(plFull.indirectExpense, 'Less: ', -1),
   ];
 
-  // Capital-bridge rows (sources → employed → in-flow) — magnitudes only.
+  // Capital-bridge rows (sources → invested → employed → in-flow) — magnitudes only.
   const capSum = (data?.capital || []).reduce((s, g) => s + g.total, 0);
-  const lossSum = (data?.capitalAdjust || []).reduce((s, g) => s + g.total, 0);
+  const retSum = (data?.capitalAdjust || []).reduce((s, g) => s + g.total, 0); // + profit / − loss
   const bridge = [
     { nm: 'Capital & Reserves', v: capSum, c: '#0d9488' },
     ...((t.quasiCapital || 0) > 0.5 ? [{ nm: 'Owner & Partner Loans', v: t.quasiCapital, c: '#0d9488' }] : []),
-    ...((data?.capitalAdjust || []).length ? [{ nm: 'Less: Accumulated Loss', v: lossSum, c: '#dc2626' }] : []),
-    { nm: '= Capital Employed', v: t.capitalInvested || 0, c: 'linear-gradient(90deg,#14b8a6,#0b7d73)', b: true },
+    { nm: '= Capital Invested', v: t.capitalInvested || 0, c: 'linear-gradient(90deg,#14b8a6,#0b7d73)', b: true },
+    ...((data?.capitalAdjust || []).length ? [{ nm: retSum < 0 ? 'Less: Accumulated Loss' : 'Add: Retained Profit', v: retSum, c: retSum < 0 ? '#dc2626' : '#16a34a' }] : []),
+    { nm: '= Capital Employed', v: employed, c: 'linear-gradient(90deg,#14b8a6,#0b7d73)', b: true },
     { nm: 'Less: Blocked', v: -(t.capitalBlocked || 0), c: '#d97706' },
     { nm: '= In-Flow Capital', v: t.inflowCapital || 0, c: 'linear-gradient(90deg,#2dd4bf,#0d9488)', b: true },
   ];
@@ -361,7 +390,7 @@ export function CapitalVsInvestmentLive({ branch }) {
         ))}
         <div className="railcard">
           <div className="l">Capital Employed</div>
-          <div className="big num">{cr(t.capitalInvested)}</div>
+          <div className="big num">{cr(employed)}</div>
           <div className="sub">In-Flow {(t.inflowPct || 0).toFixed(1)}% · Blocked {(t.blockedPct || 0).toFixed(1)}%</div>
         </div>
         <div className="live"><span className="dot" /> Live · Balance Sheet + P&amp;L</div>
@@ -412,27 +441,27 @@ export function CapitalVsInvestmentLive({ branch }) {
 
             {/* KPI strip */}
             <div className="kpis" id="cvd-ov">
-              <div className="kpi"><div className="l">Capital Invested <span className="pill up">EMPLOYED</span></div><div className="v num">{cr(t.capitalInvested)}</div><div className="s">Owner + partner funds, net of loss</div></div>
+              <div className="kpi"><div className="l">Capital Invested <span className="pill up">COMMITTED</span></div><div className="v num">{cr(t.capitalInvested)}</div><div className="s">Capital + owner &amp; partner loans</div></div>
+              <div className="kpi"><div className="l">Capital Employed <span className="pill warn">NET</span></div><div className="v num">{cr(employed)}</div><div className="s">Invested, net of retained earnings</div></div>
               <div className="kpi amber"><div className="l">Capital Blocked <span className="pill warn">{(t.blockedPct || 0).toFixed(1)}%</span></div><div className="v num">{cr(t.capitalBlocked)}</div><div className="s">Fixed &amp; slow assets — tied up</div></div>
               <div className="kpi"><div className="l">In-Flow Capital <span className="pill up">{(t.inflowPct || 0).toFixed(1)}%</span></div><div className="v num">{cr(t.inflowCapital)}</div><div className="s">Circulating working capital</div></div>
               <div className="kpi violet"><div className="l">Gross Profit</div><div className="v num">{cr(t.grossProfit)}</div><div className="s">{(t.gpMargin || 0).toFixed(1)}% margin on turnover</div></div>
               <div className="kpi green"><div className="l">Net Profit</div><div className="v num">{cr(t.netProfit)}</div><div className="s">After operating costs</div></div>
               <div className="kpi"><div className="l">GP Yield on In-Flow</div><div className="v num">{(t.gpYield || 0).toFixed(1)}%</div><div className="s">vs {hurdle}% hurdle · <span style={{ color: good ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}>{yieldDiff >= 0 ? '+' : ''}{yieldDiff} pts</span></div></div>
               <div className="kpi slate"><div className="l">Flow Turnover</div><div className="v num">{(t.flowTurnover || 0).toFixed(2)}×</div><div className="s">Turnover ÷ In-Flow</div></div>
-              <div className="kpi slate"><div className="l">External Funding</div><div className="v num">{cr(t.externalFunding)}</div><div className="s">Creditors + current liabilities</div></div>
             </div>
 
             {/* analytics row */}
             <div className="analytics">
               <div className="card">
-                <div className="hd"><div className="ti">Capital Allocation</div><div className="mut">of {cr(t.capitalInvested)}</div></div>
+                <div className="hd"><div className="ti">Capital Allocation</div><div className="mut">of {cr(employed)} employed</div></div>
                 <div className="bd">
                   <div className="donutwrap">
                     <svg width="132" height="132" viewBox="0 0 132 132" aria-label="Blocked vs in-flow allocation">
                       <circle cx="66" cy="66" r="46" fill="none" stroke="#f1f3f8" strokeWidth="18" />
                       <circle cx="66" cy="66" r="46" fill="none" stroke="#d97706" strokeWidth="18" strokeDasharray={`${blkLen} ${DC}`} transform="rotate(-90 66 66)" />
                       <circle cx="66" cy="66" r="46" fill="none" stroke="#0d9488" strokeWidth="18" strokeDasharray={`${flwLen} ${DC}`} strokeDashoffset={`-${blkLen}`} transform="rotate(-90 66 66)" />
-                      <text x="66" y="63" textAnchor="middle" fontSize="15" fontWeight="800" fill="#151b28">{cr(t.capitalInvested)}</text>
+                      <text x="66" y="63" textAnchor="middle" fontSize="15" fontWeight="800" fill="#151b28">{cr(employed)}</text>
                       <text x="66" y="80" textAnchor="middle" fontSize="8.5" letterSpacing="1" fill="#6b7488">EMPLOYED</text>
                     </svg>
                     <div className="legend">
@@ -477,10 +506,10 @@ export function CapitalVsInvestmentLive({ branch }) {
               </div>
             </div>
 
-            {/* Section 1 · Capital Employed */}
+            {/* Section 1 · Capital Invested → Employed */}
             <div className="card section" id="cvd-s1">
-              <div className="sec-hd"><span className="no teal">1</span><div><div className="tt">Capital Employed</div><div className="ds">Capital Account + Reserves{(t.quasiCapital || 0) > 0.5 ? ' + owner & partner loans (quasi-capital)' : ''}, net of accumulated loss — from Balance Sheet</div></div><span className="right num" style={{ color: 'var(--primary-d)' }}>{inr(t.capitalInvested)}</span></div>
-              <Reg groups={[...(data.capital || []), ...(data.quasi || []), ...(data.capitalAdjust || [])]} totalLabel="CAPITAL EMPLOYED" totalVal={t.capitalInvested} fmt={inr} />
+              <div className="sec-hd"><span className="no teal">1</span><div><div className="tt">Capital Invested → Employed</div><div className="ds">Capital Account{(t.quasiCapital || 0) > 0.5 ? ' + owner & partner loans' : ''} = Invested; net of retained earnings = Employed — from Balance Sheet</div></div><span className="right num" style={{ color: 'var(--primary-d)' }}>{inr(employed)}</span></div>
+              <CapitalTable capital={data.capital} quasi={data.quasi} adjust={data.capitalAdjust} invested={t.capitalInvested} employed={employed} fmt={inr} />
             </div>
 
             {/* Section 2 · Capital Blocked */}
@@ -494,7 +523,7 @@ export function CapitalVsInvestmentLive({ branch }) {
               <div className="sec-hd"><span className="no teal">3</span><div><div className="tt">In-Flow Capital</div><div className="ds">What's left to circulate &amp; earn = Invested − Blocked</div></div><span className="right num" style={{ color: 'var(--primary-d)' }}>{inr(t.inflowCapital)}</span></div>
               <div className="pad">
                 <div className="formula">
-                  <div className="cell"><div className="l">Capital Invested</div><div className="v num">{cr(t.capitalInvested)}</div></div>
+                  <div className="cell"><div className="l">Capital Employed</div><div className="v num">{cr(employed)}</div></div>
                   <div className="op">−</div>
                   <div className="cell blk"><div className="l">Capital Blocked</div><div className="v num">{cr(t.capitalBlocked)}</div></div>
                   <div className="op">=</div>

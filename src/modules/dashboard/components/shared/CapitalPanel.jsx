@@ -8,7 +8,7 @@ import { useCapitalAnalysis } from '../../../../core/useAccounting';
 export function CapitalPanel({ branch, range, formatMoney = (n) => n, onView }) {
   const q = useCapitalAnalysis(branch, range);
   const t = q.data?.totals || {};
-  const invested = t.capitalInvested || 0;
+  const invested = (t.capitalEmployed != null ? t.capitalEmployed : t.capitalInvested) || 0; // capital employed (net)
   const blocked = t.capitalBlocked || 0;
   const inflow = t.inflowCapital || 0;
   const blockedPct = t.blockedPct || 0;

@@ -395,7 +395,7 @@ export function BranchPerformanceDash({ go }) {
     return {
       code: b.code, cur: b.cur, sales, cogs: d?.totals?.cogs || 0, gp,
       gpPct: sales ? gp / sales * 100 : 0, net: d?.bridge?.netProfit ?? 0,
-      capital: c.capitalInvested || 0, inflow: c.inflowCapital || 0,
+      capital: (c.capitalEmployed != null ? c.capitalEmployed : c.capitalInvested) || 0, inflow: c.inflowCapital || 0,
     };
   };
   const rows = BR.map(rowOf);
@@ -455,7 +455,7 @@ export function BranchPerformanceDash({ go }) {
           <thead><tr>
             <th style={th}>Branch</th><th style={{ ...th, ...num }}>Sales</th><th style={{ ...th, ...num }}>Gross Profit</th>
             <th style={{ ...th, ...num }}>GP %</th><th style={{ ...th, ...num }}>Net Profit</th>
-            <th style={{ ...th, ...num }}>Capital Invested</th><th style={{ ...th, ...num }}>In-Flow Capital</th>
+            <th style={{ ...th, ...num }}>Capital Employed</th><th style={{ ...th, ...num }}>In-Flow Capital</th>
           </tr></thead>
           <tbody>
             {loading && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>Loading branches…</td></tr>}
