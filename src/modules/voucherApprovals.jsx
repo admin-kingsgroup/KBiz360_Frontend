@@ -91,7 +91,9 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   // PENDING shows every pending voucher with NO date filter and NO period bar — always
   // "all" regardless of any range left over from another tab. The settled tabs use `range`.
   const effRange = status === 'pending' ? periodRange('all', { branch }) : range;
-  const q = useVoucherApprovals(branch, status, { from: effRange.from, to: effRange.to, category });
+  // INB refunds/reissues are routed to the INB pipeline (InbApprovals) — exclude them
+  // from this SO/PO/GP-side queue so they aren't shown (and approved) in both places.
+  const q = useVoucherApprovals(branch, status, { from: effRange.from, to: effRange.to, category, refundScope: 'sopogp' });
   const d = q.data || {};
   // Vouchers edited ≥ once (cross-cuts status) — its own source for the Edited tab.
   // Uses the SAME branch resolution as every other voucher query (branchCode →
@@ -745,6 +747,16 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   });
   const rows = Array.isArray(q.data) ? q.data : (q.data && q.data.data) || [];
 
+  // INB refunds/reissues (RF/RI that reverse an INB deal) are routed to THIS pipeline,
+  // not the SO/PO/GP queue. They're single vouchers (not a sale+purchase pair), so they
+  // get their own section below the deals, fetched via the approvals report scoped to INB.
+  const rfQ = useVoucherApprovals(branch, status, { refundScope: 'inb' });
+  const inbRefunds = useMemo(() => {
+    const list = (rfQ.data && rfQ.data.entries) || [];
+    const nd = search.trim().toLowerCase();
+    return list.filter((e) => !nd || [e.vno, e.party, e.againstInvoice, String(Math.round(e.total || 0))].filter(Boolean).join(' ').toLowerCase().includes(nd));
+  }, [rfQ.data, search]);
+
   const approveMany = useApproveMany();
   const reject = useRejectVoucher();
   const qc = useQueryClient();
@@ -851,6 +863,27 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     setBusy(true);
     try { await apiPost('/api/inter-branch/revoke', { linkNo: d.linkNo, reason }); toast(`Revoked ${d.linkNo} → Pending`); qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); }
     catch (e) { toast((e && e.message) || 'Revoke failed', 'error'); }
+    finally { setBusy(false); }
+  };
+
+  // INB refund/reissue is a single voucher — approve/reject it on its own (reuses the
+  // shared voucher mutations, same as the SO/PO/GP queue would).
+  const doApproveRefund = async (e) => {
+    const { confirmed } = await confirmDialog({ title: `Approve refund ${e.vno}?`, message: 'Posts this INB refund to the books.', confirmLabel: 'Approve' });
+    if (!confirmed) return;
+    setBusy(true);
+    approveMany.mutate({ ids: [e.id], approver: 'admin' }, {
+      onSuccess: (res) => { const f = (res && res.failed) || 0; toast(f ? `${e.vno} failed to post` : `Approved ${e.vno}`, f ? 'error' : 'success'); },
+      onError: (err) => toast((err && err.message) || 'Approve failed', 'error'),
+      onSettled: () => setBusy(false),
+    });
+  };
+  const doRejectRefund = async (e) => {
+    const { confirmed, reason } = await confirmDialog({ title: `Reject refund ${e.vno}?`, message: 'Marks it Rejected (no books impact).', danger: true, reasonRequired: true, reasonLabel: 'Reason for rejection', confirmLabel: 'Reject' });
+    if (!confirmed) return;
+    setBusy(true);
+    try { await reject.mutateAsync({ id: e.id, by: 'admin', reason }); toast(`Rejected ${e.vno}`); }
+    catch (err) { toast((err && err.message) || 'Reject failed', 'error'); }
     finally { setBusy(false); }
   };
 

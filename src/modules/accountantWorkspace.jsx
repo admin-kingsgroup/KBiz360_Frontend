@@ -443,7 +443,9 @@ function GstItcPanel({ branch, cur, go, from, to }) {
 const ADJ_CATS = ['refund', 'reissue', 'adm', 'acm'];
 const ADJ_LABEL = { refund: 'Refund', reissue: 'Reissue', adm: 'ADM', acm: 'ACM' };
 function RefundsWorklist({ branch, cur, go }) {
-  const q = useVoucherApprovals(branch, 'pending');
+  // INB refunds route to the INB pipeline, so exclude them here (this tile links to the
+  // SO/PO/GP approvals queue, which no longer lists them).
+  const q = useVoucherApprovals(branch, 'pending', { refundScope: 'sopogp' });
   const rows = (q.data?.entries || []).filter((e) => ADJ_CATS.includes(e.category));
   const total = rows.reduce((s, e) => s + (Number(e.total) || 0), 0);
   return (

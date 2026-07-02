@@ -185,11 +185,13 @@ export function useLedgerComponents(name, branch, { from, to, costCenter } = {},
 // Returns { counts, status, entries, byGroup, bySubGroup, byLedger }.
 // `category` scopes it to one gated type (the per-type split screens); omit for the
 // combined queue. It is part of the query key so each type's cache stays separate.
-export function useVoucherApprovals(branch, status = 'pending', { from, to, category = '' } = {}) {
+// `refundScope` splits refund/reissue by origin: 'sopogp' excludes INB refunds (the
+// SO/PO/GP queue), 'inb' returns ONLY INB refunds (the INB pipeline), '' = whole queue.
+export function useVoucherApprovals(branch, status = 'pending', { from, to, category = '', refundScope = '' } = {}) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['vouchers', 'approvals', code || 'all', category || 'all', status, from || '', to || ''],
-    queryFn: () => apiGet('/api/vouchers/approvals', { branch: code, status, from, to, ...(category ? { category } : {}) }),
+    queryKey: ['vouchers', 'approvals', code || 'all', category || 'all', refundScope || 'all', status, from || '', to || ''],
+    queryFn: () => apiGet('/api/vouchers/approvals', { branch: code, status, from, to, ...(category ? { category } : {}), ...(refundScope ? { refundScope } : {}) }),
     enabled: enabled(),
     staleTime: 15_000,
   });
