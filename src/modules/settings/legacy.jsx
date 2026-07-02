@@ -383,7 +383,7 @@ function AppAccessTab({ rows, search, setSearch, onToggle, loaded }){
         <span style={{fontSize:10.5,color:"#5a6691",display:"flex",alignItems:"center",gap:5}}>
           <Smartphone size={13}/> Toggle which apps each user can log into. <b>Off</b> = login blocked; open sessions end within ~1 min.
         </span>
-        <button onClick={()=>exportToCSV(rows.map(u=>({id:u.id,name:u.name,email:u.email,role:u.role,status:u.status,crm:u.access?.crm!==false,erp:u.access?.erp!==false,app:u.access?.app!==false})),["id","name","email","role","status","crm","erp","app"],"app-access.csv")}
+        <button onClick={()=>exportToCSV(rows.map(u=>({id:u.id,name:u.name,email:u.email,role:u.role,status:u.status,crm:!!u.access?.crm,erp:!!u.access?.erp,app:!!u.access?.app})),["id","name","email","role","status","crm","erp","app"],"app-access.csv")}
           style={{...btnGh,fontSize:11,marginLeft:"auto"}}><Download size={13}/> Export</button>
       </div>
       <div style={{...card,padding:0,overflow:"hidden",marginBottom:14}}>
@@ -408,7 +408,7 @@ function AppAccessTab({ rows, search, setSearch, onToggle, loaded }){
                 {APP_ACCESS_COLS.map(a=>(
                   <td key={a.key} style={{padding:"8px 12px",textAlign:"center"}}>
                     <span style={{display:"inline-flex"}}>
-                      <Switch checked={u.access?.[a.key]!==false} onChange={(v)=>onToggle(u,a.key,v)} label=""/>
+                      <Switch checked={!!u.access?.[a.key]} onChange={(v)=>onToggle(u,a.key,v)} label=""/>
                     </span>
                   </td>
                 ))}
@@ -438,7 +438,7 @@ export function SettingsUsers(){
   const [selRole,setSelRole]=useState(null);
   const [editPerms,setEditPerms]=useState(null); // {userId, perms, special}
   const [newUserModal,setNewUserModal]=useState(false); useModalEsc(()=>setNewUserModal(false),newUserModal);
-  const [newUserForm,setNewUserForm]=useState({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"]});
+  const [newUserForm,setNewUserForm]=useState({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"],password:"",confirm:""});
   const [search,setSearch]=useState("");
   const mob=useMobile();
   const qc=useQueryClient();
@@ -904,6 +904,10 @@ export function SettingsUsers(){
                   {ROLE_NAMES.map(r=><option key={r}>{r}</option>)}
                 </select></FL>
               </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FL label="Password"><input type="password" autoComplete="new-password" value={newUserForm.password} onChange={e=>setNewUserForm(f=>({...f,password:e.target.value}))} placeholder="Min 8 characters" style={inp}/></FL>
+                <FL label="Confirm Password"><input type="password" autoComplete="new-password" value={newUserForm.confirm} onChange={e=>setNewUserForm(f=>({...f,confirm:e.target.value}))} placeholder="Re-enter password" style={inp}/></FL>
+              </div>
               <FL label="Branch Access">
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
                   {ALL_BRANCHES.map(b=>(
@@ -923,15 +927,18 @@ export function SettingsUsers(){
                 </div>
               </FL>
               <div style={{padding:"9px 12px",borderRadius:8,background:"#f3f4f8",fontSize:9.5,color:"#5a6691"}}>
-                Role template <b>{newUserForm.role}</b> will be applied. You can customise individual permissions after creation.
+                Creates a login for <b>ERP + CRM</b> with the password above — Books role <b>{newUserForm.role}</b> and a basic CRM role are assigned. Mobile app access stays off until enabled on the App Access tab. If this email already has a login, its password is kept.
               </div>
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setNewUserModal(false)} style={btnGh}>Cancel</button>
               <button disabled={createUserMut.isPending} onClick={()=>{
                 if(!newUserForm.name.trim()||!newUserForm.email.trim()){ toast("Name and email are required","error"); return; }
-                createUserMut.mutate({...newUserForm,active:true},{  // persists to /api/auth/users
-                  onSuccess:()=>{ setNewUserModal(false); setNewUserForm({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"]}); toast(`User ${newUserForm.name} created`); },
+                if((newUserForm.password||"").length<8){ toast("Password must be at least 8 characters","error"); return; }
+                if(newUserForm.password!==newUserForm.confirm){ toast("Passwords do not match","error"); return; }
+                const { confirm, ...payload }=newUserForm;
+                createUserMut.mutate({...payload,active:true},{  // persists to /api/auth/users
+                  onSuccess:()=>{ setNewUserModal(false); setNewUserForm({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"],password:"",confirm:""}); toast(`User ${newUserForm.name} created`); },
                   onError:(e)=>toast(e?.message||"Could not create user","error"),
                 });
               }} style={{...btnG,opacity:createUserMut.isPending?0.6:1,cursor:createUserMut.isPending?"not-allowed":"pointer"}}>{createUserMut.isPending?"Adding…":"Add User"}</button>
