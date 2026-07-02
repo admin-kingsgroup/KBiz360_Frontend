@@ -104,15 +104,14 @@ describe('INB SPG Approvals', () => {
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
   });
 
-  // Two-step INB workflow: an approved-but-un-pushed deal lands in the Un-Pushed tab and
-  // exposes a Push action that posts both legs via the deal-level /inter-branch/push.
-  test('an un-pushed deal sits in the Un-Pushed tab and Push posts it by INB Link No', async () => {
+  // Two-step INB workflow: an approved-but-un-pushed deal folds into the Pending tab
+  // (no separate Un-Pushed tab) and exposes a Push action that posts both legs via the
+  // deal-level /inter-branch/push.
+  test('an un-pushed deal shows in Pending with a Push action that posts it by INB Link No', async () => {
     mockApiGet.mockResolvedValue(mkLegs('unpushed'));
     wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
-    // not in Pending
-    expect(await screen.findByText('No pending INB deals.', { exact: false })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Un-Pushed/ }));
-    const pushBtn = await screen.findByRole('button', { name: /Push$/ });  // row "⇪ Push", not the tab
+    // Un-pushed folds into the default Pending tab → shows Push (⇪), not Approve.
+    const pushBtn = await screen.findByRole('button', { name: /Push$/ });  // row "⇪ Push"
     expect(pushBtn).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();   // already approved
     fireEvent.click(pushBtn);
