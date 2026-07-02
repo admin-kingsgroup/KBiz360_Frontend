@@ -102,4 +102,27 @@ describe('INB SPG Approvals', () => {
     expect(screen.getByText(LINK, { exact: false })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
   });
+
+  // INB refunds (RF/RI reversing an INB deal) are routed to THIS pipeline and render in
+  // their own section, fetched via useVoucherApprovals scoped to refundScope:'inb'.
+  test('INB refunds show in their own section and approve as a single voucher', async () => {
+    const { useVoucherApprovals } = require('../../core/useAccounting');
+    useVoucherApprovals.mockReturnValue({ isLoading: false, data: { entries: [
+      { id: 'rf1', vno: 'RF/BOM/26/0052', category: 'refund', inb: true, againstInvoice: 'INB/BOM/26/0069',
+        party: 'Travkings Tours and Travels AMD', total: 53558, status: 'pending', postable: true, errors: [], warnings: [] },
+    ] } });
+    mockApiGet.mockResolvedValue([]); // no INB sale/purchase deals — isolate the refunds section
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+
+    expect(await screen.findByText('RF/BOM/26/0052')).toBeInTheDocument();
+    expect(screen.getByText('INB Refunds & Reissues', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('INB/BOM/26/0069')).toBeInTheDocument();          // the deal it reverses
+    // it verifies the SO/PO/GP queue is asked to EXCLUDE these (refundScope split)
+    expect(useVoucherApprovals).toHaveBeenCalledWith('BOM', 'pending', { refundScope: 'inb' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(mockApproveMany).toHaveBeenCalled());
+    expect(mockApproveMany.mock.calls[0][0].ids).toEqual(['rf1']);
+    useVoucherApprovals.mockReturnValue({ data: {} }); // restore default for any later test
+  });
 });

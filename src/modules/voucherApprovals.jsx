@@ -982,6 +982,50 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
       </div>
       <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>INB SPG vouchers post as <b>Pending</b> and hit the books only on approval — the INB Sale and its airline Purchase post together under one INB Link No. Click a row for the JV (Dr/Cr) of both legs.</div>
 
+      {/* INB Refunds — RF/RI vouchers that reverse an INB deal. Routed here (not the
+          SO/PO/GP queue); each is a single voucher, approved/rejected on its own row. */}
+      <div style={{ ...card, overflowX: 'auto', marginTop: 16 }}>
+        <div style={{ padding: '10px 12px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+          <span style={{ fontWeight: 800, color: C.dark, fontSize: 13 }}>INB Refunds &amp; Reissues <span style={{ fontWeight: 700, color: C.dim, fontSize: 11 }}>— reverse an INB deal</span></span>
+          <span style={{ fontSize: 11.5, color: C.dim, fontWeight: 700 }}>{inbRefunds.length} {status}</span>
+        </div>
+        {rfQ.isLoading ? <div style={{ padding: 12 }}><SkeletonTable rows={3} cols={6} /></div>
+          : inbRefunds.length === 0 ? <div style={{ padding: 18, textAlign: 'center', color: C.dim, fontSize: 12 }}>No {status} INB refunds.</div>
+          : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ background: '#f3f4f8' }}>
+                  {['Vch No', 'Reverses (INB)', 'Party', 'Amount', pendingTab ? 'Actions' : 'Status'].map((h, i) => (
+                    <th key={i} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: h === 'Amount' ? 'right' : 'left' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {inbRefunds.map((e) => (
+                  <tr key={e.id} style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      {e.vno}
+                      <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#eef2ff', color: '#3d4ea8', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>INB {e.category === 'reissue' ? 'RI' : 'RF'}</span>
+                    </td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 11, color: C.dim }}>{e.againstInvoice || e.linkNo || '—'}</td>
+                    <td style={{ padding: '7px 12px' }}>{e.party || '—'}</td>
+                    <td style={{ padding: '7px 12px', ...num }}>{money(e.total || 0)}</td>
+                    {pendingTab
+                      ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
+                          {isApprover ? <>
+                            <button disabled={busy || !e.postable} title={e.postable ? '' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving')} onClick={() => doApproveRefund(e)} style={{ marginRight: 6, padding: '5px 10px', background: e.postable ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
+                            <button disabled={busy} onClick={() => doRejectRefund(e)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
+                            {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: C.red }}>blocked</span>}
+                          </> : <span style={{ fontSize: 11, color: C.dim }}>Approver only</span>}
+                        </td>
+                      : <td style={{ padding: '7px 12px', color: C.dim }}>{e.status}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+      </div>
+
       {/* Edit an INB leg in place (reuses the Vouchers editor). Saving reverts the leg to
           Pending; then Approve/Reject the deal on its row. Legs are editable only while
           Pending — the backend allows a locked INB leg to be edited only in that state. */}
