@@ -1124,7 +1124,9 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
       <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>INB SPG deals are two-step, both inside the <b>Pending</b> tab: <b>Approve</b> a deal (no books impact yet), then <b>Push</b> it (posts the INB Sale + airline Purchase together under one INB Link No and sends the deal to the buyer branch) → it moves to <b>Approved &amp; Pushed</b>. <b>Revoke</b> returns a deal to Pending. The <b>Edited</b> tab lists deals changed ≥ once. Click a row for the JV (Dr/Cr) of both legs.</div>
 
       {/* INB Refunds — RF/RI vouchers that reverse an INB deal. Routed here (not the
-          SO/PO/GP queue); each is a single voucher, approved/rejected on its own row. */}
+          SO/PO/GP queue); each is a single voucher, approved/rejected on its own row.
+          Hidden on the Edited tab (which is a cross-cut list, not a status queue). */}
+      {!editedTab && (
       <div style={{ ...card, overflowX: 'auto', marginTop: 16 }}>
         <div style={{ padding: '10px 12px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
           <span style={{ fontWeight: 800, color: C.dark, fontSize: 13 }}>INB Refunds &amp; Reissues <span style={{ fontWeight: 700, color: C.dim, fontSize: 11 }}>— reverse an INB deal</span></span>
@@ -1169,6 +1171,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
             </table>
           )}
       </div>
+      )}
 
       {/* Edit an INB leg in place (reuses the Vouchers editor). Saving reverts the leg to
           Pending; then Approve/Reject the deal on its row. Legs are editable only while

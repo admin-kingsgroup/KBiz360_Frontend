@@ -3,12 +3,19 @@
 // approve-many) or rejected; an already-posted ('saved') deal shows under Approved.
 // (jest.mock factories may only reference vars prefixed `mock`.)
 const mockApiGet = jest.fn();
+const mockEditedGet = jest.fn(() => Promise.resolve([])); // /api/vouchers/edited feed (Edited tab)
 const mockApiPost = jest.fn(() => Promise.resolve({}));
 const mockApproveMany = jest.fn();
 const mockRejectAsync = jest.fn(() => Promise.resolve());
 const mockConfirm = jest.fn(() => Promise.resolve({ confirmed: true, reason: 'x' }));
 
-jest.mock('../../core/api', () => ({ apiGet: (...a) => mockApiGet(...a), apiPost: (...a) => mockApiPost(...a), getAuthToken: jest.fn(() => 'open') }));
+// Route the edited-vouchers feed to its own mock so setting the deals list doesn't
+// accidentally populate the Edited tab.
+jest.mock('../../core/api', () => ({
+  apiGet: (url, ...a) => (url === '/api/vouchers/edited' ? mockEditedGet(url, ...a) : mockApiGet(url, ...a)),
+  apiPost: (...a) => mockApiPost(...a),
+  getAuthToken: jest.fn(() => 'open'),
+}));
 jest.mock('../../core/useAccounting', () => ({
   useVoucherApprovals: jest.fn(() => ({ data: {} })),
   useApproveVoucher: jest.fn(() => ({ mutate: jest.fn() })),
@@ -116,6 +123,20 @@ describe('INB SPG Approvals', () => {
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();   // already approved
     fireEvent.click(pushBtn);
     await waitFor(() => expect(mockApiPost).toHaveBeenCalledWith('/api/inter-branch/push', { linkNo: LINK }));
+  });
+
+  // The Edited tab is a cross-cut fed by /api/vouchers/edited, filtered to type INB.
+  test('the Edited tab lists INB legs edited ≥ once (from the edited feed)', async () => {
+    mockApiGet.mockResolvedValue([]); // no deals — isolate the Edited tab
+    mockEditedGet.mockResolvedValue([
+      { id: 'sale1', vno: 'INB/BOM/26/0003', type: 'INB', party: 'Travkings Tours and Travels AMD', total: 30551, status: 'unpushed', edits: 2, lastBy: 'afshin', lastAt: '2026-07-02', lastReason: 'fixed fare' },
+      { id: 'x9', vno: 'JV/BOM/26/0009', type: 'JV', party: 'Something', total: 100, status: 'approved', edits: 1, lastBy: 'x', lastAt: '2026-07-01', lastReason: 'n/a' }, // non-INB → filtered out
+    ]);
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Edited/ }));
+    expect(await screen.findByText('INB/BOM/26/0003')).toBeInTheDocument();
+    expect(screen.getByText('fixed fare')).toBeInTheDocument();
+    expect(screen.queryByText('JV/BOM/26/0009')).toBeNull();   // non-INB excluded
   });
 
   // INB refunds (RF/RI reversing an INB deal) are routed to THIS pipeline and render in
