@@ -30,7 +30,7 @@ const DATA = {
 };
 jest.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: DATA, isLoading: false, error: null }) }));
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { CapitalVsInvestmentLive } from '../capitalVsInvestment';
 
 test('India branch (BOM) renders ₹ figures', () => {
@@ -48,10 +48,30 @@ test('USD branch (NBO) renders $ figures, not ₹', () => {
 
 test('Complete Balance Sheet + P&L sections render every account in branch currency', () => {
   render(<CapitalVsInvestmentLive branch={{ code: 'NBO' }} />);
-  // Section 5 (complete BS) and Section 6 (complete P&L) ledgers appear, in $.
+  // Sections 5 (complete BS) & 6 (complete P&L) start collapsed — expand all first.
+  fireEvent.click(screen.getByTitle('Expand every section'));
   expect(screen.getByText('Bank HDFC').closest('tr')).toHaveTextContent('$');
   expect(screen.getByText('Ticket Sales').closest('tr')).toHaveTextContent('$');
   expect(screen.getByText('Airline Cost')).toBeInTheDocument();
   // Net Profit label is surfaced (the new P&L bridge / Section 6 total).
   expect(screen.getAllByText(/Net Profit/i).length).toBeGreaterThan(0);
+});
+
+test('a section header toggles its own body on click', () => {
+  render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
+  // Section 5 (Complete Balance Sheet) starts collapsed → its ledger is hidden.
+  expect(screen.queryByText('Bank HDFC')).toBeNull();
+  fireEvent.click(screen.getByText('Complete Balance Sheet')); // expand
+  expect(screen.getByText('Bank HDFC')).toBeInTheDocument();
+  fireEvent.click(screen.getByText('Complete Balance Sheet')); // collapse again
+  expect(screen.queryByText('Bank HDFC')).toBeNull();
+});
+
+test('collapse-all / expand-all flip every section together', () => {
+  render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
+  expect(screen.getAllByText('Owner Capital').length).toBeGreaterThan(0); // Section 1 open by default
+  fireEvent.click(screen.getByTitle('Collapse every section'));
+  expect(screen.queryByText('Owner Capital')).toBeNull();
+  fireEvent.click(screen.getByTitle('Expand every section'));
+  expect(screen.getByText('Bank HDFC')).toBeInTheDocument(); // Section 5 now open too
 });

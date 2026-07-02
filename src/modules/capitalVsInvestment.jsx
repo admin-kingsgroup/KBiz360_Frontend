@@ -98,7 +98,17 @@ const CSS = `
 .cvi .hint{padding:10px 30px 22px;font-size:10px;color:var(--ink4);font-style:italic;line-height:1.6}
 .cvi .state{padding:50px 30px;text-align:center;color:var(--ink3);font-size:13px}
 @media(max-width:760px){.cvi .meta,.cvi .kpis,.cvi .perf{grid-template-columns:1fr 1fr}.cvi .formula{flex-wrap:wrap}}
-@media(max-width:560px){.cvi .section{padding-left:14px;padding-right:14px}.cvi .perf{padding-left:14px;padding-right:14px;grid-template-columns:1fr}.cvi .led-row td.amt{width:auto;min-width:96px}.cvi .hdr{padding-left:16px;padding-right:16px}}
+.cvi .sec-band{cursor:pointer;user-select:none;border-radius:6px;padding:6px 8px;margin:-6px -8px 8px;transition:background .15s;min-height:34px}
+.cvi .sec-band:hover{background:var(--bg-lt)}
+.cvi .sec-band:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.cvi .sec-name{flex:0 0 auto}
+.cvi .sec-sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto}
+.cvi .sec-chev{margin-left:auto;flex:0 0 auto;font-size:20px;font-weight:800;color:var(--ink4);line-height:1;transition:transform .2s}
+.cvi .section.open .sec-chev{transform:rotate(90deg)}
+.cvi .section.closed{padding-bottom:14px}
+.cvi .toolbtn{font-size:10.5px;font-weight:700;color:#cfcfcf;background:#1e1e1e;border:1px solid #555;border-radius:4px;padding:5px 10px;cursor:pointer}
+.cvi .toolbtn:hover{color:#fff;border-color:var(--gold-l)}
+@media(max-width:560px){.cvi .section{padding-left:14px;padding-right:14px}.cvi .perf{padding-left:14px;padding-right:14px;grid-template-columns:1fr}.cvi .led-row td.amt{width:auto;min-width:96px}.cvi .hdr{padding-left:16px;padding-right:16px}.cvi .fetchbar{padding-left:16px;padding-right:16px}.cvi .meta{padding-left:16px;padding-right:16px}.cvi .sec-sub{display:none}.cvi .sec-band{min-height:44px}.cvi .toolbtn{padding:7px 12px}}
 `;
 
 const SecTable = ({ groups, totalLabel, totalVal, fmt }) => (
@@ -122,9 +132,36 @@ const SecTable = ({ groups, totalLabel, totalVal, fmt }) => (
   </table>
 );
 
+// Collapsible section: the whole band (number · name · sub-line · chevron) is one
+// click/keyboard toggle. Collapsed → only the band shows, so the sheet stays tidy;
+// the KPI cards above still carry every headline total, so nothing is hidden that
+// isn't also summarised. `variant` keeps the per-section total-colour class.
+function Section({ variant, num, numClass = '', name, sub, isOpen, onToggle, children }) {
+  return (
+    <div className={`section ${variant} ${isOpen ? 'open' : 'closed'}`}>
+      <div className="sec-band" role="button" tabIndex={0} aria-expanded={isOpen}
+        onClick={onToggle}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+        title={isOpen ? 'Click to collapse' : 'Click to expand'}>
+        <span className={`sec-num ${numClass}`}>{num}</span>
+        <span className="sec-name">{name}</span>
+        {sub && <span className="sec-sub">{sub}</span>}
+        <span className="sec-chev" aria-hidden="true">›</span>
+      </div>
+      {isOpen && <div className="sec-body">{children}</div>}
+    </div>
+  );
+}
+
 export function CapitalVsInvestmentLive({ branch }) {
   const [range, setRange] = useState(fyDefault);
   const [hurdle, setHurdle] = useState(DEFAULT_HURDLE); // cost-of-capital % — editable
+  // Per-section open/closed. Detail-heavy Blocked (2) and the two full statements
+  // (5 Balance Sheet, 6 P&L) start collapsed to cut clutter; the narrative core
+  // (Capital, In-Flow, Verdict) starts open. Expand-/Collapse-all flips them together.
+  const [open, setOpen] = useState({ cap: true, block: false, flow: true, rev: true, bs: false, pl: false });
+  const toggle = (k) => setOpen((o) => ({ ...o, [k]: !o[k] }));
+  const setAll = (v) => setOpen({ cap: v, block: v, flow: v, rev: v, bs: v, pl: v });
   const cur = (bc(branch) || {}).cur || '₹';            // branch currency (₹ India · $ NBO/DAR/FBM)
   const inr = (n) => fmtAmt(cur, n);                    // full amount in branch currency
   const cr = (n) => fmtShort(cur, n);                   // short scale (Cr/L · K/M/B)
@@ -165,7 +202,11 @@ export function CapitalVsInvestmentLive({ branch }) {
         <div className="fetchbar">
           <div className="live"><span className="pulse" />AUTO-FETCHED</div>
           <div className="src">Source: <b>Balance Sheet</b> &amp; <b>Profit &amp; Loss</b> · KBiz360 · read-only</div>
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'inline-flex', gap: 6 }}>
+              <button type="button" className="toolbtn" onClick={() => setAll(true)} title="Expand every section">⊞ Expand all</button>
+              <button type="button" className="toolbtn" onClick={() => setAll(false)} title="Collapse every section">⊟ Collapse all</button>
+            </div>
             <label style={{ fontSize: 10.5, color: '#cfcfcf', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>Hurdle %
               <input type="number" min="0" step="0.5" value={hurdle} onChange={(e) => setHurdle(Number(e.target.value) || 0)}
                 title="Cost-of-capital benchmark used for the GP-yield verdict" style={{ width: 58, padding: '4px 7px', borderRadius: 4, border: '1px solid #555', background: '#1e1e1e', color: '#fff', fontSize: 11, fontWeight: 700 }} />
@@ -194,20 +235,20 @@ export function CapitalVsInvestmentLive({ branch }) {
             <div className="kpi gp"><div className="k">Gross Profit</div><div className="v">{cr(t.grossProfit)}</div><div className="s">{(t.gpMargin || 0).toFixed(1)}% margin</div></div>
           </div>
 
-          <div className="section seccap">
-            <div className="sec-band"><span className="sec-num">1</span><span className="sec-name">Capital Invested</span><span className="sec-sub">Capital Account + Reserves &amp; Surplus + accumulated P&amp;L{(t.quasiCapital || 0) > 0.5 ? " + owner &amp; partner loans (quasi-capital)" : ''} — from Balance Sheet</span></div>
+          <Section variant="seccap" num="1" name="Capital Invested" isOpen={open.cap} onToggle={() => toggle('cap')}
+            sub={<>Capital Account + Reserves &amp; Surplus + accumulated P&amp;L{(t.quasiCapital || 0) > 0.5 ? ' + owner & partner loans (quasi-capital)' : ''} — from Balance Sheet</>}>
             <SecTable groups={[...(data.capital || []), ...(data.quasi || [])]} totalLabel="CAPITAL EMPLOYED" totalVal={t.capitalInvested} fmt={inr} />
-          </div>
+          </Section>
           <div className="sec-divider" />
 
-          <div className="section secblock">
-            <div className="sec-band"><span className="sec-num block">2</span><span className="sec-name">Capital Blocked</span><span className="sec-sub">fixed &amp; slow assets — tied up, not circulating</span></div>
+          <Section variant="secblock" num="2" numClass="block" name="Capital Blocked" isOpen={open.block} onToggle={() => toggle('block')}
+            sub={<>fixed &amp; slow assets — tied up, not circulating</>}>
             <SecTable groups={data.blocked} totalLabel="TOTAL BLOCKED" totalVal={t.capitalBlocked} fmt={inr} />
-          </div>
+          </Section>
           <div className="sec-divider" />
 
-          <div className="section secflow">
-            <div className="sec-band"><span className="sec-num flow">3</span><span className="sec-name">In-Flow Capital</span><span className="sec-sub">what's left to circulate &amp; earn = Invested − Blocked</span></div>
+          <Section variant="secflow" num="3" numClass="flow" name="In-Flow Capital" isOpen={open.flow} onToggle={() => toggle('flow')}
+            sub={<>what's left to circulate &amp; earn = Invested − Blocked</>}>
             <div className="formula">
               <div className="cell inv"><div className="k">Capital Invested</div><div className="v">{cr(t.capitalInvested)}</div></div>
               <div className="op">−</div>
@@ -217,11 +258,11 @@ export function CapitalVsInvestmentLive({ branch }) {
             </div>
             <div className="reconcile">Composition of current-asset ledgers totals <b>{inr(flowComp)}</b> — {reconciles ? 'reconciles with the in-flow residual ✓' : <>the <b>{inr(flowComp - (t.inflowCapital || 0))}</b> gap is financed by external funding (creditors · loans · current liabilities), which totals <b>{inr(t.externalFunding)}</b> — see the complete Balance Sheet below.</>}</div>
             <SecTable groups={data.flow} totalLabel="COMPOSITION TOTAL (CURRENT ASSETS)" totalVal={flowComp} fmt={inr} />
-          </div>
+          </Section>
           <div className="sec-divider" />
 
-          <div className="section secrev">
-            <div className="sec-band"><span className="sec-num">4</span><span className="sec-name">Turnover · Gross Profit · Net Profit</span><span className="sec-sub">is the in-flow capital generating enough profit? — from P&amp;L</span></div>
+          <Section variant="secrev" num="4" name="Turnover · Gross Profit · Net Profit" isOpen={open.rev} onToggle={() => toggle('rev')}
+            sub={<>is the in-flow capital generating enough profit? — from P&amp;L</>}>
             <SecTable groups={data.revenue} totalLabel="GROSS PROFIT" totalVal={t.grossProfit} fmt={inr} />
             <div className="formula">
               <div className="cell gp"><div className="k">Gross Profit</div><div className="v">{cr(t.grossProfit)}</div></div>
@@ -247,25 +288,25 @@ export function CapitalVsInvestmentLive({ branch }) {
                 </div>
               </div>
             </div>
-          </div>
+          </Section>
 
           <div className="summary-line">
             <b>{cr(t.capitalInvested)}</b> invested − <b>{cr(t.capitalBlocked)}</b> blocked = <b>{cr(t.inflowCapital)}</b> in flow → recycled <b>{(t.flowTurnover || 0).toFixed(2)}×</b> into <b>{cr(t.grossRevenue)}</b> turnover at <b>{(t.gpMargin || 0).toFixed(1)}%</b> margin = <b>{cr(t.grossProfit)}</b> GP → after operating costs <b>{cr(t.netProfit)}</b> net profit (a {(t.netYield || 0).toFixed(0)}% net yield on in-flow capital).
           </div>
           <div className="sec-divider" />
 
-          <div className="section seccap">
-            <div className="sec-band"><span className="sec-num">5</span><span className="sec-name">Complete Balance Sheet</span><span className="sec-sub">every account, both sides — as-on {dmy(range.to)} · {data.balanceSheet?.balanced ? 'balanced ✓' : '⚠ unbalanced'}</span></div>
+          <Section variant="seccap" num="5" name="Complete Balance Sheet" isOpen={open.bs} onToggle={() => toggle('bs')}
+            sub={<>every account, both sides — as-on {dmy(range.to)} · {data.balanceSheet?.balanced ? 'balanced ✓' : '⚠ unbalanced'}</>}>
             <SecTable groups={data.balanceSheet?.liabilities} totalLabel="TOTAL LIABILITIES & EQUITY" totalVal={t.totalLiabilities} fmt={inr} />
             <div style={{ height: 12 }} />
             <SecTable groups={data.balanceSheet?.assets} totalLabel="TOTAL ASSETS" totalVal={t.totalAssets} fmt={inr} />
-          </div>
+          </Section>
           <div className="sec-divider" />
 
-          <div className="section secrev">
-            <div className="sec-band"><span className="sec-num">6</span><span className="sec-name">Complete Profit &amp; Loss</span><span className="sec-sub">every account — trading → Gross Profit {cr(t.grossProfit)} → Net Profit</span></div>
+          <Section variant="secrev" num="6" name={<>Complete Profit &amp; Loss</>} isOpen={open.pl} onToggle={() => toggle('pl')}
+            sub={<>every account — trading → Gross Profit {cr(t.grossProfit)} → Net Profit</>}>
             <SecTable groups={plStatement} totalLabel="NET PROFIT" totalVal={t.netProfit} fmt={inr} />
-          </div>
+          </Section>
           <div className="sec-divider" />
 
           <div className="hint">Read-only · live from posted Balance Sheet (BS) and Profit &amp; Loss (P&amp;L). Sequence: <b>Capital Invested</b> → less <b>Capital Blocked</b> → the residual <b>In-Flow Capital</b> that actually circulates. Section 4 tests whether that in-flow capital generates enough gross profit, benchmarked against the editable {hurdle}% cost-of-capital hurdle.</div>
