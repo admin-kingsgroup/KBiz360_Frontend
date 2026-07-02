@@ -511,8 +511,8 @@ export function SettingsUsers(){
     const tmpl=ROLE_TEMPLATES[roleName];
     if(!tmpl)return;
     setEditPerms(ep=>({...ep,userRole:roleName,
-      perms:JSON.parse(JSON.stringify(tmpl.perms)),
-      special:{...tmpl.special},
+      perms:JSON.parse(JSON.stringify(tmpl.perms||{})),
+      special:{...(tmpl.special||{})},
     }));
   };
 
@@ -814,19 +814,19 @@ export function SettingsUsers(){
             {/* Show special toggles summary */}
             <p style={{margin:"0 0 6px",fontSize:9.5,fontWeight:700,color:"#384677",textTransform:"uppercase",letterSpacing:"0.5px"}}>Special Access</p>
             <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-              {SPECIAL_TOGGLES.filter(t=>rDef.special[t.id]).map(t=>(
+              {SPECIAL_TOGGLES.filter(t=>rDef.special?.[t.id]).map(t=>(
                 <span key={t.id} style={{fontSize:8.5,padding:"2px 6px",borderRadius:999,fontWeight:700,
                   background:({HIGH:"#FCEBEB",MED:"#FAEEDA",LOW:"#EAF3DE"})[t.risk],
                   color:({HIGH:"#A32D2D",MED:"#854F0B",LOW:"#27500A"})[t.risk]}}>{t.label}</span>
               ))}
-              {SPECIAL_TOGGLES.filter(t=>rDef.special[t.id]).length===0&&<span style={{fontSize:10,color:"#5a6691"}}>No special permissions</span>}
+              {SPECIAL_TOGGLES.filter(t=>rDef.special?.[t.id]).length===0&&<span style={{fontSize:10,color:"#5a6691"}}>No special permissions</span>}
             </div>
             {/* Module access summary */}
             <p style={{margin:"10px 0 6px",fontSize:9.5,fontWeight:700,color:"#384677",textTransform:"uppercase",letterSpacing:"0.5px"}}>Module Access</p>
             <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
               {PERM_MODULES.map(grp=>{
-                const hasAny=grp.mods.some(m=>ACTIONS.some(a=>rDef.perms[m.id]?.[a]));
-                const hasAll=grp.mods.every(m=>ACTIONS.every(a=>rDef.perms[m.id]?.[a]));
+                const hasAny=grp.mods.some(m=>ACTIONS.some(a=>rDef.perms?.[m.id]?.[a]));
+                const hasAll=grp.mods.every(m=>ACTIONS.every(a=>rDef.perms?.[m.id]?.[a]));
                 if(!hasAny)return null;
                 return (
                   <span key={grp.group} style={{fontSize:8.5,padding:"2px 7px",borderRadius:999,fontWeight:700,
