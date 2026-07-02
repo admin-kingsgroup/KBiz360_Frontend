@@ -31,7 +31,7 @@ const { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RP
 const { RPT_InterbranchElim } = lazyModule(() => import('./modules/interbranch'));
 const { SalesGpAnalytics } = lazyModule(() => import('./modules/salesGpAnalytics'));
 const { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } = lazyModule(() => import('./modules/assets'));
-const { Dashboard, AlertsDashboard, OwnerDashboard } = lazyModule(() => import('./modules/dashboard'));
+const { Dashboard, AlertsDashboard, OwnerDashboard, ReceivablesAgeingSettlementPage, PayablesAgeingSettlementPage } = lazyModule(() => import('./modules/dashboard'));
 const { DirectorDash, TargetsMaster } = lazyModule(() => import('./modules/directorDashboards'));
 const { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose } = lazyModule(() => import('./modules/finance'));
 
@@ -479,6 +479,8 @@ export default function KB360App(){
     if(route==="/masters/numbering")      return <NumberingSeriesMaster branch={branch}/>;
     // ── Accounts — branch accountant workspace (new screens) ──
     if(route==="/accounts/dashboard")     return <DashboardAccountant branch={branch} setRoute={navigate} currentUser={currentUser}/>;
+    if(route==="/accounts/receivables-ageing-settlement") return <ReceivablesAgeingSettlementPage branch={branch} setRoute={navigate} currentUser={currentUser}/>;
+    if(route==="/accounts/payables-ageing-settlement")    return <PayablesAgeingSettlementPage branch={branch} setRoute={navigate} currentUser={currentUser}/>;
     if(route==="/accounts/net-ageing")    return <PayablesLive branch={branch} setRoute={navigate} initialTab="net"/>;
     if(route==="/accounts/collections")   return <CollectionsFollowup branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/supplier-reco") return <SupplierReco branch={branch} setRoute={navigate}/>;
